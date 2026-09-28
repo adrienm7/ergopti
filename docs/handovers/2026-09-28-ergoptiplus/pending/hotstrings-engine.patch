@@ -1,0 +1,167 @@
+diff --git a/static/ergopti_plus/_shared/lua/hotstring_engine/init.lua b/static/ergopti_plus/_shared/lua/hotstring_engine/init.lua
+--- a/static/ergopti_plus/_shared/lua/hotstring_engine/init.lua
++++ b/static/ergopti_plus/_shared/lua/hotstring_engine/init.lua
+@@ -383,6 +383,7 @@
+ function M.new()
+ 	-- Tail-char buckets: key = lower-cased last codepoint of trigger.
+ 	local _buckets = {}
++	local _mapping_state = { generation = 0, mappings = 0, entries = 0, buckets = 0 }
+ 	-- Rolling buffer stored as an array of UTF-8 codepoint byte-strings.
+ 	local _buf_cps = {}
+ 	-- Monotonic timestamps aligned one-for-one with _buf_cps. False marks callers
+@@ -448,13 +449,15 @@
+ 	--- typing adn in ANY casing yields "ADN" — the literal registration is there to
+ 	--- stop the family generating "Adn" → "Adn". Treating the flag as "compare
+ 	--- exactly" meant typing "Adn" simply did nothing.
++	--- Builds the replacement before publication, preserving the active catalogue on error.
+ 	--- @param mappings table Array of mapping tables.
++	--- @return boolean True after publication; false when the input is not a table.
+ 	function engine:load_mappings(mappings)
+ 		Logger.start(LOG, "Loading mappings…")
+-		_buckets = {}
++		local candidate_buckets = {}
+ 		if type(mappings) ~= "table" then
+ 			Logger.error(LOG, "load_mappings(): expected table, got %s.", type(mappings))
+-			return
++			return false
+ 		end
+ 
+ 		local registered = 0
+@@ -472,8 +475,8 @@
+ 			-- string.lower because the latter is ASCII-only, so an accented tail typed
+ 			-- as "Ê" probed a bucket registered under "ê" and never matched.
+ 			local key    = text_utils.trig_lower(cps[n])
+-			local bucket = _buckets[key]
+-			if not bucket then bucket = {} ; _buckets[key] = bucket end
++			local bucket = candidate_buckets[key]
++			if not bucket then bucket = {} ; candidate_buckets[key] = bucket end
+ 			bucket[#bucket + 1] = {
+ 				trigger      = trigger,
+ 				-- Canonical side of a "fold" compare, precomputed so the hot path folds
+@@ -591,7 +594,7 @@
+ 		-- registration order. Same key order as the macOS registry and the
+ 		-- AutoHotkey engine: LENGTH is primary, so a longer trigger beats a
+ 		-- higher-priority shorter one — priority only arbitrates a genuine tie.
+-		for _, bucket in pairs(_buckets) do
++		for _, bucket in pairs(candidate_buckets) do
+ 			table.sort(bucket, function(a, b)
+ 				if a.tlen ~= b.tlen then return a.tlen > b.tlen end
+ 				if a.priority ~= b.priority then return a.priority > b.priority end
+@@ -599,9 +602,28 @@
+ 			end)
+ 		end
+ 		local bucket_count = 0
+-		for _ in pairs(_buckets) do bucket_count = bucket_count + 1 end
++		for _ in pairs(candidate_buckets) do bucket_count = bucket_count + 1 end
+ 		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
+ 			loaded, registered, bucket_count)
++		_buckets = candidate_buckets
++		_mapping_state = {
++			generation = _mapping_state.generation + 1,
++			mappings = loaded,
++			entries = registered,
++			buckets = bucket_count,
++		}
++		return true
++	end
++
++	--- Returns detached metadata for the last successfully published catalogue.
++	--- @return table Generation and mapping, compiled entry, and bucket counts.
++	function engine:mapping_state()
++		return {
++			generation = _mapping_state.generation,
++			mappings = _mapping_state.mappings,
++			entries = _mapping_state.entries,
++			buckets = _mapping_state.buckets,
++		}
+ 	end
+ 
+ 	--- Appends a character to the rolling buffer and checks for a trigger match.
+diff --git a/static/ergopti_plus/linux/tests/unit/meta/test_shared_hotstring_engine.lua b/static/ergopti_plus/linux/tests/unit/meta/test_shared_hotstring_engine.lua
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_shared_hotstring_engine.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_shared_hotstring_engine.lua
+@@ -711,3 +711,84 @@
+ 	end)
+ 
+ end)
++
++helpers.describe("shared hotstring engine — atomic catalogue publication", function()
++	local function mapping(trigger)
++		return { trigger = trigger, replacement = trigger .. "-result", auto_expand = true,
++			is_case_sensitive_strict = true }
++	end
++
++	local function match(engine, text)
++		engine:reset()
++		local result
++		for ch in text:gmatch(".") do result = engine:on_char(ch) end
++		return result and result.replacement
++	end
++
++	helpers.it("invalid input refuses without destroying the active catalogue", function()
++		local engine = engine_mod.new()
++		engine:load_mappings({ mapping("old") })
++		local committed = engine:load_mappings(false)
++		helpers.assert_eq(match(engine, "old"), "old-result", "refused replacement keeps old engine")
++		helpers.assert_eq(committed, false, "explicit refusal")
++		helpers.assert_eq(engine:mapping_state().generation, 1, "refusal does not publish")
++	end)
++
++	helpers.it("a compilation exception cannot publish a partially compiled catalogue", function()
++		local engine = engine_mod.new()
++		engine:load_mappings({ mapping("old") })
++		local reason = helpers.assert_throws(function()
++			engine:load_mappings({ mapping("new"), false })
++		end, "malformed mapping must propagate its compilation failure")
++		helpers.assert_true(tostring(reason):find("boolean", 1, true) ~= nil, "actual invalid row failure")
++		helpers.assert_eq(match(engine, "old"), "old-result", "old mapping survives failed compilation")
++		helpers.assert_nil(match(engine, "new"), "partial replacement is never visible")
++		helpers.assert_eq(engine:mapping_state().generation, 1, "exception does not publish")
++	end)
++
++	helpers.it("sorting failure preserves the old catalogue and exposes its reason", function()
++		local engine = engine_mod.new()
++		engine:load_mappings({ mapping("old") })
++		local original_sort = table.sort
++		table.sort = function() error("catalogue-sort-refused") end
++		local reason = helpers.assert_throws(function()
++			local ok, failure = pcall(function() engine:load_mappings({ mapping("new") }) end)
++			table.sort = original_sort
++			if not ok then error(failure) end
++		end, "sort refusal propagates")
++		helpers.assert_true(tostring(reason):find("catalogue-sort-refused", 1, true) ~= nil, "exact refusal")
++		helpers.assert_eq(match(engine, "old"), "old-result", "failed sort preserves old runtime")
++		helpers.assert_nil(match(engine, "new"), "failed sort cannot install new runtime")
++	end)
++
++	helpers.it("successful publication acknowledges replacement and reports detached counts", function()
++		local engine = engine_mod.new()
++		helpers.assert_eq(engine:mapping_state().generation, 0, "unpublished engine")
++		helpers.assert_eq(engine:load_mappings({ mapping("old") }), true, "initial publication")
++		helpers.assert_eq(engine:load_mappings({ mapping("new"), mapping("few") }), true, "replacement")
++		helpers.assert_nil(match(engine, "old"), "old mapping removed")
++		helpers.assert_eq(match(engine, "new"), "new-result", "new mapping consumed by actual engine")
++		local state = engine:mapping_state()
++		helpers.assert_eq(state.generation, 2, "one generation per publication")
++		helpers.assert_eq(state.mappings, 2, "source mappings")
++		helpers.assert_eq(state.entries, 2, "compiled entries")
++		helpers.assert_eq(state.buckets, 1, "shared tail bucket")
++		state.generation, state.entries = 99, 99
++		helpers.assert_eq(engine:mapping_state().generation, 2, "detached readback generation")
++		helpers.assert_eq(engine:mapping_state().entries, 2, "detached readback count")
++	end)
++
++	helpers.it("an empty catalogue is an acknowledged clear and can be replaced again", function()
++		local engine = engine_mod.new()
++		engine:load_mappings({ mapping("old") })
++		helpers.assert_eq(engine:load_mappings({}), true, "clear publication")
++		helpers.assert_nil(match(engine, "old"), "clear removes actual match")
++		local state = engine:mapping_state()
++		helpers.assert_eq(state.generation, 2, "clear counts as publication")
++		helpers.assert_eq(state.mappings, 0, "clear mapping count")
++		helpers.assert_eq(state.entries, 0, "clear entry count")
++		helpers.assert_eq(state.buckets, 0, "clear bucket count")
++		helpers.assert_eq(engine:load_mappings({ mapping("old") }), true, "explicit restoration")
++		helpers.assert_eq(match(engine, "old"), "old-result", "restored old mapping really executes")
++	end)
++end)

@@ -1,0 +1,731 @@
+From a96a9e84e18fb3d81637435365686bd9878b3568 Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 02:57:39 +0200
+Subject: [PATCH] feat(console): center native debug windows at a shared
+ minimum size
+
+Debug consoles opened at their small native size and separate menu and
+gesture callers bypassed placement. Give each desktop driver one owner
+that reads the minimum ratios from the shared UI manifest.
+
+Preserve larger dimensions and existing placement. Windows targets only
+the script's own window; macOS reads and applies geometry after the native
+console exists. Linux has no native console and remains excluded.
+
+Cover owned-window targeting, deferred work, native refusals and layout
+preservation, and guard both production trees against bypassing the owners.
+---
+ docs/memory/shared-architecture.md            |   7 +
+ .../_shared/ui/apps.manifest.json             |   6 +
+ static/ergopti_plus/docs/architecture.md      |   1 +
+ .../macos/modules/gestures/actions.lua        |   2 +-
+ .../ergopti_plus/macos/tests/helpers/init.lua |   2 +
+ .../tests/unit/ui/test_console_window.lua     | 144 ++++++++++++++++++
+ .../ergopti_plus/macos/ui/console_window.lua  |  66 ++++++++
+ static/ergopti_plus/macos/ui/menu/init.lua    |   2 +-
+ static/ergopti_plus/windows/ErgoptiPlus.ahk   |   1 +
+ .../windows/adapters/console_window.ahk       |  55 +++++++
+ .../ergopti_plus/windows/infra/lifecycle.ahk  |   4 +-
+ .../windows/modules/gestures/actions.ahk      |   4 +-
+ static/ergopti_plus/windows/tests/run_all.ahk |   2 +
+ .../tests/unit/test_console_window.ahk        | 108 +++++++++++++
+ .../windows/ui/console_window.ahk             |  55 +++++++
+ .../test-webview-geometry-single-source.cjs   |  68 +++++++++
+ 16 files changed, 521 insertions(+), 6 deletions(-)
+ create mode 100644 static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua
+ create mode 100644 static/ergopti_plus/macos/ui/console_window.lua
+ create mode 100644 static/ergopti_plus/windows/adapters/console_window.ahk
+ create mode 100644 static/ergopti_plus/windows/tests/unit/test_console_window.ahk
+ create mode 100644 static/ergopti_plus/windows/ui/console_window.ahk
+
+diff --git a/docs/memory/shared-architecture.md b/docs/memory/shared-architecture.md
+index e83e48a32..9ff51a048 100644
+--- a/docs/memory/shared-architecture.md
++++ b/docs/memory/shared-architecture.md
+@@ -78,6 +78,13 @@ applying it works. Test the complete user transaction.
+ The debug submenu order lives in
+ `_shared/modules/menu/menu_manifest.json`; both desktop drivers consume it.
+ 
++Native debug consoles use each driver's `ui/console_window` owner for menu and
++gesture actions. Minimum geometry lives in `native_windows.console` in the
++shared UI manifest. Windows targets `A_ScriptHwnd`, never the foreground
++application. macOS places the console after its native window is created.
++Linux has no native console; these actions remain excluded by platform instead
++of opening or resizing an unrelated terminal.
++
+ ### project-menu-manifest-macos-hotstrings-layout-gap
+ 
+ macOS does not yet consume every hotstrings/layout manifest key that Windows
+diff --git a/static/ergopti_plus/_shared/ui/apps.manifest.json b/static/ergopti_plus/_shared/ui/apps.manifest.json
+index a7db09c29..1f9e9f79e 100644
+--- a/static/ergopti_plus/_shared/ui/apps.manifest.json
++++ b/static/ergopti_plus/_shared/ui/apps.manifest.json
+@@ -1,5 +1,11 @@
+ {
+   "$description": "Per-app geometry and metadata for every webview UI. Read by all three hosts (macOS ui_builder, Windows WebView_Host_Open, future Linux WebKitGTK host) so geometry is defined once. Entry path convention: _shared/ui/<id>/index.html. Locales base convention: _shared/data/locales/. Note: macOS metrics_typing and metrics_apps use screen-relative sizing (sf.w-100, sf.h-100) rather than fixed dimensions — the values here are recommended defaults for non-macOS hosts.",
++  "native_windows": {
++    "console": {
++      "width_ratio": 0.7,
++      "height_ratio": 0.75
++    }
++  },
+   "apps": {
+     "action_picker": {
+       "width": 460,
+diff --git a/static/ergopti_plus/docs/architecture.md b/static/ergopti_plus/docs/architecture.md
+index e56116210..2411b8d6b 100644
+--- a/static/ergopti_plus/docs/architecture.md
++++ b/static/ergopti_plus/docs/architecture.md
+@@ -105,6 +105,7 @@ graph TD
+     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
+         WINDOWS_app_launcher["AppLauncher.ahk"]
+         WINDOWS_clipboard["Clipboard.ahk"]
++        WINDOWS_console_window["ConsoleWindow.ahk"]
+         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
+         WINDOWS_crypto["Crypto.ahk"]
+         WINDOWS_file_system["FileSystem.ahk"]
+diff --git a/static/ergopti_plus/macos/modules/gestures/actions.lua b/static/ergopti_plus/macos/modules/gestures/actions.lua
+index 9b828d9f0..d4f6e42ee 100644
+--- a/static/ergopti_plus/macos/modules/gestures/actions.lua
++++ b/static/ergopti_plus/macos/modules/gestures/actions.lua
+@@ -1658,7 +1658,7 @@ sg("script_quit",                         function()
+ end)
+ 
+ -- Debug
+-sg("open_console",                        function() pcall(hs.openConsole) end)
++sg("open_console",                        function() return require("ui.console_window").open() end)
+ 
+ 
+ 
+diff --git a/static/ergopti_plus/macos/tests/helpers/init.lua b/static/ergopti_plus/macos/tests/helpers/init.lua
+index f17f33f5d..6ffe74b09 100644
+--- a/static/ergopti_plus/macos/tests/helpers/init.lua
++++ b/static/ergopti_plus/macos/tests/helpers/init.lua
+@@ -332,6 +332,8 @@ function M.load_with_stubs(module_name, hs_overrides)
+ 	loaded["modules.keymap.layout_install"] = nil
+ 	loaded["modules.keymap.input_sources"]  = nil
+ 	loaded["adapters.one_shot_shift"] = nil
++	-- The console owner captures the native API and must follow the current stub.
++	loaded["ui.console_window"] = nil
+ 
+ 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
+ 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
+diff --git a/static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua b/static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua
+new file mode 100644
+index 000000000..14cffa291
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua
+@@ -0,0 +1,144 @@
++--- tests/unit/ui/test_console_window.lua
++
++--- ==============================================================================
++--- MODULE: Native Debug Console Placement Tests
++--- DESCRIPTION:
++--- Opening the console must defer native placement, target the console itself,
++--- and preserve an existing large window rather than shrinking the user's view.
++--- ==============================================================================
++
++local helpers = require("tests.helpers")
++
++--- Runs the console owner against a stateful native window and deferred queue.
++--- @param run function Receives the owner and observable native state.
++local function with_console(run)
++	helpers.with_fresh_modules({ "ui.console_window", "infra.deferred_work", "infra.logger", "infra.paths" }, function()
++		local state = {
++			frame = { x = 10, y = 20, w = 300, h = 200 },
++			screen = { x = 100, y = 50, w = 1000, h = 800 },
++			moves = 0, opens = 0, errors = 0, reads = 0, queue = {},
++		}
++		package.loaded["infra.deferred_work"] = { after = function(delay, callback)
++			helpers.assert_eq(delay, 0)
++			if state.refuse_timer then return false end
++			state.queue[#state.queue + 1] = callback
++			return true
++		end }
++		local logger = helpers.make_logger_stub()
++		logger.error = function() state.errors = state.errors + 1 end
++		package.loaded["infra.logger"] = logger
++		local window = {
++			frame = function() return state.frame end,
++			setFrame = function(self, frame)
++				if state.refuse_move then return nil end
++				state.moves = state.moves + 1
++				state.frame = frame
++				return self
++			end,
++		}
++		local owner = helpers.load_with_stubs("ui.console_window", {
++			openConsole = function(front)
++				helpers.assert_eq(front, true)
++				if state.refuse_open then error("native opening failed") end
++				state.opens = state.opens + 1
++			end,
++			console = { hswindow = function() if not state.missing_window then return window end end },
++			screen = { mainScreen = function()
++				if not state.missing_screen then return { frame = function() return state.screen end } end
++			end },
++		})
++		-- The native fixture supplies its own path adapter while loading the owner.
++		-- Wrap that exact captured table so the read counter observes production.
++		local paths = package.loaded["infra.paths"]
++		local shared = paths.shared
++		paths.shared = function(relative)
++			state.reads = state.reads + 1
++			if state.missing_manifest then error("manifest unavailable") end
++			return shared(relative)
++		end
++		run(owner, state)
++	end)
++end
++
++helpers.describe("Native console placement", function()
++	helpers.it("opens in front and enlarges only on the next run-loop turn", function()
++		with_console(function(owner, state)
++			helpers.assert_eq(owner.open(), true)
++			helpers.assert_eq(state.opens, 1)
++			helpers.assert_eq(state.moves, 0)
++			helpers.assert_eq(state.reads, 0, "the originating action must not read the geometry manifest")
++			helpers.assert_eq(#state.queue, 1)
++			state.queue[1]()
++			helpers.assert_eq(state.reads, 1)
++			helpers.assert_eq(state.moves, 1)
++			helpers.assert_eq(state.frame.w, 700)
++			helpers.assert_eq(state.frame.h, 600)
++			helpers.assert_eq(state.frame.x, 250)
++			helpers.assert_eq(state.frame.y, 150)
++		end)
++	end)
++
++	for _, refusal in ipairs({ "missing_manifest", "refuse_move" }) do
++		helpers.it("reports " .. refusal .. " from the deferred callback", function()
++			with_console(function(owner, state)
++				state[refusal] = true
++				helpers.assert_eq(owner.open(), true)
++				state.queue[1]()
++				helpers.assert_eq(state.moves, 0)
++				helpers.assert_eq(state.errors, 1)
++			end)
++		end)
++	end
++
++	helpers.it("does not schedule placement after an opening error", function()
++		with_console(function(owner, state)
++			state.refuse_open = true
++			helpers.assert_eq(owner.open(), false)
++			helpers.assert_eq(#state.queue, 0)
++			helpers.assert_eq(state.reads, 0)
++			helpers.assert_eq(state.errors, 1)
++		end)
++	end)
++
++	helpers.it("keeps the position and size of an already large console", function()
++		with_console(function(owner, state)
++			state.frame = { x = 12, y = 34, w = 900, h = 700 }
++			owner.open()
++			state.queue[1]()
++			helpers.assert_eq(state.moves, 0)
++			helpers.assert_eq(state.frame.x, 12)
++		end)
++	end)
++
++	helpers.it("grows a short dimension without shrinking the other", function()
++		with_console(function(owner, state)
++			state.frame.w = 900
++			owner.open()
++			state.queue[1]()
++			helpers.assert_eq(state.frame.w, 900)
++			helpers.assert_eq(state.frame.h, 600)
++			helpers.assert_eq(state.frame.x, 150)
++		end)
++	end)
++
++	for _, missing in ipairs({ "missing_window", "missing_screen" }) do
++		helpers.it("reports " .. missing .. " without touching another window", function()
++			with_console(function(owner, state)
++				state[missing] = true
++				owner.open()
++				state.queue[1]()
++				helpers.assert_eq(state.moves, 0)
++				helpers.assert_eq(state.errors, 1)
++			end)
++		end)
++	end
++
++	helpers.it("reports a refused deferred placement", function()
++		with_console(function(owner, state)
++			state.refuse_timer = true
++			helpers.assert_eq(owner.open(), false)
++			helpers.assert_eq(#state.queue, 0)
++			helpers.assert_eq(state.errors, 1)
++		end)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/ui/console_window.lua b/static/ergopti_plus/macos/ui/console_window.lua
+new file mode 100644
+index 000000000..1bbbc84be
+--- /dev/null
++++ b/static/ergopti_plus/macos/ui/console_window.lua
+@@ -0,0 +1,66 @@
++--- ui/console_window.lua
++
++--- ==============================================================================
++--- MODULE: Native Debug Console Window
++--- DESCRIPTION:
++--- Opens the owned console in front, then gives small windows the shared minimum
++--- geometry after AppKit has created the window. Existing large windows stay put.
++--- ==============================================================================
++
++local M = {}
++local hs = hs
++local Logger = require("infra.logger")
++local Paths = require("infra.paths")
++local DeferredWork = require("infra.deferred_work")
++local LOG = "console_window"
++
++--- Resolves the native console ratios from the shared geometry owner.
++--- @return table ratios Validated width and height ratios.
++local function read_ratios()
++	local path = assert(Paths.shared("ui/apps.manifest.json"), "shared UI manifest path is unavailable")
++	local file = assert(io.open(path, "rb"))
++	local text = file:read("*a")
++	file:close()
++	local data = hs.json.decode(text)
++	local ratios = type(data) == "table" and type(data.native_windows) == "table" and data.native_windows.console
++	assert(type(ratios) == "table", "native console geometry is missing")
++	for _, name in ipairs({ "width_ratio", "height_ratio" }) do
++		local value = ratios[name]
++		assert(type(value) == "number" and value > 0 and value <= 1, "invalid console " .. name)
++	end
++	return ratios
++end
++
++--- Places the console after its native window becomes available.
++--- @param ratios table Validated shared ratios.
++local function place(ratios)
++	local window = assert(hs.console.hswindow(), "console window is unavailable")
++	local screen = assert(hs.screen.mainScreen(), "main screen is unavailable")
++	local bounds, current = screen:frame(), window:frame()
++	local width = math.max(current.w, math.floor(bounds.w * ratios.width_ratio + 0.5))
++	local height = math.max(current.h, math.floor(bounds.h * ratios.height_ratio + 0.5))
++	if width == current.w and height == current.h then return end
++	assert(window:setFrame({
++		x = bounds.x + (bounds.w - width) / 2,
++		y = bounds.y + (bounds.h - height) / 2,
++		w = width, h = height,
++	}, 0), "console placement was refused")
++end
++
++--- Opens the debug console and schedules placement outside the originating action.
++--- @return boolean scheduled Whether opening and deferred placement were accepted.
++function M.open()
++	local opened, detail = pcall(hs.openConsole, true)
++	if not opened then
++		Logger.error(LOG, "Cannot open console: %s.", tostring(detail))
++		return false
++	end
++	local scheduled = DeferredWork.after(0, function()
++		local placed, err = pcall(function() place(read_ratios()) end)
++		if not placed then Logger.error(LOG, "Cannot place console: %s.", tostring(err)) end
++	end, "console_window.layout")
++	if not scheduled then Logger.error(LOG, "Console placement could not be scheduled.") end
++	return scheduled
++end
++
++return M
+diff --git a/static/ergopti_plus/macos/ui/menu/init.lua b/static/ergopti_plus/macos/ui/menu/init.lua
+index 2c43c7c76..0bf4b0e35 100644
+--- a/static/ergopti_plus/macos/ui/menu/init.lua
++++ b/static/ergopti_plus/macos/ui/menu/init.lua
+@@ -1214,7 +1214,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
+ 			return accepted
+ 		end,
+ 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
+-		open_console              = function() pcall(hs.openConsole) end,
++		open_console              = function() return require("ui.console_window").open() end,
+ 		open_paths_editor         = function()
+ 			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
+ 		end,
+diff --git a/static/ergopti_plus/windows/ErgoptiPlus.ahk b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+index a0eac026d..e2c4fbab4 100644
+--- a/static/ergopti_plus/windows/ErgoptiPlus.ahk
++++ b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+@@ -489,6 +489,7 @@ if UIASW_IsWorkerInvocation()
+ #Include vendor/Promise.ahk
+ #Include vendor/WebView2.ahk
+ #Include infra/webview_utils.ahk
++#Include ui/console_window.ahk
+ #Include modules/keylogger/keylogger_app_categories.ahk
+ #Include modules/keylogger/keylogger.ahk
+ #Include modules/keylogger/keylogger_hotstring_log.ahk
+diff --git a/static/ergopti_plus/windows/adapters/console_window.ahk b/static/ergopti_plus/windows/adapters/console_window.ahk
+new file mode 100644
+index 000000000..e8350b1c9
+--- /dev/null
++++ b/static/ergopti_plus/windows/adapters/console_window.ahk
+@@ -0,0 +1,55 @@
++﻿; adapters/console_window.ahk
++
++; ==============================================================================
++; MODULE: Native Debug Console Adapter
++; DESCRIPTION:
++; Both debug views share the script's main window. Native operations always use
++; that exact handle, never the focused application or a translated window title.
++; ==============================================================================
++
++#Requires AutoHotkey v2.0
++
++class ConsoleWindowNative {
++	; Opens one of the script's built-in debug views.
++	; @param {String} Kind The validated view identifier.
++	; @returns {Boolean}
++	static Open(Kind) {
++		if (Kind == "list_vars")
++			ListVars()
++		else
++			KeyHistory()
++		return true
++	}
++
++	; Reads the owned window rectangle in screen coordinates.
++	; @param {Integer} Hwnd The script window handle.
++	; @returns {Object}
++	static Frame(Hwnd) {
++		WinGetPos(&X, &Y, &Width, &Height, "ahk_id " . Hwnd)
++		return {x: X, y: Y, w: Width, h: Height}
++	}
++
++	; Reads the primary monitor's usable area, excluding taskbars.
++	; @returns {Object}
++	static Screen() {
++		MonitorGetWorkArea(MonitorGetPrimary(), &Left, &Top, &Right, &Bottom)
++		return {x: Left, y: Top, w: Right - Left, h: Bottom - Top}
++	}
++
++	; Places the owned window; native refusal propagates to the owner.
++	; @param {Integer} Hwnd The script window handle.
++	; @param {Object} Rect Target rectangle.
++	; @returns {Boolean}
++	static Move(Hwnd, Rect) {
++		WinMove(Rect.x, Rect.y, Rect.w, Rect.h, "ahk_id " . Hwnd)
++		return true
++	}
++
++	; Brings the owned window forward.
++	; @param {Integer} Hwnd The script window handle.
++	; @returns {Boolean}
++	static Activate(Hwnd) {
++		WinActivate("ahk_id " . Hwnd)
++		return true
++	}
++}
+diff --git a/static/ergopti_plus/windows/infra/lifecycle.ahk b/static/ergopti_plus/windows/infra/lifecycle.ahk
+index 7d16892a7..9acfcaf9b 100644
+--- a/static/ergopti_plus/windows/infra/lifecycle.ahk
++++ b/static/ergopti_plus/windows/infra/lifecycle.ahk
+@@ -1238,10 +1238,10 @@ WindowSpy(*) {
+ 				MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
+ }
+ ActivateListVars(*) {
+-		ListVars()
++		return ConsoleWindow_Open("list_vars")
+ }
+ ActivateKeyHistory(*) {
+-		KeyHistory()
++		return ConsoleWindow_Open("key_history")
+ }
+ ShowHealthCheck(*) {
+ 		HealthCheck_ShowWindow()
+diff --git a/static/ergopti_plus/windows/modules/gestures/actions.ahk b/static/ergopti_plus/windows/modules/gestures/actions.ahk
+index 84b0f4b7c..a2cb1723f 100644
+--- a/static/ergopti_plus/windows/modules/gestures/actions.ahk
++++ b/static/ergopti_plus/windows/modules/gestures/actions.ahk
+@@ -161,10 +161,10 @@ global GESTURE_ACTIONS := Map(
+ 				Fn: (*) => WindowSpy(),
+ 		},
+ 		"open_list_vars", {
+-				Fn: (*) => ListVars(),
++				Fn: (*) => ConsoleWindow_Open("list_vars"),
+ 		},
+ 		"open_key_history", {
+-				Fn: (*) => KeyHistory(),
++				Fn: (*) => ConsoleWindow_Open("key_history"),
+ 		},
+ 		; --- Advanced system actions ---
+ 		"screen_capture_instant", {
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index 32eeaff85..33a8edbca 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -106,6 +106,7 @@ OnError(_FatalErrorHandler)
+ #Include ../infra/tick_count.ahk
+ #Include ../vendor/Promise.ahk
+ #Include ../infra/webview_utils.ahk
++#Include ../ui/console_window.ahk
+ #Include ../infra/wall_clock.ahk
+ ; Compiled-mode bundle bootstrapper — included this early (matching its real
+ ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
+@@ -283,6 +284,7 @@ InstallSendNoOps()
+ ; top-level ExitApp would end the suite.
+ #Include unit/test_siho_boot_window.ahk
+ #Include unit/test_window_manager_force_foreground.ahk
++#Include unit/test_console_window.ahk
+ #Include unit/test_spotlight_ownership.ahk
+ #Include unit/test_take_note_async_job.ahk
+ #Include unit/test_text_sender_modifiers.ahk
+diff --git a/static/ergopti_plus/windows/tests/unit/test_console_window.ahk b/static/ergopti_plus/windows/tests/unit/test_console_window.ahk
+new file mode 100644
+index 000000000..1c7384014
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/unit/test_console_window.ahk
+@@ -0,0 +1,108 @@
++﻿; tests/unit/test_console_window.ahk
++
++; ==============================================================================
++; MODULE: Native Debug Console Placement Tests
++; DESCRIPTION:
++; Debug actions must place their owned window from the shared geometry instead
++; of moving whichever application happens to have foreground focus.
++; ==============================================================================
++
++#Requires AutoHotkey v2.0
++
++class _ConsoleTestNative {
++	static Calls := []
++	static Rect := 0
++	static RefuseMove := false
++	static RefuseOpen := false
++	static RefuseActivate := false
++	static ThrowFrame := false
++	static Reset() {
++		this.Calls := []
++		this.Rect := {x: 10, y: 20, w: 300, h: 200}
++		this.RefuseMove := false
++		this.RefuseOpen := false
++		this.RefuseActivate := false
++		this.ThrowFrame := false
++	}
++	static Open(Kind) {
++		this.Calls.Push(Kind)
++		return !this.RefuseOpen
++	}
++	static Frame(Hwnd) {
++		AssertEqual(A_ScriptHwnd, Hwnd, "placement must target the script window")
++		if this.ThrowFrame
++			throw Error("Console is no longer available.")
++		return this.Rect
++	}
++	static Screen() {
++		return {x: 100, y: 50, w: 1000, h: 800}
++	}
++	static Move(Hwnd, Rect) {
++		AssertEqual(A_ScriptHwnd, Hwnd, "moving another application is forbidden")
++		this.Calls.Push("move")
++		if this.RefuseMove
++			return false
++		this.Rect := Rect
++		return true
++	}
++	static Activate(Hwnd) {
++		AssertEqual(A_ScriptHwnd, Hwnd, "only the owned debug window may activate")
++		this.Calls.Push("activate")
++		return !this.RefuseActivate
++	}
++}
++
++_ConsoleTest_OpensAndPlaces() {
++	for Kind in ["list_vars", "key_history"] {
++		_ConsoleTestNative.Reset()
++		AssertTrue(ConsoleWindow_Open(Kind, _ConsoleTestNative), "accepted placement succeeds")
++		AssertEqual(Kind, _ConsoleTestNative.Calls[1], "the requested view opens first")
++		AssertEqual(700, _ConsoleTestNative.Rect.w, "width follows shared ratio")
++		AssertEqual(600, _ConsoleTestNative.Rect.h, "height follows shared ratio")
++		AssertEqual(250, _ConsoleTestNative.Rect.x, "centering includes screen origin")
++		AssertEqual(150, _ConsoleTestNative.Rect.y, "centering includes screen origin")
++		AssertEqual("activate", _ConsoleTestNative.Calls[3], "the placed view comes forward")
++	}
++}
++Test("Console: both debug views use owned centered geometry (native-console)", _ConsoleTest_OpensAndPlaces)
++
++_ConsoleTest_PreservesLargeWindow() {
++	_ConsoleTestNative.Reset()
++	_ConsoleTestNative.Rect := {x: 12, y: 34, w: 900, h: 700}
++	AssertTrue(ConsoleWindow_Open("list_vars", _ConsoleTestNative), "large console opens")
++	AssertEqual(2, _ConsoleTestNative.Calls.Length, "large window is not moved")
++	AssertEqual(12, _ConsoleTestNative.Rect.x, "user placement remains intact")
++	_ConsoleTestNative.Reset()
++	_ConsoleTestNative.Rect.w := 900
++	AssertTrue(ConsoleWindow_Open("key_history", _ConsoleTestNative), "short console grows")
++	AssertEqual(900, _ConsoleTestNative.Rect.w, "larger dimension must not shrink")
++	AssertEqual(600, _ConsoleTestNative.Rect.h, "short dimension reaches minimum")
++}
++Test("Console: large dimensions and placement survive (native-console)", _ConsoleTest_PreservesLargeWindow)
++
++_ConsoleTest_RefusesFailedPlacement() {
++	_ConsoleTestNative.Reset()
++	_ConsoleTestNative.RefuseMove := true
++	AssertFalse(ConsoleWindow_Open("list_vars", _ConsoleTestNative), "refused move is not success")
++	AssertEqual(2, _ConsoleTestNative.Calls.Length, "refused placement does not activate")
++}
++Test("Console: native refusal stays observable (native-console)", _ConsoleTest_RefusesFailedPlacement)
++
++_ConsoleTest_RejectsIncompleteOpen() {
++	_ConsoleTestNative.Reset()
++	_ConsoleTestNative.RefuseOpen := true
++	AssertFalse(ConsoleWindow_Open("list_vars", _ConsoleTestNative), "opening refusal is not success")
++	AssertEqual(1, _ConsoleTestNative.Calls.Length, "refused opening must not move or activate")
++	_ConsoleTestNative.Reset()
++	_ConsoleTestNative.ThrowFrame := true
++	AssertFalse(ConsoleWindow_Open("key_history", _ConsoleTestNative), "a disappeared window is not success")
++	AssertEqual(1, _ConsoleTestNative.Calls.Length, "a disappeared window must not move or activate")
++	_ConsoleTestNative.Reset()
++	_ConsoleTestNative.RefuseActivate := true
++	AssertFalse(ConsoleWindow_Open("key_history", _ConsoleTestNative), "activation refusal is not success")
++	AssertEqual(3, _ConsoleTestNative.Calls.Length, "activation was actually attempted")
++	_ConsoleTestNative.Reset()
++	AssertFalse(ConsoleWindow_Open("foreign_window", _ConsoleTestNative), "an unknown view must be refused")
++	AssertEqual(0, _ConsoleTestNative.Calls.Length, "an unknown view never reaches the native boundary")
++}
++Test("Console: native failures and invalid views are refused (native-console)", _ConsoleTest_RejectsIncompleteOpen)
+diff --git a/static/ergopti_plus/windows/ui/console_window.ahk b/static/ergopti_plus/windows/ui/console_window.ahk
+new file mode 100644
+index 000000000..03bbe2042
+--- /dev/null
++++ b/static/ergopti_plus/windows/ui/console_window.ahk
+@@ -0,0 +1,55 @@
++﻿; ui/console_window.ahk
++
++; ==============================================================================
++; MODULE: Native Debug Console Window
++; DESCRIPTION:
++; Opens either debug view with the shared minimum geometry. Already-large
++; windows keep their placement, and growing one dimension never shrinks another.
++; ==============================================================================
++
++#Requires AutoHotkey v2.0
++#Include ../adapters/console_window.ahk
++
++; Reads the shared native-window geometry; missing or invalid data is an error.
++; @returns {Map} Validated width and height ratios.
++ConsoleWindow_ReadRatios() {
++	global _SharedDir
++	Data := JsonParse(FileRead(_SharedDir . "\ui\apps.manifest.json", "UTF-8"))
++	Ratios := Data["native_windows"]["console"]
++	for Name in ["width_ratio", "height_ratio"] {
++		Value := Ratios[Name]
++		if !(Value is Number) || Value <= 0 || Value > 1
++			throw ValueError("Invalid console " . Name . ".")
++	}
++	return Ratios
++}
++
++; Opens, sizes and activates the script's own debug window.
++; @param {String} Kind The list_vars or key_history view.
++; @param {Object} Native Native boundary, replaceable by behavioral tests.
++; @returns {Boolean} True only after every requested native operation succeeded.
++ConsoleWindow_Open(Kind, Native := ConsoleWindowNative) {
++	try {
++		if (Kind != "list_vars" && Kind != "key_history")
++			throw ValueError("Unknown console view '" . Kind . "'.")
++		Ratios := ConsoleWindow_ReadRatios()
++		if Native.Open(Kind) != true
++			throw Error("Console opening was refused.")
++		Current := Native.Frame(A_ScriptHwnd)
++		Bounds := Native.Screen()
++		Width := Max(Current.w, Round(Bounds.w * Ratios["width_ratio"]))
++		Height := Max(Current.h, Round(Bounds.h * Ratios["height_ratio"]))
++		if (Width != Current.w || Height != Current.h) {
++			Rect := {x: Round(Bounds.x + (Bounds.w - Width) / 2),
++				y: Round(Bounds.y + (Bounds.h - Height) / 2), w: Width, h: Height}
++			if Native.Move(A_ScriptHwnd, Rect) != true
++				throw Error("Console placement was refused.")
++		}
++		if Native.Activate(A_ScriptHwnd) != true
++			throw Error("Console activation was refused.")
++		return true
++	} catch as Err {
++		LoggerError("ConsoleWindow", "Could not open debug view '{1}': {2}.", Kind, Err.Message)
++		return false
++	}
++}
+diff --git a/tools/test/test-webview-geometry-single-source.cjs b/tools/test/test-webview-geometry-single-source.cjs
+index 91e8f7ae6..2e9a57139 100644
+--- a/tools/test/test-webview-geometry-single-source.cjs
++++ b/tools/test/test-webview-geometry-single-source.cjs
+@@ -193,6 +193,74 @@ const LINUX_MANAGER = 'ui/webview_manager.lua';
+ const errors = [];
+ const apps = readManifest();
+ 
++// Native consoles share ratios rather than fixed webview dimensions. Linux has
++// no native debug console; it deliberately has no opener or geometry consumer.
++const consoleGeometry = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).native_windows?.console;
++assert.ok(consoleGeometry, 'the native console geometry must exist');
++for (const dimension of ['width_ratio', 'height_ratio']) {
++	assert.ok(typeof consoleGeometry[dimension] === 'number'
++		&& consoleGeometry[dimension] > 0 && consoleGeometry[dimension] <= 1,
++		`native console ${dimension} must be a finite screen ratio`);
++}
++
++/** Removes quoted examples and comments before finding native console references. */
++function consoleCode(source, language) {
++	if (language === 'lua') {
++		return (source.match(/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g) || [])
++			.filter(token => !token.startsWith('--') && !/^["'\[]/.test(token)).join(' ');
++	}
++	return source.replace(/\/\*[\s\S]*?\*\/|;[^\r\n]*|"(?:`[\s\S]|[^"`])*"|'(?:`[\s\S]|[^'`])*'/g, ' ');
++}
++
++/** Counts live native API references, including protected calls and aliases. */
++function consoleReferences(source, language) {
++	const pattern = language === 'lua' ? /\bhs\s*\.\s*openConsole\b/g : /\b(?:ListVars|KeyHistory)\b/g;
++	return [...consoleCode(source, language).matchAll(pattern)].length;
++}
++
++for (const [language, source, count] of [
++	['lua', 'hs.openConsole(true)', 1],
++	['lua', 'pcall(hs.openConsole, true)', 1],
++	['lua', 'local open = hs.openConsole', 1],
++	['lua', '-- hs.openConsole(true)\nlocal text = "hs.openConsole(true)"', 0],
++	['lua', '--[=[hs.openConsole(true)]=]\nlocal text = [=[hs.openConsole(true)]=]', 0],
++	['ahk', 'ListVars()\nKeyHistory()', 2],
++	['ahk', 'Open := ListVars', 1],
++	['ahk', '; ListVars()\nText := "KeyHistory()"\n/* ListVars() */', 0],
++]) {
++	assert.equal(consoleReferences(source, language), count, `native console scanner fixture: ${source}`);
++}
++
++/** Visits production source files, excluding tests and external/generated code. */
++function productionSources(directory, extension) {
++	return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
++		if (['tests', 'vendor', '_generated'].includes(entry.name)) return [];
++		const absolute = path.join(directory, entry.name);
++		if (entry.isDirectory()) return productionSources(absolute, extension);
++		return entry.name.endsWith(extension) ? [absolute] : [];
++	});
++}
++
++for (const [driver, language, owner, expected] of [
++	['macos', 'lua', 'ui/console_window.lua', 1],
++	['windows', 'ahk', 'adapters/console_window.ahk', 2],
++]) {
++	const directory = path.join(ROOT, SP, driver);
++	const files = productionSources(directory, `.${language}`);
++	assert.ok(files.length > 100, `${driver} console guard must scan the production tree`);
++	let owned = 0;
++	for (const absolute of files) {
++		const count = consoleReferences(fs.readFileSync(absolute, 'utf8'), language);
++		const relative = path.relative(directory, absolute).replace(/\\/g, '/');
++		if (relative === owner) owned += count;
++		else if (count) errors.push(`${driver}/${relative}: native console access must use the console window owner`);
++	}
++	assert.equal(owned, expected, `${driver} console owner must exercise the native APIs`);
++	const source = fs.readFileSync(path.join(directory, 'ui/console_window.' + language), 'utf8');
++	assert.ok(source.includes('apps.manifest.json') && source.includes('native_windows'),
++		`${driver} console owner must read the shared geometry`);
++}
++
+ // ---- macOS defer checks --------------------------------------------------
+ for (const [id, rel] of Object.entries(MACOS_MODULES)) {
+ 	if (!apps[id]) {
+-- 
+2.50.0.windows.1
+

@@ -1,0 +1,523 @@
+diff --git a/static/ergopti_plus/_shared/data/locales/ar.json b/static/ergopti_plus/_shared/data/locales/ar.json
+index d758c8a6f..b3f00bc7e 100644
+--- a/static/ergopti_plus/_shared/data/locales/ar.json
++++ b/static/ergopti_plus/_shared/data/locales/ar.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "تحديث Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "حول Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — اقتراحات لوحة مفاتيح ذكية\nالخادم الخلفي: Ollama (محلي)\nالإصدار: 1.0",
+-	"menu.llm.active_model_label": "النموذج النشط: ",
+ 	"menu.llm.add_custom_model": "إضافة نموذج مخصص",
+ 	"menu.llm.add_model_entry": "➕ إضافة نموذج مخصص…",
+ 	"menu.llm.after_hotstring": "اقتراح بعد انتهاء فقاعة السلسلة النصية",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "الخادم الخلفي: %s",
+ 	"menu.llm.model_change_title": "تغيير النموذج",
+ 	"menu.llm.model_date": "تاريخ التحديث: %s",
+-	"menu.llm.model_label": "النموذج: %s",
++	"menu.llm.model_label": "النموذج المحدد: %s",
+ 	"menu.llm.model_params_active": "المعاملات (النشطة): %s",
+ 	"menu.llm.model_params_total": "المعاملات (الإجمالي): %s",
+ 	"menu.llm.model_source": "المصدر: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/cs.json b/static/ergopti_plus/_shared/data/locales/cs.json
+index 3e19bb8f5..33c4d644b 100644
+--- a/static/ergopti_plus/_shared/data/locales/cs.json
++++ b/static/ergopti_plus/_shared/data/locales/cs.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Aktualizovat Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "O aplikaci Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Chytrá klávesnicová napovídání\nBackend: Ollama (lokálně)\nVerze: 1.0",
+-	"menu.llm.active_model_label": "Aktivní model: ",
+ 	"menu.llm.add_custom_model": "Přidat vlastní model",
+ 	"menu.llm.add_model_entry": "➕ Přidat vlastní model…",
+ 	"menu.llm.after_hotstring": "Návrh po expiraci bubliny hotstringu",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Změna modelu",
+ 	"menu.llm.model_date": "Datum aktualizace: %s",
+-	"menu.llm.model_label": "Model: %s",
++	"menu.llm.model_label": "Vybraný model: %s",
+ 	"menu.llm.model_params_active": "Parametry (aktivní): %s",
+ 	"menu.llm.model_params_total": "Parametry (celkem): %s",
+ 	"menu.llm.model_source": "Zdroj: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/da.json b/static/ergopti_plus/_shared/data/locales/da.json
+index 50bfea5fc..f111c6696 100644
+--- a/static/ergopti_plus/_shared/data/locales/da.json
++++ b/static/ergopti_plus/_shared/data/locales/da.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Opdatér Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Om Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Intelligente tastaturforslag\nBackend: Ollama (lokal)\nVersion: 1.0",
+-	"menu.llm.active_model_label": "Aktivt model: ",
+ 	"menu.llm.add_custom_model": "Tilføj et brugerdefineret model",
+ 	"menu.llm.add_model_entry": "➕ Tilføj et brugerdefineret model…",
+ 	"menu.llm.after_hotstring": "Forslag efter en hotstring boble udløber",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Modelændring",
+ 	"menu.llm.model_date": "Opdateringsdato: %s",
+-	"menu.llm.model_label": "Model: %s",
++	"menu.llm.model_label": "Valgt model: %s",
+ 	"menu.llm.model_params_active": "Parametre (Aktiv): %s",
+ 	"menu.llm.model_params_total": "Parametre (I alt): %s",
+ 	"menu.llm.model_source": "Kilde: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/de.json b/static/ergopti_plus/_shared/data/locales/de.json
+index e496eed76..4da139666 100644
+--- a/static/ergopti_plus/_shared/data/locales/de.json
++++ b/static/ergopti_plus/_shared/data/locales/de.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s aktualisieren",
+ 	"menu.llm.about": "Über Ergopti KI",
+ 	"menu.llm.about_body": "Ergopti KI — Intelligente Tastaturvorschläge\nBackend: Ollama (lokal)\nVersion: 1.0",
+-	"menu.llm.active_model_label": "Aktives Modell: ",
+ 	"menu.llm.add_custom_model": "Benutzerdefiniertes Modell hinzufügen",
+ 	"menu.llm.add_model_entry": "➕ Benutzerdefiniertes Modell hinzufügen…",
+ 	"menu.llm.after_hotstring": "Vorschlag nach Ablauf einer Hotstring-Blase",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Modelländerung",
+ 	"menu.llm.model_date": "Aktualisierungsdatum: %s",
+-	"menu.llm.model_label": "Modell: %s",
++	"menu.llm.model_label": "Ausgewähltes Modell: %s",
+ 	"menu.llm.model_params_active": "Parameter (Aktiv): %s",
+ 	"menu.llm.model_params_total": "Parameter (Gesamt): %s",
+ 	"menu.llm.model_source": "Quelle: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/en.json b/static/ergopti_plus/_shared/data/locales/en.json
+index 42dd4ab1b..6897bb264 100644
+--- a/static/ergopti_plus/_shared/data/locales/en.json
++++ b/static/ergopti_plus/_shared/data/locales/en.json
+@@ -1002,7 +1002,6 @@
+ 	"menu.layout.pause_layout_section": "Layout on pause / resume",
+ 	"menu.llm.about": "About Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Smart keyboard suggestions\nBackend: Ollama (local)\nVersion: 1.0",
+-	"menu.llm.active_model_label": "Active model: ",
+ 	"menu.llm.add_custom_model": "Add a custom model",
+ 	"menu.llm.add_model_entry": "➕ Add a custom model…",
+ 	"menu.llm.after_hotstring": "Suggestion after a hotstring bubble expires",
+@@ -1093,7 +1092,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Model Change",
+ 	"menu.llm.model_date": "Update date: %s",
+-	"menu.llm.model_label": "Model: %s",
++	"menu.llm.model_label": "Selected model: %s",
+ 	"menu.llm.model_params_active": "Parameters (Active): %s",
+ 	"menu.llm.model_params_total": "Parameters (Total): %s",
+ 	"menu.llm.model_source": "Source: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/es.json b/static/ergopti_plus/_shared/data/locales/es.json
+index 8fc6bf4ce..7bf92f1d6 100644
+--- a/static/ergopti_plus/_shared/data/locales/es.json
++++ b/static/ergopti_plus/_shared/data/locales/es.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Actualizar Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Acerca de Ergopti IA",
+ 	"menu.llm.about_body": "Ergopti IA — Sugerencias inteligentes de teclado\nBackend: Ollama (local)\nVersión: 1.0",
+-	"menu.llm.active_model_label": "Modelo activo: ",
+ 	"menu.llm.add_custom_model": "Añadir un modelo personalizado",
+ 	"menu.llm.add_model_entry": "➕ Añadir un modelo personalizado…",
+ 	"menu.llm.after_hotstring": "Sugerencia tras la expiración de una burbuja hotstring",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Cambio de modelo",
+ 	"menu.llm.model_date": "Fecha de actualización: %s",
+-	"menu.llm.model_label": "Modelo: %s",
++	"menu.llm.model_label": "Modelo seleccionado: %s",
+ 	"menu.llm.model_params_active": "Parámetros (Activos): %s",
+ 	"menu.llm.model_params_total": "Parámetros (Total): %s",
+ 	"menu.llm.model_source": "Fuente: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/fr.json b/static/ergopti_plus/_shared/data/locales/fr.json
+index 7c8b59969..84b823e51 100644
+--- a/static/ergopti_plus/_shared/data/locales/fr.json
++++ b/static/ergopti_plus/_shared/data/locales/fr.json
+@@ -1002,7 +1002,6 @@
+ 	"menu.layout.pause_layout_section": "Disposition à la pause / reprise",
+ 	"menu.llm.about": "À propos d'Ergopti IA",
+ 	"menu.llm.about_body": "Ergopti IA — Suggestions intelligentes au clavier\nBackend : Ollama (local)\nVersion : 1.0",
+-	"menu.llm.active_model_label": "Modèle actif : ",
+ 	"menu.llm.add_custom_model": "Ajouter un modèle personnalisé",
+ 	"menu.llm.add_model_entry": "➕ Ajouter un modèle personnalisé…",
+ 	"menu.llm.after_hotstring": "Suggestion après expiration d’une bulle hotstring",
+@@ -1093,7 +1092,7 @@
+ 	"menu.llm.model_backend": "Backend : %s",
+ 	"menu.llm.model_change_title": "Changement de modèle",
+ 	"menu.llm.model_date": "Date de mise à jour : %s",
+-	"menu.llm.model_label": "Modèle : %s",
++	"menu.llm.model_label": "Modèle sélectionné : %s",
+ 	"menu.llm.model_params_active": "Paramètres (Actifs) : %s",
+ 	"menu.llm.model_params_total": "Paramètres (Total) : %s",
+ 	"menu.llm.model_source": "Source : %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/he.json b/static/ergopti_plus/_shared/data/locales/he.json
+index 1736fd5c0..cb2641cad 100644
+--- a/static/ergopti_plus/_shared/data/locales/he.json
++++ b/static/ergopti_plus/_shared/data/locales/he.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "עדכן Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "אודות Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — הצעות מקלדת חכמות\nצד שרת: Ollama (מקומי)\nגרסה: 1.0",
+-	"menu.llm.active_model_label": "מודל פעיל: ",
+ 	"menu.llm.add_custom_model": "הוסף מודל מותאם",
+ 	"menu.llm.add_model_entry": "➕ הוסף מודל מותאם…",
+ 	"menu.llm.after_hotstring": "הצעה לאחר פקיעת בועת hotstring",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "צד שרת: %s",
+ 	"menu.llm.model_change_title": "החלפת מודל",
+ 	"menu.llm.model_date": "תאריך עדכון: %s",
+-	"menu.llm.model_label": "מודל: %s",
++	"menu.llm.model_label": "מודל נבחר: %s",
+ 	"menu.llm.model_params_active": "פרמטרים (פעילים): %s",
+ 	"menu.llm.model_params_total": "פרמטרים (סך הכל): %s",
+ 	"menu.llm.model_source": "מקור: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/hi.json b/static/ergopti_plus/_shared/data/locales/hi.json
+index 689429b1d..cb6d9b4d7 100644
+--- a/static/ergopti_plus/_shared/data/locales/hi.json
++++ b/static/ergopti_plus/_shared/data/locales/hi.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s अपडेट करें",
+ 	"menu.llm.about": "Ergopti AI के बारे में",
+ 	"menu.llm.about_body": "Ergopti AI — स्मार्ट कीबोर्ड सुझाव\nबैकएंड: Ollama (स्थानीय)\nसंस्करण: 1.0",
+-	"menu.llm.active_model_label": "सक्रिय मॉडल: ",
+ 	"menu.llm.add_custom_model": "कस्टम मॉडल जोड़ें",
+ 	"menu.llm.add_model_entry": "➕ कस्टम मॉडल जोड़ें…",
+ 	"menu.llm.after_hotstring": "hotstring बुलबुले समाप्त होने के बाद सुझाव",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "बैकएंड: %s",
+ 	"menu.llm.model_change_title": "मॉडल परिवर्तन",
+ 	"menu.llm.model_date": "अपडेट तारीख: %s",
+-	"menu.llm.model_label": "मॉडल: %s",
++	"menu.llm.model_label": "चयनित मॉडल: %s",
+ 	"menu.llm.model_params_active": "पैरामीटर (सक्रिय): %s",
+ 	"menu.llm.model_params_total": "पैरामीटर (कुल): %s",
+ 	"menu.llm.model_source": "स्रोत: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/it.json b/static/ergopti_plus/_shared/data/locales/it.json
+index 3291b3fe5..773a629c1 100644
+--- a/static/ergopti_plus/_shared/data/locales/it.json
++++ b/static/ergopti_plus/_shared/data/locales/it.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Aggiorna Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Informazioni su Ergopti IA",
+ 	"menu.llm.about_body": "Ergopti IA — Suggerimenti intelligenti da tastiera\nBackend: Ollama (locale)\nVersione: 1.0",
+-	"menu.llm.active_model_label": "Modello attivo: ",
+ 	"menu.llm.add_custom_model": "Aggiungi un modello personalizzato",
+ 	"menu.llm.add_model_entry": "➕ Aggiungi un modello personalizzato…",
+ 	"menu.llm.after_hotstring": "Suggerimento dopo la scadenza della bolla hotstring",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Cambio modello",
+ 	"menu.llm.model_date": "Data aggiornamento: %s",
+-	"menu.llm.model_label": "Modello: %s",
++	"menu.llm.model_label": "Modello selezionato: %s",
+ 	"menu.llm.model_params_active": "Parametri (Attivi): %s",
+ 	"menu.llm.model_params_total": "Parametri (Totale): %s",
+ 	"menu.llm.model_source": "Sorgente: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/ja.json b/static/ergopti_plus/_shared/data/locales/ja.json
+index 23b912939..3bd58fce7 100644
+--- a/static/ergopti_plus/_shared/data/locales/ja.json
++++ b/static/ergopti_plus/_shared/data/locales/ja.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s に更新",
+ 	"menu.llm.about": "Ergopti AIについて",
+ 	"menu.llm.about_body": "Ergopti AI — スマートキーボード提案\nバックエンド: Ollama (ローカル)\nバージョン: 1.0",
+-	"menu.llm.active_model_label": "アクティブモデル: ",
+ 	"menu.llm.add_custom_model": "カスタムモデルを追加",
+ 	"menu.llm.add_model_entry": "➕ カスタムモデルを追加…",
+ 	"menu.llm.after_hotstring": "ホットストリングバブルが消えた後に提案",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "バックエンド: %s",
+ 	"menu.llm.model_change_title": "モデルの変更",
+ 	"menu.llm.model_date": "更新日: %s",
+-	"menu.llm.model_label": "モデル：%s",
++	"menu.llm.model_label": "選択中のモデル：%s",
+ 	"menu.llm.model_params_active": "パラメーター（アクティブ）: %s",
+ 	"menu.llm.model_params_total": "パラメーター（合計）: %s",
+ 	"menu.llm.model_source": "ソース: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/ko.json b/static/ergopti_plus/_shared/data/locales/ko.json
+index 37db6e479..d5df206b3 100644
+--- a/static/ergopti_plus/_shared/data/locales/ko.json
++++ b/static/ergopti_plus/_shared/data/locales/ko.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s 업데이트",
+ 	"menu.llm.about": "Ergopti AI 정보",
+ 	"menu.llm.about_body": "Ergopti AI — 스마트 키보드 제안\n백엔드: Ollama (로컬)\n버전: 1.0",
+-	"menu.llm.active_model_label": "활성 모델: ",
+ 	"menu.llm.add_custom_model": "사용자 지정 모델 추가",
+ 	"menu.llm.add_model_entry": "➕ 사용자 지정 모델 추가…",
+ 	"menu.llm.after_hotstring": "핫스트링 버블 만료 후 제안",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "백엔드: %s",
+ 	"menu.llm.model_change_title": "모델 변경",
+ 	"menu.llm.model_date": "업데이트 날짜: %s",
+-	"menu.llm.model_label": "모델: %s",
++	"menu.llm.model_label": "선택된 모델: %s",
+ 	"menu.llm.model_params_active": "매개변수 (활성): %s",
+ 	"menu.llm.model_params_total": "매개변수 (전체): %s",
+ 	"menu.llm.model_source": "소스: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/nl.json b/static/ergopti_plus/_shared/data/locales/nl.json
+index 30b53f394..cf6e63c18 100644
+--- a/static/ergopti_plus/_shared/data/locales/nl.json
++++ b/static/ergopti_plus/_shared/data/locales/nl.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s bijwerken",
+ 	"menu.llm.about": "Over Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Intelligente toetsenbordvoorstellen\nBackend: Ollama (lokaal)\nVersie: 1.0",
+-	"menu.llm.active_model_label": "Actief model: ",
+ 	"menu.llm.add_custom_model": "Een aangepast model toevoegen",
+ 	"menu.llm.add_model_entry": "➕ Een aangepast model toevoegen…",
+ 	"menu.llm.after_hotstring": "Suggestie nadat een hotstring-ballon verloopt",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Modelwijziging",
+ 	"menu.llm.model_date": "Bijwerkdatum: %s",
+-	"menu.llm.model_label": "Model: %s",
++	"menu.llm.model_label": "Geselecteerd model: %s",
+ 	"menu.llm.model_params_active": "Parameters (Actief): %s",
+ 	"menu.llm.model_params_total": "Parameters (Totaal): %s",
+ 	"menu.llm.model_source": "Bron: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/no.json b/static/ergopti_plus/_shared/data/locales/no.json
+index e3ccbc86a..27d34621c 100644
+--- a/static/ergopti_plus/_shared/data/locales/no.json
++++ b/static/ergopti_plus/_shared/data/locales/no.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Oppgrader Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Om Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Smarte tastaturforslag\nBackend: Ollama (lokal)\nVersjon: 1.0",
+-	"menu.llm.active_model_label": "Aktiv modell: ",
+ 	"menu.llm.add_custom_model": "Legg til en tilpasset modell",
+ 	"menu.llm.add_model_entry": "➕ Legg til en tilpasset modell…",
+ 	"menu.llm.after_hotstring": "Forslag etter at hotstring-boble utløper",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Modellendring",
+ 	"menu.llm.model_date": "Oppdateringsdato: %s",
+-	"menu.llm.model_label": "Modell: %s",
++	"menu.llm.model_label": "Valgt modell: %s",
+ 	"menu.llm.model_params_active": "Parametere (Aktive): %s",
+ 	"menu.llm.model_params_total": "Parametere (Totalt): %s",
+ 	"menu.llm.model_source": "Kilde: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/pl.json b/static/ergopti_plus/_shared/data/locales/pl.json
+index 605853db1..437774245 100644
+--- a/static/ergopti_plus/_shared/data/locales/pl.json
++++ b/static/ergopti_plus/_shared/data/locales/pl.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Zaktualizuj Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "O Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Inteligentne podpowiedzi klawiatury\nBackend: Ollama (lokalne)\nWersja: 1.0",
+-	"menu.llm.active_model_label": "Aktywny model: ",
+ 	"menu.llm.add_custom_model": "Dodaj niestandardowy model",
+ 	"menu.llm.add_model_entry": "➕ Dodaj niestandardowy model…",
+ 	"menu.llm.after_hotstring": "Sugestia po wygaśnięciu bąbelka hotstring'a",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Zmiana modelu",
+ 	"menu.llm.model_date": "Data aktualizacji: %s",
+-	"menu.llm.model_label": "Model: %s",
++	"menu.llm.model_label": "Wybrany model: %s",
+ 	"menu.llm.model_params_active": "Parametry (Aktywne): %s",
+ 	"menu.llm.model_params_total": "Parametry (Łącznie): %s",
+ 	"menu.llm.model_source": "Źródło: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/pt.json b/static/ergopti_plus/_shared/data/locales/pt.json
+index 5f68f64cd..8d3de8298 100644
+--- a/static/ergopti_plus/_shared/data/locales/pt.json
++++ b/static/ergopti_plus/_shared/data/locales/pt.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Atualizar Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Sobre o Ergopti IA",
+ 	"menu.llm.about_body": "Ergopti IA — Sugestões inteligentes de teclado\nBackend: Ollama (local)\nVersão: 1.0",
+-	"menu.llm.active_model_label": "Modelo ativo: ",
+ 	"menu.llm.add_custom_model": "Adicionar um modelo personalizado",
+ 	"menu.llm.add_model_entry": "➕ Adicionar um modelo personalizado…",
+ 	"menu.llm.after_hotstring": "Sugestão após o vencimento de uma bolha de hotstring",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Backend: %s",
+ 	"menu.llm.model_change_title": "Mudança de modelo",
+ 	"menu.llm.model_date": "Data de atualização: %s",
+-	"menu.llm.model_label": "Modelo: %s",
++	"menu.llm.model_label": "Modelo selecionado: %s",
+ 	"menu.llm.model_params_active": "Parâmetros (Ativos): %s",
+ 	"menu.llm.model_params_total": "Parâmetros (Total): %s",
+ 	"menu.llm.model_source": "Fonte: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/ru.json b/static/ergopti_plus/_shared/data/locales/ru.json
+index e7a790e99..a802b222c 100644
+--- a/static/ergopti_plus/_shared/data/locales/ru.json
++++ b/static/ergopti_plus/_shared/data/locales/ru.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Обновить Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "О Ergopti ИИ",
+ 	"menu.llm.about_body": "Ergopti ИИ — Умные подсказки клавиатуры\nБэкенд: Ollama (локально)\nВерсия: 1.0",
+-	"menu.llm.active_model_label": "Активная модель: ",
+ 	"menu.llm.add_custom_model": "Добавить пользовательскую модель",
+ 	"menu.llm.add_model_entry": "➕ Добавить пользовательскую модель…",
+ 	"menu.llm.after_hotstring": "Предложение после исчезновения пузырька хотстринга",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Бэкенд: %s",
+ 	"menu.llm.model_change_title": "Смена модели",
+ 	"menu.llm.model_date": "Дата обновления: %s",
+-	"menu.llm.model_label": "Модель: %s",
++	"menu.llm.model_label": "Выбранная модель: %s",
+ 	"menu.llm.model_params_active": "Параметры (Активные): %s",
+ 	"menu.llm.model_params_total": "Параметры (Всего): %s",
+ 	"menu.llm.model_source": "Источник: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/sv.json b/static/ergopti_plus/_shared/data/locales/sv.json
+index a555152e5..659c1f352 100644
+--- a/static/ergopti_plus/_shared/data/locales/sv.json
++++ b/static/ergopti_plus/_shared/data/locales/sv.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Uppdatera Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Om Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — Smarta tangentbordsförslag\nBackend: Ollama (lokal)\nVersion: 1.0",
+-	"menu.llm.active_model_label": "Aktiv modell: ",
+ 	"menu.llm.add_custom_model": "Lägg till en anpassad modell",
+ 	"menu.llm.add_model_entry": "➕ Lägg till en anpassad modell…",
+ 	"menu.llm.after_hotstring": "Förslag efter att en hotstring-bubbla försvinner",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Serverdel: %s",
+ 	"menu.llm.model_change_title": "Modellbyte",
+ 	"menu.llm.model_date": "Uppdateringsdatum: %s",
+-	"menu.llm.model_label": "Modell: %s",
++	"menu.llm.model_label": "Vald modell: %s",
+ 	"menu.llm.model_params_active": "Parametrar (Aktiv): %s",
+ 	"menu.llm.model_params_total": "Parametrar (Totalt): %s",
+ 	"menu.llm.model_source": "Källa: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/tr.json b/static/ergopti_plus/_shared/data/locales/tr.json
+index 06dfd1645..5e7441bb0 100644
+--- a/static/ergopti_plus/_shared/data/locales/tr.json
++++ b/static/ergopti_plus/_shared/data/locales/tr.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s güncelle",
+ 	"menu.llm.about": "Ergopti AI Hakkında",
+ 	"menu.llm.about_body": "Ergopti AI — Akıllı klavye önerileri\nBackend: Ollama (yerel)\nSürüm: 1.0",
+-	"menu.llm.active_model_label": "Etkin model: ",
+ 	"menu.llm.add_custom_model": "Özel model ekle",
+ 	"menu.llm.add_model_entry": "➕ Özel model ekle…",
+ 	"menu.llm.after_hotstring": "Kısaltma baloncuğu sona erdiğinde öneri",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Arka uç: %s",
+ 	"menu.llm.model_change_title": "Model Değişikliği",
+ 	"menu.llm.model_date": "Güncelleme tarihi: %s",
+-	"menu.llm.model_label": "Model: %s",
++	"menu.llm.model_label": "Seçili model: %s",
+ 	"menu.llm.model_params_active": "Parametreler (Aktif): %s",
+ 	"menu.llm.model_params_total": "Parametreler (Toplam): %s",
+ 	"menu.llm.model_source": "Kaynak: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/uk.json b/static/ergopti_plus/_shared/data/locales/uk.json
+index 6e61d86f0..454eaa32b 100644
+--- a/static/ergopti_plus/_shared/data/locales/uk.json
++++ b/static/ergopti_plus/_shared/data/locales/uk.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "Оновити Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "Про Ergopti ШІ",
+ 	"menu.llm.about_body": "Ergopti ШІ — Розумні підказки клавіатури\nБекенд: Ollama (локально)\nВерсія: 1.0",
+-	"menu.llm.active_model_label": "Активна модель: ",
+ 	"menu.llm.add_custom_model": "Додати власну модель",
+ 	"menu.llm.add_model_entry": "➕ Додати власну модель…",
+ 	"menu.llm.after_hotstring": "Пропозиція після зникнення бульбашки хотстрингу",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "Бекенд: %s",
+ 	"menu.llm.model_change_title": "Зміна моделі",
+ 	"menu.llm.model_date": "Дата оновлення: %s",
+-	"menu.llm.model_label": "Модель: %s",
++	"menu.llm.model_label": "Вибрана модель: %s",
+ 	"menu.llm.model_params_active": "Параметри (Активні): %s",
+ 	"menu.llm.model_params_total": "Параметри (Всього): %s",
+ 	"menu.llm.model_source": "Джерело: %s",
+diff --git a/static/ergopti_plus/_shared/data/locales/zh.json b/static/ergopti_plus/_shared/data/locales/zh.json
+index bd8340b99..78387dc3a 100644
+--- a/static/ergopti_plus/_shared/data/locales/zh.json
++++ b/static/ergopti_plus/_shared/data/locales/zh.json
+@@ -1007,7 +1007,6 @@
+ 	"menu.layout.update_version": "更新 Ergopti (%s) v%s → v%s",
+ 	"menu.llm.about": "关于 Ergopti AI",
+ 	"menu.llm.about_body": "Ergopti AI — 智能键盘建议\n后端: Ollama (本地)\n版本: 1.0",
+-	"menu.llm.active_model_label": "活跃模型: ",
+ 	"menu.llm.add_custom_model": "添加自定义模型",
+ 	"menu.llm.add_model_entry": "➕ 添加自定义模型…",
+ 	"menu.llm.after_hotstring": "Hotstring气泡过期后的建议",
+@@ -1101,7 +1100,7 @@
+ 	"menu.llm.model_backend": "后端: %s",
+ 	"menu.llm.model_change_title": "模型更换",
+ 	"menu.llm.model_date": "更新日期: %s",
+-	"menu.llm.model_label": "模型：%s",
++	"menu.llm.model_label": "已选模型：%s",
+ 	"menu.llm.model_params_active": "参数（活跃）: %s",
+ 	"menu.llm.model_params_total": "参数（总）: %s",
+ 	"menu.llm.model_source": "来源: %s",
+diff --git a/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_health_probe_generation.lua b/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_health_probe_generation.lua
+index f9e1bd9ee..37c3e19e5 100644
+--- a/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_health_probe_generation.lua
++++ b/static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_health_probe_generation.lua
+@@ -336,7 +336,7 @@ end
+ 
+ local function build_and_assert_red(fixture)
+ 	local item = fixture.handler.build_item()
+-	local model_row = find_row(item.submenu, "menu.llm.active_model_label")
++	local model_row = find_row(item.submenu, "menu.llm.model_label")
+ 	helpers.assert_type(model_row, "table")
+ 	helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1,
+ 		"an invalidated health cache must render the current backend as unprobed")
+@@ -386,7 +386,7 @@ helpers.describe("LLM health probe ownership", function()
+ 
+ 		with_fixture(function(fixture)
+ 			local item = build_and_assert_red(fixture)
+-			local model_row = find_row(item.submenu, "menu.llm.active_model_label")
++			local model_row = find_row(item.submenu, "menu.llm.model_label")
+ 			helpers.assert_type(model_row, "table")
+ 			helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1)
+ 			local updates_before_current = fixture.updates()
+@@ -395,7 +395,7 @@ helpers.describe("LLM health probe ownership", function()
+ 				"the current MLX probe must commit and repaint exactly once")
+ 			local refreshed = fixture.handler.build_item()
+ 			local refreshed_model = find_row(
+-				refreshed.submenu, "menu.llm.active_model_label")
++				refreshed.submenu, "menu.llm.model_label")
+ 			helpers.assert_type(refreshed_model, "table")
+ 			helpers.assert_true(refreshed_model.title:find("🟡 ", 1, true) == 1,
+ 				"a committed current MLX response must render the reachable state")
+@@ -465,7 +465,7 @@ helpers.describe("LLM health probe ownership", function()
+ 			fixture.set_stop_mode("deferred")
+ 			local item = fixture.handler.build_item()
+ 			local port_action = find_nested_action(
+-				item, "menu.llm.active_model_label", "menu.llm.mlx_port_label")
++				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
+ 			local backend_action = find_nested_action(
+ 				item, "menu.llm.backend_title", "API 🌐")
+ 			helpers.assert_eq(type(port_action), "function")
+@@ -492,7 +492,7 @@ helpers.describe("LLM health probe ownership", function()
+ 			fixture.set_stop_mode("deferred")
+ 			local item = fixture.handler.build_item()
+ 			local port_action = find_nested_action(
+-				item, "menu.llm.active_model_label", "menu.llm.mlx_port_label")
++				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
+ 			local backend_action = find_nested_action(
+ 				item, "menu.llm.backend_title", "API 🌐")
+ 
+diff --git a/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua b/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua
+index 27f499f60..63ce73c19 100644
+--- a/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua
++++ b/static/ergopti_plus/macos/ui/menu/menu_llm/init.lua
+@@ -1015,7 +1015,9 @@ local function create_menu(deps)
+ 						end
+ 				end
+ 
+-				local rich_model_title = health_dot .. i18n.get("menu.llm.active_model_label")
++				-- The row's label is the manifest's own key (menu.llm.model_label), the
++				-- one Windows draws too: one row, one wording, in every driver.
++				local model_text
+ 				if state.llm_backend == "api" then
+ 						-- The local llm_model slot is stale on this backend: show the
+ 						-- active API entry's configured name instead, without
+@@ -1024,13 +1026,13 @@ local function create_menu(deps)
+ 						if type(ApiPanel.active_entry_display_name) == "function" then
+ 							entry_name = ApiPanel.active_entry_display_name()
+ 						end
+-						rich_model_title = rich_model_title
+-							.. (entry_name or i18n.get("menu.llm.no_model_none"))
++						model_text = entry_name or i18n.get("menu.llm.no_model_none")
+ 				elseif not state.llm_model or state.llm_model == "" then
+-						rich_model_title = rich_model_title .. i18n.get("menu.llm.no_model_none")
++						model_text = i18n.get("menu.llm.no_model_none")
+ 				else
+-						rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)
++						model_text = string.format("%s%s%s", active_display_model, type_str, params_ram_str)
+ 				end
++				local rich_model_title = health_dot .. string.format(i18n.get("menu.llm.model_label"), model_text)
+ 
+ 				local model_submenu
+ 				if state.llm_backend == "api" then

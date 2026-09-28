@@ -1,0 +1,150 @@
+From e58cadf956fac2bf18adf652cd3031f4198278b6 Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 13:09:22 +0200
+Subject: [PATCH] feat(layouts): declare historical hotstring source bindings
+
+Keep runtime categories, feature sections and source priority attached
+to optional geometry files without encoding activation in pack metadata.
+Reject malformed bindings before publishing the discovered catalogue.
+---
+ .../_shared/lua/hotstrings/extensions.lua     | 53 +++++++++++++++++--
+ .../meta/test_shared_extensions_scanner.lua   | 28 ++++++++++
+ 2 files changed, 76 insertions(+), 5 deletions(-)
+
+diff --git a/static/ergopti_plus/_shared/lua/hotstrings/extensions.lua b/static/ergopti_plus/_shared/lua/hotstrings/extensions.lua
+index f635a7697..faeb5496f 100644
+--- a/static/ergopti_plus/_shared/lua/hotstrings/extensions.lua
++++ b/static/ergopti_plus/_shared/lua/hotstrings/extensions.lua
+@@ -43,6 +43,44 @@ local MANIFEST_NAME = "manifest.toml"
+ -- folder to stay distinguishable from everything else it carries.
+ local HOTSTRINGS_SUBDIR = "hotstrings"
+ 
++--- Validates source associations; activation remains owned by existing preferences.
++--- @param bindings table|nil Manifest hotstring bindings.
++--- @return table Bindings keyed by extension file stem.
++local function validate_bindings(bindings)
++	if bindings == nil then return {} end
++	if type(bindings) ~= "table" then error("Invalid extension hotstring bindings", 0) end
++	for stem, binding in pairs(bindings) do
++		if type(stem) ~= "string" or not stem:match("^[a-z][a-z0-9_-]*$") or type(binding) ~= "table" then
++			error("Invalid extension hotstring binding", 0)
++		end
++		local allowed = { category = true, feature_section = true, sections = true, source = true }
++		for key in pairs(binding) do
++			if not allowed[key] then error("Unknown extension hotstring binding field", 0) end
++		end
++		if type(binding.category) ~= "string" or not binding.category:match("^[a-z][a-z0-9_]*$")
++			or type(binding.feature_section) ~= "string"
++			or not binding.feature_section:match("^hotstrings%.[a-z][a-z0-9_]*$")
++			or binding.source ~= "common" then
++			error("Invalid historical extension hotstring binding", 0)
++		end
++		if binding.sections ~= nil then
++			if type(binding.sections) ~= "table" or #binding.sections == 0 then
++				error("Invalid extension section selection", 0)
++			end
++			local seen, count = {}, 0
++			for index, section in pairs(binding.sections) do
++				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #binding.sections
++					or type(section) ~= "string" or not section:match("^[a-z][a-z0-9_]*$") or seen[section] then
++					error("Invalid extension section selection", 0)
++				end
++				seen[section], count = true, count + 1
++			end
++			if count ~= #binding.sections then error("Invalid extension section selection", 0) end
++		end
++	end
++	return bindings
++end
++
+ 
+ 
+ 
+@@ -58,12 +96,12 @@ local HOTSTRINGS_SUBDIR = "hotstrings"
+ --- @return string|nil name Declared display name.
+ --- @return table descriptions Localized descriptions.
+ local function parse_manifest(text)
+-	if text == nil then return nil, {} end
++	if text == nil then return nil, {}, {} end
+ 	if type(text) ~= "string" then error("Invalid extension manifest input (content withheld)", 0) end
+ 	local document = TomlCodec.decode(text)
+ 	if type(document) ~= "table" then error("Invalid extension manifest TOML (content withheld)", 0) end
+ 	local extension = document.extension
+-	if extension == nil then return nil, {} end
++	if extension == nil then return nil, {}, {} end
+ 	if type(extension) ~= "table" then error("Invalid extension metadata (content withheld)", 0) end
+ 	for key in pairs(extension) do
+ 		if type(key) ~= "string" then error("Invalid extension metadata (content withheld)", 0) end
+@@ -78,7 +116,7 @@ local function parse_manifest(text)
+ 			error("Invalid localized extension description (content withheld)", 0)
+ 		end
+ 	end
+-	return name ~= "" and name or nil, descriptions
++	return name ~= "" and name or nil, descriptions, validate_bindings(extension.hotstring_bindings)
+ end
+ 
+ --- Extracts the canonical display name from the extension section.
+@@ -136,14 +174,19 @@ function M.scan(roots, io_fns)
+ 						manifest_text = read_file(dir .. "/" .. MANIFEST_NAME)
+ 					end
+ 
+-					local name, descriptions = parse_manifest(manifest_text)
++					local name, descriptions, bindings = parse_manifest(manifest_text)
+ 					local toml_files = {}
++					local found_bindings = {}
+ 					for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
+ 						local stem = path:match("([^/\\]+)%.toml$")
+ 						if stem then
+-							toml_files[#toml_files + 1] = { path = path, stem = stem }
++							toml_files[#toml_files + 1] = { path = path, stem = stem, binding = bindings[stem] }
++							found_bindings[stem] = true
+ 						end
+ 					end
++					for stem in pairs(bindings) do
++						if not found_bindings[stem] then error("Bound extension hotstring file is missing", 0) end
++					end
+ 
+ 					-- Sorted so the menu order is the same on every machine. A
+ 					-- directory listing is not ordered by any contract, and a menu
+diff --git a/static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua b/static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua
+index 3f8b675ec..c749fba8f 100644
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua
+@@ -120,6 +120,34 @@ end)
+ -- ==================================================
+ 
+ helpers.describe("extensions: scanning finds packs and names them", function()
++	helpers.it("preserves historical category and section bindings without activation values", function()
++		local text = '[extension]\nname = "Geometry"\n[extension.hotstring_bindings.magicrepeat]\n'
++			.. 'category = "magickey"\nfeature_section = "hotstrings.magic_key"\n'
++			.. 'sections = ["repeat_corrections"]\nsource = "common"\n'
++		local found = Extensions.scan({ "/ext" }, fake_fs({
++			["/ext"] = { "/ext/geometry" },
++			["/ext/geometry/hotstrings"] = { "/ext/geometry/hotstrings/magicrepeat.toml" },
++		}, { ["/ext/geometry/manifest.toml"] = text }))
++		helpers.assert_eq(found[1].toml_files[1].binding, {
++			category = "magickey", feature_section = "hotstrings.magic_key",
++			sections = { "repeat_corrections" }, source = "common",
++		})
++	end)
++
++	helpers.it("refuses activation directives and malformed historical bindings", function()
++		for _, invalid in ipairs({
++			'category = "magickey"\nfeature_section = "hotstrings.magic_key"\nsource = "common"\nenabled = true',
++			'category = "magickey"\nfeature_section = "hotstrings.magic_key"\nsource = "package"',
++			'category = "magickey"\nfeature_section = "llm.enabled"\nsource = "common"',
++			'category = "magickey"\nfeature_section = "hotstrings.magic_key"\nsource = "common"\nsections = ["same", "same"]',
++		}) do
++			local ok = pcall(Extensions.scan, { "/ext" }, fake_fs({
++				["/ext"] = { "/ext/geometry" },
++				["/ext/geometry/hotstrings"] = { "/ext/geometry/hotstrings/magicrepeat.toml" },
++			}, { ["/ext/geometry/manifest.toml"] = '[extension.hotstring_bindings.magicrepeat]\n' .. invalid }))
++			helpers.assert_eq(ok, false)
++		end
++	end)
+ 
+ 	helpers.it("finds an extension and its hotstring packs", function()
+ 		local io_fns = fake_fs({
+-- 
+2.50.0.windows.1
+

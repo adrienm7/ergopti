@@ -1,0 +1,141 @@
+--- Persists desired choices and compensates the exact active engine on refusal.
+--- @param changes table Owned category/section updates.
+--- @return boolean committed
+local function commit_choices(changes)
+	if not _preferences or choices_pending() then return false end
+	local committed, reason = _preferences.set(changes)
+	if committed ~= true then
+		Logger.error(LOG, "Hotstring choice publication refused: %s.", tostring(reason))
+		return false
+	end
+	notify_change()
+	return true
+end
+
+--- Retries a retained engine compensation without replaying typed input.
+--- @return boolean restored
+function M.retry_configuration_restore()
+	return _preferences ~= nil and _preferences.retry_restore() == true
+end
+
+--- Reports whether a configuration owner is holding mutations pending compensation.
+--- @return boolean
+function M.configuration_pending() return choices_pending() end
+
+--- Marks the exact canonical choices read by the catalogue and its menu.
+--- @param document table Canonical configuration.
+--- @param mark function Ownership visitor.
+function M.mark_config_reads(document, mark) validate_choices(document, mark) end
+
+function M.disable_group(group_name)
+	return commit_choices({ { category = group_name, enabled = false } })
+end
+
+function M.enable_group(group_name)
+	return commit_choices({ { category = group_name, enabled = true } })
+end
+
+function M.toggle_group(group_name)
+	if type(group_name) ~= "string" then return false end
+	return commit_choices({ { category = group_name, enabled = not M.is_group_enabled(group_name) } })
+end
+
+--- Sets every loaded category and optionally each of its sections in one publication.
+--- @param enabled boolean Desired group state.
+--- @param sections boolean Whether to set desired child choices too.
+--- @return number|boolean Number of submitted choices, or false on refusal.
+local function set_catalogue_choices(enabled, sections)
+	local changes = {}
+	for category, children in pairs(choice_inventory()) do
+		changes[#changes + 1] = { category = category, enabled = enabled }
+		if sections then
+			for section in pairs(children) do
+				changes[#changes + 1] = { category = category, section = section, enabled = enabled }
+			end
+		end
+	end
+	if #changes == 0 then return 0 end
+	if not commit_choices(changes) then return false end
+	return #changes
+end
+
+function M.enable_all() return set_catalogue_choices(true, true) end
+function M.disable_all() return set_catalogue_choices(false, false) end
+
+--- Clears owned choices to the canonical neutral state without deleting unknown data.
+--- @return number|boolean Number of submitted choices, or false on refusal.
+function M.reset_defaults()
+	local changes = {}
+	for category, children in pairs(choice_inventory()) do
+		changes[#changes + 1] = { category = category,
+			enabled = ManifestReader.default_for("hotstrings.groups." .. category) }
+		for section in pairs(children) do
+			changes[#changes + 1] = { category = category, section = section,
+				enabled = ManifestReader.default_for("hotstrings.modules." .. category .. "." .. section) }
+		end
+	end
+	if #changes == 0 then return 0 end
+	if not commit_choices(changes) then return false end
+	return #changes
+end
+
+function M.is_group_enabled(group_name)
+	return Preferences.resolve(_choice_document, group_name)
+end
+
+function M.get_groups() return _collect_groups(_mappings) end
+
+--- Reads effective state while preserving the child's independent desired choice.
+--- @param category string
+--- @param section string
+--- @return boolean
+function M.is_section_enabled(category, section)
+	return M.is_group_enabled(category) and M.is_section_checked(category, section)
+end
+
+--- Reads desired child state even while its category is disabled.
+--- @param category string
+--- @param section string
+--- @return boolean
+function M.is_section_checked(category, section)
+	return Preferences.resolve(_choice_document, category, section)
+end
+
+--- Counts the effective mappings displayed beside a category.
+--- @param category string
+--- @return number
+function M.active_count(category)
+	local total = 0
+	for _, mapping in ipairs(_filtered_mappings) do
+		if mapping.group == category then total = total + 1 end
+	end
+	return total
+end
+
+function M.toggle_section(category, section)
+	if type(category) ~= "string" or type(section) ~= "string" then return false end
+	return commit_choices({ { category = category, section = section,
+		enabled = not M.is_section_checked(category, section) } })
+end
+
+function M.set_all_sections(category, enabled)
+	return M.set_categories_sections({ category }, enabled)
+end
+
+--- Publishes one exact set of language/category choices, preserving unrelated settings.
+--- @param categories table Dense category list.
+--- @param enabled boolean Desired section state.
+--- @return boolean committed
+function M.set_categories_sections(categories, enabled)
+	if type(categories) ~= "table" or type(enabled) ~= "boolean" then return false end
+	local known, changes = choice_inventory(), {}
+	for _, category in ipairs(categories) do
+		if not known[category] then return false end
+		if enabled then changes[#changes + 1] = { category = category, enabled = true } end
+		for section in pairs(known[category]) do
+			changes[#changes + 1] = { category = category, section = section, enabled = enabled }
+		end
+	end
+	if #changes == 0 then return true end
+	return commit_choices(changes)
+end
