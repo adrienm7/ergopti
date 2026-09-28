@@ -593,7 +593,7 @@ _TH_OverlayDefaultsOnlyWhenUserMissing() {
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_user.toml", DefPath)
 	_TH_CleanDefaults()
 	AssertEqual(0, TH["keys"].Count)
-	AssertEqual(0, TH["layers"].Count)
+	AssertFalse(TH.Has("layers"), "tap-hold absence must not create a second navigation owner")
 }
 Test("LoadTapHoldToml: absent user file never imports a recommendation", _TH_OverlayDefaultsOnlyWhenUserMissing)
 

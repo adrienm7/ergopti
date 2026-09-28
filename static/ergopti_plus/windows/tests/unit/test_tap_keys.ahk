@@ -141,8 +141,8 @@ _TK_ReadConfig() {
 	try {
 		TapKeysReadConfig(Map("shortcuts.tap_keys", Map(
 			"number_row_right_1", "send_text", "number_row_right_2", "no_such_action")))
-		AssertEqual("screen_capture", TapKeyAssignments["number_row_left"],
-			"an absent key takes the manifest default: the OS capture tool")
+		AssertEqual("none", TapKeyAssignments["number_row_left"],
+			"an absent key keeps the native layout; recommendations require an explicit restore")
 		AssertEqual("send_text", TapKeyAssignments["number_row_right_1"], "a stored action is read")
 		AssertEqual("none", TapKeyAssignments["number_row_right_2"], "an unknown action leaves the key alone")
 		TapKeysReadConfig(Map())

@@ -2,21 +2,12 @@
 
 /**
  * ==============================================================================
- * MODULE: Keyboard-Slot Default Bindings Gate
+ * MODULE: Keyboard-Slot Defaults and Recommendations Gate
  * DESCRIPTION:
- * The features manifest declares each driver's shipped keyboard-slot bindings
- * (features.shortcuts.keyboard). "Generate an AI prediction" is bound to the
- * chord each OS leaves for it: Ctrl+Space on macOS (hs_ctrl_space), Win+Space
- * on Windows (win_space), Super+Space on Linux (super_space). macOS and Linux
- * read these defaults from their generated manifest at runtime; Windows keeps
- * KEYBOARD_SHORTCUT_DEFAULTS in AutoHotkey, so this gate holds that copy to the
- * manifest.
- *
- * WHY:
- * The dedicated AI trigger-shortcut settings were replaced by these keyboard
- * slots. A binding declared in the manifest and missing from the Windows map
- * would leave Windows without a way to ask for a prediction while the menu
- * describes one.
+ * Fresh keyboard slots remain neutral. Explicit restoration uses independent
+ * recommendations, including one prediction chord per driver. Production owners
+ * project manifest defaults rather than maintaining private assignment tables.
+ * In-memory mutations prove the gate rejects broken values and projections.
  * ==============================================================================
  */
 
@@ -25,76 +16,110 @@
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
-
-const ROOT = path.resolve(__dirname, '..', '..');
-const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
-const AHK_DEFAULTS = path.join(SP, 'windows', 'infra', 'feature_state.ahk');
-const DRIVER_MODULES = {
-	hs: path.join(SP, 'macos', 'modules', 'shortcuts', 'keyboard_shortcuts.lua'),
-	linux: path.join(SP, 'linux', 'modules', 'shortcuts', 'keyboard_shortcuts.lua'),
-};
+const SP = path.resolve(__dirname, '../../static/ergopti_plus');
 const PREDICTION_SLOTS = { ahk: 'win_space', hs: 'hs_ctrl_space', linux: 'super_space' };
+const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^\uFEFF/, '');
+const stripComments = (source, marker) => source.split('\n')
+	.filter((line) => !line.trimStart().startsWith(marker)).join('\n');
 
-// Manifest slots Windows does not bind yet, found when this gate was written.
-// win_sc029 (Win+², the instant capture) lost its Windows hotkey when the key
-// became a tap key; whether the chord keeps a default is a separate decision.
-// Ratchet: an entry that stops being a gap must be removed from this list.
-const KNOWN_WINDOWS_GAPS = ['win_sc029'];
+/**
+ * Checks canonical values and the owners that initialize assignments.
+ * @param {object} input Parsed entries and driver source snapshots.
+ * @returns {{errors: string[], checks: number}} Violations and check count.
+ */
+function validate(input) {
+	const errors = [];
+	let checks = 0;
+	const check = (ok, message) => {
+		checks += 1;
+		if (!ok) errors.push(message);
+	};
+	const slots = input.slots;
+	check(slots.length >= 15, `inventory: only ${slots.length} keyboard entries parsed`);
+	check(slots.filter((entry) => entry.platforms.includes('ahk')).length >= 15,
+		'inventory: Windows must retain its full slot catalogue');
+	const identities = new Set();
+	for (const entry of slots) {
+		check(entry.default === 'none', `neutral: ${entry.id} must initialize to none`);
+		check(typeof entry.recommended === 'string' && entry.recommended.length > 0,
+			`recommendation: ${entry.id} needs an independent recommended action`);
+		check(entry.type === 'action' && entry.input_altering === true,
+			`metadata: ${entry.id} must declare an input-altering action`);
+		for (const platform of entry.platforms) {
+			const identity = `${platform}:${entry.id}`;
+			check(!identities.has(identity), `duplicate: ${identity}`);
+			identities.add(identity);
+			const value = (entry.default_per_platform || {})[platform];
+			check(value === undefined || value === 'none', `neutral: ${identity} override must stay none`);
+		}
+	}
+	for (const [platform, slot] of Object.entries(PREDICTION_SLOTS)) {
+		const recommended = slots.filter((entry) => entry.platforms.includes(platform)
+			&& ((entry.recommended_per_platform || {})[platform] ?? entry.recommended) === 'llm_generate_prediction');
+		check(recommended.length === 1 && recommended[0].id === slot,
+			`prediction: ${platform} must recommend exactly ${slot}`);
+		const entry = slots.find((candidate) => candidate.id === slot);
+		check(entry && JSON.stringify(entry.platforms) === JSON.stringify([platform]),
+			`platform: ${slot} must belong only to ${platform}`);
+	}
+	const ahk = stripComments(input.ahk, ';');
+	const assignments = [...ahk.matchAll(/^global KEYBOARD_SHORTCUT_DEFAULTS\s*:=\s*(.+)$/gm)];
+	check(assignments.length === 1
+		&& assignments[0][1].trim() === '_FeatureStateDefaultsForSection("shortcuts.keyboard")',
+		'windows-owner: defaults must use the canonical section projection exactly once');
+	const body = (ahk.match(/^_FeatureStateDefaultsForSection\(Section\)\s*\{([\s\S]*?)^\}/m) || [])[1] || '';
+	check(body !== '' && /for Entry in ManifestFeaturesForSection\(Section\)/.test(body)
+		&& /Values\[Entry\["id"\]\]\s*:=\s*ManifestDefaultFor\(Entry\["path"\]\)/.test(body)
+		&& /return Values/.test(body) && !/ManifestRecommendedFor/.test(body),
+		'windows-projection: section entries must resolve defaults, never recommendations');
+	for (const [platform, raw] of Object.entries(input.lua)) {
+		const source = stripComments(raw, '--');
+		const body = (source.match(/^local function manifest_defaults\(\)([\s\S]*?)^end/m) || [])[1] || '';
+		check(/local KEYBOARD_SECTION = "shortcuts\.keyboard"/.test(source)
+			&& body !== '' && /ipairs\(Manifest\.features\(\)\)/.test(body)
+			&& /entry\.section == KEYBOARD_SECTION/.test(body)
+			&& /defaults\[entry\.id\] = entry\.default/.test(body)
+			&& /return defaults/.test(body) && !/entry\.recommended/.test(body)
+			&& /for slot, action in pairs\(manifest_defaults\(\)\)/.test(source),
+			`${platform}-owner: initialization must consume manifest defaults`);
+	}
+	return { errors, checks };
+}
 
-const errors = [];
-let checks = 0;
-const check = (ok, message) => {
-	checks += 1;
-	if (!ok) errors.push(message);
-};
-
-// Parsed as tools/build/build-features-manifest.js does: a nested
-// [[features.X.Y]] block is, to TOML, a sub-array of the last [[features.X]]
-// entry, so each block is rewritten into one flat [[entries]] array first.
-const manifest = toml.parse(fs.readFileSync(MANIFEST, 'utf8').replace(
+const manifest = toml.parse(read('_shared/modules/features/manifest.toml').replace(
 	/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 	(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
 ));
-const slots = (manifest.entries || []).filter((entry) => entry.path_prefix === 'shortcuts.keyboard');
-check(slots.length >= 15, `only ${slots.length} shortcuts.keyboard entr(ies) parsed — the walk collapsed`);
-
-for (const [platform, slot] of Object.entries(PREDICTION_SLOTS)) {
-	const bound = slots.filter((entry) => entry.default === 'llm_generate_prediction'
-		&& (entry.platforms || []).includes(platform));
-	check(bound.length === 1 && bound[0].id === slot,
-		`${platform}: exactly one keyboard slot must default to llm_generate_prediction, and it must be ${slot}; found ${JSON.stringify(bound.map((e) => e.id))}`);
-	if (bound[0]) {
-		check(JSON.stringify(bound[0].platforms) === JSON.stringify([platform]),
-			`${slot} must be declared for ${platform} only: the chord is that OS's`);
-		check(bound[0].type === 'action', `${slot} must be an action entry`);
+const input = {
+	slots: (manifest.entries || []).filter((entry) => entry.path_prefix === 'shortcuts.keyboard'),
+	ahk: read('windows/infra/feature_state.ahk'),
+	lua: {
+		hs: read('macos/modules/shortcuts/keyboard_shortcuts.lua'),
+		linux: read('linux/modules/shortcuts/keyboard_shortcuts.lua'),
+	},
+};
+const result = validate(input);
+const mutations = [
+	['neutral', (copy) => { copy.slots[0].default = 'paste_plain'; }],
+	['neutral', (copy) => { copy.slots[0].default_per_platform = { ahk: 'paste_plain' }; }],
+	['prediction', (copy) => { copy.slots.find((entry) => entry.id === 'win_space').recommended = 'none'; }],
+	['prediction', (copy) => { copy.slots[0].recommended_per_platform = { ahk: 'llm_generate_prediction' }; }],
+	['inventory', (copy) => { copy.slots = copy.slots.slice(0, 2); }],
+	['windows-owner', (copy) => { copy.ahk = copy.ahk.replace('global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.keyboard")', 'global KEYBOARD_SHORTCUT_DEFAULTS := Map()'); }],
+	['windows-projection', (copy) => { copy.ahk = copy.ahk.replace('ManifestDefaultFor(Entry["path"])', 'ManifestRecommendedFor(Entry["path"])'); }],
+	...Object.keys(input.lua).map((platform) => [`${platform}-owner`, (copy) => {
+		copy.lua[platform] = copy.lua[platform].replace('defaults[entry.id] = entry.default', 'defaults[entry.id] = entry.recommended');
+	}]),
+];
+for (const [label, mutate] of mutations) {
+	const copy = structuredClone(input);
+	mutate(copy);
+	if (!validate(copy).errors.some((message) => message.startsWith(`${label}:`))) {
+		result.errors.push(`mutation: ${label} corruption escaped its contract check`);
 	}
 }
-
-// Windows: every ahk manifest slot default is in KEYBOARD_SHORTCUT_DEFAULTS.
-const ahk = fs.readFileSync(AHK_DEFAULTS, 'utf8').replace(/^\uFEFF/, '');
-const block = (ahk.match(/global KEYBOARD_SHORTCUT_DEFAULTS := Map\(([\s\S]*?)\n\)/) || [])[1] || '';
-const windowsDefaults = new Map([...block.matchAll(/"(\w+)",\s*"(\w+)"/g)].map((m) => [m[1], m[2]]));
-check(windowsDefaults.size >= 15, `only ${windowsDefaults.size} Windows default(s) parsed`);
-for (const entry of slots.filter((e) => (e.platforms || []).includes('ahk'))) {
-	const matches = windowsDefaults.get(entry.id) === entry.default;
-	if (KNOWN_WINDOWS_GAPS.includes(entry.id)) {
-		check(!matches, `${entry.id} is now bound on Windows: remove it from KNOWN_WINDOWS_GAPS`);
-		continue;
-	}
-	check(matches,
-		`windows KEYBOARD_SHORTCUT_DEFAULTS must map ${entry.id} to ${entry.default}, has ${windowsDefaults.get(entry.id)}`);
-}
-
-// macOS and Linux have no copy: their slot modules seed from the manifest.
-for (const [platform, file] of Object.entries(DRIVER_MODULES)) {
-	const source = fs.readFileSync(file, 'utf8');
-	check(/Manifest\.features\(\)/.test(source) && /"shortcuts\.keyboard"/.test(source),
-		`${platform}: keyboard_shortcuts.lua must seed its defaults from the manifest's shortcuts.keyboard entries`);
-}
-
-if (errors.length > 0) {
-	for (const error of errors) console.error(`[FAIL] ${error}`);
+if (result.errors.length > 0) {
+	for (const error of result.errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
 }
-console.log(`\x1b[32m[OK] keyboard-slot default bindings: ${checks} check(s) passed.\x1b[0m`);
+console.log(`[OK] keyboard slots: ${input.slots.length} entries, ${result.checks} checks and ${mutations.length} rejected mutations.`);
