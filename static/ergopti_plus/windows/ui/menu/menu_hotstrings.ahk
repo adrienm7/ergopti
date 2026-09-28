@@ -16,6 +16,14 @@
 
 global _HS_GrandTotalCache := -1
 
+; Shared declarations may expose these only after every host has a terminal owner.
+_HS_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"scope_restore", (*) => HotstringsScopeApply("recommended", OwnedOptions),
+		"scope_clear", (*) => HotstringsScopeApply("clear", OwnedOptions))
+}
+
 ; Compute the grand total count used in the tray menu title label.
 ; Sums enabled standard, ergopti, dynamic, personal and extension entries.
 _HS_ComputeGrandTotal() {
