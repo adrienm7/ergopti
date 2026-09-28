@@ -267,3 +267,148 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		helpers.assert_eq(state.seq_counter, seq_before)
 	end)
 end)
+
+helpers.describe("canonical hotstring cache projection", function()
+	local function fixture(source)
+		local state, registry = fresh_registry()
+		local files = { config = source }
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
+			write_if_unchanged = function(path, content, expected)
+				if expected.status ~= (files[path] and "ok" or "absent")
+					or (expected.status == "ok" and files[path] ~= expected.content) then return false end
+				files[path] = content; return true
+			end,
+		}
+		package.loaded["infra.preferences"] = nil
+		local preferences = require("infra.preferences")
+		registry.register_lua_group("rolls", "Rolls", { { name = "hc" }, { name = "sx" }, { name = "-" } })
+		registry.register_lua_group("ext:demo:test", "Extension", { { name = "fast" }, { name = "info", is_module_placeholder = true } })
+		return state, registry, preferences, files
+	end
+
+	helpers.it("replaces stale section settings with neutral absence before registry use", function()
+		local _, registry, preferences = fixture(nil)
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		hs.settings.set("ergopti.hotstrings_section_ext:demo:test_fast", true)
+		local saved, status = preferences.load("config")
+		helpers.assert_eq(status, "absent")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(registry.is_group_enabled("rolls"), false)
+		helpers.assert_eq(registry.is_group_enabled("ext:demo:test"), false)
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+		helpers.assert_eq(registry.is_section_enabled("ext:demo:test", "fast"), false)
+	end)
+
+	helpers.it("loads actual group and section readers without claiming unknown neighbors", function()
+		local _, registry, preferences, files = fixture('[hotstrings]\ngroups = { rolls = true, future = { keep = 9 } }\nmodules = { rolls = { hc = true, future = { keep = 7 } } }\n')
+		local source = files.config
+		local saved = preferences.load("config")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+		helpers.assert_true(registry.is_section_enabled("rolls", "hc"))
+		helpers.assert_eq(registry.is_section_enabled("rolls", "sx"), false)
+		helpers.assert_eq(files.config, source, "projection is not migration or persistence")
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_future"))
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_-"))
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_ext:demo:test_info"))
+	end)
+
+	helpers.it("rejects malformed owned values before changing a setting or group", function()
+		local _, registry, preferences = fixture('[hotstrings]\nmodules = { rolls = { hc = "yes" } }\n')
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		local saved = preferences.load("config")
+		helpers.assert_eq(registry.apply_hotstring_preferences(saved), false)
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_hc"), true)
+	end)
+
+	helpers.it("refuses a cache write whose native readback did not commit", function()
+		local _, registry, preferences = fixture(nil)
+		local set = hs.settings.set
+		hs.settings.set = function(key, value)
+			if key == "ergopti.hotstrings_section_rolls_hc" and value == false then return nil end
+			return set(key, value)
+		end
+		local ok, result = pcall(registry.apply_hotstring_preferences, preferences.load("config"))
+		hs.settings.set = set
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, false)
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_hc"))
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+	end)
+
+	helpers.it("retains an already committed corpus when the menu applies the same candidate", function()
+		local _, registry, preferences = fixture('[hotstrings]\ngroups = { rolls = true }\nmodules = { rolls = { hc = true } }\n')
+		local rebuilds = 0
+		registry.set_post_load_hook("rolls", function() rebuilds = rebuilds + 1 end)
+		local saved = preferences.load("config")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(rebuilds, 1)
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(rebuilds, 1, "boot followed by menu sync must not reload the same group")
+	end)
+
+	helpers.it("rolls settings and groups back when a real post-load hook throws", function()
+		local _, registry, preferences = fixture('[hotstrings]\ngroups = { rolls = true }\nmodules = { rolls = { hc = true } }\n')
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", false)
+		registry.set_post_load_hook("rolls", function() error("injected reload refusal") end)
+		helpers.assert_eq(registry.apply_hotstring_preferences(preferences.load("config")), false)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_hc"), false)
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+		helpers.assert_true(registry.is_group_enabled("ext:demo:test"))
+	end)
+
+	helpers.it("saves sparse choices into inline tables while retaining unknown neighbors", function()
+		local _, registry, preferences, files = fixture('[hotstrings]\ngroups = { rolls = true, future = { keep = 9 } }\nmodules = { rolls = { hc = true, future = { keep = 7 } } }\n')
+		helpers.assert_true(registry.apply_hotstring_preferences(preferences.load("config")))
+		helpers.assert_true(registry.disable_section("rolls", "hc"))
+		local state = { hotstrings = { rolls = false, ["ext:demo:test"] = false } }
+		helpers.assert_true(preferences.save("config", state, { "rolls", "ext:demo:test" }, { keymap = registry }))
+		local decoded = require("toml_codec").decode(files.config)
+		helpers.assert_nil(decoded.hotstrings.groups.rolls)
+		helpers.assert_nil(decoded.hotstrings.modules.rolls.hc)
+		helpers.assert_eq(decoded.hotstrings.groups.future.keep, 9)
+		helpers.assert_eq(decoded.hotstrings.modules.rolls.future.keep, 7)
+		helpers.assert_true(registry.apply_hotstring_preferences(preferences.load("config")))
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+	end)
+
+	helpers.it("projects the canonical source before the actual boot call can start input", function()
+		local _, registry = fixture(nil)
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		local source, read_error = helpers.read_driver_unit("local function has_common_hotstring_groups")
+		helpers.assert_type(source, "string", tostring(read_error))
+		local body = source:match('(if keymap.apply_hotstring_preferences%(boot_saved_prefs%).-if keymap_started ~= true then.-\nend)')
+		helpers.assert_type(body, "string", "the owned boot boundary must exist")
+		local starts = 0
+		local run = assert(load(body, "hotstring boot boundary", "t", setmetatable({
+			boot_saved_prefs = require("infra.preferences").load("config"),
+			keymap = {
+				apply_hotstring_preferences = registry.apply_hotstring_preferences,
+				start = function()
+					helpers.assert_eq(registry.is_group_enabled("rolls"), false)
+					helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+					starts = starts + 1; return true
+				end,
+			},
+		}, { __index = _G })))
+		run()
+		helpers.assert_eq(starts, 1)
+	end)
+
+	helpers.it("the real menu synchronizer replaces absent canonical section choices", function()
+		local _, registry, preferences = fixture(nil)
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		package.loaded["ui.menu.menu_state"] = nil
+		local MenuState = require("ui.menu.menu_state")
+		local state = { hotstrings = {}, keymap = false, delays = {}, repeat_key_enabled = false }
+		local keymap = setmetatable({ set_llm_model = function() return true end }, { __index = registry })
+		local result, report = MenuState.sync_state_to_modules(state, preferences.load("config"), false, {
+			keymap = keymap, core_mods = {}, hotstring_editor = {},
+		})
+		helpers.assert_true(result, helpers.inspect(report))
+		helpers.assert_eq(registry.is_group_enabled("rolls"), false)
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+	end)
+end)

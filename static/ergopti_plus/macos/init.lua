@@ -1610,6 +1610,9 @@ Boot.stage("Keymap engine started")
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
 -- This call was previously auto-invoked at the end of modules/keymap/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
+if keymap.apply_hotstring_preferences(boot_saved_prefs) ~= true then
+	error("canonical hotstring preferences did not commit before eventtap startup")
+end
 local keymap_started = keymap.start()
 if keymap_started ~= true then
 	error("keymap.start did not commit")
