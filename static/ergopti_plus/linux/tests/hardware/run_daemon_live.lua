@@ -155,27 +155,24 @@ os.remove(home)
 os.execute("mkdir -p '" .. home .. "'")
 local log = home .. "/daemon.log"
 
--- This fixture represents an already-configured desktop; the first-use window
--- would otherwise take focus from the editor whose injected text is measured.
-os.execute("mkdir -p '" .. home .. "/.config/ergopti'")
-local setup = assert(io.open(home .. "/.config/ergopti/config.toml", "w"))
-setup:write("[script]\nonboarding_done = true\n")
-setup:close()
+-- Select the probe's input features through the real owners in its private HOME.
+local interpreter = arg and arg[-1] or "luajit"
+local Shell = require("adapters.shell_runner")
+local prepare = string.format("HOME=%s XDG_CONFIG_HOME=%s XDG_DATA_HOME=%s %s -e %s",
+	Shell.quote(home), Shell.quote(home .. "/.config"), Shell.quote(home .. "/.local/share"),
+	Shell.quote(interpreter), Shell.quote('require("tests.support.live_preferences").daemon()'))
+assert(Shell.run(prepare), "the live daemon configuration must be prepared before input starts")
 
 -- The AI configured as a user would leave it after "Add an API": enabled, the
 -- API backend selected, one entry in the private keys file.
 if LLM_PORT then
 	os.execute("mkdir -p '" .. home .. "/.config/ergopti_plus'")
-	local storage = io.open(home .. "/.config/ergopti_plus/storage.json", "w")
-	storage:write('{"llm.enabled":true,"llm.models.selected":"api","llm.profiles.num_predictions":1}')
-	storage:close()
 	local keys = io.open(home .. "/.config/ergopti_plus/api_keys.json", "w")
 	keys:write(string.format('{"version":1,"active_id":"live","entries":[{"id":"live","provider":"openai_compat",'
 		.. '"label":"Live","token":"%s","model":"live-model","base_url":"http://127.0.0.1:%s/v1"}]}', LLM_KEY, LLM_PORT))
 	keys:close()
 	os.execute("chmod 600 '" .. home .. "/.config/ergopti_plus/api_keys.json'")
 end
-local interpreter = arg and arg[-1] or "luajit"
 os.execute(string.format(
 	-- XDG roots pinned too: a runner's XDG_CONFIG_HOME survives sudo, and the
 	-- daemon then read the runner's settings instead of the ones seeded here.

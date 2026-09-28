@@ -71,8 +71,10 @@ end
 -- =========================================
 
 print("=== 1/ the models Ollama reports ===")
+require("tests.support.live_preferences").ensure_directory()
 local Profiles = require("modules.llm.profiles")
 Profiles.init({})
+assert(Profiles.enable() == true, "the live prediction fixture must explicitly grant AI consent")
 local models = Profiles.refresh_models() or Profiles.get_models() or {}
 local listed = false
 for _, name in ipairs(models) do if name == MODEL then listed = true end end
@@ -126,7 +128,7 @@ Engine.init({
 		hide = function() return true end,
 	},
 })
-Engine.set_backend("ollama")
+assert(Engine.set_backend("ollama") == true, "the live backend must be selected durably")
 local context = "Bonjour à tous, je voulais vous dire que"
 Engine.predict(context, { app_id = "live-test", input_chars = 0 })
 run_until(180, function() return final ~= nil end)
