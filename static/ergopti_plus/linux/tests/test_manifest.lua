@@ -88,6 +88,8 @@ return {
 	"tests.unit.meta.test_tap_hold_engine",
 	"tests.unit.meta.test_tap_hold_loader",
 	"tests.unit.meta.test_tap_hold_manager",
+	"tests.unit.meta.test_nav_layer_native",
+	"tests.unit.meta.test_nav_layer_reload",
 	"tests.unit.meta.test_tap_hold_menu",
 	"tests.unit.meta.test_tap_hold_integration",
 	"tests.unit.meta.test_keyboard_hook_adapter",

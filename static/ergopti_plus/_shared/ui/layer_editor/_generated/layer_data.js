@@ -41,8 +41,8 @@ const LAYER_EDITOR_DATA = {
 	},
 	"source_kinds": {
 		"key": {"platforms":["windows","macos","linux"],"reason_key":null},
-		"mouse_button": {"platforms":["windows","macos","linux"],"reason_key":null},
-		"wheel": {"platforms":["windows","linux"],"reason_key":"platform_reason.layer_wheel_source_is_not_macos"}
+		"mouse_button": {"platforms":["windows","macos"],"reason_key":"platform_reason.layer_pointer_source_is_not_linux"},
+		"wheel": {"platforms":["windows"],"reason_key":"platform_reason.layer_wheel_source_is_windows_only"}
 	},
 	"repeat_count": {
 		"platforms": ["windows"],
@@ -225,7 +225,6 @@ const LAYER_EDITOR_DATA = {
 	"recommended": {
 		"all": {"KeyQ":"sel_doc_start","KeyW":"doc_start","KeyE":"doc_end","KeyR":"sel_doc_end","KeyT":"keystroke:F2","CapsLock":"backspace","KeyA":"sel_para_prev","KeyS":"arrow_up","KeyD":"arrow_down","KeyF":"sel_para_next","KeyG":"keystroke:F12","IntlBackslash":"duplicate_line_up","KeyZ":"move_line_up","KeyX":"move_line_down","KeyC":"duplicate_line_down","KeyV":"new_line_below","KeyY":"sel_line_start","KeyU":"sel_word_prev","KeyI":"sel_left","KeyO":"sel_right","KeyP":"sel_word_next","BracketLeft":"sel_line_end","KeyH":"window_to_monitor_left","KeyJ":"word_prev","KeyK":"arrow_left","KeyL":"arrow_right","Semicolon":"word_next","Quote":"window_to_monitor_right","KeyN":"maximize","KeyM":"line_start","Comma":"snap_left","Period":"snap_right","Slash":"line_end","AltRight":"escape"},
 		"windows": {"WheelUp":"vol_up","WheelDown":"vol_down","Digit1":"repeat_count:1","Digit2":"repeat_count:2","Digit3":"repeat_count:3","Digit4":"repeat_count:4","Digit5":"repeat_count:5","Digit6":"repeat_count:6","Digit7":"repeat_count:7","Digit8":"repeat_count:8","Digit9":"repeat_count:9","Digit0":"repeat_count:10"},
-		"macos": {"Digit1":"keystroke:F1","Digit2":"keystroke:F2","Digit3":"keystroke:F3","Digit4":"keystroke:F4","Digit5":"keystroke:F5","Digit6":"keystroke:F6","Digit7":"keystroke:F7","Digit8":"keystroke:F8","Digit9":"keystroke:F9","Digit0":"keystroke:F10","Minus":"keystroke:F11","Equal":"keystroke:F12","Space":"spotlight","Tab":"keystroke:meta+Backquote","MetaRight":"escape_or_option_shift"},
-		"linux": {"WheelUp":"vol_up","WheelDown":"vol_down"}
+		"macos": {"Digit1":"keystroke:F1","Digit2":"keystroke:F2","Digit3":"keystroke:F3","Digit4":"keystroke:F4","Digit5":"keystroke:F5","Digit6":"keystroke:F6","Digit7":"keystroke:F7","Digit8":"keystroke:F8","Digit9":"keystroke:F9","Digit0":"keystroke:F10","Minus":"keystroke:F11","Equal":"keystroke:F12","Space":"spotlight","Tab":"keystroke:meta+Backquote","MetaRight":"escape_or_option_shift"}
 	}
 };

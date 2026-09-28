@@ -56,7 +56,7 @@ M.MODIFIER_CODES = { ctrl = 29, shift = 42, alt = 56, alt_gr = 100, win = 125 }
 local KEY_LEFTSHIFT = 42
 -- Every usual modifier key, left and right.
 local MODIFIER_KEYS = EvdevCodes.MODIFIER_OF
-local KEY_LEFTCTRL, KEY_LEFTALT, KEY_LEFTMETA = 29, 56, 125
+local KEY_LEFTCTRL, KEY_LEFTALT = 29, 56
 -- The keys that are themselves under a held modifier (Ctrl+Tab, Shift+Tab,
 -- Ctrl+Backspace), as the Windows hotkeys without a wildcard are. CapsLock
 -- and the modifier keys stay tap-holds, so LShift and CapsLock held together
@@ -109,43 +109,12 @@ local TAP_NEEDS_UP = { left_ctrl = { EvdevCodes.KEY_CAPSLOCK, KEY_LEFTALT } }
 -- LAlt tapping Backspace with the layer on hold taps only with CapsLock up at
 -- its release (lalt.ahk 4.5), against a Backspace on a quick LAlt+CapsLock.
 local LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE = { left_alt = { EvdevCodes.KEY_CAPSLOCK } }
-local KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT = 102, 107, 103, 108, 105, 106
-local KEY_ENTER, KEY_BACKSPACE, KEY_ESC, KEY_DELETE = 28, 14, 1, 111
-local KEY_F2, KEY_F12 = 60, 88
+local KEY_BACKSPACE, KEY_DELETE, KEY_RIGHT = 14, 111, 106
 
 -- Tap actions that are a single key. They are dispatched through the hook
 -- like the key itself, so an Enter tapped on CapsLock ends a hotstring as a
 -- real Enter does, and an armed one-shot Shift treats them as that key.
 M.KEY_TAPS = { enter = 28, tab = 15, backspace = 14, escape = 1, delete = 111, space = 57, caps_lock = 58 }
-
---- A chord of the navigation layer.
-local function chord(mods, key) return { mods = mods, keys = { key } } end
-local C, S, A, W = KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT, KEY_LEFTMETA
-
--- The navigation layer, by physical (QWERTY) position, as on Windows
--- (windows/platform/remap/nav_layer.ahk): selection and word moves on the
--- letter rows, lines moved and duplicated on the bottom-left, windows moved to
--- another screen on the right. A key not listed stays itself.
-M.NAV_LAYER = {
-	-- Top row: q w e r t | y u i o p [
-	[16] = chord({ C, S }, KEY_HOME), [17] = chord({ C }, KEY_HOME), [18] = chord({ C }, KEY_END),
-	[19] = chord({ C, S }, KEY_END), [20] = chord({}, KEY_F2),
-	[21] = chord({ S }, KEY_HOME), [22] = chord({ C, S }, KEY_LEFT), [23] = chord({ S }, KEY_LEFT),
-	[24] = chord({ S }, KEY_RIGHT), [25] = chord({ C, S }, KEY_RIGHT), [26] = chord({ S }, KEY_END),
-	-- Middle row: caps a s d f g | h j k l ; '
-	[58] = chord({}, KEY_BACKSPACE),
-	[30] = chord({ C, S }, KEY_UP), [31] = chord({}, KEY_UP), [32] = chord({}, KEY_DOWN),
-	[33] = chord({ C, S }, KEY_DOWN), [34] = chord({}, KEY_F12),
-	[35] = chord({ W, S }, KEY_LEFT), [36] = chord({ C }, KEY_LEFT), [37] = chord({}, KEY_LEFT),
-	[38] = chord({}, KEY_RIGHT), [39] = chord({ C }, KEY_RIGHT), [40] = chord({ W, S }, KEY_RIGHT),
-	-- Bottom row: < z x c v | n m , . /
-	[86] = chord({ A, S }, KEY_UP), [44] = chord({ A }, KEY_UP), [45] = chord({ A }, KEY_DOWN),
-	[46] = chord({ A, S }, KEY_DOWN), [47] = { mods = {}, keys = { KEY_END, KEY_ENTER } },
-	[49] = chord({ W }, KEY_UP), [50] = chord({}, KEY_HOME), [51] = chord({ W }, KEY_LEFT),
-	[52] = chord({ W }, KEY_RIGHT), [53] = chord({}, KEY_END),
-	-- AltGr: Escape.
-	[100] = chord({}, KEY_ESC),
-}
 
 -- The keys the layer swallows while another key holds it, by key, with the tap
 -- and the hold that make them so: LAlt tapping Backspace with the layer on hold
@@ -166,6 +135,7 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 --- @param opts table {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
+---   nav_layer = table|nil, explicitly compiled navigation chords; absent is native,
 ---   key_text = function(code) -> string|nil, the text a key would type now in
 ---     the live layout, nil for none;
 ---   plan_text = function(text) -> steps|nil, the keystrokes { keycode, mods }
@@ -188,8 +158,12 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 --- @return table engine
 function M.new(opts)
 	local options = type(opts) == "table" and opts or {}
+	if options.nav_layer ~= nil and type(options.nav_layer) ~= "table" then
+		error("nav_layer must be a table of compiled navigation bindings", 2)
+	end
 	local self = {
 		by_code = {},
+		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
 		key_text = options.key_text,
@@ -327,7 +301,7 @@ local function chord_events(self, out, spec, value)
 			if index < #spec.keys then release(self, out, key) end
 		end
 	else
-		release(self, out, spec.keys[#spec.keys])
+		if #spec.keys > 0 then release(self, out, spec.keys[#spec.keys]) end
 		for index = #spec.mods, 1, -1 do release(self, out, spec.mods[index]) end
 	end
 end
@@ -623,8 +597,12 @@ end
 --- Presses a layer chord for `code` and remembers it until the key comes up.
 local function press_layer_key(self, code, spec)
 	local out = {}
-	self.layer_keys[code] = spec
-	chord_events(self, out, spec, DOWN)
+	local chords = spec.chords or { spec }
+	for index, item in ipairs(chords) do
+		chord_events(self, out, item, DOWN)
+		if index < #chords then chord_events(self, out, item, UP) end
+	end
+	self.layer_keys[code] = assert(chords[#chords], "a navigation binding needs a final chord")
 	return out
 end
 
@@ -665,7 +643,9 @@ function M:process(code, value, now_ms)
 	local on_layer = self.layer_keys[code]
 	if on_layer then
 		if value == REPEAT then
-			out[#out + 1] = { code = on_layer.keys[#on_layer.keys], value = REPEAT }
+			if #on_layer.keys > 0 then
+				out[#out + 1] = { code = on_layer.keys[#on_layer.keys], value = REPEAT }
+			end
 		elseif value == UP then
 			self.layer_keys[code] = nil
 			chord_events(self, out, on_layer, UP)
@@ -698,7 +678,7 @@ function M:process(code, value, now_ms)
 			-- nothing, RCtrl a Ctrl, Tab a Tab).
 			if self.layer_depth > 0 then
 				cancel_taps(self, nil)
-				local spec = M.NAV_LAYER[code]
+				local spec = self.nav_layer[code]
 				if spec then return press_layer_key(self, code, spec) end
 				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
 				self.native_keys[code] = true
@@ -785,7 +765,7 @@ function M:process(code, value, now_ms)
 	if value == DOWN then cancel_taps(self, nil) end
 
 	if self.layer_depth > 0 and value == DOWN then
-		local spec = M.NAV_LAYER[code]
+		local spec = self.nav_layer[code]
 		if spec then return press_layer_key(self, code, spec) end
 	end
 

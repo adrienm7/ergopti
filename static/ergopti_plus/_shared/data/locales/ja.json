@@ -2730,6 +2730,8 @@
 	"platform_reason.layer_fn_modifier_is_macos": "macOS のみ：Fn が修飾キーになるのは Mac だけです。PC のキーボードは Fn をキーボード内部で処理するため、Windows と Linux はそれを受け取ることがなく、送信することもできません。",
 	"platform_reason.layer_spotlight_is_macos": "macOS のみ：この操作は macOS の検索機能である Spotlight を開きます。Windows や Linux では、代わりにお使いのデスクトップ独自の検索ショートカットをキーの組み合わせとして割り当ててください。",
 	"platform_reason.layer_wheel_source_is_not_macos": "Windows と Linux のみ：macOS ではレイヤーが Karabiner-Elements 上で動作し、マウスホイールを入力として受け取れません。macOS でホイールを使って音量を変えるには、Layer + Scroll ショートカットを使ってください。",
+	"platform_reason.layer_wheel_source_is_windows_only": "マウスホイールの割り当ては Windows でのみ利用できます。macOS と Linux のナビゲーションレイヤーはスクロールを捕捉できません。",
+	"platform_reason.layer_pointer_source_is_not_linux": "Linux のナビゲーションレイヤーはマウスボタンの入力を捕捉しないため、マウスボタンの割り当ては利用できません。",
 	"platform_reason.debug_surface_is_each_drivers_own": "各ドライバーは自身の実行環境で診断します。AutoHotkey は Window Spy、変数一覧、キー履歴を備え、Hammerspoon は Lua コンソールを備えます。他の実行環境には開くべき同等物がありません。",
 	"platform_reason.chord_families_are_each_platforms": "ドライバーが割り当てる組み合わせの系統は、そのプラットフォームのものです。Windows は AltGr と CapsLock の組み合わせをまとめ、個人用ショートカットのファイルを持ちます。macOS は Ctrl と Cmd のショートカットをまとめます。各ドライバーは自分が割り当てる系統だけを並べます。",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux では非対応：このドライバーはアプリケーションごとの除外一覧を持たず、このメニューから計測ウィンドウにキーボードショートカットを割り当てることもできません。",

@@ -93,14 +93,14 @@ end
 --- Asks the remap manager to regenerate and reload its configuration.
 --- @return boolean applied
 local function apply(state)
-	local remap = dependency(state, "kanata", "platform.remap.manager")
-	if not remap or type(remap.restart) ~= "function" then
+	local remap = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
+	if not remap or type(remap.reload) ~= "function" then
 		Logger.error(LOG, "No remap manager: the saved navigation layer cannot be applied.")
 		return false
 	end
-	local ok, applied = pcall(remap.restart)
+	local ok, applied = pcall(remap.reload)
 	if not ok then
-		Logger.error(LOG, "The remap restart raised: %s.", tostring(applied))
+		Logger.error(LOG, "The native remap reload raised: %s.", tostring(applied))
 		return false
 	end
 	return applied == true

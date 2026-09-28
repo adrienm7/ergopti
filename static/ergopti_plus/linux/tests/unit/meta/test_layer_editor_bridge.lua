@@ -15,8 +15,8 @@
 ---    binds something one of the three OSes cannot resolve.
 --- 4. End to end: the page's scripted session (_shared/tests/corpus/
 ---    layer_editor/edited_layers.toml) is saved, the remap manager is asked to
----    regenerate, the window closes, and the kanata layer then generated from
----    the folder carries every Linux edit.
+---    reload, the window closes, and the installed native daemon engine emits
+---    every Linux keyboard edit.
 --- 5. A remap restart that fails keeps the window open.
 --- ==============================================================================
 
@@ -24,12 +24,10 @@ local helpers     = require("tests.helpers")
 local Json        = require("json")
 local TomlCodec   = require("toml_codec")
 local Layers      = require("keymap.layers")
-local KanataLayer = require("platform.remap.kanata_layer")
+local Manager = require("platform.remap.tap_hold_manager")
 
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 local FIXTURE = SHARED_ROOT .. "/tests/corpus/layer_editor/edited_layers.toml"
-local TEMPLATE_PATH = helpers.driver_root() .. "/platform/remap/data/kanata.kbd"
-local LAYER = "navigation"
 
 
 
@@ -61,6 +59,7 @@ end
 
 local function remove_config_dir(dir)
 	os.remove(dir .. "/layers.toml")
+	os.remove(dir .. "/tap_hold.toml")
 	os.execute('rmdir "' .. dir .. '"')
 end
 
@@ -79,8 +78,9 @@ local function make_state(dir)
 			end,
 			set_title = function(app, label) world.titles[#world.titles + 1] = app .. "=" .. label end,
 		},
-		kanata = { restart = function()
+		tap_hold = { reload = function()
 			world.restarts = world.restarts + 1
+			if world.on_reload then return world.on_reload() end
 			return world.restart_result
 		end },
 		paths = { shared_root = function() return SHARED_ROOT end },
@@ -104,33 +104,6 @@ local function codes(payload)
 	for _, err in ipairs(payload.errors or {}) do out[#out + 1] = err.code end
 	table.sort(out)
 	return table.concat(out, ",")
-end
-
---- defsrc token -> the generated navigation layer's action.
-local function layer_map(kbd)
-	local function entries(head)
-		local start = kbd:find("\n(" .. head .. "\n", 1, true)
-		helpers.assert_not_nil(start, "no (" .. head .. ") form")
-		local body = kbd:sub(start + #head + 3)
-		local out, depth, current = {}, 0, ""
-		for c in body:gmatch(".") do
-			if depth == 0 and c == ")" then break end
-			if c == "(" then depth = depth + 1 elseif c == ")" then depth = depth - 1 end
-			if depth == 0 and c:match("%s") then
-				if current ~= "" then out[#out + 1] = current end
-				current = ""
-			else
-				current = current .. c
-			end
-		end
-		if current ~= "" then out[#out + 1] = current end
-		return out
-	end
-	local keys, actions = entries("defsrc"), entries("deflayer " .. LAYER)
-	helpers.assert_eq(#actions, #keys, "the layer must line up with defsrc")
-	local out = {}
-	for i, key in ipairs(keys) do out[key] = actions[i] end
-	return out
 end
 
 
@@ -196,14 +169,25 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_nil(Bridge.on_message({ action = "format_disk" }, world.state), "an unknown action does nothing")
 	end)
 
-	helpers.it("saves the page's session, applies it, closes, and the kanata layer carries it (e2e)", function()
+	helpers.it("saves the page's session and the live daemon applies every keyboard edit (e2e)", function()
 		local dir = make_config_dir()
 		local world = make_state(dir)
+		local hook = { key_text = function() return nil end,
+			held_modifiers = function() return {} end,
+			held_text_modifier_codes = function() return {} end,
+			held_shortcut_modifier_codes = function() return {} end }
+		function hook.set_remapper(engine) hook.engine = engine end
+		Manager._reset_for_test()
+		Manager.init({ keyboard_hook = hook, execute_action = function() end,
+			action_names = function() return {} end, on_text_injected = function() end,
+			defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+		local original = hook.engine
+		world.on_reload = Manager.reload
 		local text = read_file(FIXTURE)
 		local outcome = Bridge.on_message({ action = "save", text = text }, world.state)
 		local written = read_file(dir .. "/layers.toml")
-		local NavLayer = helpers.load_module("platform.remap.nav_layer")
-		local bindings, registry = NavLayer.load({ shared_root = SHARED_ROOT, config_dir = dir })
+		local engine = hook.engine
+		Manager._reset_for_test()
 		remove_config_dir(dir)
 		helpers.assert_eq(outcome.saved, true)
 		helpers.assert_eq(outcome.applied, true)
@@ -213,10 +197,16 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		local result = last_call(world, "saveResult")
 		helpers.assert_eq(result.saved, true)
 		helpers.assert_eq(result.applied, true)
-		local layer = layer_map(KanataLayer.splice(read_file(TEMPLATE_PATH), LAYER, bindings, registry))
-		helpers.assert_eq(layer.t, "mute", "KeyT: the Linux edit")
-		helpers.assert_eq(layer.g, "f12", "KeyG keeps F12 on Linux")
-		helpers.assert_eq(layer.q, "C-S-home", "an untouched key keeps its recommended binding")
+		helpers.assert_true(engine ~= original, "the saved file swaps the actual daemon engine")
+		engine:process(56, 1, 0)
+		helpers.assert_eq(engine:process(20, 1, 10), { { code = 113, value = 1 } }, "KeyT emits mute")
+		engine:process(20, 0, 20)
+		helpers.assert_eq(engine:process(34, 1, 30), { { code = 88, value = 1 } }, "KeyG emits F12")
+		engine:process(34, 0, 40)
+		helpers.assert_eq(engine:process(16, 1, 50), {
+			{ code = 29, value = 1 }, { code = 42, value = 1 }, { code = 102, value = 1 },
+		}, "the persisted common binding emits Ctrl+Shift+Home")
+		engine:release_all()
 	end)
 
 	helpers.it("keeps the window open when the remap restart fails", function()

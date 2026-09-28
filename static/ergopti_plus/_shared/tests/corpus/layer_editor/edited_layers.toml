@@ -80,5 +80,3 @@ schema_version = 1
 [layers.nav.linux]
 "KeyT" = "mute"
 "KeyG" = "keystroke:F12"
-"WheelUp" = "vol_up"
-"WheelDown" = "vol_down"

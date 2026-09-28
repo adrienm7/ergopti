@@ -266,7 +266,7 @@ const DATA = (() => {
 	const page = loadPage();
 	page.call(`init(${JSON.stringify({ os: 'macos', path: '/cfg/layers.toml', text: null, errors: [] })})`);
 	check(page.key('WheelUp').classList.contains('unavailable'), 'the wheel cannot be a layer key on macOS');
-	check(page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_not_macos'], 'an unavailable input must say why');
+	check(page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_windows_only'], 'an unavailable input must say why');
 	check(page.key('KeyQ').classList.contains('custom'), 'a key the recommended layer binds and the empty file does not is custom');
 	page.key('KeyA').click();
 	check(page.el('repeat-apply').disabled === true, 'the repeat count cannot be picked on macOS');
