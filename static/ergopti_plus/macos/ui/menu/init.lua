@@ -1255,8 +1255,48 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return committed
 	end
+	local layout_scope = nil
+	local function apply_preference_scope(scope, mode)
+		if scope ~= "keyboard_layout" then return false end
+		if read_only_reason ~= nil then return false end
+		if not layout_scope then
+			layout_scope = require("ui.menu.scoped_preferences").new({
+				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+				runtime = {
+					capture = function() return menu_mods.keyboard_layout.capture_scope(state) end,
+					apply = function(_, rows) return menu_mods.keyboard_layout.apply_scope(state, rows) end,
+					restore = function(snapshot) return menu_mods.keyboard_layout.restore_scope(state, snapshot) end,
+				},
+				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+				admission = run_global_exclusive,
+				paused = function()
+					if type(core_mods.shortcuts_mod) ~= "table"
+						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+					return core_mods.shortcuts_mod.is_paused()
+				end,
+				backup_path = function()
+					scope_generation = scope_generation + 1
+					return MenuPaths.get("ConfigTomlPath") .. ".layout-"
+						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+				end,
+				confirm = function(selected_mode)
+					local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+					local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+					return require("infra.dialog_util").block_alert(i18n.get("menu.layout.title"), label, no, yes, "warning") == yes
+				end,
+			})
+		end
+		local committed = layout_scope.apply(mode)
+		if committed == true then
+			Builder.invalidate_cache()
+			updateMenu()
+		end
+		return committed
+	end
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
+		apply_preference_scope = apply_preference_scope,
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,

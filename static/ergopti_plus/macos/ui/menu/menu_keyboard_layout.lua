@@ -720,6 +720,12 @@ function M.build(ctx)
 		return true
 	end
 	render_ctx.commands["layout_manager"] = LayoutManagerWindow.menu_command()
+	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
+		render_ctx.commands[command] = function()
+			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
+			return ctx.apply_preference_scope("keyboard_layout", mode)
+		end
+	end
 	local custom_rows = custom_layout_rows(update_menu)
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
 		["custom_layouts"]   = function() return custom_rows end,
@@ -820,6 +826,59 @@ function M.apply_quit_layout(state, on_done)
 	return "pending"
 end
 
+local pending_switches = {}
+
+--- Reports automatic input-source transitions without terminal acknowledgement.
+--- @return boolean pending True until every scheduled/native transition settles.
+function M.scope_pending() return next(pending_switches) ~= nil end
+
+--- Captures the exact future automatic-switching policy.
+--- @param state table Live menu state.
+--- @return table|nil snapshot Detached policy, absent while native work is pending.
+function M.capture_scope(state)
+	if M.scope_pending() then return nil end
+	local result = {}
+	local Preferences = require("infra.preferences")
+	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
+		local key = assert(Preferences.flat_key_for(row.section .. "." .. row.key), "layout preference owner missing")
+		result[#result + 1] = { key = key, value = state[key] }
+	end
+	return result
+end
+
+--- Applies a planned layout policy without changing the current manual selection.
+--- @param state table Live menu state.
+--- @param rows table Canonical scope operations.
+--- @return boolean applied Terminal policy acknowledgement.
+function M.apply_scope(state, rows)
+	if M.scope_pending() then return false end
+	local Preferences, values = require("infra.preferences"), {}
+	local allowed = {}
+	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
+		allowed[row.section .. "." .. row.key] = true
+	end
+	for _, row in ipairs(rows) do
+		local path = row.section .. "." .. row.key
+		assert(allowed[path], "unexpected layout scope field: " .. path)
+		local key = assert(Preferences.flat_key_for(path), "layout preference owner missing")
+		local value = row.value
+		if row.delete then value = Manifest.default_for(path) end
+		values[#values + 1] = { key = key, value = value }
+	end
+	for _, item in ipairs(values) do state[item.key] = item.value end
+	return true
+end
+
+--- Restores a captured policy after a refused publication.
+--- @param state table Live menu state.
+--- @param snapshot table Exact policy snapshot.
+--- @return boolean restored Terminal policy acknowledgement.
+function M.restore_scope(state, snapshot)
+	if M.scope_pending() then return false end
+	for _, item in ipairs(snapshot) do state[item.key] = item.value end
+	return true
+end
+
 --- Schedules the pause / resume keyboard-layout switch on a DEFERRED run-loop
 --- cycle instead of running it inline.
 ---
@@ -840,16 +899,27 @@ function M.schedule_pause_layout_switch(is_paused, state, schedule)
 			return DeferredWork.after(0, fn, "menu_keyboard_layout.pause_switch")
 		end
 	end
-	local scheduled = schedule(function()
-		-- Look the setter up on M at call time so a test stub on the module is honoured.
-		if type(M.set_layout_by_kl_name_async) == "function" then
-			pcall(M.set_layout_by_kl_name_async, target, nil)
+	local token = { scheduling = true }
+	pending_switches[token] = true
+	local function dispatch()
+		if not pending_switches[token] or token.dispatched then return end
+		if token.scheduling then token.fired = true; return end
+		token.dispatched = true
+		local called, accepted = pcall(M.set_layout_by_kl_name_async, target, function(ok)
+			if type(ok) == "boolean" then pending_switches[token] = nil end
+		end)
+		if not called or accepted ~= true then
+			Logger.error(LOG, "Pause layout dispatch refused; terminal acknowledgement is required.")
 		end
-	end)
-	if scheduled ~= true then
+	end
+	local called, scheduled = pcall(schedule, dispatch)
+	token.scheduling = false
+	if not called or scheduled ~= true then
+		pending_switches[token] = nil
 		Logger.error(LOG, "Pause layout switch could not be scheduled.")
 		return nil
 	end
+	if token.fired then dispatch() end
 	return target
 end
 

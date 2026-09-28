@@ -21,6 +21,7 @@
 local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
+	"ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
 	"infra.dialog_util",
 	"infra.logger",
@@ -1132,6 +1133,41 @@ helpers.describe("gesture scope menu composition", function()
 			helpers.assert_eq(received.path, "/virtual/config.toml")
 			selected = "onboarding.btn.yes"
 			helpers.assert_eq(observations.builder_ctx.apply_gesture_scope("recommended"), true)
+			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+		end)
+	end)
+end)
+
+helpers.describe("layout scope menu composition", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+		with_menu_fixture({}, function(observations)
+			local received, selected, dialog_args
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				dialog_args = { ... }
+				return selected
+			end }
+			package.loaded["ui.menu.scoped_preferences"] = { new = function(options)
+				received = options
+				return { apply = function(mode)
+					return options.admission("layout scope fixture", function()
+						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
+							"ordinary save must not enter an owned scope")
+						return options.confirm(mode)
+					end)
+				end }
+			end }
+			selected = "onboarding.btn.no"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("keyboard_layout", "clear"), false)
+			helpers.assert_eq(dialog_args[3], "onboarding.btn.no")
+			helpers.assert_eq(dialog_args[4], "onboarding.btn.yes")
+			helpers.assert_eq(dialog_args[2], "common.clear_to_system")
+			helpers.assert_eq(received.scope, "keyboard_layout")
+			helpers.assert_type(received.runtime.capture, "function")
+			helpers.assert_type(received.checkpoint.capture, "function")
+			helpers.assert_type(received.checkpoint.replace, "function")
+			helpers.assert_eq(received.path, "/virtual/config.toml")
+			selected = "onboarding.btn.yes"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("keyboard_layout", "recommended"), true)
 			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
 		end)
 	end)

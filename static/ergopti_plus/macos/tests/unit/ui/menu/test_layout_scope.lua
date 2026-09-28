@@ -1,0 +1,179 @@
+--- tests/unit/ui/menu/test_layout_scope.lua
+
+local helpers = require("tests.helpers")
+local Codec = require("toml_codec")
+local FileSystem = require("adapters.file_system")
+
+local function fixture()
+	package.loaded["adapters.file_system"] = FileSystem
+	local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+	local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti+" }
+	local original = '[layout]\npause_switch_enabled = true\non_pause = "French"\non_resume = "Ergopti+"\nfuture = { preserve = 7 }\n[llm]\nenabled = true\n[metrics]\nenabled = true\n'
+	local files, controls, writes = { config = original }, {}, 0
+	local adapter = {
+		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
+		write = function() error("conditional publication is required") end,
+		write_if_unchanged = function(path, content, expected)
+			if controls.refuse and path == "config" then return false end
+			if expected.status == "ok" and expected.content ~= files[path] then return false end
+			if expected.status == "absent" and files[path] ~= nil then return false end
+			files[path], writes = content, writes + 1
+			return true
+		end,
+	}
+	package.loaded["adapters.file_system"] = adapter
+	local prefs = helpers.load_with_stubs("infra.preferences")
+	prefs.load("config")
+	local PT = require("ui.menu.preferences_transaction")
+	local save, checkpoint = PT.bind(prefs, { path = "config", state = state, hotfiles = {}, core_modules = {},
+		initial_state = state, initial_preferences = prefs.snapshot(state, {}, {}), restore_runtime = function() return true end })
+	local owner = require("ui.menu.scoped_preferences").new({
+		scope = "keyboard_layout", path = "config", state = state, files = adapter, preferences = prefs,
+		checkpoint = checkpoint, demotions = require("ui.menu.session_demotions").new(),
+		capture_preferences = function() return prefs.snapshot(state, {}, {}) end,
+		backup_path = function() return "backup" end,
+		admission = function(_, callback) return callback() end,
+		paused = function() return false end, confirm = function() return controls.confirm ~= false end,
+		runtime = {
+			capture = function() return Layout.capture_scope(state) end,
+			apply = function(_, rows) return Layout.apply_scope(state, rows) end,
+			restore = function(snapshot) return Layout.restore_scope(state, snapshot) end,
+		},
+	})
+	return owner, Layout, state, files, controls, prefs, save, function() return writes end, original
+end
+
+helpers.describe("macOS keyboard-layout scope", function()
+	helpers.it("restores and clears the exact switching policy without touching other consent or unknown data", function()
+		for _, mode in ipairs({ "clear", "recommended" }) do
+			local owner, Layout, state, files, _, prefs, save, _, original = fixture()
+			helpers.assert_eq(owner.apply(mode), true)
+			local decoded = Codec.decode(files.config)
+			helpers.assert_eq(state.layout_pause_switch_enabled, false)
+			helpers.assert_eq(state.layout_on_pause, false)
+			helpers.assert_eq(state.layout_on_resume, false)
+			helpers.assert_eq(decoded.layout.pause_switch_enabled, nil)
+			helpers.assert_eq(decoded.layout.on_pause, nil)
+			helpers.assert_eq(decoded.layout.on_resume, nil)
+			helpers.assert_eq(decoded.layout.future.preserve, 7)
+			helpers.assert_eq(decoded.llm.enabled, true)
+			helpers.assert_eq(decoded.metrics.enabled, true)
+			helpers.assert_eq(files.backup, original)
+			helpers.assert_eq(prefs.source_snapshot("config").content, files.config)
+			helpers.assert_eq(save(), true)
+			helpers.assert_eq(Layout.schedule_pause_layout_switch(false, state, function() error("no native switch") end), nil)
+		end
+	end)
+	helpers.it("refuses while an earlier deferred switch can still mutate the native input source", function()
+		local owner, Layout, state, files, _, _, _, writes, original = fixture()
+		local deferred, done
+		Layout.set_layout_by_kl_name_async = function(_, callback) done = callback; return true end
+		Layout.schedule_pause_layout_switch(false, state, function(callback) deferred = callback; return true end)
+		helpers.assert_eq(owner.apply("clear"), false)
+		helpers.assert_eq(writes(), 0)
+		deferred()
+		helpers.assert_eq(owner.apply("clear"), false, "dispatch acceptance is not terminal completion")
+		helpers.assert_eq(files.config, original)
+		done(true)
+		helpers.assert_eq(owner.apply("clear"), true)
+	end)
+	helpers.it("invalidates a refused scheduler callback and awaits a failed native terminal result", function()
+		local owner, Layout, state = fixture()
+		local deferred, done, calls = nil, nil, 0
+		Layout.set_layout_by_kl_name_async = function(_, callback) calls = calls + 1; done = callback; return true end
+		Layout.schedule_pause_layout_switch(false, state, function(callback) deferred = callback; return false end)
+		deferred()
+		helpers.assert_eq(calls, 0)
+		helpers.assert_eq(Layout.scope_pending(), false)
+		Layout.schedule_pause_layout_switch(false, state, function(callback) deferred = callback; return true end)
+		deferred()
+		helpers.assert_eq(Layout.scope_pending(), true)
+		done(false)
+		helpers.assert_eq(Layout.scope_pending(), false)
+		helpers.assert_eq(owner.apply("clear"), true)
+	end)
+	helpers.it("requires a boolean native terminal and ignores a synchronous refused schedule", function()
+		local owner, Layout, state, _, _, _, _, writes = fixture()
+		local calls, done = 0
+		Layout.set_layout_by_kl_name_async = function(_, callback) calls = calls + 1; done = callback; return true end
+		Layout.schedule_pause_layout_switch(false, state, function(callback) callback(); return false end)
+		helpers.assert_eq(calls, 0)
+		Layout.schedule_pause_layout_switch(false, state, function(callback) callback(); return true end)
+		helpers.assert_eq(calls, 1)
+		done("accepted")
+		helpers.assert_eq(owner.apply("clear"), false)
+		helpers.assert_eq(writes(), 0)
+		done(true)
+		helpers.assert_eq(owner.apply("clear"), true)
+	end)
+	helpers.it("validates every planned field before changing policy and restores absent state exactly", function()
+		local _, Layout, state = fixture()
+		local saved = Layout.capture_scope({})
+		local ok = pcall(Layout.apply_scope, state, {
+			{ section = "layout", key = "on_resume", delete = true },
+			{ section = "metrics", key = "enabled", delete = true },
+		})
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(state.layout_on_resume, "Ergopti+")
+		helpers.assert_eq(Layout.restore_scope(state, saved), true)
+		helpers.assert_eq(state.layout_on_resume, nil)
+		helpers.assert_eq(state.layout_pause_switch_enabled, nil)
+	end)
+	helpers.it("restores policy and save baselines on publication refusal or a nonterminal runtime result", function()
+		for _, failure in ipairs({ "write", "native" }) do
+			local owner, Layout, state, files, controls, prefs, save, _, original = fixture()
+			if failure == "write" then controls.refuse = true
+			else
+				local apply = Layout.apply_scope
+				Layout.apply_scope = function(...) apply(...); return "accepted" end
+			end
+			helpers.assert_eq(owner.apply("clear"), false)
+			helpers.assert_eq(files.config, original)
+			helpers.assert_eq(state.layout_pause_switch_enabled, true)
+			helpers.assert_eq(state.layout_on_pause, "French")
+			helpers.assert_eq(state.layout_on_resume, "Ergopti+")
+			helpers.assert_eq(prefs.source_snapshot("config").content, original)
+			controls.refuse = false
+			helpers.assert_eq(save(), true)
+		end
+	end)
+	helpers.it("cancel and stale source refuse before backup and state mutation", function()
+		for _, failure in ipairs({ "cancel", "stale" }) do
+			local owner, _, state, files, controls, _, _, writes = fixture()
+			if failure == "cancel" then controls.confirm = false else files.config = '[future]\nexternal = true\n' end
+			helpers.assert_eq(owner.apply("clear"), false)
+			helpers.assert_eq(writes(), 0)
+			helpers.assert_eq(state.layout_on_resume, "Ergopti+")
+		end
+	end)
+end)
+
+package.loaded["adapters.file_system"] = FileSystem
+package.loaded["infra.preferences"] = nil
+
+helpers.describe("layout scope provider", function()
+	helpers.it("dispatches the common commands through the exact scope owner", function()
+		local renderer = require("infra.manifest_menu")
+		local original, captured = renderer.build
+		renderer.build = function(_, _, _, _, ctx) captured = ctx; return {} end
+		local ok, err = xpcall(function()
+			local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+			local selected, mode
+			local ctx = { state = {}, base_dir = helpers.driver_root(), updateMenu = function() end,
+				save_prefs = function() error("scope provider must not publish an ordinary save") end,
+				apply_preference_scope = function(scope, value) selected, mode = scope, value; return true end }
+			Layout.build(ctx)
+			helpers.assert_eq(captured.commands.scope_clear(), true)
+			helpers.assert_eq(selected, "keyboard_layout")
+			helpers.assert_eq(mode, "clear")
+			helpers.assert_eq(captured.commands.scope_restore(), true)
+			helpers.assert_eq(mode, "recommended")
+			ctx.paused = true
+			helpers.assert_eq(captured.commands.scope_clear(), false)
+			ctx.paused, ctx.apply_preference_scope = false, nil
+			helpers.assert_eq(captured.commands.scope_restore(), false)
+		end, debug.traceback)
+		renderer.build = original
+		if not ok then error(err, 0) end
+	end)
+end)
