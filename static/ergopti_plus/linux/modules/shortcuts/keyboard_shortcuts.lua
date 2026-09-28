@@ -43,6 +43,8 @@ local Paths = require("infra.paths")
 local ChatGPT = require("modules.shortcuts.chatgpt")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local Manifest = require("infra.manifest_reader")
+local Codec = require("toml_codec")
+local Writer = require("toml_codec.writer")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -105,10 +107,6 @@ M.SLOT_GROUPS = {
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
 local KEYBOARD_SECTION = "shortcuts.keyboard"
 
--- Where the assignments live. One key per slot rather than one blob, so a
--- corrupt entry costs one binding instead of all of them.
-local PREF_PREFIX = "shortcuts.keyboard."
-
 -- The shared key catalogue.
 local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"
 
@@ -119,7 +117,7 @@ local _catalogue = nil
 -- slot_id → action_id, for the slots the user has assigned.
 local _assignments = {}
 
--- Whether the assignments have been read back from storage.
+-- Whether the assignments have been read back from config.toml.
 local _loaded = false
 
 
@@ -225,6 +223,18 @@ local function required_modifiers(slot_id)
 	return set
 end
 
+--- Whether the modifier prefix and key suffix both belong to the catalogue.
+--- @param slot_id string Candidate slot identity.
+--- @return boolean owned
+local function owns_slot(slot_id)
+	local mods, suffix = split_slot(slot_id)
+	if not mods then return false end
+	for _, entry in ipairs(catalogue_keys() or {}) do
+		if entry.id == suffix then return true end
+	end
+	return false
+end
+
 
 
 
@@ -259,47 +269,71 @@ local function manifest_defaults()
 	return defaults
 end
 
+--- Visits canonical assignments whose chord belongs to this owner.
+--- @param decoded table Decoded configuration.
+--- @param consume function Consumer receiving slot and stored value.
+local function walk_assignments(decoded, consume)
+	local shortcuts = type(decoded.shortcuts) == "table" and decoded.shortcuts or {}
+	local assignments = type(shortcuts.keyboard) == "table" and shortcuts.keyboard or {}
+	for slot, value in pairs(assignments) do
+		if owns_slot(slot) then consume(slot, value) end
+	end
+end
+
+--- Marks the same recognized entries that the runtime reader consumes.
+--- @param decoded table Decoded configuration.
+--- @param mark function Segment-based ownership collector.
+function M.mark_config_reads(decoded, mark)
+	walk_assignments(decoded, function(slot) mark("shortcuts", "keyboard", slot) end)
+end
+
 --- Reads the manifest defaults, then every stored assignment over them: a
 --- stored "none" clears a default the user removed. Idempotent.
 local function load_assignments()
 	if _loaded then return end
-	_loaded = true
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage or type(Storage.keys) ~= "function" then return end
+	local path = require("infra.config_paths").config("config.toml")
+	local content, status, detail = Writer.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then
+		error("keyboard_shortcuts: cannot read configuration: " .. tostring(detail))
+	end
+	local decoded = {}
+	if status == "ok" then
+		local ok, parsed = pcall(Codec.decode, content)
+		if not ok or type(parsed) ~= "table" then
+			error("keyboard_shortcuts: malformed configuration: " .. tostring(parsed))
+		end
+		decoded = parsed
+	end
 	-- The check set_action applies, applied to what was stored: an id the
 	-- catalogue does not offer (hand-edited, or retired by an update) would bind
 	-- the chord to a no-op. Windows drops it at load the same way.
 	local Gestures = action_catalogue()
 	if not Gestures then
-		Logger.error(LOG, "Keyboard shortcut assignments not loaded: no catalogue to check them against.")
-		return
+		error("Keyboard shortcut assignments not loaded: no catalogue to check them against.")
 	end
+	local loaded = {}
 	for slot, action in pairs(manifest_defaults()) do
 		if action ~= "none" then
 			if Gestures.is_assignable(action) then
-				_assignments[slot] = action
+				loaded[slot] = action
 			else
 				Logger.error(LOG, "Manifest default '%s' for %s is not in the catalogue — left unbound.",
 					action, slot)
 			end
 		end
 	end
-	for _, key in ipairs(Storage.keys()) do
-		if key:sub(1, #PREF_PREFIX) == PREF_PREFIX then
-			local slot = key:sub(#PREF_PREFIX + 1)
-			local action = Storage.get(key, nil)
-			if action == "none" then
-				_assignments[slot] = nil
-			elseif type(action) == "string" and action ~= "" then
-				if Gestures.is_assignable(action) then
-					_assignments[slot] = action
-				else
-					Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — left unbound.",
-						slot, action)
-				end
-			end
+	walk_assignments(decoded, function(slot, action)
+		if action == "none" then
+			loaded[slot] = nil
+		elseif type(action) == "string" and Gestures.is_assignable(action) then
+			loaded[slot] = action
+		else
+			loaded[slot] = nil
+			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — left unbound.", slot, tostring(action))
 		end
-	end
+	end)
+	_assignments = loaded
+	_loaded = true
 	local count = 0
 	for _ in pairs(_assignments) do count = count + 1 end
 	Logger.info(LOG, "Keyboard shortcut assignments loaded (%d bound).", count)
@@ -327,29 +361,23 @@ end
 --- @param action_id string
 --- @return boolean Whether the assignment was stored.
 function M.set_action(slot_id, action_id)
-	if not required_modifiers(slot_id) then
+	if not owns_slot(slot_id) then
 		Logger.error(LOG, "set_action(): '%s' is not a slot this driver knows — nothing bound.",
 			tostring(slot_id))
 		return false
 	end
 	load_assignments()
 
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then
-		Logger.error(LOG, "set_action(): no storage — '%s' would be forgotten at the next start.", slot_id)
-		return false
-	end
+	local path = require("infra.config_paths").config("config.toml")
 
 	if type(action_id) ~= "string" or action_id == "" or action_id == "none" then
 		-- A slot the manifest binds keeps an explicit "none": deleting the entry
 		-- would bring the default back at the next start.
-		if manifest_defaults()[slot_id] ~= nil then
-			if not Storage.set(PREF_PREFIX .. slot_id, "none") then
-				Logger.error(LOG, "set_action(): could not persist the removal of '%s'.", slot_id)
-				return false
-			end
-		elseif not Storage.delete(PREF_PREFIX .. slot_id) then
-			Logger.error(LOG, "set_action(): could not persist the removal of '%s'.", slot_id)
+		local operation = { section = KEYBOARD_SECTION, key = slot_id }
+		if manifest_defaults()[slot_id] ~= nil then operation.value = "none" else operation.delete = true end
+		local committed, detail = Writer.batch_write(path, { operation })
+		if committed ~= true then
+			Logger.error(LOG, "set_action(): could not persist the removal of '%s': %s.", slot_id, tostring(detail))
 			return false
 		end
 		_assignments[slot_id] = nil
@@ -369,8 +397,11 @@ function M.set_action(slot_id, action_id)
 		return false
 	end
 
-	if not Storage.set(PREF_PREFIX .. slot_id, action_id) then
-		Logger.error(LOG, "set_action(): could not persist '%s'.", slot_id)
+	local committed, detail = Writer.batch_write(path, {
+		{ section = KEYBOARD_SECTION, key = slot_id, value = action_id },
+	})
+	if committed ~= true then
+		Logger.error(LOG, "set_action(): could not persist '%s': %s.", slot_id, tostring(detail))
 		return false
 	end
 	_assignments[slot_id] = action_id

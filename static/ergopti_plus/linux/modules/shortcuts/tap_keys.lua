@@ -30,6 +30,8 @@ local M = {}
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
+local TomlCodec = require("toml_codec")
+local TomlWriter = require("toml_codec.writer")
 
 local LOG = "modules.shortcuts.tap_keys"
 
@@ -50,7 +52,7 @@ local BLOCKING_MODIFIERS = { "ctrl", "shift", "alt", "altgr", "meta" }
 -- Decoded tap_keys.json entries in menu order; nil until read.
 local _keys = nil
 
--- tap key id -> action id, read once from storage over the manifest defaults.
+-- tap key id -> action id, read once from config.toml over the manifest defaults.
 local _assignments = nil
 
 -- Injected by init(): whether the shortcuts feature may act now (on, not paused).
@@ -111,15 +113,47 @@ local function action_catalogue()
 	return Gestures
 end
 
---- Reads every assignment: the stored value, or the manifest default.
+--- Visits exactly the canonical assignments consumed by this owner.
+--- @param decoded table Decoded config.toml.
+--- @param consume function Consumer receiving key id and value.
+local function walk_assignments(decoded, consume)
+	local shortcuts = type(decoded.shortcuts) == "table" and decoded.shortcuts or {}
+	local assignments = type(shortcuts.tap_keys) == "table" and shortcuts.tap_keys or {}
+	for _, key in ipairs(M.keys()) do
+		if assignments[key.id] ~= nil then consume(key.id, assignments[key.id]) end
+	end
+end
+
+--- Marks exactly the preferences read by the assignment loader.
+--- @param decoded table Decoded config.toml.
+--- @param mark function Segment-based ownership collector.
+function M.mark_config_reads(decoded, mark)
+	walk_assignments(decoded, function(id) mark("shortcuts", "tap_keys", id) end)
+end
+
+--- Reads every assignment from config.toml, or the manifest default.
 local function load_assignments()
 	if _assignments then return end
-	local Storage = require("adapters.storage")
+	local path = require("infra.config_paths").config("config.toml")
+	local content, status, detail = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then
+		error("tap_keys: cannot read configuration: " .. tostring(detail))
+	end
+	local decoded = {}
+	if status == "ok" then
+		local ok, parsed = pcall(TomlCodec.decode, content)
+		if not ok or type(parsed) ~= "table" then
+			error("tap_keys: malformed configuration: " .. tostring(parsed))
+		end
+		decoded = parsed
+	end
+	local configured = {}
+	walk_assignments(decoded, function(id, value) configured[id] = value end)
 	local Gestures = action_catalogue()
 	local loaded = {}
 	for _, key in ipairs(M.keys()) do
-		local value = Storage.get(PREF_PREFIX .. key.id, nil)
-		if value == nil then value = Manifest.default_for("shortcuts.tap_keys." .. key.id) end
+		local value = configured[key.id]
+		if value == nil then value = Manifest.default_for(PREF_PREFIX .. key.id) end
 		if value ~= "none" and not (Gestures and Gestures.is_assignable(value)) then
 			Logger.warn(LOG, "Tap key '%s' holds unknown action '%s' — left unassigned.",
 				key.id, tostring(value))
@@ -155,9 +189,12 @@ function M.set_action(id, action_id)
 			tostring(action_id), id)
 		return false
 	end
-	local Storage = require("adapters.storage")
-	if not Storage.set(PREF_PREFIX .. id, action_id) then
-		Logger.error(LOG, "set_action(): could not persist tap key '%s'.", id)
+	local path = require("infra.config_paths").config("config.toml")
+	local committed, detail = TomlWriter.batch_write(path, {
+		{ section = "shortcuts.tap_keys", key = id, value = action_id },
+	})
+	if committed ~= true then
+		Logger.error(LOG, "set_action(): could not persist tap key '%s': %s.", id, tostring(detail))
 		return false
 	end
 	_assignments[id] = action_id
