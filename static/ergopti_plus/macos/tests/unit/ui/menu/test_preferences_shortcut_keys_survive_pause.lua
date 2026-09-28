@@ -90,7 +90,7 @@ helpers.describe("preferences: [shortcuts.keys] survive a paused save (shortcut-
 		helpers.it("persists the preference, not the binding, after " .. edge, function()
 			with_preferences(function(preferences)
 				Fixture.with_bindings(function(bindings, ctx)
-					helpers.assert_eq(bindings.start(), true)
+					helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 					helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 					helpers.assert_eq(bindings[edge](), true)
 					helpers.assert_eq(Fixture.live_count(ctx), 0,
@@ -117,7 +117,7 @@ helpers.describe("preferences: saved keys re-apply while paused (shortcut-prefer
 	helpers.it("reproduces the same keys without an ERROR and binds them on resume", function()
 		with_preferences(function(preferences)
 			Fixture.with_bindings(function(bindings, ctx)
-				helpers.assert_eq(bindings.start(), true)
+				helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 				helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 				-- Saved while the layer runs, so this set is right even before the
 				-- fix; only the replay behind the fence below is under test.
@@ -157,7 +157,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\nctrl_d = false\n"
 				local saved = preferences.load(CONFIG_PATH)
 				Fixture.with_bindings(function(bindings, ctx)
-					helpers.assert_eq(bindings.start(), true)
+					helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 					local denied_handle
 					for handle in pairs(ctx.live) do
 						if handle.id == "ctrl+d" then denied_handle = handle end
