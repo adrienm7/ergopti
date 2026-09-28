@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local ParameterLabel = require("action_parameter_label")
 
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
@@ -2675,7 +2676,7 @@ local function _build_shortcuts(ctx)
 			local assigned = assign_parameterized_action(
 				ctx,
 				Gestures,
-				"keyboard__" .. slot,
+				Keyboard.binding_id(slot),
 				option,
 				function() return Keyboard.set_action(slot, option) end,
 				picked
@@ -2690,11 +2691,12 @@ local function _build_shortcuts(ctx)
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
 				local slot_label = Keyboard.get_slot_label(slot)
-				local choices = slot_binding_rows(slot_label, bound, "keyboard__" .. slot,
+				local choices = slot_binding_rows(slot_label, bound, Keyboard.binding_id(slot),
 					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {
 					label = slot_label
-						.. " → " .. Gestures.get_action_label(bound),
+						.. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+							Gestures, Keyboard.binding_id(slot), bound),
 					items = choices,
 				}
 			end
@@ -2735,7 +2737,8 @@ local function _build_shortcuts(ctx)
 				return assigned
 			end
 			rows[#rows + 1] = {
-				label = name .. " → " .. (bound ~= "none" and Gestures.get_action_label(bound)
+				label = name .. " → " .. (bound ~= "none" and ParameterLabel.for_binding(
+					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
 					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
 			}

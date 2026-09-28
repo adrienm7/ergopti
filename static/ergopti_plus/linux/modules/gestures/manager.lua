@@ -42,6 +42,7 @@ local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
+local ParameterLabel = require("action_parameter_label")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
@@ -1181,7 +1182,7 @@ function M.get_action_display_label(slot)
 	local action = M.get_action(slot) or "none"
 	local label = M.get_action_label(action)
 	local value = M.get_action_parameter(slot, action)
-	return value ~= "" and (label .. " (" .. value .. ")") or label
+	return ParameterLabel.format(label, value)
 end
 
 --- Returns all gesture actions.

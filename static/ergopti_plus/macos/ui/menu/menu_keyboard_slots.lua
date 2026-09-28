@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local M = {}
+local ParameterLabel = require("action_parameter_label")
 
 local hs           = hs
 local i18n         = require("infra.i18n")
@@ -240,7 +241,8 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 	for _, slot in ipairs(KbShortcuts.assigned_keyboard_slots(group.prefix)) do
 		local action_label = slot.action
 		if type(gestures) == "table" and type(gestures.get_action_label) == "function" then
-			action_label = gestures.get_action_label(slot.action) or slot.action
+			action_label = ParameterLabel.for_binding(gestures.get_action_label(slot.action) or slot.action,
+				gestures, KbShortcuts.keyboard_binding_id(slot.id), slot.action)
 		end
 		rows[#rows + 1] = {
 			label    = KbShortcuts.get_keyboard_slot_label(slot.id) .. " : " .. action_label,

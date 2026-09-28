@@ -289,7 +289,11 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 		if (BindingId = "")
 				return Label
 		Value := GestureGetActionParameter(BindingId, ActionName)
-		return (Value != "") ? Label . " (" . Value . ")" : Label
+		if (Value = "")
+				return Label
+		if !RegExMatch(Label, "\[[^\[\]]*\]$", &Marker)
+				throw ValueError("Parameterized action label has no configurable marker: " . ActionName)
+		return SubStr(Label, 1, Marker.Pos - 1) . "[" . Value . "]"
 }
 
 ; Preserve the zero-argument contract for ordinary actions (including user

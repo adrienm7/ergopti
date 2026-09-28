@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local M = {}
+local ParameterLabel = require("action_parameter_label")
 local hs = hs
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
@@ -597,11 +598,13 @@ function M.build(ctx)
 		local enabled = state.script_control_enabled
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
 
-		local function get_label(act)
+		local function get_label(act, keyname)
 			if not act or act == "-" or act == "--" then return "-" end
 			if act:match("^#") then return act:sub(2) end
 			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
-				return ctx.gestures.get_action_label(act)
+				local binding = keyname and act ~= "none" and type(ctx.gestures.get_action_parameter) == "function"
+					and script_control.BINDING_PREFIX .. keyname or nil
+				return ParameterLabel.for_binding(ctx.gestures.get_action_label(act), ctx.gestures, binding, act)
 			end
 			return act
 		end
@@ -612,7 +615,7 @@ function M.build(ctx)
 			local current = state.script_control_shortcuts[keyname] or "none"
 			local sub = {}
 			for _, act in ipairs(actions) do
-				local label = get_label(act)
+				local label = get_label(act, keyname)
 				if label == "-" then
 					table.insert(sub, { separator = true })
 				elseif act:match("^#") then
@@ -685,17 +688,17 @@ function M.build(ctx)
 			disabled = not enabled or paused or nil,
 			items    = ({
 				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return, "return_key")),
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("return_key"),
 				},
 				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back, "backspace")),
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("backspace"),
 				},
 				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape, "escape")),
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("escape"),
 				},

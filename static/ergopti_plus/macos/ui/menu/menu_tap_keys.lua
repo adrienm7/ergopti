@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local M = {}
+local ParameterLabel = require("action_parameter_label")
 
 local i18n              = require("infra.i18n")
 local Logger            = require("infra.logger")
@@ -133,6 +134,7 @@ function M.provide_rows(ctx, disabled)
 		local action = TapKeys.get_action(key.id)
 		local action_label = action ~= "none" and gestures.get_action_label(action)
 			or i18n.get("menu.shortcuts.tap_keys.unassigned")
+		action_label = ParameterLabel.for_binding(action_label, gestures, TapKeys.binding_id(key.id), action)
 		local name = TapKeys.display_name(key.id, i18n)
 		rows[#rows + 1] = {
 			label    = name .. " : " .. action_label,
