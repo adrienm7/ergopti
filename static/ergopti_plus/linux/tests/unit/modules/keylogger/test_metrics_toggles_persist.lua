@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: A Metrics Toggle Survives the Restart
 --- DESCRIPTION:
---- That the five metrics switches are read from storage at load and written back
+--- That the five metrics switches are read from config.toml during initialization and written back
 --- when they change.
 ---
 --- WHERE THE CHOICE IS APPLIED:
@@ -33,7 +33,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fakes = helpers.load_module("tests.fakes")
+local Fixture = require("tests.support.metrics_preferences_fixture")
 
 -- What was in package.loaded before this file displaced it. RESTORED rather than
 -- cleared, and that distinction cost a CI run: clearing left the next test file
@@ -50,12 +50,12 @@ local _displaced = { storage = nil, keylogger = nil, held = false }
 --- @return table keylogger, table storage
 local function load_over_storage(initial, writes_fail)
 	if not _displaced.held then
-		_displaced.storage   = package.loaded["adapters.storage"]
+		_displaced.storage   = package.loaded["infra.metrics_preferences"]
 		_displaced.keylogger = package.loaded["modules.keylogger.keylogger"]
 		_displaced.held      = true
 	end
-	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	package.loaded["adapters.storage"] = storage
+	local storage = Fixture.new({ initial = initial, writes_fail = writes_fail })
+	package.loaded["infra.metrics_preferences"] = storage
 	package.loaded["modules.keylogger.keylogger"] = nil
 	local keylogger = require("modules.keylogger.keylogger")
 	-- init(), because that is where the stored choice is applied. Reading it at
@@ -67,7 +67,7 @@ end
 
 --- Puts back exactly what was there.
 local function drop_storage()
-	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["infra.metrics_preferences"] = _displaced.storage
 	package.loaded["modules.keylogger.keylogger"] = _displaced.keylogger
 end
 

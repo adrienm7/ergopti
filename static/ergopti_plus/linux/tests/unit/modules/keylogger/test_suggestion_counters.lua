@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -78,7 +79,7 @@ end
 
 helpers.describe("suggestion counters: what reaches the database", function()
 
-	helpers.it("persists the hotstring suggestions that were offered", function()
+	it("persists the hotstring suggestions that were offered", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("firefox", 1000)
 			keylogger.record_suggestion("firefox", "hotstring", 1100)
@@ -93,7 +94,7 @@ helpers.describe("suggestion counters: what reaches the database", function()
 				.. "accepted all day.")
 	end)
 
-	helpers.it("keeps the LLM suggestions on their own counter", function()
+	it("keeps the LLM suggestions on their own counter", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.record_suggestion("code", "llm", 1100)
@@ -105,7 +106,7 @@ helpers.describe("suggestion counters: what reaches the database", function()
 				.. "would make a good hotstring corpus look like a good model")
 	end)
 
-	helpers.it("writes only the increment on a second flush", function()
+	it("writes only the increment on a second flush", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("firefox", 1000)
 			keylogger.record_suggestion("firefox", "hotstring", 1100)
@@ -132,7 +133,7 @@ end)
 
 helpers.describe("suggestion counters: the writer's allow-list", function()
 
-	helpers.it("names both fields", function()
+	it("names both fields", function()
 		local handle = assert(io.open(
 			helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua", "r"))
 		local source = handle:read("*a")

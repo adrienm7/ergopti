@@ -333,7 +333,11 @@ local function with_storage(initial, body)
 	package.loaded["adapters.storage"] = store
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
-	local ok, err = pcall(body, store)
+	local ok, err = pcall(function()
+		require("tests.support.metrics_preferences_fixture").with(function(preferences)
+			body(store, preferences)
+		end, { initial = initial })
+	end)
 	package.loaded["adapters.storage"] = _displaced.storage
 	package.loaded["ui.tooltip.preview"] = _displaced.preview
 	package.loaded["ui.tooltip.llm"] = _displaced.llm
@@ -411,7 +415,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 	end)
 
 	helpers.it("draws the graph in graph mode, and keeps that choice", function()
-		with_storage({}, function(store)
+		with_storage({}, function(_, preferences)
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
@@ -419,7 +423,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			helpers.assert_true(Widget.set_graph(true))
 			Widget.tick(stats(42), 10)
 			helpers.assert_eq(surface.draws[1].frame.mode, "graph")
-			helpers.assert_eq(store.values["wpm_widget.graph"], true)
+			helpers.assert_eq(preferences.get("metrics.wpm_widget_graph"), true)
 		end)
 	end)
 
@@ -510,13 +514,14 @@ helpers.describe("wpm readouts: the tray readout", function()
 	end)
 
 	helpers.it("removes its item on stop, and keeps that choice", function()
-		with_storage({}, function(store)
+		with_storage({}, function(_, preferences)
 			local Readout, tray = setup()
 			Readout.start()
 			Readout.tick(stats(57), 10)
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
 			helpers.assert_true(Readout.stop())
 			helpers.assert_true(tray.items[1].removed)
-			helpers.assert_eq(store.values["wpm_menubar.visible"], nil, "off is the shipped default: nothing stored")
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), nil, "off is the shipped default: nothing stored")
 		end)
 	end)
 

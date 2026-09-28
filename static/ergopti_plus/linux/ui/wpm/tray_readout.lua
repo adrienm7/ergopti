@@ -25,6 +25,7 @@ local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
+local Preferences = require("infra.metrics_preferences")
 local ConfigPaths = require("infra.config_paths")
 local Shell     = require("adapters.shell_runner")
 local Model     = require("wpm_widget.model")
@@ -32,7 +33,12 @@ local Widget    = require("ui.wpm.widget")
 
 local LOG = "ui.wpm.tray_readout"
 
-local PREF_PREFIX = "wpm_menubar."
+local PREF_PATHS = {
+	visible = "metrics.wpm_menubar_visible",
+	colors = "metrics.wpm_menubar_colors",
+}
+
+
 local ITEM_ID = "ergopti-plus-wpm"
 local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
 
@@ -78,28 +84,12 @@ local _painter = nil
 -- =========================================
 -- =========================================
 
-local function storage()
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or type(Storage) ~= "table" then return nil end
-	return Storage
-end
-
-local function stored_bool(key)
-	local Storage = storage()
-	if not Storage then return DEFAULTS[key] end
-	local value = Storage.get(PREF_PREFIX .. key, nil)
-	if type(value) ~= "boolean" then return DEFAULTS[key] end
-	return value
-end
-
+--- Persists one canonical sparse boolean.
+--- @param key string Readout preference name.
+--- @param value boolean Desired value.
+--- @return boolean committed
 local function store_bool(key, value)
-	local Storage = storage()
-	if not Storage then
-		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
-		return false
-	end
-	if value == DEFAULTS[key] then return Storage.delete(PREF_PREFIX .. key) == true end
-	return Storage.set(PREF_PREFIX .. key, value) == true
+	return Preferences.set(assert(PREF_PATHS[key]), value)
 end
 
 local function tray()
@@ -233,8 +223,9 @@ end
 --- Applies the persisted choices at boot.
 --- @return boolean True when the readout is running after this call.
 function M.restore()
-	_state.use_colors = stored_bool("colors")
-	if not stored_bool("visible") then return false end
+	local preferences = Preferences.snapshot()
+	_state.use_colors = preferences[PREF_PATHS.colors]
+	if not preferences[PREF_PATHS.visible] then return false end
 	return start_readout(false)
 end
 

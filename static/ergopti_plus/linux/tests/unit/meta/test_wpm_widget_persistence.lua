@@ -28,7 +28,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fakes = helpers.load_module("tests.fakes")
+local Fixture = require("tests.support.metrics_preferences_fixture")
 
 -- Restored rather than cleared. A test that reaches into package.loaded owes
 -- the files after it the state it found — clearing instead cost a CI run once,
@@ -42,19 +42,19 @@ local _displaced = { storage = nil, widget = nil, held = false }
 --- @return table widget, table storage
 local function load_over_storage(initial, writes_fail)
 	if not _displaced.held then
-		_displaced.storage = package.loaded["adapters.storage"]
+		_displaced.storage = package.loaded["infra.metrics_preferences"]
 		_displaced.widget = package.loaded["ui.wpm.widget"]
 		_displaced.held = true
 	end
-	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	package.loaded["adapters.storage"] = storage
+	local storage = Fixture.new({ initial = initial, writes_fail = writes_fail })
+	package.loaded["infra.metrics_preferences"] = storage
 	package.loaded["ui.wpm.widget"] = nil
 	return require("ui.wpm.widget"), storage
 end
 
 --- Puts back exactly what was there.
 local function drop_storage()
-	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["infra.metrics_preferences"] = _displaced.storage
 	package.loaded["ui.wpm.widget"] = _displaced.widget
 end
 
@@ -74,7 +74,7 @@ helpers.describe("wpm widget: what gets written", function()
 		widget.restore()
 		local written = 0
 		for _, key in ipairs(storage.keys()) do
-			if key:find("^wpm_widget%.") then written = written + 1 end
+			if key:find("^metrics%.") then written = written + 1 end
 		end
 		drop_storage()
 		helpers.assert_eq(written, 0,
@@ -86,7 +86,7 @@ helpers.describe("wpm widget: what gets written", function()
 	helpers.it("remembers that the user turned it on", function()
 		local widget, storage = load_over_storage()
 		widget.start()
-		local stored = storage.get("wpm_widget.visible")
+		local stored = storage.get("metrics.wpm_widget_visible")
 		widget.stop()
 		drop_storage()
 		helpers.assert_eq(stored, true,
@@ -95,10 +95,10 @@ helpers.describe("wpm widget: what gets written", function()
 	end)
 
 	helpers.it("clears the entry when it is turned off again", function()
-		local widget, storage = load_over_storage({ ["wpm_widget.visible"] = true })
+		local widget, storage = load_over_storage({ ["metrics.wpm_widget_visible"] = true })
 		widget.restore()
 		widget.stop()
-		local has = storage.has("wpm_widget.visible")
+		local has = storage.has("metrics.wpm_widget_visible")
 		drop_storage()
 		helpers.assert_true(not has,
 			"back to the default means back to no entry, so the default stays live "
@@ -108,7 +108,7 @@ helpers.describe("wpm widget: what gets written", function()
 	helpers.it("remembers the colour mode", function()
 		local widget, storage = load_over_storage()
 		widget.set_use_source_colors(false)
-		local stored = storage.get("wpm_widget.source_colors")
+		local stored = storage.get("metrics.wpm_widget_colors")
 		drop_storage()
 		helpers.assert_eq(stored, false,
 			"the second of the two choices, and it reverted the same way")
@@ -116,8 +116,8 @@ helpers.describe("wpm widget: what gets written", function()
 
 	helpers.it("keeps the durable visibility and colour state when writes fail", function()
 		local widget, storage = load_over_storage({
-			["wpm_widget.visible"] = true,
-			["wpm_widget.source_colors"] = false,
+			["metrics.wpm_widget_visible"] = true,
+			["metrics.wpm_widget_colors"] = false,
 		}, true)
 		helpers.assert_true(widget.restore(), "a durable visible state must restore without rewriting it")
 		helpers.assert_eq(widget.stop(), false, "a failed delete must not report a stopped widget")
@@ -125,8 +125,8 @@ helpers.describe("wpm widget: what gets written", function()
 		helpers.assert_eq(widget.set_use_source_colors(true), false)
 		helpers.assert_eq(widget.uses_source_colors(), false,
 			"failed colour persistence must not publish a session-only mode")
-		helpers.assert_eq(storage.get("wpm_widget.visible"), true)
-		helpers.assert_eq(storage.get("wpm_widget.source_colors"), false)
+		helpers.assert_eq(storage.get("metrics.wpm_widget_visible"), true)
+		helpers.assert_eq(storage.get("metrics.wpm_widget_colors"), false)
 		drop_storage()
 	end)
 
@@ -144,7 +144,7 @@ end)
 helpers.describe("wpm widget: what gets read", function()
 
 	helpers.it("comes up showing when the user left it showing", function()
-		local widget = load_over_storage({ ["wpm_widget.visible"] = true })
+		local widget = load_over_storage({ ["metrics.wpm_widget_visible"] = true })
 		local running = widget.restore()
 		local is_running = widget.is_running()
 		widget.stop()
@@ -155,7 +155,7 @@ helpers.describe("wpm widget: what gets read", function()
 	end)
 
 	helpers.it("comes up with the colour mode the user chose", function()
-		local widget = load_over_storage({ ["wpm_widget.source_colors"] = false })
+		local widget = load_over_storage({ ["metrics.wpm_widget_colors"] = false })
 		widget.restore()
 		local uses = widget.uses_source_colors()
 		drop_storage()
@@ -174,17 +174,14 @@ helpers.describe("wpm widget: what gets read", function()
 		helpers.assert_eq(uses, shipped.source_colors)
 	end)
 
-	helpers.it("ignores a stored value that is not a boolean", function()
-		local widget = load_over_storage({ ["wpm_widget.visible"] = "true" })
-		widget.restore()
+	helpers.it("refuses a malformed canonical boolean before changing the runtime", function()
+		local widget = load_over_storage({ ["metrics.wpm_widget_visible"] = "true" })
+		local ok = pcall(widget.restore)
 		local running = widget.is_running()
-		widget.stop()
 		drop_storage()
-		helpers.assert_eq(running, widget._defaults().visible,
-			"a hand-edited store or a foreign writer can leave a string here, and "
-				.. "reading it as truthy would turn a setting on that nobody set")
+		helpers.assert_eq(ok, false, "malformed canonical configuration must be reported")
+		helpers.assert_eq(running, false, "invalid data cannot grant visibility")
 	end)
-
 end)
 
 

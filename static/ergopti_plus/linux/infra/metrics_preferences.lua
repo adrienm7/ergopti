@@ -1,0 +1,77 @@
+--- infra/metrics_preferences.lua
+
+--- ==============================================================================
+--- MODULE: Canonical Metrics Preferences (Linux)
+--- DESCRIPTION:
+--- Owns the collector and WPM boolean choices in config.toml. Widget positions
+--- and collected data retain their separate owners; legacy storage cannot grant
+--- consent or reactivate a preference removed by the canonical scope writer.
+--- ==============================================================================
+
+local M = {}
+local Manifest = require("infra.manifest_reader")
+local ConfigPaths = require("infra.config_paths")
+local Writer = require("toml_codec.writer")
+local Codec = require("toml_codec")
+local Logger = require("logger.shim")
+local LOG = "infra.metrics_preferences"
+
+local function owned(path)
+	local entry = type(path) == "string" and Manifest.find_entry_by_path(path) or nil
+	assert(entry and path:match("^metrics%.[^.]+$") and entry.type == "boolean",
+		"unknown boolean metrics preference: " .. tostring(path))
+	return path:sub(#"metrics." + 1)
+end
+
+--- Reads one complete validated metrics preference snapshot.
+--- @return table values Canonical path to effective boolean.
+--- @return table source Exact classified source for conditional publication.
+function M.snapshot()
+	local path = ConfigPaths.config("config.toml")
+	local bytes, status, detail = Writer.read_classified(path)
+	assert(status == "ok" or status == "absent", "metrics preferences are unreadable: " .. tostring(detail))
+	local config = Codec.decode(bytes or "")
+	assert(type(config) == "table", "metrics preferences contain malformed TOML")
+	assert(config.metrics == nil or type(config.metrics) == "table", "metrics preferences require a table")
+	local values, metrics = {}, config.metrics or {}
+	for _, entry in ipairs(Manifest.features()) do
+		if entry.path:match("^metrics%.[^.]+$") and entry.type == "boolean" then
+			local key = owned(entry.path)
+			local value = metrics[key]
+			assert(value == nil or type(value) == "boolean", "invalid boolean metrics preference: " .. entry.path)
+			if value == nil then value = Manifest.default_for(entry.path) end
+			values[entry.path] = value
+		end
+	end
+	return values, { status = status, content = bytes }
+end
+
+--- Reads one declared boolean without creating a file or caching a refusal.
+--- @param path string Canonical manifest path.
+--- @return boolean value
+function M.get(path)
+	owned(path)
+	return M.snapshot()[path]
+end
+
+--- Publishes one sparse choice while preserving unknown configuration.
+--- @param path string Canonical manifest path.
+--- @param value boolean New preference.
+--- @return boolean committed
+function M.set(path, value)
+	local called, committed, detail = pcall(function()
+		owned(path)
+		assert(type(value) == "boolean", "metrics preferences require boolean values")
+		local _, source = M.snapshot()
+		local operation = Manifest.sparse_operation(path, value)
+		return Writer.batch_write(ConfigPaths.config("config.toml"), { operation }, nil, source)
+	end)
+	if not called or committed ~= true then
+		Logger.error(LOG, "Metrics preference '%s' was not persisted: %s.", tostring(path), tostring(called and detail or committed))
+		return false
+	end
+	Logger.debug(LOG, "Metrics preference '%s' persisted as %s.", path, tostring(value))
+	return true
+end
+
+return M

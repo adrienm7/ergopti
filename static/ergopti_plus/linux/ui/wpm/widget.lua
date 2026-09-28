@@ -26,9 +26,17 @@ local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
+local Preferences = require("infra.metrics_preferences")
 local Model     = require("wpm_widget.model")
 
 local LOG = "ui.wpm.widget"
+
+local PREF_PATHS = {
+	visible = "metrics.wpm_widget_visible",
+	source_colors = "metrics.wpm_widget_colors",
+	graph = "metrics.wpm_widget_graph",
+}
+
 
 -- Where the choices are kept.
 local PREF_PREFIX = "wpm_widget."
@@ -87,31 +95,12 @@ local function storage()
 	return Storage
 end
 
---- A persisted boolean, or the shipped default.
---- @param key string Suffix under PREF_PREFIX.
---- @return boolean
-local function stored_bool(key)
-	local Storage = storage()
-	if not Storage then return DEFAULTS[key] end
-	local value = Storage.get(PREF_PREFIX .. key, nil)
-	-- Only a real boolean overrides the default: an unrecognisable value must
-	-- not silently turn a setting off.
-	if type(value) ~= "boolean" then return DEFAULTS[key] end
-	return value
-end
-
---- Writes a boolean, or clears the entry when it returns to the default.
---- @param key string
---- @param value boolean
---- @return boolean
+--- Persists one canonical sparse boolean.
+--- @param key string Readout preference name.
+--- @param value boolean Desired value.
+--- @return boolean committed
 local function store_bool(key, value)
-	local Storage = storage()
-	if not Storage then
-		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
-		return false
-	end
-	if value == DEFAULTS[key] then return Storage.delete(PREF_PREFIX .. key) == true end
-	return Storage.set(PREF_PREFIX .. key, value) == true
+	return Preferences.set(assert(PREF_PATHS[key]), value)
 end
 
 --- The pill's saved top-left corner, or nil for the default place.
@@ -236,10 +225,11 @@ end
 --- Applies the persisted choices and shows the widget if it was left on.
 --- @return boolean True when the widget is running after this call.
 function M.restore()
-	_state.use_source_colors = stored_bool("source_colors")
-	_state.graph = stored_bool("graph")
+	local preferences = Preferences.snapshot()
+	_state.use_source_colors = preferences[PREF_PATHS.source_colors]
+	_state.graph = preferences[PREF_PATHS.graph]
 	_state.anchor = stored_anchor()
-	local visible = stored_bool("visible")
+	local visible = preferences[PREF_PATHS.visible]
 	Logger.info(LOG, "Restored: visible=%s, source colours=%s, graph=%s.",
 		tostring(visible), tostring(_state.use_source_colors), tostring(_state.graph))
 	if not visible then return false end

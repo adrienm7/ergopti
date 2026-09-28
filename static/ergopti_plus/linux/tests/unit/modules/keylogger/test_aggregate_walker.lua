@@ -28,6 +28,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -83,7 +84,7 @@ end
 
 helpers.describe("ngram walker: the nine families", function()
 
-	helpers.it("produces tokens of every length from one to seven", function()
+	it("produces tokens of every length from one to seven", function()
 		local batch = Walker.walk(typed("abcdefgh"), "2026-08-06", "app")
 		helpers.assert_eq(count_of(batch, "ngram_chars", "a"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 1)
@@ -97,7 +98,7 @@ helpers.describe("ngram walker: the nine families", function()
 				.. "keystrokes the whole time")
 	end)
 
-	helpers.it("records words and word pairs", function()
+	it("records words and word pairs", function()
 		local batch = Walker.walk(typed("le chat noir "), "2026-08-06", "app")
 		helpers.assert_eq(count_of(batch, "ngram_words", "chat"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_word_bigrams", "le chat"), 1,
@@ -105,7 +106,7 @@ helpers.describe("ngram walker: the nine families", function()
 				.. "were empty")
 	end)
 
-	helpers.it("keeps the last word even though the stream ends mid-sentence", function()
+	it("keeps the last word even though the stream ends mid-sentence", function()
 		local batch = Walker.walk(typed("bonjour"), "2026-08-06", "app")
 		helpers.assert_eq(count_of(batch, "ngram_words", "bonjour"), 1,
 			"a flush lands between keystrokes, not between sentences, so discarding "
@@ -124,7 +125,7 @@ end)
 -- =================================================================
 
 helpers.describe("ngram walker: what must not become a sequence", function()
-	helpers.it("keeps long-gap characters but excludes their delay from n-gram timing", function()
+	it("keeps long-gap characters but excludes their delay from n-gram timing", function()
 		local batch = Walker.walk({
 			key("a", 200),
 			key("b", PAUSE_MS + 4000),
@@ -151,7 +152,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 		end
 	end)
 
-	helpers.it("does not join two characters across a long pause", function()
+	it("does not join two characters across a long pause", function()
 		local batch = Walker.walk({
 			key("a", 100), key("b", 100),
 			key("c", PAUSE_MS + 5000),
@@ -167,7 +168,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			"and the run restarts cleanly afterwards")
 	end)
 
-	helpers.it("does not chain across a correction", function()
+	it("does not chain across a correction", function()
 		local batch = Walker.walk({
 			key("a", 100), key("b", 100),
 			key("[BS]", 100),
@@ -179,7 +180,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 				.. "than it appears to; 'bc' is a pair the user never produced")
 	end)
 
-	helpers.it("counts a hotstring's output without chaining it", function()
+	it("counts a hotstring's output without chaining it", function()
 		local batch = Walker.walk({
 			key("b", 100), key("t", 100), key("w", 100),
 			key("b", 0, "hotstring"), key("y", 0, "hotstring"),
@@ -197,7 +198,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 				.. "about how much of it the driver produced")
 	end)
 
-	helpers.it("does not carry a word across a correction", function()
+	it("does not carry a word across a correction", function()
 		local batch = Walker.walk({
 			key("c", 100), key("h", 100), key("a", 100),
 			key("[BS]", 100),
@@ -221,7 +222,7 @@ end)
 
 helpers.describe("ngram walker: what the writer receives", function()
 
-	helpers.it("splits the batch by table and by application-day", function()
+	it("splits the batch by table and by application-day", function()
 		local batch = Walker.walk(typed("ab"), "2026-08-06", "firefox")
 		Walker.walk(typed("cd"), "2026-08-06", "code", batch)
 
@@ -243,7 +244,7 @@ helpers.describe("ngram walker: what the writer receives", function()
 				.. "ngram_chars again")
 	end)
 
-	helpers.it("emits nothing for a family with no rows", function()
+	it("emits nothing for a family with no rows", function()
 		local batch = Walker.walk({}, "2026-08-06", "app")
 		helpers.assert_eq(#Walker.batches_for_writer(batch), 0,
 			"an empty group would cost a sqlite3 spawn to write nothing, on a path "
@@ -263,7 +264,7 @@ end)
 
 helpers.describe("ngram walker: a real flush writes every family", function()
 
-	helpers.it("hands more than one table to the writer", function()
+	it("hands more than one table to the writer", function()
 		-- The walk and the writer were both correct in isolation before this test,
 		-- and the flush called neither. A unit that works and is never invoked is
 		-- the shape three separate defects in this driver have taken, so the join
@@ -325,7 +326,7 @@ end)
 
 helpers.describe("ngram walker: each character is stored once", function()
 
-	helpers.it("counts a typed character once in ngram_chars", function()
+	it("counts a typed character once in ngram_chars", function()
 		-- The walker writes every character, and step 3 of the flush wrote the
 		-- per-app delta of the same characters again: both upserts add, so every
 		-- persisted character count was doubled.
@@ -369,7 +370,7 @@ end)
 
 helpers.describe("keylogger: the JSON fallback does not hoard raw events", function()
 
-	helpers.it("empties the raw buffers when it flushes without SQLite", function()
+	it("empties the raw buffers when it flushes without SQLite", function()
 		local writer_name = "modules.keylogger.sqlite_writer"
 		local logger_name = "modules.keylogger.keylogger"
 		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
@@ -410,7 +411,7 @@ end)
 
 helpers.describe("aggregate walker: what the day was made of", function()
 
-	helpers.it("sorts characters into the five classes", function()
+	it("sorts characters into the five classes", function()
 		local batch = Walker.walk(typed("ab 12 ,."), "2026-08-06", "app")
 		local row = batch.chars_class["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the breakdown row must exist")
@@ -420,7 +421,7 @@ helpers.describe("aggregate walker: what the day was made of", function()
 		helpers.assert_eq(row.punct, 2)
 	end)
 
-	helpers.it("counts an accented letter as a letter", function()
+	it("counts an accented letter as a letter", function()
 		local batch = Walker.walk(typed("éàü"), "2026-08-06", "app")
 		local row = batch.chars_class["2026-08-06\1app"]
 		helpers.assert_eq(row.letter, 3,
@@ -430,7 +431,7 @@ helpers.describe("aggregate walker: what the day was made of", function()
 		helpers.assert_eq(row.other, 0)
 	end)
 
-	helpers.it("does not count an expansion as something the user typed", function()
+	it("does not count an expansion as something the user typed", function()
 		local batch = Walker.walk({
 			key("a", 100),
 			key("b", 0, "hotstring"), key("c", 0, "hotstring"),
@@ -455,14 +456,14 @@ end)
 
 helpers.describe("aggregate walker: corrections", function()
 
-	helpers.it("counts manual backspaces", function()
+	it("counts manual backspaces", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("[BS]", 100), key("b", 100),
 		}, "2026-08-06", "app")
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 2)
 	end)
 
-	helpers.it("does not count the deletions a hotstring makes to erase its trigger", function()
+	it("does not count the deletions a hotstring makes to erase its trigger", function()
 		local batch = Walker.walk({
 			key("b", 100), key("t", 100), key("w", 100),
 			key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"),
@@ -474,7 +475,7 @@ helpers.describe("aggregate walker: corrections", function()
 				.. "feature would look like it makes the user worse.")
 	end)
 
-	helpers.it("counts a run of three or more as one cascade", function()
+	it("counts a run of three or more as one cascade", function()
 		local batch = Walker.walk({
 			key("a", 100),
 			key("[BS]", 100), key("[BS]", 100), key("[BS]", 100), key("[BS]", 100),
@@ -486,7 +487,7 @@ helpers.describe("aggregate walker: corrections", function()
 		helpers.assert_eq(row.cascade_max_len, 4)
 	end)
 
-	helpers.it("does not call a single backspace a cascade", function()
+	it("does not call a single backspace a cascade", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("b", 100),
 		}, "2026-08-06", "app")
@@ -495,7 +496,7 @@ helpers.describe("aggregate walker: corrections", function()
 				.. "figure would just be the backspace count again")
 	end)
 
-	helpers.it("closes a cascade that is still open when the stream ends", function()
+	it("closes a cascade that is still open when the stream ends", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("[BS]", 100), key("[BS]", 100),
 		}, "2026-08-06", "app")
@@ -504,7 +505,7 @@ helpers.describe("aggregate walker: corrections", function()
 				.. "the boundary is the normal case rather than an edge one")
 	end)
 
-	helpers.it("measures how quickly the user resumed", function()
+	it("measures how quickly the user resumed", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("b", 250),
 		}, "2026-08-06", "app")
@@ -513,7 +514,7 @@ helpers.describe("aggregate walker: corrections", function()
 		helpers.assert_eq(row.recovery_sum_ms, 250)
 	end)
 
-	helpers.it("does not call a coffee break recovery time", function()
+	it("does not call a coffee break recovery time", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("b", PAUSE_MS + 60000),
 		}, "2026-08-06", "app")
@@ -550,7 +551,7 @@ helpers.describe("aggregate walker: when the typing happened", function()
 		return { times = times, wall_offset_ms = at * 1000 }
 	end
 
-	helpers.it("credits each keystroke to its hour and its five-minute slot", function()
+	it("credits each keystroke to its hour and its five-minute slot", function()
 		local events = typed("abcd")
 		-- Read back through the same os.date the walk uses, so a machine in any
 		-- time zone agrees with itself.
@@ -572,7 +573,7 @@ helpers.describe("aggregate walker: when the typing happened", function()
 			"the slot is floored to a five-minute step, so 10:07 belongs to 10:05")
 	end)
 
-	helpers.it("records the first and last minute the user typed", function()
+	it("records the first and last minute the user typed", function()
 		local events = typed("ab")
 		local at = os.time({ year = 2026, month = 8, day = 6, hour = 14, min = 32, sec = 0 })
 		local batch = Walker.walk(events, "2026-08-06", "app", nil, clock_at(#events, at))
@@ -582,7 +583,7 @@ helpers.describe("aggregate walker: when the typing happened", function()
 		helpers.assert_eq(row.last_typed_min, expected)
 	end)
 
-	helpers.it("skips the time-of-day tables rather than guessing when it has no clock", function()
+	it("skips the time-of-day tables rather than guessing when it has no clock", function()
 		local batch = Walker.walk(typed("abc"), "2026-08-06", "app")
 		helpers.assert_true(next(batch.hourly) == nil,
 			"a keystroke with no timestamp has no hour. Defaulting to the flush time "
@@ -608,7 +609,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 	local BURST_GAP_MS = Timings.ms("keylogger", "burst_gap_ms")
 	local SESSION_GAP_MS = Timings.ms("keylogger", "session_gap_ms")
 
-	helpers.it("counts an uninterrupted run as one burst", function()
+	it("counts an uninterrupted run as one burst", function()
 		local batch = Walker.walk(typed("bonjour tout le monde", 90), "2026-08-06", "app")
 		local row = batch.bursts["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the burst panel had no rows at all before this")
@@ -616,7 +617,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 		helpers.assert_eq(row.max_chars, 21)
 	end)
 
-	helpers.it("starts a new burst after a real gap", function()
+	it("starts a new burst after a real gap", function()
 		local batch = Walker.walk({
 			key("a", 80), key("b", 80),
 			key("c", BURST_GAP_MS + 500),
@@ -627,7 +628,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 				.. "report a single long fluent stretch the user never had")
 	end)
 
-	helpers.it("credits a burst still open when the stream ends", function()
+	it("credits a burst still open when the stream ends", function()
 		local batch = Walker.walk(typed("abc", 80), "2026-08-06", "app")
 		helpers.assert_eq(batch.bursts["2026-08-06\1app"].count_total, 1,
 			"persisting runs every few seconds, so a burst in progress at the "
@@ -635,7 +636,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 				.. "burst the user makes")
 	end)
 
-	helpers.it("keeps the squared delays so rhythm is recoverable", function()
+	it("keeps the squared delays so rhythm is recoverable", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 100), key("c", 200) },
 			"2026-08-06", "app")
 		local row = batch.bursts["2026-08-06\1app"]
@@ -646,7 +647,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 				.. "200 rows to say the same thing")
 	end)
 
-	helpers.it("records one session for a continuous stretch", function()
+	it("records one session for a continuous stretch", function()
 		local batch = Walker.walk(typed("bonjour", 90), "2026-08-06", "app")
 		local row = batch.sessions["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the session panel was empty too")
@@ -654,7 +655,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 		helpers.assert_eq(row.longest_chars, 7)
 	end)
 
-	helpers.it("splits sessions at the coarser threshold, not the burst one", function()
+	it("splits sessions at the coarser threshold, not the burst one", function()
 		local batch = Walker.walk({
 			key("a", 80), key("b", 80),
 			key("c", BURST_GAP_MS + 500),
@@ -679,7 +680,7 @@ end)
 
 helpers.describe("aggregate walker: the pause buckets", function()
 
-	helpers.it("credits a delay to every threshold at or above it", function()
+	it("credits a delay to every threshold at or above it", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 1500) }, "2026-08-06", "app")
 		local maps = batch.app_buckets["2026-08-06\1app"]
 		helpers.assert_not_nil(maps, "the dropdown behind this had nothing to read")
@@ -692,7 +693,7 @@ helpers.describe("aggregate walker: the pause buckets", function()
 		helpers.assert_eq(maps.time["60000"], 1500)
 	end)
 
-	helpers.it("counts the keystrokes each bucket credits", function()
+	it("counts the keystrokes each bucket credits", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 200), key("c", 300) },
 			"2026-08-06", "app")
 		local maps = batch.app_buckets["2026-08-06\1app"]
@@ -703,7 +704,7 @@ helpers.describe("aggregate walker: the pause buckets", function()
 				.. "plausible enough to be believed.")
 	end)
 
-	helpers.it("unrolls one row per threshold for the writer", function()
+	it("unrolls one row per threshold for the writer", function()
 		local batch = Walker.walk(typed("ab", 100), "2026-08-06", "app")
 		local rows = Walker.daily_rows(batch).app_buckets
 		helpers.assert_true(#rows > 1,
@@ -779,7 +780,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		return nil, nil, nil
 	end
 
-	helpers.it("counts two characters typed by one finger as a run", function()
+	it("counts two characters typed by one finger as a run", function()
 		local lookup = require_catalogue()
 		local first, second, other = pick_pair(lookup)
 		helpers.assert_not_nil(first,
@@ -796,7 +797,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		helpers.assert_true(other ~= nil)
 	end)
 
-	helpers.it("does not call two different fingers a run", function()
+	it("does not call two different fingers a run", function()
 		local lookup = require_catalogue()
 		local first, _, other = pick_pair(lookup)
 		local batch = Walker.walk(typed(first .. other, 90), "2026-08-06", "app")
@@ -805,7 +806,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 				.. "would report every isolated keystroke as a same-finger event")
 	end)
 
-	helpers.it("breaks the run on a correction", function()
+	it("breaks the run on a correction", function()
 		local lookup = require_catalogue()
 		local first, second = pick_pair(lookup)
 		local batch = Walker.walk({
@@ -817,7 +818,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 				.. "one finger")
 	end)
 
-	helpers.it("does not let an expansion extend a run", function()
+	it("does not let an expansion extend a run", function()
 		local lookup = require_catalogue()
 		local first, second = pick_pair(lookup)
 		local batch = Walker.walk({
@@ -828,7 +829,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 				.. "more it types for the user, which is backwards")
 	end)
 
-	helpers.it("breaks the run on a character the catalogue does not describe", function()
+	it("breaks the run on a character the catalogue does not describe", function()
 		local batch = Walker.walk(typed("\194\1691\194\1692", 90), "2026-08-06", "app")
 		local row = batch.ergo["2026-08-06\1app"]
 		helpers.assert_true(row.same_finger_streak_max <= 1,
@@ -836,7 +837,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 				.. "inflate the one number the whole argument rests on")
 	end)
 
-	helpers.it("hands the row to the writer", function()
+	it("hands the row to the writer", function()
 		local batch = Walker.walk(typed("abc", 90), "2026-08-06", "app")
 		local rows = Walker.daily_rows(batch).ergo
 		helpers.assert_eq(#rows, 1,
