@@ -32,7 +32,7 @@ local function with_manager(writer, body)
 		return body(manager)
 	end)
 
-	for name, module in pairs(saved) do package.loaded[name] = module end
+	for _, name in ipairs({ MANAGER, WRITER, LOGGER }) do package.loaded[name] = saved[name] end
 	if not ok then error(result, 0) end
 	return result
 end
@@ -59,6 +59,64 @@ local function enable_persistence(manager, path)
 end
 
 helpers.describe("gestures: durable binding transactions", function()
+	helpers.it("gesture-scope-state: restores detached assignments and parameters without saving", function()
+		with_manager({ batch_write = function() error("the runtime owner must not publish") end }, function(manager)
+			manager.set_action("tap_3", "enter")
+			manager.set_action_parameter("tap_3", "open_url", "https://original.example")
+			local snapshot = manager.capture_scope_state()
+			manager.set_action("tap_3", "vol_up")
+			manager.set_action_parameter("tap_3", "open_url", "https://candidate.example")
+			enable_persistence(manager)
+			helpers.assert_true(manager.apply_scope_state(snapshot))
+			helpers.assert_eq(manager.get_action("tap_3"), "enter")
+			helpers.assert_eq(manager.get_action_parameter("tap_3", "open_url"), "https://original.example")
+			snapshot.actions.tap_3 = "vol_up"
+			snapshot.parameters.tap_3__open_url = "https://mutated.example"
+			helpers.assert_eq(manager.get_action("tap_3"), "enter", "runtime never borrows caller maps")
+			helpers.assert_eq(manager.get_action_parameter("tap_3", "open_url"), "https://original.example")
+		end)
+	end)
+
+	helpers.it("gesture-scope-state: validates the whole candidate before releasing a reader", function()
+		with_manager({}, function(manager)
+			manager._test_begin_reading({})
+			helpers.assert_true(manager.enable())
+			local snapshot = manager.capture_scope_state()
+			snapshot.enabled, snapshot.reading = false, false
+			snapshot.actions.tap_3 = "unknown_action"
+			local stops = 0
+			manager.stop_reading = function() stops = stops + 1 end
+			helpers.assert_eq(manager.apply_scope_state(snapshot), false)
+			helpers.assert_eq(stops, 0)
+			helpers.assert_eq(manager.is_enabled(), true)
+		end)
+	end)
+
+	helpers.it("gesture-scope-state: a refused reader acquisition publishes no candidate assignments", function()
+		with_manager({}, function(manager)
+			manager.set_action("tap_3", "enter")
+			local candidate = manager.capture_scope_state()
+			candidate.enabled, candidate.reading = true, true
+			candidate.actions.tap_3 = "vol_up"
+			manager.start_reading = function() return false end
+			helpers.assert_eq(manager.apply_scope_state(candidate), false)
+			helpers.assert_eq(manager.is_enabled(), false)
+			helpers.assert_eq(manager.get_action("tap_3"), "enter")
+		end)
+	end)
+
+	helpers.it("gesture-scope-state: clear requires the reader to acknowledge its stopped state", function()
+		with_manager({}, function(manager)
+			manager._test_begin_reading({})
+			helpers.assert_true(manager.enable())
+			local candidate = manager.capture_scope_state()
+			candidate.enabled, candidate.reading = false, false
+			candidate.actions.tap_3 = "vol_up"
+			manager.stop_reading = function() end
+			helpers.assert_eq(manager.apply_scope_state(candidate), false)
+			helpers.assert_eq(manager.get_action("tap_3"), "none")
+		end)
+	end)
 
 	helpers.it("retains one binding when the staging file cannot open", function()
 		local writer, calls = rejecting_writer("cannot open staging file")

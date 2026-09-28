@@ -289,13 +289,14 @@ end
 --- @param ok_label string Already-translated.
 --- @param cancel_label string Already-translated.
 --- @return boolean|nil
-local function ask_yes_no(title, text, ok_label, cancel_label)
+local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
 	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+: the
 	-- module-level succeeded() above normalises both spellings.
 	local command = "zenity --question --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(text)
 		.. " --ok-label=" .. shell_quote(ok_label)
 		.. " --cancel-label=" .. shell_quote(cancel_label)
+		.. (default_cancel and " --default-cancel" or "")
 		.. " 2>/dev/null"
 
 	-- Probed rather than assumed, because the exit code alone cannot distinguish
@@ -3049,19 +3050,24 @@ local function _build_gestures(ctx)
 	-- would emit its rows into a menu the renderer never returns — every gesture
 	-- row silently missing, with nothing failing.
 	local gesture_rows = {}
+	local function apply_scope(mode)
+		if ctx.paused == true then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.gestures.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local committed = ge.apply_scope(mode)
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
 
 	-- The two whole-tree actions are `command` rows since 2026-08-07: the renderer
 	-- builds each row and its label from the declaration, and this driver
 	-- registers only what the click does. All three drivers had been writing the
 	-- same two rows with the same two labels.
 	local gesture_commands = {
-		["restore_defaults"] = function() return ge.reset_defaults() end,
+		["restore_defaults"] = function() return apply_scope("recommended") end,
 		["disable_all"] = function()
-			if type(ge.disable_all_actions) ~= "function" then
-				Logger.error(LOG, "Gestures expose no disable_all_actions — the row does nothing.")
-				return false
-			end
-			return ge.disable_all_actions()
+			return apply_scope("clear")
 		end,
 	}
 

@@ -26,6 +26,26 @@ local Logger = require("logger.shim")
 
 local LOG = "adapters.file_system"
 
+--- Reads exact bytes while distinguishing absence from a failed read.
+--- @param path string Source path.
+--- @return string|nil content
+--- @return string status
+--- @return string|nil detail
+function M.read_with_status(path)
+	return require("toml_codec.writer").read_classified(path)
+end
+
+--- Publishes through the shared atomic writer after its exact source check.
+--- This synchronous port completes before the daemon dispatches another callback.
+--- @param path string Destination path.
+--- @param content string Complete replacement bytes.
+--- @param expected table Classified source precondition.
+--- @return boolean committed
+--- @return string|nil detail
+function M.write_if_unchanged(path, content, expected)
+	return require("toml_codec.writer").publish_if_unchanged(path, content, nil, expected)
+end
+
 -- LuaFileSystem is optional — present on most LuaJIT installations.
 -- TODO(linux): declare lfs in vendor/ so it is always available.
 local ok_lfs, lfs = pcall(require, "lfs")
