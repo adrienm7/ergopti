@@ -196,6 +196,15 @@ for flat_key, spec in pairs(NESTED_KEY_MAP) do
 	end
 end
 
+--- Resolves an owned persisted scalar to its existing menu-state key.
+--- @param path string Canonical configuration path.
+--- @return string|nil key Existing owner key, or nil for an unknown path.
+function M.flat_key_for(path)
+	local section, key = path:match("^([^.]+)%.(.+)$")
+	if not section then return nil end
+	return _reverse_scalar[section .. ":" .. key] or _reverse_nested[section .. ":" .. key]
+end
+
 
 
 
