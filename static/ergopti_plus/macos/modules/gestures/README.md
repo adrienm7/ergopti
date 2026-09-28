@@ -35,4 +35,4 @@ Gestures.init(shared_state)
 Gestures.start()
 ```
 
-`M.DEFAULT_GESTURES` holds the recommended gesture bindings, built from the shared features manifest (`gestures.<slot>`, macOS values) over `SINGLE_SLOTS` and `AXIS_SLOTS`; menu modules must read from it rather than keep a copy. The `touchdevice` dependency is optional — if absent the module self-disables with a warning rather than crashing.
+`M.DEFAULT_GESTURES` holds neutral bindings; `M.RECOMMENDED_GESTURES` holds explicit restoration bindings, built from the shared features manifest (`gestures.<slot>`, macOS values) over `SINGLE_SLOTS` and `AXIS_SLOTS`; restore menus read the recommendation table, while initialization and clear operations read neutral defaults. The `touchdevice` dependency is optional — if absent the module self-disables with a warning rather than crashing.

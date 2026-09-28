@@ -74,19 +74,12 @@ GestureShortcutLabels() {
 		return Labels
 }
 
-; Ergopti's recommended action for every slot: the features manifest's Windows
-; value (gestures.<slot>), the only copy. A fresh config starts from it and
-; « Restaurer les valeurs conseillées » writes it back; the hand-written map this
-; replaced only promised in a comment to mirror the manifest. A slot the
-; manifest does not declare for Windows is an error, never a silent "none".
-; @return {Map} slot id => action id.
+; Explicit restore projects the manifest's recommendation for every slot.
+; Neutral initialization reads ManifestDefaultFor separately.
+; @return {Map} slot id => recommended action id.
 GestureRecommendedActions() {
 		Actions := Map()
-		for _, Slot in GestureSlotIds() {
-				Entry := ManifestFindEntryByPath("gestures." . Slot)
-				if (Entry == false)
-						throw ValueError("The features manifest declares no Windows value for gesture slot '" . Slot . "'.")
-				Actions[Slot] := Entry["default"]
-		}
+		for _, Slot in GestureSlotIds()
+				Actions[Slot] := ManifestRecommendedFor("gestures." . Slot)
 		return Actions
 }

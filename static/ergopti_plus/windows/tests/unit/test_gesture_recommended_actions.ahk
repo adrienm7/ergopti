@@ -18,7 +18,7 @@ _GRA_EverySlotIsTheManifestValue() {
 	Expected := Map()
 	for Entry in FEATURES_MANIFEST["features"] {
 		if (Entry["section"] == "gestures" and Entry["type"] == "action")
-			Expected[Entry["id"]] := Entry["default"]
+			Expected[Entry["id"]] := Entry["recommended"]
 	}
 	Slots := GestureSlotIds()
 	Assert(Slots.Length >= 10, "GestureSlotIds() must list every Windows slot, got " . Slots.Length)
@@ -30,6 +30,8 @@ _GRA_EverySlotIsTheManifestValue() {
 		AssertEqual(Expected[Slot], GESTURE_FACTORY_DEFAULTS[Slot],
 			"gestures." . Slot . " must be the manifest's Windows recommended action")
 	}
+	AssertEqual("none", ManifestDefaultFor("gestures.tap_3"), "startup stays neutral")
+	AssertEqual("left_click_toggle", GESTURE_FACTORY_DEFAULTS["tap_3"], "explicit restore remains useful")
 }
 Test("gestures: the recommended actions are the manifest's Windows values (gesture-defaults-single-source)",
 	_GRA_EverySlotIsTheManifestValue)

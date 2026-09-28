@@ -194,11 +194,14 @@ local LEGACY_SECTION_PARAMS = "linux.action_parameters"
 --- Default gesture-to-action mapping. The key-space is the union of the derived
 --- single and axis slots; neutral values come from the shared manifest.
 M.DEFAULT_GESTURES = {}
+M.RECOMMENDED_GESTURES = {}
 for _, slot in ipairs(M.SINGLE_SLOTS) do
 	M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+	M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 end
 for _, slot in ipairs(M.AXIS_SLOTS) do
 	M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+	M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 end
 
 -- =========================================
@@ -1194,7 +1197,7 @@ end
 function M.reset_defaults()
 	local staged = copy_state(_actions)
 	local updates = {}
-	for k, v in pairs(M.DEFAULT_GESTURES) do
+	for k, v in pairs(M.RECOMMENDED_GESTURES) do
 		staged[k] = v
 		updates[#updates + 1] = { section = CONFIG_SECTION, key = k, value = v }
 	end

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * « Restaurer les valeurs conseillées » under Gestures puts every slot back to
  * Ergopti's recommended action. That value is declared once, per platform, in
- * the features manifest (`gestures.<slot>`), which also writes the fresh
+ * the features manifest (`gestures.<slot>`), while neutral defaults initialize fresh
  * config.toml. macOS kept its own table (DEFAULT_GESTURES) and Windows its own
  * map (GESTURE_FACTORY_DEFAULTS); the macOS table had already drifted: the
  * manifest bound the two-finger left swipe and the three horizontal axes that
@@ -15,7 +15,7 @@
  *
  * WHAT THIS PINS:
  *   1. Neither driver spells a slot's recommended action in source: macOS
- *      builds DEFAULT_GESTURES from the manifest reader over its slot lists,
+ *      builds RECOMMENDED_GESTURES from the manifest reader over its slot lists,
  *      Windows builds GESTURE_FACTORY_DEFAULTS from the manifest reader over
  *      GestureSlotIds().
  *   2. Every slot each driver iterates has a manifest entry on that platform,
@@ -65,8 +65,8 @@ function manifestDefaults(platform) {
 	for (const entry of parseToml(raw).entries || []) {
 		if (entry.path_prefix !== 'gestures' || entry.type !== 'action') continue;
 		if (Array.isArray(entry.platforms) && !entry.platforms.includes(platform)) continue;
-		const perPlatform = entry.default_per_platform || {};
-		out.set(entry.id, perPlatform[platform] !== undefined ? perPlatform[platform] : entry.default);
+		const perPlatform = entry.recommended_per_platform || {};
+		out.set(entry.id, perPlatform[platform] !== undefined ? perPlatform[platform] : entry.recommended);
 	}
 	return out;
 }
@@ -104,6 +104,10 @@ function quoted(body) {
 	}
 	if (!/M\.DEFAULT_GESTURES\[slot\]\s*=\s*Manifest\.default_for\("gestures\."\s*\.\.\s*slot\)/.test(src)) {
 		errors.push(`${MACOS_FILE} must build DEFAULT_GESTURES from Manifest.default_for("gestures." .. slot).`);
+	}
+
+	if (!src.includes('M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)')) {
+		errors.push(`${MACOS_FILE} must project explicit recommendations separately from neutral defaults.`);
 	}
 
 	const slots = [];
@@ -146,9 +150,13 @@ function quoted(body) {
 		errors.push(`${WINDOWS_FILE} must take GESTURE_FACTORY_DEFAULTS from GestureRecommendedActions().`);
 	}
 
+	if (!src.includes('GestureAssignments[_GestureAssignmentSlot] := ManifestDefaultFor("gestures." . _GestureAssignmentSlot)')) {
+		errors.push(`${WINDOWS_FILE} must initialize assignments with neutral defaults.`);
+	}
+
 	const constants = read(WINDOWS_SLOTS_FILE);
-	if (!/ManifestFindEntryByPath\("gestures\."\s*\.\s*Slot\)/.test(constants)) {
-		errors.push(`${WINDOWS_SLOTS_FILE} must read each recommended action with ManifestFindEntryByPath("gestures." . Slot).`);
+	if (!/ManifestRecommendedFor\("gestures\."\s*\.\s*Slot\)/.test(constants)) {
+		errors.push(`${WINDOWS_SLOTS_FILE} must read each recommended action with ManifestRecommendedFor("gestures." . Slot).`);
 	}
 	const slotList = constants.match(/GestureSlotIds\(\)\s*\{[\s\S]*?static Slots := \[([\s\S]*?)\]/);
 	const slots = slotList ? quoted(slotList[1]) : [];
@@ -166,6 +174,15 @@ function quoted(body) {
 // ======= 4/ Report ================================
 // ==================================================
 // ==================================================
+
+const linuxSource = read('linux/modules/gestures/manager.lua');
+if (!linuxSource.includes('M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)')
+	|| !/function M\.reset_defaults\(\)[\s\S]*?pairs\(M\.RECOMMENDED_GESTURES\)/.test(linuxSource)) {
+	errors.push('Linux must project and restore explicit gesture recommendations separately from initialization.');
+}
+for (const [slot, action] of manifestDefaults('linux')) {
+	if (action !== 'none') errors.push(`Linux gesture recommendation gestures.${slot} must remain opt-in (none).`);
+}
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] Gesture recommended actions are not single-sourced:\x1b[0m');

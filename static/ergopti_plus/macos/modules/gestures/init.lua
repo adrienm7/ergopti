@@ -75,9 +75,11 @@ M.AXIS_SLOTS = {
 -- Neutral bindings come from the shared manifest; recommendations are applied
 -- only by an explicit scoped restore.
 M.DEFAULT_GESTURES = {}
+M.RECOMMENDED_GESTURES = {}
 for _, slots in ipairs({ M.SINGLE_SLOTS, M.AXIS_SLOTS }) do
 	for _, slot in ipairs(slots) do
 		M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+		M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 	end
 end
 
