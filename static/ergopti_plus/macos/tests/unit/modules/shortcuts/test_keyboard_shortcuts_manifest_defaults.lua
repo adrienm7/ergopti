@@ -19,6 +19,8 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"adapters.storage",
+	"infra.preferences",
+	"infra.config_paths",
 	"adapters.hotkey_registrar",
 	"adapters.file_system",
 	"infra.paths",
@@ -32,7 +34,7 @@ local OFFERED = { lookup = true, none = true, llm_generate_prediction = true }
 
 --- Runs `scenario` against the real keyboard-shortcut owner over stubbed
 --- settings, registrar and catalogue, then restores every displaced module.
---- @param store table Initial hs.settings content, mutated by writes.
+--- @param store table Initial canonical assignment map, mutated by conditional writes.
 --- @param scenario function(subject, observed)
 --- @return table observed { bound = {chord...} }
 local function with_subject(store, scenario)
@@ -60,19 +62,11 @@ local function with_subject(store, scenario)
 	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
+	require("tests.support.keyboard_config_fixture").install(store)
+
 	local subject
 	local ok, err = xpcall(function()
 		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			settings = {
-				getKeys = function()
-					local keys = {}
-					for key in pairs(store) do keys[#keys + 1] = key end
-					table.sort(keys)
-					return keys
-				end,
-				get = function(key) return store[key] end,
-				set = function(key, value) store[key] = value end,
-			},
 			json = {
 				decode = function()
 					return { keys = { { id = "a", label = "A" }, { id = "space", label = "Space" } } }
@@ -99,7 +93,7 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("binds an explicitly saved Ctrl+Space action", function()
-		local observed = with_subject({ ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "llm_generate_prediction" },
+		local observed = with_subject({ ["hs_ctrl_space"] = "llm_generate_prediction" },
 			function(subject)
 				helpers.assert_eq(subject.start(), true)
 				helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
@@ -110,7 +104,7 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("keeps a binding the user cleared cleared after a restart", function()
-		local store = { ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "none" }
+		local store = { ["hs_ctrl_space"] = "none" }
 		local observed = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
 			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none",
@@ -120,13 +114,13 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("clears an explicit assignment and keeps it native after reload", function()
-		local store = { ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "llm_generate_prediction" }
+		local store = { ["hs_ctrl_space"] = "llm_generate_prediction" }
 		with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
 			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
 			helpers.assert_eq(subject.set_action("hs_ctrl_space", "none"), true)
 		end)
-		helpers.assert_eq(store["ergopti.keyboard_shortcut_hs_ctrl_space"], "none",
+		helpers.assert_eq(store["hs_ctrl_space"], nil,
 			"clearing an existing assignment must persist the neutral choice")
 		local restarted = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
