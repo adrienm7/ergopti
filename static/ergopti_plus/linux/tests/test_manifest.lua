@@ -46,6 +46,7 @@ return {
 	"tests.unit.infra.test_logs_dir",
 	"tests.unit.infra.test_logger_error_observer",
 	"tests.unit.infra.test_metrics_preferences",
+	"tests.unit.infra.test_llm_preferences",
 	"tests.unit.infra.test_metrics_scope",
 	"tests.unit.infra.test_paths_shared_root_layouts",
 	"tests.unit.infra.test_runtime_diagnostics",

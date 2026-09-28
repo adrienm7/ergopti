@@ -22,6 +22,7 @@ local function load(backend, entry, stored_settings, without_local_model)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
+		"infra.llm_preferences",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -56,6 +57,7 @@ local function load(backend, entry, stored_settings, without_local_model)
 	}
 	local stored = { ["llm.models.selected"] = backend }
 	for key, value in pairs(stored_settings or {}) do stored[key] = value end
+	package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = stored })
 	-- Settings caches what it read; a fresh copy reads this storage.
 	package.loaded["modules.llm.settings"] = nil
 	package.loaded["adapters.storage"] = {
