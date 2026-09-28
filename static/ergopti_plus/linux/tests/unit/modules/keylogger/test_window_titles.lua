@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -74,7 +75,7 @@ end
 
 helpers.describe("window titles: what is counted", function()
 
-	helpers.it("counts a keystroke against the window it was typed into", function()
+	it("counts a keystroke against the window it was typed into", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.set_window_title("code", "main.lua — projet", 1000)
@@ -90,7 +91,7 @@ helpers.describe("window titles: what is counted", function()
 		helpers.assert_eq(titles["main.lua — projet"].c, 2)
 	end)
 
-	helpers.it("keeps two windows of one application apart", function()
+	it("keeps two windows of one application apart", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.set_window_title("code", "premier.lua", 1000)
@@ -108,7 +109,7 @@ helpers.describe("window titles: what is counted", function()
 				.. "whole point of this table is the finer one")
 	end)
 
-	helpers.it("credits the time spent under a title when it changes", function()
+	it("credits the time spent under a title when it changes", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.set_window_title("code", "premier.lua", 1000)
@@ -123,7 +124,7 @@ helpers.describe("window titles: what is counted", function()
 				.. "already spent under it was earned before the switch")
 	end)
 
-	helpers.it("writes only the increment on a second flush", function()
+	it("writes only the increment on a second flush", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.set_window_title("code", "main.lua", 1000)
@@ -152,7 +153,7 @@ end)
 
 helpers.describe("window titles: the gate", function()
 
-	helpers.it("records nothing while metrics are switched off", function()
+	it("records nothing while metrics are switched off", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.set_enabled(false)
 			keylogger.on_app_focus("code", 1000)
@@ -168,7 +169,7 @@ helpers.describe("window titles: the gate", function()
 				.. "keystroke passes, not a weaker one")
 	end)
 
-	helpers.it("ignores an empty title rather than storing a blank row", function()
+	it("ignores an empty title rather than storing a blank row", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.set_window_title("code", "", 1000)
@@ -193,7 +194,7 @@ end)
 
 helpers.describe("window titles: the owner of the interval (title-owner)", function()
 
-	helpers.it("title-owner: a cross-app title change credits the owning application", function()
+	it("title-owner: a cross-app title change credits the owning application", function()
 		-- Regression: the interval closed against the INCOMING application,
 		-- whose titles table has no such row, so the time vanished — and every
 		-- later keystroke missed its count the same way.
@@ -212,7 +213,7 @@ helpers.describe("window titles: the owner of the interval (title-owner)", funct
 			"the full interval earned under Doc must survive the switch")
 	end)
 
-	helpers.it("title-owner: the daemon title-then-focus order keeps attribution", function()
+	it("title-owner: the daemon title-then-focus order keeps attribution", function()
 		-- The daemon sends set_window_title and on_app_focus together, title
 		-- first. Closing the title on every focus change would orphan the
 		-- window it just named and unattributed the keystrokes after it.
@@ -234,7 +235,7 @@ helpers.describe("window titles: the owner of the interval (title-owner)", funct
 				.. "not to no window at all")
 	end)
 
-	helpers.it("title-owner: a switch with no new title still credits the owner at switch time", function()
+	it("title-owner: a switch with no new title still credits the owner at switch time", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.set_window_title("code", "Doc", 1000)

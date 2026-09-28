@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -85,7 +86,7 @@ end
 
 helpers.describe("hold durations: what is recorded", function()
 
-	helpers.it("accumulates the time a key spent down", function()
+	it("accumulates the time a key spent down", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.record_hold("code", 30, 120)
@@ -102,7 +103,7 @@ helpers.describe("hold durations: what is recorded", function()
 		helpers.assert_eq(row.count, 2)
 	end)
 
-	helpers.it("keeps the longest hold as a record", function()
+	it("keeps the longest hold as a record", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.record_hold("code", 30, 400)
@@ -114,7 +115,7 @@ helpers.describe("hold durations: what is recorded", function()
 				.. "followed it")
 	end)
 
-	helpers.it("keeps two keys apart", function()
+	it("keeps two keys apart", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.record_hold("code", 30, 100)
@@ -127,7 +128,7 @@ helpers.describe("hold durations: what is recorded", function()
 				.. "held, and one average over the board answers nothing")
 	end)
 
-	helpers.it("writes only the increment on a second flush", function()
+	it("writes only the increment on a second flush", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.record_hold("code", 30, 100)
@@ -140,7 +141,7 @@ helpers.describe("hold durations: what is recorded", function()
 				.. "count every earlier press once more per flush")
 	end)
 
-	helpers.it("records nothing while metrics are switched off", function()
+	it("records nothing while metrics are switched off", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.set_enabled(false)
 			keylogger.on_app_focus("code", 1000)
@@ -153,7 +154,7 @@ helpers.describe("hold durations: what is recorded", function()
 				.. "filters")
 	end)
 
-	helpers.it("ignores a negative or absent duration", function()
+	it("ignores a negative or absent duration", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("code", 1000)
 			keylogger.record_hold("code", 30, -5)
@@ -207,13 +208,13 @@ helpers.describe("hold durations: tap or hold", function()
 		if not ok then error(err, 0) end
 	end
 
-	helpers.it("declines the split when the configured keys disagree", function()
+	it("declines the split when the configured keys disagree", function()
 		with_tap_holds(nil, function(threshold)
 			helpers.assert_nil(threshold, "the shared defaults mix 0.35 s and 0.2 s")
 		end)
 	end)
 
-	helpers.it("splits on the threshold the tap-hold engine runs", function()
+	it("splits on the threshold the tap-hold engine runs", function()
 		with_tap_holds(0.25, function(threshold)
 			helpers.assert_eq(threshold, 250)
 			local writer = with_writer(function(keylogger)
