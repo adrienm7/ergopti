@@ -213,13 +213,16 @@ local function walk_assignments(decoded, consume)
 end
 
 --- Loads a complete canonical candidate before replacing desired assignments.
-local function load_assignments()
-	local decoded = read_config()
+local function load_assignments(candidate)
+	local decoded = candidate
+	if decoded == nil then decoded = read_config() end
+	assert(type(decoded) == "table", "keyboard candidate must be a table")
 	local loaded = manifest_defaults()
 	walk_assignments(decoded, function(slot, action)
 		if type(action) == "string" and action_catalogue().is_assignable(action) then
 			loaded[slot] = action
 		else
+			assert(candidate == nil, "keyboard candidate contains an invalid action")
 			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
 				slot, tostring(action), loaded[slot] or "none")
 		end
@@ -577,9 +580,32 @@ function M.set_action(slot_id, action_id)
 	return called and committed == true
 end
 
+--- Stages exact native intent while the input owner is quiescent. No file is published.
+--- @param decoded table Complete candidate configuration.
+--- @return boolean committed
+function M.apply_configuration(decoded)
+	if type(decoded) ~= "table" or _editing or _started or _start_attempt ~= nil
+		or _native_acquisition_depth ~= 0 or next(_hotkeys) ~= nil then return false end
+	_editing = true
+	local called, detail = xpcall(load_assignments, debug.traceback, decoded)
+	_editing = false
+	if not called then Logger.error(LOG, "Keyboard candidate was refused: %s.", tostring(detail)) end
+	return called
+end
+
+--- Reports actual native ownership, independently of desired assignment state.
+--- @return boolean started
+function M.is_started()
+	return _started and _delivery_enabled
+end
+
 --- Starts the keyboard shortcuts module and owns every configured binding.
+--- @param candidate table|nil Validated transaction source; nil reads the canonical file.
 --- @return boolean committed True only when every required slot was bound.
-function M.start()
+function M.start(candidate)
+	if candidate ~= nil and type(candidate) ~= "table" then return false end
+	if _editing then return false end
+	if _started and candidate ~= nil then return false end
 	if _lifecycle_paused == true or _start_attempt ~= nil then
 		_delivery_enabled = false
 		return false
@@ -598,7 +624,7 @@ function M.start()
 	_start_attempt = attempt
 	_delivery_enabled = false
 	Logger.start(LOG, "Starting keyboard shortcuts…")
-	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback)
+	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback, candidate)
 	if not assignments_ok then
 		Logger.error(LOG, "Keyboard shortcut assignments could not be loaded: %s.",
 			tostring(assignments_err))
@@ -671,10 +697,10 @@ function M.pause()
 end
 
 --- Releases the local PAUSE fence and starts one guarded replacement set.
-function M.resume_after_pause()
+function M.resume_after_pause(candidate)
 	_lifecycle_paused = false
 	invalidate_lifecycle()
-	return M.start()
+	return M.start(candidate)
 end
 
 --- Releases only the local PAUSE fence.  The aggregate Shortcuts owner calls

@@ -122,15 +122,18 @@ end
 
 --- Loads canonical assignments, using manifest defaults only for absent leaves.
 --- @param is_assignable function Authoritative action catalogue check.
-function M.load(is_assignable)
+local function load_configuration(is_assignable, candidate)
 	assert(type(is_assignable) == "function", "tap_keys.load() needs the catalogue check")
-	local decoded = read_config()
+	local decoded = candidate
+	if decoded == nil then decoded = read_config() end
+	assert(type(decoded) == "table", "tap-key candidate must be a table")
 	local configured, loaded = {}, {}
 	walk_assignments(decoded, function(id, value) configured[id] = value end)
 	for _, key in ipairs(M.keys()) do
 		local action = configured[key.id]
 		if action == nil then action = Manifest.default_for(CONFIG_SECTION .. "." .. key.id) end
 		if action ~= "none" and is_assignable(action) ~= true then
+			assert(candidate == nil, "tap-key candidate contains an invalid action")
 			Logger.warn(LOG, "Tap key '%s' holds unknown action '%s' — left alone.", key.id, tostring(action))
 			action = "none"
 		end
@@ -138,6 +141,24 @@ function M.load(is_assignable)
 	end
 	_assignments = loaded
 	Logger.info(LOG, "Tap keys loaded.")
+end
+
+--- Loads desired assignments from the canonical file.
+--- @param is_assignable function Authoritative action catalogue check.
+function M.load(is_assignable)
+	load_configuration(is_assignable)
+end
+
+--- Applies candidate intent while the aggregate owner has fenced native dispatch.
+--- This assignment owner does not acquire input or publish files.
+--- @param decoded table Complete candidate configuration.
+--- @param is_assignable function Authoritative action catalogue check.
+--- @return boolean committed
+function M.apply_configuration(decoded, is_assignable)
+	if type(decoded) ~= "table" then return false end
+	local called, detail = xpcall(load_configuration, debug.traceback, is_assignable, decoded)
+	if not called then Logger.error(LOG, "Tap-key candidate was refused: %s.", tostring(detail)) end
+	return called
 end
 
 --- Loads the assignments once; later calls keep the cached table, which
