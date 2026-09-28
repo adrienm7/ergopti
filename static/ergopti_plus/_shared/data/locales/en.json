@@ -2730,6 +2730,8 @@
 	"platform_reason.layer_fn_modifier_is_macos": "macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.",
 	"platform_reason.layer_spotlight_is_macos": "macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.",
 	"platform_reason.layer_wheel_source_is_not_macos": "Windows and Linux only: on macOS the layer runs in Karabiner-Elements, which cannot take the mouse wheel as input. To change the volume with the wheel there, use the Layer + Scroll shortcut.",
+	"platform_reason.layer_wheel_source_is_windows_only": "Wheel bindings are available only on Windows. The macOS and Linux navigation layers cannot intercept scrolling.",
+	"platform_reason.layer_pointer_source_is_not_linux": "Mouse button bindings are unavailable on Linux because its navigation layer does not intercept pointer buttons.",
 	"platform_reason.debug_surface_is_each_drivers_own": "Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.",
 	"platform_reason.chord_families_are_each_platforms": "The chord families a driver binds belong to its platform: Windows groups its AltGr and CapsLock combinations and keeps a personal shortcuts file, macOS groups its Ctrl and Cmd shortcuts. Each driver lists only the family it binds.",
 	"platform_reason.metrics_extras_are_not_on_linux": "Not on Linux: this driver has no per-application exclusion list, and no way to put a metrics window behind a keyboard shortcut from this menu.",

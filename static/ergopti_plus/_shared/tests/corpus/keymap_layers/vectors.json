@@ -402,7 +402,7 @@
 			"os": "macos",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
 			"expected": {
-				"errors": ["unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_not_macos"],
+				"errors": ["unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_windows_only"],
 				"layers": {
 					"nav": {
 						"MouseMiddle": "keystroke:Escape@repeat"
@@ -411,19 +411,17 @@
 			}
 		},
 		{
-			"id": "wheel_is_a_linux_source",
-			"description": "The same file on Linux: kanata takes the wheel, so both wheel directions bind.",
+			"id": "pointer_is_not_a_linux_source",
+			"description": "The native daemon observes pointer activity without intercepting it, so buttons and wheel bindings are refused with localized reasons.",
 			"os": "linux",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
 			"expected": {
-				"errors": [],
-				"layers": {
-					"nav": {
-						"MouseMiddle": "keystroke:Escape@repeat",
-						"WheelDown": "keystroke:AudioVolumeDown@repeat",
-						"WheelUp": "keystroke:AudioVolumeUp@repeat"
-					}
-				}
+				"errors": [
+					"unavailable_on_os|nav|all|MouseMiddle|platform_reason.layer_pointer_source_is_not_linux",
+					"unavailable_on_os|nav|linux|WheelDown|platform_reason.layer_wheel_source_is_windows_only",
+					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_windows_only"
+				],
+				"layers": { "nav": {} }
 			}
 		},
 		{
@@ -639,9 +637,7 @@
 						"Period": "keystroke:meta+ArrowRight",
 						"Quote": "keystroke:shift+meta+ArrowRight",
 						"Semicolon": "keystroke:ctrl+ArrowRight@repeat",
-						"Slash": "keystroke:End",
-						"WheelDown": "keystroke:AudioVolumeDown@repeat",
-						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+						"Slash": "keystroke:End"
 					}
 				}
 			}

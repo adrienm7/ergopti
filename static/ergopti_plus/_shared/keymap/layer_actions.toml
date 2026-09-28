@@ -86,8 +86,14 @@ reason_key = "platform_reason.layer_fn_modifier_is_macos"
 # wheel input at all, so a wheel binding there would be a key that never fires;
 # the Layer + Scroll shortcut keeps the volume on the wheel on macOS instead.
 [source_kinds.wheel]
-platforms = ["windows", "linux"]
-reason_key = "platform_reason.layer_wheel_source_is_not_macos"
+platforms = ["windows"]
+reason_key = "platform_reason.layer_wheel_source_is_windows_only"
+
+# The native Linux hook observes pointer activity without grabbing the pointer,
+# so it cannot suppress a button's original event when a layer remaps it.
+[source_kinds.mouse_button]
+platforms = ["windows", "macos"]
+reason_key = "platform_reason.layer_pointer_source_is_not_linux"
 
 # Driver-native handlers a `call:` resolution may name, per OS.
 [call_handlers]

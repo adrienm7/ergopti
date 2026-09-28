@@ -28,6 +28,7 @@ local HoldOptions = require("tap_hold.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
 local Json = require("json")
 local Paths = require("infra.paths")
+local NavLayer = require("platform.remap.nav_layer")
 
 local LOG = "platform.remap.tap_hold_manager"
 local MS_PER_SECOND = 1000
@@ -143,10 +144,10 @@ end
 --- Warns about every tap the configuration asks for that this driver cannot
 --- run: the key would otherwise hold as configured and do nothing on a tap,
 --- with the only trace a DEBUG line at each press.
-local function _warn_unsupported_taps()
+local function _warn_unsupported_taps(loaded)
 	local supported = _tap_action_set()
 	for _, key_id in ipairs(Engine.KEY_ORDER) do
-		local key = _loaded.keys[key_id]
+		local key = loaded.keys[key_id]
 		local tap = key and key.enabled ~= false and key.tap_action
 		if type(tap) == "string" and tap ~= "" and tap ~= "none" and not supported[tap] then
 			Logger.warn(LOG, "Tap-hold key '%s': tap action '%s' has no Linux implementation — its tap does nothing.",
@@ -157,15 +158,18 @@ end
 
 --- Reads the files and builds a fresh engine; the old one stays until _apply().
 local function _load()
-	_loaded = Config.load(_defaults_path, _user_path)
-	_one_shot = _read_one_shot()
-	_warn_unsupported_taps()
+	local loaded = Config.load(_defaults_path, _user_path)
+	local one_shot = _read_one_shot()
+	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
+	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir })
+	_warn_unsupported_taps(loaded)
 	local count = 0
-	for _, key in pairs(_loaded.keys) do
+	for _, key in pairs(loaded.keys) do
 		if key.enabled ~= false then count = count + 1 end
 	end
-	_engine = Engine.new({
-		keys = _loaded.keys,
+	local engine = Engine.new({
+		keys = loaded.keys,
+		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
@@ -175,6 +179,7 @@ local function _load()
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
 	})
+	_loaded, _one_shot, _engine = loaded, one_shot, engine
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, _loaded.enabled and "on" or "off")
 end
 

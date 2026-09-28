@@ -27,7 +27,8 @@ local KEYS = {
 local function drive(events, extra)
 	local kh = helpers.load_module("adapters.keyboard_hook")
 	-- A zero minimum tap: the drive has no clock between events.
-	local engine = Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000 })
+	local engine = Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000,
+		nav_layer = require("tests.support.nav_layer_fixture").recommended() })
 	local taps, emitted, chars = {}, {}, {}
 	kh.set_remapper(engine, function(action) taps[#taps + 1] = action end)
 	local callbacks = {

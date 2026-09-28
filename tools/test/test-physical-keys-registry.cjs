@@ -29,7 +29,7 @@
  * 4. Parity with every existing hand copy, each an independent oracle written
  *    before the registry: evdev.json, linux/infra/evdev_codes.lua,
  *    _shared/lua/keycodes/init.lua, azerty.json, heatmap_win.js SC_TO_KC, the
- *    Karabiner legacy_layer_keys.json and the kanata.kbd defsrc. Each scan is
+ *    Karabiner legacy_layer_keys.json and the native tap-hold input keys. Each scan is
  *    floored so a parser that stops matching cannot pass over nothing.
  * ==============================================================================
  */
@@ -413,22 +413,25 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	if (names.size < 40) fail(`legacy_layer_keys.json: only ${names.size} key codes compared (floor 40)`);
 }
 
-// --- 4.7 kanata.kbd defsrc: every source token names one registry entry.
+// --- 4.7 The daemon's tap-hold input keys use the same physical identities.
 {
-	const src = read('linux/platform/remap/data/kanata.kbd');
-	const block = (src.match(/\(defsrc([\s\S]*?)\n\)/) || [])[1] || '';
-	// kanata's own single-character synonyms (parser/src/keys DEFAULT_MAPPINGS).
-	const SYNONYM = { '`': 'grv', '<': '102d', '[': 'lbrc', ']': 'rbrc', ';': 'scln', "'": 'apos', ',': 'comm', '-': 'min', '=': 'eql', '\\': 'bksl' };
-	const tokens = block.replace(/;;[^\n]*/g, '').split(/\s+/).filter(Boolean);
+	const src = read('linux/platform/remap/tap_hold_engine.lua');
+	const block = (src.match(/M\.KEY_CODES\s*=\s*\{([\s\S]*?)\}/) || [])[1];
+	if (!block) fail('native tap-hold engine: KEY_CODES table is missing');
+	const physical = {
+		escape: 'Escape', tab: 'Tab', caps_lock: 'CapsLock', left_shift: 'ShiftLeft',
+		left_ctrl: 'ControlLeft', win: 'MetaLeft', left_alt: 'AltLeft', space: 'Space',
+		alt_gr: 'AltRight', right_ctrl: 'ControlRight', right_shift: 'ShiftRight',
+		enter: 'Enter', backspace: 'Backspace', delete: 'Delete'
+	};
 	const seen = new Set();
-	for (const token of tokens) {
-		const name = SYNONYM[token] || token;
-		const hit = find((k) => k.kanata === name);
-		if (hit.length !== 1) fail(`kanata.kbd defsrc: "${token}" resolves to ${JSON.stringify(hit)}`);
-		else if (seen.has(hit[0])) fail(`kanata.kbd defsrc: ${hit[0]} listed twice`);
-		else seen.add(hit[0]);
+	for (const [, id, raw] of (block || '').matchAll(/(\w+)\s*=\s*(\d+)/g)) {
+		const code = physical[id];
+		if (!code || registry.keys[code]?.evdev !== Number(raw)) fail('native tap-hold key disagrees with registry: ' + id);
+		if (seen.has(id)) fail('duplicate native tap-hold key: ' + id);
+		seen.add(id);
 	}
-	if (tokens.length < 60) fail(`kanata.kbd defsrc: only ${tokens.length} tokens compared (floor 60)`);
+	for (const id of Object.keys(physical)) if (!seen.has(id)) fail('native tap-hold key was not compared: ' + id);
 }
 
 report();
