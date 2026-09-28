@@ -189,6 +189,46 @@ return function(helpers)
 	end)
 
 	helpers.describe("single-file scope admission", function()
+		helpers.it("removes only validated binding parameters while preserving other domains and unknown neighbors", function()
+			for _, profile in ipairs({ { "action_parameters", "gesture__tap_4__open_url" },
+				{ "gesture_parameters", "tap_4__open_url" } }) do
+				for _, mode in ipairs({ "clear", "recommended" }) do
+					local options, files, writes = fixture()
+					local original = '[' .. profile[1] .. ']\n' .. profile[2] .. ' = "https://apple.com"\n'
+						.. 'keyboard__ctrl_k__open_url = "https://example.com"\nfuture = "preserve"\n'
+					files.config = original
+					options.owned_paths = function() return { profile[1] .. "." .. profile[2],
+						profile[1] .. ".keyboard__ctrl_k__open_url" } end
+					options.owners = { action_parameter_domain = function(path)
+						if path == profile[1] .. "." .. profile[2] then return "gesture" end
+						if path == profile[1] .. ".keyboard__ctrl_k__open_url" then return "keyboard" end
+					end }
+					local ok, detail = require("config_scope_transaction").new(options).apply("gestures", mode)
+					helpers.assert_eq(ok, true, detail)
+					local parameters = Codec.decode(files.config)[profile[1]]
+					helpers.assert_eq(parameters[profile[2]], nil)
+					helpers.assert_eq(parameters.keyboard__ctrl_k__open_url, "https://example.com")
+					helpers.assert_eq(parameters.future, "preserve")
+					helpers.assert_eq(files.backup, original)
+					helpers.assert_eq(#writes, 2)
+				end
+			end
+		end)
+		helpers.it("refuses the inline macOS parameter table before backup or runtime publication", function()
+			local options, files, writes, runtime = fixture()
+			local original = '[gestures]\naction_parameters = { tap_4__open_url = "https://apple.com", unknown = "preserve" }\n'
+			files.config = original
+			options.owned_paths = function() return { "gestures.action_parameters.tap_4__open_url" } end
+			options.owners = { action_parameter_domain = function(path)
+				if path == "gestures.action_parameters.tap_4__open_url" then return "gesture" end
+			end }
+			local ok = require("config_scope_transaction").new(options).apply("gestures", "clear")
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(files.config, original)
+			helpers.assert_eq(files.backup, nil)
+			helpers.assert_eq(#writes, 0)
+			helpers.assert_eq(runtime.marker, "original")
+		end)
 		helpers.it("refuses preset scopes before reading, backing up or touching runtime", function()
 			for _, scope in ipairs({ "global", "tap_holds" }) do
 				for _, mode in ipairs({ "recommended", "clear" }) do

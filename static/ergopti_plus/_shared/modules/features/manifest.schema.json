@@ -28,6 +28,16 @@
 				"restore_exclude": { "type": "array", "items": { "type": "string" } },
 				"includes": { "type": "array", "items": { "type": "string" } },
 				"preset": { "type": "string" },
+				"action_parameters": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["domains", "restore"],
+					"properties": {
+						"domains": { "type": "array", "minItems": 1, "uniqueItems": true,
+							"items": { "enum": ["gesture", "keyboard", "script", "tap_key", "tap_hold"] } },
+						"restore": { "const": "remove" }
+					}
+				},
 				"dynamic_defaults": {
 					"type": "array",
 					"items": {
@@ -38,6 +48,8 @@
 							"prefix": { "type": "string" },
 							"depth": { "type": "integer", "minimum": 1 },
 							"suffix": { "type": "string" },
+							"type": { "enum": ["boolean", "integer", "number", "string"],
+								"description": "Derived from neutral and recommended source values by the generator." },
 							"default": { "type": ["boolean", "number", "string"] },
 							"recommended": { "type": ["boolean", "number", "string"] }
 						}

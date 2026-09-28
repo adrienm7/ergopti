@@ -137,20 +137,23 @@ function M.sparse_operation(path, value) return _defaults.operation(path, value)
 --- Produces selected recommended writes or neutral deletions.
 --- @param scope string Scope identifier.
 --- @param mode string `recommended` or `clear`.
+--- @param owners table|nil Exact host parameter validators.
 --- @return table operations
-function M.scope_operations(scope, mode, owned_paths) return _defaults.scope_operations(scope, mode, owned_paths) end
+function M.scope_operations(scope, mode, owned_paths, owners) return _defaults.scope_operations(scope, mode, owned_paths, owners) end
 
 --- Collects dynamic paths from explicit runtime owners for one scope.
 --- @param scope string Scope identifier.
 --- @param providers table Named callbacks returning owned path arrays.
+--- @param owners table|nil Exact host parameter validators.
 --- @return table paths
-function M.scope_inventory(scope, providers) return _defaults.scope_inventory(scope, providers) end
+function M.scope_inventory(scope, providers, owners) return _defaults.scope_inventory(scope, providers, owners) end
 
 --- Separates config operations from required external preset owners.
 --- @param scope string Scope identifier.
 --- @param mode string Recommended restoration or clear.
 --- @param owned_paths table|nil Explicit runtime-owned paths.
+--- @param owners table|nil Exact host parameter validators.
 --- @return table plan
-function M.scope_plan(scope, mode, owned_paths) return _defaults.scope_plan(scope, mode, owned_paths) end
+function M.scope_plan(scope, mode, owned_paths, owners) return _defaults.scope_plan(scope, mode, owned_paths, owners) end
 
 return M

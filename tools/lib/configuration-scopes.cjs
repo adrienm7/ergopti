@@ -1,0 +1,42 @@
+// tools/lib/configuration-scopes.cjs
+
+'use strict';
+
+const schema = require('../../static/ergopti_plus/_shared/modules/features/manifest.schema.json');
+const parameterShape = schema.$defs.configuration_scope.properties.action_parameters;
+
+/**
+ * Derives generated scalar types before AHK represents false and zero alike.
+ * The source values remain authoritative; conflicting explicit types are errors.
+ * @param {object} scopes Canonical scope declarations.
+ * @returns {object} Detached scope metadata with typed dynamic defaults.
+ */
+function normalizeScopes(scopes) {
+	const normalized = structuredClone(scopes);
+	for (const [scope, declaration] of Object.entries(normalized)) {
+		const parameters = declaration.action_parameters;
+		if (parameters !== undefined && (parameters === null || typeof parameters !== 'object' ||
+			parameters.restore !== parameterShape.properties.restore.const || !Array.isArray(parameters.domains) ||
+			parameters.domains.length === 0 || new Set(parameters.domains).size !== parameters.domains.length ||
+			parameters.domains.some(domain => !parameterShape.properties.domains.items.enum.includes(domain)) ||
+			Object.keys(parameters).some(key => !Object.hasOwn(parameterShape.properties, key)))) {
+			throw new Error(`Invalid action parameter ownership in scope ${scope}`);
+		}
+		for (const entry of declaration.dynamic_defaults || []) {
+			const kind = typeof entry.default;
+			if (!['boolean', 'number', 'string'].includes(kind) || typeof entry.recommended !== kind ||
+				(kind === 'number' && (!Number.isFinite(entry.default) || !Number.isFinite(entry.recommended)))) {
+				throw new Error(`Invalid dynamic default values in scope ${scope}: ${entry.prefix}`);
+			}
+			const type = kind === 'number' && Number.isInteger(entry.default) && Number.isInteger(entry.recommended)
+				? 'integer' : kind;
+			if (entry.type !== undefined && entry.type !== type) {
+				throw new Error(`Dynamic default type disagrees with its values in scope ${scope}: ${entry.prefix}`);
+			}
+			entry.type = type;
+		}
+	}
+	return normalized;
+}
+
+module.exports = { normalizeScopes };

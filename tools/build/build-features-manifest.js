@@ -24,6 +24,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import sharedPaths from '../lib/paths.cjs';
+import scopeMetadata from '../lib/configuration-scopes.cjs';
 
 const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,7 @@ function loadManifest() {
 			'manifest.toml must contain [manifest], [sections], and at least one [[features.*]] block'
 		);
 	}
+	parsed.scopes = scopeMetadata.normalizeScopes(parsed.scopes);
 	return parsed;
 }
 
