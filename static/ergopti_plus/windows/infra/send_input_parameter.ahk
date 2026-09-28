@@ -49,9 +49,11 @@ SendInputVocabulary() {
 	if (_SEND_INPUT_VOCABULARY is Map)
 		return _SEND_INPUT_VOCABULARY
 	Path := _SharedDir . "\modules\actions\send_keys.json"
-	if !FileExist(Path)
+	if !FSExists(Path)
 		throw Error("The send-input vocabulary is missing: " . Path)
-	Text := FileRead(Path, "UTF-8")
+	Text := FSRead(Path)
+	if !(Text is String)
+		throw Error("The send-input vocabulary could not be read: " . Path)
 	Root := JsonParse(Text)
 	if !(Root is Map) || !Root.Has("modifiers") || !(Root["modifiers"] is Array)
 			|| !Root.Has("keys") || !(Root["keys"] is Array)
