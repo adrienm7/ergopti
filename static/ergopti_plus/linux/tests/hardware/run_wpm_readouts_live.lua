@@ -80,10 +80,12 @@ end
 -- ======= 1/ The pill =====================
 -- =========================================
 
+require("tests.support.live_preferences").ensure_directory()
 Widget.restore()
+assert(Widget.set_use_source_colors(true), "the colour fixture must explicitly select source colours")
 -- A place kept by an earlier run is not the default this checks.
 expect(Widget.reset_position(), "the widget starts from its default place")
-expect(Widget.start(), "the widget starts")
+assert(Widget.start() == true, "the widget must start before testing its native geometry")
 tick(fresh(typing_ai))
 expect(Surface.is_visible(), "the pill is on screen while the user types")
 
@@ -156,7 +158,7 @@ end
 -- ======= 4/ The tray readout =============
 -- =========================================
 
-expect(Readout.start(), "the tray readout starts")
+assert(Readout.start() == true, "the tray readout must start before testing its native item")
 local seconds = tonumber(arg and arg[1]) or 8
 local deadline = os.time() + seconds
 local shown = nil
