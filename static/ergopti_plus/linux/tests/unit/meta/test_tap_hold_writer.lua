@@ -151,6 +151,32 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		os.remove(path)
 	end)
 
+	helpers.it("clears only owned tap-hold fields and leaves the engine neutral", function()
+		local writer, path, state = fresh_writer()
+		local ok, err = pcall(function()
+			write_file(path, '[tap_hold]\nenabled = true\ninherit_defaults = true\nfuture = "keep"\n'
+				.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
+				.. 'enabled = true\ntime_activation_seconds = 0.3\n'
+				.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
+				.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
+				.. '[tap_hold.keys.future_key]\ntap_action = "future"\nenabled = true\n'
+				.. '[other]\nvalue = 17\n')
+			helpers.assert_true(writer.disable_all())
+			local stored = require("toml_codec").decode(read_file(path))
+			helpers.assert_eq(stored.tap_hold.keys.left_shift, { custom = { note = "keep" } })
+			helpers.assert_nil(stored.tap_hold.keys.left_ctrl)
+			helpers.assert_eq(stored.tap_hold.keys.future_key, { tap_action = "future", enabled = true })
+			helpers.assert_nil(stored.tap_hold.enabled)
+			helpers.assert_nil(stored.tap_hold.inherit_defaults)
+			helpers.assert_eq(stored.tap_hold.future, "keep")
+			helpers.assert_eq(stored.other.value, 17)
+			helpers.assert_eq(effective(path).enabled, false)
+			helpers.assert_eq(state.reloads, 1)
+		end)
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("switches the feature off in the file", function()
 		local writer, path = fresh_writer()
 		writer.set_enabled(false)

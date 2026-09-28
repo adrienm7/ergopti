@@ -10,8 +10,8 @@
 --- 1. The Windows writer's rules, on the file all three drivers read: a tap is
 ---    an action id, "" (the key itself) or "none" (nothing); a hold is a
 ---    modifier, a layer or none, and choosing one removes the other; "native"
----    clears both; « Disable all » starts from no key at all
----    (inherit_defaults = false) so the shipped defaults do not come back.
+---    clears both; « Disable all » removes owned preferences and leaves the
+---    feature neutral without erasing fields owned by other versions.
 --- 2. Only the keys the user changed are written: every other key keeps
 ---    inheriting the shared default.
 --- 3. The file is decoded by the shared TOML codec, not by a line scanner, and
@@ -188,6 +188,22 @@ local function key_entry(document, key_id)
 	return tap_hold.keys[key_id]
 end
 
+--- Removes only fields whose runtime meaning belongs to this writer.
+--- @param tap_hold table
+local function clear_owned_keys(tap_hold)
+	if type(tap_hold.keys) ~= "table" then return end
+	for key_id in pairs(Engine.KEY_CODES) do
+		local entry = tap_hold.keys[key_id]
+		if type(entry) == "table" then
+			for _, field in ipairs({ "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }) do
+				entry[field] = nil
+			end
+			if next(entry) == nil then tap_hold.keys[key_id] = nil end
+		end
+	end
+	if next(tap_hold.keys) == nil then tap_hold.keys = nil end
+end
+
 local function valid_key(key_id, caller)
 	if type(key_id) == "string" and Engine.KEY_CODES[key_id] then return true end
 	Logger.error(LOG, "%s: unknown tap-hold key '%s' — nothing written.", caller, tostring(key_id))
@@ -304,13 +320,14 @@ function M.set_enabled(enabled)
 	end)
 end
 
---- « Disable all »: no key at all, and the shipped defaults do not come back.
+--- Clears owned preferences to the neutral default while preserving unknown data.
 --- @return boolean
 function M.disable_all()
 	return commit("disable all", function(document)
 		local tap_hold = section(document)
-		tap_hold.keys = nil
-		tap_hold.inherit_defaults = false
+		tap_hold.enabled = nil
+		tap_hold.inherit_defaults = nil
+		clear_owned_keys(tap_hold)
 	end)
 end
 
@@ -321,17 +338,7 @@ function M.reset_all()
 		local tap_hold = section(document)
 		tap_hold.enabled = Manifest.recommended_for("tap_holds.enabled")
 		tap_hold.inherit_defaults = true
-		if type(tap_hold.keys) ~= "table" then return end
-		for key_id in pairs(Engine.KEY_CODES) do
-			local entry = tap_hold.keys[key_id]
-			if type(entry) == "table" then
-				for _, field in ipairs({ "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }) do
-					entry[field] = nil
-				end
-				if next(entry) == nil then tap_hold.keys[key_id] = nil end
-			end
-		end
-		if next(tap_hold.keys) == nil then tap_hold.keys = nil end
+		clear_owned_keys(tap_hold)
 	end)
 end
 
