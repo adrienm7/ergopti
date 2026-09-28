@@ -51,8 +51,8 @@ helpers.describe("ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 18 bridges", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 18)
+    helpers.it("has exactly 19 bridges", function()
+      helpers.assert_eq(#WH.get_bridge_names(), 19)
     end)
   end)
 
