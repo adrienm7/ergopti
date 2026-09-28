@@ -112,8 +112,7 @@ class ConfigCleanupWindow extends WebViewHost {
 		if IsObject(Existing) && !Existing.ResetDone {
 			if Existing.Building || Existing.Cancelled
 				return false
-			WinActivate("ahk_id " . Existing.Gui.Hwnd)
-			return true
+			return WMActivate(Existing.Gui.Hwnd)
 		}
 		WebViewHost._LoadManifest()
 		Host := ConfigCleanupWindow()

@@ -566,3 +566,19 @@ _CUK_ActionParameterRoundTrip() {
 }
 Test("four-finger URL survives real persistence reload cleanup and menu rendering (config-action-parameter-owner)",
 	_CUK_ActionParameterRoundTrip)
+
+; A stale native handle must not report that the existing preview was reopened.
+_CUK_WebWindowReuseRefusal() {
+	Previous := ConfigCleanupWindow.Current
+	Host := ConfigCleanupWindow()
+	Host.Gui := { Hwnd: 0 }
+	Host.ResetDone := false
+	ConfigCleanupWindow.Current := Host
+	try {
+		AssertFalse(ConfigCleanupWindow.Open("unused-by-reuse.toml"),
+			"the real window adapter must propagate activation refusal")
+		AssertTrue(ConfigCleanupWindow.Current == Host, "refusal must retain the admitted preview owner")
+	} finally ConfigCleanupWindow.Current := Previous
+}
+Test("config cleanup webview: reuse consumes the native activation refusal (config-cleanup-reuse)",
+	_CUK_WebWindowReuseRefusal)
