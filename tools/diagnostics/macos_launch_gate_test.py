@@ -144,16 +144,22 @@ class StateTests(unittest.TestCase):
     def test_logs_scenarios_seed_logs_dir_path(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
+            synced_home = home / "synced"
+            dangling_home = home / "dangling"
             try:
-                synced = gate.seed("symlink_logs_dir", home, "", "2026-09-24")
-                dangling = gate.seed("dangling_logs", home, "", "2026-09-24")
+                synced = gate.seed("symlink_logs_dir", synced_home, "", "2026-09-24")
+                dangling = gate.seed("dangling_logs", dangling_home, "", "2026-09-24")
             except OSError as error:
                 self.skipTest(f"symbolic links unavailable here: {error}")
-            self.assertEqual(synced["logs_dir"], home / "SyncedLogs/ergopti_plus")
-            self.assertIn(f'LogsDirPath = "{home}/SyncedLogs"',
+            self.assertNotEqual(synced["paths_toml"], dangling["paths_toml"])
+            self.assertEqual(synced["logs_dir"], synced_home / "SyncedLogs/ergopti_plus")
+            self.assertIn(f'LogsDirPath = "{synced_home}/SyncedLogs"',
                 synced["paths_toml"].read_text(encoding="utf-8"))
-            self.assertIn(f'LogsDirPath = "{home}/gitcfg/ergopti_plus"',
+            self.assertIn(f'LogsDirPath = "{dangling_home}/gitcfg/ergopti_plus"',
                 dangling["paths_toml"].read_text(encoding="utf-8"))
+            self.assertTrue((synced_home / "SyncedLogs").is_symlink())
+            self.assertTrue((dangling_home / "gitcfg/ergopti_plus").is_symlink())
+            self.assertFalse((dangling_home / "gitcfg/ergopti_plus").exists())
             self.assertIn("symlink_logs_dir", gate.SCENARIOS)
             self.assertEqual(gate.logs_folder(home), home / "Library/Logs/ergopti_plus")
 
@@ -193,11 +199,16 @@ class StateTests(unittest.TestCase):
             self.assertEqual(gate.check_state("tilde_paths", state, home), [])
 
 
-# The nine scenarios the pull-request and plain-push gate launched before the
-# profiles moved into the script (the scenario list in ci.yml at ca1a4d64a).
+# Keep independent oracles for every approved scenario, including the picked
+# logs-directory link added when launcher and driver log ownership converged.
 CI_PROFILE = [
     "clean", "upgraded", "symlink_config", "symlink_hammerspoon", "symlink_logs",
-    "tilde_paths", "dangling_logs", "configured_symlink", "plain_open",
+    "symlink_logs_dir", "tilde_paths", "dangling_logs", "configured_symlink", "plain_open",
+]
+RELEASE_PROFILE = [
+    "clean", "upgraded", "source_logs", "symlink_config", "symlink_config_documents",
+    "symlink_hammerspoon", "symlink_logs", "symlink_logs_dir", "tilde_paths",
+    "dangling_logs", "configured_symlink", "plain_open",
 ]
 SCRIPT = Path(__file__).with_name("macos_launch_gate.py")
 
@@ -212,14 +223,14 @@ def print_matrix(*arguments):
 class ProfileTests(unittest.TestCase):
     """The workflow's launch matrix comes from these profiles alone, so they must not drift."""
 
-    def test_ci_profile_keeps_the_nine_gated_scenarios(self):
+    def test_ci_profile_keeps_the_approved_gated_scenarios(self):
         self.assertEqual(list(gate.PROFILES["ci"]), CI_PROFILE,
             "the CI launch profile changed; update CI_PROFILE only for a deliberate change")
 
     def test_release_profile_launches_every_scenario(self):
         self.assertEqual(gate.PROFILES["release"], gate.SCENARIOS)
-        self.assertEqual(len(gate.SCENARIOS), 11,
-            "the scenario count changed; update this pin only for a deliberate change")
+        self.assertEqual(list(gate.SCENARIOS), RELEASE_PROFILE,
+            "the release scenarios changed; update this oracle only for a deliberate change")
 
     def test_ci_profile_is_a_strict_subset_of_release(self):
         self.assertLess(set(gate.PROFILES["ci"]), set(gate.PROFILES["release"]))
