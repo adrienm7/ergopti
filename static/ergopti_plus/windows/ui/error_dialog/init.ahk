@@ -296,11 +296,16 @@ _ErrorDialog_Present(Record) {
 		_ED_Folded := 0
 		return
 	}
-	if !_ErrorDialog_Open(Record) {
+		if !_ErrorDialog_Open(Record) {
 		; A window that could not open frees the policy for the next error
 		_ED_Busy := false
 		_ED_Folded := 0
 	}
+}
+
+; Keep native title construction independently testable without reporting a real error.
+_ErrorDialog_NewWindow() {
+	return Gui_Create("+Resize +AlwaysOnTop +MinSize440x320", t("common.error_title"))
 }
 
 ; Opens the window for one error, without taking the keyboard.
@@ -325,7 +330,7 @@ _ErrorDialog_Open(Record) {
 		return false
 	}
 
-	G := Gui_Create("+Resize +AlwaysOnTop +MinSize440x320", "ErgoptiPlus — " . t("common.error_title"))
+	G := _ErrorDialog_NewWindow()
 	G.MarginX := 0
 	G.MarginY := 0
 	ContentCtl := G.Add("Text", "x0 y0 w" . ED_WIDTH . " h" . ED_HEIGHT, "")

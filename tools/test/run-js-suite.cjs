@@ -303,6 +303,7 @@ const CHECKS = [
 	{ name: 'action picker greys a host-disabled row with its reason and never confirms it', cmd: 'node', args: ['tools/test/test-action-picker-disabled-rows.cjs'], repro: 'npm run test:action-picker-disabled-rows' },
 	{ name: 'action picker edits a text, a key or a shortcut and validates it as the drivers do', cmd: 'node', args: ['tools/test/test-action-picker-parameter-editor.cjs'], repro: 'npm run test:action-picker-parameter-editor' },
 	{ name: 'file-path headers (convention 3, every source file names itself)', cmd: 'node', args: ['tools/lint/audit-file-headers.cjs'], repro: 'node tools/lint/audit-file-headers.cjs' },
+	{ name: 'window title audit mutations', cmd: 'node', args: ['tools/test/test-gui-title-audit.cjs'], repro: 'node tools/test/test-gui-title-audit.cjs' },
 	{ name: 'window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)', cmd: 'node', args: ['tools/lint/audit-gui-titles.cjs'], repro: 'node tools/lint/audit-gui-titles.cjs' },
 	{ name: 'updater constants single source (owner/repo/timing literals match defaults.json)', cmd: 'node', args: ['tools/test/test-updater-constants-single-source.cjs'], repro: 'node tools/test/test-updater-constants-single-source.cjs' },
 	{ name: 'name parity (text_utils + action_picker + manifest_menu symmetric across drivers)', cmd: 'node', args: ['tools/test/test-name-parity.cjs'], repro: 'node tools/test/test-name-parity.cjs' },

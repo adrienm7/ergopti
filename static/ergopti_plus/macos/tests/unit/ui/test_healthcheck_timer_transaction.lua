@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 --- @param scheduler table TimerScheduler test double.
 --- @return table module Fresh healthcheck module.
 --- @return table context Captured native callbacks and side effects.
-local function load_healthcheck(scheduler)
+local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder",
@@ -34,6 +34,7 @@ local function load_healthcheck(scheduler)
 		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
 		"allowGestures", "level", "html", "show", "shadow",
 	}) do webview[method] = function(self) return self end end
+	webview.windowTitle = function(self, title) context.title = title return self end
 	webview.windowCallback = function(self, callback)
 		context.window_callback = callback
 		return self
@@ -57,13 +58,16 @@ local function load_healthcheck(scheduler)
 	package.loaded["infra.logger"] = logger
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["healthcheck.snapshot"] = {}
+	local compose_title = require("ui.ui_builder").window_title
 	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["infra.i18n"] = { get = function(key)
+		return key == "menu.debug.healthcheck" and title_label or key
+	end }
 	package.loaded["ui.ui_builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		get_app_geometry = function() return { width = 860, height = 720 } end,
-		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
+		window_title = compose_title,
 		force_focus = function() end,
 	}
 
@@ -80,6 +84,25 @@ local function load_healthcheck(scheduler)
 end
 
 helpers.describe("healthcheck window focus ownership", function()
+	helpers.it("sends one localized product prefix to the native title owner in every locale", function()
+		local Json = require("json")
+		local function read_json(relative)
+			local file = assert(io.open(helpers.shared(relative), "rb"))
+			local text = file:read("*a")
+			file:close()
+			return Json.decode(text)
+		end
+		local locales = read_json("data/locale_order.json").order
+		helpers.assert_eq(#locales, 21)
+		for _, locale in ipairs(locales) do
+			local label = read_json("data/locales/" .. locale .. ".json")["menu.debug.healthcheck"]
+			local healthcheck, context = load_healthcheck({ cancel = function() return true end }, label)
+			helpers.assert_true(healthcheck.show_window())
+			helpers.assert_eq(context.title, "ErgoptiPlus — " .. label, locale .. " native title")
+			context.window_callback("closing")
+		end
+	end)
+
 	helpers.it("(webview-focus-owner) healthcheck fallback cannot focus after refused deletion", function()
 		local pending, focuses = {}, 0
 		local healthcheck = load_healthcheck({

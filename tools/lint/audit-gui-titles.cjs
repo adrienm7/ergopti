@@ -1,105 +1,191 @@
 // tools/lint/audit-gui-titles.cjs
 
 /**
- * ==============================================================================
- * MODULE: GUI Window Title Auditor
- * DESCRIPTION:
- * Scans AHK and Lua source for Gui() creation and :windowTitle() settings and
- * verifies every window title carries the mandatory "ErgoptiPlus" prefix
- * (format "ErgoptiPlus — Nom"). Fails on any hardcoded title missing the prefix.
- * ==============================================================================
+ * Audits native titles and the brandless inputs to shared title composers.
+ * This is a bounded source check, not interprocedural data-flow analysis: it
+ * resolves direct literals, translations, simple preceding assignments (within eight lines and the same block) and
+ * inline show_webview title options. Dynamic inputs remain counted explicitly.
  */
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const ROOT = path.resolve(__dirname, '../..');
+const BRAND = /^\s*Ergopti(?:Plus)?\b/;
 
-const fs = require('fs');
-const path = require('path');
-
-const REPO_ROOT = path.resolve(__dirname, '../../');
-const WINDOWS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/windows');
-const MACOS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/macos');
-
-let totalViolations = 0;
-
-function walkFiles(dir, ext, out = []) {
-	let entries;
-	try {
-		entries = fs.readdirSync(dir);
-	} catch {
-		return out;
-	}
-	for (const e of entries) {
-		if (
-			e === 'node_modules' ||
-			e === '.git' ||
-			e === '_generated' ||
-			e === 'vendor' ||
-			e === 'tests'
-		)
-			continue;
-		const full = path.join(dir, e);
-		let st;
-		try {
-			st = fs.statSync(full);
-		} catch {
-			continue;
+/** Tokenize strings and delimiters without treating quoted comment markers as comments. */
+function tokens(source, lua) {
+	const out = [];
+	let i = 0, line = 1;
+	const consume = (end) => { line += (source.slice(i, end).match(/\n/g) || []).length; i = end; };
+	while (i < source.length) {
+		const start = i, at = line, c = source[i];
+		if (/\s/.test(c)) { consume(i + 1); continue; }
+		const long = lua && source.slice(i).match(/^(?:--)?\[(=*)\[/);
+		if (long) {
+			const close = ']' + long[1] + ']';
+			const end = source.indexOf(close, i + long[0].length);
+			const stop = end < 0 ? source.length : end + close.length;
+			if (!long[0].startsWith('--')) out.push({ value: source.slice(i + long[0].length, end < 0 ? source.length : end), string: true, line: at });
+			consume(stop); continue;
 		}
-		if (st.isDirectory()) walkFiles(full, ext, out);
-		else if (ext.includes(path.extname(e))) out.push(full);
+		if ((!lua && c === ';') || (lua && source.startsWith('--', i))) {
+			const end = source.indexOf('\n', i); consume(end < 0 ? source.length : end); continue;
+		}
+		if (!lua && source.startsWith('/*', i)) {
+			const end = source.indexOf('*/', i + 2); consume(end < 0 ? source.length : end + 2); continue;
+		}
+		if (c === '"' || c === "'") {
+			let value = ''; i++;
+			while (i < source.length && source[i] !== c) {
+				if (source[i] === (lua ? '\\' : '`') && i + 1 < source.length) { value += source[i + 1]; i += 2; }
+				else value += source[i++];
+			}
+			i = Math.min(i + 1, source.length);
+			line += (source.slice(start, i).match(/\n/g) || []).length;
+			out.push({ value, string: true, line: at }); continue;
+		}
+		const word = source.slice(i).match(/^[A-Za-z_][A-Za-z_0-9]*/);
+		const value = word ? word[0] : source.startsWith(':=', i) ? ':=' : source.startsWith('..', i) ? '..' : c;
+		out.push({ value, line: at }); i += value.length;
 	}
 	return out;
 }
 
-function auditAhkFile(filePath) {
-	const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-	const cleanContent = content.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+/** Return balanced call arguments, keeping nested expressions intact. */
+function argumentsAt(ts, open) {
+	const args = []; let current = [], depth = 0;
+	for (let i = open + 1; i < ts.length; i++) {
+		const t = ts[i], v = t.value;
+		if (!t.string && v === ')' && depth === 0) { args.push(current); return { args, end: i }; }
+		if (!t.string && v === ',' && depth === 0) { args.push(current); current = []; continue; }
+		if (!t.string && ['(', '[', '{'].includes(v)) depth++;
+		if (!t.string && [')', ']', '}'].includes(v)) depth--;
+		current.push(t);
+	}
+	return null;
+}
 
-	// Check for raw Gui(..., "Title") calls.
-	// We now mandate Gui_Create or similar helpers that enforce the prefix.
-	const guiRegex = /\bGui\(\s*["'][^"']*["']\s*,\s*["']([^"']+)["']\s*\)/g;
-	let match;
-	while ((match = guiRegex.exec(cleanContent)) !== null) {
-		const title = match[1];
-		if (!title.startsWith('ErgoptiPlus')) {
-			console.error(
-				`\x1b[31m[FAIL]\x1b[0m ${path.relative(REPO_ROOT, filePath)}: Raw Gui() title "${title}" missing "ErgoptiPlus" prefix.`
-			);
-			totalViolations++;
+function inlineTitle(ts) {
+	let depth = 0;
+	for (let i = 0; i < ts.length; i++) {
+		const t = ts[i]; if (t.string) continue;
+		if (['{', '(', '['].includes(t.value)) depth++;
+		if (['}', ')', ']'].includes(t.value)) depth--;
+		if (depth === 1 && t.value === 'title' && ts[i + 1]?.value === '=') {
+			const out = []; let nested = 0;
+			for (let j = i + 2; j < ts.length; j++) {
+				const n = ts[j];
+				if (!n.string && nested === 0 && [',', '}'].includes(n.value)) return out;
+				if (!n.string && ['{', '(', '['].includes(n.value)) nested++;
+				if (!n.string && ['}', ')', ']'].includes(n.value)) nested--;
+				out.push(n);
+			}
 		}
 	}
+	return null;
 }
 
-function auditLuaFile(filePath) {
-	const content = fs.readFileSync(filePath, 'utf8');
-	const cleanContent = content.replace(/--.*$/gm, '').replace(/--\[\[[\s\S]*?\]\]/g, '');
+function walk(dir, extension, out = []) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		if (['tests', 'vendor', '_generated', 'node_modules', '.git'].includes(entry.name)) continue;
+		const file = path.join(dir, entry.name);
+		if (entry.isDirectory()) walk(file, extension, out);
+		else if (entry.name.endsWith(extension)) out.push(file);
+	}
+	return out;
+}
 
-	// Check for windowTitle calls that don't use the prefix.
-	// ui_builder.lua is the centralized place now, but let's check others.
-	if (filePath.endsWith('ui_builder.lua')) return;
+function auditSource(source, lua, locales) {
+	const ts = tokens(source, lua), findings = [], debt = [], stats = { checked: 0, dynamic: 0 };
+	// Only simple same-line assignments are followed. Parameters, table paths,
+	// callback results and cross-function argument flow are deliberately unresolved.
+	function alias(name, before, seen) {
+		if (seen.has(name)) return [];
+		for (let i = before - 2; i >= 0; i--) {
+			if (ts[before].line - ts[i].line > 8 || !ts[i].string && ["function", "{", "}"].includes(ts[i].value)) break;
+			if (ts[i].value !== name || !['=', ':='].includes(ts[i + 1]?.value)) continue;
+			if (['.', ':', '['].includes(ts[i - 1]?.value)) continue;
+			const line = ts[i].line, expr = [];
+			for (let j = i + 2; j < before && ts[j].line === line; j++) expr.push(ts[j]);
+			return values(expr, i, new Set([...seen, name]));
+		}
+		return [];
+	}
+	function values(expr, before, seen = new Set()) {
+		if (!expr?.length) return [];
+		if (expr.length === 1 && !expr[0].string) return alias(expr[0].value, before, seen);
+		const found = [];
+		for (let i = 0; i < expr.length; i++) {
+			const t = expr[i];
+			if (t.string) {
+				if (expr[i - 1]?.value !== '[') found.push({ value: t.value });
+				continue;
+			}
+			if (/^[A-Za-z_][A-Za-z_0-9]*$/.test(t.value) && !['.', ':'].includes(expr[i - 1]?.value)
+				&& expr[i + 1]?.value !== '(' && !['[', '.'].includes(expr[i + 1]?.value))
+				found.push(...alias(t.value, before, seen));
+			if (t.value === 'window_title' && expr[i + 1]?.value === '(') found.push({ value: 'ErgoptiPlus', composed: true });
+			if (['t', 'get'].includes(t.value) && expr[i + 1]?.value === '(') {
+				const call = argumentsAt(expr, i + 1);
+				if (!call) continue;
+				const keys = values(call.args[0], before, seen);
+				for (const key of keys) for (const [locale, data] of Object.entries(locales)) {
+					if (typeof data[key.value] === 'string') found.push({ value: data[key.value], key: key.value, locale });
+				}
+				i = call.end;
+			}
+		}
+		return found;
+	}
+	for (let i = 0; i < ts.length - 1; i++) {
+		const t = ts[i], name = t.value;
+		if (t.string || ts[i + 1].value !== '(') continue;
+		if (ts[i - 1]?.value === 'function' || ts[i - 3]?.value === 'function') continue;
+		const wrapper = ['Gui_Create', 'window_title', 'set_window_title', 'set_title', 'show_webview'].includes(name);
+		const raw = ['Gui', 'windowTitle'].includes(name);
+		if (!wrapper && !raw) continue;
+		const call = argumentsAt(ts, i + 1); if (!call) continue;
+		if (ts[call.end + 1]?.value === '{' || call.args.some(a => a.some(n => n.value === ':='))) continue;
+		let expr, brandedInput = wrapper;
+		if (name === 'show_webview') expr = inlineTitle(call.args[0]);
+		else if (name === 'set_title' && call.args.length === 1) { expr = call.args[0]; brandedInput = false; }
+		else expr = call.args[['Gui_Create', 'Gui', 'set_window_title', 'set_title'].includes(name) ? 1 : 0];
+		if (!expr) continue;
+		const resolved = values(expr, i);
+		stats.checked++;
+		if (resolved.length === 0) { stats.dynamic++; continue; }
+		const bad = brandedInput ? resolved.filter(v => BRAND.test(v.value)) : resolved.filter(v => !BRAND.test(v.value));
+		// Raw expressions composed by the title helper already have their prefix.
+		if (!brandedInput && resolved.some(v => v.composed || BRAND.test(v.value))) continue;
+		const legacyRaw = !brandedInput && expr.length === 1 && expr[0].string
+			&& (name === 'windowTitle' || (name === 'Gui' && call.args[0]?.length === 1 && call.args[0][0].string));
+		if (bad.length) (brandedInput || legacyRaw ? findings : debt).push({ line: t.line, call: name, reason: brandedInput ? 'branded input to a prefix-adding wrapper' : 'raw native title lacks a product prefix', values: bad });
+	}
+	return { findings, debt, ...stats };
+}
 
-	const titleRegex = /:windowTitle\(\s*["']([^"']+)["']\s*\)/g;
-	let match;
-	while ((match = titleRegex.exec(cleanContent)) !== null) {
-		const title = match[1];
-		if (!title.startsWith('ErgoptiPlus')) {
-			console.error(
-				`\x1b[31m[FAIL]\x1b[0m ${path.relative(REPO_ROOT, filePath)}: :windowTitle() "${title}" missing "ErgoptiPlus" prefix.`
-			);
-			totalViolations++;
+function main(root = ROOT) {
+	const localeDir = path.join(root, 'static/ergopti_plus/_shared/data/locales');
+	const locales = Object.fromEntries(fs.readdirSync(localeDir).filter(n => n.endsWith('.json')).map(n => [n.slice(0, -5), JSON.parse(fs.readFileSync(path.join(localeDir, n), 'utf8'))]));
+	let violations = 0, checked = 0, dynamic = 0, rawDebt = 0;
+	for (const [platform, extension] of [['windows', '.ahk'], ['macos', '.lua'], ['linux', '.lua']]) {
+		const files = walk(path.join(root, 'static/ergopti_plus', platform), extension);
+		for (const file of files) {
+			const result = auditSource(fs.readFileSync(file, 'utf8'), extension === '.lua', locales);
+			checked += result.checked; dynamic += result.dynamic;
+			for (const item of result.debt) {
+				rawDebt++;
+				console.log(`[DEBT] ${path.relative(root, file).replaceAll("\\", "/")}:${item.line}: possible unbranded raw title; manual review required.`);
+			}
+			for (const finding of result.findings) {
+				violations++;
+				const details = [...new Set(finding.values.map(v => v.key ? `${v.locale}:${v.key}` : JSON.stringify(v.value)))].join(', ');
+				console.error(`${path.relative(root, file).replaceAll('\\', '/')}:${finding.line}: ${finding.call}: ${finding.reason} (${details}).`);
+			}
 		}
 	}
+	console.log(`GUI title audit: ${checked} call sites across Windows/macOS/Linux; ${dynamic} dynamic inputs unresolved; ${Object.keys(locales).length} locales; ${violations} violations; ${rawDebt} non-blocking raw-title review items.`);
+	return violations ? 1 : 0;
 }
-
-const ahkFiles = walkFiles(WINDOWS_DIR, ['.ahk']);
-const luaFiles = walkFiles(MACOS_DIR, ['.lua']);
-
-ahkFiles.forEach(auditAhkFile);
-luaFiles.forEach(auditLuaFile);
-
-if (totalViolations > 0) {
-	console.error(`\x1b[31m[ERROR] Found ${totalViolations} window title violation(s).\x1b[0m`);
-	console.error(`Mandatory format: "ErgoptiPlus — Name"`);
-	process.exit(1);
-} else {
-	console.log(
-		'\x1b[32m[OK] All scanned window titles respect the "ErgoptiPlus" prefix convention.\x1b[0m'
-	);
-}
+module.exports = { auditSource, main };
+if (require.main === module) process.exitCode = main(process.argv[2] || ROOT);
