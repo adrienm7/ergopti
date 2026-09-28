@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 Zdrojový kód",
 	"sg_actions.open_system_settings": "⚙ Nastavení systému",
 	"sg_actions.open_today_log": "📄 Dnešní protokol",
+	"sg_actions.open_chatgpt": "Otevřít ChatGPT (URL nastavena v menu)",
 	"sg_actions.open_url": "🌐 Otevřít odkaz [nastavitelné]",
 	"sg_actions.open_window_spy": "Sledování okna",
 	"sg_actions.para_next": "¶ ↓ Další odstavec",

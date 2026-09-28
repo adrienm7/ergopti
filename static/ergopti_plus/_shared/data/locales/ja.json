@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 ソースコード",
 	"sg_actions.open_system_settings": "⚙ システム設定",
 	"sg_actions.open_today_log": "📄 本日のログ",
+	"sg_actions.open_chatgpt": "ChatGPT を開く（メニューで設定した URL）",
 	"sg_actions.open_url": "🌐 リンクを開く [設定可能]",
 	"sg_actions.open_window_spy": "ウィンドウスパイ",
 	"sg_actions.para_next": "¶ ↓ 次の段落",

@@ -54,7 +54,7 @@ local function fixture(stored)
 	replace("infra.config_paths", { config = function() return config_path end })
 	replace("modules.shortcuts.chatgpt", { open = function() seen.chatgpt = seen.chatgpt + 1 return true end })
 	replace("modules.gestures.manager", {
-		is_assignable = function(id) return id == "select_line" or id == "script_reload" end,
+		is_assignable = function(id) return id == "select_line" or id == "script_reload" or id == "open_chatgpt" end,
 		execute_action = function(action, binding)
 			seen.executed[#seen.executed + 1] = action .. "@" .. binding
 		end,
@@ -128,12 +128,21 @@ helpers.describe("Linux keyboard slots under the grab (keyboard-slot-consume)", 
 		end)
 	end)
 
-	helpers.it("swallows the default Ctrl+G and opens ChatGPT on the next tick", function()
+	helpers.it("forwards Ctrl+G while it is unassigned", function()
 		with_fixture(nil, function(shortcuts, seen)
-			helpers.assert_eq(shortcuts.consume({ key = "g", mods = { ctrl = true } }, seen.opts()), true,
-				"the shipped binding must not also run the application's own Ctrl+G")
+			helpers.assert_eq(shortcuts.consume({ key = "g", mods = { ctrl = true } }, seen.opts()), false)
+			helpers.assert_eq(#seen.deferred, 0)
+			helpers.assert_eq(seen.chatgpt, 0)
+		end)
+	end)
+
+	helpers.it("queues an explicitly assigned ChatGPT action through the action executor", function()
+		with_fixture({ ["shortcuts.keyboard.ctrl_g"] = "open_chatgpt" }, function(shortcuts, seen)
+			helpers.assert_true(shortcuts.consume({ key = "g", mods = { ctrl = true } }, seen.opts()))
+			helpers.assert_eq(#seen.executed, 0)
 			seen.tick()
-			helpers.assert_eq(seen.chatgpt, 1)
+			helpers.assert_eq(seen.executed[1], "open_chatgpt@keyboard__ctrl_g")
+			helpers.assert_eq(seen.chatgpt, 0, "the keyboard owner must not bypass the action executor")
 		end)
 	end)
 

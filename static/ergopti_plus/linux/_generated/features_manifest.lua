@@ -401,6 +401,9 @@ M.features = {
 		path = "shortcuts.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "ahk", "linux" }, recommended = true, input_altering = true,
 	},
 	{
+		path = "shortcuts.keyboard.ctrl_g", id = "ctrl_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true,
+	},
+	{
 		path = "shortcuts.keyboard.super_space", id = "super_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "linux" }, recommended = "llm_generate_prediction", input_altering = true,
 	},
 	{

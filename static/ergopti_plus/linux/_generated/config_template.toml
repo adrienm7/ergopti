@@ -316,6 +316,7 @@ chatgpt_url = "https://chat.openai.com"
 wrap_text_if_selected = false
 
 [shortcuts.keyboard]
+ctrl_g = "none"
 super_space = "none"
 
 [shortcuts.tap_keys]

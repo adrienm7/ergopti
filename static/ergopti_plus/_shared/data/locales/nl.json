@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 Broncode",
 	"sg_actions.open_system_settings": "⚙ Systeeminstellingen",
 	"sg_actions.open_today_log": "📄 Log van vandaag",
+	"sg_actions.open_chatgpt": "ChatGPT openen (URL ingesteld in menu)",
 	"sg_actions.open_url": "🌐 Een link openen [instelbaar]",
 	"sg_actions.open_window_spy": "Window Spy",
 	"sg_actions.para_next": "¶ ↓ Volgende alinea",

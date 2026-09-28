@@ -783,6 +783,10 @@ platform = "ahk,hs"
 platform = "ahk"
 emit_ahk = "#+t"
 
+[sg_actions.open_chatgpt]
+platform = "linux"
+requires_linux = ["tool:xdg-open"]
+
 [sg_actions.open_url]
 platform = "all"
 requires_linux = ["tool:xdg-open"]
@@ -1340,6 +1344,7 @@ items = [
     "screen_capture",
     "screen_capture_instant",
     "ocr_screenshot",
+    "open_chatgpt",
     "open_url",
     "open_downloads",
     "open_file_manager",

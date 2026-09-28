@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 源代码",
 	"sg_actions.open_system_settings": "⚙ 系统设置",
 	"sg_actions.open_today_log": "📄 今日日志",
+	"sg_actions.open_chatgpt": "打开 ChatGPT（菜单中设置的 URL）",
 	"sg_actions.open_url": "🌐 打开链接 [可配置]",
 	"sg_actions.open_window_spy": "窗口侦察",
 	"sg_actions.para_next": "¶ ↓ 下一段",

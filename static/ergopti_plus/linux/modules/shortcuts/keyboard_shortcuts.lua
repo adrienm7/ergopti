@@ -24,10 +24,9 @@
 --- 2. The ACTION space is the gestures manager's. One catalogue, one executor,
 ---    one set of labels — a shortcut that ran a second implementation of
 ---    "select the word" would drift from the gesture that runs the first.
---- 3. Few default bindings. Ctrl+G keeps the product's cross-driver ChatGPT
----    shortcut, and the manifest's shortcuts.keyboard entries for Linux bind
----    Super+Space to an AI prediction; every other catalogue slot starts
----    unassigned because desktop environments already own many modifier chords.
+--- 3. Neutral defaults leave desktop chords untouched. Explicit restoration
+---    projects the manifest recommendations, including Ctrl+G for ChatGPT and
+---    Super+Space for an AI prediction, into the same assignment map as edits.
 --- 4. Matching happens here, not in the kernel. There is no userland API on Linux
 ---    to reserve a chord — the daemon already sees every key, so it decides.
 ---    Under the grab (the default) a bound chord is claimed in the keyboard
@@ -40,7 +39,6 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
-local ChatGPT = require("modules.shortcuts.chatgpt")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
@@ -487,7 +485,7 @@ end
 --- caller can leave its key alone.
 --- @param detail table|nil { key = string, mods = table } from the hook.
 --- @param only_script boolean
---- @return table|nil { slot, action, held_back }; action is nil for the default Ctrl+G.
+--- @return table|nil { slot, action, held_back }.
 local function match(detail, only_script)
 	if type(detail) ~= "table" then return nil end
 	local key = suffix_of(detail.key)
@@ -517,14 +515,6 @@ local function match(detail, only_script)
 		end
 	end
 
-	-- Ctrl+G is the one shipped binding shared with macOS. A user assignment for
-	-- this slot wins because the loop above returns first; otherwise the canonical
-	-- ChatGPT URL is useful immediately without claiming that every desktop-safe
-	-- chord can be chosen for the user.
-	if not only_script and key == "g" and held.ctrl == true
-		and held.shift ~= true and held.alt ~= true and held.meta ~= true then
-		return { slot = "ctrl_g", action = nil, held_back = false }
-	end
 	return nil
 end
 
@@ -538,11 +528,6 @@ end
 --- Runs a matched binding.
 --- @param hit table The record match() returned.
 local function fire(hit)
-	if hit.action == nil then
-		Logger.debug(LOG, "Default keyboard shortcut fired: ctrl_g → ChatGPT.")
-		pcall(ChatGPT.open)
-		return
-	end
 	Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", hit.slot, hit.action)
 	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 	if ok_gestures and type(Gestures.execute_action) == "function" then
