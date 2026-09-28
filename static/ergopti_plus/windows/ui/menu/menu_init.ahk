@@ -177,8 +177,7 @@ _MI_StageLayout() {
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
-		Map("layout_toggle", MenuRenderer_CategoryGateCommand("Layout"),
-			"layout_manager", LayoutManager_Open),
+		_LAY_ScopeCommands(),
 		Map("layout_enabled", () => IsCategoryGated("Layout")))
 	LayoutMenuTitle := t("menu.layout.title")
 	TrayMenuStage_AddFeature(LayoutMenuTitle, LayoutMenu)
@@ -401,14 +400,15 @@ _MI_StageDebug() {
 ; does. It replaced « Actions globales » and the two top-level rows that opened
 ; the folders editor and the setup wizard.
 _MI_BuildConfigurationMenu() {
-	Commands := Map(
-		"restore_recommended", ReloadWithDefaultConfig,
+	Commands := _MI_GlobalScopeCommands()
+	for Id, Callback in Map(
 		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
 		"config_folder",       FilePathsEditor,
 		"setup_wizard",        Onboarding_ShowFromMenu,
 		"uninstall",           ShowUninstallErgopti,
 		"start_at_login",      ToggleStartAtLogin
 	)
+		Commands[Id] := Callback
 	StateGetters := Map("start_at_login_enabled", StartAtLoginEnabled)
 	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands, StateGetters)
 }
@@ -517,4 +517,18 @@ _MI_LogLevelRows() {
 	return [Map(
 		"label", _LogLevelMenuLabel(),
 		"items", _MI_LogLevelChoiceRows())]
+}
+
+; Keep command registration shared by the real menu and its persistence tests.
+_LAY_ScopeCommands(Options := unset) {
+	Commands := ConfigScopeMenuCommands("keyboard_layout", Map(), IsSet(Options) ? Options : Map())
+	Commands["layout_toggle"] := MenuRenderer_CategoryGateCommand("Layout")
+	Commands["layout_manager"] := LayoutManager_Open
+	return Commands
+}
+
+/** Reuses the existing global Restore row without adding platform-only UI. */
+_MI_GlobalScopeCommands(Options := unset) {
+	Selected := IsSet(Options) ? Options : Map()
+	return Map("restore_recommended", (*) => ConfigGlobalScopeApply("recommended", Selected))
 }

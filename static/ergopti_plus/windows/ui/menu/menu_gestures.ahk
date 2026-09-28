@@ -67,8 +67,12 @@ _GES_RestoreFactoryDefaults() {
 
 ; The receipt remains pending until the existing terminal reload acknowledges it.
 _GES_ApplyScope(Mode, Options := unset) {
+	Selected := IsSet(Options) ? Options.Clone() : Map()
+	if !(Selected is Map) || Selected.Has("supplement")
+		throw ValueError("Gesture scope requires its own persistence supplement.")
+	Selected["supplement"] := GestureScopeResetOperations
 	return ConfigScopeApply("gestures", Mode,
-		Map("action_parameters", ConfigScopeActionParameterPaths), IsSet(Options) ? Options : Map())
+		Map("action_parameters", ConfigScopeActionParameterPaths), Selected)
 }
 
 ; List provider: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).

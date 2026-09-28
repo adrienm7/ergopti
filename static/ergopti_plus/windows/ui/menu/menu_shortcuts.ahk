@@ -50,10 +50,7 @@ _BuildShortcutsSubmenu() {
 
 	; `command` rows: a static label, a click, and the renderer builds the row.
 	; The category switch is one of them: the Shortcuts master gate.
-	Commands := Map(
-		"shortcuts_toggle", MenuRenderer_CategoryGateCommand("Shortcuts"),
-		"edit_shortcuts", OpenPersonalShortcuts
-	)
+	Commands := _SC_ScopeCommands()
 	Getters := Map("shortcuts_enabled", () => IsCategoryGated("Shortcuts"))
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands, Getters)
@@ -353,4 +350,21 @@ _WS_MenuAddCustom() {
 
 	Committed := WrapSymbols_AddCustom(LeftChar, RightChar)
 	return _WS_MenuRebuildAfterCommit(Committed)
+}
+
+; Bind real inventories at click time, inside the admitted configuration builder.
+_SC_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"shortcuts_toggle", MenuRenderer_CategoryGateCommand("Shortcuts"),
+		"edit_shortcuts", OpenPersonalShortcuts,
+		"scope_restore", (*) => _SC_ApplyScope("recommended", OwnedOptions),
+		"scope_clear", (*) => _SC_ApplyScope("clear", OwnedOptions))
+}
+
+_SC_ApplyScope(Mode, Options) {
+	CandidateOptions := Options.Clone()
+	CandidateOptions["supplement"] := ConfigIOShortcutScopeOperations
+	Providers := Map("personal", PersonalShortcutScopePaths, "parameters", ConfigScopeActionParameterPaths)
+	return ConfigScopeApply("shortcuts", Mode, Providers, CandidateOptions)
 }

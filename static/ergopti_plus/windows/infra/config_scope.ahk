@@ -33,7 +33,18 @@ ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
 		throw ValueError("This scope does not declare a separate-file preset.")
 	Operations() {
 		Inventory := ManifestScopeInventory(ScopeId, Providers, Owners)
-		return ManifestScopePlan(ScopeId, Mode, Inventory, Owners).operations
+		Candidate := ManifestScopePlan(ScopeId, Mode, Inventory, Owners)
+		if Options.Has("supplement") {
+			Supplement := Options["supplement"].Call(ScopeId, Mode)
+			if !(Supplement is Array)
+				throw TypeError("The scoped owner supplement must return a dense operation array.")
+			loop Supplement.Length {
+				if !Supplement.Has(A_Index) || !IsObject(Supplement[A_Index])
+					throw TypeError("The scoped owner supplement contains an invalid operation.")
+				Candidate.operations.Push(Supplement[A_Index])
+			}
+		}
+		return Candidate.operations
 	}
 	return ConfigScopeCommitOperations(ScopeId, Mode, Operations, Options, PresetOwner)
 }
@@ -217,4 +228,12 @@ ConfigScopeActionParameterPaths() {
 			Paths.Push(Path)
 	}
 	return Paths
+}
+
+/** Returns terminal scope callbacks; each click creates a fresh transaction. */
+ConfigScopeMenuCommands(ScopeId, Providers, Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"scope_restore", (*) => ConfigScopeApply(ScopeId, "recommended", Providers, OwnedOptions),
+		"scope_clear", (*) => ConfigScopeApply(ScopeId, "clear", Providers, OwnedOptions))
 }
