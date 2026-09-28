@@ -328,4 +328,63 @@ function M._reset()
 	_defer = nil
 end
 
+
+--- Resolves the exact tap-key catalogue against a detached configuration.
+--- @param document table Decoded configuration.
+--- @return table state
+function M.configuration_candidate(document)
+	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
+	local section = document.shortcuts or {}
+	assert(section.tap_keys == nil or type(section.tap_keys) == "table", "tap-key assignments are malformed")
+	local values, assignments = {}, {}
+	walk_assignments(document, function(id, value) values[id] = value end)
+	local catalogue = assert(action_catalogue(), "tap-key action catalogue is unavailable")
+	for _, key in ipairs(M.keys()) do
+		local action = values[key.id]
+		if action == nil then action = Manifest.default_for(PREF_PREFIX .. key.id) end
+		assert(type(action) == "string" and (action == "none" or catalogue.is_assignable(action)), "invalid tap-key assignment: " .. key.id)
+		assignments[key.id] = action
+	end
+	return { assignments = assignments }
+end
+
+--- Identifies an actual tap-key parameter binding from the key catalogue.
+--- @param binding string Runtime binding identity.
+--- @return string|nil domain
+function M.configuration_domain(binding)
+	for _, key in ipairs(M.keys()) do if binding == M.binding_id(key.id) then return "tap_key" end end
+	return nil
+end
+
+--- Captures the current desired assignments under exclusive ownership.
+--- @param owner table Exact acquisition token.
+--- @return table|nil state
+function M.configuration_snapshot(owner)
+	if _configuration_owner ~= owner then return nil end
+	load_assignments()
+	local copy = {}
+	for id, action in pairs(_assignments) do copy[id] = action end
+	return { assignments = copy }
+end
+
+--- Applies a complete detached tap map without writing the source file.
+--- @param owner table Exact acquisition token.
+--- @param state table Candidate or saved state.
+--- @return boolean acknowledged
+function M.apply_configuration(owner, state)
+	if _configuration_owner ~= owner or type(state) ~= "table" or type(state.assignments) ~= "table" then return false end
+	local keys, copy = {}, {}
+	local catalogue = action_catalogue()
+	if not catalogue then return false end
+	for _, key in ipairs(M.keys()) do
+		local action = state.assignments[key.id]
+		if type(action) ~= "string" or (action ~= "none" and not catalogue.is_assignable(action)) then return false end
+		keys[key.id], copy[key.id] = true, action
+	end
+	for id in pairs(state.assignments) do if not keys[id] then return false end end
+	_assignments = copy
+	_dispatch_generation = _dispatch_generation + 1
+	return true
+end
+
 return M
