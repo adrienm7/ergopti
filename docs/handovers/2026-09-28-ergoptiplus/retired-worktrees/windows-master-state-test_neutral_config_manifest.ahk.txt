@@ -1,4 +1,4 @@
-﻿; tests/unit/test_neutral_config_manifest.ahk
+; tests/unit/test_neutral_config_manifest.ahk
 
 ; Neutral defaults must remain separate from both runtime mutations and imports.
 _NeutralConfigManifestProjections() {
