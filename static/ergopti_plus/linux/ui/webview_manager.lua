@@ -135,6 +135,7 @@ end
 --- delays-and-colours window as "Error: app 'hotstrings_config' not found".
 ---
 local BRIDGE_MODULES = {
+	config_cleanup        = "ui.config_cleanup.bridge",
 	action_picker         = "ui.action_picker.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
@@ -590,6 +591,7 @@ local function _app_title(app_name)
 	-- Windows named after the menu row that opens them, in the user's language,
 	-- as macOS and Windows already title them
 	local title_keys = {
+		config_cleanup          = "dialog.unused_keys.title",
 		error_dialog            = "common.error_title",
 		healthcheck             = "menu.debug.healthcheck",
 	}

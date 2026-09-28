@@ -162,6 +162,7 @@ const CHECKS = [
 	{ name: 'diagnostics page model renders, summarises and exports the v2 schema on every driver, in 21 locales', cmd: 'node', args: ['tools/test/test-healthcheck-model.cjs'], repro: 'node tools/test/test-healthcheck-model.cjs' },
 	{ name: 'diagnostics page behaviour (ready, preview of what is shared, buttons by id, details, probes, report mode)', cmd: 'node', args: ['tools/test/test-healthcheck-page.cjs'], repro: 'node tools/test/test-healthcheck-page.cjs' },
 	{ name: 'error window page behaviour (ready, report shown as sent, crash notice, buttons by name, folds, results, 21 locales)', cmd: 'node', args: ['tools/test/test-error-dialog-page.cjs'], repro: 'npm run test:error-dialog-page' },
+	{ name: 'configuration cleanup page (long lists, literal values, session actions, 21 locales)', cmd: 'node', args: ['tools/test/test-config-cleanup-page.cjs'], repro: 'npm run test:config-cleanup-page' },
 	{ name: 'GitHub issue forms declare every field the app prefills, and a worst-case prefill fits the URL budget', cmd: 'node', args: ['tools/test/test-issue-templates.cjs'], repro: 'node tools/test/test-issue-templates.cjs' },
 	{ name: 'repository URL single source (every GitHub link derives from the updater defaults)', cmd: 'node', args: ['tools/test/test-repo-url-single-source.cjs'], repro: 'node tools/test/test-repo-url-single-source.cjs' },
 	{ name: 'UI focus-fix regression (force-focus + no raw blockAlert)', cmd: 'node', args: ['tools/test/test-ui-focus-fix.cjs'], repro: 'node tools/test/test-ui-focus-fix.cjs' },

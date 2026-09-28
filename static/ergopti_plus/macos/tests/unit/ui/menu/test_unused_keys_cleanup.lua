@@ -206,7 +206,37 @@ helpers.with_stub_scope(MODULES, function()
 	-- =======================================
 	-- =======================================
 
+	--- Keeps the existing cleanup transaction proofs independent of presentation.
+	local function run_engine_cleanup(deps)
+		local get_text = function(key) return deps.i18n.get(key) end
+		return Engine.run({
+			path = deps.path, collect = Cleanup.collect, file_adapter = deps.file_adapter, stamp = deps.stamp,
+			get_text = get_text,
+			confirm = function(title, text)
+				return deps.dialog.block_alert(title, text, get_text("button.remove"), get_text("button.cancel"),
+					"warning") == get_text("button.remove")
+			end,
+			inform = function(title, text) deps.dialog.block_alert(title, text, get_text("button.ok")) end,
+			fail = function() error("unexpected cleanup transaction refusal") end,
+			on_removed = function(result) deps.preferences.adopt_cleanup(deps.path, result.previous, result.content) end,
+		})
+	end
+
 	helpers.describe("unused keys (macos): tray wiring", function()
+		helpers.it("unused keys: the menu opens a WebView and preserves the exact adoption callback", function()
+			local captured, adopted
+			local opened = Cleanup.run_from_menu({
+				path = "/trusted/config.toml", file_adapter = IoAdapter,
+				host = { open = function(options) captured = options; return true end },
+				preferences = { adopt_cleanup = function(...) adopted = { ... }; return true end },
+			})
+			helpers.assert_eq(opened, true)
+			helpers.assert_eq(captured.path, "/trusted/config.toml")
+			helpers.assert_eq(captured.collect, Cleanup.collect)
+			helpers.assert_eq(captured.file_adapter, IoAdapter)
+			helpers.assert_eq(captured.on_removed({ previous = "before", content = "after" }), true)
+			helpers.assert_eq(adopted, { "/trusted/config.toml", "before", "after" })
+		end)
 		helpers.it("unused keys: the Configuration submenu offers and dispatches the row", function()
 			local fired = 0
 			local builder = helpers.load_with_stubs("ui.menu.builder")
@@ -260,11 +290,11 @@ helpers.with_stub_scope(MODULES, function()
 		end
 		local i18n_stub = { get = function(key) return "<" .. key .. ">" end }
 
-		helpers.it("unused keys: a confirmed cleanup asks, removes, reports and moves the save baseline", function()
+		helpers.it("unused keys: a confirmed engine cleanup removes, reports and moves the save baseline", function()
 			Sandbox.with_config(FIXTURE, function(path)
 				local calls, dialog = recorder("<button.remove>")
 				local adopted
-				local completed = Cleanup.run_from_menu({
+				local completed = run_engine_cleanup({
 					path = path, dialog = dialog, i18n = i18n_stub, file_adapter = IoAdapter,
 					stamp = Sandbox.STAMP,
 					preferences = { adopt_cleanup = function(...) adopted = { ... } end },
@@ -283,7 +313,7 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: Cancel leaves the file and writes no backup", function()
 			Sandbox.with_config(FIXTURE, function(path)
 				local calls, dialog = recorder("<button.cancel>")
-				helpers.assert_true(Cleanup.run_from_menu({
+				helpers.assert_true(run_engine_cleanup({
 					path = path, dialog = dialog, i18n = i18n_stub, file_adapter = IoAdapter,
 					stamp = Sandbox.STAMP,
 					preferences = { adopt_cleanup = function() error("nothing was cleaned") end },
@@ -298,7 +328,7 @@ helpers.with_stub_scope(MODULES, function()
 			Sandbox.with_config(FIXTURE, function(path)
 				helpers.assert_eq(select(2, Preferences.load(path)), "ok")
 				local calls, dialog = recorder("<button.remove>")
-				helpers.assert_true(Cleanup.run_from_menu({
+				helpers.assert_true(run_engine_cleanup({
 					path = path, dialog = dialog, i18n = i18n_stub, file_adapter = IoAdapter,
 					stamp = Sandbox.STAMP, preferences = Preferences,
 				}))

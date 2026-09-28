@@ -37,6 +37,14 @@ Use explicit roots or cycle-safe traversal for real directory trees.
 
 ## Cross-driver UI and data
 
+### feedback-complex-settings-use-a-shared-webview
+
+Reserve native prompts for very simple decisions. Configuration reviews and
+long settings lists use one shared WebView on Windows, macOS and Linux, with
+bounded window geometry, a scrollable list and a permanently visible action
+footer. The obsolete-settings cleanup is the reference: preview every entry,
+keep confirmation explicit, and preserve the backup-first transaction.
+
 ### feedback-ui-must-be-i18n
 
 All user-facing text uses the locale system in every supported language. English

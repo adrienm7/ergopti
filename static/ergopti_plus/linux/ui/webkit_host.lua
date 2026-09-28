@@ -41,6 +41,7 @@ local LOG = "ui.webkit_host"
 --- gave a metrics page the capabilities of the prompt editor, onboarding, and
 --- every other privileged page. Keep ownership explicit and page-scoped.
 M.APP_BRIDGES = {
+	config_cleanup           = "config_cleanup_bridge",
 	action_picker            = "action_picker_bridge",
 	changelog                = "changelog_bridge",
 	download_window          = "dl_bridge",

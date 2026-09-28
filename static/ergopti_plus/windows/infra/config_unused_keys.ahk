@@ -22,8 +22,10 @@
 ;    An unknown section emptied by the removal loses its header too.
 ; ==============================================================================
 
-; The confirmation dialog lists at most this many keys; the rest are counted.
+; Caps the legacy text formatter; the shared WebView displays every key.
 global CONFIG_UNUSED_KEYS_DISPLAY_LIMIT := 30
+
+#Include ../ui/config_cleanup/init.ahk
 
 
 
@@ -141,12 +143,12 @@ _ConfigUnusedKeysEmptiedSections(FilePath, Keys) {
 }
 
 ; Removes Keys (as returned by ConfigUnusedKeysFind) from FilePath. Returns a
-; Map with "status" ("removed", "unreadable", "backup_failed" or
+; Map with "status" ("removed", "changed", "unreadable", "backup_failed" or
 ; "write_failed"), "backup" (the backup path) and "removed" (the key count).
 ; Only "removed" changes FilePath. BackupFn(Path, Content) and
 ; WriterFn(Path, Updates) are test seams for the backup creation and the TOML
 ; writer; both must return the Integer 1 on success.
-ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0) {
+ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0, ExpectedSource := unset) {
 	if !(Keys is Array) || Keys.Length == 0
 		throw ValueError("ConfigUnusedKeysRemove needs at least one key to remove")
 	if (Stamp == "")
@@ -171,6 +173,10 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 		if !(Source is String) {
 			Outcome := "unreadable"
 			throw Error("the configuration file could not be read")
+		}
+		if IsSet(ExpectedSource) && !(Source == ExpectedSource) {
+			Outcome := "changed"
+			return { noop: true }
 		}
 		Written := WriteBackup.Call(BackupPath, Source)
 		if !((Written is Integer) && Written == 1)
@@ -202,18 +208,20 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 	; notification would say the same thing a second time.
 	Committed := ConfigCommitBuilt(FilePath, "the unused configuration key cleanup",
 		BuildPlan, Writer, (*) => 0)
-	if Committed {
+	if Committed && Outcome != "changed" {
 		Outcome := "removed"
 		try LoggerSuccess("ConfigUnusedKeys",
 			"Removed {1} unused key(s) from '{2}'; backup at '{3}'.",
 			Keys.Length, FilePath, BackupPath)
+	} else if (Outcome == "changed") {
+		try LoggerWarn("ConfigUnusedKeys", "Cleanup deferred: '{1}' changed after the preview was opened.", FilePath)
 	} else {
 		try LoggerError("ConfigUnusedKeys",
 			"Unused-key cleanup of '{1}' refused ({2}); the file was not changed.",
 			FilePath, Outcome)
 	}
 	return Map("status", Outcome, "backup", BackupPath,
-		"removed", Committed ? Keys.Length : 0)
+		"removed", Outcome == "removed" ? Keys.Length : 0)
 }
 
 
@@ -249,53 +257,10 @@ ConfigUnusedKeysOffer(FilePath, ScanFn := ConfigUnusedKeysFind, ShowFn := Config
 }
 
 /**
- * Shows the existing confirmation and backup workflow for one configuration file.
+ * Opens the shared, scrollable preview for one configuration file.
  * @param {String} ConfigurationFile - The exact file inspected by the caller.
- * @returns {Boolean} Whether inspection or the confirmed cleanup succeeded.
+ * @returns {Boolean} Whether the preview opened.
  */
 ConfigUnusedKeysShow(ConfigurationFile) {
-	Title := t("dialog.unused_keys.title")
-	try LoggerStart("ConfigUnusedKeys", "Checking '{1}' for unused keys…",
-		ConfigurationFile)
-	Scan := ConfigUnusedKeysFind(ConfigurationFile)
-	if (Scan["status"] != "ok") {
-		try LoggerError("ConfigUnusedKeys",
-			"Unused-key check of '{1}' aborted: the file is {2}.",
-			ConfigurationFile, Scan["status"])
-		MsgBox(Format(t("dialog.unused_keys.failed"),
-			t("dialog.unused_keys.reason.unreadable")), Title, "Iconx")
-		return false
-	}
-	Keys := Scan["keys"]
-	if (Keys.Length == 0) {
-		try LoggerSuccess("ConfigUnusedKeys", "No unused keys in '{1}'.",
-			ConfigurationFile)
-		MsgBox(Format(t("dialog.unused_keys.none"), ConfigurationFile), Title,
-			"Iconi")
-		return true
-	}
-	Answer := MsgBox(Format(t("dialog.unused_keys.confirm"), Keys.Length,
-		ConfigurationFile, ConfigUnusedKeysDescribe(Keys)), Title,
-		"YesNo Icon? Default2")
-	try LoggerSuccess("ConfigUnusedKeys",
-		"Found {1} unused key(s) in '{2}'; removal {3}.", Keys.Length,
-		ConfigurationFile, Answer == "Yes" ? "confirmed" : "declined")
-	if (Answer != "Yes")
-		return true
-
-	Result := ConfigUnusedKeysRemove(ConfigurationFile, Keys)
-	switch Result["status"] {
-		case "removed":
-			MsgBox(Format(t("dialog.unused_keys.done"), Result["removed"],
-				Result["backup"]), Title, "Iconi")
-			return true
-		case "backup_failed":
-			Reason := t("dialog.unused_keys.reason.backup")
-		case "unreadable":
-			Reason := t("dialog.unused_keys.reason.unreadable")
-		default:
-			Reason := t("dialog.unused_keys.reason.write")
-	}
-	MsgBox(Format(t("dialog.unused_keys.failed"), Reason), Title, "Iconx")
-	return false
+	return ConfigCleanupWindow.Open(ConfigurationFile)
 }

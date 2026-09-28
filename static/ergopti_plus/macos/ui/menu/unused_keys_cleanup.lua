@@ -4,7 +4,7 @@
 --- MODULE: Unused Configuration Keys (macOS)
 --- DESCRIPTION:
 --- Wires the shared config_unused_keys engine to the macOS readers of
---- hammerspoon/config.toml and to the driver's own dialogs, for the tray row
+--- hammerspoon/config.toml and the shared cleanup WebView, for the tray row
 --- « Nettoyer config.toml » under Configuration.
 ---
 --- FEATURES & RATIONALE:
@@ -66,38 +66,19 @@ end
 -- ==============================
 -- ==============================
 
---- Tray action: lists the unused keys of the live config.toml, asks before
---- removing them, and reports the backup path or why nothing changed.
---- @param deps table|nil Test seams: `{ path, dialog, i18n, file_adapter,
----   preferences, stamp }`; production resolves each from the driver.
---- @return boolean completed
+--- Opens the shared cleanup page with trusted macOS ownership and file ports.
+--- @param deps table|nil Test seams: path, host, preferences and file_adapter.
+--- @return boolean opened
 function M.run_from_menu(deps)
 	deps = type(deps) == "table" and deps or {}
-	local i18n = deps.i18n or require("infra.i18n")
-	local dialog = deps.dialog or require("infra.dialog_util")
 	local preferences = deps.preferences or require("infra.preferences")
 	local path = deps.path or require("ui.menu.menu_paths").get("ConfigTomlPath")
-	local get_text = function(key) return i18n.get(key) end
-	local remove_label = get_text("button.remove")
-
-	return Engine.run({
-		path = path,
-		collect = M.collect,
-		get_text = get_text,
-		stamp = deps.stamp,
+	local host = deps.host or require("ui.config_cleanup")
+	return host.open({
+		path = path, collect = M.collect,
 		file_adapter = deps.file_adapter or require("adapters.file_system"),
-		confirm = function(title, text)
-			return dialog.block_alert(title, text, remove_label, get_text("button.cancel"),
-				"warning") == remove_label
-		end,
-		inform = function(title, text)
-			dialog.block_alert(title, text, get_text("button.ok"), nil, "informational")
-		end,
-		fail = function(title, text)
-			dialog.block_alert(title, text, get_text("button.ok"), nil, "critical")
-		end,
 		on_removed = function(result)
-			preferences.adopt_cleanup(path, result.previous, result.content)
+			return preferences.adopt_cleanup(path, result.previous, result.content)
 		end,
 	})
 end

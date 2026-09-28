@@ -5,8 +5,7 @@
 --- DESCRIPTION:
 --- Wires the shared config_unused_keys engine to the Linux readers of
 --- config.toml, for the tray row « Nettoyer config.toml » under
---- Configuration. The dialogs are the tray's own zenity helpers, handed in by
---- the menu builder.
+--- Configuration. The shared cleanup WebView owns review and confirmation.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The driver's rule, from its readers. Linux has no single loader: the
@@ -62,24 +61,15 @@ end
 -- ==============================
 -- ==============================
 
---- Tray action: lists the unused keys of the live config.toml, asks before
---- removing them, and reports the backup path or why nothing changed.
---- @param deps table `{ dialogs = { confirm, inform, fail }, path?, get_text?,
----   stamp? }`. confirm returns true, false, or nil when no dialog could be shown.
---- @return boolean completed
+--- Opens the shared cleanup page with the Linux readers' ownership rule.
+--- @param deps table|nil Test seams: path, host and file_adapter.
+--- @return boolean opened
 function M.run_from_menu(deps)
-	if type(deps) ~= "table" or type(deps.dialogs) ~= "table" then
-		error("unused_keys_cleanup.run_from_menu needs the tray dialogs", 2)
-	end
-	local get_text = deps.get_text or function(key) return require("infra.i18n").get(key) end
-	return Engine.run({
+	deps = type(deps) == "table" and deps or {}
+	return (deps.host or require("ui.config_cleanup.bridge")).open({
 		path = deps.path or require("infra.config_paths").config("config.toml"),
 		collect = M.collect,
-		get_text = get_text,
-		stamp = deps.stamp,
-		confirm = deps.dialogs.confirm,
-		inform = deps.dialogs.inform,
-		fail = deps.dialogs.fail,
+		file_adapter = deps.file_adapter,
 	})
 end
 

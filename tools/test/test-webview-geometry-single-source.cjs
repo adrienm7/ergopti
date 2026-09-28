@@ -98,6 +98,7 @@ for (const [name, source, expected] of geometryFixtures) {
 // ── macOS: each module must DEFER to the manifest, never hardcode a size ──────
 // id → module file (relative to static/ergopti_plus/macos).
 const MACOS_MODULES = {
+	config_cleanup: 'ui/config_cleanup/init.lua',
 	action_picker: 'ui/action_picker/init.lua',
 	hotstrings_config_window: 'ui/hotstrings_config_window/init.lua',
 	prompt_editor: 'ui/prompt_editor/init.lua',
@@ -128,6 +129,10 @@ const MACOS_EXCLUSIONS = {
 // literal `w<W> h<H>` (Show/placeholder) and `NAME_WIDTH := <W>` globals. The
 // value is always interpolated from the manifest so this cannot pass on drift.
 const WINDOWS_APPS = {
+	config_cleanup: {
+		file: 'ui/config_cleanup/init.ahk',
+		checks: () => [/class ConfigCleanupWindow extends WebViewHost/, /Host\.AppId\s*:=\s*"config_cleanup"/, /Geo\s*:=\s*super\._Geometry\(\)/]
+	},
 	hotstring_editor: {
 		file: 'ui/personal_toml_editor_webview.ahk',
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
