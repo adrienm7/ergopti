@@ -818,6 +818,14 @@ function M.prepare_shortcut_updates(source, updates)
 	return prepare_inline_updates(source, updates, "shortcuts")
 end
 
+--- Preserves unowned hotstring neighbors while changing declared inline leaves.
+--- @param source table Exact classified source.
+--- @param updates table Owned leaf operations.
+--- @return table Prepared writer operations.
+function M.prepare_hotstring_updates(source, updates)
+	return prepare_inline_updates(source, updates, "hotstrings")
+end
+
 --- Publishes a domain owner's exact batch and advances the ordinary save baseline.
 --- @param path string Canonical configuration path.
 --- @param updates table Already validated owned operations.
@@ -837,6 +845,44 @@ function M.publish_owned(path, updates, source)
 	_source_snapshots[path] = { status = "ok", content = encoded }
 	return true
 end
+
+--- Projects canonical preferences onto the actual registered hotstring inventory.
+--- Disk-only neighbors and UI placeholders acquire no runtime ownership.
+--- @param saved table Flat values returned by this preferences reader.
+--- @param groups table Registered group names and their current enabled posture.
+--- @param get_sections function Returns each group's registered section descriptors.
+--- @return table desired Complete group and section posture, with neutral absence.
+function M.project_hotstring_preferences(saved, groups, get_sections)
+	assert(type(saved) == "table" and type(groups) == "table" and type(get_sections) == "function",
+		"hotstring projection needs canonical preferences and a registered inventory")
+	assert(saved.hotstrings == nil or type(saved.hotstrings) == "table", "hotstring groups must be a table")
+	assert(saved.section_states == nil or type(saved.section_states) == "table", "hotstring sections must be a table")
+	local desired = { hotstrings = {}, section_states = {} }
+	for name in pairs(groups) do
+		assert(type(name) == "string" and name ~= "", "hotstring group identity is invalid")
+		local enabled = saved.hotstrings and saved.hotstrings[name]
+		if enabled == nil then enabled = Manifest.default_for("hotstrings.groups." .. name) end
+		assert(type(enabled) == "boolean", "hotstring group preference must be boolean")
+		desired.hotstrings[name] = enabled
+		local supplied = saved.section_states and saved.section_states[name]
+		assert(supplied == nil or type(supplied) == "table", "hotstring section preferences must be a table")
+		local sections = get_sections(name)
+		assert(sections == nil or type(sections) == "table", "hotstring section inventory is malformed")
+		local projected = {}
+		for _, section in ipairs(sections or {}) do
+			assert(type(section) == "table" and type(section.name) == "string", "hotstring section descriptor is invalid")
+			if section.name ~= "-" and not section.is_module_placeholder then
+				local selected = supplied and supplied[section.name]
+				if selected == nil then selected = Manifest.default_for("hotstrings.modules." .. name .. "." .. section.name) end
+				assert(type(selected) == "boolean", "hotstring section preference must be boolean")
+				projected[section.name] = selected
+			end
+		end
+		desired.section_states[name] = projected
+	end
+	return desired
+end
+
 
 --- Captures the complete flat preference snapshot represented by memory and
 --- runtime-owned registries. This is the exact payload save() serializes and the
@@ -958,7 +1004,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	end
 
 	local ok, updates = pcall(function()
-		return M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing))))
+		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing)))))
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next

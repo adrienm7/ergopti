@@ -161,27 +161,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	local apply_metrics_shortcut   = deps.apply_metrics_shortcut
 	local apply_apps_time_shortcut = deps.apply_apps_time_shortcut
 
-	-- Sync section states
-	-- WHY explicit if/else: in Lua, both `false` and `nil` are falsy, so the
-	-- `cond and false or nil` idiom evaluates to `nil` even when sec_enabled
-	-- is `false` (silently re-enabling sections the user had disabled)
-	if type(saved.section_states) == "table" then
-		for group_name, secs in pairs(saved.section_states) do
-			if type(secs) == "table" then
-				for sec_name, sec_enabled in pairs(secs) do
-					local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
-					-- Stored explicitly both ways: an absent key means the manifest's
-					-- shipped default (disabled for every bundled section).
-					if sec_enabled == false then
-						try("hotstrings", "Storage.set " .. key, Storage.set, key, false)
-					elseif sec_enabled == true then
-						try("hotstrings", "Storage.set " .. key, Storage.set, key, true)
-					else
-						try("hotstrings", "Storage.delete " .. key, Storage.delete, key)
-					end
-				end
-			end
-		end
+	-- Canonical absence replaces stale derived section settings as well as groups.
+	if keymap and type(keymap.apply_hotstring_preferences) == "function" then
+		try_exact("hotstrings", "keymap.apply_hotstring_preferences", keymap.apply_hotstring_preferences, saved)
+	elseif type(saved.section_states) == "table" then
+		record_failure("hotstrings", "keymap.apply_hotstring_preferences", "owner unavailable")
 	end
 
 	-- Sync terminators
