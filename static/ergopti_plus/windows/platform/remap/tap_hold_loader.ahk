@@ -236,12 +236,7 @@ _TapHold_ParseFileInto(FilePath, Result) {
 		; tap_hold.keys.<id>
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
 			KeyId := KeyMatch[1]
-			ExpectedKind := Map(
-				"enabled", "boolean",
-				"time_activation_seconds", "number",
-				"tap_action", "string",
-				"hold_modifier", "string",
-				"hold_layer", "string").Get(Key, "")
+			ExpectedKind := TapHoldFieldKinds().Get(Key, "")
 			if (ExpectedKind == "" || LiteralKind != ExpectedKind) {
 				try LoggerError("TapHoldLoader",
 					"Field '[{1}].{2}' violates tap-hold schema type '{3}'; key disabled.",
@@ -660,4 +655,10 @@ TapHoldOneShotEndKeys(MagicKey) {
 	for Char in _TapHoldOneShotTable()["results"]
 		Keys .= Char
 	return Keys . MagicKey
+}
+
+/** Returns the per-key fields consumed by the tap-hold loader and preset owner. */
+TapHoldFieldKinds() {
+	return Map("enabled", "boolean", "time_activation_seconds", "number",
+		"tap_action", "string", "hold_modifier", "string", "hold_layer", "string")
 }

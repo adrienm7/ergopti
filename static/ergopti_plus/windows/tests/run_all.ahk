@@ -425,6 +425,7 @@ InstallSendNoOps()
 #Include unit/test_neutral_config_manifest.ahk
 #Include unit/test_config_scope_manifest.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_tap_hold_scope.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk

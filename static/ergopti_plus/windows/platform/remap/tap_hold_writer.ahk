@@ -866,3 +866,77 @@ _TH_TomlFormatLine(Key, Value) {
 	S := StrReplace(S, Chr(0x22), "\" . Chr(0x22))
 	return Key . ' = "' . S . '"'
 }
+
+/** Publishes the tap-hold preset and its config master in one terminal transition. */
+TapHoldScopeApply(Mode, Options := unset) {
+	global TapHold, _SharedDir
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return TapHoldScopeApply(Mode, IsSet(Options) ? Options : Map())
+		finally Critical(InheritedCritical)
+	}
+	if !IsSet(TapHold) || !(TapHold is Map)
+		throw Error("Tap-hold scope requires initialized runtime state.")
+	CandidateOptions := IsSet(Options) ? Options.Clone() : Map()
+	Path := CandidateOptions.Get("tap_hold_path", _TH_TapHoldConfigPath())
+	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml")
+	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode)
+	return ConfigScopeApply("tap_holds", Mode,
+		Map("parameters", ConfigScopeActionParameterPaths), CandidateOptions)
+}
+
+; This bounded owner is the only preset admitted by ConfigScopeApply. Its target
+; participates in the same WAL, backup verification and terminal compensation.
+class TapHoldScopeOwner {
+	__New(Path, Defaults, Mode) {
+		if !(Path is String) || Path == "" || !(Defaults is String) || Defaults == ""
+			throw ValueError("Tap-hold scope requires explicit file paths.")
+		this.path := Path
+		this.paths := [Path]
+		this.defaults := Defaults
+		if !(Mode == "recommended" || Mode == "clear")
+			throw ValueError("Unknown tap-hold preset operation.")
+		this.mode := Mode
+	}
+
+	; The coordinator owns admission, backup, expected-old checks and publication.
+	; This method only returns a detached candidate and cannot publish a file.
+	Build() {
+		Present := FileExist(this.path) ? 1 : 0
+		Source := Present ? FSReadUtf8Exact(this.path) : ""
+		if !(Source is String)
+			throw Error("The tap-hold source cannot be read.")
+		Existing := Present ? TOML_ParseFreshFile(this.path) : Map()
+		Kinds := TapHoldFieldKinds()
+		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true }]
+		for Section, Fields in Existing {
+			if !RegExMatch(Section, "^tap_hold\.keys\.[A-Za-z0-9_]+$")
+				continue
+			for Field in Fields {
+				if Kinds.Has(Field)
+					Rows.Push({ Section: Section, Key: Field, Delete: true })
+			}
+		}
+		if this.mode == "recommended" {
+			if !FileExist(this.defaults)
+				throw Error("The canonical tap-hold preset is missing.")
+			Preset := LoadTapHoldToml(this.defaults)
+			if TOML_UnreadableFile(this.defaults) || Preset["keys"].Count == 0
+				throw Error("The canonical tap-hold preset is unreadable or empty.")
+			for KeyId, Fields in Preset["keys"] {
+				for Field, Value in Fields {
+					if !Kinds.Has(Field)
+						throw Error("The canonical tap-hold preset contains an unknown field.")
+					Serialized := Kinds[Field] == "boolean" ? TOML_Bool(Value) : Value
+					Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Value: Serialized })
+				}
+			}
+		}
+		Image := TOML_BuildUpdatedContent(this.path, Rows)
+		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
+				|| Image["source_present"] != Present || !(Image["source_content"] == Source)
+			throw Error("The tap-hold source changed or its scoped image could not be rendered.")
+		return [{ path: this.path, image: Image }]
+	}
+}
