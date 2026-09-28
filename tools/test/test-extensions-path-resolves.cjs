@@ -39,6 +39,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const STATIC = path.join(ROOT, 'static');
@@ -120,7 +121,6 @@ if (!entry) {
 
 const AHK_READ_SITES = [
 	'static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk',
-	'static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk',
 	'static/ergopti_plus/windows/ui/hotstrings_config_window/hcw_helpers.ahk'
 ];
 
@@ -130,13 +130,106 @@ for (const rel of AHK_READ_SITES) {
 		errors.push(`${rel}: expected read site is missing — update the list or restore the file.`);
 		continue;
 	}
-	if (!src.includes('_ExtensionsDir')) {
+	if (!scriptTokens(src, '.ahk').some((token) => token.kind === 'identifier' && token.value === '_ExtensionsDir')) {
 		errors.push(
 			`${rel}: reads the extensions tree without going through _ExtensionsDir. ` +
 			'One resolver only — three independent derivations is the original defect.'
 		);
 	}
 }
+
+/** Keeps executable identifiers/punctuation; literal diagnostic prose proves no route. */
+function ahkCode(source) {
+	const clean = stripComments(source, '.ahk');
+	let out = '', previous = 0;
+	for (const token of scriptTokens(clean, '.ahk')) {
+		if (token.kind !== 'string') continue;
+		out += clean.slice(previous, token.start) + clean.slice(token.start, token.end).replace(/[^\n]/g, ' ');
+		previous = token.end;
+	}
+	return out + clean.slice(previous);
+}
+
+/** Reads one actual AHK function body with balanced code braces, not string braces. */
+function ahkFunction(source, name) {
+	const tokens = scriptTokens(source, '.ahk');
+	for (let i = 0; i < tokens.length; i += 1) {
+		if (tokens[i].kind !== 'identifier' || tokens[i].value !== name || tokens[i + 1]?.value !== '(') continue;
+		const line = source.slice(source.lastIndexOf('\n', tokens[i].start - 1) + 1, tokens[i].start);
+		if (line.trim() !== '') continue;
+		let j = i + 1, depth = 0;
+		for (; j < tokens.length; j += 1) {
+			if (tokens[j].kind !== 'symbol') continue;
+			if (tokens[j].value === '(') depth += 1;
+			if (tokens[j].value === ')' && --depth === 0) break;
+		}
+		if (tokens[j + 1]?.value !== '{') continue;
+		const start = tokens[++j].end;
+		depth = 1;
+		for (j += 1; j < tokens.length; j += 1) {
+			if (tokens[j].kind !== 'symbol') continue;
+			if (tokens[j].value === '{') depth += 1;
+			if (tokens[j].value === '}' && --depth === 0) {
+				return ahkCode(source.slice(start, tokens[j].start));
+			}
+		}
+	}
+	return '';
+}
+
+/** Checks the boot-owned catalogue route replacing the old menu directory scan. */
+function catalogueRouteErrors(input) {
+	const failures = [];
+	const check = (valid, message) => { if (!valid) failures.push(message); };
+	const boot = ahkCode(input.entry);
+	check(/_HotstringExtensionPacks\s*:=\s*HotstringExtensions_Prepare\(Features,\s*HotstringExtensions_Roots\(_ConfigDir,\s*_ExtensionsDir\)\)/.test(boot),
+		'boot catalogue must derive its bundled root from _ExtensionsDir');
+	const roots = ahkFunction(input.owner, 'HotstringExtensions_Roots');
+	check(/Roots\s*:=\s*\[BundledRoot\]/.test(roots) && /return Roots\b/.test(roots),
+		'discovery roots must retain the supplied bundled root');
+	const prepare = ahkFunction(input.owner, 'HotstringExtensions_Prepare');
+	check(/Packs\s*:=\s*HotstringExtensions_Scan\(Roots\)/.test(prepare) && /return Packs\b/.test(prepare),
+		'catalogue preparation must publish the packs scanned from its roots');
+	const scan = ahkFunction(input.owner, 'HotstringExtensions_Scan');
+	check(/for Root in Roots\b/.test(scan) && /FSListDirectoryStrict\(Root,\s*true\)/.test(scan),
+		'pack scanner must read the supplied discovery roots');
+	const cache = ahkFunction(input.menu, '_HS_PreScanExtensions');
+	check(/_HS_ExtensionsCache\s*:=\s*_HotstringExtensionPacks\b/.test(cache),
+		'hotstrings menu must consume the boot-owned catalogue');
+	check(!/\b(?:DirExist|FSListDirectoryStrict|HotstringExtensions_Scan)\s*\(|\bLoop\s+Files\b/.test(cache),
+		'hotstrings menu must not add an independent directory scan');
+	const rows = ahkFunction(input.menu, '_HS_ExtensionRows');
+	check(/_HS_PreScanExtensions\(\)/.test(rows) && /for _, Ext in _HS_ExtensionsCache\b/.test(rows),
+		'extension rows must use the populated catalogue cache');
+	return failures;
+}
+
+const catalogue = {
+	entry: entry || '',
+	owner: read('static/ergopti_plus/windows/infra/hotstrings/extension_packs.ahk') || '',
+	menu: read('static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk') || '',
+};
+for (const failure of catalogueRouteErrors(catalogue)) errors.push(`Windows catalogue: ${failure}.`);
+const catalogueMutations = [
+	['entry', 'HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir)', 'HotstringExtensions_Roots(_ConfigDir, OtherRoot)'],
+	['owner', 'Roots := [BundledRoot]', 'Roots := []'],
+	['owner', 'HotstringExtensions_Scan(Roots)', 'HotstringExtensions_Scan([])'],
+	['owner', 'FSListDirectoryStrict(Root, true)', 'FSListDirectoryStrict(OtherRoot, true)'],
+	['menu', '_HS_ExtensionsCache := _HotstringExtensionPacks', '_HS_ExtensionsCache := []'],
+	['menu', '_HS_ExtensionsCache := _HotstringExtensionPacks', 'Description := "_HS_ExtensionsCache := _HotstringExtensionPacks"'],
+	['menu', '_HS_ExtensionsCache := _HotstringExtensionPacks', '_HS_ExtensionsCache := _HotstringExtensionPacks\nDirExist("other")'],
+	['menu', '_HS_PreScanExtensions()\n', '_HS_PreScanExtensions_Disconnected()\n'],
+];
+for (const [field, needle, replacement] of catalogueMutations) {
+	const copy = { ...catalogue };
+	if (!copy[field].includes(needle)) {
+		errors.push(`Windows catalogue mutation selector missing: ${needle}`);
+		continue;
+	}
+	copy[field] = copy[field].replace(needle, replacement);
+	if (catalogueRouteErrors(copy).length === 0) errors.push(`Windows catalogue mutation escaped: ${needle}`);
+}
+if (catalogueRouteErrors(catalogue).length === 0) notes.push('Windows boot catalogue reaches hotstrings menu without a second resolver');
 
 // ─── 3. macOS: base_dir is the driver root, so exactly one ".." ──────────────
 

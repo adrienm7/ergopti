@@ -30,6 +30,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
+const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -55,19 +57,6 @@ const DRIVERS = [
 ];
 
 /**
- * Removes comments so prose that names an id cannot count as its registration.
- * @param {string} source
- * @param {string} ext
- * @returns {string}
- */
-function stripComments(source, ext) {
-	if (ext === '.ahk') {
-		return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s);.*$/gm, '$1');
-	}
-	return source.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '').replace(/--.*$/gm, '');
-}
-
-/**
  * The production source of one driver, comments removed.
  * @param {{dir: string, ext: string}} driver
  * @returns {string}
@@ -88,20 +77,57 @@ function driverSource(driver) {
 }
 
 /**
- * True when the driver source registers `id` as a command key: a bracketed Lua
- * table key (`["id"] =`) or an AutoHotkey Map entry (`"id",`).
- * @param {string} source
+ * Recognizes Lua table keys and AHK Map constructor/indexed assignments.
+ * String literals, comments and a matching Map value cannot count as keys.
+ * @param {string|object[]} source Source text or previously scanned tokens.
  * @param {string} ext
  * @param {string} id
  * @returns {boolean}
  */
 function registers(source, ext, id) {
-	const quoted = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const pattern = ext === '.ahk'
-		? new RegExp(`"${quoted}"\\s*,`)
-		: new RegExp(`\\[\\s*["']${quoted}["']\\s*\\]\\s*=`);
-	return pattern.test(source);
+	const tokens = Array.isArray(source) ? source : scriptTokens(source, ext);
+	const calls = [];
+	for (let i = 0; i < tokens.length; i += 1) {
+		const token = tokens[i], value = token.value;
+		if (token.kind === 'symbol') {
+			if (['(', '[', '{'].includes(value)) calls.push({ open: value, name: tokens[i - 1]?.value, commas: 0 });
+			if ([')', ']', '}'].includes(value)) calls.pop();
+			if (value === ',' && calls.at(-1)?.open === '(') calls.at(-1).commas += 1;
+		}
+		if (value !== id) continue;
+		const before = tokens[i - 1]?.value;
+		if (token.kind === 'string' && before === '[' && tokens[i + 1]?.value === ']'
+			&& tokens[i + 2]?.value === (ext === '.ahk' ? ':=' : '=')) return true;
+		if (ext === '.ahk' && token.kind === 'string' && calls.at(-1)?.name === 'Map'
+			&& calls.at(-1).commas % 2 === 0
+			&& ['(', ','].includes(before) && tokens[i + 1]?.value === ',') return true;
+		if (ext !== '.ahk' && token.kind === 'identifier' && ['{', ','].includes(before)
+			&& tokens[i + 1]?.value === '=') return true;
+	}
+	return false;
 }
+
+// Literal/comment decoys cannot replace a registration; syntax-equivalent
+// constructor, indexed assignment and Lua named-field forms must all work.
+for (const [ext, source] of [
+	['.ahk', 'Commands := Map("switch", Handler)'],
+	['.ahk', 'Commands["switch"] := Handler'],
+	['.lua', 'commands = { ["switch"] = handler }'],
+	['.lua', 'commands = { switch = handler }'],
+	['.ahk', '; menu/*.ahk are hoisted\nCommands := Map("switch", Handler)\n/** later prose */'],
+]) assert.equal(registers(source, ext, 'switch'), true, source);
+for (const [ext, source] of [
+	['.ahk', '; Commands := Map("switch", Handler)'],
+	['.ahk', '/* Commands["switch"] := Handler */'],
+	['.ahk', "description := 'Commands[\"switch\"] := Handler'"],
+	['.ahk', 'Run("switch", Handler)'],
+	['.ahk', 'Map("label", "switch", "other", Handler)'],
+	['.lua', '-- commands = { switch = handler }'],
+	['.lua', '--[=[ commands = { switch = handler } ]=]'],
+	['.lua', 'description = [[commands = { switch = handler }]]'],
+	['.lua', 'local switch = handler'],
+	['.lua', 'commands = { switch_other = handler }'],
+]) assert.equal(registers(source, ext, 'switch'), false, source);
 
 const visible = (row, platform) => !Array.isArray(row.platforms) || row.platforms.includes(platform);
 const errors = [];
@@ -120,6 +146,7 @@ for (const key of FEATURE_MENUS) {
 let registrations = 0;
 for (const driver of DRIVERS) {
 	const source = driverSource(driver);
+	const tokens = scriptTokens(source, driver.ext);
 	if (source.length < 100000) {
 		errors.push(`${driver.dir}: production source unreadable (${source.length} bytes)`);
 		continue;
@@ -129,7 +156,7 @@ for (const driver of DRIVERS) {
 		for (const row of rows) {
 			if (!row || row.type !== 'toggle' || !visible(row, driver.platform)) continue;
 			const command = row.command || row.id;
-			if (registers(source, driver.ext, command)) {
+			if (registers(tokens, driver.ext, command)) {
 				registrations += 1;
 			} else {
 				errors.push(
