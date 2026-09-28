@@ -430,7 +430,7 @@ function M.build(ctx)
 	end
 
 	local function cmd_restore_defaults()
-		local defaults = gestures_mod.DEFAULT_GESTURES or {}
+		local defaults = gestures_mod.RECOMMENDED_GESTURES
 		for slot, action in pairs(defaults) do
 			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
 		end

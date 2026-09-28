@@ -77,6 +77,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 		}, { __index = function() return noop end })
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return false end,
+			recommended_for = function() return "none" end,
 		}
 		package.loaded["infra.timings"] = {
 			sec = function() return 1 end,

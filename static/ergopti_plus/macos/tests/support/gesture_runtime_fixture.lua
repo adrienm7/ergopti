@@ -96,7 +96,10 @@ function M.with_fixture(options, scenario)
 		end,
 	}, { __index = function() return noop end })
 	package.loaded["infra.logger"] = logger
-	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+	package.loaded["infra.manifest_reader"] = {
+		default_for = function() return false end,
+		recommended_for = function() return "none" end,
+	}
 	package.loaded["infra.notifications"] = { notify = noop }
 	package.loaded["infra.timings"] = {
 		sec = function(_, key)

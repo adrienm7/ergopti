@@ -899,13 +899,13 @@ _GestureHeadingText(Key) {
 		return Text
 }
 
-; Factory gesture slot actions: the manifest's Windows values (constants.ahk).
+; Explicit restore actions from the manifest recommendation (constants.ahk).
 global GESTURE_FACTORY_DEFAULTS := GestureRecommendedActions()
 
-; Current action assignments — read from config.toml or factory defaults.
+; Current assignments start neutral; explicit config overrides them later.
 global GestureAssignments := Map()
-for _GestureAssignmentSlot, _GestureAssignmentAction in GESTURE_FACTORY_DEFAULTS
-		GestureAssignments[_GestureAssignmentSlot] := _GestureAssignmentAction
+for _GestureAssignmentSlot in GestureSlotIds()
+		GestureAssignments[_GestureAssignmentSlot] := ManifestDefaultFor("gestures." . _GestureAssignmentSlot)
 
 ; Window cycle tracker — ordered by manual user activation (most-recent first).
 ; _GestureCycling is set True while our own WinActivate runs so the WinEvent

@@ -842,6 +842,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	})
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
+		recommended_for = function() return "none" end,
 	}
 	package.loaded["modules.gestures.actions"] = actions
 	package.loaded["modules.shortcuts"] = nil

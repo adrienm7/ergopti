@@ -7,7 +7,7 @@
 --- to Ergopti. The command walked SINGLE_SLOTS only, so a horizontal axis slot
 --- (swipe_3_horiz, swipe_4_horiz, swipe_5_horiz) kept its action and the
 --- trackpad still answered to Ergopti after the clear. « Restaurer les valeurs
---- conseillées » must, in turn, put every slot DEFAULT_GESTURES declares back.
+--- conseillées » must restore the recommendations, independently of neutral startup.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -45,6 +45,10 @@ local function with_commands(body)
 		SINGLE_SLOTS = SINGLE,
 		AXIS_SLOTS = AXIS,
 		DEFAULT_GESTURES = {
+			tap_3 = "none", swipe_3_left = "none",
+			swipe_3_horiz = "none", swipe_4_horiz = "none",
+		},
+		RECOMMENDED_GESTURES = {
 			tap_3 = "left_click_toggle", swipe_3_left = "sel_word_prev",
 			swipe_3_horiz = "words", swipe_4_horiz = "spaces",
 		},
