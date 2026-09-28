@@ -868,7 +868,7 @@ platform = "ahk,hs"
 
 # The case actions share one rule on every driver, pinned by the corpus
 # _shared/tests/corpus/text_case/vectors.json that the three suites replay:
-# macOS and Linux read the generated Unicode table of _shared/lua/text_case,
+# macOS and Linux read the generated Unicode table of _shared/lua/unicode_case,
 # Windows converts through StrUpper / StrLower (infra/text_case.ahk). The two
 # *_selection ids toggle (a second press undoes the first); the three
 # selection_* ids convert whatever the current case.
