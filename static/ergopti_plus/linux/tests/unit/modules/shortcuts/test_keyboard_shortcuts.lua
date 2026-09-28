@@ -365,18 +365,16 @@ helpers.describe("keyboard shortcuts: matching a chord", function()
 				.. "fires alongside the one they expected")
 	end)
 
-	helpers.it("opens the canonical ChatGPT URL for the default Ctrl+G chord", function()
+	helpers.it("leaves Ctrl+G native without an explicit assignment", function()
 		local calls = 0
 		local shortcuts = load_over_config(nil, nil, {
-			open = function() calls = calls + 1 ; return true end,
+			open = function() calls = calls + 1; return true end,
 		})
 		local fired, slot = shortcuts.dispatch(chord("g", { ctrl = true }))
 		drop_config()
-		helpers.assert_true(fired)
-		helpers.assert_eq(slot, "ctrl_g")
-		helpers.assert_eq(calls, 1,
-			"Linux captured Ctrl+G but left shortcuts.chatgpt_url unused; the default "
-				.. "binding must consume the persisted canonical preference")
+		helpers.assert_eq(fired, false)
+		helpers.assert_eq(slot, nil)
+		helpers.assert_eq(calls, 0)
 	end)
 
 end)

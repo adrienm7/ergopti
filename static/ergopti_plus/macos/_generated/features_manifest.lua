@@ -1181,6 +1181,9 @@ M.unavailable = {
 		path = "shortcuts.keyboard.win_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
 	},
 	{
+		path = "shortcuts.keyboard.ctrl_g", section = "shortcuts.keyboard", reason_key = "", platforms = { "linux" },
+	},
+	{
 		path = "shortcuts.keyboard.super_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "linux" },
 	},
 	{

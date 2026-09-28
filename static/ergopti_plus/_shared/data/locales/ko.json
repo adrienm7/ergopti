@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 소스 코드",
 	"sg_actions.open_system_settings": "⚙ 시스템 설정",
 	"sg_actions.open_today_log": "📄 오늘의 로그",
+	"sg_actions.open_chatgpt": "ChatGPT 열기 (메뉴에서 설정한 URL)",
 	"sg_actions.open_url": "🌐 링크 열기 [설정 가능]",
 	"sg_actions.open_window_spy": "Window Spy",
 	"sg_actions.para_next": "¶ ↓ 다음 단락",

@@ -485,6 +485,9 @@ local BUILTIN_HANDLERS = {
 	end,
 	["left_click_toggle"] = function() run_background(_click_toggle_command("1")) end,
 	["right_click_toggle"] = function() run_background(_click_toggle_command("3")) end,
+	["open_chatgpt"] = function()
+		return require("modules.shortcuts.chatgpt").open()
+	end,
 	["open_url"] = function(binding)
 		local url = M.get_action_parameter(binding, "open_url")
 		if M.validate_action_parameter("open_url", url) then

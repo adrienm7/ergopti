@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 Codice sorgente",
 	"sg_actions.open_system_settings": "⚙ Impostazioni di sistema",
 	"sg_actions.open_today_log": "📄 Log di oggi",
+	"sg_actions.open_chatgpt": "Apri ChatGPT (URL impostato nel menu)",
 	"sg_actions.open_url": "🌐 Apri un link [configurabile]",
 	"sg_actions.open_window_spy": "Window Spy",
 	"sg_actions.para_next": "¶ ↓ Paragrafo successivo",

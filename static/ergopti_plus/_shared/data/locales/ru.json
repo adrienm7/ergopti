@@ -1833,6 +1833,7 @@
 	"sg_actions.open_script_source": "🛠 Исходный код",
 	"sg_actions.open_system_settings": "⚙ Системные настройки",
 	"sg_actions.open_today_log": "📄 Журнал за сегодня",
+	"sg_actions.open_chatgpt": "Открыть ChatGPT (URL задан в меню)",
 	"sg_actions.open_url": "🌐 Открыть ссылку [настраивается]",
 	"sg_actions.open_window_spy": "Наблюдатель окон",
 	"sg_actions.para_next": "¶ ↓ Следующий абзац",

@@ -2382,6 +2382,15 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
 
 [[features.shortcuts.keyboard]]
+id = "ctrl_g"
+platforms = ["linux"]
+default = "none"
+recommended = "open_chatgpt"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_g"
+
+[[features.shortcuts.keyboard]]
 id = "super_space"
 platforms = ["linux"]
 default = "none"
