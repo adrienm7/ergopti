@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licens: %s",
 	"layout_manager.meta_version": "Version %s",
 	"layout_manager.meta_installed_version": "Installeret version: %s",
+	"layout_manager.extension_content": "Valgfrit indhold: %s pakker med tekstgenveje, %s genvejsmenuer.",
+	"layout_manager.extension_opt_in": "Installation af et layout aktiverer ikke dette indhold. Aktivér det separat i menuerne.",
 	"layout_manager.busy_install": "Installerer…",
 	"layout_manager.busy_uninstall": "Afinstallerer…",
 	"layout_manager.source_network": "Kataloget er opdateret.",

@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licencja: %s",
 	"layout_manager.meta_version": "Wersja %s",
 	"layout_manager.meta_installed_version": "Zainstalowana wersja: %s",
+	"layout_manager.extension_content": "Opcjonalna zawartość: %s pakietów skrótów tekstowych, %s menu skrótów klawiszowych.",
+	"layout_manager.extension_opt_in": "Instalacja układu nie włącza tej zawartości. Włącz ją osobno w menu.",
 	"layout_manager.busy_install": "Instalowanie…",
 	"layout_manager.busy_uninstall": "Odinstalowywanie…",
 	"layout_manager.source_network": "Katalog jest aktualny.",

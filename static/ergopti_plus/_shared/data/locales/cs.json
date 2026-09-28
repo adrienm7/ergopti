@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licence: %s",
 	"layout_manager.meta_version": "Verze %s",
 	"layout_manager.meta_installed_version": "Nainstalovaná verze: %s",
+	"layout_manager.extension_content": "Volitelný obsah: %s balíčků textových zkratek, %s nabídek klávesových zkratek.",
+	"layout_manager.extension_opt_in": "Instalace rozložení tento obsah nezapne. Zapněte jej samostatně v nabídkách.",
 	"layout_manager.busy_install": "Instalace…",
 	"layout_manager.busy_uninstall": "Odinstalace…",
 	"layout_manager.source_network": "Katalog je aktuální.",

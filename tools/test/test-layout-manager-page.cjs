@@ -236,6 +236,31 @@ check('every status is decided from the host state, per platform', () => {
 // ========================================
 // ========================================
 
+check('extension updates remain visible when the layout bytes did not change', () => {
+	const { context } = loadPage();
+	const entry = { ...index.layouts[1], extension: { sha256: 'new-content', files: [] } };
+	const rows = context.layoutRows({ platform: 'windows', index: { layouts: [entry] },
+		installed: { ergol: { ...entry, extension: { sha256: 'old-content', files: [] } } } });
+	assert.equal(rows[0].status, 'update');
+	assert.ok(rows[0].actions.includes('update'));
+});
+
+check('optional content is counted for the host and never presented as automatically enabled', () => {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const { byId, messages, window } = loadPage();
+		const entry = { ...index.layouts[1], extension: { sha256: 'payload', files: [
+			{ path: 'ergol.keylayout' }, { path: 'manifest.toml' },
+			{ path: 'hotstrings/rolls.toml' }, { path: 'hotstrings/sfbs.toml' },
+			{ path: 'shortcuts/menu.ahk' }, { path: 'shortcuts/menu.lua' }
+		] } };
+		window.initData({ strings, state: { platform, index: { layouts: [entry] }, installed: {} } });
+		const text = textOf(byId.get('layout-list'));
+		assert.ok(text.includes(strings['layout_manager.extension_content'].replace('%s', '2').replace('%s', '1')));
+		assert.ok(text.includes(strings['layout_manager.extension_opt_in']));
+		assert.deepEqual(plain(messages), [{ action: 'ready' }]);
+	}
+});
+
 check('the page renders the rows and posts the action of each button', () => {
 	const { context, byId, messages, window } = loadPage();
 	assert.deepEqual(plain(messages), [{ action: 'ready' }], 'the page announces itself');

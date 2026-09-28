@@ -100,15 +100,21 @@ function applyDomStrings() {
  * @param {boolean} provided - Another package already provides the layout.
  * @param {boolean} builtin - The driver ships the layout built in.
  * @param {string} active - Registry id of the active layout.
+ * @param {string} platform - Host platform, selecting its shortcut menu format.
  * @returns {Object}
  */
-function makeRow(entry, installed, provided, builtin, active) {
+function makeRow(entry, installed, provided, builtin, active, platform) {
 	const source = entry || installed;
+	const files = source.extension && Array.isArray(source.extension.files) ? source.extension.files : [];
+	const hotstrings = files.filter((file) => typeof file.path === 'string' && /^hotstrings\/.+\.toml$/.test(file.path)).length;
+	const shortcutPath = platform === 'windows' ? 'shortcuts/menu.ahk' : 'shortcuts/menu.lua';
+	const shortcuts = files.some((file) => file.path === shortcutPath) ? 1 : 0;
 	let status;
 	if (builtin) status = 'builtin';
 	else if (provided) status = 'provided';
 	else if (!installed) status = 'available';
-	else if (entry && installed.sha256 !== entry.sha256) status = 'update';
+	else if (entry && (installed.sha256 !== entry.sha256
+		|| (entry.extension && entry.extension.sha256 !== (installed.extension && installed.extension.sha256)))) status = 'update';
 	else status = 'installed';
 	const isActive = active === source.id;
 	const actions = [];
@@ -127,6 +133,8 @@ function makeRow(entry, installed, provided, builtin, active) {
 		status,
 		active: isActive,
 		removed: !entry,
+		hotstrings,
+		shortcuts,
 		actions
 	};
 }
@@ -151,11 +159,11 @@ function layoutRows(state) {
 		const platforms = Array.isArray(entry.platforms) ? entry.platforms : [];
 		if (typeof state.platform === 'string' && !platforms.includes(state.platform)) continue;
 		listed.add(entry.id);
-		rows.push(makeRow(entry, installed[entry.id], Boolean(provided[entry.id]), builtin[entry.id] === true, active));
+		rows.push(makeRow(entry, installed[entry.id], Boolean(provided[entry.id]), builtin[entry.id] === true, active, state.platform));
 	}
 	for (const id of Object.keys(installed).sort()) {
 		if (!listed.has(id) && installed[id] && typeof installed[id].id === 'string') {
-			rows.push(makeRow(null, installed[id], false, false, active));
+			rows.push(makeRow(null, installed[id], false, false, active, state.platform));
 		}
 	}
 	return rows;
@@ -255,6 +263,12 @@ function renderRow(row, busy) {
 		meta.appendChild(element('span', '', _fmt('layout_manager.meta_installed_version', row.installedVersion)));
 	}
 	item.appendChild(meta);
+	if (row.hotstrings || row.shortcuts) {
+		const content = element('div', 'layout-content');
+		content.appendChild(element('div', '', _fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts)));
+		content.appendChild(element('div', 'layout-content-note', _t('layout_manager.extension_opt_in')));
+		item.appendChild(content);
+	}
 
 	const buttons = element('div', 'layout-actions');
 	if (busy && busy.id === row.id) {

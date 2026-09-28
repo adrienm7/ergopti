@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licenza: %s",
 	"layout_manager.meta_version": "Versione %s",
 	"layout_manager.meta_installed_version": "Versione installata: %s",
+	"layout_manager.extension_content": "Contenuti facoltativi: %s pacchetti di abbreviazioni, %s menu di scorciatoie.",
+	"layout_manager.extension_opt_in": "Installare una disposizione non attiva questi contenuti. Attivarli separatamente nei menu.",
 	"layout_manager.busy_install": "Installazione…",
 	"layout_manager.busy_uninstall": "Disinstallazione…",
 	"layout_manager.source_network": "Catalogo aggiornato.",

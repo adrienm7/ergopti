@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "ライセンス：%s",
 	"layout_manager.meta_version": "バージョン %s",
 	"layout_manager.meta_installed_version": "インストール済みバージョン：%s",
+	"layout_manager.extension_content": "任意のコンテンツ：文字列展開パック %s 個、ショートカットメニュー %s 個。",
+	"layout_manager.extension_opt_in": "配列をインストールしても、このコンテンツは有効になりません。メニューから個別に有効にしてください。",
 	"layout_manager.busy_install": "インストール中…",
 	"layout_manager.busy_uninstall": "アンインストール中…",
 	"layout_manager.source_network": "カタログは最新です。",

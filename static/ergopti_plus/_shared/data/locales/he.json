@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "רישיון: %s",
 	"layout_manager.meta_version": "גרסה %s",
 	"layout_manager.meta_installed_version": "גרסה מותקנת: %s",
+	"layout_manager.extension_content": "תוכן אופציונלי: %s חבילות קיצורי טקסט, %s תפריטי קיצורי מקשים.",
+	"layout_manager.extension_opt_in": "התקנת פריסה אינה מפעילה תוכן זה. יש להפעילו בנפרד בתפריטים.",
 	"layout_manager.busy_install": "מתקין…",
 	"layout_manager.busy_uninstall": "מסיר…",
 	"layout_manager.source_network": "הקטלוג מעודכן.",

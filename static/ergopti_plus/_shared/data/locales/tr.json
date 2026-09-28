@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Lisans: %s",
 	"layout_manager.meta_version": "Sürüm %s",
 	"layout_manager.meta_installed_version": "Yüklü sürüm: %s",
+	"layout_manager.extension_content": "İsteğe bağlı içerik: %s metin kısaltma paketi, %s kısayol menüsü.",
+	"layout_manager.extension_opt_in": "Bir düzeni yüklemek bu içeriği etkinleştirmez. Menülerden ayrıca etkinleştirin.",
 	"layout_manager.busy_install": "Yükleniyor…",
 	"layout_manager.busy_uninstall": "Kaldırılıyor…",
 	"layout_manager.source_network": "Katalog güncel.",

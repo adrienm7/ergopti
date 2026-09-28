@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licens: %s",
 	"layout_manager.meta_version": "Version %s",
 	"layout_manager.meta_installed_version": "Installerad version: %s",
+	"layout_manager.extension_content": "Valfritt innehåll: %s paket med textgenvägar, %s kortkommandomenyer.",
+	"layout_manager.extension_opt_in": "Installation av en layout aktiverar inte detta innehåll. Aktivera det separat i menyerna.",
 	"layout_manager.busy_install": "Installerar…",
 	"layout_manager.busy_uninstall": "Avinstallerar…",
 	"layout_manager.source_network": "Katalogen är uppdaterad.",

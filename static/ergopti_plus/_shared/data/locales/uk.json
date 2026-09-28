@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Ліцензія: %s",
 	"layout_manager.meta_version": "Версія %s",
 	"layout_manager.meta_installed_version": "Встановлена версія: %s",
+	"layout_manager.extension_content": "Необов’язковий вміст: пакетів текстових скорочень — %s, меню сполучень клавіш — %s.",
+	"layout_manager.extension_opt_in": "Установлення розкладки не вмикає цей вміст. Увімкніть його окремо в меню.",
 	"layout_manager.busy_install": "Встановлення…",
 	"layout_manager.busy_uninstall": "Видалення…",
 	"layout_manager.source_network": "Каталог актуальний.",

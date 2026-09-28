@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "许可证：%s",
 	"layout_manager.meta_version": "版本 %s",
 	"layout_manager.meta_installed_version": "已安装版本：%s",
+	"layout_manager.extension_content": "可选内容：%s 个文本缩写包，%s 个快捷键菜单。",
+	"layout_manager.extension_opt_in": "安装布局不会启用此内容。请在菜单中单独启用。",
 	"layout_manager.busy_install": "正在安装…",
 	"layout_manager.busy_uninstall": "正在卸载…",
 	"layout_manager.source_network": "目录已是最新。",
