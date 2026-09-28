@@ -15,6 +15,7 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 local ProfileSelector = require("llm.profile_selector")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 --- The built-in profiles, by id, from the shared catalogue.
 local function builtin(id)
@@ -121,7 +122,7 @@ end)
 
 helpers.describe("prediction messages: the context length chosen in the menu applies", function()
 
-	helpers.it("caps the context at the stored setting", function()
+	PreferencesFixture.it("caps the context at the stored setting", function()
 		local Settings = require("modules.llm.settings")
 		local previous = Settings.get("context_length")
 		helpers.assert_true(Settings.set("context_length", 100))
@@ -136,7 +137,7 @@ end)
 
 helpers.describe("prediction messages: the word limits and language the prompt states", function()
 
-	helpers.it("says unlimited when the user chose no maximum", function()
+	PreferencesFixture.it("says unlimited when the user chose no maximum", function()
 		local Settings = require("modules.llm.settings")
 		local previous = Settings.get("max_words")
 		helpers.assert_true(Settings.set("max_words", 0))

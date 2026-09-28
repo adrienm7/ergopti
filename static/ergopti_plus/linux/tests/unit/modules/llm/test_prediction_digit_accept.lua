@@ -18,12 +18,11 @@ local function offering(count, apply_ok)
 	local state = { applied = {}, visible = true }
 	-- The chord is read once, from a throwaway store holding nothing: the
 	-- shipped default. The engine keeps the real store it predicts with.
-	local previous_storage = package.loaded["adapters.storage"]
-	package.loaded["adapters.storage"] = Fakes.storage()
+	local previous_storage = package.loaded["infra.llm_preferences"]
+	package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new()
 	local Navigation = helpers.load_module("modules.llm.navigation_settings")
 	Navigation._reset()
 	Navigation.get()
-	package.loaded["adapters.storage"] = previous_storage
 	state.previous_focus = package.loaded["adapters.secure_field_detector"]
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureField = function() return false end,
@@ -62,6 +61,7 @@ local function offering(count, apply_ok)
 	})
 	engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 })
 	function state.restore()
+		package.loaded["infra.llm_preferences"] = previous_storage
 		package.loaded["adapters.secure_field_detector"] = state.previous_focus
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil

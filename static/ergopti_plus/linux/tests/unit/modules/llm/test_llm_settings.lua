@@ -20,7 +20,7 @@
 
 local helpers = require("tests.helpers")
 
-local Fakes = helpers.load_module("tests.fakes")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local _displaced = { storage = nil, module = nil, held = false }
 
@@ -30,12 +30,12 @@ local _displaced = { storage = nil, module = nil, held = false }
 --- @return table settings, table storage
 local function load_over_storage(initial, writes_fail)
 	if not _displaced.held then
-		_displaced.storage = package.loaded["adapters.storage"]
+		_displaced.storage = package.loaded["infra.llm_preferences"]
 		_displaced.module = package.loaded["modules.llm.settings"]
 		_displaced.held = true
 	end
-	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	package.loaded["adapters.storage"] = storage
+	local storage = PreferencesFixture.new({ initial = initial, writes_fail = writes_fail })
+	package.loaded["infra.llm_preferences"] = storage
 	package.loaded["modules.llm.settings"] = nil
 	local settings = require("modules.llm.settings")
 	settings._reset()
@@ -44,7 +44,7 @@ end
 
 --- Puts back exactly what was there.
 local function drop_storage()
-	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["infra.llm_preferences"] = _displaced.storage
 	package.loaded["modules.llm.settings"] = _displaced.module
 end
 

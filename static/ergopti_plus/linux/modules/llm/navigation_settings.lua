@@ -32,14 +32,6 @@ local function normalise(value)
 	return result
 end
 
-local function equal(left, right)
-	if #left ~= #right then return false end
-	for index, value in ipairs(left) do
-		if right[index] ~= value then return false end
-	end
-	return true
-end
-
 local function shipped()
 	if _default then return _default end
 	local ok, value = pcall(Manifest.default_for, KEY)
@@ -52,7 +44,7 @@ function M.get()
 	if _value then return _value end
 	local fallback = shipped()
 	if not fallback then return {} end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	local stored = ok and Storage and Storage.get(KEY, nil) or nil
 	_value = normalise(stored) or fallback
 	if stored ~= nil and not normalise(stored) then
@@ -65,9 +57,9 @@ function M.set(value)
 	local candidate = normalise(value)
 	local fallback = shipped()
 	if not candidate or not fallback then return false end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then return false end
-	local persisted = equal(candidate, fallback) and Storage.delete(KEY) or Storage.set(KEY, candidate)
+	local persisted = Storage.set(KEY, candidate)
 	if persisted ~= true then return false end
 	_value = candidate
 	Logger.info(LOG, "Validation modifiers: %s.", #candidate > 0 and table.concat(candidate, "+") or "none")
@@ -96,6 +88,13 @@ end
 function M._reset()
 	_value = nil
 	_default = nil
+end
+
+--- Marks the exact validation chord consumed by this owner.
+--- @param document table Parsed canonical configuration.
+--- @param mark function Consumed-key collector.
+function M.mark_config_reads(document, mark)
+	require("infra.llm_preferences").mark_config_read(document, KEY, mark)
 end
 
 return M

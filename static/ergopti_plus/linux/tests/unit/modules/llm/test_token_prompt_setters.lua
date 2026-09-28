@@ -27,6 +27,8 @@
 
 local helpers = require("tests.helpers")
 
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+
 local Engine = helpers.load_module("modules.llm.prediction_engine")
 
 --- Every `state.llm.<name>` the token-prompt bridge calls.
@@ -55,7 +57,7 @@ end
 
 helpers.describe("token prompt: the engine answers every call", function()
 
-	helpers.it("implements every function the bridge invokes", function()
+	PreferencesFixture.it("implements every function the bridge invokes", function()
 		local names = called_by_bridge()
 		helpers.assert_true(#names > 0,
 			"no calls were found in the bridge — the scan broke, and a scan that "
@@ -86,7 +88,7 @@ end)
 
 helpers.describe("token prompt: what the setters accept", function()
 
-	helpers.it("applies a temperature the user saved", function()
+	PreferencesFixture.it("applies a temperature the user saved", function()
 		local before = Engine.get_temperature()
 		local Settings = helpers.load_module("modules.llm.settings")
 		local bounds = Settings.bounds("temperature")
@@ -101,7 +103,7 @@ helpers.describe("token prompt: what the setters accept", function()
 				.. "and the request sends another")
 	end)
 
-	helpers.it("refuses a temperature outside the declared range", function()
+	PreferencesFixture.it("refuses a temperature outside the declared range", function()
 		local before = Engine.get_temperature()
 		local bounds = helpers.load_module("modules.llm.settings").bounds("temperature")
 		local accepted = Engine.set_temperature(bounds.max + 10)
@@ -112,7 +114,7 @@ helpers.describe("token prompt: what the setters accept", function()
 				.. "partially would be worse than either outcome")
 	end)
 
-	helpers.it("refuses an empty trigger list", function()
+	PreferencesFixture.it("refuses an empty trigger list", function()
 		local before = Engine.get_triggers()
 		local accepted = Engine.set_triggers({})
 		local after = Engine.get_triggers()
@@ -123,7 +125,7 @@ helpers.describe("token prompt: what the setters accept", function()
 		helpers.assert_eq(#after, #before)
 	end)
 
-	helpers.it("accepts a trigger list and drops the empty entries", function()
+	PreferencesFixture.it("accepts a trigger list and drops the empty entries", function()
 		local before = Engine.get_triggers()
 		helpers.assert_true(Engine.set_triggers({ "::", "", "@@" }))
 		local after = Engine.get_triggers()
@@ -133,7 +135,7 @@ helpers.describe("token prompt: what the setters accept", function()
 				.. "that fires constantly rather than one that never does")
 	end)
 
-	helpers.it("refuses a token budget below one", function()
+	PreferencesFixture.it("refuses a token budget below one", function()
 		local before = Engine.get_max_tokens()
 		local accepted = Engine.set_max_tokens(0)
 		helpers.assert_true(not accepted)
