@@ -140,4 +140,17 @@ function M.sparse_operation(path, value) return _defaults.operation(path, value)
 --- @return table operations
 function M.scope_operations(scope, mode, owned_paths) return _defaults.scope_operations(scope, mode, owned_paths) end
 
+--- Collects dynamic paths from explicit runtime owners for one scope.
+--- @param scope string Scope identifier.
+--- @param providers table Named callbacks returning owned path arrays.
+--- @return table paths
+function M.scope_inventory(scope, providers) return _defaults.scope_inventory(scope, providers) end
+
+--- Separates config operations from required external preset owners.
+--- @param scope string Scope identifier.
+--- @param mode string Recommended restoration or clear.
+--- @param owned_paths table|nil Explicit runtime-owned paths.
+--- @return table plan
+function M.scope_plan(scope, mode, owned_paths) return _defaults.scope_plan(scope, mode, owned_paths) end
+
 return M

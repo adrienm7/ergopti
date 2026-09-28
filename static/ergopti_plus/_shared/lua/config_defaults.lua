@@ -122,14 +122,17 @@ function M.new(manifest)
 		assert(value ~= nil, "use a neutral value to delete configuration: " .. path)
 		return row(path, value, equal(value, neutral))
 	end
-	function contract.scope_operations(scope_id, mode, owned_paths)
-		assert(mode == "recommended" or mode == "clear", "unknown configuration scope operation")
-		local prefixes, excluded, visiting, dynamic_definitions = {}, {}, {}, {}
+	local function collect_scope(scope_id)
+		local prefixes, excluded, visiting, dynamic_definitions, presets = {}, {}, {}, {}, {}
 		local function visit(id)
 			local scope = manifest.scopes[id]
 			assert(type(scope) == "table", "unknown configuration scope: " .. tostring(id))
 			assert(not visiting[id], "cyclic configuration scopes: " .. id)
 			visiting[id] = true
+			if scope.preset ~= nil then
+				assert(type(scope.preset) == "string" and scope.preset ~= "", "invalid configuration preset owner")
+				presets[id] = scope.preset
+			end
 			for _, prefix in ipairs(scope.prefixes or {}) do prefixes[#prefixes + 1] = prefix end
 			for _, path in ipairs(scope.restore_exclude or {}) do excluded[#excluded + 1] = path end
 			for _, definition in ipairs(scope.dynamic_defaults or {}) do dynamic_definitions[definition] = true end
@@ -137,6 +140,11 @@ function M.new(manifest)
 			visiting[id] = nil
 		end
 		visit(scope_id)
+		return prefixes, excluded, dynamic_definitions, presets
+	end
+	function contract.scope_operations(scope_id, mode, owned_paths)
+		assert(mode == "recommended" or mode == "clear", "unknown configuration scope operation")
+		local prefixes, excluded, dynamic_definitions = collect_scope(scope_id)
 		local operations = {}
 		local function emit(path, value)
 			if mode == "recommended" then
@@ -172,6 +180,53 @@ function M.new(manifest)
 		end
 		return operations
 	end
+	--- Collects only declared dynamic leaves supplied by explicit runtime owners.
+	--- @param scope_id string Selected scope identifier.
+	--- @param providers table Named callbacks returning dense lists of owned paths.
+	--- @return table paths Sorted, detached and deduplicated scope inventory.
+	function contract.scope_inventory(scope_id, providers)
+		assert(type(providers) == "table", "scope inventory requires runtime owners")
+		local _, _, definitions = collect_scope(scope_id)
+		local found, paths = {}, {}
+		for name, provider in pairs(providers) do
+			assert(type(name) == "string" and name ~= "" and type(provider) == "function", "invalid scope inventory owner")
+			local owned = provider()
+			assert(type(owned) == "table", "runtime inventory is unavailable: " .. name)
+			local count = 0
+			for index, path in pairs(owned) do
+				assert(type(index) == "number" and index >= 1 and index % 1 == 0 and type(path) == "string",
+					"runtime inventory must contain an array of paths: " .. name)
+				count = count + 1
+				local definition = dynamic_entry(path)
+				assert(definition or contract.has_default(path), "runtime inventory path is not declared: " .. path)
+				if definition and definitions[definition] and not found[path] then
+					found[path] = true
+					paths[#paths + 1] = path
+				end
+			end
+			assert(count == #owned, "runtime inventory must be dense: " .. name)
+		end
+		table.sort(paths)
+		return paths
+	end
+
+	--- Plans configuration rows separately from external preset owner requests.
+	--- @param scope_id string Selected scope identifier.
+	--- @param mode string Recommended restoration or clear.
+	--- @param owned_paths table|nil Explicit runtime-owned dynamic paths.
+	--- @return table plan Detached operations and required preset ownership.
+	function contract.scope_plan(scope_id, mode, owned_paths)
+		local operations = contract.scope_operations(scope_id, mode, owned_paths)
+		local _, _, _, selected = collect_scope(scope_id)
+		local scopes, presets = {}, {}
+		for scope in pairs(selected) do scopes[#scopes + 1] = scope end
+		table.sort(scopes)
+		for _, scope in ipairs(scopes) do
+			presets[#presets + 1] = { scope = scope, preset = selected[scope], mode = mode }
+		end
+		return { scope = scope_id, mode = mode, operations = operations, presets = presets }
+	end
+
 	return contract
 end
 

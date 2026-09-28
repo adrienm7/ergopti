@@ -13,7 +13,7 @@ function M.new(options)
 	assert(type(options) == "table" and type(options.path) == "string"
 		and type(options.backup_path) == "string" and options.path ~= options.backup_path,
 		"scope transactions require distinct configuration and backup paths")
-	assert(type(options.manifest) == "table" and type(options.manifest.scope_operations) == "function"
+	assert(type(options.manifest) == "table" and type(options.manifest.scope_plan) == "function"
 		and type(options.capture) == "function" and type(options.apply) == "function"
 		and type(options.restore) == "function", "scope transaction ports are incomplete")
 	assert(type(options.files) == "table" and type(options.files.read_with_status) == "function"
@@ -38,7 +38,9 @@ function M.new(options)
 		local called, committed, detail, content = pcall(function()
 			local owned_paths = type(options.owned_paths) == "function" and options.owned_paths() or {}
 			assert(type(owned_paths) == "table", "dynamic configuration ownership is unavailable")
-			local updates = options.manifest.scope_operations(scope, mode, owned_paths)
+			local plan = options.manifest.scope_plan(scope, mode, owned_paths)
+			if #plan.presets > 0 then return false, "scope requires separate preset ownership" end
+			local updates = plan.operations
 			local prepared, why, candidate, source = Writer.prepare_batch(options.path, updates, options.files)
 			if not prepared then return false, why end
 			local decoded = Codec.decode(candidate)
