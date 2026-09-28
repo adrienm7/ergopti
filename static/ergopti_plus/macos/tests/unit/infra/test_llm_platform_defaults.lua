@@ -5,6 +5,59 @@ local helpers = require("tests.helpers")
 local Codec = require("toml_codec")
 
 helpers.describe("LLM hardware defaults", function()
+	helpers.it("does not probe hardware for metadata or unrelated configuration values", function()
+		package.loaded["modules.llm.backend_detector"], package.loaded["infra.manifest_reader"] = nil, nil
+		local probes = 0
+		local manifest = helpers.load_with_stubs("infra.manifest_reader", { execute = function()
+			probes = probes + 1; return "arm64"
+		end })
+		manifest.coverage_gaps()
+		manifest.version()
+		manifest.scopes()
+		manifest.has_default("llm.models.selected")
+		manifest.default_for("metrics.enabled")
+		manifest.recommended_for("gestures.enabled")
+		manifest.sparse_operation("metrics.enabled", false)
+		manifest.scope_plan("metrics", "clear")
+		helpers.assert_eq(probes, 0)
+		manifest.default_for("llm.models.selected")
+		helpers.assert_true(probes > 0)
+		local count = probes
+		manifest.scope_plan("llm", "recommended")
+		manifest.document_defaults()
+		helpers.assert_eq(probes, count, "one resolved owner is reused by every projection")
+	end)
+	helpers.it("resolves each backend value projection through the existing hardware owner", function()
+		local saved = package.loaded["modules.llm.backend_detector"]
+		local projections = {
+			function(m) m.default_for("llm.models.selected") end,
+			function(m) m.recommended_for("llm.models.selected") end,
+			function(m) m.sparse_operation("llm.models.selected", "ollama") end,
+			function(m) m.scope_operations("llm", "recommended") end,
+			function(m) m.scope_plan("global", "clear") end,
+			function(m) m.document_defaults() end,
+			function(m) m.features() end,
+			function(m) m.find_entry_by_path("llm.models.selected") end,
+		}
+		local ok, err = pcall(function()
+			for index, project in ipairs(projections) do
+				local calls = 0
+				package.loaded["modules.llm.backend_detector"] = { auto_default = function()
+					calls = calls + 1; return "ollama"
+				end }
+				package.loaded["infra.manifest_reader"] = nil
+				local manifest = require("infra.manifest_reader")
+				helpers.assert_eq(calls, 0)
+				project(manifest)
+				helpers.assert_eq(calls, 1, "projection " .. index)
+				helpers.assert_eq(manifest.default_for("llm.models.selected"), "ollama")
+				helpers.assert_eq(calls, 1)
+			end
+		end)
+		package.loaded["modules.llm.backend_detector"] = saved
+		package.loaded["infra.manifest_reader"] = nil
+		if not ok then error(err, 0) end
+	end)
 	for _, case in ipairs({ { "x86_64", "ollama", "14.5" }, { "arm64", "mlx", "14.5" }, { "arm64", "ollama", "12.0" } }) do
 		helpers.it("keeps bootstrap, scoped deletion and sparse persistence coherent on " .. case[1] .. "/" .. case[3], function()
 			package.loaded["modules.llm.backend_detector"] = nil

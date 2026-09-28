@@ -61,19 +61,31 @@ local function load_manifest()
 end
 
 local _manifest = load_manifest()
--- Resolve the existing hardware choice before any default, scope or sparse projection.
-for _, entry in ipairs(_manifest.features) do
-	if entry.path == "llm.models.selected" then
-		local backend = require("modules.llm.backend_detector").auto_default()
-		entry.default, entry.recommended = backend, backend
-	end
-end
 local _defaults = require("config_defaults").new(_manifest)
 
 -- Path index built once at load for O(1) lookups.
 local _path_index = {}
 for _, entry in ipairs(_manifest.features) do
 	_path_index[entry.path] = entry
+end
+
+-- Metadata and unrelated preferences must not perform native hardware probes.
+-- Every value projection that includes the backend still resolves the same owner.
+local BACKEND_PATH = "llm.models.selected"
+local platform_resolved = false
+local function resolve_platform(path)
+	if platform_resolved then return end
+	if path ~= nil and path ~= BACKEND_PATH and BACKEND_PATH:sub(1, #path + 1) ~= path .. "." then return end
+	local backend = require("modules.llm.backend_detector").auto_default()
+	local entry = assert(_path_index[BACKEND_PATH], "platform backend declaration missing")
+	entry.default, entry.recommended = backend, backend
+	platform_resolved = true
+end
+
+local function resolve_scope(scope)
+	local declaration = assert(_manifest.scopes[scope], "unknown configuration scope")
+	for _, prefix in ipairs(declaration.prefixes or {}) do resolve_platform(prefix) end
+	for _, child in ipairs(declaration.includes or {}) do resolve_scope(child) end
 end
 
 Logger.done(LOG, "Features manifest loaded (v%s, %d feature(s)).",
@@ -97,6 +109,7 @@ end
 --- Flat array of feature entries (path / id / section / default / type / …).
 --- @return table
 function M.features()
+	resolve_platform()
 	return _manifest.features
 end
 
@@ -104,6 +117,7 @@ end
 --- @param path string The canonical dotted path (e.g. the menu/config key).
 --- @return table|nil
 function M.find_entry_by_path(path)
+	resolve_platform(path)
 	return _path_index[path]
 end
 
@@ -114,20 +128,27 @@ end
 --- @param path string
 --- @return any The declared default (primitive or table).
 function M.default_for(path)
+	resolve_platform(path)
 	return _defaults.default_for(path)
 end
 
 --- Returns a detached recommended value; never used as an absence fallback.
 --- @param path string Canonical feature path.
 --- @return any value
-function M.recommended_for(path) return _defaults.recommended_for(path) end
+function M.recommended_for(path)
+	resolve_platform(path)
+	return _defaults.recommended_for(path)
+end
 
 --- @return boolean declared Whether a path has a manifest-owned neutral value.
 function M.has_default(path) return _defaults.has_default(path) end
 
 --- Returns a detached nested document containing every neutral manifest value.
 --- @return table defaults
-function M.document_defaults() return _defaults.document_defaults() end
+function M.document_defaults()
+	resolve_platform()
+	return _defaults.document_defaults()
+end
 
 --- Returns the manifest-owned configuration scopes.
 --- @return table scopes
@@ -137,14 +158,20 @@ function M.scopes() return _defaults.scopes() end
 --- @param path string Canonical feature path.
 --- @param value any Desired value.
 --- @return table operation
-function M.sparse_operation(path, value) return _defaults.operation(path, value) end
+function M.sparse_operation(path, value)
+	resolve_platform(path)
+	return _defaults.operation(path, value)
+end
 
 --- Produces selected recommended writes or neutral deletions.
 --- @param scope string Scope identifier.
 --- @param mode string `recommended` or `clear`.
 --- @param owners table|nil Exact host parameter validators.
 --- @return table operations
-function M.scope_operations(scope, mode, owned_paths, owners) return _defaults.scope_operations(scope, mode, owned_paths, owners) end
+function M.scope_operations(scope, mode, owned_paths, owners)
+	resolve_scope(scope)
+	return _defaults.scope_operations(scope, mode, owned_paths, owners)
+end
 
 --- Collects dynamic paths from explicit runtime owners for one scope.
 --- @param scope string Scope identifier.
@@ -159,7 +186,10 @@ function M.scope_inventory(scope, providers, owners) return _defaults.scope_inve
 --- @param owned_paths table|nil Explicit runtime-owned paths.
 --- @param owners table|nil Exact host parameter validators.
 --- @return table plan
-function M.scope_plan(scope, mode, owned_paths, owners) return _defaults.scope_plan(scope, mode, owned_paths, owners) end
+function M.scope_plan(scope, mode, owned_paths, owners)
+	resolve_scope(scope)
+	return _defaults.scope_plan(scope, mode, owned_paths, owners)
+end
 
 
 
