@@ -277,6 +277,49 @@ Test("layout catalogue: a verified download is installed and read back by the em
 Test("layout extensions: installed content is published without enable preferences (layout-extension)",
 	_LCT_ExtensionPublishCase)
 
+Test("layout extensions: quoted pack preferences survive the real config writer and loader (layout-extension-config)",
+	_LCT_ExtensionConfigCase)
+
+_LCT_ExtensionConfigCase() {
+	Dir := _LCT_TempDir()
+	try {
+		Path := Dir . "config.toml"
+		Group := "ext:ergopti:rolls"
+		Section := 'hotstrings.modules."' . Group . '"'
+		AssertTrue(TOML_BatchWrite(Path, [
+			{ Section: "hotstrings.groups", Key: Group, Value: TOML_Bool(true) },
+			{ Section: Section, Key: "comma", Value: TOML_Bool(true) }
+		]))
+		Target := Map("hotstrings", Map("groups", Map(Group, false), "modules", Map(Group, Map("comma", false))))
+		AssertEqual(2, ApplyConfigToml(Target, Path, &Rejected), "both desired leaves must survive reload")
+		AssertEqual(0, Rejected)
+		AssertTrue(Target["hotstrings"]["groups"][Group])
+		AssertTrue(Target["hotstrings"]["modules"][Group]["comma"])
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout extensions: quoted dots stay within one config segment (layout-extension-config)",
+	_LCT_ExtensionQuotedSegmentCase)
+
+_LCT_ExtensionQuotedSegmentCase() {
+	Dir := _LCT_TempDir()
+	try {
+		Path := Dir . "config.toml"
+		Header := '[ "hotstrings" . ' . Chr(39) . "modules" . Chr(39) . ' . "pack.with.dot" ]'
+		_LCT_WriteRaw(Path, Header . "`ncomma = true`n")
+		Target := Map("hotstrings", Map("modules", Map("pack.with.dot", Map("comma", false))))
+		AssertEqual(1, ApplyConfigToml(Target, Path, &Rejected))
+		AssertEqual(0, Rejected)
+		AssertTrue(Target["hotstrings"]["modules"]["pack.with.dot"]["comma"])
+		_LCT_WriteRaw(Path, '["hotstrings.personal".foreign]' . "`nenabled = true`n")
+		Target := Map("hotstrings", Map("personal", Map()))
+		AssertEqual(0, ApplyConfigToml(Target, Path, &Rejected))
+		AssertEqual("section", TomlConfigUnknownKind(Target, '"hotstrings.personal".foreign', "enabled"),
+			"one quoted key cannot impersonate the two dynamic namespace segments")
+		AssertFalse(Target.Has("hotstrings.personal"))
+	} finally DirDelete(Dir, true)
+}
+
 _LCT_ExtensionPublishCase() {
 	Dir := _LCT_TempDir()
 	try {
