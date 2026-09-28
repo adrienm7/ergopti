@@ -483,8 +483,7 @@ end
 local function manual_refusal()
 	if _is_paused() then return "paused", "" end
 	if not _enabled then return "disabled", "" end
-	local profiles = get_profiles()
-	if not get_ollama() or not profiles or not profiles.get_current_model() then
+	if not M.get_prediction_model() then
 		return "backend_not_ready", ""
 	end
 	local buffer = _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() or ""
