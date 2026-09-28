@@ -44,6 +44,8 @@
 const fs = require('fs');
 const assert = require('node:assert/strict');
 const path = require('path');
+const { parse: parseToml } = require('smol-toml');
+const { normalizeScopes } = require('../lib/configuration-scopes.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
@@ -58,7 +60,8 @@ const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'modules', 'features', 'manif
 //            setting with no default, no type and no menu row.)
 // 2026-09-28: 11 -> 7 after recognizing declared dynamic namespaces. Keep
 // the measured floor tight: four corrected false positives are not new slack.
-const BASELINE = 7;
+// 2026-09-28: 7 -> 5 after reading the scope-owned hotstring namespaces.
+const BASELINE = 5;
 
 const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
@@ -137,16 +140,29 @@ function configReadSurfaces(source) {
 }
 
 /**
- * A dynamic namespace needs a declared child on this exact platform.
+ * A dynamic namespace needs a platform child or a typed scope declaration.
  * Runtime suffix validity still belongs to the manifest lookup owner.
  * @param {string} surface - Extracted config surface.
  * @param {Set<string>} known - Paths declared for one platform.
+ * @param {object[]} dynamic - Typed scope namespaces with exact depth and suffix.
  * @returns {boolean} Whether the manifest owns the surface.
  */
-function isDeclaredSurface(surface, known) {
-	if (!surface.endsWith('.*')) return known.has(surface);
-	const prefix = surface.slice(0, -1);
-	return [...known].some((key) => key.startsWith(prefix) && key.length > prefix.length);
+function isDeclaredSurface(surface, known, dynamic = []) {
+	const wildcard = surface.endsWith('.*');
+	if (!wildcard && known.has(surface)) return true;
+	if (wildcard) {
+		const prefix = surface.slice(0, -1);
+		if ([...known].some((key) => key.startsWith(prefix) && key.length > prefix.length)) return true;
+	}
+	return dynamic.some((definition) => {
+		const fixed = wildcard ? surface.slice(0, -2) : surface;
+		if (wildcard && fixed === definition.prefix) return true;
+		if (!fixed.startsWith(definition.prefix + '.')) return false;
+		const tail = fixed.slice(definition.prefix.length + 1).split('.');
+		if (tail.some((part) => part === '')) return false;
+		if (wildcard) return tail.length < definition.depth;
+		return tail.length === definition.depth && (!definition.suffix || tail.at(-1) === definition.suffix);
+	});
 }
 
 // Regression oracles: concatenation is a namespace, but a literal trailing dot,
@@ -159,6 +175,68 @@ assert.equal(isDeclaredSurface('shortcuts.keys.', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.keys.unknown', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.key.*', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.keys.*', new Set()), false);
+const dynamicProbe = [{ prefix: 'hotstrings.modules', depth: 2 },
+	{ prefix: 'llm.profiles.shortcuts', depth: 2, suffix: 'key' }];
+assert.equal(isDeclaredSurface('hotstrings.modules.*', new Set(), dynamicProbe), true);
+assert.equal(isDeclaredSurface('hotstrings.modules.rolls.hc', new Set(), dynamicProbe), true);
+assert.equal(isDeclaredSurface('hotstrings.modules.rolls.*', new Set(), dynamicProbe), true);
+for (const unknown of ['hotstrings.module.*', 'hotstrings.modules.rolls',
+	'hotstrings.modules.rolls.hc.extra', 'hotstrings.modules..hc',
+	'llm.profiles.shortcuts.profile.unknown', 'llm.profiles.shortcuts.profile.key.*']) {
+	assert.equal(isDeclaredSurface(unknown, new Set(), dynamicProbe), false, unknown);
+}
+assert.equal(isDeclaredSurface('llm.profiles.shortcuts.profile.key', new Set(), dynamicProbe), true);
+
+/**
+ * Recognizes one exact secondary-file writer, not a globally exempt config key.
+ * The row must belong to its preparation function and retain its override-path
+ * publication chain. A different owner, function, key or destination is scanned.
+ * @param {string} driver - Driver directory name.
+ * @param {string} relative - Source path relative to the driver.
+ * @param {string} source - Complete source text.
+ * @param {string} surface - Literal section/key pair.
+ * @param {number} offset - Row offset in the source.
+ * @returns {boolean} Whether the secondary override owner handles this row.
+ */
+function isSecondaryWrite(driver, relative, source, surface, offset) {
+	if (driver !== 'macos' || relative !== 'modules/hotstrings/hotstrings_config.lua'
+		|| surface !== '__global__.word_delimiters') return false;
+	const prepare = /^local function prepare_override_content\(overrides, word_delimiters\)\r?\n[\s\S]*?^end\b/gm.exec(source);
+	const save = /^local function save_to_disk\(overrides, word_delimiters\)\r?\n[\s\S]*?^end\b/gm.exec(source);
+	const init = /^function M\.init\(opts\)\r?\n[\s\S]*?^end\b/gm.exec(source);
+	if (!prepare || !save || !init || offset < prepare.index
+		|| offset >= prepare.index + prepare[0].length) return false;
+	return /local snapshot = _state\.source_snapshot/.test(prepare[0])
+		&& /TomlRecordEditor\.patch_table_field\(content,/.test(prepare[0])
+		&& /local prepared, prepare_error = prepare_override_content\(overrides, word_delimiters\)/.test(save[0])
+		&& /content = prepared/.test(save[0])
+		&& /FileSystem\.write_if_unchanged\(_state\.path, content, _state\.source_snapshot\)/.test(save[0])
+		&& /parse_overrides\(opts\.override_path\)/.test(init[0])
+		&& /path\s*= opts\.override_path/.test(init[0]);
+}
+
+// The production bootstrap binds this owner to its secondary TOML file.
+// Redirecting that owner to config.toml must fail the gate too.
+const secondaryBootstrap = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', 'init.lua'), 'utf8');
+const secondaryDestination = /override_path = override_path \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
+assert.equal(secondaryDestination.test(secondaryBootstrap), true, 'override owner must target its secondary file');
+assert.equal(secondaryDestination.test(secondaryBootstrap.replace('"hotstrings_config.toml"', '"config.toml"')), false);
+
+// The secondary-file exclusion is tied to the actual preparation/publication
+// chain. Neither another writer nor an undeclared neighbouring leaf inherits it.
+const secondaryOwner = 'modules/hotstrings/hotstrings_config.lua';
+const secondarySource = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', secondaryOwner), 'utf8');
+const secondaryRow = /section\s*=\s*"__global__"\s*,\s*key\s*=\s*"word_delimiters"/.exec(secondarySource);
+assert.ok(secondaryRow, 'secondary owner must still expose the literal row under test');
+assert.equal(isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.word_delimiters', secondaryRow.index), true);
+assert.equal(isSecondaryWrite('macos', 'infra/config.lua', secondarySource, '__global__.word_delimiters', secondaryRow.index), false);
+assert.equal(isSecondaryWrite('linux', secondaryOwner, secondarySource, '__global__.word_delimiters', secondaryRow.index), false);
+assert.equal(isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.unknown', secondaryRow.index), false);
+assert.equal(isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.word_delimiters', 0), false);
+assert.equal(isSecondaryWrite('macos', secondaryOwner,
+	secondarySource.replace('FileSystem.write_if_unchanged(_state.path, content, _state.source_snapshot)',
+		'FileSystem.write_if_unchanged(config_path, content, _state.source_snapshot)'),
+	'__global__.word_delimiters', secondaryRow.index), false);
 
 /**
  * Every "section.key" (or bare section) a driver's own source reads or writes.
@@ -181,7 +259,9 @@ function surfaceOf(driver) {
 			const src = fs.readFileSync(p, 'utf8');
 			// batch_write rows: { section = "x", key = "y" }
 			for (const m of src.matchAll(/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*"([A-Za-z0-9_.]+)"/g)) {
-				out.add(`${m[1]}.${m[2]}`);
+				const surface = `${m[1]}.${m[2]}`;
+				const relative = path.relative(root, p).split(path.sep).join('/');
+				if (!isSecondaryWrite(driver, relative, src, surface, m.index)) out.add(surface);
 			}
 			// A row whose key is a runtime value still names its section.
 			for (const m of src.matchAll(/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*[A-Za-z_]/g)) {
@@ -207,6 +287,9 @@ function surfaceOf(driver) {
 }
 
 const declared = parseManifest();
+const scopes = normalizeScopes(parseToml(fs.readFileSync(MANIFEST, 'utf8')).scopes);
+const dynamic = Object.values(scopes).flatMap((scope) => scope.dynamic_defaults || []);
+assert.ok(dynamic.length > 0, 'the scope registry must declare dynamic defaults');
 const DRIVERS = Object.keys(PLATFORM_OF_DRIVER).filter((d) =>
 	fs.existsSync(path.join(DRIVERS_DIR, d, 'adapters'))
 );
@@ -216,7 +299,7 @@ for (const driver of DRIVERS) {
 	const platform = PLATFORM_OF_DRIVER[driver];
 	const known = declared.get(platform) || new Set();
 	for (const surface of [...surfaceOf(driver)].sort()) {
-		if (isDeclaredSurface(surface, known)) continue;
+		if (isDeclaredSurface(surface, known, dynamic)) continue;
 		// A key is covered when its own section is declared AND the key is too;
 		// a bare section is covered by the section alone.
 		undeclared.push({ driver, platform, surface });
