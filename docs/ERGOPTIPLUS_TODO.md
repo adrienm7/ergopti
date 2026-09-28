@@ -8,13 +8,17 @@ Update the completed item and its verification before moving to the next item.
 
 ## Delivery checkpoint
 
-The overhaul is not finished. Eight reviewed integration commits now end at
-`eaa06eeba` on `dev`, on top of the earlier 340 unpublished commits. Their 64
-owned paths are committed. The handoff commit `2c73147e1` is published on
-GitHub. Its first CI is red: Windows discovery fixture, Linux bundled-corpus
-fixture, macOS launcher tests, and one documentation BOM. Corrective work is
-committed through `f5a9b4cd7`; available local gates pass. Native Swift CI,
-the corrective push and release assets remain to be verified.
+The overhaul is not finished. Eight reviewed integration commits ended at
+`eaa06eeba`, followed by the published handoff and five CI repair commits.
+Current published checkpoint: `ffb8a80d1`. Shared JavaScript, Linux unit tests,
+all 16 layout-installer jobs, macOS Lua/E2E and 250 native Swift tests pass.
+Remaining CI blockers: Windows mixed path identities, macOS Python launch-gate
+fixtures, and Linux live scenarios (explicit opt-in, updater response size and
+release UI). The corrections are applied locally. macOS Python passes 23/23;
+Windows full unit checks pass 7239/7239, scope checks 4/4, compilation and E2E pass; Linux unit
+coverage passes 3578/3578 in a documented composite, E2E 115/115 and explicit
+live-preference owner probes 28/28. All 303 JavaScript checks pass, with unchanged source hashes.
+The corrective checkpoint is ready to publish; no new release is verified.
 The only registered worktree is the main repository. Nine temporary local
 branches have been retired after their useful content was accounted for.
 Originals and unfinished proposals are preserved in the handoff package.
@@ -77,12 +81,11 @@ These are software implementations; final hardware verification remains below.
    update (`c4f5973`) to review. These are preserved, not silently merged.
    The retired-worktree audit also recovered unapplied D4 model labels/21
    locales and L4 boot/test changes; their exact deltas are in the same package.
-4. [ ] Finish publication: `2c73147e1` is on GitHub and site deployment passed.
-   Corrections for the first failures are locally verified (Windows path
-   identity, Linux neutral activation fixture, macOS launcher fixes deferred
-   to native CI, documentation BOM). Publish them, then verify
-   the corrective commit, all workflow verdicts and release assets. A clean
-   working tree alone does not prove a release.
+4. [ ] Finish publication: `ffb8a80d1` is on GitHub. The first Linux unit,
+   encoding and native Swift failures are resolved. Correct the remaining
+   Windows mixed-spelling case, macOS Python fixtures and Linux live tests
+   (opt-in setup, updater response size, release UI); publish, then verify
+   all workflow verdicts and release assets. A clean tree is not a release.
 5. [ ] Complete W1 neutral configuration and recommended/clear scopes. Finish
    macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
    composition. Keep unknown fields, verified backups, exact runtime

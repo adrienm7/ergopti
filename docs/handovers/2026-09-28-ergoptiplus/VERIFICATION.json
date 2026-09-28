@@ -261,5 +261,95 @@
       "commit": "f5a9b4cd7f5a2fa7a0e8afa0e27d11c84939c40e",
       "subject": "test(macos): isolate append integrity from log retention"
     }
-  ]
+  ],
+  "secondPublishedCI": {
+    "commit": "ffb8a80d19c02501fea7939c13e5e93fca5ad77b",
+    "url": "https://github.com/adrienm7/ergopti/actions/runs/36491375070",
+    "conclusion": "failure",
+    "passed": [
+      "shared JavaScript",
+      "Linux unit",
+      "macOS Lua unit",
+      "macOS E2E",
+      "250 Swift tests"
+    ],
+    "layoutInstaller": {
+      "url": "https://github.com/adrienm7/ergopti/actions/runs/36491455142",
+      "jobsPassed": 16,
+      "conclusion": "success"
+    },
+    "failures": [
+      "Windows mixed path spelling in injected scope catalogue",
+      "macOS launch-gate Python fixtures: three stale/shared-state assertions",
+      "Linux live daemon/Ollama/WPM opt-in setup",
+      "Linux updater response size and release WebView"
+    ],
+    "releaseVerified": false
+  },
+  "secondRepairLocal": {
+    "recorded": "2026-09-28T23:29:28.873Z",
+    "windows": {
+      "unit": 7239,
+      "failed": 0,
+      "scopeRegression": 4,
+      "e2e": 5,
+      "compile": true,
+      "encodingFiles": 1698,
+      "priorAttempt": "900-second deadline expired; incomplete, superseded by the complete successful run"
+    },
+    "linux": {
+      "wholeSuitePassed": 3564,
+      "wholeSuiteFailed": 14,
+      "total": 3578,
+      "launchFailure": "The scratch luajit -e launcher supplied the wrong arg[-1] to CLI subprocess tests.",
+      "cliReplayPassed": 22,
+      "cliReplayFailed": 0,
+      "compositeUniquePassed": 3578,
+      "e2e": 115,
+      "livePreferenceOwnerAssertions": 28,
+      "nativeLive": "GitHub CI still required for GTK, uinput, actual Ollama and updater installation"
+    },
+    "macosPython": {
+      "passed": 23,
+      "failed": 0,
+      "baselineFailed": 3
+    },
+    "javascript": {
+      "wholeSuitePassed": 302,
+      "total": 303,
+      "failed": [
+        "Karabiner Python child launch exceeded its unchanged local deadline"
+      ],
+      "replay": "Exact unchanged Karabiner wrapper passed: 27 cases, one platform skip, 3.047 seconds",
+      "compositePassed": 303,
+      "rootChanged": [],
+      "exportChanged": []
+    },
+    "fixes": [
+      "Canonicalize both Windows hotstring identity operands without altering admitted write paths",
+      "Isolate macOS launch scenarios and pin the current explicit profile lists",
+      "Explicit Linux live fixture consent, canonical directories and shipped remap presets",
+      "Bound Linux release fetching to 20 items per page without reducing the 100-candidate horizon; preserve conditional caches and cancellation",
+      "Probe the real shared release-page channel selectors and reject empty probe receipts"
+    ],
+    "releaseVerified": false,
+    "commits": [
+      {
+        "commit": "78e9d0dfe31f61cca9f23cb37c45b38153c969bb",
+        "subject": "fix(windows): compare both hotstring source identities canonically"
+      },
+      {
+        "commit": "76d063017328f2395f504dc1582a999c9468983c",
+        "subject": "test(macos): isolate launch states and pin current scenarios"
+      },
+      {
+        "commit": "d2f3b4a19f9f7817e2a1656cd61e7f6a8e576bdf",
+        "subject": "test(linux): activate live scenarios through canonical preferences"
+      },
+      {
+        "commit": "1362725c775fabb04246212af8ce90723ab6dd9f",
+        "subject": "fix(linux): paginate release discovery within the transport limit"
+      }
+    ]
+  }
 }
