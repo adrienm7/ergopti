@@ -48,8 +48,9 @@ end
 
 --- Resolves owned booleans from one parsed configuration without file effects.
 --- @param config table Parsed canonical configuration.
+--- @param mark function|nil Exact consumed-key collector.
 --- @return table values Canonical path to effective boolean.
-function M.resolve(config)
+function M.resolve(config, mark)
 	assert(type(config) == "table", "metrics preferences contain malformed TOML")
 	assert(config.metrics == nil or type(config.metrics) == "table", "metrics preferences require a table")
 	local values, metrics = {}, config.metrics or {}
@@ -57,6 +58,7 @@ function M.resolve(config)
 		if entry.path:match("^metrics%.[^.]+$") and entry.type == "boolean" then
 			local key = owned(entry.path)
 			local value = metrics[key]
+			if mark and value ~= nil then mark("metrics", key) end
 			assert(value == nil or type(value) == "boolean", "invalid boolean metrics preference: " .. entry.path)
 			if value == nil then value = Manifest.default_for(entry.path) end
 			values[entry.path] = value
