@@ -42,6 +42,7 @@
 'use strict';
 
 const fs = require('fs');
+const assert = require('node:assert/strict');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -55,7 +56,9 @@ const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'modules', 'features', 'manif
 //            a key the manifest has never declared, and its own comment says
 //            so: "use_ergopti → [hotstrings].enabled". The wizard writes a
 //            setting with no default, no type and no menu row.)
-const BASELINE = 11;
+// 2026-09-28: 11 -> 7 after recognizing declared dynamic namespaces. Keep
+// the measured floor tight: four corrected false positives are not new slack.
+const BASELINE = 7;
 
 const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
@@ -123,6 +126,41 @@ function parseManifest() {
 }
 
 /**
+ * Reads literal paths and marks a dotted prefix only when Lua concatenates it.
+ * A computed suffix is checked as a namespace, never as a literal empty key.
+ * @param {string} source - Driver source text.
+ * @returns {string[]} Literal paths or dynamic namespace patterns.
+ */
+function configReadSurfaces(source) {
+	return [...source.matchAll(/(?:storage\.(?:get|set)|default_for|find_entry_by_path)\(\s*"([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)"(\s*\.\.)?/g)]
+		.map((match) => match[2] && match[1].endsWith('.') ? match[1] + '*' : match[1]);
+}
+
+/**
+ * A dynamic namespace needs a declared child on this exact platform.
+ * Runtime suffix validity still belongs to the manifest lookup owner.
+ * @param {string} surface - Extracted config surface.
+ * @param {Set<string>} known - Paths declared for one platform.
+ * @returns {boolean} Whether the manifest owns the surface.
+ */
+function isDeclaredSurface(surface, known) {
+	if (!surface.endsWith('.*')) return known.has(surface);
+	const prefix = surface.slice(0, -1);
+	return [...known].some((key) => key.startsWith(prefix) && key.length > prefix.length);
+}
+
+// Regression oracles: concatenation is a namespace, but a literal trailing dot,
+// unknown child, similarly named section or wrong platform is never exempted.
+assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. name)'), ['shortcuts.keys.*']);
+assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys.")'), ['shortcuts.keys.']);
+const declaredProbe = new Set(['shortcuts.keys.at_hash']);
+assert.equal(isDeclaredSurface('shortcuts.keys.*', declaredProbe), true);
+assert.equal(isDeclaredSurface('shortcuts.keys.', declaredProbe), false);
+assert.equal(isDeclaredSurface('shortcuts.keys.unknown', declaredProbe), false);
+assert.equal(isDeclaredSurface('shortcuts.key.*', declaredProbe), false);
+assert.equal(isDeclaredSurface('shortcuts.keys.*', new Set()), false);
+
+/**
  * Every "section.key" (or bare section) a driver's own source reads or writes.
  * @param {string} driver - Driver directory name.
  * @returns {Set<string>} Config surfaces, as written in the source.
@@ -150,9 +188,7 @@ function surfaceOf(driver) {
 				out.add(m[1]);
 			}
 			// storage.get("section.key") / default_for("section.key")
-			for (const m of src.matchAll(/(?:storage\.(?:get|set)|default_for|find_entry_by_path)\(\s*"([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)"/g)) {
-				out.add(m[1]);
-			}
+			for (const surface of configReadSurfaces(src)) out.add(surface);
 			// Windows boot-owned scalar reads. These bypass the manifest-backed
 			// Features tree, so omitting them made a real config surface invisible
 			// to this ratchet.
@@ -180,7 +216,7 @@ for (const driver of DRIVERS) {
 	const platform = PLATFORM_OF_DRIVER[driver];
 	const known = declared.get(platform) || new Set();
 	for (const surface of [...surfaceOf(driver)].sort()) {
-		if (known.has(surface)) continue;
+		if (isDeclaredSurface(surface, known)) continue;
 		// A key is covered when its own section is declared AND the key is too;
 		// a bare section is covered by the section alone.
 		undeclared.push({ driver, platform, surface });
