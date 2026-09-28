@@ -146,10 +146,11 @@ end
 
 --- Hides and forgets every candidate.
 function M.hide()
-	if _renderer and type(_renderer.hide) == "function" then _renderer.hide() end
+	if _renderer and type(_renderer.hide) == "function" and _renderer.hide() ~= true then return false end
 	_candidates = {}
 	_active_index = 1
 	_meta = {}
+	return true
 end
 
 --- Whether candidates are presented: set by show(), cleared by hide().

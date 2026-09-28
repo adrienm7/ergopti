@@ -451,4 +451,30 @@ function M.mark_config_reads(document, mark)
 	for _, definition in pairs(DEFINITIONS) do preferences.mark_config_read(document, definition.path, mark) end
 end
 
+--- Captures registry identity as well as its exact-source cache.
+--- Opaque JSON identities remain owned by the codec and are never cloned here.
+--- @return table snapshot
+function M.configuration_snapshot()
+	return { values = _values, users = _user_profiles, source = _registry_source,
+		unreadable = _unreadable_profiles }
+end
+
+--- Restores an owner-issued registry/cache snapshot without serialization.
+--- @param snapshot table Owner-issued snapshot.
+--- @return boolean restored
+function M.restore_configuration(snapshot)
+	_values, _user_profiles = snapshot.values, snapshot.users
+	_registry_source, _unreadable_profiles = snapshot.source, snapshot.unreadable
+	return true
+end
+
+--- Reloads profile choices from the transaction's detached candidate.
+--- @return boolean applied
+function M.reload_configuration()
+	forget_registry(true)
+	load_user_profiles()
+	for name in pairs(DEFINITIONS) do if not valid(name, M.get(name)) then return false end end
+	return true
+end
+
 return M

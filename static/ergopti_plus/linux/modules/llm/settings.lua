@@ -234,4 +234,30 @@ function M.mark_config_reads(document, mark)
 	for _, path in pairs(FEATURE_PATH) do preferences.mark_config_read(document, path, mark) end
 end
 
+--- Captures the current cache without reading or publishing preferences.
+--- @return table snapshot
+function M.configuration_snapshot()
+	return { values = _values, shipped = _shipped }
+end
+
+--- Restores the exact cache after a refused configuration transaction.
+--- @param snapshot table Owner-issued snapshot.
+--- @return boolean restored
+function M.restore_configuration(snapshot)
+	_values = snapshot.values
+	_shipped = snapshot.shipped
+	return true
+end
+
+--- Resolves the detached configuration through this owner's validation rules.
+--- @return boolean applied
+function M.reload_configuration()
+	_values = {}
+	for name in pairs(FEATURE_PATH) do
+		local value = M.get(name)
+		if not in_bounds(name, value) then return false end
+	end
+	return true
+end
+
 return M

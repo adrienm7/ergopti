@@ -97,4 +97,23 @@ function M.mark_config_reads(document, mark)
 	require("infra.llm_preferences").mark_config_read(document, KEY, mark)
 end
 
+--- Captures the resolved modifier chord without file effects.
+--- @return table snapshot
+function M.configuration_snapshot() return { value = _value, default = _default } end
+
+--- Restores the exact resolved chord after a refused transaction.
+--- @param snapshot table Owner-issued snapshot.
+--- @return boolean restored
+function M.restore_configuration(snapshot)
+	_value, _default = snapshot.value, snapshot.default
+	return true
+end
+
+--- Resolves a detached candidate using the canonical navigation reader.
+--- @return boolean applied
+function M.reload_configuration()
+	_value = nil
+	return normalise(M.get()) ~= nil
+end
+
 return M

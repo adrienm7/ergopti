@@ -8,6 +8,30 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
 local LOG = "infra.llm_preferences"
+local _scope_owner = nil
+local _detached = nil
+
+--- Admits ordinary writes only outside the retained terminal transaction.
+--- @return boolean admitted
+function M.admit() return _scope_owner == nil end
+
+--- Acquires exclusive ownership before cancelling or changing AI runtime.
+--- @param owner table Transaction identity.
+--- @return boolean acquired
+function M.acquire(owner)
+	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
+	_scope_owner = owner
+	return true
+end
+
+--- Releases the exact owner only after all compensation has settled.
+--- @param owner table Transaction identity.
+--- @return boolean released
+function M.release(owner)
+	if _scope_owner ~= owner or owner.pending() then return false end
+	_scope_owner = nil
+	return true
+end
 
 local function entry(path)
 	local definition = type(path) == "string" and Manifest.find_entry_by_path(path) or nil
@@ -47,6 +71,7 @@ local function lookup(document, path)
 end
 
 local function read()
+	if _detached then return _detached.document, _detached.source end
 	local bytes, status, detail = Writer.read_classified(Paths.config("config.toml"))
 	assert(status == "ok" or status == "absent", "AI configuration is unreadable: " .. tostring(detail))
 	local document = Codec.decode(bytes or "")
@@ -101,6 +126,7 @@ end
 --- @param expected_source table|nil Exact snapshot used to build a cached candidate.
 --- @return boolean committed
 function M.set_many(values, expected_source)
+	if not M.admit() then return false end
 	local called, committed, detail = pcall(function()
 		assert(type(values) == "table", "AI preference batch requires a table")
 		assert(expected_source == nil or type(expected_source) == "table", "AI preferences require an exact source snapshot")
@@ -131,6 +157,27 @@ function M.set(path, value) return M.set_many({ [path] = value }) end
 function M.delete(path)
 	entry(path)
 	return M.set(path, Manifest.default_for(path))
+end
+
+--- Validates and temporarily exposes one detached image to existing readers.
+--- The owning transaction publishes the file; this API never writes or survives
+--- the synchronous callback, including when a reader raises.
+--- @param owner table Admission identity.
+--- @param source table Classified source containing candidate bytes.
+--- @param callback function Existing runtime readers.
+--- @return boolean applied
+function M.with_configuration(owner, source, callback)
+	if _scope_owner ~= owner or _detached ~= nil then return false end
+	local document = Codec.decode(source.content or "")
+	assert(type(document) == "table", "AI configuration contains malformed TOML")
+	for _, definition in ipairs(Manifest.features()) do
+		if definition.path:sub(1, 4) == "llm." then validate(definition, lookup(document, definition.path)) end
+	end
+	_detached = { document = document, source = source }
+	local ok, result = pcall(callback)
+	_detached = nil
+	if not ok then error(result, 0) end
+	return result == true
 end
 
 return M
