@@ -22,6 +22,13 @@ return function(helpers)
 			for _, scope in pairs(Manifest.scopes()) do
 				for _, definition in ipairs(scope.dynamic_defaults or {}) do
 					local kind = type(definition.default)
+					if kind == "table" then
+						for index in pairs(definition.default) do
+							helpers.assert_true(type(index) == "number" and index % 1 == 0
+								and index >= 1 and index <= #definition.default, "array defaults must be dense")
+						end
+						kind = "array"
+					end
 					helpers.assert_eq(definition.type, kind == "number" and "integer" or kind)
 					found[definition.type] = true
 				end

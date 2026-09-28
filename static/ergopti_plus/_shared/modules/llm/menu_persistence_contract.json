@@ -275,7 +275,8 @@
 				"flat_key": "llm_debounce",
 				"section": "llm",
 				"path": "trigger",
-				"key": "debounce",
+				"key": "debounce_ms",
+				"disk_sample": 350,
 				"sample": 0.35
 			}
 		},
