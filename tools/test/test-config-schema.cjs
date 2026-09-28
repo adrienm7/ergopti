@@ -234,6 +234,26 @@ function validate(value, sch, p, errors) {
 let totalFail = 0;
 console.log('config schema validation (config_template.toml vs config.schema.json)');
 
+// These are canonical macOS lists. Validate populated values as well as [] so
+// accepting the empty generated default cannot hide an object/list mismatch.
+for (const [section, key, valid, invalid] of [
+	['models', 'user_models', [{ backend: 'ollama', name: 'example' }], [true]],
+	['profiles', 'user_profiles', [{ id: 'custom', name: 'Custom' }], ['wrong-shape']],
+	['trigger', 'disabled_apps', ['com.example.Editor'], [17]],
+	['navigation', 'nav_modifiers', ['ctrl', 'alt'], ['unknown-modifier']],
+]) {
+	const llm = schema.properties.llm.$ref ? resolveRef(schema.properties.llm.$ref) : schema.properties.llm;
+	const leaf = llm.properties[section].properties[key];
+	for (const [value, accepted] of [[[], true], [valid, true], [{}, false], [false, false], [invalid, false]]) {
+		const errors = [];
+		validate(value, leaf, `llm.${section}.${key}`, errors);
+		if ((errors.length === 0) !== accepted) {
+			console.log(`  ✗  canonical array contract llm.${section}.${key}: ${JSON.stringify(value)}`);
+			totalFail++;
+		}
+	}
+}
+
 const unicodeLengthErrors = [];
 validate('🙂', { type: 'string', minLength: 1, maxLength: 1 }, 'unicodeLength', unicodeLengthErrors);
 validate('ab', { type: 'string', maxLength: 1 }, 'multiLength', unicodeLengthErrors);
