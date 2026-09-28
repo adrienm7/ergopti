@@ -311,3 +311,46 @@ _ScopeOwnerPreparationRefusal() {
 	} finally _ScopeOwnerCleanup(Fixture)
 }
 Test("config-scope: native recovery refusal precedes backup and publication", _ScopeOwnerPreparationRefusal)
+
+; A transient hash failure must not become the optional no-precondition sentinel.
+_ScopeExpectedOldHashRefusal(AdditionalFile := false) {
+	Fixture := AdditionalFile ? _HotstringsScopeFixture() : _ScopeOwnerFixture()
+	TargetPath := AdditionalFile ? Fixture.overrides : Fixture.path
+	Original := AdditionalFile ? Fixture.overrideSource : Fixture.source
+	Changed := Original . "# external edit after candidate read`n"
+	Port := ConfigTransitionProductionPort()
+	Rejected := false, Launches := 0, Bundle := 0
+	Hash(Content) {
+		if !Rejected && Content == Original {
+			Rejected := true
+			Assert(FSWriteDurable(TargetPath, Changed))
+			return false
+		}
+		return CryptoSha256(Content)
+	}
+	Launch(_Success, Borrowed, _Refused) {
+		Launches += 1
+		Bundle := Borrowed
+		return true
+	}
+	Port["hash"] := Hash
+	Fixture.options["port"] := Port
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := AdditionalFile ? HotstringsScopeApply("clear", Fixture.options)
+			: ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		Assert(Rejected, "the expected-old hash refusal must actually execute")
+		AssertEqual(0, Launches, "a refused precondition cannot authorize stale publication")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Changed, FSReadUtf8Exact(TargetPath), "the external edit remains authoritative")
+		Assert(!FileExist(Receipt["backup"]), "precondition failure precedes backup effects")
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-hash-precondition: config hash refusal never publishes a stale image", _ScopeExpectedOldHashRefusal)
+Test("scope-hash-precondition: extra file hash refusal never publishes a stale image", _ScopeExpectedOldHashRefusal.Bind(true))
