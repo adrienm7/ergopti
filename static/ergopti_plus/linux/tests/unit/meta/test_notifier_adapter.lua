@@ -63,6 +63,17 @@ end
 -- =================================================================
 
 helpers.describe("notifier: sending", function()
+	helpers.it("reports whether the notification command was admitted", function()
+		with_shell(nil, function(notifier)
+			helpers.assert_eq(notifier.send("bonjour"), true)
+		end)
+		with_shell({ run_fails = true }, function(notifier)
+			helpers.assert_eq(notifier.send("bonjour"), false)
+		end)
+		with_shell({ has_notify_send = false }, function(notifier)
+			helpers.assert_eq(notifier.send("bonjour"), false)
+		end)
+	end)
 
 	helpers.it("issues a notify-send carrying the message", function()
 		with_shell(nil, function(notifier, commands)

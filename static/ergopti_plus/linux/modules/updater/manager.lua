@@ -742,15 +742,22 @@ local function _complete_background_check(ok, available, release)
 	end
 	local notified = {}
 	for field, value in pairs(state) do notified[field] = value end
+	Logger.info(LOG, "New release available: %s.", release.tag)
+	if type(_on_available) ~= "function" then
+		Logger.error(LOG, "Update notification has no registered handler.")
+		return
+	end
+	local ok_notify, accepted = pcall(_on_available, release)
+	if not ok_notify then
+		Logger.error(LOG, "Update-available handler raised: %s.", tostring(accepted))
+		return
+	end
+	if accepted ~= true then
+		Logger.error(LOG, "Update notification was not accepted: %s.", tostring(accepted))
+		return
+	end
 	notified.last_notified_tag = release.tag
 	_save_check_state(notified)
-	Logger.info(LOG, "New release available: %s.", release.tag)
-	if type(_on_available) == "function" then
-		local ok_notify, notify_error = pcall(_on_available, release)
-		if not ok_notify then
-			Logger.error(LOG, "Update-available handler raised: %s.", tostring(notify_error))
-		end
-	end
 end
 
 local _arm_schedule

@@ -918,8 +918,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						and shortcuts_mod.is_paused() == true
 				end,
 				on_available = function(release)
-					AutoCheck.announce(release)
+					local accepted = AutoCheck.announce(release)
 					if type(updateMenu) == "function" then updateMenu() end
+					return accepted
 				end,
 			})
 		end)
