@@ -166,7 +166,9 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    paths of slack).
 //   32/54 (59.3 %) — layer_editor and layout_manager join error_dialog on all
 //                    drivers; measured from the combined staged tree.
-const BASELINE_SHARED = 32;
+//   33/55 (60.0 %) — ui/config_cleanup hosts the common cleanup WebView on all
+//                    three drivers; the shared ratio rises from 59.3 %.
+const BASELINE_SHARED = 33;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -197,7 +199,9 @@ const BASELINE_SHARED = 32;
 //   BASELINE_SHARED above): no driver grew an unshared directory.
 //   52 → 54 — ui/layer_editor and ui/layout_manager add two shared paths after
 //   ui/error_dialog; no new asymmetric directory is introduced.
-const BASELINE_UNION = 54;
+//   54 → 55 — ui/config_cleanup adds one path on all three drivers. This is
+//   symmetric growth, paired with the shared-count increase above.
+const BASELINE_UNION = 55;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
