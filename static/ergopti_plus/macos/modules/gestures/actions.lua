@@ -2009,6 +2009,23 @@ function M.set_action_parameter(binding, action, value)
 	return true
 end
 
+--- Replaces one detached parameter snapshot after complete validation.
+--- Used by scoped preference transactions and their exact compensation owner.
+--- @param parameters table Complete parameter snapshot.
+--- @return boolean committed
+function M.replace_action_parameters(parameters)
+	if not _state or type(parameters) ~= "table" then return false end
+	local staged = {}
+	for key, value in pairs(parameters) do
+		if type(key) ~= "string" or type(value) ~= "string" then return false end
+		local _, action = M.split_action_parameter_key(key)
+		if action and not M.validate_action_parameter(action, value) then return false end
+		staged[key] = value
+	end
+	_state.action_params = staged
+	return true
+end
+
 function M.get_all_action_parameters()
 	local out = {}
 	for key, value in pairs((_state and _state.action_params) or {}) do out[key] = value end
