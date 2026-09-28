@@ -114,11 +114,17 @@ _LCT_NoProxy(Urls) {
 }
 
 _LCT_Served(LayoutText, Etag := '"e1"') {
-	return Map(
+	Served := Map(
 		LayoutRegistry_RawUrl("index.json"), Map("status", 200, "body", _LCT_Read(_LCT_RegistryDir() . "index.json"),
 			"etag", Etag),
 		LayoutRegistry_RawUrl("ergol/ergol.keylayout"), Map("status", 200, "body", LayoutText, "etag", "")
 	)
+	for Item in LayoutCatalogue_Entry(_LCT_Index(), "ergol")["extension"]["files"] {
+		Url := LayoutRegistry_RawUrl(Item["file"])
+		if !Served.Has(Url)
+			Served[Url] := Map("status", 200, "body", _LCT_Read(_LCT_RegistryDir() . StrReplace(Item["file"], "/", "\")), "etag", "")
+	}
+	return Served
 }
 
 _LCT_Tamper(Text, Old, New) {
@@ -268,6 +274,47 @@ _LCT_RefreshCase() {
 Test("layout catalogue: a verified download is installed and read back by the emulation (layout-catalogue)",
 	_LCT_InstallCase)
 
+Test("layout extensions: installed content is published without enable preferences (layout-extension)",
+	_LCT_ExtensionPublishCase)
+
+_LCT_ExtensionPublishCase() {
+	Dir := _LCT_TempDir()
+	try {
+		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())
+		AssertTrue(Result[1])
+		Entry := LayoutCatalogue_ReadInstalled(Dir)["ergol"]
+		AssertTrue(Entry.Has("extension"), "the published record owns the complete extension generation")
+		Extension := Entry["extension"]
+		Root := Dir . "extensions\ergol\" . Extension["sha256"] . "\" . Extension["id"] . "\"
+		for File in Extension["files"] {
+			Path := Root . StrReplace(File["path"], "/", "\")
+			AssertTrue(FileExist(Path), "every advertised extension file is available before publication")
+			AssertEqual(File["sha256"], CryptoSha256(_LCT_Read(Path)))
+		}
+		AssertFalse(FileExist(Dir . "config.toml"), "installing content never enables it")
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout extensions: a corrupt manifest leaves the installed record unchanged (layout-extension)",
+	_LCT_ExtensionRefusalCase)
+
+_LCT_ExtensionRefusalCase() {
+	Dir := _LCT_TempDir()
+	Shipped := _LCT_TempDir()
+	try {
+		AssertTrue(_LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())[1])
+		Before := _LCT_Read(Dir . "installed.json")
+		DirCopy(_LCT_RegistryDir(), Shipped, true)
+		_LCT_WriteRaw(Shipped . "ergol\manifest.toml", "corrupt")
+		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), Shipped)
+		AssertFalse(Result[1], "a layout file alone cannot publish an incomplete extension")
+		AssertEqual(Before, _LCT_Read(Dir . "installed.json"))
+	} finally {
+		DirDelete(Dir, true)
+		DirDelete(Shipped, true)
+	}
+}
+
 _LCT_InstallCase() {
 	Dir := _LCT_TempDir()
 	try {
@@ -275,7 +322,8 @@ _LCT_InstallCase() {
 		Result := _LCT_Install("ergol", Dir, _LCT_Transport(_LCT_Served(_LCT_LayoutText("ergol")), Log))
 		AssertTrue(Result[1], "the installation must succeed: " . (Result[2] is String ? Result[3] : ""))
 		AssertEqual("network", Result[2]["source"])
-		AssertEqual(2, Log.Length, "the index then the layout")
+		AssertEqual(1 + LayoutCatalogue_Entry(_LCT_Index(), "ergol")["extension"]["files"].Length, Log.Length,
+			"the index and complete extension; the verified layout is reused")
 		LocalCopy := LayoutRegistry_ReadLocal("ergol", Dir)
 		AssertEqual(_LCT_LayoutText("ergol"), LocalCopy["Text"])
 		AssertEqual("ansi", LocalCopy["Entry"]["keycode_convention"], "the record keeps what the emulation reads")

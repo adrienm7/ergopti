@@ -118,6 +118,8 @@ LayoutCatalogue_IndexProblem(Index) {
 			Usable := Usable && Entry.Has(Field) && (Entry[Field] is String)
 		if !Usable
 			return "the registry entry of '" . Entry["id"] . "' has no usable file, checksum, size or version"
+		if Entry.Has("extension") && (Problem := LayoutExtension_Problem(Entry)) != ""
+			return Problem
 	}
 	return ""
 }
@@ -317,6 +319,8 @@ _LayoutCatalogueRecordEntry(Entry) {
 	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
 		if Entry.Has(Field) && ((Entry[Field] is String) || (Entry[Field] is Integer))
 			Kept[Field] := Entry[Field]
+	if Entry.Has("extension")
+		Kept["extension"] := JsonParse(_LayoutCatalogueJson(Entry["extension"]))
 	return Kept
 }
 
@@ -579,17 +583,17 @@ _LayoutCatalogueOnInstallIndex(Id, LocalDir, Transport, Bundled, BundledDir, Fin
 			Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, "the shipped copy is damaged: " . Err.Message)
 			return
 		}
-		_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_BUNDLED, Finish)
+		_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_BUNDLED, Finish, Transport, BundledDir)
 		return
 	}
 	Partial := LocalDir . Id . ".keylayout" . LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	Url := LayoutRegistry_RawUrl(Entry["file"])
 	LayoutRegistry_Request(Url, Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
 		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, Transport,
-		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish))
+		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir))
 }
 
-_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Status, Etag, Err) {
+_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir, Status, Etag, Err) {
 	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, LAYOUT_CATALOGUE_SOURCE_NETWORK
 	try {
 		if (Status != 200)
@@ -604,11 +608,29 @@ _LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Status, Etag
 	}
 	if !FSDelete(Partial)
 		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
-	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish)
+	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish, Transport, BundledDir)
 }
 
 ; Publishes a verified layout: the local copy, then the record.
-_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, Source, Finish) {
+_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, Source, Finish, Transport := 0, BundledDir := "") {
+	if !Entry.Has("extension") {
+		_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish)
+		return
+	}
+	LayoutExtension_Acquire(Entry, LocalDir, BundledDir, Transport, Text,
+		_LayoutCatalogueOnExtension.Bind(Id, LocalDir, Entry, Text, Source, Finish))
+}
+
+_LayoutCatalogueOnExtension(Id, LocalDir, Entry, Text, Source, Finish, Ok, Detail := "") {
+	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD
+	if !Ok {
+		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, Detail)
+		return
+	}
+	_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish)
+}
+
+_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish) {
 	global LAYOUT_CATALOGUE_FAILURE_WRITE, LAYOUT_CATALOGUE_FAILURE_RECORD
 	try _LayoutCatalogueWriteText(LocalDir . Id . ".keylayout", Text)
 	catch as Err {

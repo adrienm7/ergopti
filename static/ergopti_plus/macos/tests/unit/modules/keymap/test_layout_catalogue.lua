@@ -214,17 +214,26 @@ helpers.describe("layout catalogue: where a layout's bytes come from", function(
 	--- Runs one acquisition and returns its terminal result.
 	local function acquire(bundled, shipped_text, served)
 		local reads, requests = {}, {}
+		local bodies, digests = {}, {}
+		for _, file in ipairs(entry.extension.files) do
+			bodies[file.file] = read(REGISTRY_DIR .. file.file)
+			digests[bodies[file.file]] = file.sha256
+		end
 		local result = { calls = 0 }
 		Catalogue.acquire(settings(), entry, {
 			bundled_index = bundled,
-			read_bundled = function(rel) reads[#reads + 1] = rel; return shipped_text end,
+			read_bundled = function(rel)
+				reads[#reads + 1] = rel
+				if rel == entry.file then return shipped_text end
+				return shipped_text and bodies[rel] or nil
+			end,
 			transport = {
 				get = function(url, _, _, callback)
 					requests[#requests + 1] = url
 					if served then callback(200, served, nil, {}) else callback(0, "", "offline", nil) end
 				end,
 				sha256 = function(bytes, callback)
-					callback(bytes == text and entry.sha256 or string.rep("0", 64), nil)
+					callback(digests[bytes] or string.rep("0", 64), nil)
 				end,
 			},
 		}, function(ok, detail)
@@ -250,7 +259,7 @@ helpers.describe("layout catalogue: where a layout's bytes come from", function(
 		local result, reads, requests = acquire(other, text, text)
 		helpers.assert_true(result.ok, tostring(result.detail))
 		helpers.assert_eq(result.detail.source, Catalogue.SOURCE_NETWORK)
-		helpers.assert_eq(#reads, 0)
+		helpers.assert_eq(#reads, #entry.extension.files, "the extension verifies each independently versioned bundled file")
 		helpers.assert_eq(#requests, 1)
 
 		result = acquire(other, text, text .. " ")
