@@ -688,3 +688,14 @@ helpers.describe("shortcuts.bindings: exact system-pixel child composition", fun
 		end)
 	end
 end)
+
+helpers.describe("bindings effective URL snapshot", function()
+	helpers.it("reads the exact URL consumed by dispatch and settles its setter", function()
+		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+		helpers.assert_eq(subject.get_chatgpt_url(), subject.DEFAULT_CHATGPT_URL)
+		helpers.assert_eq(subject.set_chatgpt_url("https://example.test/?a=1&b=2"), true)
+		helpers.assert_eq(subject.get_chatgpt_url(), "https://example.test/?a=1&b=2")
+		helpers.assert_eq(subject.set_chatgpt_url(nil), true)
+		helpers.assert_eq(subject.get_chatgpt_url(), subject.DEFAULT_CHATGPT_URL)
+	end)
+end)

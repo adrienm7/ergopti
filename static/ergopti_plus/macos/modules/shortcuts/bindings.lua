@@ -1163,6 +1163,13 @@ end
 function M.set_chatgpt_url(url)
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
 	Logger.debug(LOG, "chatgpt_url updated: %s.", tostring(_chatgpt_url))
+	return true
+end
+
+--- Reads the effective URL used by dispatch for exact runtime compensation.
+--- @return string url
+function M.get_chatgpt_url()
+	return _chatgpt_url or M.DEFAULT_CHATGPT_URL
 end
 
 --- Returns a sorted array of all registered shortcuts with their current status.
