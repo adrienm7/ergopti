@@ -736,6 +736,68 @@ function M.prepare_gesture_updates(source, updates)
 	return rows
 end
 
+--- Rewrites only declared LLM leaves inside existing inline preference tables.
+--- The scanner owns TOML syntax; this owner clones parsed values and preserves
+--- neighboring fields before handing one complete inline value to the writer.
+--- @param source table Exact classified source snapshot.
+--- @param updates table Manifest-owned leaf operations.
+--- @return table rows Addressable operations with inline tables retained.
+function M.prepare_llm_updates(source, updates)
+	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
+	assert(scanned, detail)
+	local decoded = TomlCodec.decode(source.content or "")
+	local inline, candidates, rows = {}, {}, {}
+	local function parts(path)
+		local result = {}
+		for key in path:gmatch("[^.]+") do result[#result + 1] = key end
+		return result
+	end
+	for _, record in ipairs(scanned.records) do
+		if record.addressable then
+			local path = record.section == "" and record.key or record.section .. "." .. record.key
+			if path == "llm" or path:sub(1, 4) == "llm." then
+				local value = decoded
+				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
+				if type(value) == "table" then inline[path] = { record = record, value = value } end
+			end
+		end
+	end
+	for _, row in ipairs(updates) do
+		local path = row.section .. "." .. row.key
+		local parent = row.section
+		while parent ~= "" and not inline[parent] do parent = parent:match("^(.*)%.[^.]+$") or "" end
+		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
+			-- An empty runtime dictionary owns no unknown profile leaves on disk.
+		elseif inline[parent] then
+			local candidate = candidates[parent] or clone_value(inline[parent].value)
+			candidates[parent] = candidate
+			local keys, target = parts(path:sub(#parent + 2)), candidate
+			local missing, ancestry = false, {}
+			for index = 1, #keys - 1 do
+				local child = target[keys[index]]
+				assert(child == nil or type(child) == "table", "LLM inline ownership crosses a scalar")
+				if child == nil and row.delete then missing = true; break end
+				if child == nil then child = {}; target[keys[index]] = child end
+				ancestry[#ancestry + 1] = { parent = target, key = keys[index] }
+				target = child
+			end
+			if not missing then
+				if row.delete then target[keys[#keys]] = nil else target[keys[#keys]] = clone_value(row.value) end
+				for index = #ancestry, 1, -1 do
+					local node = ancestry[index]
+					if next(node.parent[node.key]) == nil then node.parent[node.key] = nil else break end
+				end
+			end
+		else rows[#rows + 1] = row end
+	end
+	for path, candidate in pairs(candidates) do
+		local record = inline[path].record
+		rows[#rows + 1] = next(candidate) == nil and { section = record.section, key = record.key, delete = true }
+			or { section = record.section, key = record.key, value = candidate }
+	end
+	return rows
+end
+
 --- Captures the complete flat preference snapshot represented by memory and
 --- runtime-owned registries. This is the exact payload save() serializes and the
 --- rollback owner later re-applies when publication fails.
@@ -855,7 +917,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	end
 
 	local ok, updates = pcall(function()
-		return M.prepare_gesture_updates(expected_source, sparse_updates(existing))
+		return M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing)))
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next

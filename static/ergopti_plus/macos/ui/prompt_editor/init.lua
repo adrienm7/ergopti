@@ -358,6 +358,9 @@ end
 
 --- Closes and destroys the Prompt Editor window.
 --- @return boolean committed
+--- @return boolean idle No prompt editor or retained window owns a draft.
+function M.scope_idle() return _active_window == nil and _active_context == nil end
+
 function M.close()
 	if not _active_window then return true end
 	return close_window(_active_window)

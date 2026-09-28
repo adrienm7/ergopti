@@ -648,11 +648,14 @@ M.remove_custom_terminator = preview_fenced_registry_mutation(Registry.remove_cu
 -- ── LLM bridge proxies ───────────────────────────────────────────────────────
 
 M.set_llm_model              = LLMBridge.set_llm_model
+M.set_llm_configuration_model = LLMBridge.set_llm_configuration_model
 M.set_llm_display_model_name = LLMBridge.set_llm_display_model_name
 M.set_llm_context_length     = LLMBridge.set_llm_context_length
 M.set_llm_reset_on_nav       = LLMBridge.set_llm_reset_on_nav
 M.set_llm_temperature        = LLMBridge.set_llm_temperature
 M.set_llm_max_words          = LLMBridge.set_llm_max_words
+M.set_llm_min_words          = LLMBridge.set_llm_min_words
+M.set_llm_backend_name       = LLMBridge.set_llm_backend_name
 M.set_llm_num_predictions    = LLMBridge.set_llm_num_predictions
 M.set_llm_show_info_bar      = LLMBridge.set_llm_show_info_bar
 M.set_llm_pred_indent        = LLMBridge.set_llm_pred_indent

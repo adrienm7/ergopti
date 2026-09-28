@@ -501,6 +501,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local transactional_save_prefs = nil
 	local preference_checkpoint = nil
 	local llm_handler = nil
+	local apply_preference_scope
 	-- Features whose runtime refused the saved value this session: their state
 	-- shows the real posture while saves keep the value config.toml holds.
 	local session_demotions = SessionDemotions.new()
@@ -950,6 +951,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then
 		local ok_h, res = pcall(menu_mods.llm.create, {
+			apply_preference_scope = function(scope, mode)
+				return type(apply_preference_scope) == "function" and apply_preference_scope(scope, mode) == true
+			end,
 			state          = state,
 			active_tasks   = M._active_tasks,
 			update_icon    = update_icon,
@@ -1271,7 +1275,36 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 	local metrics_scope = nil
 	local layout_scope = nil
-	local function apply_preference_scope(scope, mode)
+	local llm_scope = nil
+	apply_preference_scope = function(scope, mode)
+		if scope == "llm" then
+			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return false end
+			if not llm_scope then
+				llm_scope = require("ui.menu.llm_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, runtime = llm_handler.scope_runtime, profiles = llm_handler.scope_profiles,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod) ~= "table" or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".llm-" .. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.llm.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			local committed = llm_scope.apply(mode)
+			if committed == true then Builder.invalidate_cache(); updateMenu() end
+			return committed
+		end
 		if scope == "metrics" then
 			if read_only_reason ~= nil then return false end
 			if not metrics_scope then

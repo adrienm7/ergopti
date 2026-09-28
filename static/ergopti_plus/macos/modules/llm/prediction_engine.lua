@@ -708,6 +708,18 @@ end
 --- @return boolean
 function M.get_llm_enabled() return is_llm_enabled end
 
+--- Updates the dormant engine identity after its core owner was configured.
+--- This avoids dispatching a remote model identity to a local backend setter.
+--- @param model_name string Active engine model identifier.
+--- @return boolean settled No request or warmup is acquired.
+function M.set_llm_configuration_model(model_name)
+	if is_llm_enabled ~= false or type(model_name) ~= "string" then return false end
+	if M.reset() ~= true then return false end
+	active_model = model_name
+	_model_transition_generation = _model_transition_generation + 1
+	return true
+end
+
 function M.set_llm_model(model_name)
 	_model_transition_generation = _model_transition_generation + 1
 	local my_transition_generation = _model_transition_generation
@@ -867,6 +879,9 @@ end
 --- @return boolean found True when this engine owns the requested runtime value.
 --- @return any value Current runtime value.
 function M.get_llm_runtime_setting(key)
+	if key == "llm_model" then return true, active_model end
+	if key == "llm_display_model_name" then return true, llm_display_name end
+	if key == "llm_backend_name" then return true, llm_backend_label end
 	if key == "llm_debounce" then return true, inactivity_debounce_sec end
 	if key == "llm_max_words" then return true, max_words end
 	if key == "llm_min_words" then return true, min_words end

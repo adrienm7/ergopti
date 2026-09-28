@@ -266,6 +266,21 @@ end
 ---   reset_llm_health_status.
 --- @return string title   Title string for the backend parent menu row.
 --- @return table  menu    Populated backend_menu table.
+--- @return boolean idle No backend publication or retained stop remains.
+--- Resolves the existing backend info-bar label for configuration publication.
+--- @param backend string Backend identifier.
+--- @return string|nil label Existing presentation label.
+function M.runtime_label(backend)
+	if backend == "mlx" then return "MLX 🚀" end
+	if backend == "ollama" then return "Ollama 🦙" end
+	if backend == "api" then return "API 🌐" end
+	return nil
+end
+
+function M.scope_idle()
+	return _backend_boundary_depth == 0 and _backend_recovery_debt == nil
+end
+
 function M.build(ctx)
 	local state                 = ctx.state
 	local keymap                = ctx.keymap
@@ -296,12 +311,7 @@ function M.build(ctx)
 		return owns_backend_attempt(token) and owns_backend_debt(debt)
 	end
 
-	local function backend_runtime_label(backend)
-		if backend == "mlx" then return "MLX 🚀" end
-		if backend == "ollama" then return "Ollama 🦙" end
-		if backend == "api" then return "API 🌐" end
-		return nil
-	end
+	local backend_runtime_label = M.runtime_label
 
 	local function publish_backend_label(debt, target_backend)
 		local target_label = backend_runtime_label(target_backend)

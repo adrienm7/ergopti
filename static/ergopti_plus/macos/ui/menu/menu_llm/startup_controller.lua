@@ -1149,7 +1149,14 @@ function M.new(ctx)
 		end
 	end
 
-	return check_startup
+	local function scope_idle()
+		return not _startup_cycle_active and not _startup_requested and not _startup_abort_pending
+			and _startup_settlement_finalize == nil and _startup_callback_depth == 0
+			and not _startup_sync_in_progress and not _reattach_active
+			and not _reattach_dispatch_in_progress and not _reattach_callback_in_progress
+			and _startup_prediction_lock == nil and next(_timer_slots) == nil
+	end
+	return check_startup, scope_idle
 end
 
 return M
