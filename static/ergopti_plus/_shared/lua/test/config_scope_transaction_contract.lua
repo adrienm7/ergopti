@@ -167,8 +167,8 @@ return function(helpers)
 		end)
 	end)
 
-	helpers.describe("quoted dynamic scope refusal", function()
-		helpers.it("preserves the source and runtime when the writer cannot address a quoted extension header", function()
+	helpers.describe("quoted dynamic scope publication", function()
+		helpers.it("clears a quoted extension leaf with exact backup and neighbor preservation", function()
 			local options, files, writes, runtime = fixture()
 			local original = '[hotstrings.modules."ext:ergopti:rolls"]\ncustom = true\nunowned = false\n'
 			files.config = original
@@ -178,12 +178,13 @@ return function(helpers)
 				end })
 			end
 			local ok, detail = require("config_scope_transaction").new(options).apply("hotstrings", "clear")
-			helpers.assert_eq(ok, false)
-			helpers.assert_true(detail:find("quoted", 1, true) ~= nil, detail)
-			helpers.assert_eq(files.config, original)
-			helpers.assert_eq(files.backup, nil)
-			helpers.assert_eq(#writes, 0)
-			helpers.assert_eq(runtime.marker, "original")
+			helpers.assert_eq(ok, true, detail)
+			local group = Codec.decode(files.config).hotstrings.modules["ext:ergopti:rolls"]
+			helpers.assert_eq(group.custom, nil)
+			helpers.assert_eq(group.unowned, false)
+			helpers.assert_eq(files.backup, original)
+			helpers.assert_eq(#writes, 2)
+			helpers.assert_eq(runtime.marker, nil)
 		end)
 	end)
 

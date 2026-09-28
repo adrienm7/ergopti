@@ -41,6 +41,7 @@ local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
+local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 
 
@@ -466,7 +467,8 @@ end
 --- Prepares updates to a simple INI-style TOML file without publishing it
 --- (the driver config.toml used by config_overrides and the onboarding wizard).
 --- Each entry in `updates` is a table `{section, key, value}` where:
----   - `section` is the TOML section header without brackets, e.g. `"Script"`.
+---   - `section` is a table path without brackets; owner-provided colon segments
+---     are literal identities and are quoted when rendered, e.g. `ext:pack:group`.
 ---   - `key`     is the bare key name, e.g. `"Locale"`.
 ---   - `value`   is a Lua string, boolean, or number — serialised to TOML.
 ---   - `delete = true` removes the complete assignment instead of setting it.
@@ -538,9 +540,18 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		if not u.delete and not valid_value(u.value, {}) then
 			return reject_row(index, "value must contain only TOML scalars, dense arrays, or dictionaries")
 		end
-		if defaults and not u.delete and defaults.has_default(u.section .. "." .. u.key) then
-			u = defaults.sparse_operation(u.section .. "." .. u.key, u.value)
+		local segments = KeyPath.parse(u.section, true)
+		if not segments then return reject_row(index, "section is not a valid table path") end
+		-- Manifest paths use semantic dots; a quoted literal dot must never inherit
+		-- the neutral value of a different, nested configuration key.
+		local manifest_path = table.concat(segments, ".") .. "." .. u.key
+		for _, segment in ipairs(segments) do
+			if segment:find(".", 1, true) then manifest_path = nil; break end
 		end
+		if defaults and manifest_path and not u.delete and defaults.has_default(manifest_path) then
+			u = defaults.sparse_operation(manifest_path, u.value)
+		end
+		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete }
 		normalized[#normalized + 1] = u
 
 		local sl = u.section:lower()
@@ -574,7 +585,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 	if read_status == "absent" then
 		source = ""
 		local seeds = {}
-		for _, row in ipairs(_create_rows[refusal_key(path)] or {}) do
+		for _, seed in ipairs(_create_rows[refusal_key(path)] or {}) do
+			local segments = KeyPath.parse(seed.section, true)
+			if not segments then return false, "invalid creation seed section" end
+			local row = { section = KeyPath.render(segments), segments = segments, key = seed.key, value = seed.value }
 			local sl, kl = row.section:lower(), row.key:lower()
 			if not (lookup[sl] and lookup[sl][kl]) then
 				if not lookup[sl] then lookup[sl] = {} end
@@ -587,14 +601,34 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 			updates = seeds
 		end
 	end
-	local scanned, scan_error = RecordScanner.scan_records(source)
+	local scanned, scan_error = RecordScanner.scan_records(source, { quoted_headers = true })
 	if not scanned then return false, scan_error end
+	-- A case-insensitive batch cannot choose between two distinct source tables.
+	-- Arrays of tables additionally need an element owner that this API lacks.
+	local seen_headers = {}
+	for _, header in ipairs(scanned.headers) do
+		if header.segments then
+			local identity = header.section:lower()
+			if lookup[identity] and seen_headers[identity] then return false, "ambiguous batch table identity" end
+			seen_headers[identity] = true
+			if header.array then
+				for _, row in ipairs(updates) do
+					local inside = #row.segments >= #header.segments
+					for index, segment in ipairs(header.segments) do
+						if not row.segments[index] or row.segments[index]:lower() ~= segment:lower() then inside = false end
+					end
+					if inside then return false, "the batch cannot address an array-of-table element" end
+				end
+			end
+		end
+	end
 	local applied, replacements, removed = {}, {}, {}
 	for _, record in ipairs(scanned.records) do
 		if record.addressable then
 			local sl, kl = record.section:lower(), record.key:lower()
 			local u = lookup[sl] and lookup[sl][kl]
 			if u then
+				if applied[sl .. "\0" .. kl] then return false, "ambiguous batch key identity" end
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
@@ -613,7 +647,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		local kl = u.key:lower()
 		if not applied[sl .. "\0" .. kl] then
 			local node = decoded
-			for segment in u.section:gmatch("[^%.]+") do
+			for _, segment in ipairs(u.segments) do
 				node = type(node) == "table" and node[segment] or nil
 			end
 			if type(node) == "table" and node[u.key] ~= nil then
