@@ -11,6 +11,8 @@ local helpers = require("tests.helpers")
 -- The real shared updater defaults: release sources are part of the contract.
 local FIXTURE_DIR = (debug.getinfo(1, "S").source:gsub("^@", ""):match("^(.*)[/\\]") or ".")
 local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaults.json"
+-- The real update-channel registry: the channel ids the window accepts.
+local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
 
 local function with_changelog(callback)
 	local previous_hs = rawget(_G, "hs")
@@ -105,6 +107,7 @@ local function with_changelog(callback)
 			package.loaded["infra.paths"] = {
 				shared = function(relative)
 					if relative == "modules/updater/defaults.json" then return SHARED_DEFAULTS end
+					if relative == "modules/updater/channels.json" then return SHARED_CHANNELS end
 					return "/shared/" .. tostring(relative)
 				end,
 			}

@@ -575,22 +575,16 @@ end
 -- ==========================================
 -- ==========================================
 
---- Trims leading and trailing whitespace from a string.
---- @param s string The input string.
---- @return string The trimmed string.
-local function trim(s)
-	if type(s) ~= "string" then return "" end
-	return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
+-- The shared Unicode case module, required on the first case action rather than
+-- at load: its generated table is about 150 KB, and most sessions never
+-- transform a selection. string.upper/string.lower work on bytes and left é, à
+-- and ç unchanged, so they are not an alternative.
+local _text_case = nil
 
---- Converts a string to Title Case.
---- @param s string The input string.
---- @return string The Title Case string.
-local function titlecase(s)
-	if type(s) ~= "string" then return "" end
-	return (s:lower():gsub("(%S+)", function(w)
-		return w:sub(1, 1):upper() .. w:sub(2)
-	end))
+--- @return table The shared unicode_case module.
+local function text_case()
+	if _text_case == nil then _text_case = require("unicode_case") end
+	return _text_case
 end
 
 --- Asynchronous text-transform engine.
@@ -1498,20 +1492,54 @@ function M.surround_with_parens(parent)
 end
 
 --- Toggles the current selection between Title Case and lowercase.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
 function M.toggle_titlecase(parent)
-	return do_transform(function(sel)
-		local t = titlecase(sel)
-		-- If already title-cased, drop to lowercase; otherwise apply title case
-		return (sel == t) and sel:lower() or t
-	end, parent)
+	return do_transform(function(sel) return text_case().toggle_title(sel) end, parent)
 end
 
 --- Toggles the current selection between UPPERCASE and lowercase.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
 function M.toggle_uppercase(parent)
-	return do_transform(function(sel)
-		-- Promote if any lowercase exists; demote otherwise
-		return sel:match("%l") and sel:upper() or sel:lower()
-	end, parent)
+	return do_transform(function(sel) return text_case().toggle_upper(sel) end, parent)
+end
+
+--- Converts the current selection to UPPERCASE, whatever its current case.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.selection_uppercase(parent)
+	return do_transform(function(sel) return text_case().upper(sel) end, parent)
+end
+
+--- Converts the current selection to lowercase, whatever its current case.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.selection_lowercase(parent)
+	return do_transform(function(sel) return text_case().lower(sel) end, parent)
+end
+
+--- Converts the current selection to Title Case, whatever its current case.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.selection_titlecase(parent)
+	return do_transform(function(sel) return text_case().title(sel) end, parent)
+end
+
+--- Wraps the current selection with `left` and `right` (the wrap_selection
+--- action). The selection is copied rather than read through Accessibility, so
+--- Electron apps, which expose no AXSelectedText, are wrapped too; nothing is
+--- typed when nothing is selected.
+--- @param left string Opening text.
+--- @param right string Closing text.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.wrap_copied_selection(left, right, parent)
+	if type(left) ~= "string" or left == "" or type(right) ~= "string" or right == "" then
+		Logger.error(LOG, "Selection wrap refused: invalid delimiters.")
+		return false
+	end
+	return do_transform(function(sel) return left .. sel .. right end, parent)
 end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).
@@ -1552,6 +1580,21 @@ M.WRAP_PAIRS = WRAP_PAIRS
 --- named nested sub-submenu. Exposed so the menu mirrors the shared grouping and
 --- labels without duplicating the order or the catalogue.
 M.WRAP_GROUPS = WRAP_GROUPS
+
+--- The built-in pairs in catalogue order, the list the wrap_selection parameter
+--- is resolved against (_shared/lua/wrap_pair).
+--- @return table Array of { left, right }.
+function M.wrap_pair_list()
+	local list = {}
+	for _, group in ipairs(WRAP_GROUPS) do
+		for _, pair in ipairs(group.pairs or {}) do
+			if type(pair) == "table" and type(pair.left) == "string" and type(pair.right) == "string" then
+				list[#list + 1] = { left = pair.left, right = pair.right }
+			end
+		end
+	end
+	return list
+end
 
 --- Builds the active wrapping-pairs table from the built-in catalogue and user state.
 --- @param symbol_states table Map of symbol key → boolean (true = enabled).

@@ -1,12 +1,13 @@
 --- _shared/lua/unicode_case/data.lua
 --- AUTO-GENERATED from Unicode default case conversion in Node 22.
---- DO NOT EDIT BY HAND — run `npm run codegen:unicode-case:linux` to refresh.
+--- DO NOT EDIT BY HAND — run `npm run codegen:unicode-case` to refresh.
 
 --- ==============================================================================
---- MODULE: Unicode Case Data (shared)
+--- MODULE: Unicode Case Data
 --- DESCRIPTION:
 --- Complete Unicode 17.0 default case mappings consumed by
---- unicode_case/init.lua. Multi-codepoint mappings are retained verbatim.
+--- unicode_case/init.lua on macOS and Linux. Multi-codepoint mappings are retained
+--- verbatim. word_separator (whitespace and dashes) starts a title-case word.
 --- ==============================================================================
 
 return {
@@ -5516,6 +5517,60 @@ return {
 		["𞗿"] = true,
 		["𞥞"] = true,
 		["𞥟"] = true,
+	},
+	word_separator = {
+		["\009"] = true,
+		["\010"] = true,
+		["\011"] = true,
+		["\012"] = true,
+		["\013"] = true,
+		[" "] = true,
+		["-"] = true,
+		[""] = true,
+		[" "] = true,
+		["֊"] = true,
+		["־"] = true,
+		["᐀"] = true,
+		[" "] = true,
+		["᠆"] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		["‐"] = true,
+		["‑"] = true,
+		["‒"] = true,
+		["–"] = true,
+		["—"] = true,
+		["―"] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		[" "] = true,
+		["⸗"] = true,
+		["⸚"] = true,
+		["⸺"] = true,
+		["⸻"] = true,
+		["⹀"] = true,
+		["⹝"] = true,
+		["　"] = true,
+		["〜"] = true,
+		["〰"] = true,
+		["゠"] = true,
+		["︱"] = true,
+		["︲"] = true,
+		["﹘"] = true,
+		["﹣"] = true,
+		["－"] = true,
+		["𐵮"] = true,
+		["𐺭"] = true,
 	},
 	case_ignorable = {
 		["'"] = true,

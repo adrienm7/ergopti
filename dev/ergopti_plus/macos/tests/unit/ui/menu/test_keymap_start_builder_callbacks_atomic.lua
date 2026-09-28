@@ -125,9 +125,12 @@ local function custom_fixture(outcome, action_kind)
 	helpers.assert_type(built, "table", "the real custom builder must return a provider row")
 	local action
 	if action_kind == "top" then
-		action = built.action
+		-- The personal switch is the submenu's first row: the parent opens the
+		-- submenu, and a row that does so is never clicked.
+		helpers.assert_nil(built.action, "the personal parent row must carry no action")
+		action = built.items and built.items[1] and built.items[1].action
 	elseif action_kind == "bulk" then
-		action = find_action(built.items, "menu.hotstrings.enable_all")
+		action = find_action(built.items, "menu.hotstrings.enable_all_sections")
 	else
 		action = find_action(built.items, "TARGET_CUSTOM_SECTION")
 	end

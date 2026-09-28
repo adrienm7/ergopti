@@ -623,6 +623,40 @@ ring_buffer_size = 200
 # same duration expressed in seconds — the gate converts and compares).
 dedup_window_ms = 5000
 
+# How long a repeat streak stays open once a driver arms repeat collapsing
+# (logger SPEC § 4.2): later occurrences of a line are counted, not written,
+# and one summary is written when this window has elapsed.
+# AHK: logger.ahk LOGGER_REPEAT_WINDOW_MS. Shared core (macOS, Linux):
+# _shared/lua/logger/init.lua REPEAT_WINDOW_SEC, in seconds.
+repeat_window_ms = 600000
+
+# Repeat streaks tracked at once; the least recently used one is summarised and
+# evicted to make room for a new one.
+# AHK: logger.ahk LOGGER_REPEAT_CAPACITY. Shared core: REPEAT_CAPACITY.
+repeat_streak_capacity = 64
+
 # Interval at which the queued-write drain appends pending lines in one call.
 # AHK: logger.ahk LOGGER_FLUSH_INTERVAL_MS.
 flush_interval_ms = 500
+
+# macOS native transport only: the Windows and Linux sinks write synchronously,
+# so nothing there waits for an acknowledgement.
+# Wait before the first resend of an unacknowledged batch; each later resend
+# doubles the wait, up to ack_retry_cap_ms.
+# HS: adapters/log_transport.lua ACK_RETRY_SEC (seconds).
+ack_retry_ms = 500
+
+# Longest wait between two resends of the same batch.
+# HS: adapters/log_transport.lua ACK_RETRY_CAP_SEC (seconds).
+ack_retry_cap_ms = 4000
+
+# How long the native worker may leave one batch unacknowledged before the
+# transport is declared failed and the driver exits. A slow disk, a sync tool
+# or App Nap can stall it for seconds; that is not a failure.
+# HS: adapters/log_transport.lua STALL_FATAL_SEC (seconds).
+stall_fatal_ms = 30000
+
+# A native worker datagram or retention pass slower than this is reported to
+# launcher.log with the time spent opening files, waiting for locks and writing.
+# Swift: LoggerDatagramWorker.swift kLoggerSlowBatchThresholdMilliseconds.
+native_slow_batch_ms = 500

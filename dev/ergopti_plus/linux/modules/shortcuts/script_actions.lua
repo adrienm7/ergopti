@@ -13,8 +13,8 @@ local REQUIRED_CALLBACKS = { "reset", "reload", "quit" }
 local SCRIPT_ACTION_PREFIX = "script_"
 
 --- Whether an action id is a script-control action (pause, reload, quit…).
---- These stay live while the script is paused and after « Disable all »: they
---- are how a user gets the script back.
+--- These stay live while the script is paused and while the shortcuts are
+--- switched off: they are how a user gets the script back.
 --- @param action_name any
 --- @return boolean
 function M.is_script_action(action_name)

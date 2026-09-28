@@ -373,8 +373,8 @@ helpers.describe("HS-016 callback owners: every hand-off is visible and truthful
 				forbidden = { "_extras[name]", "GestActions.execute_single", "_on_pause_change", "kl.log_shortcut" },
 			},
 			{
-				symbol = "local _settings_prefix =", label = "configurable-hotkey callback",
-				forbidden = { "GestActions.execute_single" },
+				symbol = 'local BINDING_PREFIX = "keyboard__"', label = "configurable-hotkey callback",
+				forbidden = { "GestActions.execute_single", "action_catalogue().execute_single" },
 			},
 			{
 				symbol = "function M.bind_cmd_star", label = "Cmd-star telemetry callback",

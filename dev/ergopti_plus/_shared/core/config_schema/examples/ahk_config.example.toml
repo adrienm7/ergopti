@@ -491,7 +491,6 @@ ctrl_j = false
 open_downloads = true
 move = true
 screen = true
-screen_instant = true
 win_caps_lock = true
 
 
@@ -612,6 +611,24 @@ script_altgr_backspace = "script_reload"
 script_altgr_delete = "open_personal_shortcuts"
 script_altgr_enter = "script_pause_toggle"
 script_altgr_escape = "script_quit"
+
+
+
+# ====================================
+# ===== 6.7.1 shortcuts.tap_keys =====
+# ====================================
+
+# The number-row keys tapped alone: any action id, or "none" to keep the key's
+# own character. A parameterized action keeps its value in [action_parameters]
+# under "tap_key__<key>__<action>".
+[shortcuts.tap_keys]
+number_row_left = "screen_capture"
+number_row_right_1 = "send_text"
+number_row_right_2 = "send_shortcut"
+
+[action_parameters]
+tap_key__number_row_right_1__send_text = "bonjour cela va bien?"
+tap_key__number_row_right_2__send_shortcut = "primary+a"
 
 
 

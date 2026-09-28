@@ -100,7 +100,7 @@ _LTLG_CheckSaveConfigGated() {
 
 	; Reconciliation must be loaded-gated and operate on a detached snapshot.
 	GatePos   := InStr(Body, "MenuReady := HasMenuCandidate")
-	ClonePos  := InStr(Body, "FeatureSnapshot := _HSDeepCloneMap(FeatureState)")
+	ClonePos  := InStr(Body, "FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))")
 	SyncPos   := InStr(Body,
 		"_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)")
 	Assert(ClonePos > 0, "the full-save collector must clone Features before LLM reconciliation")

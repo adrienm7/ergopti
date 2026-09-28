@@ -9,9 +9,11 @@
 ---
 --- WHAT IS THIS MODULE'S, AND WHAT IS THE SHARED CORE'S.
 --- _shared/lua/logger owns the canonical line format, the eight variants, the
---- 200-entry ring and the five-second dedup window — items 4, 5 and 8 below. This
---- file owns the production in-memory handoff, topical routing policy, deferred
---- console/notification delivery, and the synchronous early-boot/test fallback.
+--- 200-entry ring, the five-second dedup window and repeat collapsing — items 4,
+--- 5 and 8 below. This file owns the production in-memory handoff, topical
+--- routing policy, deferred console/notification delivery, the synchronous
+--- early-boot/test fallback, and the periodic tick that flushes due repeat
+--- summaries once boot arms collapsing.
 --- The native launcher worker owns production file persistence, daily rotation,
 --- retention purge and errors/topical fan-out. The split is not cosmetic: the
 --- core's half is replayed against a cross-driver corpus so all three drivers are
@@ -31,9 +33,12 @@
 ---    Seeing a START without a following SUCCESS points to a silent failure.
 --- 5. Deduplication: consecutive identical lines are suppressed automatically;
 ---    a count summary is printed when the run breaks, using the same color/level.
+---    Once armed, repeat collapsing also folds a line that recurs with other
+---    lines in between into its first occurrence plus one timed summary.
 --- 6. Unified rotating file sink: the acknowledged native worker writes one file
----    per calendar day under <config>/logs/,
----    named ErgoptiPlus_YYYY-MM-DD.log (mirrors the AHK driver naming convention).
+---    per calendar day in the logs folder (LogsDirPath in paths.toml, or
+---    ~/Library/Logs/ergopti_plus/), named ErgoptiPlus_YYYY-MM-DD.log. This
+---    module is the one resolver of that folder and of today's file names.
 ---    Files older than max_age_days are purged automatically on init and after
 ---    the first successful write of each new calendar day.
 --- 7. Topical sub-files: lines are fan-out to per-subsystem logs (llm, karabiner…)
@@ -52,27 +57,38 @@ local M = {}
 local _ok_socket, _socket = pcall(require, "socket")
 local _gettime = (_ok_socket and _socket and _socket.gettime) or os.time
 
+-- Application folder name, default logs folder and log file-name prefixes,
+-- generated from _shared/modules/paths/app_dirs.toml. This module is the one
+-- resolver built on them: every consumer asks logs_dir(), today_log_path(),
+-- today_errors_path() or crash_reports_dir() rather than spelling a name.
+local AppDirs = require("app_dirs")
+local LogFolders = require("infra.log_folders")
+local LOG_FILES = AppDirs.files
+
 -- Early-boot fallback folder, used until M.init_log_path() re-points the sink.
--- It exists whatever the user configured, so fatal reports that must survive an
--- unusable configured folder are also written here.
-M.FALLBACK_LOG_DIR = "/tmp/"
+-- It is the default logs folder, which the launcher creates (it writes
+-- launcher.log there) before it starts Hammerspoon, so fatal reports that must
+-- survive an unusable configured folder land beside launcher.log. It is never
+-- the shared /tmp root, which every account on the Mac can read. Without a
+-- home folder there is no user-private location to prefer.
+M.FALLBACK_LOG_DIR = LogFolders.default_logs_dir(os.getenv(AppDirs.macos.base_env))
+	or LogFolders.homeless_logs_dir()
 
 -- The fallback boot log users are directed to when startup fails. The [init]
 -- topical fan-out writes the same file name, so every boot-stage line of an
 -- early run is already there.
-M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. "ErgoptiPlus_boot.log"
+M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. LOG_FILES.topical_prefix .. "boot" .. LOG_FILES.extension
 
--- Main unified log file. Set to a safe early-boot fallback; overridden by
--- M.init_log_path() once the user config directory is known.
-M.UNIFIED_LOG_FILE = M.FALLBACK_BOOT_LOG_FILE
-
--- Dedicated errors-only log (WARNING + ERROR levels). Daily file under the
--- driver logs directory. Purpose: quick triage of problems without the volume
--- of the full unified daily log.
-M.ERRORS_LOG_FILE = M.FALLBACK_LOG_DIR .. "ErgoptiPlus_errors_boot.log"
-
--- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
+-- Log directory resolved after M.init_log_path(); used by sub-file fan-out and
+-- by every public resolver below.
 local _log_dir = M.FALLBACK_LOG_DIR
+
+-- Today's unified and errors-only files as last opened by the synchronous
+-- early-boot sink. Private on purpose: they used to be public fields, fixed when
+-- the folder was chosen, and every consumer that read them after midnight
+-- opened yesterday's file once the native worker owned the rollover.
+local _unified_path = nil
+local _errors_path = nil
 
 -- Delay (seconds) after which the daily old-log purge runs. The purge is pure
 -- housekeeping (deleting stale files) and nothing downstream waits on it, so it
@@ -90,6 +106,22 @@ local SECONDS_PER_DAY = 86400
 -- Anchoring at noon keeps the age comparison DST-safe: a ±1 h shift can never
 -- push a file across a day boundary the way a midnight anchor would.
 local PURGE_NOON_HOUR = 12
+
+--- Escapes Lua pattern magic characters so a generated name matches literally.
+--- @param text string
+--- @return string
+local function _literal_pattern(text)
+	return (text:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"))
+end
+
+-- Dated-file matchers of the retention purge, capturing year, month and day.
+-- The errors file needs its OWN pattern: the unified one anchors the date
+-- right after its prefix, so it can never match the "errors_" infix.
+local DATE_CAPTURE = "(%d%d%d%d)%-(%d%d)%-(%d%d)"
+local UNIFIED_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.unified_prefix) .. DATE_CAPTURE
+	.. _literal_pattern(LOG_FILES.extension) .. "$"
+local ERRORS_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.errors_prefix) .. DATE_CAPTURE
+	.. _literal_pattern(LOG_FILES.extension) .. "$"
 
 -- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
 -- fan-out here in addition to the main unified file. Sub-files are ephemeral
@@ -216,7 +248,8 @@ end
 M.current_level = M.LEVELS.WARNING
 
 -- Optional hook set by the bootstrapper after all modules are loaded.
--- Called with (module_name, formatted_message) on every Logger.error call.
+-- Called with (module_name, formatted_message, template) on every emitted
+-- Logger.error line: the template is the message before its arguments.
 local _error_notification_handler = nil
 
 -- Optional test sink registered by unit tests to capture formatted log lines
@@ -460,22 +493,33 @@ local function _stop_pending_purge_timers()
 	return settled, first_error
 end
 
---- Configures the log file path under <config_dir>/hammerspoon/logs/ with
---- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
---- max_age_days. Best-effort: an I/O failure cannot block init, but every
---- rejected or throwing asynchronous purge boundary is logged explicitly.
---- @param config_dir string Absolute path to the user config directory (trailing slash optional).
+--- Returns the unified and errors-only log paths of one calendar date. The only
+--- place that spells the dated names, which the folder setup, the midnight
+--- rollover and the fatal report's log list all resolve through.
+--- @param log_dir string Log folder, with its trailing separator.
+--- @param date string Calendar date, "%Y-%m-%d".
+--- @return string unified_path
+--- @return string errors_path
+local function _dated_log_paths(log_dir, date)
+	return log_dir .. LOG_FILES.unified_prefix .. date .. LOG_FILES.extension,
+		log_dir .. LOG_FILES.errors_prefix .. date .. LOG_FILES.extension
+end
+
+--- Points the sink at the logs folder resolved by infra/config_paths
+--- (LogsDirPath, or ~/Library/Logs/ergopti_plus/) with daily rotation and
+--- purges files older than max_age_days. Best-effort: an I/O failure cannot
+--- block init, but every rejected or throwing asynchronous purge boundary is
+--- logged explicitly.
+--- @param log_dir string Absolute logs folder (trailing slash optional).
 --- @param max_age_days integer Days to keep before purging (default 14).
 --- @return boolean usable False when a log-folder component could not be created.
 --- @return string|nil folder_error Exact unusable component and cause.
-function M.init_log_path(config_dir, max_age_days)
+function M.init_log_path(log_dir, max_age_days)
 	max_age_days = max_age_days or DEFAULT_LOG_RETENTION_DAYS
-	if type(config_dir) ~= "string" or config_dir == "" then
-		return false, "config_dir must be a non-empty string"
+	if type(log_dir) ~= "string" or log_dir == "" then
+		return false, "log_dir must be a non-empty string"
 	end
-	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
-
-	local log_dir = config_dir .. "hammerspoon/logs/"
+	if not log_dir:match("[/\\]$") then log_dir = log_dir .. "/" end
 
 	-- Created in-process, not by forking /bin/sh.
 	--
@@ -540,8 +584,7 @@ function M.init_log_path(config_dir, max_age_days)
 		_last_log_path = nil
 	end
 
-	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-	M.ERRORS_LOG_FILE = log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+	_unified_path, _errors_path = _dated_log_paths(log_dir, os.date("%Y-%m-%d"))
 
 
 	-- Old-log purge is pure housekeeping — defer it off the boot critical path.
@@ -549,6 +592,36 @@ function M.init_log_path(config_dir, max_age_days)
 	-- downstream waits on the purge.
 	_schedule_log_purge(log_dir, max_age_days, true)
 	return folder_error == nil, folder_error
+end
+
+--- Returns the logs folder the sink writes to: the early-boot fallback until
+--- init_log_path() runs, then the folder config_paths resolved.
+--- @return string folder With a trailing slash.
+function M.logs_dir()
+	return _log_dir
+end
+
+--- Returns today's unified log path in the chosen log folder. The date is read
+--- per call: the native worker rolls files by each record's date, so a path
+--- chosen earlier names yesterday's file after midnight.
+--- @return string path
+function M.today_log_path()
+	local unified_path = _dated_log_paths(_log_dir, os.date("%Y-%m-%d"))
+	return unified_path
+end
+
+--- Returns today's errors-only log path (WARNING and ERROR lines), read per call.
+--- The file exists only once something warned that day.
+--- @return string path
+function M.today_errors_path()
+	local _, errors_path = _dated_log_paths(_log_dir, os.date("%Y-%m-%d"))
+	return errors_path
+end
+
+--- Returns the folder crash reports are written to, inside the logs folder.
+--- @return string folder With a trailing slash.
+function M.crash_reports_dir()
+	return _log_dir .. AppDirs.crash_reports_dir .. "/"
 end
 
 --- Removes one stale log and records any OS refusal without fabricating success.
@@ -626,9 +699,9 @@ function M._purge_old_logs(log_dir, max_age_days)
 		-- date immediately after "ErgoptiPlus_", so it can never match the "errors_"
 		-- infix. Missing that second pattern is exactly what let the errors file
 		-- escape every purge since the sink was introduced.
-		local year, month, day = name:match("^ErgoptiPlus_errors_(%d%d%d%d)%-(%d%d)%-(%d%d)%.log$")
+		local year, month, day = name:match(ERRORS_DATED_PATTERN)
 		if not year then
-			year, month, day = name:match("^ErgoptiPlus_(%d%d%d%d)%-(%d%d)%-(%d%d)%.log$")
+			year, month, day = name:match(UNIFIED_DATED_PATTERN)
 		end
 
 		if year then
@@ -655,9 +728,11 @@ function M._purge_old_logs(log_dir, max_age_days)
 	end
 end
 
---- Registers a callback invoked on every Logger.error call to surface errors as
---- system notifications. Set once from init.lua after all modules are loaded.
---- @param fn function|nil Callback with signature fn(module_name, message).
+--- Registers a callback invoked on every emitted Logger.error line, after its
+--- native ACK: init.lua hands it to the error window. Set once from init.lua
+--- after all modules are loaded.
+--- @param fn function|nil Callback with signature fn(module_name, message, template),
+---   template being the message before its arguments.
 function M.set_error_notification_handler(fn)
 	_error_notification_handler = (type(fn) == "function") and fn or nil
 end
@@ -817,29 +892,34 @@ local function _timestamp()
 	return os.date("%Y-%m-%d %H:%M:%S", sec) .. string.format(":%03d", ms)
 end
 
+--- Timestamp provider for every line the core formats. Replaceable for the same
+--- reason as M.clock_fn: a repeat summary quotes the timestamps of the lines it
+--- withheld, and a test can only pin that text when it owns the clock face. The
+--- core reads this field through a closure installed by M.claim_core_hooks().
+M.timestamp_fn = _timestamp
+
 --- Returns an open append handle to the current daily log file, re-opening on
---- day rollover or after init_log_path() re-points UNIFIED_LOG_FILE.
+--- day rollover or after init_log_path() re-points the folder.
 local function _ensure_log_file()
 	local today = os.date("%Y-%m-%d")
 	local previous_date = _last_log_date
 	-- Recompute the dated paths when the calendar date changes so midnight
 	-- rollovers write to the new day's file rather than reopening yesterday's.
-	if _log_dir and _last_log_date ~= today then
-		M.UNIFIED_LOG_FILE = _log_dir .. "ErgoptiPlus_" .. today .. ".log"
-		M.ERRORS_LOG_FILE  = _log_dir .. "ErgoptiPlus_errors_" .. today .. ".log"
+	if _unified_path == nil or _last_log_date ~= today then
+		_unified_path, _errors_path = _dated_log_paths(_log_dir, today)
 	end
-	if _file_handle and _last_log_date == today and _last_log_path == M.UNIFIED_LOG_FILE then
+	if _file_handle and _last_log_date == today and _last_log_path == _unified_path then
 		return _file_handle
 	end
 	if _file_handle then
 		pcall(function() _file_handle:close() end)
 		_file_handle = nil
 	end
-	local ok, fh = pcall(io.open, M.UNIFIED_LOG_FILE, "a")
+	local ok, fh = pcall(io.open, _unified_path, "a")
 	if not ok or not fh then return nil end
 	_file_handle   = fh
 	_last_log_date = today
-	_last_log_path = M.UNIFIED_LOG_FILE
+	_last_log_path = _unified_path
 	-- Session boundary marker so tailing reveals where HS restarted
 	pcall(function()
 		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
@@ -993,6 +1073,9 @@ _driver_sink = function(line, variant)
 		-- filesystem operation happen after the native worker's exact ACK.
 		local ok, record_or_err, enqueue_err, rejected_record = pcall(
 			LogTransport.enqueue, line, variant)
+		-- A stalled worker sheds DEBUG/TRACE/DONE lines by policy; the transport
+		-- counts them and the recovery WARN reports them, so this is no failure.
+		if ok and record_or_err == false then return end
 		if not ok or type(record_or_err) ~= "table" then
 			_async_sink_state.last_error = tostring(ok and enqueue_err or record_or_err)
 			local pending = _pending_error_notification
@@ -1027,7 +1110,7 @@ _driver_sink = function(line, variant)
 	if level >= Core.LEVELS.WARNING then
 		local err_full = line .. "\n"
 		pcall(function()
-			local f = io.open(M.ERRORS_LOG_FILE, "a")
+			local f = io.open(_errors_path, "a")
 			if f then
 				f:write(err_full)
 				f:close()
@@ -1052,7 +1135,8 @@ local function _deliver_async_record(record)
 			_error_notification_handler,
 			debug.traceback,
 			tostring(notification.module_name),
-			tostring(notification.message)
+			tostring(notification.message),
+			tostring(notification.template)
 		)
 		if not notified or delivered_or_err ~= true then
 			local detail = notified and (notification_err or delivered_or_err)
@@ -1113,6 +1197,12 @@ function M.start_async_sink(scheduler, transport_overrides)
 		on_delivered = _deliver_async_record,
 		on_rejected = _deliver_async_record,
 		on_failed = function(detail) _on_async_sink_failed(detail, owner) end,
+		-- A stall the worker recovered from is not fatal any more, so it has to
+		-- stay visible in the log it delayed.
+		on_stall_recovered = function(stalled_ms, shed)
+			_log("WARNING", "logger", "Native logger stalled %d ms before acknowledging; "
+				.. "%d DEBUG/TRACE/DONE line(s) were shed meanwhile.", stalled_ms, shed)
+		end,
 	}
 	-- Production supplies none of these. Tests inject only native boundaries that
 	-- cannot exist in the headless Lua process; routing and delivery stay owned by
@@ -1147,6 +1237,9 @@ end
 --- @return string|nil error_message Immediate refusal detail.
 function M.begin_async_sink_shutdown(on_done)
 	if type(on_done) ~= "function" then return false, "on_done callback is required" end
+	-- Exit and reload are the last chance to close a suppression streak: emit
+	-- the pending summaries now so the drain below carries them to the file.
+	Core.flush_repeats(true)
 	local owner = _async_sink_state
 	if not _async_sink_active then
 		local ok, callback_err = xpcall(function() on_done(true, "transport already inactive") end,
@@ -1227,7 +1320,7 @@ end
 --- local declared further down would not be captured at all.
 function M.claim_core_hooks()
 	Core.set_sink(_driver_sink)
-	Core.timestamp_fn = _timestamp
+	Core.timestamp_fn = function() return M.timestamp_fn() end
 	Core.clock_fn     = function() return M.clock_fn() end
 end
 
@@ -1327,6 +1420,7 @@ function M.warn(module_name, msg, ...) _log("WARNING", module_name, msg, ...) en
 function M.error(module_name, msg, ...)
 	local ok, base = pcall(tostring, msg)
 	local text = ok and base or "???"
+	local text_template = text
 	if select("#", ...) > 0 then
 		local ok_f, formatted = pcall(string.format, text, ...)
 		text = ok_f and formatted or text
@@ -1335,6 +1429,7 @@ function M.error(module_name, msg, ...)
 	local pending = {
 		module_name = tostring(module_name),
 		message = text,
+		template = text_template,
 		record = nil,
 	}
 	_pending_error_notification = pending
@@ -1344,6 +1439,7 @@ function M.error(module_name, msg, ...)
 		pending.record.notification = {
 			module_name = pending.module_name,
 			message = pending.message,
+			template = pending.template,
 		}
 	end
 	if emitted and not _async_sink_active and _error_notification_handler then
@@ -1351,7 +1447,8 @@ function M.error(module_name, msg, ...)
 			_error_notification_handler,
 			debug.traceback,
 			tostring(module_name),
-			text
+			text,
+			text_template
 		)
 		if not notified or delivered_or_err ~= true then
 			_async_sink_state.last_error = "error notification delivery failed: "
@@ -1404,12 +1501,79 @@ function M.reset_dedup() Core.reset_dedup() end
 --- @return number
 function M.dedup_suppressed_count() return Core.dedup_suppressed_count() end
 
---- Clock used to measure the dedup window, in seconds.
+--- Warnings and errors emitted this session, and the last ERROR line. Owned by
+--- the core like the ring, but never evicted by it: the healthcheck's counters
+--- and "Last recorded error" read this, not the 200-line ring.
+--- @return table { warn_count, err_count, last_error }
+function M.session_issues() return Core.session_issues() end
+
+--- Clock used to measure the dedup and repeat windows, in seconds.
 --- Replaceable so a test can drive the five-second window without sleeping for
 --- it: a window measured in seconds cannot otherwise be exercised by a suite that
 --- runs in milliseconds. The core reads this field through a closure installed in
 --- Section 3.2, so replacing it here still takes effect.
 M.clock_fn = _gettime
+
+-- The periodic tick that closes due repeat streaks, owned from arming until
+-- M.disable_repeat_collapsing() — or until TimerScheduler teardown cancels
+-- every scheduler-owned timer at exit.
+local _repeat_tick = nil
+
+--- Arms repeat collapsing (spec § 4.2) and commits its periodic flush tick.
+--- Boot calls this once the native sink owns the file: a summary emitted by the
+--- tick is an ordinary line and needs that destination. The tick runs at the
+--- registry's logger flush interval on the TimerScheduler, never on the HID path.
+--- @param scheduler table TimerScheduler-shaped adapter (every / cancel).
+--- @return boolean armed True when collapsing and its tick are both committed.
+--- @return string|nil error_message Exact refusal reason.
+function M.enable_repeat_collapsing(scheduler)
+	if Core.repeat_collapsing_enabled() then
+		return false, "repeat collapsing is already enabled"
+	end
+	if type(scheduler) ~= "table" or type(scheduler.every) ~= "function"
+		or type(scheduler.cancel) ~= "function" then
+		return false, "repeat collapsing needs a scheduler with every() and cancel()"
+	end
+	-- Required here, not at load: infra.timings itself requires this module.
+	local interval_sec = require("infra.timings").sec("logger", "flush_interval_ms")
+	Core.enable_repeat_collapsing()
+	local ok, handle_or_err, committed = pcall(scheduler.every, interval_sec, function()
+		Core.flush_repeats(false)
+	end)
+	if not ok or committed ~= true or type(handle_or_err) ~= "table" then
+		Core.disable_repeat_collapsing()
+		if ok and type(handle_or_err) == "table" then pcall(scheduler.cancel, handle_or_err) end
+		return false, "repeat flush tick could not be committed: " .. tostring(handle_or_err)
+	end
+	_repeat_tick = { scheduler = scheduler, handle = handle_or_err }
+	return true
+end
+
+--- Cancels the tick and disarms collapsing, forgetting live streaks without a
+--- summary. For test teardown; a live driver closes its streaks through the
+--- terminal flush in M.begin_async_sink_shutdown() instead.
+--- @return boolean disarmed False when the tick refused cancellation.
+--- @return string|nil error_message Exact refusal reason.
+function M.disable_repeat_collapsing()
+	local tick = _repeat_tick
+	if tick then
+		local ok, cancelled = pcall(tick.scheduler.cancel, tick.handle)
+		if not ok or cancelled ~= true then
+			return false, "repeat flush tick refused cancellation: " .. tostring(cancelled)
+		end
+		_repeat_tick = nil
+	end
+	Core.disable_repeat_collapsing()
+	return true
+end
+
+--- Reports whether repeat collapsing is armed.
+--- @return boolean
+function M.repeat_collapsing_enabled() return Core.repeat_collapsing_enabled() end
+
+--- Emits the summaries that are due; see the core's flush_repeats().
+--- @param force boolean True at a terminal boundary (exit, reload).
+function M.flush_repeats(force) Core.flush_repeats(force) end
 
 
 
@@ -1493,8 +1657,9 @@ local _capture_installed = false
 --- return values, so discarding them here changes nothing.
 ---
 --- The error goes to the log — including the errors-only sink, since ERROR lines
---- are mirrored there — and NOWHERE else. It deliberately does not reach the crash
---- reporter: a throw inside a timer callback is recoverable BY DEFINITION, the
+--- are mirrored there — and, through M.error, to the error window's handler, which
+--- opens a non-modal window later on a timer. It deliberately does not reach the
+--- crash reporter: a throw inside a timer callback is recoverable BY DEFINITION, the
 --- callback is abandoned and the run loop carries on, so the driver has already
 --- survived it. The reporter is reserved for genuine uncaught fatals
 --- (errors-only-log-sink), and reaching it from here would run the healthcheck's
@@ -1510,7 +1675,7 @@ local function _guard_timer_cb(fn, kind)
 	return function(...)
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
-			_log("ERROR", "runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
 		end
 	end
 end

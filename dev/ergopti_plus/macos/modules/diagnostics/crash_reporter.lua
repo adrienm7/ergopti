@@ -19,8 +19,8 @@
 --- 3. Rich diagnostics: includes everything from the healthcheck (OS, HS version,
 ---    adapters, session counters) PLUS the full in-memory log ring buffer (up to
 ---    200 lines), the active window, and the stack trace.
---- 4. Driver-scoped directory: reports live under <config_dir>/crash_reports/
----    (Hammerspoon-specific, separate from any AHK reports).
+--- 4. Logs-scoped directory: reports live in <logs>/crash_reports/, beside the
+---    daily log that explains them (Logger.crash_reports_dir()).
 --- 5. Structured output: reports are written as JSON for easy machine and human
 ---    readability, one file per incident.
 --- ==============================================================================
@@ -42,18 +42,13 @@ local LOG = "crash_reporter"
 -- ============================
 -- ============================
 
--- Subdirectory under the user config dir that receives all Hammerspoon crash
--- report files. Nested under hammerspoon/ to mirror the driver folder layout
--- and stay separate from AHK reports.
-local CRASH_REPORTS_SUBDIR = "hammerspoon/crash_reports"
-
 -- A crash storm can legitimately fill many names within one timestamp second.
 -- The bound prevents corrupted or hostile directories from turning report
 -- persistence into an unbounded collision loop.
 local MAX_REPORT_FILENAME_ATTEMPTS = 1000
 
--- Whether report() collects the healthcheck's SYSTEM probes. ui.healthcheck.run()
--- forks seven synchronous subprocesses (sysctl, vm_stat, uname, git) through
+-- Whether report() collects the healthcheck's SYSTEM snapshot. ui.healthcheck.run()
+-- used to fork seven synchronous subprocesses (sysctl, vm_stat, uname, git) through
 -- hs.execute, and report() is reached from an async callback on the SAME main run
 -- loop that dispatches the CGEventTaps — so a crash report stalled the typing tap
 -- for as long as those probes took. The genuinely valuable field, the in-memory
@@ -72,29 +67,10 @@ local COLLECT_SYSTEM_PROBES_DEFAULT = false
 -- ==========================
 -- ==========================
 
---- Resolves the absolute path to the crash_reports directory.
+--- Resolves the crash folder through its logger owner for the diagnostics page.
 --- @return string Absolute path ending with a directory separator.
-local function _reports_dir()
-	local base = nil
-
-	local ok_mp, mp = pcall(require, "infra.config_paths")
-	if ok_mp and mp and type(mp.get_config_dir) == "function" then
-		local dir = mp.get_config_dir()
-		if type(dir) == "string" and dir ~= "" then
-			base = dir
-		end
-	end
-
-	if not base then
-		local home = os.getenv("HOME") or "~"
-		base = home .. "/.config/ergopti_plus/"
-	end
-
-	if not base:match("[/\\]$") then
-		base = base .. "/"
-	end
-
-	return base .. CRASH_REPORTS_SUBDIR .. "/"
+function M.reports_dir()
+	return Logger.crash_reports_dir()
 end
 
 --- Returns the ErgoptiPlus version the About menu shows. hs.processInfo.version
@@ -273,13 +249,27 @@ function M.report(err, context)
 	if collect_probes then ok_hc, hc = pcall(require, "ui.healthcheck") end
 	if ok_hc and hc and type(hc.run) == "function" then
 		local ok_run, snap = pcall(hc.run)
-		if ok_run and type(snap) == "table" then
-			sys              = snap.sys or {}
-			uptime_sec       = snap.uptime_sec or 0
-			adapters_ok      = table.concat(snap.ports_validated or {}, ", ")
-			adapters_failed  = table.concat(snap.failed_adapters or {}, ", ")
-			session_warnings = tostring(snap.warn_count or 0)
-			session_errors   = tostring(snap.err_count  or 0)
+		if ok_run and type(snap) == "table" and type(snap.sections) == "table" then
+			-- The version 2 snapshot of _shared/modules/diagnostics/schema.json
+			local sections = snap.sections
+			local system, versions = sections.system or {}, sections.versions or {}
+			local developer, issues = sections.developer or {}, sections.issues or {}
+			sys = {
+				os_version = system.os,
+				hs_version = versions.runtime,
+				screen_res = type((sections.hardware or {}).displays) == "table"
+					and table.concat(sections.hardware.displays, ", ") or nil,
+				locale     = system.locale,
+			}
+			uptime_sec       = system.uptime or 0
+			adapters_ok      = table.concat(developer.modules_ok or {}, ", ")
+			adapters_failed  = table.concat(developer.modules_failed or {}, ", ")
+			session_warnings = tostring(issues.warn_count or 0)
+			session_errors   = tostring(issues.err_count  or 0)
+		elseif ok_run then
+			Logger.error(LOG, "The diagnostics snapshot has no sections; the report carries no system details.")
+		else
+			Logger.error(LOG, "The diagnostics snapshot failed: %s.", tostring(snap))
 		end
 	end
 
@@ -303,7 +293,7 @@ function M.report(err, context)
 		-- Error details
 		error_msg   = error_msg,
 		stack_trace = stack_trace,
-		-- System environment (from healthcheck.run().sys)
+		-- System environment (from healthcheck.run().sections)
 		os_version  = sys.os_version  or "unknown",
 		hs_version  = sys.hs_version  or "unknown",
 		screen_res  = sys.screen_res  or "unknown",
@@ -334,7 +324,7 @@ end
 function M.save(report)
 	Logger.start(LOG, "Saving crash report to disk…")
 
-	local dir = _reports_dir()
+	local dir = M.reports_dir()
 	-- Recursive mkdir: create every missing ancestor before the leaf directory.
 	-- The single 2-level approach (parent + dir) fails when two or more ancestors
 	-- are absent simultaneously (lib-update-05).

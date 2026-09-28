@@ -1679,12 +1679,15 @@ function M.stop()
 			if type(_tap.stop) ~= "function" then return false end
 			return _tap:stop()
 		end)
-		if ok_stop and stop_result ~= false then
+		local state_ok, enabled = pcall(function()
+			return _tap:isEnabled()
+		end)
+		if ok_stop and stop_result ~= false and state_ok and enabled == false then
 			_tap = nil
 		else
 			settled = false
-			Logger.error(LOG, "Script-control eventtap stop failed; retained for retry — %s.",
-				tostring(ok_stop and stop_result or stop_result))
+			Logger.error(LOG, "Script-control eventtap teardown remains owned: stop=%s; native enabled=%s.",
+				tostring(stop_result), tostring(enabled))
 		end
 	end
 
@@ -1694,6 +1697,23 @@ function M.stop()
 	end
 	Logger.success(LOG, "Script control stopped.")
 	return true
+end
+
+--- Reads native ownership; nil retains an incomplete or unreadable resource pair.
+--- @return boolean|nil started False only when no native resource is retained.
+function M.is_started()
+	if _tap == nil and _tap_watchdog == nil then return false end
+	if _tap and _tap_committed and _tap_watchdog and _tap_watchdog_committed
+		and eventtap_is_enabled(_tap) then return true end
+	return nil
+end
+
+--- Captures detached action intent for exact preference compensation.
+--- @return table actions Slot identifiers mapped to their configured actions.
+function M.get_shortcut_actions()
+	local actions = {}
+	for key, value in pairs(_key_actions) do actions[key] = value end
+	return actions
 end
 
 --- Returns whether the script is currently paused.
@@ -1820,7 +1840,7 @@ end
 ---   open_script_source, open_personal_shortcuts,
 ---   open_personal_hotstrings, open_personal_info,
 ---   open_config, open_logs_folder, open_today_log,
----   add_hotstring, trigger_prediction.
+---   add_hotstring.
 --- Keys with no handler are quietly skipped (debug log) so the right-Alt key
 --- slots and gestures stay assignable on a fresh install.
 function M.set_extras(tbl)

@@ -93,18 +93,12 @@ Test("hotstrings: global-key writes share the admitted atomic transaction (F-15)
 ; the keyboard-hook starvation path. Correctness beat the micro-optimisation.
 _A0720B4_SubCategoryManifestStaysFailFast() {
 	Body := _DriverFuncBody("_MG_LoadSubCategories")
-	Assert(Body != "", "_MG_LoadSubCategories must exist in infra/master_gates.ahk")
-	Assert(InStr(Body, "static _Cache") = 0,
-		"_MG_LoadSubCategories must NOT memoize its parsed result — an invalid canonical manifest has to fail fast on every call, and a cache would return the last good value instead of throwing")
-
-	; The reason the cache is unnecessary: the read is no longer on a Critical path.
-	Toggle := _DriverFuncBody("ToggleCategoryAllFeatures")
-	if (Toggle != "") {
-		RelPos := InStr(Toggle, "Critical(_TcafCrit)")
-		GatesPos := InStr(Toggle, "ApplyMasterGatesToFeatures(")
-		Assert(RelPos > 0 and GatesPos > 0 and GatesPos < RelPos,
-			"the master-gate application must stay inside the (short, in-memory) Critical window while the rebuild that follows runs outside it — that is what makes an uncached manifest read affordable here (F-01)")
-	}
+	Builder := _DriverFuncBody("_ConfigBuildCategoryIntentPlan")
+	Assert(Body != "" && Builder != "", "manifest reader and candidate builder must exist")
+	Assert(InStr(Body, "static _Cache") == 0,
+		"invalid canonical manifests must fail on every call, never use a stale cache")
+	Assert(InStr(Builder, "ApplyMasterGatesToFeatures(") > 0 && InStr(Builder, 'Critical("On")') == 0,
+		"uncached manifest validation must finish while building the detached candidate outside Critical")
 }
 Test("master-gates: the sub-category manifest stays fail-fast, uncached (F-16)",
 	_A0720B4_SubCategoryManifestStaysFailFast)

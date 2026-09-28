@@ -3,8 +3,9 @@
 ; ==============================================================================
 ; MODULE: Healthcheck Owner Snapshot Regression Tests
 ; DESCRIPTION:
-; Proves healthcheck rendering consumes one current Keylogger/LLM owner snapshot
-; and cannot fall back to the legacy globals that had no production writers.
+; Proves the diagnostics snapshot consumes one current Keylogger/LLM owner
+; snapshot and cannot fall back to the legacy globals that had no production
+; writers.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -30,34 +31,27 @@ _HCOS_LlmOwner() {
 		"streaming", false)
 }
 
-_HCOS_OwnerValuesReachWebAndText() {
-	KeyloggerState := _HealthCheck_KeyloggerSummary(_HCOS_KeyloggerOwner)
-	LlmState := _HealthCheck_LLMState(_HCOS_LlmOwner)
-	AssertEqual("true", KeyloggerState["enabled"])
-	AssertEqual(87, KeyloggerState["wpm"])
-	AssertEqual(41, KeyloggerState["events_session"])
-	AssertEqual(6, KeyloggerState["privacy_hits"])
-	AssertEqual("true", LlmState["enabled"])
-	AssertEqual("ollama", LlmState["backend"])
-	AssertEqual("work", LlmState["active_profile"])
+_HCOS_OwnerValuesReachTheSnapshot() {
+	Ai := _HealthCheck_Ai(_HCOS_LlmOwner)
+	AssertEqual(true, Ai["ai_enabled"])
+	AssertEqual("ollama", Ai["ai_backend"])
+	AssertEqual("work", Ai["ai_profile"])
+	AssertEqual("qwen-health", Ai["ai_model"])
 
-	Snapshot := HealthCheck_Run()
-	Snapshot["keylogger"] := KeyloggerState
-	Snapshot["llm"] := LlmState
-	Plain := HealthCheck_FormatPlain(Snapshot)
-	WebJson := _HC_SnapshotToJson(Snapshot)
-	for Expected in ["events=41", "wpm=87", "privacy_hits=6",
-		"enabled=true backend=ollama profile=work"]
-		AssertTrue(InStr(Plain, Expected, true) > 0,
-			"plain export must render current owner value: " . Expected)
-	for Expected in ['"events_session":41', '"wpm":87', '"privacy_hits":6',
-		'"backend":"ollama"', '"active_profile":"work"']
-		AssertTrue(InStr(WebJson, Expected, true) > 0,
-			"WebView snapshot must render current owner value: " . Expected)
+	Enabled := Map()
+	for Item in _HealthCheck_Features(_HCOS_LlmOwner, _HCOS_KeyloggerOwner)["items"]
+		Enabled[Item["id"]] := Item["enabled"]
+	AssertEqual(true, Enabled["llm"], "the AI switch comes from the LLM owner")
+	AssertEqual(true, Enabled["metrics"], "the metrics switch comes from the Keylogger owner")
+
+	Json := _HC_ValueToJson(Map("ai", Ai))
+	for Expected in ['"ai_backend":"ollama"', '"ai_profile":"work"', '"ai_model":"qwen-health"']
+		AssertTrue(InStr(Json, Expected, true) > 0, "the page must receive the current owner value: " . Expected)
 }
 
-Test("healthcheck: current owner snapshots reach WebView and text export (healthcheck-stale-globals)",
-	_HCOS_OwnerValuesReachWebAndText)
+Test("healthcheck: current owner snapshots reach the diagnostics snapshot (healthcheck-stale-globals)",
+	_HCOS_OwnerValuesReachTheSnapshot)
+
 
 _HCOS_ProductionOwnersAreAtomic() {
 	global _LLM_Menu, _LLM_Menu_Loaded

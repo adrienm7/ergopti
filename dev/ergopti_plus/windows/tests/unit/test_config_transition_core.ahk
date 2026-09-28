@@ -272,8 +272,8 @@ _CTT_StrictSchemaAndBounds() {
 	AssertFalse(_ConfigTransitionParse(Serialized,
 		"C:\other\paths.toml") is Map,
 		"a copied WAL must remain bound to its recorded stable locator")
-	AssertFalse(_ConfigTransitionParse(StrReplace(Serialized, "version=1",
-		"version=2"), Locator) is Map,
+	AssertFalse(_ConfigTransitionParse(StrReplace(Serialized, "version=" . CONFIG_TRANSITION_WAL_VERSION,
+		"version=" . (CONFIG_TRANSITION_WAL_VERSION + 1)), Locator) is Map,
 		"an unknown WAL version must be rejected")
 	AssertFalse(_ConfigTransitionParse(StrReplace(Serialized,
 		"phase=prepared", "phase=guessed"), Locator) is Map,
@@ -350,7 +350,7 @@ _CTT_TargetCountBoundIsPreMutation() {
 	AssertEqual("fatal", Result["status"])
 	AssertEqual("target_count_invalid", Result["kind"])
 	AssertEqual(0, Store["mutation_count"],
-		"nine targets must be refused before any write")
+		"a count beyond the frame-derived bound must be refused before any write")
 }
 Test("config transition: target count bound precedes I/O "
 	. "(config-transition-core-target-bound)",
@@ -363,7 +363,9 @@ _CTT_WalSizeBoundIsPreMutation() {
 	LongTail := ""
 	Loop 42
 		LongTail .= "\" . _CTT_Repeat(Chr(96 + Mod(A_Index, 20) + 1), 96)
-	Loop CONFIG_TRANSITION_MAX_TARGETS {
+	; Eight long paths already exceed the byte budget; the test does not need
+	; hundreds of redundant paths after capacity becomes frame-derived.
+	Loop 8 {
 		Specs.Push(Map("path", "D:\config" . LongTail . "\target"
 			. A_Index . ".toml", "new_present", 1, "new_content", "x"))
 	}
@@ -377,6 +379,46 @@ _CTT_WalSizeBoundIsPreMutation() {
 Test("config transition: WAL byte bound precedes artifact writes "
 	. "(config-transition-core-wal-size-bound)",
 	_CTT_WalSizeBoundIsPreMutation)
+
+; New frames accept a complete wide cohort; old durable frames remain recoverable.
+_CTT_WideFramesAndLegacyRecovery() {
+	Store := _CTT_NewStore(), Port := _CTT_Port(Store)
+	Locator := "C:\stable\paths.toml"
+	Specs := []
+	Loop 12 {
+		Path := "D:\config\personal" . A_Index . ".toml"
+		_CTT_SetFile(Store, Path, "old-" . A_Index)
+		Specs.Push(Map("path", Path, "new_present", 1, "new_content", "new-" . A_Index))
+	}
+	Prepared := ConfigTransitionPrepare(Locator, Specs, Port, "wide_frame")
+	AssertEqual("prepared", Prepared["kind"])
+	Wal := _CTT_GetFile(Store, ConfigTransitionWalPath(Locator))
+	Parsed := _ConfigTransitionParse(Wal, Locator)
+	AssertEqual(CONFIG_TRANSITION_WAL_VERSION, Parsed["version"])
+	AssertEqual(12, Parsed["targets"].Length)
+	for InvalidCount in ["012", "-12", "99999999999999999999999999999999"] {
+		AssertFalse(_ConfigTransitionParse(StrReplace(Wal, "target_count=12",
+			"target_count=" . InvalidCount), Locator) is Map)
+	}
+	AssertFalse(_ConfigTransitionParse(StrReplace(Wal,
+		"version=" . CONFIG_TRANSITION_WAL_VERSION,
+		"version=" . CONFIG_TRANSITION_LEGACY_WAL_VERSION), Locator) is Map,
+		"a v1 frame cannot silently claim the v2 target capacity")
+	AssertEqual("recovered_old", ConfigTransitionRecover(Locator, Port)["kind"])
+	for Index, Spec in Specs
+		AssertEqual("old-" . Index, _CTT_GetFile(Store, Spec["path"]))
+	Prepared := ConfigTransitionPrepare(Locator, [Specs[1], Specs[2]], Port, "legacy_frame")
+	AssertEqual("prepared", Prepared["kind"])
+	Wal := _CTT_GetFile(Store, ConfigTransitionWalPath(Locator))
+	Legacy := StrReplace(Wal, "version=" . CONFIG_TRANSITION_WAL_VERSION,
+		"version=" . CONFIG_TRANSITION_LEGACY_WAL_VERSION)
+	_CTT_SetFile(Store, ConfigTransitionWalPath(Locator), Legacy)
+	AssertEqual(CONFIG_TRANSITION_LEGACY_WAL_VERSION, _ConfigTransitionParse(Legacy, Locator)["version"])
+	AssertEqual("recovered_old", ConfigTransitionRecover(Locator, Port)["kind"])
+	AssertEqual("old-1", _CTT_GetFile(Store, Specs[1]["path"]))
+	AssertEqual("old-2", _CTT_GetFile(Store, Specs[2]["path"]))
+}
+Test("config transition: versioned wide frames and legacy recovery (config-transition-core-capacity)", _CTT_WideFramesAndLegacyRecovery)
 
 
 

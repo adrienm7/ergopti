@@ -37,7 +37,7 @@ final class LauncherLogTests: XCTestCase {
 	// ================================================================
 
 	private var logPath: String {
-		return NSHomeDirectory() + "/Library/Logs/ErgoptiPlus/launcher.log"
+		return NSHomeDirectory() + "/Library/Logs/ergopti_plus/launcher.log"
 	}
 
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
@@ -150,7 +150,7 @@ final class LauncherLogTests: XCTestCase {
 
 		XCTAssertTrue(
 			FileManager.default.fileExists(atPath: logPath),
-			"LauncherLog.write must create ~/Library/Logs/ErgoptiPlus/launcher.log on first use"
+			"LauncherLog.write must create ~/Library/Logs/ergopti_plus/launcher.log on first use"
 		)
 
 		let contents = try String(contentsOfFile: logPath, encoding: .utf8)
@@ -276,6 +276,40 @@ final class LauncherLogTests: XCTestCase {
 		))
 		XCTAssertTrue(failures.isEmpty)
 		XCTAssertTrue(try String(contentsOf: log, encoding: .utf8).contains("successful append"))
+	}
+
+	/// launcher.log grew for the life of the install; past the cap it becomes
+	/// launcher.1.log, which replaces the previous rotation.
+	func testLauncherLogRotatesAtTheSizeCap() throws {
+		let directory = try makeIsolatedLogDirectory()
+		defer { try? FileManager.default.removeItem(at: directory) }
+		let padding = String(repeating: "x", count: 40)
+		for index in 1...3 {
+			XCTAssertTrue(LauncherLog.writeForTesting(
+				"rotation line \(index) \(padding)",
+				directoryPath: directory.path,
+				maximumBytes: 128
+			))
+		}
+
+		let current = try String(
+			contentsOf: directory.appendingPathComponent("launcher.log"),
+			encoding: .utf8
+		)
+		let previous = try String(
+			contentsOf: directory.appendingPathComponent("launcher.1.log"),
+			encoding: .utf8
+		)
+		XCTAssertTrue(current.contains("rotation line 3"), current)
+		XCTAssertFalse(current.contains("rotation line 2"), current)
+		XCTAssertLessThanOrEqual(current.utf8.count, 128)
+		XCTAssertTrue(previous.contains("rotation line 2"), previous)
+		XCTAssertFalse(previous.contains("rotation line 1"),
+			"one rotation is kept, not an ever-growing series")
+		XCTAssertEqual(
+			try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted(),
+			["launcher.1.log", "launcher.log"]
+		)
 	}
 
 

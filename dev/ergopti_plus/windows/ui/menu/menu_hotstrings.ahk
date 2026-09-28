@@ -16,11 +16,19 @@
 
 global _HS_GrandTotalCache := -1
 
+; Shared declarations may expose these only after every host has a terminal owner.
+_HS_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"scope_restore", (*) => HotstringsScopeApply("recommended", OwnedOptions),
+		"scope_clear", (*) => HotstringsScopeApply("clear", OwnedOptions))
+}
+
 ; Compute the grand total count used in the tray menu title label.
 ; Sums enabled standard, ergopti, dynamic, personal and extension entries.
 _HS_ComputeGrandTotal() {
 global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
-global ScriptInformation, _ExtTotalPersonalCounterGlobal, _HS_GrandTotalCache
+global ScriptInformation, _ExtTotalPersonalCounterGlobal, _HS_GrandTotalCache, _HotstringExtensionPacks
 if (_HS_GrandTotalCache != -1)
 	return _HS_GrandTotalCache
 
@@ -60,6 +68,7 @@ if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 }
 Total += PersonalActiveCount
 Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
+Total += HotstringExtensions_Count(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings"))
 GrandTotal := _HS_GatedCount(IsCategoryGated("Hotstrings"), Total)
 _HS_GrandTotalCache := GrandTotal
 return GrandTotal
@@ -261,7 +270,7 @@ _HS_WordExpanderRows() {
 	; most of the catalogue ships disabled and "check all" is not that route.
 	Rows.Push(Map("label", t("menu.hotstrings.check_all"),   "action", (*) => _HS_DelimSetAll(true)))
 	Rows.Push(Map("label", t("menu.hotstrings.uncheck_all"), "action", (*) => _HS_DelimSetAll(false)))
-	Rows.Push(Map("label", t("menu.global.reset_defaults"),  "action", (*) => _HS_DelimReset()))
+	Rows.Push(Map("label", t("common.restore_recommended"), "action", (*) => _HS_DelimReset()))
 	Rows.Push(Map("separator", true))
 
 	; ── Built-in catalogue entries, in catalogue order ───────────────────────
@@ -469,7 +478,7 @@ _HS_CategoryRowsStandard() {
 		; if some or all sections inside are off.
 		Rows.Push(Map(
 			"label",   Title,
-			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"checked", IsCategoryGated(Category) ? true : false,
 			"submenu", SubMenus[Category]))
 	}
 	return Rows
@@ -496,7 +505,7 @@ _HS_CategoryRowsDynamic() {
 	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
 	DynAllEnabled := true
 	DynCount := 0
-	for _, DCfg2 in Features["hotstrings"]["dynamic"] {
+	for _, DCfg2 in MasterGateDesiredFeatures(Features)["hotstrings"]["dynamic"] {
 		DynCount++
 		if (IsObject(DCfg2) and DCfg2.Has("enabled") and !DCfg2["enabled"])
 			DynAllEnabled := false
@@ -511,7 +520,7 @@ _HS_CategoryRowsDynamic() {
 	; until a configuration satisfied the condition guarding it.
 	Rows.Push(Map(
 		"label",   DynTitle,
-		"checked", (IsGated and DynAllEnabled and DynCount > 0) ? true : false,
+		"checked", (DynAllEnabled and DynCount > 0) ? true : false,
 		"submenu", DynMenu))
 	return Rows
 }
@@ -529,10 +538,11 @@ _HS_CategoryRowsErgopti() {
 		; checkmark follows the category's own toggle, not its section states.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		Rows.Push(Map(
+		Row := Map(
 			"label",   Title,
-			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
-			"submenu", SubMenus[Category]))
+			"checked", IsCategoryGated(Category) ? true : false,
+			"submenu", SubMenus[Category])
+		Rows.Push(Row)
 	}
 	return Rows
 }
@@ -624,43 +634,13 @@ _HS_InvalidatePersonalCache() {
 	_HS_ExtensionsCacheLoaded := false
 }
 
-; Pre-scans the bundled extensions directory to build the extension data
-; so it is available for menu labels without doing file I/O under Critical.
+; Boot discovery owns the same complete catalogue used by registration. Reading
+; that snapshot also keeps menu rendering free of directory I/O under Critical.
 _HS_PreScanExtensions() {
-	global _ExtensionsDir, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	global _HotstringExtensionPacks, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
 	if _HS_ExtensionsCacheLoaded
 		return
-	ExtensionsBaseDir := _ExtensionsDir . "\"
-	_HS_ExtensionsCache := []
-	if DirExist(ExtensionsBaseDir) {
-		Loop Files ExtensionsBaseDir . "*", "D" {
-			ExtId          := A_LoopFileName
-			ExtDir         := A_LoopFileFullPath
-			ManifestPath   := ExtDir . "\manifest.toml"
-			ExtDisplayName := ExtId
-			if FileExist(ManifestPath) {
-				try {
-					MC := FileRead(ManifestPath, "UTF-8")
-					if RegExMatch(MC, "name\s*=\s*" . Chr(34) . "([^" . Chr(34) . "]+)" . Chr(34), &NM)
-						ExtDisplayName := NM[1]
-				}
-			}
-			HsDir     := ExtDir . "\hotstrings\"
-			TomlFiles := []
-			if DirExist(HsDir) {
-				Loop Files HsDir . "*.toml" {
-					FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
-					FileCount := 0
-					for _, FS in FileSections
-						FileCount += FS["count"]
-					SplitPath A_LoopFileFullPath, , , , &FileStem
-					TomlFiles.Push({ path: A_LoopFileFullPath, stem: FileStem
-						, sections: FileSections, count: FileCount })
-				}
-			}
-			_HS_ExtensionsCache.Push({ id: ExtId, name: ExtDisplayName, toml_files: TomlFiles })
-		}
-	}
+	_HS_ExtensionsCache := _HotstringExtensionPacks
 	_HS_ExtensionsCacheLoaded := true
 }
 
@@ -679,6 +659,18 @@ _HS_GetOrCreateNode(Root, PathParts) {
 		return Root[""]
 	}
 	return Node
+}
+
+; True when the personal hotstrings' gate is open (it follows the Hotstrings
+; master) and every section HS_TogglePersonalAllSections switches is on: the tick
+; of the personal « all sections » checkbox.
+_HS_PersonalSectionsAllOn(TomlData) {
+	Paths := []
+	for _, SecName in TomlData["sections_order"] {
+		if (SecName != "-")
+			Paths.Push("hotstrings.personal." . StrLower(SecName))
+	}
+	return _HS_ScopeAllOn(["Personal"], Paths)
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
@@ -754,13 +746,9 @@ _HS_PersonalRows() {
 			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalRows.Push(Map("separator", true))
-			; Section-level bulk actions for the personal hotstrings.
-			PersonalRows.Push(Map(
-				"label",  t("menu.hotstrings.enable_all"),
-				"action", (*) => HS_TogglePersonalAllSections(true)))
-			PersonalRows.Push(Map(
-				"label",  t("menu.hotstrings.disable_all"),
-				"action", (*) => HS_TogglePersonalAllSections(false)))
+			; One « all sections » checkbox for the personal hotstrings.
+			PersonalRows.Push(_HS_AllSectionsRow(_HS_PersonalSectionsAllOn(TomlData),
+				(Bool) => HS_TogglePersonalAllSections(Bool)))
 			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
@@ -793,13 +781,13 @@ _HS_PersonalRows() {
 				and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
 			if PEnabled
 				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
-			else
+			if !ReadFeatureStateV2("hotstrings.personal." . PV2Id).Get("enabled", false)
 				PersonalAllEnabled := false
 		}
 		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
 		Rows.Push(Map(
 			"label",   PersonalTitle,
-			"checked", (IsGated and PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
+			"checked", (PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
 			"submenu", PersonalMenu))
 	}
 
@@ -934,52 +922,59 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	}
 }
 
-; List provider: bundled extension hotstrings, as nested row DATA.
-;
-; Nothing here mutates the live menu — every leaf is either a label or « open the
-; file » — and the tree is exactly three levels deep (extension → TOML → its
-; sections), which is what the renderer allows. So since 2026-08-07 the renderer
-; builds all of it, and this only answers what the rows are.
-_HS_ExtensionRows() {
-	global _HS_ExtensionsCache
+; List provider: explicit group and section choices for the boot-owned catalogue.
+; Checks reflect desired values; counts reflect effective registration.
+_HS_ExtensionRows(Options := unset) {
+	global _HS_ExtensionsCache, Features
+	if !IsSet(Options)
+		Options := Map()
 	Rows := []
-	; Use the pre-warmed cache so menu build never does file I/O here — the heavy
-	; DirExist/Loop Files/FileRead scan runs in _HS_PreScanExtensions off-Critical.
 	_HS_PreScanExtensions()
-	BundledExtensions := _HS_ExtensionsCache
-	if (BundledExtensions.Length == 0) {
+	if (_HS_ExtensionsCache.Length == 0) {
 		return [Map("label", t("menu.extensions.empty"), "disabled", true)]
 	}
-	for _, Ext in BundledExtensions {
+	MasterOn := IsCategoryGated("Hotstrings")
+	for _, Ext in _HS_ExtensionsCache {
 		ExtRows := []
-		ExtTotalForExt := 0
-		for _, TF in Ext.toml_files
-			ExtTotalForExt += TF.count
+		ExtTotalForExt := HotstringExtensions_Count(Features, [Ext], MasterOn)
 		if (Ext.toml_files.Length == 0) {
 			ExtRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
 		} else {
 			for _, TF in Ext.toml_files {
+				GroupPath := "hotstrings.groups." . TF.category
 				TFRows := [
 					Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path)),
+					Map("separator", true),
+					Map("label", t("menu.hotstrings.category_enable"),
+						"checked", ReadFeatureStateV2(GroupPath)["enabled"],
+						"action", _HS_ExtensionToggle.Bind(GroupPath, Options)),
 					Map("separator", true)
 				]
 				if (TF.sections.Length == 0) {
 					TFRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
 				} else {
 					for _, Sec in TF.sections {
+						SectionPath := "hotstrings.modules." . TF.category . "." . Sec["name"]
 						TFRows.Push(Map(
 							"label",    Sec["description"] . " (" . FmtCount(Sec["count"]) . ")",
-							"disabled", true))
+							"checked", ReadFeatureStateV2(SectionPath)["enabled"],
+							"action", _HS_ExtensionToggle.Bind(SectionPath, Options)))
 					}
 				}
 				ExtRows.Push(Map(
-					"label", TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+					"label", TF.stem . " (" . FmtCount(HotstringExtensions_Count(Features,
+						[{ toml_files: [TF] }], MasterOn)) . ")",
 					"items", TFRows))
 			}
 		}
 		Rows.Push(Map(
-			"label", Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""),
+			"label", Ext.name . " (" . FmtCount(ExtTotalForExt) . ")",
 			"items", ExtRows))
 	}
 	return Rows
+}
+
+; Read intent on the click, so an older menu never inverts a masked runtime flag.
+_HS_ExtensionToggle(Path, Options, *) {
+	return HotstringExtensions_SetEnabled(Path, !ReadFeatureStateV2(Path)["enabled"], Options)
 }

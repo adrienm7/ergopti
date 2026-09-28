@@ -14,8 +14,9 @@
 ;    No intermediate dialog is shown when an update is already cached.
 ; 2. Background polling: optional periodic silent check; surfaces a TrayTip
 ;    on new releases and updates the menu label immediately.
-; 3. Channel-aware: the user can switch between the "main" (stable) and "dev"
-;    (pre-release) channels. The setting is persisted in the shared config TOML.
+; 3. Channel-aware: the user subscribes to one channel of the shared registry
+;    (_shared/modules/updater/channels.json, most stable first). The choice is
+;    persisted in the shared config TOML by Updater_SetChannel, its one owner.
 ; 4. GitHub Releases API: async WinHTTP requests retain immutable manual or
 ;    background provenance through their terminal callback.
 ; ==============================================================================
@@ -23,10 +24,16 @@
 ; INDEX: this file declares nothing itself; it #Include-s the updater
 ; sub-modules below. Functions and globals are hoisted into the global
 ; namespace, so load order is irrelevant.
+;   updater/channels.ahk    -- Update-channel registry interpreter (generated data).
+;   updater/schedule.ahk    -- Automatic-check schedule port (generated timing).
 ;   updater/core.ahk        -- Config, version compare, release fetch + parse.
 ;   updater/changelog.ahk   -- Menu actions, one-click update, changelog window.
 ;   updater/self_update.ahk -- Download, executable swap, background polling.
 
+#Include ../_generated/update_channels.ahk
+#Include updater/channels.ahk
+#Include ../_generated/update_schedule.ahk
+#Include updater/schedule.ahk
 #Include updater/core.ahk
 #Include updater/changelog.ahk
 #Include updater/self_update.ahk

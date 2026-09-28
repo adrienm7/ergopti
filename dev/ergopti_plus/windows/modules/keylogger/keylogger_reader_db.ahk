@@ -175,8 +175,9 @@ KLR_BuildDatabase(metrics_dir) {
 		md := metrics_dir
 		if !RegExMatch(md, "[\\/]$")
 				md .= "\"
-		global _ConfigDir, _AhkSubDir
-		logPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
+		; The logs folder resolver; a detached prefetch worker runs before boot
+		; reads paths.toml, so it resolves the OS-default logs folder.
+		logPath := LoggerLogsDir() . "prefetch.log"
 		KLR_PrefetchDebug(logPath, "KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL)
 		KLR_PrefetchDebug(logPath, "KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!"))
 		try {
@@ -555,8 +556,7 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 		static CHUNK_BYTES := 4 * 1024 * 1024   ; 4 MB per read
 		; Far above any single ledger statement, far below an allocation failure.
 		static MAX_CARRY_CHARS := 32 * 1024 * 1024
-		global _ConfigDir, _AhkSubDir
-		dbgPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
+		dbgPath := LoggerLogsDir() . "prefetch.log"
 		loaded_offset := 0
 		loaded_snapshot := Map("ok", false)
 		; Open in binary mode (no encoding conversion). The raw bytes are UTF-8

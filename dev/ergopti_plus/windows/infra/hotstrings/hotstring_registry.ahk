@@ -214,7 +214,7 @@ HS_EnumeratePersonalExtFiles() {
 ; @param IndexTarget {Map}    Index being built.
 ; @param SetTarget   {Map}    Trigger set being built.
 ; @returns {Integer} Number of triggers indexed.
-_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
+_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection := "") {
 	global ScriptInformation, HS_PREFIX_ENTRY_PATTERN
 	global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 	global HSE_PRIORITY_PACKAGE
@@ -239,6 +239,8 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
 			continue
 		}
 		if (CurrentSection == "")
+			continue
+		if SelectedSection != "" && CurrentSection != SelectedSection
 			continue
 		; Metadata blocks describe the file and are not hotstrings. The engine skips
 		; them explicitly; here the old single-bracket RESET happened to stand in

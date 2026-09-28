@@ -36,6 +36,7 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 	; is currently redirected elsewhere it has to be moved back and paths.toml
 	; rewritten, or the user's ask to leave that folder is silently dropped.
 	global _ob_config_dir, _ConfigDir, _DefaultConfigDir, _PathsFile, ConfigurationFile, _AhkSubDir
+	global _DefaultLogsDir
 	PreviousCritical := Critical("Off")
 	try {
 	try {
@@ -110,6 +111,8 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 					"onboarding.error.commit_trigger_recovery")
 				return false
 			}
+			; A config.toml the wizard creates carries this build's schema version.
+			updates := ConfigMigrateStampNewFile(updates, CandidateConfig)
 			updates := _ConfigPrepareTypedUpdates(updates)
 			CandidateResult := TOML_BuildUpdatedContent(CandidateConfig, updates)
 			if !ConfigTransitionResultIs(CandidateResult, "rendered")
@@ -137,8 +140,10 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 			TargetSpecs := [ConfigTransitionPresentTarget(CandidateConfig,
 				CandidateResult["content"], ExpectedCandidateOld)]
 			if PathRedirectRequired {
+				; The rewrite keeps the user's LogsDirPath.
 				try LocatorContent := ConfigTransitionPathsTomlContent(
-					CandidateDir, _DefaultConfigDir)
+					CandidateDir, _DefaultConfigDir,
+					ConfigTransitionCurrentLogsOverride(), _DefaultLogsDir)
 				catch as Err {
 					try LoggerError("Onboarding",
 						"Could not build paths.toml transition content: {1}.",

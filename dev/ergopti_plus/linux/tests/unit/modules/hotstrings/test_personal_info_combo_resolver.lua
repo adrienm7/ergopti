@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local restore_family_preferences = require("tests.support.dynamic_hotstrings_fixture").install()
 local dh      = helpers.load_module("modules.dynamic_hotstrings.manager")
 
 -- Real-shaped, nobody's data. The IBAN is distinctive enough that a substring
@@ -62,6 +63,7 @@ local function with_fixture(body, injector)
 	fh:close()
 	local ok, err = pcall(function()
 		dh.init({ trigger_char = "\\", personal_info_path = path })
+		assert(dh.set_enabled(true))
 		body()
 	end)
 	package.loaded["modules.hotstrings.injector"] = saved_injector
@@ -339,3 +341,5 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 	end)
 
 end)
+
+restore_family_preferences()

@@ -271,6 +271,15 @@ function M.new(deps)
 			Logger.error(LOG, "List '%s' row '%s' carries `fn` — a provider row says `action`, so the row does "
 				.. "nothing when clicked.", tostring(list_id), named)
 		end
+		-- A row that opens a submenu is never clicked: AppKit sends no action for
+		-- it and neither appindicator nor Win32 binds one. The subtree wins below,
+		-- so this action is dropped — which is how Gestures, Shortcuts, Metrics
+		-- and the Hotstrings master became impossible to switch on from the macOS
+		-- menu bar while their switch sat on the parent row.
+		if row.action ~= nil and (row.items ~= nil or row.submenu ~= nil) then
+			Logger.error(LOG, "List '%s' row '%s' carries both an `action` and a subtree — a row that opens a "
+				.. "submenu is never clicked, so the action can never run.", tostring(list_id), named)
+		end
 	end
 
 	--- Returns true when a menu item table is a separator.
@@ -458,38 +467,35 @@ function M.new(deps)
 				goto continue
 
 			elseif t == "toggle" then
-				-- The category's own on/off row, materialised HERE since 2026-08-08.
+				-- The category's master switch: a CHECK row, first in its submenu.
 				--
-				-- It was skipped in silence, with the comment "rendered by caller",
-				-- and that was true of exactly one driver: the AutoHotkey renderer
-				-- has built this type from the declaration all along. Linux rebuilt
-				-- the same row by hand in four submenus — hotstrings, shortcuts,
-				-- metrics, gestures — reading the SAME two i18n keys the declaration
-				-- names, and macOS built none at all because its tray parent toggles
-				-- when clicked.
-				--
-				-- Whether the row is needed is the DRIVER's answer, not a second
-				-- declaration: a caller that registers a command for it gets the row,
-				-- one that does not gets nothing and a DEBUG line saying so. That is
-				-- how one declaration serves a tray whose parent can be clicked and
-				-- one whose parent cannot, without describing the menu twice.
+				-- It rendered as a plain row whose label alternated between two keys
+				-- — « ✅ … enabled (click to disable) » and « ❌ … disabled (click to
+				-- enable) » — so the one row that governs a whole submenu was the only
+				-- on/off row of the tray that was not a checkbox, and its state was
+				-- readable only from its words. One key names it now, and the tick
+				-- carries the state exactly as a `check` row's does.
 				local toggle_id  = type(item.id) == "string" and item.id or "category_toggle"
 				local cmd_id     = type(item.command) == "string" and item.command or toggle_id
 				local fn         = commands[cmd_id]
-				local i18n_on    = type(item.i18n_on) == "string" and item.i18n_on or ""
-				local i18n_off   = type(item.i18n_off) == "string" and item.i18n_off or ""
+				local i18n_key   = type(item.i18n) == "string" and item.i18n or ""
 
-				if i18n_on == "" or i18n_off == "" then
-					Logger.warn(LOG, "'toggle' item in '%s' declares no i18n_on/i18n_off — skipped.", manifest_key)
+				if i18n_key == "" then
+					Logger.warn(LOG, "'toggle' item in '%s' declares no i18n — skipped.", manifest_key)
 				elseif type(fn) ~= "function" then
-					-- Not a warning: on a driver whose tray parent carries the toggle
-					-- there is nothing to build, and that is the normal case there.
-					Logger.debug(LOG, "No command '%s' for the '%s' toggle — this driver toggles from the parent row.",
-						tostring(cmd_id), manifest_key)
+					-- An ERROR, not a note: the submenu is shown without its switch, so
+					-- the category cannot be turned on from the tray. This was a DEBUG
+					-- line on the premise that a tray parent can toggle instead; none can.
+					Logger.error(LOG, "No command '%s' for the '%s' category switch — its submenu has no way to "
+						.. "turn it on or off.", tostring(cmd_id), manifest_key)
 				else
-					local on = R.resolve_checked_when(manifest_key, toggle_id, getters)
 					flush_sep()
-					table.insert(result, { title = i18n.get(on and i18n_on or i18n_off), fn = fn })
+					table.insert(result, {
+						title    = i18n.get(i18n_key),
+						fn       = fn,
+						checked  = R.resolve_checked_when(manifest_key, toggle_id, getters),
+						disabled = R.resolve_disabled_when(manifest_key, toggle_id, getters) or nil,
+					})
 					item_count = item_count + 1
 				end
 
@@ -663,6 +669,62 @@ function M.new(deps)
 					built.checked = R.resolve_checked_when(manifest_key, row_id, getters)
 				end
 				table.insert(result, built)
+				item_count = item_count + 1
+
+			elseif t == "choice" then
+				-- One setting with a fixed set of values: ONE row whose submenu lists
+				-- the values, the current one ticked. The values and their labels are
+				-- the enum feature's (`path`), projected into the row by
+				-- build-menu-manifest.js, so a value added to the feature appears here
+				-- without a driver change. The driver supplies the current value
+				-- (state_getters[path]) and what choosing a value does
+				-- (commands[id](value)).
+				--
+				-- It exists because the macOS menubar icon was two sibling rows, one
+				-- per variant, stored outside config.toml: a choice between values
+				-- drawn as two unrelated actions.
+				local row_id   = type(item.id) == "string" and item.id or ""
+				local i18n_key = type(item.i18n) == "string" and item.i18n or ""
+				local path     = type(item.path) == "string" and item.path or ""
+				local cmd_id   = type(item.command) == "string" and item.command or row_id
+				local fn       = commands[cmd_id]
+				local choices  = type(item.choices) == "table" and item.choices or {}
+
+				if row_id == "" or i18n_key == "" or path == "" or #choices == 0 then
+					Logger.error(LOG, "'choice' item in '%s' needs id, i18n, path and choices — skipped.", manifest_key)
+					goto continue
+				end
+				if type(fn) ~= "function" then
+					Logger.error(LOG, "No command '%s' registered for the '%s.%s' choice — skipped.",
+						tostring(cmd_id), manifest_key, row_id)
+					goto continue
+				end
+
+				local current = nil
+				if type(getters[path]) == "function" then
+					current = getters[path]()
+				else
+					-- Fails open like checked_when: no value is ticked rather than a
+					-- guessed one, and the drift is loud.
+					Logger.error(LOG, "No getter for the '%s' value of choice '%s.%s' — nothing is ticked.",
+						path, manifest_key, row_id)
+				end
+
+				local sub = {}
+				for _, choice in ipairs(choices) do
+					local value = choice.value
+					sub[#sub + 1] = {
+						title   = i18n.get(choice.i18n),
+						checked = current == value,
+						fn      = function() return fn(value) end,
+					}
+				end
+				flush_sep()
+				table.insert(result, {
+					title    = i18n.get(i18n_key),
+					menu     = sub,
+					disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
+				})
 				item_count = item_count + 1
 
 			elseif t == "dynamic" then

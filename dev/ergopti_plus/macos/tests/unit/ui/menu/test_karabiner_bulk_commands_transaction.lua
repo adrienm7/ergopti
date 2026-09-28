@@ -14,12 +14,12 @@ local helpers = require("tests.helpers")
 local COMMAND_CASES = {
 	{
 		id = "disable_all",
-		label = "tap_hold.disable_all",
+		label = "common.clear_to_system",
 		method = "clear_all_bindings",
 	},
 	{
 		id = "reset_defaults",
-		label = "tap_hold.reset_defaults",
+		label = "common.restore_recommended",
 		method = "reset_to_defaults",
 	},
 	{

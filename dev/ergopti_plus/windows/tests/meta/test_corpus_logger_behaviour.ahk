@@ -22,6 +22,9 @@
 ; 4. trace/done and start/success can never be split by a threshold.
 ; 5. The ring buffer holds its capacity, reads oldest-first across a wrap, and
 ;    handles both boundaries either side of capacity.
+; 6. The consecutive dedup, replayed alone with repeat collapsing disarmed.
+; 7. Repeat collapsing: every "repeat" case replayed on a driven clock and clock
+;    face, with the exact delivered lines and summaries, then disarmed again.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -126,6 +129,143 @@ _LogCorpus_IndexOf(Line) {
 	return -1
 }
 
+; Emits one variant with a template and optional format arguments, for the repeat
+; cases, whose key is the unformatted template.
+_LogCorpus_EmitTemplate(Variant, Tag, Template, Args*) {
+	switch Variant {
+		case "debug":   LoggerDebug(Tag, Template, Args*)
+		case "trace":   LoggerTrace(Tag, Template, Args*)
+		case "done":    LoggerDone(Tag, Template, Args*)
+		case "info":    LoggerInfo(Tag, Template, Args*)
+		case "start":   LoggerStart(Tag, Template, Args*)
+		case "success": LoggerSuccess(Tag, Template, Args*)
+		case "warn":    LoggerWarn(Tag, Template, Args*)
+		case "error":   LoggerError(Tag, Template, Args*)
+		default:        throw Error("unknown variant in corpus: " . Variant)
+	}
+}
+
+; Expands a repeat case's steps into one flat, timed action list: "times"/"every"
+; repeat a step, "range" substitutes each number for "<n>" in the template.
+_LogCorpus_ExpandRepeatSteps(Steps) {
+	Actions := []
+	for _, Step in Steps {
+		if Step.Has("flush") {
+			Actions.Push(Map("at", Step["at"], "flush", Step["flush"]))
+		} else if Step.Has("range") {
+			From := Step["range"][1]
+			loop Step["range"][2] - From + 1 {
+				N := From + A_Index - 1
+				Actions.Push(Map("at", Step["at"] + (N - From) * Step["every"],
+					"variant", Step["variant"], "module", Step["module"],
+					"template", StrReplace(Step["template"], "<n>", N)))
+			}
+		} else {
+			Every := Step.Has("every") ? Step["every"] : 0
+			loop (Step.Has("times") ? Step["times"] : 1) {
+				Action := Map("at", Step["at"] + (A_Index - 1) * Every,
+					"variant", Step["variant"], "module", Step["module"], "template", Step["template"])
+				if Step.Has("arg")
+					Action["arg"] := Step["arg"]
+				Actions.Push(Action)
+			}
+		}
+	}
+	return Actions
+}
+
+; Splits one delivered line into its four spec section 3 fields.
+_LogCorpus_ParseLine(Line) {
+	if !RegExMatch(Line, "^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}:\d{3}) \[([A-Z]+)\] \[([^\]]*)\] (.*)$", &M)
+		throw Error("every delivered line must follow spec section 3, got: " . Line)
+	return Map("stamp", M[1], "label", M[2], "module", M[3], "body", M[4])
+}
+
+; Replays one repeat case on a driven clock and clock face and returns the
+; parsed lines the sink received plus the ring size. The file sinks, the dated
+; rollover and the layer itself are restored in `finally`, so one red case can
+; neither write fixture dates into a real log folder nor leak suppression into
+; every later test of the suite.
+_LogCorpus_ReplayRepeat(Section, Vector) {
+	global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_SUB_PATHS
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
+
+	Base := RegExReplace(Vector.Has("base_time") ? Vector["base_time"] : Section["base_time"], "[^0-9]")
+	At := 0
+	Lines := []
+	Ring := 0
+	SavedLevel := LOGGER_MIN_LEVEL
+	SavedLog := LOGGER_LOG_PATH
+	SavedErrors := LOGGER_ERRORS_LOG_PATH
+	SavedDate := _LOGGER_PATH_DATE
+	SavedSubPaths := _LOGGER_SUB_PATHS
+	LOGGER_LOG_PATH := ""
+	LOGGER_ERRORS_LOG_PATH := ""
+	_LOGGER_PATH_DATE := ""
+	_LOGGER_SUB_PATHS := Map()
+	_LogCorpus_SetLevel("DEBUG")
+	_LogCorpus_ResetDedup()
+	LOGGER_RING_BUFFER := []
+	LOGGER_RING_CURSOR := 0
+	_LOGGER_CLOCK_FN := () => At * 1000
+	_LOGGER_STAMP_FN := () => FormatTime(DateAdd(Base, At, "Seconds"), "yyyy-MM-dd HH:mm:ss") . ":000"
+	LoggerSetTestSink((L) => Lines.Push(L))
+	try {
+		_LoggerRepeatEnable()
+		Previous := ""
+		for _, Action in _LogCorpus_ExpandRepeatSteps(Vector["steps"]) {
+			if (Previous != "" && Action["at"] < Previous)
+				throw Error(Vector["id"] . ": corpus steps must be listed in time order")
+			Previous := Action["at"]
+			At := Action["at"]
+			if Action.Has("flush") {
+				_LoggerFlushRepeats(Action["flush"] == "terminal")
+				continue
+			}
+			; The corpus writes its single placeholder neutrally; this driver's
+			; formatter is Format().
+			Template := StrReplace(Action["template"], "<arg>", "{1}")
+			if Action.Has("arg")
+				_LogCorpus_EmitTemplate(Action["variant"], Action["module"], Template, Action["arg"])
+			else
+				_LogCorpus_EmitTemplate(Action["variant"], Action["module"], Template)
+		}
+		Ring := LoggerRingBufferSnapshot().Length
+	} finally {
+		LoggerClearTestSink()
+		_LoggerRepeatDisable()
+		_LOGGER_CLOCK_FN := 0
+		_LOGGER_STAMP_FN := 0
+		_LogCorpus_ResetDedup()
+		LOGGER_RING_BUFFER := []
+		LOGGER_RING_CURSOR := 0
+		_LOGGER_PENDING := []
+		_LOGGER_PENDING_ERRORS := []
+		_LOGGER_SUB_PENDING := Map()
+		LOGGER_LOG_PATH := SavedLog
+		LOGGER_ERRORS_LOG_PATH := SavedErrors
+		_LOGGER_PATH_DATE := SavedDate
+		_LOGGER_SUB_PATHS := SavedSubPaths
+		LOGGER_MIN_LEVEL := SavedLevel
+		_LoggerRefreshFastFlags()
+	}
+	return {Lines: Lines, Ring: Ring}
+}
+
+; Asserts one parsed line against one expected repeat-corpus entry.
+_LogCorpus_AssertRepeatLine(Id, Index, Got, Want) {
+	static Labels := Map("debug", "DEBUG", "trace", "TRACE", "done", "DONE", "info", "INFO",
+		"start", "START", "success", "SUCCESS", "warn", "WARNING", "error", "ERROR")
+	Where := Id . " line " . Index
+	AssertEqual(Labels[Want["variant"]], Got["label"], Where . ": level label")
+	AssertEqual(Want["module"], Got["module"], Where . ": module tag")
+	AssertEqual(StrReplace(Want["body"], "<arg>", "{1}"), Got["body"], Where . ": body")
+	if Want.Has("stamp")
+		AssertEqual(Want["stamp"], Got["stamp"], Where . ": timestamp")
+}
+
 
 
 
@@ -156,6 +296,8 @@ _LogCorpus_RunAll() {
 		AssertTrue(Data.Has("filtering") and Data["filtering"].Length > 0, "the filtering section is empty")
 		AssertTrue(Data.Has("lifecycle_pairs") and Data["lifecycle_pairs"].Length > 0, "the lifecycle-pair section is empty")
 		AssertTrue(Data.Has("ring_buffer") and Data["ring_buffer"]["cases"].Length > 0, "the ring-buffer section is empty")
+		AssertTrue(Data.Has("repeat") and Data["repeat"]["cases"].Length > 0,
+			"the repeat section is empty -- every repeat case below would pass vacuously")
 	}
 	Test("logger corpus: all sections present and non-empty", _LogCorpus_Sections)
 
@@ -303,8 +445,11 @@ _LogCorpus_RunAll() {
 	_LogCorpus_MakeDedupCase(Vector) {
 		_Run() {
 			global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
-			global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT, _LastErrTime
+			global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
 
+			; These cases pin the consecutive layer ALONE (see the corpus comment):
+			; an armed repeat layer would withhold the third line of a,b,a itself
+			AssertFalse(_LOGGER_REPEAT_ENABLED, "the dedup cases must replay with repeat collapsing disarmed")
 			Saved := LOGGER_MIN_LEVEL
 			_LogCorpus_SetLevel("DEBUG")
 			_LogCorpus_ResetDedup()
@@ -413,6 +558,76 @@ _LogCorpus_RunAll() {
 		_LoggerRefreshFastFlags()
 	}
 	Test("logger corpus dedup: a streak that outlives the window re-surfaces", _LogCorpus_DedupWindowExpires)
+
+
+
+	; ======================================
+	; ======================================
+	; ======= 7/ Repeat Collapsing =========
+	; ======================================
+	; ======================================
+
+	_LogCorpus_RepeatArmingRefusedTwice() {
+		global _LOGGER_REPEAT_ENABLED
+		; A second arming would otherwise discard every live streak and its count
+		_LoggerRepeatEnable()
+		Threw := false
+		try {
+			_LoggerRepeatEnable()
+		} catch as ArmErr {
+			Threw := InStr(ArmErr.Message, "already") > 0
+		} finally {
+			_LoggerRepeatDisable()
+		}
+		AssertTrue(Threw, "a second arming must raise and say why")
+		AssertFalse(_LOGGER_REPEAT_ENABLED, "disarming must leave the layer off")
+	}
+	Test("logger corpus repeat: arming twice is refused", _LogCorpus_RepeatArmingRefusedTwice)
+
+	_LogCorpus_MakeRepeatCase(Vector) {
+		_Run() {
+			Result := _LogCorpus_ReplayRepeat(Data["repeat"], Vector)
+			Id := Vector["id"]
+			Got := []
+			for _, L in Result.Lines
+				Got.Push(_LogCorpus_ParseLine(L))
+
+			if Vector.Has("expect") {
+				AssertEqual(Vector["expect"].Length, Got.Length,
+					Id . ": exactly the expected lines must reach the sink")
+				for I, Want in Vector["expect"]
+					_LogCorpus_AssertRepeatLine(Id, I, Got[I], Want)
+			}
+			if Vector.Has("expect_ring") {
+				AssertEqual(Vector["expect_ring"], Result.Ring,
+					Id . ": withheld occurrences must stay out of the ring the crash report reads")
+			}
+			if Vector.Has("expect_line_count") {
+				; A repeat summary quotes its streak's text right after the arrow; a
+				; dedup summary never does, which is what tells the two apart
+				Plain := 0
+				Summaries := []
+				for I, Line in Got {
+					if (SubStr(Line["body"], 1, 3) == Chr(0x2191) . ' "')
+						Summaries.Push(Map("line", Line, "next", I < Got.Length ? Got[I + 1]["body"] : ""))
+					else if (SubStr(Line["body"], 1, 2) != Chr(0x2191) . " ")
+						Plain += 1
+				}
+				AssertEqual(Vector["expect_line_count"], Plain, Id . ": non-summary line count")
+				AssertEqual(Vector["expect_summaries"].Length, Summaries.Length, Id . ": repeat summary count")
+				for I, Want in Vector["expect_summaries"] {
+					_LogCorpus_AssertRepeatLine(Id, I, Summaries[I]["line"], Want)
+					if Want.Has("followed_by")
+						AssertEqual(Want["followed_by"], Summaries[I]["next"],
+							Id . ": the summary must be emitted right before the line that evicted it")
+				}
+			}
+		}
+		return _Run
+	}
+	for _, Vector in Data["repeat"]["cases"] {
+		Test("logger corpus repeat: " . Vector["id"], _LogCorpus_MakeRepeatCase(Vector))
+	}
 
 
 	_LogCorpus_Default() {

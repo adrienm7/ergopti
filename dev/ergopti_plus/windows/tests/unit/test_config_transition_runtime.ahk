@@ -86,7 +86,8 @@ _CTRT_ResetSpecsAreCompleteAndOrdered() {
 	AssertEqual(ConfigPath, Specs[1]["path"])
 	AssertTrue(Specs[1]["new_present"] == 1)
 	AssertContains(Specs[1]["new_content"], "[_meta]")
-	AssertContains(Specs[1]["new_content"], "schema_version = 2")
+	AssertContains(Specs[1]["new_content"], "schema_version = " . ConfigMigrateCurrentVersion() . "`n",
+		"the placeholder carries the version the boot migration reads")
 	AssertEqual(TapHoldPath, Specs[2]["path"])
 	AssertTrue(Specs[2]["new_present"] == 0)
 	AssertEqual(ApiPath, Specs[3]["path"])

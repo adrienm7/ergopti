@@ -65,8 +65,9 @@ end
 --- the "Unknown action" branch.
 --- @param Gestures table The gestures manager.
 --- @param ids table Action ids.
+--- @param configure function|nil Installs daemon handlers after native doubles.
 --- @return table unknown, table pressed Chords sent, by action id.
-local function run_every_action(Gestures, ids)
+local function run_every_action(Gestures, ids, configure)
 	local Logger = require("logger.shim")
 	local saved = {
 		debug = Logger.debug, warn = Logger.warn,
@@ -90,6 +91,7 @@ local function run_every_action(Gestures, ids)
 		return { read = function() return "selection" end, close = function() return true end }
 	end
 	local ok, err = pcall(with_recorded_shell, function()
+		if configure then configure() end
 		for _, id in ipairs(ids) do
 			current = id
 			Gestures.execute_action(id, "test__slot")
@@ -108,15 +110,17 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 
 	helpers.it("runs every action the catalogue declares for Linux, and every one it offers", function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
-		local noop = function() end
-		Gestures.init({ enabled = false,
-			action_handlers = require("modules.shortcuts.script_actions").new({
-				reset = noop, reload = noop, quit = noop }).handlers })
 		local ids = Gestures.get_executable_action_names()
 		helpers.assert_true(#Gestures.LINUX_DECLARED_ACTIONS > 70,
 			"the shared catalogue must be read, or this loop proves nothing")
 		helpers.assert_true(#ids >= #Gestures.LINUX_DECLARED_ACTIONS)
-		local unknown = run_every_action(Gestures, ids)
+		local unknown = run_every_action(Gestures, ids, function()
+			local noop = function() end
+			local script = require("modules.shortcuts.script_actions").new({ reset = noop, reload = noop, quit = noop })
+			local handlers = require("modules.shortcuts.action_handlers").compose(script.handlers,
+				require("modules.shortcuts.manager"), require("modules.llm.prediction_engine"))
+			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
+		end)
 		helpers.assert_eq(unknown, {},
 			"declared or offered for Linux, and nothing runs: a tap, gesture or shortcut that does nothing")
 	end)
@@ -554,7 +558,7 @@ helpers.describe("linux actions: workspace switch", function()
 		return commands, pressed
 	end
 
-	local COMBO = { ws_prev = "ctrl+alt+Left", ws_next = "ctrl+alt+Right" }
+	local COMBO = { desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }
 
 	helpers.it("asks wmctrl first, and presses nothing when it switched (workspace-uinput)", function()
 		for action in pairs(COMBO) do
@@ -589,7 +593,7 @@ helpers.describe("linux actions: workspace switch", function()
 		-- The command used to end in `| xargs -r wmctrl -s`, which exits 0 on
 		-- empty input: a wmctrl that could not list anything reported success
 		-- and nothing ran after it. Run for real against stand-in wmctrls.
-		local commands = switch("ws_prev", true, true)
+		local commands = switch("desktop_prev", true, true)
 		local dir = os.tmpname()
 		os.remove(dir)
 		os.execute("mkdir " .. dir)

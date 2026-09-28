@@ -80,7 +80,7 @@ _ActPickWeb_Available() {
 ; Items is an ordered array of headings ({ Type:"heading", Level, Text }) and
 ; actions ({ Type:"action", Id, Label }); Current is the assigned id ("" means the
 ; synthetic native pick); OnConfirm(id) is invoked with the chosen id.
-_ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
+_ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, BindingId := "") {
 	global _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
 	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_OnConfirm, _ActPickWeb_InitJs
 	global _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch
@@ -98,7 +98,7 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	_ActPickWeb_ResetDone := false
 
 	_ActPickWeb_OnConfirm := OnConfirm
-	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative)
+	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId)
 
 	g := Gui("+Resize +MinSize360x360", Title)
 	g.BackColor := "0x1e1e1e"
@@ -191,7 +191,10 @@ _ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Close), -1)
 	} else if (Action == "confirm") {
 		Id := Payload.Has("id") ? Payload["id"] : ""
-		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Confirm, Id), -1)
+		; A send_* value the page's own editor collected travels with the pick.
+		HasParameter := Payload.Has("parameter") && (Payload["parameter"] is String)
+		Parameter := HasParameter ? Payload["parameter"] : ""
+		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Confirm, Id, HasParameter, Parameter), -1)
 	}
 }
 
@@ -219,15 +222,21 @@ _ActPickWeb_PushInit() {
 
 ; Apply the chosen action: map the synthetic native pick back to "" (as the
 ; native dialog did), close the window, then invoke the caller's callback.
-_ActPickWeb_Confirm(Id) {
+; A value the page's editor collected is offered to the parameter prompt the
+; callback's assignment runs, for this action only, and withdrawn afterwards.
+_ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "") {
 	global _ActPickWeb_OnConfirm
 	if A_IsSuspended
 		return false
 	cb := _ActPickWeb_OnConfirm
 	Mapped := (Id == "__native__") ? "" : Id
 	_ActPickWeb_Close()
-	if (cb != 0 && cb != "")
-		try cb(Mapped)
+	if (cb == 0 || cb == "")
+		return
+	if HasParameter
+		GestureOfferPickedParameter(Mapped, Parameter)
+	try cb(Mapped)
+	GestureClearPickedParameter()
 }
 
 
@@ -241,7 +250,7 @@ _ActPickWeb_Confirm(Id) {
 ; ===================================
 
 ; Build the `init({...})` call string consumed by the frontend.
-_ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
+_ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 	ItemsJson := ""
 	for _, It in Items {
 		if (ItemsJson != "")
@@ -253,10 +262,18 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
 				. _ActPickWeb_Kv("text", It.Text)
 				. "}"
 		} else {
+			; send_text / send_key / send_shortcut carry their kind, and the value
+			; the binding holds, for the page's own editor.
+			Kind := GestureActionParameterSpec(It.Id)
+			Parameter := (Kind = "text" || Kind = "key" || Kind = "shortcut")
+				? "," . _ActPickWeb_Kv("parameter", Kind) . "," . _ActPickWeb_Kv("parameterValue",
+					(BindingId = "") ? "" : GestureGetActionParameter(BindingId, It.Id))
+				: ""
 			ItemsJson .= "{"
 				. _ActPickWeb_Kv("type", "action") . ","
 				. _ActPickWeb_Kv("id", It.Id) . ","
 				. _ActPickWeb_Kv("label", It.Label)
+				. Parameter
 				. "}"
 		}
 	}
@@ -271,6 +288,9 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
 		. _ActPickWeb_Kv("searchPlaceholder", t("dialog.action_picker.search")) . ","
 		. _ActPickWeb_Kv("noResults", t("dialog.action_picker.no_results")) . ","
 		. _ActPickWeb_Kv("cancelLabel", t("button.cancel")) . ","
+		. _ActPickWeb_Kv("platform", "ahk") . ","
+		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
+		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
 		. '"items":[' . ItemsJson . "]"
 		. "}"
 
@@ -286,6 +306,23 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
 ; ======= 4/ Helpers / teardown =======
 ; =====================================
 ; =====================================
+
+; The editor's localized strings: its buttons, its capture hints, and each
+; kind's prompt and refusal, the same texts the native prompt shows.
+_ActPickWeb_ParameterStringsJson() {
+	Prompts := ""
+	Errors := ""
+	for _, Pair in [["text", "send_text"], ["key", "send_key"], ["shortcut", "send_shortcut"]] {
+		Prompts .= (Prompts = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureActionParameterPrompt(Pair[2]))
+		Errors .= (Errors = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureSendInputErrorText(Pair[1]))
+	}
+	return "{"
+		. _ActPickWeb_Kv("save", t("button.save")) . ","
+		. _ActPickWeb_Kv("back", t("dialog.action_picker.back")) . ","
+		. _ActPickWeb_Kv("captureKey", t("dialog.action_picker.capture_key")) . ","
+		. _ActPickWeb_Kv("captureShortcut", t("dialog.action_picker.capture_shortcut")) . ","
+		. '"prompts":{' . Prompts . '},"errors":{' . Errors . "}}"
+}
 
 ; Builds one JSON key/value pair (key:"value") with the value safely escaped.
 _ActPickWeb_Kv(Key, Value) {

@@ -1,0 +1,71 @@
+# _shared/core/config_schema/migrations.toml
+# Versioned config.toml: the ordered, data-only migration registry.
+#
+# READ AT RUNTIME, ON EVERY BOOT, BY ALL THREE DRIVERS, before anything applies
+# or saves config.toml: Windows through windows/infra/config_migrate.ahk, macOS
+# and Linux through _shared/lua/config_migrate.lua. The decision record is
+# docs/adr/009-config-versioning.md.
+#
+# A config.toml carries its version in ``[_meta] schema_version``. A file with
+# no stamp is ``unstamped_version``. At boot a driver:
+#   - older file  -> byte-exact backup ``<name>.pre-v<N>-<stamp>.toml``, every
+#                    step from the file's version to ``current_version`` in
+#                    order, stamp last, one atomic publish;
+#   - current     -> nothing is written;
+#   - newer file  -> the file is never written and the session is read-only
+#                    (ERROR logged), so a downgrade cannot destroy settings a
+#                    newer build wrote.
+#
+# Steps are ``[steps.v<from>_to_v<to>]`` tables with to = from + 1. ``drivers``
+# names the drivers whose files the ops apply to ("ahk", "hs", "linux"); any
+# other driver only moves its stamp through that version. ``ops`` is an array
+# drawn from a CLOSED set, addressed by explicit section/key (a section is a
+# [header] path, a key is one bare segment inside it):
+#   { op = "rename", section, key, to_section?, to_key? }
+#       Moves one value. Absent source: no-op. Existing target: the target
+#       keeps its value and the source is dropped.
+#   { op = "move_section", section, to_section }
+#       Moves a section and every section below it. Same conflict rule.
+#   { op = "merge_into", section, to_section }
+#       Moves the keys of one section (not its sub-sections) into another.
+#       Same conflict rule.
+#   { op = "map_value", section, key, map = [{ from, to }, ...] }
+#       Replaces a present value equal (same type) to a ``from``.
+#   { op = "delete", section, key? }
+#       Deletes one key, or without ``key`` a section and every section
+#       below it.
+#   { op = "set_if_absent", section, key, value }
+#       Writes a value only where the key is absent (freezes an old default
+#       before the default changes).
+# A section left without keys by an op disappears. Every op is idempotent, so
+# replaying a step on its own output changes nothing.
+#
+# Policy: a key rename, move or removal ships in the SAME commit as its step
+# here; readers drop the old spelling at once (no runtime aliases). The
+# registry, its corpus (_shared/tests/corpus/config_migrations/), the registry
+# defects every loader rejects (_shared/tests/corpus/config_migration_registries/)
+# and the three interpreters are pinned together by
+# tools/test/test-config-migrations.cjs.
+
+[registry]
+current_version = 3
+unstamped_version = 2
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= 1. Steps (in order) =======
+# ===================================
+# ===================================
+
+[steps.v2_to_v3]
+from = 2
+to = 3
+drivers = ["hs"]
+reason = "The circular Spaces navigation toggle is retired: Space actions carry the wrap choice."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

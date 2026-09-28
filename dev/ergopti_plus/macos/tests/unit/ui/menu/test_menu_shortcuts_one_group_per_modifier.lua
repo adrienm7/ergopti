@@ -85,8 +85,22 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 
 	helpers.it("draws the wrap-text toggle with a title", function()
 		local rows = render_shortcuts_submenu()
-		helpers.assert_true(type(rows[1].title) == "string" and rows[1].title:find("Wrap", 1, true) ~= nil,
-			"the wrap-text toggle must be the first, titled row, got " .. tostring(rows[1].title))
-		helpers.assert_true(type(rows[1].fn) == "function", "the wrap-text toggle must be clickable")
+		helpers.assert_eq(rows[1].title, "menu.shortcuts.enable", "the submenu opens with its category switch")
+		helpers.assert_eq(rows[2].title, "-", "a separator sets the switch apart")
+		-- The number-row tap keys follow the category switch and replace the fixed
+		-- screenshot key; the wrap-text toggle is the first row after them.
+		local wrap = nil
+		for _, entry in ipairs(rows) do
+			if type(entry.title) == "string" and entry.title:find("Wrap", 1, true) then
+				wrap = entry
+				break
+			end
+		end
+		helpers.assert_true(wrap ~= nil, "the wrap-text toggle must be drawn with its title")
+		helpers.assert_true(type(wrap.fn) == "function", "the wrap-text toggle must be clickable")
+		-- A section header is drawn with its dash decoration around the label.
+		helpers.assert_true(type(rows[3].title) == "string"
+			and rows[3].title:find("menu.shortcuts.header_tap_keys", 1, true) ~= nil,
+			"the tap keys follow the category switch under their header")
 	end)
 end)

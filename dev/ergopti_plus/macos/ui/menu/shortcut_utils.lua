@@ -12,6 +12,7 @@ local hs     = hs
 local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
+local SendInput = require("send_input")
 
 local LOG = "menu.shortcut_utils"
 
@@ -215,6 +216,20 @@ end
 -- ==============================================
 -- ==============================================
 
+--- Builds the "Configure <action>" dialog title from its translated template.
+---
+--- The substitution is done on plain indices rather than with gsub: an action
+--- label may contain a `%`, which gsub reads as a capture reference in the
+--- REPLACEMENT string and would raise "invalid use of '%'".
+--- @param label string The human-readable action label.
+--- @return string The localised title.
+function M.action_parameter_title(label)
+	local template = i18n.get("dialog.gestures.param_title")
+	local at = template:find("{1}", 1, true)
+	if not at then return template .. " " .. tostring(label) end
+	return template:sub(1, at - 1) .. tostring(label) .. template:sub(at + 3)
+end
+
 --- Prompts for an action's required parameter and stores it against `binding`.
 ---
 --- Some actions (open_url, search_web) carry no useful behaviour without a value:
@@ -230,54 +245,88 @@ end
 --- @param binding string The binding the parameter belongs to.
 --- @param action string The action being configured.
 --- @param spec string The parameter spec ("search_url" or a plain link).
+--- @param picked string|nil A value the action picker's own editor collected: it
+---   is stored without a prompt when it validates, and prefills the prompt when
+---   it does not.
 --- @return boolean True when a valid value was stored, false when cancelled.
---- Builds the "Configure <action>" dialog title from its translated template.
----
---- The substitution is done on plain indices rather than with gsub: an action
---- label may contain a `%`, which gsub reads as a capture reference in the
---- REPLACEMENT string and would raise "invalid use of '%'".
---- @param label string The human-readable action label.
---- @return string The localised title.
-function M.action_parameter_title(label)
-	local template = i18n.get("dialog.gestures.param_title")
-	local at = template:find("{1}", 1, true)
-	if not at then return template .. " " .. tostring(label) end
-	return template:sub(1, at - 1) .. tostring(label) .. template:sub(at + 3)
-end
-
-function M.prompt_action_parameter(gestures, binding, action, spec)
+function M.prompt_action_parameter(gestures, binding, action, spec, picked)
 	if type(gestures) ~= "table" or type(spec) ~= "string" then return false end
 
 	local label  = (type(gestures.get_action_label) == "function" and gestures.get_action_label(action)) or action
 	local prior  = (type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(binding, action)) or ""
-	-- The %s inside the search-URL prompt is LITERAL — it is the placeholder the
-	-- user has to type — so this string is never run through string.format. The
-	-- title uses {1} precisely so the two can never be confused.
-	local prompt = i18n.get(spec == "search_url"
-		and "dialog.gestures.param_search_url"
-		or  "dialog.gestures.param_link")
+	-- The prompt and its refusal text belong to the parameter kind; the gestures
+	-- module owns them for every binding editor.
+	local prompt = gestures.parameter_prompt(action)
 
 	-- Loop until the value validates or the user cancels: accepting an invalid one
 	-- would store a parameter the action's own validator later rejects, which is
 	-- the silent no-op this prompt exists to prevent.
 	local title    = M.action_parameter_title(label)
 	local save_btn = i18n.get("button.save")
+	local value    = type(picked) == "string" and picked or nil
 
 	while true do
-		local prompt_ok, button, value = pcall(dialog.text_prompt,
-			title, prompt, prior, save_btn, i18n.get("button.cancel"))
-		if not prompt_ok or button ~= save_btn then return false end
+		if value == nil then
+			local prompt_ok, button, typed = pcall(dialog.text_prompt,
+				title, prompt, prior, save_btn, i18n.get("button.cancel"))
+			if not prompt_ok or button ~= save_btn then return false end
+			value = typed
+		end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
 			return apply_prompt_update(gestures.set_action_parameter,
 				binding, action, value)
 		end
 		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-			i18n.get("dialog.gestures.param_err_url")
-			.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
-			"OK", nil, "warning")
+			gestures.parameter_error(action), "OK", nil, "warning")
 		prior = value or prior
+		value = nil
 	end
+end
+
+-- What picker_parameter_fields reads from the gestures facade.
+local PICKER_EDITOR_FACADE = {
+	"get_action_parameter_spec", "get_action_parameter", "parameter_prompt", "parameter_error", "send_vocabulary",
+}
+
+--- Readies picker items for the picker's own parameter editor: each action whose
+--- parameter is a text, a key or a shortcut is marked with its kind and the value
+--- `binding` holds for it, and the returned fields give the page the send-input
+--- vocabulary and the same prompts and refusals as the native prompt.
+--- @param gestures table The gestures facade.
+--- @param items table Picker items, marked in place.
+--- @param binding string|nil The binding the pick is for; nil marks no value.
+--- @return table { send_vocabulary, parameter_strings }, the options ActionPicker.open
+---   reads; empty, with an error logged, when the facade lacks what the editor
+---   needs, and every value is then asked by the native prompt.
+function M.picker_parameter_fields(gestures, items, binding)
+	for _, name in ipairs(PICKER_EDITOR_FACADE) do
+		if type(gestures) ~= "table" or type(gestures[name]) ~= "function" then
+			Logger.error(LOG, "The gestures facade has no %s — the picker cannot edit a value.", name)
+			return {}
+		end
+	end
+	local prompts, errors = {}, {}
+	for _, item in ipairs(items) do
+		local kind = item.type == "action" and gestures.get_action_parameter_spec(item.id) or nil
+		if kind and SendInput.KINDS[kind] then
+			item.parameter = kind
+			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
+			prompts[kind] = gestures.parameter_prompt(item.id)
+			errors[kind] = gestures.parameter_error(item.id)
+		end
+	end
+	return {
+		send_vocabulary = gestures.send_vocabulary(),
+		parameter_strings = {
+			save = i18n.get("button.save"),
+			back = i18n.get("dialog.action_picker.back"),
+			captureKey = i18n.get("dialog.action_picker.capture_key"),
+			captureShortcut = i18n.get("dialog.action_picker.capture_shortcut"),
+			prompts = prompts,
+			errors = errors,
+		},
+	}
 end
 
 return M

@@ -29,6 +29,133 @@ local function minimal_data()
 end
 
 helpers.describe("toml_writer: exact transactional acknowledgement", function()
+	helpers.it("uses a conditional-only adapter without escaping to native filesystem publication", function()
+		local source, writes = '[shortcuts]\nenabled = true\n', 0
+		with_file_stubs(function() error("an explicit adapter owns every file operation") end, nil, function()
+			local wrote = writer.batch_write("/controlled/conditional-only.toml", {
+				{ section = "shortcuts", key = "enabled", delete = true },
+			}, {
+				read_with_status = function() return source, "ok" end,
+				write_if_unchanged = function(_, candidate, expected)
+					helpers.assert_eq(expected.content, source)
+					source, writes = candidate, writes + 1
+					return true
+				end,
+			})
+			helpers.assert_eq(wrote, true)
+		end)
+		helpers.assert_eq(writes, 1)
+		helpers.assert_eq(source:find("enabled", 1, true), nil)
+	end)
+
+	helpers.it("batch_write commits sparse deletes and sets without moving unrelated keys", function()
+		local initial = '# Keep this comment.\n[shortcuts]\nenabled = true\nfuture = "keep"\n'
+			.. '[expert]\nvalue = "unchanged"\n'
+		local captured, writes = nil, 0
+		local wrote = writer.batch_write("/controlled/sparse.toml", {
+			{ section = "shortcuts", key = "enabled", delete = true },
+			{ section = "shortcuts", key = "custom", value = "chosen" },
+			{ section = "absent", key = "enabled", delete = true },
+		}, {
+			read_with_status = function() return initial, "ok" end,
+			write = function() error("sparse writes require exact source publication") end,
+			write_if_unchanged = function(_, content, expected)
+				writes = writes + 1
+				helpers.assert_eq(expected.content, initial)
+				captured = content
+				return true
+			end,
+		})
+		helpers.assert_eq(wrote, true, "explicit deletion is a valid batch operation")
+		helpers.assert_eq(writes, 1, "mixed changes must publish together")
+		local decoded = codec.decode(captured)
+		helpers.assert_eq(decoded.shortcuts.enabled, nil)
+		helpers.assert_eq(decoded.shortcuts.custom, "chosen")
+		helpers.assert_eq(decoded.shortcuts.future, "keep")
+		helpers.assert_eq(decoded.expert.value, "unchanged")
+		helpers.assert_eq(decoded.expert.custom, nil)
+		helpers.assert_eq(decoded.absent, nil, "deleting an absent leaf must not create a section")
+		helpers.assert_contains(captured, '# Keep this comment.\n')
+	end)
+
+	helpers.it("batch_write keeps multiline lookalikes intact when deleting a real leaf", function()
+		local initial = '[expert]\nnote = """\n[shortcuts]\nenabled = true\n"""\n'
+			.. '[shortcuts] # real section\nenabled = true\nfuture = [\n  "keep",\n]\n'
+		local captured
+		helpers.assert_eq(writer.batch_write("/controlled/multiline-sparse.toml", {
+			{ section = "shortcuts", key = "enabled", delete = true },
+		}, {
+			read_with_status = function() return initial, "ok" end,
+			write = function() error("sparse writes require exact source publication") end,
+			write_if_unchanged = function(_, content) captured = content; return true end,
+		}), true)
+		local decoded = codec.decode(captured)
+		helpers.assert_eq(decoded.shortcuts.enabled, nil)
+		helpers.assert_eq(decoded.shortcuts.future[1], "keep")
+		helpers.assert_eq(decoded.expert.note, '[shortcuts]\nenabled = true\n')
+		helpers.assert_contains(captured, '[expert]\nnote = """\n[shortcuts]\nenabled = true\n"""\n')
+	end)
+
+	helpers.it("batch_write refuses a mixed sparse transaction without changing its source", function()
+		local disk = '[shortcuts]\nenabled = true\n[expert]\nkeep = 7\n'
+		local original, publications = disk, 0
+		local wrote = writer.batch_write("/controlled/refused-sparse.toml", {
+			{ section = "shortcuts", key = "enabled", delete = true },
+			{ section = "shortcuts", key = "custom", value = "chosen" },
+		}, {
+			read_with_status = function() return disk, "ok" end,
+			write = function() error("sparse writes require exact source publication") end,
+			write_if_unchanged = function(_, content, expected)
+				publications = publications + 1
+				helpers.assert_eq(expected.content, original)
+				helpers.assert_eq(codec.decode(content).shortcuts.custom, "chosen")
+				return false, "injected publication refusal"
+			end,
+		})
+		helpers.assert_eq(wrote, false)
+		helpers.assert_eq(publications, 1, "the refusal must exercise publication, not validation")
+		helpers.assert_eq(disk, original)
+	end)
+
+	helpers.it("batch_write rejects a snapshot superseded before the save begins", function()
+		local writes = 0
+		local wrote = writer.batch_write("/controlled/stale-sparse.toml", {
+			{ section = "shortcuts", key = "enabled", value = true },
+		}, {
+			read_with_status = function() return '[shortcuts]\nenabled = false\n', "ok" end,
+			write = function() writes = writes + 1; return true end,
+		}, { status = "ok", content = '[shortcuts]\nenabled = true\n' })
+		helpers.assert_eq(wrote, false)
+		helpers.assert_eq(writes, 0, "an old runtime snapshot cannot overwrite a newer disk edit")
+	end)
+
+	helpers.it("batch_write rejects malformed documents and ambiguous quoted targets", function()
+		for _, source in ipairs({ '[shortcuts]\nenabled = true\nenabled = false\n',
+			'[shortcuts]\n"enabled" = true\n' }) do
+			local writes = 0
+			local wrote = writer.batch_write("/controlled/invalid-sparse.toml", {
+				{ section = "shortcuts", key = "enabled", value = false },
+			}, {
+				read_with_status = function() return source, "ok" end,
+				write = function() writes = writes + 1; return true end,
+			})
+			helpers.assert_eq(wrote, false)
+			helpers.assert_eq(writes, 0)
+		end
+	end)
+
+	helpers.it("batch_write never reports an unaddressable deletion as committed", function()
+		local writes = 0
+		local wrote = writer.batch_write("/controlled/quoted-delete.toml", {
+			{ section = "shortcuts", key = "enabled", delete = true },
+		}, {
+			read_with_status = function() return '[shortcuts]\n"enabled" = true\n', "ok" end,
+			write = function() writes = writes + 1; return true end,
+		})
+		helpers.assert_eq(wrote, false)
+		helpers.assert_eq(writes, 0)
+	end)
+
 	helpers.it("write refuses to rename after a returned write failure", function()
 		local renames = 0
 		with_file_stubs(function(_, mode)
@@ -72,7 +199,7 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			{ section = "script", key = nil, value = "x" },
 			{ section = "script", key = "", value = "x" },
 			{ section = "script", key = "value" },
-			{ section = "script", key = "value", value = {} },
+			{ section = "script", key = "value", value = function() end },
 		}
 
 		for index, row in ipairs(invalid_rows) do
@@ -386,6 +513,24 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			"calling the two-argument write port would silently discard the snapshot")
 	end)
 
+	helpers.it("publishes arrays and inline tables together with an explicit deletion", function()
+		local captured
+		local adapter = {
+			read_with_status = function() return "[llm]\nenabled = true\n", "ok" end,
+			write = function(_, content) captured = content; return true end,
+		}
+		local ok = writer.batch_write("/controlled/compound.toml", {
+			{ section = "llm", key = "enabled", delete = true },
+			{ section = "llm", key = "modifiers", value = { "ctrl", "shift" } },
+			{ section = "llm", key = "profile", value = { name = "draft", temperature = 0.7 } },
+		}, adapter)
+		helpers.assert_eq(ok, true)
+		local decoded = codec.decode(captured)
+		helpers.assert_eq(decoded.llm.enabled, nil)
+		helpers.assert_eq(decoded.llm.modifiers[2], "shift")
+		helpers.assert_eq(decoded.llm.profile.temperature, 0.7)
+	end)
+
 	helpers.it("batch_write publishes escaped strings that the shared codec can read back", function()
 		local captured
 		local adapter = {
@@ -409,3 +554,5 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			"batch_write strings must survive the next parse byte-for-byte")
 	end)
 end)
+
+require("test.toml_quoted_headers_contract")(helpers)

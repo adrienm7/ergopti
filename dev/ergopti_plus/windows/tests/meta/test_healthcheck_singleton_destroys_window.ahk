@@ -88,31 +88,36 @@ Test("meta healthcheck-singleton: closing the window by hand clears the singleto
 	_HCSW_ManualCloseClearsTheHandle)
 
 
-; NavigationCompleted is delivered asynchronously by WebView2. A callback from
-; the window just closed can therefore run after its replacement has assigned
-; the module globals. The callback and its deferred injection must carry the
+; WebMessageReceived is delivered asynchronously by WebView2, and the probes
+; answer later still. A message or an answer of the window just closed can
+; therefore arrive after its replacement has assigned the module globals. The
+; subscription, the deferred handling and every push into the page carry the
 ; opening session, while Reset revokes that session before releasing COM state.
 ; This stays source-level because the headless suite never constructs WebView2.
-_HCSW_NavigationCallbackOwnsWindowSession() {
+_HCSW_MessagesOwnWindowSession() {
 	ShowBody := _DriverFuncBody("HealthCheck_ShowWindow")
-	NavigationBody := _DriverFuncBody("_HC_OnNavigationCompleted")
-	PushBody := _DriverFuncBody("_HC_PushSnapshot")
+	ReceiveBody := _DriverFuncBody("_HC_OnWebMessage")
+	HandleBody := _DriverFuncBody("_HC_HandleMessage")
+	SendBody := _DriverFuncBody("_HC_Send")
+	PublishBody := _DriverFuncBody("_HC_PublishProbe")
 	ResetBody := _DriverFuncBody("_HC_Reset")
-	Assert(ShowBody != "" && NavigationBody != "" && PushBody != "" && ResetBody != "",
-		"the healthcheck WebView opening, navigation, injection, and reset functions must exist")
+	Assert(ShowBody != "" && ReceiveBody != "" && HandleBody != "" && SendBody != "" && PublishBody != ""
+		&& ResetBody != "", "the healthcheck WebView opening, messaging, and reset functions must exist")
 	Assert(InStr(ShowBody, "_HC_WindowEpoch += 1") > 0
-		&& InStr(ShowBody, "_HC_OnNavigationCompleted.Bind(WindowEpoch)") > 0,
-		"each healthcheck WebView instance must allocate and bind a window epoch to NavigationCompleted")
-	NavigationGuardPos := InStr(NavigationBody, "WindowEpoch != _HC_WindowEpoch")
-	NavigationTimerPos := InStr(NavigationBody, "_HC_PushSnapshot.Bind(WindowEpoch)")
-	Assert(NavigationGuardPos > 0 && NavigationTimerPos > NavigationGuardPos,
-		"a late NavigationCompleted callback must reject a retired session before scheduling the snapshot")
-	Assert(InStr(PushBody, "WindowEpoch != _HC_WindowEpoch") > 0,
-		"the deferred snapshot injection must revalidate its captured session before resolving mutable WebView globals")
+		&& InStr(ShowBody, "_HC_OnWebMessage.Bind(WindowEpoch)") > 0,
+		"each healthcheck WebView instance must allocate and bind a window epoch to WebMessageReceived")
+	GuardPos := InStr(ReceiveBody, "WindowEpoch != _HC_WindowEpoch")
+	TimerPos := InStr(ReceiveBody, "_HC_HandleMessage.Bind(WindowEpoch")
+	Assert(GuardPos > 0 && TimerPos > GuardPos,
+		"a late message must be rejected for a retired session before its handling is scheduled")
+	for Name, Body in Map("_HC_HandleMessage", HandleBody, "_HC_Send", SendBody, "_HC_PublishProbe", PublishBody)
+		Assert(InStr(Body, "WindowEpoch != _HC_WindowEpoch") > 0,
+			Name . " must revalidate its captured session before touching the page")
 	RevokePos := InStr(ResetBody, "_HC_WindowEpoch += 1")
+	CancelPos := InStr(ResetBody, "HealthCheck_CancelProbes()")
 	ClosePos := InStr(ResetBody, ".Close()")
-	Assert(RevokePos > 0 && ClosePos > RevokePos,
-		"reset must revoke the active window epoch before closing its controller")
+	Assert(RevokePos > 0 && CancelPos > RevokePos && ClosePos > CancelPos,
+		"reset must revoke the window epoch and cancel its probes before closing the controller")
 }
-Test("meta healthcheck-singleton: navigation callbacks cannot cross window sessions (AHK-152)",
-	_HCSW_NavigationCallbackOwnsWindowSession)
+Test("meta healthcheck-singleton: page messages and probe answers cannot cross window sessions (AHK-152)",
+	_HCSW_MessagesOwnWindowSession)

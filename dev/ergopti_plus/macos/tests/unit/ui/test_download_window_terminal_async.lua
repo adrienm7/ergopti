@@ -67,7 +67,7 @@ local function with_terminal_bridge(callback)
 			launch_result = true,
 		}
 		local logger = helpers.make_logger_stub()
-		logger.UNIFIED_LOG_FILE = "/controlled/hammerspoon.log"
+		logger.today_log_path = function() return "/controlled/hammerspoon.log" end
 		state.logger = logger
 		logger.error = function(...) append_error(state, ...) end
 		logger.callback = function(module, label, fn, ...)
@@ -168,7 +168,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 	}) do
 		helpers.it("quotes the bootstrap log path " .. case.path, function()
 			with_terminal_bridge(function(window, state)
-				state.logger.UNIFIED_LOG_FILE = case.path
+				state.logger.today_log_path = function() return case.path end
 				helpers.assert_true(window.show({ kind = "mlx_install" }))
 				state.bridge({ body = { action = "terminal", session = window.session_id() } })
 				local expected = require("infra.text_utils").applescript_format(

@@ -176,8 +176,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		PendingSep := false
 
 		if ItemType == "toggle" {
-			_MR_RenderToggle(Result, Item, CategoryName)
-			ItemCount++
+			ItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)
+
+		} else if ItemType == "choice" {
+			ItemCount += _MR_RenderChoice(Result, Item, ManifestKey, Commands, StateGetters)
 
 		} else if ItemType == "feature" {
 			_MR_RenderFeature(Result, Item, CategoryName)
@@ -221,42 +223,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			}
 
 		} else if (ItemType == "check" or ItemType == "command") {
-			; The declarative row: the manifest carries its label, its checkmark
-			; predicate and its greying predicate, and the driver supplies only a
-			; NAMED behaviour through Commands.
-			;
-			; Every other type that carries behaviour hands the id back to a driver
-			; function that builds the row itself, which is why 639 rows across the
-			; three drivers lived outside their renderers. Here the row is built
-			; ONCE, in each driver's renderer, from one shared declaration — so the
-			; same setting cannot render as a tick on one OS and a checkbox on
-			; another. The Lua renderer implements the identical two types.
-			Id := _MR_Get(Item, "id")
-			I18nKey := _MR_Get(Item, "i18n")
-			CmdId := _MR_Get(Item, "command")
-			if (CmdId == "") {
-				CmdId := Id
-			}
-			if (Id == "" or I18nKey == "") {
-				try LoggerWarn("MenuRenderer", "'{1}' item missing id or i18n in '{2}' — skipped.", ItemType, ManifestKey)
-			} else if !(Commands is Map and Commands.Has(CmdId)) {
-				; Same class of drift as the action branch: a declared row whose
-				; command nobody registered renders one item short, permanently.
-				try LoggerWarn("MenuRenderer", "No command '{1}' for '{2}.{3}' — skipped.", CmdId, ManifestKey, Id)
-			} else {
-				Row := Map("label", t(I18nKey), "action", Commands[CmdId])
-				if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
-					Row["disabled"] := true
-				}
-				; Only "check" carries a tick. Giving a plain command row
-				; checked := false would draw an empty box beside a row that
-				; toggles nothing.
-				if (ItemType == "check") {
-					Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
-				}
-				_MR_RenderRows(Result, [Row], Id, 1)
-				ItemCount++
-			}
+			ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
 
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
@@ -321,6 +288,12 @@ _MR_ReportDriverDialect(Row, ListId) {
 	if (Row.Has("fn") and !Row.Has("action")) {
 		try LoggerError("MenuRenderer", "List '{1}' row '{2}' carries 'fn' — a provider row says 'action', so the row does nothing when clicked.", ListId, Named)
 	}
+	; A Win32 item that opens a submenu sends no command, so the subtree wins
+	; below and this action is dropped. Mirrors the shared Lua renderer, where the
+	; same shape left four macOS categories impossible to switch on.
+	if (Row.Has("action") and (Row.Has("items") or Row.Has("submenu"))) {
+		try LoggerError("MenuRenderer", "List '{1}' row '{2}' carries both an 'action' and a subtree — a row that opens a submenu is never clicked, so the action can never run.", ListId, Named)
+	}
 }
 
 ; Turn a list provider's row DATA into AHK menu items.
@@ -360,6 +333,8 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			try LoggerWarn("MenuRenderer", "List '{1}' produced a row with no label — skipped.", ListId)
 			continue
 		}
+		; Rows carry literal text; only the native menu syntax treats & as a mnemonic.
+		Label := StrReplace(Label, "&", "&&")
 
 		if (Row.Has("items") and Row["items"] is Array) {
 			SubMenu := Menu()
@@ -409,22 +384,157 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 	return Added
 }
 
-; Render the category on/off toggle item (always inserted at position 1).
-; The caller typically calls ``AddCategoryToggleItem`` directly before calling
-; ``MenuRenderer_Build`` so the toggle lands at the top before any manifest
-; items; this handler is here as a safety net for menus that embed it inline.
-_MR_RenderToggle(ResultMenu, Item, CategoryName) {
-	I18nOn  := _MR_Get(Item, "i18n_on")
-	I18nOff := _MR_Get(Item, "i18n_off")
-	if (I18nOn == "" or I18nOff == "") {
-		try LoggerWarn("MenuRenderer", "toggle item missing i18n_on/i18n_off — skipped.")
-		return
+; Renders the same declared command/check in full and native-built menus.
+_MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	ItemType := _MR_Get(Item, "type")
+	Id := _MR_Get(Item, "id")
+	I18nKey := _MR_Get(Item, "i18n")
+	CmdId := _MR_Get(Item, "command", Id)
+	if CmdId == ""
+		CmdId := Id
+	if Id == "" || I18nKey == "" || !(Commands is Map) || !Commands.Has(CmdId) {
+		try LoggerError("MenuRenderer", "Missing declaration or command for '{1}.{2}'.", ManifestKey, Id)
+		return 0
 	}
-	IsGated := IsCategoryGated(CategoryName)
-	AddCategoryToggleItem(ResultMenu,
-		t(I18nOn), t(I18nOff),
-		IsGated,
-		((Cat, Gated) => (*) => ToggleCategoryAllFeatures(Cat, !Gated))(CategoryName, IsGated))
+	Row := Map("label", t(I18nKey), "action", Commands[CmdId])
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
+		Row["disabled"] := true
+	if ItemType == "check"
+		Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+}
+
+/**
+ * Appends one declared command to a menu assembled by its native owner.
+ * @param {Menu} TargetMenu Native menu receiving the command.
+ * @param {String} ManifestKey Canonical menu declaration.
+ * @param {String} CommandId Declared command identifier.
+ * @param {Map} Commands Owner callbacks indexed by command identifier.
+ * @returns {Integer} Number of rows drawn.
+ */
+MenuRenderer_AppendCommand(TargetMenu, ManifestKey, CommandId, Commands, StateGetters := unset) {
+	Item := _MR_FindItemById(ManifestKey, CommandId)
+	if !(Item is Map) || _MR_Get(Item, "type") != "command" || !_MR_IsForAhk(Item)
+		return 0
+	return _MR_RenderCommand(TargetMenu, Item, ManifestKey, Commands, IsSet(StateGetters) ? StateGetters : Map())
+}
+
+; Renders a category's master switch as a checkbox row, in manifest order.
+;
+; The row is labelled by the toggle's one ``i18n`` key, ticked from its
+; ``checked_when`` getters and greyed by its ``disabled_when`` ones, exactly like
+; a ``check`` row, and it runs the command the caller registered under its id.
+; It used to be a row whose label alternated between « ✅ … (cliquer pour
+; désactiver) » and « ❌ … (cliquer pour activer) », inserted at position 1 with
+; its own separator, and three builders inserted theirs by hand instead. A toggle
+; with no registered command is reported and not drawn: falling back to a
+; generic category flip would hide a builder that forgot the switch.
+; @returns {Integer} 1 when the row was drawn, 0 otherwise.
+_MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Id := _MR_Get(Item, "id")
+	I18nKey := _MR_Get(Item, "i18n")
+	CmdId := _MR_Get(Item, "command")
+	if (CmdId == "") {
+		CmdId := Id
+	}
+	if (Id == "" or I18nKey == "") {
+		try LoggerWarn("MenuRenderer", "toggle item in '{1}' missing id or i18n — skipped.", ManifestKey)
+		return 0
+	}
+	if !(Commands is Map and Commands.Has(CmdId)) {
+		try LoggerError("MenuRenderer", "No command '{1}' for the '{2}' category switch — its submenu has no way to turn it on or off.", CmdId, ManifestKey)
+		return 0
+	}
+	Row := Map(
+		"label",   t(I18nKey),
+		"action",  Commands[CmdId],
+		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+		Row["disabled"] := true
+	}
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+}
+
+; Renders a ``choice`` row: one setting with a fixed set of values, drawn as ONE
+; row whose submenu lists the values with the current one ticked.
+;
+; The values and their label keys come from the row's ``choices``, which
+; build-menu-manifest.js projects from the enum feature at ``path`` — a value
+; added to the feature appears without a driver change. The driver supplies the
+; current value through ``StateGetters[path]`` and what choosing a value does
+; through ``Commands[id]``, called with that value. The shared Lua renderer
+; draws the identical row.
+; @returns {Integer} 1 when the row was drawn, 0 otherwise.
+_MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Id := _MR_Get(Item, "id")
+	I18nKey := _MR_Get(Item, "i18n")
+	Path := _MR_Get(Item, "path")
+	Choices := _MR_Get(Item, "choices", 0)
+	CmdId := _MR_Get(Item, "command")
+	if (CmdId == "") {
+		CmdId := Id
+	}
+	if (Id == "" or I18nKey == "" or Path == "" or !(Choices is Array) or Choices.Length == 0) {
+		try LoggerError("MenuRenderer", "choice item in '{1}' needs id, i18n, path and choices — skipped.", ManifestKey)
+		return 0
+	}
+	if !(Commands is Map and Commands.Has(CmdId)) {
+		try LoggerError("MenuRenderer", "No command '{1}' for the '{2}.{3}' choice — skipped.", CmdId, ManifestKey, Id)
+		return 0
+	}
+	; Fails open like checked_when: no value is ticked rather than a guessed one,
+	; and the drift is loud.
+	Current := ""
+	HasCurrent := false
+	if (StateGetters is Map and StateGetters.Has(Path)) {
+		Current := (StateGetters[Path])()
+		HasCurrent := true
+	} else {
+		try LoggerError("MenuRenderer", "No getter for the '{1}' value of choice '{2}.{3}' — nothing is ticked.", Path, ManifestKey, Id)
+	}
+	Command := Commands[CmdId]
+	Rows := []
+	for Choice in Choices {
+		Value := _MR_Get(Choice, "value")
+		Rows.Push(Map(
+			"label",   t(_MR_Get(Choice, "i18n")),
+			"checked", HasCurrent and Current == Value,
+			"action",  ((V) => (*) => Command(V))(Value)))
+	}
+	Row := Map("label", t(I18nKey), "items", Rows)
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+		Row["disabled"] := true
+	}
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+}
+
+; The command every master-gated category registers for its switch: flip
+; ``CategoryEnabled[Category]`` and leave the category's own rows as they are.
+; The state is read at click time, not captured when the menu was built.
+; @param Category {String} Master-gate category name (e.g. "Shortcuts").
+; @returns {Func} The menu callback.
+MenuRenderer_CategoryGateCommand(Category) {
+	return (*) => ToggleCategoryAllFeatures(Category, !IsCategoryGated(Category))
+}
+
+; Renders ONE declared toggle into a menu a driver builds itself.
+;
+; The IA submenu is assembled natively row by row and does not go through
+; MenuRenderer_Build, but its switch is still the manifest's row: the same
+; label, tick and command lookup as every other category, from the same code.
+; @param TargetMenu {Menu} The menu being built.
+; @param ManifestKey {String} Manifest array holding the toggle (e.g. "llm_menu").
+; @param ToggleId {String} The toggle row's id.
+; @param Commands {Map} Command id → callback.
+; @param StateGetters {Map} checked_when / disabled_when key → getter.
+; @returns {Integer} 1 when the row was drawn, 0 otherwise.
+MenuRenderer_AppendToggle(TargetMenu, ManifestKey, ToggleId, Commands, StateGetters) {
+	Item := _MR_FindItemById(ManifestKey, ToggleId)
+	if (Item == false or _MR_Get(Item, "type") != "toggle") {
+		try LoggerError("MenuRenderer", "No toggle '{1}' in '{2}' — the category switch is not drawn.", ToggleId, ManifestKey)
+		return 0
+	}
+	return _MR_RenderToggle(TargetMenu, Item, ManifestKey, Commands, StateGetters)
 }
 
 ; Render a manifest-path feature toggle.
@@ -447,11 +557,10 @@ _MR_RenderFeature(ResultMenu, Item, CategoryName) {
 ; items: a leading one, a trailing one, or the second of two in a row.
 ;
 ; The deferred "---" in MenuRenderer_Build only sees the manifest's own
-; separators. Rows the driver supplies bring their own: AddCategoryToggleItem
-; inserts one after every category toggle (the Lua renderer adds none, so the
-; manifest declares a "---" there for the Lua drivers), and list providers
-; return separator rows. One landing beside a manifest "---" drew two lines in a
-; row under « Disposition ». The shared Lua renderer applies the same rule.
+; separators. Rows the driver supplies bring their own — list providers return
+; separator rows — and one landing beside a manifest "---" drew two lines in a
+; row under « Disposition », back when the category switch was inserted by hand
+; with a separator of its own. The shared Lua renderer applies the same rule.
 _MR_NormalizeSeparators(TargetMenu) {
 	Count := TrayMenuItemCount(TargetMenu)
 	Position := 0            ; zero-based, as TrayMenuIsSeparatorAt takes it

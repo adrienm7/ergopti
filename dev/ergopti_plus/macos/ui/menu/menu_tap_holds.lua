@@ -919,6 +919,11 @@ function M.build(ctx)
 				update_menu
 			)
 		end,
+		-- Required on the click: the editor loads the layer data and its window
+		-- stack, which a menu build has no use for.
+		["edit_nav_layer"] = function()
+			return require("ui.layer_editor").open({ karabiner = karabiner })
+		end,
 		["copy_tap_to_combo"] = function()
 			return run_bulk_menu_command(
 				karabiner,

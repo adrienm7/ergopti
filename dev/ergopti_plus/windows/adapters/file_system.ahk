@@ -32,6 +32,13 @@
 ; =======================================================
 ; =======================================================
 
+; Reads UTF-8 text using AHK's BOM handling and preserves native read failures.
+; @param Path {String} File path.
+; @return {String} Text contents; throws when the read fails.
+FSReadStrict(Path) {
+	return FileRead(Path, "UTF-8")
+}
+
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.
@@ -292,6 +299,46 @@ FSStrictExists(Path) {
 		return 0
 	throw OSError(ErrorCode, A_ThisFunc,
 		"GetFileAttributesW failed for '" . Path . "'.")
+}
+
+/**
+ * Enumerates one directory without treating access or device failures as absence.
+ * @param {String} Path - Directory path; proven optional absence yields no entries.
+ * @param {Integer} Directories - True selects directories, false regular entries.
+ * @returns {Array} Absolute child paths; dot entries are excluded.
+ */
+FSListDirectoryStrict(Path, Directories := false) {
+	if !FSStrictExists(Path)
+		return []
+	if !DirExist(Path)
+		throw ValueError("Directory enumeration requires a directory.")
+	Data := Buffer(592, 0)
+	Handle := DllCall("kernel32\FindFirstFileW", "Str", RTrim(Path, "\/") . "\*", "Ptr", Data, "Ptr")
+	if Handle == -1 {
+		ErrorCode := A_LastError
+		if ErrorCode == 2
+			return []
+		throw OSError(ErrorCode, A_ThisFunc, "Directory enumeration could not start.")
+	}
+	Entries := []
+	try {
+		loop {
+			Name := StrGet(Data.Ptr + 44, 260, "UTF-16")
+			IsDirectory := (NumGet(Data, 0, "UInt") & 0x10) != 0
+			if Name != "." && Name != ".." && IsDirectory == !!Directories
+				Entries.Push(RTrim(Path, "\/") . "\" . Name)
+			if !DllCall("kernel32\FindNextFileW", "Ptr", Handle, "Ptr", Data, "Int") {
+				ErrorCode := A_LastError
+				if ErrorCode != 18
+					throw OSError(ErrorCode, A_ThisFunc, "Directory enumeration did not complete.")
+				break
+			}
+		}
+	} finally {
+		if !DllCall("kernel32\FindClose", "Ptr", Handle, "Int")
+			throw OSError(A_LastError, A_ThisFunc, "Directory enumeration handle did not close.")
+	}
+	return Entries
 }
 
 ; Deletes a file. Returns true if deleted or already absent, false on error.

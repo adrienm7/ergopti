@@ -86,7 +86,13 @@ end
 
 local callbacks = {}
 local hook = require("adapters.keyboard_hook")
-hook.start = function(options) callbacks = options end
+hook.start = function(options)
+	callbacks = options
+	if CONFIG:match("[/\\]daemon_keys%.toml$") then
+		local config = require("modules.hotstrings.hotstrings_config")
+		assert(config.set_all_sections("daemon_keys", true), "the scripted catalogue must be explicitly selected")
+	end
+end
 hook.isRunning = function() return true end
 hook.get_mode = function() return "scripted" end
 hook.held_text_modifier_codes = function() return {} end
@@ -191,44 +197,47 @@ local CONTROL = { BS = "backspace", CBS = "backspace", ESC = "escape", LEFT = "l
 local CONTROL_MODS = { CBS = { ctrl = true } }
 
 package.preload["adapters.event_loop"] = function()
-	return {
-		run = function(loop)
-			local i = 1
-			while i <= #SCRIPT do
-				local token = SCRIPT:match("^{(%u+)}", i)
-				if token == "PUMP" then
-					-- One idle tick of the daemon's own loop.
-					i = i + #token + 2
-					loop.onIdle()
-				elseif token == "TAP" then
-					i = i + #token + 2
-					local ran = pcall(tap_executor, "select_all", "tap_hold")
-					if not ran then screen[#screen + 1] = "[tap failed]" end
-				elseif token then
-					i = i + #token + 2
-					if token == "BS" then table.remove(screen) end
-					if token == "CBS" then
-						-- As GTK and Qt apply it: the spaces before the caret, then the word.
-						while screen[#screen] == " " do table.remove(screen) end
-						while #screen > 0 and screen[#screen] ~= " " do table.remove(screen) end
-					end
-					if token == "ENTER" then
-						screen[#screen + 1] = "\n"
-						callbacks.onChar("\n", Codes.KEY_ENTER)
-					else
-						callbacks.onKey(CONTROL[token], { mods = CONTROL_MODS[token] or {} })
-					end
-				else
-					local c = SCRIPT:match("^[%z\1-\127\194-\244][\128-\191]*", i)
-					i = i + #c
-					screen[#screen + 1] = c
-					callbacks.onChar(c, 30)
+	-- Keep the real deferred queue: boot schedules crash reporting before the
+	-- loop begins, and dropping that boundary would conceal startup failures.
+	local adapter = dofile("adapters/event_loop.lua")
+	adapter.run = function(loop)
+		adapter._run_idle_tick()
+		local i = 1
+		while i <= #SCRIPT do
+			local token = SCRIPT:match("^{(%u+)}", i)
+			if token == "PUMP" then
+				-- One idle tick of the daemon's own loop.
+				i = i + #token + 2
+				loop.onIdle()
+				adapter._run_idle_tick()
+			elseif token == "TAP" then
+				i = i + #token + 2
+				local ran = pcall(tap_executor, "select_all", "tap_hold")
+				if not ran then screen[#screen + 1] = "[tap failed]" end
+			elseif token then
+				i = i + #token + 2
+				if token == "BS" then table.remove(screen) end
+				if token == "CBS" then
+					-- As GTK and Qt apply it: the spaces before the caret, then the word.
+					while screen[#screen] == " " do table.remove(screen) end
+					while #screen > 0 and screen[#screen] ~= " " do table.remove(screen) end
 				end
+				if token == "ENTER" then
+					screen[#screen + 1] = "\n"
+					callbacks.onChar("\n", Codes.KEY_ENTER)
+				else
+					callbacks.onKey(CONTROL[token], { mods = CONTROL_MODS[token] or {} })
+				end
+			else
+				local c = SCRIPT:match("^[%z\1-\127\194-\244][\128-\191]*", i)
+				i = i + #c
+				screen[#screen + 1] = c
+				callbacks.onChar(c, 30)
 			end
-			print(string.format("SCREEN %q", table.concat(screen)))
-		end,
-		stop = function() end,
-	}
+		end
+		print(string.format("SCREEN %q", table.concat(screen)))
+	end
+	return adapter
 end
 
 dofile("ergopti_hotstrings.lua")

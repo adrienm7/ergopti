@@ -21,6 +21,8 @@
 ; Render shape:
 ;
 ;   ☰ Tap-Hold
+;     ↳ ✓ Activer les tap-holds        [the TapHolds master gate]
+;     ↳ ---
 ;     ↳ Réinitialiser les valeurs par défaut
 ;     ↳ Tout désactiver
 ;     ↳ ---
@@ -37,12 +39,10 @@
 ; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
 ; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
-	Commands := Map(
-		"reset_defaults", _TH_ResetAllToDefaults,
-		"disable_all",    _TH_DisableAll
-	)
+	Commands := _TH_ScopeCommands()
+	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map("tap_hold_keys", (*) => _TH_KeyRows())
-	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands)
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
 }
 
 ; List provider: one row per configurable key.
@@ -60,7 +60,7 @@ _TH_KeyRows() {
 		TapLbl   := TapHoldCurrentTapLabel(KeyId)
 		HoldLbl  := TapHoldCurrentHoldLabel(KeyId)
 
-		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(TapHold, KeyId)
+		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(MasterGateDesiredTapHold(TapHold), KeyId)
 
 		NoneLabel  := t("tap_hold.tap.none")
 		NoneHold   := t("tap_hold.hold.none")
@@ -279,7 +279,8 @@ class _TH_TapPickerFnObj {
 		try LoggerDebug("TapHoldMenu", "Opening tap picker for '{1}' (current='{2}').", this.KeyId, (Current == "" ? "<native>" : Current))
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
-		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id), true)
+		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id), true,
+			GestureBindingId("tap_hold", _KeyId))
 	}
 }
 
@@ -397,4 +398,14 @@ _TH_ReloadTapHoldMenu(Reason, KeyId := "") {
 		return false
 	}
 	return 1
+}
+
+; Existing shared menu identities now reach one compensated two-file owner.
+_TH_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
+		"reset_defaults", (*) => TapHoldScopeApply("recommended", OwnedOptions),
+		"disable_all", (*) => TapHoldScopeApply("clear", OwnedOptions),
+		"edit_nav_layer", LayerEditor_Open)
 }

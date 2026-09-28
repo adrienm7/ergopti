@@ -63,14 +63,18 @@ TestAuditV4_MaxHotkeysNotInHotkey() {
 		"nav_layer.ahk must set A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL"
 	)
 
-	; Extract the *WheelUp hotkey body and assert it no longer sets the variable
-	WheelUpStart := InStr(Src, "*WheelUp::")
-	WheelDownEnd := InStr(Src, "*WheelDown::", 1, WheelUpStart + 1) + 50
-	HotkeyBlock  := SubStr(Src, WheelUpStart, WheelDownEnd - WheelUpStart + 100)
-	AssertFalse(
-		InStr(HotkeyBlock, "A_MaxHotkeysPerInterval"),
-		"A_MaxHotkeysPerInterval must not appear inside the *WheelUp/*WheelDown hotkey bodies"
-	)
+	; The wheel hotkeys are registered from layers.toml now
+	; (platform/remap/nav_layer_table.ahk): every function a layer hotkey can
+	; run must leave the variable alone.
+	for FuncName in ["NavLayer_Callback", "_NavLayer_SendOnce", "_NavLayer_SendCounted", "_NavLayer_SetCount",
+			"_NavLayer_MaximizeWindow", "_NavLayer_Swallow"] {
+		Body := _DriverFuncBody(FuncName)
+		AssertTrue(Body != "", FuncName . " must exist in platform/remap/nav_layer_table.ahk")
+		AssertFalse(
+			InStr(Body, "A_MaxHotkeysPerInterval"),
+			"A_MaxHotkeysPerInterval must not be set by " . FuncName . ", which runs inside a layer hotkey"
+		)
+	}
 }
 Test("Audit-v4: A_MaxHotkeysPerInterval set at load time, not inside hotkey bodies", TestAuditV4_MaxHotkeysNotInHotkey)
 

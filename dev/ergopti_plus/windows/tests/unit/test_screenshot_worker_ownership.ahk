@@ -745,9 +745,15 @@ _GSWO_AllEntryPointsShareOwnership() {
 		&& InStr(TreeQuiesce, "WaitForSingleObject") = 0,
 		"termination must release the retained root process HANDLE before accounting can reach zero, and must never wait on the Job HANDLE")
 
+	; The physical SC029 entry point is the number_row_left tap key: it runs its
+	; assigned catalogue action through the gesture action table, whose instant
+	; capture is GestureScreenshotInstant, so it cannot spawn a worker of its own.
 	ShortcutSource := _StripFullLineComments(_DriverDirConcatFn.Call("modules/shortcuts"))
-	Assert(InStr(ShortcutSource, "SC029::") > 0
-		&& InStr(ShortcutSource, "GestureScreenshotInstant()") > 0,
+	TapFireBody := _DriverFuncBody("TapKeyFire")
+	Assert(InStr(ShortcutSource, 'SC029:: TapKeyFire("number_row_left")') > 0
+		&& InStr(TapFireBody, "GestureInvokeAction(") > 0
+		&& InStr(ShortcutSource, "GestureCaptureRegion(") = 0
+		&& InStr(ShortcutSource, "ShellRun") = 0,
 		"the physical SC029 entry point must delegate instead of spawning a sibling worker")
 }
 

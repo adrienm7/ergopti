@@ -64,9 +64,6 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- ====================================
 -- ====================================
 
--- Physical key-code for the @ / # key (position-based, not character-based)
-local KEYCODE_AT_HASH        = 10
-
 local Keycodes               = require("infra.keycodes")
 
 -- Keep-awake jitter parameters. The tick interval bounds + return delay come
@@ -796,10 +793,14 @@ acquire_tap = function(types, callback, label)
 end
 
 
---- Captures the frontmost window outside the keyboard eventtap callback.
---- The delayed lookup is intentional: any action-epoch fence returned by the tap
---- must reach the application before the target window is resolved.
-local function capture_frontmost_window()
+--- Captures the frontmost window into the screenshots folder, outside the
+--- keyboard eventtap callback. The delayed lookup is intentional: any
+--- action-epoch fence returned by a tap must reach the application before the
+--- target window is resolved. It is the screen_capture_instant action, which a
+--- tap key, a keyboard slot or a gesture may run.
+--- @param parent string|nil The dispatching parent (defaults to the shortcut layer's).
+--- @return boolean|nil
+function M.capture_frontmost_window(parent)
 	local ok, w = pcall(hs.window.frontmostWindow)
 	if not ok or not w then
 		notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
@@ -812,36 +813,53 @@ local function capture_frontmost_window()
 		return
 	end
 	return ScreenshotSave.save(
-		{ "-l", tostring(id) }, "screenshot", SHORTCUT_ACTION_PARENT)
+		{ "-l", tostring(id) }, "screenshot", parent or SHORTCUT_ACTION_PARENT)
 end
 
---- Captures the frontmost window on the physical @/# key (key-code 10).
---- Uses a raw keyDown tap so the shortcut fires before macOS generates characters.
+--- Runs the number-row tap keys from a raw keyDown tap, so a tapped key is
+--- consumed before macOS generates its character.
+---
+--- A key with Command, Option (this platform's AltGr), Control, Shift or Fn
+--- held passes through untouched, as does a key `decide` answers nil for (no tap
+--- key, or unassigned). An auto-repeat of an assigned key is consumed and runs
+--- nothing, so holding the key cannot fire the action thirty times a second.
+--- @param admission_guard function|nil The owning layer's delivery admission.
+--- @param decide function keycode -> function|nil: what a plain tap runs.
+---   Asked inside the callback, so it may only consult memory.
 --- @return table Fake-hotkey object with :delete().
-function M.bind_instant_screenshot(admission_guard)
+function M.bind_tap_keys(admission_guard, decide)
+	if type(decide) ~= "function" then
+		error("shortcuts.actions.system.bind_tap_keys: decide must be a function")
+	end
 	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
-			e, "shortcuts.at_hash")
+			e, "shortcuts.tap_keys")
 		if not is_physical then return finish_tap(false, fence_events) end
 
 		local ok_key, keycode = pcall(e.getKeyCode, e)
-		if not ok_key or keycode ~= KEYCODE_AT_HASH then
-			return finish_tap(false, fence_events)
-		end
+		if not ok_key then return finish_tap(false, fence_events) end
 		local ok_flags, flags = pcall(e.getFlags, e)
 		if not ok_flags or type(flags) ~= "table"
-			or flags.cmd or flags.alt or flags.ctrl or flags.shift then
+			or flags.cmd or flags.alt or flags.ctrl or flags.shift or flags.fn then
 			return finish_tap(false, fence_events)
 		end
+		local run = decide(keycode)
+		if type(run) ~= "function" then return finish_tap(false, fence_events) end
 
+		local ok_repeat, repeat_flag = pcall(function()
+			return e:getProperty(eventtap.event.properties.keyboardEventAutorepeat)
+		end)
+		if ok_repeat and repeat_flag ~= nil and repeat_flag ~= 0 then
+			return finish_tap(true, fence_events)
+		end
 		local scheduled = SyntheticInput.defer_after_callback(
-			"instant screenshot", function()
+			"tap key", function()
 				if not raw_binding_admitted(admission_guard) then return false end
-				return capture_frontmost_window()
+				return run()
 			end)
 		return finish_tap(scheduled, fence_events)
-	end, "instant screenshot")
+	end, "tap keys")
 end
 
 --- Adds one exact parent claim to the shared screenshot owner.

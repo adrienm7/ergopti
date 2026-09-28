@@ -52,37 +52,61 @@ _CRWT_RequiredKeys() {
 		"os_name", "os_build", "os_arch", "ahk_version", "ahk_bitness",
 		"cpu_name", "cpu_cores", "ram_total_gb", "ram_free_gb",
 		"screen_resolution", "dpi", "dpi_scale", "locale", "script_dir",
-		"git_hash", "username_hash", "uptime_sec", "active_window_title",
+		"git_hash", "uptime_sec", "active_window_title",
 		"active_window_process", "stuck_modifiers", "adapters_ok",
 		"adapters_failed", "session_warnings", "session_errors",
 		"keylogger_initialized", "config_dir", "log_tail"
 	]
 }
 
-_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson() {
-	Canary := "AuditCanary-AHK-008-raw-PII"
-	Report := Map()
-	for _, Key in _CRWT_RequiredKeys()
-		Report[Key] := "safe"
-	for _, Key in [
+; Full detail stays on this machine. A crash report is the first thing read
+; when a crash is triaged, and one whose error, stack, log and window context
+; were replaced by markers could not be triaged at all. It never leaves the
+; machine by itself: whatever is copied, saved for GitHub or sent is redacted
+; at that boundary, by Redact_Apply in the error and diagnostics windows
+; (crash-full-detail-local).
+_CRWT_FullDetailStaysLocal() {
+	Canary := "AuditCanary-full-detail"
+	Detail := [
 		"error_msg", "error_extra", "error_what", "error_file", "stack_trace",
 		"script_dir", "active_window_title", "active_window_process",
 		"config_dir", "log_tail"
 	]
-		Report[Key] := "prefix " . Canary . " suffix"
-
-	Raw := _CrashReport_ToJson(Report)
-	AssertFalse(InStr(Raw, Canary) > 0,
-		"the canonical crash artifact must never serialize raw diagnostic PII")
-	Parsed := JsonParse(Raw)
+	Report := Map()
 	for _, Key in _CRWT_RequiredKeys()
-		AssertTrue(Parsed.Has(Key),
-			"privacy redaction must retain canonical field: " . Key)
+		Report[Key] := "safe"
+	for _, Key in Detail
+		Report[Key] := "prefix " . Canary . " " . Key
+
+	Parsed := JsonParse(_CrashReport_ToJson(Report))
+	for _, Key in Detail
+		AssertEqual("prefix " . Canary . " " . Key, Parsed.Get(Key, ""),
+			"the local crash report keeps " . Key . " whole")
+	for _, Key in _CRWT_RequiredKeys()
+		AssertTrue(Parsed.Has(Key), "the canonical field is kept: " . Key)
 }
 
-Test("crash report: canonical JSON redacts every free-text privacy source "
-	. "(audit-ahk-008)",
-	_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson)
+Test("crash report: the local report keeps the error, the stack and the log whole "
+	. "(crash-full-detail-local)",
+	_CRWT_FullDetailStaysLocal)
+
+; A 32-bit FNV fold of the account name is reversed by hashing a list of common
+; names, so it identified the user as surely as the name itself. Nothing about
+; the account is collected: the shared redactor removes the name wherever it
+; appears in text that leaves the machine (no-account-hash).
+_CRWT_NoAccountNameHash() {
+	Fields := _CrashReport_CanonicalFields()
+	AssertTrue(Fields.Length > 20, "the canonical schema must be listed")
+	for _, Key in Fields
+		AssertFalse(InStr(Key, "user"), "the crash report must not carry " . Key)
+	Snapshot := _CrashReport_CheapSnapshot(Error("no-account-hash"))
+	AssertTrue(Snapshot.Count > 20, "the cheap snapshot must be built")
+	for Key in Snapshot
+		AssertFalse(InStr(Key, "user"), "the cheap crash snapshot must not carry " . Key)
+}
+
+Test("crash report: nothing is derived from the account name (no-account-hash)",
+	_CRWT_NoAccountNameHash)
 
 _CRWT_RecordDone(State, ExitCode, Stdout, Stderr) {
 	State["called"] := true
@@ -199,12 +223,18 @@ _CRWT_LargeSnapshotCrossesProcessBoundary(Options := 0) {
 		Raw := FileRead(Result["artifact"], "UTF-8")
 		AssertContains(Raw, "FIRST_SAFE_TRANSPORT_SENTINEL")
 		AssertContains(Raw, "LAST_SAFE_TRANSPORT_SENTINEL")
-		AssertFalse(InStr(Raw, Canary) > 0,
-			"the isolated worker must remove path, error, and log privacy canaries")
+		; Full detail stays on this machine (crash-full-detail-local); only the
+		; transport paths, which are not report fields, are dropped
+		AssertContains(Raw, Canary . " error", "the isolated worker keeps the error whole")
+		AssertContains(Raw, Canary . "_log_200", "the isolated worker keeps the log tail whole")
 
 		Report := JsonParse(Raw)
+		AssertFalse(Report.Has("_transport_script_dir") || Report.Has("_transport_config_dir"),
+			"the isolated worker drops the transport paths")
 		Required := _CRWT_RequiredKeys()
-		Assert(Required.Length >= 37, "the schema oracle must retain the established crash-report field floor")
+		; 36 since username_hash left the schema: nothing is derived from the
+		; account name (no-account-hash)
+		Assert(Required.Length >= 36, "the schema oracle must retain the established crash-report field floor")
 		for _, Key in Required
 			Assert(Report.Has(Key), "isolated crash report missing canonical field: " . Key)
 		if Options is Map && Options.Get("faults", "") != "" {
@@ -335,8 +365,9 @@ _CRWT_PrimaryStartRefusalUsesMinimalWorker() {
 			Scope, Map(), _CRWT_FallbackSpawn)
 		AssertEqual(2, _CRWT_FallbackSpawnState["calls"],
 			"a refused primary launch must make exactly one isolated fallback attempt")
-		AssertFalse(InStr(FileRead(Result["artifact"], "UTF-8"), Canary) > 0,
-			"the minimal fallback must remove path and error privacy canaries")
+		FallbackRaw := FileRead(Result["artifact"], "UTF-8")
+		AssertContains(FallbackRaw, Canary, "the minimal fallback keeps the error whole (crash-full-detail-local)")
+		AssertFalse(InStr(FallbackRaw, "_transport_") > 0, "the minimal fallback drops the transport paths")
 		for _, Key in _CRWT_RequiredKeys()
 			Assert(Result["report"].Has(Key), "the minimal fallback must preserve canonical field: " . Key)
 	} catch as Err {

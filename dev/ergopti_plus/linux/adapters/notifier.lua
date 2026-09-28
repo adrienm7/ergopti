@@ -121,10 +121,11 @@ end
 ---        onClick is accepted and ignored: `notify-send` returns as soon as the
 ---        notification is posted and cannot report a click without holding the
 ---        process open, which this daemon will not do on a keystroke path.
+--- @return boolean Whether the notification command was admitted; not a delivery receipt.
 function M.send(message, opts)
 	if type(message) ~= "string" or message == "" then
 		Logger.error(LOG, "send(): a message is required — nothing was shown.")
-		return
+		return false
 	end
 	local options = type(opts) == "table" and opts or {}
 	local level = type(options.level) == "string" and options.level or "info"
@@ -140,7 +141,7 @@ function M.send(message, opts)
 	if not available() then
 		-- The log is the fallback surface, so the message is not simply dropped.
 		Logger.info(LOG, "[notification] %s: %s", tostring(options.title or DEFAULT_TITLE), message)
-		return
+		return false
 	end
 
 	local title = (PREFIX_FOR_LEVEL[level] or "")
@@ -158,6 +159,7 @@ function M.send(message, opts)
 	if not ok then
 		Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message)
 	end
+	return ok == true
 end
 
 return M

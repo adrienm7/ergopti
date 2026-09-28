@@ -4,7 +4,7 @@
 ; MODULE: Reset-Config Meta Placeholder Guard Meta Test
 ; DESCRIPTION:
 ; Static source guards for the "reset to defaults" -> onboarding interaction. The
-; tray item menu.global.reset_defaults calls ReloadWithDefaultConfig (infra/
+; tray item common.restore_recommended calls ReloadWithDefaultConfig (infra/
 ; config_io.ahk), which deletes config.toml and Reloads. On the next boot
 ; Onboarding_Run() (ui/onboarding/core.ahk) gates the first-run wizard purely on
 ; FileExist(ConfigurationFile), preferring the shared WebView2 host

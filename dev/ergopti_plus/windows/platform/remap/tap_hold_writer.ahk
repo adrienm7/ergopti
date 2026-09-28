@@ -175,7 +175,7 @@ TapHoldHoldOptions() {
 ; the single source of truth for action names.
 TapHoldCurrentTapLabel(KeyId) {
 	global TapHold, _TH_TapNoneI18n
-	TapAction := TapHoldTapAction(TapHold, KeyId)
+	TapAction := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
 	if (TapAction == "") {
 		return t(_TH_TapNoneI18n)
 	}
@@ -185,8 +185,8 @@ TapHoldCurrentTapLabel(KeyId) {
 ; Return the i18n-resolved short label for the current hold option of a key.
 TapHoldCurrentHoldLabel(KeyId) {
 	global TapHold, _TH_HoldOptions
-	HoldMod   := TapHoldHoldModifier(TapHold, KeyId)
-	HoldLayer := TapHoldHoldLayer(TapHold, KeyId)
+	HoldMod   := TapHoldHoldModifier(MasterGateDesiredTapHold(TapHold), KeyId)
+	HoldLayer := TapHoldHoldLayer(MasterGateDesiredTapHold(TapHold), KeyId)
 	for _, Opt in _TH_HoldOptions {
 		if (Opt["kind"] == "modifier" and Opt["id"] == HoldMod) {
 			return _TH_HoldOptionLabel(HoldMod)
@@ -236,7 +236,7 @@ IsTapHoldTapActive(KeyId, ActionId) {
 	if !IsSet(TapHold) {
 		return false
 	}
-	Current := TapHoldTapAction(TapHold, KeyId)
+	Current := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
 	if (ActionId == "") {
 		return (Current == "")
 	}
@@ -249,8 +249,8 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 	if !IsSet(TapHold) {
 		return false
 	}
-	HoldMod   := TapHoldHoldModifier(TapHold, KeyId)
-	HoldLayer := TapHoldHoldLayer(TapHold, KeyId)
+	HoldMod   := TapHoldHoldModifier(MasterGateDesiredTapHold(TapHold), KeyId)
+	HoldLayer := TapHoldHoldLayer(MasterGateDesiredTapHold(TapHold), KeyId)
 	Kind := HoldOpt["kind"]
 	Id   := HoldOpt["id"]
 	if (Kind == "none") {
@@ -456,7 +456,6 @@ _TH_BuildDisabledCandidate(Candidate) {
 	if !(Candidate is Map)
 		return false
 	Candidate["keys"] := Map()
-	Candidate["layers"] := Map()
 	Candidate["inherit_defaults"] := false
 	return 1
 }
@@ -497,11 +496,16 @@ _TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState,
 
 ; Publish only the detached candidate. The caller invokes this helper inside a
 ; short Critical span after the durable atomic replacement has completed.
-_TH_PublishTapHoldCandidate(Candidate, OwnerToken, BoundPath, StartState) {
+_TH_PublishTapHoldCandidate(Candidate, RuntimeCandidate, EmptyKeys, OwnerToken, BoundPath, StartState) {
 	global TapHold
 	if !_TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState)
 		return false
-	TapHold := Candidate
+	if MasterGateState()["initialized"] {
+		if !IsCategoryGated("TapHolds")
+			RuntimeCandidate["keys"] := EmptyKeys
+		MasterGateState()["tap_hold"] := Candidate
+	}
+	TapHold := RuntimeCandidate
 	return 1
 }
 
@@ -510,7 +514,7 @@ _TH_PublishTapHoldCandidate(Candidate, OwnerToken, BoundPath, StartState) {
 ; tap-hold writer on the same path cannot build from a stale snapshot.
 _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
-	global TapHold
+	global TapHold, ConfigurationFile
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -538,9 +542,18 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		try LoggerError("TapHoldWriter", "The tap-hold target path is unavailable; the change was not persisted.")
 		return false
 	}
+	; The master lives in config.toml. Both files share admission before either
+	; captures desired state, so a master projection cannot overwrite a newer edit.
+	MasterOwner := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "tap-hold-master")
+	if !(MasterOwner is Object) {
+		try LoggerError("TapHoldWriter", "Cannot edit tap-holds during another configuration transaction.")
+		return false
+	}
 	OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath,
 		"tap-hold-" . ActionName)
 	if !(OwnerToken is Object) {
+		if !_ConfigWriteLeaseRelease(MasterOwner)
+			throw Error("The rejected tap-hold master owner could not be released.")
 		try LoggerError("TapHoldWriter",
 			"Cannot persist tap-hold change '{1}': another configuration transaction is in progress.",
 			ActionName)
@@ -553,7 +566,7 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		Built := false
 		try {
 			StartState := TapHold
-			Candidate := _TH_CloneData(StartState)
+			Candidate := _TH_CloneData(MasterGateDesiredTapHold(StartState))
 			Built := BuildFn.Call(Candidate)
 		} catch as Err {
 			BuildError := Err.Message
@@ -581,8 +594,9 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		}
 	} finally {
 		Released := _ConfigWriteLeaseRelease(OwnerToken)
+		MasterReleased := _ConfigWriteLeaseRelease(MasterOwner)
 	}
-	if !(Released is Integer) || Released != 1 {
+	if !(Released is Integer) || Released != 1 || !(MasterReleased is Integer) || MasterReleased != 1 {
 		try LoggerError("TapHoldWriter",
 			"The tap-hold write owner could not be released; later configuration changes may be refused.")
 		return false
@@ -607,32 +621,32 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		try LoggerError("TapHoldWriter", "Refusing an incomplete tap-hold persistence transaction.")
 		return false
 	}
-	if (Data.Has("keys") && !(Data["keys"] is Map))
-			|| (Data.Has("layers") && !(Data["layers"] is Map)) {
+	if (Data.Has("keys") && !(Data["keys"] is Map)) {
 		try LoggerError("TapHoldWriter",
-			"Refusing malformed tap-hold state; keys and layers must be Maps.")
+			"Refusing malformed tap-hold state; keys must be a Map.")
 		return false
 	}
 	; Refuse to rebuild a file the loader could not READ. Everything below is
 	; serialized from the in-memory map, and when the load saw nothing that map
 	; is the shipped defaults overlay — byte-for-byte what a user who customised
-	; nothing produces. Rewriting from it erases their per-key overrides, their
-	; hand-edited layer mappings and their explicit disable-all opt-out, and
+	; nothing produces. Rewriting from it erases their per-key overrides and
+	; their explicit disable-all opt-out, and
 	; every caller here re-publishes TapHold only on a true return, so refusing
 	; leaves memory and disk consistent.
 	if TOML_UnreadableFile(BoundPath) {
 		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': it could not be read at load, so the in-memory tap-hold map holds the shipped defaults rather than the user's configuration. Restart the driver once the file is readable.", BoundPath)
 		return false
 	}
-	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, layers={3}, inherit_defaults={4}).",
-		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0, Data.Has("layers") ? Data["layers"].Count : 0,
+	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, inherit_defaults={3}).",
+		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
 
+	RuntimeCandidate := _TH_CloneData(Data)
+	EmptyKeys := Map()
 	Lines := []
-	Lines.Push("# Auto-generated by Ergopti+ tray-menu writes — hand edits stay safe outside")
-	Lines.Push("# the [tap_hold.keys.*] blocks (which get rewritten from scratch on every")
-	Lines.Push("# toggle). The [tap_hold.layers.*] sections are emitted verbatim from the")
-	Lines.Push("# in-memory state, so customisations made via direct editing round-trip.")
+	Lines.Push("# Auto-generated by Ergopti+ tray-menu writes: the whole file is rewritten")
+	Lines.Push("# from the in-memory tap-hold state on every toggle. What a held layer does")
+	Lines.Push("# is set in layers.toml, not here.")
 	Lines.Push("")
 
 	; Root [tap_hold] section — emit inherit_defaults when it is false so
@@ -654,31 +668,6 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 				Lines.Push(_TH_TomlFormatLine(K, V))
 			}
 			Lines.Push("")
-		}
-	}
-
-	; Layers section — emitted verbatim.
-        if Data.Has("layers") {
-                for LayerId, LayerData in Data["layers"] {
-			if !(IsObject(LayerData) and Type(LayerData) == "Map") {
-				continue
-			}
-			Lines.Push("[tap_hold.layers." . LayerId . "]")
-			; Top-level layer metadata (description_key etc.).
-			for K, V in LayerData {
-				if (K == "mappings") {
-					continue  ; mappings emitted as a sub-section below
-				}
-				Lines.Push(_TH_TomlFormatLine(K, V))
-			}
-			Lines.Push("")
-			if LayerData.Has("mappings") and IsObject(LayerData["mappings"]) {
-				Lines.Push("[tap_hold.layers." . LayerId . ".mappings]")
-				for K, V in LayerData["mappings"] {
-					Lines.Push(_TH_TomlFormatLine(K, V))
-				}
-				Lines.Push("")
-			}
 		}
 	}
 
@@ -771,7 +760,7 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 	PublishError := ""
 	PreviousCritical := Critical("On")
 	try {
-		try Published := _TH_PublishTapHoldCandidate(Data, OwnerToken,
+		try Published := _TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken,
 			BoundPath, StartState)
 		catch as Err {
 			Published := false
@@ -876,4 +865,78 @@ _TH_TomlFormatLine(Key, Value) {
 	S := StrReplace(S, "\", "\\")
 	S := StrReplace(S, Chr(0x22), "\" . Chr(0x22))
 	return Key . ' = "' . S . '"'
+}
+
+/** Publishes the tap-hold preset and its config master in one terminal transition. */
+TapHoldScopeApply(Mode, Options := unset) {
+	global TapHold, _SharedDir
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return TapHoldScopeApply(Mode, IsSet(Options) ? Options : Map())
+		finally Critical(InheritedCritical)
+	}
+	if !IsSet(TapHold) || !(TapHold is Map)
+		throw Error("Tap-hold scope requires initialized runtime state.")
+	CandidateOptions := IsSet(Options) ? Options.Clone() : Map()
+	Path := CandidateOptions.Get("tap_hold_path", _TH_TapHoldConfigPath())
+	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml")
+	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode)
+	return ConfigScopeApply("tap_holds", Mode,
+		Map("parameters", ConfigScopeActionParameterPaths), CandidateOptions)
+}
+
+; This bounded owner is the only preset admitted by ConfigScopeApply. Its target
+; participates in the same WAL, backup verification and terminal compensation.
+class TapHoldScopeOwner {
+	__New(Path, Defaults, Mode) {
+		if !(Path is String) || Path == "" || !(Defaults is String) || Defaults == ""
+			throw ValueError("Tap-hold scope requires explicit file paths.")
+		this.path := Path
+		this.paths := [Path]
+		this.defaults := Defaults
+		if !(Mode == "recommended" || Mode == "clear")
+			throw ValueError("Unknown tap-hold preset operation.")
+		this.mode := Mode
+	}
+
+	; The coordinator owns admission, backup, expected-old checks and publication.
+	; This method only returns a detached candidate and cannot publish a file.
+	Build() {
+		Present := FileExist(this.path) ? 1 : 0
+		Source := Present ? FSReadUtf8Exact(this.path) : ""
+		if !(Source is String)
+			throw Error("The tap-hold source cannot be read.")
+		Existing := Present ? TOML_ParseFreshFile(this.path) : Map()
+		Kinds := TapHoldFieldKinds()
+		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true }]
+		for Section, Fields in Existing {
+			if !RegExMatch(Section, "^tap_hold\.keys\.[A-Za-z0-9_]+$")
+				continue
+			for Field in Fields {
+				if Kinds.Has(Field)
+					Rows.Push({ Section: Section, Key: Field, Delete: true })
+			}
+		}
+		if this.mode == "recommended" {
+			if !FileExist(this.defaults)
+				throw Error("The canonical tap-hold preset is missing.")
+			Preset := LoadTapHoldToml(this.defaults)
+			if TOML_UnreadableFile(this.defaults) || Preset["keys"].Count == 0
+				throw Error("The canonical tap-hold preset is unreadable or empty.")
+			for KeyId, Fields in Preset["keys"] {
+				for Field, Value in Fields {
+					if !Kinds.Has(Field)
+						throw Error("The canonical tap-hold preset contains an unknown field.")
+					Serialized := Kinds[Field] == "boolean" ? TOML_Bool(Value) : Value
+					Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Value: Serialized })
+				}
+			}
+		}
+		Image := TOML_BuildUpdatedContent(this.path, Rows)
+		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
+				|| Image["source_present"] != Present || !(Image["source_content"] == Source)
+			throw Error("The tap-hold source changed or its scoped image could not be rendered.")
+		return [{ path: this.path, image: Image }]
+	}
 }

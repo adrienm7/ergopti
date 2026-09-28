@@ -279,6 +279,7 @@ helpers.describe("wpm readouts: the live speed", function()
 
 	helpers.it("is fed by the Linux keylogger's typing, expansions and completions", function()
 		local keylogger = helpers.load_module("modules.keylogger.keylogger")
+		require("tests.support.metrics_consent_fixture").enable(keylogger)
 		keylogger.reset_session()
 		for index = 0, 29 do keylogger.on_keydown("a", 1000 + index * 150, "app", 30) end
 		keylogger.record_hotstring("app", "adn", "au début", 5600, "magickey", 3, false)
@@ -311,7 +312,7 @@ local function fake_surface()
 		surface.visible = true
 		return true
 	end
-	function surface.hide() surface.hidden = surface.hidden + 1; surface.visible = false end
+	function surface.hide() surface.hidden = surface.hidden + 1; surface.visible = false; return true end
 	function surface.is_dragging() return surface.dragging end
 	function surface.on_moved(fn) surface.moved = fn end
 	function surface.screen_frame() return { x = 0, y = 0, w = 1920, h = 1080 } end
@@ -332,7 +333,11 @@ local function with_storage(initial, body)
 	package.loaded["adapters.storage"] = store
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
-	local ok, err = pcall(body, store)
+	local ok, err = pcall(function()
+		require("tests.support.metrics_preferences_fixture").with(function(preferences)
+			body(store, preferences)
+		end, { initial = initial })
+	end)
 	package.loaded["adapters.storage"] = _displaced.storage
 	package.loaded["ui.tooltip.preview"] = _displaced.preview
 	package.loaded["ui.tooltip.llm"] = _displaced.llm
@@ -342,6 +347,41 @@ local function with_storage(initial, body)
 end
 
 helpers.describe("wpm readouts: the floating widget", function()
+	helpers.it("refuses native hide before changing the persisted visibility", function()
+		with_storage({}, function(_, preferences)
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			helpers.assert_true(Widget.start())
+			Widget.tick(stats(42), 10)
+			surface.hide = function() surface.visible = false; return false end
+			helpers.assert_eq(Widget.stop(), false)
+			helpers.assert_eq(preferences.get("metrics.wpm_widget_visible"), true)
+			helpers.assert_true(Widget.is_running())
+			helpers.assert_true(surface.visible, "a partially hidden native surface must be restored")
+		end)
+	end)
+
+	helpers.it("captures and reapplies its exact frame without preference writes", function()
+		with_storage({}, function(_, preferences)
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			helpers.assert_true(Widget.start())
+			Widget.tick(stats(42), 10)
+			local before = Widget.configuration_snapshot()
+			local changed = Widget.configuration_snapshot()
+			changed.running, changed.shown, changed.graph = false, false, true
+			helpers.assert_true(Widget.apply_configuration(changed))
+			helpers.assert_eq(surface.visible, false)
+			helpers.assert_eq(preferences.get("metrics.wpm_widget_visible"), true)
+			helpers.assert_true(Widget.apply_configuration(before))
+			helpers.assert_true(surface.visible)
+			helpers.assert_eq(surface.draws[#surface.draws].frame.number, "42")
+			before.last_frame.number = "mutated"
+			helpers.assert_eq(Widget.configuration_snapshot().last_frame.number, "42")
+		end)
+	end)
 
 	helpers.it("draws the pill in the bottom-right corner while the user types", function()
 		with_storage({}, function()
@@ -410,7 +450,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 	end)
 
 	helpers.it("draws the graph in graph mode, and keeps that choice", function()
-		with_storage({}, function(store)
+		with_storage({}, function(_, preferences)
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
@@ -418,7 +458,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 			helpers.assert_true(Widget.set_graph(true))
 			Widget.tick(stats(42), 10)
 			helpers.assert_eq(surface.draws[1].frame.mode, "graph")
-			helpers.assert_eq(store.values["wpm_widget.graph"], true)
+			helpers.assert_eq(preferences.get("metrics.wpm_widget_graph"), true)
 		end)
 	end)
 
@@ -456,7 +496,7 @@ helpers.describe("wpm readouts: the tray readout", function()
 			for key, value in pairs(opts_) do handle[key] = value end
 			return true
 		end
-		function tray.remove_item(handle) handle.removed = true end
+		function tray.remove_item(handle) handle.removed = true; return true end
 		return tray
 	end
 
@@ -468,6 +508,37 @@ helpers.describe("wpm readouts: the tray readout", function()
 		Readout._set_painter(function(frame, path) painted[#painted + 1] = { frame = frame, path = path }; return true end)
 		return Readout, tray, painted
 	end
+
+	helpers.it("refuses native retirement without losing the live item or preference", function()
+		with_storage({}, function(_, preferences)
+			local Readout, tray = setup()
+			helpers.assert_true(Readout.start())
+			Readout.tick(stats(57), 10)
+			tray.remove_item = function(handle) handle.active = false; return false end
+			helpers.assert_eq(Readout.stop(), false)
+			helpers.assert_true(Readout.is_running())
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
+			helpers.assert_true(tray.items[1].active)
+		end)
+	end)
+
+	helpers.it("recreates the exact retired readout without preference writes", function()
+		with_storage({}, function(_, preferences)
+			local Readout, tray = setup()
+			helpers.assert_true(Readout.start())
+			Readout.tick(stats(57), 10)
+			local before = Readout.configuration_snapshot()
+			local changed = Readout.configuration_snapshot()
+			changed.running, changed.presentation = false, nil
+			helpers.assert_true(Readout.apply_configuration(changed))
+			helpers.assert_true(tray.items[1].removed)
+			helpers.assert_true(Readout.apply_configuration(before))
+			helpers.assert_eq(#tray.items, 2)
+			helpers.assert_true(tray.items[2].active)
+			helpers.assert_eq(tray.items[2].title, tray.items[1].title)
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
+		end)
+	end)
 
 	helpers.it("appears with the speed while typing, and leaves the panel after", function()
 		with_storage({}, function()
@@ -509,13 +580,14 @@ helpers.describe("wpm readouts: the tray readout", function()
 	end)
 
 	helpers.it("removes its item on stop, and keeps that choice", function()
-		with_storage({}, function(store)
+		with_storage({}, function(_, preferences)
 			local Readout, tray = setup()
 			Readout.start()
 			Readout.tick(stats(57), 10)
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
 			helpers.assert_true(Readout.stop())
 			helpers.assert_true(tray.items[1].removed)
-			helpers.assert_eq(store.values["wpm_menubar.visible"], nil, "off is the shipped default: nothing stored")
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), nil, "off is the shipped default: nothing stored")
 		end)
 	end)
 

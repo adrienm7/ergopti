@@ -45,9 +45,8 @@ _TH_MissingFileReturnsEmptyScaffold() {
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_tap_hold.toml")
 	AssertEqual("Map", Type(TH))
 	AssertTrue(TH.Has("keys"))
-	AssertTrue(TH.Has("layers"))
 	AssertEqual(0, TH["keys"].Count)
-	AssertEqual(0, TH["layers"].Count)
+	AssertFalse(TH.Has("layers"), "layer bindings are not tap-hold data")
 }
 Test("LoadTapHoldToml: missing file returns empty scaffold", _TH_MissingFileReturnsEmptyScaffold)
 
@@ -99,10 +98,13 @@ _TH_UnknownHoldLayerDropsTheHoldOnly() {
 		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
 			. 'hold_modifier = "ctrl"' . "`n"
 		if (Source == "user")
-			UserText .= "[tap_hold.keys.caps_lock]`n" . 'hold_layer = "navv"' . "`n"
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n" . 'hold_layer = "navv"' . "`n"
 		else
 			DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
 				. 'hold_layer = "navv"' . "`n"
+		; Restoring a preset is explicit: its selected records become user input.
+		if Source == "defaults"
+			UserText .= DefaultsText
 		Path := _TH_Write(UserText)
 		if FileExist(DefaultsPath)
 			FileDelete(DefaultsPath)
@@ -150,19 +152,23 @@ _TH_ParsesMultipleKeysIndependently() {
 }
 Test("LoadTapHoldToml: parses multiple keys independently", _TH_ParsesMultipleKeysIndependently)
 
-_TH_ParsesLayerMappingsBlock() {
+; Layer bindings moved to layers.toml (platform/remap/layers_loader.ahk). The
+; old [tap_hold.layers.<id>.mappings] table was loaded and written back by this
+; driver and read by no other, so it looked configurable and did nothing.
+_TH_LayerSectionsAreNotTapHoldData() {
 	Path := _TH_Write(
 		"[tap_hold.layers.nav.mappings]`r`n"
 		. 'h = "arrow_left"' . "`r`n"
-		. 'j = "arrow_down"' . "`r`n"
+		. "[tap_hold.keys.caps_lock]`r`n"
+		. 'tap_action = "enter"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
-	AssertTrue(TH["layers"].Has("nav"))
-	AssertEqual("arrow_left", TH["layers"]["nav"]["mappings"]["h"])
-	AssertEqual("arrow_down", TH["layers"]["nav"]["mappings"]["j"])
+	AssertFalse(TH.Has("layers"), "[tap_hold.layers.*] must not become tap-hold state")
+	AssertEqual(1, TH["keys"].Count)
+	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
 }
-Test("LoadTapHoldToml: parses layer mappings block", _TH_ParsesLayerMappingsBlock)
+Test("LoadTapHoldToml: [tap_hold.layers.*] is not tap-hold data", _TH_LayerSectionsAreNotTapHoldData)
 
 _TH_IgnoresUnrecognisedSectionHeaders() {
 	Path := _TH_Write(
@@ -327,10 +333,6 @@ TestTapHold_InvalidSchemaTypesFailClosed() {
 			. "hold_modifier = 1`r`n"
 			. "[tap_hold.keys.space]`r`n"
 			. "hold_layer = false`r`n"
-			. "[tap_hold.layers.nav]`r`n"
-			. "description_key = true`r`n"
-			. "[tap_hold.layers.nav.mappings]`r`n"
-			. "h = false`r`n"
 			. "[tap_hold.keys.tab]`r`n"
 			. 'tap_action = "alt_tab_monitor"' . "`r`n"
 			. "time_activation_seconds = 0.2`r`n")
@@ -346,17 +348,11 @@ TestTapHold_InvalidSchemaTypesFailClosed() {
 			TapHoldDuration(TH, "caps_lock"))
 		AssertTrue(TapHoldIsActive(TH, "tab"),
 			"one invalid entry must not suppress later valid sections")
-		AssertFalse(TH["layers"].Has("nav")
-			&& TH["layers"]["nav"].Get("description_key", "") != "",
-			"a non-string layer description must not be published")
-		AssertFalse(TH["layers"].Has("nav")
-			&& TH["layers"]["nav"].Get("mappings", Map()).Has("h"),
-			"a non-string layer mapping must not be published")
 		Errors := 0
 		for Line in Captured
 			if InStr(Line, "[ERROR]", true)
 				Errors += 1
-		AssertTrue(Errors >= 6,
+		AssertTrue(Errors >= 5,
 			"every rejected tap-hold field must remain visible in the logs")
 	} finally {
 		LoggerClearTestSink()
@@ -587,7 +583,7 @@ _TH_CleanDefaults() {
 		_TomlFileCache.Delete(Path)
 }
 
-; When no user file exists, the defaults file alone is returned
+; A missing user file never imports the shipped recommendation.
 _TH_OverlayDefaultsOnlyWhenUserMissing() {
 	DefPath := _TH_WriteDefaults(
 		"[tap_hold.keys.caps_lock]`r`n"
@@ -596,11 +592,10 @@ _TH_OverlayDefaultsOnlyWhenUserMissing() {
 	)
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_user.toml", DefPath)
 	_TH_CleanDefaults()
-	AssertTrue(TH["keys"].Has("caps_lock"))
-	AssertEqual("escape", TH["keys"]["caps_lock"]["tap_action"])
-	AssertEqual(0.35,     TH["keys"]["caps_lock"]["time_activation_seconds"])
+	AssertEqual(0, TH["keys"].Count)
+	AssertFalse(TH.Has("layers"), "tap-hold absence must not create a second navigation owner")
 }
-Test("LoadTapHoldToml overlay: defaults used when user file missing", _TH_OverlayDefaultsOnlyWhenUserMissing)
+Test("LoadTapHoldToml: absent user file never imports a recommendation", _TH_OverlayDefaultsOnlyWhenUserMissing)
 
 ; User value takes precedence over the matching default field
 _TH_OverlayUserWinsOnConflict() {
@@ -616,9 +611,9 @@ _TH_OverlayUserWinsOnConflict() {
 	TH := LoadTapHoldToml(UserPath, DefPath)
 	_TH_Clean()
 	_TH_CleanDefaults()
-	; User overrides tap_action; time_activation_seconds inherits from defaults
+	; Only explicit records are loaded, including when the preset has parameters.
 	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
-	AssertEqual(0.35,    TH["keys"]["caps_lock"]["time_activation_seconds"])
+	AssertFalse(TH["keys"]["caps_lock"].Has("time_activation_seconds"))
 }
 Test("LoadTapHoldToml overlay: user value wins on conflict", _TH_OverlayUserWinsOnConflict)
 
@@ -635,11 +630,11 @@ _TH_OverlayUserOnlyKeyPreserved() {
 	TH := LoadTapHoldToml(UserPath, DefPath)
 	_TH_Clean()
 	_TH_CleanDefaults()
-	AssertTrue(TH["keys"].Has("caps_lock"))
+	AssertFalse(TH["keys"].Has("caps_lock"))
 	AssertTrue(TH["keys"].Has("my_custom_key"))
 	AssertEqual("shift", TH["keys"]["my_custom_key"]["hold_modifier"])
 }
-Test("LoadTapHoldToml overlay: user-only key is preserved alongside defaults", _TH_OverlayUserOnlyKeyPreserved)
+Test("LoadTapHoldToml: user-only key survives without importing a preset", _TH_OverlayUserOnlyKeyPreserved)
 
 ; Omitting DefaultsFilePath still works (no regression on existing callers)
 _TH_OverlayBackwardCompatNoDefaults() {
@@ -876,7 +871,9 @@ _TH_UnknownHoldModifierKeepsTheTap() {
 			. 'hold_modifier = "' . (Source == "defaults" ? Unknown : "ctrl") . '"' . "`n"
 		UserText := Known
 		if (Source == "user")
-			UserText .= "[tap_hold.keys.caps_lock]`n" . 'hold_modifier = "' . Unknown . '"' . "`n"
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n" . 'hold_modifier = "' . Unknown . '"' . "`n"
+		else
+			UserText .= DefaultsText
 		DefaultsPath := _TH_WriteDefaults(DefaultsText)
 		Path := _TH_Write(UserText)
 		Captured := []

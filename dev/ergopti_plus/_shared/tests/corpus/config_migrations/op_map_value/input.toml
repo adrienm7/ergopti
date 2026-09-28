@@ -1,0 +1,11 @@
+# _shared/tests/corpus/config_migrations/op_map_value/input.toml
+
+[layout]
+variant = "custom"
+
+[metrics]
+legacy_flag = "1"
+metrics_encrypt = 1
+
+[updater]
+channel = "stable"

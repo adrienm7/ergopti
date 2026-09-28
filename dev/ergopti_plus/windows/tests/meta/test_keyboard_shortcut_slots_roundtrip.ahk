@@ -19,8 +19,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Encodes the ROOT CAUSE — the read must cover PERSISTED slots, not just the
 ;    shipped ones — rather than naming win_b or any particular chord.
-; (The clear-path twin this file once pinned is gone: "tout désactiver" no
-; longer rewrites per-key assignments, see test_global_disable_all_preserves_assignments.)
+; (The clear-path twin this file once pinned is gone, and so is the global
+; « tout désactiver » row whose bulk flip it guarded.)
 ;
 ; SCOPE: source introspection of infra/config_io.ahk.
 ; ==============================================================================

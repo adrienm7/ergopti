@@ -3,20 +3,23 @@
 ; ==============================================================================
 ; MODULE: Master Gates application
 ; DESCRIPTION:
-; Applies the per-category master-toggle gating (``CategoryEnabled`` Map) onto
-; ``Features`` at boot, so every #HotIf evaluation reading ``Features["…"]``
-; short-circuits to false while the category is master-disabled. The per-feature
-; state persisted on disk is NOT touched — it stays in the user's config.toml
-; and is restored at next Reload after the master toggle flips back on.
+; Retains configuration intent before projecting category gates onto the runtime
+; Features and TapHold maps. Input hooks read the effective projection; editors,
+; checkmarks, and persistence read the retained choices even while masters are off.
 ;
 ; FEATURES & RATIONALE:
-; 1. Single source of truth for runtime gating. The tray menu greys out items
-;    via ``IsCategoryGated`` (which reads CategoryEnabled directly); this
-;    helper neutralises the underlying behaviour by zeroing Features entries
-;    so the hotkey path doesn't have to consult two flags.
+; 1. Switches become inactive while pure parameters retain their values. Child
+;    editing remains independent of the category master and of the pause fence.
 ; 2. TapHolds gets the same treatment via ``TapHold["keys"]`` — disabling
 ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
 ;    for every physical key.
+; 3. A registry layout the driver emulates (``Features["layout"]["emulated_layout"]``,
+;    modules/keymap/keylayout/) replaces the Ergopti emulation, so the features
+;    the manifest declares with superseded_reason_key are turned off the same
+;    way: here, on every path that rebuilds Features, and never in the saved
+;    configuration. The menu greys their rows with that reason.
+; 4. Geometry hotstrings remain an explicit user choice on every layout.
+;    Selecting a registry layout never changes their enabled state.
 ; ============================================================================== 
 
 
@@ -29,10 +32,66 @@
 ; =============================================
 ; =============================================
 
-; When a master category gate is off, force every v2 feature in that
-; category to ``false`` so #HotIf evaluations on Features short-circuit.
-; The on-disk persistence is untouched — flipping the master back on +
-; Reload restores the per-feature state from config.toml.
+; Holds the configuration intent separately from the maps read by input hooks.
+MasterGateState() {
+	static State := Map("initialized", false, "features", Map(), "tap_hold", Map())
+	return State
+}
+
+; Boot owns the sole initialization, after configuration and personal entries load.
+MasterGateInitialize(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
+	State := MasterGateState()
+	if State["initialized"]
+		throw Error("Master gate desired state is already initialized.")
+	DesiredFeatures := _HSDeepCloneMap(FeaturesTarget)
+	DesiredTapHold := _HSDeepCloneMap(TapHoldTarget)
+	ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn)
+	State["features"] := DesiredFeatures
+	State["tap_hold"] := DesiredTapHold
+	State["initialized"] := true
+	return true
+}
+
+; Ungated domains keep their existing owners; only gated roots need an intent view.
+MasterGateDesiredFeatures(FeaturesSource) {
+	State := MasterGateState()
+	if !State["initialized"]
+		return FeaturesSource
+	View := FeaturesSource.Clone()
+	for Root in ["layout", "shortcuts", "hotstrings"] {
+		if State["features"].Has(Root)
+			View[Root] := State["features"][Root]
+	}
+	return View
+}
+
+; Tap-hold writers and menu labels consume the retained configuration, not empty runtime keys.
+MasterGateDesiredTapHold(TapHoldSource) {
+	State := MasterGateState()
+	return State["initialized"] ? State["tap_hold"] : TapHoldSource
+}
+
+; Only declared switches and alpha activation flags are runtime gates. Parameters
+; retain their types and values, including numbers, strings, and alpha options.
+_MG_DisableFeatureNode(Node, Prefix) {
+	if InStr(Prefix, ".") && Node.Has("enabled") {
+		Node["enabled"] := false
+		return
+	}
+	for Key, Value in Node {
+		Path := Prefix . "." . Key
+		if Value is Map {
+			_MG_DisableFeatureNode(Value, Path)
+			continue
+		}
+		Entry := ManifestFindEntryByPath(Path)
+		if (Entry is Map) && Entry.Get("type", "") == "boolean"
+			Node[Key] := false
+		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
+			Node[Key] := false
+	}
+}
+
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
 		if !(FeaturesTarget is Map)
 				throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
@@ -47,42 +106,21 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 		; Layout master
 		if !CategoryGateFn.Call("Layout") and FeaturesTarget.Has("layout") {
-				for V2Id, _ in FeaturesTarget["layout"] {
-						FeaturesTarget["layout"][V2Id] := false
-				}
+				_MG_DisableFeatureNode(FeaturesTarget["layout"], "layout")
 		}
+
+		; A selected registry layout supersedes the Ergopti emulation. After the
+		; Layout master: a disabled category has already turned the selection off.
+		_MG_SupersedeForEmulatedLayout(FeaturesTarget)
 
 		; Shortcuts master
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
-				for V2Id, V2Val in FeaturesTarget["shortcuts"] {
-						if (Type(V2Val) == "Map") {
-								; Modélisation α + sub-Maps — flip ``enabled`` if present,
-								; else flip every leaf bool entry.
-								if V2Val.Has("enabled") {
-										V2Val["enabled"] := false
-								} else {
-										for SubId, _ in V2Val {
-												V2Val[SubId] := false
-										}
-								}
-						} else if (Type(V2Val) == "Integer" or V2Val == true or V2Val == false) {
-								FeaturesTarget["shortcuts"][V2Id] := false
-						}
-				}
+				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts")
 		}
 
 		; Hotstrings master (includes Personal sub-category).
 		if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
-				for V2Cat, V2CatMap in FeaturesTarget["hotstrings"] {
-						if (Type(V2CatMap) != "Map") {
-								continue
-						}
-						for V2Id, V2Val in V2CatMap {
-								if (Type(V2Val) == "Map" and V2Val.Has("enabled")) {
-										V2Val["enabled"] := false
-								}
-						}
-				}
+				_MG_DisableFeatureNode(FeaturesTarget["hotstrings"], "hotstrings")
 		}
 
 		; Per-TOML-file hotstring sub-category gates. Independent of the top
@@ -125,6 +163,68 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 		if HasMethod(LogDebugFn, "Call")
 				try LogDebugFn.Call("MasterGates", "ApplyMasterGatesToFeatures done.")
+}
+
+; Manifest features an emulated registry layout supersedes: the ones declaring
+; superseded_reason_key. The direct-digit override remains independent despite
+; its historical declaration; registry layers explicitly yield its owned keys.
+; @returns {Array} Their manifest entries.
+LayoutSupersededFeatures() {
+		Entries := []
+		for Entry in ManifestFeatures() {
+				if (Entry.Get("superseded_reason_key", "") != "")
+						Entries.Push(Entry)
+		}
+		return Entries
+}
+
+; Why the menu greys a feature's row: its superseded_reason_key while a registry
+; layout is emulated, "" otherwise.
+; @param {Map} ManifestEntry - The feature's manifest entry.
+; @param {Map} FeaturesSource - Features Map to read; the live one by default.
+; @returns {string} Locale key of the reason, or "".
+LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
+		; These switches choose registry layers too; only Ergopti-specific
+		; overlays become unavailable when another source is selected.
+		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != "ergopti_plus"
+				return ""
+		Reason := ManifestEntry.Get("superseded_reason_key", "")
+		if (Reason == "")
+				return ""
+		Selected := IsSet(FeaturesSource) ? KeylayoutEmulation_SelectedId(FeaturesSource) : KeylayoutEmulation_SelectedId()
+		return (Selected != "") ? Reason : ""
+}
+
+; Turns the superseded features off in ``FeaturesTarget`` when a registry layout
+; is selected there (a non-empty ``emulated_layout`` string).
+; @param {Map} FeaturesTarget - The Features Map to update.
+; @param {Array} Entries - Manifest entries to supersede (LayoutSupersededFeatures by default).
+; @returns {Integer} Number of features turned off.
+_MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
+		if (KeylayoutEmulation_SelectedId(FeaturesTarget) == "")
+				return 0
+		if !IsSet(Entries)
+				Entries := LayoutSupersededFeatures()
+		Count := 0
+		for Entry in Entries {
+				; The direct-digit override is independent of the selected source.
+				if Entry["section"] == "layout" && Entry["id"] == "direct_access_digits"
+						continue
+				Node := FeaturesTarget
+				for Part in StrSplit(Entry["section"], ".") {
+						if !(Node is Map) or !Node.Has(Part) {
+								Node := 0
+								break
+						}
+						Node := Node[Part]
+				}
+				Id := Entry["id"]
+				if (Node is Map) and Node.Has(Id) and Node[Id] {
+						Node[Id] := false
+						Count += 1
+				}
+		}
+		return Count
 }
 
 

@@ -9,7 +9,7 @@
 --- contract with the Linux readers, then prove the rule is exactly the
 --- readers': the cleaned file loads to the same driver state, and every key
 --- left behind changes that state when removed alone. They also pin the tray
---- row and its zenity dialogs.
+--- row and its cleanup WebView.
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
@@ -23,7 +23,17 @@ local Sandbox = Contract.sandbox
 -- of them visibly changes the driver state.
 local SHORTCUTS_NON_DEFAULT = not require("infra.manifest_reader").default_for("shortcuts.enabled")
 
--- One key of each shape the Linux readers take, and six they never read.
+-- The update channel the user subscribed to: a registry channel other than the
+-- installed build's, which is what the updater follows when the key is absent.
+local SUBSCRIBED_NON_DEFAULT = (function()
+	local updater = require("modules.updater.manager")
+	for _, id in ipairs(updater.CHANNELS.ids()) do
+		if id ~= updater.installed_channel() then return id end
+	end
+	error("the update channel registry must declare a second channel")
+end)()
+
+-- One key of each shape the Linux readers take, and five they never read.
 -- First-use completion survives cleanup because graphical startup reads it.
 local FIXTURE = table.concat({
 	"[script]",
@@ -54,6 +64,9 @@ local FIXTURE = table.concat({
 	"enabled = " .. tostring(SHORTCUTS_NON_DEFAULT),
 	"chatgpt_url = \"https://chat.example\"",
 	"",
+	"[updater]",
+	"channel = \"" .. SUBSCRIBED_NON_DEFAULT .. "\"",
+	"",
 	"[stale.section]",
 	"label = \"old\"",
 	"",
@@ -64,7 +77,6 @@ local EXPECTED = {
 	"metrics.metrics_encrypt=leaf",
 	"gestures.not_a_slot=leaf",
 	"gesture_parameters.broken=leaf",
-	"shortcuts.chatgpt_url=leaf",
 	"stale.section.label=section",
 }
 
@@ -76,6 +88,8 @@ local SURVIVORS = {
 	{ { "gesture_parameters", "tap_3__open_url" }, "https://example.com" },
 	{ { "linux", "gestures", "swipe_3_up" }, "open_url" },
 	{ { "shortcuts", "enabled" }, SHORTCUTS_NON_DEFAULT },
+	{ { "shortcuts", "chatgpt_url" }, "https://chat.example" },
+	{ { "updater", "channel" }, SUBSCRIBED_NON_DEFAULT },
 }
 
 local Cleanup = helpers.load_module("ui.menu.unused_keys_cleanup")
@@ -114,6 +128,30 @@ local function driver_state(path)
 	local shortcuts = helpers.load_module("modules.shortcuts.manager")
 	shortcuts.init({ persist = true, config_path = path })
 
+	-- The updater reads the subscribed channel at init; its background checks
+	-- stop at once, and the previous module comes back so no suite shares this one.
+	local previous_updater = package.loaded["modules.updater.manager"]
+	local updater = helpers.load_module("modules.updater.manager")
+	local ok_updater, updater_err = pcall(function()
+		updater.init({ config_path = path })
+		updater.stop_background_checks()
+	end)
+	local update_channel = updater.get_channel()
+	package.loaded["modules.updater.manager"] = previous_updater
+	if not ok_updater then error(updater_err, 0) end
+
+	local paths = require("infra.config_paths")
+	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
+	paths.config = function(name)
+		helpers.assert_eq(name, "config.toml")
+		return path
+	end
+	local ok_url, chatgpt_url = pcall(function()
+		return helpers.load_module("modules.shortcuts.chatgpt").get_url()
+	end)
+	paths.config, package.loaded["modules.shortcuts.chatgpt"] = previous_config, previous_chatgpt
+	if not ok_url then error(chatgpt_url, 0) end
+
 	local decoded = TomlCodec.decode(Sandbox.read_bytes(path))
 	return {
 		needs_onboarding = require("ui.onboarding.startup").should_show(decoded),
@@ -121,6 +159,8 @@ local function driver_state(path)
 		parameter = gestures.get_action_parameter("tap_3", "open_url"),
 		gestures_enabled = enable_requested,
 		shortcuts_enabled = shortcuts.is_enabled(),
+		chatgpt_url = chatgpt_url,
+		update_channel = update_channel,
 		answers = require("ui.onboarding.bridge")._answers_from_config(decoded, ""),
 	}
 end
@@ -167,6 +207,21 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 		helpers.assert_eq(#scan.keys, 0)
 	end)
 
+	helpers.it("unused keys: the subscribed update channel is read, an unknown one is offered", function()
+		local kept = Engine.find_in_source("[updater]\nchannel = \"" .. SUBSCRIBED_NON_DEFAULT .. "\"\n",
+			Cleanup.collect)
+		helpers.assert_eq(#kept.keys, 0, "the updater reads its channel from config.toml")
+		-- An alias is resolved by the registry, so it is read like the id it names.
+		local alias = "stable"
+		helpers.assert_true(require("modules.updater.manager").CHANNELS.resolve(alias) ~= nil,
+			"the registry must still declare the '" .. alias .. "' alias")
+		helpers.assert_eq(#Engine.find_in_source("[updater]\nchannel = \"" .. alias .. "\"\n",
+			Cleanup.collect).keys, 0, "an alias of a registry channel is read")
+		local unknown = Engine.find_in_source("[updater]\nchannel = \"no_such_channel\"\n", Cleanup.collect)
+		helpers.assert_eq(#unknown.keys, 1, "a channel outside the registry is ignored by the updater")
+		helpers.assert_eq(unknown.keys[1].key, "channel")
+	end)
+
 	helpers.it("unused keys: an invalid gesture parameter is ignored by the loader and offered", function()
 		local scan = Engine.find_in_source(
 			"[gesture_parameters]\ntap_3__open_url = \"not a url\"\n", Cleanup.collect)
@@ -198,71 +253,38 @@ local function find_row(items, title)
 	return nil
 end
 
---- Runs fn with os.execute recording every command. The zenity probe finds
---- the binary; every other command exits with `status`.
---- @param status any Exit status of the dialog commands.
---- @param fn function
---- @return table commands
-local function with_execute(status, fn)
-	local real = os.execute
-	local commands = {}
-	os.execute = function(command)
-		commands[#commands + 1] = tostring(command)
-		if tostring(command):find("command -v zenity", 1, true) then return 0 end
-		return status
-	end
-	local ok, err = pcall(fn)
-	os.execute = real
-	if not ok then error(err, 0) end
-	return commands
+--- Keeps the existing engine refusal and backup proofs after UI replacement.
+local function run_engine_cleanup(deps)
+	return Engine.run({
+		path = deps.path, collect = Cleanup.collect, stamp = deps.stamp,
+		get_text = deps.get_text, confirm = deps.dialogs.confirm,
+		inform = deps.dialogs.inform, fail = deps.dialogs.fail,
+	})
 end
 
 helpers.describe("unused keys (linux): tray wiring", function()
-	helpers.it("unused keys: the Global actions submenu offers the row and hands it the zenity dialogs", function()
-		local previous = package.loaded["ui.menu.unused_keys_cleanup"]
-		local captured
+	helpers.it("unused keys: the Configuration submenu opens the cleanup host without native dialogs", function()
+		local previous, called = package.loaded["ui.menu.unused_keys_cleanup"], false
 		package.loaded["ui.menu.unused_keys_cleanup"] = {
-			run_from_menu = function(deps) captured = deps; return true end,
+			run_from_menu = function(deps) helpers.assert_eq(deps, nil); called = true; return true end,
 		}
-		local ok, err = pcall(function()
+		local ok, detail = pcall(function()
 			local mb = helpers.load_module("ui.menu.menu_builder")
-			local i18n = require("infra.i18n")
-			local label = i18n.get("menu.global.clean_unused_keys")
+			local label = require("infra.i18n").get("menu.global.clean_unused_keys")
 			local row = find_row(mb.build({ _version = "test", on_quit = function() end }), label)
-			helpers.assert_true(row ~= nil, "the cleanup row must be in Global actions on Linux")
-			local fn = row.fn or row.action
-			helpers.assert_eq(type(fn), "function")
-			fn()
-			helpers.assert_true(type(captured) == "table" and type(captured.dialogs) == "table",
-				"the row must run the cleanup with this tray's dialogs")
-
-			-- LuaJIT reports success as the NUMBER 0.
-			local answer
-			local commands = with_execute(0, function()
-				answer = captured.dialogs.confirm("Title", "[a] k = \"<x & y>\"")
-			end)
-			helpers.assert_eq(answer, true)
-			local question = commands[#commands]
-			helpers.assert_true(question:find("zenity --question", 1, true) ~= nil, question)
-			helpers.assert_true(question:find("&lt;x &amp; y&gt;", 1, true) ~= nil,
-				"zenity reads --text as markup: a value holding < or & must be escaped")
-			helpers.assert_true(question:find(i18n.get("button.remove"), 1, true) ~= nil)
-
-			commands = with_execute(1, function() answer = captured.dialogs.confirm("T", "x") end)
-			helpers.assert_eq(answer, false, "Cancel is a No")
-
-			commands = with_execute(0, function() captured.dialogs.inform("Done", "ok") end)
-			helpers.assert_true(commands[1]:find("zenity --info", 1, true) ~= nil, commands[1])
-			commands = with_execute(0, function() captured.dialogs.fail("Failed", "why") end)
-			helpers.assert_true(commands[1]:find("zenity --error --title=", 1, true) ~= nil, commands[1])
+			helpers.assert_true(row ~= nil, "the Configuration menu must expose cleanup")
+			local callback = row.fn or row.action
+			helpers.assert_eq(type(callback), "function")
+			callback()
+			helpers.assert_eq(called, true)
 		end)
 		package.loaded["ui.menu.unused_keys_cleanup"] = previous
-		if not ok then error(err, 0) end
+		if not ok then error(detail, 0) end
 	end)
 
-	helpers.it("unused keys: without zenity nobody is asked and nothing is removed", function()
+	helpers.it("unused keys: the engine refuses an unavailable confirmation without modifying the file", function()
 		Sandbox.with_config(FIXTURE, function(path)
-			local completed = Cleanup.run_from_menu({
+			local completed = run_engine_cleanup({
 				path = path, stamp = Sandbox.STAMP,
 				get_text = function(key) return key end,
 				dialogs = {
@@ -276,10 +298,10 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		end)
 	end)
 
-	helpers.it("unused keys: a confirmed tray cleanup removes the keys and keeps a backup", function()
+	helpers.it("unused keys: a confirmed engine cleanup removes the keys and keeps a backup", function()
 		Sandbox.with_config(FIXTURE, function(path)
 			local shown = {}
-			local completed = Cleanup.run_from_menu({
+			local completed = run_engine_cleanup({
 				path = path, stamp = Sandbox.STAMP,
 				get_text = function(key) return key end,
 				dialogs = {
@@ -295,7 +317,13 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		end)
 	end)
 
-	helpers.it("unused keys: the tray action refuses to run without dialogs", function()
-		helpers.assert_throws(function() Cleanup.run_from_menu({}) end)
+	helpers.it("unused keys: the menu forwards trusted ownership and reports a refused WebView", function()
+		local captured
+		local opened = Cleanup.run_from_menu({ path = "/trusted/config.toml",
+			host = { open = function(options) captured = options; return false end },
+		})
+		helpers.assert_eq(opened, false)
+		helpers.assert_eq(captured.path, "/trusted/config.toml")
+		helpers.assert_eq(captured.collect, Cleanup.collect)
 	end)
 end)

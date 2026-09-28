@@ -1,0 +1,18 @@
+# _shared/tests/corpus/config_migrations/op_map_value/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: value-domain changes."
+ops = [
+	{ op = "map_value", section = "metrics", key = "metrics_encrypt", map = [{ from = 0, to = false }, { from = 1, to = true }] },
+	{ op = "map_value", section = "metrics", key = "legacy_flag", map = [{ from = 1, to = true }] },
+	{ op = "map_value", section = "updater", key = "channel", map = [{ from = "stable", to = "main" }] },
+	{ op = "map_value", section = "layout", key = "variant", map = [{ from = "old", to = "new" }] },
+	{ op = "map_value", section = "script", key = "absent_key", map = [{ from = true, to = "on" }] },
+]

@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local restore_family_preferences = require("tests.support.dynamic_hotstrings_fixture").install()
 
 
 --- Applies a captured codepoint deletion and replacement to simulated text.
@@ -65,3 +66,5 @@ helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+restore_family_preferences()

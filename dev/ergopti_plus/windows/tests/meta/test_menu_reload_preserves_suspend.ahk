@@ -127,7 +127,9 @@ _MRS_NoBareReloadAnywhereReachable() {
 		. "(reload-drops-suspend-outside-the-menu-layer) -- found " . Count . " bare Reload(s): " . Offenders)
 
 	Routed := _MRS_CountRouted(Src)
-	Assert(Routed >= 24,
+	; Four hotstring bulk wrappers share one reload site; category admission adds
+	; one inherited-Critical wrapper, giving 22 audited routed calls instead of 24.
+	Assert(Routed >= 22,
 		"the driver must still reload through ReloadPreservingSuspend at its persist-and-restart sites -- a scan "
 		. "that found none would pass the assertion above vacuously (found " . Routed . ")")
 }

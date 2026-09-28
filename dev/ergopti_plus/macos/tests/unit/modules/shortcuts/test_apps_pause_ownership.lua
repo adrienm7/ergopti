@@ -478,3 +478,37 @@ helpers.describe("Apps composite owner: clipboard restoration", function()
 		helpers.assert_eq(f.subject.has_pending_apps_action(), false)
 	end)
 end)
+
+
+helpers.describe("Apps composite owner: parent scopes", function()
+	helpers.it("a paused shortcut scope leaves gesture navigation open", function()
+		local f = fresh_apps()
+		helpers.assert_eq(f.subject.pause_apps_actions(), true)
+		helpers.assert_eq(f.subject.open_downloads(), false,
+			"the paused shortcut scope must refuse its own navigation")
+		helpers.assert_eq(f.subject.open_downloads("gestures"), true,
+			"a gesture must not be fenced by the shortcuts feature")
+		helpers.assert_eq(#f.shells, 1)
+		helpers.assert_eq(f.subject.has_pending_apps_action("gestures"), true)
+		helpers.assert_eq(f.subject.has_pending_apps_action(), false,
+			"the gesture's Finder probe belongs to the gesture scope only")
+	end)
+
+	helpers.it("pausing one parent settles its own work and not the sibling's", function()
+		local f = fresh_apps()
+		f.queue_shell({ terminate_mode = "sync" })
+		f.queue_shell({ terminate_mode = "sync" })
+		helpers.assert_eq(f.subject.open_downloads("gestures"), true)
+		helpers.assert_eq(f.subject.open_downloads(), true)
+		helpers.assert_eq(#f.shells, 2)
+		helpers.assert_eq(f.subject.pause_apps_actions("gestures"), true)
+		helpers.assert_eq(f.shells[1].terminate_calls, 1, "the gesture probe is terminated")
+		helpers.assert_eq(f.shells[2].terminate_calls, 0,
+			"the shortcut probe keeps running through a gesture PAUSE")
+		helpers.assert_eq(f.subject.is_apps_actions_paused("gestures"), true)
+		helpers.assert_eq(f.subject.is_apps_actions_paused(), false)
+		helpers.assert_eq(f.subject.has_pending_apps_action(), true)
+		helpers.assert_eq(f.subject.resume_apps_actions("gestures"), true)
+		helpers.assert_eq(f.subject.open_settings("gestures"), true)
+	end)
+end)

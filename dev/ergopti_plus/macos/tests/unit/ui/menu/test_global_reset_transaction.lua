@@ -1,11 +1,13 @@
 --- tests/unit/ui/menu/test_global_reset_transaction.lua
 
 --- ==============================================================================
---- MODULE: Global Disable and Factory Reset Transaction Regression
+--- MODULE: Factory Reset Transaction Regression
 --- DESCRIPTION:
 --- Exercises the real global actions exported by ui.menu.start and proves every
---- runtime, preference, settings, file, Karabiner, and reload boundary belongs
---- to one exact transaction with reverse compensation and retained retry debt.
+--- runtime, preference, settings, file, Karabiner, and reload boundary of the
+--- factory reset belongs to one exact transaction with reverse compensation and
+--- retained retry debt. Enable All and Disable All, the other two kinds this
+--- owner once had, are retired: the menu exports neither.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Faithful Refusals: False, nil, throws, and synchronous callbacks followed
@@ -19,6 +21,10 @@
 local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
+	"ui.menu.metrics_scope",
+	"ui.menu.scoped_preferences",
+	"ui.menu.gesture_scope",
+	"infra.dialog_util",
 	"infra.logger",
 	"infra.notifications",
 	"ui.hotstring_editor",
@@ -79,18 +85,6 @@ end
 --- @return table descriptor
 local function fail(mode, count)
 	return { mode = mode, remaining = count or 1 }
-end
-
---- Counts one exact notification label.
---- @param observations table Fixture observations.
---- @param label string Exact i18n key.
---- @return integer count
-local function count_notification(observations, label)
-	local count = 0
-	for _, notification in ipairs(observations.notifications) do
-		if notification.label == label then count = count + 1 end
-	end
-	return count
 end
 
 --- Delivers one hostile reentrant hook exactly once.
@@ -255,6 +249,13 @@ local function with_menu_fixture(options, callback)
 		post_reload_effects = 0,
 		gesture_enabled = true,
 		tap_holds_enabled = true,
+		-- Named shortcut 'alpha' keeps Bindings' two axes apart: named_shortcut is
+		-- the user preference, named_bound the native hotkey, bindings_paused the
+		-- admission fence menu_state closes whenever Shortcuts is off.
+		named_shortcut = true,
+		named_bound = true,
+		bindings_paused = false,
+		persisted_shortcut_keys = nil,
 		enable_preflight_calls = 0,
 		config_watcher_callback = nil,
 		builder_ctx = nil,
@@ -279,6 +280,21 @@ local function with_menu_fixture(options, callback)
 			end
 		end
 		return logger
+	end
+
+	-- Assigned with the other runtime doubles below. Preferences.snapshot reads
+	-- [shortcuts.keys] from list_shortcuts(), so the doubles must too: deriving
+	-- them from the Shortcuts master switch encoded the very bug under test.
+	local shortcuts
+
+	--- Mirrors Preferences.snapshot's [shortcuts.keys] collection.
+	--- @return table keys Preference per named shortcut id.
+	local function listed_shortcut_keys()
+		local keys = {}
+		for _, shortcut in ipairs(shortcuts.list_shortcuts()) do
+			keys[shortcut.id] = shortcut.enabled
+		end
+		return keys
 	end
 
 	package.loaded["infra.logger"] = logger_stub()
@@ -310,18 +326,23 @@ local function with_menu_fixture(options, callback)
 			local snapshot = clone(candidate)
 			run_hook(observations, "preferences-snapshot", "after-clone")
 			snapshot.gesture_actions = clone(observations.gestures)
-			snapshot.shortcut_keys = { alpha = candidate.shortcuts == true }
+			snapshot.shortcut_keys = listed_shortcut_keys()
 			return snapshot
 		end,
-		save = function(_, candidate)
+		save = function(_, candidate, _hotfiles, _core, snapshot_view)
+			local runtime = clone(candidate)
+			runtime.gesture_actions = clone(observations.gestures)
+			runtime.shortcut_keys = listed_shortcut_keys()
+			local snapshot = clone(runtime)
+			if snapshot_view then snapshot = snapshot_view(snapshot) end
 			local result = perform(observations, "preferences", function()
-				observations.persisted = clone(candidate)
+				-- State and module-owned shortcuts have separate observations below.
+				observations.persisted = {}
+				for key in pairs(candidate) do observations.persisted[key] = clone(snapshot[key]) end
+				observations.persisted_shortcut_keys = clone(snapshot.shortcut_keys)
 			end)
 			if result ~= true then return result end
-			local snapshot = clone(candidate)
-			snapshot.gesture_actions = clone(observations.gestures)
-			snapshot.shortcut_keys = { alpha = candidate.shortcuts == true }
-			return true, snapshot
+			return true, snapshot, runtime
 		end,
 	}
 	package.loaded["ui.menu.builder"] = {
@@ -343,18 +364,17 @@ local function with_menu_fixture(options, callback)
 		open_editor = noop,
 	}
 	package.loaded["ui.menu.menu_state"] = {
-		sync_state_to_modules = function(_, saved)
+		metrics_start_pending = function() return false end,
+		-- Same order as menu_state: the Shortcuts switch opens or closes the
+		-- admission fence first, then every saved key is replayed behind it.
+		sync_state_to_modules = function(live_state, saved)
 			return perform(observations, "runtime-sync", function()
+				observations.bindings_paused = live_state.shortcuts ~= true
 				if type(saved) == "table" and type(saved.shortcut_keys) == "table" then
 					observations.named_shortcut = saved.shortcut_keys.alpha == true
 				end
-			end)
-		end,
-	}
-	package.loaded["ui.menu.keymap_lifecycle"] = {
-		ensure_started = function()
-			return perform(observations, "ensure-started", function()
-				observations.enable_preflight_calls = observations.enable_preflight_calls + 1
+				observations.named_bound = not observations.bindings_paused
+					and observations.named_shortcut
 			end)
 		end,
 	}
@@ -519,7 +539,7 @@ local function with_menu_fixture(options, callback)
 		DEFAULT_GESTURES = { swipe_left = "desktop_left", swipe_right = "desktop_right" },
 	}
 
-	local shortcuts = {
+	shortcuts = {
 		DEFAULT_STATE = {
 			script_control_shortcuts = {
 				return_key = "script_pause_toggle",
@@ -530,22 +550,31 @@ local function with_menu_fixture(options, callback)
 		is_paused = function() return false end,
 		set_on_pause_change = noop,
 		set_extras = function(candidate)
-			if type(candidate) == "table" and type(candidate.disable_all) == "function" then
+			-- The menu hands its actions table here too; the reset marks it.
+			if type(candidate) == "table" and type(candidate.reset_defaults) == "function" then
 				observations.actions = candidate
 			end
 			return true
 		end,
 		list_shortcuts = function()
-			return { { id = "alpha", enabled = observations.named_shortcut ~= false } }
+			return { {
+				id = "alpha",
+				enabled = observations.named_shortcut == true,
+				bound = observations.named_bound == true,
+			} }
 		end,
 		disable = function()
 			return perform(observations, "named-shortcut:alpha", function()
 				observations.named_shortcut = false
+				observations.named_bound = false
 			end)
 		end,
+		-- Like Bindings.enable: behind the admission fence only the preference is
+		-- recorded; the native hotkey appears when the layer resumes.
 		enable = function()
 			return perform(observations, "named-shortcut:alpha", function()
 				observations.named_shortcut = true
+				observations.named_bound = not observations.bindings_paused
 			end)
 		end,
 		set_shortcut_action = function(slot, action)
@@ -665,9 +694,10 @@ local function with_menu_fixture(options, callback)
 		helpers.assert_not_nil(menu)
 		helpers.assert_type(observations.dynamic_menu_callback, "function")
 		observations.dynamic_menu_callback()
-		helpers.assert_type(observations.actions and observations.actions.disable_all, "function")
 		helpers.assert_type(observations.actions and observations.actions.reset_defaults, "function")
-		helpers.assert_type(observations.actions and observations.actions.enable_all, "function")
+		-- Retired on every driver: no menu row and no action may reach them.
+		helpers.assert_nil(observations.actions.enable_all, "Enable All is retired")
+		helpers.assert_nil(observations.actions.disable_all, "Disable All is retired")
 		helpers.assert_type(observations.actions and observations.actions.reload, "function")
 		helpers.assert_type(observations.actions and observations.actions.quit, "function")
 		observations.calls = {}
@@ -701,231 +731,21 @@ local function assert_fully_restored(observations)
 	helpers.assert_eq(observations.tap_holds_enabled, true)
 	helpers.assert_eq(observations.persisted, observations.initial_state)
 	helpers.assert_eq(observations.named_shortcut, true)
-	helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 0)
-	helpers.assert_eq(count_notification(observations, "notify.defaults_reset"), 0)
+	helpers.assert_eq(observations.named_bound, true)
+	-- A refused Quit tells the user so; the reset itself notifies nothing.
+	for _, notification in ipairs(observations.notifications) do
+		helpers.assert_eq(notification.label, "notify.quit_refused",
+			"a rolled-back reset notifies nothing of its own")
+	end
 end
 
 
 
 
 
--- ===========================================================
--- ===========================================================
--- ======= 1/ Disable-All Exact Transaction Boundaries =======
--- ===========================================================
--- ===========================================================
-
-helpers.describe("HS-022 disable-all is one exact global transaction", function()
-	helpers.it("holds one writer capability across the Enable All preflight", function()
-		with_menu_fixture({}, function(observations)
-			local nested_result = nil
-			observations.hooks["ensure-started:before"] = function()
-				nested_result = observations.actions.reset_defaults()
-			end
-
-			helpers.assert_eq(observations.actions.enable_all(), true)
-			helpers.assert_eq(nested_result, false,
-				"a nested bulk writer cannot publish inside the opaque keymap preflight")
-			helpers.assert_eq(observations.enable_preflight_calls, 1)
-			helpers.assert_eq(observations.calls["karabiner-reset"] or 0, 0)
-			helpers.assert_eq(observations.calls.reload or 0, 0)
-			helpers.assert_eq(observations.files, observations.initial_files)
-		end)
-	end)
-
-	helpers.it("owns the snapshot window before any reentrant global action", function()
-		with_menu_fixture({}, function(observations)
-			local nested_result = nil
-			observations.hooks["preferences-snapshot:after-clone"] = function()
-				nested_result = observations.actions.reset_defaults()
-			end
-
-			helpers.assert_true(observations.actions.disable_all())
-			helpers.assert_eq(nested_result, false,
-				"a nested reset cannot commit over a partially captured snapshot")
-			helpers.assert_eq(observations.reload_commits, 0)
-			helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 1)
-			helpers.assert_eq(count_notification(observations, "notify.defaults_reset"), 0)
-		end)
-	end)
-
-	helpers.it("compensates false, nil, and throw from every feature switch", function()
-		for _, boundary in ipairs({
-			"runtime-sync",
-			"gesture-master",
-			"tap-holds-switch",
-			"preferences",
-		}) do
-			for _, mode in ipairs({ "false", "nil", "throw" }) do
-				with_menu_fixture({ failures = { [boundary] = fail(mode) } }, function(observations)
-					helpers.assert_eq(observations.actions.disable_all(), false,
-						boundary .. " " .. mode .. " must refuse the real action")
-					assert_fully_restored(observations)
-				end)
-			end
-		end
-	end)
-
-	helpers.it("switches every feature off and keeps every assignment", function()
-		-- Disable All used to clear every tap-hold binding through Karabiner and
-		-- rewrite gesture, script-control, named and keyboard shortcuts to
-		-- `none`. It then waited on a Karabiner deployment that never settled
-		-- without a live lease, so every feature stayed checked.
-		with_menu_fixture({}, function(observations)
-			helpers.assert_eq(observations.actions.disable_all(), true)
-			helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 1)
-			for _, key in ipairs({ "keymap", "gestures", "shortcuts", "llm_enabled",
-				"keylogger_enabled", "personal_info" }) do
-				helpers.assert_eq(observations.state[key], false, key .. " must be switched off")
-				helpers.assert_eq(observations.persisted[key], false, key .. " must be persisted off")
-			end
-			for name, enabled in pairs(observations.state.hotstrings) do
-				helpers.assert_eq(enabled, false, "hotstring group '" .. name .. "' must be off")
-			end
-			helpers.assert_eq(observations.gesture_enabled, false)
-			helpers.assert_eq(observations.tap_holds_enabled, false,
-				"the Tap-Holds feature must be switched off like the others")
-			helpers.assert_true((observations.calls.regenerate or 0) >= 1,
-				"the switched-off Tap-Holds rules must be redeployed")
-
-			helpers.assert_eq(observations.karabiner_state, observations.initial_karabiner,
-				"tap-hold bindings must survive Disable All")
-			helpers.assert_eq(observations.calls["karabiner-clear"] or 0, 0)
-			helpers.assert_eq(observations.gestures, observations.initial_gestures)
-			helpers.assert_eq(observations.script, observations.initial_script)
-			helpers.assert_eq(observations.state.script_control_shortcuts,
-				observations.initial_state.script_control_shortcuts)
-			helpers.assert_eq(observations.state.script_control_enabled, true,
-				"the pause shortcut must stay available")
-			helpers.assert_eq(observations.keyboard, observations.initial_keyboard)
-			helpers.assert_eq(observations.state.terminator_states,
-				observations.initial_state.terminator_states)
-			helpers.assert_eq(observations.named_shortcut ~= false, true)
-		end)
-	end)
-
-	helpers.it("Enable All switches Tap-Holds back on after Disable All", function()
-		with_menu_fixture({}, function(observations)
-			helpers.assert_eq(observations.actions.disable_all(), true)
-			helpers.assert_eq(observations.tap_holds_enabled, false)
-			helpers.assert_eq(observations.actions.enable_all(), true)
-			helpers.assert_eq(observations.tap_holds_enabled, true)
-			helpers.assert_eq(observations.karabiner_state, observations.initial_karabiner,
-				"re-enabling must find every tap-hold binding where it was")
-		end)
-	end)
-end)
-
-
-
-
-
--- ==========================================================
--- ==========================================================
--- ======= 2/ Enable-All Exact Transaction Boundaries =======
--- ==========================================================
--- ==========================================================
-
-helpers.describe("HS-050 enable-all is one exact global transaction", function()
-	helpers.it("refuses shortcut enable failures before persistence", function()
-		for _, mode in ipairs({ "false", "nil", "throw" }) do
-			with_menu_fixture({ failures = { ["named-shortcut:alpha"] = fail(mode) } },
-				function(observations)
-					observations.named_shortcut = false
-					helpers.assert_eq(observations.actions.enable_all(), false,
-						"a named shortcut " .. mode .. " must refuse Enable All")
-					helpers.assert_eq(observations.named_shortcut, false)
-					helpers.assert_eq(observations.calls.preferences or 0, 0,
-						"preferences must stay untouched until every enable commits")
-					helpers.assert_eq(
-						count_notification(observations, "notify.all_features_enabled"),
-						0
-					)
-				end)
-		end
-	end)
-
-	helpers.it("rolls back runtime sync failures before persistence", function()
-		for _, mode in ipairs({ "false", "nil", "throw" }) do
-			with_menu_fixture({ failures = { ["runtime-sync"] = fail(mode) } },
-				function(observations)
-					observations.named_shortcut = false
-					helpers.assert_eq(observations.actions.enable_all(), false,
-						"a runtime sync " .. mode .. " must refuse Enable All")
-					helpers.assert_eq(observations.named_shortcut, false)
-					helpers.assert_eq(observations.persisted, observations.initial_state)
-					helpers.assert_eq(observations.calls.preferences or 0, 0,
-						"runtime commitment must precede preference publication")
-					helpers.assert_eq(
-						count_notification(observations, "notify.all_features_enabled"),
-						0
-					)
-				end)
-		end
-	end)
-
-	helpers.it("compensates exact keymap feature refusals before persistence", function()
-		for _, case in ipairs({
-			{ boundary = "keymap-group:common", modes = { "false", "nil", "throw" } },
-			{ boundary = "preview-star", modes = { "false", "nil", "throw" } },
-			{ boundary = "terminator:space", modes = { "false", "throw" } },
-		}) do
-			for _, mode in ipairs(case.modes) do
-				with_menu_fixture({ failures = { [case.boundary] = fail(mode) } },
-					function(observations)
-						helpers.assert_eq(observations.actions.enable_all(), false,
-							case.boundary .. " " .. mode .. " must refuse Enable All")
-						helpers.assert_eq(observations.calls.preferences or 0, 0)
-						helpers.assert_eq(
-							count_notification(observations, "notify.all_features_enabled"),
-							0
-						)
-					end)
-			end
-		end
-	end)
-
-	helpers.it("restores every runtime after preference publication refuses", function()
-		for _, mode in ipairs({ "false", "nil", "throw" }) do
-			with_menu_fixture({ failures = { preferences = fail(mode) } },
-				function(observations)
-					observations.named_shortcut = false
-					helpers.assert_eq(observations.actions.enable_all(), false)
-					helpers.assert_eq(observations.state, observations.initial_state)
-					helpers.assert_eq(observations.named_shortcut, false)
-					helpers.assert_eq(observations.persisted, observations.initial_state)
-					helpers.assert_eq(
-						count_notification(observations, "notify.all_features_enabled"),
-						0
-					)
-				end)
-		end
-	end)
-
-	helpers.it("publishes success only after the final preference commit", function()
-		with_menu_fixture({}, function(observations)
-			observations.named_shortcut = false
-			helpers.assert_eq(observations.actions.enable_all(), true)
-			helpers.assert_eq(observations.named_shortcut, true)
-			helpers.assert_eq(observations.calls.preferences, 1)
-			helpers.assert_eq(observations.persisted.shortcuts, true)
-			helpers.assert_eq(observations.calls["karabiner-clear"] or 0, 0)
-			helpers.assert_eq(observations.calls["karabiner-reset"] or 0, 0)
-			helpers.assert_eq(
-				count_notification(observations, "notify.all_features_enabled"),
-				1
-			)
-		end)
-	end)
-end)
-
-
-
-
-
 -- =============================================================
 -- =============================================================
--- ======= 3/ Factory Reset Exact Transaction Boundaries =======
+-- ======= 1/ Factory Reset Exact Transaction Boundaries =======
 -- =============================================================
 -- =============================================================
 
@@ -965,7 +785,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			observations.hooks[
 				"file-restore:/virtual/config_karabiner.toml:after"
 			] = function()
-				nested_result = observations.actions.disable_all()
+				nested_result = observations.actions.reset_defaults()
 			end
 
 			helpers.assert_eq(observations.actions.reset_defaults(), false)
@@ -1058,7 +878,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			helpers.assert_eq(observations.actions.reset_defaults(), true,
 				"the retry must finish debt before starting one new candidate")
 			helpers.assert_eq(observations.reload_commits, 1)
-			helpers.assert_eq(count_notification(observations, "notify.defaults_reset"), 0,
+			helpers.assert_eq(#observations.notifications, 0,
 				"reload handoff has no post-finalization notification tail")
 			helpers.assert_eq(observations.post_reload_effects, 0)
 			helpers.assert_eq(observations.calls.reload, 2,
@@ -1069,17 +889,17 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 	helpers.it("keeps reset fenced through a returning reload with no post-reload tail", function()
 		with_menu_fixture({ failures = { ["karabiner-reset"] = fail("pending") } }, function(observations)
 			helpers.assert_eq(observations.actions.reset_defaults(), true)
-			helpers.assert_eq(observations.actions.disable_all(), false,
-				"both global actions share one pending owner")
+			helpers.assert_eq(observations.actions.reset_defaults(), false,
+				"a second reset shares the one pending owner")
 			helpers.assert_eq(observations.reload_commits, 0)
 			local terminal = observations.terminals["karabiner-reset"]
 			terminal(true, "ready")
 			terminal(true, "duplicate")
 			helpers.assert_eq(observations.reload_commits, 1)
-			helpers.assert_eq(count_notification(observations, "notify.defaults_reset"), 0)
+			helpers.assert_eq(#observations.notifications, 0)
 			helpers.assert_eq(observations.post_reload_effects, 0,
 				"no UI or logger capability may run after the coordinator returned from hs.reload")
-			helpers.assert_eq(observations.actions.enable_all(), false,
+			helpers.assert_eq(observations.actions.reset_defaults(), false,
 				"the global mutation owner remains fenced until the Lua state is replaced")
 			helpers.assert_nil(observations.files["/virtual/config.toml"])
 			helpers.assert_not_nil(observations.files[
@@ -1100,7 +920,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			helpers.assert_eq(observations.actions.reset_defaults(), true)
 			helpers.assert_type(observations.reload_abort, "function")
 			helpers.assert_type(observations.builder_ctx, "table")
-			helpers.assert_eq(observations.actions.enable_all(), false,
+			helpers.assert_eq(observations.actions.reset_defaults(), false,
 				"an accepted reload handoff still owns every overlapping writer")
 			helpers.assert_eq(observations.actions.reload(), false,
 				"a manual reload cannot supersede the reset handoff")
@@ -1108,10 +928,11 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 				"indirect menu callers must share the same reload capability")
 			helpers.assert_eq(observations.actions.quit(), false,
 				"a quit cannot upgrade the reset's exclusive reload owner")
-			helpers.assert_eq(observations.enable_preflight_calls, 0)
 			helpers.assert_eq(observations.calls.manual_reload or 0, 0)
 			helpers.assert_eq(observations.calls.exit or 0, 0)
-			helpers.assert_eq(count_notification(observations, "notify.defaults_reset"), 0)
+			-- The refused quit tells the user so; the reset itself notifies nothing.
+			helpers.assert_eq(#observations.notifications, 1)
+			helpers.assert_eq(observations.notifications[1].label, "notify.quit_refused")
 
 			local abort = observations.reload_abort
 			observations.reload_abort = nil
@@ -1130,7 +951,7 @@ end)
 
 -- ========================================================
 -- ========================================================
--- ======= 4/ Recoverable File Move Native Contract =======
+-- ======= 2/ Recoverable File Move Native Contract =======
 -- ========================================================
 -- ========================================================
 
@@ -1282,6 +1103,118 @@ helpers.describe("HS-022 recoverable config moves retain exact inverse evidence"
 		helpers.assert_eq(mover.move(entry), false)
 		helpers.assert_eq(files["/config.toml"], "concurrent writer")
 		helpers.assert_eq(files["/config.toml.backup"], "old bytes")
+	end)
+end)
+
+
+helpers.describe("gesture scope menu composition", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+		with_menu_fixture({}, function(observations)
+			local received, selected, dialog_args
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				dialog_args = { ... }
+				return selected
+			end }
+			package.loaded["ui.menu.gesture_scope"] = { new = function(options)
+				received = options
+				return { apply = function(mode)
+					return options.admission("gesture scope fixture", function()
+						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
+							"ordinary save must not enter an owned scope")
+						return options.confirm(mode)
+					end)
+				end }
+			end }
+			selected = "onboarding.btn.no"
+			helpers.assert_eq(observations.builder_ctx.apply_gesture_scope("clear"), false)
+			helpers.assert_eq(dialog_args[3], "onboarding.btn.no")
+			helpers.assert_eq(dialog_args[4], "onboarding.btn.yes")
+			helpers.assert_eq(dialog_args[2], "common.clear_to_system")
+			helpers.assert_type(received.checkpoint.capture, "function")
+			helpers.assert_type(received.checkpoint.replace, "function")
+			helpers.assert_eq(received.path, "/virtual/config.toml")
+			selected = "onboarding.btn.yes"
+			helpers.assert_eq(observations.builder_ctx.apply_gesture_scope("recommended"), true)
+			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+		end)
+	end)
+end)
+
+helpers.describe("layout scope menu composition", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+		with_menu_fixture({}, function(observations)
+			local received, selected, dialog_args
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				dialog_args = { ... }
+				return selected
+			end }
+			package.loaded["ui.menu.scoped_preferences"] = { new = function(options)
+				received = options
+				return { apply = function(mode)
+					return options.admission("layout scope fixture", function()
+						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
+							"ordinary save must not enter an owned scope")
+						return options.confirm(mode)
+					end)
+				end }
+			end }
+			selected = "onboarding.btn.no"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("keyboard_layout", "clear"), false)
+			helpers.assert_eq(dialog_args[3], "onboarding.btn.no")
+			helpers.assert_eq(dialog_args[4], "onboarding.btn.yes")
+			helpers.assert_eq(dialog_args[2], "common.clear_to_system")
+			helpers.assert_eq(received.scope, "keyboard_layout")
+			helpers.assert_type(received.runtime.capture, "function")
+			helpers.assert_type(received.checkpoint.capture, "function")
+			helpers.assert_type(received.checkpoint.replace, "function")
+			helpers.assert_eq(received.path, "/virtual/config.toml")
+			selected = "onboarding.btn.yes"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("keyboard_layout", "recommended"), true)
+			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+		end)
+	end)
+end)
+
+helpers.describe("metrics scope menu composition", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+		with_menu_fixture({}, function(observations)
+			local received, selected, dialog_args
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				dialog_args = { ... }
+				return selected
+			end }
+			package.loaded["ui.menu.metrics_scope"] = { new = function(options)
+				received = options
+				return { apply = function(mode)
+					return options.admission("metrics scope fixture", function()
+						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
+							"ordinary save must not enter an owned scope")
+						return options.confirm(mode)
+					end)
+				end }
+			end }
+			selected = "onboarding.btn.no"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("metrics", "clear"), false)
+			helpers.assert_eq(dialog_args[3], "onboarding.btn.no")
+			helpers.assert_eq(dialog_args[4], "onboarding.btn.yes")
+			helpers.assert_eq(dialog_args[2], "common.clear_to_system")
+			helpers.assert_type(received.activation_pending, "function")
+			helpers.assert_type(received.capture_shortcuts, "function")
+			helpers.assert_eq(received.apply_shortcut("metrics_shortcut", { "ctrl" }, "m", false), true)
+			local shortcut = received.capture_shortcuts().metrics_shortcut
+			helpers.assert_eq(shortcut.key, "m")
+			helpers.assert_eq(shortcut.enabled, false)
+			shortcut.mods[1] = "alt"
+			helpers.assert_eq(received.capture_shortcuts().metrics_shortcut.mods[1], "ctrl")
+			helpers.assert_eq(received.apply_shortcut("metrics_shortcut", nil, nil), true)
+			helpers.assert_eq(received.capture_shortcuts().metrics_shortcut, false)
+			helpers.assert_type(received.checkpoint.capture, "function")
+			helpers.assert_type(received.checkpoint.replace, "function")
+			helpers.assert_eq(received.path, "/virtual/config.toml")
+			selected = "onboarding.btn.yes"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("metrics", "recommended"), true)
+			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+		end)
 	end)
 end)
 

@@ -225,10 +225,13 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
 ; explicit path, and both must be recognised as the same file.
 _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath := "") {
 		global ScriptInformation, _SharedDir
+		global _HotstringExtensionPaths
 		if (FilePath != "") {
 				return FilePath
 		}
 		LowerCat := StrLower(CategoryName)
+		if IsSet(_HotstringExtensionPaths) && _HotstringExtensionPaths.Has(LowerCat)
+				return _HotstringExtensionPaths[LowerCat]
 		if (LowerCat == "personal"
 				and IsSet(ScriptInformation)
 				and ScriptInformation.Has("PersonalTomlPath")) {
@@ -442,10 +445,12 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 }
 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
-LoadExtTomlFile(FilePath, CategoryLabel) {
+LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 		global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
 		global HS_TOML_SECTION_HEADER_PATTERN
 		if !FileExist(FilePath) {
+				if SelectedSection != ""
+						throw Error("The selected extension source is unavailable: " . FilePath)
 				try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
 				return
 		}
@@ -454,6 +459,9 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
 		CurrentSection := ""
 		SplitPath FilePath, , , , &CategoryName
 		FileContent := ReadTomlFile(FilePath)
+		if SelectedSection != "" && TOML_UnreadableFile(FilePath)
+				throw Error("The selected extension source could not be read: " . FilePath)
+		SelectedFound := false
 		loop parse, FileContent, "`n", "`r" {
 				Line := Trim(A_LoopField, " `t")
 				if (Line == "" or SubStr(Line, 1, 1) == "#") {
@@ -464,11 +472,15 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
 				; every following entry when a header carries a trailing comment.
 				if RegExMatch(TOML_StripInlineComment(Line), HS_TOML_SECTION_HEADER_PATTERN, &SecM) {
 						CurrentSection := StrLower(Trim(SecM[1]))
+						if CurrentSection == SelectedSection
+								SelectedFound := true
 						continue
 				}
 				if (CurrentSection == "") {
 						continue
 				}
+				if SelectedSection != "" && CurrentSection != SelectedSection
+						continue
 				; Metadata blocks ([_meta], [_meta.sections], [_meta.sections.<x>]) describe
 				; the file — they are NOT hotstrings. Skip them so a key like
 				; description="Hotstrings personnels" or a section label never registers as
@@ -487,6 +499,13 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
 								; user's key, not the corpus placeholder.
 								Output  := StrReplace(Output, "★", ScriptInformation["MagicKey"])
 								Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
+								if SelectedSection != "" {
+										Options["Category"] := CategoryLabel
+										Options["Section"] := CurrentSection
+										Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
+										Options["Priority"] := Resolved.Priority
+										Options["TimeActivationSeconds"] := Resolved.Delay
+								}
 								CreateCaseSensitiveHotstrings("", Trigger, Output, Options)
 								TotalLoaded += 1
 						}
@@ -514,10 +533,20 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
 						and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
 				EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
 				Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
+				if SelectedSection != "" {
+						Options["Category"] := CategoryLabel
+						Options["Section"] := CurrentSection
+						Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
+						Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
+						Options["TimeActivationSeconds"] := Resolved.Delay
+				}
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				TotalLoaded += 1
 		}
+		if SelectedSection != "" && !SelectedFound
+				throw Error("The selected extension section is unavailable: " . SelectedSection)
 		try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)
+		return TotalLoaded
 }
 
 ; Fold common French accented characters to their ASCII equivalent.

@@ -29,6 +29,37 @@ if not ok_pe then prompt_editor = nil end
 -- Monotone counter to make profile ids unique even when two clones are
 -- created within the same second (os.time() resolution = 1s).
 local _profile_seq = 0
+local editor_tasks = {}
+
+--- Pins deferred editor openings until both callback and native timer settle.
+--- @param callback function Existing editor-opening owner.
+--- @return table|nil handle Exact scheduler handle.
+--- @return boolean accepted Opening was acquired without a synchronous callback.
+local function schedule_editor(callback)
+	local task = { acquiring = true, authorized = true, callback_done = false }
+	editor_tasks[task] = true
+	local acquired, handle, accepted = Logger.callback(LOG, "Deferred profile editor acquisition", TimerScheduler.after, 0.1, function()
+		if task.acquiring then task.early_callback = true; return end
+		if task.authorized then Logger.callback(LOG, "Deferred profile editor", callback) end
+		task.callback_done = true
+		if task.native_settled then editor_tasks[task] = nil end
+	end)
+	task.acquiring, task.handle = false, handle
+	if acquired and type(handle) == "table" then
+		local observed_ok, observed = Logger.callback(LOG, "Profile editor timer observation", TimerScheduler.onSettled, handle, function()
+			task.native_settled = true
+			if task.callback_done or not task.authorized then editor_tasks[task] = nil end
+		end)
+		if observed_ok ~= true or observed ~= true then accepted = false end
+	else accepted = false end
+	if accepted ~= true or task.early_callback then
+		task.authorized = false
+		if type(handle) ~= "table" or handle.timer == nil or TimerScheduler.cancel(handle) == true then editor_tasks[task] = nil end
+		return handle, false
+	end
+	return handle, true
+end
+
 
 
 
@@ -423,7 +454,7 @@ local function make_profile_candidate_owner(deps)
 		return false
 	end
 
-	return activate_candidate, settle_recovery
+	return activate_candidate, settle_recovery, function() return recovery_debt == nil end
 end
 
 --- Creates the exact owner for edits of an already-published user profile.
@@ -604,7 +635,7 @@ local function make_profile_edit_owner(deps)
 		return action_result == true
 	end
 
-	return replace_profile, settle_recovery
+	return replace_profile, settle_recovery, function() return recovery_debt == nil and boundary_depth == 0 end
 end
 
 --- Clones a built-in profile into an editable user profile and opens the editor.
@@ -660,7 +691,7 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				end)
 			return editor_ok == true and editor_result ~= false
 		end
-		local _, timer_committed = TimerScheduler.after(0.1, open_clone_editor)
+		local _, timer_committed = schedule_editor(open_clone_editor)
 		if timer_committed ~= true then return false end
 	end
 	return true
@@ -929,7 +960,7 @@ local function make_profile_deleter(deps)
 		return true
 	end
 
-	return delete_profile, settle_recovery
+	return delete_profile, settle_recovery, function() return recovery_debt == nil end
 end
 
 
@@ -1082,7 +1113,7 @@ local function build_profile_menu(
 								end)
 							return editor_ok == true and editor_result ~= false
 						end
-						local _, timer_committed = TimerScheduler.after(0.1, open_profile_editor)
+						local _, timer_committed = schedule_editor(open_profile_editor)
 						return timer_committed == true
 					end or nil,
 				},
@@ -1166,7 +1197,7 @@ local function build_profile_menu(
 					end)
 				return editor_ok == true and editor_result ~= false
 			end
-			local _, timer_committed = TimerScheduler.after(0.1, open_create_editor)
+			local _, timer_committed = schedule_editor(open_create_editor)
 			if timer_committed ~= true then return false end
 			return true
 		end or nil,
@@ -1195,9 +1226,13 @@ function M.new(deps, models_mgr)
 		return nil
 	end
 	local obj = { deps = deps }
-	local activate_candidate, settle_candidate_recovery = make_profile_candidate_owner(deps)
-	local replace_profile, settle_edit_recovery = make_profile_edit_owner(deps)
-	local delete_profile, settle_delete_recovery = make_profile_deleter(deps)
+	local activate_candidate, settle_candidate_recovery, candidate_idle = make_profile_candidate_owner(deps)
+	local replace_profile, settle_edit_recovery, edit_idle = make_profile_edit_owner(deps)
+	local delete_profile, settle_delete_recovery, delete_idle = make_profile_deleter(deps)
+	function obj.scope_idle()
+		return next(editor_tasks) == nil and candidate_idle() and edit_idle() and delete_idle()
+			and (prompt_editor == nil or prompt_editor.scope_idle() == true)
+	end
 	deps.settle_profile_candidate_recovery = settle_candidate_recovery
 	deps.settle_profile_edit_recovery = settle_edit_recovery
 	deps.settle_profile_delete_recovery = settle_delete_recovery

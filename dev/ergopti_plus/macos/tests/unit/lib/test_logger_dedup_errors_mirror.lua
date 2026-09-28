@@ -12,7 +12,7 @@
 --- So an error storm and a one-off error looked IDENTICAL in the file anyone
 --- opens first. Nothing failed; the count was simply not there to be missed.
 ---
---- Fix: the suppression summary is mirrored into M.ERRORS_LOG_FILE whenever the
+--- Fix: the suppression summary is mirrored into the errors-only file whenever the
 --- suppressed variant sits at WARNING or above.
 ---
 --- WHY THIS TEST IS BEHAVIOURAL, AND WAS NOT.
@@ -119,17 +119,17 @@ helpers.describe("lib-logger-perf-002: the errors-only log must carry the repeat
 	helpers.it("mirrors the suppression summary, identical to the unified one", function()
 		local read = capture(function() storm(Logger.error) end)
 
-		local from_unified = summary_line(read(Logger.UNIFIED_LOG_FILE))
-		local from_errors  = summary_line(read(Logger.ERRORS_LOG_FILE))
+		local from_unified = summary_line(read(Logger.today_log_path()))
+		local from_errors  = summary_line(read(Logger.today_errors_path()))
 
 		helpers.assert_true(from_unified ~= nil, string.format(
 			"the unified log must carry a suppression summary — without one there is nothing to "
-			.. "mirror and this test asserts nothing at all. Got:\n%s", read(Logger.UNIFIED_LOG_FILE)))
+			.. "mirror and this test asserts nothing at all. Got:\n%s", read(Logger.today_log_path())))
 
 		helpers.assert_true(from_errors ~= nil, string.format(
 			"the errors-only log must carry the suppression summary too. This is the bug: the "
 			.. "file anyone opens first showed the first occurrence and stopped, so an error "
-			.. "storm and a one-off error read identically. Got:\n%s", read(Logger.ERRORS_LOG_FILE)))
+			.. "storm and a one-off error read identically. Got:\n%s", read(Logger.today_errors_path())))
 
 		helpers.assert_eq(from_errors, from_unified,
 			"the mirrored summary must be the SAME line as the unified one. A mirror that "
@@ -139,7 +139,7 @@ helpers.describe("lib-logger-perf-002: the errors-only log must carry the repeat
 
 	helpers.it("reports the exact number of lines it swallowed", function()
 		local read = capture(function() storm(Logger.error) end)
-		local line = summary_line(read(Logger.ERRORS_LOG_FILE)) or ""
+		local line = summary_line(read(Logger.today_errors_path())) or ""
 
 		-- Matched as "N identical", never as a bare "N". The line carries a
 		-- timestamp, and a probe that corrupted the count to 0 still passed a bare
@@ -156,12 +156,12 @@ helpers.describe("lib-logger-perf-002: the errors-only log must carry the repeat
 	helpers.it("keeps a suppressed INFO streak out of the errors-only log", function()
 		local read = capture(function() storm(Logger.info) end)
 
-		helpers.assert_true(summary_line(read(Logger.UNIFIED_LOG_FILE)) ~= nil,
+		helpers.assert_true(summary_line(read(Logger.today_log_path())) ~= nil,
 			"the INFO streak's summary must still reach the unified log — otherwise this case "
 			.. "passes because nothing was suppressed at all, which is the shape of a vacuous "
 			.. "absence assertion")
 
-		helpers.assert_true(summary_line(read(Logger.ERRORS_LOG_FILE)) == nil,
+		helpers.assert_true(summary_line(read(Logger.today_errors_path())) == nil,
 			"an INFO suppression summary must NOT reach the errors-only log. The summary "
 			.. "inherits the variant of the lines it stands for, so a mirror keyed on anything "
 			.. "else refills the triage file with exactly the routine noise it exists to exclude")

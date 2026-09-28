@@ -150,6 +150,35 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 		end)
 	end)
 
+	-- The page's own editor for send_text / send_key / send_shortcut: it needs
+	-- the vocabulary and its strings, and the value it collected must reach the
+	-- caller with the pick, or the user's value is thrown away.
+	helpers.it("sends the page's editor its fields and forwards the value it collected", function()
+		with_editor("ui.action_picker", function(picker, state, hs_stub)
+			local received = nil
+			picker.open({
+				title = "Editor",
+				items = {},
+				send_vocabulary = { keys = { { id = "enter", aliases = { "return" } } } },
+				parameter_strings = { save = "Save" },
+			}, function(id, parameter)
+				received = { id = id, parameter = parameter }
+				return true
+			end)
+			local bridge = state.bridges[1]
+			bridge.callback({ body = { action = "ready" } })
+			local payload = latest_init_payload(state, hs_stub)
+			helpers.assert_eq(payload.platform, "hs", "Command is the primary modifier of a captured shortcut")
+			helpers.assert_eq(payload.sendVocabulary.keys[1].id, "enter")
+			helpers.assert_eq(payload.parameterStrings.save, "Save")
+
+			bridge.callback({ body = { action = "confirm", id = "send_key", parameter = "enter" } })
+			helpers.assert_eq(received and received.id, "send_key")
+			helpers.assert_eq(received and received.parameter, "enter",
+				"the collected value travels with the pick")
+		end)
+	end)
+
 	helpers.it("keeps a rejected confirmation open so the same choice can be retried", function()
 		with_editor("ui.action_picker", function(picker, state)
 			local attempts = 0

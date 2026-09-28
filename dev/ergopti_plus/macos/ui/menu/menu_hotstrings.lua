@@ -16,6 +16,8 @@ local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Labels        = require("menu.labels")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+-- Owns the « all sections » checkbox, which the personal submenu draws too.
+local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
 
 --- Resolves a description value that may be a plain string or a multilingual table.
@@ -345,7 +347,10 @@ function M.build_groups(ctx, only, counts)
 			-- Always show count (even 0) — only enabled sections contribute
 			label   = base_label .. " (" .. fmt_count(total) .. ")",
 			checked = enabled or nil,
-			action      = toggleGroupFn(ctx, name),
+			-- Clickable only as a leaf. A category with sections opens a submenu,
+			-- and a row that opens a submenu is never clicked: its gate is the
+			-- submenu's first row instead.
+			action  = (not has_secs) and toggleGroupFn(ctx, name) or nil,
 		}
 
 		if has_secs then
@@ -378,20 +383,22 @@ function M.build_groups(ctx, only, counts)
 			--   1. the category gate — everything under it is inert while it is off
 			--   2. « ouvrir le fichier », when the category has one
 			--   3. ─────────
-			--   4. « tout activer »
-			--   5. « tout désactiver »
-			--   6. ─────────
-			--   7. the sections
+			--   4. the « all sections » checkbox
+			--   5. ─────────
+			--   6. the sections
 			--
-			-- The gate row is NEW here. Windows and Linux have shown it since they
-			-- were written; this driver relied on the parent row toggling the group
-			-- when clicked, which works and which nobody discovers — the parent of a
-			-- submenu reads as something you open, not something you switch off. The
-			-- parent keeps its behaviour; this row makes it visible.
+			-- The gate row is the only way to switch the group from its submenu.
+			-- This driver relied on the parent row toggling the group when clicked,
+			-- which never happens: AppKit sends no action for an item that opens a
+			-- submenu, and the renderer drops it. Both controls are checkboxes with
+			-- one label: the gate alternated « ✅ Activée (cliquer pour désactiver) »
+			-- and « ❌ Désactivée (cliquer pour activer) », and the sections had a
+			-- « tout activer » / « tout désactiver » pair.
 			local sec_menu = {}
 			sec_menu[#sec_menu + 1] = {
-				label  = i18n.get(enabled and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
-				action = not ctx.paused and toggleGroupFn(ctx, name) or nil,
+				label    = i18n.get("menu.hotstrings.category_enable"),
+				checked  = enabled,
+				action   = not ctx.paused and toggleGroupFn(ctx, name) or nil,
 				disabled = ctx.paused or nil,
 			}
 			local toml_path = toml_path_for_group(ctx, name)
@@ -402,17 +409,9 @@ function M.build_groups(ctx, only, counts)
 				}
 			end
 			sec_menu[#sec_menu + 1] = { separator = true }
-			-- Section-level bulk actions for this category.
-			sec_menu[#sec_menu + 1] = {
-				label    = i18n.get("menu.hotstrings.enable_all"),
-				disabled = ctx.paused or nil,
-				action       = not ctx.paused and setGroupSectionsFn(ctx, name, true) or nil,
-			}
-			sec_menu[#sec_menu + 1] = {
-				label    = i18n.get("menu.hotstrings.disable_all"),
-				disabled = ctx.paused or nil,
-				action       = not ctx.paused and setGroupSectionsFn(ctx, name, false) or nil,
-			}
+			sec_menu[#sec_menu + 1] = Custom.all_sections_row(ctx, { name }, function(enable)
+				return setGroupSectionsFn(ctx, name, enable)
+			end)
 			sec_menu[#sec_menu + 1] = { separator = true }
 			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
 			local prev_was_sep = true -- Suppress a potential leading separator
@@ -469,42 +468,34 @@ function M.build_groups(ctx, only, counts)
 	return items
 end
 
---- Builds the whole-tree bulk-action items (force every hotstring section on /
---- off). Rendered in the main Hotstrings menu as siblings of the Paramètres
---- sub-menu (after its separator), not inside it.
+--- The whole-tree « all sections » switch of the main Hotstrings menu: its tick
+--- and its behaviour, since the manifest declares the row itself as a `check`.
+--- Ticked when every hotstring group and every one of its sections is on; the
+--- action switches them all to the other side, and is nil while paused.
 --- @param ctx table Context.
---- @return table List of menu items.
-function M.build_bulk_actions(ctx)
+--- @return table { checked = boolean, action = function|nil }
+function M.all_sections_switch(ctx)
+	local names = {}
+	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
+		names[#names + 1] = ctx.get_group_name and ctx.get_group_name(f) or f
+	end
+	local all_on = Custom.all_sections_on(ctx, names)
 	return {
-		{
-			label    = i18n.get("menu.hotstrings.enable_all"),
-			disabled = ctx.paused or nil,
-			action       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
-		},
-		{
-			label    = i18n.get("menu.hotstrings.disable_all"),
-			disabled = ctx.paused or nil,
-			action       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
-		},
+		checked = all_on,
+		action  = not ctx.paused and setAllSectionsFn(ctx, not all_on) or nil,
 	}
 end
 
---- The bulk rows at the top of one language submenu.
+--- The one « all sections » checkbox at the top of a language submenu, for
+--- every section of the language's categories.
 --- @param ctx table Context.
 --- @param group_names table The language's group names.
 --- @return table List of menu items.
 function M.build_language_bulk_actions(ctx, group_names)
 	return {
-		{
-			label    = i18n.get("menu.hotstrings.enable_all"),
-			disabled = ctx.paused or nil,
-			action   = not ctx.paused and setGroupListSectionsFn(ctx, group_names, true) or nil,
-		},
-		{
-			label    = i18n.get("menu.hotstrings.disable_all"),
-			disabled = ctx.paused or nil,
-			action   = not ctx.paused and setGroupListSectionsFn(ctx, group_names, false) or nil,
-		},
+		Custom.all_sections_row(ctx, group_names, function(enable)
+			return setGroupListSectionsFn(ctx, group_names, enable)
+		end),
 	}
 end
 

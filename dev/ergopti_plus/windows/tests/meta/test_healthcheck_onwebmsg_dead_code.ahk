@@ -6,9 +6,9 @@
 ; Static source guard confirming _HealthCheck_OnWebMsg (a fully-written
 ; "copy_and_close" WebMessageReceived handler) stays removed. It was defined
 ; but never wired up to any WebMessageReceived subscription anywhere in
-; ui/healthcheck/core.ahk -- genuinely dead code with no live impact, since
-; the real Copy-and-Close button is a native AHK control, not routed through
-; WebView2 at all.
+; ui/healthcheck/core.ahk -- genuinely dead code. The page's buttons now post
+; their actions to _HC_OnWebMessage, which the window does subscribe, bound to
+; its epoch; the native Copy-and-Close button is gone.
 ;
 ; SCOPE: source introspection of ui/healthcheck/core.ahk.
 ; ==============================================================================
@@ -32,10 +32,12 @@ _HCOWM_NoDeadHandler() {
 }
 Test("HealthCheck: dead _HealthCheck_OnWebMsg handler stays removed (webview-dead-handler)", _HCOWM_NoDeadHandler)
 
-_HCOWM_CopyAndCloseIsNativeControl() {
+_HCOWM_LiveHandlerIsSubscribed() {
 	Src := _DriverDirConcat("ui/healthcheck")
-	Assert(InStr(Src, "healthcheck.copy_and_close") > 0,
-		'HealthCheck_ShowWindow must still label its Copy-and-Close button via t("healthcheck.copy_and_close") -- the real mechanism is a native AHK button, not a WebView2 message handler')
+	Assert(InStr(Src, "WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))") > 0,
+		"the diagnostics window must subscribe _HC_OnWebMessage, bound to its epoch, so a late message of a closed window cannot reach its replacement")
+	Assert(InStr(Src, "healthcheck.copy_and_close") = 0,
+		"the native Copy-and-Close button is gone: the page's Copy button posts the copy action")
 }
-Test("HealthCheck: Copy-and-Close stays a native AHK control, not a WebView2 message round-trip (webview-dead-handler)",
-	_HCOWM_CopyAndCloseIsNativeControl)
+Test("HealthCheck: the page's messages reach a subscribed, epoch-bound handler (webview-dead-handler)",
+	_HCOWM_LiveHandlerIsSubscribed)

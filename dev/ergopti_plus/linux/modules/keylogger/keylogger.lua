@@ -186,49 +186,14 @@ local _suppressed = false
 -- relaxed silently tightened again, which is the harmless direction. The master
 -- switch is the other direction: off means off, and it did not stay off.
 local PREF_PREFIX = "metrics."
-
---- Reads a persisted boolean, falling back to the manifest default.
---- @param key string Suffix under PREF_PREFIX.
---- @param fallback boolean The shipped default.
---- @return boolean
-local function stored_bool(key, fallback)
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then return fallback end
-	local value = Storage.get(PREF_PREFIX .. key, nil)
-	-- Only a real boolean overrides the shipped default. `value == true` was the
-	-- first version and it collapses EVERY other stored shape to false — a string
-	-- "true" from a hand-edited store, a table from an older schema, a number from
-	-- a foreign writer. For a privacy flag that is the wrong direction to fail in:
-	-- it would silently switch a filter off because the value was unrecognisable.
-	if type(value) ~= "boolean" then
-		if value ~= nil then
-			-- Said out loud: a stored value of an unexpected shape is a store written
-			-- by something else, and silently ignoring it hides that.
-			Logger.warn(LOG, "Stored '%s%s' is a %s, not a boolean — using the shipped default.",
-				PREF_PREFIX, key, type(value))
-		end
-		return fallback
-	end
-	Logger.debug(LOG, "Metrics '%s%s' restored from storage: %s.", PREF_PREFIX, key, tostring(value))
-	return value
-end
+local Preferences = require("infra.metrics_preferences")
 
 --- Persists a boolean, or clears it when it matches the shipped default.
 --- @param key string
 --- @param value boolean
---- @param default_value boolean
 --- @return boolean
-local function store_bool(key, value, default_value)
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then
-		Logger.error(LOG, "No storage adapter — '%s%s' was not changed.", PREF_PREFIX, key)
-		return false
-	end
-	if value == default_value then
-		return Storage.delete(PREF_PREFIX .. key) == true
-	else
-		return Storage.set(PREF_PREFIX .. key, value) == true
-	end
+local function store_bool(key, value)
+	return Preferences.set(PREF_PREFIX .. key, value)
 end
 
 local _DEFAULTS = {
@@ -239,7 +204,7 @@ local _DEFAULTS = {
 	encrypt                    = Manifest.default_for("metrics.encrypt"),
 }
 
--- Seeded from the manifest at LOAD, and re-seeded from storage inside M.init().
+-- Seeded from the manifest at LOAD, and re-seeded from config.toml inside M.init().
 --
 -- Reading the store here was the first version and it was wrong twice over. It
 -- gave this module a file-system dependency at require time that it never had —
@@ -404,7 +369,10 @@ end
 --- Initialises the keylogger.
 --- @param opts table { log_dir?, password_apps? }
 function M.init(opts)
+	if not Preferences.admit() then return false end
 	local options = type(opts) == "table" and opts or {}
+	-- Validate canonical consent before initializing collectors or persistent data.
+	local preferences = Preferences.snapshot()
 
 	-- Initialise the underlying metrics collector if available.
 	if Metrics then Metrics.init({}) end
@@ -439,7 +407,7 @@ function M.init(opts)
 	-- the migration this block launches depends on which posture is in force, so
 	-- reading it afterwards would resume the wrong direction on the first start
 	-- after the user changed it.
-	_encrypt_enabled = stored_bool("encrypt", _DEFAULTS.encrypt)
+	_encrypt_enabled = preferences["metrics.encrypt"]
 
 	-- Push the configured posture into the cipher. Without this the cipher stayed
 	-- off while get_privacy_state() reported the manifest's value, which is the
@@ -458,10 +426,10 @@ function M.init(opts)
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
 	-- than at module load: see the note beside the declarations.
-	_enabled                    = stored_bool("enabled", _DEFAULTS.enabled)
-	_private_filter_enabled     = stored_bool("private_filter_enabled", _DEFAULTS.private_filter_enabled)
-	_secure_filter_enabled      = stored_bool("secure_filter_enabled", _DEFAULTS.secure_filter_enabled)
-	_system_auth_filter_enabled = stored_bool("system_auth_filter_enabled", _DEFAULTS.system_auth_filter_enabled)
+	_enabled                    = preferences["metrics.enabled"]
+	_private_filter_enabled     = preferences["metrics.private_filter_enabled"]
+	_secure_filter_enabled      = preferences["metrics.secure_filter_enabled"]
+	_system_auth_filter_enabled = preferences["metrics.system_auth_filter_enabled"]
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
@@ -1190,8 +1158,9 @@ end
 --- all; the other two drivers have had one since they shipped.
 --- @param enabled boolean
 function M.set_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
-	if not store_bool("enabled", wanted, _DEFAULTS.enabled) then
+	if not store_bool("enabled", wanted) then
 		Logger.error(LOG, "Metrics collection state was not persisted — it was not changed.")
 		return false
 	end
@@ -1224,8 +1193,9 @@ end
 --- Toggles the private-browsing filter.
 --- @param enabled boolean
 function M.set_private_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
-	if not store_bool("private_filter_enabled", wanted, _DEFAULTS.private_filter_enabled) then
+	if not store_bool("private_filter_enabled", wanted) then
 		Logger.error(LOG, "Private-browsing filter state was not persisted — it was not changed.")
 		return false
 	end
@@ -1237,8 +1207,9 @@ end
 --- Toggles the secure-field / password-manager filter.
 --- @param enabled boolean
 function M.set_secure_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
-	if not store_bool("secure_filter_enabled", wanted, _DEFAULTS.secure_filter_enabled) then
+	if not store_bool("secure_filter_enabled", wanted) then
 		Logger.error(LOG, "Secure-field filter state was not persisted — it was not changed.")
 		return false
 	end
@@ -1250,8 +1221,9 @@ end
 --- Toggles the OS authentication-prompt filter.
 --- @param enabled boolean
 function M.set_system_auth_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
-	if not store_bool("system_auth_filter_enabled", wanted, _DEFAULTS.system_auth_filter_enabled) then
+	if not store_bool("system_auth_filter_enabled", wanted) then
 		Logger.error(LOG, "System-auth filter state was not persisted — it was not changed.")
 		return false
 	end
@@ -1266,12 +1238,13 @@ end
 --- @param enabled boolean
 --- @return boolean The posture actually in force after the call.
 function M.set_encrypt_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local want = (enabled == true)
 	if want and not TextCipher.is_available() then
 		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
 		return false
 	end
-	if not store_bool("encrypt", want, _DEFAULTS.encrypt) then
+	if not store_bool("encrypt", want) then
 		Logger.error(LOG, "At-rest encryption state was not persisted — it was not changed.")
 		return false
 	end
@@ -1293,6 +1266,7 @@ end
 --- posture. Idempotent: a pass over an already-converted table skips every row.
 --- @return boolean True when a pass is in flight.
 function M.migrate_stored_text()
+	if not Preferences.admit() then return false end
 	TextMigration.cancel()
 	return TextMigration.start(
 		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
@@ -1323,6 +1297,53 @@ end
 --- @return boolean
 function M.is_encrypt_enabled()
 	return _encrypt_enabled
+end
+
+--- Captures configuration without transient focus state or historical data.
+--- @return table|nil Detached native and desired posture; nil during conversion.
+function M.configuration_snapshot()
+	if TextMigration.is_running() then
+		Logger.error(LOG, "Collector configuration is owned by an active historical conversion.")
+		return nil
+	end
+	return {
+		enabled = _enabled,
+		private_filter_enabled = _private_filter_enabled,
+		secure_filter_enabled = _secure_filter_enabled,
+		system_auth_filter_enabled = _system_auth_filter_enabled,
+		encrypt = _encrypt_enabled,
+		cipher_enabled = TextCipher.is_enabled(),
+	}
+end
+
+--- Applies future capture policy without persistence or historical conversion.
+--- The scope owner retains the inverse if a cipher call mutates before refusal.
+--- @param candidate table Configuration snapshot to apply or restore.
+--- @return boolean acknowledged
+function M.apply_configuration(candidate)
+	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
+	for _, key in ipairs({ "enabled", "private_filter_enabled", "secure_filter_enabled",
+		"system_auth_filter_enabled", "encrypt", "cipher_enabled" }) do
+		if type(candidate[key]) ~= "boolean" then return false end
+	end
+	if TextCipher.is_enabled() ~= candidate.cipher_enabled then
+		if candidate.cipher_enabled and not TextCipher.is_available() then
+			Logger.error(LOG, "Collector configuration requires an unavailable cipher.")
+			return false
+		end
+		local called, acknowledged = pcall(TextCipher.set_enabled, candidate.cipher_enabled)
+		if not called or acknowledged ~= true or TextCipher.is_enabled() ~= candidate.cipher_enabled then
+			Logger.error(LOG, "Collector configuration cipher transition was not acknowledged.")
+			return false
+		end
+	end
+	_enabled = candidate.enabled
+	_private_filter_enabled = candidate.private_filter_enabled
+	_secure_filter_enabled = candidate.secure_filter_enabled
+	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
+	_encrypt_enabled = candidate.encrypt
+	Logger.debug(LOG, "Collector configuration applied without historical conversion.")
+	return true
 end
 
 --- Snapshot of the active privacy posture, for the menu and for diagnostics.

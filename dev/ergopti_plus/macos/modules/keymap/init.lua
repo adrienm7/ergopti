@@ -86,7 +86,8 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
-	keymap                      = true,   -- Module on/off toggle (no manifest entry)
+	keymap                      = Manifest.default_for("hotstrings.enabled"),
+	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
 	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
 	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
@@ -613,6 +614,7 @@ M.set_sections_enabled  = preview_fenced_registry_mutation(Registry.set_sections
 -- Multi-group batch form used by whole-tree menu actions. One exact boolean
 -- commitment covers every setting and live registry rebuild in the click.
 M.set_groups_sections_enabled = preview_fenced_registry_mutation(Registry.set_groups_sections_enabled)
+M.apply_hotstring_preferences = preview_fenced_registry_mutation(Registry.apply_hotstring_preferences)
 M.get_sections          = Registry.get_sections
 M.get_meta_description  = Registry.get_meta_description
 M.set_group_context     = Registry.set_group_context
@@ -622,6 +624,7 @@ M.is_group_enabled      = Registry.is_group_enabled
 M.list_groups           = Registry.list_groups
 M.register_lua_group    = preview_fenced_registry_mutation(Registry.register_lua_group)
 M.registry_transaction = preview_fenced_registry_mutation(Registry.registry_transaction)
+M.with_hotstring_delays = preview_fenced_registry_mutation(Registry.with_hotstring_delays)
 M.enable_group          = preview_fenced_registry_mutation(Registry.enable_group)
 M.sort_mappings         = preview_fenced_registry_mutation(Registry.sort_mappings)
 M.defer_sort            = Registry.defer_sort
@@ -647,11 +650,14 @@ M.remove_custom_terminator = preview_fenced_registry_mutation(Registry.remove_cu
 -- ── LLM bridge proxies ───────────────────────────────────────────────────────
 
 M.set_llm_model              = LLMBridge.set_llm_model
+M.set_llm_configuration_model = LLMBridge.set_llm_configuration_model
 M.set_llm_display_model_name = LLMBridge.set_llm_display_model_name
 M.set_llm_context_length     = LLMBridge.set_llm_context_length
 M.set_llm_reset_on_nav       = LLMBridge.set_llm_reset_on_nav
 M.set_llm_temperature        = LLMBridge.set_llm_temperature
 M.set_llm_max_words          = LLMBridge.set_llm_max_words
+M.set_llm_min_words          = LLMBridge.set_llm_min_words
+M.set_llm_backend_name       = LLMBridge.set_llm_backend_name
 M.set_llm_num_predictions    = LLMBridge.set_llm_num_predictions
 M.set_llm_show_info_bar      = LLMBridge.set_llm_show_info_bar
 M.set_llm_pred_indent        = LLMBridge.set_llm_pred_indent
@@ -678,6 +684,7 @@ M.set_preview_ai_enabled          = LLMBridge.set_preview_ai_enabled
 M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 
 M.trigger_prediction = LLMBridge._perform_llm_check
+M.request_manual_prediction = LLMBridge.request_manual_prediction
 M.reset_predictions  = LLMBridge.reset_predictions
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 

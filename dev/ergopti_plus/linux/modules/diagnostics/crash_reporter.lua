@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Crash Reporter (Linux)
 --- DESCRIPTION:
---- Basic crash diagnostics for the Linux daemon. Writes crash dumps to
---- ~/.local/share/ergopti/crashes/ when a pcall-wrapped operation fails with
---- a non-trivial error. Mirrors macOS infra/crash_reporter.lua in intent but
+--- Basic crash diagnostics for the Linux daemon. Writes crash dumps to the
+--- crash_reports folder inside the logs folder when a pcall-wrapped operation
+--- fails with a non-trivial error. Mirrors macOS infra/crash_reporter.lua in intent but
 --- uses filesystem dumps instead of hs.crash.crashReporter.
 ---
 --- FEATURES & RATIONALE:
@@ -28,7 +28,12 @@ local LOG = "diagnostics.crash_reporter"
 -- =========================================
 
 local MAX_CRASH_FILES = 20
-local CRASH_DIR = require("infra.config_paths").data("crashes")
+-- Crash dumps live in the logs folder, next to the daily log that explains
+-- them, and follow a LogsDirPath override: resolved per call.
+--- @return string Absolute folder, no trailing slash.
+local function crash_dir()
+	return require("infra.logger_sink").crash_reports_dir()
+end
 
 
 -- =========================================
@@ -39,13 +44,13 @@ local CRASH_DIR = require("infra.config_paths").data("crashes")
 
 --- Ensures the crash directory exists.
 local function _ensure_dir()
-	os.execute("mkdir -p '" .. CRASH_DIR:gsub("'", "'\\''") .. "' 2>/dev/null")
+	os.execute("mkdir -p '" .. crash_dir():gsub("'", "'\\''") .. "' 2>/dev/null")
 end
 
 --- Rotates old crash files when the directory exceeds MAX_CRASH_FILES.
 local function _rotate()
 	local files = {}
-	local pipe = io.popen("ls -1t '" .. CRASH_DIR:gsub("'", "'\\''") .. "' 2>/dev/null")
+	local pipe = io.popen("ls -1t '" .. crash_dir():gsub("'", "'\\''") .. "' 2>/dev/null")
 	if not pipe then return end
 	for line in pipe:lines() do
 		files[#files + 1] = line
@@ -54,7 +59,7 @@ local function _rotate()
 
 	while #files > MAX_CRASH_FILES do
 		local oldest = files[#files]
-		os.remove(CRASH_DIR .. "/" .. oldest)
+		os.remove(crash_dir() .. "/" .. oldest)
 		files[#files] = nil
 	end
 end
@@ -117,7 +122,7 @@ function M.dump(module_name, error_msg, context)
 
 	local ts = os.date("!%Y-%m-%dT%H-%M-%S")
 	local safe_name = module_name:gsub("[^%w_.-]", "_")
-	local path = CRASH_DIR .. "/crash_" .. ts .. "_" .. safe_name .. ".txt"
+	local path = crash_dir() .. "/crash_" .. ts .. "_" .. safe_name .. ".txt"
 	local commit_line, config_line, version_line, app_dir_line = _build_facts()
 
 	local fh = io.open(path, "w")
@@ -194,14 +199,14 @@ end
 --- Returns the crash directory path (for diagnostics / menu access).
 --- @return string
 function M.get_crash_dir()
-	return CRASH_DIR
+	return crash_dir()
 end
 
 --- Returns the number of crash files currently on disk.
 --- @return number
 function M.get_crash_count()
 	local count = 0
-	local pipe = io.popen("ls -1 '" .. CRASH_DIR:gsub("'", "'\\''") .. "' 2>/dev/null | wc -l")
+	local pipe = io.popen("ls -1 '" .. crash_dir():gsub("'", "'\\''") .. "' 2>/dev/null | wc -l")
 	if pipe then
 		local line = pipe:read("*l")
 		pipe:close()

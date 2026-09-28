@@ -13,10 +13,13 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"adapters.storage",
+	"infra.preferences",
+	"infra.config_paths",
 	"adapters.hotkey_registrar",
 	"adapters.file_system",
 	"infra.paths",
 	"infra.logger",
+	"infra.manifest_reader",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -29,16 +32,16 @@ local function with_subject(initial_action, scenario)
 	for _, name in ipairs(MODULES) do prior[name] = package.loaded[name] end
 	local prior_hs = _G.hs
 
-	local key = "ergopti.keyboard_shortcut_cmd_a"
+	local key = "cmd_a"
 	local store = {[key] = initial_action}
 	local controls = {
 		bind_refuses = false,
 		bind_hook = nil,
 		set_enabled_hook = nil,
 		set_enabled_refuses_once = false,
-		settings_throw_after_write_once = false,
+		publication_throws_once = false,
 	}
-	local counters = {bind = 0, unbind = 0, set_enabled = 0, settings_set = 0}
+	local counters = {bind = 0, unbind = 0, set_enabled = 0, file_writes = 0}
 	local handles = {}
 	local unbound_handles = {}
 	local fired = {}
@@ -85,6 +88,8 @@ local function with_subject(initial_action, scenario)
 		read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
 	}
 	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
+	-- Neutral manifest defaults acquire no extra native handles in this fixture.
+	package.loaded["infra.manifest_reader"] = nil
 	local logger = helpers.make_logger_stub()
 	logger.callback = function(_, _, fn, ...)
 		local ok, result = xpcall(fn, debug.traceback, ...)
@@ -92,6 +97,9 @@ local function with_subject(initial_action, scenario)
 	end
 	package.loaded["infra.logger"] = logger
 	package.loaded["modules.gestures.actions"] = {
+		-- The transaction under test is independent of which ids exist; the
+		-- catalogue refusal has its own test (test_action_catalogue_parity.lua).
+		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function(action_id)
 			fired[#fired + 1] = action_id
 			return true
@@ -100,21 +108,17 @@ local function with_subject(initial_action, scenario)
 	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
+	require("tests.support.keyboard_config_fixture").install(store, function()
+		counters.file_writes = counters.file_writes + 1
+		if controls.publication_throws_once then
+			controls.publication_throws_once = false
+			error("synthetic conditional publication failure")
+		end
+	end)
+
 	local subject
 	local ok, err = xpcall(function()
 		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			settings = {
-				getKeys = function() return {key} end,
-				get = function(setting_key) return store[setting_key] end,
-				set = function(setting_key, value)
-					counters.settings_set = counters.settings_set + 1
-					store[setting_key] = value
-					if controls.settings_throw_after_write_once then
-						controls.settings_throw_after_write_once = false
-						error("synthetic settings failure after write")
-					end
-				end,
-			},
 			json = {
 				decode = function()
 					return {keys = {{id = "a", label = "A"}}}
@@ -167,11 +171,11 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 	helpers.it("keeps action, setting, and exact handle when persistence raises", function()
 		with_subject("copy_selection", function(subject, ctx)
 			local exact = ctx.handles[1]
-			ctx.controls.settings_throw_after_write_once = true
+			ctx.controls.publication_throws_once = true
 			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
 			helpers.assert_eq(subject.get_action("cmd_a"), "copy_selection")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "copy_selection",
-				"a write that raises after mutation must restore the exact prior setting")
+				"a refused conditional publication must preserve the exact prior assignment")
 			helpers.assert_eq(ctx.handles[1], exact)
 			helpers.assert_eq(ctx.counters.bind, 1)
 			helpers.assert_eq(ctx.counters.unbind, 0)
@@ -200,7 +204,7 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 
 	helpers.it("retains an inert fresh candidate across persistence failure", function()
 		with_subject("none", function(subject, ctx)
-			ctx.controls.settings_throw_after_write_once = true
+			ctx.controls.publication_throws_once = true
 			ctx.controls.set_enabled_refuses_once = true
 			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
 			local exact = ctx.handles[1]
@@ -252,7 +256,7 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 
 	helpers.it("keeps retained-handle re-enable visible to re-entrant PAUSE", function()
 		with_subject("none", function(subject, ctx)
-			ctx.controls.settings_throw_after_write_once = true
+			ctx.controls.publication_throws_once = true
 			ctx.controls.set_enabled_refuses_once = true
 			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
 			local exact = ctx.handles[1]

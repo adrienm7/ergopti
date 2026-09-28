@@ -34,8 +34,7 @@ local LocaleTable = require("_generated.locale_table")
 
 local _language_packs_cache    = nil
 local _ergopti_groups_cache    = nil
-local _top_level_tail_cache    = nil
-local _global_actions_cache    = nil
+local _top_level_cache         = nil
 
 --- Returns the parsed menu_manifest.json root.
 ---
@@ -100,39 +99,29 @@ local function language_label(code)
 	return Languages.label(code, LocaleTable)
 end
 
---- Loads the top_level tail (including the separator immediately before
---- "global_actions", when declared) from menu_manifest.json,
---- filtered for the "hs" platform.
+--- Loads the whole top_level array from menu_manifest.json, separators
+--- included, filtered for the "hs" platform.
+---
+--- The WHOLE array, not a tail cut at an anchor id. The feature rows used to be
+--- a fixed sequence of calls in generate() and only the rows from
+--- "global_actions" onward were read here, so a manifest that reordered the
+--- feature rows, put a separator among them or renamed the anchor left this
+--- tray in its old order — and a missing anchor emptied the tail, taking
+--- Reload, Quit and Debug with it.
+---
+--- Each entry keeps the manifest's `greyed_when_paused` mark: the feature rows a
+--- pause greys, declared once for the three trays.
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
---- @return table Array of {id} entries in display order.
-local function load_top_level_tail()
-	if _top_level_tail_cache then return _top_level_tail_cache end
+--- @return table Array of {id, greyed_when_paused} entries in display order.
+local function load_top_level()
+	if _top_level_cache then return _top_level_cache end
 	local data = load_manifest()
 	if not data or type(data.top_level) ~= "table" then
-		Logger.error(LOG, "Failed to load top_level from manifest — tail will be empty.")
+		Logger.error(LOG, "Failed to load top_level from manifest — the tray has no row.")
 		return {}
-	end
-	local tail_start = nil
-	for i, entry in ipairs(data.top_level) do
-		if type(entry) == "table" and entry.id == "global_actions" then
-			tail_start = i
-			break
-		end
-	end
-	if not tail_start then
-		Logger.error(LOG, "top_level has no 'global_actions' entry — tail will be empty.")
-		return {}
-	end
-	-- The shared manifest owns the visual boundary between feature menus and
-	-- system-wide actions. Preserve a separator directly before global_actions,
-	-- matching the Windows manifest loader and Linux menu builder.
-	local previous = tail_start > 1 and data.top_level[tail_start - 1] or nil
-	if type(previous) == "table" and previous.id == "---" then
-		tail_start = tail_start - 1
 	end
 	local result = {}
-	for i = tail_start, #data.top_level do
-		local entry = data.top_level[i]
+	for _, entry in ipairs(data.top_level) do
 		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
 		if type(entry.platforms) == "table" then
 			local for_hs = false
@@ -141,41 +130,12 @@ local function load_top_level_tail()
 			end
 			if not for_hs then goto continue end
 		end
-		table.insert(result, { id = entry.id })
+		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })
 		::continue::
 	end
-	Logger.debug(LOG, "Top-level tail loaded from manifest (%d item(s)).", #result)
-	_top_level_tail_cache = result
-	return _top_level_tail_cache
-end
-
-
---- Loads the global_actions array from menu_manifest.json, filtered for "hs".
---- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
---- @return table Array of {id} entries.
-local function load_global_actions()
-	if _global_actions_cache then return _global_actions_cache end
-	local data = load_manifest()
-	if not data or type(data.global_actions) ~= "table" then
-		Logger.error(LOG, "Failed to load global_actions from manifest — submenu will be empty.")
-		return {}
-	end
-	local result = {}
-	for _, entry in ipairs(data.global_actions) do
-		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
-		if type(entry.platforms) == "table" then
-			local for_hs = false
-			for _, p in ipairs(entry.platforms) do
-				if p == "hs" then for_hs = true; break end
-			end
-			if not for_hs then goto continue end
-		end
-		table.insert(result, { id = entry.id })
-		::continue::
-	end
-	Logger.debug(LOG, "Global actions loaded from manifest (%d item(s)).", #result)
-	_global_actions_cache = result
-	return _global_actions_cache
+	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
+	_top_level_cache = result
+	return _top_level_cache
 end
 
 
@@ -198,561 +158,585 @@ end
 -- ==================================
 -- ==================================
 
+--- Builds the Hotstrings top-level row: its submenu is the manifest's
+--- `hotstrings_menu`, filled from the hotstrings module and the live counts.
+--- @param ctx table The global UI context.
+--- @param menu_mods table The loaded menu submodules.
+--- @return table The row to place, or no row when there is nothing to show.
+local function build_hotstrings_rows(ctx, menu_mods)
+	if type(menu_mods.hotstrings) ~= "table" then
+		Logger.warn(LOG, "Hotstrings module missing — submenu ignored.")
+		return {}
+	end
+	Logger.debug(LOG, "Building hotstrings submenu…")
+
+	-- Groups that are specific to the Ergopti keyboard layout — sourced from menu_manifest.json
+	local ERGOPTI_GROUPS = load_ergopti_groups()
+
+	local counts = HotCounter.count_all(ctx, ERGOPTI_GROUPS)
+	local fmt_grand = HotCounter.fmt_grand
+
+	local common_total      = counts.common
+	local ergopti_total     = counts.ergopti
+	local personal_total    = counts.personal
+	local ext_total         = counts.ext
+	local common_has_count  = counts.has_common
+	local ergopti_has_count = counts.has_ergopti
+	local personal_has_count= counts.has_personal
+	local ext_has_count     = counts.has_ext
+	local grand_total       = counts.grand
+	local grand_has_count   = counts.has_grand
+
+	-- Détection de l’état global : tous les hotstrings activés ?
+	local all_enabled = true
+	local any_enabled = false
+	if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
+		for _, f in ipairs(ctx.hotfiles) do
+			local name = ctx.get_group_name and ctx.get_group_name(f) or f
+			if name ~= "custom" and name ~= "personal" then
+				local enabled = false
+				if ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" then
+					enabled = ctx.keymap.is_group_enabled(name)
+				elseif ctx.state and ctx.state.hotstrings then
+					enabled = ctx.state.hotstrings[name] ~= false
+				end
+				if enabled then any_enabled = true else all_enabled = false end
+			end
+		end
+	end
+
+	local function toggle_all_hotstrings()
+		if not ctx or not ctx.hotfiles or type(ctx.hotfiles) ~= "table" then return end
+		local enable = not all_enabled
+		for _, f in ipairs(ctx.hotfiles) do
+			local name = ctx.get_group_name and ctx.get_group_name(f) or f
+			if name ~= "custom" and name ~= "personal" then
+				if ctx.keymap and type(ctx.keymap.enable_group) == "function" and type(ctx.keymap.disable_group) == "function" then
+					if enable then
+						-- Also enable every individual section so sub-menus appear checked
+						if type(ctx.keymap.get_sections) == "function"
+						and type(ctx.keymap.enable_section) == "function" then
+							local secs = ctx.keymap.get_sections(name)
+							if type(secs) == "table" then
+								for _, sec in ipairs(secs) do
+									if type(sec) == "table" and sec.name and sec.name ~= "-" then
+										pcall(ctx.keymap.enable_section, name, sec.name)
+									end
+								end
+							end
+						end
+						pcall(ctx.keymap.enable_group, name)
+					else
+						pcall(ctx.keymap.disable_group, name)
+					end
+				end
+				if ctx.state and ctx.state.hotstrings then ctx.state.hotstrings[name] = enable end
+			end
+		end
+		if ctx.save_prefs() ~= true then return false end
+		ctx.notify_feature(i18n.get("notify.hotstrings"), enable)
+		ctx.updateMenu()
+	end
+
+	local hotstrings_title = "⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")"
+
+	-- Every row below is collected for the manifest slot that declares it, and
+	-- the SHARED renderer places them. This menu was assembled here by hand
+	-- from the day it was written — the manifest declared two bulk commands, a
+	-- params group, four section headers and five list rows, and this file read
+	-- none of it. The repository carries a drift gate
+	-- (tests/meta/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
+	-- was to notice when the two descriptions disagreed, because nothing else
+	-- could.
+	local hotstrings_menu = {}
+
+	local function collect_groups(only_filter, counts_arg)
+		local result = {}
+		if type(menu_mods.hotstrings.build_groups) ~= "function" then return result end
+		local built = Logger.build(LOG, "hotstrings.build_groups",
+			function(c) return menu_mods.hotstrings.build_groups(c, only_filter, counts_arg) end, ctx)
+		if type(built) == "table" then
+			if built[1] ~= nil then
+				for _, it in ipairs(built) do table.insert(result, it) end
+			elseif next(built) ~= nil then
+				-- An empty list (no group matched the filter) is no row at all;
+				-- inserting it handed the renderer a row with no label.
+				table.insert(result, built)
+			end
+		end
+		return result
+	end
+
+	-- Language-pack groups render under their language's own submenu, never
+	-- among the neutral categories.
+	local LANGUAGE_PACKS = load_language_packs()
+	local LANGUAGE_GROUPS = Languages.groups(LANGUAGE_PACKS)
+
+	local non_ergopti_filter = {}
+	if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
+		for _, f in ipairs(ctx.hotfiles) do
+			local name = ctx.get_group_name and ctx.get_group_name(f) or f
+			local flattened_name = name:gsub("_", "")
+			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+			and not LANGUAGE_GROUPS[name]
+			and not (ERGOPTI_GROUPS[name] or ERGOPTI_GROUPS[flattened_name]) then
+				non_ergopti_filter[name] = true
+			end
+		end
+	end
+
+	local std_groups = collect_groups(non_ergopti_filter, counts)
+	local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
+
+	-- One row per language: its native name, then one « all sections »
+	-- checkbox for every category of that language, then the language's
+	-- category submenus built exactly like the neutral ones.
+	local language_rows = {}
+	for _, pack in ipairs(LANGUAGE_PACKS) do
+		local only = {}
+		local names = {}
+		for _, stem in ipairs(pack.categories) do
+			local name = Languages.group_id(pack.id, stem)
+			only[name] = true
+			names[#names + 1] = name
+		end
+		local items = {}
+		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
+			and menu_mods.hotstrings.build_language_bulk_actions(ctx, names) or {}
+		for _, row in ipairs(bulk) do items[#items + 1] = row end
+		items[#items + 1] = { separator = true }
+		local total = 0
+		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
+		for _, name in ipairs(names) do
+			total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
+		end
+		language_rows[#language_rows + 1] = {
+			label = language_label(pack.locale) .. " (" .. fmt_grand(total) .. ")",
+			items = items,
+		}
+	end
+	local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
+		and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
+
+	-- 4. The manifest's `hotstring_extensions` row (counts already included in
+	-- grand_total via HotCounter). Named here because the id is what the
+	-- action↔handler bijection gate matches on, and this section was built
+	-- anonymously — so the manifest could restrict the row to Windows on the
+	-- grounds that "neither Lua driver ships an extensions directory" while
+	-- hotstring_counter.lua was walking exactly that directory and this block
+	-- was rendering the result. A row nothing names is a row nothing can check.
+	local manifest_row = "hotstring_extensions"
+	Logger.debug(LOG, "Building manifest row '%s' (%d extension(s)).", manifest_row, #counts.ext_details)
+	local extension_items = {}
+	do
+		for _, ext in ipairs(counts.ext_details) do
+			local toml_submenus = {}
+			for _, f in ipairs(ext.files) do
+				local sec_menu = {
+					{
+						title = i18n.get("menu.hotstrings.open_file"),
+						fn    = (function(path)
+							return function()
+								DeferredWork.after(0, function()
+									pcall(hs.execute, "open " .. text_utils.shell_quote(path))
+								end, "menu_builder.open_extension")
+							end
+						end)(f.path),
+					},
+				}
+				if #f.sections > 0 then table.insert(sec_menu, { title = "-" }) end
+				for _, sec in ipairs(f.sections) do
+					table.insert(sec_menu, {
+						title    = sec.name .. " (" .. fmt_grand(sec.count) .. ")",
+						disabled = true,
+					})
+				end
+				local toml_label = f.stem .. (f.total > 0 and (" (" .. fmt_grand(f.total) .. ")") or "")
+				table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
+			end
+			local ext_label = ext.name .. (ext.total > 0 and (" (" .. fmt_grand(ext.total) .. ")") or "")
+			table.insert(extension_items, { title = ext_label, menu = toml_submenus })
+		end
+	end
+
+
+	-- ===== The manifest's own rows, placed by the shared renderer =====
+
+	-- Section headers carry a count here and a plain key in the manifest, so
+	-- the label is enriched through the renderer's hook rather than by
+	-- building the header — and the manifest still owns whether the header
+	-- exists and where it sits.
+	local section_labels = {
+		["menu.hotstrings.header_common"] = i18n.decorate_section(
+			string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))),
+		["menu.hotstrings.header_ergopti"] = i18n.decorate_section(
+			string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))),
+		["menu.hotstrings.personal_header"] = i18n.decorate_section(
+			string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))),
+		["menu.extensions.header"] = ext_has_count
+			and i18n.decorate_section(i18n.get("menu.extensions.header") .. " (" .. fmt_grand(ext_total) .. ")")
+			or  i18n.decorate_section(i18n.get("menu.extensions.header")),
+	}
+
+	--- Converts already-built hs rows into the provider data a `list` row
+	--- takes. These builders return menu trees, and rewriting all four of them
+	--- to emit provider rows is a larger job than this one; adapting here is
+	--- what lets the renderer own the placement today.
+	--- @param built table Menu rows in this driver's shape.
+	--- @return table Provider rows.
+	--- The extension rows are still built in this driver's dialect below, so
+	--- they alone are adapted. The category and personal builders emit provider
+	--- rows themselves since 2026-08-07.
+	--- @param built table Rows in this driver's shape.
+	--- @return table Provider rows.
+	local function as_rows(built)
+		local out = {}
+		for _, entry in ipairs(built or {}) do
+			out[#out + 1] = MenuUtils.as_provider_row(entry)
+		end
+		return out
+	end
+
+	local hs_ctx = {}
+	for key, value in pairs(ctx) do hs_ctx[key] = value end
+	hs_ctx.section_label = function(key) return section_labels[key] end
+	-- The « all sections » checkbox is a `check` declaration, so the renderer
+	-- builds the row and this driver supplies only its tick and behaviour.
+	-- Taken from the hotstrings module rather than reimplemented: it owns the
+	-- section walk, and a second copy of that walk is exactly the kind of
+	-- duplicate this migration exists to remove.
+	local all_sections = type(menu_mods.hotstrings.all_sections_switch) == "function"
+		and menu_mods.hotstrings.all_sections_switch(ctx) or nil
+	hs_ctx.commands = {
+		-- The category switch, first row of the submenu. It used to be the
+		-- parent row's `action`, which AppKit never sends for an item that
+		-- opens a submenu, so the Hotstrings master could not be switched from
+		-- the menu bar at all.
+		["hotstrings_toggle"]      = function()
+			if ctx.paused then
+				Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
+				return false
+			end
+			return toggle_all_hotstrings()
+		end,
+	}
+	-- Registered only when the module provides it: an unregistered command is
+	-- reported by the renderer and its row is not drawn, where an empty stand-in
+	-- drew a row that did nothing when clicked.
+	if all_sections then
+		hs_ctx.commands["hotstrings_all_sections"] = function()
+			if type(all_sections.action) ~= "function" then
+				Logger.warn(LOG, "All-sections switch refused: the script is paused.")
+				return false
+			end
+			return all_sections.action()
+		end
+	end
+	hs_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
+	hs_ctx.state_getters["hotstrings_enabled"] = function() return all_enabled end
+	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function()
+		return all_sections ~= nil and all_sections.checked == true
+	end
+
+	local providers = {
+		["hotstring_categories_standard"] = function() return std_groups end,
+		["hotstring_categories_ergopti"]  = function() return ergopti_groups_built end,
+		["hotstring_languages"]           = function() return language_rows end,
+		-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
+		-- that builder emits `label`/`action`/`items` itself, so there is no
+		-- translation step and the renderer materialises the tree.
+		["hotstring_personal"]            = function()
+			return custom_item and { custom_item } or {}
+		end,
+		["hotstring_extensions"]          = function() return as_rows(extension_items) end,
+		-- The dynamic-rule categories are Windows' and Linux's; this driver has
+		-- no separate block for them, and an empty provider is what says so
+		-- without the renderer warning about an unanswered row.
+		["hotstring_categories_dynamic"]  = function() return {} end,
+	}
+
+	local group_builders = {
+		["hotstrings_params"] = function(c)
+			local built = type(menu_mods.hotstrings.build_management) == "function"
+				and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, c)
+				or nil
+			if not built then return nil end
+			return { menu = built.menu, disabled = built.disabled }
+		end,
+	}
+
+	do
+		local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+		if ok_mm and type(ManifestMenu.build) == "function" then
+			local rendered = ManifestMenu.build("hotstrings_menu", "Hotstrings",
+				nil, group_builders, hs_ctx, providers)
+			for _, row in ipairs(rendered or {}) do table.insert(hotstrings_menu, row) end
+		else
+			Logger.error(LOG, "Manifest renderer unavailable — the hotstrings submenu has no row.")
+		end
+	end
+
+	-- Grand total already includes extensions (computed by HotCounter.count_all)
+	-- From the shared key, not a literal. Windows and Linux both read
+	-- `menu.hotstrings.title` for this same entry, and it is translated in all
+	-- twenty-one locales — « ⚡ ホットストリング » in Japanese — so the hardcoded
+	-- string was the one top-level menu this driver refused to translate.
+	local hotstrings_label = i18n.get("menu.hotstrings.title")
+	hotstrings_title = grand_has_count
+		and (hotstrings_label .. " (" .. fmt_grand(grand_total) .. ")")
+		or  hotstrings_label
+
+	if #hotstrings_menu == 0 then
+		Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
+		return {}
+	end
+	-- The tick mirrors the switch; the switch itself is the submenu's first
+	-- row, since a row that opens a submenu is never clicked.
+	return { {
+		label = hotstrings_title,
+		submenu = hotstrings_menu,
+		checked = all_enabled or nil,
+	} }
+end
+
 --- Generates the complete items list for the Hammerspoon menubar.
+---
+--- Every top-level row, separators included, is placed in the order the
+--- manifest's `top_level` declares for this platform: the loop below reads that
+--- array and dispatches each id to its builder. The feature rows used to be a
+--- fixed sequence of calls here, ahead of a tail read from the manifest, so the
+--- declared order reached only half of the tray.
 --- @param ctx table The global UI context.
 --- @param menu_mods table The loaded menu submodules.
 --- @param actions table Callbacks for global system actions.
 --- @return table The assembled menu structure.
 function M.generate(ctx, menu_mods, actions)
-	local items = {}
-
-	-- Helper function to insert only valid components and log errors
-	local function push_into(target, label, fn, arg)
+	--- Runs one component builder and returns what it built as a list of rows.
+	--- @param label string Component name for the log.
+	--- @param fn function Builder.
+	--- @param arg any Builder argument.
+	--- @return table Rows built, empty when the builder failed or built nothing.
+	local function collect(label, fn, arg)
+		local rows = {}
 		local result = Logger.build(LOG, label, fn, arg)
 		if result then
 			if type(result) == "table" and result[1] ~= nil then
 				-- Result is a list (build_groups)
-				for _, it in ipairs(result) do table.insert(target, it) end
+				for _, it in ipairs(result) do rows[#rows + 1] = it end
 			else
-				table.insert(target, result)
+				rows[#rows + 1] = result
 			end
 			Logger.debug(LOG, string.format("Component '%s' added successfully.", label))
 		else
 			Logger.warn(LOG, string.format("Component '%s' missing or in error — ignored.", label))
 		end
+		return rows
 	end
 
-	local function push(label, fn, arg)
-		push_into(items, label, fn, arg)
+	--- Builds the row a menu module owns, when the module is loaded.
+	--- @param key string Key of the module in menu_mods.
+	--- @param arg any Builder argument, ctx by default.
+	--- @return table Rows built.
+	local function module_rows(key, arg)
+		local mod = menu_mods[key]
+		if type(mod) ~= "table" or type(mod.build) ~= "function" then
+			Logger.warn(LOG, "Menu module '%s' missing — its row is not drawn.", key)
+			return {}
+		end
+		return collect(key .. ".build", mod.build, arg or ctx)
 	end
 
-	-- Keyboard layout zone — placed just before hotstrings so it sits at the
-	-- top of the user-facing submenus
-	if type(menu_mods.keyboard_layout) == "table" and type(menu_mods.keyboard_layout.build) == "function" then
-		push("keyboard_layout.build", menu_mods.keyboard_layout.build, ctx)
-	end
-
-	-- Hotstrings zone avec activation globale
-	if type(menu_mods.hotstrings) == "table" then
-		Logger.debug(LOG, "Building hotstrings submenu…")
-
-		-- Groups that are specific to the Ergopti keyboard layout — sourced from menu_manifest.json
-		local ERGOPTI_GROUPS = load_ergopti_groups()
-
-		local counts = HotCounter.count_all(ctx, ERGOPTI_GROUPS)
-		local fmt_grand = HotCounter.fmt_grand
-
-		local common_total      = counts.common
-		local ergopti_total     = counts.ergopti
-		local personal_total    = counts.personal
-		local ext_total         = counts.ext
-		local common_has_count  = counts.has_common
-		local ergopti_has_count = counts.has_ergopti
-		local personal_has_count= counts.has_personal
-		local ext_has_count     = counts.has_ext
-		local grand_total       = counts.grand
-		local grand_has_count   = counts.has_grand
-
-		-- Détection de l’état global : tous les hotstrings activés ?
-		local all_enabled = true
-		local any_enabled = false
-		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
-			for _, f in ipairs(ctx.hotfiles) do
-				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				if name ~= "custom" and name ~= "personal" then
-					local enabled = false
-					if ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" then
-						enabled = ctx.keymap.is_group_enabled(name)
-					elseif ctx.state and ctx.state.hotstrings then
-						enabled = ctx.state.hotstrings[name] ~= false
-					end
-					if enabled then any_enabled = true else all_enabled = false end
-				end
+	-- One builder per top-level id. Each returns the rows it places, and the
+	-- loop after this table decides WHERE: the manifest's order, not this
+	-- table's. tools/test/test-menu-top-level-parity.cjs holds these keys to the
+	-- ids the manifest declares for macOS, in both directions.
+	local builders = {
+		["keyboard_layout"] = function() return module_rows("keyboard_layout") end,
+		["hotstrings"]      = function() return build_hotstrings_rows(ctx, menu_mods) end,
+		["llm"]             = function()
+			if type(ctx.llm_handler) ~= "table" or type(ctx.llm_handler.build_item) ~= "function" then
+				Logger.warn(LOG, "LLM handler missing or incomplete — AI component ignored.")
+				return {}
 			end
-		end
-
-		local function toggle_all_hotstrings()
-			if not ctx or not ctx.hotfiles or type(ctx.hotfiles) ~= "table" then return end
-			local enable = not all_enabled
-			for _, f in ipairs(ctx.hotfiles) do
-				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				if name ~= "custom" and name ~= "personal" then
-					if ctx.keymap and type(ctx.keymap.enable_group) == "function" and type(ctx.keymap.disable_group) == "function" then
-						if enable then
-							-- Also enable every individual section so sub-menus appear checked
-							if type(ctx.keymap.get_sections) == "function"
-							and type(ctx.keymap.enable_section) == "function" then
-								local secs = ctx.keymap.get_sections(name)
-								if type(secs) == "table" then
-									for _, sec in ipairs(secs) do
-										if type(sec) == "table" and sec.name and sec.name ~= "-" then
-											pcall(ctx.keymap.enable_section, name, sec.name)
-										end
-									end
-								end
-							end
-							pcall(ctx.keymap.enable_group, name)
-						else
-							pcall(ctx.keymap.disable_group, name)
-						end
-					end
-					if ctx.state and ctx.state.hotstrings then ctx.state.hotstrings[name] = enable end
-				end
+			Logger.debug(LOG, "Building AI component…")
+			local ok_b, llm_item = pcall(ctx.llm_handler.build_item)
+			if not ok_b then
+				Logger.error(LOG, string.format("Error building AI component: %s.", tostring(llm_item)))
+				return {}
 			end
-			if ctx.save_prefs() ~= true then return false end
-			ctx.notify_feature(i18n.get("notify.hotstrings"), enable)
-			ctx.updateMenu()
-		end
-
-		local hotstrings_title = "⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")"
-
-		-- Every row below is collected for the manifest slot that declares it, and
-		-- the SHARED renderer places them. This menu was assembled here by hand
-		-- from the day it was written — the manifest declared two bulk commands, a
-		-- params group, four section headers and five list rows, and this file read
-		-- none of it. The repository carries a drift gate
-		-- (tests/meta/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
-		-- was to notice when the two descriptions disagreed, because nothing else
-		-- could.
-		local hotstrings_menu = {}
-
-		local function collect_groups(only_filter, counts_arg)
-			local result = {}
-			if type(menu_mods.hotstrings.build_groups) ~= "function" then return result end
-			local built = Logger.build(LOG, "hotstrings.build_groups",
-				function(c) return menu_mods.hotstrings.build_groups(c, only_filter, counts_arg) end, ctx)
-			if type(built) == "table" then
-				if built[1] ~= nil then
-					for _, it in ipairs(built) do table.insert(result, it) end
-				elseif next(built) ~= nil then
-					-- An empty list (no group matched the filter) is no row at all;
-					-- inserting it handed the renderer a row with no label.
-					table.insert(result, built)
-				end
-			end
-			return result
-		end
-
-		-- Language-pack groups render under their language's own submenu, never
-		-- among the neutral categories.
-		local LANGUAGE_PACKS = load_language_packs()
-		local LANGUAGE_GROUPS = Languages.groups(LANGUAGE_PACKS)
-
-		local non_ergopti_filter = {}
-		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
-			for _, f in ipairs(ctx.hotfiles) do
-				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				local flattened_name = name:gsub("_", "")
-				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
-				and not LANGUAGE_GROUPS[name]
-				and not (ERGOPTI_GROUPS[name] or ERGOPTI_GROUPS[flattened_name]) then
-					non_ergopti_filter[name] = true
-				end
-			end
-		end
-
-		local std_groups = collect_groups(non_ergopti_filter, counts)
-		local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
-
-		-- One row per language: its native name, then « tout activer » /
-		-- « tout désactiver » for every category of that language, then the
-		-- language's category submenus built exactly like the neutral ones.
-		local language_rows = {}
-		for _, pack in ipairs(LANGUAGE_PACKS) do
-			local only = {}
-			local names = {}
-			for _, stem in ipairs(pack.categories) do
-				local name = Languages.group_id(pack.id, stem)
-				only[name] = true
-				names[#names + 1] = name
-			end
-			local items = {}
-			local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
-				and menu_mods.hotstrings.build_language_bulk_actions(ctx, names) or {}
-			for _, row in ipairs(bulk) do items[#items + 1] = row end
-			items[#items + 1] = { separator = true }
-			local total = 0
-			for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
-			for _, name in ipairs(names) do
-				total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
-			end
-			language_rows[#language_rows + 1] = {
-				label = language_label(pack.locale) .. " (" .. fmt_grand(total) .. ")",
-				items = items,
-			}
-		end
-		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
-			and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
-
-		-- 4. The manifest's `hotstring_extensions` row (counts already included in
-		-- grand_total via HotCounter). Named here because the id is what the
-		-- action↔handler bijection gate matches on, and this section was built
-		-- anonymously — so the manifest could restrict the row to Windows on the
-		-- grounds that "neither Lua driver ships an extensions directory" while
-		-- hotstring_counter.lua was walking exactly that directory and this block
-		-- was rendering the result. A row nothing names is a row nothing can check.
-		local manifest_row = "hotstring_extensions"
-		Logger.debug(LOG, "Building manifest row '%s' (%d extension(s)).", manifest_row, #counts.ext_details)
-		local extension_items = {}
-		do
-			for _, ext in ipairs(counts.ext_details) do
-				local toml_submenus = {}
-				for _, f in ipairs(ext.files) do
-					local sec_menu = {
-						{
-							title = i18n.get("menu.hotstrings.open_file"),
-							fn    = (function(path)
-								return function()
-									DeferredWork.after(0, function()
-										pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-									end, "menu_builder.open_extension")
-								end
-							end)(f.path),
-						},
-					}
-					if #f.sections > 0 then table.insert(sec_menu, { title = "-" }) end
-					for _, sec in ipairs(f.sections) do
-						table.insert(sec_menu, {
-							title    = sec.name .. " (" .. fmt_grand(sec.count) .. ")",
-							disabled = true,
-						})
-					end
-					local toml_label = f.stem .. (f.total > 0 and (" (" .. fmt_grand(f.total) .. ")") or "")
-					table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
-				end
-				local ext_label = ext.name .. (ext.total > 0 and (" (" .. fmt_grand(ext.total) .. ")") or "")
-				table.insert(extension_items, { title = ext_label, menu = toml_submenus })
-			end
-		end
-
-
-		-- ===== The manifest's own rows, placed by the shared renderer =====
-
-		-- Section headers carry a count here and a plain key in the manifest, so
-		-- the label is enriched through the renderer's hook rather than by
-		-- building the header — and the manifest still owns whether the header
-		-- exists and where it sits.
-		local section_labels = {
-			["menu.hotstrings.header_common"] = i18n.decorate_section(
-				string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))),
-			["menu.hotstrings.header_ergopti"] = i18n.decorate_section(
-				string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))),
-			["menu.hotstrings.personal_header"] = i18n.decorate_section(
-				string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))),
-			["menu.extensions.header"] = ext_has_count
-				and i18n.decorate_section(i18n.get("menu.extensions.header") .. " (" .. fmt_grand(ext_total) .. ")")
-				or  i18n.decorate_section(i18n.get("menu.extensions.header")),
-		}
-
-		--- Converts already-built hs rows into the provider data a `list` row
-		--- takes. These builders return menu trees, and rewriting all four of them
-		--- to emit provider rows is a larger job than this one; adapting here is
-		--- what lets the renderer own the placement today.
-		--- @param built table Menu rows in this driver's shape.
-		--- @return table Provider rows.
-		--- The extension rows are still built in this driver's dialect below, so
-		--- they alone are adapted. The category and personal builders emit provider
-		--- rows themselves since 2026-08-07.
-		--- @param built table Rows in this driver's shape.
-		--- @return table Provider rows.
-		local function as_rows(built)
-			local out = {}
-			for _, entry in ipairs(built or {}) do
-				out[#out + 1] = MenuUtils.as_provider_row(entry)
-			end
-			return out
-		end
-
-		local hs_ctx = {}
-		for key, value in pairs(ctx) do hs_ctx[key] = value end
-		hs_ctx.section_label = function(key) return section_labels[key] end
-		-- The two bulk rows are `command` declarations, so the renderer builds the
-		-- row and this driver supplies only the behaviour. Taken from the existing
-		-- builder rather than reimplemented: it owns the section-walk both rows
-		-- perform, and a second copy of that walk is exactly the kind of duplicate
-		-- this migration exists to remove.
-		local bulk_rows = type(menu_mods.hotstrings.build_bulk_actions) == "function"
-			and menu_mods.hotstrings.build_bulk_actions(ctx) or {}
-		hs_ctx.commands = {
-			["hotstrings_enable_all"]  = bulk_rows[1] and bulk_rows[1].action or function() end,
-			["hotstrings_disable_all"] = bulk_rows[2] and bulk_rows[2].action or function() end,
-		}
-
-		local providers = {
-			["hotstring_categories_standard"] = function() return std_groups end,
-			["hotstring_categories_ergopti"]  = function() return ergopti_groups_built end,
-			["hotstring_languages"]           = function() return language_rows end,
-			-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
-			-- that builder emits `label`/`action`/`items` itself, so there is no
-			-- translation step and the renderer materialises the tree.
-			["hotstring_personal"]            = function()
-				return custom_item and { custom_item } or {}
-			end,
-			["hotstring_extensions"]          = function() return as_rows(extension_items) end,
-			-- The dynamic-rule categories are Windows' and Linux's; this driver has
-			-- no separate block for them, and an empty provider is what says so
-			-- without the renderer warning about an unanswered row.
-			["hotstring_categories_dynamic"]  = function() return {} end,
-		}
-
-		local group_builders = {
-			["hotstrings_params"] = function(c)
-				local built = type(menu_mods.hotstrings.build_management) == "function"
-					and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, c)
-					or nil
-				if not built then return nil end
-				return { menu = built.menu, disabled = built.disabled }
-			end,
-		}
-
-		do
-			local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
-			if ok_mm and type(ManifestMenu.build) == "function" then
-				local rendered = ManifestMenu.build("hotstrings_menu", "Hotstrings",
-					nil, group_builders, hs_ctx, providers)
-				for _, row in ipairs(rendered or {}) do table.insert(hotstrings_menu, row) end
-			else
-				Logger.error(LOG, "Manifest renderer unavailable — the hotstrings submenu has no row.")
-			end
-		end
-
-		-- Grand total already includes extensions (computed by HotCounter.count_all)
-		-- From the shared key, not a literal. Windows and Linux both read
-		-- `menu.hotstrings.title` for this same entry, and it is translated in all
-		-- twenty-one locales — « ⚡ ホットストリング » in Japanese — so the hardcoded
-		-- string was the one top-level menu this driver refused to translate.
-		local hotstrings_label = i18n.get("menu.hotstrings.title")
-		hotstrings_title = grand_has_count
-			and (hotstrings_label .. " (" .. fmt_grand(grand_total) .. ")")
-			or  hotstrings_label
-
-		if #hotstrings_menu > 0 then
-			table.insert(items, {
-				label = hotstrings_title,
-				submenu = hotstrings_menu,
-				checked = all_enabled or nil,
-				action = not ctx.paused and toggle_all_hotstrings or nil
-			})
-		else
-			Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
-		end
-	else
-		Logger.warn(LOG, "Hotstrings module missing — submenu ignored.")
-	end
-
-	-- AI zone
-	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_item) == "function" then
-		Logger.debug(LOG, "Building AI component…")
-		local ok_b, llm_item = pcall(ctx.llm_handler.build_item)
-		if ok_b and llm_item then
-			table.insert(items, llm_item)
 			Logger.debug(LOG, "AI component added successfully.")
-		elseif not ok_b then
-			Logger.error(LOG, string.format("Error building AI component: %s.", tostring(llm_item)))
-		end
-	else
-		Logger.warn(LOG, "LLM handler missing or incomplete — AI component ignored.")
-	end
-
-	-- Metrics zone
-	if type(menu_mods.keylogger) == "table" then
-		push("keylogger.build", menu_mods.keylogger.build, ctx)
-	else
-		Logger.warn(LOG, "Keylogger module missing.")
-	end
-
-	if type(menu_mods.shortcuts) == "table" then
-		-- Inject the edit-shortcuts callback so the shortcuts submodule can surface it
-		local shortcuts_ctx = setmetatable({ actions = actions }, { __index = ctx })
-		push("shortcuts.build", menu_mods.shortcuts.build, shortcuts_ctx)
-	end
-
-	-- Tap-holds then Gestures — keyboard first, then trackpad
-	if type(menu_mods.tap_holds) == "table" and type(menu_mods.tap_holds.build) == "function" then
-		push("tap_holds.build", menu_mods.tap_holds.build, ctx)
-	end
-	if type(menu_mods.gestures) == "table" then
-		push("gestures.build", menu_mods.gestures.build, ctx)
-	end
-	if type(menu_mods.apps) == "table" then
-		push("apps.build", menu_mods.apps.build, ctx)
-	end
-
-	-- « Pause = tout éteint »: every feature row above is greyed and stripped of
-	-- its handler in one place. Each builder used to decide this for itself, so
-	-- Shortcuts and Gestures greyed while Hotstrings, AI, Metrics and Tap-Holds
-	-- stayed live (Metrics could even be toggled mid-pause). The tail below —
-	-- global actions, language, config, about, reload, quit, debug — and the
-	-- title row that resumes the script are added afterwards and stay enabled.
-	if ctx.paused == true then
-		for _, row in ipairs(items) do
-			if type(row) == "table" and row.separator ~= true then
-				row.disabled = true
-				row.action = nil
-				row.fn = nil
+			return llm_item and { llm_item } or {}
+		end,
+		["metrics"]         = function() return module_rows("keylogger") end,
+		-- The shortcuts submodule surfaces the edit-shortcuts callback, so it gets
+		-- the actions on top of the context.
+		["shortcuts"]       = function()
+			return module_rows("shortcuts", setmetatable({ actions = actions }, { __index = ctx }))
+		end,
+		["tap_holds"]       = function() return module_rows("tap_holds") end,
+		["gestures"]        = function() return module_rows("gestures") end,
+		["apps"]            = function() return module_rows("apps") end,
+		["configuration"]   = function()
+			-- Every row is `type = "command"` in the manifest: labels, order and
+			-- the separator are declared, and this file supplies only what each
+			-- row does. Read once, so the pause gate below can tell the rows apart
+			-- by the handler they carry.
+			local restore = actions.reset_defaults
+			local clean = actions.clean_unused_keys
+			local cfg_ctx = {}
+			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
+			cfg_ctx.commands = {
+				["restore_recommended"] = restore,
+				["clean_unused_keys"]   = clean,
+				["config_folder"]       = actions.open_paths,
+				["setup_wizard"]        = actions.show_setup_wizard,
+				["uninstall"]           = actions.uninstall,
+				["start_at_login"]      = actions.start_at_login,
+			}
+			cfg_ctx.state_getters = {}
+			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
+			cfg_ctx.state_getters.start_at_login_enabled = function()
+				return require("ui.menu.start_at_login").enabled()
 			end
-		end
-	end
-
-
-	-- ── Tail: order driven by the shared manifest top_level (MENU-1/MENU-2).
-	-- Build log-level items first (needed only when "debug" id is dispatched).
-	local Logger_mod = require("infra.logger")
-	local active_level_name = "INFO"
-	local log_level_items = {}
-	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
-		local lvl_num  = Logger_mod.LEVELS[lvl]
-		local is_active = (Logger_mod.current_level == lvl_num)
-		if is_active then active_level_name = lvl end
-		local lvl_capture = lvl
-		-- Provider rows: these are the `items` of the log-level list row below.
-		table.insert(log_level_items, {
-			label   = Labels.log_level_emoji(lvl) .. " " .. lvl,
-			checked = is_active,
-			action  = function() actions.set_log_level(lvl_capture) end,
-		})
-	end
-	local healthcheck = require("ui.healthcheck")
-
-	for _, entry in ipairs(load_top_level_tail()) do
-		local id = entry.id
-		if id == "---" then
-			table.insert(items, { separator = true })
-		elseif id == "global_actions" then
-			local ga_items = {}
-
 			-- Pause owns the bindings axis for the whole pause window: pause_all()
 			-- snapshots what was running and resume_all() restores that snapshot.
-			-- A global action taken in between is therefore either silently
-			-- discarded on resume, or — for « Tout activer » — binds every hotkey
-			-- immediately and breaks the « pause = tout éteint » invariant the
-			-- pause exists to guarantee. The per-feature toggles were gated for
-			-- exactly this; these three, which move ALL of them at once, were not.
-			-- The three rows are `type = "command"` in the manifest: their labels
-			-- and their order are declared, and this file supplies only what each
-			-- one does. The chain of `elseif` that used to map id → label → action
-			-- was the manifest's own table written out a second time, in a third
-			-- language, and the separator before the reset was written out here too.
-			local ok_ga, ManifestMenu = pcall(require, "infra.manifest_menu")
-			if ok_ga and type(ManifestMenu.build) == "function" then
-				local ga_ctx = {}
-				for key, value in pairs(ctx or {}) do ga_ctx[key] = value end
-				ga_ctx.commands = {
-					["enable_all"]      = actions.enable_all,
-					["disable_all"]     = actions.disable_all,
-					["reset_defaults"]  = actions.reset_defaults,
-					["clean_unused_keys"] = actions.clean_unused_keys,
-					["uninstall"] = actions.uninstall,
-					["start_at_login"] = actions.start_at_login,
-				}
-				ga_ctx.state_getters = {}
-				for key, value in pairs(ctx.state_getters or {}) do ga_ctx.state_getters[key] = value end
-				ga_ctx.state_getters.start_at_login_enabled = function()
-					return require("ui.menu.start_at_login").enabled()
-				end
-				for _, row in ipairs(ManifestMenu.build("global_actions", "Global", nil, nil, ga_ctx) or {}) do
-					local independent = (type(actions.uninstall) == "function" and row.fn == actions.uninstall)
-						or (type(actions.start_at_login) == "function" and row.fn == actions.start_at_login)
-					if ctx.paused and not independent then
-						-- Greyed AND stripped of its handler, not merely greyed. A
-						-- disabled row whose fn survives still fires the moment the
-						-- greying is rendered wrong somewhere else, and these three move
-						-- every binding at once — which is the whole reason the pause
-						-- window has to own that axis alone.
+			-- A row that rewrites the configuration in between is either discarded
+			-- on resume or breaks the « pause = tout éteint » invariant, so those
+			-- two are greyed AND stripped of their handler: a disabled row whose fn
+			-- survives still fires the moment the greying is rendered wrong
+			-- somewhere else. The two rows that only open a window stay live.
+			local pause_gated = {}
+			for _, fn in ipairs({ restore, clean }) do
+				-- An unregistered command draws no row, so it has nothing to gate.
+				if type(fn) == "function" then pause_gated[fn] = true end
+			end
+			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx) or {}
+			if ctx.paused then
+				for _, row in ipairs(rows) do
+					if row.fn ~= nil and pause_gated[row.fn] then
 						row.disabled = true
 						row.fn = nil
 					end
-					table.insert(ga_items, row)
 				end
-			else
-				Logger.error(LOG, "Manifest renderer unavailable — the global actions are not rendered.")
 			end
-			table.insert(items, { label = i18n.get("menu.global.title"), submenu = ga_items })
-		elseif id == "language" then
-			-- The locale rows reach the tray through the manifest's `language_menu`
-			-- now. They were the same twenty-one entries on every driver, from the
-			-- same shared catalogue, and nothing described the menu holding them.
+			return { { label = i18n.get("menu.configuration.title"), submenu = rows } }
+		end,
+		["language"]        = function()
+			-- The locale rows reach the tray through the manifest's `language_menu`.
+			-- They were the same twenty-one entries on every driver, from the same
+			-- shared catalogue, and nothing described the menu holding them.
 			local rendered = ManifestMenu.build("language_menu", "Language", nil, nil, ctx, {
 				["locales"] = function() return i18n.build_language_menu_items() or {} end,
 			})
-			table.insert(items, { label = i18n.get("menu.global.language"), submenu = rendered })
-		elseif id == "config_folder" then
-			table.insert(items, { label = i18n.get("menu.global.config_folder"), action = actions.open_paths })
-		elseif id == "setup_wizard" then
-			table.insert(items, { label = i18n.get("menu.global.setup_wizard"), action = actions.show_setup_wizard })
-		elseif id == "about" then
-			if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
-				local ok_a, about_item = pcall(menu_mods.about.build, ctx)
-				if ok_a and about_item then table.insert(items, about_item) end
+			return { { label = i18n.get("menu.global.language"), submenu = rendered } }
+		end,
+		["about"]           = function()
+			if type(menu_mods.about) ~= "table" or type(menu_mods.about.build) ~= "function" then
+				Logger.warn(LOG, "About module missing — its row is not drawn.")
+				return {}
 			end
-		elseif id == "reload" then
+			local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+			if not ok_a then
+				Logger.error(LOG, "Error building the About submenu: %s.", tostring(about_item))
+				return {}
+			end
+			return about_item and { about_item } or {}
+		end,
+		["reload"]          = function()
 			-- Strip the leading emoji token — emoji render poorly in native macOS menu bars
-			table.insert(items, { label = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""), action = actions.reload })
-		elseif id == "quit" then
-			table.insert(items, { label = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), action = actions.quit })
-		elseif id == "debug" then
-			-- The manifest declares every row of this submenu and the shared renderer
-			-- places them; this file supplies only what each one does.
-			--
-			-- It used to iterate the SAME array and then write the label for each id
-			-- by hand, in a chain of `elseif` — so the manifest decided the order and
-			-- this file decided everything else, in a second language. Linux has read
-			-- this section through the renderer since 2026-08-06 and Windows since
-			-- this morning; macOS was the last of the three.
-			local debug_items = {}
-			local ok_dbg, ManifestMenu = pcall(require, "infra.manifest_menu")
-			if ok_dbg and type(ManifestMenu.build) == "function" then
-				local dbg_ctx = {}
-				for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
-				dbg_ctx.commands = {
-					["console"]        = actions.open_console,
-					["open_logs"]      = actions.open_logs,
-					["open_today_log"] = actions.open_today_log,
-					["open_error_log"] = actions.open_error_log,
-					["healthcheck"]    = function() healthcheck.show_window() end,
-				}
-				-- The picker's own row carries the level currently set, which is why it
-				-- is a `list` and not a `command`: a declaration cannot spell a label
-				-- that changes with the state behind it.
-				debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {
-					["log_level"] = function()
-						return { {
-							label = i18n.get("menu.debug.log_level") .. " : "
-								.. Labels.log_level_emoji(active_level_name) .. " " .. active_level_name,
-							items = log_level_items,
-						} }
-					end,
-				}) or {}
-			else
-				Logger.error(LOG, "Manifest renderer unavailable — the debug submenu is empty.")
+			return { { label = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""), action = actions.reload } }
+		end,
+		["quit"]            = function()
+			return { { label = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), action = actions.quit } }
+		end,
+		["debug"]           = function()
+			-- The manifest declares every row of this submenu and the shared
+			-- renderer places them; this file supplies only what each one does.
+			local active_level_name = "INFO"
+			local log_level_items = {}
+			for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
+				local is_active = (Logger.current_level == Logger.LEVELS[lvl])
+				if is_active then active_level_name = lvl end
+				local lvl_capture = lvl
+				-- Provider rows: these are the `items` of the log-level list row below.
+				table.insert(log_level_items, {
+					label   = Labels.log_level_emoji(lvl) .. " " .. lvl,
+					checked = is_active,
+					action  = function() actions.set_log_level(lvl_capture) end,
+				})
 			end
-			table.insert(items, { label = i18n.get("menu.debug.title"), submenu = debug_items })
+			local healthcheck = require("ui.healthcheck")
+			local dbg_ctx = {}
+			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
+			dbg_ctx.commands = {
+				["console"]        = actions.open_console,
+				["open_logs"]      = actions.open_logs,
+				["open_today_log"] = actions.open_today_log,
+				["open_error_log"] = actions.open_error_log,
+				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
+				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
+				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
+				["show_error_dialog"] = actions.toggle_error_dialog,
+			}
+			dbg_ctx.state_getters = {}
+			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
+			dbg_ctx.state_getters["error_dialog_enabled"] = function()
+				return require("ui.error_dialog").is_enabled()
+			end
+			-- The picker's own row carries the level currently set, which is why it
+			-- is a `list` and not a `command`: a declaration cannot spell a label
+			-- that changes with the state behind it.
+			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {
+				["log_level"] = function()
+					return { {
+						label = i18n.get("menu.debug.log_level") .. " : "
+							.. Labels.log_level_emoji(active_level_name) .. " " .. active_level_name,
+						items = log_level_items,
+					} }
+				end,
+			}) or {}
+			return { { label = i18n.get("menu.debug.title"), submenu = debug_items } }
+		end,
+	}
+
+	local items = {}
+	for _, entry in ipairs(load_top_level()) do
+		local id = entry.id
+		if id == "---" then
+			table.insert(items, { separator = true })
+		elseif type(builders[id]) ~= "function" then
+			-- A declared row this driver has no builder for is a row the user was
+			-- promised and will not see.
+			Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+		else
+			for _, row in ipairs(builders[id]() or {}) do
+				-- « Pause = tout éteint »: every row the manifest marks as a feature
+				-- is greyed and stripped of its handler in one place. Each builder
+				-- used to decide this for itself, so Shortcuts and Gestures greyed
+				-- while Hotstrings, AI, Metrics and Tap-Holds stayed live (Metrics
+				-- could even be toggled mid-pause). The unmarked rows (configuration,
+				-- language, about, reload, quit, debug) and the title row that
+				-- resumes the script stay live: they are how the user inspects,
+				-- resumes or leaves a paused script.
+				if ctx.paused == true and entry.greyed_when_paused and type(row) == "table" and row.separator ~= true then
+					row.disabled = true
+					row.action = nil
+					row.fn = nil
+				end
+				table.insert(items, row)
+			end
 		end
 	end
 
 	-- Everything above collected row DATA; this is where the shared renderer turns
-	-- it into the table hs.menubar consumes.
-	--
-	-- Each component builder used to end with the row that hangs its submenu on
-	-- the tray — `title` + `menu`, written by hand once per submenu, a dozen times
-	-- over — and this function returned that array untouched. Linux made the same
-	-- move on 2026-08-07 and it was overdue here for a harder reason than symmetry:
-	-- two of those builders had ALREADY started returning provider rows, so the
-	-- Karabiner and « Disposition » entries reached the menu bar with no title and
-	-- their subtrees on a field hs.menubar does not read. Both were simply gone
-	-- from the menu, and nothing said so.
-	local rendered = {}
-	local ok_root, ManifestMenu = pcall(require, "infra.manifest_menu")
-	if ok_root and type(ManifestMenu.render_rows) == "function" then
-		rendered = ManifestMenu.render_rows(items, "top_level")
-	else
-		Logger.error(LOG, "Manifest renderer unavailable — the tray menu cannot be drawn.")
-	end
+	-- it into the table hs.menubar consumes, dropping any separator that would not
+	-- sit between two rows.
+	local rendered = ManifestMenu.render_rows(items, "top_level")
 
 	-- Collect the download item now so it participates in canvas width calculation below.
-	-- pcall-isolated like every other component builder above (e.g. the AI zone at
-	-- line ~447) — an exception here must degrade to "no download item", not take
-	-- down the whole menu-build pipeline.
+	-- pcall-isolated like every component builder above — an exception here must
+	-- degrade to "no download item", not take down the whole menu-build pipeline.
 	--
 	-- Prepended AFTER the render, in the hs.menubar shape: it is a transient
 	-- progress row the LLM module owns and rebuilds on its own timer, not a row of

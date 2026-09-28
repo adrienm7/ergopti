@@ -18,16 +18,31 @@
 
 global UPDATER_GH_OWNER  := "adrienm7"
 global UPDATER_GH_REPO   := "ergopti"
-global UPDATER_CHANNEL   := "main"    ; overwritten by Updater_LoadChannel()
+; The registry's most stable channel until Updater_LoadChannel() resolves the
+; subscribed one at boot.
+global UPDATER_CHANNEL   := UpdateChannels_Ids()[1]
 global UPDATER_INI_KEY   := "channel"
 global UPDATER_INI_SECTION := "updater"
 
-; Background update-check interval. 0 means "never" (disabled). The default
-; 24h cadence is a sensible balance between freshness and network restraint
-; — most users do not want a release-day notification but appreciate hearing
-; about a security fix within the same day. Honoured by ``Updater_StartBackgroundChecks``.
+; Every channel reads the same release list and keeps its own latest release
+; through the shared registry (_Updater_SelectChannelRelease). GitHub's
+; /releases/latest ignores prereleases and answers 404 while no stable release
+; exists, which callers reported as an unreachable network. Mirrors
+; update_check.releases_url in _shared/modules/updater/defaults.json (pinned
+; by tools/test/test-updater-constants-single-source.cjs).
+global UPDATER_RELEASES_API_URL_TEMPLATE := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
+
+; Returned instead of a release when the list holds none of the requested
+; channel: distinct from "" (network or HTTP failure), which callers report
+; as unreachable.
+global UPDATER_NO_CHANNEL_RELEASE := "[]"
+
+; Background update-check interval. 0 means "never" (disabled). The default and
+; the presets are the shared ones (_shared/modules/updater/defaults.json, read
+; through modules/updater/schedule.ahk); a saved value outside them snaps to
+; the nearest preset. Honoured by ``Updater_StartBackgroundChecks``.
 global UPDATER_INI_INTERVAL_KEY    := "check_interval_seconds"
-global UPDATER_DEFAULT_INTERVAL    := 86400
+global UPDATER_DEFAULT_INTERVAL    := UpdateSchedule_Timing()["default_check_interval_sec"]
 global UPDATER_CHECK_INTERVAL      := UPDATER_DEFAULT_INTERVAL
 
 ; WinHttp timeout budget (ms) for the synchronous GitHub Releases / asset calls.
@@ -102,24 +117,6 @@ global _UpdaterMenuRebuildPending       := false
 global UPDATER_ASYNC_POLL_MS   := 250
 global UPDATER_ASYNC_MAX_POLLS := Ceil((UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS + UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS) / UPDATER_ASYNC_POLL_MS) + 20
 
-; User-facing presets for the frequency submenu. Kept in display order so the
-; menu renders the way users naturally read time: short to long, with the
-; "off" row at the very bottom — a destructive choice deserves its own slot.
-global UPDATER_INTERVAL_PRESETS := [
-	{ Code: "1m",    Seconds: 60      },
-	{ Code: "5m",    Seconds: 300     },
-	{ Code: "10m",   Seconds: 600     },
-	{ Code: "1h",    Seconds: 3600    },
-	{ Code: "2h",    Seconds: 7200    },
-	{ Code: "3h",    Seconds: 10800   },
-	{ Code: "6h",    Seconds: 21600   },
-	{ Code: "12h",   Seconds: 43200   },
-	{ Code: "24h",   Seconds: 86400   },
-	{ Code: "2d",    Seconds: 172800  },
-	{ Code: "7d",    Seconds: 604800  },
-	{ Code: "never", Seconds: 0       }
-]
-
 ; Last release tag we already surfaced a notification for, so we don't keep
 ; nagging the user every interval tick about the same available update. Reset
 ; only when the user installs (or explicitly dismisses) the offer.
@@ -165,6 +162,9 @@ _Updater_SurfaceFailure(MessageKey, LogMessage, NotifyFn := 0,
 	Level := "error") {
 	try LoggerError("Updater", LogMessage)
 	try {
+		; A failure balloon is not an update offer: a click on it must not open
+		; the update prompt.
+		_Updater_ReleaseBalloon()
 		Message := t(MessageKey)
 		Options := Map("title", t("updater.title_update"), "level", Level)
 		Result := IsObject(NotifyFn)
@@ -1017,39 +1017,31 @@ _Updater_ScheduleDeferredChannelReloadIfReady() {
 ; ===== 1.2) Channel persistence =====
 ; ====================================
 
-; Loads the saved channel from config.toml (via the shared INI cache).
+; Loads the subscribed channel (via the shared INI cache).
 ;
 ; Priority order:
-;   1. ``[Updater] UpdateChannel`` in config.toml — explicit user override
-;      via the tray menu's "Update channel" submenu.
-;   2. ``BUNDLE_CHANNEL`` stamped at build time — "dev" for pre-release exes,
-;      "main" for stable. This means a user who downloads a dev pre-release
-;      stays on dev (and gets pre-release update notifications) without
-;      flipping any setting; the same exe published to main defaults to
-;      "main".
-;   3. Hardcoded "main" — last-resort default for dev / source-tree runs
-;      where the build placeholder was never replaced.
+;   1. ``[updater] channel`` in config.toml — the user's choice from the About
+;      menu or the Versions window, resolved through the shared registry, so a
+;      hand-written alias ("stable") reads as its channel.
+;   2. The installed build's channel (_Updater_InstalledChannel): a user who
+;      downloads a dev pre-release stays on dev without flipping a setting.
+; An unknown persisted value is logged and the installed channel is followed.
 Updater_LoadChannel() {
 	global _IniCache, UPDATER_CHANNEL, UPDATER_INI_SECTION, UPDATER_INI_KEY
-	global BUNDLE_CHANNEL
-
-	; Step 2: seed from the build-stamped channel first (overridden below if
-	; the user has an explicit config-file override). When running from the
-	; source tree BUNDLE_CHANNEL is not set, so default to "dev" — all releases
-	; are pre-releases in that context and "main" would show an empty list.
-	if IsSet(BUNDLE_CHANNEL)
-		and (BUNDLE_CHANNEL == "main" or BUNDLE_CHANNEL == "dev") {
-		UPDATER_CHANNEL := BUNDLE_CHANNEL
-	} else {
-		UPDATER_CHANNEL := "dev"
+	Installed := _Updater_InstalledChannel()
+	UPDATER_CHANNEL := Installed
+	if !IsSet(_IniCache)
+		return
+	Raw := IniCacheGet(_IniCache, UPDATER_INI_SECTION, UPDATER_INI_KEY)
+	if (Raw == "_")
+		return
+	Resolved := UpdateChannels_Resolve(Raw)
+	if (Resolved == "") {
+		try LoggerWarn("Updater", "config.toml names an unknown update channel '{1}'; following the installed channel '{2}'.",
+			Raw is String ? Raw : Type(Raw), Installed)
+		return
 	}
-
-	; Step 1: explicit user override always wins.
-	if IsSet(_IniCache) {
-		raw := IniCacheGet(_IniCache, UPDATER_INI_SECTION, UPDATER_INI_KEY)
-		if (raw != "_" and (raw == "main" or raw == "dev"))
-			UPDATER_CHANNEL := raw
-	}
+	UPDATER_CHANNEL := Resolved
 }
 
 ; Persists the chosen channel, retires all old-channel producers and hands one
@@ -1103,8 +1095,11 @@ Updater_SetChannel(Channel, Request := unset, IsSuspended := unset, NotifyFn := 
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
-	if (Channel != "main" and Channel != "dev") {
-		try LoggerError("Updater", "Invalid update channel '{1}' was refused.", Channel)
+	; Exact registry ids only: AHK's != compares case-insensitively, which let
+	; "Main" through as a channel. Aliases are resolved where config is read.
+	if !UpdateChannels_IsKnown(Channel) {
+		try LoggerError("Updater", "Invalid update channel '{1}' was refused.",
+			Channel is String ? Channel : Type(Channel))
 		return false
 	}
 	; The self-update download's WinHttp request and poll-timer chain are
@@ -1306,8 +1301,9 @@ Updater_SetChannel(Channel, Request := unset, IsSuspended := unset, NotifyFn := 
 ; =========================================
 
 ; Reads the saved background-check cadence from the INI cache. Accepts any
-; non-negative integer (seconds); 0 means "never". Defaults to 24h when the
-; key is absent so a fresh install gets a sensible cadence out of the box.
+; non-negative integer (seconds) and snaps it to the nearest shared preset, so
+; the frequency picker always ticks the cadence in force; 0 means "never". The
+; shared default applies when the key is absent.
 Updater_LoadCheckInterval() {
 	global _IniCache, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION
 	global UPDATER_INI_INTERVAL_KEY, UPDATER_DEFAULT_INTERVAL
@@ -1340,7 +1336,11 @@ Updater_LoadCheckInterval() {
 	}
 	if (seconds < 0)
 		seconds := 0
-	UPDATER_CHECK_INTERVAL := seconds
+	Snap := UpdateSchedule_SnapInterval(seconds)
+	if Snap.Snapped
+		try LoggerWarn("Updater", "check_interval_seconds {1} is not a frequency preset — using the nearest one, {2} s ({3}).",
+			seconds, Snap.Seconds, Snap.Code)
+	UPDATER_CHECK_INTERVAL := Snap.Seconds
 }
 
 ; Builds the cadence transaction only after ConfigCommitBuilt owns config.toml.
@@ -1672,48 +1672,21 @@ _Updater_IsNewerVersion(Latest, Current) {
 	return _Updater_CompareVersions(Latest, Current) > 0
 }
 
-; Returns the immutable release channel stamped into the running executable.
-; The source-tree placeholder is deliberately treated as dev, matching
-; Updater_LoadChannel(). Compiled release artifacts are stamped main or dev by
-; the release workflow.
+; Returns the immutable release channel stamped into the running executable by
+; the release workflow, or the registry's unreleased-build channel for a
+; source-tree run, whose placeholder is never replaced. Which tags a channel
+; owns and which candidate a check offers live in the shared registry
+; (modules/updater/channels.ahk: UpdateChannels_ShouldOffer).
 _Updater_InstalledChannel() {
 	global BUNDLE_CHANNEL
-	if IsSet(BUNDLE_CHANNEL)
-		and (BUNDLE_CHANNEL == "main" or BUNDLE_CHANNEL == "dev")
+	if IsSet(BUNDLE_CHANNEL) && UpdateChannels_IsKnown(BUNDLE_CHANNEL)
 		return BUNDLE_CHANNEL
-	return "dev"
+	return UpdateChannels_UnreleasedBuildChannel()
 }
 
-; Enforces the tag family emitted by .github/workflows/ci.yml for each channel.
-; Stable releases are ordinary semver; dev releases use v0.0.0-dev.N.
-_Updater_TagMatchesChannel(Tag, Channel) {
-	Parsed := _Updater_ParseVersion(Tag)
-	if !IsObject(Parsed)
-		return false
-	if (Channel == "main")
-		return Parsed.PreParts == 0
-	if (Channel != "dev")
-		return false
-	return Parsed.Maj == 0 and Parsed.Min == 0 and Parsed.Pat == 0
-		and IsObject(Parsed.PreParts) and Parsed.PreParts.Length == 2
-		and Parsed.PreParts[1] == "dev"
-		and RegExMatch(Parsed.PreParts[2], "^[1-9]\d*$")
-}
-
-; A deliberate channel change is an artifact-family migration, not an
-; ordinary version upgrade. Its candidate is therefore eligible even when
-; semver orders the CI dev family below the installed stable version. Within
-; one channel, the strict newer-only rule remains unchanged.
-_Updater_ShouldOfferCandidate(Latest, Current, SelectedChannel,
-	InstalledChannel) {
-	if !_Updater_TagMatchesChannel(Latest, SelectedChannel)
-		return false
-	if (SelectedChannel != InstalledChannel) {
-		if (InstalledChannel != "main" and InstalledChannel != "dev")
-			return false
-		return true
-	}
-	return _Updater_IsNewerVersion(Latest, Current)
+; The short, translated name of a channel (its registry label key).
+_Updater_ChannelLabel(Channel) {
+	return t(UpdateChannels_Field(Channel, "label_key"))
 }
 
 
@@ -1813,8 +1786,7 @@ _Updater_RequestContextValid(Request) {
 		and Generation >= 0
 		and Type(BackgroundGeneration) == "Integer"
 		and BackgroundGeneration >= 0
-		and Channel is String
-		and (Channel == "main" or Channel == "dev")
+		and UpdateChannels_IsKnown(Channel)
 		and Type(ChannelEpoch) == "Integer"
 		and ChannelEpoch > 0
 }
@@ -2229,18 +2201,13 @@ _Updater_RunMenuRebuildForRequest(Request, WorkerFn := 0) {
 		_Updater_MenuRequestAuthorized.Bind(Request), WorkerFn)
 }
 
-; Returns the GitHub Releases API URL for the chosen channel.
-; For the dev channel we fetch the last 10 releases and pick the first one
-; whose "prerelease" flag is true.  Using per_page=1 was insufficient because
-; GitHub returns releases in reverse-chronological order: if the most recent
-; publish is a stable release it lands at position 1 and any newer prerelease
-; hiding behind it would go undetected.
-Updater_ReleaseApiUrl(Channel) {
-	global UPDATER_GH_OWNER, UPDATER_GH_REPO
-	if (Channel == "dev")
-		return "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=10"
-	; Stable: the dedicated "latest" endpoint always returns the newest non-pre-release.
-	return "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
+; Returns the GitHub Releases list URL every channel reads. The list is ordered
+; by publish date, so a channel's latest release is chosen by the registry's
+; tag rule and semver order, never by position.
+Updater_ReleaseApiUrl() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO, UPDATER_RELEASES_API_URL_TEMPLATE
+	return StrReplace(StrReplace(UPDATER_RELEASES_API_URL_TEMPLATE,
+		"{owner}", UPDATER_GH_OWNER), "{repo}", UPDATER_GH_REPO)
 }
 
 ; Returns the GitHub Releases HTML page URL (for "Open in browser" actions).
@@ -2346,7 +2313,7 @@ Updater_FetchLatestJson(Channel) {
 	global _UpdaterFetchCache
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
-	Url := Updater_ReleaseApiUrl(Channel)
+	Url := Updater_ReleaseApiUrl()
 	Json := ""
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -2378,8 +2345,10 @@ Updater_FetchLatestJson(Channel) {
 ; string every downstream parser expects. Shared by the synchronous fetch above
 ; and the async background path so their status / ETag / array-unwrap handling
 ; can never drift apart. Returns "" when there is nothing usable (304 with no
-; cached body, 403 rate limit, or any other non-200). Updates the per-channel
-; conditional-GET cache on a fresh 200.
+; cached body, 403 rate limit, or any other non-200) and UPDATER_NO_CHANNEL_RELEASE
+; when the list holds no release of the channel. Updates the per-channel
+; conditional-GET cache on a fresh 200; the cache keeps the whole list, so a 304
+; selects the channel's release again.
 _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 	global _UpdaterFetchCache
 	Json := ""
@@ -2401,12 +2370,41 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 	} else {
 		try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
 	}
-	; Array response (dev channel) — unwrap to the highest-semver prerelease so
-	; every downstream parser receives a single-object JSON string.
+	; The list answers every channel: keep this channel's latest release so every
+	; downstream parser receives a single-object JSON string.
 	if (_Updater_JsonPayloadIsUsable(Json)
 		and SubStr(LTrim(Json), 1, 1) == "[")
-		Json := _Updater_UnwrapLatestPrerelease(Json)
+		Json := _Updater_SelectChannelRelease(Json, Channel)
 	return Json
+}
+
+; Returns the JSON object of a channel's latest release in a releases array,
+; chosen by the shared registry's tag rule and semver order (GitHub lists by
+; publish date, so a later stable must not hide a higher dev build or the
+; reverse), or UPDATER_NO_CHANNEL_RELEASE when the list holds none.
+_Updater_SelectChannelRelease(Json, Channel) {
+	global UPDATER_NO_CHANNEL_RELEASE
+	Chunks := _Updater_SplitReleasesArray(Json)
+	Tags := []
+	for _, Chunk in Chunks
+		Tags.Push(Updater_ParseTagName(Chunk))
+	Best := UpdateChannels_PickLatest(Tags, Channel)
+	if !Best {
+		try LoggerInfo("Updater", "No release of channel '{1}' among the {2} listed.", Channel, Chunks.Length)
+		return UPDATER_NO_CHANNEL_RELEASE
+	}
+	return Chunks[Best]
+}
+
+; Reports whether a fetch answered that its channel has no release yet.
+_Updater_JsonIsNoChannelRelease(Json) {
+	global UPDATER_NO_CHANNEL_RELEASE
+	return Json is String && Json == UPDATER_NO_CHANNEL_RELEASE
+}
+
+; The user-facing sentence for a channel without any release yet.
+_Updater_NoChannelReleaseMessage(Channel) {
+	return StrReplace(t("updater.no_release_on_channel"), "{channel}", _Updater_ChannelLabel(Channel))
 }
 
 ; Async, non-blocking sibling of Updater_FetchLatestJson. Dispatches the GitHub
@@ -2418,7 +2416,7 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 ; fetch (bounded timeouts, the user is actively waiting on the click). Mirrors
 ; the WinHTTP-async + SetTimer-poll pattern used in modules/llm.
 _Updater_FetchLatestJsonAsync(Channel, Request, OnJson) {
-	Url := Updater_ReleaseApiUrl(Channel)
+	Url := Updater_ReleaseApiUrl()
 	; Publish exact cancellation ownership before the first COM call. Open(),
 	; header configuration and cache-header application can pump messages; a
 	; suspend reached from that re-entrancy must find this request in the shared
@@ -3078,7 +3076,7 @@ _Updater_AbortStagingOnExit() {
 ; (Json == "" on any failure). Used by _Updater_OpenChangelogWindow so the
 ; changelog GUI build never blocks the keyboard hook on a slow network.
 _Updater_FetchReleasesListJsonAsync(Channel, Request, OnJson) {
-	Url := Updater_ReleasesListApiUrl(Channel)
+	Url := Updater_ReleaseApiUrl()
 	Owner := _Updater_RegisterAsyncRequestOwner(
 		0, Channel, OnJson, Url, Request)
 	if !IsObject(Owner) {
@@ -3180,49 +3178,12 @@ _Updater_PollReleasesListAsync(id) {
 	return true
 }
 
-; Given a GitHub releases array JSON string, return the JSON object of the
-; highest-semver prerelease entry. GitHub orders by publish date, not semver;
-; a stable release at the top must not cause us to miss a newer prerelease
-; further down the page. Falls back to the first entry when no prerelease
-; is found.
-_Updater_UnwrapLatestPrerelease(Json) {
-	Chunks := _Updater_SplitReleasesArray(Json)
-	BestTag := ""
-	BestChunk := ""
-	for _, Chunk in Chunks {
-		if !_Updater_ParsePrerelease(Chunk)
-			continue
-		Tag := Updater_ParseTagName(Chunk)
-		if (Tag == "")
-			continue
-		if (BestTag == "" or _Updater_CompareVersions(Tag, BestTag) > 0) {
-			BestTag := Tag
-			BestChunk := Chunk
-		}
-	}
-	if (BestChunk != "")
-		return BestChunk
-	if (Chunks.Length > 0)
-		return Chunks[1]
-	return Json
-}
-
-; Returns the GitHub Releases LIST API URL for the channel. The page size is
-; intentionally generous so the changelog window can show several months of
-; history without paging — even on a busy dev channel that lands one release
-; per commit. GitHub's free-tier limit (60 anon req/hour) leaves us plenty of
-; headroom because the call is user-initiated only.
-Updater_ReleasesListApiUrl(Channel := "") {
-	global UPDATER_GH_OWNER, UPDATER_GH_REPO
-	return "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=50"
-}
-
 ; Fetches the releases LIST endpoint (synchronous, like ``Updater_FetchLatestJson``)
 ; and returns the raw JSON array string. Returns "" on any error.
 Updater_FetchReleasesListJson(Channel := "") {
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
-	Url := Updater_ReleasesListApiUrl(Channel)
+	Url := Updater_ReleaseApiUrl()
 	Json := ""
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -3290,8 +3251,9 @@ _Updater_SplitReleasesArray(Json) {
 	return out
 }
 
-; Extracts the boolean "prerelease" flag — true means a dev-channel release,
-; false a stable one. Defaults to false when the field is absent.
+; Extracts GitHub's boolean "prerelease" flag (the release workflow sets it
+; from the channel's github_prerelease). Channel membership itself is decided
+; by the tag, through the shared registry. Defaults to false when absent.
 _Updater_ParsePrerelease(Json) {
 	if RegExMatch(Json, '"prerelease"\s*:\s*(true|false)', &M)
 		return M[1] == "true"
@@ -3312,16 +3274,16 @@ _Updater_ParsePublishedAt(Json) {
 	return ""
 }
 
-; Build an array of release records from the raw JSON list. When ``MainOnly``
-; is true the list is restricted to stable releases (``prerelease == false``);
-; otherwise both pre-releases and stables come through so the dev channel can
-; show every nightly side by side with the latest stable.
+; Build an array of release records from the raw JSON list. With a ViewChannel,
+; the list keeps what that channel's Versions view shows (UpdateChannels_VisibleIn:
+; its own releases and those of every more stable channel), so the dev view
+; shows every nightly side by side with the stable releases.
 ;
 ; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease, RawJson }. The original
 ; API order is preserved (GitHub returns most-recent first) so callers do not
 ; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
 ; can resolve the authenticated asset via _Updater_FindAsset (AHK-07).
-Updater_ParseReleasesList(Json, MainOnly := false) {
+Updater_ParseReleasesList(Json, ViewChannel := "") {
 	out := []
 	for _, chunk in _Updater_SplitReleasesArray(Json) {
 		rec := {
@@ -3334,7 +3296,7 @@ Updater_ParseReleasesList(Json, MainOnly := false) {
 		}
 		if (rec.Tag == "")
 			continue
-		if (MainOnly and rec.Prerelease)
+		if (ViewChannel != "" and !UpdateChannels_VisibleIn(ViewChannel, rec.Tag))
 			continue
 		out.Push(rec)
 	}
@@ -3342,7 +3304,7 @@ Updater_ParseReleasesList(Json, MainOnly := false) {
 }
 
 ; Extracts the "tag_name" field from a GitHub release JSON payload.
-; Handles both object (latest endpoint) and array (list endpoint) responses.
+; Handles both a release object and a raw releases array (its first entry).
 Updater_ParseTagName(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""

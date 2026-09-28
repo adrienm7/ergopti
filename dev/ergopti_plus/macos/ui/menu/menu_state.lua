@@ -25,6 +25,11 @@ local LOG    = "menu_state"
 -- critical path; a sub-second gap of unlogged keystrokes after boot is harmless.
 local KEYLOGGER_START_DELAY_SEC = 0.5
 local _keylogger_start_generation = 0
+local _keylogger_start_pending = false
+
+--- Reports boot activation that has not reached the native lifecycle owner.
+--- @return boolean pending True until the current deferred start settles.
+function M.metrics_start_pending() return _keylogger_start_pending end
 
 
 
@@ -37,88 +42,136 @@ local _keylogger_start_generation = 0
 -- ==========================================
 -- ==========================================
 
+--- Deep-copies plain Lua data so a demotion record cannot alias live state.
+--- @param value any Value to copy.
+--- @return any copy
+local function clone_value(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, child in pairs(value) do copy[clone_value(key)] = clone_value(child) end
+	return copy
+end
+
 --- Synchronises the loaded state table back into all engine modules.
---- Called once at startup after preferences are loaded, and after a reset.
+--- Called once at startup after preferences are loaded, after a failed save
+--- (rollback) and by the global actions.
+---
+--- Failures are isolated per feature. A refused lifecycle whose runtime posture
+--- can be read back demotes only that feature's state flag, in memory, and is
+--- reported in `report.demotions`; the sync never persists anything, so a boot
+--- refusal can neither save before the caller's transaction exists nor rewrite
+--- config.toml. A refusal whose posture cannot be proved lands in
+--- `report.unsettled`, the only case in which the caller must roll back whole.
 --- @param state table The current mutable state table.
 --- @param saved table The raw saved preferences table.
---- @param config_absent boolean True when no config file was found on disk.
---- @param deps table Dependency bag: { keymap, gestures, hotstring_editor, core_mods, save_prefs, apply_metrics_shortcut, apply_apps_time_shortcut, _metrics_hk_ref, _apps_time_hk_ref }.
+--- @param config_absent boolean Must be false: the caller seeds config.toml once
+--- its save transaction exists, never this sync.
+--- @param deps table Dependency bag: { keymap, gestures, hotstring_editor, core_mods, apply_llm_enabled, apply_metrics_shortcut, apply_apps_time_shortcut, _metrics_hk, _apps_time_hk, on_runtime_demotion }.
+--- @return boolean committed True only when every feature applied.
+--- @return table report { failures, demotions, unsettled, repairs } per feature.
 function M.sync_state_to_modules(state, saved, config_absent, deps)
-	local sync_failed = false
+	if config_absent then
+		error("sync_state_to_modules never persists; seed config.toml after the save transaction exists", 2)
+	end
+	local report = { failures = {}, demotions = {}, unsettled = {}, repairs = {} }
+
+	--- Records one refused step of a feature and names both in an ERROR.
+	--- @param feature string Feature the refused owner belongs to.
+	--- @param label string Refused runtime step.
+	--- @param detail any Refusal result or raised error.
+	local function record_failure(feature, label, detail)
+		report.failures[#report.failures + 1] = {
+			feature = feature, step = label, detail = tostring(detail),
+		}
+		Logger.error(LOG, "sync_state_to_modules: feature '%s' was not fully applied: %s did not commit — %s.",
+			feature, label, tostring(detail))
+	end
 
 	--- Calls a runtime setter under pcall and records any raised failure.
 	--- Successful setters may return nil; only a thrown error breaks the sync contract.
-	--- @param label string Human-readable description for the warning.
+	--- @param feature string Feature the setter belongs to.
+	--- @param label string Human-readable description for the error.
 	--- @param fn function|nil Function to call, or nil when the dependency is optional.
 	--- @param ... any Arguments forwarded to fn.
 	--- @return boolean completed True unless the setter raised.
-	local function try(label, fn, ...)
+	local function try(feature, label, fn, ...)
 		if type(fn) ~= "function" then return true end
 		local ok, err = pcall(fn, ...)
-		if not ok then
-			sync_failed = true
-			Logger.warn(LOG, "sync_state_to_modules: %s failed — %s", label, tostring(err))
-		end
+		if not ok then record_failure(feature, label, err) end
 		return ok, err
 	end
 
 	--- Calls a lifecycle method whose contract requires an exact true result.
-	--- @param label string Human-readable description for the warning.
+	--- @param feature string Feature the lifecycle belongs to.
+	--- @param label string Human-readable description for the error.
 	--- @param fn function|nil Required lifecycle method.
 	--- @param ... any Arguments forwarded to fn.
 	--- @return boolean committed True only after exact runtime commitment.
-	local function try_exact(label, fn, ...)
+	local function try_exact(feature, label, fn, ...)
 		if type(fn) ~= "function" then
-			sync_failed = true
-			Logger.warn(LOG, "sync_state_to_modules: %s is unavailable.", label)
+			record_failure(feature, label, "unavailable")
 			return false
 		end
 		local ok, result_or_err = pcall(fn, ...)
 		if not ok or result_or_err ~= true then
-			sync_failed = true
-			Logger.warn(LOG, "sync_state_to_modules: %s did not commit — %s",
-				label, tostring(result_or_err))
+			record_failure(feature, label, result_or_err)
 			return false
 		end
 		return true
+	end
+
+	--- Shows one feature flag at the posture its runtime really has, in memory
+	--- only. The record keeps the saved value so the caller can keep it on disk.
+	--- @param feature string Demoted feature.
+	--- @param key string State key of its switch.
+	--- @param runtime_value any Posture the runtime actually has.
+	--- @param reason string Why the saved value could not apply.
+	--- @return table record { feature, key, persisted, demoted }.
+	local function demote(feature, key, runtime_value, reason)
+		local record = {
+			feature = feature,
+			key = key,
+			persisted = clone_value(state[key]),
+			demoted = clone_value(runtime_value),
+		}
+		state[key] = runtime_value
+		report.demotions[#report.demotions + 1] = record
+		Logger.error(LOG, "Feature '%s' is %s for this session because %s; config.toml keeps its saved value.",
+			feature, runtime_value and "ON" or "OFF", reason)
+		return record
+	end
+
+	--- Records a refusal whose runtime posture cannot be proved.
+	--- @param feature string Feature left in an unknown posture.
+	--- @param label string Step whose outcome is unknown.
+	--- @param detail any Query failure or refusal.
+	local function unsettled(feature, label, detail)
+		report.unsettled[#report.unsettled + 1] = {
+			feature = feature, step = label, detail = tostring(detail),
+		}
+		Logger.error(LOG, "Feature '%s' runtime posture is unknown after %s — %s.",
+			feature, label, tostring(detail))
 	end
 
 	local keymap           = deps.keymap
 	local gestures         = deps.gestures
 	local hotstring_editor = deps.hotstring_editor
 	local core_mods        = deps.core_mods
-	local save_prefs       = deps.save_prefs
 	local apply_llm_enabled = deps.apply_llm_enabled
 	local apply_metrics_shortcut   = deps.apply_metrics_shortcut
 	local apply_apps_time_shortcut = deps.apply_apps_time_shortcut
 
-	-- Sync section states
-	-- WHY explicit if/else: in Lua, both `false` and `nil` are falsy, so the
-	-- `cond and false or nil` idiom evaluates to `nil` even when sec_enabled
-	-- is `false` (silently re-enabling sections the user had disabled)
-	if type(saved.section_states) == "table" then
-		for group_name, secs in pairs(saved.section_states) do
-			if type(secs) == "table" then
-				for sec_name, sec_enabled in pairs(secs) do
-					local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
-					-- Stored explicitly both ways: an absent key means the manifest's
-					-- shipped default (disabled for every bundled section).
-					if sec_enabled == false then
-						try("Storage.set " .. key, Storage.set, key, false)
-					elseif sec_enabled == true then
-						try("Storage.set " .. key, Storage.set, key, true)
-					else
-						try("Storage.delete " .. key, Storage.delete, key)
-					end
-				end
-			end
-		end
+	-- Canonical absence replaces stale derived section settings as well as groups.
+	if keymap and type(keymap.apply_hotstring_preferences) == "function" then
+		try_exact("hotstrings", "keymap.apply_hotstring_preferences", keymap.apply_hotstring_preferences, saved)
+	elseif type(saved.section_states) == "table" then
+		record_failure("hotstrings", "keymap.apply_hotstring_preferences", "owner unavailable")
 	end
 
 	-- Sync terminators
 	if type(saved.terminator_states) == "table" then
 		for key, enabled in pairs(saved.terminator_states) do
-			if keymap and type(keymap.set_terminator_enabled) == "function" then try("keymap.set_terminator_enabled", keymap.set_terminator_enabled, key, enabled) end
+			if keymap and type(keymap.set_terminator_enabled) == "function" then try("hotstrings", "keymap.set_terminator_enabled", keymap.set_terminator_enabled, key, enabled) end
 		end
 	end
 
@@ -131,7 +184,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			for index = #(type(defs) == "table" and defs or {}), 1, -1 do
 				local def = defs[index]
 				if type(def) == "table" and def.custom == true then
-					if not try_exact("keymap.remove_custom_terminator",
+					if not try_exact("hotstrings", "keymap.remove_custom_terminator",
 						keymap.remove_custom_terminator, def.key) then
 						custom_runtime_failed = true
 					end
@@ -156,9 +209,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				end, debug.traceback)
 				if not validation_ok then
 					custom_runtime_failed = true
-					sync_failed = true
-					Logger.warn(LOG, "sync_state_to_modules: custom terminator validation failed — %s",
-						tostring(candidate_valid))
+					record_failure("hotstrings", "keymap.validate_custom_terminator", candidate_valid)
 					break
 				end
 				if candidate_valid then
@@ -166,9 +217,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 						debug.traceback, ct.key, ct.char, label, consume)
 					if not ok_add or added ~= true then
 						custom_runtime_failed = true
-						sync_failed = true
-						Logger.warn(LOG, "sync_state_to_modules: custom terminator restore did not commit — %s",
-							tostring(added))
+						record_failure("hotstrings", "keymap.add_custom_terminator", added)
 						break
 					end
 					accepted_keys[ct.key] = true
@@ -182,9 +231,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 					-- re-applied here and not by the terminator_states loop above,
 					-- because that loop runs before add_custom_terminator has created
 					-- the key it would be setting.
-					local enabled_ct = type(saved.terminator_states) == "table"
-						and saved.terminator_states[ct.key] or nil
-					if enabled_ct ~= nil and not try_exact("keymap.set_terminator_enabled",
+					local enabled_ct
+					if type(saved.terminator_states) == "table" then
+						enabled_ct = saved.terminator_states[ct.key]
+					end
+					if enabled_ct ~= nil and not try_exact("hotstrings", "keymap.set_terminator_enabled",
 						keymap.set_terminator_enabled, ct.key, enabled_ct) then
 						custom_runtime_failed = true
 						break
@@ -208,10 +259,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 					if not accepted_keys[key] then state.terminator_states[key] = nil end
 				end
 			end
-			if custom_repaired and save_prefs() ~= true then
-				sync_failed = true
-				Logger.error(LOG, "Rejected custom terminators could not be removed from preferences.")
-			end
+			-- The caller persists the repair once its save transaction exists; saving
+			-- from here ran before that transaction was seeded at boot and failed.
+			if custom_repaired then report.repairs[#report.repairs + 1] = "custom_terminators" end
 		end
 	end
 
@@ -222,7 +272,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	--      this is the new authoritative source (TOML metadata + user override).
 	--   3. `keymap.DELAYS_DEFAULT[k]` — ultimate hardcoded fallback.
 	if type(state.expansion_delay) == "number" then
-		if keymap and type(keymap.set_base_delay) == "function" then try("keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay) end
+		if keymap and type(keymap.set_base_delay) == "function" then try("hotstrings", "keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay) end
 	end
 	if keymap and type(keymap.set_delay) == "function" then
 		local defs       = keymap.DELAYS_DEFAULT or {}
@@ -235,14 +285,14 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				local r = hs_cfg.resolve(key_to_cat[k], nil)
 				if r and type(r.delay) == "number" then resolved = r.delay end
 			end
-			try("keymap.set_delay " .. k, keymap.set_delay, k, state.delays[k] or resolved or default_val)
+			try("hotstrings", "keymap.set_delay " .. k, keymap.set_delay, k, state.delays[k] or resolved or default_val)
 		end
 	end
 
 	-- Sync gestures
 	if gestures and type(saved.gesture_actions) == "table" then
 		for slot, action in pairs(saved.gesture_actions) do
-			if type(gestures.set_action) == "function" then try("gestures.set_action", gestures.set_action, slot, action) end
+			if type(gestures.set_action) == "function" then try("gestures", "gestures.set_action", gestures.set_action, slot, action) end
 		end
 	end
 	if gestures and type(saved.gesture_action_parameters) == "table"
@@ -253,17 +303,34 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				binding, action = gestures.split_action_parameter_key(key)
 			end
 			if binding and action then
-				try("gestures.set_action_parameter", gestures.set_action_parameter, binding, action, value)
+				try("gestures", "gestures.set_action_parameter", gestures.set_action_parameter, binding, action, value)
 			end
 		end
 	end
-	if gestures and type(gestures.apply_all_overrides) == "function" then try("gestures.apply_all_overrides", gestures.apply_all_overrides) end
+	if gestures and type(gestures.apply_all_overrides) == "function" then try("gestures", "gestures.apply_all_overrides", gestures.apply_all_overrides) end
+
+	-- Hotstring preview and magic-key options belong to the text engine, not to
+	-- the AI, so a refused AI identity below must not keep them unapplied.
+	if keymap then
+		for _, item in ipairs({
+			{ fn = "set_repeat_feature_enabled",      val = state.repeat_key_enabled },
+			{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
+			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
+			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
+			{ fn = "set_trigger_char",                val = state.trigger_char },
+		}) do
+			if type(keymap[item.fn]) == "function" then
+				try("hotstrings", "keymap." .. item.fn, keymap[item.fn], item.val)
+			end
+		end
+	end
 
 	-- Restore the backend/profile/model identity before keymap LLM setters. Those
 	-- setters may schedule warmup work immediately, so reversing this order would
 	-- dispatch the acknowledged model through the just-rejected backend.
 	local llm = core_mods and core_mods.llm
-	local llm_identity_committed = true
+	local llm_committed = true
+	local llm_refusal = nil
 	if llm then
 		local identity_map = {
 			{ fn = "set_backend",        val = state.llm_backend },
@@ -273,39 +340,52 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_model_mlx",    val = state.llm_model_mlx },
 		}
 		for _, item in ipairs(identity_map) do
-			if not try_exact("llm." .. item.fn, llm[item.fn], item.val) then
-				llm_identity_committed = false
+			if not try_exact("ai", "llm." .. item.fn, llm[item.fn], item.val) then
+				llm_committed = false
+				llm_refusal = "llm." .. item.fn .. " was refused"
 				break
 			end
 		end
-		if llm_identity_committed and type(llm.set_llm_streaming) == "function" then
-			try("llm.set_llm_streaming", llm.set_llm_streaming, state.llm_streaming)
+		if llm_committed and type(llm.set_llm_streaming) == "function" then
+			try("ai", "llm.set_llm_streaming", llm.set_llm_streaming, state.llm_streaming)
 		end
 	end
 
-	-- Sync keymap options
-	if keymap and llm_identity_committed then
-		local keymap_identity_committed = try_exact(
-			"keymap.set_llm_model", keymap.set_llm_model, state.llm_model)
+	-- Sync keymap AI options
+	if keymap then
 		local llm_enabled_setter = type(apply_llm_enabled) == "function"
 			and apply_llm_enabled or keymap.set_llm_enabled
-		if keymap_identity_committed and type(llm_enabled_setter) == "function" then
-			keymap_identity_committed = try_exact(
-				"keymap.set_llm_enabled", llm_enabled_setter, state.llm_enabled)
+		if llm_committed then
+			llm_committed = try_exact("ai", "keymap.set_llm_model", keymap.set_llm_model, state.llm_model)
+			if not llm_committed then llm_refusal = "keymap.set_llm_model was refused" end
 		end
-		if keymap_identity_committed then
+		if llm_committed and type(llm_enabled_setter) == "function" then
+			llm_committed = try_exact("ai", "keymap.set_llm_enabled", llm_enabled_setter, state.llm_enabled)
+			if not llm_committed then llm_refusal = "keymap.set_llm_enabled was refused" end
+		end
+		if not llm_committed then
+			-- A partial identity must not serve predictions, so the AI stays off for
+			-- this session; the next boot retries the saved configuration. A keymap
+			-- without an AI switch has no prediction runtime to turn off.
+			local off_ok, off_result = true, true
+			if type(llm_enabled_setter) == "function" then
+				off_ok, off_result = pcall(llm_enabled_setter, false)
+			end
+			if off_ok and off_result == true then
+				if state.llm_enabled then demote("ai", "llm_enabled", false, llm_refusal) end
+			else
+				unsettled("ai", "AI disable after " .. tostring(llm_refusal), off_result)
+			end
+		end
+		if llm_committed then
 			local backend_labels = { mlx = "MLX 🚀", ollama = "Ollama 🦙", api = "API 🌐" }
 			local map = {
-			{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
-			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 			{ fn = "set_preview_ai_enabled",          val = state.preview_ai_enabled },
-			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
 			{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },
 			{ fn = "set_llm_auto_raise_temp",         val = state.llm_auto_raise_temp },
 			{ fn = "set_llm_debounce",                val = state.llm_debounce },
 			{ fn = "set_llm_backend_name",            val = backend_labels[state.llm_backend] or state.llm_backend },
 			{ fn = "set_llm_display_model_name",      val = state.llm_model },
-			{ fn = "set_trigger_char",                val = state.trigger_char },
 			{ fn = "set_llm_context_length",          val = state.llm_context_length },
 			{ fn = "set_llm_reset_on_nav",            val = state.llm_reset_on_nav },
 			{ fn = "set_llm_temperature",             val = state.llm_temperature },
@@ -327,7 +407,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			}
 			for _, item in ipairs(map) do
 				if type(keymap[item.fn]) == "function" then
-					try("keymap." .. item.fn, keymap[item.fn], item.val)
+					try("ai", "keymap." .. item.fn, keymap[item.fn], item.val)
 				end
 			end
 		end
@@ -339,20 +419,20 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		"llm_debounce", "llm_max_words", "llm_min_words", "llm_temperature",
 		"llm_context_length", "llm_pred_indent", "llm_nav_modifiers", "llm_val_modifiers",
 	}) do
-		if state[key] ~= nil then try("Storage.set " .. key, Storage.set, key, state[key]) end
+		if state[key] ~= nil then try("ai", "Storage.set " .. key, Storage.set, key, state[key]) end
 	end
 
 	-- Sync editor options
-	if type(hotstring_editor.set_trigger_char) == "function"    then try("hotstring_editor.set_trigger_char", hotstring_editor.set_trigger_char, state.trigger_char) end
-	if type(hotstring_editor.set_default_section) == "function" then try("hotstring_editor.set_default_section", hotstring_editor.set_default_section, state.custom_default_section) end
-	if type(hotstring_editor.set_close_on_add) == "function"    then try("hotstring_editor.set_close_on_add", hotstring_editor.set_close_on_add, state.custom_close_on_add) end
+	if type(hotstring_editor.set_trigger_char) == "function"    then try("hotstring_editor", "hotstring_editor.set_trigger_char", hotstring_editor.set_trigger_char, state.trigger_char) end
+	if type(hotstring_editor.set_default_section) == "function" then try("hotstring_editor", "hotstring_editor.set_default_section", hotstring_editor.set_default_section, state.custom_default_section) end
+	if type(hotstring_editor.set_close_on_add) == "function"    then try("hotstring_editor", "hotstring_editor.set_close_on_add", hotstring_editor.set_close_on_add, state.custom_close_on_add) end
 
 	-- Sync the dynamic-hotstrings RulesEngine's trigger char too — without this
 	-- it only ever sees the value captured once at boot, orphaning every
 	-- date/prefix rule from a magic-key change made via the menu (F-HIGH-8 fix).
 	local dyn_hot_mod = core_mods and core_mods.dyn_hot_mod
 	if dyn_hot_mod and type(dyn_hot_mod.set_trigger_char) == "function" then
-		try("dyn_hot_mod.set_trigger_char", dyn_hot_mod.set_trigger_char, state.trigger_char)
+		try("hotstrings", "dyn_hot_mod.set_trigger_char", dyn_hot_mod.set_trigger_char, state.trigger_char)
 	end
 
 	local sc = state.custom_editor_shortcut
@@ -360,30 +440,30 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		local def = { mods = {"ctrl"}, key = state.trigger_char }
 		state.custom_editor_shortcut = def
 		if type(hotstring_editor.set_shortcut) == "function" then
-			try_exact("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key)
+			try_exact("hotstring_editor", "hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key)
 		end
 	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
 		if type(hotstring_editor.set_shortcut) == "function" then
-			try_exact("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key)
+			try_exact("hotstring_editor", "hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key)
 		end
 	elseif sc == false and type(hotstring_editor.clear_shortcut) == "function" then
-		try_exact("hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
+		try_exact("hotstring_editor", "hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
 	end
 
 	if type(apply_metrics_shortcut) == "function" then
 		if type(state.metrics_shortcut) == "table" then
-			try_exact("apply_metrics_shortcut", apply_metrics_shortcut,
+			try_exact("metrics", "apply_metrics_shortcut", apply_metrics_shortcut,
 				state.metrics_shortcut.mods, state.metrics_shortcut.key, false)
 		else
-			try_exact("apply_metrics_shortcut", apply_metrics_shortcut, nil, nil, false)
+			try_exact("metrics", "apply_metrics_shortcut", apply_metrics_shortcut, nil, nil, false)
 		end
 	end
 	if type(apply_apps_time_shortcut) == "function" then
 		if type(state.apps_time_shortcut) == "table" then
-			try_exact("apply_apps_time_shortcut", apply_apps_time_shortcut,
+			try_exact("metrics", "apply_apps_time_shortcut", apply_apps_time_shortcut,
 				state.apps_time_shortcut.mods, state.apps_time_shortcut.key, false)
 		else
-			try_exact("apply_apps_time_shortcut", apply_apps_time_shortcut, nil, nil, false)
+			try_exact("metrics", "apply_apps_time_shortcut", apply_apps_time_shortcut, nil, nil, false)
 		end
 	end
 	-- Re-enable after a brief warm-up delay: on the very first presses after
@@ -392,8 +472,8 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- active once the tap is stable. 0.1s is enough — the event tap is live
 	-- well before 1s in practice; the original 1.0s was unnecessarily long.
 	DeferredWork.after(0.1, function()
-		if deps._metrics_hk and deps._metrics_hk[1] then try("metrics_hotkey:enable", function() deps._metrics_hk[1]:enable() end) end
-		if deps._apps_time_hk and deps._apps_time_hk[1] then try("apps_time_hotkey:enable", function() deps._apps_time_hk[1]:enable() end) end
+		if deps._metrics_hk and deps._metrics_hk[1] then try("metrics", "metrics_hotkey:enable", function() deps._metrics_hk[1]:enable() end) end
+		if deps._apps_time_hk and deps._apps_time_hk[1] then try("metrics", "apps_time_hotkey:enable", function() deps._apps_time_hk[1]:enable() end) end
 	end, "menu_state.hotkey_warmup")
 
 	-- Sync keylogger engine
@@ -401,25 +481,26 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if kl then
 		_keylogger_start_generation = _keylogger_start_generation + 1
 		local keylogger_generation = _keylogger_start_generation
+		_keylogger_start_pending = false
 		if type(kl.set_options) == "function" then
-			try("keylogger.set_options", kl.set_options, {
+			try("metrics", "keylogger.set_options", kl.set_options, {
 				encrypt     = state.keylogger_encrypt,
 				menubar     = state.keylogger_menubar_wpm,
 				float       = state.keylogger_float_wpm,
 				float_graph = state.keylogger_float_graph,
 			})
 		end
-		if type(kl.set_disabled_apps) == "function" then try("keylogger.set_disabled_apps", kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
+		if type(kl.set_disabled_apps) == "function" then try("metrics", "keylogger.set_disabled_apps", kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
 		if type(kl.set_private_filter_enabled) == "function" then
-			try("keylogger.set_private_filter_enabled", kl.set_private_filter_enabled,
+			try("metrics", "keylogger.set_private_filter_enabled", kl.set_private_filter_enabled,
 				state.keylogger_private_filter_enabled)
 		end
 		if type(kl.set_secure_field_filter_enabled) == "function" then
-			try("keylogger.set_secure_field_filter_enabled", kl.set_secure_field_filter_enabled,
+			try("metrics", "keylogger.set_secure_field_filter_enabled", kl.set_secure_field_filter_enabled,
 				state.keylogger_secure_filter_enabled)
 		end
 		if type(kl.set_system_auth_filter_enabled) == "function" then
-			try("keylogger.set_system_auth_filter_enabled", kl.set_system_auth_filter_enabled,
+			try("metrics", "keylogger.set_system_auth_filter_enabled", kl.set_system_auth_filter_enabled,
 				state.keylogger_system_auth_filter_enabled)
 		end
 		if state.keylogger_enabled then
@@ -429,26 +510,43 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			-- harmless — defer it off the boot critical path so the menubar/UI become
 			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
 			local _shortcuts_ref = core_mods.shortcuts_mod
-			DeferredWork.after(KEYLOGGER_START_DELAY_SEC, function()
+			_keylogger_start_pending = true
+			local scheduling, fired = true, false
+			local function activate()
 				if keylogger_generation ~= _keylogger_start_generation then return end
+				if scheduling then fired = true; return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
-				local start_ok, started = try("keylogger.start", kl.start, _shortcuts_ref)
-				if not start_ok or started ~= true then
-					state.keylogger_enabled = false
-					sync_failed = true
-					local persist_ok, persisted = pcall(save_prefs)
-					if not persist_ok or persisted ~= true then
-						Logger.error(LOG, "Deferred keylogger start failed and its disabled rollback could not be persisted.")
-					end
-					Logger.error(LOG, "Deferred keylogger start was rejected; Metrics remains disabled.")
+				local start_ok, started = try("metrics", "keylogger.start", kl.start, _shortcuts_ref)
+				if start_ok and started ~= true then
+					record_failure("metrics", "keylogger.start", started)
 				end
+				if not start_ok or started ~= true then
+					-- In memory only: persisting OFF here rewrote config.toml whenever
+					-- the engine lacked a permission, so Metrics stayed off for good.
+					local record = demote("metrics", "keylogger_enabled", false,
+						"the deferred keylogger start was refused")
+					if type(deps.on_runtime_demotion) == "function" then
+						local notified, notify_err = pcall(deps.on_runtime_demotion, record)
+						if not notified then
+							Logger.error(LOG, "Deferred Metrics demotion could not be recorded: %s.",
+								tostring(notify_err))
+						end
+					end
+				end
+				_keylogger_start_pending = false
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
-			end, "menu_state.keylogger_start")
+			end
+			local scheduled = DeferredWork.after(KEYLOGGER_START_DELAY_SEC, activate, "menu_state.keylogger_start")
+			scheduling = false
+			if scheduled ~= true then
+				_keylogger_start_generation = _keylogger_start_generation + 1
+				_keylogger_start_pending = false
+			elseif fired then activate() end
 		else
 			if type(kl.stop) == "function" then
-				local stop_ok, stopped = try("keylogger.stop", kl.stop)
+				local stop_ok, stopped = try("metrics", "keylogger.stop", kl.stop)
 				if not stop_ok or stopped ~= true then
 					Logger.error(LOG, "Keylogger is disabled, but native lifecycle cleanup remains pending.")
 				end
@@ -457,93 +555,98 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 	local cipher_ok, TextCipher = pcall(require, "modules.keylogger.text_cipher")
 	if cipher_ok and type(TextCipher) == "table" and type(TextCipher.set_enabled) == "function" then
-		try("keylogger.text_cipher.set_enabled", TextCipher.set_enabled, state.keylogger_encrypt)
+		try("metrics", "keylogger.text_cipher.set_enabled", TextCipher.set_enabled, state.keylogger_encrypt)
 	end
 
 	-- Start/stop engines
 	if keymap then
 		if state.keymap then
 			local _t_km = hs.timer.secondsSinceEpoch()
+			-- ensure_started() clears state.keymap itself on refusal; restore the
+			-- saved ON first so the demotion records what config.toml holds.
+			local saved_keymap = state.keymap
 			if not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
 				"synchronize menu state") then
-				state.keymap = false
+				record_failure("hotstrings", "keymap.start", "refused")
+				state.keymap = saved_keymap
+				demote("hotstrings", "keymap", false, "the typing engine did not start")
 			end
 			Logger.info(LOG, "Keymap engine start: %.1f ms.", (hs.timer.secondsSinceEpoch() - _t_km) * 1000)
 
 			-- Recover from a stale paused state when script control is not paused
 			local paused = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false
 			if not paused and type(keymap.is_processing_paused) == "function" and keymap.is_processing_paused() then
-				if type(keymap.resume_processing) == "function" then try("keymap.resume_processing", keymap.resume_processing) end
+				if type(keymap.resume_processing) == "function" then try("hotstrings", "keymap.resume_processing", keymap.resume_processing) end
 			end
 		else
-			if type(keymap.stop) == "function" then try("keymap.stop", keymap.stop) end
+			if type(keymap.stop) == "function" then try("hotstrings", "keymap.stop", keymap.stop) end
 		end
 	end
 	if gestures then
 		local desired_gestures = state.gestures == true
 		local gesture_lifecycle = desired_gestures
 			and gestures.enable_all or gestures.disable_all
-		local gesture_committed = try_exact(
-			desired_gestures and "gestures.enable_all" or "gestures.disable_all",
-			gesture_lifecycle)
+		local gesture_label = desired_gestures and "gestures.enable_all" or "gestures.disable_all"
+		local gesture_committed = try_exact("gestures", gesture_label, gesture_lifecycle)
 		if gesture_committed ~= true then
 			-- Production enable_all()/disable_all() preserve their previous CoreState
-			-- on refusal. Publish that exact runtime posture back into the mutable
-			-- state and preferences so boot cannot report the rejected desired value.
+			-- on refusal. Show that exact runtime posture in memory only: saving it
+			-- here ran before the boot save transaction existed, and would have
+			-- replaced the user's config.toml value with a runtime refusal.
 			local query_ok, runtime_enabled = pcall(gestures.is_enabled)
 			if query_ok and type(runtime_enabled) == "boolean" then
-				state.gestures = runtime_enabled
-				if type(save_prefs) == "function" then
-					try_exact("save_prefs gesture lifecycle rollback", save_prefs)
+				if runtime_enabled ~= desired_gestures then
+					demote("gestures", "gestures", runtime_enabled, gesture_label .. " was refused")
 				end
 			else
-				sync_failed = true
-				Logger.warn(LOG,
-					"sync_state_to_modules: gestures.is_enabled rollback query failed — %s",
-					tostring(runtime_enabled))
+				unsettled("gestures", "gestures.is_enabled", runtime_enabled)
 			end
 		end
 
 		-- Sync granular settings
 		if type(saved.gesture_modes) == "table" then
 			for slot, mode in pairs(saved.gesture_modes) do
-				if type(gestures.set_mode) == "function" then try("gestures.set_mode", gestures.set_mode, slot, mode) end
+				if type(gestures.set_mode) == "function" then try("gestures", "gestures.set_mode", gestures.set_mode, slot, mode) end
 			end
 		end
 		if type(saved.gesture_sensitivities) == "table" then
 			for slot, sens in pairs(saved.gesture_sensitivities) do
-				if type(gestures.set_sensitivity) == "function" then try("gestures.set_sensitivity", gestures.set_sensitivity, slot, sens) end
+				if type(gestures.set_sensitivity) == "function" then try("gestures", "gestures.set_sensitivity", gestures.set_sensitivity, slot, sens) end
 			end
 		end
 		if saved.gesture_space_wrap ~= nil then
-			if type(gestures.set_space_wrap) == "function" then try("gestures.set_space_wrap", gestures.set_space_wrap, saved.gesture_space_wrap) end
+			if type(gestures.set_space_wrap) == "function" then try("gestures", "gestures.set_space_wrap", gestures.set_space_wrap, saved.gesture_space_wrap) end
 		end
 	end
 	-- Drive shortcuts with binding-only helpers so the script-control eventtap
 	-- (AltGr+Enter/Backspace/Escape) is never destroyed mid-session.
 	-- stop()/start() would kill the tap; pause_bindings/resume_bindings is safe.
+	-- A refused pause or resume can leave one child of the layer live (native
+	-- hotkeys vs keyboard shortcuts), so its posture is never provable here.
 	if core_mods.shortcuts_mod then
-		if state.shortcuts then
-			try_exact("shortcuts.resume_bindings", core_mods.shortcuts_mod.resume_bindings)
-		else
-			try_exact("shortcuts.pause_bindings", core_mods.shortcuts_mod.pause_bindings)
+		local shortcut_label = state.shortcuts and "shortcuts.resume_bindings"
+			or "shortcuts.pause_bindings"
+		local shortcut_lifecycle = state.shortcuts and core_mods.shortcuts_mod.resume_bindings
+			or core_mods.shortcuts_mod.pause_bindings
+		if not try_exact("shortcuts", shortcut_label, shortcut_lifecycle) then
+			unsettled("shortcuts", shortcut_label, "the layer may be partially applied")
 		end
 	end
 	if core_mods.shortcuts_mod and type(state.script_control_shortcuts) == "table"
 		and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
 		for keyname, action in pairs(state.script_control_shortcuts) do
-			try("shortcuts.set_shortcut_action", core_mods.shortcuts_mod.set_shortcut_action,
+			try("shortcuts", "shortcuts.set_shortcut_action", core_mods.shortcuts_mod.set_shortcut_action,
 				keyname, action)
 		end
 	end
 	if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
-		try("shortcuts.set_chatgpt_url", core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
+		try("shortcuts", "shortcuts.set_chatgpt_url", core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
 	end
 	if core_mods.dyn_hot_mod then
 		if state.personal_info then
-			if type(core_mods.dyn_hot_mod.enable) == "function" then try("dyn_hot.enable", core_mods.dyn_hot_mod.enable) end
+			if type(core_mods.dyn_hot_mod.enable) == "function" then try("personal_info", "dyn_hot.enable", core_mods.dyn_hot_mod.enable) end
 		else
-			if type(core_mods.dyn_hot_mod.disable) == "function" then try("dyn_hot.disable", core_mods.dyn_hot_mod.disable) end
+			if type(core_mods.dyn_hot_mod.disable) == "function" then try("personal_info", "dyn_hot.disable", core_mods.dyn_hot_mod.disable) end
 		end
 	end
 
@@ -562,9 +665,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		local _n_enable, _n_disable = 0, 0
 		for name, enabled in pairs(state.hotstrings) do
 			if enabled then
-				if type(keymap.enable_group) == "function" then try("keymap.enable_group " .. name, keymap.enable_group, name); _n_enable = _n_enable + 1 end
+				if type(keymap.enable_group) == "function" then try("hotstrings", "keymap.enable_group " .. name, keymap.enable_group, name); _n_enable = _n_enable + 1 end
 			else
-				if type(keymap.disable_group) == "function" then try("keymap.disable_group " .. name, keymap.disable_group, name); _n_disable = _n_disable + 1 end
+				if type(keymap.disable_group) == "function" then try("hotstrings", "keymap.disable_group " .. name, keymap.disable_group, name); _n_disable = _n_disable + 1 end
 			end
 		end
 		-- Timing surfaced so a regression to the disable+enable round-trip (which
@@ -574,15 +677,27 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			_n_enable, _n_disable, (hs.timer.secondsSinceEpoch() - _t_sync) * 1000)
 	end
 	if core_mods.shortcuts_mod and type(saved) == "table" and type(saved.shortcut_keys) == "table" then
-		if type(core_mods.shortcuts_mod.enable) == "function" and type(core_mods.shortcuts_mod.disable) == "function" then
-			for id, enabled in pairs(saved.shortcut_keys) do
-				if enabled then try("shortcuts.enable", core_mods.shortcuts_mod.enable, id) else try("shortcuts.disable", core_mods.shortcuts_mod.disable, id) end
+		local shortcuts = core_mods.shortcuts_mod
+		for id, enabled in pairs(saved.shortcut_keys) do
+			local apply = enabled and shortcuts.enable or shortcuts.disable
+			local label = (enabled and "shortcuts.enable " or "shortcuts.disable ") .. id
+			if not try_exact("shortcuts", label, apply, id) then
+				local query_ok, actual = pcall(shortcuts.is_enabled, id)
+				if query_ok and type(actual) == "boolean" then
+					if actual ~= enabled then
+						report.demotions[#report.demotions + 1] = {
+							feature = "shortcuts", key = "shortcut_keys", subkey = id,
+							persisted = enabled, demoted = actual,
+						}
+					end
+				else
+					unsettled("shortcuts", "shortcuts.is_enabled " .. id, actual)
+				end
 			end
 		end
 	end
 
-	if config_absent and save_prefs() ~= true then return false end
-	return not sync_failed
+	return #report.failures == 0 and #report.unsettled == 0, report
 end
 
 return M

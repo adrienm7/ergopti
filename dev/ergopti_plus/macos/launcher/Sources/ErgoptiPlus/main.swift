@@ -215,11 +215,19 @@ func writeLauncherLogData(
 }
 
 enum LauncherLog {
-	// Standard macOS per-app log location; readable by the user without special
-	// permissions and rotated by nothing — kept deliberately tiny (one line per
-	// launch event) so unbounded growth is not a practical concern.
-	private static let logDirectory = NSHomeDirectory() + "/Library/Logs/ErgoptiPlus"
-	private static let logFileName = "launcher.log"
+	// Standard macOS per-app log location (~/Library/Logs/ergopti_plus, from the
+	// shared application-folders registry), readable by the user without
+	// special permissions and the default folder of the Lua logs too. It is
+	// written before any configuration is read, so a LogsDirPath override never
+	// moves it. Every launch, every boot stage until the native logger commits
+	// and every slow native-logger reply append here, so the file is bounded:
+	// past maximumFileBytes it becomes launcher.1.log, which replaces the
+	// previous rotation.
+	private static let logDirectory = NSHomeDirectory() + "/" + kMacOSLogsHomeRelativePath
+	private static let logFileName = kLauncherLogFileName
+	private static let rotatedFileName = "launcher.1.log"
+	/// Size past which launcher.log is rotated before the next append.
+	static let maximumFileBytes: off_t = 1_048_576
 	private static let queue = DispatchQueue(label: "com.ergoptiplus.launcher-log")
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
 	private static let lockRetryMicroseconds: useconds_t = 1_000
@@ -230,7 +238,7 @@ enum LauncherLog {
 
 	/// Per-launch fatal report written by Lua before it exits (see
 	/// EmbeddedFatalReport.swift); kept beside launcher.log for the user.
-	static var fatalReportPath: String { return logDirectory + "/hammerspoon-fatal.txt" }
+	static var fatalReportPath: String { return logDirectory + "/" + kFatalReportFileName }
 
 	private static let dateFormatter: DateFormatter = {
 		let f = DateFormatter()
@@ -238,7 +246,7 @@ enum LauncherLog {
 		return f
 	}()
 
-	/// Appends one timestamped line to ~/Library/Logs/ErgoptiPlus/launcher.log.
+	/// Appends one timestamped line to ~/Library/Logs/ergopti_plus/launcher.log.
 	/// Best-effort: a logging failure must never prevent the launcher from
 	/// proceeding, so every step here is wrapped defensively.
 	static func write(_ message: String) {
@@ -258,7 +266,8 @@ enum LauncherLog {
 		_ message: String,
 		directoryPath: String,
 		beforeLock: (() -> Void)? = nil,
-		onFailure: ((String, Int32) -> Void)? = nil
+		onFailure: ((String, Int32) -> Void)? = nil,
+		maximumBytes: off_t = LauncherLog.maximumFileBytes
 	) -> Bool {
 		guard isValidTestLogDirectory(directoryPath) else {
 			onFailure?("validate-test-directory", EINVAL)
@@ -268,6 +277,7 @@ enum LauncherLog {
 			writeUnlocked(
 				message,
 				directoryPath: directoryPath,
+				maximumBytes: maximumBytes,
 				beforeLock: beforeLock,
 				onFailure: onFailure
 			)
@@ -400,6 +410,7 @@ enum LauncherLog {
 	private static func writeUnlocked(
 		_ message: String,
 		directoryPath: String,
+		maximumBytes: off_t = LauncherLog.maximumFileBytes,
 		beforeLock: (() -> Void)? = nil,
 		onFailure: ((String, Int32) -> Void)? = nil
 	) -> Bool {
@@ -410,6 +421,29 @@ enum LauncherLog {
 		let directoryDescriptor = openLogDirectory(directoryPath, onFailure: onFailure)
 		guard directoryDescriptor >= 0 else { return false }
 		defer { Darwin.close(directoryDescriptor) }
+		return appendRecord(
+			data,
+			directoryDescriptor: directoryDescriptor,
+			maximumBytes: maximumBytes,
+			mayRotate: true,
+			beforeLock: beforeLock,
+			onFailure: onFailure
+		)
+	}
+
+	/// Appends one record under the file lock. When this writer holds the file
+	/// the name still points to and the record would take it past the cap, the
+	/// file is first renamed to launcher.1.log and the record goes to a fresh
+	/// launcher.log. A writer that waited behind a rotation finds its inode no
+	/// longer named launcher.log and appends to the current file instead.
+	private static func appendRecord(
+		_ data: Data,
+		directoryDescriptor: Int32,
+		maximumBytes: off_t,
+		mayRotate: Bool,
+		beforeLock: (() -> Void)?,
+		onFailure: ((String, Int32) -> Void)?
+	) -> Bool {
 		let logDescriptor = openLogFile(
 			directoryDescriptor: directoryDescriptor,
 			onFailure: onFailure
@@ -422,6 +456,42 @@ enum LauncherLog {
 			return false
 		}
 		defer { _ = ergoptiFlock(logDescriptor, LOCK_UN) }
+
+		if mayRotate {
+			var held = stat()
+			var named = stat()
+			let heldKnown = Darwin.fstat(logDescriptor, &held) == 0
+			let namedKnown = logFileName.withCString { name in
+				Darwin.fstatat(directoryDescriptor, name, &named, AT_SYMLINK_NOFOLLOW)
+			} == 0
+			let holdsNamedFile = heldKnown && namedKnown
+				&& held.st_dev == named.st_dev && held.st_ino == named.st_ino
+			let appendToFreshFile: Bool
+			if !holdsNamedFile {
+				appendToFreshFile = true
+			} else if held.st_size > 0 && held.st_size + off_t(data.count) > maximumBytes {
+				appendToFreshFile = logFileName.withCString { current in
+					rotatedFileName.withCString { previous in
+						Darwin.renameat(directoryDescriptor, current, directoryDescriptor, previous)
+					}
+				} == 0
+				// A failed rename keeps the line: it matters more than the size bound.
+				if !appendToFreshFile { onFailure?("rotate-file", errno) }
+			} else {
+				appendToFreshFile = false
+			}
+			if appendToFreshFile {
+				return appendRecord(
+					data,
+					directoryDescriptor: directoryDescriptor,
+					maximumBytes: maximumBytes,
+					mayRotate: false,
+					beforeLock: nil,
+					onFailure: onFailure
+				)
+			}
+		}
+
 		let written = writeLauncherLogData(data, descriptor: logDescriptor)
 		if !written { onFailure?("write-file", errno) }
 		return written
@@ -451,6 +521,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updater: SPUUpdater?
+	// Retained here: Sparkle keeps its delegate weakly.
+	private let updateChannelFeed = UpdateChannelFeed()
 	private let updaterCommandRouter = UpdaterCommandRouter()
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let applicationLauncher: (
@@ -464,6 +536,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let loggerWorkerFactory: () -> LoggerDatagramServing?
 	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
 	private let fatalReportStore: EmbeddedFatalReportStore
+	private let childActivity: EmbeddedChildActivity
 	private let guardianRegistrationQueue = DispatchQueue(
 		label: "com.ergoptiplus.remap-guardian.registration",
 		qos: .userInitiated
@@ -487,6 +560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - loggerWorkerFactory: Binds the native loopback logger before child start.
 	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
 	///   - fatalReportStore: Per-launch report the Lua runtime writes before a fatal exit.
+	///   - childActivity: Keeps App Nap off the launcher while its child runs.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -511,7 +585,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		processExitMonitorFactory: @escaping EmbeddedProcessExitMonitorFactory =
 			makeEmbeddedProcessExitMonitor,
 		fatalReportStore: EmbeddedFatalReportStore =
-			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath)
+			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath),
+		childActivity: EmbeddedChildActivity = EmbeddedChildActivity()
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -521,6 +596,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.loggerWorkerFactory = loggerWorkerFactory
 		self.processExitMonitorFactory = processExitMonitorFactory
 		self.fatalReportStore = fatalReportStore
+		self.childActivity = childActivity
 		super.init()
 	}
 
@@ -538,12 +614,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
 
-		// Wire Sparkle. Automatic checks (Info.plist SUEnableAutomaticChecks /
-		// SUScheduledCheckInterval) only fetch the appcast; a download must wait
-		// for the user's install choice, which the consent policy proves on the
-		// live updater before it may start. A refusal leaves updates off rather
-		// than letting Sparkle download in the background. The user driver
-		// speaks the shared locale catalog in the driver's chosen language.
+		// Lua owns the check cadence; Sparkle handles authenticated installation.
+		// Prove the consent policy before starting the localized user driver.
+		// The feed delegate serves the channel selected in the menu.
 		let userDriver = CatalogUpdateUserDriver(
 			textsProvider: { LauncherLocalization.load().flatMap(UpdatePromptTexts.init(localization:)) },
 			presenter: UpdatePromptPanel(),
@@ -554,15 +627,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			hostBundle: Bundle.main,
 			applicationBundle: Bundle.main,
 			userDriver: userDriver,
-			delegate: nil
+			delegate: updateChannelFeed
 		)
+		// A persisted Sparkle preference overrides the bundle's default.
+		sparkle.automaticallyChecksForUpdates = false
 		if let refusal = UpdateConsentPolicy.refusal(for: sparkle) {
 			LauncherLog.write("ERROR: Sparkle updater not started: \(refusal)")
 		} else {
 			do {
 				try sparkle.start()
 				updater = sparkle
-				updaterCommandRouter.bind(sparkle)
+				updaterCommandRouter.bind(sparkle, channelSelector: updateChannelFeed)
 				LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
 			} catch {
 				let failure = error as NSError
@@ -602,10 +677,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		startManagedHammerspoon(at: hsBinary, launcherPath: launcherPath)
 	}
 
-	/// Routes the private menu command to the retained Sparkle controller.
+	/// Routes the private menu commands to the retained Sparkle controller.
 	func application(_ application: NSApplication, open urls: [URL]) {
 		for url in urls where updaterCommandRouter.route(url) {
-			LauncherLog.write("accepted native updater check command")
+			LauncherLog.write("accepted native updater command \(url.path)")
 		}
 	}
 
@@ -652,6 +727,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// teardown will eventually run the worker's deinitializer.
 		loggerWorker?.stop()
 		loggerWorker = nil
+		childActivity.release()
 	}
 
 
@@ -767,6 +843,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		LauncherLog.write(
 			"launcher stage: native logger worker bound on loopback port \(activeLoggerWorker.endpoint.port)"
 		)
+		// From the configure handshake on, a late ACK counts against the Lua
+		// transport's stall budget: keep App Nap off until the child is gone.
+		childActivity.hold()
 		hsLaunchContext = (binaryPath, remapGuardianStatus)
 		hsLogFolderRefusal = nil
 		activeLoggerWorker.setConfigureRefusalHandler { [weak self] failure in
@@ -814,6 +893,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		guard let applicationURL = embeddedApplicationBundleURL(binaryPath: binaryPath) else {
 			loggerWorker?.stop()
 			loggerWorker = nil
+			childActivity.release()
 			fail("Embedded Hammerspoon application bundle path is invalid.")
 			return
 		}
@@ -827,6 +907,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 				guard let application else {
 					self.loggerWorker?.stop()
 					self.loggerWorker = nil
+					self.childActivity.release()
 					self.fail(
 						"Failed to launch embedded Hammerspoon: "
 							+ (error?.localizedDescription ?? "Launch Services returned no application.")
@@ -940,6 +1021,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		_ exit: EmbeddedProcessExit,
 		guardianStatus: RemapGuardianRegistrationStatus
 	) {
+		// The child is gone; a bootstrap retry below holds the activity again.
+		childActivity.release()
 		guard !applicationIsTerminating else {
 			applicationTerminator(self)
 			return
@@ -958,13 +1041,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// handshake is also what a fatal Lua abort looks like, and treating it as
 		// a Quit made v0.0.0-dev.128 vanish with no dialog and no log.
 		if let report = fatalReportStore.read() {
+			let localization = LauncherLocalization.load()
 			fail(
 				report.diagnostic,
 				alertText: embeddedFatalAlertText(
 					report,
 					logPath: LauncherLog.filePath,
-					localization: LauncherLocalization.load()
-				)
+					localization: localization
+				),
+				title: embeddedFatalAlertTitle(report, localization: localization)
 			)
 			return
 		}
@@ -1028,7 +1113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// catalog. When that catalog is itself unreadable (a damaged bundle), the
 	// English developer diagnostic is shown instead: the documented pre-i18n
 	// fatal-modal exception.
-	private func fail(_ message: String, alertText: String? = nil) {
+	private func fail(_ message: String, alertText: String? = nil, title: String? = nil) {
 		if let fatalReporter {
 			fatalReporter(message)
 			return
@@ -1038,7 +1123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		let localization = LauncherLocalization.load()
 		let alert = NSAlert()
-		alert.messageText = localization?.text("launcher.fatal.title") ?? "ErgoptiPlus could not start"
+		// A runtime stop brings its own title; every other failure is a failed start.
+		alert.messageText = title ?? localization?.text("launcher.fatal.title") ?? kFatalBootTitleFallback
 		alert.informativeText = alertText ?? message
 		alert.alertStyle = .critical
 		alert.addButton(withTitle: localization?.text("launcher.fatal.quit") ?? "Quit")

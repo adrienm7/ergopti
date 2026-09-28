@@ -50,9 +50,8 @@ Test("crash_reporter: CrashReport_Save requires a complete durable write (AHK-08
 	_CRUN_UsesCompleteDurableWrite)
 
 _CRUN_WriterRefusalCannotPublishSuccess() {
-	global _ConfigDir, _CrashReporter_Subdir
-	SavedConfigDir := _ConfigDir
-	SavedSubdir := _CrashReporter_Subdir
+	global _LogsDir
+	SavedLogsDir := _LogsDir
 	Root := A_Temp . "\ergopti_crash_report_refusal_" . A_TickCount . "\"
 	WriterCalls := 0
 	ObservedPath := ""
@@ -64,8 +63,8 @@ _CRUN_WriterRefusalCannotPublishSuccess() {
 	}
 
 	try {
-		_ConfigDir := Root
-		_CrashReporter_Subdir := "reports"
+		; The logger's resolver names the crash-reports folder inside the logs folder.
+		_LogsDir := Root
 		Result := CrashReport_Save(Map(
 			"timestamp", "2026-08-28T20:30:00Z",
 			"driver", "autohotkey"), _RefuseWriter)
@@ -73,9 +72,10 @@ _CRUN_WriterRefusalCannotPublishSuccess() {
 			"a refused durable writer must make CrashReport_Save fail instead of returning a success path")
 		Assert(ObservedPath != "" && !FileExist(ObservedPath),
 			"a failed crash report must leave no partial JSON artifact behind")
+		Assert(InStr(ObservedPath, Root . "crash_reports\") == 1,
+			"the report must be written in the crash_reports folder inside the logs folder")
 	} finally {
-		_ConfigDir := SavedConfigDir
-		_CrashReporter_Subdir := SavedSubdir
+		_LogsDir := SavedLogsDir
 		try DirDelete(Root, true)
 	}
 }

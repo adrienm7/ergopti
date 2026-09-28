@@ -4,7 +4,8 @@
 --- MODULE: Keyboard Input Sources
 --- DESCRIPTION:
 --- Enumerates and switches the macOS keyboard input sources (the live HIToolbox
---- list), maps Ergopti variants to their TIS identifiers, and enables / selects a
+--- list), maps the layouts an installed bundle declares to their TIS identifiers,
+--- adds or removes any installed .keylayout in the enabled list, and selects a
 --- source via isolated osascript. Extracted from ui/menu/menu_keyboard_layout.lua
 --- (audit F4) — the ~660-line input-source layer that the submenu builder drives.
 ---
@@ -17,7 +18,7 @@
 ---    stall the Hammerspoon run loop.
 ---
 --- Owns the active-layout probe cache; depends on layout_install for on-disk
---- bundle detection (highest_installed / path_exists) and the install dirs.
+--- bundle detection (highest_installed / bundle_variants) and the install dirs.
 --- ==============================================================================
 
 local hs      = hs
@@ -32,27 +33,9 @@ local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
 local highest_installed  = install.highest_installed
-local path_exists        = install.path_exists
 local version_gt         = install.version_gt
 local USER_LAYOUTS_DIR   = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR = install.SYSTEM_LAYOUTS_DIR
-
--- All Ergopti variants packaged in the bundle. Used to expose a submenu with
--- a one-click TISEnableInputSource entry for each. The order shown in the
--- menu mirrors the natural progression: base → ANSI → plus → plus ANSI →
--- plus_plus → plus_plus ANSI.
--- TIS IDs use the `com.apple.keyboardlayout.*` namespace (third-party convention).
--- The shorter `com.apple.keylayout.*` namespace is reserved by macOS for system
--- input sources; using it for a third-party bundle causes the OS to silently
--- refuse to register the bundle, so it never appears in the input-source list.
--- Note: Ergopti++ variants are intentionally absent here — they are not
--- included in the current bundle and must not be offered to the user.
-local ERGOPTI_VARIANTS = {
-	{ id = "com.apple.keyboardlayout.ergopti",           label = "Ergopti",      suffix = ""          },
-	{ id = "com.apple.keyboardlayout.ergopti.ansi",      label = "Ergopti ANSI", suffix = "_ansi"     },
-	{ id = "com.apple.keyboardlayout.ergopti.plus",      label = "Ergopti+",     suffix = "_plus"     },
-	{ id = "com.apple.keyboardlayout.ergopti.plus.ansi", label = "Ergopti+ ANSI", suffix = "_plus_ansi" },
-}
 
 -- Throttle window for the async active-layout refresh (seconds). Bounds python3
 -- spawns even if the user reopens the menu rapidly.
@@ -746,13 +729,10 @@ end run
 	end)
 end
 
---- Returns a set of TIS IDs for Ergopti variants currently present in
---- AppleEnabledInputSources, read directly from HIToolbox via `defaults export`.
---- Maps KeyboardLayout Name (internal name) back to TIS IDs via ERGOPTI_VARIANTS.
---- This bypasses the TIS osascript path that fails on macOS Sequoia.
---- @return table Set of TIS IDs, e.g. { ["com.apple.keyboardlayout.ergopti.plus"] = true }.
 --- Builds a mapping from KeyboardLayout Name (internal HIToolbox name) to stable TIS ID
---- for every variant in the currently installed bundle. Returns nil if no bundle is installed.
+--- for every layout the installed bundle declares in its Info.plist (the system scope
+--- first). Returns nil if no bundle is installed. The bundle itself says what it
+--- installs, so no list of variants is written here.
 --- Example: { ["Ergopti_v2_2_2_plus"] = "com.apple.keyboardlayout.ergopti.plus", ... }
 --- @return table|nil
 function build_kl_name_to_tis_id()
@@ -761,72 +741,42 @@ function build_kl_name_to_tis_id()
 	local sb      = sb_sys or sb_user
 	local sb_dir  = sb_sys and SYSTEM_LAYOUTS_DIR or (sb_user and USER_LAYOUTS_DIR) or nil
 	if not sb or not sb_dir then return nil end
-	local installed_bundle = sb.name:gsub("%.bundle$", ""):gsub("%.", "_")
 	local bundle_path = sb_dir:gsub("[/\\]$", "") .. "/" .. sb.name
 	local map = {}
-	for _, var in ipairs(ERGOPTI_VARIANTS) do
-		local internal   = installed_bundle .. (var.suffix or "")
-		local keylayout  = bundle_path .. "/Contents/Resources/" .. internal .. ".keylayout"
-		if path_exists(keylayout) then
-			map[internal] = var.id
-		end
+	for _, variant in ipairs(install.bundle_variants(bundle_path)) do
+		map[variant.name] = variant.tis_id
 	end
 	return map
 end
 
 
---- Adds the given TIS input source to the user's enabled-list via
---- `defaults write com.apple.HIToolbox`, then restarts SystemUIServer so
---- the change takes effect immediately.
----
---- The Carbon TIS ObjC-bridge approach (TISCreateInputSourceList +
---- TISEnableInputSource called from osascript) was tried extensively but
---- crashes silently on macOS Sequoia: NSMutableDictionary bridged to
---- CFDictionaryRef causes osascript to exit without writing any output,
---- leaving the Lua caller with status=<no-output>. The `defaults write`
---- approach is what Karabiner-Elements and other third-party tools use and
---- is known to work reliably on macOS 12–15.
----
---- The AppleEnabledInputSources preference is an array of dicts. We read
---- the current list, check whether the target ID is already present, append
---- it if not, and write back.  The whole operation is a single Python 3
---- one-liner that ships with macOS and needs no extra dependencies.
---- @param raw_id string TISInputSourceID, e.g. "com.apple.keyboardlayout.ergopti.plus".
---- @param label string Human-readable label used in log messages.
---- @param on_done function|nil fn(ok, output, reason).
---- @return boolean accepted True only when the child start commits.
-local function enable_and_select_source_async(raw_id, label, bundle_path, internal_name, on_done)
-	if type(raw_id) ~= "string" or raw_id == "" then
-		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_id")
-		return false
-	end
-	if type(bundle_path) ~= "string" or bundle_path == "" then
-		Logger.error(LOG, "enable_and_select_source_async: bundle_path missing for '%s'.", raw_id)
-		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_bundle")
-		return false
-	end
-	if type(internal_name) ~= "string" or internal_name == "" then
-		Logger.error(LOG, "enable_and_select_source_async: internal_name missing for '%s'.", raw_id)
-		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_name")
-		return false
-	end
-	local display = (type(label) == "string" and label ~= "") and label or raw_id
-
-	-- bundle_path: absolute path to the installed .bundle directory
-	-- internal_name: the keylayout filename base (e.g. "Ergopti_v2_2_2_plus")
-	-- The correct HIToolbox entry format matches macOS built-in layouts (e.g. French):
-	--   InputSourceKind  → "Keyboard Layout"
-	--   KeyboardLayout ID   → integer id= from the .keylayout XML (no Bundle ID needed)
-	--   KeyboardLayout Name → name= from the .keylayout XML (= internal_name)
-	-- Adding a Bundle ID or using a string for KeyboardLayout ID causes macOS to silently
-	-- ignore the entry at next login / SystemUIServer restart.
-	local py_script = [[
+-- Edits the user's enabled input-source list (AppleEnabledInputSources of
+-- com.apple.HIToolbox) through `defaults export` / `defaults import`, then
+-- restarts SystemUIServer so the change takes effect immediately.
+--
+-- The Carbon TIS ObjC-bridge approach (TISCreateInputSourceList +
+-- TISEnableInputSource called from osascript) was tried extensively but
+-- crashes silently on macOS Sequoia: NSMutableDictionary bridged to
+-- CFDictionaryRef causes osascript to exit without writing any output,
+-- leaving the Lua caller with status=<no-output>. The `defaults write`
+-- approach is what Karabiner-Elements and other third-party tools use and
+-- is known to work reliably on macOS 12–15.
+--
+-- argv: mode ("enable" with the .keylayout path, "disable" with the
+-- KeyboardLayout Name), target, and the global deadline in seconds.
+-- The entry format matches macOS built-in layouts (e.g. French):
+--   InputSourceKind     → "Keyboard Layout"
+--   KeyboardLayout ID   → integer id= from the .keylayout XML (no Bundle ID needed)
+--   KeyboardLayout Name → name= from the .keylayout XML
+-- Adding a Bundle ID or using a string for KeyboardLayout ID causes macOS to silently
+-- ignore the entry at next login / SystemUIServer restart.
+local ENABLED_LIST_SCRIPT = [[
 import subprocess, sys, plistlib, re, os, signal, time
 
 DOMAIN        = "com.apple.HIToolbox"
 KEY           = "AppleEnabledInputSources"
-BUNDLE_PATH   = sys.argv[1]
-INTERNAL_NAME = sys.argv[2]
+MODE          = sys.argv[1]
+TARGET        = sys.argv[2]
 CHILD_TIMEOUT = float(sys.argv[3])
 DEADLINE      = time.monotonic() + CHILD_TIMEOUT
 ACTIVE_CHILD  = None
@@ -876,17 +826,23 @@ def run_child(args, capture_stdout=False):
         raise subprocess.CalledProcessError(child.returncode, args)
     return stdout
 
-# Extract KeyboardLayout ID (integer) from the .keylayout XML
-keylayout_file = os.path.join(BUNDLE_PATH, "Contents", "Resources", INTERNAL_NAME + ".keylayout")
-try:
-    with open(keylayout_file, "r", encoding="utf-8") as f:
-        content = f.read(4096)
-    m = re.search(r'<keyboard\b[^>]*\bid=["\']?(-?\d+)["\']?', content)
-    if not m:
-        print("PARSE_ERR:no id= in " + keylayout_file); sys.exit(1)
-    kl_id = int(m.group(1))
-except Exception as e:
-    print("PARSE_ERR:" + str(e)); sys.exit(1)
+if MODE == "enable":
+    # KeyboardLayout ID (integer) and Name, both from the .keylayout XML itself.
+    try:
+        with open(TARGET, "r", encoding="utf-8") as f:
+            content = f.read(4096)
+        m = re.search(r'<keyboard\b[^>]*\bid=["\']?(-?\d+)["\']?', content)
+        n = re.search(r'<keyboard\b[^>]*\bname="([^"]+)"', content)
+        if not m or not n:
+            print("PARSE_ERR:no id= or name= in " + TARGET); sys.exit(1)
+        kl_id = int(m.group(1))
+        INTERNAL_NAME = n.group(1)
+    except Exception as e:
+        print("PARSE_ERR:" + str(e)); sys.exit(1)
+elif MODE == "disable":
+    INTERNAL_NAME = TARGET
+else:
+    print("ARG_ERR:unknown mode " + MODE); sys.exit(2)
 
 try:
     raw = run_child(["defaults", "export", DOMAIN, "-"], capture_stdout=True)
@@ -896,26 +852,29 @@ except Exception as e:
 
 sources = prefs.get(KEY, [])
 
-# Remove only entries that are stale for THIS variant:
-#   - any Ergopti entry that still has a Bundle ID (wrong legacy format), OR
-#   - the exact same KeyboardLayout Name we are about to add (dedup).
-# Other Ergopti variants that are already clean are left untouched.
-def is_stale_entry(s):
-    bid  = s.get("Bundle ID", "")
-    name = s.get("KeyboardLayout Name", "")
-    if "ergopti" in bid.lower(): return True
-    if name == INTERNAL_NAME: return True
-    return False
+if MODE == "enable":
+    # Remove only entries that are stale for THIS layout:
+    #   - any Ergopti entry that still has a Bundle ID (wrong legacy format), OR
+    #   - the exact same KeyboardLayout Name we are about to add (dedup).
+    # Other layouts already listed are left untouched.
+    def is_stale_entry(s):
+        bid  = s.get("Bundle ID", "")
+        name = s.get("KeyboardLayout Name", "")
+        if "ergopti" in bid.lower(): return True
+        if name == INTERNAL_NAME: return True
+        return False
 
-sources = [s for s in sources if not is_stale_entry(s)]
-
-# Format mirrors macOS built-in keyboard layout entries (e.g. French):
-# no Bundle ID, KeyboardLayout ID is a native integer in the plist.
-sources.append({
-    "InputSourceKind":     "Keyboard Layout",
-    "KeyboardLayout ID":   kl_id,
-    "KeyboardLayout Name": INTERNAL_NAME,
-})
+    sources = [s for s in sources if not is_stale_entry(s)]
+    sources.append({
+        "InputSourceKind":     "Keyboard Layout",
+        "KeyboardLayout ID":   kl_id,
+        "KeyboardLayout Name": INTERNAL_NAME,
+    })
+else:
+    kept = [s for s in sources if s.get("KeyboardLayout Name", "") != INTERNAL_NAME]
+    if len(kept) == len(sources):
+        print("ABSENT"); sys.exit(0)
+    sources = kept
 prefs[KEY] = sources
 
 plist_bytes = plistlib.dumps(prefs, fmt=plistlib.FMT_XML)
@@ -936,25 +895,62 @@ run_child(["launchctl", "kickstart", "-k", "user/" + uid + "/com.apple.SystemUIS
 print("OK")
 ]]
 
+--- Runs ENABLED_LIST_SCRIPT under the one deadline-bounded mutation owner.
+--- @param mode string "enable" or "disable".
+--- @param target string The .keylayout path (enable) or KeyboardLayout Name (disable).
+--- @param display string Name used in log messages.
+--- @param accepted table Outputs that mean success, e.g. { OK = true }.
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True only when the child start commits.
+local function edit_enabled_list_async(mode, target, display, accepted, on_done)
+	local label = mode == "enable" and "enable_source" or "disable_source"
 	local nested_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
-	return run_bounded_process("Enable keyboard input source", "/usr/bin/python3",
-		{ "-c", py_script, bundle_path, internal_name, tostring(nested_timeout) },
+	return run_bounded_process("Edit enabled keyboard input sources", "/usr/bin/python3",
+		{ "-c", ENABLED_LIST_SCRIPT, mode, target, tostring(nested_timeout) },
 		function(process_ok, out, reason)
 			local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
-			local enabled = process_ok == true
-				and (out_text == "OK" or out_text == "ALREADY_PRESENT")
-			if enabled then
+			if process_ok == true and accepted[out_text] then
 				invalidate_active_layouts_cache()
-				Logger.success(LOG, "Input source '%s' (%s) added to enabled list (%s).",
-					display, raw_id, out_text)
-				invoke_mutation_done("enable_source.done", on_done, true, out_text, nil)
+				Logger.success(LOG, "Input source '%s' %sd (%s).", display, mode, out_text)
+				invoke_mutation_done(label .. ".done", on_done, true, out_text, nil)
 				return
 			end
 			local failure_reason = reason or "invalid_output"
-			Logger.warn(LOG, "Failed to add '%s' (%s) — reason=%s.",
-				display, raw_id, failure_reason)
-			invoke_mutation_done("enable_source.done", on_done, false, out_text, failure_reason)
+			Logger.warn(LOG, "Failed to %s '%s' — reason=%s.", mode, display, failure_reason)
+			invoke_mutation_done(label .. ".done", on_done, false, out_text, failure_reason)
 		end)
+end
+
+--- Adds an installed .keylayout to the user's enabled input sources. Its
+--- KeyboardLayout ID and Name are read from the file, so any layout works,
+--- whether it sits in a bundle or on its own in ~/Library/Keyboard Layouts.
+--- @param keylayout_path string Absolute path of the installed .keylayout.
+--- @param label string Human-readable label used in log messages.
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True only when the child start commits.
+local function enable_keylayout_source_async(keylayout_path, label, on_done)
+	if type(keylayout_path) ~= "string" or not keylayout_path:match("%.keylayout$") then
+		Logger.error(LOG, "enable_keylayout_source_async: '%s' is not a .keylayout path.", tostring(keylayout_path))
+		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_path")
+		return false
+	end
+	local display = (type(label) == "string" and label ~= "") and label or keylayout_path
+	return edit_enabled_list_async("enable", keylayout_path, display, { OK = true, ALREADY_PRESENT = true }, on_done)
+end
+
+--- Removes a keyboard layout from the user's enabled input sources. A layout
+--- that is not listed is already removed.
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param label string Human-readable label used in log messages.
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True only when the child start commits.
+local function disable_keylayout_source_async(keyboard_name, label, on_done)
+	if type(keyboard_name) ~= "string" or keyboard_name == "" then
+		invoke_mutation_done("disable_source.reject", on_done, false, nil, "invalid_name")
+		return false
+	end
+	local display = (type(label) == "string" and label ~= "") and label or keyboard_name
+	return edit_enabled_list_async("disable", keyboard_name, display, { OK = true, ABSENT = true }, on_done)
 end
 
 --- Returns true if the given layout name looks like a legacy versioned Ergopti
@@ -1132,7 +1128,6 @@ end
 
 
 return {
-	ERGOPTI_VARIANTS              = ERGOPTI_VARIANTS,
 	extract_ergopti_version       = extract_ergopti_version,
 	format_ergopti_display        = format_ergopti_display,
 	parse_active_layouts          = parse_active_layouts,
@@ -1140,7 +1135,8 @@ return {
 	refresh_active_layouts_async  = refresh_active_layouts_async,
 	list_active_keyboard_layouts  = list_active_keyboard_layouts,
 	set_input_source_async        = set_input_source_async,
-	enable_and_select_source_async = enable_and_select_source_async,
+	enable_keylayout_source_async = enable_keylayout_source_async,
+	disable_keylayout_source_async = disable_keylayout_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,
 	upgrade_active_list_async     = upgrade_active_list_async,

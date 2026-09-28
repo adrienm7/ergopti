@@ -56,8 +56,8 @@ helpers.describe("shortcuts/keyboard_shortcuts.lua: double-start guard (shortcut
 
 	helpers.it("M.start() checks _started before rebinding hotkeys", function()
 		local src = read_source("local function load_assignments") -- modules/shortcuts/keyboard_shortcuts.lua
-		local start_pos = src:find("function M.start()", 1, true)
-		local stop_pos = start_pos and src:find("\nfunction M.stop()", start_pos, true) or nil
+		local start_pos = src:find("function%s+M%.start%s*%(")
+		local stop_pos = start_pos and src:find("\nfunction%s+M%.stop%s*%(", start_pos) or nil
 		helpers.assert_true(start_pos ~= nil and stop_pos ~= nil,
 			"keyboard_shortcuts must retain bounded start and stop lifecycle methods")
 		local start_body = src:sub(start_pos, stop_pos)

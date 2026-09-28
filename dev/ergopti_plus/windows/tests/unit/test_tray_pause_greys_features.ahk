@@ -87,26 +87,53 @@ _TPGF_OwnersApplyGreying() {
 		"a freshly published root must receive the current pause state")
 }
 
-; Every head row declared before the tail must be staged as a feature row, so a
-; new head submenu cannot silently stay live while paused.
-_TPGF_EveryHeadRowIsAFeature() {
-	Body := _StripFullLineComments(_DriverFuncBody("initMenu"))
-	Assert(Body != "", "initMenu must be readable")
-	Head := SubStr(Body, 1, InStr(Body, "_MI_AssertHeadOrder(") - 1)
-	Assert(Head != "", "initMenu must stage its head before _MI_AssertHeadOrder")
-	AssertEqual(0, InStr(Head, "TrayMenuStage_Add("),
-		"a head row staged with the plain TrayMenuStage_Add would stay live while paused")
-	AssertEqual(6, StrLen(Head) - StrLen(StrReplace(Head, "TrayMenuStage_AddFeature(", "TrayMenuStage_AddFeature")),
-		"initMenu must stage its six non-IA head rows as feature rows")
-	Llm := _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
-	Assert(Llm != "", "LLM_Menu_Init must be readable")
-	AssertEqual(0, InStr(Llm, 'TrayMenuStage_Add(t("menu.llm.title")'),
-		"the IA head row must be staged as a feature row")
+; The top-level ids a pause switches off: the rows the manifest marks
+; `greyed_when_paused`, visible on this platform. Each one's root builder must
+; stage its row as a feature row so the pause greys it, and every other builder
+; must stage a plain row so « Suspendre », language, reload, quit and debug stay
+; live. Read from the manifest, which the macOS and Linux roots read too, so the
+; three trays grey the same rows.
+_TPGF_MarkedFeatureIds() {
+	Ids := []
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if (Entry is Map) && _MR_IsForAhk(Entry) && (Entry.Get("greyed_when_paused", false) == true)
+			Ids.Push(Entry["id"])
+	}
+	return Ids
+}
+
+_TPGF_EveryFeatureRowIsStagedAsAFeature() {
+	Builders := _MI_TopLevelBuilders()
+	Features := Map()
+	Marked := _TPGF_MarkedFeatureIds()
+	Assert(Marked.Length >= 7, "the manifest must mark the feature rows a pause greys, got " . Marked.Length)
+	for _, Id in Marked {
+		Assert(Builders.Has(Id), "the tray root must have a builder for the feature row " . Id)
+		Features[Id] := true
+	}
+	Checked := 0
+	for Id, Builder in Builders {
+		Body := _StripFullLineComments(_DriverFuncBody(Builder.Name))
+		; The IA row is staged by LLM_Menu_Init, which owns its persistent submenu.
+		if (Id == "llm")
+			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
+		if Features.Has(Id) {
+			Assert(InStr(Body, "TrayMenuStage_AddFeature(") > 0,
+				"the " . Id . " row must be staged as a feature row so a pause greys it")
+			AssertEqual(0, InStr(Body, "TrayMenuStage_Add("),
+				"the " . Id . " row staged with the plain TrayMenuStage_Add would stay live while paused")
+		} else {
+			AssertEqual(0, InStr(Body, "TrayMenuStage_AddFeature("),
+				"the " . Id . " row is no feature: greyed by a pause, it could not be used to resume or leave")
+		}
+		Checked += 1
+	}
+	Assert(Checked >= 12, "the tray root must dispatch at least twelve builders, read " . Checked)
 }
 
 Test("tray pause: feature submenus greyed, global rows live, restored on resume (tray-pause-greys-features)",
 	_TPGF_PauseGreysOnlyFeatureRows)
 Test("tray pause: UpdateTrayIcon and publication apply the greying (tray-pause-greys-features)",
 	_TPGF_OwnersApplyGreying)
-Test("tray pause: every tray head row is staged as a feature row (tray-pause-greys-features)",
-	_TPGF_EveryHeadRowIsAFeature)
+Test("tray pause: every feature row of the root is staged as a feature row (tray-pause-greys-features)",
+	_TPGF_EveryFeatureRowIsStagedAsAFeature)

@@ -40,43 +40,9 @@ InitSubMenus() {
 		; RegisterMenuItemInsert("1&"/"2&"/"3&") — three inserts by position to
 		; express « these three come first », which building the array in order says
 		; on its own.
-		Rows := []
-		; THE ORDER BELOW IS THE SHARED ONE, and the three drivers had three of
-		; them until 2026-08-07: this driver put the two bulk actions above
-		; « ouvrir le fichier », Linux put them below it, and macOS had no category
-		; gate row at all. Same submenu, same five categories, three layouts.
-		;
-		;   1. the category gate — everything under it is inert while it is off
-		;   2. « ouvrir le fichier », when the category has one
-		;   3. ─────────
-		;   4. « tout activer »
-		;   5. « tout désactiver »
-		;   6. ─────────
-		;   7. the sections
-		;
-		; Its state drives the parent menu checkmark (IsCategoryGated), independent
-		; of how many individual sections are checked. Capture V1Cat by value so
-		; each closure toggles its own category.
-		Rows.Push(Map(
-			"label",  IsCategoryGated(V1Cat)
-				? t("menu.hotstrings.category_on")
-				: t("menu.hotstrings.category_off"),
-			"action", ((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat)))
-
 		TomlPath := HotstringsBundledTomlPath(V1Cat)
-		if FileExist(TomlPath) {
-			Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
-		}
-		Rows.Push(Map("separator", true))
-		; Section-level bulk actions for this category.
-		Rows.Push(Map(
-			"label",  t("menu.hotstrings.enable_all"),
-			"action", ((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat)))
-		Rows.Push(Map(
-			"label",  t("menu.hotstrings.disable_all"),
-			"action", ((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat)))
-		Rows.Push(Map("separator", true))
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
+		Rows := _HS_CategoryHeadRows(V1Cat, V2Section, TomlPath)
 		if (V2Section != "") {
 			Entries := ManifestFeaturesForSection(V2Section)
 			; Build a map from the section-name part of the v2 path to its entry
@@ -173,8 +139,18 @@ _HS_RegisterLanguageMenuCategories() {
 	}
 }
 
+; The whole tree's « all sections » checkbox, at the top of the Hotstrings menu:
+; ticked when the Hotstrings master is on and every hotstring section is, which
+; is exactly the state ToggleAllHotstrings(true) establishes.
+_HS_AllHotstringsOn() {
+	global Features
+	; A detached copy: the collector seeds runtime-discovered personal nodes into
+	; the map it is given, and a menu read must not publish them.
+	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(MasterGateDesiredFeatures(Features))))
+}
+
 ; List provider: one row per language pack, labelled with the language's native
-; name, opening a submenu with « tout activer » / « tout désactiver » for the whole
+; name, opening a submenu with one « all sections » checkbox for the whole
 ; language followed by that language's category submenus (built by InitSubMenus
 ; exactly like the neutral categories).
 _HS_LanguageRows() {
@@ -183,12 +159,7 @@ _HS_LanguageRows() {
 	IsGated := IsCategoryGated("Hotstrings")
 	for _, Pack in HotstringsLanguageCategories() {
 		Items := []
-		Items.Push(Map(
-			"label",  t("menu.hotstrings.enable_all"),
-			"action", ((p) => (*) => ToggleLanguageAllSections(p, true))(Pack)))
-		Items.Push(Map(
-			"label",  t("menu.hotstrings.disable_all"),
-			"action", ((p) => (*) => ToggleLanguageAllSections(p, false))(Pack)))
+		Items.Push(_HS_LanguageSwitchRow(Pack))
 		Items.Push(Map("separator", true))
 		LanguageTotal := 0
 		for _, Cat in Pack["categories"] {
@@ -199,7 +170,7 @@ _HS_LanguageRows() {
 			LanguageTotal += Total
 			Items.Push(Map(
 				"label",   GetCategoryTitle(V1Cat) . " (" . FmtCount(Total) . ")",
-				"checked", (IsGated and IsCategoryGated(V1Cat)) ? true : false,
+				"checked", IsCategoryGated(V1Cat) ? true : false,
 				"submenu", SubMenus[V1Cat]))
 		}
 		; The flag is an icon here, as in the language selector: Win32 menus
@@ -218,13 +189,9 @@ _HS_LanguageRows() {
 _BuildDynamicHotstringsSubmenu() {
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	Rows := []
-	; Section-level bulk actions for the dynamic-hotstrings category.
-	Rows.Push(Map(
-		"label",  t("menu.hotstrings.enable_all"),
-		"action", (*) => ToggleCategoryAllSections("DynamicHotstrings", true)))
-	Rows.Push(Map(
-		"label",  t("menu.hotstrings.disable_all"),
-		"action", (*) => ToggleCategoryAllSections("DynamicHotstrings", false)))
+	; One « all sections » checkbox for the dynamic-hotstrings category.
+	Rows.Push(_HS_AllSectionsRow(_HS_ScopeAllOn(["DynamicHotstrings"], _HS_SectionPaths("hotstrings.dynamic")),
+		(Bool) => ToggleCategoryAllSections("DynamicHotstrings", Bool)))
 	Rows.Push(Map("separator", true))
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {

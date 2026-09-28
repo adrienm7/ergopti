@@ -7,6 +7,7 @@
 --- are tested with the expectation that is_available() returns false.
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 local sw     = helpers.load_module("modules.keylogger.sqlite_writer")
 
 helpers.describe("sqlite_writer", function()
@@ -16,7 +17,7 @@ helpers.describe("sqlite_writer", function()
   -- ==========================================================================
 
   helpers.describe("module structure", function()
-    helpers.it("exports the expected methods", function()
+    it("exports the expected methods", function()
       helpers.assert_true(type(sw.is_available)     == "function", "is_available")
       helpers.assert_true(type(sw.open_db)           == "function", "open_db")
       helpers.assert_true(type(sw.close_db)          == "function", "close_db")
@@ -31,7 +32,7 @@ helpers.describe("sqlite_writer", function()
       helpers.assert_true(type(sw.bump_rev)          == "function", "bump_rev")
     end)
 
-    helpers.it("seeds every app-time and hotstring metric on the initial upsert", function()
+    it("seeds every app-time and hotstring metric on the initial upsert", function()
       local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
       local fh = assert(io.open(path, "r"))
       local src = fh:read("*a"); fh:close()
@@ -39,7 +40,7 @@ helpers.describe("sqlite_writer", function()
         "initial INSERT must retain every field, not only the conflict-update path")
     end)
 
-	helpers.it("persists generated-output sources and physical scancodes independently", function()
+	it("persists generated-output sources and physical scancodes independently", function()
 		local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
 		local fh = assert(io.open(path, "r"))
 		local src = fh:read("*a"); fh:close()
@@ -51,7 +52,7 @@ helpers.describe("sqlite_writer", function()
 			"evdev hardware counts must be persisted in the canonical scancode table")
 	end)
 
-    helpers.it("preserves complete dotted application identifiers during flush", function()
+    it("preserves complete dotted application identifiers during flush", function()
       local path = helpers.driver_root() .. "/modules/keylogger/keylogger.lua"
       local fh = assert(io.open(path, "r"))
       local src = fh:read("*a"); fh:close()
@@ -59,7 +60,7 @@ helpers.describe("sqlite_writer", function()
         "SQLite aggregation must use the same full app ID as the dashboard")
     end)
 
-    helpers.it("uses persistent IDs and non-destructive inserts for raw events", function()
+    it("uses persistent IDs and non-destructive inserts for raw events", function()
       local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
       local fh = assert(io.open(path, "r"))
       local src = fh:read("*a"); fh:close()
@@ -73,7 +74,7 @@ helpers.describe("sqlite_writer", function()
         "Linux must write canonical events_app_switch rows")
     end)
 
-    helpers.it("events_typing insert supplies every column it names (typing-arity)", function()
+    it("events_typing insert supplies every column it names (typing-arity)", function()
       -- Regression: the VALUES tuple carried 20 entries for a 22-column list,
       -- so every flush with a manual keystroke failed in SQLite and aborted
       -- before hotstrings, n-grams and titles. The layout binding was computed
@@ -155,7 +156,7 @@ helpers.describe("sqlite_writer", function()
       helpers.assert_eq(cols[22], "events_json", "column 22 carries events_json")
     end)
 
-    helpers.it("migrates the former device OS constraint to include Linux", function()
+    it("migrates the former device OS constraint to include Linux", function()
       local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
       local fh = assert(io.open(path, "r"))
       local src = fh:read("*a"); fh:close()
@@ -163,7 +164,7 @@ helpers.describe("sqlite_writer", function()
       helpers.assert_true(src:find("'darwin','windows','linux'", 1, true) ~= nil)
     end)
 
-    helpers.it("is_available returns false when sqlite3 CLI is absent", function()
+    it("is_available returns false when sqlite3 CLI is absent", function()
       -- On the maintainer's Windows machine and most CI, sqlite3 is absent.
       helpers.assert_true(type(sw.is_available()) == "boolean", "is_available returns boolean")
     end)
@@ -175,7 +176,7 @@ helpers.describe("sqlite_writer", function()
 
   helpers.describe("graceful degradation (no sqlite3)", function()
 
-    helpers.it("open_db returns false when sqlite3 is absent", function()
+    it("open_db returns false when sqlite3 is absent", function()
       local ok = sw.open_db("/tmp/nonexistent/ergopti_test.sqlite")
       -- May return true (if sqlite3 IS available) or false.
       helpers.assert_true(type(ok) == "boolean", "open_db returns boolean")
@@ -186,39 +187,39 @@ helpers.describe("sqlite_writer", function()
     -- error. What each asserts instead is the REFUSAL — a writer with no database
     -- that reported success would let the caller advance its watermark past rows
     -- that were never persisted, which loses them silently and for good.
-    helpers.it("register_device refuses when the db is closed", function()
+    it("register_device refuses when the db is closed", function()
       sw.close_db()
       local ok = sw.register_device("test-1", "test", "linux", "5.15", "sig")
       helpers.assert_true(ok == nil or ok == false,
         "a closed database must not report a registered device")
     end)
 
-    helpers.it("insert_typing_events writes nothing for an empty list", function()
+    it("insert_typing_events writes nothing for an empty list", function()
       local ok = sw.insert_typing_events("dev", {})
       helpers.assert_true(ok == nil or ok == false or ok == 0,
         "no events means no rows — a positive answer here is a watermark advanced "
           .. "over nothing")
     end)
 
-    helpers.it("insert_typing_events writes nothing for a nil list", function()
+    it("insert_typing_events writes nothing for a nil list", function()
       local ok = sw.insert_typing_events("dev", nil)
       helpers.assert_true(ok == nil or ok == false or ok == 0,
         "same for nil, which is what a failed decode hands it")
     end)
 
-    helpers.it("upsert_app_day writes nothing for empty fields", function()
+    it("upsert_app_day writes nothing for empty fields", function()
       local ok = sw.upsert_app_day("dev", "2026-01-01", "app", {})
       helpers.assert_true(ok == nil or ok == false or ok == 0,
         "an upsert with no fields must not claim a row")
     end)
 
-    helpers.it("upsert_ngrams writes nothing for an empty map", function()
+    it("upsert_ngrams writes nothing for an empty map", function()
       local ok = sw.upsert_ngrams("dev", "2026-01-01", "app", {})
       helpers.assert_true(ok == nil or ok == false or ok == 0,
         "an empty ngram map must not claim a row either")
     end)
 
-    helpers.it("bump_rev refuses when the db is closed", function()
+    it("bump_rev refuses when the db is closed", function()
       local ok = sw.bump_rev()
       helpers.assert_true(ok == nil or ok == false,
         "the revision counter is the dashboards' cache-invalidation signal; bumping it "
@@ -232,14 +233,14 @@ helpers.describe("sqlite_writer", function()
 
   helpers.describe("safety", function()
 
-    helpers.it("register_device with SQL metacharacters is refused, not injected", function()
+    it("register_device with SQL metacharacters is refused, not injected", function()
       local ok = sw.register_device("tes't-1", "tes't", "lin'ux", "5.1'5", "si'g")
       helpers.assert_true(ok == nil or ok == false,
         "with no database open the answer is refusal — and it must be the SAME refusal "
           .. "as for clean input, or the quotes changed a code path")
     end)
 
-    helpers.it("insert_typing_events with quotes in text is refused, not injected", function()
+    it("insert_typing_events with quotes in text is refused, not injected", function()
       local ok = sw.insert_typing_events("dev", {
         { ts = "2026-01-01 12:00:00", date = "2026-01-01",
           app = "test'app", text = "he'llo \"world\"", wpm = 60 },
@@ -249,7 +250,7 @@ helpers.describe("sqlite_writer", function()
           .. "database — a different answer would mean the quotes reached the SQL")
     end)
 
-    helpers.it("double close_db leaves the writer reopenable", function()
+    it("double close_db leaves the writer reopenable", function()
       sw.close_db()
       sw.close_db()
       helpers.assert_eq(type(sw.open_db("/tmp/ergopti_double_close_probe.sqlite")), "boolean",
@@ -264,14 +265,14 @@ helpers.describe("sqlite_writer", function()
 
   helpers.describe("keylogger flush integration", function()
 
-    helpers.it("keylogger exports flush and export_json methods", function()
+    it("keylogger exports flush and export_json methods", function()
       local kl = helpers.load_module("modules.keylogger.keylogger")
       helpers.assert_true(type(kl.flush)       == "function", "flush is a function")
       helpers.assert_true(type(kl.export_json) == "function", "export_json is a function")
       helpers.assert_true(type(kl.export_session) == "function", "export_session is a function")
     end)
 
-    helpers.it("keylogger flush does not crash when sqlite is absent", function()
+    it("keylogger flush does not crash when sqlite is absent", function()
       local kl = helpers.load_module("modules.keylogger.keylogger")
       kl.init({})  -- sqlite_writer.open_db will fail → JSON fallback
       kl.flush()
@@ -281,7 +282,7 @@ helpers.describe("sqlite_writer", function()
           .. "produce something — a flush that quietly dropped the buffer would leave it empty")
     end)
 
-    helpers.it("export_json returns valid JSON-like string", function()
+    it("export_json returns valid JSON-like string", function()
       local kl = helpers.load_module("modules.keylogger.keylogger")
       kl.init({})
       local json = kl.export_json()

@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -44,6 +45,7 @@ local function with_writer(body)
 	local ok, err = pcall(function()
 		local keylogger = require(logger_name)
 		keylogger.init({ sqlite_path = "/tmp/ergopti_switch_probe.sqlite" })
+		require("tests.support.metrics_consent_fixture").enable(keylogger)
 		keylogger.reset_session()
 		body(keylogger)
 	end)
@@ -65,7 +67,7 @@ end
 
 helpers.describe("app switches: the aggregate behind the flow panel", function()
 
-	helpers.it("writes one row per ordered pair", function()
+	it("writes one row per ordered pair", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("firefox", 1000)
 			keylogger.on_app_focus("code", 5000)
@@ -91,7 +93,7 @@ helpers.describe("app switches: the aggregate behind the flow panel", function()
 				.. "the user came from")
 	end)
 
-	helpers.it("counts before the raw events are handed over", function()
+	it("counts before the raw events are handed over", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("a", 1000)
 			keylogger.on_app_focus("b", 2000)
@@ -116,7 +118,7 @@ end)
 
 helpers.describe("app switches: the calendar day", function()
 
-	helpers.it("files a switch under the same day as the keystrokes around it", function()
+	it("files a switch under the same day as the keystrokes around it", function()
 		local writer = with_writer(function(keylogger)
 			keylogger.on_app_focus("firefox", 1000)
 			keylogger.on_keydown("a", 1100, "firefox")

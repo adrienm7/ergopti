@@ -25,6 +25,7 @@ local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
+local Preferences = require("infra.metrics_preferences")
 local ConfigPaths = require("infra.config_paths")
 local Shell     = require("adapters.shell_runner")
 local Model     = require("wpm_widget.model")
@@ -32,7 +33,12 @@ local Widget    = require("ui.wpm.widget")
 
 local LOG = "ui.wpm.tray_readout"
 
-local PREF_PREFIX = "wpm_menubar."
+local PREF_PATHS = {
+	visible = "metrics.wpm_menubar_visible",
+	colors = "metrics.wpm_menubar_colors",
+}
+
+
 local ITEM_ID = "ergopti-plus-wpm"
 local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
 
@@ -63,11 +69,21 @@ local _state = {
 	last_update_s = nil,
 	last_key = nil,
 	flip = false,
+	presentation = nil,
 }
 
 -- The tray backend and the icon painter; replaceable by tests.
 local _tray = nil
 local _painter = nil
+local _restore_debt = nil
+local ensure_item
+
+local function clone(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, child in pairs(value) do copy[key] = clone(child) end
+	return copy
+end
 
 
 
@@ -78,28 +94,12 @@ local _painter = nil
 -- =========================================
 -- =========================================
 
-local function storage()
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or type(Storage) ~= "table" then return nil end
-	return Storage
-end
-
-local function stored_bool(key)
-	local Storage = storage()
-	if not Storage then return DEFAULTS[key] end
-	local value = Storage.get(PREF_PREFIX .. key, nil)
-	if type(value) ~= "boolean" then return DEFAULTS[key] end
-	return value
-end
-
+--- Persists one canonical sparse boolean.
+--- @param key string Readout preference name.
+--- @param value boolean Desired value.
+--- @return boolean committed
 local function store_bool(key, value)
-	local Storage = storage()
-	if not Storage then
-		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
-		return false
-	end
-	if value == DEFAULTS[key] then return Storage.delete(PREF_PREFIX .. key) == true end
-	return Storage.set(PREF_PREFIX .. key, value) == true
+	return Preferences.set(assert(PREF_PATHS[key]), value)
 end
 
 local function tray()
@@ -209,9 +209,15 @@ end
 
 local function remove_item()
 	local Tray = tray()
-	if _state.handle and Tray then Tray.remove_item(_state.handle) end
+	if _state.handle then
+		if not Tray then return false end
+		local called, removed = pcall(Tray.remove_item, _state.handle)
+		if not called or removed ~= true then return false end
+	end
 	_state.handle = nil
 	_state.last_key = nil
+	_state.presentation = nil
+	return true
 end
 
 local function start_readout(persist)
@@ -233,24 +239,76 @@ end
 --- Applies the persisted choices at boot.
 --- @return boolean True when the readout is running after this call.
 function M.restore()
-	_state.use_colors = stored_bool("colors")
-	if not stored_bool("visible") then return false end
+	if _restore_debt or not Preferences.admit() then return false end
+	local preferences = Preferences.snapshot()
+	_state.use_colors = preferences[PREF_PATHS.colors]
+	if not preferences[PREF_PATHS.visible] then return false end
 	return start_readout(false)
 end
 
 function M.start()
+	if _restore_debt or not Preferences.admit() then return false end
 	return start_readout(true)
+end
+
+--- Captures choices and presentation independently of the mutable native handle.
+--- @return table snapshot Detached runtime state.
+function M.configuration_snapshot()
+	if _restore_debt then return nil end
+	local copy = {}
+	for key, value in pairs(_state) do
+		if key ~= "handle" then copy[key] = clone(value) end
+	end
+	return copy
+end
+
+--- Applies native presentation without ordinary persistence or metric mutation.
+--- @param candidate table Detached configuration snapshot.
+--- @return boolean acknowledged Native presentation settled.
+function M.apply_configuration(candidate)
+	if type(candidate) ~= "table" or type(candidate.running) ~= "boolean"
+		or type(candidate.use_colors) ~= "boolean" then return false end
+	local presentation = candidate.presentation
+	if presentation ~= nil then
+		if not candidate.running or type(presentation) ~= "table" or type(presentation.icon) ~= "string"
+			or type(presentation.title) ~= "string" or type(presentation.active) ~= "boolean" then return false end
+		local Tray = tray()
+		local handle = ensure_item(presentation.icon)
+		if not Tray or not handle then return false end
+		local called, updated = pcall(Tray.update_item, handle, clone(presentation))
+		if not called or updated ~= true then return false end
+	elseif remove_item() ~= true then
+		return false
+	end
+	local handle = _state.handle
+	_state = clone(candidate)
+	_state.handle = handle
+	return true
+end
+
+--- Retains the exact inverse until native restoration acknowledges completion.
+--- @return boolean restored
+function M.retry_configuration_restore()
+	if not _restore_debt then return true end
+	local called, restored = pcall(M.apply_configuration, _restore_debt)
+	if not called or restored ~= true then return false end
+	_restore_debt = nil
+	return true
 end
 
 --- @return boolean
 function M.stop()
+	if _restore_debt or not Preferences.admit() then return false end
 	if not _state.running then return true end
-	if not store_bool("visible", false) then
-		Logger.error(LOG, "The hidden state could not be persisted — the tray readout stays on.")
+	local candidate = M.configuration_snapshot()
+	_restore_debt = M.configuration_snapshot()
+	candidate.running, candidate.presentation = false, nil
+	if M.apply_configuration(candidate) ~= true or not store_bool("visible", false) then
+		M.retry_configuration_restore()
+		Logger.error(LOG, "The tray readout stop was refused; its previous state is retained for restoration.")
 		return false
 	end
-	_state.running = false
-	remove_item()
+	_restore_debt = nil
 	Logger.info(LOG, "WPM tray readout stopped.")
 	return true
 end
@@ -258,6 +316,7 @@ end
 --- @param enabled boolean
 --- @return boolean
 function M.set_use_source_colors(enabled)
+	if _restore_debt or not Preferences.admit() then return false end
 	local wanted = enabled and true or false
 	if not store_bool("colors", wanted) then
 		Logger.error(LOG, "The colour state could not be persisted — it was not changed.")
@@ -274,7 +333,7 @@ function M.uses_source_colors()
 end
 
 --- The readout's own tray item, created on first need.
-local function ensure_item(icon)
+ensure_item = function(icon)
 	if _state.handle then return _state.handle end
 	local Tray = tray()
 	if not Tray or type(Tray.new_item) ~= "function" then return nil end
@@ -290,6 +349,7 @@ end
 --- @param now_s number Monotonic seconds.
 --- @return table|nil The frame shown, or nil when hidden.
 function M.tick(stats, now_s)
+	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
 	if _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
 	_state.last_update_s = now_s
@@ -298,7 +358,11 @@ function M.tick(stats, now_s)
 	local frame = Model.menubar_frame(canon, stats, Widget.frame_options(now_s, _state.use_colors))
 	local Tray = tray()
 	if not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
-		if _state.handle and Tray then Tray.update_item(_state.handle, { active = false }) end
+		if _state.handle and Tray then
+			local called, updated = pcall(Tray.update_item, _state.handle, { active = false })
+			if not called or updated ~= true then return nil end
+			if _state.presentation then _state.presentation.active = false end
+		end
 		_state.last_key = nil
 		return nil
 	end
@@ -308,7 +372,10 @@ function M.tick(stats, now_s)
 	if not icon then return nil end
 	local handle = ensure_item(icon)
 	if not handle or not Tray then return nil end
-	Tray.update_item(handle, { icon = icon, title = frame.label, active = true })
+	local presentation = { icon = icon, title = frame.label, active = true }
+	local called, updated = pcall(Tray.update_item, handle, presentation)
+	if not called or updated ~= true then return nil end
+	_state.presentation = presentation
 	_state.last_key = key
 	return frame
 end
@@ -322,6 +389,8 @@ function M._defaults()
 	return copy
 end
 function M._reset()
+	_restore_debt = nil
+	_state.presentation = nil
 	_state.running = false
 	_state.use_colors = DEFAULTS.colors
 	_state.handle = nil

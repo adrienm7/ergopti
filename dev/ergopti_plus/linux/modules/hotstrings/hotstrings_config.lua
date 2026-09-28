@@ -32,6 +32,7 @@ local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 local TomlCodec = require("toml_codec")
+local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
 local ManifestReader = require("infra.manifest_reader")
 
@@ -338,15 +339,15 @@ local function save_overrides(overrides)
 	table.sort(names)
 
 	--- Emits one TOML table, or nothing when it carries no override.
-	--- @param header string
+	--- @param segments table Literal category and optional section identities.
 	--- @param values table
-	local function emit(header, values)
+	local function emit(segments, values)
 		if values.delay == nil and values.color == nil and values.show_tooltip == nil
 			and values.priority == nil
 		then
 			return
 		end
-		lines[#lines + 1] = "[" .. header .. "]"
+		lines[#lines + 1] = "[" .. KeyPath.render(segments) .. "]"
 		if values.delay ~= nil then
 			lines[#lines + 1] = string.format("delay = %s", tostring(values.delay))
 		end
@@ -369,12 +370,12 @@ local function save_overrides(overrides)
 
 	for _, category in ipairs(names) do
 		local entry = overrides[category]
-		emit(category, entry)
+		emit({ category }, entry)
 		local sections = {}
 		for name in pairs(entry.sections or {}) do sections[#sections + 1] = name end
 		table.sort(sections)
 		for _, name in ipairs(sections) do
-			emit(category .. "." .. name, entry.sections[name])
+			emit({ category, name }, entry.sections[name])
 		end
 	end
 
@@ -1056,52 +1057,6 @@ function M.disable_all()
 	return changed
 end
 
---- The categories whose gate is closed, as a sorted list.
----
---- For the global « Disable all », which closes every gate and must give the
---- user back exactly the gates they had open. Section choices are not part of
---- it: disable_all never touches them.
---- @return table Sorted array of category ids.
-function M.closed_category_gates()
-	local closed = {}
-	for id in pairs(_categories) do
-		if _disabled_groups[id] then closed[#closed + 1] = id end
-	end
-	table.sort(closed)
-	return closed
-end
-
---- Opens every category gate except the listed ones, in one commit and one
---- reload. Section choices are left exactly as they are, unlike enable_all,
---- which also switches every bundled section on.
---- @param closed table Array of category ids whose gate stays closed.
---- @return boolean True when the gates were committed.
-function M.restore_category_gates(closed)
-	if type(closed) ~= "table" then
-		Logger.error(LOG, "Category gates to restore must be a list — nothing changed.")
-		return false
-	end
-	local keep = {}
-	for _, id in ipairs(closed) do
-		if type(id) == "string" then keep[id] = true end
-	end
-	local candidate = copy_disabled(_disabled_groups)
-	local changed = 0
-	for id in pairs(_categories) do
-		local want = keep[id] or nil
-		if candidate[id] ~= want then
-			candidate[id] = want
-			changed = changed + 1
-		end
-	end
-	if changed == 0 then return true end
-	if not commit_disabled(candidate) then return false end
-	M.load_all()
-	notify_change()
-	Logger.info(LOG, "Category gates restored (%d changed, %d kept closed).", changed, #closed)
-	return true
-end
-
 --- Restores the shipped state: every gate open and every section back to the
 --- manifest's default, which is disabled for the bundled packs.
 --- @return integer Number of entries cleared.
@@ -1170,9 +1125,11 @@ function M.is_section_checked(category, section)
 	if _disabled_groups[key] then return false end
 	if _disabled_groups[ENABLED_MARK .. key] then return true end
 	-- Untouched: the feature manifest's shipped default. A section it does not
-	-- declare belongs to a personal or extension pack, which is the user's own.
+	-- declare belongs to a personal or extension pack and remains opt-in too.
 	local shipped = Languages.section_default(ManifestReader.features(), category, section)
-	if shipped == nil then return true end
+	if shipped == nil then
+		return ManifestReader.default_for("hotstrings.modules." .. category .. "." .. section)
+	end
 	return shipped
 end
 

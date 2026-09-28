@@ -89,13 +89,13 @@ helpers.describe("modules/updater/manager.lua", function()
 		local real_fetch = M._fetch_releases
 		local real_current_version = M.current_version
 		M._fetch_releases = function(_, callback)
-			callback(body, 200, nil)
+			callback("[" .. body .. "]", 200, nil)
 			return true
 		end
 		M.current_version = function() return "3.0.0" end
 		M.clear_cached_release()
 		local available = nil
-		local ok, dispatched = pcall(M.check_for_updates, "stable", function(value)
+		local ok, dispatched = pcall(M.check_for_updates, "main", function(value)
 			available = value
 		end)
 		M._fetch_releases = real_fetch
@@ -119,7 +119,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local real_current_version = M.current_version
 		M.current_version = function() return "3.0.0" end
 		M.clear_cached_release()
-		local available = M._process_release_response(body, "stable")
+		local available = M._process_release_response("[" .. body .. "]", "main")
 		M.current_version = real_current_version
 		helpers.assert_eq(available, false,
 			"an unauthenticated release must not become installable")
@@ -127,12 +127,64 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(M.get_cached_release())
 	end)
 
-	helpers.it("release_api_url builds correct URLs for stable and dev channels", function()
-		local stable_url = M.release_api_url("stable")
-		local dev_url = M.release_api_url("dev")
-		helpers.assert_true(stable_url:find("/latest") ~= nil, "stable URL should end with /latest")
-		helpers.assert_true(dev_url:find("per_page") ~= nil, "dev URL should include per_page")
-		helpers.assert_true(stable_url:find("api.github.com") ~= nil, "should point to GitHub API")
+	-- The stable channel asked /releases/latest, which ignores prereleases and
+	-- answers 404 while no stable release exists; the check then reported
+	-- "not available" for what was a missing channel.
+	helpers.it("every channel reads the shared release list, never /releases/latest", function()
+		local url = M.release_api_url()
+		helpers.assert_eq(url, "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100",
+			"the list comes from defaults.json update_check.releases_url")
+		helpers.assert_eq(url:find("/releases/latest", 1, true), nil)
+		for _, id in ipairs(M.CHANNELS.ids()) do
+			helpers.assert_eq(select(1, M._build_fetch_request(id)), url, id .. " reads the same list")
+		end
+	end)
+
+	local function release(tag, prerelease)
+		return string.format('{"tag_name":"%s","prerelease":%s,"assets":['
+			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/bundle"},'
+			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/sum"}]}',
+			tag, tostring(prerelease), M.LINUX_ASSET_NAME, tag, M.LINUX_CHECKSUM_ASSET_NAME, tag)
+	end
+
+	helpers.it("keeps each channel's latest release from the publish-ordered list", function()
+		local list = "[" .. table.concat({
+			release("v0.0.0-dev.134", true), release("v1.2.0", false),
+			release("v1.3.0-beta.1", true), release("v0.0.0-dev.133", true), release("v1.1.0", false),
+		}, ",") .. "]"
+		local Parser = require("updater.release_parser")
+		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "main")), "v1.2.0",
+			"the stable channel keeps its latest stable release, not the newest publication")
+		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "dev")), "v0.0.0-dev.134")
+		helpers.assert_nil(M._select_channel_release("[" .. release("v0.0.0-dev.134", true) .. "]", "main"),
+			"a list without a stable release has no stable candidate")
+		helpers.assert_nil(M._select_channel_release('{"message":"rate limited"}', "main"),
+			"an API error object is no release list")
+	end)
+
+	helpers.it("a switch to dev offers the dev build over an installed stable", function()
+		local real_current_version = M.current_version
+		M.current_version = function() return "1.2.0" end
+		M.clear_cached_release()
+		local ok, available = pcall(M._process_release_response,
+			"[" .. release("v0.0.0-dev.10", true) .. "," .. release("v1.2.0", false) .. "]", "dev")
+		local cached = M.get_cached_release()
+		M.current_version = real_current_version
+		helpers.assert_true(ok, tostring(available))
+		helpers.assert_eq(available, true,
+			"an explicit channel change migrates to that channel's family (same rule as Windows)")
+		helpers.assert_eq(cached and cached.tag, "v0.0.0-dev.10")
+		M.clear_cached_release()
+	end)
+
+	helpers.it("a dev tag never satisfies the stable channel", function()
+		local real_current_version = M.current_version
+		M.current_version = function() return "0.0.0-dev.5" end
+		M.clear_cached_release()
+		local available = M._process_release_response("[" .. release("v0.0.0-dev.99", true) .. "]", "main")
+		M.current_version = real_current_version
+		helpers.assert_eq(available, false)
+		helpers.assert_nil(M.get_cached_release())
 	end)
 
 	helpers.it("releases_page_url returns a github.com URL", function()
@@ -167,34 +219,96 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(rel, "should return nil when no check has succeeded")
 	end)
 
-	helpers.it("channel defaults to 'stable'", function()
-		local ch = M.get_channel()
-		helpers.assert_true(ch == "stable" or ch == "dev",
-			"channel should be stable or dev, got: " .. tostring(ch))
+	helpers.it("the channel defaults to the installed build's registry channel", function()
+		helpers.assert_eq(M.get_channel(), M.installed_channel())
+		helpers.assert_true(M.CHANNELS.channel(M.get_channel()) ~= nil,
+			"the default must be a channel of the shared registry, not a second vocabulary")
+		local real_current_version = M.current_version
+		M.current_version = function() return "1.4.2" end
+		local stable = M.installed_channel()
+		M.current_version = function() return "0.0.0-dev.133" end
+		local dev = M.installed_channel()
+		M.current_version = function() return "local" end
+		local source = M.installed_channel()
+		M.current_version = real_current_version
+		helpers.assert_eq(stable, "main")
+		helpers.assert_eq(dev, "dev")
+		helpers.assert_eq(source, M.CHANNELS.unreleased_build_channel,
+			"a source checkout follows the registry's unreleased-build channel")
 	end)
 
-	helpers.it("set_channel changes the active channel", function()
-		local orig = M.get_channel()
-		local new_ch = (orig == "stable") and "dev" or "stable"
-		M.set_channel(new_ch)
-		helpers.assert_eq(M.get_channel(), new_ch, "channel should change")
-		-- Restore.
-		M.set_channel(orig)
-		helpers.assert_eq(M.get_channel(), orig, "channel should restore")
+	--- Runs a body against a fresh manager bound to a temporary config.toml.
+	local function with_config(initial, body)
+		local path = os.tmpname()
+		pcall(os.remove, path)
+		if initial then
+			local handle = assert(io.open(path, "w"))
+			handle:write(initial)
+			handle:close()
+		end
+		local previous = package.loaded["modules.updater.manager"]
+		package.loaded["modules.updater.manager"] = nil
+		local fresh = require("modules.updater.manager")
+		local ok, err = pcall(function()
+			fresh.init({ config_path = path })
+			fresh.stop_background_checks()
+			body(fresh, path)
+		end)
+		fresh.stop_background_checks()
+		package.loaded["modules.updater.manager"] = previous
+		pcall(os.remove, path)
+		if not ok then error(err, 0) end
+	end
+
+	local function read_config(path)
+		local handle = io.open(path, "r")
+		if not handle then return nil end
+		local decoded = require("toml_codec").decode(handle:read("*a"))
+		handle:close()
+		return decoded
+	end
+
+	helpers.it("set_channel persists [updater] channel in config.toml", function()
+		with_config(nil, function(fresh, path)
+			helpers.assert_true(fresh.set_channel("dev"), "a registry channel is accepted")
+			helpers.assert_eq(fresh.get_channel(), "dev")
+			helpers.assert_eq(read_config(path).updater.channel, "dev",
+				"the channel lives in config.toml like on the other drivers")
+			helpers.assert_true(fresh.set_channel("main"))
+			helpers.assert_eq(read_config(path).updater.channel, "main")
+		end)
 	end)
 
-	helpers.it("set_channel rejects unknown channels gracefully", function()
-		local orig = M.get_channel()
-		M.set_channel("unknown_channel")
-		helpers.assert_eq(M.get_channel(), orig, "channel should not change on invalid input")
+	helpers.it("set_channel refuses aliases and ids outside the registry", function()
+		with_config(nil, function(fresh)
+			local before = fresh.get_channel()
+			for _, value in ipairs({ "stable", "unknown_channel", "Main" }) do
+				helpers.assert_eq(fresh.set_channel(value), false, value .. " must be refused")
+				helpers.assert_eq(fresh.get_channel(), before, value .. " must not change the channel")
+			end
+		end)
 	end)
 
-	helpers.it("set_check_interval and get_check_interval round-trip", function()
-		local orig = M.get_check_interval()
-		M.set_check_interval(3600)
-		helpers.assert_eq(M.get_check_interval(), 3600, "interval should be 3600")
-		-- Restore.
-		M.set_check_interval(orig)
+	helpers.it("init reads the persisted channel through the registry", function()
+		with_config('[updater]\nchannel = "stable"\n', function(fresh)
+			helpers.assert_eq(fresh.get_channel(), "main", "the old 'stable' spelling reads as main")
+		end)
+		with_config('[updater]\nchannel = "dev"\n', function(fresh)
+			helpers.assert_eq(fresh.get_channel(), "dev")
+		end)
+		with_config('[updater]\nchannel = "beta"\n', function(fresh)
+			helpers.assert_eq(fresh.get_channel(), fresh.installed_channel(),
+				"an unknown value follows the installed build's channel")
+		end)
+	end)
+
+	helpers.it("set_check_interval and get_check_interval round-trip through config.toml", function()
+		with_config(nil, function(fresh, path)
+			helpers.assert_true(fresh.set_check_interval(3600))
+			helpers.assert_eq(fresh.get_check_interval(), 3600, "interval should be 3600")
+			helpers.assert_eq(read_config(path).updater.check_interval_seconds, 3600,
+				"the interval lives in config.toml like on the other drivers")
+		end)
 	end)
 
 	helpers.it("set_check_interval rejects negative values", function()
@@ -203,19 +317,20 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_check_interval(), orig, "interval should not change on negative")
 	end)
 
-	helpers.it("keeps the durable channel and interval when storage fails", function()
+	helpers.it("keeps the durable channel and interval when persistence fails", function()
 		local previous_storage = package.loaded["adapters.storage"]
 		local previous_manager = package.loaded["modules.updater.manager"]
-		local storage = Fakes.storage({
-			initial = { ["updater.channel"] = "stable", ["updater.interval_sec"] = 7200 },
-			writes_fail = true,
-		})
+		local storage = Fakes.storage({ writes_fail = true })
 		package.loaded["adapters.storage"] = storage
 		package.loaded["modules.updater.manager"] = nil
 		local failing = require("modules.updater.manager")
-		failing.init({})
+		-- A config.toml whose directory does not exist: the writer must refuse.
+		local unwritable = os.tmpname() .. "-missing-dir/config.toml"
+		failing.init({ config_path = unwritable })
+		local before = failing.get_channel()
+		local target = before == "dev" and "main" or "dev"
 
-		local channel_changed = failing.set_channel("dev")
+		local channel_changed = failing.set_channel(target)
 		local interval_changed = failing.set_check_interval(3600)
 		local channel = failing.get_channel()
 		local interval = failing.get_check_interval()
@@ -225,10 +340,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(channel_changed, false)
 		helpers.assert_eq(interval_changed, false)
-		helpers.assert_eq(channel, "stable", "a failed write must not switch the live release feed")
-		helpers.assert_eq(interval, 7200, "a failed write must not change the live schedule")
-		helpers.assert_eq(storage.get("updater.channel"), "stable")
-		helpers.assert_eq(storage.get("updater.interval_sec"), 7200)
+		helpers.assert_eq(channel, before, "a failed write must not switch the live release feed")
+		helpers.assert_eq(interval, failing.DEFAULT_INTERVAL_SEC, "a failed write must not change the live schedule")
 	end)
 
 	helpers.it("clear_cached_release resets state to idle", function()
@@ -264,8 +377,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		local i18n = require("infra.i18n")
 		M.clear_cached_release()
 		local label = M.get_menu_label()
-		-- "(dev)" names the prerelease channel, the same token in every locale.
-		local expected = i18n.get("menu.about.check_for_updates") .. (M.get_channel() == "dev" and " (dev)" or "")
+		-- The registry channel is displayed on its own checked row.
+		local expected = i18n.get("menu.about.check_for_updates")
 		helpers.assert_eq(label, expected,
 			"the idle label must be whatever the catalogue says for the active locale")
 		helpers.assert_true(label ~= "menu.about.check_for_updates",
@@ -280,7 +393,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local i18n = require("infra.i18n")
 		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
 		local label = M.get_menu_label()
-		local expected = i18n.get("menu.about.check_for_updates") .. (M.get_channel() == "dev" and " (dev)" or "")
+		local expected = i18n.get("menu.about.check_for_updates")
 		M.clear_cached_release()
 		helpers.assert_eq(label, expected,
 			"the row runs a check, so it must be labelled as one whatever the cached release")
@@ -304,7 +417,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		}
 		package.loaded["modules.updater.manager"] = nil
 		local unavailable = require("modules.updater.manager")
-		local started = unavailable.start_background_checks("stable", 60)
+		local started = unavailable.start_background_checks(nil, 60)
 
 		package.loaded["adapters.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
@@ -312,42 +425,36 @@ helpers.describe("modules/updater/manager.lua", function()
 			"missing luv must be a truthful unavailable capability, not a green schedule")
 	end)
 
-	helpers.it("rolls back a partially armed background schedule", function()
+	helpers.it("reports a schedule whose timer was not armed", function()
 		local previous_timer = package.loaded["adapters.timer_scheduler"]
 		local previous_manager = package.loaded["modules.updater.manager"]
-		local cancelled = {}
 		local timer = { HAS_ASYNC = true }
-		function timer.after() return { id = "boot", armed = true } end
-		function timer.every() return { id = "repeat", armed = false, fired = true } end
+		function timer.after() return { id = "refused", armed = false, fired = true } end
 		function timer.cancel(handle)
-			cancelled[#cancelled + 1] = handle.id
 			handle.armed = false
 			return true
 		end
 		package.loaded["adapters.timer_scheduler"] = timer
 		package.loaded["modules.updater.manager"] = nil
-		local partial = require("modules.updater.manager")
-		partial.current_version = function() return "1.0.0" end
-		local started = partial.start_background_checks("stable", 60)
+		local refused = require("modules.updater.manager")
+		refused.current_version = function() return "1.0.0" end
+		local started = refused.start_background_checks()
 
 		package.loaded["adapters.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
-		helpers.assert_eq(started, false)
-		table.sort(cancelled)
-		helpers.assert_eq(cancelled, { "boot", "repeat" },
-			"both halves of a partial schedule must release ownership")
+		helpers.assert_eq(started, false, "a refused timer must not read as a running schedule")
 	end)
 
 	helpers.it("init loads persisted settings and initialises", function()
-		local persisted = require("adapters.storage").get("updater.channel", nil)
-		local expected = (persisted == "stable" or persisted == "dev") and persisted or M.default_channel()
-		-- init() should work without opts.
-		M.init({})
+		local path = os.tmpname()
+		pcall(os.remove, path)
+		local expected = M.installed_channel()
+		M.init({ config_path = path })
 		helpers.assert_eq(M.get_channel(), expected,
 			"init with no opts must not silently move the user off their release channel")
 		-- Channel should still be the same.
 		local ch = M.get_channel()
-		helpers.assert_true(ch == "stable" or ch == "dev", "channel should be valid after init")
+		helpers.assert_true(M.CHANNELS.channel(ch) ~= nil, "channel should be a registry channel after init")
 	end)
 
 	helpers.it("check_for_updates dispatches and publishes asynchronously", function()
@@ -360,7 +467,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		M.clear_cached_release()
 		local completions = 0
 		local completion_error = nil
-		local dispatched = M.check_for_updates("stable", function(_, _, err)
+		local dispatched = M.check_for_updates("main", function(_, _, err)
 			completions = completions + 1
 			completion_error = err
 		end)
@@ -375,9 +482,62 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_state(), "idle")
 	end)
 
+	-- GitHub answers 304 Not Modified, with no body, when the list is unchanged
+	-- since the ETag curl saved. check_for_updates cleared the cached release
+	-- before fetching and a 304 then read as "nothing available": an update
+	-- vanished at the next check, and a manual check said there was none.
+	helpers.it("a 304 keeps the release the previous 200 found available", function()
+		local real_fs = require("adapters.file_system")
+		local previous_fs = package.loaded["adapters.file_system"]
+		local previous_manager = package.loaded["modules.updater.manager"]
+		-- The ETag cache directory exists, so the request is conditional as soon
+		-- as the list it names is held.
+		package.loaded["adapters.file_system"] = setmetatable({
+			exists = function() return true end,
+		}, { __index = real_fs })
+		package.loaded["modules.updater.manager"] = nil
+		local fresh = require("modules.updater.manager")
+		package.loaded["adapters.file_system"] = previous_fs
+		package.loaded["modules.updater.manager"] = previous_manager
+
+		local list = "[" .. release("v0.0.0-dev.140", true) .. "," .. release("v1.2.0", false) .. "]"
+		local responses = {
+			{ ok = true, status = 200, body = list },
+			{ ok = false, status = 304, body = "", error = "HTTP 304" },
+		}
+		local requests = {}
+		fresh._http_client = {
+			get = function(_, _, options, callback)
+				requests[#requests + 1] = options
+				callback(table.remove(responses, 1))
+				return true
+			end,
+			cancel = function() return true end,
+		}
+		fresh.current_version = function() return "local" end
+
+		local results = {}
+		for _ = 1, 2 do
+			fresh.check_for_updates("main", function(available, release, err)
+				results[#results + 1] = { available = available, tag = release and release.tag, err = err }
+			end)
+		end
+
+		helpers.assert_eq(#requests, 2, "two checks, two requests")
+		helpers.assert_nil(requests[1].etag_compare,
+			"without the list an ETag names, the first request must be unconditional")
+		helpers.assert_true(requests[1].etag_save ~= nil, "the first answer's ETag is saved")
+		helpers.assert_true(requests[2].etag_compare ~= nil, "the second request is conditional")
+		helpers.assert_eq(results[1].available, true, "the 200 finds the release")
+		helpers.assert_eq(results[2].available, true, "the 304 keeps it available")
+		helpers.assert_eq(results[2].tag, results[1].tag, "the same release stays cached")
+		helpers.assert_eq(fresh.get_state(), "available")
+		helpers.assert_eq(fresh.get_cached_release().tag, "v1.2.0")
+	end)
+
 	helpers.it("builds a bounded HTTPS release request for the updater owner", function()
 		helpers.assert_true(type(M._build_fetch_request) == "function")
-		local url, headers, options = M._build_fetch_request("stable")
+		local url, headers, options = M._build_fetch_request("main")
 		helpers.assert_contains(url, "https://api.github.com/")
 		helpers.assert_eq(headers.Accept, "application/vnd.github+json")
 		helpers.assert_eq(options.owner, "updater")

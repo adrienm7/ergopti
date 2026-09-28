@@ -30,6 +30,10 @@ local Logger = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
+-- Windows that open by themselves while the user may be typing: shown
+-- without taking the keyboard focus.
+local UNFOCUSED_APPS = { error_dialog = true }
+
 -- Product name and separator of every window title (see M.window_title).
 local WINDOW_TITLE_PRODUCT = "Ergopti"
 local WINDOW_TITLE_SEPARATOR = " — "
@@ -131,9 +135,11 @@ end
 --- delays-and-colours window as "Error: app 'hotstrings_config' not found".
 ---
 local BRIDGE_MODULES = {
+	config_cleanup        = "ui.config_cleanup.bridge",
 	action_picker         = "ui.action_picker.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
+	error_dialog          = "ui.error_dialog.bridge",
 	healthcheck           = "ui.healthcheck.bridge",
 	hotstring_editor      = "ui.hotstring_editor.bridge",
 	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
@@ -143,10 +149,12 @@ local BRIDGE_MODULES = {
 	-- the bridge behind it was perfectly healthy. A half-registered name is worse
 	-- than an unregistered one — it looks supported at the only place anyone checks.
 	hotstrings_config_window = "ui.hotstrings_config_window.bridge",
+	layer_editor          = "ui.layer_editor.bridge",
 	metrics_apps          = "ui.metrics_apps.bridge",
 	metrics_typing        = "ui.metrics_typing.bridge",
 	model_browser         = "ui.model_browser.bridge",
 	onboarding            = "ui.onboarding.bridge",
+	layout_manager        = "ui.layout_manager.bridge",
 	paths_editor          = "ui.paths_editor.bridge",
 	personal_info_editor  = "ui.personal_info_editor.bridge",
 	numeric_prompt        = "ui.numeric_prompt.bridge",
@@ -291,6 +299,13 @@ function M.hide(app_name, expected_epoch)
 	_windows[app_name] = nil
 	if _gtk_available then
 		M._destroy_gtk_window(app_name, owned.epoch)
+	end
+	-- A bridge that holds state for its window (the error window's policy) is
+	-- told when the window goes, whoever closed it
+	local handler = owned.handler
+	if type(handler) == "table" and type(handler.on_window_closed) == "function" then
+		local ok, err = pcall(handler.on_window_closed, owned.epoch)
+		if not ok then Logger.error(LOG, "The '%s' bridge failed on close: %s", app_name, tostring(err)) end
 	end
 	Logger.info(LOG, "Webview '%s' closed after %.1f s open.", app_name,
 		(Monotonic.now_ms() - (owned.opened_ms or Monotonic.now_ms())) / 1000)
@@ -575,17 +590,27 @@ end
 --- @param app_name string The app directory name.
 --- @return string
 local function _app_title(app_name)
+	-- Windows named after the menu row that opens them, in the user's language,
+	-- as macOS and Windows already title them
+	local title_keys = {
+		config_cleanup          = "dialog.unused_keys.title",
+		error_dialog            = "common.error_title",
+		healthcheck             = "menu.debug.healthcheck",
+	}
+	if title_keys[app_name] then
+		return require("infra.i18n").get(title_keys[app_name])
+	end
 	local titles = {
 		action_picker           = "Action Picker",
-		changelog               = "Release Notes",
+		changelog               = "Releases",
 		download_window         = "Download",
-		healthcheck             = "Diagnostic",
 		hotstrings_config_window = "Hotstrings Config",
 		hotstring_editor        = "Hotstring Editor",
 		metrics_apps            = "Metrics — Apps",
 		metrics_typing          = "Metrics — Typing",
 		model_browser           = "Model Browser",
 		onboarding              = "Setup Wizard",
+		layout_manager          = "Keyboard Layouts",
 		paths_editor            = "Paths Editor",
 		personal_info_editor    = "Personal Info",
 		numeric_prompt          = "Valeur",
@@ -596,6 +621,7 @@ local function _app_title(app_name)
 		return (a:upper() .. b:gsub("_", " "))
 	end)
 end
+M._app_title = _app_title
 
 
 -- =========================================
@@ -633,6 +659,8 @@ function M._create_gtk_window(app_name, html, handler)
 		default_height   = geometry.height,
 		window_position  = Gtk.WindowPosition.CENTER,
 		type             = Gtk.WindowType.TOPLEVEL,
+		-- A window that can appear while the user types must not take the keyboard
+		focus_on_map     = not UNFOCUSED_APPS[app_name],
 	})
 
 	-- Set minimum size if supported.

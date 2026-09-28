@@ -30,6 +30,7 @@ local Hotkeys       = require("adapters.hotkey_registrar")
 local kl_mod        = require("modules.keylogger")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
+local Manifest      = require("infra.manifest_reader")
 local Logger        = require("infra.logger")
 
 local LOG = "menu_metrics"
@@ -56,8 +57,8 @@ M.DEFAULT_STATE = {
 	keylogger_private_filter_enabled     = kl_mod.DEFAULT_STATE.keylogger_private_filter_enabled,
 	keylogger_secure_filter_enabled      = kl_mod.DEFAULT_STATE.keylogger_secure_filter_enabled,
 	keylogger_system_auth_filter_enabled = kl_mod.DEFAULT_STATE.keylogger_system_auth_filter_enabled,
-	metrics_shortcut                 = false,
-	apps_time_shortcut               = false,
+	metrics_shortcut                 = Manifest.default_for("metrics.shortcut"),
+	apps_time_shortcut               = Manifest.default_for("metrics.apps_shortcut"),
 }
 
 
@@ -609,12 +610,127 @@ function M.build(ctx)
 		exclude_apps    = rows_exclude_apps,
 	}
 
+	--- The category switch: the metrics submenu's first row (the manifest's
+	--- metrics_toggle). It used to be the parent row's action, which AppKit never
+	--- sends for an item that opens a submenu, so Metrics could not be switched on
+	--- from the menu bar at all.
+	--- @return boolean|nil committed
+	local function toggle_metrics()
+		if not state.keylogger_enabled then
+			local res = dialog.block_alert(
+				i18n.get("dialog.metrics.security_warning_title"),
+				i18n.get("dialog.metrics.security_warning_body"),
+				i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+			if res ~= i18n.get("button.activate") then return end
+		end
+
+		local desired_enabled = not state.keylogger_enabled
+		local ok_kl, Keylogger = pcall(require, "modules.keylogger")
+		if not ok_kl then Keylogger = nil end
+		local lifecycle_method = desired_enabled and "start" or "stop"
+		if type(Keylogger) ~= "table" or type(Keylogger[lifecycle_method]) ~= "function" then
+			-- Validate the security lifecycle capability before publishing either
+			-- memory or disk. In particular, OFF without a stop boundary would leave
+			-- key capture active behind an unchecked menu item.
+			Logger.error(LOG, "Metrics %s is unavailable; state remains unchanged.",
+				lifecycle_method)
+			updateMenu()
+			return false
+		end
+
+		state.keylogger_enabled = desired_enabled
+		if save_prefs() ~= true then return false end
+
+		local ok_wm, WpmMenubar = pcall(require, "ui.wpm.wpm_menubar")
+		if not ok_wm then WpmMenubar = nil end
+		local ok_ww, WpmWidget = pcall(require, "ui.wpm.wpm_widget")
+		if not ok_ww then WpmWidget = nil end
+
+		if state.keylogger_enabled then
+			if Keylogger and type(Keylogger.set_options) == "function" then
+				pcall(Keylogger.set_options, { encrypt = state.keylogger_encrypt })
+			end
+			if Keylogger and type(Keylogger.set_disabled_apps) == "function" then
+				pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
+			end
+			local start_ok, started = pcall(Keylogger.start, script_control)
+			if not start_ok or started ~= true then
+				-- The preference was published before runtime activation. Compensate
+				-- transactionally so the checkmark cannot claim Metrics is active while
+				-- its security-context watcher (and therefore the engine) is absent.
+				state.keylogger_enabled = false
+				local rollback_saved = save_prefs() == true
+				state.keylogger_enabled = false
+				Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
+					tostring(rollback_saved))
+				if WpmMenubar then
+					call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
+				end
+				if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
+				updateMenu()
+				return false
+			end
+			if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
+				pcall(WpmMenubar.set_use_source_colors, state.keylogger_menubar_colors)
+			end
+			if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
+				pcall(WpmWidget.set_use_source_colors, state.keylogger_float_colors)
+			end
+			-- Gate on pause exactly like the 5 sibling per-feature toggles above
+			-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
+			-- dyn_include_realtime): re-enabling the master switch while paused must
+			-- record the preference but NOT arm the widget's 0.2s render timer +
+			-- global mouse eventtap or the menubar's 0.5s timer until resume
+			-- (« pause = tout éteint », F-L10) — this call site was the one place
+			-- that still started both unconditionally on re-enable (F-LOW-13).
+			local wpm_committed = true
+			if state.keylogger_menubar_wpm and not paused_now() then
+				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
+					compensate_rejected_wpm_start("keylogger_menubar_wpm", "WPM menubar")
+					wpm_committed = false
+				end
+			end
+			if state.keylogger_float_wpm and not paused_now() then
+				if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+					state.keylogger_float_graph) then
+					compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+					wpm_committed = false
+				end
+			end
+			if not wpm_committed then
+				updateMenu()
+				return false
+			end
+		else
+			local runtime_settled = true
+			local stop_ok, stopped = pcall(Keylogger.stop)
+			if not stop_ok or stopped ~= true then
+				Logger.error(LOG, "Metrics is disabled, but native keylogger cleanup remains pending.")
+				runtime_settled = false
+			end
+			if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop") then
+				runtime_settled = false
+			end
+			if not call_wpm_lifecycle("WPM widget", WpmWidget, "stop") then
+				runtime_settled = false
+			end
+			if not runtime_settled then
+				updateMenu()
+				return false
+			end
+		end
+
+		updateMenu()
+		return true
+	end
+
 	-- The declarative rows read their state and their behaviour off the
 	-- context. A copy, so the caller's ctx is untouched.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.state_getters = STATE_GETTERS
 	render_ctx.commands = {
+		["metrics_toggle"] = toggle_metrics,
 		["filter_private"] = cmd_filter_private,
 		["filter_secure"]  = cmd_filter_secure,
 		["filter_sysauth"] = cmd_filter_sysauth,
@@ -625,120 +741,20 @@ function M.build(ctx)
 		["wpm_menubar"]    = cmd_wpm_menubar,
 		["menubar_colors"] = cmd_menubar_colors,
 	}
+	for command, mode in pairs({ ["scope_restore"] = "recommended", ["scope_clear"] = "clear" }) do
+		render_ctx.commands[command] = function()
+			if paused_now() or type(ctx.apply_preference_scope) ~= "function" then return false end
+			return ctx.apply_preference_scope("metrics", mode)
+		end
+	end
 
 	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx, list_providers)
 
+	-- The tick mirrors the switch; the parent has no action, since a row that
+	-- opens a submenu is never clicked.
 	return {
 		label   = i18n.get("menu.metrics.title"),
 		checked = state.keylogger_enabled,
-		action  = function()
-			if not state.keylogger_enabled then
-				local res = dialog.block_alert(
-					i18n.get("dialog.metrics.security_warning_title"),
-					i18n.get("dialog.metrics.security_warning_body"),
-					i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
-				if res ~= i18n.get("button.activate") then return end
-			end
-
-			local desired_enabled = not state.keylogger_enabled
-			local ok_kl, Keylogger = pcall(require, "modules.keylogger")
-			if not ok_kl then Keylogger = nil end
-			local lifecycle_method = desired_enabled and "start" or "stop"
-			if type(Keylogger) ~= "table" or type(Keylogger[lifecycle_method]) ~= "function" then
-				-- Validate the security lifecycle capability before publishing either
-				-- memory or disk. In particular, OFF without a stop boundary would leave
-				-- key capture active behind an unchecked menu item.
-				Logger.error(LOG, "Metrics %s is unavailable; state remains unchanged.",
-					lifecycle_method)
-				updateMenu()
-				return false
-			end
-
-			state.keylogger_enabled = desired_enabled
-			if save_prefs() ~= true then return false end
-
-			local ok_wm, WpmMenubar = pcall(require, "ui.wpm.wpm_menubar")
-			if not ok_wm then WpmMenubar = nil end
-			local ok_ww, WpmWidget = pcall(require, "ui.wpm.wpm_widget")
-			if not ok_ww then WpmWidget = nil end
-
-			if state.keylogger_enabled then
-				if Keylogger and type(Keylogger.set_options) == "function" then
-					pcall(Keylogger.set_options, { encrypt = state.keylogger_encrypt })
-				end
-				if Keylogger and type(Keylogger.set_disabled_apps) == "function" then
-					pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
-				end
-				local start_ok, started = pcall(Keylogger.start, script_control)
-				if not start_ok or started ~= true then
-					-- The preference was published before runtime activation. Compensate
-					-- transactionally so the checkmark cannot claim Metrics is active while
-					-- its security-context watcher (and therefore the engine) is absent.
-					state.keylogger_enabled = false
-					local rollback_saved = save_prefs() == true
-					state.keylogger_enabled = false
-					Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
-						tostring(rollback_saved))
-					if WpmMenubar then
-						call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
-					end
-					if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
-					updateMenu()
-					return false
-				end
-				if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
-					pcall(WpmMenubar.set_use_source_colors, state.keylogger_menubar_colors)
-				end
-				if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
-					pcall(WpmWidget.set_use_source_colors, state.keylogger_float_colors)
-				end
-				-- Gate on pause exactly like the 5 sibling per-feature toggles above
-				-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
-				-- dyn_include_realtime): re-enabling the master switch while paused must
-				-- record the preference but NOT arm the widget's 0.2s render timer +
-				-- global mouse eventtap or the menubar's 0.5s timer until resume
-				-- (« pause = tout éteint », F-L10) — this call site was the one place
-				-- that still started both unconditionally on re-enable (F-LOW-13).
-				local wpm_committed = true
-				if state.keylogger_menubar_wpm and not paused_now() then
-					if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-						compensate_rejected_wpm_start("keylogger_menubar_wpm", "WPM menubar")
-						wpm_committed = false
-					end
-				end
-				if state.keylogger_float_wpm and not paused_now() then
-					if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-						state.keylogger_float_graph) then
-						compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
-						wpm_committed = false
-					end
-				end
-				if not wpm_committed then
-					updateMenu()
-					return false
-				end
-			else
-				local runtime_settled = true
-				local stop_ok, stopped = pcall(Keylogger.stop)
-				if not stop_ok or stopped ~= true then
-					Logger.error(LOG, "Metrics is disabled, but native keylogger cleanup remains pending.")
-					runtime_settled = false
-				end
-				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop") then
-					runtime_settled = false
-				end
-				if not call_wpm_lifecycle("WPM widget", WpmWidget, "stop") then
-					runtime_settled = false
-				end
-				if not runtime_settled then
-					updateMenu()
-					return false
-				end
-			end
-
-			updateMenu()
-			return true
-		end,
 		-- `submenu`: the rows are already materialised by ManifestMenu.build. The
 		-- tray reads provider rows, where a `menu` field is never read, so the
 		-- Metrics entry reached the menu bar with nothing under it.

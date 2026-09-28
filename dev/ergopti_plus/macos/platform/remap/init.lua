@@ -31,6 +31,7 @@ local Logger      = require("infra.logger")
 local Defaults    = require("platform.remap.defaults")
 local Config      = require("platform.remap.config")
 local Generator   = require("platform.remap.generator")
+local NavLayer    = require("platform.remap.nav_layer")
 local KeLifecycle = require("platform.remap.ke_lifecycle")
 local KeVariables = require("platform.remap.ke_variables")
 local LeaseController = require("platform.remap.lease_controller")
@@ -4146,7 +4147,7 @@ end
 function M.reset_to_defaults(on_done)
 	Logger.debug(LOG, "Reset-to-defaults transaction requested.")
 	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
-		local defaults = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
+		local defaults = Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.mod_combos_config         = defaults.mod_combos_config
@@ -4433,6 +4434,15 @@ function M.regenerate(
 	end
 	context.lease_token = lease_token
 	if is_lease_failure_recovery then recovery_capability.owned_token = lease_token end
+
+	-- The navigation layer is data: layers.toml is read again for every
+	-- regeneration, so an edited file applies with the next one.
+	local ok_nav, nav_layer = pcall(NavLayer.load)
+	if not ok_nav then
+		Logger.error(LOG, "The navigation layer could not be read: %s.", tostring(nav_layer))
+		return fail("nav-layer-unavailable")
+	end
+	_state.nav_layer = nav_layer
 
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,

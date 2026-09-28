@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migrations/op_rename/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: rename within and across sections."
+ops = [
+	{ op = "rename", section = "hotstrings.dynamic", key = "datefr", to_key = "date_fr" },
+	{ op = "rename", section = "llm.trigger", key = "debounce", to_section = "llm.timing", to_key = "debounce_ms" },
+	{ op = "rename", section = "layout", key = "old_flag", to_key = "new_flag" },
+	{ op = "rename", section = "layout", key = "never_written", to_key = "whatever" },
+]

@@ -708,6 +708,18 @@ end
 --- @return boolean
 function M.get_llm_enabled() return is_llm_enabled end
 
+--- Updates the dormant engine identity after its core owner was configured.
+--- This avoids dispatching a remote model identity to a local backend setter.
+--- @param model_name string Active engine model identifier.
+--- @return boolean settled No request or warmup is acquired.
+function M.set_llm_configuration_model(model_name)
+	if is_llm_enabled ~= false or type(model_name) ~= "string" then return false end
+	if M.reset() ~= true then return false end
+	active_model = model_name
+	_model_transition_generation = _model_transition_generation + 1
+	return true
+end
+
 function M.set_llm_model(model_name)
 	_model_transition_generation = _model_transition_generation + 1
 	local my_transition_generation = _model_transition_generation
@@ -867,6 +879,9 @@ end
 --- @return boolean found True when this engine owns the requested runtime value.
 --- @return any value Current runtime value.
 function M.get_llm_runtime_setting(key)
+	if key == "llm_model" then return true, active_model end
+	if key == "llm_display_model_name" then return true, llm_display_name end
+	if key == "llm_backend_name" then return true, llm_backend_label end
 	if key == "llm_debounce" then return true, inactivity_debounce_sec end
 	if key == "llm_max_words" then return true, max_words end
 	if key == "llm_min_words" then return true, min_words end
@@ -1841,6 +1856,61 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	last_buffer_signature    = signature
 	_last_request_buffer_len = #buffer
 	_last_request_at_s       = hs.timer.secondsSinceEpoch()
+end
+
+-- The reasons a manual request is refused, each with the locale key of the
+-- notice that tells the user. manual_refusal checks them in this order: a
+-- pause outranks everything, then the AI switch, then the backend, then the
+-- typed context. Windows and Linux declare the same four
+-- (tools/test/test-manual-prediction-refusals-single-source.cjs).
+local MANUAL_REFUSAL_KEYS = {
+	paused            = "llm.manual_prediction.paused",
+	disabled          = "llm.manual_prediction.disabled",
+	backend_not_ready = "llm.manual_prediction.backend_not_ready",
+	empty_context     = "llm.manual_prediction.empty_context",
+}
+
+--- Decides why a manual prediction request cannot run, if it cannot.
+--- @return string|nil reason A key of MANUAL_REFUSAL_KEYS, or nil when ready.
+--- @return string context The context the prediction would complete.
+local function manual_refusal()
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	if sc and type(sc.is_paused) == "function" and sc.is_paused() then return "paused", "" end
+	-- A hidden preview is the AI switched off as far as the user can see: the
+	-- request would run and paint nothing.
+	if not is_llm_enabled or not is_ai_preview_enabled then return "disabled", "" end
+	local model_ok, model = xpcall(core_llm.get_current_model, debug.traceback)
+	if not model_ok or type(model) ~= "string" or model == "" then
+		return "backend_not_ready", ""
+	end
+	if type(core_llm.is_backend_ready) == "function" and not core_llm.is_backend_ready() then
+		return "backend_not_ready", ""
+	end
+	local buffer = _state.llm_buffer
+	if type(buffer) ~= "string" then buffer = _state.buffer end
+	if type(buffer) ~= "string" or buffer == "" then return "empty_context", "" end
+	return nil, buffer
+end
+
+--- Runs a prediction now, on the user's request: the llm_generate_prediction
+--- action. perform_check's own refusals are debug lines meant for the
+--- per-keystroke path; a chord pressed on purpose that did nothing would read as
+--- a broken shortcut, so every refusal here is logged at INFO and shown.
+--- @return boolean requested True when a request was sent to perform_check.
+function M.request_manual_prediction()
+	if not require_state("request_manual_prediction") then return false end
+	local reason, context = manual_refusal()
+	if reason then
+		Logger.info(LOG, "Manual prediction refused (%s).", reason)
+		local ok_show, shown = pcall(tooltip.show, i18n.get(MANUAL_REFUSAL_KEYS[reason]), true, true)
+		if not ok_show or shown ~= true then
+			Logger.warn(LOG, "Manual prediction notice '%s' was not shown: %s.", reason, tostring(shown))
+		end
+		return false
+	end
+	Logger.info(LOG, "Manual prediction requested (%d context byte(s)).", #context)
+	M.perform_check(true)
+	return true
 end
 
 --- Clears all active predictions and fully resets the prediction pipeline state.

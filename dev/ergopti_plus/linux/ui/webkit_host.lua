@@ -41,17 +41,21 @@ local LOG = "ui.webkit_host"
 --- gave a metrics page the capabilities of the prompt editor, onboarding, and
 --- every other privileged page. Keep ownership explicit and page-scoped.
 M.APP_BRIDGES = {
+	config_cleanup           = "config_cleanup_bridge",
 	action_picker            = "action_picker_bridge",
 	changelog                = "changelog_bridge",
 	download_window          = "dl_bridge",
+	error_dialog             = "error_dialog",
 	healthcheck              = "healthcheck",
 	hotstring_editor         = "hsEditor",
 	hotstrings_config_window = "hotstrings_config_bridge",
+	layer_editor             = "layer_editor_bridge",
 	metrics_apps             = "metrics_apps_bridge",
 	metrics_typing           = "metrics_typing_bridge",
 	model_browser            = "model_browser_bridge",
 	numeric_prompt           = "numeric_prompt_bridge",
 	onboarding               = "hsOnboarding",
+	layout_manager           = "layout_manager_bridge",
 	paths_editor             = "hsPaths",
 	personal_info_editor     = "hsPersonalInfo",
 	prompt_editor            = "prompt_bridge",

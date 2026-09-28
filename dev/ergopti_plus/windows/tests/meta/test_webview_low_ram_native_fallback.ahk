@@ -74,8 +74,8 @@ _TWLR_UpdaterChangelogHasNativeNotes() {
 	Src := _DriverDirConcat("modules/updater")
 	Assert(InStr(Src, "RightPaneEdit") > 0,
 		"updater changelog must build a native RightPaneEdit fallback when WebView2 is off")
-	Assert(InStr(Src, "RightPaneEdit.Value := _Updater_MarkdownToPlain(md)") > 0,
-		"ShowBody must render the Markdown into the native Edit via _Updater_MarkdownToPlain (not raw md, not a no-op)")
+	Assert(InStr(Src, "RightPaneEdit.Value := _Updater_ReleaseNotesToPlain(md)") > 0,
+		"ShowBody must render the changelog section into the native Edit via _Updater_ReleaseNotesToPlain (not raw md, not a no-op)")
 }
 Test("webview-lowram: updater changelog renders notes natively when WebView2 is off", _TWLR_UpdaterChangelogHasNativeNotes)
 

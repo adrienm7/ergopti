@@ -213,16 +213,16 @@ describe("Build commit: the healthcheck reports the commit and the real config d
 			resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
 			system_facts = function() return {} end,
 		}, function()
-			result = handler.on_message("ready", {})
+			result = handler.build_snapshot({}, false)
 		end)
-		assert_true(type(result) == "table" and type(result.sys) == "table", "the snapshot carries sys")
-		assert_eq(SHORT, result.sys.git_hash, "the page's Last git commit row must not read unknown")
-		assert_eq(Snapshot.COMMIT_SOURCE_BUILD, result.sys.commit_source)
-		assert_eq(ConfigPaths.get_config_dir(), result.sys.config_dir,
+		assert_true(type(result) == "table" and type(result.sections) == "table", "the snapshot carries its sections")
+		assert_eq(SHORT .. " (" .. Snapshot.COMMIT_SOURCE_BUILD .. ")", result.sections.versions.commit,
+			"the page's commit row names the commit and where it came from, never unknown")
+		local paths = result.sections.paths
+		assert_eq(ConfigPaths.get_config_dir(), paths.config_dir,
 			"the config dir is the one config_paths resolves, not the install tree")
-		assert_eq(Paths.driver_root(), result.sys.script_dir)
-		assert_true(result.sys.config_dir ~= result.sys.script_dir,
-			"the config dir and the script dir are different places")
+		assert_eq(Paths.driver_root(), paths.app_dir)
+		assert_true(paths.config_dir ~= paths.app_dir, "the config dir and the app dir are different places")
 	end)
 end)
 

@@ -127,7 +127,10 @@ local function load_real_sticky_pause_owner()
 	package.loaded["modules.gestures.engine"] = gesture_engine
 	package.loaded["modules.gestures.actions"] = actions
 	package.loaded["modules.gestures.conflicts"] = permissive()
-	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+	package.loaded["infra.manifest_reader"] = {
+		default_for = function() return false end,
+		recommended_for = function() return "none" end,
+	}
 	package.loaded["adapters.timer_scheduler"] = TimerScheduler
 	reset_module("modules.gestures")
 	local gestures = require("modules.gestures")

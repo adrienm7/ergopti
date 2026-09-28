@@ -54,10 +54,17 @@ end
 --- The shape is the page's contract, not this driver's: title/label/
 --- searchPlaceholder/cancelLabel/noneLabel strings, `current` (the id already
 --- bound), `allowNative`, and an ordered `items` list of
---- {type="heading",level,text} / {type="action",id,label}. Every string comes
---- from i18n — the three hardcoded French labels this handler used to return
---- were not translations of anything, they were invented here.
---- @param opts table|nil { current: string|nil, allow_native: boolean|nil }
+--- {type="heading",level,text} / {type="action",id,label,disabled?,hint?}.
+--- Every string comes from i18n — the three hardcoded French labels this
+--- handler used to return were not translations of anything, they were invented
+--- here.
+---
+--- The items are the gestures manager's picker items, built from the generated
+--- catalogue: the same order and headings the other two drivers show. They used
+--- to be a flat, alphabetical list of a hard-coded 42-id table, with no heading
+--- at all and 38 of the actions this driver runs missing.
+--- @param opts table|nil { title, label, current, allow_native, native_label,
+---   items, send_vocabulary, parameter_strings }, every field optional.
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
 	local o = type(opts) == "table" and opts or {}
@@ -67,20 +74,10 @@ function M.build_init_payload(opts)
 	if not items then
 		items = {}
 		local ok_actions, Actions = pcall(require, "modules.gestures.manager")
-		if not ok_actions or type(Actions.get_action_names) ~= "function"
-			or type(Actions.get_action_label) ~= "function" then
+		if not ok_actions or type(Actions.get_picker_items) ~= "function" then
 			Logger.error(LOG, "Cannot build the action catalogue: the gestures action registry is unavailable.")
 		else
-			for _, name in ipairs(Actions.get_action_names()) do
-				-- The page adds its own translated `none` row before this catalogue.
-				if name ~= "none" then
-					items[#items + 1] = {
-						type  = "action",
-						id    = name,
-						label = Actions.get_action_label(name),
-					}
-				end
-			end
+			items = Actions.get_picker_items()
 		end
 	end
 
@@ -97,6 +94,12 @@ function M.build_init_payload(opts)
 		noResults         = i18n.get("dialog.action_picker.no_results"),
 		cancelLabel       = i18n.get("button.cancel"),
 		items             = items,
+		-- The page's own editor for send_text / send_key / send_shortcut, from
+		-- the gestures manager's get_picker_parameter_fields; without them every
+		-- action confirms at once and the zenity prompt asks.
+		platform          = "linux",
+		sendVocabulary    = o.send_vocabulary,
+		parameterStrings  = o.parameter_strings,
 	}
 end
 
@@ -133,7 +136,8 @@ end
 
 --- Opens a picker session for one binding target.
 --- @param opts table Picker payload options.
---- @param on_confirm function Called with the selected action id.
+--- @param on_confirm function Called with the selected action id, the daemon state
+---   and the value the page's editor collected for it, if any.
 --- @param on_cancel function|nil Called after a cancellation request.
 --- @return boolean opened
 function M.open(opts, on_confirm, on_cancel)
@@ -237,7 +241,9 @@ local function _handle_table(data, state, context)
 			if session.settling then return nil end
 			session.settling = true
 			local id = type(data.id) == "string" and data.id or "none"
-			local ok_callback, accepted = pcall(session.on_confirm, id, state)
+			-- A value the page's editor collected travels with the pick.
+			local parameter = type(data.parameter) == "string" and data.parameter or nil
+			local ok_callback, accepted = pcall(session.on_confirm, id, state, parameter)
 			session.settling = false
 			if not ok_callback then
 				Logger.error(LOG, "Action picker confirmation callback failed: %s", tostring(accepted))

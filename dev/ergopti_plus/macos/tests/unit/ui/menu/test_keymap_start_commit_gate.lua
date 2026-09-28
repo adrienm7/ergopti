@@ -71,12 +71,15 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 
 	helpers.it("routes every menu-side keymap start through the shared gate", function()
 		local units = {
-			-- 5 since the language submenus: their « tout activer » starts the keymap too.
-			{ marker = "function M.build_bulk_actions", expected = 5, label = "common hotstrings" },
+			-- 5 since the language submenus: their « all sections » checkbox starts the
+			-- keymap too.
+			{ marker = "function M.all_sections_switch", expected = 5, label = "common hotstrings" },
 			{ marker = "function M.build_custom", expected = 3, label = "custom hotstrings" },
 			{ marker = "function M.schedule_pause_layout_switch", expected = 1, label = "layout menu" },
 			{ marker = "function M.sync_state_to_modules", expected = 1, label = "state synchronization" },
-			{ marker = "local function bind_managed_hotkey", expected = 1, label = "enable-all action" },
+			-- The menu root (ui/menu/init.lua) starts nothing any more: its one entry
+			-- point, the global « Tout activer », was retired on every driver.
+			{ marker = "local function bind_managed_hotkey", expected = 0, label = "menu root" },
 		}
 		for _, unit in ipairs(units) do
 			local source, err = helpers.read_driver_unit(unit.marker)

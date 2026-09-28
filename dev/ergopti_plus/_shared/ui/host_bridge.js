@@ -16,17 +16,22 @@
 //
 //   action_picker_bridge      — _shared/ui/action_picker
 //   changelog_bridge          — _shared/ui/changelog
+//   config_cleanup_bridge     — _shared/ui/config_cleanup
 //   dl_bridge                 — _shared/ui/download_window
+//   error_dialog              — _shared/ui/error_dialog
 //   hsEditor                  — _shared/ui/hotstring_editor
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
 //   hsOnboarding              — _shared/ui/onboarding
+//   layer_editor_bridge       — _shared/ui/layer_editor
 //   hsPaths                   — _shared/ui/paths_editor
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
+//   layout_manager_bridge     — _shared/ui/layout_manager
 //   metrics_apps_bridge       — _shared/ui/metrics_apps
 //   metrics_typing_bridge     — _shared/ui/metrics_typing
 //   model_browser_bridge      — _shared/ui/model_browser
 //   numeric_prompt_bridge     — _shared/ui/numeric_prompt
 //   prompt_bridge             — _shared/ui/prompt_editor
+//   release_notes_bridge      — _shared/ui/release_notes (Windows update prompt)
 //   token_bridge              — _shared/ui/token_prompt
 //   healthcheck               — _shared/ui/healthcheck
 //

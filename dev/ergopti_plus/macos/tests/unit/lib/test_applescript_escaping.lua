@@ -159,7 +159,7 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 
 	helpers.it("the Ollama launch path is shell-quoted, not %q-quoted", function()
 		local api_src = helpers.read_driver_source("OLLAMA_KILL_SETTLE_SEC")
-		local builder_src = helpers.read_driver_source('local DAILY_LOG_PREFIX = "ErgoptiPlus_"')
+		local builder_src = helpers.read_driver_source("local DAILY_LOG_PREFIX = AppDirs.files.unified_prefix")
 		helpers.assert_true(api_src ~= nil and api_src ~= "", "api_ollama must be locatable")
 		helpers.assert_true(builder_src ~= nil and builder_src ~= "",
 			"the delegated Ollama server-command owner must be locatable")

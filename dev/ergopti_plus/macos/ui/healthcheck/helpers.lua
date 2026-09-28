@@ -1,518 +1,444 @@
 --- ui/healthcheck/helpers.lua
 
 --- ==============================================================================
---- MODULE: Healthcheck Helpers
+--- MODULE: Healthcheck Collectors (macOS)
 --- DESCRIPTION:
---- State-gathering probes for the healthcheck diagnostic. Extracted from the
---- former monolithic infra/healthcheck.lua (audit F2) so the macOS driver mirrors
---- the Windows ui/healthcheck/{init,core,helpers} layout.
+--- The synchronous half of the diagnostics snapshot (version 2 of
+--- _shared/modules/diagnostics/schema.json): one collector per section, each
+--- returning that section's fields. The asynchronous probes (network, AI
+--- backend, sysctl, df) live in ui.healthcheck.probes.
 ---
 --- FEATURES & RATIONALE:
---- 1. System probe: H.sys_info() captures macOS/Hammerspoon versions, CPU, RAM,
----    screen, locale, git hash — every field guarded with pcall so a single OS
----    call failure degrades to "?" instead of aborting the snapshot.
---- 2. Enriched collectors: one pcall-protected collector per runtime subsystem
----    (pause, keylogger, LLM, layout, hotstrings, logs, config) so a broken probe
----    cannot abort the whole healthcheck.
---- 3. Formatter: H.format_uptime() converts raw seconds to a human-readable
----    uptime string. All diagnostic labels are in English (developer-facing,
----    not translated).
----
---- The HTML rendering lives in the shared frontend _shared/ui/healthcheck/;
---- core.lua injects the snapshot as JSON and the client-side script.js renders
---- the report.
----
---- This module returns a table H of pure-ish functions (Logger is the only shared
---- dependency). It never reaches back into core — the dependency edge is strictly
---- core → helpers, so the two files can be reasoned about independently.
+--- 1. Phase A never leaves the process: memory, Hammerspoon queries, cached
+---    values and small files. hs.execute used to run sysctl and uname here, on
+---    the main run loop that also dispatches the event taps, so opening the
+---    window could stall typing. Every subprocess is now a probe.
+--- 2. Values are raw (bytes, seconds, booleans); the shared page formats them,
+---    so the three drivers show one format.
+--- 3. A fact that cannot be read is left out and logged; the page shows it as
+---    unknown. A fabricated default would read as a measurement.
+--- 4. Nothing identifies a place or a device: no Wi-Fi name, no serial, no
+---    host name. Open applications and device names are collected only when
+---    the user ticks "Include details".
 --- ==============================================================================
 
 local H = {}
 
 local hs       = hs
 local Logger   = require("infra.logger")
-local i18n     = require("infra.i18n")
-local Snapshot = require("healthcheck.snapshot")
-local NetworkInfo = require("adapters.network_info")
 
 local LOG = "healthcheck"
 
+-- The macOS guardian registration states, as the launcher exports them
+-- (launcher/Sources/ErgoptiPlus/RemapLeaseGuardian.swift)
+local GUARDIAN_PERMISSION = { ready = "granted", requires_approval = "missing" }
 
+-- The manifest's platform codes, as the drivers are named
+local PLATFORM_NAMES = { ahk = "Windows", hs = "macOS", linux = "Linux" }
 
+-- The words a USB product name is classified by; the name itself is opt-in
+local DEVICE_KINDS = {
+	{ pattern = "keyboard", kind = "keyboard" },
+	{ pattern = "trackpad", kind = "touchpad" },
+	{ pattern = "touchpad", kind = "touchpad" },
+	{ pattern = "mouse",    kind = "mouse" },
+}
 
-
---- ===========================================
---- ===========================================
---- ======= 1/ System Information Probe =======
---- ===========================================
---- ===========================================
-
---- Collects OS/runtime/screen fields into a flat table.
---- @return table
-function H.sys_info()
-	local info = {}
-	info.wifi_ssid_hash = NetworkInfo.getSsidHash()
-	info.wifi_signal = NetworkInfo.getSignalStrength()
-
-	-- Hammerspoon version
-	local hs_ver = "?"
-	if hs and hs.processInfo and type(hs.processInfo) == "table" then
-		local v = hs.processInfo.version
-		if type(v) == "string" and v ~= "" then hs_ver = v
-		else Logger.warn(LOG, "hs.processInfo.version is absent or empty.") end
-	else
-		Logger.warn(LOG, "hs.processInfo is unavailable.")
-	end
-	info.hs_version = hs_ver
-	Logger.debug(LOG, "hs_version: %s.", hs_ver)
-
-	-- macOS version
-	local os_ver = "?"
-	local ok_host, hs_host = pcall(require, "hs.host")
-	if not ok_host then
-		Logger.warn(LOG, "hs.host unavailable: %s.", tostring(hs_host))
-	elseif type(hs_host.operatingSystemVersionString) ~= "function" then
-		Logger.warn(LOG, "hs.host.operatingSystemVersionString is not a function.")
-	else
-		local ok_v, v = pcall(hs_host.operatingSystemVersionString)
-		if ok_v and type(v) == "string" then os_ver = v
-		else Logger.warn(LOG, "operatingSystemVersionString() failed: %s.", tostring(v)) end
-	end
-	info.os_version = os_ver
-	Logger.debug(LOG, "os_version: %s.", os_ver)
-
-	-- Primary screen resolution
-	local res = "?"
-	local ok_scr, scr = pcall(function() return hs.screen.mainScreen() end)
-	if not ok_scr or not scr then
-		Logger.warn(LOG, "hs.screen.mainScreen() unavailable: %s.", tostring(scr))
-	elseif type(scr.currentMode) ~= "function" then
-		Logger.warn(LOG, "screen.currentMode is not a function.")
-	else
-		local ok_m, m = pcall(function() return scr:currentMode() end)
-		if ok_m and m and m.w and m.h then
-			res = m.w .. "×" .. m.h
-		else
-			Logger.warn(LOG, "screen:currentMode() failed or returned incomplete data: %s.", tostring(m))
-		end
-	end
-	info.screen_res = res
-	Logger.debug(LOG, "screen_res: %s.", res)
-
-	-- System locale — hs.host.locale is a table; current() is the function
-	local locale = "?"
-	if ok_host and hs_host then
-		if type(hs_host.locale) ~= "table" then
-			Logger.warn(LOG, "hs.host.locale is not a table.")
-		elseif type(hs_host.locale.current) ~= "function" then
-			Logger.warn(LOG, "hs.host.locale.current is not a function.")
-		else
-			local ok_l, l = pcall(hs_host.locale.current)
-			if ok_l and type(l) == "string" and l ~= "" then locale = l
-			else Logger.warn(LOG, "locale.current() failed: %s.", tostring(l)) end
-		end
-	end
-	info.locale = locale
-	Logger.debug(LOG, "locale: %s.", locale)
-
-	-- The configuration directory is the one config.toml is read from, owned by
-	-- config_paths (paths.toml / ERGOPTI_CONFIG_DIR). hs.configdir is where the
-	-- driver's Lua sources live: inside the packaged app it is
-	-- ErgoptiPlus.app/Contents/Resources/..., which the report used to present
-	-- as the configuration folder even when setup had chosen another one.
-	info.config_dir = H.config_dir()
-	info.script_dir = H.script_dir()
-
-	-- CPU model + core count via sysctl
-	local cpu_model = "?"
-	local cpu_cores = "?"
-	local ok_cpu, cpu_out = pcall(hs.execute, "sysctl -n machdep.cpu.brand_string 2>/dev/null")
-	if ok_cpu and type(cpu_out) == "string" and cpu_out ~= "" then
-		cpu_model = cpu_out:match("^%s*(.-)%s*$")
-	else
-		-- Apple Silicon fallback
-		local ok_ap, ap_out = pcall(hs.execute, "sysctl -n machdep.cpu.brand_string 2>/dev/null || sysctl -n hw.model 2>/dev/null")
-		if ok_ap and type(ap_out) == "string" and ap_out ~= "" then cpu_model = ap_out:match("^%s*(.-)%s*$") end
-	end
-	local ok_cores, cores_out = pcall(hs.execute, "sysctl -n hw.logicalcpu 2>/dev/null")
-	if ok_cores and type(cores_out) == "string" and cores_out ~= "" then
-		cpu_cores = cores_out:match("^%s*(.-)%s*$")
-	end
-	info.cpu_model = cpu_model
-	info.cpu_cores = cpu_cores
-	Logger.debug(LOG, "cpu_model: %s cores: %s.", cpu_model, cpu_cores)
-
-	-- Page size belongs to the host snapshot; assuming 4 KiB undercounts free
-	-- memory on systems using larger pages
-	local ram_total = "?"
-	local ram_free  = "?"
-	if ok_host and type(hs_host.vmStat) == "function" then
-		local ok_vm, vm = pcall(hs_host.vmStat)
-		if ok_vm and type(vm) == "table" then
-			if type(vm.memSize) == "number" and vm.memSize > 0 then
-				ram_total = string.format("%.1f GB", vm.memSize / 1073741824)
-			end
-			if type(vm.pagesFree) == "number" and vm.pagesFree >= 0
-				and type(vm.pageSize) == "number" and vm.pageSize > 0 then
-				ram_free = string.format("%.1f GB", vm.pagesFree * vm.pageSize / 1073741824)
-			end
-		end
-		if ram_total == "?" or ram_free == "?" then
-			Logger.warn(LOG, "hs.host.vmStat() failed or returned incomplete memory data.")
-		end
-	else
-		Logger.warn(LOG, "hs.host.vmStat is unavailable.")
-	end
-	info.ram_total = ram_total
-	info.ram_free  = ram_free
-	Logger.debug(LOG, "ram_total: %s ram_free: %s.", ram_total, ram_free)
-
-	-- Architecture
-	local arch = "?"
-	local ok_arch, arch_out = pcall(hs.execute, "uname -m 2>/dev/null")
-	if ok_arch and type(arch_out) == "string" and arch_out ~= "" then
-		arch = arch_out:match("^%s*(.-)%s*$")
-	end
-	info.arch = arch
-	Logger.debug(LOG, "arch: %s.", arch)
-
-	-- Screen DPI (points per inch from Hammerspoon screen info). Left nil when
-	-- the physical size is unknown, so the report shows the backing scale alone
-	-- instead of a "?" in front of it.
-	local dpi = nil
-	local ok_dpi, scr_d = pcall(function() return hs.screen.mainScreen() end)
-	if ok_dpi and scr_d and type(scr_d.currentMode) == "function" then
-		local ok_md, md = pcall(function() return scr_d:currentMode() end)
-		if ok_md and md and md.w and md.h then
-			-- physicalSize is in mm; derive PPI if available
-			if type(scr_d.physicalSize) == "function" then
-				local ok_ps, ps = pcall(function() return scr_d:physicalSize() end)
-				if ok_ps and ps and ps.w and ps.w > 0 then
-					dpi = string.format("%d", math.floor(md.w / (ps.w / 25.4) + 0.5))
-				end
-			end
-			-- Usable and full desktop frames are both in points; their ratio
-			-- measures Dock space, not the display's backing scale
-			if type(md.scale) == "number" and md.scale > 0 then
-				info.retina_scale = string.format("%.1f×", md.scale)
-			end
-		end
-	end
-	info.dpi = dpi
-	Logger.debug(LOG, "dpi: %s.", tostring(dpi))
-
-	-- Commit: the packaged app has no .git, so `git rev-parse` answered
-	-- "unknown" for every release build. The shared resolver reads the build
-	-- stamp first and the source checkout second, without a subprocess.
-	info.git_hash, info.commit_source = H.build_commit()
-	Logger.debug(LOG, "git_hash: %s (%s).", info.git_hash, info.commit_source)
-
-	return info
-end
-
---- The configuration directory the driver reads config.toml from.
---- @return string Absolute path, or "" when config_paths is not initialised.
-function H.config_dir()
-	local ConfigPaths = require("infra.config_paths")
-	if not ConfigPaths.is_initialized() then
-		Logger.warn(LOG, "config_paths is not initialised — the configuration directory is unknown.")
-		return ""
-	end
-	return ConfigPaths.get_config_dir()
-end
-
---- The directory the driver's Lua sources run from (hs.configdir).
---- @return string Absolute path, or "" when Hammerspoon exposes none.
-function H.script_dir()
-	if hs and type(hs.configdir) == "string" and hs.configdir ~= "" then return hs.configdir end
-	Logger.warn(LOG, "hs.configdir is not a string — the script directory is unknown.")
-	return ""
-end
-
---- The commit this driver was built from, and where that answer came from.
---- @return string commit Abbreviated commit id or "unknown".
---- @return string source "build", "git" or "unknown".
-function H.build_commit()
-	return require("infra.diagnostic_snapshot").resolve_commit()
-end
-
-
-
-
-
---- ====================================================
---- ====================================================
---- ======= 2/ Enriched Runtime State Collectors =======
---- ====================================================
---- ====================================================
-
---- === Enriched collectors (maximum completeness, privacy-safe, pcall-protected) ===
--- (Added to make the system diagnostic as complete as possible while staying robust.)
-
-function H.collect_pause_state()
-	local st = { is_paused = false, source = "unknown" }
-	local ok, sc = pcall(require, "modules.shortcuts.script_control")
+--- Calls a probe, logging and dropping a failure.
+--- @param label string What was read, for the log.
+--- @param fn function
+--- @return any
+local function read(label, fn)
+	local ok, value = pcall(fn)
 	if not ok then
-		Logger.warn(LOG, "script_control unavailable: %s.", tostring(sc))
-		st.source = "script_control (unavailable)"
-	elseif type(sc.is_paused) ~= "function" then
-		Logger.warn(LOG, "script_control.is_paused is not a function.")
-		st.source = "script_control (contract missing)"
-	else
-		st.is_paused = not not sc.is_paused()
-		st.source = "script_control"
-	end
-	Logger.debug(LOG, "Pause state: is_paused=%s source=%s.", tostring(st.is_paused), st.source)
-	return st
-end
-
-function H.collect_keylogger_summary()
-	-- events_session / privacy_hits have no public accessor today, so they are
-	-- reported as "n/a" rather than probed against a nonexistent function. WPM is
-	-- live from the keylogger; the log paths are the logger's canonical constants.
-	local sum = {
-		enabled = "unknown",
-		wpm = "n/a",
-		events_session = "n/a",
-		privacy_hits = "n/a",
-		today_log = Logger.UNIFIED_LOG_FILE or "",
-		errors_log = Logger.ERRORS_LOG_FILE or "",
-		notes = "High-severity (WARNING/ERROR) also written to dedicated ErgoptiPlus_errors_*.log (see Debug > Open Error Log)",
-	}
-	local ok_k, kl = pcall(require, "modules.keylogger")
-	if not ok_k then
-		Logger.warn(LOG, "modules.keylogger unavailable: %s.", tostring(kl))
-	elseif type(kl.get_live_stats) ~= "function" then
-		Logger.warn(LOG, "keylogger.get_live_stats is not a function.")
-	else
-		local st = kl.get_live_stats() or {}
-		if st.wpm ~= nil then sum.wpm = st.wpm end
-	end
-	Logger.debug(LOG, "Keylogger: wpm=%s unified='%s' errors='%s'.",
-		tostring(sum.wpm), tostring(sum.today_log), tostring(sum.errors_log))
-	return sum
-end
-
-function H.collect_llm_state()
-	local st = { enabled = "unknown", backend = "unknown", active_profile = "unknown", model = "n/a", n_predictions = "n/a", streaming = "n/a" }
-	local ok, llm = pcall(require, "modules.llm")
-	if not ok then
-		Logger.warn(LOG, "modules.llm unavailable: %s.", tostring(llm))
-	else
-		if type(llm.get_runtime_llm_enabled) == "function" then
-			st.enabled = tostring(llm.get_runtime_llm_enabled())
-		else
-			Logger.warn(LOG, "llm.get_runtime_llm_enabled is not a function.")
-		end
-		if type(llm.get_backend) == "function" then
-			st.backend = llm.get_backend() or st.backend
-		else
-			Logger.warn(LOG, "llm.get_backend is not a function.")
-		end
-		if type(llm.get_active_profile) == "function" then
-			st.active_profile = llm.get_active_profile() or st.active_profile
-		else
-			Logger.warn(LOG, "llm.get_active_profile is not a function.")
-		end
-	end
-	Logger.debug(LOG, "LLM: enabled=%s backend=%s profile=%s.",
-		tostring(st.enabled), tostring(st.backend), tostring(st.active_profile))
-	return st
-end
-
-function H.collect_layout_state()
-	-- ergopti_base (active-layout detection) and caps (capslock) have no runtime
-	-- accessor — checkKeyboardModifiers only exposes shift/ctrl/alt/cmd/fn — so
-	-- they stay "n/a" instead of probing a function that does not exist. altgr and
-	-- shift are read live through the key_state adapter's real API.
-	local st = { ergopti_base = "n/a", altgr = "unknown", shift = "unknown", caps = "n/a", prefix_latch = "clean" }
-	local ok_ks, ks = pcall(require, "adapters.key_state")
-	if not ok_ks then
-		Logger.warn(LOG, "adapters.key_state unavailable: %s.", tostring(ks))
-	else
-		if type(ks.is_right_altgr_held) == "function" then st.altgr = ks.is_right_altgr_held() and "active" or "off"
-		else Logger.warn(LOG, "key_state.is_right_altgr_held is not a function.") end
-		if type(ks.isDown) == "function" then st.shift = ks.isDown("shift") and "active" or "off"
-		else Logger.warn(LOG, "key_state.isDown is not a function.") end
-	end
-	Logger.debug(LOG, "Layout: altgr=%s shift=%s.", tostring(st.altgr), tostring(st.shift))
-	return st
-end
-
---- Reads the remap engine's exact lease phase and Login Items approval state.
---- Karabiner has no tray row, so this is where a support request can see that
---- the engine is held waiting for approval; the lease is read in memory only.
---- @return table { phase, guardian_status, approval_required }
-function H.collect_remap_state()
-	local st = { phase = "unknown", guardian_status = "unknown", approval_required = false }
-	local ok_lc, LeaseController = pcall(require, "platform.remap.lease_controller")
-	if not ok_lc or type(LeaseController) ~= "table" or type(LeaseController.status) ~= "function" then
-		Logger.warn(LOG, "platform.remap.lease_controller unavailable: %s.", tostring(LeaseController))
-		return st
-	end
-	local ok_status, phase, snapshot = pcall(LeaseController.status)
-	if not ok_status then
-		Logger.warn(LOG, "Remap lease status could not be read: %s.", tostring(phase))
-		return st
-	end
-	st.phase = tostring(phase)
-	if type(snapshot) == "table" and type(snapshot.guardian_status) == "string" then
-		st.guardian_status = snapshot.guardian_status
-		st.approval_required = snapshot.guardian_status == "requires_approval"
-	end
-	Logger.debug(LOG, "Remap: phase=%s guardian=%s.", st.phase, st.guardian_status)
-	return st
-end
-
-function H.collect_hotstrings_state()
-	local st = { terminators = 0, magic_key = "", personal_count = 0, dynamic_count = 0, default_delay = "n/a" }
-	local ok_t, term = pcall(require, "modules.keymap.terminators")
-	if not ok_t then
-		Logger.warn(LOG, "modules.keymap.terminators unavailable: %s.", tostring(term))
-	elseif type(term.get_terminator_defs) ~= "function" then
-		Logger.warn(LOG, "terminators.get_terminator_defs is not a function.")
-	else
-		local defs = term.get_terminator_defs() or {}
-		local n = 0
-		for _ in pairs(defs) do n = n + 1 end
-		st.terminators = n
-	end
-	-- The magic key is the keymap's trigger char (owned by the registry).
-	local ok_km, km = pcall(require, "modules.keymap")
-	if not ok_km then
-		Logger.warn(LOG, "modules.keymap unavailable: %s.", tostring(km))
-	elseif type(km.get_trigger_char) ~= "function" then
-		Logger.warn(LOG, "keymap.get_trigger_char is not a function.")
-	else
-		st.magic_key = km.get_trigger_char() or ""
-	end
-	Logger.debug(LOG, "Hotstrings: terminators=%d magic_key='%s'.", st.terminators, tostring(st.magic_key))
-	return st
-end
-
-function H.collect_logs_info()
-	local info = {
-		unified_today = "",
-		errors_today = "",
-		errors_sink_active = false,
-		ring_lines = 0,
-		note = "Dedicated errors sink (WARNING/ERROR only) keeps the main daily log smaller and easier to read.",
-	}
-	-- Canonical log file paths live on the logger module as public constants,
-	-- re-pointed at the dated files by Logger.init_log_path() during boot.
-	info.unified_today      = Logger.UNIFIED_LOG_FILE or ""
-	info.errors_today       = Logger.ERRORS_LOG_FILE or ""
-	info.errors_sink_active = (info.errors_today ~= "")
-	-- Logger is already required at module level; re-require only to check ring_buffer_snapshot
-	if type(Logger.ring_buffer_snapshot) == "function" then
-		local rb = Logger.ring_buffer_snapshot() or {}
-		info.ring_lines = #rb
-	else
-		Logger.warn(LOG, "Logger.ring_buffer_snapshot is not a function.")
-	end
-	Logger.debug(LOG, "Logs info: ring_lines=%d errors_sink_active=%s.",
-		info.ring_lines, tostring(info.errors_sink_active))
-	return info
-end
-
-function H.collect_config_summary()
-	local sum = { overrides = 0, enabled_hotstrings = "n/a", enabled_gestures = "n/a", enabled_llm = "n/a", config_files = {} }
-	-- The files config_paths actually resolves, not hs.configdir-relative guesses:
-	-- the old list named <app bundle>/config.toml and a tap_hold.toml this driver
-	-- never reads.
-	local ConfigPaths = require("infra.config_paths")
-	if not ConfigPaths.is_initialized() then
-		Logger.warn(LOG, "config_paths is not initialised — cannot locate config files.")
-	else
-		table.insert(sum.config_files, ConfigPaths.get("ConfigTomlPath"))
-	end
-	Logger.debug(LOG, "Config summary: files=%d.", #sum.config_files)
-	return sum
-end
-
---- Collects what this platform does NOT have, and how much of it is explained.
----
---- This is the only place a user can ask why a menu row they read about is not
---- in their menu. Until 2026-08-03 there was no such place: `reason_key` existed
---- in the schema, was policed by a ratchet, and was read by nothing — and the
---- driver could not even enumerate its own absences, because the generated
---- manifest ships only the features the platform HAS.
----
---- The silent count is deliberately reported next to the explained one. A report
---- that listed only the explained absences would look complete while saying
---- nothing about the ones that matter most.
---- @return table { total, explained, silent, entries } where entries carry a reason.
-function H.collect_platform_coverage()
-	local ok_reader, Manifest = pcall(require, "infra.manifest_reader")
-	if not ok_reader or type(Manifest.coverage_gaps) ~= "function" then
-		Logger.warn(LOG, "manifest_reader exposes no coverage_gaps — platform coverage unavailable.")
+		Logger.warn(LOG, "Diagnostics could not read %s: %s.", label, tostring(value))
 		return nil
 	end
+	return value
+end
 
-	local explained, silent = Manifest.coverage_gaps()
-	local entries = {}
-	for _, gap in ipairs(explained) do
-		entries[#entries + 1] = {
-			path   = gap.path,
-			reason = i18n.get(gap.reason_key),
-			only   = table.concat(gap.platforms or {}, ", "),
-		}
-	end
-	table.sort(entries, function(a, b) return a.path < b.path end)
+--- The folder part of a path.
+--- @param path string|nil
+--- @return string|nil
+local function dirname(path)
+	if type(path) ~= "string" then return nil end
+	return path:match("^(.*)/[^/]*$")
+end
 
-	Logger.debug(LOG, "Platform coverage: %d unavailable, %d explained, %d silent.",
-		#explained + #silent, #explained, #silent)
+
+
+
+
+-- ========================
+-- ========================
+-- ======= 1/ Paths =======
+-- ========================
+-- ========================
+
+--- The folders and files the diagnostics page lists and opens by id.
+--- @param report_subdir string The schema's report.subdir.
+--- @return table
+function H.collect_paths(report_subdir)
+	local ConfigPaths = require("infra.config_paths")
+	local logs_dir = Logger.logs_dir()
 	return {
-		total     = #explained + #silent,
-		explained = #explained,
-		silent    = #silent,
-		entries   = entries,
+		config_dir      = ConfigPaths.is_initialized() and ConfigPaths.get_config_dir() or nil,
+		logs_dir        = logs_dir,
+		log_today       = Logger.today_log_path(),
+		errors_today    = Logger.today_errors_path(),
+		crash_dir       = read("the crash reports folder", function()
+			return require("modules.diagnostics.crash_reporter").reports_dir()
+		end),
+		diagnostics_dir = logs_dir and (logs_dir .. "/" .. report_subdir) or nil,
+		app_dir         = type(hs.configdir) == "string" and hs.configdir or nil,
+		launcher_log    = read("the launcher log", function()
+			local env = require("adapters.boot_fatal").LAUNCHER_LOG_ENV
+			local path = os.getenv(env)
+			return (type(path) == "string" and path ~= "") and path or nil
+		end),
 	}
 end
 
---- Formats one permission query result for the report.
---- @param granted boolean|nil Native state; nil when the query failed.
---- @param detail string|nil Query failure detail.
---- @return string label `granted`, `missing`, or `unknown (<detail>)`.
-local function permission_label(granted, detail)
+
+
+
+
+-- ===========================
+-- ===========================
+-- ======= 2/ Versions =======
+-- ===========================
+-- ===========================
+
+--- The versions a bug report is triaged by.
+--- @return table
+function H.collect_versions()
+	local SystemInfo = require("adapters.system_info")
+	local commit, source = require("infra.diagnostic_snapshot").resolve_commit()
+	local runtime = SystemInfo.runtime_version()
+	return {
+		ergopti_version = read("the ErgoptiPlus version", function()
+			return require("modules.updater").current_version()
+		end),
+		commit          = commit .. " (" .. source .. ")",
+		channel         = read("the update channel", function()
+			return require("modules.updater").installed_channel()
+		end),
+		runtime         = runtime and ("Hammerspoon " .. runtime) or nil,
+		-- The version the package pins, and whether its CLI is installed: the fork
+		-- ships no version file to read
+		karabiner       = read("the Karabiner-Elements version", function()
+			local manifest = require("vendor.karabiner-elements.manifest")
+			local installed = require("adapters.file_system").exists(require("platform.remap.ke_paths").CLI)
+			return tostring(manifest.version) .. (installed and "" or " (not installed)")
+		end),
+	}
+end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 3/ Hardware And Load =======
+-- ====================================
+-- ====================================
+
+--- The host's memory statistics, or nil.
+--- @return table|nil
+local function vm_stat()
+	return read("the memory statistics", function() return hs.host.vmStat() end)
+end
+
+--- One display: its resolution, backing scale and whether it is the main one.
+--- @param screen table hs.screen
+--- @param main table|nil The main screen.
+--- @return string|nil
+local function describe_display(screen, main)
+	local mode = screen:currentMode()
+	if type(mode) ~= "table" or not mode.w or not mode.h then return nil end
+	local text = string.format("%d×%d", mode.w, mode.h)
+	if type(mode.scale) == "number" and mode.scale > 0 then text = text .. string.format(" @%gx", mode.scale) end
+	-- Compared by id: every hs.screen query returns a new object
+	if main and screen:id() == main:id() then text = text .. " (main)" end
+	return text
+end
+
+--- The hardware section, without the facts only sysctl knows (a probe).
+--- @return table
+function H.collect_hardware()
+	local SystemInfo = require("adapters.system_info")
+	local stat = vm_stat()
+	local displays = read("the displays", function()
+		local main = hs.screen.mainScreen()
+		local list = {}
+		for _, screen in ipairs(hs.screen.allScreens()) do
+			local text = describe_display(screen, main)
+			if text then list[#list + 1] = text end
+		end
+		return list
+	end)
+	return {
+		arch      = SystemInfo.arch(),
+		ram_total = (type(stat) == "table" and type(stat.memSize) == "number" and stat.memSize > 0)
+			and stat.memSize or nil,
+		displays  = displays,
+	}
+end
+
+--- The names of the regular applications running now (opt-in).
+--- @return table
+local function running_apps()
+	local names = {}
+	for _, app in ipairs(hs.application.runningApplications()) do
+		-- Regular applications only: background agents are not what a user
+		-- means by "open applications"
+		if app:kind() == 1 then
+			local name = app:name()
+			if type(name) == "string" and name ~= "" then names[#names + 1] = name end
+		end
+	end
+	table.sort(names)
+	return names
+end
+
+--- The system section and its load.
+--- @param detailed boolean Whether the user ticked "Include details".
+--- @param uptime_sec number Seconds since the driver started.
+--- @return table
+function H.collect_system(detailed, uptime_sec)
+	local SystemInfo = require("adapters.system_info")
+	local stat = vm_stat()
+	local version = SystemInfo.os_version()
+	local ram_free = nil
+	if type(stat) == "table" and type(stat.pagesFree) == "number" and stat.pagesFree >= 0
+		and type(stat.pageSize) == "number" and stat.pageSize > 0 then
+		-- The page size comes from the host: assuming 4 KiB undercounts free
+		-- memory on the 16 KiB pages of Apple silicon
+		ram_free = stat.pagesFree * stat.pageSize
+	end
+	return {
+		os              = version and ("macOS " .. version) or nil,
+		locale          = read("the locale", function() return hs.host.locale.current() end),
+		keyboard_layout = SystemInfo.keyboard_layout(),
+		ram_free        = ram_free,
+		uptime          = uptime_sec,
+		elevated        = SystemInfo.elevated() == "true",
+		running_apps    = detailed and read("the open applications", running_apps) or nil,
+	}
+end
+
+
+
+
+
+-- ========================
+-- ========================
+-- ======= 4/ Input =======
+-- ========================
+-- ========================
+
+--- The keyboard state at this instant, and the remapping engine's phase.
+--- @return table
+function H.collect_input()
+	local KeyState = require("adapters.key_state")
+	local input = {
+		paused    = read("the pause state", function()
+			return require("modules.shortcuts.script_control").is_paused() == true
+		end),
+		shift     = KeyState.isDown("shift"),
+		ctrl      = KeyState.isDown("ctrl"),
+		alt       = KeyState.isDown("alt"),
+		altgr     = KeyState.is_right_altgr_held(),
+		meta      = KeyState.isDown("cmd"),
+		caps_lock = read("the CapsLock state", function()
+			local on, err = KeyState.capslock_on()
+			if on == nil then error(err) end
+			return on
+		end),
+	}
+	local phase = read("the remapping lease", function()
+		return (require("platform.remap.lease_controller").status())
+	end)
+	input.remap_phase = phase and tostring(phase) or nil
+	return input
+end
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 5/ Network, Features And AI =======
+-- ===========================================
+-- ===========================================
+
+--- The feature switches this driver can answer, as { id, enabled } items.
+--- @param state table|nil The menu state (the menu hands it over).
+--- @return table
+function H.collect_features(state)
+	local items = {}
+	local function add(id, enabled)
+		if type(enabled) == "boolean" then items[#items + 1] = { id = id, enabled = enabled } end
+	end
+	if type(state) == "table" then
+		if type(state.hotstrings) == "table" then
+			local any = false
+			for _, on in pairs(state.hotstrings) do if on == true then any = true end end
+			add("hotstrings", any)
+		end
+		add("layout", state.keymap)
+		add("shortcuts", state.shortcuts)
+		add("gestures", state.gestures)
+		add("metrics", state.keylogger_enabled)
+	end
+	add("llm", read("the AI switch", function()
+		return require("modules.llm").get_runtime_llm_enabled() == true
+	end))
+	return { items = items }
+end
+
+--- The network facts phase A can read: the Wi-Fi signal only. The network's
+--- name identifies a place, and a hash of it is reversed with a list of common
+--- names (no-network-identity); GitHub's reachability is a probe.
+--- @return table
+function H.collect_network()
+	local signal = require("adapters.network_info").getSignalStrength()
+	return { wifi_signal = type(signal) == "number" and string.format("%d%%", signal) or nil }
+end
+
+--- The features this platform lacks, from the generated manifest: the only
+--- place a user can ask why a menu row they read about is not in their menu.
+--- Every absence is listed, explained or not: a list of only the explained
+--- ones would look complete while hiding the ones that matter most. The page
+--- translates each reason key.
+--- @return table { items = { { feature, platforms, reason } } }
+function H.collect_unavailable()
+	local explained, silent = require("infra.manifest_reader").coverage_gaps()
+	local items = {}
+	for _, gaps in ipairs({ explained, silent }) do
+		for _, gap in ipairs(gaps) do
+			local names = {}
+			for _, code in ipairs(gap.platforms or {}) do
+				local name = PLATFORM_NAMES[code]
+				if not name then error("the manifest names an unknown platform: " .. tostring(code)) end
+				names[#names + 1] = name
+			end
+			items[#items + 1] = {
+				feature   = gap.path,
+				platforms = table.concat(names, ", "),
+				reason    = (type(gap.reason_key) == "string" and gap.reason_key ~= "") and gap.reason_key or nil,
+			}
+		end
+	end
+	table.sort(items, function(a, b) return a.feature < b.feature end)
+	return { items = items }
+end
+
+--- The AI section: the switch, the backend, the model and the profile.
+--- @return table
+function H.collect_ai()
+	local llm = require("modules.llm")
+	return {
+		ai_enabled = read("the AI switch", function() return llm.get_runtime_llm_enabled() == true end),
+		ai_backend = read("the AI backend", function() return llm.get_backend() end),
+		ai_model   = read("the AI model", function() return llm.get_current_model() end),
+		ai_profile = read("the AI profile", function() return llm.get_active_profile() end),
+	}
+end
+
+
+
+
+
+-- ==============================
+-- ==============================
+-- ======= 6/ Permissions =======
+-- ==============================
+-- ==============================
+
+--- A native permission answer as a schema state.
+--- @param id string The permission, for the log.
+--- @param granted boolean|nil
+--- @param detail string|nil Why the query failed.
+--- @return string "granted", "missing" or "unknown"
+local function permission_state(id, granted, detail)
 	if granted == true then return "granted" end
 	if granted == false then return "missing" end
-	return "unknown (" .. tostring(detail or "query failed") .. ")"
+	Logger.warn(LOG, "The %s permission could not be read: %s.", id, tostring(detail or "no answer"))
+	return "unknown"
 end
 
---- Reports the macOS privacy permissions of this runtime, without prompting.
---- The packaged runtime has its own identity, so a grant held by a stock
---- Hammerspoon never applies to it: a missing Screen Recording grant is why a
---- screenshot or a picked color comes back empty or wrong.
---- @return table { accessibility, screen_recording } labels.
-function H.collect_permissions()
-	local Accessibility = require("adapters.accessibility_permission")
-	local ScreenCapture = require("adapters.screen_capture")
-	local permissions = {
-		accessibility = permission_label(Accessibility.is_trusted()),
-		screen_recording = permission_label(ScreenCapture.permission_state()),
+--- The macOS permissions, read without prompting, in the schema's order.
+--- @param ids table The schema's permission ids for this driver, ordered.
+--- @return table
+function H.collect_permissions(ids)
+	local states = {
+		accessibility    = function()
+			return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
+		end,
+		screen_recording = function()
+			return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
+		end,
+		-- Hammerspoon has no query for Input Monitoring that does not prompt, and
+		-- the grant belongs to the Karabiner grabber rather than to this process
+		input_monitoring = function() return "unknown" end,
+		login_items      = function()
+			local _, snapshot = require("platform.remap.lease_controller").status()
+			local status = type(snapshot) == "table" and snapshot.guardian_status or nil
+			return GUARDIAN_PERMISSION[status] or "unknown"
+		end,
 	}
-	Logger.debug(LOG, "Permissions: accessibility=%s screen_recording=%s.",
-		permissions.accessibility, permissions.screen_recording)
-	return permissions
+	local items = {}
+	for _, id in ipairs(ids) do
+		local reader = states[id]
+		if not reader then error("no reader for the permission " .. tostring(id)) end
+		items[#items + 1] = { id = id, state = read("the permission " .. id, reader) or "unknown" }
+	end
+	return { items = items }
 end
 
 
 
 
---- ==============================================
---- ==============================================
---- ======= 3/ Formatter =========================
---- ==============================================
---- ==============================================
 
---- Converts raw seconds to a human-readable uptime string (e.g. "2h 04m 37s").
---- Delegates to the shared healthcheck.snapshot module so the format logic
---- lives in exactly one place across all drivers
---- @param sec number Elapsed seconds.
+-- ==========================
+-- ==========================
+-- ======= 7/ Devices =======
+-- ==========================
+-- ==========================
+
+--- The kind of a device, from its USB product name or its Bluetooth minor
+--- type ("Keyboard", "Mouse", "Trackpad").
+--- @param name string|nil
 --- @return string
-function H.format_uptime(sec)
-	return Snapshot.format_uptime(sec)
+function H.device_kind(name)
+	local lower = type(name) == "string" and name:lower() or ""
+	for _, entry in ipairs(DEVICE_KINDS) do
+		if lower:find(entry.pattern, 1, true) then return entry.kind end
+	end
+	return "other"
+end
+
+--- The attached USB devices: bus, kind and ids, and their names only when
+--- the user ticked "Include details". hs.usb sees no Bluetooth device: the
+--- bluetooth probe (ui.healthcheck.probes) completes the list.
+--- @param detailed boolean
+--- @return table
+function H.collect_peripherals(detailed)
+	local items = {}
+	for _, device in ipairs(read("the USB devices", function() return hs.usb.attachedDevices() end) or {}) do
+		local item = {
+			bus        = "usb",
+			kind       = H.device_kind(device.productName),
+			vendor_id  = type(device.vendorID) == "number" and string.format("%04x", device.vendorID) or nil,
+			product_id = type(device.productID) == "number" and string.format("%04x", device.productID) or nil,
+		}
+		if detailed then item.name = device.productName end
+		items[#items + 1] = item
+	end
+	return { items = items }
 end
 
 return H

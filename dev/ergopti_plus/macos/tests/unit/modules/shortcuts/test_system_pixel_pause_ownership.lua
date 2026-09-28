@@ -507,3 +507,37 @@ helpers.describe("system_pixel exact async owner: start admission", function()
 			end)
 	end
 end)
+
+
+-- ======================================================
+-- ======================================================
+-- ======= 7/ Parent Scopes ==============================
+-- ======================================================
+-- ======================================================
+
+helpers.describe("system_pixel parent scopes", function()
+	helpers.it("a paused shortcut scope leaves the gesture's pixel read open", function()
+		local subject = fresh_pixel_owner()
+		helpers.assert_eq(subject.pause_pixel_actions(), true)
+		helpers.assert_eq(subject.copy_pixel_color(), false,
+			"the paused shortcut scope must refuse its own pixel read")
+		helpers.assert_eq(subject.copy_pixel_color("gestures"), true,
+			"a gesture must not be fenced by the shortcuts feature")
+		helpers.assert_eq(subject.has_pending_pixel_action("gestures"), true)
+		helpers.assert_eq(subject.has_pending_pixel_action(), false,
+			"the gesture's capture belongs to the gesture scope only")
+	end)
+
+	helpers.it("a gesture PAUSE leaves the shortcut's capture running", function()
+		local subject, fixture = fresh_pixel_owner()
+		helpers.assert_eq(subject.interactive_screenshot(), true)
+		helpers.assert_eq(subject.pause_pixel_actions("gestures"), true)
+		helpers.assert_eq(fixture.tasks[1].terminate_calls, 0,
+			"the shortcut's screencapture keeps running through a gesture PAUSE")
+		helpers.assert_eq(subject.is_pixel_actions_paused(), false)
+		helpers.assert_eq(subject.is_pixel_actions_paused("gestures"), true)
+		helpers.assert_eq(subject.resume_pixel_actions("gestures"), true)
+		helpers.assert_eq(subject.copy_pixel_color("gestures"), false,
+			"one capture at a time, whatever its parent")
+	end)
+end)

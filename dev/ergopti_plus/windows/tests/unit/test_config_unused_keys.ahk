@@ -130,6 +130,71 @@ _CUK_MissingFileHasNothingToClean() {
 Test("config unused keys: a missing config has nothing to clean "
 	. "(config-unused-keys-missing)", _CUK_MissingFileHasNothingToClean)
 
+_CUK_LanguageCategoryGatesHaveAnOwner() {
+	Target := ManifestBuildFeaturesMap()
+	Count := 0
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Category in Pack["categories"] {
+			Owner := ""
+			AssertEqual("", TomlConfigUnknownKind(Target, "category_enabled", Category["v2"], &Owner),
+				"FeatureState reads the language gate " . Category["v2"])
+			AssertEqual("FeatureState", Owner, "the generic feature loader must leave this value to its actual reader")
+			Count += 1
+		}
+	}
+	AssertTrue(Count > 0, "the shipped language packs must exercise at least one category gate")
+	AssertEqual("leaf", TomlConfigUnknownKind(Target, "category_enabled", "french_autocorection"),
+		"a language-looking typo must remain an unknown key")
+}
+Test("config language category gates remain owned and cannot be cleaned as unused (language-category-owner)",
+	_CUK_LanguageCategoryGatesHaveAnOwner)
+
+_CUK_UnknownKeysWarnOnceWithoutErrors() {
+	Dir := _CUK_NewDir()
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, "[metrics]`nenabled = true`nobsolete_metric = true`n[old.section]`nenabled = true`n"))
+		ApplyConfigToml(ManifestBuildFeaturesMap(), Path)
+		Errors := 0, Warnings := 0
+		for Line in Lines {
+			if InStr(Line, "[TomlConfigLoader]") {
+				if InStr(Line, "[ERROR]")
+					Errors += 1
+				if InStr(Line, "[WARNING]")
+					Warnings += 1
+			}
+		}
+		AssertEqual(0, Errors, "unused keys are cleanup candidates, not runtime failures")
+		AssertEqual(1, Warnings, "one warning summarizes the whole file")
+	} finally {
+		LoggerClearTestSink()
+		DirDelete(Dir, true)
+	}
+}
+Test("config unused keys: obsolete entries produce one warning and no error (unused-config-warning)",
+	_CUK_UnknownKeysWarnOnceWithoutErrors)
+
+_CUK_StartupOffersTheExistingCleanupWithoutWriting() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteFixture(Dir)
+		Before := FSReadUtf8Exact(Path)
+		Offered := []
+		AssertTrue(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (FilePath) => Offered.Push(FilePath)))
+		AssertEqual(1, Offered.Length, "one file produces one cleanup proposal")
+		AssertEqual(Path, Offered[1], "the proposal targets the exact configuration file")
+		AssertEqual(Before, FSReadUtf8Exact(Path), "offering the tool does not accept cleanup for the user")
+		AssertFalse(ConfigUnusedKeysOffer(Dir . "\absent.toml", ConfigUnusedKeysFind, (*) => Offered.Push("unexpected")))
+		AssertTrue(FSWriteDurable(Path, "[metrics]`nenabled = true`n"))
+		AssertFalse(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (*) => Offered.Push("unexpected")))
+		AssertEqual(1, Offered.Length, "a clean or absent configuration needs no proposal")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: startup offers cleanup once without accepting it (unused-config-warning)",
+	_CUK_StartupOffersTheExistingCleanupWithoutWriting)
+
 
 
 
@@ -270,7 +335,7 @@ Test("config unused keys: a refused write reports failure and keeps the config "
 
 _CUK_MenuDeclaresTheAction() {
 	Found := false
-	for Entry in _MM_GetManifestRoot()["global_actions"] {
+	for Entry in _MM_GetManifestRoot()["configuration_menu"] {
 		if (Entry.Get("id", "") != "clean_unused_keys")
 			continue
 		Found := true
@@ -281,11 +346,239 @@ _CUK_MenuDeclaresTheAction() {
 		AssertFalse(Entry.Has("platforms"), "the cleanup row must not be restricted to one platform")
 		AssertFalse(Entry.Has("reason_key"), "an unrestricted row has no platform reason")
 	}
-	AssertTrue(Found, "global_actions must declare clean_unused_keys")
-	Body := _DriverFuncBody("_MI_BuildGlobalActionsMenu")
-	AssertTrue(Body != "", "_MI_BuildGlobalActionsMenu must be found")
-	AssertTrue(InStr(Body, '"clean_unused_keys", ShowUnusedConfigKeysCleanup') > 0,
-		"the Windows global actions menu must dispatch clean_unused_keys")
+	AssertTrue(Found, "configuration_menu must declare clean_unused_keys")
+	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
+	AssertTrue(Body != "", "_MI_BuildConfigurationMenu must be found")
+	AssertTrue(RegExMatch(Body, '"clean_unused_keys",\s+ShowUnusedConfigKeysCleanup') > 0,
+		"the Windows Configuration menu must dispatch clean_unused_keys")
 }
-Test("config unused keys: the global actions menu declares and dispatches the cleanup "
+Test("config unused keys: the Configuration menu declares and dispatches the cleanup "
 	. "(config-unused-keys-menu)", _CUK_MenuDeclaresTheAction)
+
+_CUK_StartupDefersCleanupUntilReady() {
+	Source := _DriverSourceNoComments()
+	AssertTrue(Source != "", "driver source must be readable")
+	; The entry point stays contiguous in the source helper, so these positions
+	; prove the timer is armed after readiness even when the entry is relocated.
+	Ready := InStr(Source, "_DriverReady := true")
+	Offer := InStr(Source, "SetTimer(ConfigUnusedKeysOffer.Bind(ConfigurationFile), -MENU_BUILD_DEFER_MS)")
+	AssertTrue(Ready > 0, "the driver must publish readiness")
+	AssertTrue(Offer > Ready, "the cleanup prompt must be deferred until after readiness")
+}
+Test("config unused keys: startup schedules the cleanup offer after readiness (unused-config-warning)",
+	_CUK_StartupDefersCleanupUntilReady)
+
+; A nonmodal preview must not authorize deletion of bytes changed after opening.
+_CUK_WebPreviewLifecycle() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteFixture(Dir)
+		Session := ConfigCleanupSession(Path)
+		State := Session.Handle("ready")
+		AssertEqual("ready", State["status"])
+		AssertEqual(2, State["keys"].Length)
+		Before := FSReadUtf8Exact(Path)
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", "stale")))
+		AssertEqual(Before, FSReadUtf8Exact(Path))
+		AssertTrue(FSWriteDurable(Path, Before . "`n# changed after preview`n"))
+		Changed := FSReadUtf8Exact(Path)
+		AssertEqual("changed", Session.Handle(Map("action", "clean", "session", Session.Token))["status"])
+		AssertEqual(Changed, FSReadUtf8Exact(Path))
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", Session.Token)), "refresh is required")
+		AssertEqual("ready", Session.Handle(Map("action", "refresh", "session", Session.Token))["status"])
+		Result := Session.Handle(Map("action", "clean", "session", Session.Token,
+			"path", Dir . "\untrusted.toml", "keys", []))
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Changed, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", Session.Token)), "one confirmed transaction only")
+		Decoded := JsonParse(Session.Json())
+		AssertFalse(Decoded.Has("source"), "private source bytes never enter the page contract")
+		Session.Close()
+		AssertEqual(0, Session.Handle("ready"), "late callbacks cannot reopen a closed session")
+	} finally DirDelete(Dir, true)
+}
+Test("config cleanup webview: changed files require refresh, one backup and no stale action (config-cleanup-webview)",
+	_CUK_WebPreviewLifecycle)
+
+_CUK_WebPreviewCancelAndLongList() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Source := "[obsolete]`n"
+		Loop 80
+			Source .= "setting_" . A_Index . " = true`n"
+		AssertTrue(FSWriteDurable(Path, Source))
+		Session := ConfigCleanupSession(Path)
+		AssertEqual(80, Session.Handle("ready")["keys"].Length)
+		AssertEqual(80, JsonParse(Session.Json())["keys"].Length, "the bridge never truncates at 30")
+		Session.Handle(Map("action", "close", "session", Session.Token))
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", Session.Token)))
+		AssertEqual(Source, FSReadUtf8Exact(Path), "closing writes nothing")
+	} finally DirDelete(Dir, true)
+}
+Test("config cleanup webview: all 80 entries survive and cancellation preserves bytes (config-cleanup-webview)",
+	_CUK_WebPreviewCancelAndLongList)
+
+; Models the message pump inside WebView2.create without creating a native view.
+class _CUK_DeferredGui {
+	Hidden := false
+	Destroyed := false
+	Hide() {
+		this.Hidden := true
+	}
+	Destroy() {
+		this.Destroyed := true
+	}
+}
+
+class _CUK_DeferredController {
+	Closed := false
+	Close() {
+		this.Closed := true
+	}
+}
+
+_CUK_FakeCleanupBuild(Host) {
+	Host.Gui := _CUK_DeferredGui()
+	Host.ProbeGui := Host.Gui
+	Host.Close()
+	AssertFalse(Host.ProbeGui.Destroyed, "creation must retain its native parent until the controller returns")
+	AssertTrue(Host.ProbeGui.Hidden, "the cancelled window disappears immediately")
+	AssertEqual(0, Host.Session.Handle("ready"), "cancellation revokes the session during the await")
+	AssertFalse(ConfigCleanupWindow.Open("ignored.toml"), "a cancelled build cannot be reused or replaced")
+	Host.Controller := _CUK_DeferredController()
+	Host.ProbeController := Host.Controller
+	Host.WebView := {}
+	Host.ResetDone := false
+	return true
+}
+
+_CUK_WebWindowDeferredClose() {
+	PreviousBuild := WebViewHost.Prototype.GetOwnPropDesc("_Build")
+	PreviousCurrent := ConfigCleanupWindow.Current
+	Host := ConfigCleanupWindow()
+	Host.Session := ConfigCleanupSession("unused-by-this-test.toml")
+	Host.AppId := "config_cleanup"
+	ConfigCleanupWindow.Current := Host
+	WebViewHost.Prototype.DefineProp("_Build", {Call: _CUK_FakeCleanupBuild})
+	try {
+		Host._Build()
+		AssertTrue(Host.Cancelled)
+		AssertFalse(Host.Building)
+		AssertTrue(Host.ResetDone, "a late controller cannot resurrect a closed host")
+		AssertTrue(Host.ProbeGui.Destroyed)
+		AssertTrue(Host.ProbeController.Closed)
+		AssertEqual(0, Host.Gui)
+		AssertEqual(0, ConfigCleanupWindow.Current, "the retired owner releases the singleton")
+	} finally {
+		WebViewHost.Prototype.DefineProp("_Build", PreviousBuild)
+		Host.Building := false
+		Host.Close()
+		ConfigCleanupWindow.Current := PreviousCurrent
+	}
+}
+Test("config cleanup webview: close during native creation releases the late controller (config-cleanup-webview)",
+	_CUK_WebWindowDeferredClose)
+
+_CUK_ActionParameterOwnership() {
+	Target := ManifestBuildFeaturesMap()
+	for Binding in ["gesture__tap_4", "keyboard__ctrl_k", "script__pause", "tap_hold__caps_lock", "tap_key__number_row_left"] {
+		Owner := ""
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Binding . "__open_url", &Owner),
+			"parameterized bindings must remain owned: " . Binding)
+		AssertEqual("Gestures", Owner)
+	}
+	for Key in ["gesture__tap_4__missing_action", "gesture__tap_4__none", "bogus__tap_4__open_url", "gesture____open_url"]
+		AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", Key), "unknown parameters remain visible: " . Key)
+}
+Test("action parameters have a declared owner without exempting unknown keys (config-action-parameter-owner)",
+	_CUK_ActionParameterOwnership)
+
+_CUK_ActionParameterLabels() {
+	global _I18nCache, _I18nCacheLoaded, _SharedDir, GestureActionParameters
+	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded, SavedParameters := GestureActionParameters
+	try {
+		Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+		AssertEqual(21, Locales.Length)
+		for Locale in Locales {
+			Strings := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+			_I18nCache := Strings, _I18nCacheLoaded := true
+			for Action in ["open_url", "search_web", "wrap_selection", "send_text", "send_key", "send_shortcut"] {
+				Label := Strings["sg_actions." . Action]
+				Assert(RegExMatch(Label, "\[[^\[\]]*\]$", &Marker), Locale . ": " . Action)
+				GestureActionParameters := Map()
+				AssertEqual(Label, GestureActionDisplayLabel(Action, "gesture__tap_4"))
+				for Value in ["https://apple.com", "https://example.org/?q=%s", "[x] 50% & café"] {
+					GestureActionParameters["gesture__tap_4__" . Action] := Value
+					AssertEqual(SubStr(Label, 1, Marker.Pos - 1) . "[" . Value . "]",
+						GestureActionDisplayLabel(Action, "gesture__tap_4"), Locale . ": " . Action)
+				}
+			}
+		}
+	} finally {
+		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded, GestureActionParameters := SavedParameters
+	}
+}
+Test("action labels replace the configurable marker in every locale (action-parameter-label)",
+	_CUK_ActionParameterLabels)
+
+_CUK_ActionParameterRoundTrip() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache
+	OriginalConfig := ConfigurationFile
+	OriginalParameters := GestureActionParameters
+	OriginalAssignments := GestureAssignments.Clone()
+	OriginalCache := _IniCache
+	Dir := _CUK_NewDir()
+	try {
+		ConfigurationFile := Dir . "\config.toml"
+		GestureActionParameters := Map()
+		AssertTrue(GestureSaveAssignment("tap_4", "open_url"))
+		AssertTrue(GestureSetActionParameter("gesture__tap_4", "open_url", "https://apple.com"))
+		AssertTrue(TOML_BatchWrite(ConfigurationFile, [{ Section: "action_parameters", Key: "obsolete", Value: "unused" }]))
+		_IniCache := ParseTomlFile(ConfigurationFile)
+		GestureActionParameters := Map()
+		GestureAssignments["tap_4"] := "none"
+		GesturesReadConfig()
+		AssertEqual("open_url", GestureAssignments["tap_4"])
+		AssertEqual("https://apple.com", GestureGetActionParameter("gesture__tap_4", "open_url"))
+		Found := 0
+		for Row in _GES_SlotRows() {
+			if InStr(Row.Get("label", ""), "https://apple.com") {
+				Found += 1
+				AssertTrue(InStr(Row["label"], t("gesture.slots.tap_4")) > 0)
+			}
+		}
+		AssertEqual(1, Found, "the real four-finger menu row shows the chosen URL after reload")
+		Scan := ConfigUnusedKeysFind(ConfigurationFile)
+		AssertEqual("action_parameters.obsolete=section", _CUK_Join(_CUK_Ids(Scan["keys"])))
+		AssertEqual("removed", ConfigUnusedKeysRemove(ConfigurationFile, Scan["keys"], "20990101-000099")["status"])
+		_IniCache := ParseTomlFile(ConfigurationFile)
+		GesturesReadConfig()
+		AssertEqual("https://apple.com", GestureGetActionParameter("gesture__tap_4", "open_url"),
+			"cleaning an unrelated obsolete key must preserve the configured URL")
+	} finally {
+		ConfigurationFile := OriginalConfig
+		GestureActionParameters := OriginalParameters
+		GestureAssignments := OriginalAssignments
+		_IniCache := OriginalCache
+		DirDelete(Dir, true)
+	}
+}
+Test("four-finger URL survives real persistence reload cleanup and menu rendering (config-action-parameter-owner)",
+	_CUK_ActionParameterRoundTrip)
+
+; A stale native handle must not report that the existing preview was reopened.
+_CUK_WebWindowReuseRefusal() {
+	Previous := ConfigCleanupWindow.Current
+	Host := ConfigCleanupWindow()
+	Host.Gui := { Hwnd: 0 }
+	Host.ResetDone := false
+	ConfigCleanupWindow.Current := Host
+	try {
+		AssertFalse(ConfigCleanupWindow.Open("unused-by-reuse.toml"),
+			"the real window adapter must propagate activation refusal")
+		AssertTrue(ConfigCleanupWindow.Current == Host, "refusal must retain the admitted preview owner")
+	} finally ConfigCleanupWindow.Current := Previous
+}
+Test("config cleanup webview: reuse consumes the native activation refusal (config-cleanup-reuse)",
+	_CUK_WebWindowReuseRefusal)

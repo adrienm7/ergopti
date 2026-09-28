@@ -133,7 +133,7 @@ local function load_real_shortcut_delivery_owner()
 		return handle
 	end
 	local system_actions = setmetatable({
-		bind_instant_screenshot = function() return make_handle(noop, "at_hash") end,
+		bind_tap_keys = function() return make_handle(noop, "tap_keys") end,
 		bind_layer_scroll = function() return make_handle(noop, "layer_scroll") end,
 		bind_wrap_text_if_selected = make_wrap_handle,
 		bind_cmd_star = function() return make_handle(noop, "cmd_star") end,

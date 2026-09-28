@@ -3,15 +3,22 @@
 --- ==============================================================================
 --- MODULE: Menu About / Update
 --- DESCRIPTION:
---- Builds the "About / Update" sub-menu for the macOS menubar. User-initiated
---- update checks cross the narrow launcher adapter so Sparkle alone verifies,
---- downloads, installs, and relaunches the outer application bundle.
+--- Builds the "About / Update" sub-menu for the macOS menubar. The automatic
+--- checks are the Lua driver's (modules/updater/auto_check.lua); the check row
+--- crosses the narrow launcher adapter so Sparkle verifies, downloads, installs,
+--- and relaunches the outer application bundle only when the user clicks it.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Native ownership: Sparkle's standard controller provides authenticated
 ---    download progress and replaces the actual outer bundle.
---- 2. Build-owned channel: stable and development bundles keep the immutable
----    feed stamped by CI; the Lua menu cannot diverge from Sparkle's feed.
+--- 1b. Lua cadence: the frequency picker lists the shared presets and persists
+---    through the menu session's automatic-check owner (ctx.update_checks); the
+---    check row names a release that owner found.
+--- 2. One channel owner: the rows list every channel of the shared registry and
+---    subscribe through the menu session's channel owner (ctx.channel_owner,
+---    modules/updater/channel.lua), which persists the choice and
+---    tells the launcher which feed Sparkle reads; the check names the same
+---    channel, so the menu cannot diverge from Sparkle's feed.
 --- ==============================================================================
 
 local M = {}
@@ -59,11 +66,50 @@ end
 
 --- Opens the dedicated changelog window for the given channel.
 --- Delegates to ui.changelog which shows a webview with the full release list
---- and markdown-rendered notes instead of a plain text dialog.
---- @param channel string "main" or "dev"
-local function show_changelog(channel)
+--- and markdown-rendered notes instead of a plain text dialog. Its banner
+--- subscribes through the same channel owner as the rows below.
+--- @param channel string Registry channel shown first (the subscribed one).
+--- @param owner table|nil The menu session's update-channel owner.
+local function show_changelog(channel, owner)
 	Logger.info(LOG, "Opening changelog window (channel=%s).", channel)
-	changelog.open({ channel = channel })
+	changelog.open({ channel = channel, channel_owner = owner })
+end
+
+
+
+
+--- "Update to {tag}" by plain substitution: a tag is outside data, and a "%" in
+--- it would be read as a capture reference in a gsub replacement.
+--- @param tag string Release tag.
+--- @return string label
+local function update_now_label(tag)
+	local template = i18n.get("menu.about.update_now")
+	local at = template:find("{tag}", 1, true)
+	if not at then return template .. " " .. tag end
+	return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
+end
+
+--- The check-frequency picker: one row per shared preset, ticked on the
+--- interval in force, whose click persists through the automatic-check owner.
+--- @param checks table The menu session's automatic-check owner.
+--- @return table row A provider row with its items.
+local function frequency_picker(checks)
+	local current = checks.interval_code()
+	local rows = {}
+	for _, preset in ipairs(checks.presets()) do
+		rows[#rows + 1] = {
+			label = i18n.get("menu.about.frequency." .. preset.code),
+			checked = preset.code == current,
+			action = function()
+				Logger.info(LOG, "User chose the check frequency '%s'.", preset.code)
+				checks.set_interval(preset.seconds)
+			end,
+		}
+	end
+	return {
+		label = i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. current),
+		items = rows,
+	}
 end
 
 
@@ -79,7 +125,11 @@ end
 --- @param ctx table Menu context.
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
-	local channel = Updater.default_channel()
+	local owner = type(ctx) == "table" and ctx.channel_owner or nil
+	if type(owner) ~= "table" then
+		Logger.error(LOG, "No update channel owner in the menu context — the channel rows are left out.")
+	end
+	local channel = owner and owner.get() or Updater.installed_channel()
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
@@ -106,15 +156,39 @@ function M.build(ctx)
 
 	table.insert(menu_items, { separator = true })
 
-	if not local_src then
-		-- A packaged build delegates the entire transaction to Sparkle.
+	-- One row per registry channel, ticked on the subscribed one, right before the
+	-- check row. The owner persists the choice and refreshes the menu.
+	local registry = Updater.channels()
+	for _, id in ipairs(owner and registry.ids() or {}) do
 		table.insert(menu_items, {
+			label = i18n.get(registry.channel(id).menu_label_key),
+			checked = id == channel,
+			action = function()
+				Logger.info(LOG, "User chose the update channel '%s'.", id)
+				owner.set(id)
+			end,
+		})
+	end
+
+	if not local_src then
+		-- A packaged build hands the transaction to Sparkle on this click only;
+		-- the automatic checks name the release they found here.
+		local checks = type(ctx) == "table" and ctx.update_checks or nil
+		local latest = type(checks) == "table" and checks.latest() or nil
+		local check_row = {
 			label = i18n.get("menu.about.check_for_updates"),
 			action = function()
 				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
-				UpdateLauncher.request_check()
+				UpdateLauncher.request_check(channel)
 			end,
-		})
+		}
+		if latest then check_row.label = update_now_label(latest.tag) end
+		table.insert(menu_items, check_row)
+		if type(checks) == "table" then
+			table.insert(menu_items, frequency_picker(checks))
+		else
+			Logger.error(LOG, "No automatic update-check owner in the menu context — the frequency rows are left out.")
+		end
 	end
 
 	-- The updater block above is the manifest's `about_updates` list; the two rows
@@ -126,7 +200,7 @@ function M.build(ctx)
 	render_ctx.commands = {
 		["about_changelog"] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
-			show_changelog(channel)
+			show_changelog(channel, owner)
 		end,
 		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
 	}

@@ -64,7 +64,7 @@ helpers.describe("gesture dispatch: naming the slot", function()
 	helpers.it("names a swipe by finger count and direction", function()
 		local M = helpers.load_module("modules.gestures.manager")
 		enable_manager(M)
-		M.set_action("swipe_5_up", "mission_control")
+		helpers.assert_true(M.set_action("swipe_5_up", "lock_screen"), "a Linux catalogue id binds")
 
 		helpers.assert_true(M.dispatch_gesture({ fingers = 5, direction = "up", tap = false }),
 			"a five-finger swipe up must reach swipe_5_up — the slot no libinput-based "
@@ -74,7 +74,7 @@ helpers.describe("gesture dispatch: naming the slot", function()
 	helpers.it("names a tap by finger count", function()
 		local M = helpers.load_module("modules.gestures.manager")
 		enable_manager(M)
-		M.set_action("tap_4", "app_window_previous")
+		helpers.assert_true(M.set_action("tap_4", "app_window_previous"), "a Linux catalogue id binds")
 
 		helpers.assert_true(M.dispatch_gesture({ fingers = 4, direction = nil, tap = true }),
 			"libinput implements tapping for one, two and three fingers only, and "
@@ -127,7 +127,7 @@ helpers.describe("gesture dispatch: when it must not fire", function()
 	helpers.it("does nothing while gestures are disabled", function()
 		local M = helpers.load_module("modules.gestures.manager")
 		enable_manager(M)
-		M.set_action("swipe_5_up", "mission_control")
+		helpers.assert_true(M.set_action("swipe_5_up", "lock_screen"), "a Linux catalogue id binds")
 		M.disable()
 		helpers.assert_true(not M.dispatch_gesture({ fingers = 5, direction = "up", tap = false }),
 			"the master toggle has to gate the new path as well as the old one")
@@ -146,7 +146,7 @@ helpers.describe("gesture dispatch: when it must not fire", function()
 	helpers.it("does not invent a sixth finger", function()
 		local M = helpers.load_module("modules.gestures.manager")
 		enable_manager(M)
-		M.set_action("tap_5", "show_desktop")
+		helpers.assert_true(M.set_action("tap_5", "lock_screen"), "a Linux catalogue id binds")
 		-- Six or more fingers clears every BTN_TOOL_* bit, so a decoder that got
 		-- confused could report a large count. It must land on the top slot the
 		-- catalogue has rather than name one that does not exist.

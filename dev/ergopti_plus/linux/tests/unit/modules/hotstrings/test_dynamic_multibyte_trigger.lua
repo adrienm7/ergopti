@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local restore_family_preferences = require("tests.support.dynamic_hotstrings_fixture").install()
 
 
 --- Runs one body with an observable injector and restores the package cache.
@@ -77,3 +78,5 @@ helpers.describe("dynamic hotstrings: multibyte trigger", function()
 		helpers.assert_true(manager.is_enabled() == false)
 	end)
 end)
+
+restore_family_preferences()

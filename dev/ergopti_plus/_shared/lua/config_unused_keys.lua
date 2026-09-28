@@ -24,7 +24,8 @@
 ---    still holds the bytes that were backed up.
 --- 4. Conservative addressing. Keys outside any table, quoted keys, and
 ---    array-of-tables records are never offered: removing them by text alone
----    cannot be proven exact.
+---    cannot be proven exact. Metadata tables ([_meta] and any other [_*]) are
+---    never offered either, as on Windows.
 --- ==============================================================================
 
 local M = {}
@@ -38,7 +39,6 @@ end
 local TomlCodec     = require("toml_codec")
 local TomlWriter    = require("toml_codec.writer")
 local RecordScanner = require("toml_codec.record_scanner")
-local Bom           = require("toml_codec.bom")
 local LOG           = "config_unused_keys"
 
 --- The confirmation dialog lists at most this many keys; the rest are counted.
@@ -118,159 +118,8 @@ end
 -- =================================
 -- =================================
 
---- Splits source bytes into physical lines, each keeping its exact terminator.
---- @param source string Complete file content.
---- @return table lines Array of `{ text, eol }`.
-local function split_lines(source)
-	local lines = {}
-	local cursor = 1
-	while cursor <= #source do
-		local cr_at = source:find("\r", cursor, true)
-		local lf_at = source:find("\n", cursor, true)
-		local eol_at = (cr_at and lf_at) and math.min(cr_at, lf_at) or cr_at or lf_at
-		if not eol_at then
-			lines[#lines + 1] = { text = source:sub(cursor), eol = "" }
-			break
-		end
-		local eol = source:sub(eol_at, eol_at)
-		local eol_last = eol_at
-		if eol == "\r" and source:sub(eol_at + 1, eol_at + 1) == "\n" then
-			eol = "\r\n"
-			eol_last = eol_at + 1
-		end
-		lines[#lines + 1] = { text = source:sub(cursor, eol_at - 1), eol = eol }
-		cursor = eol_last + 1
-	end
-	return lines
-end
-
-local function trim(value)
-	return (value:match("^%s*(.-)%s*$")) or ""
-end
-
---- Splits a dotted bare-key path. Returns nil for anything that is not a plain
---- run of bare segments (quotes, empty segments), which is never offered.
---- @param text string Key or header body.
---- @return table|nil segments
-local function bare_segments(text)
-	if text:find("[\"']") then return nil end
-	local segments = {}
-	for part in (text .. "."):gmatch("([^%.]*)%.") do
-		local segment = trim(part)
-		if not segment:match("^[%w_%-]+$") then return nil end
-		segments[#segments + 1] = segment
-	end
-	return #segments > 0 and segments or nil
-end
-
---- Parses a table header line.
---- @param trimmed string The trimmed physical line, starting with "[".
---- @return table header `{ array, segments|nil }`; segments is nil when unaddressable.
-local function parse_header(trimmed)
-	local array = trimmed:sub(1, 2) == "[["
-	local body, rest
-	if array then
-		body, rest = trimmed:match("^%[%[([^%]]*)%]%](.*)$")
-	else
-		body, rest = trimmed:match("^%[([^%]]*)%](.*)$")
-	end
-	local header = { array = array, segments = nil }
-	if body and (trim(rest) == "" or trim(rest):sub(1, 1) == "#") then
-		header.segments = bare_segments(body)
-	end
-	return header
-end
-
---- Whether prefix is a leading run of segments.
---- @param segments table
---- @param prefix table
---- @return boolean
-local function starts_with(segments, prefix)
-	if #prefix > #segments then return false end
-	for index = 1, #prefix do
-		if segments[index] ~= prefix[index] then return false end
-	end
-	return true
-end
-
---- Finds every assignment record of a TOML document with its exact line span.
----
---- Continuation lines of arrays, inline tables and multiline strings belong to
---- the record that opened them (the shared record scanner decides), so a line
---- that merely looks like a header inside a value is data.
---- @param source string Complete file content.
---- @return table|nil scan `{ lines, headers, records }`, nil when a value never closes.
---- @return string|nil error_detail
-function M.scan_records(source)
-	local lines = split_lines(source)
-	local headers, records = {}, {}
-	local current = nil
-	local open = nil
-	local depth, multiline_quote = 0, nil
-	for index, line in ipairs(lines) do
-		local raw = index == 1 and Bom.strip_prefix(line.text) or line.text
-		if depth > 0 or multiline_quote ~= nil then
-			depth, multiline_quote = RecordScanner.advance(raw, depth, multiline_quote)
-			open.last = index
-			open.value_parts[#open.value_parts + 1] = trim(raw)
-		else
-			local trimmed = trim(raw)
-			if trimmed == "" or trimmed:sub(1, 1) == "#" then
-				open = nil
-			elseif trimmed:sub(1, 1) == "[" then
-				current = parse_header(trimmed)
-				current.index = index
-				current.section = current.segments and table.concat(current.segments, ".") or nil
-				headers[#headers + 1] = current
-				open = nil
-			else
-				local key_text, value_text = trimmed:match("^([^=]-)%s*=%s*(.*)$")
-				open = {
-					first = index,
-					last = index,
-					header = current,
-					key_segments = key_text and bare_segments(key_text) or nil,
-					value_parts = { value_text or "" },
-				}
-				records[#records + 1] = open
-				depth, multiline_quote = RecordScanner.advance(raw, 0, nil)
-			end
-		end
-	end
-	if depth > 0 or multiline_quote ~= nil then
-		return nil, "unterminated TOML assignment"
-	end
-
-	-- Anything under an array of tables attaches to its latest element; the
-	-- text alone cannot name that element, so none of it is addressable.
-	local array_prefixes = {}
-	for _, header in ipairs(headers) do
-		if header.array and header.segments then array_prefixes[#array_prefixes + 1] = header.segments end
-	end
-	for _, record in ipairs(records) do
-		local header = record.header
-		local addressable = header ~= nil and header.segments ~= nil and not header.array
-			and record.key_segments ~= nil
-		if addressable then
-			for _, prefix in ipairs(array_prefixes) do
-				if starts_with(header.segments, prefix) then
-					addressable = false
-					break
-				end
-			end
-		end
-		record.addressable = addressable
-		if addressable then
-			record.section = header.section
-			record.key = table.concat(record.key_segments, ".")
-			record.path = {}
-			for _, segment in ipairs(header.segments) do record.path[#record.path + 1] = segment end
-			for _, segment in ipairs(record.key_segments) do record.path[#record.path + 1] = segment end
-			record.value = table.concat(record.value_parts, " ")
-		end
-	end
-	return { lines = lines, headers = headers, records = records }
-end
+--- Shared document scanner used by cleanup and sparse configuration writes.
+M.scan_records = RecordScanner.scan_records
 
 
 
@@ -313,7 +162,11 @@ function M.find_in_source(source, collect)
 
 	local keys = {}
 	for _, record in ipairs(scan.records) do
-		if record.addressable and not consumption.touches(record.path) then
+		-- A [_*] table is metadata no reader marks: [_meta] holds the schema
+		-- stamp the boot migration reads before any reader runs. The Windows
+		-- loader skips the same tables.
+		local metadata = record.addressable and record.path[1]:sub(1, 1) == "_"
+		if record.addressable and not metadata and not consumption.touches(record.path) then
 			keys[#keys + 1] = {
 				section = record.section,
 				key     = record.key,
@@ -341,7 +194,9 @@ function M.find(opts)
 	if status ~= "ok" or type(content) ~= "string" then
 		return { status = "unreadable", keys = {} }
 	end
-	return M.find_in_source(content, opts.collect)
+	local scan = M.find_in_source(content, opts.collect)
+	scan.source = content
+	return scan
 end
 
 --- Substitutes {1}, {2}, … in a localized template without pattern magic, so
@@ -510,6 +365,11 @@ function M.remove(opts)
 	if not read_ok then return refuse("unreadable", source) end
 	if read_status ~= "ok" or type(source) ~= "string" then
 		return refuse("unreadable", read_detail or read_status)
+	end
+	if opts.expected_source ~= nil and source ~= opts.expected_source then
+		result.status = "changed"
+		Logger.warn(LOG, "Cleanup deferred: '%s' changed after the preview was opened.", path)
+		return result
 	end
 
 	-- The copy is created where nothing exists yet and read back before any

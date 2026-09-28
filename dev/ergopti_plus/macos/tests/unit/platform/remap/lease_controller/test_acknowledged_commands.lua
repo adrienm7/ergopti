@@ -7,9 +7,42 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Replay  = require("tests.support.repeat_collapsing_replay")
 local support = require("tests.support.lease_controller_fixture")
 local with_fixture = support.with_fixture
 local find_native_revoke = support.find_native_revoke
+
+--- Renders one captured logger call (module, format, args...) to its text.
+--- @param event table
+--- @return string
+local function rendered(event)
+	local ok, text = pcall(string.format, tostring(event[2]), table.unpack(event, 3))
+	return ok and text or tostring(event[2])
+end
+
+--- Counts the captured lines at one level whose text contains `needle`.
+--- @param ctx table Fixture context.
+--- @param level string
+--- @param needle string
+--- @return number
+local function level_lines(ctx, level, needle)
+	local count = 0
+	for _, event in ipairs(ctx.logs[level]) do
+		if rendered(event):find(needle, 1, true) then count = count + 1 end
+	end
+	return count
+end
+
+--- Counts the captured lines, at any level, that mention a heartbeat.
+--- @param ctx table Fixture context.
+--- @return number
+local function heartbeat_lines(ctx)
+	local count = 0
+	for _, level in ipairs({ "debug", "info", "warn", "error" }) do
+		count = count + level_lines(ctx, level, "heartbeat")
+	end
+	return count
+end
 
 helpers.describe("karabiner lease controller: acknowledged commands", function()
 	helpers.it("serializes timer PING behind exact PONG before a queued pause", function()
@@ -209,6 +242,81 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			helpers.assert_eq(phases[#phases], "active")
 			helpers.assert_true(not heartbeat.cancelled,
 				"recovery must keep the five-second liveness source retained")
+		end)
+	end)
+
+	helpers.it("keeps a successful heartbeat out of the log", function()
+		-- Every 5 s for the whole session: a line per heartbeat was about 17,000
+		-- lines a day, each with a new sequence number, so nothing could fold it.
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			local before = heartbeat_lines(ctx)
+			for sequence = 1, 3 do
+				ctx.fire_heartbeat_timer()
+				ctx.chunk(1, "PONG " .. sequence .. "\n")
+			end
+			helpers.assert_eq(controller.status(), "active", "fixture: the heartbeats must succeed")
+			helpers.assert_eq(heartbeat_lines(ctx) - before, 0,
+				"a successful heartbeat is not news and must write no line at any level")
+		end)
+	end)
+
+	helpers.it("warns on a failed heartbeat and reports its recovery once", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.chunk(1, "PING_FAILED 1\n")
+			helpers.assert_eq(level_lines(ctx, "warn", "heartbeat"), 1,
+				"a failed heartbeat must stay loud")
+
+			ctx.timers[#ctx.timers].fn()
+			ctx.chunk(1, "PONG 2\n")
+			helpers.assert_eq(controller.status(), "active", "fixture: the retry must recover")
+			helpers.assert_eq(level_lines(ctx, "info", "recovered"), 1,
+				"the recovery must be reported once at info, or a warning is never known to have cleared")
+
+			ctx.fire_heartbeat_timer()
+			ctx.chunk(1, "PONG 3\n")
+			helpers.assert_eq(level_lines(ctx, "info", "recovered"), 1,
+				"a later healthy heartbeat is not a second recovery")
+		end)
+	end)
+
+	helpers.it("keeps every recovery in the log once repeat collapsing is armed", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			for episode = 0, 1 do
+				ctx.fire_heartbeat_timer()
+				ctx.chunk(1, "PING_FAILED " .. (2 * episode + 1) .. "\n")
+				ctx.timers[#ctx.timers].fn()
+				ctx.chunk(1, "PONG " .. (2 * episode + 2) .. "\n")
+				helpers.assert_eq(controller.status(), "active", "fixture: each retry must recover")
+			end
+
+			local calls = {}
+			for _, event in ipairs(ctx.logs.info) do
+				if rendered(event):find("recovered", 1, true) then
+					calls[#calls + 1] = {
+						variant = "info", module = event[1], msg = event[2],
+						args = table.pack(table.unpack(event, 3)),
+					}
+				end
+			end
+			helpers.assert_eq(#calls, 2, "fixture: two failure episodes must report two recoveries")
+			-- Each failure warning names its own heartbeat, so collapsing keeps
+			-- every one; a recovery folded into the first one's streak would leave
+			-- the second warning looking as if it never cleared.
+			helpers.assert_eq(#Replay.delivered(calls), 2,
+				"every recovery answers a visible warning and must be written when it happens")
 		end)
 	end)
 

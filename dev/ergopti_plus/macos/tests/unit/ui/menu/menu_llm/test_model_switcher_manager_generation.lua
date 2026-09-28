@@ -52,7 +52,7 @@ end
 --- @return table Logger double.
 local function install_common_stubs()
 	local logger = helpers.make_logger_stub()
-	logger.UNIFIED_LOG_FILE = "/tmp/ergopti-hs007.log"
+	logger.today_log_path = function() return "/tmp/ergopti-hs007.log" end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = {get = function(key) return key end}
 	package.loaded["infra.notifications"] = {notify = function() end}

@@ -30,6 +30,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 local Fakes = helpers.load_module("tests.fakes")
 
 local DRIVER_ROOT = helpers.driver_root()
@@ -42,11 +43,12 @@ local _previous_storage = package.loaded["adapters.storage"]
 local _previous_keylogger = package.loaded["modules.keylogger.keylogger"]
 
 --- Reloads the keylogger with fresh module state.
-local function fresh_keylogger()
+local function fresh_keylogger(neutral)
 	package.loaded["adapters.storage"] = Fakes.storage()
 	package.loaded["modules.keylogger.keylogger"] = nil
 	local kl = require("modules.keylogger.keylogger")
 	kl.init({})
+	if not neutral then helpers.assert_true(kl.set_enabled(true)) end
 	return kl
 end
 
@@ -86,9 +88,9 @@ end
 -- ==========================================
 
 helpers.describe("keylogger privacy — the posture is read, not re-typed", function()
-	helpers.it("exposes every flag the shared manifest declares", function()
+	it("exposes every flag the shared manifest declares", function()
 		local Manifest = require("infra.manifest_reader")
-		local kl = fresh_keylogger()
+		local kl = fresh_keylogger(true)
 		local state = kl.get_privacy_state()
 
 		local pairs_to_check = {
@@ -103,7 +105,7 @@ helpers.describe("keylogger privacy — the posture is read, not re-typed", func
 		end
 	end)
 
-	helpers.it("does not hardcode the four defaults in the driver", function()
+	it("does not hardcode the four defaults in the driver", function()
 		local code = code_of("modules/keylogger/keylogger.lua")
 		for _, path in ipairs({
 			"metrics.enabled",
@@ -127,14 +129,14 @@ end)
 -- =========================================
 
 helpers.describe("keylogger privacy — the off switch", function()
-	helpers.it("records nothing once disabled", function()
+	it("records nothing once disabled", function()
 		local kl = fresh_keylogger()
 		kl.set_enabled(false)
 		helpers.assert_eq(keystrokes_after_typing(kl, "gedit"), 0,
 			"a disabled keylogger must record nothing")
 	end)
 
-	helpers.it("records again once re-enabled", function()
+	it("records again once re-enabled", function()
 		local kl = fresh_keylogger()
 		kl.set_enabled(false)
 		keystrokes_after_typing(kl, "gedit")
@@ -143,18 +145,18 @@ helpers.describe("keylogger privacy — the off switch", function()
 			"re-enabling must resume collection")
 	end)
 
-	helpers.it("records normally by default", function()
+	it("records normally after explicit consent", function()
 		-- Without this the two tests above pass on a keylogger that records
 		-- nothing at all, which is not the behaviour being tested.
 		local kl = fresh_keylogger()
 		helpers.assert_true(keystrokes_after_typing(kl, "gedit") > 0,
-			"the default posture must still collect")
+			"the explicitly enabled collector must collect")
 	end)
 end)
 
 
 helpers.describe("keylogger privacy — private browsing", function()
-	helpers.it("recognises the markers every major browser uses", function()
+	it("recognises the markers every major browser uses", function()
 		local kl = fresh_keylogger()
 		for _, title in ipairs({
 			"Mozilla Firefox — Private Browsing",
@@ -168,21 +170,21 @@ helpers.describe("keylogger privacy — private browsing", function()
 		end
 	end)
 
-	helpers.it("does not flag an ordinary window", function()
+	it("does not flag an ordinary window", function()
 		local kl = fresh_keylogger()
 		helpers.assert_eq(kl.is_private_window("Inbox — Mozilla Firefox"), false)
 		helpers.assert_eq(kl.is_private_window(""), false)
 		helpers.assert_eq(kl.is_private_window(nil), false)
 	end)
 
-	helpers.it("drops keystrokes while a private window is focused", function()
+	it("drops keystrokes while a private window is focused", function()
 		local kl = fresh_keylogger()
 		kl.set_private_window(true)
 		helpers.assert_eq(keystrokes_after_typing(kl, "firefox"), 0,
 			"keystrokes typed in a private window must not be recorded")
 	end)
 
-	helpers.it("resumes when focus leaves the private window", function()
+	it("resumes when focus leaves the private window", function()
 		local kl = fresh_keylogger()
 		kl.set_private_window(true)
 		keystrokes_after_typing(kl, "firefox")
@@ -191,7 +193,7 @@ helpers.describe("keylogger privacy — private browsing", function()
 			"leaving the private window must resume collection")
 	end)
 
-	helpers.it("honours the filter toggle", function()
+	it("honours the filter toggle", function()
 		local kl = fresh_keylogger()
 		kl.set_private_filter_enabled(false)
 		kl.set_private_window(true)
@@ -202,14 +204,14 @@ end)
 
 
 helpers.describe("keylogger privacy — secure fields", function()
-	helpers.it("drops keystrokes when the adapter reports a secure field", function()
+	it("drops keystrokes when the adapter reports a secure field", function()
 		local kl = fresh_keylogger()
 		kl.set_secure_field(true)
 		helpers.assert_eq(keystrokes_after_typing(kl, "gedit"), 0,
 			"the AT-SPI verdict must suppress collection on ANY app, not just known ones")
 	end)
 
-	helpers.it("is additive to the application-name list", function()
+	it("is additive to the application-name list", function()
 		-- The adapter matches WM_CLASS exactly on a shorter list. It is consulted
 		-- IN ADDITION to the substring list, never instead of it — delegating
 		-- would drop gpg/ssh-agent/polkit/sudo and leak those keystrokes.
@@ -230,7 +232,7 @@ end)
 -- =========================================
 
 helpers.describe("keylogger privacy — focus and titles obey the same gate", function()
-	helpers.it("focus-gate: focus changes while disabled record nothing", function()
+	it("focus-gate: focus changes while disabled record nothing", function()
 		-- Regression: on_app_focus() never asked may_record(), so app switches
 		-- and focus time were persisted while metrics were disabled, private,
 		-- or suppressed — the off-switch test only ever counted keystrokes.
@@ -250,7 +252,7 @@ helpers.describe("keylogger privacy — focus and titles obey the same gate", fu
 			"only the interval recorded while enabled may be credited")
 	end)
 
-	helpers.it("focus-gate: a switch made while private records no transition", function()
+	it("focus-gate: a switch made while private records no transition", function()
 		local kl = fresh_keylogger()
 		kl.on_app_focus("firefox", 1000)
 		kl.set_private_window(true)
@@ -262,7 +264,7 @@ helpers.describe("keylogger privacy — focus and titles obey the same gate", fu
 			"the interval closed while private must not be credited either")
 	end)
 
-	helpers.it("focus-gate: the title interval closes only while recording is allowed", function()
+	it("focus-gate: the title interval closes only while recording is allowed", function()
 		-- The interval-close preamble ran before the may_record() gate, so the
 		-- time spent under a title leaked into the database on the next flush
 		-- even when recording was forbidden — and a title names the page.
@@ -305,7 +307,7 @@ helpers.describe("keylogger privacy — coverage never narrows", function()
 		"gpg", "ssh-agent", "polkit", "sudo",
 	}
 
-	helpers.it("matches every privacy-critical app at the default posture", function()
+	it("matches every privacy-critical app at the default posture", function()
 		local kl = fresh_keylogger()
 		for _, app in ipairs(ALL_PRIVACY_APPS) do
 			helpers.assert_true(kl.is_password_app(app),
@@ -313,7 +315,7 @@ helpers.describe("keylogger privacy — coverage never narrows", function()
 		end
 	end)
 
-	helpers.it("keeps the two halves independent", function()
+	it("keeps the two halves independent", function()
 		local kl = fresh_keylogger()
 
 		kl.set_system_auth_filter_enabled(false)
@@ -340,7 +342,7 @@ helpers.describe("keylogger privacy — coverage never narrows", function()
 		kl.set_system_auth_filter_enabled(true)
 	end)
 
-	helpers.it("still ignores ordinary applications", function()
+	it("still ignores ordinary applications", function()
 		local kl = fresh_keylogger()
 		helpers.assert_eq(kl.is_password_app("firefox"), false)
 		helpers.assert_eq(kl.is_password_app(""), false)
@@ -355,7 +357,7 @@ end)
 -- =========================================
 
 helpers.describe("keylogger privacy — the daemon supplies the signals", function()
-	helpers.it("feeds the focused window title to the private-browsing filter", function()
+	it("feeds the focused window title to the private-browsing filter", function()
 		-- Every behavioural test above still passes if this wiring is deleted:
 		-- the filter would simply never fire. The window title used to be
 		-- received as `_windowTitle` and discarded, which is precisely how the
@@ -369,7 +371,7 @@ helpers.describe("keylogger privacy — the daemon supplies the signals", functi
 			"the window title must no longer be received and discarded")
 	end)
 
-	helpers.it("asks AT-SPI whether the focused element is a password field", function()
+	it("asks AT-SPI whether the focused element is a password field", function()
 		-- The sibling of the defect above, and worse, because this one had a whole
 		-- adapter behind it. adapters/secure_field_detector.lua was written and
 		-- tested, keylogger.set_secure_field was written, and `refresh()` had no
@@ -409,7 +411,7 @@ helpers.describe("keylogger privacy — the daemon supplies the signals", functi
 				.. "foreground resolution — found " .. uses .. " call(s)")
 	end)
 
-	helpers.it("uses the shared keyword list rather than a driver-local copy", function()
+	it("uses the shared keyword list rather than a driver-local copy", function()
 		local code = code_of("modules/keylogger/keylogger.lua")
 		helpers.assert_contains(code, 'require("keylogger.private_window")',
 			"the markers are a cross-driver privacy guarantee and live in _shared")

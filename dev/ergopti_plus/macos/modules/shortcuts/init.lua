@@ -20,6 +20,7 @@ local GestureActions    = require("modules.gestures.actions")
 local HotkeyRegistrar   = require("adapters.hotkey_registrar")
 local StartupTransaction = require("infra.startup_transaction")
 local Logger             = require("infra.logger")
+local Manifest           = require("infra.manifest_reader")
 
 local M = {}
 
@@ -103,9 +104,13 @@ end)
 -- ================================
 
 M.DEFAULT_STATE = {
-	shortcuts                = true,
-	script_control_enabled   = true,
-	script_control_shortcuts = { return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit" },
+	shortcuts                = Manifest.default_for("shortcuts.enabled"),
+	script_control_enabled   = Manifest.default_for("shortcuts.script_control.enabled"),
+	script_control_shortcuts = {
+		return_key = Manifest.default_for("shortcuts.script_control.return_key"),
+		backspace = Manifest.default_for("shortcuts.script_control.backspace"),
+		escape = Manifest.default_for("shortcuts.script_control.escape"),
+	},
 	chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,
 }
 
@@ -125,6 +130,7 @@ M.list_shortcuts         = Bindings.list_shortcuts
 M.enable                 = Bindings.enable
 M.disable                = Bindings.disable
 M.is_enabled             = Bindings.is_enabled
+M.is_bound               = Bindings.is_bound
 M.set_wrap_pairs_getter  = Bindings.set_wrap_pairs_getter
 M.set_chatgpt_url        = Bindings.set_chatgpt_url
 
@@ -149,10 +155,12 @@ M.stop_keyboard_shortcuts  = KeyboardShortcuts.stop
 M.set_keyboard_action      = KeyboardShortcuts.set_action
 M.get_keyboard_action      = KeyboardShortcuts.get_action
 M.get_keyboard_slot_label  = KeyboardShortcuts.get_slot_label
+M.get_keyboard_slot_chord  = KeyboardShortcuts.get_slot_chord
 M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
 M.get_keyboard_slot_groups = function() return KeyboardShortcuts.SLOT_GROUPS end
 M.available_keyboard_slots = KeyboardShortcuts.available_slots
 M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
+M.keyboard_binding_id      = KeyboardShortcuts.binding_id
 
 --- Stops independent shortcut children without letting one refusal hide its sibling.
 --- @param steps table[] Ordered `{name, stop}` descriptors.
@@ -331,7 +339,7 @@ end
 
 --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().
 --- @return boolean committed True only when both child starts committed.
-function M.resume_bindings(parent)
+function M.resume_bindings(parent, candidate)
 	local claim = binding_pause_claim(parent)
 	local owned_claim = binding_pause_claims[claim] == true
 	M.release_bindings_pause_claim(claim)
@@ -367,13 +375,15 @@ function M.resume_bindings(parent)
 					if committed ~= true or not attempt_is_current() then return false end
 					return true
 				end
-				return (Bindings.resume_after_pause or Bindings.start)()
+				return (Bindings.resume_after_pause or Bindings.start)(candidate ~= nil)
 			end,
 			stop = Bindings.pause or Bindings.stop,
 		},
 		{
 			name = "keyboard_shortcuts",
-			start = KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start,
+			start = function()
+				return (KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start)(candidate)
+			end,
 			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
 		},
 	})

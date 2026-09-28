@@ -10,8 +10,9 @@
 --- sit under a « Hotstrings par langue » header, behind a separator, and each
 --- row starts with its locale's flag from the shared locale table.
 ---
---- « Nettoyer les réglages inutilisés » edits the configuration file while the
---- three rows above it switch features; a separator now sets it apart.
+--- The Configuration submenu draws the two rows that rewrite the configuration,
+--- then a separator, then the two that open a window: the folders editor, which
+--- this driver shows like the other two, and the setup wizard.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -75,12 +76,38 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 		helpers.assert_true(is_separator(rows[at - 2]), "and a separator must precede that header")
 	end)
 
-	helpers.it("global actions: a separator precedes the unused-settings cleanup", function()
+	helpers.it("configuration: rewriting rows, a separator, then the two windows", function()
 		local mb = helpers.load_module("ui.menu.menu_builder")
-		local label = require("infra.i18n").get("menu.global.clean_unused_keys")
-		local rows, at = submenu_with(mb.build({ _version = "9.9.9", on_quit = function() end }), label)
-		helpers.assert_true(rows ~= nil and at > 1, "the cleanup row must follow the other global actions")
-		helpers.assert_true(is_separator(rows[at - 1]),
-			"a separator must precede « Nettoyer les réglages inutilisés »")
+		local i18n = require("infra.i18n")
+		local shown = {}
+		local items = mb.build({
+			_version = "9.9.9",
+			on_quit = function() end,
+			webview = { show = function(name) shown[#shown + 1] = name end },
+		})
+		local rows
+		for _, item in ipairs(items) do
+			if item.title == i18n.get("menu.configuration.title") then rows = item.menu end
+		end
+		helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
+		local drawn = {}
+		for index, row in ipairs(rows) do drawn[index] = is_separator(row) and "-" or row.title end
+		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
+			i18n.get("common.restore_recommended"),
+			i18n.get("menu.global.clean_unused_keys"),
+			"-",
+			i18n.get("menu.global.config_folder"),
+			i18n.get("menu.global.setup_wizard"),
+			i18n.get("menu.global.start_at_login"),
+			"-",
+			i18n.get("menu.global.uninstall"),
+		}, " | "))
+		-- The folders editor, as on the other two drivers, not the file manager.
+		local folder = rows[4]
+		local fn = folder.fn or folder.action
+		helpers.assert_eq(type(fn), "function", "the folders row must act")
+		fn()
+		helpers.assert_eq(table.concat(shown, ","), "paths_editor",
+			"the folders row must open the folders editor")
 	end)
 end)

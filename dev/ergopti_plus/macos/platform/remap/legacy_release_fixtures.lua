@@ -74,7 +74,8 @@ local STICKY_TO_BASE_ACTION = {
 	sticky_hyper = "hyper",
 }
 
--- `actions.json`, `capsword.json`, `layer_keys.json`, `combos.json`,
+-- `actions.json`, `capsword.json`, `layer_keys.json` (kept, frozen, as
+-- `legacy_layer_keys.json` since the layer is generated), `combos.json`,
 -- `mod_combos.json`, and `tap_hold_keys.json` decode to structurally identical
 -- tables throughout v0.0.0-dev.1-v0.0.0-dev.107. Their blobs all changed between
 -- dev.40 and dev.41, but a recursively key-sorted JSON comparison proves that

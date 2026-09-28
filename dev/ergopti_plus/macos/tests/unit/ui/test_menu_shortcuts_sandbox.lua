@@ -40,6 +40,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				"infra.manifest_menu",
 				"ui.menu.shortcut_utils",
 				"ui.menu.menu_keyboard_slots",
+				"ui.menu.menu_tap_keys",
 				"infra.manifest_reader",
 				"hs",
 				"tests.stubs.hs",
@@ -88,6 +89,9 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				}
 				package.loaded["ui.menu.shortcut_utils"] = {}
 				package.loaded["ui.menu.menu_keyboard_slots"] = {
+					provide_rows = function() return {} end,
+				}
+				package.loaded["ui.menu.menu_tap_keys"] = {
 					provide_rows = function() return {} end,
 				}
 				package.loaded["infra.manifest_reader"] = {

@@ -199,7 +199,7 @@ local function complete_system_facade(ctx, system, options)
 		return owner
 	end
 	for method, id in pairs({
-		bind_instant_screenshot = "at_hash",
+		bind_tap_keys = "tap_keys",
 		bind_layer_scroll = "layer_scroll",
 		bind_wrap_text_if_selected = "wrap_text_if_selected",
 		bind_cmd_star = "cmd_star",
@@ -328,6 +328,7 @@ local function load_subject(options)
 				end,
 			},
 		})
+		require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 		return subject, ctx
 	end)
 end
@@ -626,7 +627,7 @@ end)
 
 helpers.describe("shortcut bindings: raw owner release identity", function()
 	for _, id in ipairs({
-		"at_hash", "layer_scroll", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "layer_scroll", "cmd_star", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " callback when its factory reenters pause", function()
 			local options = { reenter_raw_factory = id }
@@ -646,7 +647,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"at_hash", "layer_scroll", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "layer_scroll", "cmd_star", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " enable factory that reenters pause", function()
 			local options = {}
@@ -660,13 +661,15 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 			helpers.assert_eq(ctx.reentrant_pause_result, false)
 			helpers.assert_eq(ctx.reentrant_callback_result, false)
 			helpers.assert_eq(ctx.raw_handles[id].delete_calls, 1)
-			helpers.assert_eq(subject.is_enabled(id), false)
+			helpers.assert_eq(subject.is_bound(id), false)
+			helpers.assert_eq(subject.is_enabled(id), false,
+				"a superseded enable must leave the prior disabled preference")
 			helpers.assert_eq(subject.pause(), true)
 		end)
 	end
 
 	for _, id in ipairs({
-		"at_hash", "layer_scroll", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "layer_scroll", "cmd_star", "wrap_text_if_selected",
 	}) do
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
 			helpers.it("retains " .. id .. " on pause delete " .. mode, function()
@@ -689,12 +692,15 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 				helpers.assert_eq(subject.start(), true)
 				local exact_handle = ctx.raw_handles[id]
 				helpers.assert_eq(subject.disable(id), false)
-				helpers.assert_eq(subject.is_enabled(id), true,
+				helpers.assert_eq(subject.is_bound(id), true,
 					"an ambiguous raw release must retain the exact owner")
+				helpers.assert_eq(subject.is_enabled(id), true,
+					"a refused disable must not record the preference")
 				helpers.assert_eq(exact_handle.delete_calls, 1)
 				options.raw_release_modes[id] = "true"
 				helpers.assert_eq(subject.disable(id), true)
 				helpers.assert_eq(exact_handle.delete_calls, 2)
+				helpers.assert_eq(subject.is_bound(id), false)
 				helpers.assert_eq(subject.is_enabled(id), false)
 			end)
 		end

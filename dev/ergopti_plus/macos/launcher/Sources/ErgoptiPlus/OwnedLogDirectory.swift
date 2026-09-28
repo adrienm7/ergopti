@@ -19,6 +19,10 @@
     parent with mode 0700. The target of a dangling link is never created.
  4. Every refusal carries a user-fixable cause, so the launcher can name the
     folder and the reason instead of reporting a bare child exit status.
+ 5. Only a folder named after the application is restricted to its owner.
+    The logs folder can be moved by LogsDirPath, and the Lua resolver appends
+    that folder to anything else the user picks; a folder the user merely
+    chose, such as ~/Documents, must never lose its sharing permissions here.
  ==============================================================================
  */
 
@@ -91,7 +95,8 @@ struct LogDirectoryFailure: Error, Equatable {
 	}
 }
 
-/// Opened, validated, 0700 log directory. The caller owns `descriptor`.
+/// Opened, validated log directory, 0700 when it is the application's own
+/// folder. The caller owns `descriptor`.
 struct OwnedLogDirectory {
 	let descriptor: Int32
 	let resolvedPath: String
@@ -130,7 +135,7 @@ enum OwnedLogDirectoryResolver {
 			refusal = .notDirectory
 		} else if attributes.st_uid != geteuid() {
 			refusal = .notOwned(resolvedPath: resolvedPath)
-		} else if Darwin.fchmod(descriptor, S_IRWXU) != 0 {
+		} else if isApplicationFolder(normalized), Darwin.fchmod(descriptor, S_IRWXU) != 0 {
 			refusal = .cannotSetPermissions(errorCode: errno)
 		} else {
 			refusal = nil
@@ -140,6 +145,13 @@ enum OwnedLogDirectoryResolver {
 			return .failure(LogDirectoryFailure(path: normalized, refusal: refusal))
 		}
 		return .success(OwnedLogDirectory(descriptor: descriptor, resolvedPath: resolvedPath))
+	}
+
+	/// True when the configured folder is the application's own folder, the only
+	/// one this resolver may restrict to its owner.
+	/// - Parameter normalizedPath: Folder as configured, after normalization.
+	static func isApplicationFolder(_ normalizedPath: String) -> Bool {
+		return (normalizedPath as NSString).lastPathComponent == kAppFolderName
 	}
 
 	/// Normalizes one absolute directory without admitting a NUL or parent escape.

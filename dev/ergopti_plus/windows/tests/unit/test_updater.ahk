@@ -756,6 +756,8 @@ _UpdaterTest_PausedTrayClickRefusesBeforeUpdaterWork() {
 		State.ShowCount += 1,
 		_Updater_ShowAvailableUpdateEntry(true, NotifyFn, ContinueFn))
 
+	; The click answers the updater's own balloon: only that one routes.
+	_Updater_ClaimBalloon()
 	_Updater_OnTrayMsg(0, 0x405, 0x404, 0, ShowFn)
 	AssertEqual(1, State.ShowCount,
 		"a genuine balloon click must reach the updater policy boundary while paused")
@@ -3955,7 +3957,7 @@ _UpdaterTest_RecordCrossChannelRebuild(State) {
 
 _UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
 	global UPDATER_LATEST_RELEASE, UPDATER_REQUEST_ORIGIN_MANUAL
-	ShouldOffer := _UpdaterTest_ResolveFunction("_Updater_ShouldOfferCandidate")
+	ShouldOffer := _UpdaterTest_ResolveFunction("UpdateChannels_ShouldOffer")
 	Publish := _UpdaterTest_ResolveFunction("_Updater_PublishOneClickRelease")
 	Workflow := FileRead(A_ScriptDir . "\..\..\..\..\.github\workflows\ci.yml", "UTF-8")
 	TagTemplate := 'tag="v0.0.0-dev.${next_n}"'
@@ -4097,30 +4099,18 @@ Test("Updater AHK-049: absolute download deadline terminates and cleans staging 
 
 _UpdaterTest_MarkdownPayloadCannotCloseScript() {
 	Canary := "</script><script>window.auditCanary=1</script>"
-	Html := _Updater_MakeMarkdownHtml(Canary)
-	ClosingScripts := 0
-	SearchAt := 1
-	while (Found := InStr(Html, "</script>", true, SearchAt)) {
-		ClosingScripts += 1
-		SearchAt := Found + 1
-	}
-	AssertEqual(1, ClosingScripts,
-		"remote Markdown must not create a second executable script boundary")
-	EscapedCanary := StrReplace(Canary, "<", "\u003c")
-	EscapedCanary := StrReplace(EscapedCanary, ">", "\u003e")
-	Assert(InStr(Html, EscapedCanary) > 0,
-		"the release body must remain present with HTML-significant characters escaped")
-	Assert(InStr(Html, "function safeUrl(") > 0 && InStr(Html, "https:\/\/") > 0,
-		"rendered Markdown links and images must pass through an HTTPS-only URL policy")
-	FirstPolicyCall := InStr(Html, "u=safeUrl(u)")
-	SecondPolicyCall := InStr(Html, "u=safeUrl(u)", true, FirstPolicyCall + 1)
-	Assert(FirstPolicyCall > 0 && SecondPolicyCall > FirstPolicyCall,
-		"both image and link targets must invoke the URL policy before entering innerHTML")
+	Seed := _Updater_ReleaseNotesSeed(Canary, "boundary-test")
+	Assert(InStr(Seed, "<") = 0 && InStr(Seed, ">") = 0,
+		"remote Markdown must not create an executable script boundary")
+	Assert(RegExMatch(Seed, 'body:("(?:[^"\\]|\\.)*")', &Literal) > 0,
+		"the shared notes page must receive one JSON string literal")
+	AssertEqual(Canary, JsonParse(Literal[1]),
+		"escaping must preserve the complete remote release body as data")
 	ControlText := "before" . Chr(8) . Chr(12) . Chr(0x1F) . "after"
 	AssertEqual(ControlText, JsonParse(JsonStringLiteral(ControlText, true)),
 		"the shared script-string encoder must round-trip every C0 control character")
 }
-Test("Updater: release Markdown cannot escape its script or inject an active URL (updater-markdown-script-boundary)",
+Test("Updater: release Markdown cannot escape its script (updater-markdown-script-boundary)",
 	_UpdaterTest_MarkdownPayloadCannotCloseScript)
 
 ; A "Check for updates" click that finds a newer release used to download,

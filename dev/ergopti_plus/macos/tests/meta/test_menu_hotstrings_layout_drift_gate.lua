@@ -61,14 +61,19 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- to build `toggle` rows: the signature keys on the id when there is one, and
 	-- an id is what lets a driver register the command that asks for the row.
 	"toggle:hotstrings_toggle",
+	-- The switch is set apart from what it governs, on every driver: the
+	-- Windows renderer used to insert this separator itself, beside the switch it
+	-- also inserted by hand, and the Lua drivers drew none.
+	"---",
 	"group:hotstrings_params",
 	-- One `dynamic:hotstring_bulk_actions` row until 2026-08-06, which expanded
 	-- to TWO rows inside each driver — so the manifest described neither, and
-	-- macOS had no handler for the id at all and rendered nothing. Two `command`
-	-- rows now: the renderer builds them, and what this list pins is what the
-	-- user sees rather than a slot whose contents only the drivers knew.
-	"command:hotstrings_enable_all",
-	"command:hotstrings_disable_all",
+	-- macOS had no handler for the id at all and rendered nothing. Then two
+	-- `command` rows, « tout activer » and « tout désactiver »; one `check` row
+	-- since, ticked when every section is on. The renderer builds it, and what
+	-- this list pins is what the user sees rather than a slot whose contents only
+	-- the drivers knew.
+	"check:hotstrings_all_sections",
 	"---",
 	"section_header:menu.hotstrings.header_common",
 	"list:hotstring_categories_standard",
@@ -116,25 +121,33 @@ local CANONICAL_HOTSTRINGS_MENU = {
 -- signature, and the renderer is what collapses a separator with nothing between
 -- it and the next one.
 local CANONICAL_LAYOUT_MENU = {
-	"toggle:layout_toggle",
+	-- No `toggle:layout_toggle`: only Windows emulates the Ergopti layout, so
+	-- the switch is declared for it alone. On this driver the row had no command
+	-- and was skipped in silence, which the renderer now reports as an error.
 	-- UPDATED 2026-09-21: two sections, so the rows that only matter with the
 	-- Ergopti layout (its .bundle, the active variants, the menubar icon) are
 	-- told apart from those that work on any layout (pause/resume switching, the
 	-- key turned into a star key). Same rows as before, regrouped under headers.
 	"---",
-	"section_header:menu.layout.header_ergopti",
+	-- UPDATED: the Ergopti section is the custom layout section, on every
+	-- driver: the registry layouts the layout manager installs, and its window.
+	"section_header:menu.layout.header_custom",
+	"list:custom_layouts",
+	"command:layout_manager",
 	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
 	-- keyboard layout through the OS's input-source mechanism and draws a
 	-- menubar icon; neither concept exists on the other two drivers.
 	"list:layout_bundle",
+	-- UPDATED 2026-09-24: the menubar icon is ONE choice row, the last of the
+	-- Ergopti section, and the input sources sit under a header of their own.
+	"choice:menubar_icon",
 	"---",
+	"section_header:menu.layout.active_layouts",
 	-- `list`, not `dynamic`, since 2026-08-07. This driver has always supplied
 	-- active_layout_rows() as a LIST PROVIDER, and the manifest said `dynamic`,
 	-- so the renderer looked for a dynamic handler, found none, warned once and
 	-- skipped the row — the layout list did not render at all.
 	"list:active_layouts",
-	"---",
-	"list:layout_logo",
 	"---",
 	"section_header:menu.layout.header_any",
 	-- The pause/resume layout pickers, declared 2026-08-07 with the blocks

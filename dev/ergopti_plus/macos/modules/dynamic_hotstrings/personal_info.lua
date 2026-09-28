@@ -1042,6 +1042,7 @@ function M.enable()
 	Logger.debug(LOG, "Enabling personal info tracking…")
 	_enabled = true; _state = STATE_IDLE; _combo = ""
 	Logger.info(LOG, "Personal info tracking enabled.")
+	return true
 end
 
 --- Disables the engine tracking.
@@ -1049,6 +1050,22 @@ function M.disable()
 	Logger.debug(LOG, "Disabling personal info tracking…")
 	_enabled = false; _state = STATE_IDLE; _combo = ""
 	Logger.info(LOG, "Personal info tracking disabled.")
+	return true
+end
+
+--- Reads the desired personal-information expansion state.
+--- @return boolean enabled
+function M.is_enabled()
+	return _enabled
+end
+
+--- Applies an explicit choice without changing the personal-information file.
+--- @param enabled boolean Desired expansion state.
+--- @return boolean committed
+function M.set_enabled(enabled)
+	if type(enabled) ~= "boolean" then return false end
+	if enabled then return M.enable() end
+	return M.disable()
 end
 
 --- Stops the engine tracking.

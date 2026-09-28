@@ -131,7 +131,7 @@
 
 	"dedup": {
 		"window_seconds": 5,
-		"_comment": "Both driver loggers suppress a line identical to the previous one inside a 5 s window, then close the streak with a \"N identical lines suppressed\" summary. The shared core did NOT — which meant adopting it would have removed flood suppression from a driver that had it, quietly, and the first anyone would know is a log file full of one line. Keyed on everything AFTER the timestamp: two emissions a second apart differ only there, so keying on the whole line would suppress nothing.",
+		"_comment": "Both driver loggers suppress a line identical to the previous one inside a 5 s window, then close the streak with a \"N identical lines suppressed\" summary. The shared core did NOT — which meant adopting it would have removed flood suppression from a driver that had it, quietly, and the first anyone would know is a log file full of one line. Keyed on everything AFTER the timestamp: two emissions a second apart differ only there, so keying on the whole line would suppress nothing. These cases pin this layer ALONE, so they are replayed with repeat collapsing disarmed: with it armed, the third line of a,b,a is withheld by the repeat layer (see \"repeat\"), not by this one.",
 		"cases": [
 			{
 				"id": "identical_consecutive_is_suppressed",
@@ -182,6 +182,217 @@
 				"description": "The ring buffer feeds crash reports; a thousand copies of one line would push out everything that explains it.",
 				"emit": ["a", "a", "a"],
 				"expect_ring_entries": 1
+			}
+		]
+	},
+
+	"repeat": {
+		"window_ms": 600000,
+		"capacity": 64,
+		"_comment": "Spec § 4.2. The consecutive dedup above cannot see a line that recurs every 30 s with other lines in between, nor one whose arguments change (a counter, a watcher count). Once a driver ARMS this layer, a debug or info line is keyed by variant + module + its UNFORMATTED template, a warn or error line by its formatted body, and trace/done/start/success are never collapsed so both halves of a lifecycle pair always stay visible. The first occurrence is always emitted; later ones inside the window are counted, and one summary with the count, the first and last suppressed timestamps and the last formatted value is emitted when the window has elapsed (checked on every emission and on the driver's periodic tick), when the calendar date changes, when the least recently used of the bounded streaks is evicted, or on a terminal flush (exit, reload), which also closes the open dedup streak first.",
+		"_how_to_replay": "Time is driven by the harness: each step's \"at\" is seconds after the case's base_time (the section default unless the case overrides it). The harness sets the logger clock to that offset and its timestamp provider to base_time + at, rendered as YYYY-MM-DD HH:MM:SS:000. \"<arg>\" in a template is the single format placeholder, written in each driver's own syntax (%s in Lua, {1} in AutoHotkey), and the same substitution is applied to the expected summary bodies, which quote the driver's template verbatim. \"times\"/\"every\" repeat a step; \"range\" replaces \"<n>\" in the template with each number of the range. \"flush\": \"tick\" is the driver's periodic flush, \"terminal\" the exit/reload flush. \"expect\" lists every delivered line in order; a case may instead give \"expect_line_count\" (non-summary lines) and \"expect_summaries\".",
+		"base_time": "2026-01-15 10:00:00",
+		"cases": [
+			{
+				"id": "periodic_line_collapses_to_first_plus_summary",
+				"description": "The gestures health check logs every 30 s. Twenty ticks inside one window become the first line plus one summary, not twenty lines, and the summary is emitted by the periodic flush once the window has elapsed.",
+				"steps": [
+					{ "at": 0, "every": 30, "times": 20, "variant": "debug", "module": "gestures", "template": "Health-check tick (watchers=<arg>)", "arg": "1" },
+					{ "at": 600, "flush": "tick" }
+				],
+				"expect": [
+					{ "variant": "debug", "module": "gestures", "body": "Health-check tick (watchers=1)", "stamp": "2026-01-15 10:00:00:000" },
+					{ "variant": "debug", "module": "gestures", "body": "↑ \"Health-check tick (watchers=<arg>)\" repeated 19 more times between 2026-01-15 10:00:30:000 and 2026-01-15 10:09:30:000 (last: Health-check tick (watchers=1)).", "stamp": "2026-01-15 10:10:00:000" }
+				],
+				"expect_ring": 2
+			},
+			{
+				"id": "a_tick_inside_the_window_emits_nothing",
+				"description": "The periodic flush closes a streak only once its window has fully elapsed: a tick one second early must leave it open, or a streak would be summarised on whatever tick happened to follow it.",
+				"steps": [
+					{ "at": 0, "variant": "debug", "module": "gestures", "template": "Poll (queue=<arg>).", "arg": "0" },
+					{ "at": 30, "variant": "debug", "module": "gestures", "template": "Poll (queue=<arg>).", "arg": "0" },
+					{ "at": 599, "flush": "tick" },
+					{ "at": 600, "flush": "tick" }
+				],
+				"expect": [
+					{ "variant": "debug", "module": "gestures", "body": "Poll (queue=0).", "stamp": "2026-01-15 10:00:00:000" },
+					{ "variant": "debug", "module": "gestures", "body": "↑ \"Poll (queue=<arg>).\" repeated 1 more time between 2026-01-15 10:00:30:000 and 2026-01-15 10:00:30:000 (last: Poll (queue=0).).", "stamp": "2026-01-15 10:10:00:000" }
+				]
+			},
+			{
+				"id": "changing_arguments_are_one_streak_keyed_by_template",
+				"description": "A counter in the arguments must not defeat collapsing, which is exactly what defeated the old consecutive dedup. The value change stays visible through the summary's last value.",
+				"steps": [
+					{ "at": 0, "variant": "info", "module": "watchers", "template": "Watcher count is <arg>.", "arg": "1" },
+					{ "at": 10, "variant": "info", "module": "watchers", "template": "Watcher count is <arg>.", "arg": "2" },
+					{ "at": 20, "variant": "info", "module": "watchers", "template": "Watcher count is <arg>.", "arg": "3" },
+					{ "at": 30, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "info", "module": "watchers", "body": "Watcher count is 1." },
+					{ "variant": "info", "module": "watchers", "body": "↑ \"Watcher count is <arg>.\" repeated 2 more times between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:20:000 (last: Watcher count is 3.).", "stamp": "2026-01-15 10:00:30:000" }
+				]
+			},
+			{
+				"id": "interleaved_modules_are_separate_streaks",
+				"description": "The same text from two modules is two streaks, and a terminal flush emits their summaries in the order the streaks were opened.",
+				"steps": [
+					{ "at": 0, "variant": "debug", "module": "gestures", "template": "Tick." },
+					{ "at": 1, "variant": "debug", "module": "lease", "template": "Tick." },
+					{ "at": 30, "variant": "debug", "module": "gestures", "template": "Tick." },
+					{ "at": 31, "variant": "debug", "module": "lease", "template": "Tick." },
+					{ "at": 60, "variant": "debug", "module": "gestures", "template": "Tick." },
+					{ "at": 61, "variant": "debug", "module": "lease", "template": "Tick." },
+					{ "at": 90, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "debug", "module": "gestures", "body": "Tick." },
+					{ "variant": "debug", "module": "lease", "body": "Tick." },
+					{ "variant": "debug", "module": "gestures", "body": "↑ \"Tick.\" repeated 2 more times between 2026-01-15 10:00:30:000 and 2026-01-15 10:01:00:000." },
+					{ "variant": "debug", "module": "lease", "body": "↑ \"Tick.\" repeated 2 more times between 2026-01-15 10:00:31:000 and 2026-01-15 10:01:01:000." }
+				]
+			},
+			{
+				"id": "non_consecutive_repeat_is_collapsed",
+				"description": "a, b, a: the consecutive dedup lets the second a through by design; the repeat layer is what withholds it.",
+				"steps": [
+					{ "at": 0, "variant": "info", "module": "corpus", "template": "Alpha." },
+					{ "at": 1, "variant": "info", "module": "corpus", "template": "Beta." },
+					{ "at": 2, "variant": "info", "module": "corpus", "template": "Alpha." },
+					{ "at": 3, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "info", "module": "corpus", "body": "Alpha." },
+					{ "variant": "info", "module": "corpus", "body": "Beta." },
+					{ "variant": "info", "module": "corpus", "body": "↑ \"Alpha.\" repeated 1 more time between 2026-01-15 10:00:02:000 and 2026-01-15 10:00:02:000." }
+				]
+			},
+			{
+				"id": "warn_and_error_are_keyed_by_formatted_body",
+				"description": "Each distinct failure is still recorded: a warning or an error collapses only onto the same formatted text, and its summary keeps the variant so it still reaches the errors-only file.",
+				"steps": [
+					{ "at": 0, "variant": "warn", "module": "probe", "template": "Probe failed: <arg>.", "arg": "timeout" },
+					{ "at": 10, "variant": "warn", "module": "probe", "template": "Probe failed: <arg>.", "arg": "timeout" },
+					{ "at": 20, "variant": "warn", "module": "probe", "template": "Probe failed: <arg>.", "arg": "refused" },
+					{ "at": 30, "variant": "error", "module": "writer", "template": "Write failed: <arg>.", "arg": "disk full" },
+					{ "at": 40, "variant": "error", "module": "writer", "template": "Write failed: <arg>.", "arg": "disk full" },
+					{ "at": 50, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "warn", "module": "probe", "body": "Probe failed: timeout." },
+					{ "variant": "warn", "module": "probe", "body": "Probe failed: refused." },
+					{ "variant": "error", "module": "writer", "body": "Write failed: disk full." },
+					{ "variant": "warn", "module": "probe", "body": "↑ \"Probe failed: timeout.\" repeated 1 more time between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:10:000." },
+					{ "variant": "error", "module": "writer", "body": "↑ \"Write failed: disk full.\" repeated 1 more time between 2026-01-15 10:00:40:000 and 2026-01-15 10:00:40:000." }
+				]
+			},
+			{
+				"id": "lifecycle_variants_are_never_collapsed",
+				"description": "A collapsed START or SUCCESS would leave the other half of its pair alone in the log, which reads as the silent failure the pairing rule exists to expose.",
+				"steps": [
+					{ "at": 0, "variant": "start", "module": "layout", "template": "Loading layout…" },
+					{ "at": 1, "variant": "success", "module": "layout", "template": "Layout loaded." },
+					{ "at": 30, "variant": "start", "module": "layout", "template": "Loading layout…" },
+					{ "at": 31, "variant": "success", "module": "layout", "template": "Layout loaded." },
+					{ "at": 40, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "start", "module": "layout", "body": "Loading layout…" },
+					{ "variant": "success", "module": "layout", "body": "Layout loaded." },
+					{ "variant": "start", "module": "layout", "body": "Loading layout…" },
+					{ "variant": "success", "module": "layout", "body": "Layout loaded." }
+				]
+			},
+			{
+				"id": "window_expiry_re_emits_the_line",
+				"description": "Collapsed, never silenced: an occurrence after the window closes the old streak with its summary and is itself emitted as the first line of a new one.",
+				"steps": [
+					{ "at": 0, "variant": "info", "module": "poller", "template": "Poll." },
+					{ "at": 60, "variant": "info", "module": "poller", "template": "Poll." },
+					{ "at": 700, "variant": "info", "module": "poller", "template": "Poll." },
+					{ "at": 710, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "info", "module": "poller", "body": "Poll.", "stamp": "2026-01-15 10:00:00:000" },
+					{ "variant": "info", "module": "poller", "body": "↑ \"Poll.\" repeated 1 more time between 2026-01-15 10:01:00:000 and 2026-01-15 10:01:00:000.", "stamp": "2026-01-15 10:11:40:000" },
+					{ "variant": "info", "module": "poller", "body": "Poll.", "stamp": "2026-01-15 10:11:40:000" }
+				]
+			},
+			{
+				"id": "terminal_flush_closes_the_dedup_streak_first",
+				"description": "At exit or reload nothing will ever close either kind of streak again. The dedup streak is closed first because its suppressed lines are the most recent ones.",
+				"steps": [
+					{ "at": 0, "variant": "debug", "module": "corpus", "template": "Tick." },
+					{ "at": 30, "variant": "debug", "module": "corpus", "template": "Tick." },
+					{ "at": 40, "variant": "info", "module": "corpus", "template": "Burst." },
+					{ "at": 41, "variant": "info", "module": "corpus", "template": "Burst." },
+					{ "at": 50, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "debug", "module": "corpus", "body": "Tick." },
+					{ "variant": "info", "module": "corpus", "body": "Burst." },
+					{ "variant": "info", "module": "logger", "body": "↑ 1 identical line suppressed" },
+					{ "variant": "debug", "module": "corpus", "body": "↑ \"Tick.\" repeated 1 more time between 2026-01-15 10:00:30:000 and 2026-01-15 10:00:30:000." }
+				]
+			},
+			{
+				"id": "dedup_runs_before_the_repeat_layer",
+				"description": "A burst of identical consecutive lines is still reported by the prompt dedup summary; the repeat layer only sees lines the dedup let through, so the burst is not counted twice.",
+				"steps": [
+					{ "at": 0, "every": 0, "times": 3, "variant": "info", "module": "corpus", "template": "Burst." },
+					{ "at": 1, "variant": "info", "module": "corpus", "template": "Other." },
+					{ "at": 2, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "info", "module": "corpus", "body": "Burst." },
+					{ "variant": "info", "module": "logger", "body": "↑ 2 identical lines suppressed" },
+					{ "variant": "info", "module": "corpus", "body": "Other." }
+				]
+			},
+			{
+				"id": "least_recent_streak_is_evicted_with_its_summary",
+				"description": "The streak table is bounded. Opening one streak more than the capacity evicts the least recently used one, and an evicted streak that suppressed anything reports it right there instead of losing the count.",
+				"steps": [
+					{ "at": 0, "variant": "debug", "module": "corpus", "template": "Streak A." },
+					{ "at": 10, "variant": "debug", "module": "corpus", "template": "Streak A." },
+					{ "at": 11, "every": 1, "range": [1, 64], "variant": "debug", "module": "corpus", "template": "Filler <n>." },
+					{ "at": 80, "flush": "terminal" }
+				],
+				"expect_line_count": 65,
+				"expect_summaries": [
+					{ "variant": "debug", "module": "corpus", "body": "↑ \"Streak A.\" repeated 1 more time between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:10:000.", "followed_by": "Filler 64." }
+				]
+			},
+			{
+				"id": "midnight_rollover_on_emission",
+				"description": "A streak never spans two calendar days: the first emission dated the next day closes it, quoting the previous day's timestamps, and is then emitted itself as the first line of a new streak.",
+				"base_time": "2026-01-15 23:59:00",
+				"steps": [
+					{ "at": 0, "variant": "debug", "module": "corpus", "template": "Midnight tick." },
+					{ "at": 30, "variant": "debug", "module": "corpus", "template": "Midnight tick." },
+					{ "at": 90, "variant": "debug", "module": "corpus", "template": "Midnight tick." },
+					{ "at": 100, "flush": "terminal" }
+				],
+				"expect": [
+					{ "variant": "debug", "module": "corpus", "body": "Midnight tick.", "stamp": "2026-01-15 23:59:00:000" },
+					{ "variant": "debug", "module": "corpus", "body": "↑ \"Midnight tick.\" repeated 1 more time between 2026-01-15 23:59:30:000 and 2026-01-15 23:59:30:000.", "stamp": "2026-01-16 00:00:30:000" },
+					{ "variant": "debug", "module": "corpus", "body": "Midnight tick.", "stamp": "2026-01-16 00:00:30:000" }
+				]
+			},
+			{
+				"id": "midnight_rollover_on_a_tick",
+				"description": "The periodic flush applies the same date rule, so a source that falls silent just before midnight is summarised on the first tick of the new day instead of when its window elapses.",
+				"base_time": "2026-01-15 23:59:00",
+				"steps": [
+					{ "at": 0, "variant": "debug", "module": "corpus", "template": "Midnight tick." },
+					{ "at": 30, "variant": "debug", "module": "corpus", "template": "Midnight tick." },
+					{ "at": 70, "flush": "tick" }
+				],
+				"expect": [
+					{ "variant": "debug", "module": "corpus", "body": "Midnight tick.", "stamp": "2026-01-15 23:59:00:000" },
+					{ "variant": "debug", "module": "corpus", "body": "↑ \"Midnight tick.\" repeated 1 more time between 2026-01-15 23:59:30:000 and 2026-01-15 23:59:30:000.", "stamp": "2026-01-16 00:00:10:000" }
+				]
 			}
 		]
 	},

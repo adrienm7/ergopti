@@ -191,6 +191,14 @@ function M.shell_runner(opts)
 	function fake.exec_stdin(command) return fake.exec(command) end
 	function fake.with_exact_stdin(command) return command end
 	function fake.exec_exact_stdin(command) return fake.exec(command) end
+	-- Records the run and answers it with the same canned output, once
+	function fake.run_async(executable, args, _, callback)
+		local command = executable .. " " .. table.concat(args or {}, " ")
+		fake.commands[#fake.commands + 1] = command
+		callback({ ok = true, code = 0, stdout = answer_for(command), stderr = "" })
+		return { cancel = function() end }
+	end
+	fake.HAS_ASYNC = true
 	function fake._set_runner() end
 	function fake._reset_runner() end
 

@@ -900,6 +900,11 @@ HotstringPrefixWatcherRebuildIndex() {
 		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet)
 		_extPacks += 1
 	}
+	global _HotstringExtensionPacks, Features
+	for Request in HotstringExtensions_RegistrationPlan(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings")) {
+		_RegisterExtPackTriggers(Request.path, Request.category, NewIndex, NewSet, Request.section)
+		_extPacks += 1
+	}
 	_buildMs := TickElapsed(_buildStart)
 	_PrefixIndex := NewIndex
 	_TriggerSet := NewSet

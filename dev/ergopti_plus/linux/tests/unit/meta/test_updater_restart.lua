@@ -109,20 +109,23 @@ end)
 
 helpers.describe("updater restart: the tray tells and acts", function()
 
-	--- The Updates submenu built on a fake updater; returns its rows.
+	--- The About submenu built on a fake updater; returns its update rows.
 	local function updates_rows(fake, ctx_extra)
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		local ctx = { _version = "test", on_quit = function() end, updater = fake }
 		for key, value in pairs(ctx_extra) do ctx[key] = value end
-		local title = require("infra.i18n").get("menu.updates.title")
+		local title = require("infra.i18n").get("menu.about.title")
 		for _, item in ipairs(mb.build(ctx)) do
 			if item.title == title then return item.menu end
 		end
-		error("no Updates section")
+		error("no About section")
 	end
 
 	local function fake_updater(state, release)
+		local real = require("modules.updater.manager")
 		local fake = {
+			CHANNELS = real.CHANNELS,
+			TIMING = real.TIMING,
 			INTERVAL_PRESETS = {},
 			get_channel = function() return "dev" end,
 			get_check_interval = function() return 3600 end,
@@ -159,7 +162,7 @@ helpers.describe("updater restart: the tray tells and acts", function()
 		fake.install_update = function(path) installed_from = path; return true end
 		local finished = nil
 		local rows = updates_rows(fake, { on_update_finished = function(...) finished = { ... } end })
-		local label = require("infra.i18n").get("menu.updates.download_install"):gsub("{tag}", release.tag)
+		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", release.tag)
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -183,7 +186,7 @@ helpers.describe("updater restart: the tray tells and acts", function()
 		end
 		fake.install_update = function() error("nothing to install") end
 		local rows = updates_rows(fake, { on_update_finished = function() end })
-		local label = require("infra.i18n").get("menu.updates.download_install"):gsub("{tag}", shown.tag)
+		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", shown.tag)
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -197,7 +200,7 @@ helpers.describe("updater restart: the tray tells and acts", function()
 		fake.install_update = function() error("nothing to install") end
 		local finished = nil
 		local rows = updates_rows(fake, { on_update_finished = function(...) finished = { ... } end })
-		local label = require("infra.i18n").get("menu.updates.download_install"):gsub("{tag}", "v0.0.0-dev.134")
+		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", "v0.0.0-dev.134")
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end

@@ -154,7 +154,8 @@ helpers.describe("paths JavaScript delivery", function()
 			hs.osascript.applescript = function() return true, picked end
 			calls.bridge_callback({ body = { action = "browse" } })
 			pending[1](); pending[2]()
-			local encoded = assert(evaluations[1].code:match("^window%.applyBrowseResult%((.*)%)$"))
+			-- The second argument names the field the browse was opened for.
+			local encoded = assert(evaluations[1].code:match('^window%.applyBrowseResult%((.*), "config"%)$'))
 			helpers.assert_eq(encoded, expected)
 			helpers.assert_eq(encoded:find("[%z\1-\31]"), nil)
 		end)

@@ -11,7 +11,13 @@
  *
  * FEATURES & RATIONALE:
  * 1. Inert by construction: raw HTML in the source is shown as literal text, so
- *    a <script> or an onerror attribute can never become live markup.
+ *    a <script> or an onerror attribute can never become live markup. The one
+ *    exception is structural and token-level: a line that is exactly <details>,
+ *    <details open> or </details>, and a <summary>…</summary> line opening a
+ *    fold, build the fold with createElement() (CI folds the changelog this
+ *    way for github.com). Nothing is copied from the tag, so any attribute, and
+ *    any other tag, keeps the line literal. An empty <a id="…"></a> line is
+ *    dropped, as GitHub renders nothing for it.
  * 2. Caller-owned link policy: anchors carry no href, so the WebView cannot
  *    navigate. A link becomes clickable only when its absolute https: URL passes
  *    the caller's allow() predicate; the click is then handed to open(), which
@@ -35,6 +41,13 @@
 	var TABLE_SEPARATOR = /^ *\|? *:?-+:? *(\| *:?-+:? *)*\|? *$/;
 	var BARE_URL = /^https?:\/\/[^\s<>]+/;
 	var ESCAPABLE = '\\`*_{}[]()#+-.!|~<>"\'';
+	// Structural fold lines. Exact spellings only: a tag with any attribute is not
+	// matched and therefore stays literal text.
+	var DETAILS_OPEN = /^ {0,3}<details( open)?>[ \t]*$/;
+	var DETAILS_CLOSE = /^ {0,3}<\/details>[ \t]*$/;
+	var SUMMARY = /^ {0,3}<summary>(.*)<\/summary>[ \t]*$/;
+	var SUMMARY_STRONG = /<(b|strong)>(.*?)<\/\1>/g;
+	var EMPTY_ANCHOR = /^ {0,3}<a (?:id|name)="[A-Za-z0-9_-]*"><\/a>[ \t]*$/;
 
 	// =========================================
 	// =========================================
@@ -336,8 +349,90 @@
 			HEADING.test(line) ||
 			THEMATIC_BREAK.test(line) ||
 			BLOCKQUOTE.test(line) ||
-			LIST_ITEM.test(line)
+			LIST_ITEM.test(line) ||
+			DETAILS_OPEN.test(line) ||
+			DETAILS_CLOSE.test(line) ||
+			EMPTY_ANCHOR.test(line)
 		);
+	}
+
+	/**
+	 * Returns the index of the fenced block's last line (its closing fence, or
+	 * the last line when the fence never closes), mirroring _renderBlocks.
+	 * @param {string[]} lines
+	 * @param {number} start - Index of the opening fence line.
+	 * @param {string} marker - Opening fence run.
+	 * @return {number}
+	 */
+	function _fenceEnd(lines, start, marker) {
+		var i = start + 1;
+		while (i < lines.length && lines[i].trim().indexOf(marker) !== 0) i++;
+		return Math.min(i, lines.length - 1);
+	}
+
+	/**
+	 * Finds the </details> closing the fold opened just before lines[start],
+	 * skipping fenced code and nested folds.
+	 * @param {string[]} lines
+	 * @param {number} start - First line inside the fold.
+	 * @return {number} Index of the closing line, or lines.length when unclosed.
+	 */
+	function _foldEnd(lines, start) {
+		var depth = 1;
+		for (var i = start; i < lines.length; i++) {
+			var fence = FENCE.exec(lines[i]);
+			if (fence) {
+				i = _fenceEnd(lines, i, fence[1]);
+				continue;
+			}
+			if (DETAILS_OPEN.test(lines[i])) depth++;
+			else if (DETAILS_CLOSE.test(lines[i]) && --depth === 0) return i;
+		}
+		return lines.length;
+	}
+
+	/**
+	 * Appends a fold summary: inline Markdown where <b>/<strong> pairs become
+	 * strong elements and every other tag stays literal text.
+	 * @param {string} text - Source between <summary> and </summary>.
+	 * @param {Node} parent - The summary element.
+	 * @param {Object} options
+	 */
+	function _appendSummary(text, parent, options) {
+		var last = 0;
+		var match;
+		SUMMARY_STRONG.lastIndex = 0;
+		while ((match = SUMMARY_STRONG.exec(text)) !== null) {
+			if (match.index > last) _parseInline(text.slice(last, match.index), parent, options, false);
+			var strong = document.createElement('strong');
+			_parseInline(match[2], strong, options, false);
+			parent.appendChild(strong);
+			last = SUMMARY_STRONG.lastIndex;
+		}
+		if (last < text.length) _parseInline(text.slice(last), parent, options, false);
+	}
+
+	/**
+	 * Renders the fold whose <details> line is lines[start].
+	 * @return {number} Index of the first line after the fold.
+	 */
+	function _renderFold(lines, start, parent, options) {
+		var details = document.createElement('details');
+		if (DETAILS_OPEN.exec(lines[start])[1]) details.setAttribute('open', '');
+		var end = _foldEnd(lines, start + 1);
+		var inner = lines.slice(start + 1, end);
+		var first = 0;
+		while (first < inner.length && _isBlank(inner[first])) first++;
+		var summary = first < inner.length ? SUMMARY.exec(inner[first]) : null;
+		if (summary) {
+			var summaryEl = document.createElement('summary');
+			_appendSummary(summary[1], summaryEl, options);
+			details.appendChild(summaryEl);
+			inner = inner.slice(first + 1);
+		}
+		_renderBlocks(inner, details, options, false);
+		parent.appendChild(details);
+		return end + 1;
 	}
 
 	/**
@@ -386,6 +481,17 @@
 
 			if (THEMATIC_BREAK.test(line)) {
 				parent.appendChild(document.createElement('hr'));
+				i++;
+				continue;
+			}
+
+			if (DETAILS_OPEN.test(line)) {
+				i = _renderFold(lines, i, parent, options);
+				continue;
+			}
+
+			// A stray fold end and an empty anchor render nothing, as on GitHub.
+			if (DETAILS_CLOSE.test(line) || EMPTY_ANCHOR.test(line)) {
 				i++;
 				continue;
 			}

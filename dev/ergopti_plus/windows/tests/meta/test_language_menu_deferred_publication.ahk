@@ -15,8 +15,8 @@ _LMDP_DeferredLanguageMenuIsPublishedAtomically() {
 		"BuildLanguageMenuDeferred must replace the placeholder with the complete staged submenu")
 	Assert(InStr(Deferred, 'A_TrayMenu.Enable(t("menu.global.language"))') > 0,
 		"BuildLanguageMenuDeferred must enable the row only after the complete submenu is published")
-	Tail := _DriverFuncBody("_MI_AppendTail")
-	Assert(Tail != "", "_MI_AppendTail must exist")
+	Tail := _DriverFuncBody("_MI_StageLanguage")
+	Assert(Tail != "", "_MI_StageLanguage must exist")
 	Assert(InStr(Tail, 'TrayMenuStage_Disable(t("menu.global.language"))') > 0,
 		"the deferred language placeholder must be disabled so an early click is not silently lost")
 }

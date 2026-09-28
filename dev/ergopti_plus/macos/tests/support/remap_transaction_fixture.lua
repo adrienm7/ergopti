@@ -174,8 +174,11 @@ return function(run)
 					return calls.save_succeeds
 				end,
 				build_default_state = function()
+					error("restoration must select the recommended preset explicitly")
+				end,
+				build_recommended_state = function()
 					return {
-						enabled = true,
+						tap_holds_enabled = true,
 						tap_hold_config = {},
 						mod_combos_config = {},
 						tap_hold_timeout_ms = 200,
@@ -366,7 +369,11 @@ return function(run)
 			end
 			function timer_scheduler.every() return { committed = false, fired = true }, false end
 			package.loaded["adapters.timer_scheduler"] = timer_scheduler
-			package.loaded["infra.config_paths"] = { get = function() return "missing-config.toml" end }
+			-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+			package.loaded["infra.config_paths"] = {
+				get = function() return "missing-config.toml" end,
+				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+			}
 			package.loaded["modules.keylogger.kc_bridge"] = {
 				refresh_managed_set = function()
 					calls.classifier_refreshes = calls.classifier_refreshes + 1

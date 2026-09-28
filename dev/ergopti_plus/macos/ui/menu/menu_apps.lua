@@ -68,10 +68,13 @@ local function scan_paths(directory, pattern, category)
 end
 
 
--- Short descriptions shown next to each app name in the submenu
-local APP_DESCRIPTIONS = {
-	["App Cloner"] = i18n.get("menu.apps.clone_desc"),
-	["Encryptor"]  = i18n.get("menu.apps.encrypt_desc"),
+-- The locale KEY of the short description shown next to each app name. The
+-- text is resolved when the submenu is built: resolved here, at module load, it
+-- was frozen in the session cache and stayed in the old language after a
+-- language change until the next reload.
+local APP_DESCRIPTION_KEYS = {
+	["App Cloner"] = "menu.apps.clone_desc",
+	["Encryptor"]  = "menu.apps.encrypt_desc",
 }
 
 
@@ -200,7 +203,7 @@ local function discover_bundled_apps(ctx)
 
 			table.insert(entries, {
 				name        = display,
-				description = APP_DESCRIPTIONS[display] or "",
+				description_key = APP_DESCRIPTION_KEYS[display],
 				path        = app_path,
 				icon        = load_icon(app_path, info),
 			})
@@ -232,8 +235,8 @@ function M.build(ctx)
 
 	for _, app in ipairs(apps) do
 		local label = app.name
-		if app.description ~= "" then
-			label = label .. " — " .. app.description
+		if app.description_key then
+			label = label .. " — " .. i18n.get(app.description_key)
 		end
 
 		local app_path = app.path

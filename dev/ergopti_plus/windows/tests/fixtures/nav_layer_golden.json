@@ -1,0 +1,240 @@
+{
+	"description": "Windows navigation hotkeys from commit 9ac06b773, before replacing the static layer with data. Labels are checked against that upstream source: every physical key is a wildcard and AltGr has only the scan-code key and its LCtrl combination. Actions retain the prior frozen Send templates: N is the repeat count. The recommended layer must preserve every row.",
+	"rows": [
+		{
+			"hotkey": "*WheelUp",
+			"criterion": "layer",
+			"action": "send:{Volume_Up N}"
+		},
+		{
+			"hotkey": "*WheelDown",
+			"criterion": "layer",
+			"action": "send:{Volume_Down N}"
+		},
+		{
+			"hotkey": "~SC01D & ~SC138",
+			"criterion": "layer",
+			"action": "send:{Escape N}"
+		},
+		{
+			"hotkey": "*SC138",
+			"criterion": "layer",
+			"action": "send:{Escape N}"
+		},
+		{
+			"hotkey": "*SC002",
+			"criterion": "layer",
+			"action": "repeat_count:1"
+		},
+		{
+			"hotkey": "*SC003",
+			"criterion": "layer",
+			"action": "repeat_count:2"
+		},
+		{
+			"hotkey": "*SC004",
+			"criterion": "layer",
+			"action": "repeat_count:3"
+		},
+		{
+			"hotkey": "*SC005",
+			"criterion": "layer",
+			"action": "repeat_count:4"
+		},
+		{
+			"hotkey": "*SC006",
+			"criterion": "layer",
+			"action": "repeat_count:5"
+		},
+		{
+			"hotkey": "*SC007",
+			"criterion": "layer",
+			"action": "repeat_count:6"
+		},
+		{
+			"hotkey": "*SC008",
+			"criterion": "layer",
+			"action": "repeat_count:7"
+		},
+		{
+			"hotkey": "*SC009",
+			"criterion": "layer",
+			"action": "repeat_count:8"
+		},
+		{
+			"hotkey": "*SC00A",
+			"criterion": "layer",
+			"action": "repeat_count:9"
+		},
+		{
+			"hotkey": "*SC00B",
+			"criterion": "layer",
+			"action": "repeat_count:10"
+		},
+		{
+			"hotkey": "*SC010",
+			"criterion": "layer",
+			"action": "send:^+{Home}"
+		},
+		{
+			"hotkey": "*SC011",
+			"criterion": "layer",
+			"action": "send:^{Home}"
+		},
+		{
+			"hotkey": "*SC012",
+			"criterion": "layer",
+			"action": "send:^{End}"
+		},
+		{
+			"hotkey": "*SC013",
+			"criterion": "layer",
+			"action": "send:^+{End}"
+		},
+		{
+			"hotkey": "*SC014",
+			"criterion": "layer",
+			"action": "send:{F2}"
+		},
+		{
+			"hotkey": "*SC03A",
+			"criterion": "layer",
+			"action": "send:{BackSpace N}"
+		},
+		{
+			"hotkey": "*SC01E",
+			"criterion": "layer",
+			"action": "send:^+{Up N}"
+		},
+		{
+			"hotkey": "*SC01F",
+			"criterion": "layer",
+			"action": "send:{Up N}"
+		},
+		{
+			"hotkey": "*SC020",
+			"criterion": "layer",
+			"action": "send:{Down N}"
+		},
+		{
+			"hotkey": "*SC021",
+			"criterion": "layer",
+			"action": "send:^+{Down N}"
+		},
+		{
+			"hotkey": "*SC022",
+			"criterion": "layer",
+			"action": "send:{F12}"
+		},
+		{
+			"hotkey": "*SC056",
+			"criterion": "layer",
+			"action": "send:!+{Up N}"
+		},
+		{
+			"hotkey": "*SC02C",
+			"criterion": "layer",
+			"action": "send:!{Up N}"
+		},
+		{
+			"hotkey": "*SC02D",
+			"criterion": "layer",
+			"action": "send:!{Down N}"
+		},
+		{
+			"hotkey": "*SC02E",
+			"criterion": "layer",
+			"action": "send:!+{Down N}"
+		},
+		{
+			"hotkey": "*SC02F",
+			"criterion": "layer",
+			"action": "send:{End}{Enter N}"
+		},
+		{
+			"hotkey": "*SC015",
+			"criterion": "layer",
+			"action": "send:+{Home}"
+		},
+		{
+			"hotkey": "*SC016",
+			"criterion": "layer",
+			"action": "send:^+{Left N}"
+		},
+		{
+			"hotkey": "*SC017",
+			"criterion": "layer",
+			"action": "send:+{Left N}"
+		},
+		{
+			"hotkey": "*SC018",
+			"criterion": "layer",
+			"action": "send:+{Right N}"
+		},
+		{
+			"hotkey": "*SC019",
+			"criterion": "layer",
+			"action": "send:^+{Right N}"
+		},
+		{
+			"hotkey": "*SC01A",
+			"criterion": "layer",
+			"action": "send:+{End}"
+		},
+		{
+			"hotkey": "*SC023",
+			"criterion": "layer",
+			"action": "send:#+{Left}"
+		},
+		{
+			"hotkey": "*SC024",
+			"criterion": "layer",
+			"action": "send:^{Left N}"
+		},
+		{
+			"hotkey": "*SC025",
+			"criterion": "layer",
+			"action": "send:{Left N}"
+		},
+		{
+			"hotkey": "*SC026",
+			"criterion": "layer",
+			"action": "send:{Right N}"
+		},
+		{
+			"hotkey": "*SC027",
+			"criterion": "layer",
+			"action": "send:^{Right N}"
+		},
+		{
+			"hotkey": "*SC028",
+			"criterion": "layer",
+			"action": "send:#+{Right}"
+		},
+		{
+			"hotkey": "*SC031",
+			"criterion": "layer",
+			"action": "call:maximize_window"
+		},
+		{
+			"hotkey": "*SC032",
+			"criterion": "layer",
+			"action": "send:{Home}"
+		},
+		{
+			"hotkey": "*SC033",
+			"criterion": "layer",
+			"action": "send:#{Left}"
+		},
+		{
+			"hotkey": "*SC034",
+			"criterion": "layer",
+			"action": "send:#{Right}"
+		},
+		{
+			"hotkey": "*SC035",
+			"criterion": "layer",
+			"action": "send:{End}"
+		}
+	]
+}

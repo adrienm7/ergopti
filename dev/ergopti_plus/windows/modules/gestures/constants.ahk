@@ -73,3 +73,13 @@ GestureShortcutLabels() {
 		)
 		return Labels
 }
+
+; Explicit restore projects the manifest's recommendation for every slot.
+; Neutral initialization reads ManifestDefaultFor separately.
+; @return {Map} slot id => recommended action id.
+GestureRecommendedActions() {
+		Actions := Map()
+		for _, Slot in GestureSlotIds()
+				Actions[Slot] := ManifestRecommendedFor("gestures." . Slot)
+		return Actions
+}

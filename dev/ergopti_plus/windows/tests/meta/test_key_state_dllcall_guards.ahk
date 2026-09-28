@@ -77,6 +77,19 @@ TestKeyState_ScanScancodeForCharDoesNotThrow() {
 }
 Test("key_state: KS_ScanScancodeForChar does not throw (key-state-dllcall-uncaught)", TestKeyState_ScanScancodeForCharDoesNotThrow)
 
+; The space bar (SC039, VK_SPACE) types a space on every layout, so it pins the
+; two label probes against the real OS without depending on the user's layout.
+TestKeyState_KeyTextProbesReadTheSpaceBar() {
+	Hkl := KS_ResolveKeyboardLayout()
+	Vk := KS_ScancodeToVk(0x39, Hkl)
+	AssertEqual(0x20, Vk, "KS_ScancodeToVk must map SC039 to VK_SPACE")
+	Result := KS_KeyTextNoStateChange(Vk, 0x39, Hkl)
+	AssertEqual(1, Result.Count, "KS_KeyTextNoStateChange must report one character for the space bar")
+	AssertEqual(" ", Result.Text, "KS_KeyTextNoStateChange must read the space the space bar types")
+}
+Test("key_state: the label probes read the space bar (key-state-dllcall-uncaught)",
+	TestKeyState_KeyTextProbesReadTheSpaceBar)
+
 
 
 
@@ -99,3 +112,7 @@ Test("key_state: KS_ResolveKeyboardLayout has a try/catch (key-state-dllcall-unc
 	() => _KSDG_CheckFunctionHasCatch("KS_ResolveKeyboardLayout"))
 Test("key_state: KS_ScanScancodeForChar has a try/catch (key-state-dllcall-uncaught)",
 	() => _KSDG_CheckFunctionHasCatch("KS_ScanScancodeForChar"))
+Test("key_state: KS_ScancodeToVk has a try/catch (key-state-dllcall-uncaught)",
+	() => _KSDG_CheckFunctionHasCatch("KS_ScancodeToVk"))
+Test("key_state: KS_KeyTextNoStateChange has a try/catch (key-state-dllcall-uncaught)",
+	() => _KSDG_CheckFunctionHasCatch("KS_KeyTextNoStateChange"))

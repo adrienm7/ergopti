@@ -18,10 +18,11 @@
 ; amount of hardening there would have helped. The caller has to declare.
 ;
 ; The class assertion below is the important one: it re-derives the payload of
-; EVERY ActionLayer key from nav_layer.ahk's own source and requires each to be
-; classified correctly. A new layer key added later is covered the day it is
-; written, which is the failure mode this driver keeps hitting — the one missed
-; sibling site.
+; EVERY sending key of the recommended layer from the table the driver registers
+; (platform/remap/nav_layer_table.ahk) and requires each to be classified
+; correctly. A key added to the preset later is covered the day it is written,
+; which is the failure mode this driver keeps hitting — the one missed sibling
+; site.
 ;
 ; SCOPE: behavioural for the classifier and for every real layer payload;
 ; positional for the ActionLayer wiring, because ActionLayer's own SendInput is
@@ -110,22 +111,20 @@ _SBE_MixedPayloadIsTreatedAsAMove() {
 ; ===================================================================
 ; ===================================================================
 
-; Rebuild the payload of each ActionLayer key from nav_layer.ahk. The real call
-; sites concatenate a repetition count onto a literal prefix
-; (``ActionLayer("{Up " . AppState_GetNumberOfRepetitions() . "}")``), so a
-; literal ending in a space is closed with a concrete count here.
+; Rebuild the payload of every layer key that sends, from the table the driver
+; registers for Ergopti's recommended layer (platform/remap/nav_layer_table.ahk).
+; A repeatable action carries its repetition count in the payload
+; ("{Up 2}"), so the table's open Send text is closed with a concrete count here.
 _SBE_LayerPayloads() {
-	Src := _DriverSourceNoComments()
+	SharedDir := A_ScriptDir . "\..\..\_shared"
+	Ctx := KeymapLayers_LoadContext(SharedDir)
+	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\keymap\layers.recommended.toml", "UTF-8"))
+	Assert(Result["ok"] && Result["layers"].Has(NAV_LAYER_ID),
+		"the recommended layer must resolve for Windows before its payloads can be classified")
 	Payloads := []
-	Pos := 1
-	while (FoundPos := RegExMatch(Src, 'ActionLayer\("([^"]*)"', &M, Pos)) {
-		Pos := FoundPos + M.Len
-		Literal := M[1]
-		if (Literal == "")
-			continue
-		if (SubStr(Literal, -1) == " ")
-			Literal .= "2}"
-		Payloads.Push(Literal)
+	for Row in NavLayer_BuildTable(Result["layers"][NAV_LAYER_ID], Ctx) {
+		if (SubStr(Row["action"], 1, 5) == "send:")
+			Payloads.Push(Row["send_open"] . (Row["counted"] ? " 2}" : "}"))
 	}
 	return Payloads
 }

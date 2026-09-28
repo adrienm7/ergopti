@@ -39,6 +39,8 @@ _BuildShortcutsSubmenu() {
 	ListProviders := Map(
 		"script_control_shortcuts",   () => _SC_ScriptControlRows(),
 		"keyboard_slots",             () => KeyboardSlotRows(),
+		; The number-row tap keys: labels read live from the layout in use.
+		"tap_keys",                   () => TapKeyRows(),
 		"wrap_symbols_menu",          () => _SC_WrapSymbolRows(),
 		; extensions_shortcuts left DynHandlers on 2026-08-07: its manifest row is
 		; `type = "list"` now, so the renderer draws the separator, the header and
@@ -47,11 +49,11 @@ _BuildShortcutsSubmenu() {
 	)
 
 	; `command` rows: a static label, a click, and the renderer builds the row.
-	Commands := Map(
-		"edit_shortcuts", OpenPersonalShortcuts
-	)
+	; The category switch is one of them: the Shortcuts master gate.
+	Commands := _SC_ScopeCommands()
+	Getters := Map("shortcuts_enabled", () => IsCategoryGated("Shortcuts"))
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands)
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands, Getters)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
@@ -189,7 +191,7 @@ _WS_BuildSymbolRows() {
 		"action", (*) => _WS_MenuSetAll(true)))
 	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
 		"action", (*) => _WS_MenuSetAll(false)))
-	Rows.Push(Map("label", t("menu.global.reset_defaults"),
+	Rows.Push(Map("label", t("common.restore_recommended"),
 		"action", (*) => _WS_MenuReset()))
 	Rows.Push(Map("separator", true))
 
@@ -348,4 +350,21 @@ _WS_MenuAddCustom() {
 
 	Committed := WrapSymbols_AddCustom(LeftChar, RightChar)
 	return _WS_MenuRebuildAfterCommit(Committed)
+}
+
+; Bind real inventories at click time, inside the admitted configuration builder.
+_SC_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"shortcuts_toggle", MenuRenderer_CategoryGateCommand("Shortcuts"),
+		"edit_shortcuts", OpenPersonalShortcuts,
+		"scope_restore", (*) => _SC_ApplyScope("recommended", OwnedOptions),
+		"scope_clear", (*) => _SC_ApplyScope("clear", OwnedOptions))
+}
+
+_SC_ApplyScope(Mode, Options) {
+	CandidateOptions := Options.Clone()
+	CandidateOptions["supplement"] := ConfigIOShortcutScopeOperations
+	Providers := Map("personal", PersonalShortcutScopePaths, "parameters", ConfigScopeActionParameterPaths)
+	return ConfigScopeApply("shortcuts", Mode, Providers, CandidateOptions)
 }

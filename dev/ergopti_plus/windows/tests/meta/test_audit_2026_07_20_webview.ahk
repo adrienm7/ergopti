@@ -19,9 +19,10 @@
 ;       callbacks bypass native Suspend, so a paused driver still let a page
 ;       click write config, re-register hotstrings, or (onboarding) launch an
 ;       elevated UAC driver install. Most handlers use a direct guard; the
-;       changelog captures immutable AHK-14 provenance before its yielding COM
-;       read and revalidates actions afterward. Both deliberately exempt
-;       `ready`: gating page-lifecycle signals strands the safety fallback.
+;       updater bridges (changelog, update prompt notes) capture immutable
+;       AHK-14 provenance before their yielding COM read and revalidate actions
+;       afterward. Both deliberately exempt `ready`: gating page-lifecycle
+;       signals strands the safety fallback.
 ; F-26  _PromptEdWeb_TryOpen captured the open context BELOW its singleton
 ;       early-return, so re-opening for a different profile kept the previous
 ;       _PromptEdWeb_EditId and saving overwrote the WRONG profile.
@@ -69,24 +70,29 @@ _A0720WV_MessageHandlers() {
 	return Out
 }
 
-_A0720WV_ChangelogHasSuspendPolicy(Body) {
+; The updater bridges (the Versions window and the update prompt's notes pane)
+; share one suspend policy instead of a bare A_IsSuspended read: provenance is
+; captured before the yielding COM read, and every action is revalidated after it.
+_A0720WV_ManualBridgeHasSuspendPolicy(Fn, Body) {
 	ReadPos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
 	BornPos := InStr(Body, "Request.BornSuspended")
 	PolicyPos := InStr(Body, "_Updater_RequestMayPublish(Request)")
-	FetchPos := InStr(Body, "_CLW_FetchAndInject(")
 	UrlPos := InStr(Body, "_Updater_OpenManualUrl(")
 	Assert(ReadPos > 0 and BornPos > ReadPos and PolicyPos > BornPos,
-		"_CLW_OnWebMessage must preserve entry-time suspend provenance across its yielding COM read and revalidate it before actions")
-	Assert(FetchPos > PolicyPos and UrlPos > PolicyPos,
-		"_CLW_OnWebMessage must apply the shared suspend policy before every mutating bridge action")
+		Fn . " must preserve entry-time suspend provenance across its yielding COM read and revalidate it before actions")
+	Assert(UrlPos > PolicyPos,
+		Fn . " must apply the shared suspend policy before opening a URL")
+	if (Fn == "_CLW_OnWebMessage")
+		Assert(InStr(Body, "_CLW_FetchAndInject(") > PolicyPos,
+			"_CLW_OnWebMessage must apply the shared suspend policy before every mutating bridge action")
 
 	Reader := _DriverFuncBody("_Updater_ReadManualBridgeMessage")
 	Assert(Reader != "",
-		"_Updater_ReadManualBridgeMessage must exist — it is the changelog bridge's suspend-policy owner")
+		"_Updater_ReadManualBridgeMessage must exist — it is the updater bridges' suspend-policy owner")
 	CapturePos := InStr(Reader, "_Updater_NewRequestContext(")
 	YieldPos := InStr(Reader, "ReadFn.Call()")
 	Assert(CapturePos > 0 and YieldPos > CapturePos,
-		"the changelog bridge must capture AHK-14 provenance before the COM message read can yield")
+		"the updater bridges must capture AHK-14 provenance before the COM message read can yield")
 }
 
 _A0720WV_EveryHandlerIsSuspendGuarded() {
@@ -94,17 +100,17 @@ _A0720WV_EveryHandlerIsSuspendGuarded() {
 	for _, Fn in _A0720WV_MessageHandlers() {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . " must exist — if a host was renamed, update this list rather than dropping the handler from the invariant")
-		if (Fn == "_CLW_OnWebMessage")
-			_A0720WV_ChangelogHasSuspendPolicy(Body)
+		if InStr(Body, "_Updater_ReadManualBridgeMessage(")
+			_A0720WV_ManualBridgeHasSuspendPolicy(Fn, Body)
 		else
 			Assert(InStr(Body, "A_IsSuspended") > 0,
 				Fn . " must gate on A_IsSuspended: WebMessageReceived is a COM callback and bypasses native Suspend, which only disarms hotkeys, so a paused driver would still let a page click write config, re-register hotstrings or launch an elevated install")
 		Checked += 1
 	}
 	; A floor, not a tautology: the previous ">= 9" compared a hardcoded list
-	; against its own length and could never fail. Eleven handlers are registered
+	; against its own length and could never fail. Twelve handlers are registered
 	; today, so a drop below that means a host lost its registration.
-	Assert(Checked >= 11,
+	Assert(Checked >= 12,
 		"every WebView2 message handler must be covered by this invariant (found " . Checked . ") — the cluster this guards exists precisely because each guard was applied only to the sites its test named")
 }
 Test("webview: every message handler honours the suspend invariant (F-25)",

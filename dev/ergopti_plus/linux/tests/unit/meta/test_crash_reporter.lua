@@ -9,10 +9,11 @@
 --- daemon's crash pipeline can never land silently.
 ---
 --- FEATURES & RATIONALE:
---- 1. Require-time HOME binding: CRASH_DIR is computed from os.getenv("HOME") at
----    require time, so the suite redirects HOME via an os.getenv shim BEFORE the
----    module loads (Lua 5.4 has no os.setenv) and asserts get_crash_dir() reflects
----    the sandbox path.
+--- 1. Call-time resolution: the crash folder is <logs>/crash_reports, resolved
+---    per call from HOME, XDG_STATE_HOME and the LogsDirPath override, so the
+---    suite redirects HOME via an os.getenv shim (Lua 5.4 has no os.setenv) and
+---    an empty bootstrap store around every call, and asserts get_crash_dir()
+---    reflects the sandbox path.
 --- 2. Hermetic I/O: the module shells out with Unix-only mkdir -p / ls, which do
 ---    not exist under the Windows test host. The sandbox stubs os.execute, io.popen
 ---    and io.open so M.dump is exercised end to end — path construction and dump
@@ -48,8 +49,9 @@ local REAL_GETENV = os.getenv
 local TMP_HOME     = (REAL_GETENV("TEMP") or REAL_GETENV("TMP") or "/tmp")
 	:gsub("\\", "/"):gsub("/$", "") .. "/ergopti_cr_sandbox_home"
 
--- The crash directory the module must derive from TMP_HOME at require time.
-local EXPECTED_DIR = TMP_HOME .. "/.local/share/ergopti/crashes"
+-- The crash directory the module must derive from TMP_HOME: the crash_reports
+-- folder of the default logs folder, ~/.local/state/ergopti_plus/logs.
+local EXPECTED_DIR = TMP_HOME .. "/.local/state/ergopti_plus/logs/crash_reports"
 
 
 
@@ -99,6 +101,24 @@ end
 -- ===== 2.2) I/O Sandbox =====
 -- ============================
 
+--- Runs `fn` while the logs folder resolves from the sandbox HOME: no
+--- XDG_STATE_HOME and an empty bootstrap store, so no LogsDirPath is set.
+--- @param fn function Body to run.
+local function with_resolution(fn)
+	local saved_getenv = os.getenv
+	local saved_storage = package.loaded["adapters.storage"]
+	os.getenv = function(name)
+		if name == "HOME" then return TMP_HOME end
+		if name == "XDG_STATE_HOME" then return nil end
+		return REAL_GETENV(name)
+	end
+	package.loaded["adapters.storage"] = { get = function(_, fallback) return fallback end }
+	local ok, err = pcall(fn)
+	os.getenv = saved_getenv
+	package.loaded["adapters.storage"] = saved_storage
+	if not ok then error(err, 0) end
+end
+
 --- Runs `fn` with os.execute, io.popen and io.open stubbed so the module never
 --- touches the real filesystem. Captures the single file path/mode/body that
 --- M.dump writes, and optionally feeds a canned io.popen line for count parsing.
@@ -128,7 +148,7 @@ local function with_sandbox(opts, fn)
 		}
 	end
 
-	local ok, err = pcall(fn)
+	local ok, err = pcall(with_resolution, fn)
 
 	-- Restore globals unconditionally so a failing assertion cannot leak stubs.
 	io.open, os.execute, io.popen = real_open, real_exec, real_popen
@@ -151,8 +171,10 @@ end
 helpers.describe("linux: crash_reporter diagnostics", function()
 	local cr = load_crash_reporter()
 
-	helpers.it("binds CRASH_DIR to $HOME at require time", function()
-		helpers.assert_eq(cr.get_crash_dir(), EXPECTED_DIR, "crash dir derived from HOME")
+	helpers.it("resolves the crash folder inside the logs folder, from HOME", function()
+		with_resolution(function()
+			helpers.assert_eq(cr.get_crash_dir(), EXPECTED_DIR, "crash dir derived from HOME")
+		end)
 	end)
 
 	helpers.it("protect returns the wrapped result on success", function()

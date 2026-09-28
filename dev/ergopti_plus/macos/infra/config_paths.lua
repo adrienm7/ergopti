@@ -16,9 +16,10 @@
 --- 2. ONE writer of paths.toml. Two lived here before, in two files: the
 ---    onboarding wizard's persist_config_dir_for_wizard and the path editor's
 ---    apply_and_reload, near-duplicates that differed in whether they reloaded
----    and in how they treated a value equal to the default. set_config_dir is
----    the single writer; whether to reload afterwards is the caller's business,
----    which is the actual difference between those two.
+---    and in how they treated a value equal to the default. set_paths is the
+---    single writer (set_config_dir is its configuration-only form); whether to
+---    reload afterwards is the caller's business, which is the actual
+---    difference between those two.
 --- 3. Resolution works BEFORE init(). Modules requiring this during their own
 ---    load — keylogger's init IIFE among them — must still get the
 ---    user-configured directory, so the default is computed at module load and
@@ -36,6 +37,11 @@
 ---    save. Native pickers and typed webview fields therefore cannot disagree:
 ---    every persisted override is an absolute native path, never cwd-relative
 ---    or a literal tilde segment.
+--- 6. The logs folder is the second key, LogsDirPath. Empty means
+---    ~/Library/Logs/ergopti_plus/. A folder not named after the application
+---    gets that subfolder appended: the native logger worker restricts its
+---    folder to the owner and purges old logs there, which must never happen to
+---    a folder such as ~/Documents that the user merely picked.
 --- ==============================================================================
 
 local M = {}
@@ -43,6 +49,8 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
+local AppDirs    = require("app_dirs")
+local LogFolders = require("infra.log_folders")
 local LOG        = "config_paths"
 
 
@@ -76,8 +84,10 @@ if type(_managed_paths_file) ~= "string"
 	_managed_paths_file = nil
 end
 
--- The single key stored in paths.toml.
+-- The two keys stored in paths.toml: the configuration folder, and the logs
+-- folder named by the shared application-folders registry.
 local CONFIG_DIR_KEY = "ConfigDirPath"
+local LOGS_DIR_KEY   = AppDirs.override_key
 
 -- Driver root — derived at module-load time so standalone source-tree launches
 -- can read their adjacent paths.toml before M.init(). M.init() may override it.
@@ -96,7 +106,10 @@ local _default_config_dir = (function()
 	return nil
 end)()
 
--- In-memory cache: { ConfigDirPath = "..." } or {}; nil = not yet loaded.
+-- The OS-default logs folder, from the one formula over the same home.
+local _default_logs_dir = LogFolders.default_logs_dir(_home) or LogFolders.homeless_logs_dir()
+
+-- In-memory cache: { ConfigDirPath = "...", LogsDirPath = "..." } or {}; nil = not yet loaded.
 local _bootstrap = nil
 local _bootstrap_status = nil
 local _bootstrap_snapshot = nil
@@ -162,23 +175,43 @@ local function expand_legacy_home(value)
 	return (_home:gsub("/+$", "")) .. value:sub(2)
 end
 
---- Validates and normalizes one config-directory override. @param value string|nil Empty/nil clears the override.
---- @return string|nil normalized Absolute path with a trailing slash.
+--- Validates and normalizes one folder override.
+--- @param value string|nil Empty/nil clears the override.
+--- @param key string|nil paths.toml key named in the refusal (ConfigDirPath by default).
+--- @return string|nil normalized Absolute path with a trailing slash, or "".
 --- @return string|nil error_detail
-local function normalize_config_dir_override(value)
+local function normalize_config_dir_override(value, key)
+	key = key or CONFIG_DIR_KEY
 	if value == nil or value == "" then return "" end
 	if type(value) ~= "string" then
-		return nil, "ConfigDirPath must be a string or empty"
+		return nil, key .. " must be a string or empty"
 	end
 	local is_absolute = value:sub(1, 1) == "/"
 	if package.config:sub(1, 1) == "\\" then
 		is_absolute = is_absolute or value:match("^%a:[/\\]") ~= nil
 	end
 	if not is_absolute then
-		return nil, "ConfigDirPath must be an absolute path"
+		return nil, key .. " must be an absolute path"
 	end
 	if not value:match("[/\\]$") then value = value .. "/" end
 	return value
+end
+
+--- Validates one logs-folder override and makes it a folder the application
+--- owns: a folder whose last component is not the application folder name gets
+--- that subfolder appended, so retention and the owner-only permission change
+--- never reach a folder the user merely picked.
+--- @param value string|nil Empty/nil clears the override.
+--- @return string|nil normalized Absolute path with a trailing slash, or "".
+--- @return string|nil error_detail
+local function normalize_logs_dir_override(value)
+	local normalized, err = normalize_config_dir_override(value, LOGS_DIR_KEY)
+	if normalized == nil or normalized == "" then return normalized, err end
+	local leaf = normalized:match("([^/\\]+)[/\\]$")
+	if leaf ~= AppDirs.folder_name then
+		normalized = normalized .. AppDirs.folder_name .. "/"
+	end
+	return normalized
 end
 
 --- Parses a simple flat TOML file (key = "value" pairs, ignoring comments).
@@ -212,6 +245,11 @@ local function read_bootstrap(path)
 		local normalized, validation_error = normalize_config_dir_override(expanded)
 		if normalized == nil then return nil, "error", validation_error end
 		parsed[CONFIG_DIR_KEY] = normalized
+	end
+	if parsed[LOGS_DIR_KEY] ~= nil then
+		local normalized, validation_error = normalize_logs_dir_override(parsed[LOGS_DIR_KEY])
+		if normalized == nil then return nil, "error", validation_error end
+		parsed[LOGS_DIR_KEY] = normalized ~= "" and normalized or nil
 	end
 	return parsed, "ok", nil, raw
 end
@@ -257,6 +295,18 @@ local function config_dir()
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then return v end
 	return _default_config_dir or _base_dir or ""
+end
+
+--- Returns the resolved logs folder (with trailing slash): the LogsDirPath
+--- override, or ~/Library/Logs/ergopti_plus/. Lazy-loads paths.toml like
+--- config_dir(). Without a home folder the logger's early-boot fallback is the
+--- only folder left.
+--- @return string
+local function logs_dir()
+	config_dir()
+	local v = _bootstrap[LOGS_DIR_KEY]
+	if type(v) == "string" and v ~= "" then return v end
+	return _default_logs_dir
 end
 
 --- Ensures a directory exists (idempotent), creating parents as needed.
@@ -332,6 +382,16 @@ local function serialize_toml()
 		lines[#lines + 1] = string.format('%s = "%s"', CONFIG_DIR_KEY, v)
 	else
 		lines[#lines + 1] = string.format('# %s = "%s"', CONFIG_DIR_KEY, default_dir)
+	end
+	lines[#lines + 1] = ""
+	local default_logs = _default_logs_dir
+	lines[#lines + 1] = string.format(
+		"# Logs folder. If absent or commented out, logs are written to: %s", default_logs)
+	local logs = _bootstrap[LOGS_DIR_KEY]
+	if type(logs) == "string" and logs ~= "" then
+		lines[#lines + 1] = string.format('%s = "%s"', LOGS_DIR_KEY, logs)
+	else
+		lines[#lines + 1] = string.format('# %s = "%s"', LOGS_DIR_KEY, default_logs)
 	end
 	lines[#lines + 1] = ""
 	return table.concat(lines, "\n")
@@ -640,44 +700,101 @@ function M.get_default_config_dir()
 	return _default_config_dir or _base_dir or ""
 end
 
---- Persists a new config directory to paths.toml. THE single writer.
+--- The configured logs folder (with trailing slash): LogsDirPath, or the OS
+--- default. The logger is pointed at it once at boot; consumers ask the logger.
+--- @return string
+function M.get_logs_dir()
+	return logs_dir()
+end
+
+--- The OS-default logs folder (with trailing slash), shown by the path editor.
+--- @return string
+function M.get_default_logs_dir()
+	return _default_logs_dir
+end
+
+--- Persists the configuration and logs folders to paths.toml in one
+--- publication. THE single writer.
 ---
 --- Whether to reload afterwards is the caller's decision and the only real
 --- difference between the two writers this replaces: the path editor reloads so
 --- every module picks up the new location, while the onboarding wizard must NOT
 --- — it writes config.toml right after and reloads once at the end, and a reload
---- here would restart the script mid-wizard and lose the remaining answers.
---- @param new_dir string|nil Absolute path (trailing slash optional), or "" / nil
----                           to mean "use the OS default".
---- @return boolean changed True when the stored value actually moved.
-function M.set_config_dir(new_dir)
+--- here would restart the script mid-wizard and lose the remaining answers. On
+--- this driver a new logs folder always needs that reload: the native logger
+--- worker refuses a folder change inside a running session.
+--- @param new_config_dir string|nil Absolute path (trailing slash optional), ""
+---   for the OS default, or nil to keep the stored value.
+--- @param new_logs_dir string|nil Same convention for LogsDirPath.
+--- @return boolean changed True when a resolved folder actually moved.
+--- @return string|nil error_message Validation or publication failure.
+function M.set_paths(new_config_dir, new_logs_dir)
 	if _bootstrap_status == "error" then
 		return false, "paths.toml is unreadable or malformed"
 	end
-	local normalized, validation_error = normalize_config_dir_override(new_dir)
-	if normalized == nil then return false, validation_error end
-	new_dir = normalized
+	local config_value, logs_value
+	if new_config_dir ~= nil then
+		local normalized, validation_error = normalize_config_dir_override(new_config_dir)
+		if normalized == nil then return false, validation_error end
+		config_value = normalized
+	end
+	if new_logs_dir ~= nil then
+		local normalized, validation_error = normalize_logs_dir_override(new_logs_dir)
+		if normalized == nil then return false, validation_error end
+		logs_value = normalized
+	end
+	-- A logs override is created before anything changes: the native worker
+	-- refuses a folder it cannot open and the start then stops, so a folder
+	-- stored without existing would keep the application from booting until
+	-- paths.toml is edited by hand.
+	if logs_value ~= nil and logs_value ~= "" and logs_value ~= (_default_logs_dir or "")
+		and not ensure_dir(logs_value) then
+		return false, string.format("could not create logs directory '%s'", logs_value)
+	end
 
-	local old_dir = config_dir()
-	local old_override = _bootstrap[CONFIG_DIR_KEY]
-	-- An empty path or one equal to the default → clear the override so
-	-- paths.toml stays a commented-out template and a future reload follows the
+	local old_dir, old_logs = config_dir(), logs_dir()
+	local old_config_override = _bootstrap[CONFIG_DIR_KEY]
+	local old_logs_override = _bootstrap[LOGS_DIR_KEY]
+	-- An empty path or one equal to the default clears the override, so
+	-- paths.toml keeps a commented-out template and a future reload follows the
 	-- OS default.
-	if new_dir == "" or new_dir == (_default_config_dir or "") then
-		_bootstrap[CONFIG_DIR_KEY] = nil
-	else
-		if not ensure_dir(new_dir) then
-			return false, string.format("could not create config directory '%s'", new_dir)
+	if config_value ~= nil then
+		if config_value == "" or config_value == (_default_config_dir or "") then
+			_bootstrap[CONFIG_DIR_KEY] = nil
+		else
+			if not ensure_dir(config_value) then
+				return false, string.format("could not create config directory '%s'", config_value)
+			end
+			_bootstrap[CONFIG_DIR_KEY] = config_value
 		end
-		_bootstrap[CONFIG_DIR_KEY] = new_dir
+	end
+	if logs_value ~= nil then
+		if logs_value == "" or logs_value == (_default_logs_dir or "") then
+			_bootstrap[LOGS_DIR_KEY] = nil
+		else
+			_bootstrap[LOGS_DIR_KEY] = logs_value
+		end
 	end
 	local saved, save_err = save_bootstrap()
 	if not saved then
-		_bootstrap[CONFIG_DIR_KEY] = old_override
+		_bootstrap[CONFIG_DIR_KEY] = old_config_override
+		_bootstrap[LOGS_DIR_KEY] = old_logs_override
 		adopt_changed_bootstrap_target()
 		return false, save_err
 	end
-	return config_dir() ~= old_dir
+	if logs_dir() ~= old_logs then
+		Logger.info(LOG, "Logs folder set to '%s'; it takes effect at the next reload.", logs_dir())
+	end
+	return config_dir() ~= old_dir or logs_dir() ~= old_logs
+end
+
+--- Persists a new config directory to paths.toml, keeping LogsDirPath.
+--- @param new_dir string|nil Absolute path (trailing slash optional), or "" / nil
+---                           to mean "use the OS default".
+--- @return boolean changed True when the stored value actually moved.
+--- @return string|nil error_message Validation or publication failure.
+function M.set_config_dir(new_dir)
+	return M.set_paths(new_dir or "", nil)
 end
 
 --- Metrics store directory of a configuration directory. The single rule shared

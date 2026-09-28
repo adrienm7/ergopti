@@ -8,10 +8,12 @@ final class UpdateConsentPolicyTests: XCTestCase {
 	private final class SettingsStub: AutomaticUpdateSettings {
 		let allowsAutomaticUpdates: Bool
 		let automaticallyDownloadsUpdates: Bool
+		let automaticallyChecksForUpdates: Bool
 
-		init(allows: Bool, downloads: Bool) {
+		init(allows: Bool, downloads: Bool, checks: Bool = false) {
 			allowsAutomaticUpdates = allows
 			automaticallyDownloadsUpdates = downloads
+			automaticallyChecksForUpdates = checks
 		}
 	}
 
@@ -27,5 +29,10 @@ final class UpdateConsentPolicyTests: XCTestCase {
 	func testRefusesWhenAutomaticDownloadsAreOn() {
 		XCTAssertNotNil(UpdateConsentPolicy.refusal(for: SettingsStub(allows: false, downloads: true)),
 			"automatic downloads fetch and stage an update before any consent")
+	}
+
+	func testRefusesASecondAutomaticCheckOwner() {
+		XCTAssertNotNil(UpdateConsentPolicy.refusal(for: SettingsStub(allows: false, downloads: false, checks: true)),
+			"a stored Sparkle default must not re-enable a scheduler that ignores Lua's pause and interval")
 	}
 }

@@ -1,358 +1,299 @@
 // _shared/ui/healthcheck/script.js
 
-// ===========================================================================
-// MODULE: Healthcheck Shared Renderer
-// DESCRIPTION:
-// Receives a diagnostic snapshot as JSON and renders the full report
-// client-side.  All labels are in English (developer-facing diagnostic —
-// not i18n'd).  Handles the Windows (AHK), macOS and Linux snapshot shapes;
-// the OS-specific system rows are rendered conditionally based on which
-// fields are present in the snapshot, and a generic row with no value is
-// omitted rather than shown as "?".
-//
-// Entry point:
-//   window.renderHealthcheck(snapshot)
-//     snapshot — the raw snapshot object produced by HealthCheck_Run()
-//     on Windows or M.run() on macOS.  The top-level keys are:
-//       version, sys, uptime_sec, warn_count, err_count,
-//       ports_validated, failed_adapters,
-//       wired_count, adapter_count, unwired_adapters,  (macOS only)
-//       event_tap_timeout_telemetry,                    (macOS only)
-//       last_error, recent_issues,
-//       pause_state, keylogger, llm, layout, hotstrings, logs, config,
-//       remap                                           (macOS only)
-//       permissions                                     (macOS only)
-// ===========================================================================
-
 /**
- * Formats raw seconds into a human-readable uptime string (e.g. "2h 04m 37s").
- * @param {number} sec
- * @returns {string}
- */
-function formatUptime(sec) {
-	sec = Math.floor(sec || 0);
-	var h = Math.floor(sec / 3600);
-	var m = Math.floor((sec % 3600) / 60);
-	var s = sec % 60;
-	if (h > 0) {
-		return h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(s).padStart(2, '0') + 's';
-	}
-	if (m > 0) {
-		return m + 'm ' + String(s).padStart(2, '0') + 's';
-	}
-	return s + 's';
-}
-
-/**
- * Renders a key-value table row.
- * @param {string} field
- * @param {string} value HTML-safe value
- * @returns {string}
- */
-function row(field, value) {
-	return '<tr><td>' + field + '</td><td>' + value + '</td></tr>';
-}
-
-/**
- * Renders a row only when its value is known. A "?" told the reader nothing a
- * missing row does not, and on Linux, whose snapshot has no screen probe, it
- * filled the table with question marks.
- * @param {string} field
- * @param {*} value Raw value; undefined, null and "" omit the row.
- * @returns {string}
- */
-function optionalRow(field, value) {
-	if (value === undefined || value === null || value === '') return '';
-	return row(field, escapeHtml(String(value)));
-}
-
-/**
- * Renders one macOS privacy permission state; anything but "granted" is a
- * failure because the matching feature cannot work without it.
- * @param {string} state "granted", "missing", or "unknown (...)"
- * @returns {string} HTML-safe value
- */
-function permissionValue(state) {
-	var text = escapeHtml(String(state || 'unknown'));
-	var cls = state === 'granted' ? 'ok' : 'fail';
-	return '<span class="' + cls + '">' + text + '</span>';
-}
-
-/**
- * Renders the complete healthcheck report into #content.
- * @param {object} s - Snapshot from HealthCheck_Run() / M.run()
- */
-window.renderHealthcheck = function (s) {
-	s = s || {};
-	var sys = s.sys || {};
-	var okList = s.ports_validated || [];
-	var failList = s.failed_adapters || [];
-	var total = okList.length + failList.length;
-	var warnCount = s.warn_count || 0;
-	var errCount = s.err_count || 0;
-	var lastErr = s.last_error || '';
-	var issues = s.recent_issues || [];
-
-	var html = '';
-
-	// ── Title ────────────────────────────────────────────────────────────
-	html += '<h1>System diagnostic</h1>';
-
-	// ── System table ─────────────────────────────────────────────────────
-	html += '<h2>System</h2>';
-	html += '<table><tr><th>Field</th><th>Value</th></tr>';
-
-	html += row('ErgoptiPlus version', escapeHtml(String(s.version || '')));
-	// commit_source says whether the id comes from a package's build stamp or a
-	// source checkout, so a release build and a dev run of it are told apart.
-	var commit = String(sys.git_hash || 'unknown');
-	if (sys.commit_source) commit += ' (' + String(sys.commit_source) + ')';
-	html += row('Last git commit', escapeHtml(commit));
-	html += row('Uptime', escapeHtml(formatUptime(s.uptime_sec)));
-
-	// OS-specific rows: detect the driver by the presence of ahk_version vs hs_version
-	if (sys.ahk_version !== undefined) {
-		// Windows / AHK driver
-		html += row('AutoHotkey', escapeHtml(String(sys.ahk_version || '') + ' ' + String(sys.ahk_bitness || '')));
-		html += row('Windows', escapeHtml(String(sys.os_name || '')));
-		html += row('Windows build', escapeHtml(String(sys.os_build || '')));
-		html += row('Architecture', escapeHtml(String(sys.os_arch || '')));
-	} else if (sys.hs_version !== undefined) {
-		// macOS / Hammerspoon driver
-		html += row('Hammerspoon', escapeHtml(String(sys.hs_version || '?')));
-		if (s.event_tap_timeout_telemetry) {
-			html += row(
-				'Native tap timeout telemetry',
-				escapeHtml(String(s.event_tap_timeout_telemetry.summary || 'unavailable'))
-			);
-		}
-		html += row('macOS', escapeHtml(String(sys.os_version || '?')));
-		html += row('Architecture', escapeHtml(String(sys.arch || '?')));
-		if (s.permissions) {
-			html += row('Accessibility', permissionValue(s.permissions.accessibility));
-			html += row('Screen Recording', permissionValue(s.permissions.screen_recording));
-		}
-	} else if (sys.os === 'linux') {
-		// Linux driver: the distribution, the kernel and the display stack are
-		// what a Linux report is triaged by.
-		html += optionalRow('Linux', sys.os_name);
-		html += optionalRow('Kernel', sys.kernel);
-		html += optionalRow('Architecture', sys.arch);
-		var display = sys.display_server;
-		if (display && sys.desktop) display += ' (' + sys.desktop + ')';
-		html += optionalRow('Display server', display);
-		html += optionalRow('Lua runtime', sys.runtime);
-	}
-
-	html += optionalRow('CPU', sys.cpu_name || sys.cpu_model);
-	html += optionalRow('Logical cores', sys.cpu_cores);
-
-	if (sys.ram_total_gb !== undefined) {
-		// Windows format
-		html += row('Total RAM', escapeHtml(String(sys.ram_total_gb) + ' GB'));
-		html += row('Available RAM', escapeHtml(String(sys.ram_free_gb) + ' GB'));
-	} else {
-		// macOS and Linux format
-		html += optionalRow('Total RAM', sys.ram_total);
-		html += optionalRow('Available RAM', sys.ram_free);
-	}
-
-	html += optionalRow('Screen resolution', sys.screen_res);
-
-	if (sys.dpi_scale !== undefined) {
-		// Windows DPI
-		html += row('DPI', escapeHtml(String(sys.dpi || '') + ' (' + String(sys.dpi_scale) + '%)'));
-	} else if (sys.dpi !== undefined || sys.retina_scale) {
-		// macOS: the DPI is absent when the physical size is unknown, and the
-		// backing scale then stands alone rather than behind a "?".
-		var dpiParts = [];
-		if (sys.dpi !== undefined) dpiParts.push(escapeHtml(String(sys.dpi)));
-		if (sys.retina_scale) dpiParts.push('<em>' + escapeHtml(String(sys.retina_scale)) + ' Retina</em>');
-		html += row('DPI', dpiParts.join(' &nbsp;'));
-	}
-
-	html += optionalRow('Locale', sys.locale);
-
-	if (sys.config_dir) {
-		html += row('Config dir', '<code>' + escapeHtml(String(sys.config_dir)) + '</code>');
-	}
-	// Where the application runs from: inside a packaged app this is the
-	// bundle, which is why it must never be presented as the config dir.
-	if (sys.script_dir) {
-		html += row('App dir', '<code>' + escapeHtml(String(sys.script_dir)) + '</code>');
-	}
-
-	html += '</table>';
-
-	// ── Session counters ─────────────────────────────────────────────────
-	var warnOk = warnCount === 0
-		? '<span class="ok">&#x2705; ' + warnCount + '</span>'
-		: '<span class="fail">&#x274C; ' + warnCount + '</span>';
-	var errOk = errCount === 0
-		? '<span class="ok">&#x2705; ' + errCount + '</span>'
-		: '<span class="fail">&#x274C; ' + errCount + '</span>';
-
-	html += '<h2>Session counters</h2>';
-	html += '<table><tr><th>Type</th><th>Count</th></tr>';
-	html += '<tr><td>&#x26A0;&#xFE0F; Warnings</td><td>' + warnOk + '</td></tr>';
-	html += '<tr><td>&#x1F534; Errors</td><td>' + errOk + '</td></tr>';
-	html += '</table>';
-
-	// ── Runtime state ────────────────────────────────────────────────────
-	if (s.pause_state || s.layout || s.remap || s.llm || s.keylogger || s.hotstrings || s.logs) {
-		html += '<h2>Runtime state</h2>';
-		html += '<table><tr><th>Field</th><th>Value</th></tr>';
-
-		if (s.pause_state) {
-			var ps = s.pause_state;
-			var pauseVal = ps.is_paused
-				? '<span class="fail">PAUSED</span> (' + escapeHtml(String(ps.source || '')) + ')'
-				: '<span class="ok">running</span>';
-			html += row('Pause / Suspend', pauseVal);
-		}
-
-		if (s.layout) {
-			var ly = s.layout;
-			html += row('Layout base', escapeHtml(String(ly.ergopti_base)));
-			html += row('AltGr', escapeHtml(String(ly.altgr)));
-			html += row('Shift', escapeHtml(String(ly.shift)));
-			html += row('Caps', escapeHtml(String(ly.caps)));
-			html += row('Prefix latch', escapeHtml(String(ly.prefix_latch)));
-		}
-
-		// macOS only: the remap engine has no tray row, so a helper held until
-		// Login Items approval is reported here as well as by a notification.
-		if (s.remap) {
-			var rm = s.remap;
-			html += row('Remap engine', escapeHtml(String(rm.phase)));
-			var approvalVal = rm.approval_required
-				? '<span class="fail">required: System Settings &gt; General &gt; Login Items</span>'
-				: '<span class="ok">' + escapeHtml(String(rm.guardian_status)) + '</span>';
-			html += row('Login Items approval', approvalVal);
-		}
-
-		if (s.llm) {
-			var ll = s.llm;
-			html += row('LLM enabled', escapeHtml(String(ll.enabled)));
-			html += row('LLM backend', escapeHtml(String(ll.backend)));
-			html += row('LLM profile', escapeHtml(String(ll.active_profile)));
-			if (ll.model !== undefined) {
-				html += row('LLM model', escapeHtml(String(ll.model)));
-			}
-			if (ll.n_predictions !== undefined) {
-				html += row('LLM predictions', escapeHtml(String(ll.n_predictions)));
-			}
-		}
-
-		if (s.keylogger) {
-			var kl = s.keylogger;
-			html += row('Keylogger events', escapeHtml(String(kl.events_session)));
-			html += row('WPM', escapeHtml(String(kl.wpm)));
-			html += row('Privacy hits', escapeHtml(String(kl.privacy_hits)));
-		}
-
-		if (s.hotstrings) {
-			var ht = s.hotstrings;
-			html += row('Terminators', escapeHtml(String(ht.terminators)));
-			html += row('Personal hotstrings', escapeHtml(String(ht.personal_count)));
-			html += row('Dynamic hotstrings', escapeHtml(String(ht.dynamic_count)));
-			if (ht.default_delay !== undefined) {
-				html += row('Default delay', escapeHtml(String(ht.default_delay)));
-			}
-			html += row('Magic key', escapeHtml(String(ht.magic_key)));
-		}
-
-		if (s.logs) {
-			var lg = s.logs;
-			var logVal = lg.unified_today
-				? '<code>' + escapeHtml(String(lg.unified_today)) + '</code>'
-				: '<em>n/a</em>';
-			var errVal = lg.errors_today
-				? '<code>' + escapeHtml(String(lg.errors_today)) + '</code>'
-				: '<em>n/a</em>';
-			html += row('Log (unified)', logVal);
-			html += row('Log (errors)', errVal);
-			html += row('Ring buffer lines', escapeHtml(String(lg.ring_lines || 0)));
-		}
-
-		html += '</table>';
-	}
-
-	// ── Adapters ─────────────────────────────────────────────────────────
-	var wiredCount = s.wired_count;
-	var adapterCount = s.adapter_count;
-	var unwiredList = s.unwired_adapters || [];
-
-	var adaptersLabel = 'Adapters (' + okList.length + '/' + total + ' OK';
-	if (wiredCount !== undefined && adapterCount !== undefined) {
-		adaptersLabel += ' — ' + wiredCount + '/' + adapterCount + ' wired';
-	}
-	adaptersLabel += ')';
-	html += '<h2>' + adaptersLabel + '</h2>';
-
-	var unwiredSet = {};
-	unwiredList.forEach(function (name) { unwiredSet[name] = true; });
-
-	html += '<ul>';
-	okList.forEach(function (name) {
-		if (unwiredSet[name]) {
-			html += '<li><span class="unwired">~</span> <code>' + escapeHtml(String(name)) + '</code> <em>(contract-healthy, not wired into any feature)</em></li>';
-		} else {
-			html += '<li><span class="ok">&#x2713;</span> <code>' + escapeHtml(String(name)) + '</code></li>';
-		}
-	});
-	failList.forEach(function (name) {
-		html += '<li><span class="fail">&#x2717;</span> <code>' + escapeHtml(String(name)) + '</code></li>';
-	});
-	html += '</ul>';
-
-	// ── Last error ───────────────────────────────────────────────────────
-	html += '<h2>Last recorded error</h2>';
-	if (lastErr) {
-		html += '<pre>' + escapeHtml(String(lastErr)) + '</pre>';
-	} else {
-		html += '<em>No error recorded.</em>';
-	}
-
-	// ── Recent issues ────────────────────────────────────────────────────
-	html += '<h2>Recent warnings / errors (' + issues.length + '/100)</h2>';
-	if (issues.length === 0) {
-		html += '<em>No warnings or errors since startup.</em>';
-	} else {
-		var lines = issues.map(function (l) { return escapeHtml(String(l)); }).join('\n');
-		html += '<pre>' + lines + '</pre>';
-	}
-
-	document.getElementById('content').innerHTML = html;
-};
-
-/**
- * Starts the Linux request/response path after the renderer exists.
+ * ==============================================================================
+ * MODULE: Diagnostics Page
+ * DESCRIPTION:
+ * The diagnostics window of the three drivers: it renders the host's v2
+ * snapshot through the shared model (model.js), keeps the preview of what
+ * leaves the machine, and asks the host, by message, to copy, save, report,
+ * open a folder or a settings page, collect again or close.
  *
- * Windows and macOS inject their snapshots directly after navigation. Linux
- * owns a page-scoped WebKit message handler instead, so it must request the
- * first snapshot and decode the native response. The host marker keeps this
- * path inert in the other two drivers.
+ * FEATURES & RATIONALE:
+ * 1. One entry point for the host, window.receiveDiagnostics(message), with a
+ *    typed message: init (config and first snapshot), snapshot (after a
+ *    refresh), probe (an asynchronous probe answered) and action (the result
+ *    of a request). macOS and Windows evaluate it; Linux answers the bridge's
+ *    requests through window.__hostBridgeResponse, routed to the same place.
+ * 2. The page builds the exported text once, redacts it with the shared rules
+ *    the host handed over, and shows that exact text in the preview: the user
+ *    sees what is copied, saved and sent.
+ * 3. Buttons send action names and ids only. The host validates every message
+ *    against its allowlist and opens nothing it did not collect itself.
+ * 4. "Include details" asks the host to collect the opt-in facts; unticking it
+ *    drops them from the page at once, before any export.
+ * ==============================================================================
  */
-function startLinuxHealthcheckBridge() {
-	if (window.__ergopti_host !== 'linux') {
-		return;
+
+(function () {
+	'use strict';
+
+	var Model = window.ErgoptiDiagnostics;
+	var Redact = window.ErgoptiRedact;
+	var post = makeHostBridge('healthcheck');
+
+	// The host's configuration (schema, redaction rules and context, mode) and
+	// the snapshot on screen; both null until the host's init message
+	var state = { config: null, snapshot: null };
+
+	/**
+	 * True for a boolean true, or the 1 the AutoHotkey JSON writer sends for it.
+	 * @param {*} value
+	 * @returns {boolean}
+	 */
+	function isTrue(value) {
+		return value === true || value === 1;
 	}
 
-	var post = makeHostBridge('healthcheck');
-	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
-		if (bridge !== 'healthcheck') {
+	// ==============================
+	// ==============================
+	// ======= 1/ Translation =======
+	// ==============================
+	// ==============================
+
+	/**
+	 * Translates a key, filling "%s" placeholders in order. An unknown key comes
+	 * back as itself, which is visible rather than blank.
+	 * @param {string} key
+	 * @returns {string}
+	 */
+	function t(key) {
+		var strings = window._i18n_strings || {};
+		var value = strings[key];
+		if (typeof value !== 'string') return key;
+		var args = Array.prototype.slice.call(arguments, 1);
+		var index = 0;
+		return value.replace(/%s/g, function () {
+			return String(args[index++]);
+		});
+	}
+
+	// ================================
+	// ================================
+	// ======= 2/ Rendering ===========
+	// ================================
+	// ================================
+
+	/**
+	 * The redacted Markdown report of the snapshot on screen.
+	 * @returns {string}
+	 */
+	function exportText() {
+		var markdown = Model.formatMarkdown(state.snapshot, state.config.schema, t);
+		return Redact.apply(markdown, state.config.redaction, state.config.context);
+	}
+
+	/**
+	 * Enables the toolbar once there is something to act on.
+	 * @param {boolean} enabled
+	 */
+	function setToolbarEnabled(enabled) {
+		document.querySelectorAll('.toolbar button').forEach(function (button) {
+			if (button.id !== 'btn-close') button.disabled = !enabled;
+		});
+		document.getElementById('chk-details').disabled = !enabled;
+	}
+
+	/**
+	 * Shows a one-line status under the toolbar.
+	 * @param {string} text
+	 * @param {string} kind "ok", "fail" or "info".
+	 */
+	function setStatus(text, kind) {
+		var status = document.getElementById('status');
+		status.textContent = text;
+		status.className = 'status ' + (kind || 'info');
+	}
+
+	/** Renders the page and the preview from the current state. */
+	function render() {
+		var content = document.getElementById('content');
+		if (!state.snapshot || !state.config) {
+			content.innerHTML = '<p class="loading">' + escapeHtml(t('healthcheck.status.loading')) + '</p>';
+			setToolbarEnabled(false);
 			return;
 		}
-		var snapshot = decodeHostBridgeResponse(isBase64, payload);
-		if (snapshot !== null) {
-			window.renderHealthcheck(snapshot);
+		content.innerHTML = Model.renderHtml(state.snapshot, state.config.schema, t);
+		document.getElementById('preview-text').textContent = exportText();
+		document.getElementById('chk-details').checked = isTrue(state.snapshot.detailed);
+		setToolbarEnabled(true);
+	}
+
+	// ===============================
+	// ===============================
+	// ======= 3/ Host Messages ======
+	// ===============================
+	// ===============================
+
+	/**
+	 * Merges the sections a probe filled into the snapshot on screen.
+	 * @param {object} sections { <section id>: { <field id>: value } }
+	 */
+	function mergeSections(sections) {
+		Object.keys(sections || {}).forEach(function (id) {
+			var target = state.snapshot.sections[id];
+			if (!target || typeof target !== 'object' || Array.isArray(target)) {
+				target = {};
+				state.snapshot.sections[id] = target;
+			}
+			var values = sections[id] || {};
+			Object.keys(values).forEach(function (key) {
+				target[key] = values[key];
+			});
+		});
+	}
+
+	/**
+	 * Reports the outcome of an action the page asked for.
+	 * @param {object} message { action, ok, path, missing }
+	 */
+	function onActionResult(message) {
+		// A file not created yet, such as today's errors file before the day's
+		// first warning, is nothing to open rather than a failure
+		if (isTrue(message.missing)) {
+			setStatus(t('healthcheck.status.missing'), 'info');
+			return;
+		}
+		if (!isTrue(message.ok)) {
+			setStatus(t('healthcheck.status.failed'), 'fail');
+			return;
+		}
+		switch (message.action) {
+			case 'copy':
+				setStatus(t('healthcheck.status.copied'), 'ok');
+				break;
+			case 'save':
+				setStatus(t('healthcheck.status.saved', message.path || ''), 'ok');
+				break;
+			case 'report':
+				setStatus(t('notify.report_bug_body'), 'ok');
+				break;
+			default:
+				setStatus('', 'info');
+		}
+	}
+
+	/** In report mode, the user starts from the preview and the report button. */
+	function applyMode() {
+		if (state.config.mode !== 'report') return;
+		document.getElementById('preview').open = true;
+		setStatus(t('healthcheck.status.report_mode'), 'info');
+		document.getElementById('btn-report').focus();
+	}
+
+	/**
+	 * The host's only entry point into the page.
+	 * @param {object} message { type: "init"|"snapshot"|"probe"|"action", … }
+	 */
+	window.receiveDiagnostics = function (message) {
+		if (!message || typeof message !== 'object') return;
+		switch (message.type) {
+			case 'init':
+				state.config = message.config;
+				state.snapshot = message.snapshot;
+				render();
+				applyMode();
+				break;
+			case 'snapshot':
+				if (!state.config) return;
+				state.snapshot = message.snapshot;
+				setStatus('', 'info');
+				render();
+				break;
+			case 'probe':
+				if (!state.snapshot) return;
+				state.snapshot.probes = state.snapshot.probes || {};
+				state.snapshot.probes[message.id] = message.result;
+				mergeSections(message.sections);
+				render();
+				break;
+			case 'action':
+				onActionResult(message);
+				break;
 		}
 	};
-	window.refreshHealthcheck = function () {
-		post({ action: 'refresh' });
-	};
-	post('ready');
-}
 
-startLinuxHealthcheckBridge();
+	// Linux answers each request through the bridge response hook
+	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
+		if (bridge !== 'healthcheck') return;
+		var message = decodeHostBridgeResponse(isBase64, payload);
+		if (message !== null) window.receiveDiagnostics(message);
+	};
+
+	// ==============================
+	// ==============================
+	// ======= 4/ Page Actions ======
+	// ==============================
+	// ==============================
+
+	/**
+	 * The report's file name and the prefilled issue fields, redacted.
+	 * @returns {{name: string, fields: object}}
+	 */
+	function reportParts() {
+		var info = Model.reportInfo(state.snapshot);
+		var name = Model.fileName(info);
+		var fields = Model.issueFields(info, name);
+		Object.keys(fields).forEach(function (id) {
+			fields[id] = Redact.apply(String(fields[id]), state.config.redaction, state.config.context);
+		});
+		return { name: name, fields: fields };
+	}
+
+	var TOOLBAR = {
+		'btn-copy': function () {
+			post({ action: 'copy', text: exportText() });
+		},
+		'btn-save': function () {
+			post({ action: 'save', text: exportText(), name: reportParts().name });
+		},
+		'btn-report': function () {
+			var parts = reportParts();
+			post({ action: 'report', text: exportText(), name: parts.name, fields: parts.fields });
+		},
+		'btn-open-logs': function () {
+			post({ action: 'open_path', id: 'logs_dir' });
+		},
+		'btn-refresh': function () {
+			setStatus(t('healthcheck.status.loading'), 'info');
+			post({ action: 'refresh', detailed: document.getElementById('chk-details').checked });
+		},
+		'btn-close': function () {
+			post({ action: 'close' });
+		}
+	};
+
+	Object.keys(TOOLBAR).forEach(function (id) {
+		document.getElementById(id).addEventListener('click', TOOLBAR[id]);
+	});
+
+	document.getElementById('chk-details').addEventListener('change', function (event) {
+		var detailed = event.target.checked;
+		if (!detailed && state.snapshot) {
+			// Dropped from the page at once: nothing opt-in may reach an export
+			// the user makes before the host answers
+			state.snapshot = Model.withoutOptIn(state.snapshot, state.config.schema);
+			render();
+		}
+		setStatus(t('healthcheck.status.loading'), 'info');
+		post({ action: 'refresh', detailed: detailed });
+	});
+
+	// Row buttons (Open, Open settings) carry an action and an id, nothing else
+	document.getElementById('content').addEventListener('click', function (event) {
+		var button = event.target.closest('button[data-action]');
+		if (!button) return;
+		post({ action: button.getAttribute('data-action'), id: button.getAttribute('data-id') });
+	});
+
+	// The labels arrive with the locale; the page renders again in the user's
+	// language whenever they are applied
+	var applyStrings = window.i18n_apply;
+	window.i18n_apply = function (strings) {
+		if (typeof applyStrings === 'function') applyStrings(strings);
+		render();
+	};
+
+	render();
+	post('ready');
+})();

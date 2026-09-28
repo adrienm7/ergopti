@@ -185,6 +185,12 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
 local input_capture_gate = nil
 
+-- The error window: a logged ERROR can open it (the shared policy decides),
+-- and the start after a crash announces the crash. Installed before main() so
+-- the boot's own errors count; it opens nothing before the event loop runs.
+local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
+if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
+
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
@@ -538,6 +544,21 @@ local function main()
 	end
 
 	BootProfiler.stage("config")
+	require("toml_codec.writer").set_sparse_defaults(
+		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
+	-- 8.0) Version config.toml before anything reads or writes it: the gesture
+	-- and shortcut managers below load the migrated file, and a file the wizard
+	-- creates carries this build's version. A file this build cannot version (a
+	-- newer schema, a failed migration) stays untouched and every write to it is
+	-- refused for the session (_shared/lua/config_migrate.lua,
+	-- docs/adr/009-config-versioning.md). Required here, not at the top: main()
+	-- sits near LuaJIT's upvalue limit.
+	require("config_migrate").boot({
+		path          = require("infra.config_paths").config("config.toml"),
+		driver        = "linux",
+		registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+	})
+
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
 
@@ -696,64 +717,6 @@ local function main()
 			if rebuild_tray_menu then rebuild_tray_menu() end
 		end,
 	})
-
-	-- « Disable all » / « Enable all »: every feature switch, not only the
-	-- hotstrings, and Enable all restores what was on rather than everything.
-	-- The closures read the module handles at call time, so features initialised
-	-- later in the boot (gestures, shortcuts) are covered.
-	--- A feature whose on/off state is one boolean.
-	--- @param id string
-	--- @param is_on function
-	--- @param set function Receives the wanted boolean, returns whether it holds.
-	--- @param persistent boolean|nil false for a switch with no persisted state.
-	local function switch_feature(id, is_on, set, persistent)
-		return {
-			id = id,
-			persistent = persistent,
-			capture = function() return is_on() == true end,
-			disable = function() return set(false) end,
-			restore = function(value) return set(value == true) end,
-			enable = function() return set(true) end,
-		}
-	end
-	local global_features = {
-		{
-			id = "hotstrings",
-			capture = function() return hotstrings_config.closed_category_gates() end,
-			disable = function() return hotstrings_config.disable_all() ~= false end,
-			restore = function(closed) return hotstrings_config.restore_category_gates(closed or {}) end,
-			enable = function() return hotstrings_config.restore_category_gates({}) end,
-		},
-	}
-	if shortcuts then
-		global_features[#global_features + 1] = switch_feature("shortcuts", shortcuts.is_enabled,
-			function(want) return want == shortcuts.is_enabled() or shortcuts.set_enabled(want) end)
-	end
-	if gestures then
-		global_features[#global_features + 1] = switch_feature("gestures", gestures.is_enabled,
-			function(want) return want == gestures.is_enabled() or gestures.set_enabled(want) end)
-	end
-	if prediction_engine then
-		global_features[#global_features + 1] = switch_feature("llm", prediction_engine.is_enabled,
-			function(want)
-				if want == prediction_engine.is_enabled() then return true end
-				if want then return prediction_engine.enable() end
-				return prediction_engine.disable()
-			end)
-	end
-	global_features[#global_features + 1] = switch_feature("metrics", keylogger.is_enabled,
-		function(want) return want == keylogger.is_enabled() or keylogger.set_enabled(want) end)
-	if dyn_hotstrings then
-		global_features[#global_features + 1] = switch_feature("dynamic_hotstrings", dyn_hotstrings.is_enabled,
-			function(want) dyn_hotstrings.set_enabled(want) return dyn_hotstrings.is_enabled() == want end, false)
-	end
-	global_features[#global_features + 1] = switch_feature("tap_holds", TapHold.is_enabled,
-		TapHold.set_enabled, false)
-	-- Required here, not at file scope: main() is at LuaJIT's 60-upvalue limit
-	-- and a file-scope module would be one more upvalue of it.
-	local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
-	local global_switch = GlobalFeatureSwitch.new({ features = global_features,
-		storage = require("adapters.storage") })
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
@@ -1121,6 +1084,15 @@ local function main()
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
+			is_paused     = script_actions.is_paused,
+			-- How a manual prediction request says why it was refused: the daemon's
+			-- one transient surface outside the prediction overlay.
+			notify        = function(text)
+				if not notifier then return false end
+				-- send() reports its own failures and returns nothing.
+				notifier.send(text, { level = "info" })
+				return true
+			end,
 			triggers      = { "//", ";;", "--" },
 			overlay       = llm_overlay,
 			apply_prediction = function(candidate)
@@ -1246,6 +1218,7 @@ local function main()
 	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
 		is_active = function()
 			return shortcuts ~= nil and shortcuts.is_enabled()
+				and shortcuts.configuration_admitted()
 				and shortcuts.is_wrap_on_type_enabled()
 				and not script_actions.is_paused()
 				and not secure_focus_guard.blocks_text()
@@ -1262,6 +1235,17 @@ local function main()
 			engine:reset()
 			return true
 		end,
+	})
+
+	-- The number-row tap keys: a plain press of one the user assigned runs its
+	-- action on the next loop tick and never reaches the application. Decided in
+	-- the consumption callback below, before wrap-on-type sees the key.
+	local tap_keys = require("modules.shortcuts.tap_keys")
+	tap_keys.init({
+		is_active = function()
+			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
+		end,
+		defer = function(fn) return event_loop.defer(fn) end,
 	})
 
 	local function on_click()
@@ -1424,11 +1408,34 @@ local function main()
 	if not keyboard_layout.refresh(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
+	-- it, so the application never sees a chord Ergopti runs. It comes last: an
+	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- The press is recorded for the metrics exactly as the control callback
+	-- records a forwarded chord, and the typing buffer is left alone because the
+	-- key never reached the application (the gesture path runs actions the same way).
+	local function consume_bound_chord(detail)
+		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+		local consumed = keyboard_shortcuts.consume(detail, {
+			only_script = script_actions.is_paused() or not shortcuts_on,
+			defer = function(fn) return event_loop.defer(fn) end,
+		})
+		if not consumed then return false end
+		local chord = keyboard_shortcuts.chord_name(detail)
+		if chord then
+			keylogger.record_shortcut(_cached_app_id or "Unknown", chord, math.floor(Monotonic.now_ms()))
+		end
+		return true
+	end
 	local on_consume = input_capture_gate.guard(function(detail)
+		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
-		return prediction_engine
+		if prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"
-			and prediction_engine.handle_shortcut(detail) == true
+			and prediction_engine.handle_shortcut(detail) == true then
+			return true
+		end
+		return consume_bound_chord(detail)
 	end)
 	local function handle_hold(scancode, held_ms)
 		if capture_owned_scancodes[scancode] then
@@ -1511,17 +1518,28 @@ local function main()
 		tray_menu.setIcon({ title = "Ergopti" })
 
 	if menu_builder then
-		local config_dir = resolve_config_path(opts.config) or DEFAULT_CONFIG_DIR
-
 		-- Build the menu context once; shared between the initial menu build
 		-- and the updater's on_available callback (which triggers a rebuild
 		-- so the menu label changes when an update is found).
 		local function _build_menu_ctx()
+			-- Required here rather than at file scope: main() sits at LuaJIT's
+			-- upvalue limit, and only the three log rows below use them.
+			local LogOpeners = require("ui.log_openers")
+			--- Hands one log path to xdg-open in the background.
+			--- @param target string Absolute folder or file.
+			--- @return boolean started
+			local function xdg_open_log_target(target)
+				Logger.info(LOG, "Opening %s", target)
+				-- "'\\''" is the POSIX close-escape-reopen idiom, as in the pack opener.
+				local started = os.execute(string.format("xdg-open '%s' 2>/dev/null &", target:gsub("'", "'\\''")))
+				return started == true or started == 0
+			end
 			return {
 				_version      = Version.VERSION,
 				-- Read at every rebuild: the pause toggle rebuilds the menu, which
 				-- greys the feature rows and turns the title row into « resume ».
 				paused        = script_actions.is_paused(),
+				is_paused     = script_actions.is_paused,
 				on_toggle_pause = script_actions.toggle_pause,
 				config        = hotstrings_config,
 				engine        = engine,
@@ -1554,8 +1572,10 @@ local function main()
 						webview_manager.set_daemon_state({
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
-							gestures = gestures, dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
+							gestures = gestures, shortcuts = shortcuts,
+							dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
 							input_capture_gate = input_capture_gate,
+							is_paused = script_actions.is_paused,
 							layout = new_layout,
 							on_reload = function() perform_reload("the paths editor") end,
 							on_config_changed = function()
@@ -1660,40 +1680,20 @@ local function main()
 				-- two broken words and silently opened nothing.
 				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
 			end,
-			on_open_config = function(dir)
-				local d = dir or config_dir
-				Logger.info(LOG, "Opening config folder: %s", d)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
-			end,
+			-- The three log rows open through ui/log_openers, shared with the
+			-- gesture actions: every path comes from the sink that writes it, and
+			-- a missing errors file is announced instead of opened blindly.
 			on_open_logs = function()
-				-- Single resolver, shared with the sink that writes there: this action
-				-- used to open a hardcoded HOME path that ignored XDG_DATA_HOME and
-				-- that nothing ever wrote to.
-				local log_dir = LoggerSink.log_dir()
-				Logger.info(LOG, "Opening log folder: %s", log_dir)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
+				return LogOpeners.open_logs_folder(xdg_open_log_target)
 			end,
-			-- The two rows the shared manifest has always declared for this platform
-			-- and that this driver never built: they are translated in all 21
-			-- locales and present on the other two drivers. Both paths come from
-			-- the sink that writes them, so neither can name a file nobody fills.
 			on_open_today_log = function()
-				local path = LoggerSink.main_log_path()
-				Logger.info(LOG, "Opening today's log: %s", path)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
+				return LogOpeners.open_today_log(xdg_open_log_target)
 			end,
 			on_open_error_log = function()
-				local path = LoggerSink.errors_log_path()
-				Logger.info(LOG, "Opening the errors log: %s", path)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
+				return LogOpeners.open_today_errors(xdg_open_log_target)
 			end,
-			on_healthcheck = function()
-				if webview_manager then
-					webview_manager.show("healthcheck")
-				else
-					Logger.info(LOG, "[stub] Healthcheck — webview manager not available.")
-				end
-			end,
+			-- The bridge opens its window: it replaces an open one and resets its mode
+			on_healthcheck = function() require("ui.healthcheck.bridge").open() end,
 			on_show_setup_wizard = function()
 				if webview_manager then
 					webview_manager.show("onboarding")
@@ -1701,26 +1701,18 @@ local function main()
 					Logger.info(LOG, "[stub] Setup wizard — webview manager not available.")
 				end
 			end,
-			-- Called directly. These used to be guarded by `if
-			-- hotstrings_config.enable_all then`, and the functions did not exist —
-			-- so the guard was false, the row did nothing, and a click that did
-			-- nothing is indistinguishable from a click that missed.
-			--
-			-- They moved the hotstrings only, and Enable all switched every bundled
-			-- section on instead of restoring. They now go through the global
-			-- feature switch, which works like a pause (see global_feature_switch).
-			on_enable_all  = function()
-				global_switch.enable_all()
-				if rebuild_tray_menu then rebuild_tray_menu() end
-			end,
-			on_disable_all = function()
-				global_switch.disable_all()
-				if rebuild_tray_menu then rebuild_tray_menu() end
-			end,
 			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
 				Logger.info(LOG, "Log level set to %s.", lvl)
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			on_toggle_error_dialog = function()
+				if not ErrorDialog then
+					Logger.error(LOG, "The error window did not load; its setting cannot change.")
+					return
+				end
+				if not ErrorDialog.set_enabled(not ErrorDialog.is_enabled()) then return end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			}
@@ -1871,9 +1863,11 @@ local function main()
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
+		-- Required here, not at file scope: main() sits near LuaJIT's 60-upvalue limit.
+		local ActionHandlers = require("modules.shortcuts.action_handlers")
 		gestures.init({
 			persist = true,
-			action_handlers = script_actions.handlers,
+			action_handlers = ActionHandlers.compose(script_actions.handlers, shortcuts, prediction_engine),
 			is_paused = script_actions.is_paused,
 		})
 		Logger.info(LOG, "Gestures manager initialised.")
@@ -1885,10 +1879,6 @@ local function main()
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
 
-	-- 8.10d') « Disable all » survives a restart: the persisted switches already
-	-- read back off, and the runtime-only ones are switched off again here.
-	global_switch.reapply_after_boot()
-
 	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
 	-- can query/control daemon modules (keylogger, LLM, config, engine).
 	if webview_manager then
@@ -1898,9 +1888,11 @@ local function main()
 			config    = hotstrings_config,
 			llm       = prediction_engine,
 			gestures  = gestures,
+			shortcuts = shortcuts,
 			dyn_hotstrings = dyn_hotstrings,
 			magic_key = MagicKey,
 			input_capture_gate = input_capture_gate,
+			is_paused = script_actions.is_paused,
 			layout    = opts.layout,
 			on_reload = function() perform_reload("the paths editor") end,
 			on_config_changed = function()
@@ -1927,11 +1919,6 @@ local function main()
 	})
 
 	if updater then
-		-- The one release that has been notified, so a background check every few
-		-- hours does not re-announce the same version for as long as the user
-		-- leaves it uninstalled.
-		local _notified_tag = nil
-
 		local on_available = function(release)
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
 
@@ -1943,11 +1930,11 @@ local function main()
 			-- The tag lands on the REPLACEMENT side of gsub, where "%" is special:
 			-- a release tagged "v2.1%-rc1" would raise inside the notification and
 			-- take the menu rebuild below with it.
-			if notifier and ok_i18n and i18n_mod and release.tag ~= _notified_tag then
-				_notified_tag = release.tag
+			local accepted = false
+			if notifier and ok_i18n and i18n_mod then
 				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
 				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
-				notifier.send(body, {
+				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_title"),
 					level = "info",
 				})
@@ -1957,8 +1944,11 @@ local function main()
 			if tray_menu and menu_builder then
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end
+			return accepted == true
 		end
-		updater.init({ on_available = on_available })
+		-- A paused driver dispatches no automatic check (the record is kept, so
+		-- the check runs at the first evaluation after resuming).
+		updater.init({ on_available = on_available, is_paused = script_actions.is_paused })
 	end
 	BootProfiler.stage_done("services")
 
@@ -2060,8 +2050,13 @@ local function main()
 		shutdown.request("runtime callback failure", "runtime callback failure")
 	end
 
+	-- Summarises the repeat streaks that are due, so a source that fell silent
+	-- keeps no withheld count waiting for an unrelated line (logger SPEC § 4.2).
+	local function flush_due_repeats() Logger.flush_repeats(false) end
+
 	local on_periodic = function()
 		tick_count = tick_count + 1
+		RuntimeGuard.call("logger repeat flush", flush_due_repeats)
 		-- Here rather than in onIdle: it re-reads /proc/bus/input/devices, which
 		-- has no business on the keystroke path. A keyboard unplugged and plugged
 		-- back in gets a new eventN node, and restarting the remap daemon
@@ -2143,6 +2138,12 @@ local function main()
 		end
 	end
 
+	-- systemd restarts a crashed daemon, and the crash left no window behind: the
+	-- first tick of the new loop announces the newest crash dump, once
+	if ErrorDialog then
+		event_loop.defer(function() ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir()) end, 0)
+	end
+
 	event_loop.run({
 		onIdle = function()
 			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
@@ -2191,6 +2192,8 @@ local function main()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 	keylogger.flush()
+	-- The last chance to emit the withheld counts of every open streak.
+	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end
 
@@ -2206,6 +2209,13 @@ end
 -- message handler, before the unwind.
 local ok_main, err_main = CrashReporter.protect("ergopti_hotstrings", main)
 if not ok_main then
+	-- Withheld counts first, so the fatal line stays the last thing in the log.
+	-- Guarded because the crash may have come from the logger itself, and
+	-- nothing may stand between an unhandled error and the non-zero exit below.
+	local flushed, flush_err = pcall(Logger.flush_repeats, true)
+	if not flushed then
+		io.stderr:write("[ergopti_hotstrings] terminal log flush failed: " .. tostring(flush_err) .. "\n")
+	end
 	Logger.error(LOG, "Daemon terminated by an unhandled error: %s", tostring(err_main))
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.

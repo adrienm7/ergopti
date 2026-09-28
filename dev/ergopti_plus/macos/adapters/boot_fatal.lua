@@ -15,9 +15,13 @@
 --- 2. Launcher dialog: Hammerspoon reports exit status 0 even after Lua calls
 ---    os.exit(n), so the launcher cannot tell a fatal abort from a Quit by the
 ---    status alone. A report file, whose path the launcher exports, carries the
----    stage, the localized message and the developer detail to a modal alert
----    that stays until the user dismisses it.
---- 3. Privacy: callers pass stage names and developer diagnostics only, never
+---    kind, the stage, the localized message and the developer detail to a
+---    modal alert that stays until the user dismisses it.
+--- 3. Boot or runtime: a component that fails after boot completed stopped a
+---    running app. Presenting it as "could not start" at a boot "step" sent
+---    users looking for a startup problem, so such a report says kind=runtime,
+---    names the component and lists the day's log files.
+--- 4. Privacy: callers pass stage names and developer diagnostics only, never
 ---    typed text, clipboard content or credentials.
 --- ==============================================================================
 
@@ -56,24 +60,16 @@ local function single_line(value)
 	return (text:gsub("\r?\n", " | "))
 end
 
-
-
-
-
--- ===================================
--- ===================================
--- ======= 2/ Public API =============
--- ===================================
--- ===================================
-
---- Reports one fatal abort through every channel that survives os.exit().
---- @param stage string Stable stage name, such as "native_logger_transport".
+--- Writes one fatal report through every channel that survives os.exit().
+--- @param kind string M.KIND_BOOT or M.KIND_RUNTIME.
+--- @param stage any Boot stage, or runtime component.
 --- @param detail any Developer-facing cause.
 --- @param message string|nil Localized user-facing explanation.
+--- @param log_paths table|nil Log files the launcher lists for a runtime stop.
 --- @param deps table|nil Test seams: getenv, open, clock, fallback_path.
 --- @return boolean launcher_notified True when the launcher report was written.
 --- @return table outcomes Per-channel `{ written, detail }` results.
-function M.report(stage, detail, message, deps)
+local function write_report(kind, stage, detail, message, log_paths, deps)
 	deps = type(deps) == "table" and deps or {}
 	local getenv = deps.getenv or os.getenv
 	local open = deps.open or io.open
@@ -83,10 +79,14 @@ function M.report(stage, detail, message, deps)
 	local exact_stage = single_line(stage ~= nil and stage or "unknown")
 	local exact_detail = single_line(detail ~= nil and detail or "no detail")
 	local exact_message = single_line(message or "")
-	pcall(Logger.error, LOG, "Fatal abort at boot stage '%s': %s.", exact_stage, exact_detail)
+	-- The boot wording is matched by the packaged launch gate; the runtime
+	-- wording must never contain it (tools/diagnostics/macos_launch_gate.py).
+	local where = kind == M.KIND_RUNTIME
+		and string.format("in runtime component '%s'", exact_stage)
+		or string.format("at boot stage '%s'", exact_stage)
+	pcall(Logger.error, LOG, "Fatal abort %s: %s.", where, exact_detail)
 
-	local line = string.format("%s [ERROR] [init] FATAL at boot stage '%s': %s\n",
-		clock(), exact_stage, exact_detail)
+	local line = string.format("%s [ERROR] [init] FATAL %s: %s\n", clock(), where, exact_detail)
 	local outcomes = {}
 	local function record(channel, written, write_detail)
 		outcomes[channel] = { written = written, detail = write_detail }
@@ -101,8 +101,7 @@ function M.report(stage, detail, message, deps)
 	local launcher_log = getenv(M.LAUNCHER_LOG_ENV)
 	if type(launcher_log) == "string" and launcher_log ~= "" then
 		record("launcher_log", write_now(open, launcher_log, "ab",
-			string.format("[%s] embedded Hammerspoon FATAL at boot stage '%s': %s\n",
-				clock(), exact_stage, exact_detail)))
+			string.format("[%s] embedded Hammerspoon FATAL %s: %s\n", clock(), where, exact_detail)))
 	else
 		outcomes.launcher_log = { written = false, detail = "no launcher log exported" }
 	end
@@ -112,10 +111,75 @@ function M.report(stage, detail, message, deps)
 		outcomes.launcher_report = { written = false, detail = "no launcher report file exported" }
 		return false, outcomes
 	end
-	local written, write_detail = write_now(open, report_path, "wb", string.format(
-		"stage=%s\nmessage=%s\ndetail=%s\n", exact_stage, exact_message, exact_detail))
+	local body = string.format("kind=%s\nstage=%s\nmessage=%s\ndetail=%s\n",
+		kind, exact_stage, exact_message, exact_detail)
+	for _, path in ipairs(type(log_paths) == "table" and log_paths or {}) do
+		body = body .. "log=" .. single_line(path) .. "\n"
+	end
+	local written, write_detail = write_now(open, report_path, "wb", body)
 	record("launcher_report", written, write_detail)
 	return written == true, outcomes
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 2/ Public API =============
+-- ===================================
+-- ===================================
+
+--- Report kind of a failure during startup: "could not start", with the stage.
+M.KIND_BOOT = "boot"
+
+--- Report kind of a failure after boot completed: the app was running and
+--- stopped, so the launcher names the component and lists the day's logs.
+M.KIND_RUNTIME = "runtime"
+
+--- Chooses how one fatal exit is presented. A component that fails after boot
+--- completed stopped a running app; reporting it as "could not start" at a boot
+--- "step" sent users looking for a startup problem that did not exist.
+--- @param owner string|nil Failing owner, such as "native_logger".
+--- @param boot_complete boolean Whether the boot sequence had completed.
+--- @param current_stage string|nil Boot stage running when boot is incomplete.
+--- @return string kind M.KIND_BOOT or M.KIND_RUNTIME.
+--- @return string stage Boot stage or runtime component shown to the user.
+--- @return string message_key Default localized explanation for that kind.
+function M.presentation(owner, boot_complete, current_stage)
+	local exact_owner = tostring(owner or "runtime_dependency")
+	if boot_complete == true then
+		return M.KIND_RUNTIME, exact_owner, "dialog.fatal_error.runtime_stopped"
+	end
+	-- The generic post-onboarding owner names the boot stage that was running.
+	if exact_owner == "boot" and type(current_stage) == "string" and current_stage ~= "" then
+		return M.KIND_BOOT, current_stage, "dialog.fatal_error.cannot_start"
+	end
+	return M.KIND_BOOT, exact_owner, "dialog.fatal_error.cannot_start"
+end
+
+--- Reports one failed start through every channel that survives os.exit().
+--- @param stage string Stable stage name, such as "native_logger_transport".
+--- @param detail any Developer-facing cause.
+--- @param message string|nil Localized user-facing explanation.
+--- @param deps table|nil Test seams: getenv, open, clock, fallback_path.
+--- @return boolean launcher_notified True when the launcher report was written.
+--- @return table outcomes Per-channel `{ written, detail }` results.
+function M.report(stage, detail, message, deps)
+	return write_report(M.KIND_BOOT, stage, detail, message, nil, deps)
+end
+
+--- Reports one runtime stop, after boot completed, through the same channels.
+--- @param component string Failing owner, such as "native_logger".
+--- @param detail any Developer-facing cause.
+--- @param message string|nil Localized user-facing explanation.
+--- @param log_paths table Today's log files, listed in the launcher alert.
+--- @param deps table|nil Test seams: getenv, open, clock, fallback_path.
+--- @return boolean launcher_notified True when the launcher report was written.
+--- @return table outcomes Per-channel `{ written, detail }` results.
+function M.report_runtime(component, detail, message, log_paths, deps)
+	return write_report(M.KIND_RUNTIME, component, detail, message, log_paths, deps)
 end
 
 return M

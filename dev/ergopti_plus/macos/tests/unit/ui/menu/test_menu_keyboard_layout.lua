@@ -272,15 +272,18 @@ helpers.describe("menu_keyboard_layout.DEFAULT_STATE (pause-layout feature)", fu
 
 	-- Regression: before the fix, DEFAULT_STATE was absent, so preferences.lua
 	-- could not hydrate the layout keys and they were silently ignored.
-	helpers.it("DEFAULT_STATE has exactly the three pause-layout keys (no extras)", function()
-		local allowed = { layout_pause_switch_enabled = true, layout_on_pause = true, layout_on_resume = true }
+	-- The menubar icon variant joined them on 2026-09-24: it moved from
+	-- hs.settings to config.toml [ui], so this module now seeds its default too.
+	helpers.it("DEFAULT_STATE has exactly the three pause-layout keys and the menubar icon (no extras)", function()
+		local allowed = { layout_pause_switch_enabled = true, layout_on_pause = true, layout_on_resume = true,
+			menubar_icon = true }
 		local count = 0
 		for k in pairs(kbd.DEFAULT_STATE) do
 			count = count + 1
 			helpers.assert_true(allowed[k] == true,
 				"Unexpected key in DEFAULT_STATE: " .. tostring(k))
 		end
-		helpers.assert_eq(count, 3)
+		helpers.assert_eq(count, 4)
 	end)
 end)
 

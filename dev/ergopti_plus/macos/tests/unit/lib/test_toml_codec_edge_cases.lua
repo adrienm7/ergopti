@@ -38,6 +38,10 @@
 --- 9. HS-091 — Basic-string writers emitted raw C0/DEL bytes and the decoder's
 ---    sentinel substitutions corrupted escaped U+0001/U+0002. Fix: escape and
 ---    unescape basic-string bodies with one control-safe, single-pass codec.
+---
+--- 10. Literal-string keys ('KeyL' = …) kept their quotes, so they named a
+---    different key from "KeyL" and a layer file written with single quotes
+---    bound nothing. Fix: unquote them in parse_key like basic-string keys.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -703,5 +707,29 @@ list = [
 		helpers.assert_type(decoded, "table")
 		helpers.assert_eq(decoded.metrics.disabled_apps.list,
 			{ "com.example]app", "other" })
+	end)
+end)
+
+helpers.describe("toml_codec: literal-string keys are unquoted like basic-string keys", function()
+	helpers.it("reads 'KeyL' = ... as the key KeyL", function()
+		local decoded = codec.decode("[layers.nav.all]\n'KeyL' = \"arrow_right\"\n\"KeyK\" = 'arrow_left'\n")
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.layers.nav.all, { KeyL = "arrow_right", KeyK = "arrow_left" })
+	end)
+
+	helpers.it("keeps a dot inside a literal-string key as part of the key", function()
+		local decoded = codec.decode("'a.b' = 1\n")
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded["a.b"], 1)
+	end)
+
+	helpers.it("reads a literal-string key inside an inline table", function()
+		local decoded = codec.decode("t = { 'x' = 1 }\n")
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.t, { x = 1 })
+	end)
+
+	helpers.it("treats 'KeyL' and \"KeyL\" as the same key, so both is a duplicate", function()
+		helpers.assert_nil(codec.decode("'KeyL' = 1\n\"KeyL\" = 2\n"))
 	end)
 end)

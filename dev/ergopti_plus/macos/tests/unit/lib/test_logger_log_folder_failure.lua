@@ -54,7 +54,7 @@ local function with_unusable(missing, link_mode, body)
 	Logger.set_sink(function(line) lines[#lines + 1] = line end)
 
 	local ok, err = pcall(function()
-		local usable, detail = Logger.init_log_path(CONFIG_DIR, 14)
+		local usable, detail = Logger.init_log_path(LOG_DIR, 14)
 		body(lines, usable, detail)
 	end)
 

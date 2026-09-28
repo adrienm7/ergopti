@@ -410,7 +410,16 @@ end
 
 --- Hides the preview.
 function M.hide()
-	if _window then pcall(function() _window:hide() end) end
+	if not _window then return true end
+	local ok, hidden = pcall(function()
+		_window:hide()
+		return _window:get_visible() == false
+	end)
+	if not ok or hidden ~= true then
+		Logger.error(LOG, "Preview hide was not acknowledged.")
+		return false
+	end
+	return true
 end
 
 --- @return boolean True when a preview is on screen.

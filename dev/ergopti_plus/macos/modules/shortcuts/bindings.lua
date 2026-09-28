@@ -22,6 +22,7 @@ local app_acts    = require("modules.shortcuts.actions.apps")
 local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local Manifest    = require("infra.manifest_reader")
+local TapKeys     = require("modules.shortcuts.tap_keys")
 
 local LOG = "shortcuts.bindings"
 
@@ -71,7 +72,7 @@ local native_acquisition_depth = 0
 local rebind_recovery_intent = false
 
 local EXACT_RELEASE_IDS = {
-	at_hash = true,
+	tap_keys = true,
 	layer_scroll = true,
 	cmd_star = true,
 	wrap_text_if_selected = true,
@@ -252,10 +253,32 @@ end
 -- =====================================
 -- =====================================
 
--- Screenshots & Layer (appear first in the menu, before the Ctrl block)
-hotkey_labels.at_hash = i18n.get("shortcuts.label_at_hash")
-hotkey_defs.at_hash   = function()
-	return sys_acts.bind_instant_screenshot(delivery_admitted)
+--- What a plain tap on a keycode runs (modules/shortcuts/tap_keys.lua): the key's
+--- action through the gesture registry, under the key's own binding, or nil when
+--- the keycode is no assigned tap key. Memory only: asked inside the eventtap.
+--- @param keycode integer
+--- @return function|nil
+local function decide_tap_key(keycode)
+	local action, binding = TapKeys.decide(keycode)
+	if not action then return nil end
+	return function()
+		local GestActions = require("modules.gestures.actions")
+		return GestActions.execute_single(action, binding)
+	end
+end
+
+-- The number-row tap keys. Their rows are the tap_keys list of the manifest,
+-- not a toggle: an unassigned key is simply let through.
+hotkey_labels.tap_keys = i18n.get("menu.shortcuts.header_tap_keys")
+hotkey_defs.tap_keys   = function()
+	-- Read before the tap starts: its callback may only consult memory.
+	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	return sys_acts.bind_tap_keys(delivery_admitted, decide_tap_key)
+end
+
+local function has_tap_key_assignments()
+	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	return TapKeys.has_assignments()
 end
 
 hotkey_labels.layer_scroll = i18n.get("shortcuts.label_layer_scroll")
@@ -373,6 +396,14 @@ hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
 hotkey_defs.cmd_star   = function()
 	-- Pass the log callback so bind_cmd_star can log the re-fired Cmd+S
 	return sys_acts.bind_cmd_star(log_shortcut, delivery_admitted)
+end
+
+-- A master enable is not a preset import. Each child starts from its own
+-- neutral desired value and may later be enabled explicitly behind any fence.
+for name in pairs(hotkey_defs) do
+	-- Dispatcher ownership is derived from assignments when the layer starts;
+	-- there is deliberately no shortcuts.keys.tap_keys preference.
+	_disabled_set[name] = name == "tap_keys" or not Manifest.default_for("shortcuts.keys." .. name)
 end
 
 
@@ -693,6 +724,7 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 		end
 	end
 
+	_disabled_set.tap_keys = not has_tap_key_assignments()
 	for name, def in pairs(hotkey_defs) do
 		-- Skip hotkeys that are already active OR that were explicitly disabled
 		-- via M.disable() — the _disabled_set persists across stop/start cycles
@@ -863,8 +895,10 @@ function M.resume_rebind_after_pause()
 end
 
 --- Restores hotkeys and the exact keep-awake intent captured by M.pause().
+--- @param activate boolean|nil Explicit configuration activation; omitted preserves the pause snapshot.
 --- @return boolean committed
-function M.resume_after_pause()
+function M.resume_after_pause(activate)
+	if activate == true then pause_restore_intent = true end
 	lifecycle_paused = false
 	invalidate_lifecycle()
 	if started == true and pause_restore_intent ~= true then
@@ -965,27 +999,42 @@ function M.has_pause_debt()
 		or children_have_pause_debt()
 end
 
---- Enables a single named hotkey by running its factory function.
+--- Records the user's preference for one named hotkey and binds it when the
+--- layer admits native acquisition. Behind the pause fence (Shortcuts OFF,
+--- ScriptControl PAUSE, layout-rebind recovery) only the preference changes:
+--- the boot and Disable All synchronizations replay every saved key there, and
+--- refusing them lost the preference and logged an ERROR per key. The next
+--- start/resume binds every shortcut that is not in _disabled_set.
 --- @param name string The shortcut identifier.
---- @return boolean committed
+--- @return boolean committed True once the preference is recorded and, when
+---   admission is open, the native hotkey is owned.
 function M.enable(name)
 	if type(name) ~= "string" then
 		Logger.error(LOG, "M.enable(): name must be a string.")
 		return false
 	end
-	if not admission_open() or start_attempt ~= nil then
-		Logger.error(LOG, "M.enable(): lifecycle admission is paused.")
+	if start_attempt ~= nil then
+		Logger.error(LOG, "M.enable(): a start transaction is acquiring native hotkeys.")
 		return false
-	end
-	if hotkeys[name] then
-		Logger.debug(LOG, "Hotkey '%s' already enabled — skipping.", name)
-		return true
 	end
 	local def = hotkey_defs[name]
 	if type(def) ~= "function" then
 		Logger.error(LOG, "M.enable(): unknown hotkey '%s'.", name)
 		return false
 	end
+	if name == "tap_keys" and not has_tap_key_assignments() then return M.disable(name) end
+	if not admission_open() then
+		_disabled_set[name] = nil
+		Logger.debug(LOG, "Hotkey '%s' enabled while the layer is paused — it binds on resume.", name)
+		return true
+	end
+	if hotkeys[name] then
+		Logger.debug(LOG, "Hotkey '%s' already enabled — skipping.", name)
+		return true
+	end
+	-- A refused acquisition is no change: the saved preference must survive a
+	-- factory failure or a superseding pause exactly as it was before the call.
+	local previously_disabled = _disabled_set[name]
 	_disabled_set[name] = nil
 	local acquisition_epoch = lifecycle_epoch
 	native_acquisition_depth = native_acquisition_depth + 1
@@ -1001,13 +1050,13 @@ function M.enable(name)
 				Logger.error(LOG,
 					"M.enable(): superseded factory cleanup remains pending for '%s'.", name)
 			end
-			_disabled_set[name] = true
+			_disabled_set[name] = previously_disabled
 			return false
 		end
 		Logger.debug(LOG, "Hotkey '%s' enabled.", name)
 		return true
 	end
-	_disabled_set[name] = true
+	_disabled_set[name] = previously_disabled
 	Logger.error(LOG, "M.enable(): factory for '%s' failed: %s.", name, tostring(obj))
 	return false
 end
@@ -1048,10 +1097,33 @@ function M.disable(name)
 	return true
 end
 
---- Returns whether a specific hotkey is currently active.
+--- Reconciles the shared tap-key owner after an assignment was persisted.
+--- A stopped or paused layer retains intent without acquiring native input.
+--- @return boolean committed
+function M.reconcile_tap_keys()
+	if start_attempt ~= nil then return false end
+	if not has_tap_key_assignments() then return M.disable("tap_keys") end
+	if not started or not admission_open() then
+		_disabled_set.tap_keys = nil
+		return true
+	end
+	return M.enable("tap_keys")
+end
+
+--- Returns the user's preference for a named hotkey, whatever the layer's
+--- lifecycle. This is what config.toml persists and the menu checks: a pause,
+--- Shortcuts OFF or a layout rebind releases the native hotkey, never the
+--- preference.
 --- @param name string The shortcut identifier.
---- @return boolean True if the hotkey is bound.
+--- @return boolean True when the shortcut is registered and not disabled.
 function M.is_enabled(name)
+	return hotkey_defs[name] ~= nil and not _disabled_set[name]
+end
+
+--- Returns whether a named hotkey currently owns a native binding.
+--- @param name string The shortcut identifier.
+--- @return boolean True if the hotkey is bound right now.
+function M.is_bound(name)
 	return hotkeys[name] ~= nil
 end
 
@@ -1059,7 +1131,7 @@ end
 ---   1) ctrl + single letter (ctrl_a … ctrl_z)
 ---   2) ctrl + punctuation word (ctrl_period, ctrl_quote, …)
 ---   3) cmd shortcuts (cmd_shift_v, cmd_star, …)
----   4) everything else (at_hash, layer_scroll — extracted separately by the menu)
+---   4) everything else (tap_keys, layer_scroll — extracted separately by the menu)
 --- Within each group items sort alphabetically by id.
 --- @param id string The shortcut identifier.
 --- @return string Opaque sort key.
@@ -1093,17 +1165,29 @@ end
 function M.set_chatgpt_url(url)
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
 	Logger.debug(LOG, "chatgpt_url updated: %s.", tostring(_chatgpt_url))
+	return true
+end
+
+--- Reads the effective URL used by dispatch for exact runtime compensation.
+--- @return string url
+function M.get_chatgpt_url()
+	return _chatgpt_url or M.DEFAULT_CHATGPT_URL
 end
 
 --- Returns a sorted array of all registered shortcuts with their current status.
---- @return table Array of {id, label, enabled} tables.
+--- `enabled` is the user's preference (see M.is_enabled), which Preferences
+--- persists to [shortcuts.keys]; `bound` is the live native state (see
+--- M.is_bound). Reporting the binding as `enabled` wrote every key false on
+--- any save made while the layer was paused or off.
+--- @return table Array of {id, label, enabled, bound} tables.
 function M.list_shortcuts()
 	local out = {}
 	for name in pairs(hotkey_defs) do
 		table.insert(out, {
 			id      = name,
 			label   = hotkey_labels[name] or name,
-			enabled = (hotkeys[name] ~= nil),
+			enabled = M.is_enabled(name),
+			bound   = M.is_bound(name),
 		})
 	end
 	table.sort(out, function(a, b) return sort_key(a.id) < sort_key(b.id) end)

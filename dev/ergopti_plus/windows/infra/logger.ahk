@@ -5,9 +5,10 @@
 ; DESCRIPTION:
 ; Lightweight central logger for ErgoptiPlus, matching the 8-variant taxonomy
 ; in _shared/modules/logger/SPEC.md (debug / trace / done / info / start / success /
-; warn / error). Writes structured lines to ``ErgoptiPlus.log`` next to the
-; script and keeps a small in-memory ring buffer that the tray menu can dump
-; for live debugging without re-reading the file.
+; warn / error). Writes structured lines to the daily log in the logs folder
+; (LoggerLogsDir: LogsDirPath, or %LOCALAPPDATA%\ergopti_plus\logs\) and keeps
+; a small in-memory ring buffer that the tray menu can dump for live debugging
+; without re-reading the file.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Eight variants on two axes (importance × lifecycle role) so every call
@@ -25,6 +26,10 @@
 ; 6. Dedicated errors-only sink: every WARNING/ERROR line is also appended to
 ;    ErgoptiPlus_errors_YYYY-MM-DD.log (same daily rotation/purge policy). This
 ;    gives a small, focused file for quick triage of problems.
+; 7. Two suppression layers, mirroring the shared Lua core (spec section 4): a
+;    consecutive-line dedup and, once LoggerInit arms it, a bounded repeat
+;    collapser that folds a line recurring with other lines in between, or with
+;    changing arguments, into its first occurrence plus one timed summary.
 ; ==============================================================================
 
 
@@ -201,6 +206,43 @@ global _LOGGER_DEDUP_LEVEL := ""
 global _LOGGER_DEDUP_COUNT := 0
 global _LastErrTime := 0
 
+; How long a repeat streak stays open, and how many streaks are tracked at once
+; (spec section 4.2). The shared Lua core holds the same values, the window in
+; seconds; test-logger-scalars-single-source.cjs pins both to the registry.
+; Single source: _shared/modules/timings/constants.toml [logger]
+; repeat_window_ms and repeat_streak_capacity.
+global LOGGER_REPEAT_WINDOW_MS := 600000
+global LOGGER_REPEAT_CAPACITY := 64
+
+; What a collapsible level is keyed on, beside its level and tag. DEBUG and INFO
+; use the UNFORMATTED template so a changing counter cannot defeat the key;
+; WARNING and ERROR use the formatted body so every distinct failure is still
+; recorded once. TRACE, DONE, START and SUCCESS are absent on purpose: a
+; collapsed half of a lifecycle pair would read as the silent failure the
+; pairing rule exists to expose.
+global LOGGER_REPEAT_KEY_BY := Map("DEBUG", "template", "INFO", "template",
+		"WARNING", "body", "ERROR", "body")
+
+; Repeat-collapsing state, disarmed until LoggerInit's one-time block arms it:
+; the whole AHK suite shares this process, and a ten-minute window armed by
+; default would make one test's line withhold another test's. _DATE is the day
+; every live streak belongs to, _OLDEST the earliest streak start (tick ms, ""
+; when none) so the per-line due check is one comparison, _SEQ orders streaks
+; by creation and _USE by recency.
+global _LOGGER_REPEAT_ENABLED := False
+global _LOGGER_REPEAT_STREAKS := Map()
+global _LOGGER_REPEAT_DATE := ""
+global _LOGGER_REPEAT_OLDEST := ""
+global _LOGGER_REPEAT_SEQ := 0
+global _LOGGER_REPEAT_USE := 0
+
+; Test seams for the suppression clock and the line timestamp, mirroring the
+; shared core's clock_fn / timestamp_fn: a ten-minute window and a midnight
+; rollover cannot be exercised by a suite that runs in seconds. 0 means the
+; production A_TickCount / WallClockTimestamp().
+global _LOGGER_CLOCK_FN := 0
+global _LOGGER_STAMP_FN := 0
+
 
 
 
@@ -211,25 +253,124 @@ global _LastErrTime := 0
 ; =============================
 ; =============================
 
-; Resolve the dated log-file paths for TODAY under <ConfigDir>/autohotkey/logs/,
-; creating the directory if needed, and record the date they were built for.
-; Resolves _ConfigDir at call time so any later override (paths.toml) is picked
-; up. Shared by LoggerInit and the midnight rollover in _LoggerFlush so the
-; filename format lives in exactly one place.
+; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\ (from
+; _generated/app_dirs.ahk). Local, not Roaming: logs are machine state.
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerDefaultLogsDir() {
+		Root := EnvGet(AppDirsWindowsLogsBaseEnv())
+		if (Root == "")
+				throw Error("%" . AppDirsWindowsLogsBaseEnv() . "% is empty: the default logs folder cannot be resolved.")
+		return RTrim(Root, "\/") . "\" . AppDirsWindowsLogsRelative() . "\"
+}
+
+; The one rule for an acceptable logs folder: an absolute path on a drive or a
+; UNC share. Shared by the boot resolver and the paths editor, which refuses
+; what this rejects instead of saving a folder the resolver would discard.
+; @param Dir {String} Candidate folder, slashes in either direction.
+; @returns {Boolean}
+LoggerIsAbsoluteFolder(Dir) {
+		Dir := StrReplace(Trim(Dir), "/", "\")
+		return RegExMatch(Dir, "^[A-Za-z]:\\") || SubStr(Dir, 1, 2) == "\\"
+}
+
+; Resolves the LogsDirPath override read from paths.toml. Empty means the OS
+; default. The default folder, or one whose last component is the application
+; folder name, is used as is; anything else gets that subfolder appended, so
+; retention never deletes in a folder the user merely picked. An override that
+; is not an absolute path is refused visibly and the default is used, exactly
+; like an unreadable paths.toml.
+; @param Override {String} Raw LogsDirPath value, "" when absent.
+; @param DefaultDir {String} Folder used when the override is empty or invalid.
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerResolveLogsDir(Override, DefaultDir) {
+		if !(Override is String) || !(DefaultDir is String) || DefaultDir == ""
+				throw TypeError("LoggerResolveLogsDir needs a String override and a default folder.")
+		Dir := StrReplace(Trim(Override), "/", "\")
+		if (Dir == "")
+				return DefaultDir
+		if !LoggerIsAbsoluteFolder(Dir) {
+				try LoggerError("Logger", "{1} '{2}' is not an absolute folder; logs stay in '{3}'.",
+						AppDirsLogsOverrideKey(), Override, DefaultDir)
+				return DefaultDir
+		}
+		Dir := RTrim(Dir, "\")
+		if (Dir . "\" = DefaultDir)
+				return DefaultDir
+		SplitPath(Dir, &Leaf)
+		if (Leaf != AppDirsFolderName())
+				Dir .= "\" . AppDirsFolderName()
+		return Dir . "\"
+}
+
+; THE logs-folder resolver: the folder boot resolved from paths.toml, or the OS
+; default before boot has run (the logger may emit from the first #Include).
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerLogsDir() {
+		global _LogsDir
+		; Exactly one trailing backslash, whatever the folder was stored with:
+		; every consumer appends a bare name to it.
+		if IsSet(_LogsDir) && (_LogsDir is String) && _LogsDir != ""
+				return RTrim(_LogsDir, "\/") . "\"
+		return LoggerDefaultLogsDir()
+}
+
+; Today's unified log, named at call time so a driver up past midnight never
+; opens yesterday's file.
+; @returns {String}
+LoggerTodayLogPath() {
+		return LoggerLogsDir() . AppDirsLogUnifiedPrefix() . FormatTime(, "yyyy-MM-dd") . AppDirsLogExtension()
+}
+
+; Today's errors-only log (WARNING and ERROR lines). It exists only once
+; something warned that day.
+; @returns {String}
+LoggerTodayErrorsPath() {
+		return LoggerLogsDir() . AppDirsLogErrorsPrefix() . FormatTime(, "yyyy-MM-dd") . AppDirsLogExtension()
+}
+
+; The folder crash reports are written to, inside the logs folder.
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerCrashReportsDir() {
+		return LoggerLogsDir() . AppDirsCrashReportsDir() . "\"
+}
+
+; Appends one line to bootstrap.log, the sink for what happens before
+; paths.toml is read and before LoggerInit may run: a second instance yielding
+; to the live owner, a refused configuration transition. LogsDirPath is not
+; known yet, so the file is in the default logs folder, the one boot names in
+; _DefaultLogsDir or, before boot, the OS default. It never touches the dated
+; files a live owner is writing.
+; @param Severity {String} "WARNING" or "ERROR".
+; @param Source {String} Module name shown between brackets.
+; @param Message {String} The line, without timestamp.
+; @returns {String} The file written.
+LoggerAppendBootstrapLine(Severity, Source, Message) {
+		global _DefaultLogsDir
+		Dir := (IsSet(_DefaultLogsDir) && (_DefaultLogsDir is String) && _DefaultLogsDir != "")
+				? _DefaultLogsDir : LoggerDefaultLogsDir()
+		if !DirExist(Dir)
+				DirCreate(Dir)
+		BootstrapLog := Dir . "bootstrap.log"
+		FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . " [" . Severity . "] ["
+				. Source . "] " . Message . "`r`n", BootstrapLog, "UTF-8")
+		return BootstrapLog
+}
+
+; Resolve the dated log-file paths for TODAY in the logs folder, creating the
+; directory if needed, and record the date they were built for. Shared by
+; LoggerInit and the midnight rollover in _LoggerFlush so the filename format
+; lives in exactly one place.
 ; @returns {String} The resolved log directory, with a trailing backslash.
 _LoggerResolveDatedPaths() {
 		global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
-		global _ConfigDir, _AhkSubDir
 
-		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-				? _ConfigDir . _AhkSubDir . "logs\"
-				: A_ScriptDir . "\logs\"
+		LogDir := LoggerLogsDir()
 		if !DirExist(LogDir) {
 				try DirCreate(LogDir)
 		}
 		Today := FormatTime(, "yyyy-MM-dd")
-		LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Today . ".log"
-		LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Today . ".log"
+		LOGGER_LOG_PATH := LogDir . AppDirsLogUnifiedPrefix() . Today . AppDirsLogExtension()
+		LOGGER_ERRORS_LOG_PATH := LogDir . AppDirsLogErrorsPrefix() . Today . AppDirsLogExtension()
 		_LOGGER_PATH_DATE := Today
 		return LogDir
 }
@@ -272,6 +413,10 @@ LoggerInit() {
 		if !_LOGGER_FLUSH_TIMER_STARTED {
 				SetTimer(_LoggerFlush, LOGGER_FLUSH_INTERVAL_MS)
 				OnExit(_LoggerOnExitFlush)
+				; Armed with the timer that summarises due streaks and the exit hook
+				; that closes the rest (spec section 4.2), and exactly once: a second
+				; arming is refused rather than dropping the live counts.
+				_LoggerRepeatEnable()
 				_LOGGER_FLUSH_TIMER_STARTED := True
 				; Session boundary marker (matches the macOS driver) so tailing the log
 				; reveals where the driver (re)started. Written once per session to the
@@ -539,6 +684,11 @@ _LoggerFlushOwned(ForceFlush := false) {
 	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _LOGGER_PATH_DATE, LOGGER_RETENTION_DAYS
 
+	; This is the periodic tick: close the repeat streaks that are due, so a
+	; source that fell silent is summarised without waiting for another line.
+	; First, so the summaries join the queue this very flush writes.
+	_LoggerFlushRepeats(false)
+
 	; Midnight rollover. The driver routinely stays up across several days, so
 	; without this the dated filename resolved at init would capture every later
 	; entry — misdating the log and making _LoggerPurgeOldLogs, which ages files
@@ -663,8 +813,8 @@ _LoggerDatedPathForDate(Date, ErrorsOnly := false) {
 	SlashAt := InStr(BasePath, "\", false, -1)
 	if (BasePath == "" || SlashAt == 0)
 		return ""
-	Prefix := ErrorsOnly ? "ErgoptiPlus_errors_" : "ErgoptiPlus_"
-	return SubStr(BasePath, 1, SlashAt) . Prefix . Date . ".log"
+	Prefix := ErrorsOnly ? AppDirsLogErrorsPrefix() : AppDirsLogUnifiedPrefix()
+	return SubStr(BasePath, 1, SlashAt) . Prefix . Date . AppDirsLogExtension()
 }
 
 _LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
@@ -743,17 +893,14 @@ _LoggerRequeue(Pending, PendingErr) {
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
-		global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
 		; If the very last log call before shutdown was itself a suppressed
 		; duplicate, its streak's "N more identical lines" summary is still
 		; pending — the streak only ever gets flushed when a DIFFERENT line
-		; arrives (see _LoggerEmit). Emit it now so a repeating warning/error
+		; arrives (see _LoggerEmit). The same holds for every open repeat
+		; streak. The terminal flush emits both now so a repeating warning/error
 		; storm immediately preceding this exit/reload is not silently lost
 		; (logger-dedup-streak-lost-on-exit).
-		if (_LOGGER_DEDUP_COUNT > 0) {
-				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
-				_LOGGER_DEDUP_COUNT := 0
-		}
+		_LoggerFlushRepeats(true)
 		; Use the forced-flush path on exit too — a subsequent OS kill cannot
 		; replay the buffered append.
 		_LoggerFlush(true)
@@ -1014,6 +1161,7 @@ LoggerRingBufferSnapshot() {
 _LoggerEmit(Level, Tag, Msg, Args*) {
 		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
 		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
 		; Safety net for unknown levels — the public wrappers already short-circuit
 		; on the per-level fast-path flags, so a severity comparison here would be
 		; a redundant second filter. Only guard against a completely unrecognised Level.
@@ -1038,28 +1186,41 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		}
 		; The shared wall-clock helper caches the second-resolution text while
 		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
-		Stamp := WallClockTimestamp()
+		; The test clock face, when installed, replaces that one sample.
+		Stamp := _LOGGER_STAMP_FN ? _LOGGER_STAMP_FN.Call() : WallClockTimestamp()
 		; Timestamp-independent message identity — the dedup key. Matches the macOS
 		; logger, which dedups on its "[LEVEL] [module] body" line.
 		MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
 		Line := Stamp . " " . MsgLine
+		Now := _LoggerNowMs()
+
+		; Due repeat streaks are closed on every emission, not only on the flush
+		; tick, exactly like the shared core: each summary lands before the line
+		; that found it due, and a slow tick cannot change what is written.
+		if _LOGGER_REPEAT_ENABLED
+				_LoggerExpireRepeatStreaks(Now, Stamp)
 
 		; ── Deduplication ──
 		; Suppress consecutive identical lines (any level) within a 5000 ms window so a
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		if (MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}
+		; ── Repeat collapsing ──
+		; Only what the dedup let through reaches this layer, so a burst is reported
+		; once, promptly, by the dedup summary and never counted twice.
+		if (_LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
+				return
 		if (_LOGGER_DEDUP_COUNT > 0) {
 				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
 		}
 		_LOGGER_DEDUP_KEY := MsgLine
 		_LOGGER_DEDUP_LEVEL := Level
 		_LOGGER_DEDUP_COUNT := 0
-		_LastErrTime := A_TickCount
+		_LastErrTime := Now
 
 		_LoggerPushRing(Line)
 		if _LOGGER_TEST_SINK != 0 {
@@ -1069,8 +1230,14 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		if IsSet(HealthCheck_RecordWarn)
 			HealthCheck_RecordWarn()
 	} else if (Level == "ERROR") {
+		; The whole line, as the macOS and Linux logger cores record it: the body
+		; alone said neither when the error happened nor which module raised it
 		if IsSet(HealthCheck_RecordError)
-			HealthCheck_RecordError(Body)
+			HealthCheck_RecordError(Line)
+		; The UNFORMATTED template: the error window's signature must not change
+		; with the arguments. It only decides and arms a timer (no logging here)
+		if IsSet(ErrorDialog_OnError)
+			ErrorDialog_OnError(Tag, Msg, Body, Stamp)
 	}
 	; Always enqueue the line unconditionally so pre-init messages (emitted
 	; before LoggerInit has resolved LOGGER_LOG_PATH) survive until the first
@@ -1116,6 +1283,231 @@ _LoggerEmitDedupSummary(Level, Count) {
 	}
 	_LoggerFanOut("logger", Line)
 }
+
+
+
+
+; ==================================
+; ===== 3.1) Repeat collapsing =====
+; ==================================
+
+; Milliseconds on the clock both suppression windows are measured with:
+; A_TickCount, or the test clock when one is installed.
+_LoggerNowMs() {
+	global _LOGGER_CLOCK_FN
+	return _LOGGER_CLOCK_FN ? _LOGGER_CLOCK_FN.Call() : A_TickCount
+}
+
+; Elapsed milliseconds between two readings of that clock, safe across the
+; 32-bit tick rollover exactly like the dedup window's own comparison.
+_LoggerElapsedMs(Now, Since) {
+	return (Now - Since + 0x100000000) & 0xFFFFFFFF
+}
+
+; Arms repeat collapsing (spec section 4.2). LoggerInit's one-time block is the
+; only production caller; a second arming raises instead of silently discarding
+; every live streak and the counts it carries.
+_LoggerRepeatEnable() {
+	global _LOGGER_REPEAT_ENABLED
+	if _LOGGER_REPEAT_ENABLED
+		throw Error("logger: repeat collapsing is already enabled")
+	_LoggerRepeatForget()
+	_LOGGER_REPEAT_ENABLED := True
+}
+
+; Disarms repeat collapsing and forgets every streak without a summary. For test
+; teardown; a live driver closes its streaks with _LoggerFlushRepeats(true).
+_LoggerRepeatDisable() {
+	global _LOGGER_REPEAT_ENABLED
+	_LOGGER_REPEAT_ENABLED := False
+	_LoggerRepeatForget()
+}
+
+_LoggerRepeatForget() {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_DATE, _LOGGER_REPEAT_OLDEST
+	_LOGGER_REPEAT_STREAKS := Map()
+	_LOGGER_REPEAT_DATE := ""
+	_LOGGER_REPEAT_OLDEST := ""
+}
+
+; Emits the summaries that are due. The periodic form (Force false) closes the
+; streaks whose window has elapsed, or all of them when the calendar date
+; changed; the flush tick runs it so a source that fell silent is still
+; summarised. The terminal form (Force true) is for exit and reload, after which
+; nothing would ever close a streak again: it closes the open dedup streak first,
+; then every repeat streak.
+_LoggerFlushRepeats(Force) {
+	global _LOGGER_REPEAT_ENABLED, _LOGGER_REPEAT_STREAKS, _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
+	global _LOGGER_STAMP_FN
+	if Force {
+		if (_LOGGER_DEDUP_COUNT > 0) {
+			_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+			_LOGGER_DEDUP_COUNT := 0
+		}
+		if _LOGGER_REPEAT_ENABLED
+			_LoggerCloseRepeatStreaks(_LoggerNowMs(), true,
+				_LOGGER_STAMP_FN ? _LOGGER_STAMP_FN.Call() : WallClockTimestamp())
+		return
+	}
+	if (_LOGGER_REPEAT_ENABLED and _LOGGER_REPEAT_STREAKS.Count > 0)
+		_LoggerExpireRepeatStreaks(_LoggerNowMs(),
+			_LOGGER_STAMP_FN ? _LOGGER_STAMP_FN.Call() : WallClockTimestamp())
+}
+
+; Closes what is due: every streak when the calendar date changed (a streak
+; never spans two days), otherwise the streaks whose window has elapsed. The
+; common case, nothing due, costs one comparison.
+_LoggerExpireRepeatStreaks(Now, Stamp) {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_DATE, _LOGGER_REPEAT_OLDEST, LOGGER_REPEAT_WINDOW_MS
+	Date := SubStr(Stamp, 1, 10)
+	if (_LOGGER_REPEAT_STREAKS.Count == 0) {
+		_LOGGER_REPEAT_DATE := Date
+		return
+	}
+	if (Date !== _LOGGER_REPEAT_DATE) {
+		_LoggerCloseRepeatStreaks(Now, true, Stamp)
+		_LOGGER_REPEAT_DATE := Date
+	} else if (_LOGGER_REPEAT_OLDEST != ""
+			and _LoggerElapsedMs(Now, _LOGGER_REPEAT_OLDEST) >= LOGGER_REPEAT_WINDOW_MS) {
+		_LoggerCloseRepeatStreaks(Now, false, Stamp)
+	}
+}
+
+; Closes every streak whose window has elapsed at Now, or all of them, and emits
+; their summaries in the order the streaks were opened. Streaks are unpublished
+; BEFORE any summary is emitted, so nothing re-entering the logger can observe a
+; half-closed table.
+_LoggerCloseRepeatStreaks(Now, Everything, Stamp) {
+	global _LOGGER_REPEAT_STREAKS, LOGGER_REPEAT_WINDOW_MS
+	Closing := []
+	for _, Streak in _LOGGER_REPEAT_STREAKS {
+		if (Everything or _LoggerElapsedMs(Now, Streak.Start) >= LOGGER_REPEAT_WINDOW_MS)
+			Closing.Push(Streak)
+	}
+	if (Closing.Length == 0)
+		return
+	; Insertion sort by creation order: at most LOGGER_REPEAT_CAPACITY entries
+	loop Closing.Length - 1 {
+		Current := Closing[A_Index + 1]
+		Slot := A_Index
+		while (Slot >= 1 and Closing[Slot].Seq > Current.Seq) {
+			Closing[Slot + 1] := Closing[Slot]
+			Slot -= 1
+		}
+		Closing[Slot + 1] := Current
+	}
+	for _, Streak in Closing
+		_LOGGER_REPEAT_STREAKS.Delete(Streak.Key)
+	_LoggerRecomputeOldestStreak(Now)
+	for _, Streak in Closing {
+		if (Streak.Count > 0)
+			_LoggerEmitRepeatSummary(Streak, Stamp)
+	}
+}
+
+; Recomputes the earliest live streak start after streaks were removed. Ages
+; are compared rather than raw ticks so the rollover cannot reorder them.
+_LoggerRecomputeOldestStreak(Now) {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_OLDEST
+	Oldest := ""
+	OldestAge := -1
+	for _, Streak in _LOGGER_REPEAT_STREAKS {
+		Age := _LoggerElapsedMs(Now, Streak.Start)
+		if (Age > OldestAge) {
+			OldestAge := Age
+			Oldest := Streak.Start
+		}
+	}
+	_LOGGER_REPEAT_OLDEST := Oldest
+}
+
+; Evicts the least recently used streak to make room for a new one, reporting its
+; count first so a bounded table never loses a withheld occurrence.
+_LoggerEvictLeastRecentStreak(Now, Stamp) {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_OLDEST
+	Victim := 0
+	for _, Streak in _LOGGER_REPEAT_STREAKS {
+		if (!IsObject(Victim) or Streak.Used < Victim.Used)
+			Victim := Streak
+	}
+	_LOGGER_REPEAT_STREAKS.Delete(Victim.Key)
+	if (Victim.Start == _LOGGER_REPEAT_OLDEST)
+		_LoggerRecomputeOldestStreak(Now)
+	if (Victim.Count > 0)
+		_LoggerEmitRepeatSummary(Victim, Stamp)
+}
+
+; Decides whether one line is a repeat to withhold, recording it when it is and
+; opening a new streak when it is the first occurrence. Returns true when the
+; line must not be emitted.
+_LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now) {
+	global LOGGER_REPEAT_KEY_BY, LOGGER_REPEAT_CAPACITY, _LOGGER_REPEAT_STREAKS
+	global _LOGGER_REPEAT_OLDEST, _LOGGER_REPEAT_SEQ, _LOGGER_REPEAT_USE
+	if !LOGGER_REPEAT_KEY_BY.Has(Level)
+		return false
+	Text := (LOGGER_REPEAT_KEY_BY[Level] == "template") ? String(Msg) : Body
+	Key := Level . Chr(31) . Tag . Chr(31) . Text
+	_LOGGER_REPEAT_USE += 1
+
+	if _LOGGER_REPEAT_STREAKS.Has(Key) {
+		Streak := _LOGGER_REPEAT_STREAKS[Key]
+		Streak.Count += 1
+		if (Streak.Count == 1)
+			Streak.FirstStamp := Stamp
+		Streak.LastStamp := Stamp
+		Streak.LastBody := Body
+		Streak.Used := _LOGGER_REPEAT_USE
+		return true
+	}
+
+	if (_LOGGER_REPEAT_STREAKS.Count >= LOGGER_REPEAT_CAPACITY)
+		_LoggerEvictLeastRecentStreak(Now, Stamp)
+	_LOGGER_REPEAT_SEQ += 1
+	_LOGGER_REPEAT_STREAKS[Key] := {Key: Key, Level: Level, Tag: Tag, Text: Text, Start: Now,
+		Seq: _LOGGER_REPEAT_SEQ, Used: _LOGGER_REPEAT_USE, Count: 0,
+		FirstStamp: "", LastStamp: "", LastBody: ""}
+	if (_LOGGER_REPEAT_OLDEST == "")
+		_LOGGER_REPEAT_OLDEST := Now
+	return false
+}
+
+; Emits the summary that closes one repeat streak, at the streak's own level and
+; under its own tag, so a collapsed warning still reaches the errors-only file
+; and a topical file still receives its own module's summary. Matches the shared
+; core byte for byte; Chr(0x2191) keeps the up-arrow out of the source. An open
+; dedup streak is closed first: its suppressed lines are the most recent ones.
+_LoggerEmitRepeatSummary(Streak, Stamp) {
+	global LOGGER_SEVERITY, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_TEST_SINK
+	global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
+	if (_LOGGER_DEDUP_COUNT > 0) {
+		_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+		_LOGGER_DEDUP_COUNT := 0
+	}
+	Times := (Streak.Count == 1) ? "time" : "times"
+	Last := (Streak.LastBody !== Streak.Text) ? " (last: " . Streak.LastBody . ")" : ""
+	Line := Stamp . " [" . Streak.Level . "] [" . Streak.Tag . "] " . Chr(0x2191) . ' "' . Streak.Text
+		. '" repeated ' . Streak.Count . " more " . Times . " between " . Streak.FirstStamp
+		. " and " . Streak.LastStamp . Last . "."
+	_LoggerPushRing(Line)
+	if _LOGGER_TEST_SINK != 0 {
+		try _LOGGER_TEST_SINK(Line)
+	}
+	_LOGGER_PENDING.Push(Line)
+	if LOGGER_SEVERITY[Streak.Level] >= LOGGER_SEVERITY["WARNING"] {
+		_LOGGER_PENDING_ERRORS.Push(Line)
+	}
+	if LOGGER_SEVERITY[Streak.Level] >= LOGGER_SEVERITY["ERROR"] {
+		_LoggerFlush(true)
+	}
+	_LoggerFanOut(Streak.Tag, Line)
+}
+
+
+
+
+; ============================================
+; ===== 3.2) Fan-out, retention and ring =====
+; ============================================
 
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file
 ; whose date does not match today. Sub-files are ephemeral (today only) — they
@@ -1221,12 +1613,14 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
 		}
 		CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
 		CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+		; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
+		; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log); \Q..\E keeps the
+		; generated names literal inside the pattern.
+		Dated := "^(?:\Q" . AppDirsLogErrorsPrefix() . "\E|\Q" . AppDirsLogUnifiedPrefix()
+				. "\E)(\d{4})-(\d{2})-(\d{2})\Q" . AppDirsLogExtension() . "\E$"
 		try {
-				loop files, LogDir . "ErgoptiPlus_*.log" {
-						; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
-						; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log).
-						if RegExMatch(A_LoopFileName, "^ErgoptiPlus(?:_errors)?_(\d{4})-(\d{2})-(\d{2})\.log$",
-								&Match) {
+				loop files, LogDir . AppDirsLogUnifiedPrefix() . "*" . AppDirsLogExtension() {
+						if RegExMatch(A_LoopFileName, Dated, &Match) {
 								FileDate := Match[1] . Match[2] . Match[3]
 								if (FileDate < CutoffDate) {
 										try FileDelete(A_LoopFileFullPath)

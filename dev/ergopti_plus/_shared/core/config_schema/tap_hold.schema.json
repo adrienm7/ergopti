@@ -12,8 +12,7 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"keys": { "$ref": "#/$defs/keys_map" },
-				"layers": { "$ref": "#/$defs/layers_map" }
+				"keys": { "$ref": "#/$defs/keys_map" }
 			}
 		}
 	},
@@ -46,7 +45,7 @@
 				},
 				"hold_layer": {
 					"type": "string",
-					"description": "Layer activated while held. Reference to a tap_hold.layers.<name> key."
+					"description": "Layer activated while held: one of [tap_hold.hold_picker].layers. What the layer does is bound in _shared/keymap/layers.recommended.toml and the user's layers.toml, not here."
 				},
 				"hold_modifier": {
 					"oneOf": [
@@ -70,28 +69,6 @@
 					}
 				}
 			]
-		},
-
-		"layers_map": {
-			"type": "object",
-			"additionalProperties": { "$ref": "#/$defs/layer_definition" }
-		},
-
-		"layer_definition": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["mappings"],
-			"properties": {
-				"description_key": {
-					"type": "string",
-					"description": "i18n key used for the menu label. Resolved against static/locales/<lang>.json."
-				},
-				"mappings": {
-					"type": "object",
-					"additionalProperties": { "type": "string" },
-					"description": "Map of source key → action or destination key. Action strings reference _shared/modules/gestures/actions.toml."
-				}
-			}
 		}
 	}
 }

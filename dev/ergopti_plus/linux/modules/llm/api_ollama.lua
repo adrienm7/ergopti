@@ -171,7 +171,7 @@ end
 --- @param on_chunk function  Called with (delta_text) for each streaming chunk.
 --- @param on_done  function  Called with (full_text, error) on completion.
 function M.chat(base_url, model, messages, opts, on_chunk, on_done)
-	if _active_request then M.cancel() end
+	if _active_request and M.cancel() ~= true then return false end
 	_request_epoch = _request_epoch + 1
 
 	local options = type(opts) == "table" and opts or {}
@@ -240,9 +240,10 @@ end
 function M.cancel()
 	if not _active_request then return true end
 	local request = _active_request
-	_request_epoch = _request_epoch + 1
 	local cancelled = HttpClient.cancel()
-	finish_request(request, cancelled and "cancelled" or "cancellation failed")
+	if cancelled ~= true then return false end
+	_request_epoch = _request_epoch + 1
+	finish_request(request, "cancelled")
 	Logger.debug(LOG, "Request cancellation %s.", cancelled and "committed" or "failed")
 	return cancelled
 end

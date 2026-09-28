@@ -229,6 +229,7 @@ function M.new(ctx)
 		local record = {
 			callback = callback,
 			chord = chord,
+			mods = clone_value(mods), key = key,
 			committed = false,
 			handle = nil,
 		}
@@ -630,7 +631,7 @@ function M.new(ctx)
 			end
 			return false
 		end, {
-			activate = not get_startup_silence(),
+			activate = opts.activate ~= false and not get_startup_silence(),
 			persist = persist,
 		})
 	end
@@ -828,9 +829,56 @@ function M.new(ctx)
 			Logger.debug(LOG, "Profile shortcut triggered: '%s'", profile_id)
 			return inst.trigger_prediction_with_profile(profile_id)
 		end, {
-			activate = opts.silent ~= true,
+			activate = opts.activate ~= false and opts.silent ~= true,
 			persist = persist,
 		})
+	end
+
+	--- Captures actual owned hotkeys, including their acknowledged delivery posture.
+	--- @return table|nil snapshot Nil while exact cleanup or a profile trigger remains.
+	function inst.configuration_snapshot()
+		if restore_fence > 0 or recovery_debt ~= nil or #cleanup_debts > 0
+			or profile_trigger_in_progress or profile_restore_debt ~= nil then return nil end
+		local function capture(handle)
+			if handle == nil then return false end
+			local record = handle_records[handle]
+			if not record or record.handle == nil then return nil end
+			return { mods = clone_value(record.mods), key = record.key, enabled = record.committed == true }
+		end
+		local primary = capture(get_trigger_hk())
+		if primary == nil then return nil end
+		local result = { llm_trigger_shortcut = primary, llm_profile_shortcuts = {} }
+		for id, handle in pairs(get_profile_hks()) do
+			local entry = capture(handle)
+			if entry == nil then return nil end
+			result.llm_profile_shortcuts[id] = entry
+		end
+		return result
+	end
+
+	--- Reconciles the owned shortcut set with terminal registrar acknowledgements.
+	--- Preference data is restored by the parent scope after runtime reconciliation.
+	--- @param snapshot table Native chord and delivery snapshot.
+	--- @return boolean settled No deferred shortcut publication is accepted.
+	function inst.apply_configuration(snapshot)
+		if type(snapshot) ~= "table" or type(snapshot.llm_profile_shortcuts) ~= "table"
+			or restore_fence > 0 or not settle_debts() then return false end
+		local primary = snapshot.llm_trigger_shortcut
+		if primary ~= false and type(primary) ~= "table" then return false end
+		local options = { persist = false, activate = type(primary) == "table" and primary.enabled ~= false }
+		if inst.apply_llm_shortcut(type(primary) == "table" and primary.mods or nil,
+			type(primary) == "table" and primary.key or nil, options) ~= true then return false end
+		local ids = {}
+		for id in pairs(get_profile_hks()) do ids[id] = true end
+		for id in pairs(snapshot.llm_profile_shortcuts) do ids[id] = true end
+		for id in pairs(ids) do
+			local entry = snapshot.llm_profile_shortcuts[id]
+			if entry ~= nil and entry ~= false and type(entry) ~= "table" then return false end
+			if inst.apply_llm_profile_shortcut(id, type(entry) == "table" and entry.mods or nil,
+				type(entry) == "table" and entry.key or nil,
+				{ persist = false, activate = type(entry) == "table" and entry.enabled ~= false }) ~= true then return false end
+		end
+		return inst.configuration_snapshot() ~= nil
 	end
 
 	return inst

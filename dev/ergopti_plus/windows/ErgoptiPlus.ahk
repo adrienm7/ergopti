@@ -148,13 +148,11 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 		; previous day — so a yielding instance would destroy the LIVE owner's
 		; gestures/layout/tray sub-logs on its way out.
 		;
-		; A_AppData is a built-in needing no bootstrap, and A_AppData\Ergopti is
-		; already where paths.toml lives, so this sink is reachable before any
-		; path resolution and never collides with the live owner's log files.
+		; LoggerAppendBootstrapLine writes to bootstrap.log in the default logs
+		; folder, which needs nothing but %LOCALAPPDATA%: it is reachable before
+		; any path resolution and never collides with the live owner's dated
+		; log files.
 		try {
-			_YieldDir := A_AppData . "\Ergopti"
-			if !DirExist(_YieldDir)
-				DirCreate(_YieldDir)
 			_MutexOutcome := (_DriverMutexDecision = DRIVER_MUTEX_YIELD)
 				? "Another instance owns the single-owner mutex after "
 					. DRIVER_MUTEX_WAIT_MS . " ms"
@@ -163,10 +161,8 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 					. ", error=" . _DriverMutexError . ")"
 			_MutexSeverity := (_DriverMutexDecision = DRIVER_MUTEX_YIELD)
 				? "WARNING" : "ERROR"
-			FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
-				. " [" . _MutexSeverity . "] [ErgoptiPlus] " . _MutexOutcome
-				. "; terminating without registering any hook.`r`n",
-				_YieldDir . "\bootstrap.log", "UTF-8")
+			LoggerAppendBootstrapLine(_MutexSeverity, "ErgoptiPlus",
+				_MutexOutcome . "; terminating without registering any hook.")
 		}
 		ExitApp(_DriverMutexDecision = DRIVER_MUTEX_YIELD ? 0 : 1)
 	}
@@ -207,7 +203,7 @@ if !_DriverIsDetachedWorker
 ; well-formed.
 global CapsWordEnabled := False
 global LayerEnabled := False
-global TapHold := Map("keys", Map(), "layers", Map())
+global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
 ; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
@@ -332,11 +328,19 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; It defines a FUNCTION rather than a global, so this ordering is a convenience
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
+; Application folder, logs folder and log file names, generated from
+; _shared/modules/paths/app_dirs.toml; functions too, read by the logger.
+#Include _generated/app_dirs.ahk
 #Include infra/tick_count.ahk
 #Include infra/wall_clock.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
 #Include infra/diagnostic_snapshot.ahk
+#Include infra/issue_link.ahk
+#Include infra/redact.ahk
+#Include infra/issue_report.ahk
+#Include infra/error_policy.ahk
+#Include infra/error_report.ahk
 #Include infra/hotpath_profiler.ahk
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
@@ -401,6 +405,9 @@ if UIASW_IsWorkerInvocation()
 #Include infra/window_utils.ahk
 #Include infra/external_url_policy.ahk
 #Include infra/text_utils.ahk
+#Include infra/text_case.ahk
+#Include infra/wrap_pair.ahk
+#Include infra/send_input_parameter.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
 
@@ -422,7 +429,10 @@ if UIASW_IsWorkerInvocation()
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
 #Include infra/toml/toml_loader.ahk
+#Include infra/hotstrings/extension_packs.ahk
 #Include infra/toml/toml_config_loader.ahk
+; The config.toml schema migration the boot runs before any reader or writer.
+#Include infra/config_migrate.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
@@ -450,12 +460,14 @@ if UIASW_IsWorkerInvocation()
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
+#Include ui/error_dialog/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include infra/locale.ahk
 #Include _generated/gesture_emit_actions.ahk
+#Include _generated/action_catalogue.ahk
 #Include _generated/locale_table.ahk
 #Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
@@ -478,6 +490,15 @@ if UIASW_IsWorkerInvocation()
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
+; .keylayout reading (registry layout emulation and the Ergopti tables):
+; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
+; and the Ergopti tables are read by modules/keymap/layout.ahk.
+#Include modules/keymap/keylayout/keylayout_parser.ahk
+#Include modules/keymap/keylayout/keylayout_tables.ahk
+#Include modules/keymap/keylayout/keylayout_emulation.ahk
+#Include modules/keymap/keylayout/layout_registry.ahk
+#Include modules/keymap/keylayout/layout_catalogue.ahk
+#Include modules/keymap/keylayout/layout_extension.ahk
 #Include infra/app_picker.ahk
 #Include infra/config_shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
@@ -488,6 +509,7 @@ if UIASW_IsWorkerInvocation()
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
 #Include infra/webview_utils.ahk
+#Include ui/console_window.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
 #Include modules/keylogger/keylogger.ahk
 #Include modules/keylogger/keylogger_hotstring_log.ahk
@@ -602,6 +624,13 @@ if (_DriverStartupSmokeDir != "") {
 ; in the timings.
 BootProfile_Stamp("Tray reset + onboarding")
 
+; Version config.toml before anything reads it: the snapshot below,
+; ApplyBootConfigToml and the boot full save all see the migrated file. A file
+; this build cannot version (a newer schema, a failed migration) stays
+; untouched and every write to it is refused for the session
+; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
+ConfigMigrateBoot(ConfigurationFile)
+
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ; Latch the session sentinel SaveFullConfig honours when that parse could not
 ; READ an existing config.toml. This snapshot is taken once and never refreshed,
@@ -639,6 +668,9 @@ BootProfile_Stamp("Hotstring engine initialised")
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
+; Right after the logger: every later ERROR of the boot can open the error
+; window, which waits for the driver to be ready before it shows
+ErrorDialog_Init(_IniCache)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
 		bootScriptName := A_ScriptFullPath
@@ -785,6 +817,8 @@ try {
 		}
 	}
 }
+_HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
+	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
 _BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
@@ -1030,17 +1064,10 @@ try {
 #Include *i %LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #Include %A_ScriptDir%
 #InputLevel 0
-; Capture the un-gated per-section hotstring Features BEFORE gating, so a live
-; category toggle (ToggleCategoryAllFeatures) can restore a category's sections on
-; re-enable. Declared + populated here, before gating, so the auto-execute thread
-; never re-inits the Map after filling it.
-global _HSCategorySnapshot := Map()
+; Capture configuration intent once before deriving the effective runtime.
 BootProfile_StageBegin("feature gates")
-try _HSSnapshotAllCategories()
-catch as _SnapErr
-	LoggerError("ErgoptiPlus", "Hotstring category snapshot failed; a live category re-enable may not restore its sections: {1}.", _SnapErr.Message)
 _GateCountsBefore := DiagSnapshot_CountFeatures(Features)
-ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
+MasterGateInitialize(Features, TapHold, IsCategoryGated, LoggerDebug)
 _GateCountsAfter := DiagSnapshot_CountFeatures(Features)
 ; The master gates silently zero whole categories. Without the counts a user log
 ; cannot tell "the feature is off" from "its category is off".
@@ -1082,7 +1109,9 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 
 #Include infra/config_io.ahk
-
+#Include infra/config_scope.ahk
+#Include infra/hotstrings/hotstrings_scope.ahk
+#Include infra/config_global_scope.ahk
 CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
@@ -1203,7 +1232,9 @@ global _FmtCountCache := Map()
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
+#Include ui/layout_manager/init.ahk
 #Include ui/personal_info_editor/init.ahk
+#Include ui/layer_editor/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk
 #Include infra/lifecycle.ahk
@@ -1211,6 +1242,10 @@ global _FmtCountCache := Map()
 #Include infra/script_altgr_hotkeys.ahk
 BootProfile_StageBegin("layout and remaps")
 _RegisterScriptAltGrHotkeys()
+; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
+; whose criterion holds, so the registry layout emulation must register first to
+; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.
+KeylayoutEmulation_Boot(_ConfigDir)
 
 ; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
 ; below. There used to be an inline forward-order load here at #InputLevel 0,
@@ -1221,6 +1256,12 @@ _RegisterScriptAltGrHotkeys()
 ; them in forward order so first-declared (prominent) sections win HSE's
 ; first-registered-wins collision tiebreak, matching the old effective order.
 #InputLevel 2
+; The number-row tap keys first: AutoHotkey fires the earliest-created eligible
+; #HotIf variant of a hotkey, and the digit-row emulation below binds the same
+; three scancodes. Their assignments are read before a press can reach them.
+#Include infra/tap_keys.ahk
+#Include modules/shortcuts/tap_keys.ahk
+TapKeysReadConfig(_IniCache)
 #Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
 #Include platform/remap.ahk
@@ -1296,6 +1337,10 @@ if (_DriverStartupSmokeDir != "") {
 		; reveals it. A driver that reaches ready without it has no tray at all.
 		if A_IconHidden
 				throw Error("the driver reached ready without revealing its tray icon")
+		; The isolated wrapper can inspect the ready registry before ExitProcess
+		; deliberately bypasses production teardown and OnExit callbacks.
+		if IsSet(_DriverStartupSmokeInspect)
+				_DriverStartupSmokeInspect.Call()
 		try _LoggerFlush(true)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's
@@ -1342,6 +1387,9 @@ if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected
 ; already true here, so the deferred initMenu builds the language submenu inline (no
 ; separate _LangMenuBuildPending pass needed on this boot path).
 SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
+; Obsolete configuration keys are a maintenance task, not a runtime error.
+; Offer the existing backed-up cleanup only after the driver is ready.
+SetTimer(ConfigUnusedKeysOffer.Bind(ConfigurationFile), -MENU_BUILD_DEFER_MS)
 if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 ; The deferred boot worker owns the OFF-state IA population. It arms that

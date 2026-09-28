@@ -20,8 +20,11 @@
 ---    a translated error, always reaches the page.
 --- 2. Singleton window: a second call to M.open() while the window is already
 ---    visible brings it to the front instead of opening a duplicate.
---- 3. Channel routing: the caller passes a default channel ("main" or "dev");
----    the user can switch channels interactively inside the UI.
+--- 3. Channel routing: the ids come from the shared update-channel registry.
+---    The window opens on the channel the caller names (the subscribed one); a
+---    tab only changes the view. The page's subscription banner goes through
+---    the caller's channel owner (modules/updater/channel.lua), and the owner's
+---    changes, from the menu or the page, are pushed back to the open page.
 --- 4. One document policy: the page's browser-host CSP only allows external
 ---    same-origin scripts, which blocks every script once inlined, so the page
 ---    never left its loading state. The generated document instead carries the
@@ -40,11 +43,13 @@ local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local Json       = require("json")
 local ReleaseSources = require("updater.release_sources")
+local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
 
 local LOG = "changelog_window"
 
 local _sources = nil
+local _channels = nil
 
 --- Loads the release sources once from the shared updater defaults.
 --- @return table|nil sources
@@ -60,6 +65,38 @@ local function load_sources()
 	if not sources then return nil, err end
 	_sources = sources
 	return sources, nil
+end
+
+--- Loads the shared update-channel registry once. Without it no channel id is
+--- accepted: a guessed list could show or subscribe to a channel that is gone.
+--- @return table|nil registry updater.channels interpreter
+--- @return string|nil error
+local function load_channels()
+	if _channels then return _channels, nil end
+	local path = Paths.shared("modules/updater/channels.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then return nil, "the shared update channel registry is unreadable" end
+	local ok, decoded = pcall(Json.decode, raw)
+	if not ok then return nil, "the shared update channel registry is not valid JSON" end
+	local registry, err = UpdateChannels.load(decoded)
+	if not registry then return nil, err end
+	_channels = registry
+	return registry, nil
+end
+
+--- Returns the registry id a caller or the page named, or nil with a log line.
+--- @param channel any Id to check (exact; aliases are not accepted here).
+--- @param purpose string What the id is for, for the log.
+--- @return string|nil id
+local function registry_channel(channel, purpose)
+	local registry, err = load_channels()
+	if not registry then
+		Logger.error(LOG, "Refused the %s: %s.", purpose, tostring(err))
+		return nil
+	end
+	if type(channel) == "string" and registry.channel(channel) ~= nil then return channel end
+	Logger.warn(LOG, "Refused the %s: '%s' is not a registry channel.", purpose, tostring(channel))
+	return nil
 end
 
 --- Bounded GET over hs.http. NSURLSession honours the system proxy; the
@@ -109,6 +146,9 @@ local _queued   = {}
 local _fetch_generation = 0
 local _opening = nil
 local _closing = false
+-- The caller's update-channel owner ({ get, set, subscribe }), or nil when the
+-- window was opened without one (no subscription banner then).
+local _channel_owner = nil
 
 --- Checks publication authority independently of retained native cleanup handles.
 --- @param owner table? Captured session identity.
@@ -250,12 +290,13 @@ local function valid_releases(data, body)
 	return true
 end
 
---- Fetches releases from the GitHub API and injects them into the webview.
---- Stable requests filter pre-releases without silently changing the channel.
---- @param channel string "main" or "dev"
+--- Fetches releases from the GitHub API and injects them into the webview. The
+--- page keeps what the channel's view lists (the shared registry's tag rule).
+--- @param channel string Registry channel id.
 local function fetch_and_inject(channel)
 	local owner, view, controller = _focus_owner, _wv, _ucc
 	if not session_is_current(owner, view, controller) then return end
+	if not registry_channel(channel, "release fetch") then return end
 	local request_generation = next_fetch_generation()
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
@@ -299,18 +340,7 @@ local function fetch_and_inject(channel)
 			return
 		end
 
-		-- For the stable channel, filter out pre-releases.
-		-- If none exist yet, inject an empty list so the JS shows the empty state
-		-- rather than silently falling back to showing all pre-releases as "stable".
 		local releases = data
-		if channel == "main" then
-			local stable = {}
-			for _, r in ipairs(data) do
-				if not r.prerelease then table.insert(stable, r) end
-			end
-			releases = stable
-		end
-
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
@@ -346,6 +376,27 @@ local function flush_queue()
 	end
 end
 
+--- Subscribes to the channel the page asked for through the caller's channel
+--- owner, then answers the page with the subscription that holds afterwards,
+--- so a refusal shows as a failure instead of a banner left pending.
+--- @param channel any Channel id posted by the page.
+--- @return boolean committed
+local function subscribe_from_page(channel)
+	local channel_owner = _channel_owner
+	local id = registry_channel(channel, "subscription")
+	local committed = false
+	if id and not channel_owner then
+		Logger.error(LOG, "Refused the subscription: the window was opened without an update channel owner.")
+	elseif id then
+		local ok, result = pcall(channel_owner.set, id)
+		if not ok then Logger.error(LOG, "The update channel owner raised: %s.", tostring(result)) end
+		committed = ok and result == true
+	end
+	local held = channel_owner and channel_owner.get() or nil
+	eval(string.format("setSubscribedChannel(%s,%s)", js_str(held), committed and "true" or "false"))
+	return committed
+end
+
 --- Creates a distinct native message controller for one window session.
 --- @param owner table Exact session identity.
 local function ensure_ucc(owner)
@@ -371,7 +422,9 @@ local function ensure_ucc(owner)
 		if type(body) ~= "table" then return end
 
 		if body.action == "fetch" then
-			fetch_and_inject(body.channel or "main")
+			fetch_and_inject(body.channel)
+		elseif body.action == "set_channel" then
+			subscribe_from_page(body.channel)
 		elseif body.action == "open_url" and type(body.url) == "string" then
 			if ui_builder.open_http_url(body.url) then
 				Logger.info(LOG, "Opened changelog release URL.")
@@ -411,8 +464,13 @@ local function build_window(channel, opening_generation, focus_owner)
 	local repository = sources and string.format(
 		"window.__changelog_gh_owner=%s;window.__changelog_gh_repo=%s;",
 		js_str(sources.owner), js_str(sources.repo)) or ""
+	-- The subscription banner needs the owner's channel; Sparkle reads the new
+	-- feed at its next check, so a change never restarts the app here.
+	local subscription = _channel_owner and string.format(
+		"window.__subscribed_channel=%s;window.__channel_switch_restarts=false;",
+		js_str(_channel_owner.get())) or ""
 	local config_script = string.format(
-		"<script>%swindow.__changelog_channel=%s;</script>", repository, js_str(channel))
+		"<script>%s%swindow.__changelog_channel=%s;</script>", repository, subscription, js_str(channel))
 
 	-- Build HTML with repo config injected before script.js IIFE runs.
 	-- ui_builder.build_injected_html inlines CSS/JS; we then patch the result
@@ -507,12 +565,49 @@ local function build_window(channel, opening_generation, focus_owner)
 	return scheduled == true and candidate_is_owned()
 end
 
+--- Tells the open page which channel the user now receives updates from. The
+--- channel owner calls it after every durable change, from the menu or the page.
+--- @param channel string Registry channel id.
+--- @return boolean pushed Whether an open page was told.
+function M.push_subscribed_channel(channel)
+	local id = registry_channel(channel, "subscription update")
+	if not id or not session_is_current(_focus_owner, _wv, _ucc) then return false end
+	eval(string.format("setSubscribedChannel(%s,true)", js_str(id)))
+	return true
+end
+
 --- Opens or focuses the changelog after settling every prior cleanup obligation.
---- @param opts table|nil Requested channel.
+--- @param opts table|nil { channel = registry id shown first, channel_owner =
+---   update-channel owner (modules/updater/channel.lua) behind the banner }.
 --- @return boolean committed
 function M.open(opts)
 	if _opening or _closing then return false end
-	local channel = (type(opts) == "table" and opts.channel == "dev") and "dev" or "main"
+	opts = type(opts) == "table" and opts or {}
+	local channel_owner = opts.channel_owner
+	if channel_owner ~= nil and (type(channel_owner) ~= "table" or type(channel_owner.get) ~= "function"
+		or type(channel_owner.set) ~= "function" or type(channel_owner.subscribe) ~= "function")
+	then
+		Logger.error(LOG, "Refused to open the changelog: the channel owner is not an update-channel owner.")
+		return false
+	end
+	local registry, registry_err = load_channels()
+	if not registry then
+		Logger.error(LOG, "Refused to open the changelog: %s.", tostring(registry_err))
+		return false
+	end
+	local channel
+	if opts.channel ~= nil then
+		channel = registry_channel(opts.channel, "channel to open on")
+		if not channel then return false end
+	else
+		channel = channel_owner and channel_owner.get() or registry.ids()[1]
+	end
+	-- Adopted once the previous session is settled: closing it releases its owner.
+	local function adopt_channel_owner()
+		if not channel_owner then return end
+		_channel_owner = channel_owner
+		channel_owner.subscribe("changelog", M.push_subscribed_channel)
+	end
 
 	if not _wv and _ucc and M.close() ~= true then return false end
 
@@ -529,12 +624,17 @@ function M.open(opts)
 					and _wv == view and _ucc == controller and _wv_committed == true
 			end })
 			if not session_is_current(focus_owner, view, controller) then return false end
+			if channel_owner then
+				adopt_channel_owner()
+				M.push_subscribed_channel(channel_owner.get())
+			end
 			-- Reload releases for the requested channel.
 			fetch_and_inject(channel)
 			return true
 		end
 	end
 
+	adopt_channel_owner()
 	local opening_generation = next_fetch_generation()
 	local owner = {}
 	_opening, _focus_owner = owner, owner
@@ -594,6 +694,7 @@ function M.close()
 		end
 		if _ucc == controller then _ucc = nil end
 	end
+	_channel_owner = nil
 	_closing = false
 	Logger.info(LOG, "Changelog window closed.")
 	return true
