@@ -44,7 +44,6 @@ const PRE_CONSENT_KEYS = [
 	'updater.update_dialog_header',
 	'updater.update_dialog_install',
 	'menu.about.update_now',
-	'menu.updates.download_install',
 ];
 
 // Copy shown only once a consented download is staged; it defines each

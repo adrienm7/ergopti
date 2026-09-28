@@ -391,7 +391,7 @@ const APPROVED_TOP_LEVEL = [
 	'tap_holds', 'shortcuts', 'gestures', SEPARATOR,
 	'keyboard_layout', 'hotstrings', 'llm', SEPARATOR,
 	'metrics', 'apps', SEPARATOR,
-	'configuration', 'language', 'updates', 'about', SEPARATOR,
+	'configuration', 'language', 'about', SEPARATOR,
 	'suspend', 'reload', 'quit', 'debug'
 ];
 
