@@ -31,6 +31,15 @@ local function with_config(source, body)
 end
 
 helpers.describe("canonical metrics preferences", function()
+	helpers.it("cleanup retains canonical metric choices and offers only unknown neighbors", function()
+		with_config('[metrics]\nenabled = true\nwpm_widget_colors = false\nfuture = 42\n', function(_, path)
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq(scan.keys[1].key, "future")
+		end)
+	end)
+
 	helpers.it("both WPM surfaces read canonical choices and persist their own leaves", function()
 		with_config('[metrics]\nwpm_widget_colors = false\nwpm_menubar_colors = false\n', function(_, path)
 			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
