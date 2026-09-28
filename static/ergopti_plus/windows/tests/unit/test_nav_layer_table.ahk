@@ -101,6 +101,7 @@ _NLT_Behaviours(Rows) {
 
 _NLT_ResetRegistration() {
 	global _NavLayerRegistered := false
+	global _NavLayerRegistrationAttempted := false
 }
 
 
@@ -221,10 +222,43 @@ _NLT_RegistersEveryRowUnderItsCriterion() {
 Test("nav layer table: registration puts each row under its criterion, once (nav-layer-generated)",
 	_NLT_RegistersEveryRowUnderItsCriterion)
 
-_NLT_CriteriaFollowTheLayerState() {
-	global LayerEnabled, _ALTGR_KANA_FIXUP
-	SavedLayer := LayerEnabled, SavedKana := _ALTGR_KANA_FIXUP
+_NLT_FailSecondRegistration(State, Name, Callback, Options) {
+	State["count"] += 1
+	if (State["count"] == 2)
+		throw Error("injected native registration refusal")
+	State["first_criterion"] := State["criterion"]
+}
+
+_NLT_FailedRegistrationNeverAdmitsPartialRows() {
+	global LayerEnabled
+	SavedLayer := LayerEnabled
+	Ctx := KeymapLayers_LoadContext(_NLT_SharedDir())
+	Rows := _NLT_Rows(Ctx, _NLT_RecommendedText())
+	State := Map("count", 0, "criterion", "")
+	SelectCriterion := (Args*) => State["criterion"] := Args.Length ? Args[1] : "reset"
+	_NLT_ResetRegistration()
 	try {
+		LayerEnabled := true
+		AssertThrows(() => NavLayer_Register(Rows, _NLT_FailSecondRegistration.Bind(State), SelectCriterion))
+		AssertEqual(2, State["count"], "the refusal occurs after one real row has been installed")
+		AssertEqual("reset", State["criterion"], "a failure still resets the process-wide HotIf")
+		AssertFalse(State["first_criterion"].Call(), "a partial table must never admit input")
+		AssertThrows(() => NavLayer_Register([], (Args*) => 0, (Args*) => 0),
+			"a failed native registration cannot be retried over partially owned variants")
+	} finally {
+		LayerEnabled := SavedLayer
+		_NLT_ResetRegistration()
+	}
+}
+Test("nav layer registration failure cannot activate a partial table (nav-layer-registration-atomic)",
+	_NLT_FailedRegistrationNeverAdmitsPartialRows)
+
+_NLT_CriteriaFollowTheLayerState() {
+	global LayerEnabled, _ALTGR_KANA_FIXUP, _NavLayerRegistered
+	SavedLayer := LayerEnabled, SavedKana := _ALTGR_KANA_FIXUP
+	SavedRegistered := _NavLayerRegistered
+	try {
+		_NavLayerRegistered := true
 		LayerEnabled := false, _ALTGR_KANA_FIXUP := true
 		AssertFalse(_NavLayer_LayerActive(), "no binding fires outside the layer")
 		LayerEnabled := true
@@ -235,6 +269,7 @@ _NLT_CriteriaFollowTheLayerState() {
 		AssertFalse(_NavLayer_LayerActive(), "standard layouts also require the navigation gate")
 	} finally {
 		LayerEnabled := SavedLayer, _ALTGR_KANA_FIXUP := SavedKana
+		_NavLayerRegistered := SavedRegistered
 	}
 }
 Test("nav layer table: the criterion follows LayerEnabled on every layout", _NLT_CriteriaFollowTheLayerState)

@@ -51,6 +51,7 @@ global NAV_LAYER_MODIFIER_CHORD_NAMES := Map("ctrl", "ctrl", "alt", "alt", "shif
 global NAV_LAYER_CALL_HANDLERS := Map("maximize_window", _NavLayer_MaximizeWindow)
 
 global _NavLayerRegistered := false
+global _NavLayerRegistrationAttempted := false
 
 
 
@@ -232,8 +233,8 @@ _NavLayer_ErrorWhere(Err) {
 }
 
 _NavLayer_LayerActive(*) {
-	global LayerEnabled
-	return LayerEnabled
+	global LayerEnabled, _NavLayerRegistered
+	return _NavLayerRegistered && LayerEnabled
 }
 
 /**
@@ -244,10 +245,10 @@ _NavLayer_LayerActive(*) {
  * @returns {Integer} The number of hotkeys registered.
  */
 NavLayer_Register(Rows, HotkeyFn := Hotkey, HotIfFn := HotIf) {
-	global _NavLayerRegistered, NAV_LAYER_HOTKEY_OPTIONS
+	global _NavLayerRegistered, _NavLayerRegistrationAttempted, NAV_LAYER_HOTKEY_OPTIONS
 	global NAV_LAYER_CRITERION_LAYER
-	if _NavLayerRegistered
-		throw Error("The navigation layer is already registered.", -1)
+	if _NavLayerRegistrationAttempted
+		throw Error("The navigation layer registration was already attempted; restart before retrying.", -1)
 	Criteria := Map(NAV_LAYER_CRITERION_LAYER, _NavLayer_LayerActive)
 	; Build every callback before the first registration, so a bad row fails
 	; before any hotkey exists rather than halfway through the table.
@@ -257,6 +258,9 @@ NavLayer_Register(Rows, HotkeyFn := Hotkey, HotIfFn := HotIf) {
 			throw ValueError("Unknown navigation-layer criterion '" . Row["criterion"] . "'.", -1)
 		Callbacks.Push(NavLayer_Callback(Row))
 	}
+	; Partially installed native variants must stay dormant after a refusal.
+	; A second attempt cannot publish them accidentally alongside a new table.
+	_NavLayerRegistrationAttempted := true
 	; HotIf is process-wide: reset it even when a registration throws.
 	try {
 		for RowIndex, Row in Rows {
