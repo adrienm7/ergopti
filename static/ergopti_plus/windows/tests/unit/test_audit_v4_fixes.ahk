@@ -67,7 +67,7 @@ TestAuditV4_MaxHotkeysNotInHotkey() {
 	; (platform/remap/nav_layer_table.ahk): every function a layer hotkey can
 	; run must leave the variable alone.
 	for FuncName in ["NavLayer_Callback", "_NavLayer_SendOnce", "_NavLayer_SendCounted", "_NavLayer_SetCount",
-			"_NavLayer_MaximizeWindow", "_NavLayer_KanaGuarded"] {
+			"_NavLayer_MaximizeWindow", "_NavLayer_Swallow"] {
 		Body := _DriverFuncBody(FuncName)
 		AssertTrue(Body != "", FuncName . " must exist in platform/remap/nav_layer_table.ahk")
 		AssertFalse(

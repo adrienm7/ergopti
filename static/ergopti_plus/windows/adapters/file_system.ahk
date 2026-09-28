@@ -32,6 +32,13 @@
 ; =======================================================
 ; =======================================================
 
+; Reads UTF-8 text using AHK's BOM handling and preserves native read failures.
+; @param Path {String} File path.
+; @return {String} Text contents; throws when the read fails.
+FSReadStrict(Path) {
+	return FileRead(Path, "UTF-8")
+}
+
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.

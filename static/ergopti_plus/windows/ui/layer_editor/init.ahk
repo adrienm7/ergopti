@@ -96,12 +96,12 @@ LayerEditor_Save(Text, Ctx, ConfigDir) {
 		return Map("saved", false, "path", Path, "errors", Errors)
 	Stage := Path . ".tmp"
 	if !FSWriteDurable(Stage, Text) {
-		try FileDelete(Stage)
+		try FSDeleteStrict(Stage)
 		return Map("saved", false, "path", Path, "errors",
 			[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, "'" . Stage . "' could not be written")])
 	}
 	if !FSAtomicMoveReplace(Stage, Path) {
-		try FileDelete(Stage)
+		try FSDeleteStrict(Stage)
 		return Map("saved", false, "path", Path, "errors",
 			[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, "'" . Path . "' could not be replaced")])
 	}
@@ -152,7 +152,7 @@ LayerEditor_InitJs(Ctx, ConfigDir) {
 	Errors := []
 	if FileExist(Path) {
 		try {
-			Text := FileRead(Path, "UTF-8")
+			Text := FSReadStrict(Path)
 			TextJson := JsonStringLiteral(Text)
 			Errors := _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
 		} catch as Err {

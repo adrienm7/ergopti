@@ -71,7 +71,7 @@ KeymapLayers_LoadContext(SharedDir) {
 	RegistryPath := Root . "\data\keycodes\physical_keys.json"
 	; FileRead throws on a missing or locked file, which is the answer we want
 	; for shipped data.
-	Registry := JsonParse(FileRead(RegistryPath, "UTF-8"))
+	Registry := JsonParse(FSReadStrict(RegistryPath))
 	return KeymapLayers_NewContext(Registry, _KL_ReadVocabulary(Root))
 }
 
@@ -252,7 +252,7 @@ KeymapLayers_LoadUserFile(Ctx, ConfigDir, Os := "windows") {
 		Result := KeymapLayers_Load(Os, Ctx)
 	} else {
 		try {
-			Text := FileRead(Path, "UTF-8")
+			Text := FSReadStrict(Path)
 		} catch as Err {
 			Result := _KL_Reject(Map("ok", true, "errors", [], "layers", Map()),
 				_KL_Error("file_unreadable", "", "", "", Err.Message))

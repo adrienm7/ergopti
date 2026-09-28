@@ -189,9 +189,9 @@ _LEH_SessionReachesTheHotkeyTable() {
 		Rows := Map()
 		for Row in NavLayer_BuildTable(Loaded["layers"][NAV_LAYER_ID], Ctx)
 			Rows[Row["hotkey"]] := Row["action"]
-		AssertEqual("send:{Up N}", Rows.Get("SC014", ""), "KeyT: the Windows edit, a repeatable Up")
-		AssertFalse(Rows.Has("SC022"), "KeyG made native on Windows registers no hotkey")
-		AssertEqual("send:^+{Home}", Rows.Get("SC010", ""), "an untouched key keeps its recommended binding")
+		AssertEqual("send:{Up N}", Rows.Get("*SC014", ""), "KeyT: the Windows edit, a repeatable Up")
+		AssertFalse(Rows.Has("*SC022"), "KeyG made native on Windows registers no hotkey")
+		AssertEqual("send:^+{Home}", Rows.Get("*SC010", ""), "an untouched key keeps its recommended binding")
 	} finally _LEH_RemoveDir(Dir)
 }
 Test("layer editor host: the page's session is saved and reaches the hotkey table (e2e)", _LEH_SessionReachesTheHotkeyTable)
