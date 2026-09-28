@@ -4,8 +4,9 @@
 ; MODULE: Layout Features An Emulated Layout Supersedes — Tests
 ; DESCRIPTION:
 ; The Ergopti emulation's features (its layers and their overlays: typography,
-; selection wrapping, the Ergopti+ changes) and the digit-row swap only apply
-; while no registry layout is emulated. The manifest declares them, with the
+; selection wrapping, the Ergopti+ changes) only apply while no registry layout
+; is emulated. The independent digit-row swap stays available. The manifest
+; declares the historical layer registrations, with the
 ; reason the menu shows, by superseded_reason_key (layout-supersession-declared):
 ; - the declared set is read from the manifest, not from a driver list;
 ; - the master gate turns off exactly what it is given;
@@ -71,14 +72,17 @@ Test("layout supersession: a superseded row is greyed with its reason while a la
 	_LSD_ReasonCase)
 
 _LSD_ReasonCase() {
-	Entry := ManifestFindEntryByPath("layout.ergopti_base")
-	Assert(Entry is Map, "layout.ergopti_base must be in the manifest")
+	Entry := ManifestFindEntryByPath("layout.ergopti_plus")
+	Assert(Entry is Map, "layout.ergopti_plus must be in the manifest")
 	Emulating := Map("layout", Map("emulated_layout", "ergol"))
 	NotEmulating := Map("layout", Map("emulated_layout", ""))
 	AssertEqual(Entry["superseded_reason_key"], LayoutSupersededReason(Entry, Emulating))
 	AssertEqual("", LayoutSupersededReason(Entry, NotEmulating), "no reason without an emulated layout")
 	Other := ManifestFindEntryByPath("layout.ctrl_magic_save")
 	AssertEqual("", LayoutSupersededReason(Other, Emulating), "a feature that works on any layout keeps its row")
+	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.direct_access_digits"]
+		AssertEqual("", LayoutSupersededReason(ManifestFindEntryByPath(Path), Emulating),
+			Path . " remains editable as an independent layer choice")
 }
 
 Test("layout preferences: explicitly enabled geometry hotstrings survive every layout (layout-ergopti-hotstrings)",
