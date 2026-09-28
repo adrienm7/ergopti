@@ -332,7 +332,7 @@ class WebViewHost {
 				g.OnEvent("Size",  this._OnResize.Bind(this))
 
 				; Show BEFORE creating the control — a hidden Gui has a zero client rect
-				g.Show("w" . Geo.w . " h" . Geo.h . " Center")
+				g.Show((Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
 				this.Gui := g
 
 				; ── WebView2 create ──────────────────────────────────────────────────

@@ -367,3 +367,115 @@ _CUK_StartupDefersCleanupUntilReady() {
 }
 Test("config unused keys: startup schedules the cleanup offer after readiness (unused-config-warning)",
 	_CUK_StartupDefersCleanupUntilReady)
+
+; A nonmodal preview must not authorize deletion of bytes changed after opening.
+_CUK_WebPreviewLifecycle() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteFixture(Dir)
+		Session := ConfigCleanupSession(Path)
+		State := Session.Handle("ready")
+		AssertEqual("ready", State["status"])
+		AssertEqual(2, State["keys"].Length)
+		Before := FSReadUtf8Exact(Path)
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", "stale")))
+		AssertEqual(Before, FSReadUtf8Exact(Path))
+		AssertTrue(FSWriteDurable(Path, Before . "`n# changed after preview`n"))
+		Changed := FSReadUtf8Exact(Path)
+		AssertEqual("changed", Session.Handle(Map("action", "clean", "session", Session.Token))["status"])
+		AssertEqual(Changed, FSReadUtf8Exact(Path))
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", Session.Token)), "refresh is required")
+		AssertEqual("ready", Session.Handle(Map("action", "refresh", "session", Session.Token))["status"])
+		Result := Session.Handle(Map("action", "clean", "session", Session.Token,
+			"path", Dir . "\untrusted.toml", "keys", []))
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Changed, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", Session.Token)), "one confirmed transaction only")
+		Decoded := JsonParse(Session.Json())
+		AssertFalse(Decoded.Has("source"), "private source bytes never enter the page contract")
+		Session.Close()
+		AssertEqual(0, Session.Handle("ready"), "late callbacks cannot reopen a closed session")
+	} finally DirDelete(Dir, true)
+}
+Test("config cleanup webview: changed files require refresh, one backup and no stale action (config-cleanup-webview)",
+	_CUK_WebPreviewLifecycle)
+
+_CUK_WebPreviewCancelAndLongList() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Source := "[obsolete]`n"
+		Loop 80
+			Source .= "setting_" . A_Index . " = true`n"
+		AssertTrue(FSWriteDurable(Path, Source))
+		Session := ConfigCleanupSession(Path)
+		AssertEqual(80, Session.Handle("ready")["keys"].Length)
+		AssertEqual(80, JsonParse(Session.Json())["keys"].Length, "the bridge never truncates at 30")
+		Session.Handle(Map("action", "close", "session", Session.Token))
+		AssertEqual(0, Session.Handle(Map("action", "clean", "session", Session.Token)))
+		AssertEqual(Source, FSReadUtf8Exact(Path), "closing writes nothing")
+	} finally DirDelete(Dir, true)
+}
+Test("config cleanup webview: all 80 entries survive and cancellation preserves bytes (config-cleanup-webview)",
+	_CUK_WebPreviewCancelAndLongList)
+
+; Models the message pump inside WebView2.create without creating a native view.
+class _CUK_DeferredGui {
+	Hidden := false
+	Destroyed := false
+	Hide() {
+		this.Hidden := true
+	}
+	Destroy() {
+		this.Destroyed := true
+	}
+}
+
+class _CUK_DeferredController {
+	Closed := false
+	Close() {
+		this.Closed := true
+	}
+}
+
+_CUK_FakeCleanupBuild(Host) {
+	Host.Gui := _CUK_DeferredGui()
+	Host.ProbeGui := Host.Gui
+	Host.Close()
+	AssertFalse(Host.ProbeGui.Destroyed, "creation must retain its native parent until the controller returns")
+	AssertTrue(Host.ProbeGui.Hidden, "the cancelled window disappears immediately")
+	AssertEqual(0, Host.Session.Handle("ready"), "cancellation revokes the session during the await")
+	AssertFalse(ConfigCleanupWindow.Open("ignored.toml"), "a cancelled build cannot be reused or replaced")
+	Host.Controller := _CUK_DeferredController()
+	Host.ProbeController := Host.Controller
+	Host.WebView := {}
+	Host.ResetDone := false
+	return true
+}
+
+_CUK_WebWindowDeferredClose() {
+	PreviousBuild := WebViewHost.Prototype.GetOwnPropDesc("_Build")
+	PreviousCurrent := ConfigCleanupWindow.Current
+	Host := ConfigCleanupWindow()
+	Host.Session := ConfigCleanupSession("unused-by-this-test.toml")
+	Host.AppId := "config_cleanup"
+	ConfigCleanupWindow.Current := Host
+	WebViewHost.Prototype.DefineProp("_Build", {Call: _CUK_FakeCleanupBuild})
+	try {
+		Host._Build()
+		AssertTrue(Host.Cancelled)
+		AssertFalse(Host.Building)
+		AssertTrue(Host.ResetDone, "a late controller cannot resurrect a closed host")
+		AssertTrue(Host.ProbeGui.Destroyed)
+		AssertTrue(Host.ProbeController.Closed)
+		AssertEqual(0, Host.Gui)
+		AssertEqual(0, ConfigCleanupWindow.Current, "the retired owner releases the singleton")
+	} finally {
+		WebViewHost.Prototype.DefineProp("_Build", PreviousBuild)
+		Host.Building := false
+		Host.Close()
+		ConfigCleanupWindow.Current := PreviousCurrent
+	}
+}
+Test("config cleanup webview: close during native creation releases the late controller (config-cleanup-webview)",
+	_CUK_WebWindowDeferredClose)

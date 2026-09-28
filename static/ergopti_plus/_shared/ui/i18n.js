@@ -191,7 +191,8 @@
 		}
 
 		function finish(strings) {
-			apply(strings);
+			// Pages extend this public hook to translate their dynamic content too.
+			window.i18n_apply(strings);
 			var missing = unresolved_keys(strings);
 			if (missing.length > 0) {
 				// Named, not counted: a key no locale in the chain resolves is a

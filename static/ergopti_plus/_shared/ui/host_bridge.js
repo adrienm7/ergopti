@@ -16,6 +16,7 @@
 //
 //   action_picker_bridge      — _shared/ui/action_picker
 //   changelog_bridge          — _shared/ui/changelog
+//   config_cleanup_bridge     — _shared/ui/config_cleanup
 //   dl_bridge                 — _shared/ui/download_window
 //   error_dialog              — _shared/ui/error_dialog
 //   hsEditor                  — _shared/ui/hotstring_editor

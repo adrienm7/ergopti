@@ -9,7 +9,7 @@
 --- contract with the Linux readers, then prove the rule is exactly the
 --- readers': the cleaned file loads to the same driver state, and every key
 --- left behind changes that state when removed alone. They also pin the tray
---- row and its zenity dialogs.
+--- row and its cleanup WebView.
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
@@ -240,71 +240,38 @@ local function find_row(items, title)
 	return nil
 end
 
---- Runs fn with os.execute recording every command. The zenity probe finds
---- the binary; every other command exits with `status`.
---- @param status any Exit status of the dialog commands.
---- @param fn function
---- @return table commands
-local function with_execute(status, fn)
-	local real = os.execute
-	local commands = {}
-	os.execute = function(command)
-		commands[#commands + 1] = tostring(command)
-		if tostring(command):find("command -v zenity", 1, true) then return 0 end
-		return status
-	end
-	local ok, err = pcall(fn)
-	os.execute = real
-	if not ok then error(err, 0) end
-	return commands
+--- Keeps the existing engine refusal and backup proofs after UI replacement.
+local function run_engine_cleanup(deps)
+	return Engine.run({
+		path = deps.path, collect = Cleanup.collect, stamp = deps.stamp,
+		get_text = deps.get_text, confirm = deps.dialogs.confirm,
+		inform = deps.dialogs.inform, fail = deps.dialogs.fail,
+	})
 end
 
 helpers.describe("unused keys (linux): tray wiring", function()
-	helpers.it("unused keys: the Configuration submenu offers the row and hands it the zenity dialogs", function()
-		local previous = package.loaded["ui.menu.unused_keys_cleanup"]
-		local captured
+	helpers.it("unused keys: the Configuration submenu opens the cleanup host without native dialogs", function()
+		local previous, called = package.loaded["ui.menu.unused_keys_cleanup"], false
 		package.loaded["ui.menu.unused_keys_cleanup"] = {
-			run_from_menu = function(deps) captured = deps; return true end,
+			run_from_menu = function(deps) helpers.assert_eq(deps, nil); called = true; return true end,
 		}
-		local ok, err = pcall(function()
+		local ok, detail = pcall(function()
 			local mb = helpers.load_module("ui.menu.menu_builder")
-			local i18n = require("infra.i18n")
-			local label = i18n.get("menu.global.clean_unused_keys")
+			local label = require("infra.i18n").get("menu.global.clean_unused_keys")
 			local row = find_row(mb.build({ _version = "test", on_quit = function() end }), label)
-			helpers.assert_true(row ~= nil, "the cleanup row must be in Configuration on Linux")
-			local fn = row.fn or row.action
-			helpers.assert_eq(type(fn), "function")
-			fn()
-			helpers.assert_true(type(captured) == "table" and type(captured.dialogs) == "table",
-				"the row must run the cleanup with this tray's dialogs")
-
-			-- LuaJIT reports success as the NUMBER 0.
-			local answer
-			local commands = with_execute(0, function()
-				answer = captured.dialogs.confirm("Title", "[a] k = \"<x & y>\"")
-			end)
-			helpers.assert_eq(answer, true)
-			local question = commands[#commands]
-			helpers.assert_true(question:find("zenity --question", 1, true) ~= nil, question)
-			helpers.assert_true(question:find("&lt;x &amp; y&gt;", 1, true) ~= nil,
-				"zenity reads --text as markup: a value holding < or & must be escaped")
-			helpers.assert_true(question:find(i18n.get("button.remove"), 1, true) ~= nil)
-
-			commands = with_execute(1, function() answer = captured.dialogs.confirm("T", "x") end)
-			helpers.assert_eq(answer, false, "Cancel is a No")
-
-			commands = with_execute(0, function() captured.dialogs.inform("Done", "ok") end)
-			helpers.assert_true(commands[1]:find("zenity --info", 1, true) ~= nil, commands[1])
-			commands = with_execute(0, function() captured.dialogs.fail("Failed", "why") end)
-			helpers.assert_true(commands[1]:find("zenity --error --title=", 1, true) ~= nil, commands[1])
+			helpers.assert_true(row ~= nil, "the Configuration menu must expose cleanup")
+			local callback = row.fn or row.action
+			helpers.assert_eq(type(callback), "function")
+			callback()
+			helpers.assert_eq(called, true)
 		end)
 		package.loaded["ui.menu.unused_keys_cleanup"] = previous
-		if not ok then error(err, 0) end
+		if not ok then error(detail, 0) end
 	end)
 
-	helpers.it("unused keys: without zenity nobody is asked and nothing is removed", function()
+	helpers.it("unused keys: the engine refuses an unavailable confirmation without modifying the file", function()
 		Sandbox.with_config(FIXTURE, function(path)
-			local completed = Cleanup.run_from_menu({
+			local completed = run_engine_cleanup({
 				path = path, stamp = Sandbox.STAMP,
 				get_text = function(key) return key end,
 				dialogs = {
@@ -318,10 +285,10 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		end)
 	end)
 
-	helpers.it("unused keys: a confirmed tray cleanup removes the keys and keeps a backup", function()
+	helpers.it("unused keys: a confirmed engine cleanup removes the keys and keeps a backup", function()
 		Sandbox.with_config(FIXTURE, function(path)
 			local shown = {}
-			local completed = Cleanup.run_from_menu({
+			local completed = run_engine_cleanup({
 				path = path, stamp = Sandbox.STAMP,
 				get_text = function(key) return key end,
 				dialogs = {
@@ -337,7 +304,13 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		end)
 	end)
 
-	helpers.it("unused keys: the tray action refuses to run without dialogs", function()
-		helpers.assert_throws(function() Cleanup.run_from_menu({}) end)
+	helpers.it("unused keys: the menu forwards trusted ownership and reports a refused WebView", function()
+		local captured
+		local opened = Cleanup.run_from_menu({ path = "/trusted/config.toml",
+			host = { open = function(options) captured = options; return false end },
+		})
+		helpers.assert_eq(opened, false)
+		helpers.assert_eq(captured.path, "/trusted/config.toml")
+		helpers.assert_eq(captured.collect, Cleanup.collect)
 	end)
 end)

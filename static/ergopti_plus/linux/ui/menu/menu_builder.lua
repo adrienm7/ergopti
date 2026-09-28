@@ -3182,7 +3182,7 @@ local function _build_configuration(ctx)
 			})
 		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
-		-- asks through this tray's own zenity dialogs.
+		-- opens the shared review page through the driver's WebView owner.
 		["clean_unused_keys"] = function()
 			local ok_cleanup, Cleanup = pcall(require, "ui.menu.unused_keys_cleanup")
 			if not ok_cleanup or type(Cleanup) ~= "table" then
@@ -3192,14 +3192,7 @@ local function _build_configuration(ctx)
 					i18n_safe("dialog.unused_keys.title"))
 				return
 			end
-			Cleanup.run_from_menu({ dialogs = {
-				confirm = function(title, text)
-					return ask_yes_no(title, zenity_plain(text),
-						i18n_safe("button.remove"), i18n_safe("button.cancel"))
-				end,
-				inform = function(title, text) show_info(title, zenity_plain(text)) end,
-				fail = function(title, text) show_error(zenity_plain(text), title) end,
-			} })
+			return Cleanup.run_from_menu()
 		end,
 		-- The folders editor, as on the other two drivers. This row used to open
 		-- the hotstrings folder in the file manager, a second meaning for one

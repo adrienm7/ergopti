@@ -346,7 +346,9 @@ function M.find(opts)
 	if status ~= "ok" or type(content) ~= "string" then
 		return { status = "unreadable", keys = {} }
 	end
-	return M.find_in_source(content, opts.collect)
+	local scan = M.find_in_source(content, opts.collect)
+	scan.source = content
+	return scan
 end
 
 --- Substitutes {1}, {2}, … in a localized template without pattern magic, so
@@ -515,6 +517,11 @@ function M.remove(opts)
 	if not read_ok then return refuse("unreadable", source) end
 	if read_status ~= "ok" or type(source) ~= "string" then
 		return refuse("unreadable", read_detail or read_status)
+	end
+	if opts.expected_source ~= nil and source ~= opts.expected_source then
+		result.status = "changed"
+		Logger.warn(LOG, "Cleanup deferred: '%s' changed after the preview was opened.", path)
+		return result
 	end
 
 	-- The copy is created where nothing exists yet and read back before any
