@@ -29,6 +29,7 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const {
 	REGISTRY_DIR,
@@ -267,6 +268,43 @@ check('the registry validator rejects asymmetric and dangling variants', () => {
 	const f = { ...validMeta(), family: 'other', variants: ['e'] };
 	assert.ok(validateRegistry(new Map([['e', e], ['f', f]])).length > 0, 'variants of two families accepted');
 	assert.deepStrictEqual(validateRegistry(new Map([['e', e], ['f', { ...f, family: 'sample' }]])), []);
+});
+
+check('layout extensions inventory existing-format files and reject incomplete packages', () => {
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-layout-extension-'));
+	try {
+		fs.cpSync(REGISTRY_DIR, fixture, { recursive: true });
+		const folder = path.join(fixture, 'ergopti');
+		const hotstrings = path.join(folder, 'hotstrings');
+		fs.mkdirSync(hotstrings, { recursive: true });
+		const content = '[[sample]]\n"test★" = "example"\n';
+		fs.writeFileSync(path.join(hotstrings, 'sample.toml'), content);
+		const result = buildIndex(fixture).index.layouts.find((entry) => entry.id === 'ergopti');
+		assert.ok(result.extension, 'every layout is an existing-format extension');
+		const file = result.extension.files.find((item) => item.path === 'hotstrings/sample.toml');
+		assert.deepStrictEqual(file, {
+			path: 'hotstrings/sample.toml', file: 'ergopti/hotstrings/sample.toml',
+			size: Buffer.byteLength(content), sha256: sha256(content)
+		});
+		assert.ok(result.extension.files.some((item) => item.path === 'manifest.toml'));
+		assert.ok(result.extension.files.some((item) => item.path === 'ergopti.keylayout'));
+		const generation = result.extension.sha256;
+		fs.writeFileSync(path.join(hotstrings, 'sample.toml'), content + '# changed\n');
+		assert.notStrictEqual(buildIndex(fixture).index.layouts.find((entry) => entry.id === 'ergopti').extension.sha256, generation);
+		fs.mkdirSync(path.join(hotstrings, 'nested'));
+		assert.throws(() => buildIndex(fixture), /unsupported extension file/);
+		fs.rmdirSync(path.join(hotstrings, 'nested'));
+		const manifestPath = path.join(folder, 'manifest.toml');
+		const manifest = fs.readFileSync(manifestPath, 'utf8');
+		fs.writeFileSync(manifestPath, manifest.replace('id = "ergopti"', 'id = "../outside"'));
+		assert.throws(() => buildIndex(fixture), /extension id/);
+		fs.writeFileSync(manifestPath, manifest);
+		fs.rmSync(path.join(folder, 'manifest.toml'));
+		assert.throws(() => buildIndex(fixture), /manifest\.toml/);
+	} finally {
+		assert.ok(path.resolve(fixture).startsWith(path.resolve(os.tmpdir()) + path.sep + 'ergopti-layout-extension-'));
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
 });
 
 console.log(`\n${passes} passed, ${failures} failed`);
