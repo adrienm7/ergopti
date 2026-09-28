@@ -145,6 +145,14 @@ function M.registry_transaction(label, mutation)
 	return Groups.transaction(label, mutation)
 end
 
+--- Commits the canonical delay projection and its conditional source publication.
+--- @param resolve function Pure resolver using the candidate override source.
+--- @param publish function Exact conditional publication callback.
+--- @return boolean committed
+function M.with_hotstring_delays(resolve, publish)
+	return Groups.with_hotstring_delays(resolve, publish)
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.

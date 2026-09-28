@@ -1357,8 +1357,9 @@ do
 	local override_path = config_paths.get_config_dir()
 	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
 	override_path = override_path .. "hotstrings_config.toml"
-	hotstrings_config.init({
+	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
+		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
@@ -1379,6 +1380,8 @@ do
 			return hotstrings_dir .. category .. ".toml"
 		end,
 	})
+
+	if hotstring_config_ready ~= true then error("hotstring override owner did not initialize") end
 
 	-- Wire the config window so it can discover personal + extension files.
 	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
