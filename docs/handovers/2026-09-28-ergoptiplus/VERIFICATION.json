@@ -183,5 +183,83 @@
         "tests/e2e/run_e2e.lua"
       ]
     }
+  ],
+  "publishedCI": {
+    "commit": "2c73147e12ecdd07dea368461954bb8a5f884687",
+    "url": "https://github.com/adrienm7/ergopti/actions/runs/36485979779",
+    "conclusion": "failure",
+    "windows": {
+      "passed": 7238,
+      "failed": 1
+    },
+    "linux": {
+      "passed": 3575,
+      "failed": 1
+    },
+    "macosLua": "unit and E2E jobs passed",
+    "macosSwift": {
+      "tests": 250,
+      "failedAssertions": 4
+    },
+    "site": "success",
+    "layout": "encoding hygiene failed on historical .ahk.txt BOM; other jobs passed",
+    "releaseVerified": false
+  },
+  "correctiveLocal": {
+    "linuxFull": {
+      "passed": 3567,
+      "failed": 9,
+      "cause": "WSL has luv; CI has no luv. Unchanged event-loop and watcher modules."
+    },
+    "linuxDependencyMatchedReplay": {
+      "passed": 65,
+      "failed": 0,
+      "modules": [
+        "event_loop_adapter",
+        "file_watchers",
+        "hotstrings_config"
+      ],
+      "note": "Whole-run failures and changed fixture covered; native CI verdict pending."
+    },
+    "encodingShellExitCode": 0,
+    "artifactHashesVerified": 47,
+    "swift": "Native macOS execution deferred by repository gate on Windows",
+    "windows": {
+      "unit": 7239,
+      "failed": 0,
+      "e2e": 5,
+      "compile": "complete include graph passed",
+      "encoding": "1698 AHK files passed",
+      "regression": "Equivalent primary path spelling fails original code and passes correction; neighbor excluded"
+    },
+    "javascript": {
+      "passed": 302,
+      "total": 303,
+      "failed": [
+        "domain pipeline: build:linux exceeded local orchestration time limit"
+      ],
+      "rootChanged": [],
+      "exportChanged": [],
+      "replay": "Exact domain pipeline replay: 14/14 steps passed, unchanged timeout and assertions",
+      "compositePassed": 303
+    }
+  },
+  "correctiveCommits": [
+    {
+      "commit": "dd5cd6f2d6eb59969708d47e5857733bdf126f3d",
+      "subject": "test(linux): activate bundled hotstrings explicitly in discovery test"
+    },
+    {
+      "commit": "395e8307cf1c98a2cfb2bfc7f9ede871e56c6d2c",
+      "subject": "fix(windows): normalize personal hotstring discovery identity"
+    },
+    {
+      "commit": "c307259693dfe768f5a8ec0972be30f4c4385d92",
+      "subject": "fix(macos): preserve exact updater command paths"
+    },
+    {
+      "commit": "f5a9b4cd7f5a2fa7a0e8afa0e27d11c84939c40e",
+      "subject": "test(macos): isolate append integrity from log retention"
+    }
   ]
 }

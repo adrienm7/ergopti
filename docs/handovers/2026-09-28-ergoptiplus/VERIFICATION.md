@@ -20,6 +20,34 @@ limitations. CI for the published commit remains the final release verdict.
 | Strict conventions | Zero violations |
 | Pending artifact integrity | 47 preserved artifacts inventoried with SHA-256 |
 
+## First published CI
+
+Published checkpoint: `2c73147e12ecdd07dea368461954bb8a5f884687`.
+[Root workflow](https://github.com/adrienm7/ergopti/actions/runs/36485979779)
+failed: Windows 7238/7239, Linux 3575/3576, and four assertions in the macOS
+Swift launcher suite. macOS Lua unit and E2E jobs passed. Site deployment
+passed. The layout installer matrix passed its other jobs but rejected a BOM
+in the historical `.ahk.txt` documentation snapshot. These CI failures override
+any inference of release readiness from the earlier local results. Corrections
+and their final workflow verdicts remain to be recorded.
+
+The corrected Linux fixture passed in a complete LuaJIT run (3567 passing;
+nine environment failures in unchanged event-loop/watcher modules). This WSL
+host has `luv`; CI does not. Replaying those modules and the changed Hotstrings
+module with CI dependency availability passed 65/65. This is composite evidence,
+not a claim that the first whole-run exit status was zero. The exact BOM shell
+check from `linux-layout.yml` also passes after correcting the documentation
+snapshot. Swift launcher execution is explicitly deferred to native macOS CI.
+
+Windows correction: 7239/7239 unit checks, 5/5 E2E and full production compile
+pass; AHK encoding passes. The strengthened path-identity test fails on the
+original implementation and passes after correction. The full JavaScript
+registry reports 302/303 with one local build timeout. Its exact domain
+pipeline replay then passes all 14 steps without changing any assertion or
+timeout. All 303 checks therefore have passing evidence; the initial complete
+invocation remains recorded as exit 1. Root and export source hashes stayed
+unchanged throughout the registry run.
+
 ## JavaScript composite verification
 
 The initial run executed all 303 checks registered by the repository suite.

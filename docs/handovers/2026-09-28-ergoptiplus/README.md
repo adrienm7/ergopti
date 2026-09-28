@@ -29,8 +29,10 @@ override those historical instructions.
   configured value; valid gesture action parameters must survive cleanup.
 - Consolidate useful work into the real repository and retire temporary
   branches/worktrees after their contents are accounted for.
-- Preserve quota for a clean, published handoff. Update the linear TODO after
-  each completed step; then advance as far as possible.
+- First restore green CI, verify the new release and leave a clean checkpoint.
+  Then spend the remaining quota on one TODO item at a time without parallel
+  agents, updating the checklist after every completed unit and reserving enough
+  capacity to publish a clean final handoff.
 
 ## Unapplied proposals
 
@@ -46,6 +48,12 @@ to force an old proposal onto a changed source.
 | `hotstrings-engine.patch` | Shared engine detached catalogue publication | 59/59 on LuaJIT and Lua 5.4; five new cases fail before fix |
 | `hotstrings-catalogue.patch` | Linux catalogue publication; apply after engine | 53/53 on both runtimes; five causal failures |
 | `mac-remap-sparse.patch` | macOS neutral remap persistence; after integrated owned-field preservation | 8/8 targeted, 47/47 broader; four causal failures |
+
+The standalone CI repair changes `test_hotstrings_config.lua` after the
+`hotstrings-catalogue.patch` proposal was captured. Rebase that proposal over
+the current isolated discovery/activation fixture; preserve its explicit
+activation and real-trigger execution assertions. Original proposal hashes
+remain historical and must not be rewritten to conceal this prerequisite.
 
 These proofs are recorded from private overlays, not whole-repository release
 gates. Integrate each coherently and rerun the gates selected by `verify-change`.
@@ -82,6 +90,9 @@ The retired-worktree audit records the remaining uncertainty and the ignored
 fixture/generated files that need not be copied to GitHub. These small recovery
 artifacts preserve useful unfinished work; the old 632 MB workspace snapshot is
 not needed to read this TODO or resume the identified implementation tasks.
+The historical `.ahk.txt` snapshot uses UTF-8 without BOM, as required for text
+documentation. Its manifest retains the original hash and the restoration rule:
+prepend the three BOM bytes when restoring it as an actual `.ahk` source file.
 
 ## Incomplete design material
 

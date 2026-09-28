@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-09-28. Integration branch: `dev`. This ordered checklist is the
+Updated: 2026-09-29. Integration branch: `dev`. This ordered checklist is the
 current handoff; older workflow task-status files are historical evidence.
 Update the completed item and its verification before moving to the next item.
 
@@ -10,8 +10,11 @@ Update the completed item and its verification before moving to the next item.
 
 The overhaul is not finished. Eight reviewed integration commits now end at
 `eaa06eeba` on `dev`, on top of the earlier 340 unpublished commits. Their 64
-owned paths are committed. This document is the pre-publication checkpoint;
-the next step is publishing it and checking the resulting CI/release.
+owned paths are committed. The handoff commit `2c73147e1` is published on
+GitHub. Its first CI is red: Windows discovery fixture, Linux bundled-corpus
+fixture, macOS launcher tests, and one documentation BOM. Corrective work is
+committed through `f5a9b4cd7`; available local gates pass. Native Swift CI,
+the corrective push and release assets remain to be verified.
 The only registered worktree is the main repository. Nine temporary local
 branches have been retired after their useful content was accounted for.
 Originals and unfinished proposals are preserved in the handoff package.
@@ -19,6 +22,9 @@ Originals and unfinished proposals are preserved in the handoff package.
 The user authorizes publishing `dev` and necessary CI repairs, forbids force
 pushes and new feature branches, and wants a cloneable GitHub handoff. Preserve
 unrelated changes and stage exact paths. Do not reload the live Windows driver.
+After CI and a verified new release, continue one TODO item at a time without
+parallel agents. Update this file after each finished unit and reserve enough
+quota to commit, publish and document the final clean checkpoint.
 
 ## Already integrated functionality
 
@@ -71,8 +77,12 @@ These are software implementations; final hardware verification remains below.
    update (`c4f5973`) to review. These are preserved, not silently merged.
    The retired-worktree audit also recovered unapplied D4 model labels/21
    locales and L4 boot/test changes; their exact deltas are in the same package.
-4. [ ] Publish `dev`, verify the remote commit, follow CI, repair regressions and
-   verify release assets. A clean working tree alone does not prove a release.
+4. [ ] Finish publication: `2c73147e1` is on GitHub and site deployment passed.
+   Corrections for the first failures are locally verified (Windows path
+   identity, Linux neutral activation fixture, macOS launcher fixes deferred
+   to native CI, documentation BOM). Publish them, then verify
+   the corrective commit, all workflow verdicts and release assets. A clean
+   working tree alone does not prove a release.
 5. [ ] Complete W1 neutral configuration and recommended/clear scopes. Finish
    macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
    composition. Keep unknown fields, verified backups, exact runtime

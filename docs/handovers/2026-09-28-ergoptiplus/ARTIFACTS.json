@@ -211,8 +211,10 @@
   },
   {
     "path": "retired-worktrees/windows-master-state-test_neutral_config_manifest.ahk.txt",
-    "bytes": 4552,
-    "sha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba"
+    "bytes": 4549,
+    "sha256": "d0ff19e145c6934e740caebb3caca28ebb680037b277111a92e80644a82145e3",
+    "originalSha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
+    "representation": "UTF-8 text snapshot without BOM; prepend EF BB BF when restoring as an .ahk source file."
   },
   {
     "path": "retired-worktrees/windows-master-state-unstaged.patch",
