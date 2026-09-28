@@ -63,12 +63,58 @@
 ; Both would otherwise fail the "every segment must already exist in the
 ; manifest" walk below on every single boot, since neither can be declared
 ; ahead of time in manifest.toml.
-TomlSectionIsDynamicPersonalNamespace(SectionPath) {
-	if (SectionPath == "personal_editor") {
-		return true
+/**
+ * Decodes a dotted TOML section without splitting dots inside quoted keys.
+ * @param {String} Header - Section contents without brackets.
+ * @returns {Array|Integer} Semantic key segments, or false for malformed input.
+ */
+TomlConfigSectionParts(Header) {
+	if !(Header is String)
+		return false
+	Rest := Trim(Header)
+	Parts := []
+	Pattern := "^(?:([A-Za-z0-9_-]+)|" . Chr(34) . "((?:[^" . Chr(34) . "\\]|\\.)*)" . Chr(34) . "|'([^']*)')"
+	while (Rest != "") {
+		if !RegExMatch(Rest, Pattern, &TokenMatch)
+			return false
+		Token := TokenMatch[0]
+		if SubStr(Token, 1, 1) == Chr(34)
+			Part := UnescapeTomlString(SubStr(Token, 2, -1))
+		else if SubStr(Token, 1, 1) == "'"
+			Part := SubStr(Token, 2, -1)
+		else
+			Part := Token
+		Parts.Push(Part)
+		Rest := Trim(SubStr(Rest, StrLen(Token) + 1))
+		if Rest == ""
+			return Parts
+		if SubStr(Rest, 1, 1) != "."
+			return false
+		Rest := Trim(SubStr(Rest, 2))
+		if Rest == ""
+			return false
 	}
-	return (StrLen(SectionPath) >= 19 and SubStr(SectionPath, 1, 19) == "hotstrings.personal")
-		and (SectionPath == "hotstrings.personal" or SubStr(SectionPath, 20, 1) == ".")
+	return false
+}
+
+; Manifest paths use semantic names; quotes belong only to TOML serialization.
+TomlConfigManifestPath(Header) {
+	Parts := TomlConfigSectionParts(Header)
+	if !(Parts is Array)
+		return ""
+	Path := ""
+	for Part in Parts
+		Path .= (Path == "" ? "" : ".") . Part
+	return Path
+}
+
+TomlSectionIsDynamicPersonalNamespace(SectionPath) {
+	Parts := TomlConfigSectionParts(SectionPath)
+	if !(Parts is Array)
+		return false
+	if (Parts.Length == 1 && Parts[1] == "personal_editor")
+		return true
+	return Parts.Length >= 2 && Parts[1] == "hotstrings" && Parts[2] == "personal"
 }
 
 ; Keys stored in config.toml but deliberately loaded by a subsystem other than
@@ -112,6 +158,7 @@ TomlConfigActionParameterIsOwned(Key) {
 }
 
 TomlConfigForeignOwner(SectionPath, Key) {
+	SectionPath := TomlConfigManifestPath(SectionPath)
 	Registry := TomlConfigForeignOwnershipRegistry()
 	if Registry.Has(SectionPath) {
 		Section := Registry[SectionPath]
@@ -161,7 +208,10 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	if TomlSectionIsDynamicPersonalNamespace(SectionPath)
 		return ""
 	Node := Features
-	for _, Part in StrSplit(SectionPath, ".") {
+	Parts := TomlConfigSectionParts(SectionPath)
+	if !(Parts is Array)
+		return "section"
+	for _, Part in Parts {
 		if (Part == "")
 			continue
 		if (Type(Node) == "Map" and Node.Has(Part))
@@ -254,6 +304,7 @@ TomlConfigEnumUsesBooleanLiterals(Entry) {
 
 /** Resolves the same schema owner for configuration reads and writes. */
 TomlConfigExpectedType(CurrentSection, Key, &Entry) {
+	CurrentSection := TomlConfigManifestPath(CurrentSection)
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
 	if !(Entry is Map) {
@@ -497,7 +548,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		; TomlSectionIsDynamicPersonalNamespace): missing segments are
 		; auto-vivified as empty Maps instead of being rejected.
 		IsDynamicPersonalNamespace := TomlSectionIsDynamicPersonalNamespace(CurrentSection)
-		Parts := StrSplit(CurrentSection, ".")
+		Parts := TomlConfigSectionParts(CurrentSection)
 		Node := Features
 		Failed := false
 		for _, Part in Parts {
