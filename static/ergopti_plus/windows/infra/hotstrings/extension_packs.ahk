@@ -157,3 +157,61 @@ _HotstringExtensions_Boolean(Value) {
 		throw ValueError("Extension activation requires a Boolean preference.")
 	return Value
 }
+
+/**
+ * Publishes one discovered preference without changing its master or siblings.
+ * @param {String} Path Canonical group or section preference.
+ * @param {Integer} Value Explicit desired Boolean.
+ * @param {Map} Options Lifecycle ports and optional discovery roots callback.
+ * @returns {Map} Receipt retained until reload commits or compensates.
+ */
+HotstringExtensions_SetEnabled(Path, Value, Options := unset) {
+	_HotstringExtensions_Boolean(Value)
+	if !IsSet(Options)
+		Options := Map()
+	if !(Options is Map)
+		throw TypeError("Extension publication requires an options map.")
+	RootsFn := Options.Get("roots", _HotstringExtensions_CurrentRoots)
+	Operations() {
+		; Rescan under the configuration lease: a menu opened before uninstall
+		; cannot persist activation for content which is no longer owned.
+		for Pack in HotstringExtensions_Scan(RootsFn.Call()) {
+			for File in Pack.toml_files {
+				if Path == "hotstrings.groups." . File.category
+					return [ManifestSparseOperation(Path, Value)]
+				for Section in File.sections {
+					if Path == "hotstrings.modules." . File.category . "." . Section["name"]
+						return [ManifestSparseOperation(Path, Value)]
+				}
+			}
+		}
+		throw ValueError("The extension no longer owns this preference.")
+	}
+	return ConfigScopeCommitOperations("hotstrings", "extension_preference", Operations, Options)
+}
+
+_HotstringExtensions_CurrentRoots() {
+	global _ConfigDir, _ExtensionsDir
+	return HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir)
+}
+
+/**
+ * Counts source entries selected by the exact registration plan.
+ * @param {Map} Target Desired or effective features.
+ * @param {Array} Packs Complete discovered catalogue or an explicit subset.
+ * @param {Integer} MasterOn Effective master state.
+ * @returns {Integer} Effective source entry count.
+ */
+HotstringExtensions_Count(Target, Packs, MasterOn) {
+	Counts := Map()
+	for Pack in Packs {
+		for File in Pack.toml_files {
+			for Section in File.sections
+				Counts[File.category . "." . Section["name"]] := Section["count"]
+		}
+	}
+	Total := 0
+	for Request in HotstringExtensions_RegistrationPlan(Target, Packs, MasterOn)
+		Total += Counts[Request.category . "." . Request.section]
+	return Total
+}
