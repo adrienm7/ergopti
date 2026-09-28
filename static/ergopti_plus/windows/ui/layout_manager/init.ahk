@@ -41,6 +41,8 @@ global _LayMgrWeb_ResetDone  := false
 global _LayMgrWeb_SessionEpoch := 0
 ; Result of the last operation, shown by the page (0 when none).
 global _LayMgrWeb_Result := 0
+; A durable catalogue operation still waits for its terminal runtime refresh.
+global _LayMgrWeb_RuntimeRefresh := 0
 
 ; Virtual host mapped to _SharedDir (apps.manifest.json).
 global LAYMGR_VHOST := "ergopti.layoutmanager"
@@ -139,7 +141,8 @@ LayoutManager_PageState(LocalDir := unset) {
 		Installed := Map()
 		RecordError := Err.Message
 	}
-	Busy := LayoutCatalogue_Busy()
+	global _LayMgrWeb_RuntimeRefresh
+	Busy := (_LayMgrWeb_RuntimeRefresh is Map) ? _LayMgrWeb_RuntimeRefresh : LayoutCatalogue_Busy()
 	return Map(
 		"platform", LAYOUT_CATALOGUE_PLATFORM,
 		"index", (Index is Map) ? Index : JSON_NULL,
@@ -187,7 +190,7 @@ _LayMgrWeb_Strings() {
  * @returns {boolean} Whether the message was accepted.
  */
 LayoutManager_HandleMessage(Payload, Deps := 0) {
-	global LAYMGR_ACTIONS, _LayMgrWeb_Result
+	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
 	if !(Deps is Map)
 		Deps := _LayMgrWeb_DefaultDeps()
 	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
@@ -196,6 +199,11 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 		return false
 	}
 	Action := Payload["action"]
+	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
+			|| Action == "uninstall" || Action == "select") {
+		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
+		return false
+	}
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
 		Deps["push"].Call("initData", Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"])))
@@ -254,15 +262,44 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 }
 
 _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
-	global _LayMgrWeb_Result
-	if Ok
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", true)
-	else
+	global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+	if !Ok {
 		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", false, "code", String(CodeOrDetail),
 			"detail", String(Detail))
+		_LayMgrWeb_PushState(Deps)
+		return false
+	}
+	if !Deps.Has("after") {
+		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", true)
+		_LayMgrWeb_PushState(Deps)
+		return true
+	}
+	Pending := Map("id", Id, "action", Action)
+	_LayMgrWeb_RuntimeRefresh := Pending
+	_LayMgrWeb_Result := 0
 	_LayMgrWeb_PushState(Deps)
-	if Ok && Deps.Has("after") && HasMethod(Deps["after"], "Call")
-		Deps["after"].Call(Id, Action)
+	Finish(Ready) {
+		global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+		if _LayMgrWeb_RuntimeRefresh != Pending
+			return false
+		_LayMgrWeb_RuntimeRefresh := 0
+		Accepted := (Ready is Integer) && Ready == 1
+		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", Accepted)
+		if !Accepted
+			_LayMgrWeb_Result["code"] := "other"
+		_LayMgrWeb_PushState(Deps)
+		return true
+	}
+	try Started := Deps["after"].Call(Id, Action, Finish)
+	catch as Err {
+		LoggerError("LayoutManager", "Runtime refresh failed after catalogue publication: {1}.", Err.Message)
+		Started := false
+	}
+	if !(Started is Integer) || Started != 1 {
+		Finish(false)
+		return false
+	}
+	return true
 }
 
 _LayMgrWeb_PushState(Deps, *) {
@@ -310,18 +347,44 @@ LayoutManager_SelectBuiltin() {
 	return ReloadPreservingSuspend()
 }
 
-; After an operation: an updated emulated layout is reloaded, an uninstalled
-; one is no longer emulated.
-_LayMgrWeb_After(Id, Action) {
-	global Features
-	if (KeylayoutEmulation_SelectedId() != Id)
-		return
-	if (Action == "uninstall") {
+; The successor discovers committed extension roots even for nonselected layouts.
+; A launch acknowledgement is deliberately separate from terminal completion.
+_LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
+	global Features, _ConfigDir, _HotstringExtensionPacks
+	if !IsSet(Options)
+		Options := Map()
+	LocalDir := Options.Has("local_dir") ? Options["local_dir"] : LayoutRegistry_LocalDir(_ConfigDir)
+	Selected := Options.Get("selected", KeylayoutEmulation_SelectedId).Call() == Id
+	Packs := Options.Has("packs") ? Options["packs"].Call() : _HotstringExtensionPacks
+	NeedsRefresh := Selected
+	for Pack in Packs {
+		if Pack.id == Id
+			NeedsRefresh := true
+	}
+	Installed := LayoutCatalogue_ReadInstalled(LocalDir)
+	if Installed.Has(Id) && Installed[Id].Has("extension")
+		NeedsRefresh := true
+	if !NeedsRefresh {
+		OnDone.Call(true)
+		return true
+	}
+	if Selected && Action == "uninstall" {
 		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
-		if !WriteFeatureV2(Features, "layout.emulated_layout", "")
+		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, "layout.emulated_layout", Value))
+		if !WriteSelection.Call("")
 			return ConfigReportPersistenceFailure("the layout selection")
 	}
-	return ReloadPreservingSuspend()
+	Refused(Reason) {
+		LoggerError("LayoutManager", "Runtime refresh refused after catalogue publication: {1}.", Reason)
+		OnDone.Call(false)
+	}
+	ReloadFn := Options.Get("reload", ReloadPreservingSuspend)
+	Started := ReloadFn.Call((*) => OnDone.Call(true), 0, Refused)
+	if !(Started is Integer) || Started != 1 {
+		OnDone.Call(false)
+		return false
+	}
+	return true
 }
 
 _LayMgrWeb_DefaultDeps() {
