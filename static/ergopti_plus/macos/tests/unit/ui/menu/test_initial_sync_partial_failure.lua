@@ -109,23 +109,28 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 			"a runtime refusal during the rollback must not rewrite config.toml")
 	end)
 
-	helpers.it("lets Disable All write its explicit OFF over a demoted feature", function()
+	helpers.it("retired bulk switches cannot replace consent or the saved demoted value", function()
 		local fixture = boot({ gestures_enable = false })
-		helpers.assert_eq(fixture.global_actions().disable_all(), true)
+		local actions = fixture.global_actions()
+		helpers.assert_nil(actions.disable_all, "the retired OFF operation must not be published")
+		helpers.assert_nil(actions.enable_all, "the retired ON operation must not enable consent features")
+		helpers.assert_eq(type(actions.reset_defaults), "function", "the remaining reset must stay reachable")
+		helpers.assert_eq(fixture.save_prefs(), true)
 		local written = fixture.saves[#fixture.saves]
-		helpers.assert_true(written ~= nil, "Disable All must save")
-		helpers.assert_eq(written.gestures, false,
-			"a global action sets every feature explicitly, so no demotion may override it")
+		helpers.assert_true(written ~= nil, "the unrelated save must commit")
+		helpers.assert_eq(written.gestures, true,
+			"building the remaining global actions must retain the desired value")
 	end)
 
-	helpers.it("restores the saved value when a refused Disable All save is reversed", function()
+	helpers.it("preserves the saved gesture value when a refused reset is reversed", function()
 		local fixture = boot({ gestures_enable = false })
-		fixture.refuse_next_save()
-		helpers.assert_eq(fixture.global_actions().disable_all(), false,
-			"a refused candidate save must fail Disable All")
-		helpers.assert_eq(#fixture.saves, 1, "the inverse must republish the pre-action preferences")
-		helpers.assert_eq(fixture.saves[1].gestures, true,
-			"the inverse must keep the saved Gestures ON, not write the demoted posture")
+		-- Runtime sync writes first; refuse the reset owner's explicit setter.
+		fixture.refuse_gesture_assignment_after(2)
+		helpers.assert_eq(fixture.global_actions().reset_defaults(), false,
+			"a refused candidate assignment must fail the reset")
+		helpers.assert_eq(fixture.gesture_assignment_refusals, 1, "the candidate must reach the injected refusal")
+		helpers.assert_eq(fixture.gesture_assignment_calls, 3, "the refused candidate must be followed by its inverse")
+		helpers.assert_eq(#fixture.saves, 0, "reset compensation must leave the saved file intact")
 		helpers.assert_eq(fixture.state.gestures, false, "the live state keeps the real posture")
 
 		helpers.assert_eq(fixture.save_prefs(), true)
@@ -133,15 +138,19 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 			"the reversed action must leave the demotion active for later saves")
 	end)
 
-	helpers.it("restores the saved value when a refused Enable All save is reversed", function()
+	helpers.it("preserves the saved metrics value when a refused reset is reversed", function()
 		local fixture = boot({ keylogger_start = false })
 		fixture.flush_deferred()
 		helpers.assert_eq(fixture.state.keylogger_enabled, false)
-		fixture.refuse_next_save()
-		helpers.assert_eq(fixture.global_actions().enable_all(), false,
-			"a refused candidate save must fail Enable All")
-		helpers.assert_eq(#fixture.saves, 1, "the inverse must republish the pre-action preferences")
-		helpers.assert_eq(fixture.saves[1].keylogger_enabled, true,
+		-- The following third call must be the reset owner's inverse.
+		fixture.refuse_gesture_assignment_after(2)
+		helpers.assert_eq(fixture.global_actions().reset_defaults(), false,
+			"a refused candidate assignment must fail the reset")
+		helpers.assert_eq(fixture.gesture_assignment_refusals, 1, "the candidate must reach the injected refusal")
+		helpers.assert_eq(fixture.gesture_assignment_calls, 3, "the refused candidate must be followed by its inverse")
+		helpers.assert_eq(#fixture.saves, 0, "reset compensation must not write the demoted state")
+		helpers.assert_eq(fixture.save_prefs(), true)
+		helpers.assert_eq(fixture.saves[#fixture.saves].keylogger_enabled, true,
 			"the inverse must keep the saved Metrics ON, not write the demoted posture")
 	end)
 

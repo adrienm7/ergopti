@@ -49,20 +49,22 @@ Test("menu layout: each hotstring language row carries its locale's flag (menu-l
 	_MLG_LanguageRowCarriesItsFlag)
 
 ; The Configuration submenu: the two rows that rewrite the configuration, a
-; separator, then the two that open a window — and this driver registers a
-; command for each of the four.
+; separator, then configuration windows and the installation controls.
 _MLG_ConfigurationRowsInOrder() {
 	Entries := _MM_GetManifestRoot()["configuration_menu"]
 	Order := ""
 	for _, Entry in Entries
 		Order .= (Order == "" ? "" : ", ") . (Entry.Get("type", "") == "---" ? "---" : Entry["id"])
-	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard", Order,
+	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard, start_at_login, ---, uninstall", Order,
 		"configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
+	Assert(Body != "", "the Configuration builder must exist before checking its commands")
 	for _, Pair in [["restore_recommended", "ReloadWithDefaultConfig"],
 			["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
-			["setup_wizard", "Onboarding_ShowFromMenu"]]
+			["setup_wizard", "Onboarding_ShowFromMenu"],
+			["start_at_login", "ToggleStartAtLogin"],
+			["uninstall", "ShowUninstallErgopti"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
 }

@@ -321,6 +321,9 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			"-",
 			CONFIG_FOLDER,
 			i18n.get("menu.global.setup_wizard"),
+			i18n.get("menu.global.start_at_login"),
+			"-",
+			i18n.get("menu.global.uninstall"),
 		}, " | "))
 	end)
 end)

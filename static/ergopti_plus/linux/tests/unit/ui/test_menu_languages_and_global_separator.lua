@@ -98,6 +98,9 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 			"-",
 			i18n.get("menu.global.config_folder"),
 			i18n.get("menu.global.setup_wizard"),
+			i18n.get("menu.global.start_at_login"),
+			"-",
+			i18n.get("menu.global.uninstall"),
 		}, " | "))
 		-- The folders editor, as on the other two drivers, not the file manager.
 		local folder = rows[4]
