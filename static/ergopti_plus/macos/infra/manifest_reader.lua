@@ -61,6 +61,7 @@ local function load_manifest()
 end
 
 local _manifest = load_manifest()
+local _defaults = require("config_defaults").new(_manifest)
 
 -- Path index built once at load for O(1) lookups.
 local _path_index = {}
@@ -106,12 +107,36 @@ end
 --- @param path string
 --- @return any The declared default (primitive or table).
 function M.default_for(path)
-	local entry = _path_index[path]
-	if not entry then
-		error(string.format("[manifest_reader] no manifest entry for path '%s'", tostring(path)))
-	end
-	return entry.default
+	return _defaults.default_for(path)
 end
+
+--- Returns a detached recommended value; never used as an absence fallback.
+--- @param path string Canonical feature path.
+--- @return any value
+function M.recommended_for(path) return _defaults.recommended_for(path) end
+
+--- @return boolean declared Whether a path has a manifest-owned neutral value.
+function M.has_default(path) return _defaults.has_default(path) end
+
+--- Returns a detached nested document containing every neutral manifest value.
+--- @return table defaults
+function M.document_defaults() return _defaults.document_defaults() end
+
+--- Returns the manifest-owned configuration scopes.
+--- @return table scopes
+function M.scopes() return _defaults.scopes() end
+
+--- Produces an explicit set or delete operation relative to neutral absence.
+--- @param path string Canonical feature path.
+--- @param value any Desired value.
+--- @return table operation
+function M.sparse_operation(path, value) return _defaults.operation(path, value) end
+
+--- Produces selected recommended writes or neutral deletions.
+--- @param scope string Scope identifier.
+--- @param mode string `recommended` or `clear`.
+--- @return table operations
+function M.scope_operations(scope, mode, owned_paths) return _defaults.scope_operations(scope, mode, owned_paths) end
 
 
 

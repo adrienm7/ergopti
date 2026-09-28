@@ -46,11 +46,13 @@ _MGDS_NoGateCategoriesFollowMaster() {
 	Assert(Body != "", "IsCategoryGated must exist in infra/feature_state.ahk")
 
 	PassPos := InStr(Body, "CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)")
-	WarnPos := InStr(Body, "schema drift")
+	DefaultPos := InStr(Body, "ManifestDefaultFor(")
 	Assert(PassPos > 0,
 		"IsCategoryGated must recognise the categories that follow the Hotstrings master instead of warning about them")
-	Assert(WarnPos > 0 && PassPos < WarnPos,
-		"the follow-the-master pass-through must be checked BEFORE the unknown-category warning, so a normal menu build logs nothing")
+	Assert(DefaultPos > 0 && PassPos < DefaultPos,
+		"the inherited master must resolve before checking a missing category's declared neutral default")
+	Assert(InStr(Body, "LoggerWarn(") == 0,
+		"a legitimate inherited-master lookup must not emit a schema warning")
 
 	Src := _DriverSourceConcat()
 	for Cat in ["DynamicHotstrings", "Personal"] {

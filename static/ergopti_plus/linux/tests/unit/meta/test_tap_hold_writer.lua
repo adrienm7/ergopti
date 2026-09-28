@@ -60,6 +60,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 
 	helpers.it("sets a tap in the shared schema and reloads the engine", function()
 		local writer, path, state = fresh_writer()
+		write_file(path, require("tests.support.tap_hold_fixture").with_preset())
 		helpers.assert_true(writer.set_tap("left_shift", "paste"))
 		helpers.assert_true(read_file(path):find("[tap_hold.keys.left_shift]", 1, true) ~= nil)
 		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "paste")
@@ -133,13 +134,20 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		os.remove(path)
 	end)
 
-	helpers.it("resets to the shared defaults by removing the file", function()
+	helpers.it("restores the shared preset explicitly and preserves unknown nested fields", function()
 		local writer, path, state = fresh_writer()
-		writer.disable_all()
+		write_file(path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nenabled = false\n'
+			.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
+			.. '[other]\nvalue = 17\n')
 		helpers.assert_true(writer.reset_all())
-		helpers.assert_eq(read_file(path), "")
+		local stored = require("toml_codec").decode(read_file(path))
+		helpers.assert_eq(stored.tap_hold.inherit_defaults, true)
+		helpers.assert_eq(stored.tap_hold.keys.left_shift.custom.note, "keep")
+		helpers.assert_eq(stored.other.value, 17)
+		helpers.assert_eq(effective(path).enabled, true)
 		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "copy")
-		helpers.assert_eq(state.reloads, 2)
+		helpers.assert_eq(state.reloads, 1)
 		os.remove(path)
 	end)
 

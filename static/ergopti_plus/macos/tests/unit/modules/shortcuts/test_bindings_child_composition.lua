@@ -328,6 +328,7 @@ local function load_subject(options)
 				end,
 			},
 		})
+		require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 		return subject, ctx
 	end)
 end

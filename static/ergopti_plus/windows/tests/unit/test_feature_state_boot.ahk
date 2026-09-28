@@ -10,15 +10,16 @@
 ; ============================================================================
 
 _FeatureStateBootRun(Fixture) {
-    Harness := A_ScriptDir . "\startup\feature_state_boot_smoke.ahk"
+    Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
     AssertTrue(FileExist(Harness) != "", "feature-state startup harness must exist")
     Command := Chr(34) . A_AhkPath . Chr(34) . " " . Chr(34) . Harness . Chr(34) . " " . Fixture
     ExitCode := RunWait(Command, A_ScriptDir, "Hide")
     AssertEqual(0, ExitCode, "feature-state startup fixture must exit cleanly: " . Fixture)
+	return ExitCode
 }
 
 _FeatureStateBootRunFails(Fixture) {
-	Harness := A_ScriptDir . "\startup\feature_state_boot_smoke.ahk"
+	Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
 	AssertTrue(FileExist(Harness) != "", "feature-state startup harness must exist")
 	Command := Chr(34) . A_AhkPath . Chr(34) . " " . Chr(34) . Harness . Chr(34) . " " . Fixture
 	ExitCode := RunWait(Command, A_ScriptDir, "Hide")

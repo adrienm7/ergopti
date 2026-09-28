@@ -32,6 +32,7 @@ end
 --- Builds the menu with a real tap-hold manager on the shared defaults, a fake
 --- writer and a fake picker, and returns the Tap-Holds section.
 local function build(calls, picked, user_text)
+	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
 	os.remove(user_path)

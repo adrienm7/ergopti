@@ -324,6 +324,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- the AI, so a refused AI identity below must not keep them unapplied.
 	if keymap then
 		for _, item in ipairs({
+			{ fn = "set_repeat_feature_enabled",      val = state.repeat_key_enabled },
 			{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
 			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },

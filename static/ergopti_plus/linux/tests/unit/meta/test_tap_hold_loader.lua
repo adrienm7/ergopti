@@ -18,7 +18,7 @@ local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 local function load(text)
 	local path = os.tmpname()
 	local fh = assert(io.open(path, "w"))
-	fh:write(text)
+	fh:write(require("tests.support.tap_hold_fixture").with_preset(text))
 	fh:close()
 	local loaded = Config.load(DEFAULTS, path)
 	os.remove(path)
@@ -27,11 +27,10 @@ end
 
 helpers.describe("tap-hold config: the user file over the shared defaults", function()
 
-	helpers.it("keeps the shared defaults when the user file is absent", function()
+	helpers.it("keeps every key neutral when the user file is absent", function()
 		local loaded = Config.load(DEFAULTS, "/nonexistent/tap_hold.toml")
-		helpers.assert_true(loaded.enabled)
-		helpers.assert_eq(loaded.keys.left_shift.tap_action, "copy")
-		helpers.assert_eq(loaded.keys.caps_lock.hold_modifier, "ctrl")
+		helpers.assert_eq(loaded.enabled, false)
+		helpers.assert_nil(next(loaded.keys))
 		helpers.assert_nil(loaded.user_error)
 	end)
 
@@ -74,10 +73,11 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_eq(loaded.keys.left_shift.enabled, false)
 	end)
 
-	helpers.it("reports a malformed user file and keeps the defaults whole", function()
+	helpers.it("reports a malformed user file and keeps every key neutral", function()
 		local loaded = load('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.user_error, "malformed")
-		helpers.assert_eq(loaded.keys.left_shift.tap_action, "copy")
+		helpers.assert_eq(loaded.enabled, false)
+		helpers.assert_nil(next(loaded.keys))
 	end)
 
 end)

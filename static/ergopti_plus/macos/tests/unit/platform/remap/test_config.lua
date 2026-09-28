@@ -100,7 +100,7 @@ helpers.describe("Config.build_default_state", function()
 		end
 		local keys = assert(Config.load_tap_hold_keys(data_dir .. "tap_hold_keys.json"))
 		local combos = assert(Config.load_mod_combos(data_dir .. "mod_combos.json"))
-		local state = Config.build_default_state(keys, combos)
+		local state = Config.build_recommended_state(keys, combos)
 		local checked = 0
 		for id, slots in pairs(state.tap_hold_config) do
 			checked = checked + 1
@@ -147,7 +147,7 @@ helpers.describe("Config: the remap integration is not a user setting", function
 end)
 
 helpers.describe("Config: the Tap-Holds feature switch", function()
-	helpers.it("persists the switch and reads it back, absent meaning on", function()
+	helpers.it("persists explicit activation and reads absence as neutral", function()
 		local codec = package.loaded["infra.toml.codec"]
 		local encoded = nil
 		local original_encode = codec.encode
@@ -156,14 +156,14 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 			error("stop before the disk write")
 		end
 		local state = Config.build_default_state({}, {})
-		helpers.assert_eq(state.tap_holds_enabled, true, "a fresh install starts with Tap-Holds on")
-		state.tap_holds_enabled = false
+		helpers.assert_eq(state.tap_holds_enabled, false, "a fresh install leaves Tap-Holds off")
+		state.tap_holds_enabled = true
 		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
 		codec.encode = original_encode
-		helpers.assert_eq(encoded.tap_holds.enabled, false)
+		helpers.assert_eq(encoded.tap_holds.enabled, true)
 
 		local original_load = Config._load_toml_file
-		for _, case in ipairs({ { stored = false, expected = false }, { stored = nil, expected = true } }) do
+		for _, case in ipairs({ { stored = false, expected = false }, { stored = true, expected = true }, { expected = false } }) do
 			Config._load_toml_file = function()
 				return {
 					tap_holds = { enabled = case.stored, config = { escape = { tap = "escape", hold = "ctrl" } } },

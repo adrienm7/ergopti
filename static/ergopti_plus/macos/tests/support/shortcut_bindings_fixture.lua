@@ -23,6 +23,29 @@ local helpers = require("tests.helpers")
 
 local M = {}
 
+--- Selects explicit shortcut intent before a lifecycle test acquires handles.
+--- @param bindings table Fresh real bindings owner.
+function M.prefer_all(bindings)
+	helpers.assert_eq(bindings.pause_hotkeys_only(), true)
+	local count = 0
+	for _, entry in ipairs(bindings.list_shortcuts()) do
+		helpers.assert_eq(bindings.enable(entry.id), true)
+		helpers.assert_eq(bindings.is_bound(entry.id), false)
+		count = count + 1
+	end
+	helpers.assert_true(count > 0, "explicit preferences require a real registry")
+	helpers.assert_eq(bindings.release_pause_admission(), true)
+end
+
+--- Runs a configured-user lifecycle scenario with every shortcut selected.
+--- @param callback function Scenario receiving the owner and observations.
+function M.with_recommended_bindings(callback)
+	return M.with_bindings(function(bindings, ctx)
+		M.prefer_all(bindings)
+		return callback(bindings, ctx)
+	end)
+end
+
 local CHILD_APIS = {
 	{
 		facade = "text", pause = "pause_text_actions", resume = "resume_text_actions",

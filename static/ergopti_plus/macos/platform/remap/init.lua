@@ -4147,7 +4147,7 @@ end
 function M.reset_to_defaults(on_done)
 	Logger.debug(LOG, "Reset-to-defaults transaction requested.")
 	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
-		local defaults = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
+		local defaults = Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.mod_combos_config         = defaults.mod_combos_config

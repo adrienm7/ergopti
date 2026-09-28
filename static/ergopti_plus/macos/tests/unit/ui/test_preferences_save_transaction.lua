@@ -209,6 +209,9 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
 		helpers.assert_eq(disk, malformed)
 		helpers.assert_eq(expected_sources[1], { status = "ok", content = initial })
+		helpers.assert_eq(attempts, 1, "a stale or malformed source must stop before publication")
+		disk = initial
+		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
 		helpers.assert_eq(expected_sources[2], { status = "ok", content = initial },
 			"invalid external bytes must never become an overwrite authorization")
 	end)

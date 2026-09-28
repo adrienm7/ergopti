@@ -98,10 +98,13 @@ _TH_UnknownHoldLayerDropsTheHoldOnly() {
 		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
 			. 'hold_modifier = "ctrl"' . "`n"
 		if (Source == "user")
-			UserText .= "[tap_hold.keys.caps_lock]`n" . 'hold_layer = "navv"' . "`n"
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n" . 'hold_layer = "navv"' . "`n"
 		else
 			DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
 				. 'hold_layer = "navv"' . "`n"
+		; Restoring a preset is explicit: its selected records become user input.
+		if Source == "defaults"
+			UserText .= DefaultsText
 		Path := _TH_Write(UserText)
 		if FileExist(DefaultsPath)
 			FileDelete(DefaultsPath)
@@ -580,7 +583,7 @@ _TH_CleanDefaults() {
 		_TomlFileCache.Delete(Path)
 }
 
-; When no user file exists, the defaults file alone is returned
+; A missing user file never imports the shipped recommendation.
 _TH_OverlayDefaultsOnlyWhenUserMissing() {
 	DefPath := _TH_WriteDefaults(
 		"[tap_hold.keys.caps_lock]`r`n"
@@ -589,11 +592,10 @@ _TH_OverlayDefaultsOnlyWhenUserMissing() {
 	)
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_user.toml", DefPath)
 	_TH_CleanDefaults()
-	AssertTrue(TH["keys"].Has("caps_lock"))
-	AssertEqual("escape", TH["keys"]["caps_lock"]["tap_action"])
-	AssertEqual(0.35,     TH["keys"]["caps_lock"]["time_activation_seconds"])
+	AssertEqual(0, TH["keys"].Count)
+	AssertEqual(0, TH["layers"].Count)
 }
-Test("LoadTapHoldToml overlay: defaults used when user file missing", _TH_OverlayDefaultsOnlyWhenUserMissing)
+Test("LoadTapHoldToml: absent user file never imports a recommendation", _TH_OverlayDefaultsOnlyWhenUserMissing)
 
 ; User value takes precedence over the matching default field
 _TH_OverlayUserWinsOnConflict() {
@@ -609,9 +611,9 @@ _TH_OverlayUserWinsOnConflict() {
 	TH := LoadTapHoldToml(UserPath, DefPath)
 	_TH_Clean()
 	_TH_CleanDefaults()
-	; User overrides tap_action; time_activation_seconds inherits from defaults
+	; Only explicit records are loaded, including when the preset has parameters.
 	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
-	AssertEqual(0.35,    TH["keys"]["caps_lock"]["time_activation_seconds"])
+	AssertFalse(TH["keys"]["caps_lock"].Has("time_activation_seconds"))
 }
 Test("LoadTapHoldToml overlay: user value wins on conflict", _TH_OverlayUserWinsOnConflict)
 
@@ -628,11 +630,11 @@ _TH_OverlayUserOnlyKeyPreserved() {
 	TH := LoadTapHoldToml(UserPath, DefPath)
 	_TH_Clean()
 	_TH_CleanDefaults()
-	AssertTrue(TH["keys"].Has("caps_lock"))
+	AssertFalse(TH["keys"].Has("caps_lock"))
 	AssertTrue(TH["keys"].Has("my_custom_key"))
 	AssertEqual("shift", TH["keys"]["my_custom_key"]["hold_modifier"])
 }
-Test("LoadTapHoldToml overlay: user-only key is preserved alongside defaults", _TH_OverlayUserOnlyKeyPreserved)
+Test("LoadTapHoldToml: user-only key survives without importing a preset", _TH_OverlayUserOnlyKeyPreserved)
 
 ; Omitting DefaultsFilePath still works (no regression on existing callers)
 _TH_OverlayBackwardCompatNoDefaults() {
@@ -869,7 +871,9 @@ _TH_UnknownHoldModifierKeepsTheTap() {
 			. 'hold_modifier = "' . (Source == "defaults" ? Unknown : "ctrl") . '"' . "`n"
 		UserText := Known
 		if (Source == "user")
-			UserText .= "[tap_hold.keys.caps_lock]`n" . 'hold_modifier = "' . Unknown . '"' . "`n"
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n" . 'hold_modifier = "' . Unknown . '"' . "`n"
+		else
+			UserText .= DefaultsText
 		DefaultsPath := _TH_WriteDefaults(DefaultsText)
 		Path := _TH_Write(UserText)
 		Captured := []

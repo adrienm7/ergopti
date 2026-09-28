@@ -10,6 +10,7 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"infra.logger",
+	"infra.manifest_reader",
 	"infra.notifications",
 	"infra.i18n",
 	"ui.menu.shortcut_utils",
@@ -128,7 +129,7 @@ local function build_fixture(backend, save_results, options)
 	end
 
 	package.loaded["infra.logger"] = {
-		debug = noop, info = noop, warn = noop, error = noop,
+		debug = noop, info = noop, warn = noop, error = noop, done = noop,
 		callback = function(_, _, callback, ...)
 			return xpcall(callback, debug.traceback, ...)
 		end,

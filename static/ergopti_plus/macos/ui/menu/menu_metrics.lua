@@ -30,6 +30,7 @@ local Hotkeys       = require("adapters.hotkey_registrar")
 local kl_mod        = require("modules.keylogger")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
+local Manifest      = require("infra.manifest_reader")
 local Logger        = require("infra.logger")
 
 local LOG = "menu_metrics"
@@ -56,8 +57,8 @@ M.DEFAULT_STATE = {
 	keylogger_private_filter_enabled     = kl_mod.DEFAULT_STATE.keylogger_private_filter_enabled,
 	keylogger_secure_filter_enabled      = kl_mod.DEFAULT_STATE.keylogger_secure_filter_enabled,
 	keylogger_system_auth_filter_enabled = kl_mod.DEFAULT_STATE.keylogger_system_auth_filter_enabled,
-	metrics_shortcut                 = false,
-	apps_time_shortcut               = false,
+	metrics_shortcut                 = Manifest.default_for("metrics.shortcut"),
+	apps_time_shortcut               = Manifest.default_for("metrics.apps_shortcut"),
 }
 
 

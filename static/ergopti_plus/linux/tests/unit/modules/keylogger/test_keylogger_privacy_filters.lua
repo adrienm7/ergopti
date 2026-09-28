@@ -42,11 +42,12 @@ local _previous_storage = package.loaded["adapters.storage"]
 local _previous_keylogger = package.loaded["modules.keylogger.keylogger"]
 
 --- Reloads the keylogger with fresh module state.
-local function fresh_keylogger()
+local function fresh_keylogger(neutral)
 	package.loaded["adapters.storage"] = Fakes.storage()
 	package.loaded["modules.keylogger.keylogger"] = nil
 	local kl = require("modules.keylogger.keylogger")
 	kl.init({})
+	if not neutral then helpers.assert_true(kl.set_enabled(true)) end
 	return kl
 end
 
@@ -88,7 +89,7 @@ end
 helpers.describe("keylogger privacy — the posture is read, not re-typed", function()
 	helpers.it("exposes every flag the shared manifest declares", function()
 		local Manifest = require("infra.manifest_reader")
-		local kl = fresh_keylogger()
+		local kl = fresh_keylogger(true)
 		local state = kl.get_privacy_state()
 
 		local pairs_to_check = {
@@ -143,12 +144,12 @@ helpers.describe("keylogger privacy — the off switch", function()
 			"re-enabling must resume collection")
 	end)
 
-	helpers.it("records normally by default", function()
+	helpers.it("records normally after explicit consent", function()
 		-- Without this the two tests above pass on a keylogger that records
 		-- nothing at all, which is not the behaviour being tested.
 		local kl = fresh_keylogger()
 		helpers.assert_true(keystrokes_after_typing(kl, "gedit") > 0,
-			"the default posture must still collect")
+			"the explicitly enabled collector must collect")
 	end)
 end)
 

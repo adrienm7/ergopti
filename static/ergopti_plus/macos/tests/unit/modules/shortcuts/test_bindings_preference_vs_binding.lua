@@ -65,7 +65,7 @@ end
 helpers.describe("shortcut bindings: preference survives every release edge (shortcut-preference-vs-binding)", function()
 	for _, edge in ipairs({ "pause", "stop", "pause_hotkeys_only" }) do
 		helpers.it("keeps every preference through " .. edge, function()
-			Fixture.with_bindings(function(bindings, ctx)
+			Fixture.with_recommended_bindings(function(bindings, ctx)
 				helpers.assert_eq(bindings.start(), true)
 				helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 				local function wanted(id) return id ~= DISABLED_ID end
@@ -93,7 +93,7 @@ end)
 
 helpers.describe("shortcut bindings: paused preference edits (shortcut-preference-vs-binding)", function()
 	helpers.it("records an enable while paused, binds nothing, and binds it on resume", function()
-		Fixture.with_bindings(function(bindings, ctx)
+		Fixture.with_recommended_bindings(function(bindings, ctx)
 			helpers.assert_eq(bindings.start(), true)
 			helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 			helpers.assert_eq(bindings.pause(), true)
@@ -115,7 +115,7 @@ helpers.describe("shortcut bindings: paused preference edits (shortcut-preferenc
 	end)
 
 	helpers.it("keeps a shortcut disabled while paused unbound after resume", function()
-		Fixture.with_bindings(function(bindings)
+		Fixture.with_recommended_bindings(function(bindings)
 			helpers.assert_eq(bindings.start(), true)
 			helpers.assert_eq(bindings.pause(), true)
 			helpers.assert_eq(bindings.disable(DISABLED_ID), true)
@@ -139,7 +139,7 @@ end)
 
 helpers.describe("shortcut bindings: a refused enable keeps the preference (shortcut-preference-vs-binding)", function()
 	helpers.it("keeps a disabled preference disabled", function()
-		Fixture.with_bindings(function(bindings, ctx)
+		Fixture.with_recommended_bindings(function(bindings, ctx)
 			helpers.assert_eq(bindings.start(), true)
 			helpers.assert_eq(bindings.disable("cmd_star"), true)
 			ctx.refuse.cmd_star = true
@@ -150,7 +150,7 @@ helpers.describe("shortcut bindings: a refused enable keeps the preference (shor
 	end)
 
 	helpers.it("keeps an enabled preference enabled", function()
-		Fixture.with_bindings(function(bindings, ctx)
+		Fixture.with_recommended_bindings(function(bindings, ctx)
 			ctx.refuse.cmd_star = true
 			helpers.assert_eq(bindings.enable("cmd_star"), false)
 			helpers.assert_eq(bindings.is_enabled("cmd_star"), true,
@@ -160,7 +160,7 @@ helpers.describe("shortcut bindings: a refused enable keeps the preference (shor
 	end)
 
 	helpers.it("refuses an unknown id without inventing a preference", function()
-		Fixture.with_bindings(function(bindings)
+		Fixture.with_recommended_bindings(function(bindings)
 			helpers.assert_eq(bindings.pause(), true)
 			helpers.assert_eq(bindings.enable("no_such_shortcut_id"), false)
 			helpers.assert_eq(bindings.is_enabled("no_such_shortcut_id"), false)

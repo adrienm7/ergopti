@@ -174,8 +174,11 @@ return function(run)
 					return calls.save_succeeds
 				end,
 				build_default_state = function()
+					error("restoration must select the recommended preset explicitly")
+				end,
+				build_recommended_state = function()
 					return {
-						enabled = true,
+						tap_holds_enabled = true,
 						tap_hold_config = {},
 						mod_combos_config = {},
 						tap_hold_timeout_ms = 200,

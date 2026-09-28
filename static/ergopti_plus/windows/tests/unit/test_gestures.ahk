@@ -20,16 +20,10 @@
 
 TestGestures_DefaultAssignments() {
     AssertTrue(GestureAssignments.Has("tap_3"), "tap_3 should exist")
-    AssertEqual("left_click_toggle", GestureAssignments["tap_3"], "tap_3 default")
-    AssertEqual("tab_new", GestureAssignments["swipe_3_up"], "swipe_3_up default")
-    AssertEqual("tab_close", GestureAssignments["swipe_3_down"], "swipe_3_down default")
-    AssertEqual("tab_prev", GestureAssignments["swipe_3_left"], "swipe_3_left default")
-    AssertEqual("tab_next", GestureAssignments["swipe_3_right"], "swipe_3_right default")
-    AssertEqual("screenshot_window_clipboard", GestureAssignments["tap_4"], "tap_4 default")
-    AssertEqual("win_app_next", GestureAssignments["swipe_4_up"], "swipe_4_up default")
-    AssertEqual("win_app_prev", GestureAssignments["swipe_4_down"], "swipe_4_down default")
-    AssertEqual("desktop_prev", GestureAssignments["swipe_4_left"], "swipe_4_left default")
-    AssertEqual("desktop_next", GestureAssignments["swipe_4_right"], "swipe_4_right default")
+    for Slot in GESTURE_SLOTS {
+        AssertTrue(GestureAssignments.Has(Slot), "every declared gesture must have a default")
+        AssertEqual("none", GestureAssignments[Slot], Slot . " starts neutral")
+    }
 }
 Test("Gestures: default assignments are populated", TestGestures_DefaultAssignments)
 

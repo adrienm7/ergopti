@@ -153,6 +153,162 @@ ManifestFindEntryByPath(V2Path) {
 	return _MANIFEST_PATH_INDEX.Has(V2Path) ? _MANIFEST_PATH_INDEX[V2Path] : false
 }
 
+; Detached values keep mutable runtime state from changing neutral absence.
+ManifestCloneValue(Value) {
+	if Value is Map {
+		Copy := Map()
+		for Key, Child in Value
+			Copy[Key] := ManifestCloneValue(Child)
+		return Copy
+	}
+	if Value is Array {
+		Copy := []
+		for Child in Value
+			Copy.Push(ManifestCloneValue(Child))
+		return Copy
+	}
+	return Value
+}
+
+; Resolve a whole feature or one of its typed child values.
+ManifestValueFor(V2Path, Field) {
+	if !ManifestEnsureLoaded()
+		throw Error("Configuration manifest is unavailable.")
+	Prefix := V2Path
+	Suffix := []
+	while !(Entry := ManifestFindEntryByPath(Prefix)) {
+		Dot := InStr(Prefix, ".", true, -1)
+		if !Dot {
+			Dynamic := ManifestDynamicEntry(V2Path)
+			if Dynamic is Map
+				return ManifestCloneValue(Dynamic[Field])
+			throw Error("Unknown configuration path: " . V2Path)
+		}
+		Suffix.InsertAt(1, SubStr(Prefix, Dot + 1))
+		Prefix := SubStr(Prefix, 1, Dot - 1)
+	}
+	Value := Entry[Field]
+	for Key in Suffix {
+		if !(Value is Map) || !Value.Has(Key)
+			throw Error("Unknown configuration path: " . V2Path)
+		Value := Value[Key]
+	}
+	return ManifestCloneValue(Value)
+}
+
+; Dynamic user-authored sections have a declared neutral leaf shape.
+ManifestDynamicEntry(V2Path) {
+	global FEATURES_MANIFEST
+	for _, Scope in FEATURES_MANIFEST["scopes"] {
+		for Definition in Scope.Get("dynamic_defaults", []) {
+			Prefix := Definition["prefix"] . "."
+			if SubStr(V2Path, 1, StrLen(Prefix)) != Prefix
+				continue
+			Tail := SubStr(V2Path, StrLen(Prefix) + 1)
+			Parts := StrSplit(Tail, ".")
+			if Parts.Length != Definition["depth"] || InStr(Tail, "..") || SubStr(Tail, -1) == "."
+				continue
+			if Definition.Has("suffix") && Parts[-1] != Definition["suffix"]
+				continue
+			return Definition
+		}
+	}
+	return false
+}
+
+; The neutral value is the sole interpretation of an absent setting.
+ManifestDefaultFor(V2Path) => ManifestValueFor(V2Path, "default")
+
+; Recommendations are imported only by an explicit configuration action.
+ManifestRecommendedFor(V2Path) => ManifestValueFor(V2Path, "recommended")
+
+; Compare typed nested values before deciding whether a key belongs on disk.
+ManifestValuesEqual(Left, Right) {
+	if Type(Left) != Type(Right)
+		return false
+	if Left is Map || Left is Array {
+		if (Left is Map ? Left.Count : Left.Length) != (Right is Map ? Right.Count : Right.Length)
+			return false
+		for Key, Value in Left {
+			if !Right.Has(Key) || !ManifestValuesEqual(Value, Right[Key])
+				return false
+		}
+		return true
+	}
+	return Left == Right
+}
+
+; Create one native TOML batch row with explicit deletion intent.
+ManifestConfigRow(V2Path, Value := unset, Delete := false) {
+	Dot := InStr(V2Path, ".", true, -1)
+	if !Dot
+		throw Error("Configuration paths require a section and key.")
+	Row := { Section: SubStr(V2Path, 1, Dot - 1), Key: SubStr(V2Path, Dot + 1) }
+	if Delete
+		Row.Delete := 1
+	else
+		Row.Value := ManifestCloneValue(Value)
+	return Row
+}
+
+; Persist only desired differences from the neutral baseline.
+ManifestSparseOperation(V2Path, Value) {
+	return ManifestConfigRow(V2Path, Value, ManifestValuesEqual(Value, ManifestDefaultFor(V2Path)))
+}
+
+; Match complete path segments, never adjacent names with a common prefix.
+ManifestPathBelongs(Path, Prefix) {
+	return Path == Prefix || SubStr(Path, 1, StrLen(Prefix) + 1) == Prefix . "."
+}
+
+; Collect a scope and its named children while rejecting registry cycles.
+ManifestCollectScope(ScopeId, Prefixes, Excluded, Visiting) {
+	global FEATURES_MANIFEST
+	Scopes := FEATURES_MANIFEST["scopes"]
+	if !Scopes.Has(ScopeId) || Visiting.Has(ScopeId)
+		throw Error("Unknown or cyclic configuration scope: " . ScopeId)
+	Visiting[ScopeId] := true
+	Scope := Scopes[ScopeId]
+	for Prefix in Scope["prefixes"]
+		Prefixes.Push(Prefix)
+	for Path in Scope["restore_exclude"]
+		Excluded.Push(Path)
+	for Child in Scope.Get("includes", [])
+		ManifestCollectScope(Child, Prefixes, Excluded, Visiting)
+	Visiting.Delete(ScopeId)
+}
+
+; Produce canonical rows for a selected preset or clear operation.
+ManifestScopeOperations(ScopeId, Mode) {
+	if !ManifestEnsureLoaded() || !(Mode == "recommended" || Mode == "clear")
+		throw Error("Invalid configuration scope operation.")
+	Prefixes := [], Excluded := [], Rows := []
+	ManifestCollectScope(ScopeId, Prefixes, Excluded, Map())
+	for Entry in ManifestFeatures() {
+		Selected := false
+		for Prefix in Prefixes
+			Selected := Selected || ManifestPathBelongs(Entry["path"], Prefix)
+		if !Selected
+			continue
+		Values := Map(Entry["path"], Entry["recommended"])
+		if Entry["type"] == "feature" {
+			Values := Map()
+			for Key, Value in Entry["recommended"]
+				Values[Entry["path"] . "." . Key] := Value
+		}
+		for Path, Value in Values {
+			Skip := false
+			if Mode == "recommended" {
+				for Prefix in Excluded
+					Skip := Skip || ManifestPathBelongs(Path, Prefix)
+			}
+			if !Skip
+				Rows.Push(ManifestConfigRow(Path, Value, Mode == "clear"))
+		}
+	}
+	return Rows
+}
+
 
 
 
@@ -205,7 +361,7 @@ ManifestBuildFeaturesMap() {
 
 		; Insert the feature value at its id. Default may be a primitive or a
 		; nested Map — both are stored as-is for downstream consumption.
-		Cursor[Entry["id"]] := Entry["default"]
+		Cursor[Entry["id"]] := ManifestCloneValue(Entry["default"])
 	}
 
 	return FeaturesMap

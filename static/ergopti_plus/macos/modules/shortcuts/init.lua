@@ -20,6 +20,7 @@ local GestureActions    = require("modules.gestures.actions")
 local HotkeyRegistrar   = require("adapters.hotkey_registrar")
 local StartupTransaction = require("infra.startup_transaction")
 local Logger             = require("infra.logger")
+local Manifest           = require("infra.manifest_reader")
 
 local M = {}
 
@@ -103,9 +104,13 @@ end)
 -- ================================
 
 M.DEFAULT_STATE = {
-	shortcuts                = true,
-	script_control_enabled   = true,
-	script_control_shortcuts = { return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit" },
+	shortcuts                = Manifest.default_for("shortcuts.enabled"),
+	script_control_enabled   = Manifest.default_for("shortcuts.script_control.enabled"),
+	script_control_shortcuts = {
+		return_key = Manifest.default_for("shortcuts.script_control.return_key"),
+		backspace = Manifest.default_for("shortcuts.script_control.backspace"),
+		escape = Manifest.default_for("shortcuts.script_control.escape"),
+	},
 	chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,
 }
 

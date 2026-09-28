@@ -29,9 +29,21 @@ function build(config = evidenceConfig) {
 
 const rows = build();
 const summary = summarize(rows);
-assert.strictEqual(summary.total, 334, 'the canonical Linux projection must classify all 334 features');
+const canonical = fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', '_shared',
+	'modules', 'features', 'manifest.toml'), 'utf8');
+const declaredCount = [...canonical.matchAll(/^\[\[features\.[^\]]+\]\]$/gm)].length;
+assert.ok(declaredCount >= 326, 'canonical registry must retain its audited feature coverage');
+assert.strictEqual(summary.total, declaredCount, 'the Linux projection must classify every canonical feature');
 assert.ok(summary.claimed_supported >= 126, 'supported feature count may only increase from the audited 126');
-assert.ok(summary.unavailable <= 198, 'unavailable feature count may only decrease from the audited 198');
+const provenPaths = new Set([
+	...Object.values(evidenceConfig.evidence_groups).flatMap((group) => group.members),
+	...Object.keys(evidenceConfig.overrides),
+]);
+assert.ok(provenPaths.size >= 126, 'the audited supported paths must retain explicit evidence');
+for (const featurePath of provenPaths) {
+	assert.strictEqual(rows.find((row) => row.path === featurePath)?.status, 'claimed_supported',
+		`adding platform-specific defaults must not remove Linux support for ${featurePath}`);
+}
 // Only macOS draws a menubar icon whose variant the user picks.
 const menubarIcon = rows.find((row) => row.path === 'ui.menubar_icon');
 assert.ok(menubarIcon && menubarIcon.status === 'unavailable'

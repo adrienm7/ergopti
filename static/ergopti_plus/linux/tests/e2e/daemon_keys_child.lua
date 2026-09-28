@@ -86,7 +86,13 @@ end
 
 local callbacks = {}
 local hook = require("adapters.keyboard_hook")
-hook.start = function(options) callbacks = options end
+hook.start = function(options)
+	callbacks = options
+	if CONFIG:match("[/\\]daemon_keys%.toml$") then
+		local config = require("modules.hotstrings.hotstrings_config")
+		assert(config.set_all_sections("daemon_keys", true), "the scripted catalogue must be explicitly selected")
+	end
+end
 hook.isRunning = function() return true end
 hook.get_mode = function() return "scripted" end
 hook.held_text_modifier_codes = function() return {} end

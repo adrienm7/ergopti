@@ -279,6 +279,7 @@ helpers.describe("wpm readouts: the live speed", function()
 
 	helpers.it("is fed by the Linux keylogger's typing, expansions and completions", function()
 		local keylogger = helpers.load_module("modules.keylogger.keylogger")
+		require("tests.support.metrics_consent_fixture").enable(keylogger)
 		keylogger.reset_session()
 		for index = 0, 29 do keylogger.on_keydown("a", 1000 + index * 150, "app", 30) end
 		keylogger.record_hotstring("app", "adn", "au début", 5600, "magickey", 3, false)

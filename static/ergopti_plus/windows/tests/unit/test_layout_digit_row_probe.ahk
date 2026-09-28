@@ -205,9 +205,9 @@ _LDRP_SwitchingLayoutsNeverReloadsUnderTheDefaults() {
 		Pending: IsSet(_PENDING_KEYBOARD_HKL) ? _PENDING_KEYBOARD_HKL : 0,
 		Remap: IsSet(_LAYOUT_REMAP_HKL) ? _LAYOUT_REMAP_HKL : 0, Retry: _LayoutPollRetry }
 	SavedDigits := _LDRP_SetLayoutFeature("direct_access_digits",
-		ManifestFindEntryByPath("layout.direct_access_digits")["default"])
+		ManifestRecommendedFor("layout.direct_access_digits"))
 	SavedEmulated := _LDRP_SetLayoutFeature("ergopti_base",
-		ManifestFindEntryByPath("layout.ergopti_base")["default"])
+		ManifestRecommendedFor("layout.ergopti_base"))
 	Reloads := []
 	Port := Map(
 		"needs_reload", LayoutRemapNeedsReload,
@@ -236,7 +236,7 @@ _LDRP_SwitchingLayoutsNeverReloadsUnderTheDefaults() {
 		_LayoutPollRetry := Saved.Retry
 	}
 }
-Test("digit row: under the shipped defaults no switch between real layouts reloads, both ways (digit-row-live-2026-09-27)",
+Test("digit row: under the explicitly selected preset no switch between real layouts reloads, both ways (digit-row-live-2026-09-27)",
 	_LDRP_SwitchingLayoutsNeverReloadsUnderTheDefaults)
 
 ; modules/keymap/layout.ahk registers the swap at load, so the harness cannot

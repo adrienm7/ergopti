@@ -33,6 +33,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local restore_family_preferences = require("tests.support.dynamic_hotstrings_fixture").install()
 
 local Prefix = helpers.load_module("modules.dynamic_hotstrings.prefix_rules")
 
@@ -193,6 +194,7 @@ helpers.describe("prefix expansions: the switches", function()
 	helpers.it("takes a switched-off family out of the category's count", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local storage = Fakes.storage({})
+		local previous_storage = package.loaded["adapters.storage"]
 		package.loaded["adapters.storage"] = storage
 
 		local path = os.tmpname()
@@ -204,12 +206,13 @@ helpers.describe("prefix expansions: the switches", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 		dh.init({ trigger_char = "\\", personal_info_path = path })
 		dh.set_enabled(true)
+		require("tests.support.dynamic_hotstrings_fixture").prefer_families(dh)
 
 		local before = dh.active_count()
 		dh.set_rule_enabled("phoneprefixes", false)
 		local after = dh.active_count()
 
-		package.loaded["adapters.storage"] = nil
+		package.loaded["adapters.storage"] = previous_storage
 		os.remove(path)
 
 		helpers.assert_true(before > after,
@@ -255,6 +258,9 @@ helpers.describe("prefix expansions: reaching the engine", function()
 			load_mappings = function(_, mappings) given = mappings end,
 		}
 		config.init(fake_engine, nil, nil)
+		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
+			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
+		end
 		config.set_extra_mappings_provider(provider)
 		config.load_all()
 		config.set_extra_mappings_provider(nil)
@@ -292,6 +298,9 @@ helpers.describe("prefix expansions: reaching the engine", function()
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local given = nil
 		config.init({ load_mappings = function(_, mappings) given = mappings end }, nil, nil)
+		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
+			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
+		end
 		config.set_extra_mappings_provider(function()
 			return { { trigger = "0750", replacement = "0750399576",
 				group = "dynamichotstrings", section = "phoneprefixes", auto_expand = true } }
@@ -311,3 +320,5 @@ helpers.describe("prefix expansions: reaching the engine", function()
 	end)
 
 end)
+
+restore_family_preferences()

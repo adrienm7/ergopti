@@ -35,9 +35,9 @@ local input_sources = require("modules.keymap.input_sources")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
-	layout_pause_switch_enabled = false,
-	layout_on_pause             = false,
-	layout_on_resume            = false,
+	layout_pause_switch_enabled = Manifest.default_for("layout.pause_switch_enabled"),
+	layout_on_pause             = Manifest.default_for("layout.on_pause"),
+	layout_on_resume            = Manifest.default_for("layout.on_resume"),
 	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
 	menubar_icon                = Manifest.default_for("ui.menubar_icon"),
 }

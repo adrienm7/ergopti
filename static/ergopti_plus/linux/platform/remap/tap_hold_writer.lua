@@ -27,6 +27,7 @@ local Logger = require("logger.shim")
 local TomlCodec = require("toml_codec")
 local BasicString = require("toml_codec.basic_string")
 local Engine = require("platform.remap.tap_hold_engine")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "platform.remap.tap_hold_writer"
 
@@ -313,22 +314,25 @@ function M.disable_all()
 	end)
 end
 
---- « Reset to defaults »: the user's file goes, every key is the shared default.
+--- Restores the shared preset while retaining fields outside the writer's ownership.
 --- @return boolean
 function M.reset_all()
-	if not _path then
-		Logger.error(LOG, "Tap-hold writer used before init() — reset not done.")
-		return false
-	end
-	local ok, err = os.remove(_path)
-	local probe = io.open(_path, "r")
-	if probe then
-		probe:close()
-		Logger.error(LOG, "Cannot remove '%s' (%s) — the tap-holds were not reset.", _path, tostring(err))
-		return false
-	end
-	Logger.info(LOG, "Tap-hold overrides %s — every key is the shared default.", ok and "removed" or "absent")
-	return _reload()
+	return commit("restore shared preset", function(document)
+		local tap_hold = section(document)
+		tap_hold.enabled = Manifest.recommended_for("tap_holds.enabled")
+		tap_hold.inherit_defaults = true
+		if type(tap_hold.keys) ~= "table" then return end
+		for key_id in pairs(Engine.KEY_CODES) do
+			local entry = tap_hold.keys[key_id]
+			if type(entry) == "table" then
+				for _, field in ipairs({ "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }) do
+					entry[field] = nil
+				end
+				if next(entry) == nil then tap_hold.keys[key_id] = nil end
+			end
+		end
+		if next(tap_hold.keys) == nil then tap_hold.keys = nil end
+	end)
 end
 
 --- Whether the user's file names this key.

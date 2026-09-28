@@ -187,8 +187,8 @@ TestFMv2_LayoutDefaults() {
 	AssertTrue(Built["layout"].Has("direct_access_digits"))
 	AssertTrue(Built["layout"].Has("ergopti_alt_gr"))
 	AssertTrue(Built["layout"].Has("ergopti_plus"))
-	AssertEqual(true, Built["layout"]["ergopti_base"])
-	AssertEqual(true, Built["layout"]["ergopti_plus"])
+	AssertEqual(false, Built["layout"]["ergopti_base"])
+	AssertEqual(false, Built["layout"]["ergopti_plus"])
 }
 Test("ManifestBuildFeaturesMap: layout features are plain booleans (no .enabled wrapper)",
 	TestFMv2_LayoutDefaults)
@@ -315,7 +315,7 @@ TestFMv2_ShortcutsAccentedAGrave() {
 	AssertTrue(Built["shortcuts"].Has("a_grave"))
 	Entry := Built["shortcuts"]["a_grave"]
 	AssertEqual("Map", Type(Entry))
-	AssertEqual(true, Entry["enabled"])
+	AssertEqual(false, Entry["enabled"])
 	AssertEqual("v", Entry["letter"])
 }
 Test("ManifestBuildFeaturesMap: accented shortcuts carry enabled + letter sub-keys",
@@ -325,7 +325,7 @@ TestFMv2_ShortcutsTakeNote() {
 	Built := ManifestBuildFeaturesMap()
 	Entry := Built["shortcuts"]["take_note"]
 	AssertEqual("Map", Type(Entry))
-	AssertEqual(true, Entry["enabled"])
+	AssertEqual(false, Entry["enabled"])
 	AssertEqual(false, Entry["dated_notes"])
 	AssertEqual("D:\Bureau", Entry["destination_folder"])
 }
@@ -336,7 +336,7 @@ TestFMv2_AhkShortcutsSubsections() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built["shortcuts"].Has("alt_gr_caps_lock"))
 	AssertTrue(Built["shortcuts"]["alt_gr_caps_lock"].Has("ctrl_delete"))
-	AssertEqual(true, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
+	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
 	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["backspace"])
 	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["caps_lock"])
 }
@@ -346,9 +346,9 @@ Test("ManifestBuildFeaturesMap: nested ahk.shortcuts.* sub-Maps preserve their d
 TestFMv2_GesturesStrippedFromAhk() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built.Has("gestures"))
-	AssertEqual(true, Built["gestures"]["enabled"])
-	AssertEqual("tab_close", Built["gestures"]["swipe_3_down"])
-	AssertEqual("left_click_toggle", Built["gestures"]["tap_3"])
+	AssertEqual(false, Built["gestures"]["enabled"])
+	AssertEqual("none", Built["gestures"]["swipe_3_down"])
+	AssertEqual("none", Built["gestures"]["tap_3"])
 }
 Test("ManifestBuildFeaturesMap: ahk.gestures lands at Features[gestures] with action defaults",
 	TestFMv2_GesturesStrippedFromAhk)
@@ -423,7 +423,7 @@ TestFMv2_RejectsScalarTypeConfusion() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"wrongly typed scalars must never replace manifest-owned values")
-		AssertEqual(true, Features["layout"]["ergopti_base"],
+		AssertEqual(false, Features["layout"]["ergopti_base"],
 			"the string 'false' must not become a truthy boolean feature")
 		AssertEqual("fr", Features["script"]["locale"])
 		AssertEqual("INFO", Features["script"]["log_level"])
@@ -465,7 +465,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 		AssertEqual(0, Applied,
 			"TOML booleans and integers must retain their source types")
 		AssertEqual(LayoutDefault, Features["layout"]["ergopti_base"])
-		AssertEqual("auto", Features["script"]["alt_gr_is_kana_remap"])
+		AssertEqual(false, Features["script"]["alt_gr_is_kana_remap"])
 		AssertEqual(ContextDefault,
 			Features["llm"]["generation"]["context_length"])
 		AssertEqual(DelayDefault,
@@ -621,11 +621,11 @@ TestFMv2_DriverNamespacedSectionIsRejected() {
 	Captured := []
 	try {
 		Path := _FM_WriteFixture("ahk_layout",
-			"[ahk.layout]`r`nergopti_base = false`r`n")
+			"[ahk.layout]`r`nergopti_base = true`r`n")
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied, "a driver-namespaced section must apply nothing")
-		AssertEqual(true, Features["layout"]["ergopti_base"],
+		AssertEqual(false, Features["layout"]["ergopti_base"],
 			"the manifest default must survive an [ahk.layout] section")
 		Joined := ""
 		for Line in Captured

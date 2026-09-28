@@ -103,7 +103,7 @@ end
 
 helpers.describe("menu_shortcuts: row checkmarks show the preference (shortcut-preference-vs-binding)", function()
 	helpers.it("keeps the checkmarks while the Shortcuts layer is off", function()
-		Fixture.with_bindings(function(bindings)
+		Fixture.with_recommended_bindings(function(bindings)
 			helpers.assert_eq(bindings.start(), true)
 			helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 			assert_checkmarks(bindings, build_ctrl_rows(bindings, true), "running")

@@ -78,7 +78,10 @@ local function fresh_runtime(effects)
 	package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
 	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
 
-	return helpers.load_with_stubs("modules.keymap")
+	local keymap = helpers.load_with_stubs("modules.keymap")
+	keymap.set_preview_enabled(true)
+	keymap.set_preview_star_enabled(true)
+	return keymap
 end
 
 helpers.describe("keymap semantic mutations wait for native preview revocation", function()

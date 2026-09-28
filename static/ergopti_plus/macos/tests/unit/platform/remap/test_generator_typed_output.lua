@@ -124,7 +124,7 @@ helpers.with_fresh_modules({
 	--- @param symmetric boolean|nil Symmetric chord mode; nil keeps the default.
 	--- @return table rules The generated complex_modifications rules.
 	local function build(tap_holds, mod_combos, symmetric)
-		local state = Config.build_default_state(keys, combos)
+		local state = Config.build_recommended_state(keys, combos)
 		for id, slots in pairs(tap_holds or {}) do state.tap_hold_config[id] = copy(slots) end
 		for id, slots in pairs(mod_combos or {}) do state.mod_combos_config[id] = copy(slots) end
 		if symmetric ~= nil then state.combo_symmetric = symmetric end
@@ -772,7 +772,7 @@ helpers.with_fresh_modules({
 		helpers.it("the shipped defaults emit no chord the hold-then-tap rule already types (redundant-chord-skipped)", function()
 			-- A chord whose action is its combo's tap slot adds nothing when its first
 			-- key has a hold, but makes that key wait for a partner on every press.
-			local state = Config.build_default_state(keys, combos)
+			local state = Config.build_recommended_state(keys, combos)
 			local hold_of = {}
 			for _, key_def in ipairs(keys) do
 				hold_of[key_def.from.key_code] = (state.tap_hold_config[key_def.id] or {}).hold or "none"

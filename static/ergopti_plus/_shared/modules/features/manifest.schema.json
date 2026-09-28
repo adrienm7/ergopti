@@ -5,15 +5,46 @@
 	"description": "JSON Schema for _shared/modules/features/manifest.toml — the single source of truth that drives first-boot config generation and tray-menu rendering in both drivers.",
 	"type": "object",
 	"additionalProperties": false,
-	"required": ["manifest", "sections", "features"],
+	"required": ["manifest", "sections", "features", "scopes"],
 
 	"properties": {
 		"manifest": { "$ref": "#/$defs/manifest_meta" },
 		"sections": { "$ref": "#/$defs/sections_root" },
-		"features": { "$ref": "#/$defs/features_root" }
+		"features": { "$ref": "#/$defs/features_root" },
+		"scopes": {
+			"type": "object",
+			"required": ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics", "global"],
+			"additionalProperties": { "$ref": "#/$defs/configuration_scope" }
+		}
 	},
 
 	"$defs": {
+		"configuration_scope": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["prefixes", "restore_exclude"],
+			"properties": {
+				"prefixes": { "type": "array", "items": { "type": "string" } },
+				"restore_exclude": { "type": "array", "items": { "type": "string" } },
+				"includes": { "type": "array", "items": { "type": "string" } },
+				"preset": { "type": "string" },
+				"dynamic_defaults": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["prefix", "depth", "default", "recommended"],
+						"properties": {
+							"prefix": { "type": "string" },
+							"depth": { "type": "integer", "minimum": 1 },
+							"suffix": { "type": "string" },
+							"default": { "type": ["boolean", "number", "string"] },
+							"recommended": { "type": ["boolean", "number", "string"] }
+						}
+					}
+				}
+			}
+		},
 		"manifest_meta": {
 			"type": "object",
 			"additionalProperties": false,
@@ -72,7 +103,7 @@
 		"feature_entry": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["id", "description_key"],
+			"required": ["id", "description_key", "input_altering"],
 			"properties": {
 				"id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
 				"default": {
@@ -88,6 +119,15 @@
 					},
 					"description": "Per-platform default value. Use only when the default legitimately differs per driver."
 				},
+				"recommended": {
+					"description": "Explicit Ergopti preset; never an implicit absence default."
+				},
+				"recommended_per_platform": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": { "ahk": {}, "hs": {}, "linux": {} }
+				},
+				"input_altering": { "type": "boolean" },
 				"type": {
 					"enum": ["boolean", "enum", "string", "number", "array", "action", "feature"]
 				},
@@ -117,6 +157,7 @@
 			"oneOf": [{ "required": ["default"] }, { "required": ["default_per_platform"] }],
 
 			"allOf": [
+				{ "oneOf": [{ "required": ["recommended"] }, { "required": ["recommended_per_platform"] }] },
 				{
 					"if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
 					"then": { "required": ["enum_values"] }
