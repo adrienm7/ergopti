@@ -148,7 +148,7 @@ function M.settings()
 	if not layouts then return nil, layouts_err end
 	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
 	if not updater then return nil, updater_err end
-	return Registry.resolve(layouts, updater)
+	return Registry.resolve(layouts, updater, require("modules.updater.manager").installed_channel())
 end
 
 --- The first candidate path that exists under the driver root.
@@ -226,6 +226,7 @@ end
 --- @param settings table Result of M.settings().
 --- @return table
 local function default_deps(settings)
+	local Version = require("infra.version")
 	local local_dir = ConfigPaths.config(settings.local_folder) .. "/"
 	local driver_root = Paths.driver_root()
 	-- curl records the response ETag in this file (--etag-save); the transport
@@ -233,6 +234,7 @@ local function default_deps(settings)
 	local etag_capture = local_dir .. ".index.etag.download"
 	return {
 		settings = settings,
+		local_source = Version.SOURCE == Version.SOURCE_LOCAL,
 		transport = {
 			get = function(url, headers, timeout_ms, callback)
 				local is_index = url:sub(-#settings.index_file) == settings.index_file
@@ -309,11 +311,11 @@ local function write_file(deps, path, content)
 	return true, nil
 end
 
---- The index shipped with the package, decoded once.
+--- The shipped index, reread for source checkouts so Refresh sees local edits.
 --- @param deps table
 --- @return table|nil
 local function bundled_index(deps)
-	if _bundled_index_read then return _bundled_index end
+	if _bundled_index_read and not deps.local_source then return _bundled_index end
 	_bundled_index_read = true
 	if type(deps.bundled_dir) ~= "string" then
 		Logger.warn(LOG, "No layout registry is shipped with this driver; offline installation is unavailable.")
@@ -485,6 +487,7 @@ function M.refresh(on_done, deps)
 	deps = resolved
 	Logger.start(LOG, "Refreshing the layout catalogue…")
 	Catalogue.refresh(deps.settings, {
+		local_source = deps.local_source,
 		read_cache = function()
 			local index_path = deps.local_dir .. deps.settings.index_file
 			if not deps.exists(index_path) then return nil end

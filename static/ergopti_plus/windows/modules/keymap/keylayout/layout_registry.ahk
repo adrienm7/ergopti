@@ -136,7 +136,7 @@ LayoutRegistry_RawUrl(RelativePath) {
 	Settings := LayoutRegistry_Settings()
 	Url := Settings["raw_url_template"]
 	for Name, Value in Map("owner", _LayoutRegistryGithub["owner"], "repo", _LayoutRegistryGithub["repo"],
-		"branch", Settings["branch"], "folder", Settings["folder"], "path", RelativePath)
+		"branch", _Updater_InstalledChannel(), "folder", Settings["folder"], "path", RelativePath)
 		Url := StrReplace(Url, "{" . Name . "}", Value)
 	return Url
 }

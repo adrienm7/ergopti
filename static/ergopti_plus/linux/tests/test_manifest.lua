@@ -209,6 +209,7 @@ return {
 	"tests.unit.modules.keylogger.test_window_titles",
 	"tests.unit.modules.keymap.test_layout_catalogue",
 	"tests.unit.modules.keymap.test_layout_registry",
+	"tests.unit.modules.keymap.test_layout_registry_channel",
 	"tests.unit.modules.llm.test_llm_settings",
 	"tests.unit.modules.llm.test_prediction_messages",
 	"tests.unit.modules.llm.test_parser_spacing",
