@@ -666,10 +666,10 @@ end
 --- The selected backend: "ollama" or "api".
 --- @return string
 function M.get_backend()
-	local ok, Storage = pcall(require, "adapters.storage")
-	local value = ok and Storage.get(BACKEND_KEY, nil) or nil
-	if BACKENDS[value] then return value end
-	return require("infra.manifest_reader").default_for(BACKEND_KEY)
+	local value = require("infra.llm_preferences").get(BACKEND_KEY)
+	if value == nil then value = require("infra.manifest_reader").default_for(BACKEND_KEY) end
+	assert(BACKENDS[value], "invalid configured prediction backend")
+	return value
 end
 
 --- Selects the backend.
@@ -678,9 +678,7 @@ end
 function M.set_backend(kind)
 	if not BACKENDS[kind] then return false end
 	M.dismiss()
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok then return false end
-	Storage.set(BACKEND_KEY, kind)
+	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
 	return true
 end

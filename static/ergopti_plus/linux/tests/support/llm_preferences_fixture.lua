@@ -9,12 +9,43 @@ local Fakes = require("tests.fakes")
 --- @param options table|nil Initial values and refused-write switch.
 --- @return table preferences
 function M.new(options)
+	options = options or {}
 	local port = Fakes.storage(options)
 	local write, remove = port.set, port.delete
+	local revision = 0
+	function port.get_many(paths)
+		local values = {}
+		for _, path in ipairs(paths) do
+			local value = port.get(path)
+			if value == nil then value = Manifest.default_for(path) end
+			values[path] = value
+		end
+		return values, { status = "ok", content = tostring(revision) }
+	end
 	function port.set(path, value)
 		local operation = Manifest.sparse_operation(path, value)
-		if operation.delete then return remove(path) end
-		return write(path, value)
+		local committed
+		if operation.delete then committed = remove(path) else committed = write(path, value) end
+		if committed == true then revision = revision + 1 end
+		return committed
+	end
+	function port.delete(path)
+		local committed = remove(path)
+		if committed == true then revision = revision + 1 end
+		return committed
+	end
+	function port.set_many(values, expected_source)
+		if options.writes_fail then return false end
+		if expected_source and expected_source.content ~= tostring(revision) then return false end
+		local next_values = {}
+		for key, value in pairs(port.values) do next_values[key] = value end
+		for path, value in pairs(values) do
+			local operation = Manifest.sparse_operation(path, value)
+			if operation.delete then next_values[path] = nil else next_values[path] = value end
+		end
+		port.values = next_values
+		revision = revision + 1
+		return true
 	end
 	return port
 end
@@ -25,10 +56,16 @@ end
 function M.with(body, options)
 	local preferences = require("infra.llm_preferences")
 	local old_get, old_set, old_delete = preferences.get, preferences.set, preferences.delete
+	local old_many = preferences.set_many
+	local old_get_many = preferences.get_many
 	local fake = M.new(options)
 	preferences.get, preferences.set, preferences.delete = fake.get, fake.set, fake.delete
+	preferences.set_many = fake.set_many
+	preferences.get_many = fake.get_many
 	local ok, err = pcall(body, fake)
 	preferences.get, preferences.set, preferences.delete = old_get, old_set, old_delete
+	preferences.set_many = old_many
+	preferences.get_many = old_get_many
 	if not ok then error(err, 0) end
 end
 

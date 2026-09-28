@@ -17,6 +17,45 @@ local utf8_lib = (type(utf8) == "table" and utf8.char) and utf8 or require("comp
 
 local M = {}
 
+-- Explicit lossless values stay distinguishable without changing legacy tables.
+local ARRAY_VALUES = setmetatable({}, { __mode = "k" })
+local LOSSLESS_NULL = setmetatable({}, {
+	__newindex = function() error("JSON null is immutable", 2) end,
+	__metatable = false,
+})
+
+local function array_length(value)
+	if type(value) ~= "table" or value == LOSSLESS_NULL then return nil end
+	local count = 0
+	for index in pairs(value) do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return nil end
+		count = count + 1
+	end
+	for index = 1, count do if rawget(value, index) == nil then return nil end end
+	return count
+end
+
+--- Reports whether a value retains an explicit JSON array identity.
+--- @param value any
+--- @return boolean
+function M.is_array(value) return type(value) == "table" and ARRAY_VALUES[value] == true end
+
+--- Reports whether a value is the explicit lossless JSON null token.
+--- @param value any
+--- @return boolean
+function M.is_null(value) return value == LOSSLESS_NULL end
+
+--- Copies dense values into an explicit JSON array, including an empty array.
+--- @param values table Dense values to copy.
+--- @return table array Detached outer array; child values retain their identities.
+function M.array(values)
+	local count = assert(array_length(values), "JSON arrays require dense numeric values")
+	local array = {}
+	for index = 1, count do array[index] = values[index] end
+	ARRAY_VALUES[array] = true
+	return array
+end
+
 -- What a lone UTF-16 surrogate decodes to: it names no character, and emitting
 -- it as-is would produce bytes no UTF-8 reader accepts.
 local REPLACEMENT_CHARACTER = 0xFFFD
@@ -42,7 +81,7 @@ end
 --- Handles objects, arrays, strings, numbers, booleans, and null.
 --- @param raw string JSON string.
 --- @return any|nil Decoded Lua value, or nil on parse failure.
-function M.decode(raw)
+local function decode(raw, lossless)
 	if type(raw) ~= "string" or raw == "" then return nil end
 	local pos = 1
 
@@ -58,7 +97,7 @@ function M.decode(raw)
 		return nil
 	end
 
-	local NULL = {}
+	local NULL = lossless and LOSSLESS_NULL or {}
 
 	local parse_value  -- forward decl
 
@@ -82,7 +121,9 @@ function M.decode(raw)
 				elseif esc == "r"  then res[#res + 1] = "\r"
 				elseif esc == "t"  then res[#res + 1] = "\t"
 				elseif esc == "u" then
-					local code = tonumber(raw:sub(pos, pos + 3), 16)
+					local hex = raw:sub(pos, pos + 3)
+					if lossless and not hex:match("^%x%x%x%x$") then return nil end
+					local code = tonumber(hex, 16)
 					if not code then return nil end
 					pos = pos + 4
 					-- A character above the Basic Multilingual Plane arrives as a
@@ -93,16 +134,20 @@ function M.decode(raw)
 							pos = pos + 6
 							code = 0x10000 + (code - 0xD800) * 0x400 + (low - 0xDC00)
 						else
+							if lossless then return nil end
 							code = REPLACEMENT_CHARACTER
 						end
 					elseif code >= 0xDC00 and code <= 0xDFFF then
+						if lossless then return nil end
 						code = REPLACEMENT_CHARACTER
 					end
 					res[#res + 1] = utf8_lib.char(code)
 				else
+					if lossless then return nil end
 					res[#res + 1] = esc
 				end
 			else
+				if lossless and ch:byte() < 32 then return nil end
 				res[#res + 1] = ch
 			end
 		end
@@ -125,6 +170,7 @@ function M.decode(raw)
 				pos = pos + 1
 				local val = parse_value()
 				if val == nil then return nil end
+				if lossless and obj[key] ~= nil then return nil end
 				obj[key] = (val == NULL) and nil or val
 				local sep = skip_ws()
 				if sep == "}" then pos = pos + 1; return obj end
@@ -136,6 +182,7 @@ function M.decode(raw)
 		if c == "[" then
 			pos = pos + 1
 			local arr = {}
+			if lossless then ARRAY_VALUES[arr] = true end
 			if skip_ws() == "]" then pos = pos + 1; return arr end
 			while true do
 				local val = parse_value()
@@ -157,7 +204,17 @@ function M.decode(raw)
 		local s, e = raw:find("^-?%d+%.?%d*[eE]?[+-]?%d*", pos)
 		if s == pos then
 			pos = e + 1
-			return tonumber(raw:sub(s, e))
+			local token = raw:sub(s, e)
+			local number = tonumber(token)
+			if lossless then
+				local mantissa, exponent = token:match("^(.-)[eE](.*)$")
+				if exponent and not exponent:match("^[+-]?%d+$") then return nil end
+				mantissa = mantissa or token
+				if not (mantissa:match("^%-?0$") or mantissa:match("^%-?[1-9]%d*$")
+					or mantissa:match("^%-?0%.%d+$") or mantissa:match("^%-?[1-9]%d*%.%d+$")) then return nil end
+				if not number or number == math.huge or number == -math.huge then return nil end
+			end
+			return number
 		end
 
 		return nil
@@ -169,6 +226,17 @@ function M.decode(raw)
 	return result == NULL and nil or result
 end
 
+--- Decodes JSON with the established untagged-table behavior.
+--- @param raw string
+--- @return any|nil Decoded legacy value, or nil on failure.
+function M.decode(raw) return decode(raw, false) end
+
+--- Decodes explicit JSON identities without altering the default decoder.
+--- Rejects malformed or ambiguous values instead of normalizing their content.
+--- @param raw string
+--- @return any|nil Tagged arrays/null and ordinary objects, or nil on failure.
+function M.decode_lossless(raw) return decode(raw, true) end
+
 -- ============================================================================
 -- 2. JSON encoder
 -- ============================================================================
@@ -178,7 +246,7 @@ end
 --- @param val any Lua value.
 --- @return string|nil JSON string, or nil on unsupported type.
 function M.encode(val)
-	if val == nil then return "null" end
+	if val == nil or val == LOSSLESS_NULL then return "null" end
 	local t = type(val)
 	if t == "boolean" then return val and "true" or "false" end
 	if t == "number" then
@@ -190,6 +258,17 @@ function M.encode(val)
 	end
 	if t == "string" then return M.quote(val) end
 	if t == "table" then
+		if ARRAY_VALUES[val] then
+			local count = array_length(val)
+			if not count then return nil end
+			local parts = {}
+			for index = 1, count do
+				local encoded = M.encode(val[index])
+				if encoded == nil then return nil end
+				parts[index] = encoded
+			end
+			return "[" .. table.concat(parts, ",") .. "]"
+		end
 		local is_array = true
 		local max_idx = 0
 		for k in pairs(val) do

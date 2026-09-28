@@ -41,9 +41,11 @@ function M.collect(decoded, mark)
 	require("modules.shortcuts.manager").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
 	require("infra.metrics_preferences").resolve(decoded, mark)
-	for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings" }) do
+	for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings", "profile_settings" }) do
 		require("modules.llm." .. name).mark_config_reads(decoded, mark)
 	end
+	require("modules.llm.profiles").mark_config_reads(decoded, mark)
+	require("infra.llm_preferences").mark_config_read(decoded, "llm.models.selected", mark)
 	require("modules.updater.manager").mark_config_reads(decoded, mark)
 	require("ui.onboarding.bridge")._answers_from_config(decoded, "", mark)
 	require("ui.onboarding.startup").should_show(decoded, mark)
