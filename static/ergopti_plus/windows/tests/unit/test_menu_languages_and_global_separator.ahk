@@ -59,8 +59,13 @@ _MLG_ConfigurationRowsInOrder() {
 		"configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")
-	for _, Pair in [["restore_recommended", "ReloadWithDefaultConfig"],
-			["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
+	; Global Restore now composes every persistence owner at its terminal boundary.
+	AssertContains(Body, "Commands := _MI_GlobalScopeCommands()",
+		"the real Configuration menu must retain the global command factory")
+	Commands := _MI_GlobalScopeCommands()
+	AssertTrue(Commands.Has("restore_recommended") && Commands["restore_recommended"] is Func,
+		"the global owner must expose the existing Restore command")
+	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
 			["start_at_login", "ToggleStartAtLogin"],
