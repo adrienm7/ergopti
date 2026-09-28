@@ -5491,16 +5491,19 @@ description_key = "menu.layout"
 platforms = ["hs"]
 
 [scopes.tap_holds]
+action_parameters = { domains = ["tap_hold"], restore = "remove" }
 prefixes = ["tap_holds", "category_enabled.tap_holds"]
 preset = "tap_hold"
 restore_exclude = []
 
 [scopes.shortcuts]
+action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
 prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts"]
 restore_exclude = []
 dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }]
 
 [scopes.gestures]
+action_parameters = { domains = ["gesture"], restore = "remove" }
 prefixes = ["gestures"]
 restore_exclude = []
 

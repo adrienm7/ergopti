@@ -3,7 +3,67 @@
 --- Plans carry dynamic ownership and separate-file requirements explicitly.
 return function(helpers)
 	local Manifest = require("infra.manifest_reader")
+	local Actions = require("_generated.action_catalogue").actions
+	-- This port stands in for each host's existing parameter-key validator. The
+	-- real generated catalogue supplies parameter capability; scopes never infer it.
+	local function parameter_domain(path)
+		local key = path:match("^action_parameters%.(.+)$")
+		if not key then return nil end
+		local domain, binding, action = key:match("^([a-z_]+)__(.-)__([a-z0-9_]+)$")
+		if not domain or not binding:match("^[a-z0-9_]+$") or binding:find("__", 1, true)
+			or binding:sub(1, 1) == "_" or binding:sub(-1) == "_" then return nil end
+		local meta = Actions[action]
+		return meta and type(meta.parameter) == "string" and meta.parameter ~= "" and domain or nil
+	end
+	local owners = { action_parameter_domain = parameter_domain }
 	helpers.describe("scoped configuration planning", function()
+		helpers.it("retains generated dynamic scalar types before a native runtime erases false versus zero", function()
+			local found = {}
+			for _, scope in pairs(Manifest.scopes()) do
+				for _, definition in ipairs(scope.dynamic_defaults or {}) do
+					local kind = type(definition.default)
+					helpers.assert_eq(definition.type, kind == "number" and "integer" or kind)
+					found[definition.type] = true
+				end
+			end
+			helpers.assert_eq(found.boolean, true)
+			helpers.assert_eq(found.integer, true)
+		end)
+		helpers.it("removes only validated parameter domains for both clear and recommendation restore", function()
+			local paths = { "action_parameters.gesture__tap_4__open_url", "action_parameters.keyboard__ctrl_k__open_url",
+				"action_parameters.script__reload__open_url", "action_parameters.tap_key__digit_1__open_url",
+				"action_parameters.tap_hold__caps_lock__open_url" }
+			for _, selected in ipairs({ { "gestures", 1 }, { "shortcuts", 3 }, { "tap_holds", 1 }, { "hotstrings", 0 } }) do
+				local inventory = Manifest.scope_inventory(selected[1], { actions = function() return paths end }, owners)
+				helpers.assert_eq(#inventory, selected[2])
+				for _, mode in ipairs({ "clear", "recommended" }) do
+					local plan = Manifest.scope_plan(selected[1], mode, paths, owners)
+					local actual = {}
+					for _, row in ipairs(plan.operations) do
+						if row.section == "action_parameters" then
+							helpers.assert_eq(row.delete, true)
+							helpers.assert_eq(row.value, nil)
+							actual[#actual + 1] = row.section .. "." .. row.key
+						end
+					end
+					table.sort(actual)
+					helpers.assert_eq(actual, inventory)
+				end
+			end
+		end)
+		helpers.it("requires exact host ownership and refuses malformed or non-parameter actions", function()
+			for _, path in ipairs({ "action_parameters.gesture__tap_4__none", "action_parameters.gesture__tap_4__made_up",
+				"action_parameters.gesture__tap__4__open_url", "action_parameters.gesture__tap_4__open_url.extra",
+				"action_parameters.foreign__tap_4__open_url", "other.gesture__tap_4__open_url" }) do
+				helpers.assert_eq(pcall(Manifest.scope_plan, "gestures", "clear", { path }, owners), false, path)
+				helpers.assert_eq(pcall(Manifest.scope_inventory, "gestures", { actions = function() return { path } end }, owners), false, path)
+			end
+			local path = "action_parameters.gesture__tap_4__open_url"
+			helpers.assert_eq(pcall(Manifest.scope_plan, "gestures", "clear", { path }), false)
+			helpers.assert_eq(pcall(Manifest.scope_plan, "gestures", "clear", { path }, {
+				action_parameter_domain = function() error("owner unavailable") end,
+			}), false)
+		end)
 		helpers.it("collects exact runtime-owned leaves once without claiming static or unknown siblings", function()
 			local calls = 0
 			helpers.assert_not_nil(Manifest.find_entry_by_path("gestures.enabled"))

@@ -43,6 +43,27 @@ function M.new(manifest)
 		assert(not index[entry.path], "duplicate configuration path: " .. entry.path)
 		index[entry.path] = entry
 	end
+	local parameter_domains = {}
+	for _, scope in pairs(manifest.scopes) do
+		local declaration = scope.action_parameters
+		if declaration ~= nil then
+			assert(type(declaration) == "table" and declaration.restore == "remove"
+				and type(declaration.domains) == "table" and #declaration.domains > 0,
+				"action parameter scopes require domains and explicit remove restoration")
+			for _, domain in ipairs(declaration.domains) do
+				assert(type(domain) == "string" and domain ~= "", "invalid action parameter scope domain")
+				parameter_domains[domain] = true
+			end
+		end
+	end
+	local function parameter_domain(path, owners)
+		if owners == nil then return nil end
+		assert(type(owners) == "table" and type(owners.action_parameter_domain) == "function",
+			"scope parameter ownership requires an exact host validator")
+		local domain = owners.action_parameter_domain(path)
+		assert(domain == nil or parameter_domains[domain], "action parameter owner returned an undeclared domain")
+		return domain
+	end
 	local contract = {}
 	local function dynamic_entry(path)
 		local parent = path
@@ -123,7 +144,7 @@ function M.new(manifest)
 		return row(path, value, equal(value, neutral))
 	end
 	local function collect_scope(scope_id)
-		local prefixes, excluded, visiting, dynamic_definitions, presets = {}, {}, {}, {}, {}
+		local prefixes, excluded, visiting, dynamic_definitions, presets, parameters = {}, {}, {}, {}, {}, {}
 		local function visit(id)
 			local scope = manifest.scopes[id]
 			assert(type(scope) == "table", "unknown configuration scope: " .. tostring(id))
@@ -133,6 +154,9 @@ function M.new(manifest)
 				assert(type(scope.preset) == "string" and scope.preset ~= "", "invalid configuration preset owner")
 				presets[id] = scope.preset
 			end
+			if scope.action_parameters then
+				for _, domain in ipairs(scope.action_parameters.domains) do parameters[domain] = true end
+			end
 			for _, prefix in ipairs(scope.prefixes or {}) do prefixes[#prefixes + 1] = prefix end
 			for _, path in ipairs(scope.restore_exclude or {}) do excluded[#excluded + 1] = path end
 			for _, definition in ipairs(scope.dynamic_defaults or {}) do dynamic_definitions[definition] = true end
@@ -140,11 +164,11 @@ function M.new(manifest)
 			visiting[id] = nil
 		end
 		visit(scope_id)
-		return prefixes, excluded, dynamic_definitions, presets
+		return prefixes, excluded, dynamic_definitions, presets, parameters
 	end
-	function contract.scope_operations(scope_id, mode, owned_paths)
+	function contract.scope_operations(scope_id, mode, owned_paths, owners)
 		assert(mode == "recommended" or mode == "clear", "unknown configuration scope operation")
-		local prefixes, excluded, dynamic_definitions = collect_scope(scope_id)
+		local prefixes, excluded, dynamic_definitions, _, parameters = collect_scope(scope_id)
 		local operations = {}
 		local function emit(path, value)
 			if mode == "recommended" then
@@ -172,10 +196,18 @@ function M.new(manifest)
 		for _, path in ipairs(owned_paths or {}) do
 			assert(type(path) == "string", "owned configuration paths must be strings")
 			local definition = dynamic_entry(path)
-			assert(definition, "dynamic scope path is not declared: " .. path)
-			if dynamic_definitions[definition] and not emitted[path] then
-				emit(path, definition.recommended)
-				emitted[path] = true
+			local domain = not definition and parameter_domain(path, owners) or nil
+			assert(definition or domain, "dynamic scope path is not declared: " .. path)
+			if not emitted[path] then
+				if domain and parameters[domain] then
+					-- Both modes remove the prior binding parameter. No scalar empty
+					-- value or newly granted consent stands in for explicit absence.
+					operations[#operations + 1] = row(path, nil, true)
+					emitted[path] = true
+				elseif definition and dynamic_definitions[definition] then
+					emit(path, definition.recommended)
+					emitted[path] = true
+				end
 			end
 		end
 		return operations
@@ -183,10 +215,11 @@ function M.new(manifest)
 	--- Collects only declared dynamic leaves supplied by explicit runtime owners.
 	--- @param scope_id string Selected scope identifier.
 	--- @param providers table Named callbacks returning dense lists of owned paths.
+	--- @param owners table|nil Exact host validators for non-scalar parameter owners.
 	--- @return table paths Sorted, detached and deduplicated scope inventory.
-	function contract.scope_inventory(scope_id, providers)
+	function contract.scope_inventory(scope_id, providers, owners)
 		assert(type(providers) == "table", "scope inventory requires runtime owners")
-		local _, _, definitions = collect_scope(scope_id)
+		local _, _, definitions, _, parameters = collect_scope(scope_id)
 		local found, paths = {}, {}
 		for name, provider in pairs(providers) do
 			assert(type(name) == "string" and name ~= "" and type(provider) == "function", "invalid scope inventory owner")
@@ -198,8 +231,9 @@ function M.new(manifest)
 					"runtime inventory must contain an array of paths: " .. name)
 				count = count + 1
 				local definition = dynamic_entry(path)
-				assert(definition or contract.has_default(path), "runtime inventory path is not declared: " .. path)
-				if definition and definitions[definition] and not found[path] then
+				local domain = not definition and not contract.has_default(path) and parameter_domain(path, owners) or nil
+				assert(definition or domain or contract.has_default(path), "runtime inventory path is not declared: " .. path)
+				if ((definition and definitions[definition]) or (domain and parameters[domain])) and not found[path] then
 					found[path] = true
 					paths[#paths + 1] = path
 				end
@@ -214,9 +248,10 @@ function M.new(manifest)
 	--- @param scope_id string Selected scope identifier.
 	--- @param mode string Recommended restoration or clear.
 	--- @param owned_paths table|nil Explicit runtime-owned dynamic paths.
+	--- @param owners table|nil Exact host validators for non-scalar parameter owners.
 	--- @return table plan Detached operations and required preset ownership.
-	function contract.scope_plan(scope_id, mode, owned_paths)
-		local operations = contract.scope_operations(scope_id, mode, owned_paths)
+	function contract.scope_plan(scope_id, mode, owned_paths, owners)
+		local operations = contract.scope_operations(scope_id, mode, owned_paths, owners)
 		local _, _, _, selected = collect_scope(scope_id)
 		local scopes, presets = {}, {}
 		for scope in pairs(selected) do scopes[#scopes + 1] = scope end

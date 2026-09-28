@@ -38,7 +38,7 @@ function M.new(options)
 		local called, committed, detail, content = pcall(function()
 			local owned_paths = type(options.owned_paths) == "function" and options.owned_paths() or {}
 			assert(type(owned_paths) == "table", "dynamic configuration ownership is unavailable")
-			local plan = options.manifest.scope_plan(scope, mode, owned_paths)
+			local plan = options.manifest.scope_plan(scope, mode, owned_paths, options.owners)
 			if #plan.presets > 0 then return false, "scope requires separate preset ownership" end
 			local updates = plan.operations
 			local prepared, why, candidate, source = Writer.prepare_batch(options.path, updates, options.files)

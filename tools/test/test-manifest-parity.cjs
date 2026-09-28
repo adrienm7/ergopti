@@ -576,4 +576,29 @@ for (const feature of linuxHsFeatures) {
 	);
 }
 
+const { normalizeScopes } = require('../lib/configuration-scopes.cjs');
+const scopeFixture = { probe: { prefixes: [], restore_exclude: [], dynamic_defaults: [
+	{ prefix: 'enabled', depth: 1, default: false, recommended: true },
+	{ prefix: 'delay', depth: 1, default: 0, recommended: 0 },
+	{ prefix: 'fraction', depth: 1, default: 0, recommended: 0.5 },
+	{ prefix: 'name', depth: 1, default: '', recommended: 'chosen' }
+] } };
+const typed = normalizeScopes(scopeFixture).probe.dynamic_defaults;
+test('dynamic scope types preserve booleans, integers, floats and strings',
+	JSON.stringify(typed.map(row => row.type)) === JSON.stringify(['boolean', 'integer', 'number', 'string']));
+test('scope normalization does not mutate canonical input', scopeFixture.probe.dynamic_defaults[0].type === undefined);
+for (const patch of [{ recommended: 0 }, { type: 'integer' }, { default: {} }, { default: NaN }]) {
+	let refused = false;
+	try { normalizeScopes({ probe: { dynamic_defaults: [{ ...scopeFixture.probe.dynamic_defaults[0], ...patch }] } }); }
+	catch { refused = true; }
+	test('inconsistent dynamic default metadata is refused: ' + JSON.stringify(patch), refused);
+}
+for (const parameters of [{ domains: ['gesture'], restore: 'keep' },
+	{ domains: ['unknown'], restore: 'remove' }, { domains: ['gesture', 'gesture'], restore: 'remove' },
+	{ domains: [], restore: 'remove' }, { domains: ['gesture'], restore: 'remove', default: '' }]) {
+	let refused = false;
+	try { normalizeScopes({ probe: { action_parameters: parameters } }); }
+	catch { refused = true; }
+	test('invalid action parameter scope metadata is refused: ' + JSON.stringify(parameters), refused);
+}
 report();
