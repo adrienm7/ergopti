@@ -1093,7 +1093,7 @@ recommended = ""
 input_altering = false
 type = "string"
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "hs", "linux"]
+platforms = ["ahk", "linux"]
 
 
 
@@ -1202,6 +1202,15 @@ description_key = "menu.llm.generation.sequential_mode"
 # ============================
 
 [[features.llm.models]]
+id = "user_models"
+default = []
+recommended = []
+input_altering = false
+type = "array"
+description_key = "menu.llm.title"
+platforms = ["hs"]
+
+[[features.llm.models]]
 id = "selected"
 # Linux has one backend and it is Ollama — see the MLX restriction below, which
 # is the same fact stated from the other side. Declaring the default here rather
@@ -1244,6 +1253,15 @@ reason_key = "platform_reason.llm_mlx_is_apple_silicon"
 # ==============================
 
 [[features.llm.profiles]]
+id = "user_profiles"
+default = []
+recommended = []
+input_altering = false
+type = "array"
+description_key = "menu.profiles.header_custom_profiles"
+platforms = ["hs"]
+
+[[features.llm.profiles]]
 id = "active"
 default = "basic"
 recommended = "basic"
@@ -1266,12 +1284,22 @@ recommended = true
 input_altering = false
 type = "boolean"
 description_key = "menu.llm.profiles.auto_profile_for_model"
+platforms = ["ahk", "linux"]
 
 
 
 # =============================
 # ===== 3.3.5 llm.trigger =====
 # =============================
+
+[[features.llm.trigger]]
+id = "disabled_apps"
+default = []
+recommended = []
+input_altering = false
+type = "array"
+description_key = "menu.llm.title"
+platforms = ["hs"]
 
 [[features.llm.trigger]]
 id = "debounce_ms"
@@ -1340,6 +1368,15 @@ platforms = ["hs"]
 # A bare digit accepts prediction N by default: the digit is swallowed while
 # the tooltip shows predictions, and types normally otherwise. The AI menu can
 # require a modifier (Alt, Ctrl, Cmd/Win, Shift or a combination).
+[[features.llm.navigation]]
+id = "nav_modifiers"
+default = []
+recommended = []
+input_altering = false
+type = "array"
+description_key = "menu.llm.nav_modifiers_prompt"
+platforms = ["hs"]
+
 [[features.llm.navigation]]
 id = "val_modifiers"
 default = []
@@ -5576,6 +5613,7 @@ dynamic_defaults = [{ prefix = "category_enabled", depth = 1, default = false, r
 [scopes.llm]
 prefixes = ["llm"]
 restore_exclude = ["llm.enabled"]
+dynamic_defaults = [{ prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = [], recommended = [] }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "" }]
 
 [scopes.metrics]
 prefixes = ["metrics"]

@@ -264,7 +264,6 @@ time_activation_seconds = 0.75
 
 [llm]
 enabled = false
-user_profiles = ""
 
 [llm.display]
 pred_indent = 0
@@ -282,16 +281,18 @@ reset_on_nav = true
 sequential_mode = false
 
 [llm.models]
+user_models = []
 selected = "mlx"
 ollama = "gemma-4-E2B-it"
 mlx = "Qwen3.5-2B"
 
 [llm.profiles]
+user_profiles = []
 active = "basic"
 num_predictions = 3
-auto_profile_for_model = true
 
 [llm.trigger]
+disabled_apps = []
 debounce_ms = 200
 instant_on_word_end = true
 after_hotstring = true
@@ -300,6 +301,7 @@ url_bar_filter_enabled = false
 shortcut = false
 
 [llm.navigation]
+nav_modifiers = []
 val_modifiers = []
 arrow_nav_enabled = false
 
