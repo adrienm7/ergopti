@@ -1665,6 +1665,13 @@ end
 --- Captures actual configuration independently from the menu's desired values.
 --- Credentials and backend request ownership are deliberately outside this scope.
 --- @return table snapshot Detached core configuration.
+--- Reports pending initialization or credential transactions that can change identity.
+--- @return boolean idle Those owners have reached terminal completion.
+function M.configuration_idle()
+	return CoreState.api_entries_load_timer == nil and CoreState.background_bootstrap_timer == nil
+		and CoreState.api_persist_pending == nil and CoreState.api_cleanup_pending == nil
+end
+
 function M.configuration_snapshot()
 	return {
 		backend = CoreState.backend,

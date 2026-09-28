@@ -197,6 +197,7 @@ local function with_fixture(options, body)
 			end,
 		}
 		package.loaded["ui.prompt_editor"] = {
+			scope_idle = function() return options.editor_busy ~= true end,
 			open = function(profile, callback)
 				editor_open_count = editor_open_count + 1
 				editor_calls[#editor_calls + 1] = profile or false
@@ -1121,6 +1122,24 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(fixture.state.llm_model, "B")
 			helpers.assert_eq(fixture.keymap_model_calls, {"B"})
 			helpers.assert_eq(fixture.keymap_display_calls, {"B"})
+		end)
+	end)
+end)
+
+helpers.describe("LLM scope deferred editor admission", function()
+	helpers.it("refuses queued and open editors until both existing owners are idle", function()
+		local options = { initial_profiles = { { id = "custom", label = "Custom" } } }
+		with_fixture(options, function(fixture)
+			helpers.assert_eq(fixture.manager.scope_idle(), true)
+			local row = find_child_row(fixture.manager.get_menu_item().menu, "Custom", "menu.profiles.edit_profile")
+			helpers.assert_eq(row.action(), true)
+			helpers.assert_eq(fixture.manager.scope_idle(), false)
+			options.editor_busy = true
+			fixture.fire_timer()
+			helpers.assert_eq(fixture.editor_open_count(), 1)
+			helpers.assert_eq(fixture.manager.scope_idle(), false)
+			options.editor_busy = false
+			helpers.assert_eq(fixture.manager.scope_idle(), true)
 		end)
 	end)
 end)

@@ -122,7 +122,7 @@ local function with_fixture(callback)
 		})
 		local state = { llm_enabled = false, llm_backend = "mlx" }
 		fixture.state = state
-		fixture.check_startup = Startup.new({
+		fixture.check_startup, fixture.scope_idle = Startup.new({
 			state = state,
 			keymap = {},
 			models_mgr = models_mgr,
@@ -419,6 +419,18 @@ helpers.describe("startup arm_startup_timer exact TimerScheduler ownership", fun
 			fixture.start_mode = "sync_callback"
 			helpers.assert_true(fixture.check_startup())
 			helpers.assert_eq(fixture.reattach_calls, 0)
+		end)
+	end)
+end)
+
+helpers.describe("LLM scope startup admission", function()
+	helpers.it("refuses a queued startup timer until its real native terminal", function()
+		with_fixture(function(fixture)
+			helpers.assert_eq(fixture.scope_idle(), true)
+			helpers.assert_eq(fixture.check_startup(), true)
+			helpers.assert_eq(fixture.scope_idle(), false)
+			for _, timer in ipairs(fixture.timers) do fixture.deliver(timer) end
+			helpers.assert_eq(fixture.scope_idle(), true)
 		end)
 	end)
 end)

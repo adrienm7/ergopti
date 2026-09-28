@@ -845,7 +845,7 @@ local function create_menu(deps)
 		-- ===== 2.4) Lifecycle & Main Build =======
 		-- =========================================
 
-		local check_startup
+		local check_startup, startup_scope_idle
 		local activation_generation = 0
 		local activation_requirement_owner = nil
 		if deps.script_control
@@ -1578,7 +1578,17 @@ local function create_menu(deps)
 										end
 								end
 								local render_ctx = {
-										commands      = { ["llm_toggle"] = toggle_action },
+										commands      = {
+											llm_toggle = toggle_action,
+											scope_restore = function()
+												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
+												return deps.apply_preference_scope("llm", "recommended") == true
+											end,
+											scope_clear = function()
+												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
+												return deps.apply_preference_scope("llm", "clear") == true
+											end,
+										},
 										state_getters = {
 												llm_enabled      = function() return state.llm_enabled == true end,
 												llm_toggle_ready = function() return toggle_ready == true end,
@@ -1599,7 +1609,7 @@ local function create_menu(deps)
 				}
 		end
 
-		check_startup = StartupCtrl.new({
+		check_startup, startup_scope_idle = StartupCtrl.new({
 				state                      = state,
 				keymap                     = keymap,
 				models_mgr                 = models_mgr,
@@ -1641,7 +1651,21 @@ local function create_menu(deps)
 				}
 		end
 
+		local scope_runtime = require("ui.menu.menu_llm.scope_runtime").new({
+			state = state, core = llm_mod, keymap = keymap, shortcuts = trigger_orch,
+			idle = function()
+				for _, owner in ipairs({ prediction_locks, activation_controller, switcher, BackendPanel, settings_mgr, profiles_mgr }) do
+					if type(owner.scope_idle) ~= "function" or owner.scope_idle() ~= true then return false end
+				end
+				return type(startup_scope_idle) == "function" and startup_scope_idle() == true
+					and llm_mod.configuration_idle() == true
+			end,
+			display_model = switcher.get_display_model_name, model_power = switcher.get_model_power_level,
+			backend_label = BackendPanel.runtime_label, reset_health = M.reset_llm_health_status,
+		})
 		return {
+				scope_runtime = scope_runtime,
+				scope_profiles = llm_mod.get_all_profiles,
 				build_item          = build_item,
 				build_download_item = build_download_item,
 				check_startup       = check_startup,

@@ -571,6 +571,7 @@ end
 
 function M.set_llm_enabled(v)               return engine.set_llm_enabled(v)               end
 function M.get_llm_enabled()                return engine.get_llm_enabled()          end
+function M.set_llm_configuration_model(name) return engine.set_llm_configuration_model(name) end
 function M.set_llm_model(name)              return engine.set_llm_model(name)              end
 function M.set_llm_display_model_name(name) return engine.set_llm_display_model_name(name) end
 function M.set_llm_backend_name(label)      return engine.set_llm_backend_name(label)      end

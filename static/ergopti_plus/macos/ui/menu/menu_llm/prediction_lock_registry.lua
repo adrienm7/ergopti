@@ -127,6 +127,10 @@ function M.new(ctx)
 		return id ~= nil and leases[id] == true
 	end
 
+	--- Returns whether another lifecycle owner still protects prediction state.
+	--- @return boolean idle No outstanding lease.
+	function inst.scope_idle() return lease_count == 0 end
+
 	return inst
 end
 
