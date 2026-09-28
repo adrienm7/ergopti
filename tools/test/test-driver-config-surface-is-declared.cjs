@@ -153,7 +153,7 @@ function isDeclaredSurface(surface, known) {
 // unknown child, similarly named section or wrong platform is never exempted.
 assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. name)'), ['shortcuts.keys.*']);
 assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys.")'), ['shortcuts.keys.']);
-const declaredProbe = new Set(['shortcuts.keys.at_hash']);
+const declaredProbe = new Set(['shortcuts.keys.layer_scroll']);
 assert.equal(isDeclaredSurface('shortcuts.keys.*', declaredProbe), true);
 assert.equal(isDeclaredSurface('shortcuts.keys.', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.keys.unknown', declaredProbe), false);
