@@ -1,0 +1,66 @@
+From 703d10c88ae4f98be283357afc2116be636efb29 Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 12:45:08 +0200
+Subject: [PATCH] feat(layouts): discover committed extension packs on Linux
+
+---
+ static/ergopti_plus/linux/infra/paths.lua        |  8 ++++++--
+ .../unit/modules/keymap/test_layout_registry.lua | 16 ++++++++++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/static/ergopti_plus/linux/infra/paths.lua b/static/ergopti_plus/linux/infra/paths.lua
+index e453f3a26..d68d9fd89 100644
+--- a/static/ergopti_plus/linux/infra/paths.lua
++++ b/static/ergopti_plus/linux/infra/paths.lua
+@@ -197,8 +197,8 @@ end
+ --- The bundled root is a SIBLING of _shared and of this driver, not a child of
+ --- either: extensions are shipped to all three drivers from one place, which is
+ --- why the Windows driver's `_ExtensionsDir` points at the same directory. The
+---- user root comes second so an extension installed by the user overrides a
+---- bundled one of the same id — the overlay rule the hotstring packs already use.
++--- committed layout generations come next. The user root comes last, preserving
++--- its precedence over bundled and layout-installed packs with the same id.
+ --- @return table Array of absolute paths; may be empty when neither exists.
+ function M.extension_roots()
+ 	local roots = {}
+@@ -209,6 +209,10 @@ function M.extension_roots()
+ 		roots[#roots + 1] = shared .. "/../extensions"
+ 	end
+ 	local ok_cfg, ConfigPaths = pcall(require, "infra.config_paths")
++	-- Resolve lazily: the layout registry itself imports Paths at module load.
++	for _, root in ipairs(require("modules.keymap.layout_registry").extension_roots()) do
++		roots[#roots + 1] = root
++	end
+ 	if ok_cfg and type(ConfigPaths.home) == "function" then
+ 		roots[#roots + 1] = ConfigPaths.home() .. "/.config/ergopti/extensions"
+ 	end
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua b/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
+index 0a19c9d54..ffe807172 100644
+--- a/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
+@@ -146,6 +146,22 @@ local function shipped_files()
+ end
+ 
+ helpers.describe("layout manager (Linux): installing", function()
++	helpers.it("makes committed layout packs visible before user overrides", function()
++		local Paths = require("infra.paths")
++		local saved_registry = package.loaded["modules.keymap.layout_registry"]
++		local saved_config = package.loaded["infra.config_paths"]
++		package.loaded["modules.keymap.layout_registry"] = {
++			extension_roots = function() return { "/committed/layout/generation" } end,
++		}
++		package.loaded["infra.config_paths"] = { home = function() return "/private/user" end }
++		local ok, roots = pcall(Paths.extension_roots)
++		package.loaded["modules.keymap.layout_registry"] = saved_registry
++		package.loaded["infra.config_paths"] = saved_config
++		helpers.assert_true(ok, tostring(roots))
++		helpers.assert_eq(roots[#roots - 1], "/committed/layout/generation")
++		helpers.assert_eq(roots[#roots], "/private/user/.config/ergopti/extensions")
++	end)
++
+ 	helpers.it("names the shared defaults file it cannot decode (layout-registry-convert)", function()
+ 		-- The shared json.lua answers nil to invalid JSON instead of raising, so a
+ 		-- reader that only checks the pcall status loses the reason.
+-- 
+2.50.0.windows.1
+

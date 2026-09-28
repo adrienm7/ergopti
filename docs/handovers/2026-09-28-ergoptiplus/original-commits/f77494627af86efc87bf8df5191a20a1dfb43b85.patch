@@ -1,0 +1,979 @@
+From f77494627af86efc87bf8df5191a20a1dfb43b85 Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 12:30:36 +0200
+Subject: [PATCH] feat(layouts): publish verified extension generations
+ atomically
+
+---
+ .../_shared/lua/layouts/catalogue.lua         |  12 +-
+ .../_shared/lua/layouts/extension.lua         | 177 ++++++++++++++++++
+ .../linux/modules/keymap/layout_registry.lua  |  21 ++-
+ .../modules/keymap/test_layout_registry.lua   |  27 ++-
+ .../macos/modules/keymap/layout_registry.lua  |  18 ++
+ .../modules/keymap/test_layout_catalogue.lua  |  15 +-
+ .../modules/keymap/test_layout_extension.lua  |  96 ++++++++++
+ .../modules/keymap/test_layout_registry.lua   |  37 +++-
+ static/ergopti_plus/windows/ErgoptiPlus.ahk   |   1 +
+ .../keymap/keylayout/layout_catalogue.ahk     |  32 +++-
+ .../keymap/keylayout/layout_extension.ahk     | 168 +++++++++++++++++
+ static/ergopti_plus/windows/tests/run_all.ahk |   1 +
+ .../tests/unit/test_layout_catalogue.ahk      |  52 ++++-
+ 13 files changed, 639 insertions(+), 18 deletions(-)
+ create mode 100644 static/ergopti_plus/_shared/lua/layouts/extension.lua
+ create mode 100644 static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua
+ create mode 100644 static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk
+
+diff --git a/static/ergopti_plus/_shared/lua/layouts/catalogue.lua b/static/ergopti_plus/_shared/lua/layouts/catalogue.lua
+index 9f0e84943..9bc86c430 100644
+--- a/static/ergopti_plus/_shared/lua/layouts/catalogue.lua
++++ b/static/ergopti_plus/_shared/lua/layouts/catalogue.lua
+@@ -26,6 +26,7 @@
+ --- ==============================================================================
+ 
+ local Registry = require("layouts.registry")
++local Extension = require("layouts.extension")
+ 
+ local M = {}
+ 
+@@ -78,6 +79,10 @@ function M.validate_index(index)
+ 			or type(entry.size) ~= "number" or type(entry.version) ~= "string" then
+ 			return false, "the registry entry of '" .. entry.id .. "' has no usable file, checksum, size or version"
+ 		end
++		if entry.extension ~= nil then
++			local valid, reason = Extension.validate(entry)
++			if not valid then return false, reason end
++		end
+ 	end
+ 	return true, nil
+ end
+@@ -334,7 +339,12 @@ function M.acquire(settings, entry, deps, on_done)
+ 	local function finish(ok, detail)
+ 		if finished then return end
+ 		finished = true
+-		on_done(ok, detail)
++		if not ok or entry.extension == nil then on_done(ok, detail) return end
++		Extension.acquire(settings, entry, deps, function(complete, content)
++			if not complete then on_done(false, content) return end
++			detail.content = content
++			on_done(true, detail)
++		end)
+ 	end
+ 	if M.bundled_entry(deps.bundled_index, entry) then
+ 		-- A shipped copy the shipped index lists but that cannot be read is a
+diff --git a/static/ergopti_plus/_shared/lua/layouts/extension.lua b/static/ergopti_plus/_shared/lua/layouts/extension.lua
+new file mode 100644
+index 000000000..932b1ffb9
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/layouts/extension.lua
+@@ -0,0 +1,177 @@
++--- _shared/lua/layouts/extension.lua
++
++--- ==============================================================================
++--- MODULE: Layout Extension Content
++--- DESCRIPTION:
++--- Validates and stages existing-format extension files. Content generations are
++--- immutable; only the atomically published installed-layout record makes a
++--- generation discoverable by the existing extension scanners. No enable state
++--- is read or written here. Network, digest and filesystem operations are injected.
++--- ==============================================================================
++
++local M = {}
++local Registry = require("layouts.registry")
++
++--- Whether a checksum is the lowercase SHA-256 format used by the index builder.
++--- @param value any
++--- @return boolean
++local function checksum(value)
++	return type(value) == "string" and #value == 64 and value:match("^[0-9a-f]+$") ~= nil
++end
++
++--- Accepts only existing extension paths, never traversal or arbitrary code files.
++--- @param path any
++--- @param id string Layout id.
++--- @return boolean
++local function supported_path(path, id)
++	if type(path) ~= "string" then return false end
++	return path == "manifest.toml" or path == id .. ".keylayout"
++		or path:match("^hotstrings/[a-z][a-z0-9_-]*%.toml$") ~= nil
++		or path == "shortcuts/menu.lua" or path == "shortcuts/menu.ahk"
++		or path:match("^[A-Z][A-Z0-9_-]*$") ~= nil
++		or path:match("^[A-Z][A-Z0-9_-]*%.txt$") ~= nil
++end
++
++--- Validates a complete extension inventory before network or disk effects.
++--- @param entry table Layout registry entry.
++--- @param max_bytes number|nil Optional aggregate download bound.
++--- @return boolean
++--- @return string|nil
++function M.validate(entry, max_bytes)
++	if type(entry) ~= "table" or not Registry.is_valid_id(entry.id) then return false, "invalid layout id" end
++	local extension = entry.extension
++	if type(extension) ~= "table" or type(extension.id) ~= "string"
++		or not extension.id:match("^[a-z][a-z0-9_-]*$") or not checksum(extension.sha256)
++		or type(extension.files) ~= "table" or type(extension.name) ~= "string" or extension.name == "" then
++		return false, "invalid layout extension inventory"
++	end
++	local seen, total = {}, 0
++	for _, file in ipairs(extension.files) do
++		if type(file) ~= "table" or not supported_path(file.path, entry.id)
++			or (file.file ~= entry.id .. "/" .. file.path and file.file ~= extension.id .. "/" .. file.path) or seen[file.path]
++			or type(file.size) ~= "number" or file.size < 0 or file.size % 1 ~= 0 or not checksum(file.sha256) then
++			return false, "invalid or duplicate layout extension file"
++		end
++		seen[file.path] = true
++		total = total + file.size
++	end
++	if not seen["manifest.toml"] or not seen[entry.id .. ".keylayout"] then
++		return false, "layout extension is missing its manifest or keylayout"
++	end
++	if max_bytes and total > max_bytes then return false, "layout extension exceeds the download bound" end
++	return true
++end
++
++--- A generation root contains one ordinary extension directory.
++--- @param local_dir string Layout state directory, ending in a separator.
++--- @param entry table Validated registry entry.
++--- @return string
++function M.generation_root(local_dir, entry)
++	return local_dir .. "extensions/" .. entry.id .. "/" .. entry.extension.sha256
++end
++
++--- Downloads or reads every file, then verifies its bytes before yielding content.
++--- @param settings table Registry settings.
++--- @param entry table Registry entry.
++--- @param deps table Injected read_bundled and transport collaborators.
++--- @param on_done function Receives (ok, files_or_reason).
++function M.acquire(settings, entry, deps, on_done)
++	local valid, reason = M.validate(entry, settings.max_file_bytes)
++	if not valid then on_done(false, reason) return end
++	local output, position, finished = {}, 0, false
++	local function finish(ok, detail)
++		if finished then return end
++		finished = true
++		on_done(ok, detail)
++	end
++	local next_file
++	next_file = function()
++		position = position + 1
++		local file = entry.extension.files[position]
++		if not file then finish(true, output) return end
++		local digest_started, accepted = false, false
++		local function verify(text)
++			if digest_started or finished then return end
++			digest_started = true
++			if type(text) ~= "string" or #text ~= file.size then finish(false, "extension file size mismatch") return end
++			deps.transport.sha256(text, function(digest, err)
++				if accepted or finished then return end
++				accepted = true
++				if digest ~= file.sha256 then finish(false, "extension checksum mismatch: " .. tostring(err or file.path)) return end
++				output[file.path] = text
++				next_file()
++			end)
++		end
++		local function download()
++			local received = false
++			deps.transport.get(Registry.raw_url(settings, file.file), { ["User-Agent"] = Registry.USER_AGENT },
++				settings.timeout_ms, function(status, body, err)
++					if received or finished then return end
++					received = true
++					if tonumber(status) ~= 200 then finish(false, tostring(err or status)) else verify(body) end
++				end)
++		end
++		local bundled = type(deps.read_bundled) == "function" and deps.read_bundled(file.file) or nil
++		if type(bundled) == "string" and #bundled == file.size then
++			-- Only a matching digest can accept a bundled file. A changed remote
++			-- extension may share the same layout bytes but carry newer hotstrings.
++			local checked = false
++			deps.transport.sha256(bundled, function(digest)
++				if checked or finished then return end
++				checked = true
++				if digest == file.sha256 then verify(bundled) else download() end
++			end)
++		else
++			download()
++		end
++	end
++	next_file()
++end
++
++--- Stages already verified content without changing its installed record.
++--- Existing generations are immutable; conflicting bytes are a hard failure.
++--- @param local_dir string Layout state directory.
++--- @param entry table Registry entry.
++--- @param content table Verified bytes keyed by relative extension path.
++--- @param deps table Injected read(path) and atomic write(path, text) functions.
++--- @return boolean
++--- @return string|nil
++function M.stage(local_dir, entry, content, deps)
++	local valid, reason = M.validate(entry)
++	if not valid then return false, reason end
++	for _, file in ipairs(entry.extension.files) do
++		if type(content[file.path]) ~= "string" or #content[file.path] ~= file.size then
++			return false, "incomplete verified extension content"
++		end
++	end
++	local directory = M.generation_root(local_dir, entry) .. "/" .. entry.extension.id .. "/"
++	for _, file in ipairs(entry.extension.files) do
++		local path, text = directory .. file.path, content[file.path]
++		local existing = deps.read(path)
++		if existing ~= nil and existing ~= text then return false, "immutable extension content changed" end
++		if existing == nil then
++			local ok, err = deps.write(path, text)
++			if not ok then return false, err end
++		end
++	end
++	return true
++end
++
++--- Supplies roots only for committed entries; staging directories remain invisible.
++--- @param local_dir string Layout state directory.
++--- @param record table Installed-layout record.
++--- @return table Sorted extension roots, consumed by the existing scanner.
++function M.roots(local_dir, record)
++	local roots = {}
++	for _, entry in pairs(record.layouts) do
++		if entry.extension ~= nil then
++			local valid, reason = M.validate(entry)
++			if not valid then error(reason, 0) end
++			roots[#roots + 1] = M.generation_root(local_dir, entry)
++		end
++	end
++	table.sort(roots)
++	return roots
++end
++
++return M
+diff --git a/static/ergopti_plus/linux/modules/keymap/layout_registry.lua b/static/ergopti_plus/linux/modules/keymap/layout_registry.lua
+index 9faff0444..27a3d7a57 100644
+--- a/static/ergopti_plus/linux/modules/keymap/layout_registry.lua
++++ b/static/ergopti_plus/linux/modules/keymap/layout_registry.lua
+@@ -38,6 +38,7 @@ local ProcessRunner = require("adapters.process_runner")
+ local Json          = require("json")
+ local Registry      = require("layouts.registry")
+ local Catalogue     = require("layouts.catalogue")
++local Extension     = require("layouts.extension")
+ 
+ local M = {}
+ 
+@@ -303,7 +304,8 @@ end
+ --- @return boolean ok
+ --- @return string|nil error
+ local function write_file(deps, path, content)
+-	if not deps.ensure_dir(deps.local_dir) then return false, "cannot create " .. deps.local_dir end
++	local parent = assert(path:match("^(.*)/[^/]+$"), "layout write requires an absolute parent")
++	if not deps.ensure_dir(parent) then return false, "cannot create " .. parent end
+ 	local written, write_err = deps.write(path, content)
+ 	if not written then return false, "cannot write " .. path .. ": " .. tostring(write_err) end
+ 	return true, nil
+@@ -653,6 +655,12 @@ function M.install(id, on_done, deps)
+ 				finish(false, M.FAILURE_DOWNLOAD, detail)
+ 				return
+ 			end
++			if entry.extension ~= nil then
++				local staged, stage_err = Extension.stage(deps.local_dir, entry, detail.content, {
++					read = deps.read, write = function(path, text) return write_file(deps, path, text) end,
++				})
++				if not staged then finish(false, M.FAILURE_WRITE, stage_err) return end
++			end
+ 			local layout_path = deps.local_dir .. id .. ".keylayout"
+ 			local written, write_err = write_file(deps, layout_path, detail.text)
+ 			if not written then
+@@ -796,4 +804,15 @@ function M._reset()
+ 	_bundled_index_read = false
+ end
+ 
++--- Roots of committed extension generations, without changing activation choices.
++--- @param deps table|nil Optional filesystem collaborators.
++--- @return table
++function M.extension_roots(deps)
++	local resolved, reason = resolve_deps(deps)
++	if not resolved then error(reason, 0) end
++	local record, err = read_installed(resolved)
++	if not record then error(err, 0) end
++	return Extension.roots(resolved.local_dir, record)
++end
++
+ return M
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua b/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
+index 303f6ede8..0a19c9d54 100644
+--- a/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
+@@ -62,11 +62,22 @@ local function manager(options)
+ 	LayoutRegistry._reset()
+ 	local settings = assert(LayoutRegistry.settings())
+ 	local digests = {}
+-	for _, entry in ipairs(INDEX.layouts) do digests[registry_file(entry.file)] = entry.sha256 end
++	for _, entry in ipairs(INDEX.layouts) do
++		digests[registry_file(entry.file)] = entry.sha256
++		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
++	end
+ 	local state = { requests = {}, files = {}, runs = {}, deleted = {} }
+ 	for path, text in pairs(options.files or {}) do state.files[path] = text end
+ 	local runs = options.runs or {}
+ 	local served = options.served or {}
++	if type(served) == "table" and served[INDEX_URL] then
++		for _, entry in ipairs(INDEX.layouts) do
++			for _, file in ipairs(entry.extension.files) do
++				local url = "https://raw.githubusercontent.com/adrienm7/ergopti/main/static/layouts/registry/" .. file.file
++				if served[url] == nil then served[url] = registry_file(file.file) end
++			end
++		end
++	end
+ 	local deps = {
+ 		settings = settings,
+ 		transport = {
+@@ -127,7 +138,10 @@ end
+ --- @return table
+ local function shipped_files()
+ 	local files = { [SHIPPED_DIR .. "index.json"] = INDEX_TEXT }
+-	for _, entry in ipairs(INDEX.layouts) do files[SHIPPED_DIR .. entry.file] = registry_file(entry.file) end
++	for _, entry in ipairs(INDEX.layouts) do
++		files[SHIPPED_DIR .. entry.file] = registry_file(entry.file)
++		for _, file in ipairs(entry.extension.files) do files[SHIPPED_DIR .. file.file] = registry_file(file.file) end
++	end
+ 	return files
+ end
+ 
+@@ -164,7 +178,7 @@ helpers.describe("layout manager (Linux): installing", function()
+ 		helpers.assert_true(result.ok, "the installation must succeed: " .. tostring(result.extra))
+ 		helpers.assert_eq(result.detail.source, "network")
+ 		helpers.assert_true(result.detail.verified)
+-		helpers.assert_eq(#state.requests, 2, "the index then the layout")
++		helpers.assert_eq(#state.requests, 2 + #entry_of("ergol").extension.files, "the index, layout and complete extension")
+ 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
+ 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"')
+ 		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == layout, "the verified bytes are converted")
+@@ -198,6 +212,13 @@ helpers.describe("layout manager (Linux): installing", function()
+ 			files = shipped_files(),
+ 			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+ 		})
++		local directories = {}
++		deps.ensure_dir = function(path) directories[path] = true return true end
++		deps.write = function(path, content)
++			if not directories[path:match("^(.*)/[^/]+$")] then return false, "parent missing" end
++			state.files[path] = content
++			return true
++		end
+ 		local result = run(function(done) LayoutRegistry.install("ergopti", done, deps) end)
+ 		helpers.assert_true(result.ok, "the shipped Ergopti must install offline: " .. tostring(result.extra))
+ 		helpers.assert_eq(result.detail.source, "bundled")
+diff --git a/static/ergopti_plus/macos/modules/keymap/layout_registry.lua b/static/ergopti_plus/macos/modules/keymap/layout_registry.lua
+index db641eb09..78c3ce756 100644
+--- a/static/ergopti_plus/macos/modules/keymap/layout_registry.lua
++++ b/static/ergopti_plus/macos/modules/keymap/layout_registry.lua
+@@ -33,6 +33,7 @@ local Crypto       = require("adapters.crypto")
+ local Json         = require("json")
+ local Registry     = require("layouts.registry")
+ local Catalogue    = require("layouts.catalogue")
++local Extension    = require("layouts.extension")
+ 
+ local M = {}
+ 
+@@ -514,6 +515,12 @@ function M.install(id, on_done, deps)
+ 				finish(false, M.FAILURE_DOWNLOAD, detail)
+ 				return
+ 			end
++			if entry.extension ~= nil then
++				local staged, stage_err = Extension.stage(deps.local_dir, entry, detail.content, {
++					read = deps.read, write = function(path, text) return write_file(deps, path, text) end,
++				})
++				if not staged then finish(false, M.FAILURE_WRITE, stage_err) return end
++			end
+ 			local path, code, publish_err = publish(deps, entry, detail.text)
+ 			if not path then
+ 				finish(false, code, publish_err)
+@@ -629,4 +636,15 @@ function M._reset()
+ 	_bundled_index_read = false
+ end
+ 
++--- Roots of committed extension generations, without changing activation choices.
++--- @param deps table|nil Optional filesystem collaborators.
++--- @return table
++function M.extension_roots(deps)
++	local resolved, reason = resolve_deps(deps)
++	if not resolved then error(reason, 0) end
++	local record, err = read_installed(resolved)
++	if not record then error(err, 0) end
++	return Extension.roots(resolved.local_dir, record)
++end
++
+ return M
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua
+index 678d0123e..1caba51ce 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua
+@@ -211,17 +211,26 @@ helpers.describe("layout catalogue: where a layout's bytes come from", function(
+ 	--- Runs one acquisition and returns its terminal result.
+ 	local function acquire(bundled, shipped_text, served)
+ 		local reads, requests = {}, {}
++		local bodies, digests = {}, {}
++		for _, file in ipairs(entry.extension.files) do
++			bodies[file.file] = read(REGISTRY_DIR .. file.file)
++			digests[bodies[file.file]] = file.sha256
++		end
+ 		local result = { calls = 0 }
+ 		Catalogue.acquire(settings(), entry, {
+ 			bundled_index = bundled,
+-			read_bundled = function(rel) reads[#reads + 1] = rel; return shipped_text end,
++			read_bundled = function(rel)
++				reads[#reads + 1] = rel
++				if rel == entry.file then return shipped_text end
++				return shipped_text and bodies[rel] or nil
++			end,
+ 			transport = {
+ 				get = function(url, _, _, callback)
+ 					requests[#requests + 1] = url
+ 					if served then callback(200, served, nil, {}) else callback(0, "", "offline", nil) end
+ 				end,
+ 				sha256 = function(bytes, callback)
+-					callback(bytes == text and entry.sha256 or string.rep("0", 64), nil)
++					callback(digests[bytes] or string.rep("0", 64), nil)
+ 				end,
+ 			},
+ 		}, function(ok, detail)
+@@ -247,7 +256,7 @@ helpers.describe("layout catalogue: where a layout's bytes come from", function(
+ 		local result, reads, requests = acquire(other, text, text)
+ 		helpers.assert_true(result.ok, tostring(result.detail))
+ 		helpers.assert_eq(result.detail.source, Catalogue.SOURCE_NETWORK)
+-		helpers.assert_eq(#reads, 0)
++		helpers.assert_eq(#reads, #entry.extension.files, "the extension verifies each independently versioned bundled file")
+ 		helpers.assert_eq(#requests, 1)
+ 
+ 		result = acquire(other, text, text .. " ")
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua
+new file mode 100644
+index 000000000..962651ef5
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua
+@@ -0,0 +1,96 @@
++--- tests/unit/modules/keymap/test_layout_extension.lua
++
++--- ==============================================================================
++--- MODULE: Layout Extension Publication Tests
++--- DESCRIPTION:
++--- Exercises immutable extension staging and record-based discovery with private
++--- injected files. A rejected download or stage cannot expose partial content.
++--- ==============================================================================
++
++local helpers = require("tests.helpers")
++local Extension = require("layouts.extension")
++
++local function fixture()
++	local files = {
++		{ path = "manifest.toml", file = "sample/manifest.toml", size = 1, sha256 = string.rep("a", 64) },
++		{ path = "sample.keylayout", file = "sample/sample.keylayout", size = 1, sha256 = string.rep("b", 64) },
++		{ path = "hotstrings/demo.toml", file = "sample/hotstrings/demo.toml", size = 1, sha256 = string.rep("c", 64) },
++	}
++	return { id = "sample", extension = { id = "sample", name = "Sample", version = "1.0.0",
++		sha256 = string.rep("d", 64), files = files } }
++end
++
++helpers.describe("Layout extension publication", function()
++	helpers.it("verifies every downloaded file and refuses corrupt content without publication", function()
++		local entry, requests, result = fixture(), {}, nil
++		local settings = { max_file_bytes = 100, timeout_ms = 50,
++			url_template = "https://example.test/{path}", owner = "owner", repo = "repo", branch = "dev", folder = "registry" }
++		local transport = {
++			get = function(url, _, _, callback)
++				requests[#requests + 1] = url
++				callback(200, url:find("manifest", 1, true) and "a" or "x")
++			end,
++			sha256 = function(text, callback) callback(string.rep(text, 64)) end,
++		}
++		Extension.acquire(settings, entry, { transport = transport }, function(ok, detail) result = { ok, detail } end)
++		helpers.assert_true(result ~= nil and not result[1])
++		helpers.assert_eq(#requests, 2, "stop before fetching later files after corruption")
++		local callbacks = 0
++		transport.get = function(url, _, _, callback)
++			local text = url:find("manifest", 1, true) and "a" or url:find("keylayout", 1, true) and "b" or "c"
++			callback(200, text)
++			callback(200, text)
++		end
++		Extension.acquire(settings, entry, { transport = transport }, function(ok, content)
++			callbacks = callbacks + 1
++			helpers.assert_true(ok)
++			helpers.assert_eq(content["hotstrings/demo.toml"], "c")
++		end)
++		helpers.assert_eq(callbacks, 1)
++	end)
++
++	helpers.it("refuses traversal, duplicate files and missing manifests before writing", function()
++		local entry = fixture()
++		helpers.assert_true(Extension.validate(entry, 100))
++		entry.extension.files[3].path = "../config.toml"
++		helpers.assert_true(not Extension.validate(entry, 100))
++		entry = fixture()
++		entry.extension.files[3] = entry.extension.files[1]
++		helpers.assert_true(not Extension.validate(entry, 100))
++		entry = fixture()
++		table.remove(entry.extension.files, 1)
++		helpers.assert_true(not Extension.validate(entry, 100))
++	end)
++
++	helpers.it("never discovers staged content until its installed record commits", function()
++		local entry, writes = fixture(), {}
++		local deps = { read = function(path) return writes[path] end,
++			write = function(path, text) writes[path] = text return true end }
++		local bytes = { ["manifest.toml"] = "a", ["sample.keylayout"] = "b", ["hotstrings/demo.toml"] = "c" }
++		local ok = Extension.stage("/private/", entry, bytes, deps)
++		helpers.assert_true(ok)
++		helpers.assert_eq(#Extension.roots("/private/", { layouts = {} }), 0)
++		local roots = Extension.roots("/private/", { layouts = { sample = entry } })
++		helpers.assert_eq(#roots, 1)
++		helpers.assert_eq(writes[roots[1] .. "/sample/hotstrings/demo.toml"], "c")
++		helpers.assert_true(entry.enabled == nil and entry.extension.enabled == nil)
++	end)
++
++	helpers.it("failed staging leaves the previous generation discoverable and unmodified", function()
++		local old, next_entry = fixture(), fixture()
++		next_entry.extension.sha256 = string.rep("e", 64)
++		local before = Extension.roots("/private/", { layouts = { sample = old } })[1]
++		local writes = 0
++		local ok = Extension.stage("/private/", next_entry,
++			{ ["manifest.toml"] = "a", ["sample.keylayout"] = "b", ["hotstrings/demo.toml"] = "c" }, {
++				read = function() return nil end,
++				write = function(path)
++					helpers.assert_true(not path:find(before, 1, true))
++					writes = writes + 1
++					return writes < 2, "disk full"
++				end,
++			})
++		helpers.assert_true(not ok)
++		helpers.assert_eq(Extension.roots("/private/", { layouts = { sample = old } })[1], before)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua
+index 3aebcc3bc..d1da7a0ec 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua
+@@ -69,10 +69,21 @@ local function manager(options)
+ 	LayoutRegistry._reset()
+ 	local settings = assert(LayoutRegistry.settings())
+ 	local digests = {}
+-	for _, entry in ipairs(INDEX.layouts) do digests[registry_file(entry.file)] = entry.sha256 end
++	for _, entry in ipairs(INDEX.layouts) do
++		digests[registry_file(entry.file)] = entry.sha256
++		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
++	end
+ 	local state = { requests = {}, files = {}, enabled = {}, disabled = {}, selected = {}, deleted = {} }
+ 	for path, text in pairs(options.files or {}) do state.files[path] = text end
+ 	local served = options.served or {}
++	if type(served) == "table" and served[INDEX_URL] then
++		for _, entry in ipairs(INDEX.layouts) do
++			for _, file in ipairs(entry.extension.files) do
++				local url = INDEX_URL:gsub("index%.json$", "") .. file.file
++				if served[url] == nil then served[url] = registry_file(file.file) end
++			end
++		end
++	end
+ 	local deps = {
+ 		settings = settings,
+ 		transport = {
+@@ -132,7 +143,9 @@ end
+ --- @return table
+ local function shipped_files()
+ 	local files = { [SHIPPED_DIR .. "index.json"] = INDEX_TEXT }
+-	for _, entry in ipairs(INDEX.layouts) do files[SHIPPED_DIR .. entry.file] = registry_file(entry.file) end
++	for _, entry in ipairs(INDEX.layouts) do
++		for _, file in ipairs(entry.extension.files) do files[SHIPPED_DIR .. file.file] = registry_file(file.file) end
++	end
+ 	return files
+ end
+ 
+@@ -144,6 +157,20 @@ local function record(state)
+ end
+ 
+ helpers.describe("layout manager (macOS): installing", function()
++	helpers.it("keeps extension content unavailable after a publication failure (layout-extension)", function()
++		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
++		local write = deps.write
++		deps.write = function(path, text)
++			if path:find("/extensions/", 1, true) then return false, "disk full" end
++			return write(path, text)
++		end
++		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
++		helpers.assert_true(not result.ok)
++		helpers.assert_eq(#LayoutRegistry.extension_roots(deps), 0)
++		helpers.assert_nil(state.files[LOCAL_DIR .. "installed.json"])
++		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"])
++	end)
++
+ 	helpers.it("installs a downloaded layout, enables it and records it last (layout-registry-install)", function()
+ 		local LayoutRegistry, deps, state = manager({
+ 			served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = registry_file("ergol/ergol.keylayout") },
+@@ -153,13 +180,17 @@ helpers.describe("layout manager (macOS): installing", function()
+ 		helpers.assert_eq(result.detail.path, LAYOUTS_DIR .. "ergol.keylayout")
+ 		helpers.assert_eq(result.detail.source, "network")
+ 		helpers.assert_true(result.detail.enabled)
+-		helpers.assert_eq(#state.requests, 2, "the index then the layout")
++		helpers.assert_eq(#state.requests, 2 + #entry_of("ergol").extension.files, "the index, layout and verified extension")
+ 		helpers.assert_true(state.files[LAYOUTS_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"),
+ 			"the installed file is the registry file byte for byte")
+ 		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"))
+ 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
+ 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"', "with the ETag it was served with")
+ 		helpers.assert_eq(record(state).layouts.ergol.sha256, entry_of("ergol").sha256)
++		local roots = LayoutRegistry.extension_roots(deps)
++		helpers.assert_eq(#roots, 1)
++		helpers.assert_eq(state.files[roots[1] .. "/ergol/manifest.toml"], registry_file("ergol/manifest.toml"))
++		helpers.assert_nil(state.files["/cfg/config.toml"], "installation does not persist enable preferences")
+ 		helpers.assert_eq(state.enabled[1].path, LAYOUTS_DIR .. "ergol.keylayout")
+ 		local snapshot = LayoutRegistry.snapshot(deps)
+ 		helpers.assert_eq(snapshot.installed.ergol.version, entry_of("ergol").version)
+diff --git a/static/ergopti_plus/windows/ErgoptiPlus.ahk b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+index 3b76c961a..21dd96c6d 100644
+--- a/static/ergopti_plus/windows/ErgoptiPlus.ahk
++++ b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+@@ -497,6 +497,7 @@ if UIASW_IsWorkerInvocation()
+ #Include modules/keymap/keylayout/keylayout_emulation.ahk
+ #Include modules/keymap/keylayout/layout_registry.ahk
+ #Include modules/keymap/keylayout/layout_catalogue.ahk
++#Include modules/keymap/keylayout/layout_extension.ahk
+ #Include infra/app_picker.ahk
+ #Include infra/config_shortcuts.ahk
+ #Include infra/metrics/metrics_shortcuts.ahk
+diff --git a/static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk b/static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk
+index 19e05d807..58023cdba 100644
+--- a/static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk
++++ b/static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk
+@@ -118,6 +118,8 @@ LayoutCatalogue_IndexProblem(Index) {
+ 			Usable := Usable && Entry.Has(Field) && (Entry[Field] is String)
+ 		if !Usable
+ 			return "the registry entry of '" . Entry["id"] . "' has no usable file, checksum, size or version"
++		if Entry.Has("extension") && (Problem := LayoutExtension_Problem(Entry)) != ""
++			return Problem
+ 	}
+ 	return ""
+ }
+@@ -317,6 +319,8 @@ _LayoutCatalogueRecordEntry(Entry) {
+ 	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
+ 		if Entry.Has(Field) && ((Entry[Field] is String) || (Entry[Field] is Integer))
+ 			Kept[Field] := Entry[Field]
++	if Entry.Has("extension")
++		Kept["extension"] := JsonParse(_LayoutCatalogueJson(Entry["extension"]))
+ 	return Kept
+ }
+ 
+@@ -565,17 +569,17 @@ _LayoutCatalogueOnInstallIndex(Id, LocalDir, Transport, Bundled, BundledDir, Fin
+ 			Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, "the shipped copy is damaged: " . Err.Message)
+ 			return
+ 		}
+-		_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_BUNDLED, Finish)
++		_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_BUNDLED, Finish, Transport, BundledDir)
+ 		return
+ 	}
+ 	Partial := LocalDir . Id . ".keylayout" . LAYOUT_REGISTRY_PARTIAL_SUFFIX
+ 	Url := LayoutRegistry_RawUrl(Entry["file"])
+ 	LayoutRegistry_Request(Url, Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
+ 		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, Transport,
+-		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish))
++		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir))
+ }
+ 
+-_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Status, Etag, Err) {
++_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir, Status, Etag, Err) {
+ 	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, LAYOUT_CATALOGUE_SOURCE_NETWORK
+ 	try {
+ 		if (Status != 200)
+@@ -590,11 +594,29 @@ _LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Status, Etag
+ 	}
+ 	if !FSDelete(Partial)
+ 		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
+-	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish)
++	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish, Transport, BundledDir)
+ }
+ 
+ ; Publishes a verified layout: the local copy, then the record.
+-_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, Source, Finish) {
++_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, Source, Finish, Transport := 0, BundledDir := "") {
++	if !Entry.Has("extension") {
++		_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish)
++		return
++	}
++	LayoutExtension_Acquire(Entry, LocalDir, BundledDir, Transport, Text,
++		_LayoutCatalogueOnExtension.Bind(Id, LocalDir, Entry, Text, Source, Finish))
++}
++
++_LayoutCatalogueOnExtension(Id, LocalDir, Entry, Text, Source, Finish, Ok, Detail := "") {
++	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD
++	if !Ok {
++		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, Detail)
++		return
++	}
++	_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish)
++}
++
++_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish) {
+ 	global LAYOUT_CATALOGUE_FAILURE_WRITE, LAYOUT_CATALOGUE_FAILURE_RECORD
+ 	try _LayoutCatalogueWriteText(LocalDir . Id . ".keylayout", Text)
+ 	catch as Err {
+diff --git a/static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk b/static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk
+new file mode 100644
+index 000000000..2997e6edb
+--- /dev/null
++++ b/static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk
+@@ -0,0 +1,168 @@
++﻿; modules/keymap/keylayout/layout_extension.ahk
++
++; ==============================================================================
++; MODULE: Layout Extension Content
++; DESCRIPTION:
++; Acquires and stages existing-format extension files before the installed record
++; publishes their immutable generation. Discovery never scans unfinished stages,
++; and installation never writes hotstring or shortcut activation preferences.
++; ==============================================================================
++
++/**
++ * Validates an extension inventory before filesystem or network effects.
++ * @param {Map} Entry - Registry layout entry.
++ * @returns {String} Empty when valid, otherwise a diagnostic.
++ */
++LayoutExtension_Problem(Entry) {
++	if !(Entry is Map) || !LayoutRegistry_IsValidId(Entry.Get("id", ""))
++		return "invalid layout id"
++	Extension := Entry.Get("extension", 0)
++	if !(Extension is Map) || !RegExMatch(Extension.Get("id", ""), "^[a-z][a-z0-9_-]*$")
++			|| !RegExMatch(Extension.Get("sha256", ""), "^[0-9a-f]{64}$") || !(Extension.Get("files", 0) is Array)
++		return "invalid layout extension inventory"
++	Seen := Map(), Total := 0
++	for Item in Extension["files"] {
++		if !(Item is Map)
++			return "invalid layout extension file"
++		Path := Item.Get("path", "")
++		Allowed := (Path == "manifest.toml") || (Path == Entry["id"] . ".keylayout")
++			|| RegExMatch(Path, "^hotstrings/[a-z][a-z0-9_-]*\.toml$")
++			|| RegExMatch(Path, "^shortcuts/menu\.(ahk|lua)$") || RegExMatch(Path, "^[A-Z][A-Z0-9_-]*(\.txt)?$")
++		if !Allowed || Seen.Has(Path) || !(Item.Get("size", "") is Integer) || Item["size"] < 0
++				|| !RegExMatch(Item.Get("sha256", ""), "^[0-9a-f]{64}$")
++			return "invalid or duplicate layout extension file"
++		if (Item.Get("file", "") != Entry["id"] . "/" . Path)
++				&& (Item.Get("file", "") != Extension["id"] . "/" . Path)
++			return "extension file is outside its registry folder"
++		Seen[Path] := true
++		Total += Item["size"]
++	}
++	if !Seen.Has("manifest.toml") || !Seen.Has(Entry["id"] . ".keylayout")
++		return "layout extension is missing its manifest or keylayout"
++	return Total > LayoutRegistry_Settings()["max_file_bytes"] ? "layout extension exceeds the download bound" : ""
++}
++
++/**
++ * Roots consumed by the existing extension scanner; only committed records count.
++ * @param {String} LocalDir - Layout state folder with a trailing separator.
++ * @returns {Array} Generation roots with trailing separators.
++ */
++LayoutExtension_Roots(LocalDir) {
++	Roots := []
++	for Id, Entry in LayoutCatalogue_ReadInstalled(LocalDir) {
++		if !Entry.Has("extension")
++			continue
++		Problem := LayoutExtension_Problem(Entry)
++		if Problem != ""
++			throw Error(Problem)
++		Roots.Push(LocalDir . "extensions\" . Id . "\" . Entry["extension"]["sha256"] . "\")
++	}
++	return Roots
++}
++
++/**
++ * Acquires every verified file and stages it without publishing an installed record.
++ * @param {Map} Entry - Registry entry.
++ * @param {String} LocalDir - Layout state folder.
++ * @param {String} BundledDir - Shipped registry folder, or empty.
++ * @param {Map|Integer} Transport - Existing registry transport collaborator.
++ * @param {String} LayoutText - Already verified layout bytes.
++ * @param {Func} OnDone - Receives success and an optional error diagnostic.
++ */
++LayoutExtension_Acquire(Entry, LocalDir, BundledDir, Transport, LayoutText, OnDone) {
++	Problem := LayoutExtension_Problem(Entry)
++	if Problem != "" {
++		OnDone.Call(false, Problem)
++		return
++	}
++	State := Map("entry", Entry, "local", LocalDir, "bundled", BundledDir, "transport", Transport,
++		"content", Map(Entry["id"] . ".keylayout", LayoutText), "position", 0, "done", OnDone, "finished", false)
++	_LayoutExtensionNext(State)
++}
++
++_LayoutExtensionFinish(State, Ok, Detail := "") {
++	if State["finished"]
++		return
++	State["finished"] := true
++	State["done"].Call(Ok, Detail)
++}
++
++_LayoutExtensionMatches(Item, Text) {
++	return (Text is String) && (StrPut(Text, "UTF-8") - 1 == Item["size"]) && (CryptoSha256(Text) == Item["sha256"])
++}
++
++_LayoutExtensionNext(State) {
++	global LAYOUT_REGISTRY_USER_AGENT
++	if State["finished"]
++		return
++	State["position"] += 1
++	Files := State["entry"]["extension"]["files"]
++	if State["position"] > Files.Length {
++		try _LayoutExtensionStage(State)
++		catch as Err {
++			_LayoutExtensionFinish(State, false, Err.Message)
++			return
++		}
++		_LayoutExtensionFinish(State, true)
++		return
++	}
++	Item := Files[State["position"]]
++	if State["content"].Has(Item["path"]) {
++		if !_LayoutExtensionMatches(Item, State["content"][Item["path"]]) {
++			_LayoutExtensionFinish(State, false, "extension keylayout does not match its inventory")
++			return
++		}
++		_LayoutExtensionNext(State)
++		return
++	}
++	Bundled := State["bundled"] . StrReplace(Item["file"], "/", "\")
++	Text := State["bundled"] != "" && FileExist(Bundled)
++		? FSReadBounded(Bundled, LayoutRegistry_Settings()["max_file_bytes"]) : false
++	if _LayoutExtensionMatches(Item, Text) {
++		State["content"][Item["path"]] := Text
++		_LayoutExtensionNext(State)
++		return
++	}
++	Partial := State["local"] . State["entry"]["id"] . ".extension.download"
++	LayoutRegistry_Request(LayoutRegistry_RawUrl(Item["file"]), Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
++		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, State["transport"],
++		_LayoutExtensionDownloaded.Bind(State, Item, Partial, State["position"]))
++}
++
++_LayoutExtensionDownloaded(State, Item, Partial, Position, Status, Etag, Err) {
++	if State["finished"] || State["position"] != Position
++		return
++	try {
++		if Status != 200
++			throw Error("Extension download failed: " . Status . " " . Err)
++		Text := _LayoutRegistryReadText(Partial)
++		if !_LayoutExtensionMatches(Item, Text)
++			throw Error("Extension checksum or size mismatch: " . Item["path"])
++		State["content"][Item["path"]] := Text
++	} catch as Failure {
++		if FileExist(Partial) && !FSDelete(Partial)
++			LoggerWarn("LayoutCatalogue", "Cannot remove the partial extension download {1}.", Partial)
++		_LayoutExtensionFinish(State, false, Failure.Message)
++		return
++	}
++	if !FSDelete(Partial)
++		LoggerWarn("LayoutCatalogue", "Cannot remove the partial extension download {1}.", Partial)
++	_LayoutExtensionNext(State)
++}
++
++_LayoutExtensionStage(State) {
++	Entry := State["entry"], Extension := Entry["extension"]
++	Root := State["local"] . "extensions\" . Entry["id"] . "\" . Extension["sha256"] . "\" . Extension["id"] . "\"
++	for Item in Extension["files"] {
++		Path := Root . StrReplace(Item["path"], "/", "\")
++		Text := State["content"][Item["path"]]
++		if FileExist(Path) {
++			if _LayoutRegistryReadText(Path) !== Text
++				throw Error("Immutable extension content changed: " . Item["path"])
++			continue
++		}
++		SplitPath(Path,, &Parent)
++		DirCreate(Parent)
++		_LayoutCatalogueWriteText(Path, Text)
++	}
++}
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index e41cc6274..b49dcb706 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -223,6 +223,7 @@ global _DefaultLogsDir := _LogsDir
+ #Include ../modules/keymap/keylayout/keylayout_emulation.ahk
+ #Include ../modules/keymap/keylayout/layout_registry.ahk
+ #Include ../modules/keymap/keylayout/layout_catalogue.ahk
++#Include ../modules/keymap/keylayout/layout_extension.ahk
+ ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
+ ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
+ #Include ../modules/keymap/layout_poll_helper.ahk
+diff --git a/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk b/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk
+index 97400e9e3..6dea2467c 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk
+@@ -114,11 +114,17 @@ _LCT_NoProxy(Urls) {
+ }
+ 
+ _LCT_Served(LayoutText, Etag := '"e1"') {
+-	return Map(
++	Served := Map(
+ 		LayoutRegistry_RawUrl("index.json"), Map("status", 200, "body", _LCT_Read(_LCT_RegistryDir() . "index.json"),
+ 			"etag", Etag),
+ 		LayoutRegistry_RawUrl("ergol/ergol.keylayout"), Map("status", 200, "body", LayoutText, "etag", "")
+ 	)
++	for Item in LayoutCatalogue_Entry(_LCT_Index(), "ergol")["extension"]["files"] {
++		Url := LayoutRegistry_RawUrl(Item["file"])
++		if !Served.Has(Url)
++			Served[Url] := Map("status", 200, "body", _LCT_Read(_LCT_RegistryDir() . StrReplace(Item["file"], "/", "\")), "etag", "")
++	}
++	return Served
+ }
+ 
+ _LCT_Tamper(Text, Old, New) {
+@@ -242,6 +248,47 @@ _LCT_RefreshCase() {
+ Test("layout catalogue: a verified download is installed and read back by the emulation (layout-catalogue)",
+ 	_LCT_InstallCase)
+ 
++Test("layout extensions: installed content is published without enable preferences (layout-extension)",
++	_LCT_ExtensionPublishCase)
++
++_LCT_ExtensionPublishCase() {
++	Dir := _LCT_TempDir()
++	try {
++		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())
++		AssertTrue(Result[1])
++		Entry := LayoutCatalogue_ReadInstalled(Dir)["ergol"]
++		AssertTrue(Entry.Has("extension"), "the published record owns the complete extension generation")
++		Extension := Entry["extension"]
++		Root := Dir . "extensions\ergol\" . Extension["sha256"] . "\" . Extension["id"] . "\"
++		for File in Extension["files"] {
++			Path := Root . StrReplace(File["path"], "/", "\")
++			AssertTrue(FileExist(Path), "every advertised extension file is available before publication")
++			AssertEqual(File["sha256"], CryptoSha256(_LCT_Read(Path)))
++		}
++		AssertFalse(FileExist(Dir . "config.toml"), "installing content never enables it")
++	} finally DirDelete(Dir, true)
++}
++
++Test("layout extensions: a corrupt manifest leaves the installed record unchanged (layout-extension)",
++	_LCT_ExtensionRefusalCase)
++
++_LCT_ExtensionRefusalCase() {
++	Dir := _LCT_TempDir()
++	Shipped := _LCT_TempDir()
++	try {
++		AssertTrue(_LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())[1])
++		Before := _LCT_Read(Dir . "installed.json")
++		DirCopy(_LCT_RegistryDir(), Shipped, true)
++		_LCT_WriteRaw(Shipped . "ergol\manifest.toml", "corrupt")
++		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), Shipped)
++		AssertFalse(Result[1], "a layout file alone cannot publish an incomplete extension")
++		AssertEqual(Before, _LCT_Read(Dir . "installed.json"))
++	} finally {
++		DirDelete(Dir, true)
++		DirDelete(Shipped, true)
++	}
++}
++
+ _LCT_InstallCase() {
+ 	Dir := _LCT_TempDir()
+ 	try {
+@@ -249,7 +296,8 @@ _LCT_InstallCase() {
+ 		Result := _LCT_Install("ergol", Dir, _LCT_Transport(_LCT_Served(_LCT_LayoutText("ergol")), Log))
+ 		AssertTrue(Result[1], "the installation must succeed: " . (Result[2] is String ? Result[3] : ""))
+ 		AssertEqual("network", Result[2]["source"])
+-		AssertEqual(2, Log.Length, "the index then the layout")
++		AssertEqual(1 + LayoutCatalogue_Entry(_LCT_Index(), "ergol")["extension"]["files"].Length, Log.Length,
++			"the index and complete extension; the verified layout is reused")
+ 		LocalCopy := LayoutRegistry_ReadLocal("ergol", Dir)
+ 		AssertEqual(_LCT_LayoutText("ergol"), LocalCopy["Text"])
+ 		AssertEqual("ansi", LocalCopy["Entry"]["keycode_convention"], "the record keeps what the emulation reads")
+-- 
+2.50.0.windows.1
+

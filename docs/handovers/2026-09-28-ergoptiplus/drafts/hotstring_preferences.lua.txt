@@ -1,0 +1,109 @@
+--- infra/hotstring_preferences.lua
+
+--- Owns canonical category and section choices and their runtime compensation.
+local M = {}
+local Manifest = require("infra.manifest_reader")
+local Transaction = require("config_scope_transaction")
+local Writer = require("toml_codec.writer")
+local Codec = require("toml_codec")
+local Paths = require("infra.config_paths")
+local _sequence = 0
+
+--- Reads one desired category or section without conflating it with its master.
+--- @param document table Canonical configuration.
+--- @param category string Runtime category identity.
+--- @param section string|nil Runtime section identity.
+--- @param mark function|nil Exact ownership visitor.
+--- @return boolean enabled
+function M.resolve(document, category, section, mark)
+	assert(type(category) == "string" and category ~= "" and not category:find(".", 1, true), "invalid hotstring category")
+	assert(section == nil or (type(section) == "string" and section ~= "" and not section:find(".", 1, true)), "invalid hotstring section")
+	local hotstrings = document.hotstrings
+	assert(hotstrings == nil or type(hotstrings) == "table", "hotstrings must be a table")
+	local kind = section and "modules" or "groups"
+	local collection = hotstrings and hotstrings[kind]
+	assert(collection == nil or type(collection) == "table", "hotstring choices must be a table")
+	local value = collection and collection[category]
+	if section then
+		assert(value == nil or type(value) == "table", "hotstring section choices must be a table")
+		value = value and value[section]
+	end
+	local path = "hotstrings." .. kind .. "." .. category .. (section and "." .. section or "")
+	if value == nil then value = Manifest.default_for(path)
+	elseif mark then
+		if section then mark("hotstrings", kind, category, section)
+		else mark("hotstrings", kind, category) end
+	end
+	assert(type(value) == "boolean", "hotstring choice must be boolean: " .. path)
+	return value
+end
+
+--- Reads the canonical document without falling back to legacy cached storage.
+--- @param path string|nil Configuration path.
+--- @param files table|nil File owner.
+--- @return table document
+--- @return table source Exact source for conditional publication.
+function M.read(path, files)
+	local content, status, detail = Writer.read_classified(path or Paths.config("config.toml"), files)
+	assert(status == "ok" or status == "absent", "hotstring choices unreadable: " .. tostring(detail))
+	local document = Codec.decode(content or "")
+	assert(type(document) == "table", "hotstring choices malformed")
+	return document, { status = status, content = content }
+end
+
+--- Creates the category owner using the existing single-file transaction coordinator.
+--- @param options table Known identities, validation and acknowledged runtime ports.
+--- @return table owner Set, pending, and explicit compensation retry.
+function M.new(options)
+	assert(type(options) == "table" and type(options.known) == "function"
+		and type(options.validate) == "function" and type(options.capture) == "function"
+		and type(options.apply) == "function" and type(options.restore) == "function", "hotstring preference ports incomplete")
+	local owner, transaction, busy = {}, nil, false
+	function owner.pending() return busy or (transaction ~= nil and transaction.pending()) end
+	function owner.retry_restore()
+		if busy then return false end
+		return transaction == nil or transaction.retry_restore() == true
+	end
+	function owner.set(changes)
+		if owner.pending() or type(changes) ~= "table" then return false, "hotstring configuration is pending" end
+		busy = true
+		local called, committed, detail = pcall(function()
+			local path = options.path or Paths.config("config.toml")
+			local files = options.files or require("adapters.file_system")
+			local document, source = M.read(path, files)
+			options.validate(document)
+			local operations, seen = {}, {}
+			for _, change in ipairs(changes) do
+				assert(type(change) == "table" and type(change.enabled) == "boolean", "invalid hotstring choice")
+				assert(options.known(change.category, change.section) == true, "unknown hotstring identity")
+				M.resolve(document, change.category, change.section)
+				local key = "hotstrings." .. (change.section and "modules" or "groups") .. "." .. change.category
+					.. (change.section and "." .. change.section or "")
+				assert(not seen[key], "duplicate hotstring choice")
+				seen[key] = true
+				operations[#operations + 1] = Manifest.sparse_operation(key, change.enabled)
+			end
+			assert(#operations > 0, "no hotstring choices supplied")
+			_sequence = _sequence + 1
+			transaction = Transaction.new({ path = path, files = files,
+				backup_path = path .. ".hotstrings-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
+				manifest = { scope_plan = function() return { operations = operations, presets = {} } end },
+				prepare_batch = function(target, updates, adapter)
+					return Writer.prepare_batch(target, updates, adapter, source)
+				end,
+				capture = options.capture, restore = options.restore,
+				apply = function(candidate)
+					options.validate(candidate)
+					return options.apply(candidate) == true
+				end,
+			})
+			return transaction.apply("hotstrings", "clear")
+		end)
+		busy = false
+		if not called then return false, tostring(committed) end
+		return committed == true, detail
+	end
+	return owner
+end
+
+return M

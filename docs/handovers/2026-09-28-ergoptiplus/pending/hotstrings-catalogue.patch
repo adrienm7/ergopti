@@ -1,0 +1,351 @@
+diff --git a/static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua b/static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua
+--- a/static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua
++++ b/static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua
+@@ -861,23 +861,27 @@
+ 	return paths
+ end
+ 
++--- Loads one complete catalogue and reports whether runtime publication succeeded.
++--- @return number Retained or newly accepted mapping count.
++--- @return boolean True only after the engine acknowledges publication.
++--- @return string|nil Refusal reason.
+ function M.load_all()
+ 	if not _engine then
+ 		Logger.error(LOG, "load_all(): engine not initialised.")
+-		return 0
+-	end
+-
+-	_toml_paths = resolve_paths()
++		return 0, false, "engine-not-initialized"
++	end
++
++	local staged_paths = resolve_paths()
+ 
+ 	-- An empty catalogue is not an empty load. This used to return here, which
+ 	-- meant a machine whose hotstring TOMLs were missing or unreadable also lost
+ 	-- the prefix expansions built from personal_info.toml — two unrelated files,
+ 	-- one of which was punishing the other.
+-	if #_toml_paths == 0 then
++	if #staged_paths == 0 then
+ 		Logger.warn(LOG, "load_all(): no TOML files found.")
+ 	end
+ 
+-	local catalogue = Loader.load_catalogue(_toml_paths, {
++	local catalogue = Loader.load_catalogue(staged_paths, {
+ 		magic_key = _magic_key,
+ 		canonical_magic_key = _canonical_magic_key,
+ 	})
+@@ -886,7 +890,7 @@
+ 		Logger.error(LOG,
+ 			"Catalogue reload refused: %d source(s) failed without a healthy snapshot; keeping %d mapping(s).",
+ 			_parse_errors, #_mappings)
+-		return #_mappings
++		return #_mappings, false, "catalogue-not-committed"
+ 	end
+ 	local staged_mappings = catalogue.mappings
+ 	local staged_categories = catalogue.categories
+@@ -899,13 +903,17 @@
+ 	if _extra_mappings_provider then
+ 		local ok, extra = pcall(_extra_mappings_provider)
+ 		if not ok then
+-			Logger.error(LOG, "The extra mappings provider raised — those mappings are absent: %s.",
++			Logger.error(LOG, "The extra mappings provider refused the catalogue: %s.",
+ 				tostring(extra))
++			return #_mappings, false, tostring(extra)
+ 		elseif type(extra) == "table" then
+ 			for _, mapping in ipairs(extra) do
+ 				staged_mappings[#staged_mappings + 1] = mapping
+ 			end
+ 			Logger.debug(LOG, "Appended %d mapping(s) from the provider.", #extra)
++		else
++			Logger.error(LOG, "The extra mappings provider must return a table.")
++			return #_mappings, false, "invalid-extra-mappings"
+ 		end
+ 	end
+ 
+@@ -943,19 +951,24 @@
+ 
+ 	-- Exact-trigger collisions are intentional engine input: equal-length
+ 	-- candidates are ordered by effective priority, then registration order.
+-	_engine:load_mappings(filtered)
++	local ok, committed = pcall(_engine.load_mappings, _engine, filtered)
++	if not ok or committed ~= true then
++		local reason = ok and "engine-publication-refused" or tostring(committed)
++		Logger.error(LOG, "Catalogue publication refused: %s.", reason)
++		return #_mappings, false, reason
++	end
++	_toml_paths = staged_paths
+ 	_mappings = staged_mappings
+ 	_categories = staged_categories
+ 	_resolve_cache = {}
+ 
+ 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
+ 		#filtered, _count_groups(filtered), _parse_errors)
+-	return #filtered
++	return #filtered, true
+ end
+ 
+ function M.reload()
+ 	Logger.info(LOG, "Reload requested — re-scanning…")
+-	_toml_paths = {}
+ 	return M.load_all()
+ end
+ 
+diff --git a/static/ergopti_plus/linux/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua b/static/ergopti_plus/linux/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua
+@@ -64,7 +64,7 @@
+ --- @return table module
+ local function module_for(vector)
+ 	local mod = helpers.load_module("modules.hotstrings.hotstrings_config")
+-	mod.init({ load_mappings = function() end }, nil)
++	mod.init({ load_mappings = function() return true end }, nil)
+ 
+ 	-- The shape the loader produces: the category's own values at the top level,
+ 	-- its sections under `sections`, keyed by name.
+diff --git a/static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua b/static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua
+@@ -19,7 +19,7 @@
+     local orig = e.load_mappings
+     e.load_mappings = function(self, mappings)
+       e._loaded = mappings
+-      if orig then orig(self, mappings) end
++      if orig then return orig(self, mappings) end
+     end
+     return e
+   end
+@@ -127,8 +127,11 @@
+       local bundled_dir = Paths.shared and Paths.shared("modules/hotstrings") or nil
+       local bundled = bundled_dir and Loader.find_toml_files(bundled_dir) or {}
+       if #bundled > 0 then
+-        helpers.assert_true(count > 0,
+-          "the bundled packs are on disk and discoverable, so they must have loaded")
++        helpers.assert_true(cfg.mapping_count() > 0,
++          "bundled mappings must be discovered even when their sections are inactive")
++        cfg.enable_all()
++        helpers.assert_true(#engine._loaded > 0,
++          "explicit activation must hand the discovered bundled mappings to the real engine")
+       end
+     end)
+   end)
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_catalogue_last_known_good.lua b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_catalogue_last_known_good.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_catalogue_last_known_good.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_catalogue_last_known_good.lua
+@@ -105,6 +105,7 @@
+ 				load_mappings = function(_, mappings)
+ 					loads = loads + 1
+ 					loaded = mappings
++					return true
+ 				end,
+ 			}, "virtual.toml", nil)
+ 
+@@ -137,3 +138,115 @@
+ 	end)
+ 
+ end)
++
++helpers.describe("hotstring catalogue: runtime publication acknowledgement", function()
++	local function with_catalogue(body)
++		local saved = {}
++		for name, module in pairs(package.loaded) do saved[name] = module end
++		local stage, refusal, calls = "old", nil, 0
++		package.loaded["adapters.storage"] = { get = function(_, default) return default end }
++		package.loaded["modules.hotstrings.loader"] = {
++			find_toml_files = function() return {} end,
++			list_subdirs = function() return {} end,
++			read_file = function() return nil end,
++			load_catalogue = function()
++				return { committed = true, errors = 0,
++					mappings = { { trigger = stage, replacement = stage .. "-result", group = stage,
++						auto_expand = true, is_case_sensitive_strict = true } },
++					categories = { [stage] = { id = stage, sections = {}, sections_order = {} } } }
++			end,
++		}
++		package.loaded["modules.hotstrings.hotstrings_config"] = nil
++		local ok, err = pcall(function()
++			local engine = require("hotstring_engine").new()
++			local publish = engine.load_mappings
++			engine.load_mappings = function(self, mappings)
++				calls = calls + 1
++				if refusal == "raise" then error("runtime-catalogue-refused") end
++				if refusal == "false" then return false end
++				return publish(self, mappings)
++			end
++			local Config = require("modules.hotstrings.hotstrings_config")
++			Config._set_override_config_dir_for_test(os.tmpname() .. "-absent")
++			Config.init(engine, "virtual-catalogue", nil)
++			Config.load_all()
++			local controls = {
++				stage = function(value) stage = value end,
++				refuse = function(value) refusal = value end,
++				calls = function() return calls end,
++			}
++			body(Config, engine, controls)
++		end)
++		for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
++		for name, module in pairs(saved) do package.loaded[name] = module end
++		if not ok then error(err, 0) end
++	end
++
++	local function match(engine, text)
++		engine:reset()
++		local result
++		for ch in text:gmatch(".") do result = engine:on_char(ch) end
++		return result and result.replacement
++	end
++
++	for _, refusal in ipairs({ "false", "raise" }) do
++		helpers.it("preserves engine and menu metadata after runtime " .. refusal, function()
++			with_catalogue(function(Config, engine, controls)
++				controls.stage("new")
++				controls.refuse(refusal)
++				local count, committed, reason = Config.reload()
++				helpers.assert_eq(committed, false, "caller receives refusal")
++				helpers.assert_true(type(reason) == "string" and reason:find("refused", 1, true) ~= nil,
++					"refusal reason is retained")
++				helpers.assert_eq(count, 1, "retained count")
++				helpers.assert_not_nil(Config.get_category("old"), "old menu metadata retained")
++				helpers.assert_nil(Config.get_category("new"), "new menu metadata not published")
++				helpers.assert_eq(match(engine, "old"), "old-result", "old engine remains effective")
++				helpers.assert_nil(match(engine, "new"), "candidate does not execute")
++				controls.refuse(nil)
++				local _, retried = Config.reload()
++				helpers.assert_eq(retried, true, "explicit retry can commit")
++				helpers.assert_nil(Config.get_category("old"), "old metadata replaced after retry")
++				helpers.assert_not_nil(Config.get_category("new"), "new metadata accepted after retry")
++				helpers.assert_eq(match(engine, "new"), "new-result", "retry engine executes")
++			end)
++		end)
++	end
++
++	for _, invalid in ipairs({ "raise", "non-table" }) do
++		helpers.it("refuses an incomplete catalogue when the personal provider returns " .. invalid, function()
++			with_catalogue(function(Config, engine, controls)
++				controls.stage("new")
++				Config.set_extra_mappings_provider(function()
++					if invalid == "raise" then error("personal-source-unreadable") end
++					return false
++				end)
++				local before = controls.calls()
++				local _, committed, reason = Config.reload()
++				helpers.assert_eq(committed, false, "provider failure refuses whole candidate")
++				helpers.assert_true(type(reason) == "string" and #reason > 0, "explicit provider failure")
++				helpers.assert_eq(controls.calls(), before, "incomplete candidate never reaches engine")
++				helpers.assert_eq(match(engine, "old"), "old-result", "healthy prior catalogue kept")
++				helpers.assert_not_nil(Config.get_category("old"), "prior metadata kept")
++			end)
++		end)
++	end
++
++	helpers.it("publishes a complete retry with the personal provider and exact engine receipt", function()
++		with_catalogue(function(Config, engine, controls)
++			controls.stage("new")
++			Config.set_extra_mappings_provider(function()
++				return { { trigger = "extra", replacement = "personal", group = "new",
++					auto_expand = true, is_case_sensitive_strict = true } }
++			end)
++			local count, committed = Config.reload()
++			helpers.assert_eq(committed, true, "complete candidate acknowledged")
++			helpers.assert_eq(count, 2, "both sources accepted")
++			helpers.assert_eq(Config.mapping_count(), 2, "owner agrees with engine")
++			helpers.assert_eq(engine:mapping_state().mappings, 2, "real engine readback agrees")
++			helpers.assert_eq(match(engine, "extra"), "personal", "provider mapping executes")
++			helpers.assert_eq(match(engine, "new"), "new-result", "file mapping executes")
++			helpers.assert_nil(match(engine, "old"), "old mapping removed only on success")
++		end)
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua
+@@ -65,7 +65,7 @@
+ 		local ok, err = pcall(function()
+ 			local loaded = nil
+ 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+-			Config.init({ load_mappings = function(_, mappings) loaded = mappings end }, path, nil)
++			Config.init({ load_mappings = function(_, mappings) loaded = mappings; return true end }, path, nil)
+ 			helpers.assert_true(Config.set_magic_key("§", "★"))
+ 			Config.load_all()
+ 			for category in pairs(Config.get_categories()) do
+@@ -82,7 +82,7 @@
+ 
+ 			loaded = nil
+ 			Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+-			Config.init({ load_mappings = function(_, mappings) loaded = mappings end }, path, nil)
++			Config.init({ load_mappings = function(_, mappings) loaded = mappings; return true end }, path, nil)
+ 			helpers.assert_true(Config.set_magic_key("§", "★"))
+ 			Config.load_all()
+ 			helpers.assert_eq(loaded[1].trigger, "alpha§",
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua
+@@ -253,18 +253,23 @@
+ 	--- @return table Array of mappings the engine was given.
+ 	local function loaded_with(provider)
+ 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
+-		local given = {}
++		local given, publications = {}, 0
+ 		local fake_engine = {
+-			load_mappings = function(_, mappings) given = mappings end,
++			load_mappings = function(_, mappings)
++				given = mappings
++				publications = publications + 1
++				return true
++			end,
+ 		}
+ 		config.init(fake_engine, nil, nil)
+ 		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
+ 			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
+ 		end
+ 		config.set_extra_mappings_provider(provider)
+-		config.load_all()
++		local previous_publications = publications
++		local _, committed, reason = config.load_all()
+ 		config.set_extra_mappings_provider(nil)
+-		return given
++		return given, committed, reason, publications - previous_publications
+ 	end
+ 
+ 	helpers.it("hands the provider's mappings to the engine", function()
+@@ -282,11 +287,14 @@
+ 				.. "same as no feature at all — which is what this driver had")
+ 	end)
+ 
+-	helpers.it("survives a provider that raises", function()
+-		local given = loaded_with(function() error("personal_info.toml is unreadable") end)
+-		helpers.assert_true(type(given) == "table",
+-			"the catalogue must still load: a broken personal_info.toml costs the "
+-				.. "user their prefix expansions, never their whole hotstring set")
++	helpers.it("refuses replacement when the personal provider raises", function()
++		local _, committed, reason, publications = loaded_with(function()
++			error("personal_info.toml is unreadable")
++		end)
++		helpers.assert_eq(committed, false, "an incomplete replacement must be refused")
++		helpers.assert_eq(publications, 0, "a failed personal source cannot replace the healthy engine")
++		helpers.assert_true(reason:find("personal_info.toml is unreadable", 1, true) ~= nil,
++			"the exact source failure must reach the caller")
+ 	end)
+ 
+ 	helpers.it("still registers them when the catalogue is empty", function()
+@@ -297,7 +305,7 @@
+ 		-- its phone, SSN and IBAN completions as well.
+ 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
+ 		local given = nil
+-		config.init({ load_mappings = function(_, mappings) given = mappings end }, nil, nil)
++		config.init({ load_mappings = function(_, mappings) given = mappings; return true end }, nil, nil)
+ 		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
+ 			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
+ 		end
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua
+@@ -21,7 +21,7 @@
+ 	local Storage = require("adapters.storage")
+ 	Storage.set("hotstrings.disabled_categories", "")
+ 	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+-	Config.init({ load_mappings = function() end }, os.tmpname() .. "_absent.toml", nil)
++	Config.init({ load_mappings = function() return true end }, os.tmpname() .. "_absent.toml", nil)
+ 	Config._set_categories_for_test({
+ 		french_autocorrection = { id = "french_autocorrection", sections = { accents = { count = 1 }, minus = { count = 1 } } },
+ 		french_magickey = { id = "french_magickey", sections = { text_expansion = { count = 1 } } },

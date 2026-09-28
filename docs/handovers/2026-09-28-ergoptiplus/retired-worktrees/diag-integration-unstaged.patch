@@ -1,0 +1,69 @@
+diff --git a/static/ergopti_plus/macos/init.lua b/static/ergopti_plus/macos/init.lua
+index bba3b1406..20f380431 100644
+--- a/static/ergopti_plus/macos/init.lua
++++ b/static/ergopti_plus/macos/init.lua
+@@ -1346,6 +1346,16 @@ local function language_pack_path(language, stem)
+ 	return nil
+ end
+ 
++-- Discover once for this boot so the loader, override resolver and menu paths
++-- all refer to the same committed extension generation.
++local extension_packs = require("infra.extension_packs").scan()
++local extension_paths = {}
++for _, pack in ipairs(extension_packs) do
++	for _, file in ipairs(pack.toml_files) do
++		extension_paths[require("hotstrings.extensions").category_key(pack.id, file.stem)] = file.path
++	end
++end
++
+ -- Initialise the hotstrings_config module so per-group delays and tooltip
+ -- colors can be resolved from the TOML metadata + the shared user override
+ -- file. The resolver routes the personal category through the (possibly
+@@ -1358,6 +1368,7 @@ do
+ 	hotstrings_config.init({
+ 		override_path = override_path,
+ 		toml_resolver = function(category)
++			if extension_paths[category] then return extension_paths[category] end
+ 			if category == "personal" then
+ 				return config_paths.get("PersonalTomlPath")
+ 			end
+@@ -1542,6 +1553,11 @@ for _, g in ipairs(require("infra.personal_hotstrings").load({ bundled_hotstring
+ 	hotfile_paths[g.name] = g.path
+ end
+ 
++for _, group in ipairs(require("infra.extension_packs").load(extension_packs, keymap)) do
++	hotfiles[#hotfiles + 1] = group.name
++	hotfile_paths[group.name] = group.path
++end
++
+ -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
+ -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
+ Logger.debug(LOG, "Starting dynamic hotstrings module…")
+diff --git a/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk b/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk
+index bb6a5498a..eca29b6c0 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk
+@@ -322,6 +322,23 @@ _LCT_ExtensionOverlayCase() {
+ Test("layout extensions: desired choices survive master gating (layout-extension-runtime)",
+ 	_LCT_ExtensionDesiredCase)
+ 
++Test("layout extensions: bound fragments preserve historical section routing (layout-extension-binding)",
++	_LCT_ExtensionBindingCase)
++
++_LCT_ExtensionBindingCase() {
++	Binding := Map("category", "magickey", "feature_section", "hotstrings.magic_key",
++		"source", "common", "sections", ["repeat_corrections"])
++	File := { category: "ext:ergopti:magicrepeat", path: "geometry.toml", binding: Binding }
++	Packs := [{ id: "ergopti", toml_files: [File] }]
++	AssertEqual("geometry.toml", HotstringExtensions_Source(Packs, "magickey", "repeat_corrections"))
++	AssertEqual("", HotstringExtensions_Source(Packs, "magickey", "text_expansion_symbols"))
++	AssertEqual("", HotstringExtensions_Source(Packs, "magickey"), "general metadata remains owned by the base file")
++	AssertEqual("geometry.toml", HotstringExtensions_Source(Packs, File.category))
++	Packs.Push({ id: "conflicting", toml_files: [File] })
++	AssertThrows(() => HotstringExtensions_Source(Packs, "magickey", "repeat_corrections"),
++		"two owners cannot silently replace a historical section")
++}
++
+ _LCT_ExtensionDesiredCase() {
+ 	Category := "ext:ergopti:rolls"
+ 	Packs := [{ id: "ergopti", name: "Ergopti", toml_files: [

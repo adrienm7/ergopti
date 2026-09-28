@@ -1,0 +1,851 @@
+diff --git a/static/ergopti_plus/_shared/modules/features/manifest.toml b/static/ergopti_plus/_shared/modules/features/manifest.toml
+index 32d03b272..e7fb13d37 100644
+--- a/static/ergopti_plus/_shared/modules/features/manifest.toml
++++ b/static/ergopti_plus/_shared/modules/features/manifest.toml
+@@ -5594,7 +5594,7 @@ restore_exclude = []
+ action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
+ prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts"]
+ restore_exclude = []
+-dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }]
++dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
+ 
+ [scopes.gestures]
+ action_parameters = { domains = ["gesture"], restore = "remove" }
+diff --git a/static/ergopti_plus/linux/_generated/features_manifest.lua b/static/ergopti_plus/linux/_generated/features_manifest.lua
+index cc6d77aa6..dec691e68 100644
+--- a/static/ergopti_plus/linux/_generated/features_manifest.lua
++++ b/static/ergopti_plus/linux/_generated/features_manifest.lua
+@@ -18,7 +18,7 @@ local M = {}
+ M.version = "2.0.0"
+ 
+ M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui" }
+-M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
++M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none", type = "string" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
+ 
+ M.sections = {
+ 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
+diff --git a/static/ergopti_plus/macos/_generated/features_manifest.lua b/static/ergopti_plus/macos/_generated/features_manifest.lua
+index c8c47866f..d7cdd6ecc 100644
+--- a/static/ergopti_plus/macos/_generated/features_manifest.lua
++++ b/static/ergopti_plus/macos/_generated/features_manifest.lua
+@@ -18,7 +18,7 @@ local M = {}
+ M.version = "2.0.0"
+ 
+ M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui" }
+-M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
++M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none", type = "string" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
+ 
+ M.sections = {
+ 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
+diff --git a/static/ergopti_plus/macos/modules/shortcuts/init.lua b/static/ergopti_plus/macos/modules/shortcuts/init.lua
+index ea2ba5679..1497f6ed2 100644
+--- a/static/ergopti_plus/macos/modules/shortcuts/init.lua
++++ b/static/ergopti_plus/macos/modules/shortcuts/init.lua
+@@ -339,7 +339,7 @@ end
+ 
+ --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().
+ --- @return boolean committed True only when both child starts committed.
+-function M.resume_bindings(parent)
++function M.resume_bindings(parent, candidate)
+ 	local claim = binding_pause_claim(parent)
+ 	local owned_claim = binding_pause_claims[claim] == true
+ 	M.release_bindings_pause_claim(claim)
+@@ -381,7 +381,9 @@ function M.resume_bindings(parent)
+ 		},
+ 		{
+ 			name = "keyboard_shortcuts",
+-			start = KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start,
++			start = function()
++				return (KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start)(candidate)
++			end,
+ 			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
+ 		},
+ 	})
+diff --git a/static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua b/static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua
+index cfa75bad7..4e2510208 100644
+--- a/static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua
++++ b/static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua
+@@ -11,9 +11,9 @@
+ --- FEATURES & RATIONALE:
+ --- 1. Unified Registry: Reuses GestActions (gestures/actions.lua) so all action
+ ---    labels, icons, and implementations stay in one place.
+---- 2. Manifest Defaults: the shipped bindings are the features manifest's
+----    shortcuts.keyboard entries for macOS (Ctrl+Space generates an AI
+----    prediction); the user can override or clear any slot.
++--- 2. Manifest Defaults: absent assignments remain neutral. Canonical choices
++---    in config.toml are visible even with the master stopped; only start()
++---    acquires native chords for explicitly assigned catalogue slots.
+ --- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
+ ---    and rebuilt after any assignment change + reload. The OS call itself lives
+ ---    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
+@@ -27,12 +27,22 @@ local Registrar   = require("adapters.hotkey_registrar")
+ local FileSystem  = require("adapters.file_system")
+ local Paths       = require("infra.paths")
+ local Logger      = require("infra.logger")
+-local GestActions = require("modules.gestures.actions")
+-local Storage     = require("adapters.storage")
++local GestActions = nil
++local Codec       = require("toml_codec")
++local Writer      = require("toml_codec.writer")
++local Preferences = require("infra.preferences")
++local ConfigPaths = require("infra.config_paths")
+ local Manifest    = require("infra.manifest_reader")
+ 
+ local LOG = "shortcuts.keyboard_shortcuts"
+ 
++-- Ownership inspection needs only key identities; action initialization belongs
++-- to assignment validation and delivery, not the cleanup reader.
++local function action_catalogue()
++	if GestActions == nil then GestActions = require("modules.gestures.actions") end
++	return GestActions
++end
++
+ -- The binding a slot's action is dispatched under. Action parameters are stored
+ -- under it too, so a menu that asks for one must use this spelling.
+ local BINDING_PREFIX = "keyboard__"
+@@ -40,7 +50,8 @@ local BINDING_PREFIX = "keyboard__"
+ local _hotkeys   = {}  -- slot_id → registrar handle
+ local _actions   = {}  -- slot_id → action_id
+ local _started   = false
+-local _settings_prefix = "keyboard_shortcut_"
++local _loaded    = false
++local _editing = false
+ local _delivery_enabled = false
+ local _lifecycle_paused = false
+ local _lifecycle_epoch = 0
+@@ -166,6 +177,85 @@ local function catalogue_keys()
+ 	return _catalogue.keys
+ end
+ 
++--- Reads the canonical source without migrating or consulting legacy storage.
++--- @return table decoded
++--- @return table source Exact classification for conditional publication.
++local function read_config()
++	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
++	assert(status == "ok" or status == "absent", "keyboard configuration unavailable: " .. tostring(detail))
++	local decoded = Codec.decode(content or "")
++	assert(type(decoded) == "table", "keyboard configuration is malformed")
++	return decoded, { status = status, content = content }
++end
++
++--- Builds exact host identities from the existing modifier and key catalogues.
++--- @return table index Set of canonical slot IDs.
++local function owned_slots()
++	local keys = assert(catalogue_keys(), "keyboard key catalogue unavailable")
++	local index = {}
++	for _, group in ipairs(SLOT_MODS) do
++		for _, key in ipairs(keys) do index[group[1] .. key.id] = true end
++	end
++	return index
++end
++
++local function walk_assignments(decoded, consume)
++	local shortcuts = decoded.shortcuts
++	if shortcuts == nil then return end
++	assert(type(shortcuts) == "table", "shortcuts must be a table")
++	local assignments = shortcuts.keyboard
++	if assignments == nil then return end
++	assert(type(assignments) == "table", "keyboard assignments must be a table")
++	local known = owned_slots()
++	for slot, action in pairs(assignments) do
++		if known[slot] then consume(slot, action) end
++	end
++end
++
++--- Loads a complete canonical candidate before replacing desired assignments.
++local function load_assignments(candidate)
++	local decoded = candidate
++	if decoded == nil then decoded = read_config() end
++	assert(type(decoded) == "table", "keyboard candidate must be a table")
++	local loaded = manifest_defaults()
++	walk_assignments(decoded, function(slot, action)
++		if type(action) == "string" and action_catalogue().is_assignable(action) then
++			loaded[slot] = action
++		else
++			assert(candidate == nil, "keyboard candidate contains an invalid action")
++			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
++				slot, tostring(action), loaded[slot] or "none")
++		end
++	end)
++	_actions, _loaded = loaded, true
++end
++
++local function ensure_loaded()
++	if not _loaded then load_assignments() end
++end
++
++--- Marks only exact host slots consumed by the canonical loader.
++--- @param decoded table Parsed configuration.
++--- @param mark function Segment-based ownership collector.
++function M.mark_config_reads(decoded, mark)
++	walk_assignments(decoded, function(slot) mark("shortcuts", "keyboard", slot) end)
++end
++
++--- Lists disk and live owned slots for scoped restore/clear without a namespace sweep.
++--- @return table paths Sorted canonical leaf paths.
++function M.get_owned_config_paths()
++	local decoded, found = read_config(), {}
++	walk_assignments(decoded, function(slot) found[slot] = true end)
++	local known = owned_slots()
++	for slot, action in pairs(_actions) do
++		if known[slot] and action ~= "none" then found[slot] = true end
++	end
++	local result = {}
++	for slot in pairs(found) do result[#result + 1] = KEYBOARD_SECTION .. "." .. slot end
++	table.sort(result)
++	return result
++end
++
+ --- Key id → display label, from the catalogue.
+ --- @return table
+ local function key_labels()
+@@ -268,7 +358,7 @@ local function bind_slot(slot_id, action_id)
+ 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, current_action)
+ 		local ok_action, handled = Logger.callback(LOG,
+ 			"Configurable shortcut '" .. tostring(slot_id) .. "'",
+-			GestActions.execute_single, current_action, M.binding_id(slot_id))
++			action_catalogue().execute_single, current_action, M.binding_id(slot_id))
+ 		if not ok_action then return false end
+ 		if handled ~= true then
+ 			Logger.error(LOG, "Configurable shortcut '%s' was not handled by action '%s'.",
+@@ -312,37 +402,6 @@ local function set_slot_enabled(slot_id, enabled)
+ 	return false
+ end
+ 
+---- Reads the exact persisted value before a mutation.
+---- @param key string
+---- @return boolean ok
+---- @return any value_or_error
+-local function read_setting(key)
+-	local ok, value = Storage.read_exact(key)
+-	if not ok then
+-		Logger.error(LOG, "Shortcut setting snapshot failed for '%s': %s.", key, tostring(value))
+-		return false, value
+-	end
+-	return true, value
+-end
+-
+---- Writes a value and restores the snapshot when the write raises after mutation.
+---- @param key string
+---- @param value any
+---- @param snapshot any
+---- @return boolean committed
+-local function persist_setting(key, value, snapshot)
+-	if Storage.set(key, value) == true then return true end
+-
+-	local restored = snapshot == nil and Storage.delete_exact(key) or Storage.set(key, snapshot)
+-	if not restored then
+-		Logger.error(LOG,
+-			"Shortcut setting write failed for '%s'; snapshot restore also failed.", key)
+-	else
+-		Logger.error(LOG, "Shortcut setting write failed for '%s'; snapshot restored.", key)
+-	end
+-	return false
+-end
+-
+ --- Releases the hotkey for a slot if active.
+ --- @param slot_id string
+ --- @return boolean settled True only when the native owner was released.
+@@ -372,6 +431,7 @@ end
+ --- Returns the full action→slot assignment table (slot_id → action_id).
+ --- @return table
+ function M.get_assignments()
++	ensure_loaded()
+ 	return _actions
+ end
+ 
+@@ -379,6 +439,7 @@ end
+ --- @param slot_id string
+ --- @return string action_id or "none".
+ function M.get_action(slot_id)
++	ensure_loaded()
+ 	return _actions[slot_id] or "none"
+ end
+ 
+@@ -434,6 +495,7 @@ end
+ --- @param prefix string
+ --- @return table Array of { id, label, action } for assigned slots only.
+ function M.assigned_slots(prefix)
++	ensure_loaded()
+ 	local out = {}
+ 	for _, slot in ipairs(M.available_slots(prefix)) do
+ 		local action = _actions[slot.id]
+@@ -452,27 +514,26 @@ function M.binding_id(slot_id)
+ end
+ 
+ --- Configures the action for a slot without replacing an already-owned chord.
+---- Persists the assignment in hs.settings so it survives reloads.
++--- Publishes the canonical sparse assignment only after native admission.
+ --- @param slot_id string
+ --- @param action_id string
+-function M.set_action(slot_id, action_id)
++local function set_action(slot_id, action_id)
+ 	if type(slot_id) ~= "string" or type(action_id) ~= "string" then
+ 		Logger.error(LOG, "set_action(): both arguments must be strings.")
+ 		return false
+ 	end
+ 	-- The same catalogue check the gesture slots and the Windows driver apply: an
+ 	-- unknown id would be persisted, bound, and then do nothing on every press.
+-	if not GestActions.is_assignable(action_id) then
++	if not action_catalogue().is_assignable(action_id) then
+ 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action_id, slot_id)
+ 		return false
+ 	end
+ 	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
++	if not owned_slots()[slot_id] then return false end
++	ensure_loaded()
+ 	local old_action = _actions[slot_id] or "none"
+-	if old_action == action_id then return true end
+-
+-	local setting_key = _settings_prefix .. slot_id
+-	local snap_ok, persisted_snapshot = read_setting(setting_key)
+-	if not snap_ok then return false end
++	local _, source = read_config()
++	local rows = Preferences.prepare_shortcut_updates(source, { Manifest.sparse_operation(KEYBOARD_SECTION .. "." .. slot_id, action_id) })
+ 
+ 	local native_transition = nil
+ 	if _started and old_action == "none" and action_id ~= "none" then
+@@ -483,7 +544,7 @@ function M.set_action(slot_id, action_id)
+ 		native_transition = "disabled"
+ 	end
+ 
+-	if persist_setting(setting_key, action_id, persisted_snapshot) ~= true then
++	if Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source) ~= true then
+ 		if native_transition == "enabled" then
+ 			if set_slot_enabled(slot_id, false) ~= true then
+ 				Logger.error(LOG,
+@@ -506,45 +567,45 @@ function M.set_action(slot_id, action_id)
+ 	return true
+ end
+ 
+---- Loads persisted assignments from hs.settings, seeding defaults first.
+-local function load_assignments()
+-	-- Seed the manifest defaults; a stored value, "none" included, overrides one.
+-	for slot, action in pairs(manifest_defaults()) do
+-		if GestActions.is_assignable(action) then
+-			_actions[slot] = action
+-		else
+-			Logger.error(LOG, "Manifest default '%s' for slot '%s' is not in the catalogue — left unbound.",
+-				action, slot)
+-		end
+-	end
+-	-- Apply user overrides from hs.settings
+-	-- We iterate over all known SG action names to find relevant settings keys.
+-	-- Any slot that has been set via M.set_action() will be in hs.settings.
+-	-- Since slot ids are open-ended (any modifier+key), we read all settings
+-	-- with our prefix and apply them.
+-	local all_settings = Storage.keys()
+-	local prefix_len = #_settings_prefix
+-	for _, k in ipairs(all_settings) do
+-		if k:sub(1, prefix_len) == _settings_prefix then
+-			local slot = k:sub(prefix_len + 1)
+-			local val  = Storage.get(k)
+-			-- The check set_action applies, applied to what was stored: an id the
+-			-- catalogue does not offer (hand-edited, or retired by an update)
+-			-- would bind the chord to a no-op. Windows drops it at load the same
+-			-- way and keeps the slot's default.
+-			if type(val) == "string" and GestActions.is_assignable(val) then
+-				_actions[slot] = val
+-			elseif type(val) == "string" then
+-				Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
+-					slot, val, _actions[slot] or "none")
+-			end
+-		end
+-	end
++--- Serializes one domain edit across native acquisition and exact-source publication.
++--- @param slot_id string Canonical catalogue slot.
++--- @param action_id string Catalogue action identifier.
++--- @return boolean committed
++function M.set_action(slot_id, action_id)
++	if _editing then return false end
++	_editing = true
++	local called, committed = xpcall(set_action, debug.traceback, slot_id, action_id)
++	_editing = false
++	if not called then Logger.error(LOG, "Keyboard assignment failed: %s.", tostring(committed)) end
++	return called and committed == true
++end
++
++--- Stages exact native intent while the input owner is quiescent. No file is published.
++--- @param decoded table Complete candidate configuration.
++--- @return boolean committed
++function M.apply_configuration(decoded)
++	if type(decoded) ~= "table" or _editing or _started or _start_attempt ~= nil
++		or _native_acquisition_depth ~= 0 or next(_hotkeys) ~= nil then return false end
++	_editing = true
++	local called, detail = xpcall(load_assignments, debug.traceback, decoded)
++	_editing = false
++	if not called then Logger.error(LOG, "Keyboard candidate was refused: %s.", tostring(detail)) end
++	return called
++end
++
++--- Reports actual native ownership, independently of desired assignment state.
++--- @return boolean started
++function M.is_started()
++	return _started and _delivery_enabled
+ end
+ 
+ --- Starts the keyboard shortcuts module and owns every configured binding.
++--- @param candidate table|nil Validated transaction source; nil reads the canonical file.
+ --- @return boolean committed True only when every required slot was bound.
+-function M.start()
++function M.start(candidate)
++	if candidate ~= nil and type(candidate) ~= "table" then return false end
++	if _editing then return false end
++	if _started and candidate ~= nil then return false end
+ 	if _lifecycle_paused == true or _start_attempt ~= nil then
+ 		_delivery_enabled = false
+ 		return false
+@@ -563,7 +624,7 @@ function M.start()
+ 	_start_attempt = attempt
+ 	_delivery_enabled = false
+ 	Logger.start(LOG, "Starting keyboard shortcuts…")
+-	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback)
++	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback, candidate)
+ 	if not assignments_ok then
+ 		Logger.error(LOG, "Keyboard shortcut assignments could not be loaded: %s.",
+ 			tostring(assignments_err))
+@@ -636,10 +697,10 @@ function M.pause()
+ end
+ 
+ --- Releases the local PAUSE fence and starts one guarded replacement set.
+-function M.resume_after_pause()
++function M.resume_after_pause(candidate)
+ 	_lifecycle_paused = false
+ 	invalidate_lifecycle()
+-	return M.start()
++	return M.start(candidate)
+ end
+ 
+ --- Releases only the local PAUSE fence.  The aggregate Shortcuts owner calls
+diff --git a/static/ergopti_plus/macos/modules/shortcuts/tap_keys.lua b/static/ergopti_plus/macos/modules/shortcuts/tap_keys.lua
+index 36404b1f0..1b46a50ee 100644
+--- a/static/ergopti_plus/macos/modules/shortcuts/tap_keys.lua
++++ b/static/ergopti_plus/macos/modules/shortcuts/tap_keys.lua
+@@ -122,15 +122,18 @@ end
+ 
+ --- Loads canonical assignments, using manifest defaults only for absent leaves.
+ --- @param is_assignable function Authoritative action catalogue check.
+-function M.load(is_assignable)
++local function load_configuration(is_assignable, candidate)
+ 	assert(type(is_assignable) == "function", "tap_keys.load() needs the catalogue check")
+-	local decoded = read_config()
++	local decoded = candidate
++	if decoded == nil then decoded = read_config() end
++	assert(type(decoded) == "table", "tap-key candidate must be a table")
+ 	local configured, loaded = {}, {}
+ 	walk_assignments(decoded, function(id, value) configured[id] = value end)
+ 	for _, key in ipairs(M.keys()) do
+ 		local action = configured[key.id]
+ 		if action == nil then action = Manifest.default_for(CONFIG_SECTION .. "." .. key.id) end
+ 		if action ~= "none" and is_assignable(action) ~= true then
++			assert(candidate == nil, "tap-key candidate contains an invalid action")
+ 			Logger.warn(LOG, "Tap key '%s' holds unknown action '%s' — left alone.", key.id, tostring(action))
+ 			action = "none"
+ 		end
+@@ -140,6 +143,24 @@ function M.load(is_assignable)
+ 	Logger.info(LOG, "Tap keys loaded.")
+ end
+ 
++--- Loads desired assignments from the canonical file.
++--- @param is_assignable function Authoritative action catalogue check.
++function M.load(is_assignable)
++	load_configuration(is_assignable)
++end
++
++--- Applies candidate intent while the aggregate owner has fenced native dispatch.
++--- This assignment owner does not acquire input or publish files.
++--- @param decoded table Complete candidate configuration.
++--- @param is_assignable function Authoritative action catalogue check.
++--- @return boolean committed
++function M.apply_configuration(decoded, is_assignable)
++	if type(decoded) ~= "table" then return false end
++	local called, detail = xpcall(load_configuration, debug.traceback, is_assignable, decoded)
++	if not called then Logger.error(LOG, "Tap-key candidate was refused: %s.", tostring(detail)) end
++	return called
++end
++
+ --- Loads the assignments once; later calls keep the cached table, which
+ --- set_action keeps current.
+ --- @param is_assignable function The catalogue check.
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_edit_transaction.lua b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_edit_transaction.lua
+index 88665d5e8..fae8954d6 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_edit_transaction.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_edit_transaction.lua
+@@ -13,6 +13,8 @@ local helpers = require("tests.helpers")
+ 
+ local MODULES = {
+ 	"adapters.storage",
++	"infra.preferences",
++	"infra.config_paths",
+ 	"adapters.hotkey_registrar",
+ 	"adapters.file_system",
+ 	"infra.paths",
+@@ -30,16 +32,16 @@ local function with_subject(initial_action, scenario)
+ 	for _, name in ipairs(MODULES) do prior[name] = package.loaded[name] end
+ 	local prior_hs = _G.hs
+ 
+-	local key = "ergopti.keyboard_shortcut_cmd_a"
++	local key = "cmd_a"
+ 	local store = {[key] = initial_action}
+ 	local controls = {
+ 		bind_refuses = false,
+ 		bind_hook = nil,
+ 		set_enabled_hook = nil,
+ 		set_enabled_refuses_once = false,
+-		settings_throw_after_write_once = false,
++		publication_throws_once = false,
+ 	}
+-	local counters = {bind = 0, unbind = 0, set_enabled = 0, settings_set = 0}
++	local counters = {bind = 0, unbind = 0, set_enabled = 0, file_writes = 0}
+ 	local handles = {}
+ 	local unbound_handles = {}
+ 	local fired = {}
+@@ -86,9 +88,8 @@ local function with_subject(initial_action, scenario)
+ 		read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
+ 	}
+ 	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
+-	-- No shipped bindings: the transaction under test owns the one cmd_a slot, and
+-	-- the manifest defaults have their own test (test_keyboard_shortcuts_manifest_defaults.lua).
+-	package.loaded["infra.manifest_reader"] = {features = function() return {} end}
++	-- Neutral manifest defaults acquire no extra native handles in this fixture.
++	package.loaded["infra.manifest_reader"] = nil
+ 	local logger = helpers.make_logger_stub()
+ 	logger.callback = function(_, _, fn, ...)
+ 		local ok, result = xpcall(fn, debug.traceback, ...)
+@@ -107,21 +108,17 @@ local function with_subject(initial_action, scenario)
+ 	package.loaded["adapters.storage"] = nil
+ 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+ 
++	require("tests.support.keyboard_config_fixture").install(store, function()
++		counters.file_writes = counters.file_writes + 1
++		if controls.publication_throws_once then
++			controls.publication_throws_once = false
++			error("synthetic conditional publication failure")
++		end
++	end)
++
+ 	local subject
+ 	local ok, err = xpcall(function()
+ 		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
+-			settings = {
+-				getKeys = function() return {key} end,
+-				get = function(setting_key) return store[setting_key] end,
+-				set = function(setting_key, value)
+-					counters.settings_set = counters.settings_set + 1
+-					store[setting_key] = value
+-					if controls.settings_throw_after_write_once then
+-						controls.settings_throw_after_write_once = false
+-						error("synthetic settings failure after write")
+-					end
+-				end,
+-			},
+ 			json = {
+ 				decode = function()
+ 					return {keys = {{id = "a", label = "A"}}}
+@@ -174,11 +171,11 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
+ 	helpers.it("keeps action, setting, and exact handle when persistence raises", function()
+ 		with_subject("copy_selection", function(subject, ctx)
+ 			local exact = ctx.handles[1]
+-			ctx.controls.settings_throw_after_write_once = true
++			ctx.controls.publication_throws_once = true
+ 			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+ 			helpers.assert_eq(subject.get_action("cmd_a"), "copy_selection")
+ 			helpers.assert_eq(ctx.store[ctx.setting_key], "copy_selection",
+-				"a write that raises after mutation must restore the exact prior setting")
++				"a refused conditional publication must preserve the exact prior assignment")
+ 			helpers.assert_eq(ctx.handles[1], exact)
+ 			helpers.assert_eq(ctx.counters.bind, 1)
+ 			helpers.assert_eq(ctx.counters.unbind, 0)
+@@ -207,7 +204,7 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
+ 
+ 	helpers.it("retains an inert fresh candidate across persistence failure", function()
+ 		with_subject("none", function(subject, ctx)
+-			ctx.controls.settings_throw_after_write_once = true
++			ctx.controls.publication_throws_once = true
+ 			ctx.controls.set_enabled_refuses_once = true
+ 			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+ 			local exact = ctx.handles[1]
+@@ -259,7 +256,7 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
+ 
+ 	helpers.it("keeps retained-handle re-enable visible to re-entrant PAUSE", function()
+ 		with_subject("none", function(subject, ctx)
+-			ctx.controls.settings_throw_after_write_once = true
++			ctx.controls.publication_throws_once = true
+ 			ctx.controls.set_enabled_refuses_once = true
+ 			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+ 			local exact = ctx.handles[1]
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_manifest_defaults.lua b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_manifest_defaults.lua
+index 566fa5fbd..49cefa0a8 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_manifest_defaults.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_manifest_defaults.lua
+@@ -19,6 +19,8 @@ local helpers = require("tests.helpers")
+ 
+ local MODULES = {
+ 	"adapters.storage",
++	"infra.preferences",
++	"infra.config_paths",
+ 	"adapters.hotkey_registrar",
+ 	"adapters.file_system",
+ 	"infra.paths",
+@@ -32,7 +34,7 @@ local OFFERED = { lookup = true, none = true, llm_generate_prediction = true }
+ 
+ --- Runs `scenario` against the real keyboard-shortcut owner over stubbed
+ --- settings, registrar and catalogue, then restores every displaced module.
+---- @param store table Initial hs.settings content, mutated by writes.
++--- @param store table Initial canonical assignment map, mutated by conditional writes.
+ --- @param scenario function(subject, observed)
+ --- @return table observed { bound = {chord...} }
+ local function with_subject(store, scenario)
+@@ -60,19 +62,11 @@ local function with_subject(store, scenario)
+ 	package.loaded["adapters.storage"] = nil
+ 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+ 
++	require("tests.support.keyboard_config_fixture").install(store)
++
+ 	local subject
+ 	local ok, err = xpcall(function()
+ 		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
+-			settings = {
+-				getKeys = function()
+-					local keys = {}
+-					for key in pairs(store) do keys[#keys + 1] = key end
+-					table.sort(keys)
+-					return keys
+-				end,
+-				get = function(key) return store[key] end,
+-				set = function(key, value) store[key] = value end,
+-			},
+ 			json = {
+ 				decode = function()
+ 					return { keys = { { id = "a", label = "A" }, { id = "space", label = "Space" } } }
+@@ -99,7 +93,7 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
+ 	end)
+ 
+ 	helpers.it("binds an explicitly saved Ctrl+Space action", function()
+-		local observed = with_subject({ ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "llm_generate_prediction" },
++		local observed = with_subject({ ["hs_ctrl_space"] = "llm_generate_prediction" },
+ 			function(subject)
+ 				helpers.assert_eq(subject.start(), true)
+ 				helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
+@@ -110,7 +104,7 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
+ 	end)
+ 
+ 	helpers.it("keeps a binding the user cleared cleared after a restart", function()
+-		local store = { ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "none" }
++		local store = { ["hs_ctrl_space"] = "none" }
+ 		local observed = with_subject(store, function(subject)
+ 			helpers.assert_eq(subject.start(), true)
+ 			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none",
+@@ -120,13 +114,13 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
+ 	end)
+ 
+ 	helpers.it("clears an explicit assignment and keeps it native after reload", function()
+-		local store = { ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "llm_generate_prediction" }
++		local store = { ["hs_ctrl_space"] = "llm_generate_prediction" }
+ 		with_subject(store, function(subject)
+ 			helpers.assert_eq(subject.start(), true)
+ 			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
+ 			helpers.assert_eq(subject.set_action("hs_ctrl_space", "none"), true)
+ 		end)
+-		helpers.assert_eq(store["ergopti.keyboard_shortcut_hs_ctrl_space"], "none",
++		helpers.assert_eq(store["hs_ctrl_space"], nil,
+ 			"clearing an existing assignment must persist the neutral choice")
+ 		local restarted = with_subject(store, function(subject)
+ 			helpers.assert_eq(subject.start(), true)
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_start_transaction.lua b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_start_transaction.lua
+index b38e042a7..0e60bb974 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_start_transaction.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_start_transaction.lua
+@@ -54,17 +54,8 @@ local function load_subject()
+ 	package.loaded["adapters.storage"] = nil
+ 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+ 
++	require("tests.support.keyboard_config_fixture").install({ cmd_a = "script_pause_toggle", cmd_b = "script_pause_toggle" })
+ 	local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
+-		settings = {
+-			getKeys = function()
+-				return {
+-					"ergopti.keyboard_shortcut_cmd_a",
+-					"ergopti.keyboard_shortcut_cmd_b",
+-				}
+-			end,
+-			get = function() return "script_pause_toggle" end,
+-			set = function() end,
+-		},
+ 		json = {
+ 			decode = function()
+ 				return {keys = {{id = "a", label = "A"}, {id = "b", label = "B"}}}
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_unknown_action.lua b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_unknown_action.lua
+index 715080c9c..718aa1ba9 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_unknown_action.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_keyboard_shortcuts_unknown_action.lua
+@@ -21,6 +21,8 @@ local helpers = require("tests.helpers")
+ 
+ local MODULES = {
+ 	"adapters.storage",
++	"infra.preferences",
++	"infra.config_paths",
+ 	"adapters.hotkey_registrar",
+ 	"adapters.file_system",
+ 	"infra.paths",
+@@ -35,7 +37,7 @@ local OFFERED = { lookup = true, none = true }
+ 
+ --- Runs `scenario` against the real keyboard-shortcut owner over stubbed
+ --- settings, registrar and catalogue, then restores every displaced module.
+---- @param store table Initial hs.settings content, mutated by writes.
++--- @param store table Initial canonical assignment map, mutated by conditional writes.
+ --- @param scenario function(subject, observed)
+ --- @return table observed { bound = {chord...}, warnings = {message...} }
+ local function with_subject(store, scenario)
+@@ -65,19 +67,11 @@ local function with_subject(store, scenario)
+ 	package.loaded["adapters.storage"] = nil
+ 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+ 
++	require("tests.support.keyboard_config_fixture").install(store)
++
+ 	local subject
+ 	local ok, err = xpcall(function()
+ 		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
+-			settings = {
+-				getKeys = function()
+-					local keys = {}
+-					for key in pairs(store) do keys[#keys + 1] = key end
+-					table.sort(keys)
+-					return keys
+-				end,
+-				get = function(key) return store[key] end,
+-				set = function(key, value) store[key] = value end,
+-			},
+ 			json = {
+ 				decode = function()
+ 					return { keys = { { id = "a", label = "A" }, { id = "b", label = "B" } } }
+@@ -116,21 +110,21 @@ end
+ 
+ helpers.describe("keyboard shortcuts: unknown action ids", function()
+ 	helpers.it("set_action refuses an id the catalogue does not offer", function()
+-		local store = { ["ergopti.keyboard_shortcut_cmd_a"] = "lookup" }
++		local store = { ["cmd_a"] = "lookup" }
+ 		local observed = with_subject(store, function(subject)
+ 			helpers.assert_eq(subject.start(), true, "a valid assignment must start")
+ 			helpers.assert_eq(subject.set_action("cmd_a", "no_such_action"), false,
+ 				"an id no handler runs must be refused, as Windows refuses it")
+ 			helpers.assert_eq(subject.get_action("cmd_a"), "lookup", "a refused id must not replace the binding")
+ 		end)
+-		helpers.assert_eq(store["ergopti.keyboard_shortcut_cmd_a"], "lookup", "nothing may be persisted")
++		helpers.assert_eq(store["cmd_a"], "lookup", "nothing may be persisted")
+ 		helpers.assert_true(names(observed.warnings, "no_such_action"), "the refused id must be named in a warning")
+ 	end)
+ 
+ 	helpers.it("leaves a stored id the catalogue does not offer unbound, and says so", function()
+ 		local store = {
+-			["ergopti.keyboard_shortcut_cmd_a"] = "lookup",
+-			["ergopti.keyboard_shortcut_cmd_b"] = "no_such_action",
++			["cmd_a"] = "lookup",
++			["cmd_b"] = "no_such_action",
+ 		}
+ 		local observed = with_subject(store, function(subject)
+ 			helpers.assert_eq(subject.start(), true, "a valid assignment must still start")
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_start_transaction.lua b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_start_transaction.lua
+index 952155fea..e4cdf0172 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_start_transaction.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_start_transaction.lua
+@@ -19,7 +19,8 @@ local function load_subject(controls)
+ 	local events = {}
+ 
+ 	local function start_child(name)
+-		return function()
++		return function(candidate)
++			if name == "keyboard" then controls.keyboard_candidate = candidate end
+ 			events[#events + 1] = "start:" .. name
+ 			if controls[name .. "_mode"] == "throw" then
+ 				error("START_THROW:" .. name)
+@@ -150,4 +151,29 @@ helpers.describe("shortcuts aggregate start transaction", function()
+ 	end)
+ end)
+ 
++helpers.describe("shortcut candidate forwarding", function()
++	helpers.it("passes the exact unpublished candidate through the real aggregate owner", function()
++		local controls = {}
++		local subject = load_subject(controls)
++		local candidate = { shortcuts = { keyboard = { cmd_a = "send_text" } } }
++		helpers.assert_eq(subject.pause_bindings("feature_toggle"), true)
++		helpers.assert_eq(subject.resume_bindings("feature_toggle", candidate), true)
++		helpers.assert_true(controls.keyboard_candidate == candidate)
++	end)
++
++	helpers.it("retains the claim after candidate refusal and permits exact recovery", function()
++		local controls = { keyboard_has_result = true, keyboard_result = false }
++		local subject, events = load_subject(controls)
++		local candidate = { shortcuts = { keyboard = { cmd_a = "send_text" } } }
++		helpers.assert_eq(subject.pause_bindings("feature_toggle"), true)
++		helpers.assert_eq(subject.resume_bindings("feature_toggle", candidate), false)
++		helpers.assert_true(controls.keyboard_candidate == candidate)
++		helpers.assert_eq(events[#events - 1], "stop:bindings")
++		helpers.assert_eq(events[#events], "stop:actions")
++		controls.keyboard_result = true
++		helpers.assert_eq(subject.resume_bindings("feature_toggle", {}), true)
++		helpers.assert_eq(controls.keyboard_candidate, {})
++	end)
++end)
++
+ return true
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_tap_keys_canonical.lua b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_tap_keys_canonical.lua
+index 3d38f9acc..d7bba6095 100644
+--- a/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_tap_keys_canonical.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_tap_keys_canonical.lua
+@@ -143,3 +143,30 @@ helpers.describe("canonical macOS tap-key assignments", function()
+ 		end)
+ 	end)
+ end)
++
++helpers.describe("tap-key scope candidate application", function()
++	helpers.it("applies and compensates exact memory choices without publishing the config source", function()
++		with_fixture('[shortcuts.tap_keys]\nnumber_row_left = "send_text"\n', function(taps, _, control, valid)
++			taps.load(valid)
++			local source = control.content
++			helpers.assert_eq(taps.apply_configuration({ shortcuts = { tap_keys = { number_row_right_1 = "screen_capture" } } }, valid), true)
++			helpers.assert_eq(taps.get_action("number_row_left"), "none")
++			helpers.assert_eq(taps.get_action("number_row_right_1"), "screen_capture")
++			helpers.assert_eq(taps.apply_configuration(Codec.decode(source), valid), true)
++			helpers.assert_eq(taps.get_action("number_row_left"), "send_text")
++			helpers.assert_eq(taps.get_action("number_row_right_1"), "none")
++			helpers.assert_eq(control.content, source)
++			helpers.assert_eq(control.writes, 0)
++		end)
++	end)
++
++	helpers.it("refuses invalid owned leaves without changing any current assignment", function()
++		with_fixture('[shortcuts.tap_keys]\nnumber_row_left = "send_text"\n', function(taps, _, control, valid)
++			taps.load(valid)
++			helpers.assert_eq(taps.apply_configuration({ shortcuts = { tap_keys = { number_row_left = "unknown_action" } } }, valid), false)
++			helpers.assert_eq(taps.get_action("number_row_left"), "send_text")
++			helpers.assert_eq(taps.apply_configuration({ shortcuts = { tap_keys = false } }, valid), false)
++			helpers.assert_eq(control.writes, 0)
++		end)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/ui/menu/unused_keys_cleanup.lua b/static/ergopti_plus/macos/ui/menu/unused_keys_cleanup.lua
+index 16cd484d4..d4103ea0b 100644
+--- a/static/ergopti_plus/macos/ui/menu/unused_keys_cleanup.lua
++++ b/static/ergopti_plus/macos/ui/menu/unused_keys_cleanup.lua
+@@ -42,6 +42,7 @@ function M.collect(decoded, mark)
+ 	require("infra.config_overrides").mark_config_reads(decoded, mark)
+ 	require("infra.preferences").mark_config_reads(decoded, mark)
+ 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
++	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
+ 	require("ui.onboarding")._answers_from_config(decoded, mark)
+ end
+ 
+diff --git a/static/ergopti_plus/windows/_generated/features_manifest.ahk b/static/ergopti_plus/windows/_generated/features_manifest.ahk
+index 1032a14b1..36ce4b230 100644
+--- a/static/ergopti_plus/windows/_generated/features_manifest.ahk
++++ b/static/ergopti_plus/windows/_generated/features_manifest.ahk
+@@ -5,7 +5,7 @@
+ global FEATURES_MANIFEST := Map(
+     "version", "2.0.0",
+     "section_order", ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui"],
+-    "scopes", Map("tap_holds", Map("action_parameters", Map("domains", ["tap_hold"], "restore", "remove"), "prefixes", ["tap_holds", "category_enabled.tap_holds"], "preset", "tap_hold", "restore_exclude", []), "shortcuts", Map("action_parameters", Map("domains", ["keyboard", "script", "tap_key"], "restore", "remove"), "prefixes", ["shortcuts", "mod_combos", "category_enabled.shortcuts"], "restore_exclude", [], "dynamic_defaults", [Map("prefix", "shortcuts.personal", "depth", 1, "default", false, "recommended", false, "type", "boolean")]), "gestures", Map("action_parameters", Map("domains", ["gesture"], "restore", "remove"), "prefixes", ["gestures"], "restore_exclude", []), "keyboard_layout", Map("prefixes", ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"], "restore_exclude", []), "hotstrings", Map("prefixes", ["hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key"], "restore_exclude", ["hotstrings.preview_ai_enabled"], "dynamic_defaults", [Map("prefix", "category_enabled", "depth", 1, "default", false, "recommended", true, "type", "boolean"), Map("prefix", "hotstrings.groups", "depth", 1, "default", false, "recommended", true, "type", "boolean"), Map("prefix", "hotstrings.modules", "depth", 2, "default", false, "recommended", true, "type", "boolean"), Map("prefix", "hotstrings.personal", "depth", 2, "suffix", "enabled", "default", false, "recommended", false, "type", "boolean"), Map("prefix", "hotstrings.personal", "depth", 2, "suffix", "time_activation_seconds", "default", 0, "recommended", 0, "type", "integer")]), "llm", Map("prefixes", ["llm"], "restore_exclude", ["llm.enabled"], "dynamic_defaults", [Map("prefix", "llm.profiles.shortcuts", "depth", 2, "suffix", "mods", "default", [], "recommended", [], "type", "array"), Map("prefix", "llm.profiles.shortcuts", "depth", 2, "suffix", "key", "default", "", "recommended", "", "type", "string")]), "metrics", Map("prefixes", ["metrics"], "restore_exclude", ["metrics.enabled", "metrics.metrics_enabled"]), "global", Map("includes", ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"], "prefixes", ["script"], "restore_exclude", [])),
++    "scopes", Map("tap_holds", Map("action_parameters", Map("domains", ["tap_hold"], "restore", "remove"), "prefixes", ["tap_holds", "category_enabled.tap_holds"], "preset", "tap_hold", "restore_exclude", []), "shortcuts", Map("action_parameters", Map("domains", ["keyboard", "script", "tap_key"], "restore", "remove"), "prefixes", ["shortcuts", "mod_combos", "category_enabled.shortcuts"], "restore_exclude", [], "dynamic_defaults", [Map("prefix", "shortcuts.personal", "depth", 1, "default", false, "recommended", false, "type", "boolean"), Map("prefix", "shortcuts.keyboard", "depth", 1, "default", "none", "recommended", "none", "type", "string")]), "gestures", Map("action_parameters", Map("domains", ["gesture"], "restore", "remove"), "prefixes", ["gestures"], "restore_exclude", []), "keyboard_layout", Map("prefixes", ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"], "restore_exclude", []), "hotstrings", Map("prefixes", ["hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key"], "restore_exclude", ["hotstrings.preview_ai_enabled"], "dynamic_defaults", [Map("prefix", "category_enabled", "depth", 1, "default", false, "recommended", true, "type", "boolean"), Map("prefix", "hotstrings.groups", "depth", 1, "default", false, "recommended", true, "type", "boolean"), Map("prefix", "hotstrings.modules", "depth", 2, "default", false, "recommended", true, "type", "boolean"), Map("prefix", "hotstrings.personal", "depth", 2, "suffix", "enabled", "default", false, "recommended", false, "type", "boolean"), Map("prefix", "hotstrings.personal", "depth", 2, "suffix", "time_activation_seconds", "default", 0, "recommended", 0, "type", "integer")]), "llm", Map("prefixes", ["llm"], "restore_exclude", ["llm.enabled"], "dynamic_defaults", [Map("prefix", "llm.profiles.shortcuts", "depth", 2, "suffix", "mods", "default", [], "recommended", [], "type", "array"), Map("prefix", "llm.profiles.shortcuts", "depth", 2, "suffix", "key", "default", "", "recommended", "", "type", "string")]), "metrics", Map("prefixes", ["metrics"], "restore_exclude", ["metrics.enabled", "metrics.metrics_enabled"]), "global", Map("includes", ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"], "prefixes", ["script"], "restore_exclude", [])),
+     "sections", Map(
+         "script", Map("description_key", "menu.script", "platforms", ["ahk", "hs", "linux"], "subsections", []),
+         "hotstrings", Map("description_key", "menu.hotstrings", "platforms", ["ahk", "hs", "linux"], "subsections", ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "french_distancesreduction", "french_autocorrection", "french_magickey", "dynamic", "personal"]),

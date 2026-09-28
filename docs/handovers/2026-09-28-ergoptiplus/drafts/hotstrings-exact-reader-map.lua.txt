@@ -1,0 +1,49 @@
+local root="D:/Documents/GitHub/ergopti/static/ergopti_plus/macos"
+local shared=root:gsub("/macos$","/_shared/lua")
+package.path=root.."/?.lua;"..root.."/?/init.lua;"..shared.."/?.lua;"..shared.."/?/init.lua;"..package.path
+require("compat.utf8").install();_G.hs=require("tests.stubs.hs")
+local Manifest=require("infra.manifest_reader")
+local Preferences=require("infra.preferences")
+local Toml=require("toml_codec")
+local directory=root:gsub("/macos$","/_shared/modules/hotstrings/")
+local function read(path)local f=assert(io.open(path,"r"));local s=f:read("*a");f:close();return s end
+local index=Toml.decode(read(directory.."_index.toml"))
+local inventory={}
+for _,group in ipairs(index.menu.categories_order) do inventory[group]={path=directory..group..".toml"} end
+for _,pack in ipairs(require("hotstrings.languages").packs(index)) do
+ for _,stem in ipairs(pack.categories) do inventory[pack.id.."_"..stem]={path=directory..pack.id.."/"..stem..".toml"} end
+end
+for _,item in pairs(inventory) do item.decoded=Toml.decode(read(item.path)) end
+local function group_for(category)
+ local matched
+ for group in pairs(inventory) do if group:gsub("_","")==category:gsub("_","") then assert(not matched);matched=group end end
+ return matched
+end
+print("manifest_path\tcanonical_candidate\tstatus\treader")
+for _,op in ipairs(Manifest.scope_plan("hotstrings","clear",{},{}).operations) do
+ local path=op.section.."."..op.key
+ local canonical,status,reader=path,"scalar_reader","Preferences.KEY_MAP"
+ if path=="hotstrings.dynamic.enabled" then
+  canonical="hotstrings.groups.dynamichotstrings";status="retire_dormant_scalar_use_registry_group";reader="RegistryIndex.is_group_enabled"
+ elseif not Preferences.flat_key_for(path) then
+  local category,section,leaf=path:match("^hotstrings%.([^.]+)%.([^.]+)%.([^.]+)$")
+  local group=category and group_for(category)
+  if category=="dynamic" and section=="text_expansion_personal_information" then
+   if leaf=="enabled" then canonical="hotstrings.modules.personal_info";status="scalar_reader_runtime_owner";reader="MenuState -> dynamic_hotstrings.enable/disable"
+   else canonical="NONE";status="no_native_reader";reader="generated only" end
+  elseif category=="dynamic" then
+   canonical="hotstrings.modules.dynamichotstrings."..section:gsub("_","")
+   status="registry_section";reader="RulesEngine.guard -> RegistryIndex.is_section_enabled"
+  elseif group and inventory[group].decoded[section] then
+   if leaf=="enabled" then canonical="hotstrings.modules."..group.."."..section;status="registry_section";reader="RegistryGroups.load_toml -> RegistryIndex.is_section_enabled"
+   elseif leaf=="time_activation_seconds" then canonical="hotstrings_config.toml:["..group.."."..section.."].delay";status="separate_store_resolver_engine_audit_needed";reader="HotstringsConfig.resolve; State.SECTION_DELAYS reads corpus metadata" end
+  elseif category=="personal" then
+   canonical=leaf=="enabled" and "hotstrings.modules.personal."..section or "hotstrings_config.toml:[personal."..section.."].delay"
+   status="requires_actual_personal_catalogue";reader="PersonalHotstrings.load; no ownership without registered descriptor"
+  else
+   canonical=group and ("hotstrings.modules."..group.."."..section) or "NONE"
+   status="no_bundled_registered_section";reader=group and inventory[group].path or "none"
+  end
+ end
+ print(table.concat({path,canonical,status,reader},"\t"))
+end

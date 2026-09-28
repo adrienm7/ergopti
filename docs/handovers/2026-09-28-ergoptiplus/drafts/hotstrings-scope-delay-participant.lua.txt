@@ -1,0 +1,72 @@
+--- Prepares an owned delay reset for the existing preference transaction.
+--- Only removals are accepted: pure timing parameters have equal neutral and
+--- recommended values, so an absent secondary file never needs to be created.
+--- @param owned table Exact category/section descriptors from the live registry.
+--- @return table|nil participant Conditional publication and retained inverse.
+function M.prepare_scope_reset(owned)
+	if not require_state("prepare_scope_reset") or _state.writes_blocked or _state.scope_pending then return nil end
+	assert(type(owned) == "table", "hotstring delay ownership is unavailable")
+	local before = { source = clone_value(_state.source_snapshot), overrides = clone_value(_state.overrides) }
+	local observed, status = FileSystem.read_with_status(_state.path)
+	if not source_snapshots_equal(before.source, { status = status, content = observed }) then return nil end
+	local candidate = clone_value(before.overrides)
+	for _, item in ipairs(owned) do
+		local category = assert(ConfigSchema.normalize_category(item.category), "invalid owned delay category")
+		assert(ConfigSchema.is_section(item.section), "invalid owned delay section")
+		local section = ConfigSchema.normalize_section(item.section)
+		local entry = candidate[category]
+		local target = entry and (section and (entry.sections or {})[section] or entry)
+		if target then target.delay = nil end
+	end
+	local content = assert(prepare_override_content(candidate, _state.word_delimiters, true))
+	local changed = before.source.status == "ok" and before.source.content ~= content
+	local replacement = changed and { status = "ok", content = content } or before.source
+	local owner, phase = {}, "prepared"
+	local function source_is(expected)
+		local bytes, read_status = FileSystem.read_with_status(_state.path)
+		return source_snapshots_equal(expected, { status = read_status, content = bytes })
+	end
+	local function project(values, publish)
+		assert(type(_state.delay_transaction) == "function", "native delay owner is unavailable")
+		return _state.delay_transaction(delay_projection(values), publish) == true
+	end
+	function owner.apply(backup_path)
+		if phase ~= "prepared" or _state.scope_pending or not source_is(before.source) then return false end
+		assert(type(backup_path) == "string" and backup_path ~= _state.path, "delay backup path is invalid")
+		if changed then
+			if FileSystem.write_if_unchanged(backup_path, before.source.content, { status = "absent" }) ~= true then return false end
+			local bytes, backup_status = FileSystem.read_with_status(backup_path)
+			if backup_status ~= "ok" or bytes ~= before.source.content then return false end
+		end
+		_state.scope_pending, phase = owner, "attempted"
+		local committed = project(candidate, function()
+			if not source_is(before.source) then return false end
+			return not changed or FileSystem.write_if_unchanged(_state.path, content, before.source) == true
+		end)
+		if committed ~= true or not source_is(replacement) then return false end
+		_state.overrides, _state.source_snapshot = candidate, clone_value(replacement)
+		_state.resolve_cache = {}
+		phase = "published"
+		return true
+	end
+	function owner.restore()
+		if phase == "prepared" or phase == "restored" then return true end
+		if phase == "finished" or _state.scope_pending ~= owner then return false end
+		local original = source_is(before.source)
+		if not original and not source_is(replacement) then return false end
+		if project(before.overrides, function()
+			if original then return source_is(before.source) end
+			return FileSystem.write_if_unchanged(_state.path, before.source.content, replacement) == true
+		end) ~= true or not source_is(before.source) then return false end
+		_state.overrides, _state.source_snapshot = clone_value(before.overrides), clone_value(before.source)
+		_state.resolve_cache, _state.scope_pending = {}, nil
+		phase = "restored"
+		return true
+	end
+	function owner.finish()
+		assert(phase == "published" and _state.scope_pending == owner, "delay scope lost publication ownership")
+		_state.scope_pending, phase = nil, "finished"
+		return true
+	end
+	return owner
+end

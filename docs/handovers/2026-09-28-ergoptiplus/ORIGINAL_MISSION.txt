@@ -1,0 +1,875 @@
+
+
+› # Mission : terminer la refonte ErgoptiPlus, l'intégrer à `dev`, pousser et boucler jusqu'à la release
+
+  Tu travailles dans le dépôt `D:/Documents/GitHub/ergopti` (machine Windows 11 ; Git Bash et
+  PowerShell disponibles ; `gh` authentifié sur `adrienm7/ergopti`). Tu reprends un chantier
+  commencé par des agents Claude dont le quota est épuisé. Ce fichier est autonome : il remplace
+  `PROMPT_REPRISE_1_RELEASE.md` et `PROMPT_REPRISE_2_SUITE.md`, qui restent seulement comme
+  historique.
+
+  Le but final :
+  1. terminer toutes les tâches de la refonte ;
+  2. intégrer le tout par-dessus le `dev` à jour, avec mes derniers commits amont ;
+  3. pousser `dev` ;
+  4. suivre la CI jusqu'à ce qu'elle soit verte ET que la release soit créée. Si c'est KO, tu
+     corriges, tu pousses et tu recommences.
+
+  ## 0. Autorisations et règles impératives
+
+  - **Autorisation explicite de pousser `dev`.** Je t'autorise à pousser `dev`, et seulement
+    `dev`, à l'étape 7, puis à y pousser les correctifs nécessaires tant que la CI n'est pas
+    verte et que la release n'existe pas. Cette autorisation remplace, pour cette mission, la
+    règle « ne jamais pousser `dev` sans accord » d'`AGENTS.md`. Elle ne couvre JAMAIS `main`.
+  - **Pas de réécriture de `dev`.** Pas de `--force`, pas de `--force-with-lease`, pas de
+    réécriture de `origin/dev`. `dev` avance uniquement en fast-forward (`git merge --ff-only`).
+  - **Historique linéaire.** Pas de commit de merge, pas de squash, pas de trailer
+    `Co-Authored-By`, ni aucun crédit d'outil.
+  - **Commits.** Commits atomiques, au format Conventional Commits en anglais : sujet de 72
+    caractères au plus, corps qui explique le pourquoi.
+  - **Staging.** Ajoute les chemins un par un : jamais `git add -A`, `git add .`, `git add -u`,
+    `stash`, `reset --hard` ni `clean` sur un worktree actif.
+  - **Contrat du dépôt.** Lis `AGENTS.md`, puis `docs/memory/README.md` et les sujets qu'il
+    désigne. Les procédures sont dans `.agents/skills/<nom>/SKILL.md` : lis ces fichiers
+    directement. Au minimum : `commit-and-push`, `verify-change`, `ship-fix`,
+    `cross-driver-parity`, `i18n`, `logger`, `ahk-driver`, `hammerspoon-driver`,
+    `linux-driver`, `meta-test`, `false-green-tests`, `windows-toolchain`, `bulk-edit`,
+    `workflow-change-control`.
+  - **Qualité.**
+    - TDD : écris le test, vois-le échouer, puis implémente.
+    - Parité complète entre macOS (Hammerspoon), Windows (AutoHotkey v2) et Linux (LuaJIT).
+    - Chaque texte visible par l'utilisateur existe dans les 21 locales, avec de vraies
+      traductions (`en.json` fait référence ; voir le skill `i18n`).
+    - Les fichiers générés passent toujours par leur générateur.
+    - AutoHotkey : UTF-8 avec BOM et LF. Tout le reste : LF.
+    - Fail fast, pas de fallback silencieux.
+  - **Écriture des fichiers.** Les heredocs de Git Bash abîment les antislashs, et Python en mode
+    texte force le CRLF. Écris les fichiers avec ton outil d'édition, ou en binaire.
+  - **Disque.** D: est presque plein (quelques Go libres). Crée tout nouveau worktree sous
+    `C:/ewtb/`.
+  - **Jonctions.** Chaque worktree a des jonctions `node_modules` et `.venv` vers le checkout
+    principal. Avant de supprimer un worktree, retire-les avec `cmd /c rmdir <chemin>`, sinon le
+    contenu partagé est effacé.
+  - **Tests.** Ne jamais affaiblir, sauter ni supprimer un test pour faire passer la CI.
+
+  ## 1. Où tout se trouve
+
+  Dossier de contexte : `D:/ewt/_context/`.
+
+  - **À faire d'abord :** `node D:/ewt/_context/tools/build_context.cjs`. Cela régénère :
+    - `TASK_STATUS.md` : état de chaque tâche (implémentation, relecture), avec ses commits,
+      `not_done`, risques et questions ;
+    - `TASK_SPECS.md` : mes décisions produit validées (DECISIONS, puis EXTRA_COMMON qui
+      l'emporte) et la spec complète de chacune des 35 tâches, par lane.
+
+    Ces deux fichiers sont ta source de vérité fonctionnelle. Le script relit le journal du
+    workflow Claude, ou sa copie `journal.jsonl` si l'original a disparu.
+  - **Mes demandes d'origine, R1 à R35 :** `feature_map_script_with_R1-R35.js`. R36 (les 3
+    touches personnalisables) correspond à la tâche D6.
+  - **Rapports d'analyse initiaux :** `map/*.txt` et `map/critique.md`. Leurs numéros de ligne
+    datent de la base : ce sont des hypothèses, revérifie-les.
+  - **Worktrees de travail :** `D:/ewt/<lane>` sur les branches `feat/ovh-<lane>`, pour les
+    lanes state, menu, logging, updater, actions, diag, navlayer et layouts. Toutes partent de la
+    base `f4d0bfd633ab7af50044199917e1e3db4241d8be`. Il y a environ 200 commits au total.
+  - **Branche d'intégration :** `feat/overhaul`, encore au commit de base.
+  - **`dev` local :** `origin/dev` plus mon commit non poussé `f5eabcfe6` (skill
+    `workflow-change-control`, règle dans `AGENTS.md`, mémoire). Il doit partir avec la release.
+    Vérifie avec `git log origin/dev..dev`.
+  - **Amont :** j'ai poussé beaucoup de correctifs Linux sur `dev` (dernière release
+    `v0.0.0-dev.135` au moment de l'écriture). **Kanata est RETIRÉ sous Linux.** Le démon exécute
+    lui-même les tap-holds et la couche de navigation :
+    - `static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua`, `tap_hold_loader.lua`,
+      `tap_hold_manager.lua` ;
+    - commits `a5616e7fa`, `6eec7b633`, `339f7c65c`, et `2b7b9269f` pour le menu Tap-Holds du
+      tray Linux.
+
+    La décision « Tap-Holds (Linux : son sous-menu kanata) » de DECISIONS est donc périmée : sous
+    Linux, pars du menu tray et du moteur du démon amont.
+
+  ## 2. Nettoyage de départ
+
+  1. **Vérifie que plus aucun agent Claude n'écrit dans `D:/ewt/*`.** `git status` doit rester
+     stable sur une minute. Sinon, arrête-toi et demande-moi.
+  2. **Supprime les notes non suivies.** Il s'agit des fichiers `_PAUSED_READ_FIRST.txt` et
+     `_UPSTREAM_NOTE.txt` à la racine des worktrees.
+  3. **Si `D:/ewt/integ` existe**, c'est un début d'intégration sur l'ancienne base, à ignorer.
+     Retire ses jonctions, puis `git worktree remove --force D:/ewt/integ` et
+     `git worktree prune`.
+  4. **Trie le travail non commité de chaque worktree** (`git -C D:/ewt/<lane> status`). Des
+     agents ont pu être interrompus en cours de tâche, notamment D4, E3, N3 et la relecture
+     de L3.
+     - Ce qui est complet, cohérent et vert : commite-le atomiquement dans sa lane.
+     - Le reste : restaure ces fichiers exacts et note-les comme non faits.
+
+  ## 3. Intégrer l'existant sur le `dev` à jour
+
+  1. `git -C D:/Documents/GitHub/ergopti fetch origin`.
+  2. Vérifie que `feat/overhaul` ne contient rien au-delà de la base. Ensuite :
+     `git branch -f feat/overhaul dev`, où `dev` = `origin/dev` + `f5eabcfe6`. Si `dev` local
+     est en retard sur `origin/dev`, rebase d'abord `f5eabcfe6` dessus.
+  3. Crée un worktree `C:/ewtb/integ` sur `feat/overhaul`, avec ses jonctions
+     (`cmd /c mklink /J`).
+  4. **Cherry-picke chaque lane dans cet ordre :** state, logging, menu, actions, updater, diag,
+     navlayer, layouts. Utilise `git cherry-pick f4d0bfd633ab..feat/ovh-<lane>` pour garder les
+     commits atomiques. Environ 60 fichiers se recouvrent entre lanes et avec l'amont. Règles de
+     résolution :
+     - **Locales JSON et `manifest.toml` :** union des clés et des lignes, chacune à sa
+       position.
+     - **Fichiers générés** (`menu_manifest.json`, manifests de features, `_generated/*`,
+       templates de config, `docs/architecture.md`) : régénère-les avec leurs générateurs,
+       jamais à la main.
+     - **Code Linux : l'amont fait foi.** Retire tout ce que les lanes ont ajouté pour kanata.
+       La couche de nav générée pour Linux (N2) doit alimenter le moteur du démon ; sinon,
+       retire proprement la partie Linux de N2 et note-le.
+     - **Menus Linux :** pars du menu tray amont. Les lignes Restaurer et Tout effacer utilisent
+       `common.restore_recommended` et `common.clear_to_system`.
+     - **Compteurs de ratchets** (par exemple le total de `tools/test/test-linux-feature-parity.cjs`) :
+       recalcule-les, ne prends la valeur d'aucun des deux côtés.
+     - **Le commit `64c6f319d` de layouts** casse seul le ratchet driver-tree-parity, que le
+       commit suivant répare. Laisse-le ainsi, ou réordonne si c'est trivial.
+  5. **Après chaque lane :** régénère, puis `node tools/test/verify-change.cjs`. Corrige la
+     casse entre lanes par des commits `fix(...)` dédiés, avec un test de régression.
+
+  ## 4. Relire ce qui n'a jamais été relu
+
+  **Tâches concernées.** Dans `TASK_STATUS.md`, prends toutes les tâches dont l'implémentation
+  est `done` ou `partial` mais dont la relecture est absente, `blocked` ou `interrupted`. Au
+  moment de l'écriture : A3, C3, D6, E3, L3, et N3 / D4 si elles ont produit des commits.
+  Prends aussi les restes des relectures `partial` (A1, C2, D2).
+
+  **Méthode.** Pour chacune, fais une relecture adversariale contre sa spec dans
+  `TASK_SPECS.md` : parité sur les 3 OS, 21 locales, tests capables d'échouer, fail fast.
+  Corrige chaque défaut avec un test qui échoue avant le correctif.
+
+  ## 5. Implémenter ce qui reste
+
+  Tu travailles par-dessus `feat/overhaul`, qui contient déjà l'amont. Ne construis jamais de
+  nouveau travail sur l'ancienne base.
+
+  **Parallélisme.** Si tu peux lancer plusieurs sessions ou sous-agents, par exemple un
+  `codex exec` par worktree, fais tourner au plus 3 tâches indépendantes en parallèle :
+  - chacune dans son worktree `C:/ewtb/<tâche>`, sur une branche `feat/ovh2-<tâche>` créée
+    depuis `feat/overhaul` ;
+  - chaque session commence par `git log` et `git status` et reprend l'existant ;
+  - n'arrête jamais une session en cours pour lui ajouter une exigence : fais une tâche de
+    suivi.
+
+  Sinon, enchaîne les tâches une par une directement dans `C:/ewtb/integ`.
+
+  Chaque tâche est suivie d'une auto-relecture adversariale, puis rapatriée sur `feat/overhaul`
+  par cherry-pick. La spec complète de chaque tâche est dans `TASK_SPECS.md`.
+
+  **Ordre conseillé :**
+
+  1. **W1 : défauts neutres.**
+     - Une config vide donne le comportement de l'OS.
+     - Toute fonctionnalité qui modifie la saisie est désactivée par défaut.
+     - Les valeurs « conseillées » sont séparées dans le manifest.
+     - La persistance est clairsemée.
+     - « Restaurer les valeurs conseillées » et « Tout effacer (comportement du système) »
+       existent par périmètre.
+     - Aucune migration : il n'y a pas encore d'utilisateurs.
+  2. **W2 : assistant de premier lancement.**
+     - Une page par sous-menu, avec « Activer » à Non par défaut et une liste dépliable des
+       réglages conseillés à importer.
+     - Il se lance automatiquement sur les 3 OS quand `config.toml` est absent, et reste
+       relançable depuis Configuration.
+     - Il dépend de W1.
+  3. **Trou A1.**
+     - Les lignes sous une catégorie désactivée doivent rester actives et modifiables.
+     - Sous Windows, change d'abord le modèle d'état (`ApplyMasterGatesToFeatures`).
+  4. **A4 : sous-menus Tap-Hold et Combinaisons de touches.**
+     - Sous-menu Tap-Hold avec « Main gauche — Tap / Hold » et « Main droite — Tap / Hold ».
+     - Sous-menu « Combinaisons de touches » sous Raccourcis, avec sa propre case à cocher.
+     - Catalogue de touches partagé.
+     - Sous Linux, pars du menu Tap-Holds amont et du moteur du démon.
+  5. **A5 : conflits avec les gestes système.** Avertissements, ligne de statut ✓/⚠ et
+     « Réglages des gestes du système… ».
+  6. **B4 :** la console de débogage s'ouvre grande et centrée.
+  7. **C4 : fenêtre de résultat du contrôle de mise à jour manuel.**
+     - Fenêtre centrée, sur 2 lignes, avec Fermer / Mettre à jour.
+     - Elle indique le canal vérifié et ajoute une ligne par autre canal plus récent.
+     - Sparkle est localisé.
+     - Aujourd'hui, Windows installe directement et Linux ne fait que logguer : c'est à
+       remplacer par cette fenêtre.
+  8. **D3 : Spaces / bureaux.** 4 actions (précédent / suivant, normal et circulaire) ; retrait
+     de `space_wrap` et du réglage « Navigation circulaire ».
+  9. **D4 : prédiction IA** (reprends le travail existant de la lane actions s'il a été
+     commité).
+     - Action « générer une prédiction IA » sur les 3 OS, avec un retour visible à chaque
+       refus.
+     - Raccourcis conseillés Ctrl+Espace (macOS), Win+Espace (Windows) et Super+Espace (Linux),
+       touches avalées.
+     - Retrait des anciens réglages de raccourci déclencheur.
+     - Libellé « Modèle sélectionné » et pluriel corrigé.
+     - « Nombre de suggestions » déplacé dans les paramètres de génération.
+  10. **D5 : actions inspirées de Shortcutie.**
+      - SANS « fermer toutes les apps ».
+      - La suppression de la quarantaine et le vidage de la corbeille demandent confirmation.
+  11. **Trou D2 :** `copy_selected_path` sous Linux.
+  12. **F2 :**
+      - interrupteur Karabiner respecté ;
+      - « Retirer Ergopti de Karabiner » ;
+      - sauvegarde et restauration du registre du pavé tactile Windows ;
+      - état du guardian de remap dans le diagnostic.
+
+      F1 est abandonnée, car kanata est retiré.
+  13. **N3 : éditeur web de la couche de navigation** (reprends le travail existant de la lane
+      navlayer s'il a été commité).
+      - Clavier visuel, pavé numérique, clics et molette.
+      - Il écrit `layers.toml` et alimente le moteur de chaque driver. Sous Linux, c'est le
+        moteur du démon.
+      - Entrée de menu « Éditer la couche de navigation… ».
+      - Implémentée dans la lane navlayer (5 commits, `48239f347` à `547e56e14`) mais jamais
+        relue : relis-la à l'étape 4.
+      - Sous Linux, `linux/ui/layer_editor/bridge.lua` applique encore la couche via
+        `platform/remap/manager.restart()`, le chemin kanata. À l'intégration, fais pointer cet
+        `apply()` sur le moteur de tap-holds du démon.
+      - Restes connus :
+        - pas de capture d'un raccourci en l'appuyant ;
+        - pas de construction de séquences multi-accords ;
+        - seule la couche `nav` est éditable.
+  14. **Trou L3, décision du mainteneur (2026-09-26).** AUCUNE coupure automatique des
+      hotstrings propres à Ergopti (`sfbs_reduction`, `rolls`) selon la disposition détectée,
+      sur aucun OS. Ces groupes sont désactivés par défaut, et l'utilisateur choisit de les
+      activer ou non, quelle que soit sa disposition (par exemple un fork d'Ergopti).
+      - Retire la coupure automatique Windows (`ff00d5139`) et ne l'ajoute pas sous macOS ni
+        Linux.
+      - Vérifie que les deux groupes sont bien désactivés dans les valeurs par défaut
+        partagées, et que le menu laisse les activer sous n'importe quelle disposition.
+  16. **Nouvelle tâche L4 (demande du mainteneur, 2026-09-26) : chaque disposition est une
+      extension.** On sait déjà émuler ou installer les dispositions du registre (Ergo-L…) et
+      ajouter des extensions de hotstrings et de raccourcis. Chaque `.keylayout` du registre
+      devient une extension qui peut embarquer ses propres hotstrings et raccourcis.
+      - Une entrée du registre = le `.keylayout` + des hotstrings et des raccourcis
+        optionnels, au même format que les extensions existantes (réutilise leur format, leur
+        chargement et leur menu, ne crée pas un second système).
+      - Les groupes propres à Ergopti (`sfbs_reduction`, `rolls` et tout autre groupe qui
+        n'a de sens que sur Ergopti) deviennent le contenu de l'extension Ergopti.
+      - Installer ou activer une disposition rend ses hotstrings et raccourcis disponibles,
+        sans les activer : ils restent désactivés par défaut et l'utilisateur les active,
+        quelle que soit la disposition active (point 14).
+      - Le gestionnaire de dispositions (L3) montre ce que chaque disposition embarque.
+      - **Touche magique ★ (conseil retenu, sauf contre-ordre du mainteneur) :** elle reste
+        une fonction générale, pas une partie de l'extension Ergopti.
+        - Restent généraux : le déclencheur ★, la répétition de la lettre précédente, les
+          abréviations par langue (`c★` = c'est, emojis, symboles, Typst). Ils ne dépendent
+          que d'avoir une touche qui produit ★.
+        - Chaque extension de disposition déclare quelle touche physique est sa touche ★
+          (Ergopti déclare la sienne). Sans déclaration, l'utilisateur choisit la touche,
+          comme aujourd'hui avec « Transformer une touche en touche ★ ».
+        - Passent dans l'extension de la disposition : les règles qui dépendent de la
+          géométrie d'Ergopti, comme les corrections de faux positifs de la répétition
+          (`repeat_corrections`, ê→u).
+        - Les valeurs par défaut actuelles de la partie générale ne changent pas.
+        - Le mainteneur a validé ce découpage le 2026-09-26.
+      - **Touche ★ configurable (demande du mainteneur, 2026-09-26), sur les 3 OS :**
+        - Choisir l'emplacement physique qui produit la touche magique : n'importe quelle
+          touche ou position du clavier, en l'appuyant ou dans une liste. Pars des champs
+          existants `magic_key_source_scan` et `magic_key_source_char` et de la section
+          « Transformer une touche en touche ★ » ; complète ce qui manque sur chaque driver.
+        - Choisir le caractère déclencheur : ★ par défaut, ou `;` ou tout autre symbole.
+          Les hotstrings écrits avec ★ dans les TOML se déclenchent alors avec ce caractère,
+          et tous les libellés de l'interface affichent le caractère choisi.
+        - La disposition active peut proposer sa touche ★ par défaut ; le choix de
+          l'utilisateur l'emporte toujours.
+        - Corrige au passage le bug connu de Linux, où la touche magique vaut `\` au lieu
+          de ★ et où les libellés affichent un antislash (`docs/ERGOPTI_PLUS.md` §6.2).
+        - Tests par driver (déclenchement avec un autre caractère, changement d'emplacement,
+          libellés), 21 locales, et une valeur invalide refusée avec un message clair.
+      - Sur les 3 OS, avec les tests par driver et les 21 locales. Si un autre choix de
+        conception reste ambigu, pose la question au mainteneur.
+  15. **Autres restes des `not_done`** dans `TASK_STATUS.md`. Par exemple : le libellé de la
+      ligne de l'éditeur de chemins, les titres des fenêtres GTK Linux en anglais en dur, et
+      R17 sous Linux (`menu.updates.open_releases`, que l'updater retire).
+
+  **Questions produit : réponses par défaut, à appliquer sauf si je t'ai dit autre chose.**
+  - **A3, gestes conseillés macOS (décision du mainteneur, 2026-09-26) :** garde les valeurs
+    par défaut qu'il a choisies dans le manifest pour le glissement à 2 doigts vers la gauche
+    et les glissements horizontaux à 3, 4 et 5 doigts (flèche haut, mots, Spaces, fenêtres) :
+    elles sont mûrement réfléchies. N'aligne pas le manifest sur le runtime ; c'est le runtime
+    qui doit appliquer ces valeurs. Les gestes sont désactivés par défaut.
+  - **L3 :** pas de coupure automatique selon la disposition, voir le point 14.
+  - Pour toute autre question produit ouverte, choisis l'option la plus conservatrice et
+    cohérente avec DECISIONS, puis liste-la dans le rapport final.
+
+  Optimot n'est PAS à faire : j'attends l'accord de son auteur.
+
+  ## 6. Vérifications avant le push
+
+  1. `git fetch origin`. Si `origin/dev` a bougé, rebase `feat/overhaul` dessus. Vérifie ensuite
+     que `git merge-base --is-ancestor origin/dev feat/overhaul` réussit.
+  2. Dans `C:/ewtb/integ` :
+     - `node tools/test/verify-change.cjs --range=origin/dev..HEAD` ;
+     - puis `node tools/test/verify-change.cjs --all --diagnose`.
+
+     Corrige toute régression candidate. Rouges connus, propres à cette machine, à classer
+     avec preuve en les reproduisant sur `origin/dev` :
+     - Node local 22.16 alors que le dépôt épingle 22.22.2 ;
+     - le générateur `codegen-unicode-case-linux.cjs` exige Unicode 17 ;
+     - le test RTK ne trouve pas `dirname` ;
+     - l'étape `build:linux` dépasse 60 s sous Windows : vérifie-la avec
+       `npm run build:linux` lancé directement ;
+     - 7 tests Linux de `test_file_watchers.lua` échouent sous Windows.
+
+     La suite AHK tourne ici : lis le plus récent `%TEMP%/ergopti_test_results_*.txt`. Le Swift
+     du launcher macOS ne compile pas ici, seule la CI macOS le valide.
+  3. **CI sur la branche avant `dev`.** La CI ne se déclenche pas sur un simple push de branche
+     de fonctionnalité. Pousse `feat/overhaul` (autorisé), puis
+     `gh workflow run ci.yml --ref feat/overhaul`. Suis ce run comme à l'étape 8 et corrige
+     jusqu'au vert, jobs macOS, Windows et Linux compris. Les jobs de release ne tournent que
+     sur `dev` et `main`.
+
+  ## 7. Pousser `dev`
+
+  1. `git fetch origin`, puis refais la vérification d'ancêtre de l'étape 6.
+  2. Dans le checkout principal `D:/Documents/GitHub/ergopti`, qui est sur `dev` et doit être
+     propre (sinon arrête-toi et demande-moi) : `git merge --ff-only feat/overhaul`.
+  3. `git push origin dev`, sans aucune option de force. Si le push est refusé parce que `dev`
+     a bougé : fetch, rebase `feat/overhaul` sur `origin/dev`, relance l'étape 6.2, puis
+     réessaie.
+
+  ## 8. Boucle CI → release
+
+  Le workflow `.github/workflows/ci.yml` tourne à chaque push sur `dev`. La release est créée
+  ainsi :
+  - `resolve-release-meta` calcule le tag suivant `v0.0.0-dev.<N>`. Ce job exige que
+    `macos-ok`, `windows-ok` et `linux-ok` aient réussi.
+  - `build-macos`, `build-windows`, `build-linux` et `release-gate-macos` s'exécutent ensuite.
+  - `finalize-release` fait le `gh release create`, en prerelease, avec comme cible le SHA
+    poussé.
+
+  Pour chaque SHA poussé :
+
+  ```bash
+  SHA=$(git -C D:/Documents/GitHub/ergopti rev-parse origin/dev)
+  gh run list --workflow ci.yml --branch dev --commit "$SHA" --json databaseId,status,conclusion
+  gh run watch <id> --exit-status > C:/ewtb/ci-<id>.log 2>&1   # jamais dans un pipe tail/head
+  gh run view <id> --json conclusion,jobs --jq '.conclusion, (.jobs[] | select(.conclusion!="success" and .conclusion!="skipped") | .name + " "
+  + .conclusion)'
+  gh release list --limit 5 --json tagName,isPrerelease,createdAt
+  gh api repos/adrienm7/ergopti/releases/tags/<tag> --jq .target_commitish   # doit valoir $SHA
+  ```
+
+  **Condition de fin :** le run du SHA est en `success` ET une release `v0.0.0-dev.<N>` existe,
+  dont la cible est ce SHA et qui porte ses assets.
+
+  **Si la CI est KO :**
+  1. `gh run view <id> --log-failed > C:/ewtb/ci-<id>-failed.log`.
+  2. Trouve la cause racine et reproduis-la localement quand c'est possible.
+  3. Corrige avec un test de régression, dans un commit atomique.
+  4. Lance `verify-change`, puis pousse sur `dev` (autorisé).
+  5. Recommence la boucle.
+
+  **Cas particuliers :**
+  - **Échec d'infrastructure** (runner, réseau, timeout de téléchargement) : relance une fois
+    avec `gh run rerun <id> --failed`.
+  - **Blocage extérieur au dépôt** (panne GitHub, secret manquant, quota de minutes) : arrête et
+    explique.
+  - **Pas de progrès :** si le même job échoue trois fois de suite pour la même cause malgré
+    tes correctifs, arrête et écris le rapport au lieu de boucler.
+  - **`skip=true`** (le tag existe déjà) : pousse un commit utile de plus ou demande-moi, ne
+    touche jamais aux tags à la main.
+
+  ## 9. Rapport final
+
+  Écris `D:/ewt/_context/RAPPORT_FINAL.md` avec :
+  - les tâches livrées et leurs commits ;
+  - ce qui a été exclu ou reste à faire, et pourquoi ;
+  - les réponses par défaut appliquées aux questions produit ;
+  - les résultats des vérifications locales ;
+  - l'URL du run CI vert et le tag de la release.
+
+  Ajoute une **liste précise de tests manuels** par OS :
+  - **Windows :** émulation Ergopti lue depuis le `.keylayout`, couche de nav générée, les 3
+    touches personnalisables et leurs libellés, fenêtre d'erreur, logs dans
+    `%LOCALAPPDATA%\ergopti_plus\logs`, mises à jour.
+  - **macOS :** tous les menus cliquables (c'était le bug bloquant), cases à cocher en premier
+    item des sous-menus, gestes, logs dans `~/Library/Logs/ergopti_plus`, cadence de mise à
+    jour, assistant de premier lancement.
+  - **Linux :** tap-holds du démon, menus du tray, gestionnaire de dispositions, prédiction IA.
+
+  Ne supprime pas les worktrees `D:/ewt/*` : liste-les dans le rapport.
+
+
+• Je vais régénérer le contexte, lire les consignes et vérifier que les worktrees sont stables avant d’y toucher. Je suivrai ensuite l’intégration et les
+  validations jusqu’à la CI et la release, dans les limites de blocage que tu as fixées.
+
+• Ran node D:/ewt/_context/tools/build_context.cjs
+  └ Wrote TASK_SPECS.md (35 tasks) and TASK_STATUS.md (62 results).
+
+• Ran Get-Content -Raw AGENTS.md; Get-Content -Raw docs/memory/README.md; Get-Content -Raw .agents/skills/windows-toolchain/SKILL.md; Get-Content -Raw docs/
+  │ tooling/rtk.md
+  └ # Shared repository contract
+
+    … +293 lines (ctrl + t to view transcript)
+    not Rust Token Killer and is never removed or overwritten by these scripts.
+
+
+• Ran $repoTrees = git worktree list --porcelain; $repoTrees; $snapshot = foreach ($lanePath in (Get-ChildItem -LiteralPath D:/ewt -Directory)) { if
+  │ (Test-Path -LiteralPath ($lanePath.FullName + '/.git')) { $s = git -C $lanePath.FullName status --porcelain=v1;
+  │ [pscustomobject]@{Path=$lanePath.FullName; Status=@($s); Head=(git -C $lanePath.FullName rev-parse HEAD)} } }; $snapshot | ConvertTo-Json -Depth 4 |
+  │ … +3 lines
+  └ worktree D:/Documents/GitHub/ergopti
+    HEAD 1f62601988f9e07c7c34483e1dfe1ebd6e921382
+    … +378 lines (ctrl + t to view transcript)
+    commit without pushing, per the `commit-and-push` skill.
+
+
+• Ran $skills =
+  │ 'commit-and-push','verify-change','ship-fix','cross-driver-parity','i18n','logger','ahk-driver','hammerspoon-driver','linux-driver','meta-test','false
+  │ -green-tests','bulk-edit'; foreach ($skill in $skills) { Get-Content -Raw -Encoding UTF8 ('.agents/skills/' + $skill + '/SKILL.md') }
+  └ ---
+    name: commit-and-push
+    … +1360 lines (ctrl + t to view transcript)
+    broken links. Verify rewritten links directly. See the `verify-change` skill.
+
+
+• Le contexte est régénéré. Les huit lanes sont présentes ; seule actions contient du code non commité, notamment la prédiction IA. Aucun processus Claude
+  n’apparaît dans le premier relevé. Je vérifie encore la stabilité sur une minute et l’historique de dev, qui a avancé depuis le prompt.
+
+  J’applique les skills de workflow, de vérification et de drivers demandés, avec le contrôle des encodages Windows.
+
+• Ran Get-Content -Raw -Encoding UTF8 .agents/skills/commit-and-push/SKILL.md; Get-Content -Raw -Encoding UTF8 .agents/skills/verify-change/SKILL.md;
+  │ Get-Content -Raw -Encoding UTF8 .agents/skills/ship-fix/SKILL.md; Get-Content -Raw -Encoding UTF8 .agents/skills/cross-driver-parity/SKILL.md;
+  │ Get-Content -Raw -Encoding UTF8 .agents/skills/i18n/SKILL.md
+  └ ---
+    name: commit-and-push
+    … +417 lines (ctrl + t to view transcript)
+    because it looks correct to a French speaker.
+
+
+• Ran $initial = Get-Content -Raw -Encoding UTF8 C:/Windows/Temp/ergopti-start-status.json | ConvertFrom-Json; foreach ($tree in $initial) { $now = @(git -C
+  │ $tree.Path status --porcelain=v1); $headNow = git -C $tree.Path rev-parse HEAD; [pscustomobject]@{Path=$tree.Path; Stable=(($now -join "`n") -eq
+  │ ($tree.Status -join "`n") -and $headNow -eq $tree.Head)} }; .\tools\rtk\rtk.ps1 git status --short; .\tools\rtk\rtk.ps1 git log --oneline origin/
+  │ … +1 lines
+  └
+    Path           Stable
+    … +1414 lines (ctrl + t to view transcript)
+
+
+
+• Ran $initial = Get-Content -Raw -Encoding UTF8 C:/Windows/Temp/ergopti-start-status.json | ConvertFrom-Json; foreach ($tree in $initial) { $now = @(git -C
+  │ $tree.Path status --porcelain=v1); $headNow = git -C $tree.Path rev-parse HEAD; [pscustomobject]@{Path=$tree.Path; Stable=(($now -join "`n") -eq
+  │ ($tree.Status -join "`n") -and $headNow -eq $tree.Head)} }; Get-Item C:/Windows/Temp/ergopti-start-status.json | Select-Object LastWriteTime;
+  │ … +3 lines
+  └
+    Path           Stable
+    … +130 lines (ctrl + t to view transcript)
+
+
+
+• Ran Get-Content -Raw -Encoding UTF8 .agents/skills/ahk-driver/SKILL.md; Get-Content -Raw -Encoding UTF8 .agents/skills/hammerspoon-driver/SKILL.md;
+  │ Get-Content -Raw -Encoding UTF8 .agents/skills/linux-driver/SKILL.md; Get-Content -Raw -Encoding UTF8 .agents/skills/orchestrate-pass/SKILL.md
+  └ ---
+    name: ahk-driver
+    … +535 lines (ctrl + t to view transcript)
+    — synthesis is where you add the value the agents cannot.
+
+
+• Ran Get-Content -Raw -Encoding UTF8 docs/memory/workflow-and-verification.md; Get-Content -Raw -Encoding UTF8 docs/memory/shared-architecture.md
+  └ <!-- docs/memory/workflow-and-verification.md -->
+
+    … +453 lines (ctrl + t to view transcript)
+    handle entries disappearing between discovery and use.
+
+
+• Ran Get-Content -Raw -Encoding UTF8 .agents/skills/orchestrate-pass/SKILL.md; Get-Content -Raw -Encoding UTF8 .agents/skills/linux-driver/SKILL.md;
+  │ Get-Content -Raw -Encoding UTF8 docs/memory/linux-web-release.md
+  └ ---
+    name: orchestrate-pass
+    … +478 lines (ctrl + t to view transcript)
+    do not silently skip the guard.
+
+
+• Les huit worktrees sont stables depuis plus d’une minute. Je lance deux analyses en parallèle : le tri du travail interrompu dans actions, et l’inventaire
+  des tâches et relectures restantes. Je prépare l’intégration pendant ce temps, sans modifier les deux worktrees de test D4 déjà présents sous C:/ewtb.
+
+• Started `/root/triage_actions`
+
+• Started `/root/task_inventory`
+
+• Ran Get-Content -Raw -Encoding UTF8 docs/memory/windows-ahk.md; Get-Content -Raw -Encoding UTF8 docs/memory/macos-hammerspoon.md; Get-Content -Raw
+  │ -Encoding UTF8 docs/memory/text-input-and-config.md
+  └ <!-- docs/memory/windows-ahk.md -->
+
+    … +1287 lines (ctrl + t to view transcript)
+    injection. Menus and bridges consume those defaults rather than redeclaring them.
+
+
+• Ran Get-Content -Encoding UTF8 D:/ewt/_context/TASK_SPECS.md -TotalCount 190; Get-Content -Raw -Encoding UTF8 .agents/skills/meta-test/SKILL.md;
+  │ Get-Content -Raw -Encoding UTF8 docs/memory/rejected_proposals.md
+  └ # ErgoptiPlus overhaul: decisions and task specs
+
+    … +441 lines (ctrl + t to view transcript)
+    [native border experiment](../audits/performance/ahk/2026_09_08/border_position/report.md).
+
+
+• Ran $lanes = 'state','logging','menu','actions','updater','diag','navlayer','layouts'; foreach ($lane in $lanes) { foreach ($note in
+  │ '_PAUSED_READ_FIRST.txt','_UPSTREAM_NOTE.txt') { $target = 'D:/ewt/' + $lane + '/' + $note; if (Test-Path -LiteralPath $target) { $tracked = git -C
+  │ ('D:/ewt/' + $lane) ls-files -- $note; if ($tracked) { throw ('Unexpected tracked note: ' + $target) }; Remove-Item -LiteralPath $target; Write-Output
+  │ … +4 lines
+  └ Removed D:/ewt/state/_PAUSED_READ_FIRST.txt
+    Removed D:/ewt/state/_UPSTREAM_NOTE.txt
+    … +26 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran .\tools\rtk\rtk.ps1 git show --stat f5eabcfe6; .\tools\rtk\rtk.ps1 git log -5 --oneline -- .agents/skills/workflow-change-control/SKILL.md; .
+  │ \tools\rtk\rtk.ps1 git log --all --oneline --grep='workflow'; Get-Content -Raw -Encoding UTF8 .nvmrc; Get-Command node,gh,rg | Select-Object
+  │ Name,Source | ConvertTo-Json; Get-ChildItem -LiteralPath C:/ewtb/d4-node | Select-Object Name | ConvertTo-Json
+  └ commit f5eabcfe6551e88a57b88f4b6adf69f2ce0e060d
+    Author: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+    … +94 lines (ctrl + t to view transcript)
+        "Name":  "node-v22.22.2-win-x64"
+    }
+
+• Ran $oldPatch = git show f5eabcfe6 --pretty=format: | git patch-id --stable; $newPatch = git show 2ea71d91f --pretty=format: | git patch-id --stable;
+  │ [pscustomobject]@{Original=$oldPatch; Upstream=$newPatch; SamePatch=(($oldPatch -split ' ')[0] -eq ($newPatch -split ' ')[0])} | ConvertTo-Json; git
+  │ merge-base --is-ancestor 2ea71d91f dev; Write-Output ('rebased workflow commit ancestor exit=' + $LASTEXITCODE); & C:/ewtb/d4-node/
+  │ … +2 lines
+  └ {
+        "Original":  "be89b1f41b04e317fd20c732525a0dbc76156722 0000000000000000000000000000000000000000",
+    … +30 lines (ctrl + t to view transcript)
+    ]
+    1f62601988f9e07c7c34483e1dfe1ebd6e921382
+
+• Ran Get-Content -Encoding UTF8 docs/memory/windows-ahk.md | Select-Object -Skip 350 -First 165; Get-Content -Encoding UTF8 docs/memory/
+  │ macos-hammerspoon.md -TotalCount 220
+  └ own legacy spellings bricks the installed base: every legacy key is skipped
+    AND the rejected-override latch then blocks all later saves, including the
+    … +334 lines (ctrl + t to view transcript)
+    and rollback contract, but an actual native start refusal requires a macOS
+    binding-level or fault-injection test.
+
+• Ton commit de protection des workflows est déjà dans dev sous le nouveau SHA 2ea71d91f ; son patch est identique à celui de f5eabcfe6. L’API GitHub
+  confirme aussi que dev local correspond actuellement à l’amont.
+
+  Le tri a retrouvé quatre commits D4 absents du tableau de suivi. Le reste non commité retire une grande partie de l’ancien mécanisme de raccourci IA ; je
+  vérifie notamment que ses garanties restent couvertes avant de le conserver.
+
+• Ran Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -in 2932,6920,7964,13136 } | Select-Object ProcessId,Name,CommandLine | ConvertTo-Json;
+  │ $remoteUrl = git remote get-url origin; Write-Output $remoteUrl; Get-Content -Encoding UTF8 D:/ewt/_context/TASK_STATUS.md -TotalCount 42; .
+  │ \tools\rtk\rtk.ps1 git log --reverse --format='%h %s' f4d0bfd633ab..feat/ovh-state
+  └ [
+        {
+    … +81 lines (ctrl + t to view transcript)
+    c974d1b4f fix(config): reject the same registry defects on every driver
+    ecb957120 docs(adr): name the Windows full save as the one restamping writer
+
+• Ran Get-Process -Id 13136,7964 -ErrorAction SilentlyContinue | Select-Object Id,CPU,StartTime,WorkingSet | ConvertTo-Json; Get-ChildItem
+  │ -LiteralPath .git/objects/pack -Filter 'tmp*' | Select-Object Name,Length,LastWriteTime | ConvertTo-Json; .\tools\rtk\rtk.ps1 git status --short;
+  │ Get-Item node_modules,.venv | Select-Object FullName,LinkType,Target | ConvertTo-Json
+  └ [
+        {
+    … +31 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran [pscustomobject]@{Snapshot=(Get-Item C:/Windows/Temp/ergopti-start-status.json).LastWriteTime.ToString('o'); Now=(Get-Date).ToString('o')} |
+  │ ConvertTo-Json; Get-ChildItem -LiteralPath C:/ewtb | Select-Object -ExpandProperty Name; .\tools\rtk\rtk.ps1 git fetch origin; $refs = git
+  │ for-each-ref --format='%(refname:short) %(objectname)' refs/heads/dev refs/heads/feat/overhaul refs/remotes/origin/dev; $refs; git merge-base
+  │ … +2 lines
+  └ {
+        "Snapshot":  "2026-09-28T00:25:09.7406270+02:00",
+    … +26 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran .\tools\rtk\rtk.ps1 git diff --stat f4d0bfd633ab..feat/ovh-state; .\tools\rtk\rtk.ps1 git diff --name-only f4d0bfd633ab..dev -- static/ergopti_plus/
+  │ macos/infra/preferences.lua static/ergopti_plus/macos/ui/menu/init.lua static/ergopti_plus/macos/ui/menu/global_actions_transaction.lua; .
+  │ \tools\rtk\rtk.ps1 git log --oneline --max-count=12 origin/dev; .\tools\rtk\rtk.ps1 rg -n 'codegen|build:manifest|build:menu|build:domain'
+  │ … +1 lines
+  └ docs/memory/macos-hammerspoon.md                   |  47 ++
+     docs/memory/text-input-and-config.md               |  12 +
+    … +171 lines (ctrl + t to view transcript)
+    141:        "codegen:unicode-case:linux": "node ./tools/codegen/codegen-unicode-case-linux.cjs",
+    142:        "codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",
+
+• Interacted with `/root/triage_actions`
+
+• Ran Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^git|^ssh|^remote-https' } | Select-Object ProcessId,ParentProcessId,Name,CommandLine |
+  │ ConvertTo-Json; Get-ChildItem -LiteralPath .git/objects/pack -Filter 'tmp*' | Select-Object Name,Length,LastWriteTime | ConvertTo-Json; .
+  │ \tools\rtk\rtk.ps1 git config --get-all remote.origin.fetch; .\tools\rtk\rtk.ps1 rg -n '^### Task|^## Lane|^### [A-Z][0-9]' D:/ewt/_context/
+  │ … +1 lines
+  └ [
+        {
+    … +63 lines (ctrl + t to view transcript)
+    393:### D2: R32 paste plain, Unicode-correct case actions, wrap selection with a ...
+      +18 more in D:/ewt/_context/TASK_SPECS.md [see remaining: tail -n +26 ~/AppData\Local\rtk\tee\1790548191_grep_0_D__ewt__context_TASK_SPECS_md.log]
+
+• Ran .\tools\rtk\rtk.ps1 git config --get-regexp '^url\..*\.(insteadof|pushinsteadof)$'; Get-Content -Raw -Encoding UTF8 .agents/skills/project-memory/
+  │ SKILL.md; Get-Content -Encoding UTF8 D:/ewt/_context/TASK_SPECS.md | Select-Object -Skip 90 -First 29
+  └ ---
+    name: project-memory
+    … +99 lines (ctrl + t to view transcript)
+    per-driver commit-path tests, Linux autorun test.
+    ```
+
+• Ran $fetchSsh = Get-CimInstance Win32_Process -Filter 'ProcessId = 7964'; if ($fetchSsh -and $fetchSsh.ParentProcessId -eq 6920 -and $fetchSsh.CommandLine
+  │ -like '*git-upload-pack*adrienm7/ergopti.git*') { Stop-Process -Id 7964 }; .\tools\rtk\rtk.ps1 git -c remote.origin.url=https://github.com/adrienm7/
+  │ ergopti.git fetch origin
+  └ FAILED: git fetch
+    fetch-pack: unexpected disconnect while reading sideband packet
+    fatal: early EOF
+    fatal: fetch-pack: invalid index-pack output
+
+
+• Ran $fetchSsh = Get-CimInstance Win32_Process -Filter 'ProcessId = 6116'; if ($fetchSsh -and $fetchSsh.ParentProcessId -eq 12420 -and
+  │ $fetchSsh.CommandLine -like '*git-upload-pack*adrienm7/ergopti.git*') { Stop-Process -Id 6116 }; .\tools\rtk\rtk.ps1 git -c
+  │ url.https://github.com/.insteadOf=git@github.com: fetch origin
+  └ ok fetched (14 new refs)
+
+• Completed `/root/triage_actions`
+
+• Ran node C:/ewtb/archive-actions.cjs; .\tools\rtk\rtk.ps1 git log --oneline dev..origin/dev; .\tools\rtk\rtk.ps1 git status --short; $branchTip = git
+  │ rev-parse feat/overhaul; if ($branchTip -ne 'f4d0bfd633ab7af50044199917e1e3db4241d8be') { throw 'Integration branch no longer at base' }; .
+  │ \tools\rtk\rtk.ps1 git branch -f feat/overhaul dev; .\tools\rtk\rtk.ps1 git worktree add C:/ewtb/integ feat/overhaul
+  └ {"destination":"C:/ewtb/actions-interrupted-20260928","tracked":109,"untracked":4}
+
+    ok
+    ok
+
+• Le fetch a réussi via HTTPS après un blocage du transport SSH ; je n’ai changé aucune configuration Git persistante. feat/overhaul part maintenant du dev
+  actuel, dans C:/ewtb/integ.
+
+  Le reliquat D4 n’est pas prêt à être commité : un contrôle JS échoue et le déplacement du nombre de suggestions est incomplet sous Linux. J’en ai archivé
+  le patch et les fichiers exacts. Je restaure uniquement ces chemins dans la lane, puis je reprendrai les morceaux utiles sur la base intégrée.
+
+• Completed `/root/task_inventory`
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit `/feedback` to report the issue.
+
+• Je reprends en vérifiant l’état réel des worktrees, des agents et des commandes après l’interruption, puis je poursuis l’intégration.
+
+• Ran git worktree list --porcelain; git -C C:/ewtb/integ status --short; git -C C:/ewtb/integ log -5 --oneline; Get-Content -Raw -Encoding UTF8 C:/ewtb/
+  │ overhaul-progress.md; Get-ChildItem -LiteralPath C:/ewtb | Select-Object -ExpandProperty Name
+  └ worktree D:/Documents/GitHub/ergopti
+    HEAD 1f62601988f9e07c7c34483e1dfe1ebd6e921382
+    … +126 lines (ctrl + t to view transcript)
+    overhaul-progress.md
+    task-inventory.json
+
+• Ran node C:/ewtb/restore-actions.cjs; cmd /c mklink /J C:\ewtb\integ\node_modules D:\Documents\GitHub\ergopti\node_modules; cmd /c mklink /J C:
+  │ \ewtb\integ\.venv D:\Documents\GitHub\ergopti\.venv; .\tools\rtk\rtk.ps1 git cherry-pick f4d0bfd633ab..feat/ovh-state
+  └ Restored archived incomplete D4 paths individually: 113
+
+    … +25 lines (ctrl + t to view transcript)
+    hint: run "git cherry-pick --abort".
+    hint: Disable this message with "git config set advice.mergeConflict false"
+
+• Ran .\tools\rtk\rtk.ps1 git diff --name-only --diff-filter=U; .\tools\rtk\rtk.ps1 rg -n -C 14 '^(<<<<<<<|=======|>>>>>>>)' docs/memory/
+  │ macos-hammerspoon.md; .\tools\rtk\rtk.ps1 git status --short
+  └ docs/memory/macos-hammerspoon.md
+
+    … +80 lines (ctrl + t to view transcript)
+    M  static/ergopti_plus/macos/tests/unit/modules/gestures/test_touch_watcher_lifecycle_transaction.lua
+    M  static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_pause_owner_inventory.lua
+
+• Ran .\tools\rtk\rtk.ps1 git add -- docs/memory/macos-hammerspoon.md; $env:GIT_EDITOR = 'true'; .\tools\rtk\rtk.ps1 git cherry-pick --continue
+  └ ok 11 files changed, 614 insertions(+), 340 deletions(-)
+    [OK] No pinned source reads in staged tests.
+    … +168 lines (ctrl + t to view transcript)
+     Date: Thu Sep 24 10:35:55 2026 +0200
+     2 files changed, 11 insertions(+), 5 deletions(-)
+
+• Ran $env:PATH = 'C:\ewtb\d4-node\node-v22.22.2-win-x64;' + $env:PATH; node tools/build/build-domain.cjs *> C:/ewtb/state-generate.log; $code =
+  │ $LASTEXITCODE; Get-Content -Encoding UTF8 C:/ewtb/state-generate.log -Tail 18; exit $code
+  └        Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'smol-toml' imported from C:\ewtb\integ\tools\build\build-features-manifest.js
+               at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+    … +14 lines (ctrl + t to view transcript)
+    Total: 1 step(s) — 0 passed, 1 failed
+
+
+• Les 20 commits de la lane state sont intégrés. Un seul conflit concernait deux ajouts de documentation ; les deux ont été conservés.
+
+  La régénération s’arrête avant les tests : smol-toml manque dans les dépendances partagées. Je vérifie l’installation pour rétablir un environnement de
+  validation complet.
+
+• Ran Get-Item node_modules | Format-List FullName,LinkType,Target; Test-Path node_modules/smol-toml; Get-ChildItem node_modules -Name | Select-Object
+  │ -First 12; .\tools\rtk\rtk.ps1 rg -n 'smol-toml|packageManager|engines' package.json package-lock.json; Get-Command npm | Select-Object Source |
+  │ ConvertTo-Json; Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' } | Select-Object ProcessId,CommandLine | ConvertTo-Json; .
+  │ … +1 lines
+  └
+
+    … +48 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran Get-Content -Encoding UTF8 tools/test/verify-change.cjs -TotalCount 110; Get-ChildItem .venv -Name | Select-Object -First 8; Get-Command
+  │ lua,luajit,python -ErrorAction SilentlyContinue | Select-Object Name,Source | ConvertTo-Json; Test-Path 'C:/Program Files/AutoHotkey/v2/
+  │ AutoHotkey64.exe'
+  └ // tools/test/verify-change.cjs
+
+    … +123 lines (ctrl + t to view transcript)
+    ]
+    True
+
+• Ran $env:PATH = 'C:\ewtb\d4-node\node-v22.22.2-win-x64;' + $env:PATH; npm.cmd ci --no-audit --no-fund *> C:/ewtb/npm-ci.log; $code = $LASTEXITCODE;
+  │ Get-Content -Encoding UTF8 C:/ewtb/npm-ci.log -Tail 20; exit $code
+  └
+    > svelte-static@3.0.0 prepare
+    … +3 lines (ctrl + t to view transcript)
+
+    added 375 packages in 11s
+
+• Interacted with `/root/task_inventory`
+
+• Ran Get-Content -Encoding UTF8 C:/ewtb/npm-ci.log -Tail 8; .\tools\rtk\rtk.ps1 git diff --check dev..HEAD; .\tools\rtk\rtk.ps1 git log --format='%h %B'
+  │ dev..HEAD
+  └
+    > svelte-static@3.0.0 prepare
+    … +54 lines (ctrl + t to view transcript)
+    Windows stamped a literal schema_version = 2 and nothing read it. The
+    boot now runs ConfigMigrateBoot right before the first read of
+
+• Ran .\tools\rtk\rtk.ps1 git log --reverse --oneline f4d0bfd633ab..feat/ovh-logging; .\tools\rtk\rtk.ps1 git log --oneline dev --grep='log'; .
+  │ \tools\rtk\rtk.ps1 git diff --name-only f4d0bfd633ab..feat/ovh-logging
+  └ 11faa67c7 feat(logger): collapse repeated lines in the shared core and AHK
+    dbb1dc61a feat(macos): arm logger repeat collapsing at boot
+    … +270 lines (ctrl + t to view transcript)
+    Changes:
+
+
+• Ran Get-Content -Encoding UTF8 C:/ewtb/state-generate.log -Tail 12; if (Test-Path C:/ewtb/state-verify.log) { Get-Content -Encoding UTF8 C:/ewtb/
+  │ state-verify.log -Tail 12 }; .\tools\rtk\rtk.ps1 git status --short
+  └   ✓  test:keycode-data-js-parity — DC-1 parity
+      ✓  test:port-compliance — 13 port adapter contracts
+    … +33 lines (ctrl + t to view transcript)
+    RUNNING 272/6875 - LoggerDone: emits a DONE line
+    ok 272 - LoggerDone: emits a DONE line
+
+• Interacted with `/root/triage_actions`
+
+• Les dépendances sont réinstallées avec Node 22.22.2. Les 14 étapes de génération passent, sans dérive des fichiers générés. La vérification de la lane
+  state est en cours, avec la suite AHK complète.
+
+  En parallèle, je fais examiner les recouvrements de la lane logging avec les correctifs amont, notamment le logger natif macOS et la CI réorganisée.
+
+• Ran $last = Get-ChildItem -LiteralPath $env:TEMP -Filter 'ergopti_test_results_*.txt' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if
+  │ ($last) { $last.FullName; Get-Content -Encoding UTF8 $last.FullName -Tail 5 }; Select-String -LiteralPath C:/ewtb/state-verify.log -Pattern '^not
+  │ ok','FAIL','Error:' | Select-Object -Last 8; Get-Content -Encoding UTF8 C:/ewtb/state-verify.log -Tail 8
+  └ C:\Users\admin\AppData\Local\Temp\ergopti_test_results_10968.txt
+    # duration_ms 1509 2555.258
+    … +29 lines (ctrl + t to view transcript)
+
+
+
+• Ran $commits = git log --format='%H%x09%s' dev..HEAD; foreach ($line in $commits) { $parts = $line -split "`t",2; if ($parts[1].Length -gt 72)
+  │ { Write-Output ($parts[0].Substring(0,9) + ' ' + $parts[1].Length + ' ' + $parts[1]) } }; $bodies = git log --format='%B' dev..HEAD; $bodies |
+  │ Select-String -Pattern 'Co-Authored-By'; Get-Content -Encoding UTF8 C:/ewtb/state-verify.log -Tail 4
+  └ RUNNING 1515/6875 - updater swap transaction: canceled Starting owner kills unpublished child
+    ok 1515 - updater swap transaction: canceled Starting owner kills unpublished child
+    # duration_ms 1515 51.005
+    RUNNING 1516/6875 - updater fixture: canceled child cleanup failure is not green (updater-canceled-cleanup)
+
+• Ran Select-String -LiteralPath C:/ewtb/state-verify.log -Pattern '^==','^\s*FAIL','^not ok','^\s*✗','^\s*×','SUMMARY','[0-9]+ failed' | Select-Object
+  │ -First 18; Get-Content -Encoding UTF8 C:/ewtb/state-verify.log -TotalCount 50; .\tools\rtk\rtk.ps1 rg -n 'timeout|ahk-suite|ahk-e2e' tools/test/
+  │ verify-change.cjs
+  └
+    C:\ewtb\state-verify.log:25:=== ahk-encoding ===
+    … +63 lines (ctrl + t to view transcript)
+
+
+
+• Completed `/root/task_inventory`
+
+• Ran $env:PATH = 'C:\ewtb\d4-node\node-v22.22.2-win-x64;' + $env:PATH; node tools/build/build-domain.cjs *> C:/ewtb/state-generate.log; $code =
+  │ $LASTEXITCODE; Get-Content -Encoding UTF8 C:/ewtb/state-generate.log -Tail 20; if ($code -ne 0) { exit $code }; node tools/test/verify-change.cjs *>
+  │ C:/ewtb/state-verify-default.log; node tools/test/verify-change.cjs --range=dev..HEAD *> C:/ewtb/state-verify.log; $code = $LASTEXITCODE; Get-Content
+  │ … +1 lines
+  └   ✓  build:manifest — generate features_manifest.{ahk,lua}
+      ✓  codegen:terminators — regenerate terminators.{ahk,lua}
+    … +16 lines (ctrl + t to view transcript)
+    Total: 14 step(s) — 14 passed, 0 failed
+
+
+• Completed `/root/triage_actions`
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit `/feedback` to report the issue.
+
+• You have 2 usage limit resets available. Run /usage to use one.
+
+• Goal active Objective: Complete ErgoptiPlus overhaul, integrate linearly over updated dev, validate feature-branch CI, fast-forward and push dev, then
+repair until CI succeeds and a prerelease with assets targets the pushed SHA; write D:/ewt/_context/RAPPORT_FINAL.md. Time: 9m.
+
+• Je vérifie la commande de validation déjà lancée et reprends à son résultat, sans relancer de suite en double.
+
+• Ran Get-Content -Encoding UTF8 C:/ewtb/state-verify.log -Tail 18; .\tools\rtk\rtk.ps1 git status --short; Get-CimInstance Win32_Process | Where-Object
+  │ { $_.Name -match 'AutoHotkey|node.exe' } | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json
+  └ ok 2888 - KL_BuildInserts: 'mouse_click' (first value of its case group) is not silently dropped (switch-fallthrough-bug)
+    # duration_ms 2888 0.096
+    … +29 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Added C:\ewtb\run-gate.cjs (+11 -0)
+     1 +const fs = require('node:fs');
+     2 +const cp = require('node:child_process');
+     3 +const [cwd, log, receipt, script, ...args] = process.argv.slice(2);
+     4 +if (!cwd || !log || !receipt || !script) throw new Error('Expected cwd, log, receipt, script and arguments');
+     5 +const started = new Date().toISOString();
+     6 +fs.writeFileSync(receipt, JSON.stringify({ status: 'running', pid: process.pid, cwd, script, args, started }) + '\n');
+     7 +const fd = fs.openSync(log, 'w');
+     8 +const result = cp.spawnSync(process.execPath, [script, ...args], { cwd, stdio: ['ignore', fd, fd], windowsHide: true });
+     9 +fs.closeSync(fd);
+    10 +fs.writeFileSync(receipt, JSON.stringify({ status: 'finished', exitCode: result.status, signal: result.signal, error: result.error?.message, cwd, sc
+        ript, args, started, finished: new Date().toISOString() }) + '\n');
+    11 +process.exitCode = result.status ?? 1;
+
+• Ran $env:PATH = 'C:\ewtb\d4-node\node-v22.22.2-win-x64;' + $env:PATH; $gate = Start-Process -FilePath C:/ewtb/d4-node/node-v22.22.2-win-x64/node.exe
+  │ -ArgumentList 'C:/ewtb/run-gate.cjs','C:/ewtb/integ','C:/ewtb/state-verify-2.log','C:/ewtb/state-verify-2.json','tools/test/
+  │ verify-change.cjs','--range=dev..HEAD' -WindowStyle Hidden -PassThru; $gate.Id; Get-Content -Encoding UTF8 C:/ewtb/state-verify-2.json -ErrorAction
+  │ … +1 lines
+  └ 9056
+
+• L’interruption a arrêté la validation pendant la suite AHK, avant tout verdict final. J’ai confirmé qu’aucun processus de test ne tournait encore, puis
+  relancé la même vérification avec un journal et un résultat persistants pour qu’elle puisse survivre aux prochaines interruptions.
+
+• Started `/root/state_review`
+
+• Started `/root/logging_integration_review`
+
+• Ran Get-Content -Raw -Encoding UTF8 C:/ewtb/state-verify-2.json; Get-Content -Encoding UTF8 C:/ewtb/state-verify-2.log -Tail 4; .\tools\rtk\rtk.ps1 rg -n
+  │ 'recommended|neutral|scopes|sparse' static/ergopti_plus/_shared/modules/features/manifest.toml tools/build/build-features-manifest.js static/
+  │ ergopti_plus/macos/infra/preferences.lua static/ergopti_plus/windows/infra/config_io.ahk; Get-Content -Encoding UTF8 static/ergopti_plus/_shared/
+  │ … +1 lines
+  └ {"status":"running","pid":9056,"cwd":"C:/ewtb/integ","script":"tools/test/verify-change.cjs","args":
+    ["--range=dev..HEAD"],"started":"2026-09-27T22:44:28.629Z"}
+    … +106 lines (ctrl + t to view transcript)
+    description_key = "menu.hotstrings"
+    platforms = ["ahk", "hs", "linux"]
+
+• Ran Get-Process -Id 9056 -ErrorAction SilentlyContinue | Select-Object Id,CPU,StartTime | ConvertTo-Json; Get-Content -Encoding UTF8 C:/ewtb/
+  │ state-verify-2.log -Tail 4; .\tools\rtk\rtk.ps1 rg -n 'function.*default|DEFAULT_STATE|function.*save|function.*snapshot' static/ergopti_plus/macos/
+  │ infra/preferences.lua; .\tools\rtk\rtk.ps1 rg -n 'function|sparse|default' tools/build/build-features-manifest.js | Select-Object -First 30
+  └ {
+        "Id":  9056,
+    … +41 lines (ctrl + t to view transcript)
+      +15 more in tools/build/build-features-manifest.js [see remaining: tail -n +26 ~/
+    AppData\Local\rtk\tee\1790549121_grep_0_build_build_features_manifest_js.log]
+
+• Ran Get-Content -Raw -Encoding UTF8 C:/ewtb/state-verify-2.json; Get-Process -Id 9056 -ErrorAction SilentlyContinue | Select-Object Id,CPU |
+  │ ConvertTo-Json; Get-Content -Encoding UTF8 C:/ewtb/state-verify-2.log -Tail 6; Select-String -LiteralPath C:/ewtb/state-verify-2.log -Pattern '^not
+  │ ok','^===','^.*failed, [0-9]+ skipped' | Select-Object -Last 10
+  └ {"status":"running","pid":9056,"cwd":"C:/ewtb/integ","script":"tools/test/verify-change.cjs","args":
+    ["--range=dev..HEAD"],"started":"2026-09-27T22:44:28.629Z"}
+    … +14 lines (ctrl + t to view transcript)
+
+
+
+• La suite AHK progresse sans échec signalé pour l’instant. La relecture a repéré un cas à vérifier dans l’isolation des erreurs au démarrage macOS.
+
+  Pour la lane suivante, un point d’intégration est confirmé : le nouveau dossier de logs devra aussi être utilisé par le nettoyage de la CI macOS actuelle,
+  faute de quoi le test de lancement pourra rencontrer des logs laissés par les tests natifs.
+
+• Ran Get-Content -Encoding UTF8 static/ergopti_plus/macos/ui/menu/menu_state.lua | Select-Object -Skip 100 -First 190; Get-Content -Encoding UTF8 static/
+  │ ergopti_plus/macos/ui/menu/init.lua | Select-Object -Skip 300 -First 110
+  └     --- @param label string Human-readable description for the error.
+        --- @param fn function|nil Required lifecycle method.
+    … +296 lines (ctrl + t to view transcript)
+                if not custom_text then pcall(function() myMenu:setTitle("") end) end
+            else
+
+• Goal paused Objective: Complete ErgoptiPlus overhaul, integrate linearly over updated dev, validate feature-branch CI, fast-forward and push dev, then
+repair until CI succeeds and a prerelease with assets targets the pushed SHA; write D:/ewt/_context/RAPPORT_FINAL.md. Time: 12m.

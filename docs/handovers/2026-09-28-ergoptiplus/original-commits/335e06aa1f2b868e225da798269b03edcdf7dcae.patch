@@ -1,0 +1,2645 @@
+From 335e06aa1f2b868e225da798269b03edcdf7dcae Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 11:25:24 +0200
+Subject: [PATCH] fix(windows): preserve desired features behind category
+ masters
+
+Keep user choices separate from effective runtime gates so disabled
+categories remain editable and full saves retain explicit intent. Publish
+only affected domains after durable acceptance and share admission with
+tap-hold writes to avoid losing concurrent state changes.
+
+Persist neutral feature values as deletions through the manifest contract.
+Cover closed-master edits, mixed sparse saves, rollback, reactivation,
+unrelated runtime refusals and cross-file tap-hold admission.
+---
+ static/ergopti_plus/windows/ErgoptiPlus.ahk   |  11 +-
+ .../ergopti_plus/windows/infra/config_io.ahk  | 544 +++++++-----------
+ .../ergopti_plus/windows/infra/feature_io.ahk |  57 +-
+ .../windows/infra/master_gates.ahk            | 109 ++--
+ .../windows/infra/personal_features.ahk       |  13 +-
+ .../platform/remap/tap_hold_writer.ahk        |  41 +-
+ .../meta/test_audit_2026_07_20_batch4.ahk     |  18 +-
+ .../test_config_failures_are_surfaced.ahk     |  48 +-
+ .../meta/test_config_persistence_callers.ahk  |  82 +--
+ .../test_config_typed_foreign_producers.ahk   |  27 +-
+ .../meta/test_feature_io_impl_no_global.ahk   |  16 +-
+ .../tests/meta/test_llm_menu_loaded_gate.ahk  |   2 +-
+ ..._menu_dynamic_hotstrings_category_gate.ahk |  24 +-
+ .../test_menu_reload_preserves_suspend.ahk    |   4 +-
+ .../meta/test_personal_hotstring_seed.ahk     |   9 +-
+ .../meta/test_reload_pending_contract.ahk     |   3 +-
+ ...t_tap_hold_global_transaction_20260813.ahk |   6 +-
+ .../test_tap_hold_persist_before_publish.ahk  |   4 +-
+ ...st_toggle_category_all_features_atomic.ahk |  63 +-
+ .../ergopti_plus/windows/tests/test_stubs.ahk |   2 +
+ .../unit/test_config_full_save_generation.ahk |   5 +-
+ .../test_config_persistence_transactions.ahk  |  10 +-
+ .../unit/test_config_typed_transactions.ahk   |   4 +-
+ .../unit/test_hotstring_bulk_checkboxes.ahk   |  35 +-
+ .../tests/unit/test_llm_menu_persistence.ahk  |   2 +-
+ .../windows/tests/unit/test_master_gates.ahk  | 231 ++++++++
+ .../unit/test_master_gates_not_persisted.ahk  | 247 ++------
+ .../tests/unit/test_toml_numeric_strings.ahk  |   6 +-
+ static/ergopti_plus/windows/ui/editors.ahk    |  31 +-
+ .../windows/ui/menu/menu_engine.ahk           |  35 +-
+ .../ui/menu/menu_hotstring_switches.ahk       |   7 +-
+ .../windows/ui/menu/menu_hotstrings.ahk       |  12 +-
+ .../windows/ui/menu/menu_init.ahk             |   2 +-
+ .../windows/ui/menu/menu_submenus.ahk         |   6 +-
+ .../windows/ui/menu/menu_taphold.ahk          |   2 +-
+ 35 files changed, 880 insertions(+), 838 deletions(-)
+
+diff --git a/static/ergopti_plus/windows/ErgoptiPlus.ahk b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+index a0eac026d..068df85cc 100644
+--- a/static/ergopti_plus/windows/ErgoptiPlus.ahk
++++ b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+@@ -1038,17 +1038,10 @@ try {
+ #Include *i %LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
+ #Include %A_ScriptDir%
+ #InputLevel 0
+-; Capture the un-gated per-section hotstring Features BEFORE gating, so a live
+-; category toggle (ToggleCategoryAllFeatures) can restore a category's sections on
+-; re-enable. Declared + populated here, before gating, so the auto-execute thread
+-; never re-inits the Map after filling it.
+-global _HSCategorySnapshot := Map()
++; Capture configuration intent once before deriving the effective runtime.
+ BootProfile_StageBegin("feature gates")
+-try _HSSnapshotAllCategories()
+-catch as _SnapErr
+-	LoggerError("ErgoptiPlus", "Hotstring category snapshot failed; a live category re-enable may not restore its sections: {1}.", _SnapErr.Message)
+ _GateCountsBefore := DiagSnapshot_CountFeatures(Features)
+-ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
++MasterGateInitialize(Features, TapHold, IsCategoryGated, LoggerDebug)
+ _GateCountsAfter := DiagSnapshot_CountFeatures(Features)
+ ; The master gates silently zero whole categories. Without the counts a user log
+ ; cannot tell "the feature is off" from "its category is off".
+diff --git a/static/ergopti_plus/windows/infra/config_io.ahk b/static/ergopti_plus/windows/infra/config_io.ahk
+index a30f708f3..d14cbbf48 100644
+--- a/static/ergopti_plus/windows/infra/config_io.ahk
++++ b/static/ergopti_plus/windows/infra/config_io.ahk
+@@ -738,7 +738,7 @@ _ConfigStageFeatureEntries(FeaturesTarget, Entries, Updates) {
+ 			continue
+ 		}
+ 		Loc["v2_node"][Loc["key"]] := Value
+-		Updates.Push({ Section: Loc["section"], Key: Loc["key"], Value: Value })
++		Updates.Push(_ConfigSparseOperation(Loc["section"], Loc["key"], Value))
+ 		Applied += 1
+ 	}
+ 	return Applied
+@@ -752,52 +752,17 @@ _ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
+ 	if !FeaturesTarget["hotstrings"].Has("personal")
+ 		FeaturesTarget["hotstrings"]["personal"] := Map()
+ 	if !FeaturesTarget["hotstrings"]["personal"].Has(SectionName) {
++		Path := "hotstrings.personal." . SectionName
+ 		FeaturesTarget["hotstrings"]["personal"][SectionName] := Map(
+-			"enabled", false,
+-			"time_activation_seconds", 0)
++			"enabled", ManifestDefaultFor(Path . ".enabled"),
++			"time_activation_seconds", ManifestDefaultFor(Path . ".time_activation_seconds"))
+ 	}
+ 	return true
+ }
+ 
+-; The whole tree's « all sections » checkbox: every hotstring section on or off
+-; in one transaction. Ticking also opens the Hotstrings switch and every closed
+-; gate of the categories it writes: a closed gate zeroes its sections at boot, so
+-; the box stayed unticked however often it was clicked. Unticking leaves every
+-; gate as it is, since each is a checkbox of its own; this closed the Hotstrings
+-; switch too, which neither macOS nor Linux does.
++; Section selection persists independently of every category's runtime master.
+ ToggleAllHotstrings(Value) {
+-		global CategoryEnabled, ConfigurationFile, Features, _FLAT_HOTSTRING_V1_CATS
+-		Bool := (Value = true or Value = 1)
+-		CandidateCategories := CategoryEnabled.Clone()
+-		CandidateFeatures := _HSDeepCloneMap(Features)
+-		Updates := []
+-		if Bool {
+-				Gates := ["Hotstrings"]
+-				Gates.Push(_FLAT_HOTSTRING_V1_CATS*)
+-				for _, Gate in Gates {
+-						if (CandidateCategories.Has(Gate) and !CandidateCategories[Gate]) {
+-								CandidateCategories[Gate] := true
+-								Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Gate), Value: TOML_Bool(true) })
+-						}
+-				}
+-		}
+-		Entries := []
+-		for V2Path in _CollectAllHotstringsV2Paths(CandidateFeatures)
+-				Entries.Push(Map("path", V2Path, "value", Bool))
+-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+-		if (Applied != Entries.Length)
+-				return ConfigReportPersistenceFailure("the bulk hotstring toggle", 0,
+-					"one or more feature paths could not be resolved")
+-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the bulk hotstring toggle")
+-				return false
+-		PreviousCritical := Critical("On")
+-		try {
+-				CategoryEnabled := CandidateCategories
+-				Features := CandidateFeatures
+-		} finally {
+-				Critical(PreviousCritical)
+-		}
+-		return ReloadPreservingSuspend()
++	return _ConfigCommitHotstringIntent("all", "", Value, "the bulk hotstring toggle")
+ }
+ 
+ IsCategoryAllEnabled(Categories) {
+@@ -810,10 +775,15 @@ IsCategoryAllEnabled(Categories) {
+ 	return true
+ }
+ 
+-; Deep-clone a (possibly nested) Map. Used to snapshot per-section hotstring
+-; Features so a live category toggle can restore them independently of later
+-; mutations. Non-Map values are returned as-is (leaf bool / number / string).
++; Detached transaction candidates must not share mutable Maps or Arrays with
++; either the desired state or the effective runtime.
+ _HSDeepCloneMap(M) {
++		if M is Array {
++				Out := []
++				for V in M
++						Out.Push(_HSDeepCloneMap(V))
++				return Out
++		}
+ 		if (Type(M) != "Map") {
+ 				return M
+ 		}
+@@ -824,60 +794,15 @@ _HSDeepCloneMap(M) {
+ 		return Out
+ }
+ 
+-; Snapshots a category from detached Features into a detached snapshot Map.
+-_HSSnapshotCategoryTo(FeaturesTarget, SnapshotTarget, V2Cat) {
+-		if (FeaturesTarget.Has("hotstrings") and FeaturesTarget["hotstrings"].Has(V2Cat))
+-				SnapshotTarget[V2Cat] := _HSDeepCloneMap(FeaturesTarget["hotstrings"][V2Cat])
+-}
+-
+-; Restores a category into detached Features from a detached snapshot Map.
+-_HSRestoreCategoryFrom(FeaturesTarget, SnapshotTarget, V2Cat) {
+-		if !(SnapshotTarget.Has(V2Cat) and FeaturesTarget.Has("hotstrings")
+-				and FeaturesTarget["hotstrings"].Has(V2Cat))
+-				return
+-		Target := FeaturesTarget["hotstrings"][V2Cat]
+-		for Section, SecMap in SnapshotTarget[V2Cat]
+-				Target[Section] := _HSDeepCloneMap(SecMap)
+-}
+-
+-; Snapshot one category's current (un-gated) section states into _HSCategorySnapshot.
+-_HSSnapshotCategory(V2Cat) {
+-		global Features, _HSCategorySnapshot
+-		if IsSet(Features) and IsSet(_HSCategorySnapshot)
+-				_HSSnapshotCategoryTo(Features, _HSCategorySnapshot, V2Cat)
+-}
+-
+-; Snapshot every hotstring category. Called once at boot, before gating.
+-_HSSnapshotAllCategories() {
+-		global Features
+-		if (IsSet(Features) and Features.Has("hotstrings")) {
+-				for V2Cat, _ in Features["hotstrings"] {
+-						_HSSnapshotCategory(V2Cat)
+-				}
+-		}
+-}
+-
+-; Restore a category's section states from the snapshot, in place (the category Map
+-; keeps its identity; each section entry is replaced with a fresh clone).
+-_HSRestoreCategory(V2Cat) {
+-		global Features, _HSCategorySnapshot
+-		; IsSet on BOTH globals. _HSCategorySnapshot is declared in ErgoptiPlus.ahk,
+-		; which the headless test harness does not load, so reading it first threw an
+-		; unset error before the IsSet(Features) guard beside it could apply.
+-		if !(IsSet(_HSCategorySnapshot) and _HSCategorySnapshot.Has(V2Cat) and IsSet(Features)
+-				and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
+-				return
+-		}
+-		_HSRestoreCategoryFrom(Features, _HSCategorySnapshot, V2Cat)
+-}
+-
+ ; Resolves a category gate against a detached candidate rather than the live
+ ; global Map, so master-gate application can finish before the atomic publish.
+ _ConfigCandidateCategoryEnabled(CategoryTarget, Category) {
+ 		global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER
+ 		if CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)
+-				return CategoryTarget.Get("Hotstrings", true)
+-		return CategoryTarget.Get(Category, true)
++				Category := "Hotstrings"
++		if CategoryTarget.Has(Category)
++				return CategoryTarget[Category]
++		return ManifestDefaultFor("category_enabled." . _CategoryEnabledKey(Category))
+ }
+ 
+ ; Hotstring sub-categories whose entire content the live rebuild can apply, so
+@@ -891,193 +816,173 @@ _IsLiveHotstringCategory(Category) {
+ 		return Live.Has(Category)
+ }
+ 
+-ToggleCategoryAllFeatures(Category, Value) {
+-		global CategoryEnabled, ConfigurationFile, Features, TapHold, _HSCategorySnapshot
+-		Bool := (Value = true or Value = 1)
+-		if _IsLiveHotstringCategory(Category) {
+-				V2Cat := _CategoryEnabledKey(Category)
+-				try LoggerDebug("Menu", "Live category toggle: {1} -> {2}.", Category, Bool ? "ON" : "OFF")
+-				CandidateFeatures := _HSDeepCloneMap(Features)
+-				CandidateCategories := CategoryEnabled.Clone()
+-				CandidateTapHold := _HSDeepCloneMap(TapHold)
+-				if IsSet(_HSCategorySnapshot)
+-						CandidateSnapshot := _HSDeepCloneMap(_HSCategorySnapshot)
+-				else
+-						CandidateSnapshot := Map()
+-				if Bool
+-						_HSRestoreCategoryFrom(CandidateFeatures, CandidateSnapshot, V2Cat)
+-				else
+-						_HSSnapshotCategoryTo(CandidateFeatures, CandidateSnapshot, V2Cat)
+-				CandidateCategories[Category] := Bool
+-				CandidateGate := (CandidateCategory) => _ConfigCandidateCategoryEnabled(
+-						CandidateCategories, CandidateCategory)
+-				ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold, CandidateGate, LoggerDebug)
+-				Updates := [{ Section: "category_enabled", Key: V2Cat, Value: TOML_Bool(Bool) }]
+-				if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
+-						return false
++ToggleCategoryAllFeatures(Category, Value, WriterFn := 0, NotifyFn := 0, ApplyFn := 0) {
++	global ConfigurationFile
++	InheritedCritical := A_IsCritical
++	if InheritedCritical {
++		Critical("Off")
++		try return ToggleCategoryAllFeatures(Category, Value, WriterFn, NotifyFn, ApplyFn)
++		finally Critical(InheritedCritical)
++	}
++	Bool := (Value = true or Value = 1)
++	if !ConfigCommitBuilt(ConfigurationFile, "the '" . Category . "' category toggle",
++			_ConfigBuildCategoryIntentPlan.Bind(Category, Bool), WriterFn, NotifyFn)
++		return false
++	if HasMethod(ApplyFn, "Call")
++		return ApplyFn.Call()
++	if _IsLiveHotstringCategory(Category) {
++		LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
++		RebuildHotstringsLive()
++		LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
++		return true
++	}
++	return ReloadPreservingSuspend()
++}
++
++; The lease is already held before reading desired, effective, or category state.
++_ConfigBuildCategoryIntentPlan(Category, Bool) {
++	global Features, TapHold, CategoryEnabled
++	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(Features))
++	DesiredTapHold := _HSDeepCloneMap(MasterGateDesiredTapHold(TapHold))
++	CandidateCategories := CategoryEnabled.Clone()
++	if !CandidateCategories.Has(Category)
++		throw Error("Unknown category gate: " . Category)
++	CandidateCategories[Category] := Bool
++	Projected := _HSDeepCloneMap(Desired)
++	ProjectedTapHold := _HSDeepCloneMap(DesiredTapHold)
++	ApplyMasterGatesToFeatures(Projected, ProjectedTapHold,
++		(Name) => _ConfigCandidateCategoryEnabled(CandidateCategories, Name))
++	RuntimePatches := []
++	CandidateTapHold := 0
++	switch Category {
++		case "Layout", "Shortcuts", "Hotstrings":
++			Root := StrLower(Category)
++			if Projected.Has(Root)
++				RuntimePatches.Push({ target: Features, key: Root, value: Projected[Root] })
++		case "TapHolds":
++			CandidateTapHold := ProjectedTapHold
++		default:
++			Root := _CategoryEnabledKey(Category)
++			if !Projected.Has("hotstrings") || !Projected["hotstrings"].Has(Root)
++				throw Error("Unknown hotstring category state: " . Category)
++			RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
++	}
++	Updates := [_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Category), Bool)]
++	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired,
++		RuntimePatches, CandidateCategories, CandidateTapHold) }
++}
+ 
+-				; Only reference swaps sit under Critical. Candidate construction,
+-				; manifest I/O and persistence all completed before this window.
+-				_TcafCrit := Critical("On")
+-				try {
+-						Features := CandidateFeatures
+-						CategoryEnabled := CandidateCategories
+-						TapHold := CandidateTapHold
+-						_HSCategorySnapshot := CandidateSnapshot
+-				} finally {
+-						Critical(_TcafCrit)
+-				}
+-				LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
+-				RebuildHotstringsLive()
+-				LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
+-				return true
+-		}
+-		CandidateCategories := CategoryEnabled.Clone()
+-		CandidateCategories[Category] := Bool
+-		Updates := [{ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: TOML_Bool(Bool) }]
+-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
+-				return false
+-		CategoryEnabled := CandidateCategories
+-		return ReloadPreservingSuspend()
++; Publishing is a bounded reference swap. No filesystem, manifest, or native
++; acquisition runs while the input thread is excluded.
++_ConfigPublishDesiredState(Desired, RuntimePatches, CandidateCategories := 0, CandidateTapHold := 0) {
++	global TapHold, CategoryEnabled
++	PreviousCritical := Critical("On")
++	try {
++		MasterGateState()["features"] := Desired
++		for Patch in RuntimePatches
++			Patch.target[Patch.key] := Patch.value
++		if CandidateCategories is Map
++			CategoryEnabled := CandidateCategories
++		if CandidateTapHold is Map
++			TapHold := CandidateTapHold
++	} finally Critical(PreviousCritical)
+ }
+ 
+-; Force every section of one hotstring category on/off (bulk action), scoped to
+-; a single manifest section. Mirrors ToggleAllHotstrings but per-category:
+-; enabling also lifts the Hotstrings master gate and (when the category has one)
+-; the category gate, so the activation is immediately effective; disabling just
+-; clears the sections. ``V1Cat`` is the PascalCase category id (e.g. "Rolls",
+-; "DynamicHotstrings").
++; Select every section of one category while retaining its independent master.
+ ToggleCategoryAllSections(V1Cat, Enable) {
+-		global CategoryEnabled, ConfigurationFile, _LegacyTopCategoryMap, Features
+-		Bool := (Enable = true or Enable = 1)
+-		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
+-		if (V2Section == "") {
+-				try LoggerWarn("Menu", "ToggleCategoryAllSections: no v2 section for '{1}' — skipped.", V1Cat)
+-				return
+-		}
+-		CandidateCategories := CategoryEnabled.Clone()
+-		CandidateFeatures := _HSDeepCloneMap(Features)
+-		Updates := []
+-		if Bool {
+-				; Master gate must be on for any hotstring to fire.
+-				if !CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"] {
+-						CandidateCategories["Hotstrings"] := true
+-						Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
+-				}
+-				; Lift this category's own gate too, when it has one (flat categories do;
+-				; DynamicHotstrings / Personal follow the master directly).
+-				if (CandidateCategories.Has(V1Cat) and !CandidateCategories[V1Cat]) {
+-						CandidateCategories[V1Cat] := true
+-						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: TOML_Bool(true) })
+-				}
+-		}
+-		Entries := []
+-		for _, Entry in ManifestFeaturesForSection(V2Section)
+-				Entries.Push(Map("path", Entry["path"], "value", Bool))
+-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+-		if (Applied != Entries.Length)
+-				return ConfigReportPersistenceFailure("the '" . V1Cat . "' section toggle", 0,
+-					"one or more feature paths could not be resolved")
+-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . V1Cat . "' section toggle")
+-				return false
+-		PreviousCritical := Critical("On")
+-		try {
+-				CategoryEnabled := CandidateCategories
+-				Features := CandidateFeatures
+-		} finally {
+-				Critical(PreviousCritical)
+-		}
+-		return ReloadPreservingSuspend()
++	return _ConfigCommitHotstringIntent("category", V1Cat, Enable,
++		"the '" . V1Cat . "' section toggle")
+ }
+ 
+-; Force every section of every category of one language pack on/off — the
+-; « tout activer » / « tout désactiver » rows of a language submenu. Same
+-; contract as ToggleCategoryAllSections, applied to all of the language's
+-; categories in ONE persisted transaction: enabling also lifts the Hotstrings
+-; master and each category gate so the activation is immediately effective.
+-; ``Pack`` is one entry of HotstringsLanguageCategories().
++; Select one language pack in a single transaction without changing its masters.
+ ToggleLanguageAllSections(Pack, Enable) {
+-		global CategoryEnabled, ConfigurationFile, Features
+-		Bool := (Enable = true or Enable = 1)
+-		CandidateCategories := CategoryEnabled.Clone()
+-		CandidateFeatures := _HSDeepCloneMap(Features)
+-		Updates := []
+-		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
+-				CandidateCategories["Hotstrings"] := true
+-				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
+-		}
+-		Entries := []
+-		for _, Cat in Pack["categories"] {
+-				if (Bool and CandidateCategories.Has(Cat["v1"]) and !CandidateCategories[Cat["v1"]]) {
+-						CandidateCategories[Cat["v1"]] := true
+-						Updates.Push({ Section: "category_enabled", Key: Cat["v2"], Value: TOML_Bool(true) })
+-				}
+-				for _, Entry in ManifestFeaturesForSection("hotstrings." . Cat["v2"])
+-						Entries.Push(Map("path", Entry["path"], "value", Bool))
+-		}
+-		Label := "the '" . Pack["id"] . "' language toggle"
+-		if (Entries.Length == 0)
+-				throw Error("Language pack '" . Pack["id"] . "' has no manifest feature rows.")
+-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+-		if (Applied != Entries.Length)
+-				return ConfigReportPersistenceFailure(Label, 0,
+-					"one or more feature paths could not be resolved")
+-		if !ConfigCommitUpdates(ConfigurationFile, Updates, Label)
+-				return false
+-		PreviousCritical := Critical("On")
+-		try {
+-				CategoryEnabled := CandidateCategories
+-				Features := CandidateFeatures
+-		} finally {
+-				Critical(PreviousCritical)
+-		}
+-		return ReloadPreservingSuspend()
++	return _ConfigCommitHotstringIntent("language", Pack, Enable,
++		"the '" . Pack["id"] . "' language toggle")
+ }
+ 
+-; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
+-; Personal sections are runtime-discovered, so their v2 paths are built from the
+-; TOML section names (hotstrings.personal.<lower(section)>). Enabling lifts the
+-; Hotstrings master gate so the sections fire immediately.
++; Personal section paths come from discovered TOML names; selection remains
++; editable while the Hotstrings or Personal master is disabled.
+ HS_TogglePersonalAllSections(Enable) {
+-		global CategoryEnabled, ConfigurationFile, ScriptInformation, Features
+-		Bool := (Enable = true or Enable = 1)
+-		PersonalSectionsPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+-		if (PersonalSectionsPath == "" or !FileExist(PersonalSectionsPath)) {
+-				; Reachable on a fresh install (no personal_hotstrings.toml yet) or after
+-				; relocating the config dir: the menu item does nothing and says nothing.
+-				; The sibling ToggleCategoryAllSections logs on the equivalent bail.
+-				try LoggerWarn("Hotstrings", "Personal sections toggle ignored — no personal hotstrings file at '{1}'.", PersonalSectionsPath)
+-				return
+-		}
+-		CandidateCategories := CategoryEnabled.Clone()
+-		CandidateFeatures := _HSDeepCloneMap(Features)
+-		Updates := []
+-		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
+-				CandidateCategories["Hotstrings"] := true
+-				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
+-		}
+-		Data := ReadPersonalToml()
+-		Entries := []
+-		for _, SecName in Data["sections_order"] {
+-				if (SecName != "-") {
+-						_ConfigSeedPersonalHotstring(CandidateFeatures, SecName)
+-						Entries.Push(Map("path", "hotstrings.personal." . StrLower(SecName), "value", Bool))
+-				}
+-		}
+-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+-		if (Applied != Entries.Length)
+-				return ConfigReportPersistenceFailure("the personal-hotstring section toggle", 0,
+-					"one or more personal feature paths could not be resolved")
+-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the personal-hotstring section toggle")
+-				return false
+-		PreviousCritical := Critical("On")
+-		try {
+-				CategoryEnabled := CandidateCategories
+-				Features := CandidateFeatures
+-		} finally {
+-				Critical(PreviousCritical)
++	return _ConfigCommitHotstringIntent("personal", "", Enable,
++		"the personal-hotstring section toggle")
++}
++
++; Section selection never changes a master checkbox. Users may prepare every
++; desired section while all native activation remains disabled.
++_ConfigCommitHotstringIntent(Kind, Selector, Enable, Context) {
++	global ConfigurationFile
++	if !ConfigCommitBuilt(ConfigurationFile, Context,
++			_ConfigBuildHotstringIntentPlan.Bind(Kind, Selector, !!Enable))
++		return false
++	return ReloadPreservingSuspend()
++}
++
++; Scope enumeration and personal discovery occur under the same owner as write
++; and publication, avoiding a stale pre-lease snapshot during another edit.
++_ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
++	global Features, TapHold, CategoryEnabled, _LegacyTopCategoryMap, ScriptInformation
++	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(Features))
++	Entries := []
++	switch Kind {
++		case "all":
++			for Path in _CollectAllHotstringsV2Paths(Desired)
++				Entries.Push(Map("path", Path, "value", Bool))
++		case "category":
++			if !_LegacyTopCategoryMap.Has(Selector)
++				throw Error("Unknown hotstring category: " . Selector)
++			for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Selector])
++				Entries.Push(Map("path", Entry["path"], "value", Bool))
++		case "language":
++			for Category in Selector["categories"] {
++				for Entry in ManifestFeaturesForSection("hotstrings." . Category["v2"])
++					Entries.Push(Map("path", Entry["path"], "value", Bool))
++			}
++		case "personal":
++			PersonalPath := ScriptInformation.Get("PersonalTomlPath", "")
++			if PersonalPath == "" || !FSExists(PersonalPath)
++				throw Error("Personal hotstring configuration is unavailable.")
++			for Section in ReadPersonalToml()["sections_order"] {
++				if Section == "-"
++					continue
++				_ConfigSeedPersonalHotstring(Desired, Section)
++				Entries.Push(Map("path", "hotstrings.personal." . StrLower(Section), "value", Bool))
++			}
++		default:
++			throw Error("Unknown hotstring scope: " . Kind)
++	}
++	if !Entries.Length
++		throw Error("The hotstring scope contains no configurable sections.")
++	Updates := []
++	if _ConfigStageFeatureEntries(Desired, Entries, Updates) != Entries.Length
++		throw Error("A hotstring scope feature could not be resolved.")
++	Projected := _HSDeepCloneMap(Desired)
++	ApplyMasterGatesToFeatures(Projected, Map(), IsCategoryGated)
++	CandidateFeatures := _HSDeepCloneMap(Features)
++	RuntimePatches := []
++	NewPersonalRoot := false
++	for Entry in Entries {
++		Path := Entry["path"]
++		if SubStr(Path, 1, StrLen("hotstrings.personal.")) == "hotstrings.personal."
++			_ConfigSeedPersonalHotstring(CandidateFeatures, SubStr(Path, StrLen("hotstrings.personal.") + 1))
++		Loc := FeatureLocateV2(CandidateFeatures, Path)
++		ProjectedLoc := FeatureLocateV2(Projected, Path)
++		if !(Loc is Map) || !(ProjectedLoc is Map)
++			throw Error("A hotstring runtime path could not be resolved: " . Path)
++		Loc["v2_node"][Loc["key"]] := ProjectedLoc["v2_node"][ProjectedLoc["key"]]
++		Current := FeatureLocateV2(Features, Path)
++		if Current is Map {
++			RuntimePatches.Push({ target: Current["v2_node"], key: Current["key"], value: Loc["v2_node"][Loc["key"]] })
++		} else if Features["hotstrings"].Has("personal") {
++			Section := SubStr(Path, StrLen("hotstrings.personal.") + 1)
++			RuntimePatches.Push({ target: Features["hotstrings"]["personal"], key: Section,
++				value: CandidateFeatures["hotstrings"]["personal"][Section] })
++		} else {
++			NewPersonalRoot := true
+ 		}
+-		return ReloadPreservingSuspend()
++	}
++	if NewPersonalRoot
++		RuntimePatches.Push({ target: Features["hotstrings"], key: "personal", value: CandidateFeatures["hotstrings"]["personal"] })
++	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired, RuntimePatches) }
+ }
+ 
+ _CategoryEnabledKey(Category) {
+@@ -1119,13 +1024,15 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
+ 				; Full-save collection is speculative until TOML_BatchWrite commits. Keep
+ 				; LLM menu reconciliation detached so a refused writer cannot publish a
+ 				; state that only existed in the failed serialization candidate.
+-				FeatureSnapshot := _HSDeepCloneMap(FeatureState)
++				FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))
++				; The dedicated category owner below is authoritative for master gates.
++				if FeatureSnapshot.Has("category_enabled")
++						FeatureSnapshot.Delete("category_enabled")
+ 				if IsSet(_LLM_Menu_SyncToFeatures)
+ 						&& MenuReady && (MenuState is Map)
+ 						&& !_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)
+ 						throw Error("LLM menu state could not be reconciled into the full-save candidate")
+-				_CollectFeatureUpdates(Updates, "",
+-						_PruneMasterGatedFeatures(FeatureSnapshot))
++				_CollectFeatureUpdates(Updates, "", FeatureSnapshot)
+ 				; The version the boot migration reads (infra/config_migrate.ahk).
+ 				Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
+ 		}
+@@ -1192,7 +1099,30 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
+ 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
+ 		if IsSet(UPDATER_CHANNEL)
+ 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
+-		return Updates
++		return _ConfigSparseUpdates(Updates)
++}
++
++; Manifest comparison uses native values; Boolean serialization sentinels belong
++; to the final typed writer boundary, after neutral-value deletion is decided.
++_ConfigSparseOperation(Section, Key, Value) {
++	NativeValue := Value is TOML_Bool ? Value.Value : Value
++	return ManifestSparseOperation(Section . "." . Key, NativeValue)
++}
++
++; Neutral values delete their previous override in the same atomic batch.
++; Schema metadata is owned by migration and is never a user feature default.
++_ConfigSparseUpdates(Updates) {
++	Sparse := []
++	for Update in Updates {
++		OwnedElsewhere := TomlConfigSectionSkipKind(Update.Section) == "foreign"
++			|| (TomlConfigForeignOwner(Update.Section, Update.Key) != ""
++				&& !(ManifestFindEntryByPath(Update.Section . "." . Update.Key) is Map))
++		if OwnedElsewhere || (Update.HasOwnProp("Delete") && Update.Delete == 1)
++			Sparse.Push(Update)
++		else
++			Sparse.Push(_ConfigSparseOperation(Update.Section, Update.Key, Update.Value))
++	}
++	return Sparse
+ }
+ 
+ ; Targeted repairs and explicit reset do not serialize the incomplete boot tree.
+@@ -1401,74 +1331,6 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
+ 		&& !_ConfigFullSaveHasPending()
+ }
+ 
+-; Resolve the CategoryEnabled master-gate label that owns a Features node key
+-; ("layout" -> "Layout", "distances_reduction" -> "DistancesReduction"), or ""
+-; when that key has no dedicated gate. Derived from CategoryEnabled through
+-; _CategoryEnabledKey rather than a second table, so a new master gate is picked
+-; up here automatically instead of being silently unprotected.
+-_MasterGateLabelFor(NodeKey) {
+-		global CategoryEnabled
+-		if !IsSet(CategoryEnabled)
+-				return ""
+-		for Category, _Bool in CategoryEnabled {
+-				if (_CategoryEnabledKey(Category) == NodeKey)
+-						return Category
+-		}
+-		return ""
+-}
+-
+-; True when the Features node named NodeKey may be serialized right now. A node
+-; with no gate is always persistable; a gated one only while its master is on.
+-_MasterGateAllowsPersist(NodeKey) {
+-		Label := _MasterGateLabelFor(NodeKey)
+-		if (Label == "")
+-				return true
+-		return IsCategoryGated(Label)
+-}
+-
+-; Return a shallow view of Features with every master-gated-OFF branch removed,
+-; for the walker below to flatten.
+-;
+-; ApplyMasterGatesToFeatures (infra/master_gates.ahk) zeroes those branches IN
+-; PLACE as a RUNTIME gate, and its own contract states the per-feature state on
+-; disk is NOT touched and is restored at the next Reload once the master flips
+-; back on. SaveFullConfig had no notion of that distinction: it walked the same
+-; live map, so the boot-armed save wrote the runtime zeroes back as if they were
+-; the user's intent, and re-enabling the category later revealed every child
+-; unticked with nothing logged. TOML_BatchWrite preserves keys it does not
+-; re-collect, so omitting the branch is exactly what "leave the disk alone"
+-; means — the same mechanism the [llm] block already relies on.
+-_PruneMasterGatedFeatures(FeaturesMap) {
+-		Pruned := Map()
+-		if (Type(FeaturesMap) != "Map")
+-				return Pruned
+-		for TopKey, TopVal in FeaturesMap {
+-				; Non-Map top-level entries are skipped by the walker anyway.
+-				if (Type(TopVal) != "Map")
+-						continue
+-				if !_MasterGateAllowsPersist(TopKey) {
+-						try LoggerDebug("ConfigIO", "Not serializing '{1}': its master gate is off, so the in-memory tree holds runtime zeroes rather than the user's settings.", TopKey)
+-						continue
+-				}
+-				if (TopKey != "hotstrings") {
+-						Pruned[TopKey] := TopVal
+-						continue
+-				}
+-				; Hotstring sub-categories own gates independent of the Hotstrings
+-				; master and are zeroed the same way when theirs is off.
+-				SubTree := Map()
+-				for SubKey, SubVal in TopVal {
+-						if (Type(SubVal) == "Map" and !_MasterGateAllowsPersist(SubKey)) {
+-								try LoggerDebug("ConfigIO", "Not serializing 'hotstrings.{1}': its sub-category gate is off.", SubKey)
+-								continue
+-						}
+-						SubTree[SubKey] := SubVal
+-				}
+-				Pruned[TopKey] := SubTree
+-		}
+-		return Pruned
+-}
+-
+ _CollectFeatureUpdates(Updates, SectionPath, Node) {
+ 		if (Type(Node) != "Map")
+ 				return
+diff --git a/static/ergopti_plus/windows/infra/feature_io.ahk b/static/ergopti_plus/windows/infra/feature_io.ahk
+index 638f2e27f..8811e30c4 100644
+--- a/static/ergopti_plus/windows/infra/feature_io.ahk
++++ b/static/ergopti_plus/windows/infra/feature_io.ahk
+@@ -158,7 +158,7 @@ _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop, WriterName) {
+ 	CandidateNode := TargetNode.Clone()
+ 	CandidateNode[Key] := Value
+ 	return {
+-		update: { Section: Loc["section"], Key: Key, Value: Value },
++		update: _ConfigSparseOperation(Loc["section"], Key, Value),
+ 		target_node: TargetNode,
+ 		candidate_node: CandidateNode,
+ 		key: Key
+@@ -166,6 +166,9 @@ _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop, WriterName) {
+ }
+ 
+ _FeatureBuildSinglePlan(FeaturesMap, V2Path, Value, Prop) {
++	if _FeatureUsesDesiredState(FeaturesMap)
++		return _FeatureBuildDesiredPlan(FeaturesMap,
++			[Map("path", V2Path, "value", Value, "prop", Prop)], { applied: 0 })
+ 	Candidate := _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop,
+ 		"WriteFeatureV2")
+ 	if !(Candidate is Object)
+@@ -177,6 +180,8 @@ _FeatureBuildSinglePlan(FeaturesMap, V2Path, Value, Prop) {
+ }
+ 
+ _FeatureBuildBatchPlan(FeaturesMap, Entries, CommitState) {
++	if _FeatureUsesDesiredState(FeaturesMap)
++		return _FeatureBuildDesiredPlan(FeaturesMap, Entries, CommitState)
+ 	Updates := []
+ 	Candidates := []
+ 	for Entry in Entries {
+@@ -204,7 +209,53 @@ _FeaturePublishCandidates(Candidates) {
+ 		Candidate.target_node[Candidate.key] := Candidate.candidate_node[Candidate.key]
+ }
+ 
+-; Read the runtime state of a v2 feature. Returns a Map keyed by the v2 property
++; Explicit detached callers retain their own state. Only the initialized live
++; feature tree participates in the driver's desired/runtime publication pair.
++_FeatureUsesDesiredState(FeaturesMap) {
++	global Features
++	return MasterGateState()["initialized"] && IsSet(Features) && FeaturesMap == Features
++}
++
++; Called after acquiring config.toml ownership. The runtime patch includes only
++; edited leaves, so an unrelated session refusal is never silently reactivated.
++_FeatureBuildDesiredPlan(FeaturesMap, Entries, CommitState) {
++	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(FeaturesMap))
++	Updates := []
++	Resolved := []
++	for Entry in Entries {
++		Path := Entry["path"]
++		Prop := Entry.Get("prop", "")
++		Loc := FeatureLocateV2(Desired, Path, Prop)
++		RuntimeLoc := FeatureLocateV2(FeaturesMap, Path, Prop)
++		if !(Loc is Map) || !(RuntimeLoc is Map)
++			throw Error("A desired feature path could not resolve: " . Path)
++		Loc["v2_node"][Loc["key"]] := Entry["value"]
++		Updates.Push(_ConfigSparseOperation(Loc["section"], Loc["key"], Entry["value"]))
++		Resolved.Push({ path: Path, prop: Prop, target: RuntimeLoc["v2_node"], key: RuntimeLoc["key"] })
++	}
++	CommitState.applied := Updates.Length
++	if !Updates.Length
++		return { noop: true }
++	Runtime := _HSDeepCloneMap(Desired)
++	ApplyMasterGatesToFeatures(Runtime, Map(), IsCategoryGated)
++	for Patch in Resolved {
++		Loc := FeatureLocateV2(Runtime, Patch.path, Patch.prop)
++		Patch.value := Loc["v2_node"][Loc["key"]]
++	}
++	return { updates: Updates, publish: _FeaturePublishDesiredPlan.Bind(Desired, Resolved) }
++}
++
++; All allocations, manifest reads, and durable writes finish before publication.
++_FeaturePublishDesiredPlan(Desired, Patches) {
++	PreviousCritical := Critical("On")
++	try {
++		MasterGateState()["features"] := Desired
++		for Patch in Patches
++			Patch.target[Patch.key] := Patch.value
++	} finally Critical(PreviousCritical)
++}
++
++; Read the desired state of a v2 feature. Returns a Map keyed by the v2 property
+ ; names present on the feature node (enabled, letter, link, search_engine, …),
+ ; or an empty Map when the path does not resolve. Mirrors the shape the menu
+ ; needs while dropping the v1 PascalCase property names.
+@@ -216,7 +267,7 @@ ReadFeatureStateV2(V2Path) {
+ 	State := Map()
+ 	if !IsSet(Features) or !(Features is Map)
+ 		return State
+-	Loc := FeatureLocateV2(Features, V2Path)
++	Loc := FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)
+ 	if (Loc == false)
+ 		return State
+ 	Node := Loc["v2_node"]
+diff --git a/static/ergopti_plus/windows/infra/master_gates.ahk b/static/ergopti_plus/windows/infra/master_gates.ahk
+index 8d6f4f920..f2fb38c9f 100644
+--- a/static/ergopti_plus/windows/infra/master_gates.ahk
++++ b/static/ergopti_plus/windows/infra/master_gates.ahk
+@@ -3,17 +3,13 @@
+ ; ==============================================================================
+ ; MODULE: Master Gates application
+ ; DESCRIPTION:
+-; Applies the per-category master-toggle gating (``CategoryEnabled`` Map) onto
+-; ``Features`` at boot, so every #HotIf evaluation reading ``Features["…"]``
+-; short-circuits to false while the category is master-disabled. The per-feature
+-; state persisted on disk is NOT touched — it stays in the user's config.toml
+-; and is restored at next Reload after the master toggle flips back on.
++; Retains configuration intent before projecting category gates onto the runtime
++; Features and TapHold maps. Input hooks read the effective projection; editors,
++; checkmarks, and persistence read the retained choices even while masters are off.
+ ;
+ ; FEATURES & RATIONALE:
+-; 1. Single source of truth for runtime gating. The tray menu greys out items
+-;    via ``IsCategoryGated`` (which reads CategoryEnabled directly); this
+-;    helper neutralises the underlying behaviour by zeroing Features entries
+-;    so the hotkey path doesn't have to consult two flags.
++; 1. Switches become inactive while pure parameters retain their values. Child
++;    editing remains independent of the category master and of the pause fence.
+ ; 2. TapHolds gets the same treatment via ``TapHold["keys"]`` — disabling
+ ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
+ ;    for every physical key.
+@@ -29,10 +25,66 @@
+ ; =============================================
+ ; =============================================
+ 
+-; When a master category gate is off, force every v2 feature in that
+-; category to ``false`` so #HotIf evaluations on Features short-circuit.
+-; The on-disk persistence is untouched — flipping the master back on +
+-; Reload restores the per-feature state from config.toml.
++; Holds the configuration intent separately from the maps read by input hooks.
++MasterGateState() {
++	static State := Map("initialized", false, "features", Map(), "tap_hold", Map())
++	return State
++}
++
++; Boot owns the sole initialization, after configuration and personal entries load.
++MasterGateInitialize(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
++	State := MasterGateState()
++	if State["initialized"]
++		throw Error("Master gate desired state is already initialized.")
++	DesiredFeatures := _HSDeepCloneMap(FeaturesTarget)
++	DesiredTapHold := _HSDeepCloneMap(TapHoldTarget)
++	ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn)
++	State["features"] := DesiredFeatures
++	State["tap_hold"] := DesiredTapHold
++	State["initialized"] := true
++	return true
++}
++
++; Ungated domains keep their existing owners; only gated roots need an intent view.
++MasterGateDesiredFeatures(FeaturesSource) {
++	State := MasterGateState()
++	if !State["initialized"]
++		return FeaturesSource
++	View := FeaturesSource.Clone()
++	for Root in ["layout", "shortcuts", "hotstrings"] {
++		if State["features"].Has(Root)
++			View[Root] := State["features"][Root]
++	}
++	return View
++}
++
++; Tap-hold writers and menu labels consume the retained configuration, not empty runtime keys.
++MasterGateDesiredTapHold(TapHoldSource) {
++	State := MasterGateState()
++	return State["initialized"] ? State["tap_hold"] : TapHoldSource
++}
++
++; Only declared switches and alpha activation flags are runtime gates. Parameters
++; retain their types and values, including numbers, strings, and alpha options.
++_MG_DisableFeatureNode(Node, Prefix) {
++	if InStr(Prefix, ".") && Node.Has("enabled") {
++		Node["enabled"] := false
++		return
++	}
++	for Key, Value in Node {
++		Path := Prefix . "." . Key
++		if Value is Map {
++			_MG_DisableFeatureNode(Value, Path)
++			continue
++		}
++		Entry := ManifestFindEntryByPath(Path)
++		if (Entry is Map) && Entry.Get("type", "") == "boolean"
++			Node[Key] := false
++		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
++			Node[Key] := false
++	}
++}
++
+ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
+ 		if !(FeaturesTarget is Map)
+ 				throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
+@@ -47,42 +99,17 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
+ 
+ 		; Layout master
+ 		if !CategoryGateFn.Call("Layout") and FeaturesTarget.Has("layout") {
+-				for V2Id, _ in FeaturesTarget["layout"] {
+-						FeaturesTarget["layout"][V2Id] := false
+-				}
++				_MG_DisableFeatureNode(FeaturesTarget["layout"], "layout")
+ 		}
+ 
+ 		; Shortcuts master
+ 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
+-				for V2Id, V2Val in FeaturesTarget["shortcuts"] {
+-						if (Type(V2Val) == "Map") {
+-								; Modélisation α + sub-Maps — flip ``enabled`` if present,
+-								; else flip every leaf bool entry.
+-								if V2Val.Has("enabled") {
+-										V2Val["enabled"] := false
+-								} else {
+-										for SubId, _ in V2Val {
+-												V2Val[SubId] := false
+-										}
+-								}
+-						} else if (Type(V2Val) == "Integer" or V2Val == true or V2Val == false) {
+-								FeaturesTarget["shortcuts"][V2Id] := false
+-						}
+-				}
++				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts")
+ 		}
+ 
+ 		; Hotstrings master (includes Personal sub-category).
+ 		if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
+-				for V2Cat, V2CatMap in FeaturesTarget["hotstrings"] {
+-						if (Type(V2CatMap) != "Map") {
+-								continue
+-						}
+-						for V2Id, V2Val in V2CatMap {
+-								if (Type(V2Val) == "Map" and V2Val.Has("enabled")) {
+-										V2Val["enabled"] := false
+-								}
+-						}
+-				}
++				_MG_DisableFeatureNode(FeaturesTarget["hotstrings"], "hotstrings")
+ 		}
+ 
+ 		; Per-TOML-file hotstring sub-category gates. Independent of the top
+diff --git a/static/ergopti_plus/windows/infra/personal_features.ahk b/static/ergopti_plus/windows/infra/personal_features.ahk
+index 3ccd40aa4..629fd9cab 100644
+--- a/static/ergopti_plus/windows/infra/personal_features.ahk
++++ b/static/ergopti_plus/windows/infra/personal_features.ahk
+@@ -44,6 +44,15 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
+ 								Features["shortcuts"]["personal"] := Map()
+ 						}
+ 						Features["shortcuts"]["personal"][Name] := DefaultEnabled
++						if MasterGateState()["initialized"] {
++								Desired := MasterGateState()["features"]["shortcuts"]
++								if !Desired.Has("personal")
++										Desired["personal"] := Map()
++								if !Desired["personal"].Has(Name)
++										Desired["personal"][Name] := DefaultEnabled
++								Features["shortcuts"]["personal"][Name] :=
++										IsCategoryGated("Shortcuts") && Desired["personal"][Name]
++						}
+ 				}
+ 		}
+ }
+@@ -69,5 +78,7 @@ EnsurePersonalHotstringFeature(SecName) {
+ 		if !Features["hotstrings"].Has("personal")
+ 				Features["hotstrings"]["personal"] := Map()
+ 		if !Features["hotstrings"]["personal"].Has(SecName)
+-				Features["hotstrings"]["personal"][SecName] := Map("enabled", false, "time_activation_seconds", 0)
++				_ConfigSeedPersonalHotstring(Features, SecName)
++		if MasterGateState()["initialized"]
++				_ConfigSeedPersonalHotstring(MasterGateState()["features"], SecName)
+ }
+diff --git a/static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk b/static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk
+index f32f2c96f..97ec90ddf 100644
+--- a/static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk
++++ b/static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk
+@@ -175,7 +175,7 @@ TapHoldHoldOptions() {
+ ; the single source of truth for action names.
+ TapHoldCurrentTapLabel(KeyId) {
+ 	global TapHold, _TH_TapNoneI18n
+-	TapAction := TapHoldTapAction(TapHold, KeyId)
++	TapAction := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
+ 	if (TapAction == "") {
+ 		return t(_TH_TapNoneI18n)
+ 	}
+@@ -185,8 +185,8 @@ TapHoldCurrentTapLabel(KeyId) {
+ ; Return the i18n-resolved short label for the current hold option of a key.
+ TapHoldCurrentHoldLabel(KeyId) {
+ 	global TapHold, _TH_HoldOptions
+-	HoldMod   := TapHoldHoldModifier(TapHold, KeyId)
+-	HoldLayer := TapHoldHoldLayer(TapHold, KeyId)
++	HoldMod   := TapHoldHoldModifier(MasterGateDesiredTapHold(TapHold), KeyId)
++	HoldLayer := TapHoldHoldLayer(MasterGateDesiredTapHold(TapHold), KeyId)
+ 	for _, Opt in _TH_HoldOptions {
+ 		if (Opt["kind"] == "modifier" and Opt["id"] == HoldMod) {
+ 			return _TH_HoldOptionLabel(HoldMod)
+@@ -236,7 +236,7 @@ IsTapHoldTapActive(KeyId, ActionId) {
+ 	if !IsSet(TapHold) {
+ 		return false
+ 	}
+-	Current := TapHoldTapAction(TapHold, KeyId)
++	Current := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
+ 	if (ActionId == "") {
+ 		return (Current == "")
+ 	}
+@@ -249,8 +249,8 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
+ 	if !IsSet(TapHold) {
+ 		return false
+ 	}
+-	HoldMod   := TapHoldHoldModifier(TapHold, KeyId)
+-	HoldLayer := TapHoldHoldLayer(TapHold, KeyId)
++	HoldMod   := TapHoldHoldModifier(MasterGateDesiredTapHold(TapHold), KeyId)
++	HoldLayer := TapHoldHoldLayer(MasterGateDesiredTapHold(TapHold), KeyId)
+ 	Kind := HoldOpt["kind"]
+ 	Id   := HoldOpt["id"]
+ 	if (Kind == "none") {
+@@ -497,11 +497,16 @@ _TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState,
+ 
+ ; Publish only the detached candidate. The caller invokes this helper inside a
+ ; short Critical span after the durable atomic replacement has completed.
+-_TH_PublishTapHoldCandidate(Candidate, OwnerToken, BoundPath, StartState) {
++_TH_PublishTapHoldCandidate(Candidate, RuntimeCandidate, EmptyKeys, OwnerToken, BoundPath, StartState) {
+ 	global TapHold
+ 	if !_TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState)
+ 		return false
+-	TapHold := Candidate
++	if MasterGateState()["initialized"] {
++		if !IsCategoryGated("TapHolds")
++			RuntimeCandidate["keys"] := EmptyKeys
++		MasterGateState()["tap_hold"] := Candidate
++	}
++	TapHold := RuntimeCandidate
+ 	return 1
+ }
+ 
+@@ -510,7 +515,7 @@ _TH_PublishTapHoldCandidate(Candidate, OwnerToken, BoundPath, StartState) {
+ ; tap-hold writer on the same path cannot build from a stale snapshot.
+ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
+ 		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
+-	global TapHold
++	global TapHold, ConfigurationFile
+ 	InheritedCritical := A_IsCritical
+ 	if InheritedCritical {
+ 		Critical("Off")
+@@ -538,9 +543,18 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
+ 		try LoggerError("TapHoldWriter", "The tap-hold target path is unavailable; the change was not persisted.")
+ 		return false
+ 	}
++	; The master lives in config.toml. Both files share admission before either
++	; captures desired state, so a master projection cannot overwrite a newer edit.
++	MasterOwner := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "tap-hold-master")
++	if !(MasterOwner is Object) {
++		try LoggerError("TapHoldWriter", "Cannot edit tap-holds during another configuration transaction.")
++		return false
++	}
+ 	OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath,
+ 		"tap-hold-" . ActionName)
+ 	if !(OwnerToken is Object) {
++		if !_ConfigWriteLeaseRelease(MasterOwner)
++			throw Error("The rejected tap-hold master owner could not be released.")
+ 		try LoggerError("TapHoldWriter",
+ 			"Cannot persist tap-hold change '{1}': another configuration transaction is in progress.",
+ 			ActionName)
+@@ -553,7 +567,7 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
+ 		Built := false
+ 		try {
+ 			StartState := TapHold
+-			Candidate := _TH_CloneData(StartState)
++			Candidate := _TH_CloneData(MasterGateDesiredTapHold(StartState))
+ 			Built := BuildFn.Call(Candidate)
+ 		} catch as Err {
+ 			BuildError := Err.Message
+@@ -581,8 +595,9 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
+ 		}
+ 	} finally {
+ 		Released := _ConfigWriteLeaseRelease(OwnerToken)
++		MasterReleased := _ConfigWriteLeaseRelease(MasterOwner)
+ 	}
+-	if !(Released is Integer) || Released != 1 {
++	if !(Released is Integer) || Released != 1 || !(MasterReleased is Integer) || MasterReleased != 1 {
+ 		try LoggerError("TapHoldWriter",
+ 			"The tap-hold write owner could not be released; later configuration changes may be refused.")
+ 		return false
+@@ -628,6 +643,8 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
+ 		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0, Data.Has("layers") ? Data["layers"].Count : 0,
+                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
+ 
++	RuntimeCandidate := _TH_CloneData(Data)
++	EmptyKeys := Map()
+ 	Lines := []
+ 	Lines.Push("# Auto-generated by Ergopti+ tray-menu writes — hand edits stay safe outside")
+ 	Lines.Push("# the [tap_hold.keys.*] blocks (which get rewritten from scratch on every")
+@@ -771,7 +788,7 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
+ 	PublishError := ""
+ 	PreviousCritical := Critical("On")
+ 	try {
+-		try Published := _TH_PublishTapHoldCandidate(Data, OwnerToken,
++		try Published := _TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken,
+ 			BoundPath, StartState)
+ 		catch as Err {
+ 			Published := false
+diff --git a/static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk b/static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk
+index bd9250085..5acf53a3c 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk
+@@ -93,18 +93,12 @@ Test("hotstrings: global-key writes share the admitted atomic transaction (F-15)
+ ; the keyboard-hook starvation path. Correctness beat the micro-optimisation.
+ _A0720B4_SubCategoryManifestStaysFailFast() {
+ 	Body := _DriverFuncBody("_MG_LoadSubCategories")
+-	Assert(Body != "", "_MG_LoadSubCategories must exist in infra/master_gates.ahk")
+-	Assert(InStr(Body, "static _Cache") = 0,
+-		"_MG_LoadSubCategories must NOT memoize its parsed result — an invalid canonical manifest has to fail fast on every call, and a cache would return the last good value instead of throwing")
+-
+-	; The reason the cache is unnecessary: the read is no longer on a Critical path.
+-	Toggle := _DriverFuncBody("ToggleCategoryAllFeatures")
+-	if (Toggle != "") {
+-		RelPos := InStr(Toggle, "Critical(_TcafCrit)")
+-		GatesPos := InStr(Toggle, "ApplyMasterGatesToFeatures(")
+-		Assert(RelPos > 0 and GatesPos > 0 and GatesPos < RelPos,
+-			"the master-gate application must stay inside the (short, in-memory) Critical window while the rebuild that follows runs outside it — that is what makes an uncached manifest read affordable here (F-01)")
+-	}
++	Builder := _DriverFuncBody("_ConfigBuildCategoryIntentPlan")
++	Assert(Body != "" && Builder != "", "manifest reader and candidate builder must exist")
++	Assert(InStr(Body, "static _Cache") == 0,
++		"invalid canonical manifests must fail on every call, never use a stale cache")
++	Assert(InStr(Builder, "ApplyMasterGatesToFeatures(") > 0 && InStr(Builder, 'Critical("On")') == 0,
++		"uncached manifest validation must finish while building the detached candidate outside Critical")
+ }
+ Test("master-gates: the sub-category manifest stays fail-fast, uncached (F-16)",
+ 	_A0720B4_SubCategoryManifestStaysFailFast)
+diff --git a/static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk b/static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk
+index bc4964149..889f02f7e 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk
+@@ -152,11 +152,14 @@ _CFAS_BothShortcutReadersReport() {
+ _CFAS_BothSectionTogglesReport() {
+ 	for Name in ["HS_TogglePersonalAllSections", "ToggleCategoryAllSections"] {
+ 		Body := _DriverFuncBody(Name)
+-		if (Body == "")
+-			continue
+-		Assert(InStr(Body, "Logger") > 0,
+-			Name . " must log when it declines to act — a menu item that does nothing and says nothing is indistinguishable from one that is broken")
++		Assert(Body != "" && InStr(Body, "return _ConfigCommitHotstringIntent(") > 0,
++			Name . " must consume the reporting transaction result")
+ 	}
++	Owner := _DriverFuncBody("_ConfigCommitHotstringIntent")
++	Gateway := _DriverFuncBody("ConfigCommitBuilt")
++	Assert(Owner != "" && Gateway != "", "the common reporting path must exist")
++	Assert(InStr(Owner, "if !ConfigCommitBuilt(") > 0 && InStr(Gateway, "ConfigReportPersistenceFailure(") > 0,
++		"every construction or durable refusal must reach the explicit failure reporter")
+ }
+ 
+ ; The bulk toggle now owns only the config.toml master gate. The standalone
+@@ -180,7 +183,7 @@ _CFAS_TapHoldDisableIsNotSwallowed() {
+ 		&& InStr(WriterBody, "if !Replaced") > 0
+ 		&& InStr(WriterBody, "if !Published") > 0,
+ 		"every non-throwing persistence refusal must abort explicitly")
+-	Assert(InStr(Publisher, "TapHold := Candidate") > 0,
++	Assert(InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
+ 		"only the post-replacement publisher may swap live TapHold")
+ }
+ 
+@@ -203,19 +206,17 @@ Test("meta config: the tap-hold disable failure is not swallowed",
+ ; published. Reload is not recovery: it is itself a side effect and cannot be
+ ; used to hide a mutation that never committed.
+ _CFAS_BulkTogglesRecoverFromAFailedWrite() {
+-	for Name in ["ToggleCategoryAllFeatures"] {
+-		Body := _StripFullLineComments(_DriverFuncBody(Name))
+-		Assert(Body != "", Name . "() must exist")
+-		PersistPos := InStr(Body, "ConfigCommitUpdates(")
+-		PublishPos := InStr(Body, "Features := CandidateFeatures")
+-		ReloadPos := InStr(Body, "ReloadPreservingSuspend()")
+-		Assert(PersistPos > 0 and InStr(Body, "if !ConfigCommitUpdates(") > 0,
+-			Name . " must test the non-throwing persistence result")
+-		Assert(PublishPos == 0 or PublishPos > PersistPos,
+-			Name . " must publish detached state only after persistence succeeds")
+-		Assert(ReloadPos == 0 or ReloadPos > PersistPos,
+-			Name . " must never reload on the failed-commit branch")
+-	}
++	Body := _StripFullLineComments(_DriverFuncBody("ToggleCategoryAllFeatures"))
++	Assert(Body != "", "the category writer must exist")
++	PersistPos := InStr(Body, "if !ConfigCommitBuilt(")
++	RefusalPos := InStr(Body, "return false",, PersistPos)
++	RebuildPos := InStr(Body, "RebuildHotstringsLive(")
++	ReloadPos := InStr(Body, "ReloadPreservingSuspend(")
++	Assert(PersistPos > 0 && RefusalPos > PersistPos,
++		"a non-throwing commit refusal must return false")
++	Assert(RebuildPos > RefusalPos && ReloadPos > RefusalPos,
++		"native effects must occur only after the refused-commit exit")
++	Assert(InStr(Body, "Features :=") == 0, "the writer must delegate publication to the durable gateway")
+ }
+ Test("meta config: a bulk toggle recovers when its write fails",
+ 	_CFAS_BulkTogglesRecoverFromAFailedWrite)
+@@ -224,13 +225,10 @@ Test("meta config: a bulk toggle recovers when its write fails",
+ ; agree. None has a caller that reaches it today, which is precisely why they
+ ; would have surfaced as a puzzle rather than a regression.
+ _CFAS_LatentContractsAreConsistent() {
+-	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in infra/, so the
+-	; headless harness does not load it. Guarding one global of a pair and not
+-	; the other means the unguarded read throws before the guard can apply.
+-	Body := _DriverFuncBody("_HSRestoreCategory")
+-	Assert(Body != "", "_HSRestoreCategory() must exist")
+-	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
+-		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside infra/, so reading it first throws under the headless harness")
++	Body := _DriverFuncBody("MasterGateInitialize")
++	Assert(Body != "", "desired-state initialization must exist")
++	Assert(InStr(Body, 'State["initialized"]') > 0 && InStr(Body, "throw Error(") > 0,
++		"duplicate initialization must fail instead of capturing runtime zeroes as intent")
+ 
+ 	; AltGr has no prefix symbol on a Kana-style layout, so the keystroke
+ 	; composer owns it. Without its own case it fell through to the default and
+diff --git a/static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk b/static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk
+index 0111ce915..79b80a98e 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk
+@@ -49,7 +49,7 @@ _CPC_LineConsumesResult(Lines, Index) {
+ 		if _CPC_IsFunctionDeclaration(Lines, Index + A_Index)
+ 			break
+ 		if RegExMatch(Candidate,
+-			"i)^\s*(?:(?:if|else\s+if)\b[^\r\n]*\b|(?:try\s+)?return\s+)"
++			"i)^\s*(?:(?:if|else\s+if)\b[^\r\n]*\b|(?:try\s+)?return\b[^\r\n]*\b)"
+ 			. Assignment[1] . "\b")
+ 			return true
+ 	}
+@@ -73,13 +73,29 @@ _CPC_IsFunctionDeclaration(Lines, Index) {
+ 	return false
+ }
+ 
++_CPC_ResultConsumptionRecognizesTestedReturns() {
++	Assert(_CPC_LineConsumesResult([
++		"Committed := ConfigCommitBuilt(Path, Context, BuildFn)",
++		"return (Committed is Integer) && Committed == 1"], 1),
++		"a parenthesized strict status return consumes the writer result")
++	AssertFalse(_CPC_LineConsumesResult([
++		"Committed := ConfigCommitBuilt(Path, Context, BuildFn)",
++		"return true"], 1), "an assigned but ignored status must fail")
++	AssertFalse(_CPC_LineConsumesResult([
++		"Committed := ConfigCommitBuilt(Path, Context, BuildFn)",
++		"NextWriter() {", "return Committed"], 1),
++		"a later function cannot consume this writer's result")
++}
++Test("AHK-15-persistence: result scan distinguishes tested and discarded status",
++	_CPC_ResultConsumptionRecognizesTestedReturns)
++
+ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
+ 	Src := _DriverSourceNoComments()
+ 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
+ 	Calls := 0
+ 	Lines := StrSplit(Src, "`n", "`r")
+ 	for Index, Line in Lines {
+-		if !RegExMatch(Line, "\b(?:TOML_(?:Write|BatchWrite)|ConfigCommitUpdates)\(")
++		if !RegExMatch(Line, "\b(?:TOML_(?:Write|BatchWrite)|ConfigCommit(?:Updates|Built))\(")
+ 			continue
+ 		if _CPC_IsFunctionDeclaration(Lines, Index)
+ 			continue
+@@ -87,14 +103,14 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
+ 		Assert(_CPC_LineConsumesResult(Lines, Index),
+ 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
+ 	}
+-	; Audited inventory: config_shortcuts (1), config_io (9, the language-pack
+-	; bulk toggle included), gestures (4),
+-	; i18n (1), TOML_Write (1), personal editor (1), trigger journal (1),
+-	; menu rebuild (1) and the unused-key cleanup (1). Pin the exact census so
++	; Audited inventory: config_io (6), config_shortcuts (2), unused-key cleanup
++	; (2), feature_io (2), gestures (4), and one each in i18n, TOML_Write,
++	; updater, editors, trigger journal, menu rebuild, personal editor and WPM.
++	; Both admitted builders and direct-update gateways count. Pin the census so
+ 	; deleting a caller cannot make this class guard progressively vacuous, while
+ 	; every future sibling is still inspected by the loop above before the
+ 	; inventory assertion is reached.
+-	AssertEqual(20, Calls,
++	AssertEqual(24, Calls,
+ 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
+ }
+ Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
+@@ -187,33 +203,31 @@ Test("AHK-15-persistence: every gesture writer gates reload/publication",
+ 
+ _CPC_AssertBulkFunctionStagesBeforePublishing(Name) {
+ 	Body := _StripFullLineComments(_DriverFuncBody(Name))
+-	Assert(Body != "", Name . " must exist for the AHK-15 bulk transaction guard")
+-	PersistPos := InStr(Body, "ConfigCommitUpdates(")
+-	ReloadPos := InStr(Body, "ReloadPreservingSuspend()")
+-	Assert(InStr(Body, "Candidate") > 0,
+-		Name . " must build detached candidate state instead of mutating live Maps before persistence")
+-	Assert(PersistPos > 0, Name . " must commit through the single boolean-consuming helper")
+-	Assert(ReloadPos == 0 or PersistPos < ReloadPos,
+-		Name . " must not reload before its durable commit succeeds")
+-	Prefix := SubStr(Body, 1, PersistPos - 1)
+-	Assert(!RegExMatch(Prefix,
+-		"m)^\s*(?:Features|CategoryEnabled|TapHold|GestureAssignments|KeyboardShortcutAssignments|ScriptShortcutAssignments)\s*(?:\[|:=)"),
+-		Name . " must not publish or mutate a live shared Map before ConfigCommitUpdates returns true")
+-	Assert(!RegExMatch(Prefix, "m)^\s*WPMWidget\.[A-Za-z_][A-Za-z0-9_]*\s*:="),
+-		Name . " must not publish WPM state before ConfigCommitUpdates returns true")
+-	Assert(InStr(Body, "TOML_Write(") = 0 and InStr(Body, "TOML_BatchWrite(") = 0
+-		and InStr(Body, "WriteFeatureV2(") = 0 and InStr(Body, "WriteFeatureBatchV2(") = 0,
+-		Name . " must use one ConfigCommitUpdates batch per branch, not sibling read-modify-write calls")
+-	ExpectedCommits := (Name == "ToggleCategoryAllFeatures") ? 2 : 1
+-	AssertEqual(ExpectedCommits, _CPC_CountOccurrences(Body, "ConfigCommitUpdates("),
+-		Name . " must keep exactly one config.toml batch on each mutually exclusive mutation branch")
+-	if (Name == "ToggleAllHotstrings") {
+-		Assert(InStr(Body, "_CollectAllHotstringsV2Paths(CandidateFeatures)") > 0,
+-			"personal hotstring discovery must seed only the detached candidate before persistence")
+-		CollectorBody := _DriverFuncBody("_CollectAllHotstringsV2Paths")
+-		Assert(InStr(CollectorBody, "_ConfigSeedPersonalHotstring(FeaturesTarget") > 0
+-			and InStr(CollectorBody, "EnsurePersonalHotstringFeature(") = 0,
+-			"the hotstring path collector must not mutate the live Features global")
++	Assert(Body != "", Name . " must exist")
++	Category := Name == "ToggleCategoryAllFeatures"
++	Owner := Category ? Body : _StripFullLineComments(_DriverFuncBody("_ConfigCommitHotstringIntent"))
++	BuilderName := Category ? "_ConfigBuildCategoryIntentPlan" : "_ConfigBuildHotstringIntentPlan"
++	Builder := _StripFullLineComments(_DriverFuncBody(BuilderName))
++	Assert(Owner != "" && Builder != "", "admission and candidate phases must exist")
++	if !Category
++		Assert(InStr(Body, "return _ConfigCommitHotstringIntent(") > 0, Name . " must consume the common commit result")
++	PersistPos := InStr(Owner, "if !ConfigCommitBuilt(")
++	ReloadPos := InStr(Owner, "ReloadPreservingSuspend(")
++	Assert(PersistPos > 0 && ReloadPos > PersistPos, "durable commit must precede reload")
++	AssertEqual(1, _CPC_CountOccurrences(Owner, "ConfigCommitBuilt("), "one logical edit has one admitted config batch")
++	Assert(InStr(Owner, BuilderName . ".Bind(") > 0, "candidate construction must occur under the config lease")
++	Assert(InStr(Builder, "MasterGateDesiredFeatures(") > 0 && InStr(Builder, "_ConfigPublishDesiredState.Bind(") > 0,
++		"the candidate retains intent and delegates atomic publication to the gateway")
++	for Source in [Body, Builder] {
++		Assert(!RegExMatch(Source, "m)^\s*(?:Features|CategoryEnabled|TapHold)\s*(?:\[|:=)"),
++			Name . " cannot publish shared state before the durable gateway accepts it")
++	}
++	if Name == "ToggleAllHotstrings" {
++		Collector := _DriverFuncBody("_CollectAllHotstringsV2Paths")
++		Assert(Collector != "" && InStr(Builder, "_CollectAllHotstringsV2Paths(Desired)") > 0,
++			"personal discovery must run on a detached desired candidate")
++		Assert(InStr(Collector, "_ConfigSeedPersonalHotstring(FeaturesTarget") > 0 && InStr(Collector, "EnsurePersonalHotstringFeature(") == 0,
++			"discovery cannot mutate the live feature tree")
+ 	}
+ }
+ 
+diff --git a/static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk b/static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk
+index 03fd5d467..0f89dd2ea 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk
+@@ -22,20 +22,21 @@
+ ; =========================================
+ 
+ _CTFP_CategoryProducersRetainBooleanIntent() {
+-	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllFeatures",
+-		"ToggleCategoryAllSections", "HS_TogglePersonalAllSections", "_ConfigCollectFullSaveUpdates"] {
+-		Body := _StripFullLineComments(_DriverFuncBody(Name))
+-		Assert(Body != "", "category producer must exist: " . Name)
+-		Position := 1
+-		Count := 0
+-		while Position := RegExMatch(Body, 'Section:\s*"category_enabled"[^\r\n]+', &Record, Position) {
+-			Count += 1
+-			AssertTrue(RegExMatch(Record[0], 'Value:\s*TOML_Bool\('),
+-				"foreign category Boolean intent must be explicit in " . Name)
+-			Position += StrLen(Record[0])
+-		}
+-		AssertTrue(Count > 0, "the producer's category updates must be inspected: " . Name)
++	Builder := _StripFullLineComments(_DriverFuncBody("_ConfigBuildCategoryIntentPlan"))
++	Collector := _StripFullLineComments(_DriverFuncBody("_ConfigCollectFullSaveUpdates"))
++	Assert(Builder != "" && Collector != "", "both category persistence producers must exist")
++	Assert(InStr(Builder, '_ConfigSparseOperation("category_enabled",') > 0,
++		"category writes use the canonical sparse baseline before typed serialization")
++	Assert(RegExMatch(Collector, 'Section:\s*"category_enabled"[^\r\n]+Value:\s*TOML_Bool\(') > 0,
++		"full-save category values retain Boolean intent until sparse normalization")
++	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
++		Body := _DriverFuncBody(Name)
++		Assert(Body != "" && InStr(Body, "_ConfigCommitHotstringIntent(") > 0,
++			"section selection must use its independent transaction: " . Name)
+ 	}
++	Sections := _DriverFuncBody("_ConfigBuildHotstringIntentPlan")
++	Assert(Sections != "" && InStr(Sections, '"category_enabled"') == 0,
++		"selecting children must not write their master gates")
+ }
+ Test("config: every category producer retains foreign Boolean intent "
+ 	. "(config-typed-foreign-categories)", _CTFP_CategoryProducersRetainBooleanIntent)
+diff --git a/static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk b/static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk
+index c3ca672a6..b893af22d 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk
+@@ -91,12 +91,12 @@ _FIONG_NoBareCallShapesRemain() {
+ Test("menu_engine: every FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 caller resolves Features explicitly (F43)", _FIONG_NoBareCallShapesRemain)
+ 
+ _FIONG_ConfigIoCallersResolveFeatures() {
+-	for _, FuncName in ["ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
+-		Body := _DriverFuncBody(FuncName)
+-		Assert(Body != "", FuncName . " must exist in infra/config_io.ahk")
+-		Assert(InStr(Body, "global") > 0 and InStr(Body, "Features") > 0,
+-			FuncName . " must reference Features in its global declaration so it can pass it explicitly to WriteFeatureBatchV2 (F43)")
+-	}
++	Body := _DriverFuncBody("_ConfigBuildHotstringIntentPlan")
++	Assert(Body != "", "the hotstring candidate builder must exist")
++	Assert(InStr(Body, "global Features") > 0 && InStr(Body, "MasterGateDesiredFeatures(Features)") > 0,
++		"the admitted builder must explicitly capture its global desired source")
++	Assert(InStr(Body, "_ConfigStageFeatureEntries(Desired,") > 0,
++		"the mutation helper must receive a detached explicit target")
+ }
+ Test("config_io: every WriteFeatureBatchV2 caller resolves Features explicitly (F43)", _FIONG_ConfigIoCallersResolveFeatures)
+ 
+@@ -118,7 +118,7 @@ _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly() {
+ 	Assert(Body != "", "ReadFeatureStateV2 must exist in infra/feature_io.ahk")
+ 	Assert(InStr(Body, "global Features") > 0,
+ 		"ReadFeatureStateV2 is the documented read-only-accessor exception and may bind global Features itself")
+-	Assert(InStr(Body, "FeatureLocateV2(Features, V2Path)") > 0,
+-		"ReadFeatureStateV2 must pass Features explicitly into FeatureLocateV2, not rely on a delegating wrapper")
++	Assert(InStr(Body, "FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)") > 0,
++		"ReadFeatureStateV2 must pass its explicit desired view into the locator")
+ }
+ Test("feature_io: ReadFeatureStateV2 binds global Features (documented read-only exception) but calls FeatureLocateV2 explicitly (F43)", _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly)
+diff --git a/static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk b/static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk
+index 62410bd88..138abfafb 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk
+@@ -100,7 +100,7 @@ _LTLG_CheckSaveConfigGated() {
+ 
+ 	; Reconciliation must be loaded-gated and operate on a detached snapshot.
+ 	GatePos   := InStr(Body, "MenuReady := HasMenuCandidate")
+-	ClonePos  := InStr(Body, "FeatureSnapshot := _HSDeepCloneMap(FeatureState)")
++	ClonePos  := InStr(Body, "FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))")
+ 	SyncPos   := InStr(Body,
+ 		"_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)")
+ 	Assert(ClonePos > 0, "the full-save collector must clone Features before LLM reconciliation")
+diff --git a/static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk b/static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk
+index 67359c5de..3151a3c85 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk
+@@ -40,27 +40,23 @@ _MDHCG_CheckDynamicHotstringsExcluded() {
+ 	Body := _DriverFuncBody("MenuRowFromManifest")
+ 	Assert(Body != "", "MenuRowFromManifest must exist in ui/menu/menu_engine.ahk")
+ 
+-	Assert(InStr(Body, '"DynamicHotstrings"') > 0,
+-		'MenuRowFromManifest must special-case "DynamicHotstrings" -- it is the one hotstring sub-category with no independent CategoryEnabled entry (it follows the Hotstrings master directly)')
+-
+-	MasterCheckPos := InStr(Body, "_MasterCategoryFor(V1CategoryPath)")
+-	Assert(MasterCheckPos > 0, "MenuRowFromManifest must still check IsCategoryGated(_MasterCategoryFor(V1CategoryPath))")
+-
+-	ExclusionPos := InStr(Body, '"DynamicHotstrings"')
+-	Assert(ExclusionPos > MasterCheckPos,
+-		"the DynamicHotstrings exclusion must guard the SECOND (sub-category) gate check, not replace the first (master-gate) check")
++	Assert(InStr(Body, "IsCategoryGated(") == 0,
++		"editable children must not query independent gates, including categories without their own master")
++	Assert(InStr(Body, "ReadFeatureStateV2(") > 0,
++		"the actual row must retain the user's desired choice behind a disabled master")
+ }
+ Test("menu: MenuRowFromManifest excludes DynamicHotstrings from the redundant sub-category IsCategoryGated check (menu-category-gate-false-positive)",
+ 	_MDHCG_CheckDynamicHotstringsExcluded)
+ 
+ _MDHCG_CheckOtherHotstringSubcategoriesStillChecked() {
+ 	Body := _DriverFuncBody("MenuRowFromManifest")
+-	; The five real per-file sub-categories must still be gated via
+-	; IsCategoryGated(SubCategory) -- only DynamicHotstrings is excluded.
+-	Assert(InStr(Body, "IsCategoryGated(SubCategory)") > 0,
+-		"MenuRowFromManifest must still check IsCategoryGated(SubCategory) for real per-file sub-categories (Autocorrection, DistancesReduction, SFBsReduction, Rolls, MagicKey)")
++	Assert(Body != "", "the manifest row builder must exist")
++	Projection := _DriverFuncBody("ApplyMasterGatesToFeatures")
++	Assert(Projection != "", "the effective-state projection must exist")
++	Assert(InStr(Projection, "CategoryGateFn.Call(SubV1)") > 0,
++		"real subcategory masters must keep gating native state while the menu remains editable")
+ }
+-Test("menu: MenuRowFromManifest still gates the five real per-file hotstring sub-categories (menu-category-gate-false-positive)",
++Test("menu: real hotstring subcategories gate runtime independently of editable rows (menu-category-gate-false-positive)",
+ 	_MDHCG_CheckOtherHotstringSubcategoriesStillChecked)
+ 
+ 
+diff --git a/static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk b/static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk
+index 373e8a395..00aa98998 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk
+@@ -127,7 +127,9 @@ _MRS_NoBareReloadAnywhereReachable() {
+ 		. "(reload-drops-suspend-outside-the-menu-layer) -- found " . Count . " bare Reload(s): " . Offenders)
+ 
+ 	Routed := _MRS_CountRouted(Src)
+-	Assert(Routed >= 24,
++	; Four hotstring bulk wrappers share one reload site; category admission adds
++	; one inherited-Critical wrapper, giving 22 audited routed calls instead of 24.
++	Assert(Routed >= 22,
+ 		"the driver must still reload through ReloadPreservingSuspend at its persist-and-restart sites -- a scan "
+ 		. "that found none would pass the assertion above vacuously (found " . Routed . ")")
+ }
+diff --git a/static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk b/static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk
+index 81fb3851e..f1af18b72 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk
+@@ -30,8 +30,13 @@ _PHS_AssertSeedingWired() {
+ 	pf := _DriverSourceConcat()
+ 	Assert(InStr(pf, "EnsurePersonalHotstringFeature(SecName)") > 0,
+ 		"EnsurePersonalHotstringFeature must exist to seed custom personal hotstring sections (personal-hotstring-seed)")
+-	Assert(InStr(pf, '["hotstrings"]["personal"][SecName] := Map(') > 0,
+-		"EnsurePersonalHotstringFeature must seed a Map node (not a bool) mirroring the manifest shape (personal-hotstring-seed)")
++	Seed := _DriverFuncBody("EnsurePersonalHotstringFeature")
++	CandidateSeed := _DriverFuncBody("_ConfigSeedPersonalHotstring")
++	Assert(Seed != "" && CandidateSeed != "", "both personal seeding phases must exist")
++	Assert(InStr(Seed, "_ConfigSeedPersonalHotstring(Features, SecName)") > 0
++		&& InStr(CandidateSeed, '["hotstrings"]["personal"][SectionName] := Map(') > 0
++		&& InStr(CandidateSeed, 'ManifestDefaultFor(Path . ".enabled")') > 0,
++		"personal sections must use the manifest's neutral Map shape before applying saved overrides")
+ 
+ 	ep := FileRead(Root . "/ErgoptiPlus.ahk")
+ 	seedPos  := InStr(ep, "EnsurePersonalHotstringFeature")
+diff --git a/static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk b/static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk
+index 631c9a044..f41cfb02c 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk
+@@ -102,7 +102,8 @@ _RBL_EveryBundleLenderTakesTheRefusalBack() {
+ 			Offenders .= (Offenders == "" ? "" : "; ")
+ 				. "ReloadPreservingSuspend(" . Args[1] . ", " . Args[2] . ")"
+ 	}
+-	Assert(Calls >= 24,
++	; Shared hotstring bulk admission consolidates the audited routed census.
++	Assert(Calls >= 22,
+ 		"the scan must still find the reload call sites (found " . Calls . ")")
+ 	Assert(Lenders >= 4,
+ 		"the scan must still find the bundle lenders: paths editor, onboarding, reset and channel switch (found "
+diff --git a/static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk b/static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk
+index be4671830..d1e1f564b 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk
+@@ -65,7 +65,7 @@ _THGTM_CommitOwnsBeforeSnapshot() {
+ 	BoundPos := InStr(Body, "BoundPath := _TH_TapHoldConfigPath()")
+ 	LeasePos := InStr(Body, "_ConfigWriteLeaseTryAcquire(BoundPath")
+ 	SnapshotPos := InStr(Body, "StartState := TapHold")
+-	ClonePos := InStr(Body, "Candidate := _TH_CloneData(StartState)")
++	ClonePos := InStr(Body, "Candidate := _TH_CloneData(MasterGateDesiredTapHold(StartState))")
+ 	WritePos := InStr(Body, "_TH_WriteTapHoldToml(Candidate")
+ 	ReleasePos := InStr(Body, "_ConfigWriteLeaseRelease(OwnerToken)")
+ 	Assert(BoundPos > 0 && LeasePos > BoundPos
+@@ -83,7 +83,7 @@ _THGTM_DurableWriterIsUniqueAuthorizedAndAtomic() {
+ 	StagePos := InStr(Body, "FSWriteDurable(StagePath, Content)")
+ 	AuthorizePos := InStr(Body, "_TH_AuthorizeTapHoldCommit(OwnerToken")
+ 	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, BoundPath)")
+-	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, OwnerToken")
++	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
+ 	Assert(StagePos > 0 && AuthorizePos > StagePos
+ 		&& ReplacePos > AuthorizePos && PublishPos > ReplacePos,
+ 		"a complete durable stage must be re-authorized, atomically replaced, then published live in order")
+@@ -104,7 +104,7 @@ _THGTM_DurableWriterIsUniqueAuthorizedAndAtomic() {
+ 
+ 	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
+ 	Assert(Publisher != "", "_TH_PublishTapHoldCandidate must remain source-visible")
+-	Assert(InStr(Publisher, "TapHold := Candidate") > 0,
++	Assert(InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
+ 		"the one live publisher must swap the detached candidate by reference")
+ 	Assert(InStr(Publisher, "FS") == 0 && InStr(Publisher, "File") == 0,
+ 		"the live publication callback must remain memory-only inside Critical")
+diff --git a/static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk b/static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk
+index 0cfdf46ff..00a4b6f8c 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk
+@@ -15,11 +15,11 @@ _THPPP_CandidateCommitsOnlyAfterWrite() {
+ 	WriterBody := _DriverFuncBody("_TH_WriteTapHoldToml")
+ 	WritePos := InStr(WriterBody, "FSWriteDurable(StagePath, Content)")
+ 	ReplacePos := InStr(WriterBody, "FSAtomicMoveReplace(StagePath, BoundPath)")
+-	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, OwnerToken")
++	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
+ 	Assert(WritePos > 0 && ReplacePos > WritePos && PublishPos > ReplacePos,
+ 		"the shared writer must durably stage and atomically replace before publishing TapHold")
+ 	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
+-	Assert(Publisher != "" && InStr(Publisher, "TapHold := Candidate") > 0,
++	Assert(Publisher != "" && InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
+ 		"one memory-only helper must own live TapHold publication")
+ 	MenuSource := _DriverDirConcat("ui/menu")
+ 	Assert(InStr(MenuSource, "WriteTapHoldNative(this.KeyId)") > 0,
+diff --git a/static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk b/static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk
+index 4f4a05d49..0846d9b76 100644
+--- a/static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk
++++ b/static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk
+@@ -42,48 +42,27 @@
+ ; ===================================================
+ 
+ _TCAF_LiveToggleIsAtomic() {
+-	Body := _DriverFuncBody("ToggleCategoryAllFeatures")
+-	Assert(Body != "", "ToggleCategoryAllFeatures(Category, Value) declaration must exist in config_io.ahk")
+-
+-	CritPos := InStr(Body, 'Critical("On")')
+-	Assert(CritPos > 0,
+-		"ToggleCategoryAllFeatures must enter Critical around the live-category mutation window so a concurrent #HotIf/InputHook evaluation never observes torn Features/TapHold state")
+-
+-	RestorePos := InStr(Body, "_HSRestoreCategoryFrom(CandidateFeatures")
+-	SnapshotPos := InStr(Body, "_HSSnapshotCategoryTo(CandidateFeatures")
+-	Assert(RestorePos > 0, "ToggleCategoryAllFeatures must restore the category snapshot on ON")
+-	Assert(SnapshotPos > 0, "ToggleCategoryAllFeatures must snapshot the category on OFF")
+-	Assert(RestorePos < CritPos and SnapshotPos < CritPos,
+-		"snapshot/restore must build detached candidates before Critical; no live Map is exposed yet")
+-
+-	GatesPos := InStr(Body, "ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold")
+-	Assert(GatesPos > 0, "ToggleCategoryAllFeatures must re-apply master gates before rebuilding")
+-	Assert(GatesPos < CritPos,
+-		"manifest I/O and master-gate application must finish on detached candidates before Critical")
+-
+-	WritePos := InStr(Body, "ConfigCommitUpdates(ConfigurationFile")
+-	Assert(WritePos > GatesPos and WritePos < CritPos,
+-		"the detached candidate must persist successfully before the atomic publish window")
+-	PublishPos := InStr(Body, "Features := CandidateFeatures")
+-	Assert(PublishPos > CritPos,
+-		"Critical must begin before the first live candidate reference is published")
+-
+-	RebuildPos := InStr(Body, "RebuildHotstringsLive()")
+-	Assert(RebuildPos > 0, "ToggleCategoryAllFeatures must rebuild the live hotstring engine")
+-	Assert(GatesPos < RebuildPos, "master gates must be re-applied before the engine rebuild")
+-
+-	Assert(InStr(Body, "finally") > 0,
+-		"ToggleCategoryAllFeatures must release Critical in a finally block so an exception during publication cannot leak Critical")
+-	Assert(InStr(Body, "Critical(_TcafCrit)") > 0,
+-		"ToggleCategoryAllFeatures must restore the prior Critical state after the mutation window (no leaked Critical)")
+-
+-	; F-01: the UPPER bound. Critical must be RELEASED before the rebuild.
+-	RelPos := InStr(Body, "Critical(_TcafCrit)")
+-	Assert(RelPos < RebuildPos,
+-		"ToggleCategoryAllFeatures must RELEASE Critical before RebuildHotstringsLive(): that call re-runs RegisterAllHotstrings (~1.3 s) and, via RebuildTrayMenu -> _HS_InvalidatePersonalCache, a full recursive personal-hotstrings + extensions rescan. Holding Critical across it starves the LL keyboard hook past LowLevelHooksTimeout and Windows silently drops physical keystrokes (F33 regression, reintroduced by this caller)")
+-
+-	Assert(WritePos < CritPos,
+-		"the config write is unbounded file I/O and must sit before the Critical publish span")
++	Body := _StripFullLineComments(_DriverFuncBody("ToggleCategoryAllFeatures"))
++	Builder := _StripFullLineComments(_DriverFuncBody("_ConfigBuildCategoryIntentPlan"))
++	Publish := _StripFullLineComments(_DriverFuncBody("_ConfigPublishDesiredState"))
++	Assert(Body != "" && Builder != "" && Publish != "", "all transaction phases must exist")
++	Assert(InStr(Body, "if !ConfigCommitBuilt(") > 0 && InStr(Body, "_ConfigBuildCategoryIntentPlan.Bind(") > 0,
++		"the category candidate must be built only after config admission")
++	Assert(InStr(Builder, "MasterGateDesiredFeatures(") > 0 && InStr(Builder, "MasterGateDesiredTapHold(") > 0,
++		"both candidates must originate from retained intent, never an already-gated snapshot")
++	Assert(InStr(Builder, "ApplyMasterGatesToFeatures(") > 0 && InStr(Builder, "_ConfigPublishDesiredState.Bind(") > 0,
++		"the detached projection must complete before publication is offered to the gateway")
++	Assert(InStr(Builder, 'Critical("On")') == 0, "manifest reads cannot run under Critical")
++	CritPos := InStr(Publish, 'Critical("On")')
++	ReleasePos := InStr(Publish, "finally Critical(")
++	for Assignment in ["Patch.target[Patch.key] := Patch.value", "TapHold := CandidateTapHold", "CategoryEnabled := CandidateCategories"] {
++		Pos := InStr(Publish, Assignment)
++		Assert(CritPos > 0 && Pos > CritPos && ReleasePos > Pos, "every runtime reference swap must be atomic")
++	}
++	for Forbidden in ["ApplyMasterGatesToFeatures(", "ConfigCommit", "RebuildHotstringsLive(", "ReloadPreservingSuspend("]
++		Assert(InStr(Publish, Forbidden) == 0, "publication must remain memory-only: " . Forbidden)
++	Assert(InStr(Body, 'Critical("On")') == 0 && InStr(Body, "RebuildHotstringsLive(") > 0,
++		"native rebuilding must remain outside the Critical publication window")
+ }
+ Test("config_io: ToggleCategoryAllFeatures publishes detached candidates atomically (F39)", _TCAF_LiveToggleIsAtomic)
+ 
+diff --git a/static/ergopti_plus/windows/tests/test_stubs.ahk b/static/ergopti_plus/windows/tests/test_stubs.ahk
+index 4f57f95fb..ed4111842 100644
+--- a/static/ergopti_plus/windows/tests/test_stubs.ahk
++++ b/static/ergopti_plus/windows/tests/test_stubs.ahk
+@@ -335,6 +335,8 @@ global CategoryEnabled := Map(
+     "Hotstrings", true,
+     "TapHolds",   true,
+ )
++; Production feature_state is loaded only by the isolated boot smoke harness.
++global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map("DynamicHotstrings", true, "Personal", true)
+ IsCategoryGated(Category) {
+     global CategoryEnabled
+     return CategoryEnabled.Has(Category) ? CategoryEnabled[Category] : true
+diff --git a/static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk b/static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk
+index fe81c0ac5..e13333112 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk
+@@ -784,12 +784,15 @@ Test("config full save: inherited Critical cannot wrap collection IO timers or f
+ 
+ _CFGFS_LlmCollectionDoesNotMutateLiveFeatures() {
+ 	global Features, _LLM_Menu, _LLM_Menu_Loaded
++	SavedFeatures := Features
+ 	SavedEnabled := Features["llm"]["enabled"]
+ 	SavedMenu := _LLM_Menu
+ 	HadLoaded := IsSet(_LLM_Menu_Loaded)
+ 	if HadLoaded
+ 		SavedLoaded := _LLM_Menu_Loaded
+ 	try {
++		Features := ManifestBuildFeaturesMap()
++		Features["llm"]["enabled"] := SavedEnabled
+ 		_LLM_Menu := _HSDeepCloneMap(SavedMenu)
+ 		_LLM_Menu_Loaded := true
+ 		_LLM_Menu["enabled"] := !SavedEnabled
+@@ -802,7 +805,7 @@ _CFGFS_LlmCollectionDoesNotMutateLiveFeatures() {
+ 		AssertEqual(SavedEnabled, Features["llm"]["enabled"],
+ 			"speculative LLM reconciliation must target only the detached snapshot")
+ 	} finally {
+-		Features["llm"]["enabled"] := SavedEnabled
++		Features := SavedFeatures
+ 		_LLM_Menu := SavedMenu
+ 		if HadLoaded
+ 			_LLM_Menu_Loaded := SavedLoaded
+diff --git a/static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk b/static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk
+index fec5edefc..57bffd574 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk
+@@ -19,11 +19,11 @@
+ ; MetricsFilters class is included centrally because its persistence paths now
+ ; have behavioural global-barrier coverage.
+ class WPMWidgetConst {
+-	static CFG_VISIBLE := "wpm_visible"
+-	static CFG_X := "wpm_x"
+-	static CFG_Y := "wpm_y"
+-	static CFG_COLORS := "wpm_colors"
+-	static CFG_GRAPH := "wpm_graph"
++	static CFG_VISIBLE := "wpm_widget_visible"
++	static CFG_X := "wpm_widget_x"
++	static CFG_Y := "wpm_widget_y"
++	static CFG_COLORS := "wpm_widget_colors"
++	static CFG_GRAPH := "wpm_widget_graph"
+ }
+ 
+ class WPMWidget {
+diff --git a/static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk b/static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk
+index 86bcad78f..1282778aa 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk
+@@ -67,7 +67,9 @@ _CTT_RealCollector(OnboardingSeen) {
+ 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true),
+ 			"the real full-save collector must produce valid typed updates")
+ 		Target := ManifestBuildFeaturesMap()
+-		Target["llm"]["onboarding_seen"] := !OnboardingSeen
++		if !OnboardingSeen
++			AssertEqual("absent", TOML_Read(Path, "llm", "onboarding_seen", "absent"),
++				"a neutral onboarding value is persisted as deletion")
+ 		ApplyConfigToml(Target, Path)
+ 		AssertEqual(OnboardingSeen, Target["llm"]["onboarding_seen"],
+ 			"the final collector override must preserve the loaded onboarding Boolean")
+diff --git a/static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk b/static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk
+index 78e421aae..3e794cedc 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk
+@@ -15,10 +15,9 @@
+ ; rows are built by the real builders over the live Features and CategoryEnabled
+ ; maps, which each test restores.
+ ;
+-; The whole tree's checkbox went on calling the pair's old writer, which closed
+-; the Hotstrings switch when unticked and never opened a closed category gate
+-; when ticked, so it stayed unticked however often it was clicked. Its writer is
+-; run here against a scratch config.toml.
++; Bulk selection edits desired section state independently of category masters.
++; The checks below keep those masters closed while selecting every child and
++; exercise the durable writer against a scratch config.toml.
+ ; ==============================================================================
+ 
+ #Requires AutoHotkey v2.0
+@@ -140,8 +139,8 @@ _HBC_ScopeAllOnReadsEverySection() {
+ 	Paths := _HS_SectionPaths("hotstrings.rolls")
+ 	_HBC_WithRolls(true, true, () => AssertTrue(_HS_ScopeAllOn(["Rolls"], Paths),
+ 		"every section on and the gate on is « all on »"))
+-	_HBC_WithRolls(false, true, () => AssertFalse(_HS_ScopeAllOn(["Rolls"], Paths),
+-		"a closed gate is not « all on »"))
++	_HBC_WithRolls(false, true, () => AssertTrue(_HS_ScopeAllOn(["Rolls"], Paths),
++		"selected sections stay checked behind a closed gate"))
+ 	_HBC_WithRolls(true, true, _HBC_OneSectionOff.Bind(Paths))
+ 	AssertFalse(_HS_ScopeAllOn([], Paths), "a scope with no gate has nothing the checkbox could switch on")
+ 	AssertFalse(_HS_ScopeAllOn(["Rolls"], []), "a scope with no section has nothing the checkbox could switch on")
+@@ -178,7 +177,7 @@ _HBC_AssertCategoryHead(State) {
+ 	AssertEqual(State, Rows[1]["checked"], "the gate is a checkbox ticked from the category gate")
+ 	All := _HBC_RowsLabelled(Rows, t("menu.hotstrings.enable_all_sections"))
+ 	AssertEqual(1, All.Length, "one control for every section of the category")
+-	AssertEqual(State, All[1]["checked"], "ticked exactly when the gate and every section are on")
++	AssertTrue(All[1]["checked"], "section selection is independent of the category gate")
+ 	_HBC_AssertNoRetired(Rows, "the category submenu")
+ }
+ 
+@@ -217,6 +216,7 @@ _HBC_WithScratchConfig(Gates, Body) {
+ 	SavedPath := ConfigurationFile
+ 	SavedFeatures := Features
+ 	SavedCategories := CategoryEnabled
++	SavedOwner := MasterGateState().Clone()
+ 	ReloadsBefore := _Stub_SentText.Length
+ 	ConfigPath := A_Temp . "\ergopti_hbc_whole_tree_" . A_ScriptHwnd . "_" . A_TickCount . ".toml"
+ 	try FileDelete(ConfigPath)
+@@ -224,9 +224,13 @@ _HBC_WithScratchConfig(Gates, Body) {
+ 		_FLAT_HOTSTRING_V1_CATS := ["Rolls"]
+ 		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
+ 		ConfigurationFile := ConfigPath
++		Features := _HSDeepCloneMap(Features)
+ 		CategoryEnabled := CategoryEnabled.Clone()
+ 		for Gate, Value in Gates
+ 			CategoryEnabled[Gate] := Value
++		_HBC_SetSections("hotstrings.rolls", Gates["Hotstrings"])
++		MasterGateState()["initialized"] := false
++		MasterGateInitialize(Features, Map(), IsCategoryGated)
+ 		Body(ConfigPath)
+ 	} finally {
+ 		_FLAT_HOTSTRING_V1_CATS := unset
+@@ -234,6 +238,9 @@ _HBC_WithScratchConfig(Gates, Body) {
+ 		ConfigurationFile := SavedPath
+ 		Features := SavedFeatures
+ 		CategoryEnabled := SavedCategories
++		MasterGateState().Clear()
++		for Key, Value in SavedOwner
++			MasterGateState()[Key] := Value
+ 		while (_Stub_SentText.Length > ReloadsBefore)
+ 			_Stub_SentText.Pop()
+ 		if _ParseTomlCache.Has(ConfigPath)
+@@ -276,19 +283,19 @@ _HBC_WholeTreeTickOpensEveryGate() {
+ 
+ _HBC_AssertTickOpensGates(ConfigPath) {
+ 	global CategoryEnabled
+-	AssertFalse(_HS_AllHotstringsOn(), "closed gates leave the checkbox unticked")
++	AssertFalse(_HS_AllHotstringsOn(), "unselected sections leave the checkbox unticked")
+ 	AssertTrue(ToggleAllHotstrings(true), "the whole-tree write must commit")
+-	AssertTrue(CategoryEnabled["Hotstrings"], "ticking every section opens the Hotstrings switch")
+-	AssertTrue(CategoryEnabled["Rolls"], "and every closed category gate of the tree")
+-	AssertEqual(1, TOML_Read(ConfigPath, "category_enabled", "rolls", -1),
+-		"the opened category gate is persisted")
++	AssertFalse(CategoryEnabled["Hotstrings"], "selecting every section leaves the master disabled")
++	AssertFalse(CategoryEnabled["Rolls"], "section selection preserves the category gate")
++	AssertEqual(-1, TOML_Read(ConfigPath, "category_enabled", "rolls", -1),
++		"section selection cannot create a master override")
+ 	_HBC_ApplyGatesAsAtBoot()
+ 	AssertTrue(_HS_AllHotstringsOn(), "one click ticks the checkbox, once the reload has applied the gates")
+ }
+ 
+ Test("hotstring bulk: the « all sections » row is one checkbox (hotstring-bulk-checkboxes)",
+ 	_HBC_AllSectionsRowIsACheckbox)
+-Test("hotstring bulk: « all on » reads the gate and every section (hotstring-bulk-checkboxes)",
++Test("hotstring bulk: « all on » reads every desired section (hotstring-bulk-checkboxes)",
+ 	_HBC_ScopeAllOnReadsEverySection)
+ Test("hotstring bulk: a category opens with its gate and one « all » checkbox (hotstring-bulk-checkboxes)",
+ 	_HBC_CategoryHeadRows)
+@@ -296,5 +303,5 @@ Test("hotstring bulk: a language opens with one « all » checkbox (hotstring-bu
+ 	_HBC_LanguageSwitchRowIsACheckbox)
+ Test("hotstring bulk: unticking the whole tree keeps every gate (hotstring-bulk-checkboxes)",
+ 	_HBC_WholeTreeUntickKeepsGates)
+-Test("hotstring bulk: ticking the whole tree opens every gate (hotstring-bulk-checkboxes)",
++Test("hotstring bulk: ticking the whole tree preserves disabled gates (hotstring-bulk-checkboxes)",
+ 	_HBC_WholeTreeTickOpensEveryGate)
+diff --git a/static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk b/static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk
+index fcba2228d..631ab3562 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk
+@@ -617,7 +617,7 @@ Test_LLM_Persist_AppOverridesTraverseRealFullSave() {
+ 	Path := A_Temp . "\ergopti_llm_app_overrides_full_save.toml"
+ 	try {
+ 		try FileDelete(Path)
+-		CandidateFeatures := _HSDeepCloneMap(Features)
++		CandidateFeatures := ManifestBuildFeaturesMap()
+ 		CandidateMenu := _LLM_Persist_MakeDefaultTray()
+ 		CandidateMenu["onboarding_seen"] := false
+ 		CandidateMenu["app_profile_overrides"] := Map(
+diff --git a/static/ergopti_plus/windows/tests/unit/test_master_gates.ahk b/static/ergopti_plus/windows/tests/unit/test_master_gates.ahk
+index 0903402a6..6f18201fe 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_master_gates.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_master_gates.ahk
+@@ -11,6 +11,8 @@
+ ; aggregate of its section states.
+ ; ==============================================================================
+ 
++#Include ../../ui/menu/menu_engine.ahk
++
+ 
+ 
+ 
+@@ -166,3 +168,232 @@ TestMasterGates_TargetNamesRemainExplicit() {
+ }
+ Test("master gates: application retains explicit candidate targets",
+ 	TestMasterGates_TargetNamesRemainExplicit)
++
++; Boot's captured intent must remain editable while only its runtime is gated.
++_A1_WithDesiredFixture(Body) {
++	global Features, TapHold, CategoryEnabled, ConfigurationFile
++	Saved := Map("features", Features, "tap_hold", TapHold,
++		"categories", CategoryEnabled, "path", ConfigurationFile)
++	Owner := MasterGateState()
++	SavedOwner := Owner.Clone()
++	try {
++		Owner["initialized"] := false
++		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", false),
++			"shortcuts", Map("gpt", Map("enabled", true, "link", "https://example.test")),
++			"hotstrings", Map("repeat_key_enabled", true, "trigger_char", "*",
++				"rolls", Map("hc", Map("enabled", true))))
++		TapHold := Map("keys", Map("caps_lock", Map("tap_action", "enter", "hold_modifier", "ctrl")))
++		CategoryEnabled := Map("Layout", false, "Shortcuts", false, "Hotstrings", false,
++			"TapHolds", false, "Rolls", false)
++		ConfigurationFile := A_Temp . "\ergopti_a1_desired_" . A_TickCount . ".toml"
++		MasterGateInitialize(Features, TapHold, IsCategoryGated)
++		Body.Call()
++	} finally {
++		Features := Saved["features"]
++		TapHold := Saved["tap_hold"]
++		CategoryEnabled := Saved["categories"]
++		ConfigurationFile := Saved["path"]
++		Owner.Clear()
++		for Key, Value in SavedOwner
++			Owner[Key] := Value
++	}
++}
++
++_A1_DesiredMenu() {
++	global Features
++	AssertFalse(Features["layout"]["ergopti_base"], "the native layout remains inactive")
++	Row := MenuRowWithLabel("layout.ergopti_base", "Layout fixture", "Layout")
++	AssertTrue(Row is Map, "the desired row is reachable")
++	AssertTrue(Row["checked"], "the desired child remains checked behind a disabled master")
++	AssertFalse(Row.Get("disabled", false), "a disabled master must not disable its child editor")
++}
++Test("master intent: disabled masters retain editable checked children (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_DesiredMenu))
++
++_A1_DesiredWrite() {
++	global Features
++	Observed := { updates: [] }
++	Writer(Path, Updates) {
++		Observed.updates := Updates
++		return true
++	}
++	AssertTrue(WriteFeatureV2(Features, "layout.ergopti_alt_gr", true, "", Writer, (*) => 0))
++	AssertFalse(Features["layout"]["ergopti_alt_gr"], "editing a child must not revive runtime under master OFF")
++	AssertTrue(ReadFeatureStateV2("layout.ergopti_alt_gr")["enabled"], "the committed desired choice is visible")
++	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "editing a sibling preserves prior intent")
++	AssertEqual(1, Observed.updates.Length, "the write crosses the real transaction boundary")
++}
++Test("master intent: child edits preserve disabled runtime and sibling intent (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_DesiredWrite))
++
++_A1_GatesKeepParameters() {
++	Candidate := Map("layout", Map("ergopti_base", true, "parameter", "retained"),
++		"shortcuts", Map("gpt", Map("enabled", true, "letter", "q"), "delay_ms", 42))
++	ApplyMasterGatesToFeatures(Candidate, Map(), (*) => false)
++	AssertEqual("retained", Candidate["layout"]["parameter"], "gates preserve string parameters")
++	AssertEqual(42, Candidate["shortcuts"]["delay_ms"], "gates preserve numeric parameters")
++	AssertEqual("q", Candidate["shortcuts"]["gpt"]["letter"], "disabled alpha features retain their parameter")
++	AssertFalse(Candidate["layout"]["ergopti_base"])
++	AssertFalse(Candidate["shortcuts"]["gpt"]["enabled"])
++}
++Test("master intent: runtime projection preserves pure parameters (a1-desired)", _A1_GatesKeepParameters)
++
++; A full save must emit desired children even when their runtime is gated off.
++_A1_FullSaveUsesDesired() {
++	Updates := _ConfigCollectFullSaveUpdates()
++	Found := false
++	for Update in Updates {
++		if Update.Section == "layout" && Update.Key == "ergopti_base" {
++			Found := true
++			AssertTrue(Update.HasOwnProp("Value") && Update.Value == true,
++				"the desired true override survives a full save behind master OFF")
++		}
++	}
++	AssertTrue(Found, "the full-save collector cannot omit the disabled branch")
++}
++Test("master intent: full save includes desired children behind disabled masters (a1-sparse)",
++	_A1_WithDesiredFixture.Bind(_A1_FullSaveUsesDesired))
++
++; Runtime false is not an OFF receipt when the durable desired value was true.
++_A1_ExplicitOffDeletesDesiredOverride() {
++	global Features
++	Observed := { updates: [] }
++	Writer(Path, Updates) {
++		Observed.updates := Updates
++		return true
++	}
++	AssertFalse(Features["layout"]["ergopti_base"])
++	AssertTrue(WriteFeatureV2(Features, "layout.ergopti_base", false, "", Writer, (*) => 0))
++	AssertEqual(1, Observed.updates.Length, "runtime false must not bypass the desired OFF write")
++	AssertTrue(Observed.updates[1].HasOwnProp("Delete") && Observed.updates[1].Delete == 1,
++		"neutral OFF explicitly deletes the former true override")
++	AssertFalse(ReadFeatureStateV2("layout.ergopti_base")["enabled"])
++}
++Test("master intent: explicit OFF deletes a demoted desired override (a1-sparse)",
++	_A1_WithDesiredFixture.Bind(_A1_ExplicitOffDeletesDesiredOverride))
++
++_A1_RefusedWriteRetainsBothStates() {
++	global Features
++	Desired := MasterGateState()["features"]
++	Runtime := Features
++	AssertFalse(WriteFeatureV2(Features, "layout.ergopti_base", false, "", (*) => false, (*) => 0))
++	AssertTrue(MasterGateState()["features"] == Desired, "refusal cannot publish desired candidates")
++	AssertTrue(Features == Runtime, "refusal cannot publish runtime candidates")
++	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"])
++	AssertFalse(Features["layout"]["ergopti_base"])
++}
++Test("master intent: refused persistence preserves desired and raw runtime (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_RefusedWriteRetainsBothStates))
++
++_A1_ReenableDesiredOnly() {
++	global Features
++	AssertTrue(ToggleCategoryAllFeatures("Layout", true, (*) => true, (*) => 0, (*) => true))
++	AssertTrue(Features["layout"]["ergopti_base"], "reenabling restores the desired true child")
++	AssertFalse(Features["layout"]["ergopti_alt_gr"], "reenabling does not enable the undesired sibling")
++	AssertTrue(ToggleCategoryAllFeatures("Shortcuts", true, (*) => true, (*) => 0, (*) => true))
++	AssertTrue(Features["shortcuts"]["gpt"]["enabled"])
++	AssertEqual("https://example.test", Features["shortcuts"]["gpt"]["link"], "parameters survive OFF and ON")
++}
++Test("master intent: reenable restores only desired children (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_ReenableDesiredOnly))
++
++_A1_UnrelatedDemotionSurvivesEdit() {
++	global Features, CategoryEnabled
++	CategoryEnabled["Layout"] := true
++	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"])
++	AssertFalse(Features["layout"]["ergopti_base"])
++	AssertTrue(WriteFeatureV2(Features, "layout.ergopti_alt_gr", true, "", (*) => true, (*) => 0))
++	AssertFalse(Features["layout"]["ergopti_base"], "a sibling edit cannot reactivate a session-demoted feature")
++	AssertTrue(Features["layout"]["ergopti_alt_gr"])
++}
++Test("master intent: unrelated session demotion survives a child edit (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_UnrelatedDemotionSurvivesEdit))
++
++_A1_TapHoldEditWhileDisabled() {
++	global TapHold, _ConfigDir, _AhkSubDir
++	SavedDir := _ConfigDir
++	SavedSubDir := _AhkSubDir
++	try {
++		_ConfigDir := A_Temp . "\ergopti_a1_taphold_" . A_TickCount . "\"
++		_AhkSubDir := ""
++		AssertTrue(IsTapHoldTapActive("caps_lock", "enter"), "the tap picker reads retained intent")
++		AssertTrue(WriteTapHoldTap("tab", "escape", (*) => true, (*) => true, (*) => true))
++		AssertEqual(0, TapHold["keys"].Count, "editing tap-holds under OFF cannot activate native bindings")
++		Desired := MasterGateDesiredTapHold(TapHold)
++		AssertTrue(Desired["keys"].Has("caps_lock"), "editing another key preserves prior desired bindings")
++		AssertEqual("escape", Desired["keys"]["tab"]["tap_action"])
++		AssertFalse(WriteTapHoldTap("caps_lock", "space", (*) => false, (*) => true, (*) => true))
++		AssertTrue(MasterGateDesiredTapHold(TapHold) == Desired, "refused staging preserves desired identity")
++		AssertEqual(0, TapHold["keys"].Count)
++	} finally {
++		_ConfigDir := SavedDir
++		_AhkSubDir := SavedSubDir
++	}
++}
++Test("master intent: tap-hold edits retain desired bindings without activation (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_TapHoldEditWhileDisabled))
++
++_A1_EditorsUseDesiredIntent() {
++	global Features, HSE_RepeatEnabled, ScriptInformation
++	SavedRepeat := HSE_RepeatEnabled
++	SavedMagic := ScriptInformation.Get("MagicKey", "")
++	try {
++		HSE_RepeatEnabled := false
++		AssertTrue(ToggleRepeatKeyEnabled((*) => true, (*) => 0, (*) => true))
++		AssertFalse(ReadFeatureStateV2("hotstrings.repeat_key_enabled")["enabled"],
++			"the repeat editor turns desired true OFF even while its runtime is already false")
++		AssertFalse(HSE_RepeatEnabled, "the repeat runtime remains disabled")
++		AssertTrue(ModifyMagicKey(0, "#", (*) => true, (*) => 0, (*) => true))
++		AssertEqual("#", MasterGateDesiredFeatures(Features)["hotstrings"]["trigger_char"],
++			"the magic-key parameter publishes into retained intent")
++		AssertTrue(ModifyLink(0, "https://changed.test", (*) => true, (*) => 0, (*) => true))
++		AssertEqual("https://changed.test", ReadFeatureStateV2("shortcuts.gpt")["link"])
++		AssertFalse(Features["shortcuts"]["gpt"]["enabled"], "parameter edits do not activate shortcuts")
++	} finally {
++		HSE_RepeatEnabled := SavedRepeat
++		ScriptInformation["MagicKey"] := SavedMagic
++	}
++}
++Test("master intent: parameter editors and repeat toggle consume desired state (a1-desired)",
++	_A1_WithDesiredFixture.Bind(_A1_EditorsUseDesiredIntent))
++
++_A1_DemotionDuringMasterWrite() {
++	global Features, CategoryEnabled
++	CategoryEnabled["Layout"] := true
++	Features["layout"]["ergopti_base"] := true
++	Writer(*) {
++		global Features
++		Features["layout"]["ergopti_base"] := false
++		return true
++	}
++	AssertTrue(ToggleCategoryAllFeatures("Shortcuts", true, Writer, (*) => 0, (*) => true))
++	AssertFalse(Features["layout"]["ergopti_base"],
++		"a runtime demotion during unrelated durable I/O must survive category publication")
++	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "session demotion must not erase desired intent")
++}
++Test("master intent: master publication preserves a concurrent runtime demotion (a1-admission)",
++	_A1_WithDesiredFixture.Bind(_A1_DemotionDuringMasterWrite))
++
++_A1_TapWriterSharesMasterAdmission() {
++	global _ConfigDir, _AhkSubDir, TapHold
++	SavedDir := _ConfigDir
++	SavedSubDir := _AhkSubDir
++	Observed := { nested: -1 }
++	Writer(*) {
++		Observed.nested := WriteTapHoldTap("tab", "escape", (*) => true, (*) => true, (*) => true)
++		return true
++	}
++	try {
++		_ConfigDir := A_Temp . "\ergopti_a1_admission_" . A_TickCount . "\"
++		_AhkSubDir := ""
++		AssertTrue(ToggleCategoryAllFeatures("TapHolds", true, Writer, (*) => 0, (*) => true))
++		AssertFalse(Observed.nested, "tap edits cannot interleave a master snapshot owned through config.toml")
++		AssertTrue(TapHold["keys"].Has("caps_lock"))
++		AssertFalse(MasterGateDesiredTapHold(TapHold)["keys"].Has("tab"), "a refused nested edit publishes no desired state")
++	} finally {
++		_ConfigDir := SavedDir
++		_AhkSubDir := SavedSubDir
++	}
++}
++Test("master intent: tap-hold writer shares admission with its category master (a1-admission)",
++	_A1_WithDesiredFixture.Bind(_A1_TapWriterSharesMasterAdmission))
+diff --git a/static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk b/static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk
+index 41154470a..6b78f1485 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk
+@@ -1,216 +1,63 @@
+ ﻿; tests/unit/test_master_gates_not_persisted.ahk
+ 
+ ; ==============================================================================
+-; MODULE: Regression — a runtime master gate must never be written to disk
++; MODULE: Master Gates Must Not Replace Saved Intent
+ ; DESCRIPTION:
+-; ApplyMasterGatesToFeatures zeroes a master-disabled category's features IN
+-; PLACE, and its own module header states the contract: the per-feature state
+-; persisted on disk is NOT touched, it stays in config.toml and is restored at
+-; the next Reload once the master flips back on.
+-;
+-; ROOT CAUSE ENCODED:
+-; SaveFullConfig had no notion of that distinction. It flattened the same live
+-; Features map, so the boot-armed save (armed at boot right AFTER the gates are
+-; applied) serialised the runtime zeroes as if they were the user's intent.
+-; Turning a category off therefore erased every per-feature choice it contained,
+-; permanently: re-enabling the category later showed every child unticked, with
+-; no error, no log line and nothing to connect it to the save that caused it.
+-; The same happens without a reboot on any live SaveFullConfig call made while a
+-; gate is off.
+-;
+-; The fix omits a gated-off branch from the collected updates. TOML_BatchWrite
+-; preserves keys it does not re-collect, so the on-disk values survive untouched
+-; for exactly as long as the gate is off — which is what the gate already
+-; promised.
++; A full save once flattened runtime zeroes into configuration, erasing desired
++; children behind disabled masters. Omitting those branches avoided the loss but
++; also discarded edits made while disabled. The collector now serializes retained
++; intent as explicit sparse set/delete operations while preserving unknown TOML.
+ ; ==============================================================================
+ 
+ #Requires AutoHotkey v2.0
+ 
+-; The stubbed CategoryEnabled map carries only the four categories the harness
+-; needs (Layout, Shortcuts, Hotstrings, TapHolds), so a bare read of Rolls or
+-; Autocorrection raises "Item has no value". Save through a sentinel and restore
+-; by removing the keys this test invented, exactly like test_master_gates.ahk.
+-_MGP_SaveGate(Name) {
+-	global CategoryEnabled
+-	return CategoryEnabled.Has(Name) ? CategoryEnabled[Name] : "<absent>"
+-}
+-_MGP_RestoreGate(Name, Saved) {
+-	global CategoryEnabled
+-	if (Saved == "<absent>") {
+-		if CategoryEnabled.Has(Name)
+-			CategoryEnabled.Delete(Name)
+-		return
+-	}
+-	CategoryEnabled[Name] := Saved
+-}
+-
+-
+-
+-
+-
+-; ==============================================================
+-; ==============================================================
+-; ======= 1/ Shared fixture ====================================
+-; ==============================================================
+-; ==============================================================
+-
+-; Mirrors the real tree shape: a top-level gated category (layout) plus the
+-; hotstrings sub-tree, whose sub-categories carry their own independent gates.
+-_MGP_Fixture() {
+-	return Map(
+-		"layout", Map("ergopti_base", true, "ergopti_alt_gr", true),
+-		"hotstrings", Map(
+-			"rolls",          Map("hc", Map("enabled", true)),
+-			"autocorrection", Map("errors", Map("enabled", true))
+-		)
+-	)
+-}
+-
+-; A throwaway TapHold target so the gate application never touches the global.
+-_MGP_TapHoldStub() {
+-	return Map("keys", Map(), "layers", Map())
+-}
+-
+-; Run the exact composition SaveFullConfig uses to build its feature writes.
+-_MGP_Collect(FeaturesMap) {
+-	Updates := []
+-	_CollectFeatureUpdates(Updates, "", _PruneMasterGatedFeatures(FeaturesMap))
+-	return Updates
+-}
+-
+-; True when some update writes Key into a section naming Needle. Matching on the
+-; section SUBSTRING rather than the fully resolved name keeps this test about
+-; persistence, not about the manifest's ahk.-prefix resolution (which
+-; test_config_io_feature_section_prefix.ahk already owns).
+-_MGP_HasKeyUnder(Updates, Needle, Key) {
+-	for U in Updates {
+-		if (InStr(U.Section, Needle) and U.Key = Key)
+-			return true
+-	}
+-	return false
+-}
+ 
+ 
+ 
++; ==========================================
++; ==========================================
++; ======= 1/ Desired persistence ===========
++; ==========================================
++; ==========================================
+ 
+-
+-; ==============================================================
+-; ==============================================================
+-; ======= 2/ Top-level master gate =============================
+-; ==============================================================
+-; ==============================================================
+-
+-_MGP_GatedCategoryContributesNoWrite() {
+-	global CategoryEnabled
+-	ManifestEnsureLoaded()
+-	OldLayout := _MGP_SaveGate("Layout")
+-	OldHotstrings := _MGP_SaveGate("Hotstrings")
+-	OldRolls := _MGP_SaveGate("Rolls")
+-	OldAuto := _MGP_SaveGate("Autocorrection")
++_MGP_DesiredBatchPreservesUnknown() {
++	global ConfigurationFile, Features
++	Original := "[unknown.nested]" . Chr(10) . 'token = "retain"' . Chr(10)
++	Original .= "[layout]" . Chr(10) . "ergopti_alt_gr = true" . Chr(10)
++	FileAppend(Original, ConfigurationFile, "UTF-8-RAW")
+ 	try {
+-		CategoryEnabled["Hotstrings"] := true
+-		CategoryEnabled["Rolls"] := true
+-		CategoryEnabled["Autocorrection"] := true
+-
+-		; Positive control FIRST, so the assertions below cannot pass merely
+-		; because the collector emitted nothing at all.
+-		CategoryEnabled["Layout"] := true
+-		OnFeatures := _MGP_Fixture()
+-		ApplyMasterGatesToFeatures(OnFeatures, _MGP_TapHoldStub(), IsCategoryGated)
+-		OnUpdates := _MGP_Collect(OnFeatures)
+-		AssertTrue(_MGP_HasKeyUnder(OnUpdates, "layout", "ergopti_base"),
+-			"an un-gated category must still be serialised")
+-		AssertTrue(_MGP_HasKeyUnder(OnUpdates, "layout", "ergopti_alt_gr"),
+-			"an un-gated category must still be serialised")
+-
+-		CategoryEnabled["Layout"] := false
+-		OffFeatures := _MGP_Fixture()
+-		ApplyMasterGatesToFeatures(OffFeatures, _MGP_TapHoldStub(), IsCategoryGated)
+-		AssertFalse(OffFeatures["layout"]["ergopti_base"],
+-			"sanity: the runtime gate zeroes the live map in place — that is the value the save must NOT persist")
+-
+-		OffUpdates := _MGP_Collect(OffFeatures)
+-		AssertFalse(_MGP_HasKeyUnder(OffUpdates, "layout", "ergopti_base"),
+-			"a master-gated-off category must contribute NO feature write: the zeroes in Features are a RUNTIME gate, and persisting them destroys the per-feature settings the gate promised to preserve on disk")
+-		AssertFalse(_MGP_HasKeyUnder(OffUpdates, "layout", "ergopti_alt_gr"),
+-			"a master-gated-off category must contribute NO feature write for any of its leaves")
+-		; The rest of the tree must keep being saved — refusing everything would
+-		; be a different bug wearing the same green tick.
+-		AssertTrue(_MGP_HasKeyUnder(OffUpdates, "rolls", "enabled"),
+-			"gating one category off must not stop the others from being serialised")
++		Updates := _ConfigCollectFullSaveUpdates()
++		AssertTrue(ConfigCommitUpdates(ConfigurationFile, Updates, "desired fixture"),
++			"the full-save batch must cross the durable transaction gateway")
++		AssertEqual("retain", TOML_Read(ConfigurationFile, "unknown.nested", "token", "missing"),
++			"unknown nested keys survive the mixed sparse batch")
++		AssertEqual(1, TOML_Read(ConfigurationFile, "layout", "ergopti_base", -1),
++			"desired true survives while its runtime master is disabled")
++		AssertEqual(-1, TOML_Read(ConfigurationFile, "layout", "ergopti_alt_gr", -1),
++			"a desired neutral leaf deletes its previous override rather than omitting it")
++		AssertEqual(1, TOML_Read(ConfigurationFile, "hotstrings.rolls.hc", "enabled", -1),
++			"disabled hotstring subcategories retain their desired section choices")
++		AssertFalse(Features["layout"]["ergopti_base"], "saving cannot activate runtime")
+ 	} finally {
+-		_MGP_RestoreGate("Layout", OldLayout)
+-		_MGP_RestoreGate("Hotstrings", OldHotstrings)
+-		_MGP_RestoreGate("Rolls", OldRolls)
+-		_MGP_RestoreGate("Autocorrection", OldAuto)
++		FileDelete(ConfigurationFile)
+ 	}
+ }
+-
+-
+-
+-
+-
+-; ==============================================================
+-; ==============================================================
+-; ======= 3/ Hotstring sub-category gates ======================
+-; ==============================================================
+-; ==============================================================
+-
+-_MGP_GatedSubCategoryContributesNoWrite() {
+-	global CategoryEnabled
+-	ManifestEnsureLoaded()
+-	OldHotstrings := _MGP_SaveGate("Hotstrings")
+-	OldRolls := _MGP_SaveGate("Rolls")
+-	OldAuto := _MGP_SaveGate("Autocorrection")
+-	try {
+-		CategoryEnabled["Hotstrings"] := true
+-		CategoryEnabled["Autocorrection"] := true
+-		CategoryEnabled["Rolls"] := false
+-
+-		Feat := _MGP_Fixture()
+-		ApplyMasterGatesToFeatures(Feat, _MGP_TapHoldStub(), IsCategoryGated)
+-		AssertFalse(Feat["hotstrings"]["rolls"]["hc"]["enabled"],
+-			"sanity: the sub-category gate zeroes only its own branch in place")
+-
+-		Updates := _MGP_Collect(Feat)
+-		AssertFalse(_MGP_HasKeyUnder(Updates, "rolls", "enabled"),
+-			"a gated-off hotstring sub-category must contribute NO feature write — its sections were zeroed by the runtime gate, and persisting that wipes the user's per-section choices under that category")
+-		AssertTrue(_MGP_HasKeyUnder(Updates, "autocorrection", "enabled"),
+-			"an un-gated sibling sub-category must still be serialised")
+-	} finally {
+-		_MGP_RestoreGate("Hotstrings", OldHotstrings)
+-		_MGP_RestoreGate("Rolls", OldRolls)
+-		_MGP_RestoreGate("Autocorrection", OldAuto)
+-	}
+-}
+-
+-
+-
+-
+-
+-; ==============================================================
+-; ==============================================================
+-; ======= 4/ The writer really uses the filter =================
+-; ==============================================================
+-; ==============================================================
+-
+-; The behavioural cases above exercise the composition directly; this pins that
+-; the collector reached by SaveFullConfig performs it, so the filter cannot be
+-; left orphaned during extraction or refactoring.
+-_MGP_SaveFullConfigFiltersBeforeCollecting() {
+-	SaveBody := _DriverFuncBody("SaveFullConfig")
+-	Collector := _DriverFuncBody("_ConfigCollectFullSaveUpdates")
+-	Assert(InStr(SaveBody, "_ConfigCollectFullSaveUpdates()") > 0,
+-		"SaveFullConfig must invoke the authoritative full-save collector")
+-	FlattenPos := InStr(Collector, "_CollectFeatureUpdates")
+-	FilterPos := InStr(Collector, "_PruneMasterGatedFeatures")
+-	Assert(FlattenPos > 0,
+-		"the full-save collector must still flatten the feature tree")
+-	Assert(FilterPos > FlattenPos,
+-		"the full-save collector must feed the walker a gate-filtered snapshot — walking live runtime zeroes destroys persisted per-feature choices")
+-}
+-
+-
+-Test("config_io: a master-gated-off category is not serialised", _MGP_GatedCategoryContributesNoWrite)
+-Test("config_io: a gated-off hotstring sub-category is not serialised", _MGP_GatedSubCategoryContributesNoWrite)
+-Test("config_io: SaveFullConfig filters the feature tree before collecting", _MGP_SaveFullConfigFiltersBeforeCollecting)
++Test("config_io: sparse desired save preserves disabled children and unknown TOML (a1-sparse)",
++	_A1_WithDesiredFixture.Bind(_MGP_DesiredBatchPreservesUnknown))
++
++_MGP_SaveFullConfigCollectsDesired() {
++	Save := _StripFullLineComments(_DriverFuncBody("SaveFullConfig"))
++	Collector := _StripFullLineComments(_DriverFuncBody("_ConfigCollectFullSaveUpdates"))
++	Assert(Save != "" && Collector != "", "both full-save phases must exist")
++	Assert(InStr(Save, "_ConfigCollectFullSaveUpdates()") > 0,
++		"the durable coordinator must invoke the authoritative collector")
++	DesiredPos := InStr(Collector, "MasterGateDesiredFeatures(")
++	FlattenPos := InStr(Collector, "_CollectFeatureUpdates(")
++	Assert(DesiredPos > 0 && FlattenPos > DesiredPos,
++		"the collector must capture retained intent before flattening")
++	Assert(InStr(Collector, "_PruneMasterGatedFeatures(") == 0,
++		"disabled branches remain editable and cannot be omitted from persistence")
++	Assert(InStr(Collector, "_ConfigSparseUpdates(") > FlattenPos,
++		"neutral desired values must become explicit deletes")
++}
++Test("config_io: SaveFullConfig snapshots desired state before collecting", _MGP_SaveFullConfigCollectsDesired)
+diff --git a/static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk b/static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk
+index 436db6c6e..31cc05013 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk
+@@ -77,9 +77,11 @@ _TNS_WidgetProducers(Mode) {
+ 		for Update in Updates {
+ 			if Update.Section == "metrics"
+ 					&& (Update.Key == WPMWidgetConst.CFG_X || Update.Key == WPMWidgetConst.CFG_Y) {
+-				AssertTrue(Update.Value is Integer,
++				Value := Update.HasOwnProp("Delete") && Update.Delete == 1
++					? ManifestDefaultFor(Update.Section . "." . Update.Key) : Update.Value
++				AssertTrue(Value is Integer,
+ 					"the producer must retain numeric intent before any writer coercion")
+-				Coordinates[Update.Key] := Update.Value
++				Coordinates[Update.Key] := Value
+ 			}
+ 		}
+ 		AssertEqual(2, Coordinates.Count)
+diff --git a/static/ergopti_plus/windows/ui/editors.ahk b/static/ergopti_plus/windows/ui/editors.ahk
+index 444ab2a66..52abf3a57 100644
+--- a/static/ergopti_plus/windows/ui/editors.ahk
++++ b/static/ergopti_plus/windows/ui/editors.ahk
+@@ -164,12 +164,24 @@ _EditorDestroyAfterCommit(gui, Context) {
+ }
+ 
+ _EditorBuildMagicKeyPlan(NewValue) {
++	global Features
++	if _FeatureUsesDesiredState(Features) {
++		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.trigger_char", NewValue, "")
++		Plan.publish := _EditorPublishDesiredMagicKey.Bind(Plan.publish, NewValue)
++		return Plan
++	}
+ 	return {
+ 		updates: [{ Section: "hotstrings", Key: "trigger_char", Value: NewValue }],
+ 		publish: _EditorPublishMagicKey.Bind(NewValue),
+ 	}
+ }
+ 
++_EditorPublishDesiredMagicKey(PublishFn, NewValue) {
++	global ScriptInformation
++	PublishFn.Call()
++	ScriptInformation["MagicKey"] := NewValue
++}
++
+ _EditorPublishMagicKey(NewValue) {
+ 	global ScriptInformation, Features
+ 	ScriptInformation["MagicKey"] := NewValue
+@@ -198,7 +210,13 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
+ }
+ 
+ _EditorBuildRepeatKeyPlan() {
+-	global HSE_RepeatEnabled
++	global HSE_RepeatEnabled, Features
++	if _FeatureUsesDesiredState(Features) {
++		Candidate := !ReadFeatureStateV2("hotstrings.repeat_key_enabled")["enabled"]
++		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.repeat_key_enabled", Candidate, "")
++		Plan.publish := _EditorPublishDesiredRepeatKey.Bind(Plan.publish)
++		return Plan
++	}
+ 	Candidate := !HSE_RepeatEnabled
+ 	return {
+ 		updates: [{ Section: "hotstrings", Key: "repeat_key_enabled", Value: Candidate }],
+@@ -206,6 +224,14 @@ _EditorBuildRepeatKeyPlan() {
+ 	}
+ }
+ 
++_EditorPublishDesiredRepeatKey(PublishFn) {
++	global HSE_RepeatEnabled, Features
++	PublishFn.Call()
++	HSE_RepeatEnabled := Features["hotstrings"]["repeat_key_enabled"]
++	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
++		HSE_AdvanceRuntimeDecisionGeneration()
++}
++
+ _EditorPublishRepeatKey(Candidate) {
+ 	global HSE_RepeatEnabled, Features
+ 	HSE_RepeatEnabled := Candidate
+@@ -353,6 +379,9 @@ GPTLinkEditor(*) {
+ }
+ 
+ _EditorBuildLinkPlan(NewValue) {
++	global Features
++	if _FeatureUsesDesiredState(Features)
++		return _FeatureBuildSinglePlan(Features, "shortcuts.gpt", NewValue, "link")
+ 	return {
+ 		updates: [{ Section: "shortcuts.gpt", Key: "link", Value: NewValue }],
+ 		publish: _EditorPublishLink.Bind(NewValue),
+diff --git a/static/ergopti_plus/windows/ui/menu/menu_engine.ahk b/static/ergopti_plus/windows/ui/menu/menu_engine.ahk
+index f73fdcad0..8e1037f4a 100644
+--- a/static/ergopti_plus/windows/ui/menu/menu_engine.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_engine.ahk
+@@ -22,7 +22,7 @@
+ ; ``path`` (canonical v2), ``id``, ``description_key``, etc. The toggle, state
+ ; read and label are all driven by that v2 path through infra/feature_io.ahk.
+ ; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
+-; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
++; ``Shortcuts``, ``Autocorrection``, …) carried by category builders.
+ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
+ 	Row := MenuRowFromManifest(ManifestEntry, V1CategoryPath)
+ 	if (Row == "") {
+@@ -44,7 +44,7 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
+ ;
+ ; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
+ ; ``path`` (canonical v2), ``id``, ``description_key``, etc.
+-; ``V1CategoryPath`` is the PascalCase top-level category used for the greying.
++; ``V1CategoryPath`` identifies the owning PascalCase top-level category.
+ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
+ 	global Features
+ 	V2Path := ManifestEntry["path"]
+@@ -67,26 +67,8 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
+ 		"action",  (*) => ToggleFeatureV2(V2Path),
+ 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
+ 
+-	; Greying — off when the master category gate is off OR the per-file
+-	; sub-category gate is off. The sub-category gate lets a single hotstring
+-	; TOML file be switched off while the rest stay live; greying its sections
+-	; keeps them from being live-toggled back on while the file is off.
+-	; _MasterCategoryFor maps hotstring sub-categories to the Hotstrings master;
+-	; the first path segment is the sub-category itself (a no-op extra check for
+-	; non-hotstring categories, whose first segment IS their master gate).
+-	;
+-	; DynamicHotstrings is excluded from that second check: unlike its five
+-	; siblings (Autocorrection/DistancesReduction/SFBsReduction/Rolls/MagicKey),
+-	; it has no independent per-file CategoryEnabled entry -- it follows the
+-	; Hotstrings master directly (see menu_hotstrings.ahk's _HS_CategoriesDynamic
+-	; comment). IsCategoryGated("DynamicHotstrings") would log a spurious
+-	; "unknown category" warning on every menu build for no behavioral gain --
+-	; the first check above already covers it via _MasterCategoryFor.
+-	SubCategory := StrSplit(V1CategoryPath, ".")[1]
+-	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath))
+-		or (SubCategory != "DynamicHotstrings" and !IsCategoryGated(SubCategory)) {
+-		Row["disabled"] := true
+-	}
++	; The master controls activation; its children remain configurable. Pause
++	; greying remains owned by the shared menu renderer.
+ 	return Row
+ }
+ 
+@@ -99,7 +81,7 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
+ ; ``V2Path`` is the canonical v2 path of the feature (e.g.
+ ; "hotstrings.personal.<id>", "shortcuts.personal.<name>"); toggles and state
+ ; reads go through infra/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
+-; top-level category whose master-gate state controls greying (``Hotstrings``,
++; top-level category carried by the caller (``Hotstrings``,
+ ; ``Shortcuts``).
+ MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
+ 	Row := MenuRowWithLabel(V2Path, MenuTitle, MasterCategory)
+@@ -132,9 +114,6 @@ MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
+ 		"label",   MenuTitle,
+ 		"action",  (*) => ToggleFeatureV2(V2Path),
+ 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
+-	if !IsCategoryGated(MasterCategory) {
+-		Row["disabled"] := true
+-	}
+ 	return Row
+ }
+ 
+@@ -249,10 +228,6 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
+ 		MenuParent.Check(MenuTitle)
+ 	}
+ 
+-	; Grey out the picker when its master category gate is off (UX affordance).
+-	if !IsCategoryGated(MasterCategory) {
+-		try MenuParent.Disable(MenuTitle)
+-	}
+ }
+ 
+ ; Sets the remap target letter on a feature and enables it. Persists both the
+diff --git a/static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk b/static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk
+index 6fdce1066..b0ebd8922 100644
+--- a/static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk
+@@ -44,15 +44,10 @@ _HS_PathsAllEnabled(Paths) {
+ 	return true
+ }
+ 
+-; True when every gate of the scope is open and every one of its paths is on —
+-; what a scope's « all sections » checkbox shows.
++; Section selection remains independent of the scope's runtime master.
+ _HS_ScopeAllOn(Gates, Paths) {
+ 	if (Gates.Length == 0)
+ 		return false
+-	for _, Gate in Gates {
+-		if !IsCategoryGated(Gate)
+-			return false
+-	}
+ 	return _HS_PathsAllEnabled(Paths)
+ }
+ 
+diff --git a/static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk b/static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk
+index 25d15c612..32832b1e8 100644
+--- a/static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk
+@@ -469,7 +469,7 @@ _HS_CategoryRowsStandard() {
+ 		; if some or all sections inside are off.
+ 		Rows.Push(Map(
+ 			"label",   Title,
+-			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
++			"checked", IsCategoryGated(Category) ? true : false,
+ 			"submenu", SubMenus[Category]))
+ 	}
+ 	return Rows
+@@ -496,7 +496,7 @@ _HS_CategoryRowsDynamic() {
+ 	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
+ 	DynAllEnabled := true
+ 	DynCount := 0
+-	for _, DCfg2 in Features["hotstrings"]["dynamic"] {
++	for _, DCfg2 in MasterGateDesiredFeatures(Features)["hotstrings"]["dynamic"] {
+ 		DynCount++
+ 		if (IsObject(DCfg2) and DCfg2.Has("enabled") and !DCfg2["enabled"])
+ 			DynAllEnabled := false
+@@ -511,7 +511,7 @@ _HS_CategoryRowsDynamic() {
+ 	; until a configuration satisfied the condition guarding it.
+ 	Rows.Push(Map(
+ 		"label",   DynTitle,
+-		"checked", (IsGated and DynAllEnabled and DynCount > 0) ? true : false,
++		"checked", (DynAllEnabled and DynCount > 0) ? true : false,
+ 		"submenu", DynMenu))
+ 	return Rows
+ }
+@@ -531,7 +531,7 @@ _HS_CategoryRowsErgopti() {
+ 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
+ 		Rows.Push(Map(
+ 			"label",   Title,
+-			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
++			"checked", IsCategoryGated(Category) ? true : false,
+ 			"submenu", SubMenus[Category]))
+ 	}
+ 	return Rows
+@@ -801,13 +801,13 @@ _HS_PersonalRows() {
+ 				and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
+ 			if PEnabled
+ 				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
+-			else
++			if !ReadFeatureStateV2("hotstrings.personal." . PV2Id).Get("enabled", false)
+ 				PersonalAllEnabled := false
+ 		}
+ 		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
+ 		Rows.Push(Map(
+ 			"label",   PersonalTitle,
+-			"checked", (IsGated and PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
++			"checked", (PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
+ 			"submenu", PersonalMenu))
+ 	}
+ 
+diff --git a/static/ergopti_plus/windows/ui/menu/menu_init.ahk b/static/ergopti_plus/windows/ui/menu/menu_init.ahk
+index 604054fd5..5110c98d7 100644
+--- a/static/ergopti_plus/windows/ui/menu/menu_init.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_init.ahk
+@@ -207,7 +207,7 @@ _MI_StageHotstrings() {
+ 		"repeat_key", ToggleRepeatKeyEnabled,
+ 	)
+ 	_HotParamGetters := Map(
+-		"hotstrings_repeat_enabled", () => HSE_RepeatEnabled,
++		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
+ 	)
+ 
+ 	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`
+diff --git a/static/ergopti_plus/windows/ui/menu/menu_submenus.ahk b/static/ergopti_plus/windows/ui/menu/menu_submenus.ahk
+index 5fe47fa26..fbcbd07b3 100644
+--- a/static/ergopti_plus/windows/ui/menu/menu_submenus.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_submenus.ahk
+@@ -144,11 +144,9 @@ _HS_RegisterLanguageMenuCategories() {
+ ; is exactly the state ToggleAllHotstrings(true) establishes.
+ _HS_AllHotstringsOn() {
+ 	global Features
+-	if !IsCategoryGated("Hotstrings")
+-		return false
+ 	; A detached copy: the collector seeds runtime-discovered personal nodes into
+ 	; the map it is given, and a menu read must not publish them.
+-	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(Features)))
++	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(MasterGateDesiredFeatures(Features))))
+ }
+ 
+ ; List provider: one row per language pack, labelled with the language's native
+@@ -172,7 +170,7 @@ _HS_LanguageRows() {
+ 			LanguageTotal += Total
+ 			Items.Push(Map(
+ 				"label",   GetCategoryTitle(V1Cat) . " (" . FmtCount(Total) . ")",
+-				"checked", (IsGated and IsCategoryGated(V1Cat)) ? true : false,
++				"checked", IsCategoryGated(V1Cat) ? true : false,
+ 				"submenu", SubMenus[V1Cat]))
+ 		}
+ 		; The flag is an icon here, as in the language selector: Win32 menus
+diff --git a/static/ergopti_plus/windows/ui/menu/menu_taphold.ahk b/static/ergopti_plus/windows/ui/menu/menu_taphold.ahk
+index 08d5a9391..0ce2f5369 100644
+--- a/static/ergopti_plus/windows/ui/menu/menu_taphold.ahk
++++ b/static/ergopti_plus/windows/ui/menu/menu_taphold.ahk
+@@ -64,7 +64,7 @@ _TH_KeyRows() {
+ 		TapLbl   := TapHoldCurrentTapLabel(KeyId)
+ 		HoldLbl  := TapHoldCurrentHoldLabel(KeyId)
+ 
+-		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(TapHold, KeyId)
++		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(MasterGateDesiredTapHold(TapHold), KeyId)
+ 
+ 		NoneLabel  := t("tap_hold.tap.none")
+ 		NoneHold   := t("tap_hold.hold.none")
+-- 
+2.50.0.windows.1
+

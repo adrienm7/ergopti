@@ -1,0 +1,218 @@
+From f35930ec2fedd889c4ffc4fff7dfbd1101626783 Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 12:58:20 +0200
+Subject: [PATCH] feat(layouts): discover committed extension packs on macOS
+
+Reuse the shared pack scanner and existing registry roots with user
+overlay precedence. Refuse partial filesystem discovery and unsuccessful
+registration instead of hiding installed content.
+---
+ .../macos/infra/extension_packs.lua           | 103 ++++++++++++++++++
+ .../tests/unit/lib/test_extension_packs.lua   |  85 +++++++++++++++
+ 2 files changed, 188 insertions(+)
+ create mode 100644 static/ergopti_plus/macos/infra/extension_packs.lua
+ create mode 100644 static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua
+
+diff --git a/static/ergopti_plus/macos/infra/extension_packs.lua b/static/ergopti_plus/macos/infra/extension_packs.lua
+new file mode 100644
+index 000000000..dcba54346
+--- /dev/null
++++ b/static/ergopti_plus/macos/infra/extension_packs.lua
+@@ -0,0 +1,103 @@
++--- infra/extension_packs.lua
++
++--- ==============================================================================
++--- MODULE: Existing Extension Pack Discovery
++--- DESCRIPTION:
++--- Supplies the shared extension scanner with macOS filesystem collaborators.
++--- Bundled, committed layout and user roots share the same format and precedence.
++--- Registration goes through the existing keymap TOML loader and never enables a
++--- group or writes preferences. Menus and editors consume the same discovered files.
++--- ==============================================================================
++
++local M = {}
++local Extensions = require("hotstrings.extensions")
++
++--- Lists directories or regular files through the existing safe directory reader.
++--- @param path string Directory to inspect.
++--- @param kind string Expected attribute mode.
++--- @return table Absolute paths.
++local function children(path, kind)
++	local FsDir = require("infra.fs_dir")
++	local FileSystem = require("adapters.file_system")
++	if hs.fs.attributes(path) == nil then
++		local _, status = FileSystem.classify_no_follow(path)
++		if status == "absent" then return {} end
++		error("Extension directory inspection did not commit", 0)
++	end
++	local names, listed = FsDir.try_entries(path)
++	if listed ~= true then error("Extension directory enumeration did not commit", 0) end
++	local out = {}
++	for _, name in ipairs(names) do
++		if name ~= "." and name ~= ".." then
++			local full = path:gsub("/+$", "") .. "/" .. name
++			local attr = hs.fs.attributes(full)
++			if attr == nil then
++				local _, status = FileSystem.classify_no_follow(full)
++				if status ~= "absent" then error("Extension child inspection did not commit", 0) end
++			end
++			if type(attr) == "table" and attr.mode == kind then out[#out + 1] = full end
++		end
++	end
++	table.sort(out)
++	return out
++end
++
++--- Roots in overlay order, retaining the user's copy as the final authority.
++--- @return table Absolute extension roots.
++function M.roots()
++	local Paths = require("infra.paths")
++	local ConfigPaths = require("infra.config_paths")
++	local shared = Paths.shared_root()
++	if not shared then error("The shared extension directory cannot be resolved.", 0) end
++	local roots = { shared .. "/../extensions" }
++	for _, root in ipairs(require("modules.keymap.layout_registry").extension_roots()) do
++		roots[#roots + 1] = root
++	end
++	roots[#roots + 1] = ConfigPaths.get_config_dir() .. "extensions"
++	return roots
++end
++
++--- Keeps proven optional absence distinct from unreadable or unstable manifests.
++--- @param path string Manifest path.
++--- @return string|nil
++local function read_manifest(path)
++	local content, status = require("adapters.file_system").read_with_status(path)
++	if status == "absent" then return nil end
++	if status ~= "ok" or type(content) ~= "string" then
++		error("Extension manifest read did not commit", 0)
++	end
++	return content
++end
++
++--- Discovers packs in canonical precedence order; callers may inject private I/O.
++--- @param roots table|nil Optional extension roots.
++--- @param io_fns table|nil Optional scanner collaborators.
++--- @return table Shared extension records.
++function M.scan(roots, io_fns)
++	if roots == nil then roots = M.roots() end
++	return Extensions.scan(roots, io_fns or {
++		list_dirs = function(path) return children(path, "directory") end,
++		list_files = function(path) return children(path, "file") end,
++		read_file = read_manifest,
++	})
++end
++
++--- Registers discovered files with the existing loader, without activating them.
++--- @param packs table Shared extension records.
++--- @param keymap table Existing keymap owner.
++--- @return table Registered { name, path, extension } entries.
++function M.load(packs, keymap)
++	local loaded = {}
++	for _, extension in ipairs(packs) do
++		for _, file in ipairs(extension.toml_files) do
++			local category = Extensions.category_key(extension.id, file.stem)
++			if keymap.load_toml(category, file.path) ~= true then
++				error("Extension hotstring registration did not commit: " .. category, 0)
++			end
++			loaded[#loaded + 1] = { name = category, path = file.path, extension = extension.id }
++		end
++	end
++	return loaded
++end
++
++return M
+diff --git a/static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua b/static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua
+new file mode 100644
+index 000000000..01e6febd6
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua
+@@ -0,0 +1,85 @@
++--- tests/unit/lib/test_extension_packs.lua
++
++--- ==============================================================================
++--- MODULE: Existing Extension Pack Loading Tests
++--- DESCRIPTION:
++--- Confirms that layout extension discovery uses the existing pack format and
++--- routes every file through the normal loader without implicit activation.
++--- ==============================================================================
++
++local helpers = require("tests.helpers")
++local Packs = require("infra.extension_packs")
++
++helpers.describe("Layout extension pack loading", function()
++	helpers.it("orders bundled, committed layout and user roots through their existing owners", function()
++		helpers.with_stub_scope({ "infra.paths", "infra.config_paths", "modules.keymap.layout_registry" }, function()
++			package.loaded["infra.paths"] = { shared_root = function() return "/app/_shared" end }
++			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/user/" end }
++			package.loaded["modules.keymap.layout_registry"] = {
++				extension_roots = function() return { "/installed/generation" } end,
++			}
++			helpers.assert_eq(Packs.roots(), { "/app/_shared/../extensions", "/installed/generation", "/user/extensions" })
++		end)
++	end)
++
++	helpers.it("rejects unproven child absence instead of publishing a partial catalogue", function()
++		local saved_attributes = hs.fs.attributes
++		local saved_files = package.loaded["adapters.file_system"]
++		local saved_dirs = package.loaded["infra.fs_dir"]
++		hs.fs.attributes = function(path)
++			if path == "/packs" then return { mode = "directory" } end
++			return nil
++		end
++		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
++		package.loaded["infra.fs_dir"] = { try_entries = function() return { "sample" }, true end }
++		local ok = pcall(Packs.scan, { "/packs" })
++		hs.fs.attributes = saved_attributes
++		package.loaded["adapters.file_system"] = saved_files
++		package.loaded["infra.fs_dir"] = saved_dirs
++		helpers.assert_true(not ok, "a failed child stat cannot mean an empty extension catalogue")
++	end)
++
++	helpers.it("does not treat dot directory entries as extension packs", function()
++		local saved_attributes = hs.fs.attributes
++		local saved_files = package.loaded["adapters.file_system"]
++		local saved_dirs = package.loaded["infra.fs_dir"]
++		hs.fs.attributes = function(path)
++			return { mode = path:match("%.toml$") and "file" or "directory" }
++		end
++		package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
++		package.loaded["infra.fs_dir"] = { try_entries = function(path)
++			return path == "/packs" and { ".", "..", "sample" } or {}, true
++		end }
++		local ok, found = pcall(Packs.scan, { "/packs" })
++		hs.fs.attributes = saved_attributes
++		package.loaded["adapters.file_system"] = saved_files
++		package.loaded["infra.fs_dir"] = saved_dirs
++		helpers.assert_true(ok, tostring(found))
++		helpers.assert_eq(#found, 1)
++		helpers.assert_eq(found[1].id, "sample")
++	end)
++
++	helpers.it("preserves user overlay precedence and registers without enable writes", function()
++		local found = Packs.scan({ "/bundled", "/installed", "/user" }, {
++			list_dirs = function(root) return { root .. "/ergopti" } end,
++			list_files = function(root) return { root .. "/rolls.toml" } end,
++			read_file = function() return '[extension]\nname = "Ergopti"\n' end,
++		})
++		helpers.assert_eq(#found, 1)
++		local calls = {}
++		local loaded = Packs.load(found, {
++			load_toml = function(name, path) calls[#calls + 1] = { name, path } return true end,
++			set_group_enabled = function() error("installation cannot enable groups") end,
++		})
++		helpers.assert_eq(#loaded, 1)
++		helpers.assert_eq(calls[1][1], "ext:ergopti:rolls")
++		helpers.assert_eq(calls[1][2], "/user/ergopti/hotstrings/rolls.toml")
++	end)
++
++	helpers.it("rejects an unsuccessful existing-loader registration", function()
++		local ok = pcall(Packs.load, { { id = "sample", toml_files = { { stem = "rolls", path = "/private/rolls.toml" } } } }, {
++			load_toml = function() return false end,
++		})
++		helpers.assert_true(not ok, "an installed pack must not silently disappear from the live catalogue")
++	end)
++end)
+-- 
+2.50.0.windows.1
+

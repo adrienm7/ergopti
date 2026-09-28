@@ -1,0 +1,57 @@
+--- Returns the exact categories/sections consumed by the loaded catalogue.
+--- @return table identities
+local function choice_inventory()
+	local result = {}
+	for category, metadata in pairs(_categories) do
+		result[category] = {}
+		for section in pairs(metadata.sections or {}) do result[category][section] = true end
+	end
+	for _, mapping in ipairs(_mappings) do
+		local group = mapping.group
+		if type(group) == "string" and group ~= "" then
+			result[group] = result[group] or {}
+			if mapping.section then result[group][mapping.section] = true end
+		end
+	end
+	return result
+end
+
+--- Validates every owned leaf while leaving unknown neighbouring values untouched.
+--- @param document table Canonical configuration.
+--- @param mark function|nil Exact cleanup visitor.
+local function validate_choices(document, mark)
+	for category, sections in pairs(choice_inventory()) do
+		Preferences.resolve(document, category, nil, mark)
+		for section in pairs(sections) do Preferences.resolve(document, category, section, mark) end
+	end
+end
+
+--- Filters a detached catalogue using desired category and section choices.
+--- @param mappings table Source mappings.
+--- @param document table Canonical choices.
+--- @return table effective
+local function filter_choices(mappings, document)
+	local filtered = {}
+	for _, mapping in ipairs(mappings) do
+		local group = Preferences.resolve(document, mapping.group)
+		local section = not mapping.section or Preferences.resolve(document, mapping.group, mapping.section)
+		if group and section then filtered[#filtered + 1] = mapping end
+	end
+	return filtered
+end
+
+--- Installs acknowledged effective rules before publishing their desired cache.
+--- @param document table Canonical desired choices.
+--- @param mappings table Exact effective engine image.
+--- @return boolean acknowledged
+local function publish_choices(document, mappings)
+	if _engine:load_mappings(mappings) ~= true then return false end
+	_choice_document, _filtered_mappings = document, mappings
+	return true
+end
+
+--- Rejects competing mutations while publication or compensation remains owned.
+--- @return boolean
+local function choices_pending()
+	return _preferences ~= nil and _preferences.pending()
+end

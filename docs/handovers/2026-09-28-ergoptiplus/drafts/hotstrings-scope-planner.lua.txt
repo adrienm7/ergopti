@@ -1,0 +1,77 @@
+--- Resolves a hotstring scope through existing preferences and registered readers.
+--- No speculative section or filename becomes a configuration owner.
+local M = {}
+local Manifest = require("infra.manifest_reader")
+local Preferences = require("infra.preferences")
+local Languages = require("hotstrings.languages")
+local Extensions = require("hotstrings.extensions")
+local KeyPath = require("toml_codec.key_path")
+
+--- Builds one canonical plan from the actual native inventory.
+--- @param mode string Recommended restoration or clear.
+--- @param keymap table Existing group and section registry.
+--- @return table plan Config operations, secondary delay owners and omissions.
+function M.plan(mode, keymap)
+	assert(mode == "clear" or mode == "recommended", "invalid hotstring scope mode")
+	local plan = { scope = "hotstrings", mode = mode, operations = {}, presets = {}, delays = {}, omitted = {} }
+	local added, delay_added = {}, {}
+	local function add(path, value, table_path)
+		assert(not added[path], "hotstring scope has duplicate readers: " .. path)
+		added[path] = true
+		local row = Manifest.sparse_operation(path, value)
+		-- Dynamic group identities can contain colons; encode each semantic segment.
+		row.section = KeyPath.render(table_path or assert(KeyPath.parse(row.section, true)))
+		plan.operations[#plan.operations + 1] = row
+	end
+	local function delay(category, section)
+		local id = category .. "\0" .. tostring(section or "")
+		if delay_added[id] then return end
+		delay_added[id] = true
+		plan.delays[#plan.delays + 1] = { category = category, section = section }
+	end
+	for _, row in ipairs(Manifest.scope_operations("hotstrings", mode)) do
+		local path = row.section .. "." .. row.key
+		if Preferences.flat_key_for(path) and not path:match("^hotstrings%.dynamic%.") then
+			add(path, row.delete and Manifest.default_for(path) or row.value)
+		elseif path == "hotstrings.dynamic.text_expansion_personal_information.enabled" then
+			local feature = mode == "clear" and Manifest.default_for("hotstrings.dynamic.text_expansion_personal_information")
+				or Manifest.recommended_for("hotstrings.dynamic.text_expansion_personal_information")
+			-- The scalar placeholder has its own reader, not a registry section.
+			plan.operations[#plan.operations + 1] = feature.enabled == false
+				and { section = "hotstrings.modules", key = "personal_info", delete = true }
+				or { section = "hotstrings.modules", key = "personal_info", value = feature.enabled }
+		elseif row.key == "time_activation_seconds" then
+			assert(row.delete == true, "non-neutral hotstring timing recommendation requires an explicit source owner")
+		else
+			plan.omitted[#plan.omitted + 1] = path
+		end
+	end
+	local groups = assert(keymap.list_groups(), "hotstring group inventory unavailable")
+	for group in pairs(groups) do
+		local group_path = "hotstrings.groups." .. group
+		add(group_path, mode == "clear" and Manifest.default_for(group_path) or Manifest.recommended_for(group_path), { "hotstrings", "groups" })
+		local extension_id = Extensions.parse_category_key(group)
+		local category = extension_id and ("ext." .. extension_id) or group
+		local source = assert(keymap.get_group_source(group), "registered group source unavailable")
+		local sections = keymap.get_sections(group)
+		assert(type(sections) == "table", "registered hotstring sections unavailable")
+		for _, section in ipairs(sections) do
+			if section.name ~= "-" and not section.is_module_placeholder then
+				local path = "hotstrings.modules." .. group .. "." .. section.name
+				local feature = section.feature_path and Manifest.find_entry_by_path(section.feature_path)
+					or Languages.section_entry(Manifest.features(), group, section.name)
+				local value
+				if feature then value = (mode == "clear" and feature.default or feature.recommended).enabled
+				else value = mode == "clear" and Manifest.default_for(path) or Manifest.recommended_for(path) end
+				assert(type(value) == "boolean", "hotstring section has no boolean recommendation")
+				add(path, value, { "hotstrings", "modules", group })
+				if source.kind == "toml" then delay(category, section.name) end
+			end
+		end
+		if source.kind == "toml" then delay(category, nil) end
+	end
+	table.sort(plan.operations, function(a, b) return a.section .. "." .. a.key < b.section .. "." .. b.key end)
+	return plan
+end
+
+return M

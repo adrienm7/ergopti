@@ -1,0 +1,237 @@
+[
+  {
+    "path": "PRODUCT_SPECIFICATION.txt",
+    "bytes": 158690,
+    "sha256": "a7f1c131b87719c9eb45893527e23035d7f116ff484a5db7aedd01cca3b1c39a"
+  },
+  {
+    "path": "ORIGINAL_MISSION.txt",
+    "bytes": 54597,
+    "sha256": "660b12766570a204e66b4a7e314defa1bbe1ca351d004a8a66d688f92c4f0226"
+  },
+  {
+    "path": "pending/hotstrings-repeat.patch",
+    "bytes": 14153,
+    "sha256": "88079e894f04717a6de5e4f211504c5c1d240663e064e2a9618b8194a2a1c8d7"
+  },
+  {
+    "path": "pending/hotstrings-repeat.hashes.json",
+    "bytes": 755,
+    "sha256": "d52a6b53e3017d14e21cd0ad884ba76f6d787f524296513fbd666b4e948c30d5"
+  },
+  {
+    "path": "pending/hotstrings-engine.patch",
+    "bytes": 8229,
+    "sha256": "bc220b557dde2cd3cff019a5e06e48d1b03f27a5ee5daf863c2554792fa26fb2"
+  },
+  {
+    "path": "pending/hotstrings-engine.hashes.json",
+    "bytes": 508,
+    "sha256": "7e94761733e28bf25281d3a13723fb4abc45e4cdda6a9e34ce5962a85f60cb6d"
+  },
+  {
+    "path": "pending/hotstrings-catalogue.patch",
+    "bytes": 16804,
+    "sha256": "591501da64ff4693f841d1f65455fbb8e76fbe3dd06875ec45f41840fe0bc2d6"
+  },
+  {
+    "path": "pending/hotstrings-catalogue.hashes.json",
+    "bytes": 1873,
+    "sha256": "b7e82889d91328ef9bb7198d3dfcd35cddcd6c07ac370020406fb0e7036639a6"
+  },
+  {
+    "path": "pending/mac-remap-sparse.patch",
+    "bytes": 7125,
+    "sha256": "6f2cf419ec01ac93c9c7721baa2d8580cd6c5f6e6501059146a6bdd4db10a8b6"
+  },
+  {
+    "path": "pending/mac-remap-sparse.hashes.json",
+    "bytes": 508,
+    "sha256": "855dfbfd6e1ed87fb15905b2a9e2dbecd69fa81ff03c8c069ede46644200385f"
+  },
+  {
+    "path": "mac-hotstrings-final-handoff.md",
+    "bytes": 8084,
+    "sha256": "440e92a720bda2c30d3f5aad2b6a4dbbbaadcd96b702027cd173b0459e8d9c01"
+  },
+  {
+    "path": "linux-hotstrings-final-handoff.md",
+    "bytes": 10334,
+    "sha256": "9f4e4d9a194631434a71077e7c658abbd4329206569fcb5b8929f51fea69342c"
+  },
+  {
+    "path": "hotstrings-reader-mapping-HANDOFF.md",
+    "bytes": 7219,
+    "sha256": "f06e5c9f5f311b66d869cf20e7d207d801b8863d2646dbce8f1b823e3d304325"
+  },
+  {
+    "path": "linux-hotstrings-owner-inventory.md",
+    "bytes": 6906,
+    "sha256": "ded27f9c32609cf3c7ed1638640113346eb7dac0d2610422d7326841b5dc1e22"
+  },
+  {
+    "path": "hotstrings-engine-HANDOFF.md",
+    "bytes": 2989,
+    "sha256": "35c7ff1cea2140d7283d0015656700fdc1b55bf8c8433a37b64db059958ae12a"
+  },
+  {
+    "path": "hotstrings-catalogue-HANDOFF.md",
+    "bytes": 3876,
+    "sha256": "aa9aef8c4dc19245a60be01bcbd0252296140c2fbc391a61eddb18a7ce9859f0"
+  },
+  {
+    "path": "drafts/mac-hotstrings-terminal-plan.md",
+    "bytes": 2281,
+    "sha256": "ef89d3f69068441d8f2955d94df0630d3ff034ac701637cbb6801bbfd3c5e432"
+  },
+  {
+    "path": "drafts/hotstrings-scope-delay-participant.lua.txt",
+    "bytes": 4112,
+    "sha256": "d2303af57cb5a6b988bee7b91843174cb02222343c16a9821aef27c52625b86d"
+  },
+  {
+    "path": "drafts/hotstrings-scope-planner.lua.txt",
+    "bytes": 4341,
+    "sha256": "2363c3a91de456b8cd5aacddd61a9f22877ae068629deae1e025252c8cafa16e"
+  },
+  {
+    "path": "drafts/hotstrings-native-snapshot.lua.txt",
+    "bytes": 1648,
+    "sha256": "ca5ec61c842d31797574c43775fafde6b8a16a004a9cd6f1ca77f4bf385eecc3"
+  },
+  {
+    "path": "drafts/hotstrings-exact-reader-map.tsv",
+    "bytes": 21215,
+    "sha256": "cca857c59eae9d3246773f2dc579726cfc0ecf5fe4c5d1ed29b1172abb3ec86f"
+  },
+  {
+    "path": "drafts/hotstrings-exact-reader-map.lua.txt",
+    "bytes": 3409,
+    "sha256": "c3327f0b6080cd490149b10f499ff147e8b548bac30d96a07f2ba06f00a3bd4a"
+  },
+  {
+    "path": "drafts/hotstring_preferences.lua.txt",
+    "bytes": 5332,
+    "sha256": "a58493fc1c15516c3454ee10160d6e78d33939ada03d2cbd2a026f52759224b2"
+  },
+  {
+    "path": "drafts/hotstrings-groups-helpers.lua.txt",
+    "bytes": 2202,
+    "sha256": "0d4ba368fa95d87e5f0d7961d3c4fc924ea0cb4e828d98087d3903e2ed622ca2"
+  },
+  {
+    "path": "drafts/hotstrings-groups-api.lua.txt",
+    "bytes": 5341,
+    "sha256": "4ded64136d4ea1a8a9a3eb03c83373ee1e2a3bdf60b82eec61825506c195d6e0"
+  },
+  {
+    "path": "original-commits/335e06aa1f2b868e225da798269b03edcdf7dcae.patch",
+    "bytes": 134592,
+    "sha256": "766356368708018df8b8cc7792442ca2349e5bbdf2998c569b0300c2c04f89c3"
+  },
+  {
+    "path": "original-commits/5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130.patch",
+    "bytes": 6775,
+    "sha256": "79433257d9ab46c770b40590686653a475220d63b80f3757a67b7f969efe8571"
+  },
+  {
+    "path": "original-commits/703d10c88ae4f98be283357afc2116be636efb29.patch",
+    "bytes": 3538,
+    "sha256": "bf6175522871ea5f574a519ac5866276df665924eef08075744aba2c80cc68b7"
+  },
+  {
+    "path": "original-commits/7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27.patch",
+    "bytes": 11839,
+    "sha256": "fd7c9c298a0c5e1e5c1a11ae8b0d0fa7f3117eecc39bae0684d611c5f2c24764"
+  },
+  {
+    "path": "original-commits/8ad07a053c904c69869172f343ebe8fd4877dcf5.patch",
+    "bytes": 712590,
+    "sha256": "cff3e2ab4f126b5980f436b42d8219aa69047dd1b9e974d00b4e1a2f78968463"
+  },
+  {
+    "path": "original-commits/a96a9e84e18fb3d81637435365686bd9878b3568.patch",
+    "bytes": 32061,
+    "sha256": "72a0ce955968a5957682187efc6730ad437b9f09081bcb7a92483172f33e012c"
+  },
+  {
+    "path": "original-commits/c4f59734352ab442daad6309f5ec57854f4511a3.patch",
+    "bytes": 4025,
+    "sha256": "51841bfd619ab27363ac5ecd3b81ec1828946730e4ec6cc79d5fa9e21d181216"
+  },
+  {
+    "path": "original-commits/e58cadf956fac2bf18adf652cd3031f4198278b6.patch",
+    "bytes": 7454,
+    "sha256": "9d4e0c05344824cae03bd52ed898961b54dd0a81bff319b5138752b1529ea662"
+  },
+  {
+    "path": "original-commits/ecacf79938b74817e48ddf9915902b32de8ca1fe.patch",
+    "bytes": 192440,
+    "sha256": "8cfff657ec7eca1aaeae7254230ca15b28016e073e18b5dc787537ce258f757e"
+  },
+  {
+    "path": "original-commits/f35930ec2fedd889c4ffc4fff7dfbd1101626783.patch",
+    "bytes": 9823,
+    "sha256": "6419fa5a056ef6811e489ad914291e6b564c260ae10162a30525ef6140841523"
+  },
+  {
+    "path": "original-commits/f77494627af86efc87bf8df5191a20a1dfb43b85.patch",
+    "bytes": 45871,
+    "sha256": "3d35c85e502e1dca5bb533cbd48b88fd842f24953a7ce3b15df405c24c9d924f"
+  },
+  {
+    "path": "original-commits/manifest.json",
+    "bytes": 29626,
+    "sha256": "1d2bc2d888e7f78ffb11c11913ca3094d99d44a2a260e7a8d8ea32c8f81a5530"
+  },
+  {
+    "path": "branch-final-audit.json",
+    "bytes": 73064,
+    "sha256": "9c2457ffecc633832764703c6c983eeaf33b12acec758205101022e64c183569"
+  },
+  {
+    "path": "branch-final-audit.md",
+    "bytes": 7970,
+    "sha256": "8674efeaced82a7007990c35c1a533bbf686a7876624a38a87675003c4a41c57"
+  },
+  {
+    "path": "retired-worktrees/actions-D4-history.bundle",
+    "bytes": 483526,
+    "sha256": "917cd6218564fb48e398384e32844707b9d0bbd384eb3b7945250c07121a6a79"
+  },
+  {
+    "path": "retired-worktrees/actions-D4-staged.patch",
+    "bytes": 30572,
+    "sha256": "2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937"
+  },
+  {
+    "path": "retired-worktrees/diag-integration-unstaged.patch",
+    "bytes": 3457,
+    "sha256": "03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f"
+  },
+  {
+    "path": "retired-worktrees/windows-master-state-test_neutral_config_manifest.ahk.txt",
+    "bytes": 4552,
+    "sha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba"
+  },
+  {
+    "path": "retired-worktrees/windows-master-state-unstaged.patch",
+    "bytes": 511775,
+    "sha256": "693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6"
+  },
+  {
+    "path": "retired-worktree-final-audit.md",
+    "bytes": 4534,
+    "sha256": "ad4033acd21d3edacfb3b4a2ef992b9ce5446a92adb3bd4bc72dc6c9968d175c"
+  },
+  {
+    "path": "retired-worktree-final-audit.json",
+    "bytes": 51576,
+    "sha256": "814c681d203cc51931c17daf4f7ef87c1d33b1de7c8c2f9c2b782492326fc9e2"
+  },
+  {
+    "path": "retired-worktrees/dev-before.patch",
+    "bytes": 54449,
+    "sha256": "59f85e702e16afadc987341e797cc0f0ee0c0683a87fb7ef935ea94583cbfcff"
+  }
+]

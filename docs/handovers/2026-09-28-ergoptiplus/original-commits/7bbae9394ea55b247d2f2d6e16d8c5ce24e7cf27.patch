@@ -1,0 +1,243 @@
+From 7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27 Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 12:15:10 +0200
+Subject: [PATCH] feat(config): retain rollback debt for scoped transactions
+
+Back up the exact source before applying a scoped runtime candidate, then
+publish only against that source. Retain compensation debt when native
+rollback is refused so a later retry cannot silently lose ownership.
+
+Expose explicit runtime and file ports for subsequent menu integration.
+---
+ .../_shared/lua/config_scope_transaction.lua  |  73 +++++++++
+ .../infra/test_config_scope_transaction.lua   | 138 ++++++++++++++++++
+ 2 files changed, 211 insertions(+)
+ create mode 100644 static/ergopti_plus/_shared/lua/config_scope_transaction.lua
+ create mode 100644 static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua
+
+diff --git a/static/ergopti_plus/_shared/lua/config_scope_transaction.lua b/static/ergopti_plus/_shared/lua/config_scope_transaction.lua
+new file mode 100644
+index 000000000..08d1f92f1
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/config_scope_transaction.lua
+@@ -0,0 +1,73 @@
++--- _shared/lua/config_scope_transaction.lua
++
++--- Owns a scoped preference publication and exact runtime compensation.
++local M = {}
++local Writer = require("toml_codec.writer")
++local Codec = require("toml_codec")
++
++--- Creates a session owner with explicit platform and runtime boundaries.
++--- Runtime apply/restore must return literal true after terminal completion.
++--- @param options table Path, unique backup path, manifest, files and runtime ports.
++--- @return table owner Transaction owner retaining failed compensation debt.
++function M.new(options)
++	assert(type(options) == "table" and type(options.path) == "string"
++		and type(options.backup_path) == "string" and options.path ~= options.backup_path,
++		"scope transactions require distinct configuration and backup paths")
++	assert(type(options.manifest) == "table" and type(options.manifest.scope_operations) == "function"
++		and type(options.capture) == "function" and type(options.apply) == "function"
++		and type(options.restore) == "function", "scope transaction ports are incomplete")
++	assert(type(options.files) == "table" and type(options.files.read_with_status) == "function"
++		and type(options.files.write) == "function" and type(options.files.write_if_unchanged) == "function",
++		"scope transactions require serialized conditional publication")
++	local owner, debt, busy = {}, nil, false
++	local function compensate()
++		if debt == nil then return true end
++		local ok, restored = pcall(options.restore, debt)
++		if not ok or restored ~= true then return false end
++		debt = nil
++		return true
++	end
++	function owner.pending() return debt ~= nil or busy end
++	function owner.retry_restore()
++		if busy then return false end
++		return compensate()
++	end
++	function owner.apply(scope, mode)
++		if busy or debt ~= nil then return false, "a configuration transaction is still pending" end
++		busy = true
++		local called, committed, detail, content = pcall(function()
++			local owned_paths = type(options.owned_paths) == "function" and options.owned_paths() or {}
++			assert(type(owned_paths) == "table", "dynamic configuration ownership is unavailable")
++			local updates = options.manifest.scope_operations(scope, mode, owned_paths)
++			local prepared, why, candidate, source = Writer.prepare_batch(options.path, updates, options.files)
++			if not prepared then return false, why end
++			local decoded = Codec.decode(candidate)
++			local snapshot = options.capture()
++			if type(snapshot) ~= "table" then return false, "runtime snapshot was not acknowledged" end
++			if source.status == "ok" then
++				local backed, backup_error = Writer.publish_if_unchanged(options.backup_path,
++					source.content, options.files, { status = "absent" })
++				if backed ~= true then return false, "backup refused: " .. tostring(backup_error) end
++				local observed, status = Writer.read_classified(options.backup_path, options.files)
++				if status ~= "ok" or observed ~= source.content then return false, "backup verification failed" end
++			end
++			-- Capture before invocation because a native callback can mutate and throw.
++			debt = snapshot
++			if options.apply(decoded, updates) ~= true then return false, "runtime application refused" end
++			local published, publish_error = Writer.publish_if_unchanged(options.path,
++				candidate, options.files, source)
++			if published ~= true then return false, publish_error end
++			debt = nil
++			return true, nil, candidate
++		end)
++		busy = false
++		if not called or committed ~= true then
++			local restored = compensate()
++			return false, restored and tostring(called and detail or committed) or "runtime rollback remains pending"
++		end
++		return true, nil, content
++	end
++	return owner
++end
++
++return M
+diff --git a/static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua b/static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua
+new file mode 100644
+index 000000000..b211d77b9
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua
+@@ -0,0 +1,138 @@
++--- tests/unit/infra/test_config_scope_transaction.lua
++
++local helpers = require("tests.helpers")
++local Codec = require("toml_codec")
++local Manifest = require("infra.manifest_reader")
++
++local function fixture()
++	local original = '[gestures]\nenabled = true\nswipe_3_down = "copy"\nfuture = 42\n[gestures.expert]\nvalue = "preserve"\n[llm]\nenabled = true\n'
++	local files = { config = original }
++	local writes, runtime = {}, { marker = "original" }
++	local controls = {}
++	local fs = {
++		write = function() error("publication must retain its source precondition") end,
++		read_with_status = function(path)
++			return files[path], files[path] and "ok" or "absent"
++		end,
++		write_if_unchanged = function(path, content, expected)
++			if controls.refuse == path then return false end
++			if expected.status == "absent" and files[path] ~= nil then return false end
++			if expected.status == "ok" and files[path] ~= expected.content then return false end
++			files[path] = content
++			writes[#writes + 1] = path
++			return true
++		end,
++	}
++	local options = {
++		path = "config", backup_path = "backup", files = fs, manifest = Manifest,
++		capture = function() return { marker = runtime.marker } end,
++		apply = function(decoded)
++			runtime.marker = decoded.gestures.enabled
++			if controls.external_edit then files.config = controls.external_edit end
++			if controls.throw_apply then error("native acquisition refused") end
++			return controls.apply_result ~= false
++		end,
++		restore = function(snapshot)
++			runtime.marker = snapshot.marker
++			return controls.restore_result ~= false
++		end,
++	}
++	return options, files, writes, runtime, controls, original
++end
++
++helpers.describe("scoped configuration transaction", function()
++	helpers.it("makes ordinary registered configuration writes sparse without touching unrelated files", function()
++		helpers.with_fresh_modules({ "toml_codec.writer" }, function()
++		local options, files = fixture()
++		local writer = require("toml_codec.writer")
++		writer.set_sparse_defaults("config", Manifest)
++		local updates = { { section = "gestures", key = "enabled", value = false } }
++		helpers.assert_eq(writer.batch_write("config", updates, options.files), true)
++		helpers.assert_eq(Codec.decode(files.config).gestures.enabled, nil)
++		helpers.assert_eq(updates[1].value, false, "caller-owned operations must not be mutated")
++		helpers.assert_eq(writer.batch_write("other", updates, options.files), true)
++		helpers.assert_eq(Codec.decode(files.other).gestures.enabled, false)
++		end)
++	end)
++
++	helpers.it("clears owned leaves while preserving unknown nested keys and unrelated consent", function()
++		local options, files, writes, runtime, _, original = fixture()
++		local owner = require("config_scope_transaction").new(options)
++		local committed, detail = owner.apply("gestures", "clear")
++		helpers.assert_eq(committed, true, detail)
++		local decoded = Codec.decode(files.config)
++		helpers.assert_eq(decoded.gestures.enabled, nil)
++		helpers.assert_eq(decoded.gestures.swipe_3_down, nil)
++		helpers.assert_eq(decoded.gestures.future, 42)
++		helpers.assert_eq(decoded.gestures.expert.value, "preserve")
++		helpers.assert_eq(decoded.llm.enabled, true)
++		helpers.assert_eq(files.backup, original)
++		helpers.assert_eq(#writes, 2)
++		helpers.assert_eq(runtime.marker, nil)
++	end)
++
++	helpers.it("restores recommendations without acquiring absent AI or metrics consent", function()
++		local options, files = fixture()
++		files.config = ""
++		helpers.assert_eq(require("config_scope_transaction").new(options).apply("global", "recommended"), true)
++		local decoded = Codec.decode(files.config)
++		helpers.assert_eq(decoded.gestures.enabled, true)
++		helpers.assert_eq(decoded.llm.enabled, nil)
++		helpers.assert_eq(decoded.metrics.enabled, nil)
++		helpers.assert_eq(decoded.hotstrings.preview_ai_enabled, nil)
++	end)
++
++	helpers.it("refuses a failed backup before touching runtime or the destination", function()
++		local options, files, writes, runtime, controls, original = fixture()
++		controls.refuse = "backup"
++		helpers.assert_eq(require("config_scope_transaction").new(options).apply("gestures", "clear"), false)
++		helpers.assert_eq(runtime.marker, "original")
++		helpers.assert_eq(files.config, original)
++		helpers.assert_eq(#writes, 0)
++	end)
++
++	helpers.it("compensates a throwing native application without publishing the candidate", function()
++		local options, files, _, runtime, controls, original = fixture()
++		controls.throw_apply = true
++		helpers.assert_eq(require("config_scope_transaction").new(options).apply("gestures", "clear"), false)
++		helpers.assert_eq(runtime.marker, "original")
++		helpers.assert_eq(files.config, original)
++	end)
++
++	helpers.it("compensates a refused publication without losing unknown bytes", function()
++		local options, files, _, runtime, controls, original = fixture()
++		controls.refuse = "config"
++		helpers.assert_eq(require("config_scope_transaction").new(options).apply("gestures", "clear"), false)
++		helpers.assert_eq(runtime.marker, "original")
++		helpers.assert_eq(files.config, original)
++	end)
++
++	helpers.it("retains failed rollback debt and refuses another transaction until restored", function()
++		local options, _, _, _, controls = fixture()
++		controls.apply_result, controls.restore_result = false, false
++		local owner = require("config_scope_transaction").new(options)
++		helpers.assert_eq(owner.apply("gestures", "clear"), false)
++		helpers.assert_eq(owner.pending(), true)
++		helpers.assert_eq(owner.apply("gestures", "recommended"), false)
++		controls.restore_result = true
++		helpers.assert_eq(owner.retry_restore(), true)
++		helpers.assert_eq(owner.pending(), false)
++	end)
++
++	helpers.it("preserves an external edit arriving during runtime application", function()
++		local options, files, _, runtime, controls = fixture()
++		controls.external_edit = '[future]\nvalue = "external"\n'
++		helpers.assert_eq(require("config_scope_transaction").new(options).apply("gestures", "clear"), false)
++		helpers.assert_eq(files.config, controls.external_edit)
++		helpers.assert_eq(runtime.marker, "original")
++	end)
++
++	helpers.it("never overwrites an existing backup", function()
++		local options, files, _, runtime, _, original = fixture()
++		files.backup = "previous recovery bytes"
++		helpers.assert_eq(require("config_scope_transaction").new(options).apply("gestures", "clear"), false)
++		helpers.assert_eq(files.backup, "previous recovery bytes")
++		helpers.assert_eq(files.config, original)
++		helpers.assert_eq(runtime.marker, "original")
++	end)
++end)
+-- 
+2.50.0.windows.1
+

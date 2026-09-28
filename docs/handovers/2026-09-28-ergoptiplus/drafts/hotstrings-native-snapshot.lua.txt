@@ -1,0 +1,28 @@
+--- Captures native hotstring configuration without trusting the menu's intent.
+--- Partial acquisition has no boolean posture and cannot enter a scope transaction.
+--- @return table snapshot Actual lifecycle, scalar and registered section values.
+function M.hotstrings_configuration_snapshot()
+	local running = _started and _watchdog_committed == true and taps_are_enabled()
+		and watchdog_is_running(_watchdog_timer) and diagnostic_mailbox_is_running()
+	if not running then
+		assert(not _started and not _action_listener_registered and not _watchdog_timer
+			and not _diagnostic_mailbox_started and not diagnostic_mailbox_is_running()
+			and not eventtap_is_enabled("keyDown", tap) and not eventtap_is_enabled("loopbackKeyUp", loopback_keyup_tap)
+			and not eventtap_is_enabled("flagsChanged", shift_tap) and not eventtap_is_enabled("mouse", mouse_tap),
+			"hotstring native lifecycle has unsettled ownership")
+	end
+	local result = LLMBridge.hotstrings_configuration_snapshot()
+	result.keymap, result.trigger_char, result.expansion_delay = running == true, M.get_trigger_char(), M.get_base_delay()
+	result.repeat_key_enabled = M.is_repeat_feature_enabled()
+	result.hotstrings, result.section_states, result.delays = M.list_groups(), {}, {}
+	for name in pairs(result.hotstrings) do
+		result.section_states[name] = {}
+		for _, section in ipairs(M.get_sections(name) or {}) do
+			if section.name ~= "-" and not section.is_module_placeholder then
+				result.section_states[name][section.name] = M.is_section_enabled(name, section.name)
+			end
+		end
+	end
+	for key, value in pairs(CoreState.DELAYS) do result.delays[key] = value end
+	return result
+end

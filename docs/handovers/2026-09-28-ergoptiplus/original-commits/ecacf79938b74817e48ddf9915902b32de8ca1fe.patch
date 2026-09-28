@@ -1,0 +1,3876 @@
+From ecacf79938b74817e48ddf9915902b32de8ca1fe Mon Sep 17 00:00:00 2001
+From: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 13:07:20 +0200
+Subject: [PATCH] feat(layouts): add the shared layout manager window on three
+ drivers
+
+The registry catalogue needs one place where a user sees each layout's
+name, author, licence and version with its status, and installs, updates,
+uninstalls or selects it. _shared/ui/layout_manager is that page for every
+driver: it decides the rows once from one state shape, so the three hosts
+only report facts (the catalogue, the installed record, the operation in
+flight, the active layout).
+
+Each host accepts an allowlist of actions and checks every layout id
+against the catalogue or the installed record before it acts, and opens
+only the https homepage the catalogue gives, never a URL the page sends.
+macOS and Linux share manager_bridge.lua; Windows mirrors it in its
+WebView2 host. A JS DOM test pins the rows, the buttons, the error and
+result lines, the busy state and the identical action list of the page
+and the three hosts, and every string exists in the 21 locales.
+---
+ package.json                                  |   1 +
+ .../ergopti_plus/_shared/data/locales/ar.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/cs.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/da.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/de.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/en.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/es.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/fr.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/he.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/hi.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/it.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/ja.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/ko.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/nl.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/no.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/pl.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/pt.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/ru.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/sv.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/tr.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/uk.json |  40 ++
+ .../ergopti_plus/_shared/data/locales/zh.json |  40 ++
+ .../_shared/lua/layouts/manager_bridge.lua    | 186 +++++++
+ .../_shared/ui/apps.manifest.json             |   7 +
+ static/ergopti_plus/_shared/ui/host_bridge.js |   1 +
+ .../_shared/ui/layout_manager/index.html      |  35 ++
+ .../_shared/ui/layout_manager/script.js       | 386 ++++++++++++++
+ .../_shared/ui/layout_manager/strings.json    |  46 ++
+ .../_shared/ui/layout_manager/style.css       | 270 ++++++++++
+ .../linux/tests/test_manifest.lua             |   1 +
+ .../tests/unit/meta/test_webkit_host.lua      |   6 +-
+ .../unit/ui/test_layout_manager_bridge.lua    |  69 +++
+ .../linux/ui/layout_manager/bridge.lua        | 109 ++++
+ static/ergopti_plus/linux/ui/webkit_host.lua  |   1 +
+ .../ergopti_plus/linux/ui/webview_manager.lua |   2 +
+ .../unit/ui/menu/test_menu_layout_manager.lua |  47 ++
+ .../unit/ui/test_layout_manager_bridge.lua    | 115 +++++
+ .../macos/ui/menu/menu_layout_manager.lua     | 202 ++++++++
+ static/ergopti_plus/windows/ErgoptiPlus.ahk   |   1 +
+ static/ergopti_plus/windows/tests/run_all.ahk |   2 +
+ .../tests/unit/test_layout_manager_host.ahk   | 148 ++++++
+ .../windows/ui/layout_manager/init.ahk        | 486 ++++++++++++++++++
+ tools/test/run-js-suite.cjs                   |   1 +
+ tools/test/test-layout-manager-page.cjs       | 374 ++++++++++++++
+ .../test-webview-geometry-single-source.cjs   |   5 +
+ 45 files changed, 3338 insertions(+), 3 deletions(-)
+ create mode 100644 static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua
+ create mode 100644 static/ergopti_plus/_shared/ui/layout_manager/index.html
+ create mode 100644 static/ergopti_plus/_shared/ui/layout_manager/script.js
+ create mode 100644 static/ergopti_plus/_shared/ui/layout_manager/strings.json
+ create mode 100644 static/ergopti_plus/_shared/ui/layout_manager/style.css
+ create mode 100644 static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua
+ create mode 100644 static/ergopti_plus/linux/ui/layout_manager/bridge.lua
+ create mode 100644 static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua
+ create mode 100644 static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua
+ create mode 100644 static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua
+ create mode 100644 static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk
+ create mode 100644 static/ergopti_plus/windows/ui/layout_manager/init.ahk
+ create mode 100644 tools/test/test-layout-manager-page.cjs
+
+diff --git a/package.json b/package.json
+index c9057affd..f92de1bb1 100644
+--- a/package.json
++++ b/package.json
+@@ -321,6 +321,7 @@
+ 		"test:karabiner-package-manifest": "node ./tools/test/test-karabiner-package-manifest.cjs",
+ 		"test:input-source-python-supervisor": "node ./tools/test/test-input-source-python-supervisor.cjs",
+ 		"test:input-source-enabled-list-edit": "node ./tools/test/test-input-source-enabled-list-edit.cjs",
++		"test:layout-manager-page": "node ./tools/test/test-layout-manager-page.cjs",
+ 		"test:pty-process-group-escalation": "node ./tools/test/test-pty-process-group-escalation.cjs",
+ 		"test:mlx-deps-lock-fingerprint": "node ./tools/test/test-mlx-deps-lock-fingerprint.cjs",
+ 		"test:app-cloner-shortcut-maximize": "node ./tools/test/test-app-cloner-shortcut-maximize.cjs",
+diff --git a/static/ergopti_plus/_shared/data/locales/ar.json b/static/ergopti_plus/_shared/data/locales/ar.json
+index 813b91360..bab860909 100644
+--- a/static/ergopti_plus/_shared/data/locales/ar.json
++++ b/static/ergopti_plus/_shared/data/locales/ar.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "تخطيط Ergopti فقط: تتم محاكاة تخطيط آخر",
+ 	"menu.layout.superseded_digit_row": "يحدد التخطيط المحاكى صف الأرقام الخاص به",
+ 	"layouts.linux_needs_python": "يتطلب تحويل هذا التخطيط لنظام Linux وجود Python 3.8 أو أحدث (python3). ثبّته ثم أعد المحاولة.",
++	"layout_manager.window_title": "تخطيطات لوحة المفاتيح",
++	"layout_manager.subtitle": "ثبّت تخطيطات الكتالوج أو حدّثها أو أزل تثبيتها.",
++	"layout_manager.btn_refresh": "تحديث",
++	"layout_manager.btn_close": "إغلاق",
++	"layout_manager.btn_install": "تثبيت",
++	"layout_manager.btn_update": "تحديث",
++	"layout_manager.btn_uninstall": "إزالة التثبيت",
++	"layout_manager.btn_select": "استخدام",
++	"layout_manager.btn_homepage": "الموقع",
++	"layout_manager.status_installed": "مثبّت",
++	"layout_manager.status_update": "يتوفر تحديث",
++	"layout_manager.status_available": "متاح",
++	"layout_manager.status_builtin": "مدمج",
++	"layout_manager.status_provided": "مثبّت عبر حزمة Ergopti",
++	"layout_manager.status_active": "نشط",
++	"layout_manager.meta_author": "المؤلف: %s",
++	"layout_manager.meta_licence": "الترخيص: %s",
++	"layout_manager.meta_version": "الإصدار %s",
++	"layout_manager.meta_installed_version": "الإصدار المثبّت: %s",
++	"layout_manager.busy_install": "جارٍ التثبيت…",
++	"layout_manager.busy_uninstall": "جارٍ إزالة التثبيت…",
++	"layout_manager.source_network": "الكتالوج محدَّث.",
++	"layout_manager.source_cache": "كتالوج آخر اتصال.",
++	"layout_manager.source_bundled": "الكتالوج المرفق مع التطبيق.",
++	"layout_manager.source_none": "لا يتوفر أي كتالوج.",
++	"layout_manager.error_offline": "تعذّر الوصول إلى السجل: تحقّق من الاتصال.",
++	"layout_manager.error_http": "ردّ السجل بخطأ (%s).",
++	"layout_manager.error_generic": "الكتالوج المستلم غير قابل للاستخدام (%s).",
++	"layout_manager.error_record": "قائمة التخطيطات المثبّتة غير قابلة للقراءة.",
++	"layout_manager.empty": "لا يتوفر أي تخطيط من هذا الكتالوج لهذا النظام.",
++	"layout_manager.result_installed": "تم تثبيت «%s».",
++	"layout_manager.result_installed_not_enabled": "تم تثبيت «%s»: أضِفه من إعدادات النظام > لوحة المفاتيح > مصادر الإدخال.",
++	"layout_manager.result_uninstalled": "تمت إزالة تثبيت «%s».",
++	"layout_manager.result_selected": "«%s» هو التخطيط النشط.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "هناك عملية أخرى قيد التنفيذ.",
++	"layout_manager.failure_provided_by_bundle": "حزمة Ergopti المثبّتة توفّره بالفعل.",
++	"layout_manager.failure_foreign_file": "يوجد بالفعل ملف بالاسم نفسه لم يثبّته ErgoptiPlus.",
++	"layout_manager.failure_download": "فشل التنزيل أو تم تعديل الملف.",
++	"layout_manager.failure_other": "فشلت العملية (التفاصيل في السجل).",
+ 	"llm.deps.browser_install_tip": "نزّل Ollama لنظام Windows من الصفحة التي فُتحت في متصفحك، شغّل المثبّت، ثم عُد إلى هنا — سيتم اكتشاف الاتصال تلقائيًا.",
+ 	"llm.deps.done_success": "✅ Ollama جاهز",
+ 	"llm.deps.fail_server_not_responding": "انتهى المثبّت لكن خادم Ollama لا يستجيب.",
+diff --git a/static/ergopti_plus/_shared/data/locales/cs.json b/static/ergopti_plus/_shared/data/locales/cs.json
+index 43be27942..94a16f47b 100644
+--- a/static/ergopti_plus/_shared/data/locales/cs.json
++++ b/static/ergopti_plus/_shared/data/locales/cs.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Pouze rozložení Ergopti: emuluje se jiné rozložení",
+ 	"menu.layout.superseded_digit_row": "Emulované rozložení si samo určuje řadu číslic",
+ 	"layouts.linux_needs_python": "Převod tohoto rozložení pro Linux vyžaduje Python 3.8 nebo novější (python3). Nainstalujte jej a zkuste to znovu.",
++	"layout_manager.window_title": "Rozložení klávesnice",
++	"layout_manager.subtitle": "Instalujte, aktualizujte nebo odinstalujte rozložení z katalogu.",
++	"layout_manager.btn_refresh": "Obnovit",
++	"layout_manager.btn_close": "Zavřít",
++	"layout_manager.btn_install": "Instalovat",
++	"layout_manager.btn_update": "Aktualizovat",
++	"layout_manager.btn_uninstall": "Odinstalovat",
++	"layout_manager.btn_select": "Použít",
++	"layout_manager.btn_homepage": "Web",
++	"layout_manager.status_installed": "Nainstalováno",
++	"layout_manager.status_update": "Dostupná aktualizace",
++	"layout_manager.status_available": "K dispozici",
++	"layout_manager.status_builtin": "Vestavěné",
++	"layout_manager.status_provided": "Nainstalováno balíčkem Ergopti",
++	"layout_manager.status_active": "Aktivní",
++	"layout_manager.meta_author": "Autor: %s",
++	"layout_manager.meta_licence": "Licence: %s",
++	"layout_manager.meta_version": "Verze %s",
++	"layout_manager.meta_installed_version": "Nainstalovaná verze: %s",
++	"layout_manager.busy_install": "Instalace…",
++	"layout_manager.busy_uninstall": "Odinstalace…",
++	"layout_manager.source_network": "Katalog je aktuální.",
++	"layout_manager.source_cache": "Katalog z posledního připojení.",
++	"layout_manager.source_bundled": "Katalog dodaný s aplikací.",
++	"layout_manager.source_none": "Žádný katalog není k dispozici.",
++	"layout_manager.error_offline": "Registr je nedostupný: zkontrolujte připojení.",
++	"layout_manager.error_http": "Registr odpověděl chybou (%s).",
++	"layout_manager.error_generic": "Přijatý katalog je nepoužitelný (%s).",
++	"layout_manager.error_record": "Seznam nainstalovaných rozložení nelze přečíst.",
++	"layout_manager.empty": "Pro tento systém není v katalogu žádné rozložení.",
++	"layout_manager.result_installed": "„%s“ je nainstalováno.",
++	"layout_manager.result_installed_not_enabled": "„%s“ je nainstalováno: přidejte ho v Nastavení systému > Klávesnice > Zdroje vstupu.",
++	"layout_manager.result_uninstalled": "„%s“ je odinstalováno.",
++	"layout_manager.result_selected": "„%s“ je aktivní rozložení.",
++	"layout_manager.result_failed": "„%s“: %s",
++	"layout_manager.failure_busy": "probíhá jiná operace.",
++	"layout_manager.failure_provided_by_bundle": "nainstalovaný balíček Ergopti ho již poskytuje.",
++	"layout_manager.failure_foreign_file": "již existuje soubor stejného názvu, který ErgoptiPlus nenainstaloval.",
++	"layout_manager.failure_download": "stažení selhalo nebo byl soubor pozměněn.",
++	"layout_manager.failure_other": "operace selhala (podrobnosti v protokolu).",
+ 	"llm.deps.browser_install_tip": "Stáhněte si Ollama pro Windows ze stránky otevřené v prohlížeči, spusťte instalátor a vraťte se sem — připojení bude detekováno automaticky.",
+ 	"llm.deps.done_success": "✅ Ollama připraven",
+ 	"llm.deps.fail_server_not_responding": "Instalátor skončil, ale server Ollama neodpovíí.",
+diff --git a/static/ergopti_plus/_shared/data/locales/da.json b/static/ergopti_plus/_shared/data/locales/da.json
+index 81f8e7b36..279907410 100644
+--- a/static/ergopti_plus/_shared/data/locales/da.json
++++ b/static/ergopti_plus/_shared/data/locales/da.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Kun Ergopti-layout: et andet layout emuleres",
+ 	"menu.layout.superseded_digit_row": "Det emulerede layout bestemmer selv sin talrække",
+ 	"layouts.linux_needs_python": "Konvertering af dette tastaturlayout til Linux kræver Python 3.8 eller nyere (python3). Installer det, og prøv igen.",
++	"layout_manager.window_title": "Tastaturlayouts",
++	"layout_manager.subtitle": "Installer, opdater eller afinstaller katalogets layouts.",
++	"layout_manager.btn_refresh": "Opdater",
++	"layout_manager.btn_close": "Luk",
++	"layout_manager.btn_install": "Installer",
++	"layout_manager.btn_update": "Opdater",
++	"layout_manager.btn_uninstall": "Afinstaller",
++	"layout_manager.btn_select": "Brug",
++	"layout_manager.btn_homepage": "Websted",
++	"layout_manager.status_installed": "Installeret",
++	"layout_manager.status_update": "Opdatering tilgængelig",
++	"layout_manager.status_available": "Tilgængelig",
++	"layout_manager.status_builtin": "Indbygget",
++	"layout_manager.status_provided": "Installeret af Ergopti-pakken",
++	"layout_manager.status_active": "Aktiv",
++	"layout_manager.meta_author": "Forfatter: %s",
++	"layout_manager.meta_licence": "Licens: %s",
++	"layout_manager.meta_version": "Version %s",
++	"layout_manager.meta_installed_version": "Installeret version: %s",
++	"layout_manager.busy_install": "Installerer…",
++	"layout_manager.busy_uninstall": "Afinstallerer…",
++	"layout_manager.source_network": "Kataloget er opdateret.",
++	"layout_manager.source_cache": "Katalog fra seneste forbindelse.",
++	"layout_manager.source_bundled": "Katalog leveret med appen.",
++	"layout_manager.source_none": "Intet katalog tilgængeligt.",
++	"layout_manager.error_offline": "Registret kan ikke nås: kontrollér forbindelsen.",
++	"layout_manager.error_http": "Registret svarede med en fejl (%s).",
++	"layout_manager.error_generic": "Det modtagne katalog kan ikke bruges (%s).",
++	"layout_manager.error_record": "Listen over installerede layouts kan ikke læses.",
++	"layout_manager.empty": "Intet layout i kataloget er tilgængeligt for dette system.",
++	"layout_manager.result_installed": "“%s” er installeret.",
++	"layout_manager.result_installed_not_enabled": "“%s” er installeret: tilføj det i Systemindstillinger > Tastatur > Inputkilder.",
++	"layout_manager.result_uninstalled": "“%s” er afinstalleret.",
++	"layout_manager.result_selected": "“%s” er det aktive layout.",
++	"layout_manager.result_failed": "“%s”: %s",
++	"layout_manager.failure_busy": "en anden handling er i gang.",
++	"layout_manager.failure_provided_by_bundle": "den installerede Ergopti-pakke leverer det allerede.",
++	"layout_manager.failure_foreign_file": "der findes allerede en fil med samme navn, som ErgoptiPlus ikke har installeret.",
++	"layout_manager.failure_download": "download mislykkedes, eller filen er ændret.",
++	"layout_manager.failure_other": "handlingen mislykkedes (detaljer i loggen).",
+ 	"llm.deps.browser_install_tip": "Download Ollama til Windows fra siden, der lige åbnede i din browser, kør installationsprogrammet og kom tilbage — forbindelsen registreres automatisk.",
+ 	"llm.deps.done_success": "✅ Ollama klar",
+ 	"llm.deps.fail_server_not_responding": "Installationsprogrammet afsluttedes, men Ollama-serveren svarer ikke.",
+diff --git a/static/ergopti_plus/_shared/data/locales/de.json b/static/ergopti_plus/_shared/data/locales/de.json
+index 00e4a39f2..23f42d9d0 100644
+--- a/static/ergopti_plus/_shared/data/locales/de.json
++++ b/static/ergopti_plus/_shared/data/locales/de.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Nur Ergopti-Layout: ein anderes Tastaturlayout wird emuliert",
+ 	"menu.layout.superseded_digit_row": "Das emulierte Tastaturlayout legt seine Ziffernreihe selbst fest",
+ 	"layouts.linux_needs_python": "Die Umwandlung dieses Tastaturlayouts für Linux erfordert Python 3.8 oder neuer (python3). Installieren Sie es und versuchen Sie es erneut.",
++	"layout_manager.window_title": "Tastaturlayouts",
++	"layout_manager.subtitle": "Layouts aus dem Katalog installieren, aktualisieren oder deinstallieren.",
++	"layout_manager.btn_refresh": "Aktualisieren",
++	"layout_manager.btn_close": "Schließen",
++	"layout_manager.btn_install": "Installieren",
++	"layout_manager.btn_update": "Aktualisieren",
++	"layout_manager.btn_uninstall": "Deinstallieren",
++	"layout_manager.btn_select": "Verwenden",
++	"layout_manager.btn_homepage": "Website",
++	"layout_manager.status_installed": "Installiert",
++	"layout_manager.status_update": "Aktualisierung verfügbar",
++	"layout_manager.status_available": "Verfügbar",
++	"layout_manager.status_builtin": "Integriert",
++	"layout_manager.status_provided": "Durch das Ergopti-Paket installiert",
++	"layout_manager.status_active": "Aktiv",
++	"layout_manager.meta_author": "Autor: %s",
++	"layout_manager.meta_licence": "Lizenz: %s",
++	"layout_manager.meta_version": "Version %s",
++	"layout_manager.meta_installed_version": "Installierte Version: %s",
++	"layout_manager.busy_install": "Wird installiert…",
++	"layout_manager.busy_uninstall": "Wird deinstalliert…",
++	"layout_manager.source_network": "Katalog ist aktuell.",
++	"layout_manager.source_cache": "Katalog der letzten Verbindung.",
++	"layout_manager.source_bundled": "Mit der App ausgelieferter Katalog.",
++	"layout_manager.source_none": "Kein Katalog verfügbar.",
++	"layout_manager.error_offline": "Verzeichnis nicht erreichbar: Verbindung prüfen.",
++	"layout_manager.error_http": "Das Verzeichnis hat mit einem Fehler geantwortet (%s).",
++	"layout_manager.error_generic": "Der empfangene Katalog ist unbrauchbar (%s).",
++	"layout_manager.error_record": "Die Liste der installierten Layouts ist unlesbar.",
++	"layout_manager.empty": "Kein Layout dieses Katalogs ist für dieses System verfügbar.",
++	"layout_manager.result_installed": "„%s“ ist installiert.",
++	"layout_manager.result_installed_not_enabled": "„%s“ ist installiert: in den Systemeinstellungen > Tastatur > Eingabequellen hinzufügen.",
++	"layout_manager.result_uninstalled": "„%s“ ist deinstalliert.",
++	"layout_manager.result_selected": "„%s“ ist das aktive Layout.",
++	"layout_manager.result_failed": "„%s“: %s",
++	"layout_manager.failure_busy": "ein anderer Vorgang läuft noch.",
++	"layout_manager.failure_provided_by_bundle": "das installierte Ergopti-Paket stellt es bereits bereit.",
++	"layout_manager.failure_foreign_file": "eine gleichnamige Datei, die ErgoptiPlus nicht installiert hat, existiert bereits.",
++	"layout_manager.failure_download": "der Download ist fehlgeschlagen oder die Datei wurde verändert.",
++	"layout_manager.failure_other": "der Vorgang ist fehlgeschlagen (Details im Protokoll).",
+ 	"llm.deps.browser_install_tip": "Lade Ollama für Windows von der im Browser geöffneten Seite herunter, führe das Installationsprogramm aus und kehre hierher zurück — die Verbindung wird automatisch erkannt.",
+ 	"llm.deps.done_success": "✅ Ollama bereit",
+ 	"llm.deps.fail_server_not_responding": "Installer beendet, aber der Ollama-Server antwortet nicht.",
+diff --git a/static/ergopti_plus/_shared/data/locales/en.json b/static/ergopti_plus/_shared/data/locales/en.json
+index b92339ccc..79b41f5b0 100644
+--- a/static/ergopti_plus/_shared/data/locales/en.json
++++ b/static/ergopti_plus/_shared/data/locales/en.json
+@@ -789,6 +789,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Ergopti layout only: another layout is emulated",
+ 	"menu.layout.superseded_digit_row": "The emulated layout sets its own digit row",
+ 	"layouts.linux_needs_python": "Converting this layout for Linux needs Python 3.8 or newer (python3). Install it, then try again.",
++	"layout_manager.window_title": "Keyboard layouts",
++	"layout_manager.subtitle": "Install, update or uninstall the layouts of the catalogue.",
++	"layout_manager.btn_refresh": "Refresh",
++	"layout_manager.btn_close": "Close",
++	"layout_manager.btn_install": "Install",
++	"layout_manager.btn_update": "Update",
++	"layout_manager.btn_uninstall": "Uninstall",
++	"layout_manager.btn_select": "Use",
++	"layout_manager.btn_homepage": "Website",
++	"layout_manager.status_installed": "Installed",
++	"layout_manager.status_update": "Update available",
++	"layout_manager.status_available": "Available",
++	"layout_manager.status_builtin": "Built in",
++	"layout_manager.status_provided": "Installed by the Ergopti bundle",
++	"layout_manager.status_active": "Active",
++	"layout_manager.meta_author": "Author: %s",
++	"layout_manager.meta_licence": "Licence: %s",
++	"layout_manager.meta_version": "Version %s",
++	"layout_manager.meta_installed_version": "Installed version: %s",
++	"layout_manager.busy_install": "Installing…",
++	"layout_manager.busy_uninstall": "Uninstalling…",
++	"layout_manager.source_network": "Catalogue up to date.",
++	"layout_manager.source_cache": "Catalogue from the last connection.",
++	"layout_manager.source_bundled": "Catalogue shipped with the app.",
++	"layout_manager.source_none": "No catalogue available.",
++	"layout_manager.error_offline": "Registry unreachable: check the connection.",
++	"layout_manager.error_http": "The registry answered with an error (%s).",
++	"layout_manager.error_generic": "The catalogue received is unusable (%s).",
++	"layout_manager.error_record": "The list of installed layouts is unreadable.",
++	"layout_manager.empty": "No layout of this catalogue is available for this system.",
++	"layout_manager.result_installed": "“%s” is installed.",
++	"layout_manager.result_installed_not_enabled": "“%s” is installed: add it in System Settings > Keyboard > Input Sources.",
++	"layout_manager.result_uninstalled": "“%s” is uninstalled.",
++	"layout_manager.result_selected": "“%s” is the active layout.",
++	"layout_manager.result_failed": "“%s”: %s",
++	"layout_manager.failure_busy": "another operation is in progress.",
++	"layout_manager.failure_provided_by_bundle": "the installed Ergopti bundle already provides it.",
++	"layout_manager.failure_foreign_file": "a file of the same name that ErgoptiPlus did not install already exists.",
++	"layout_manager.failure_download": "the download failed or the file was altered.",
++	"layout_manager.failure_other": "the operation failed (details in the log).",
+ 	"llm.deps.browser_install_tip": "Download Ollama for Windows from the page just opened in your browser, run the installer, then come back — the connection will be detected automatically.",
+ 	"llm.deps.done_success": "✅ Ollama ready",
+ 	"llm.deps.fail_server_not_responding": "Installer exited but the Ollama server is not responding.",
+diff --git a/static/ergopti_plus/_shared/data/locales/es.json b/static/ergopti_plus/_shared/data/locales/es.json
+index 02bb341d3..a9d8d115f 100644
+--- a/static/ergopti_plus/_shared/data/locales/es.json
++++ b/static/ergopti_plus/_shared/data/locales/es.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Solo distribución Ergopti: se emula otra distribución",
+ 	"menu.layout.superseded_digit_row": "La distribución emulada define su propia fila de números",
+ 	"layouts.linux_needs_python": "Convertir esta distribución para Linux requiere Python 3.8 o posterior (python3). Instálelo y vuelva a intentarlo.",
++	"layout_manager.window_title": "Distribuciones de teclado",
++	"layout_manager.subtitle": "Instale, actualice o desinstale las distribuciones del catálogo.",
++	"layout_manager.btn_refresh": "Actualizar",
++	"layout_manager.btn_close": "Cerrar",
++	"layout_manager.btn_install": "Instalar",
++	"layout_manager.btn_update": "Actualizar",
++	"layout_manager.btn_uninstall": "Desinstalar",
++	"layout_manager.btn_select": "Usar",
++	"layout_manager.btn_homepage": "Sitio web",
++	"layout_manager.status_installed": "Instalada",
++	"layout_manager.status_update": "Actualización disponible",
++	"layout_manager.status_available": "Disponible",
++	"layout_manager.status_builtin": "Integrada",
++	"layout_manager.status_provided": "Instalada por el paquete Ergopti",
++	"layout_manager.status_active": "Activa",
++	"layout_manager.meta_author": "Autor: %s",
++	"layout_manager.meta_licence": "Licencia: %s",
++	"layout_manager.meta_version": "Versión %s",
++	"layout_manager.meta_installed_version": "Versión instalada: %s",
++	"layout_manager.busy_install": "Instalando…",
++	"layout_manager.busy_uninstall": "Desinstalando…",
++	"layout_manager.source_network": "Catálogo actualizado.",
++	"layout_manager.source_cache": "Catálogo de la última conexión.",
++	"layout_manager.source_bundled": "Catálogo incluido con la aplicación.",
++	"layout_manager.source_none": "No hay ningún catálogo disponible.",
++	"layout_manager.error_offline": "Registro inaccesible: compruebe la conexión.",
++	"layout_manager.error_http": "El registro respondió con un error (%s).",
++	"layout_manager.error_generic": "El catálogo recibido no se puede usar (%s).",
++	"layout_manager.error_record": "La lista de distribuciones instaladas es ilegible.",
++	"layout_manager.empty": "Ninguna distribución de este catálogo está disponible para este sistema.",
++	"layout_manager.result_installed": "«%s» está instalada.",
++	"layout_manager.result_installed_not_enabled": "«%s» está instalada: añádala en Ajustes del Sistema > Teclado > Fuentes de entrada.",
++	"layout_manager.result_uninstalled": "«%s» está desinstalada.",
++	"layout_manager.result_selected": "«%s» es la distribución activa.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "hay otra operación en curso.",
++	"layout_manager.failure_provided_by_bundle": "el paquete Ergopti instalado ya la proporciona.",
++	"layout_manager.failure_foreign_file": "ya existe un archivo con el mismo nombre que ErgoptiPlus no instaló.",
++	"layout_manager.failure_download": "la descarga falló o el archivo fue alterado.",
++	"layout_manager.failure_other": "la operación falló (detalles en el registro).",
+ 	"llm.deps.browser_install_tip": "Descarga Ollama para Windows desde la página abierta en tu navegador, ejecuta el instalador y vuelve aquí — la conexión se detectará automáticamente.",
+ 	"llm.deps.done_success": "✅ Ollama listo",
+ 	"llm.deps.fail_server_not_responding": "El instalador ha terminado pero el servidor Ollama no responde.",
+diff --git a/static/ergopti_plus/_shared/data/locales/fr.json b/static/ergopti_plus/_shared/data/locales/fr.json
+index 7e7427180..5da3a1f95 100644
+--- a/static/ergopti_plus/_shared/data/locales/fr.json
++++ b/static/ergopti_plus/_shared/data/locales/fr.json
+@@ -789,6 +789,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Disposition Ergopti uniquement : une autre disposition est émulée",
+ 	"menu.layout.superseded_digit_row": "La disposition émulée définit sa propre rangée de chiffres",
+ 	"layouts.linux_needs_python": "La conversion de cette disposition pour Linux nécessite Python 3.8 ou plus récent (python3). Installez-le, puis réessayez.",
++	"layout_manager.window_title": "Dispositions de clavier",
++	"layout_manager.subtitle": "Installez, mettez à jour ou désinstallez les dispositions du catalogue.",
++	"layout_manager.btn_refresh": "Actualiser",
++	"layout_manager.btn_close": "Fermer",
++	"layout_manager.btn_install": "Installer",
++	"layout_manager.btn_update": "Mettre à jour",
++	"layout_manager.btn_uninstall": "Désinstaller",
++	"layout_manager.btn_select": "Utiliser",
++	"layout_manager.btn_homepage": "Site",
++	"layout_manager.status_installed": "Installée",
++	"layout_manager.status_update": "Mise à jour disponible",
++	"layout_manager.status_available": "Disponible",
++	"layout_manager.status_builtin": "Intégrée",
++	"layout_manager.status_provided": "Installée par le paquet Ergopti",
++	"layout_manager.status_active": "Active",
++	"layout_manager.meta_author": "Auteur : %s",
++	"layout_manager.meta_licence": "Licence : %s",
++	"layout_manager.meta_version": "Version %s",
++	"layout_manager.meta_installed_version": "Version installée : %s",
++	"layout_manager.busy_install": "Installation…",
++	"layout_manager.busy_uninstall": "Désinstallation…",
++	"layout_manager.source_network": "Catalogue à jour.",
++	"layout_manager.source_cache": "Catalogue de la dernière connexion.",
++	"layout_manager.source_bundled": "Catalogue fourni avec l'application.",
++	"layout_manager.source_none": "Aucun catalogue disponible.",
++	"layout_manager.error_offline": "Registre injoignable : vérifiez la connexion.",
++	"layout_manager.error_http": "Le registre a répondu par une erreur (%s).",
++	"layout_manager.error_generic": "Le catalogue reçu est inutilisable (%s).",
++	"layout_manager.error_record": "La liste des dispositions installées est illisible.",
++	"layout_manager.empty": "Aucune disposition de ce catalogue n'est disponible pour ce système.",
++	"layout_manager.result_installed": "« %s » est installée.",
++	"layout_manager.result_installed_not_enabled": "« %s » est installée : ajoutez-la dans Réglages Système > Clavier > Sources de saisie.",
++	"layout_manager.result_uninstalled": "« %s » est désinstallée.",
++	"layout_manager.result_selected": "« %s » est la disposition active.",
++	"layout_manager.result_failed": "« %s » : %s",
++	"layout_manager.failure_busy": "une autre opération est en cours.",
++	"layout_manager.failure_provided_by_bundle": "le paquet Ergopti installé la fournit déjà.",
++	"layout_manager.failure_foreign_file": "un fichier du même nom, qu'ErgoptiPlus n'a pas installé, existe déjà.",
++	"layout_manager.failure_download": "téléchargement impossible ou fichier altéré.",
++	"layout_manager.failure_other": "l'opération a échoué (détails dans le journal).",
+ 	"llm.deps.browser_install_tip": "Téléchargez Ollama pour Windows depuis la page ouverte dans le navigateur, lancez l'installeur, puis revenez ici — la connexion sera détectée automatiquement.",
+ 	"llm.deps.done_success": "✅ Ollama prêt",
+ 	"llm.deps.fail_server_not_responding": "L’installeur s’est terminé mais le serveur Ollama ne répond pas.",
+diff --git a/static/ergopti_plus/_shared/data/locales/he.json b/static/ergopti_plus/_shared/data/locales/he.json
+index b8457dbc7..a46a6bfae 100644
+--- a/static/ergopti_plus/_shared/data/locales/he.json
++++ b/static/ergopti_plus/_shared/data/locales/he.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "פריסת Ergopti בלבד: פריסה אחרת מדומה",
+ 	"menu.layout.superseded_digit_row": "הפריסה המדומה קובעת בעצמה את שורת הספרות",
+ 	"layouts.linux_needs_python": "המרת פריסה זו עבור Linux דורשת Python 3.8 ומעלה (python3). התקינו אותו ונסו שוב.",
++	"layout_manager.window_title": "פריסות מקלדת",
++	"layout_manager.subtitle": "התקינו, עדכנו או הסירו את הפריסות שבקטלוג.",
++	"layout_manager.btn_refresh": "רענון",
++	"layout_manager.btn_close": "סגירה",
++	"layout_manager.btn_install": "התקנה",
++	"layout_manager.btn_update": "עדכון",
++	"layout_manager.btn_uninstall": "הסרה",
++	"layout_manager.btn_select": "שימוש",
++	"layout_manager.btn_homepage": "אתר",
++	"layout_manager.status_installed": "מותקנת",
++	"layout_manager.status_update": "עדכון זמין",
++	"layout_manager.status_available": "זמינה",
++	"layout_manager.status_builtin": "מובנית",
++	"layout_manager.status_provided": "הותקנה על ידי חבילת Ergopti",
++	"layout_manager.status_active": "פעילה",
++	"layout_manager.meta_author": "יוצר: %s",
++	"layout_manager.meta_licence": "רישיון: %s",
++	"layout_manager.meta_version": "גרסה %s",
++	"layout_manager.meta_installed_version": "גרסה מותקנת: %s",
++	"layout_manager.busy_install": "מתקין…",
++	"layout_manager.busy_uninstall": "מסיר…",
++	"layout_manager.source_network": "הקטלוג מעודכן.",
++	"layout_manager.source_cache": "הקטלוג מהחיבור האחרון.",
++	"layout_manager.source_bundled": "הקטלוג שמגיע עם היישום.",
++	"layout_manager.source_none": "אין קטלוג זמין.",
++	"layout_manager.error_offline": "לא ניתן להגיע למאגר: בדקו את החיבור.",
++	"layout_manager.error_http": "המאגר השיב בשגיאה (%s).",
++	"layout_manager.error_generic": "לא ניתן להשתמש בקטלוג שהתקבל (%s).",
++	"layout_manager.error_record": "לא ניתן לקרוא את רשימת הפריסות המותקנות.",
++	"layout_manager.empty": "אין בקטלוג פריסה זמינה למערכת זו.",
++	"layout_manager.result_installed": "„%s” הותקנה.",
++	"layout_manager.result_installed_not_enabled": "„%s” הותקנה: הוסיפו אותה בהגדרות המערכת > מקלדת > מקורות קלט.",
++	"layout_manager.result_uninstalled": "„%s” הוסרה.",
++	"layout_manager.result_selected": "„%s” היא הפריסה הפעילה.",
++	"layout_manager.result_failed": "„%s”: %s",
++	"layout_manager.failure_busy": "פעולה אחרת מתבצעת.",
++	"layout_manager.failure_provided_by_bundle": "חבילת Ergopti המותקנת כבר מספקת אותה.",
++	"layout_manager.failure_foreign_file": "כבר קיים קובץ באותו שם ש-ErgoptiPlus לא התקין.",
++	"layout_manager.failure_download": "ההורדה נכשלה או שהקובץ שונה.",
++	"layout_manager.failure_other": "הפעולה נכשלה (פרטים ביומן).",
+ 	"llm.deps.browser_install_tip": "הורד את Ollama עבור Windows מהדף שנפתח בדפדפן, הפעל את תוכנת ההתקנה וחזור לכאן — החיבור יזוהה אוטומטית.",
+ 	"llm.deps.done_success": "✅ Ollama מוכן",
+ 	"llm.deps.fail_server_not_responding": "תוכנית ההתקנה סיימה אך שרת Ollama אינו מגיב.",
+diff --git a/static/ergopti_plus/_shared/data/locales/hi.json b/static/ergopti_plus/_shared/data/locales/hi.json
+index a83133d2e..f6cca964f 100644
+--- a/static/ergopti_plus/_shared/data/locales/hi.json
++++ b/static/ergopti_plus/_shared/data/locales/hi.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "केवल Ergopti लेआउट: किसी दूसरे लेआउट का अनुकरण हो रहा है",
+ 	"menu.layout.superseded_digit_row": "अनुकरण किया गया लेआउट अपनी अंकों की पंक्ति स्वयं तय करता है",
+ 	"layouts.linux_needs_python": "इस लेआउट को Linux के लिए बदलने हेतु Python 3.8 या नया (python3) आवश्यक है। इसे इंस्टॉल करें, फिर दोबारा प्रयास करें।",
++	"layout_manager.window_title": "कीबोर्ड लेआउट",
++	"layout_manager.subtitle": "कैटलॉग के लेआउट इंस्टॉल, अपडेट या अनइंस्टॉल करें।",
++	"layout_manager.btn_refresh": "रीफ़्रेश करें",
++	"layout_manager.btn_close": "बंद करें",
++	"layout_manager.btn_install": "इंस्टॉल करें",
++	"layout_manager.btn_update": "अपडेट करें",
++	"layout_manager.btn_uninstall": "अनइंस्टॉल करें",
++	"layout_manager.btn_select": "उपयोग करें",
++	"layout_manager.btn_homepage": "वेबसाइट",
++	"layout_manager.status_installed": "इंस्टॉल है",
++	"layout_manager.status_update": "अपडेट उपलब्ध",
++	"layout_manager.status_available": "उपलब्ध",
++	"layout_manager.status_builtin": "अंतर्निहित",
++	"layout_manager.status_provided": "Ergopti बंडल द्वारा इंस्टॉल",
++	"layout_manager.status_active": "सक्रिय",
++	"layout_manager.meta_author": "लेखक: %s",
++	"layout_manager.meta_licence": "लाइसेंस: %s",
++	"layout_manager.meta_version": "संस्करण %s",
++	"layout_manager.meta_installed_version": "इंस्टॉल किया गया संस्करण: %s",
++	"layout_manager.busy_install": "इंस्टॉल हो रहा है…",
++	"layout_manager.busy_uninstall": "अनइंस्टॉल हो रहा है…",
++	"layout_manager.source_network": "कैटलॉग अद्यतन है।",
++	"layout_manager.source_cache": "पिछले कनेक्शन का कैटलॉग।",
++	"layout_manager.source_bundled": "ऐप के साथ आया कैटलॉग।",
++	"layout_manager.source_none": "कोई कैटलॉग उपलब्ध नहीं है।",
++	"layout_manager.error_offline": "रजिस्ट्री तक नहीं पहुँच सके: कनेक्शन जाँचें।",
++	"layout_manager.error_http": "रजिस्ट्री ने त्रुटि लौटाई (%s)।",
++	"layout_manager.error_generic": "प्राप्त कैटलॉग उपयोग योग्य नहीं है (%s)।",
++	"layout_manager.error_record": "इंस्टॉल किए गए लेआउट की सूची पढ़ी नहीं जा सकती।",
++	"layout_manager.empty": "इस कैटलॉग का कोई लेआउट इस सिस्टम के लिए उपलब्ध नहीं है।",
++	"layout_manager.result_installed": "“%s” इंस्टॉल हो गया है।",
++	"layout_manager.result_installed_not_enabled": "“%s” इंस्टॉल हो गया है: इसे सिस्टम सेटिंग्स > कीबोर्ड > इनपुट स्रोत में जोड़ें।",
++	"layout_manager.result_uninstalled": "“%s” अनइंस्टॉल हो गया है।",
++	"layout_manager.result_selected": "“%s” सक्रिय लेआउट है।",
++	"layout_manager.result_failed": "“%s”: %s",
++	"layout_manager.failure_busy": "दूसरा कार्य चल रहा है।",
++	"layout_manager.failure_provided_by_bundle": "इंस्टॉल किया गया Ergopti बंडल इसे पहले से देता है।",
++	"layout_manager.failure_foreign_file": "उसी नाम की एक फ़ाइल पहले से है जिसे ErgoptiPlus ने इंस्टॉल नहीं किया।",
++	"layout_manager.failure_download": "डाउनलोड विफल हुआ या फ़ाइल बदली गई थी।",
++	"layout_manager.failure_other": "कार्य विफल हुआ (विवरण लॉग में)।",
+ 	"llm.deps.browser_install_tip": "ब्राउज़र में खुले पृष्ठ से Windows के लिए Ollama डाउनलोड करें, इंस्टॉलर चलाएँ, फिर यहाँ वापस आएँ — कनेक्शन स्वचालित रूप से पहचाना जाएगा।",
+ 	"llm.deps.done_success": "✅ Ollama तैयार है",
+ 	"llm.deps.fail_server_not_responding": "इंस्टॉलर समाप्त हो गया लेकिन Ollama सर्वर प्रतिक्रिया नहीं दे रहा।",
+diff --git a/static/ergopti_plus/_shared/data/locales/it.json b/static/ergopti_plus/_shared/data/locales/it.json
+index 5075180d5..372cce5e5 100644
+--- a/static/ergopti_plus/_shared/data/locales/it.json
++++ b/static/ergopti_plus/_shared/data/locales/it.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Solo layout Ergopti: è emulato un altro layout",
+ 	"menu.layout.superseded_digit_row": "Il layout emulato definisce la propria riga dei numeri",
+ 	"layouts.linux_needs_python": "La conversione di questo layout per Linux richiede Python 3.8 o successivo (python3). Installalo, poi riprova.",
++	"layout_manager.window_title": "Layout di tastiera",
++	"layout_manager.subtitle": "Installa, aggiorna o disinstalla i layout del catalogo.",
++	"layout_manager.btn_refresh": "Aggiorna",
++	"layout_manager.btn_close": "Chiudi",
++	"layout_manager.btn_install": "Installa",
++	"layout_manager.btn_update": "Aggiorna",
++	"layout_manager.btn_uninstall": "Disinstalla",
++	"layout_manager.btn_select": "Usa",
++	"layout_manager.btn_homepage": "Sito",
++	"layout_manager.status_installed": "Installato",
++	"layout_manager.status_update": "Aggiornamento disponibile",
++	"layout_manager.status_available": "Disponibile",
++	"layout_manager.status_builtin": "Integrato",
++	"layout_manager.status_provided": "Installato dal pacchetto Ergopti",
++	"layout_manager.status_active": "Attivo",
++	"layout_manager.meta_author": "Autore: %s",
++	"layout_manager.meta_licence": "Licenza: %s",
++	"layout_manager.meta_version": "Versione %s",
++	"layout_manager.meta_installed_version": "Versione installata: %s",
++	"layout_manager.busy_install": "Installazione…",
++	"layout_manager.busy_uninstall": "Disinstallazione…",
++	"layout_manager.source_network": "Catalogo aggiornato.",
++	"layout_manager.source_cache": "Catalogo dell'ultima connessione.",
++	"layout_manager.source_bundled": "Catalogo fornito con l'app.",
++	"layout_manager.source_none": "Nessun catalogo disponibile.",
++	"layout_manager.error_offline": "Registro non raggiungibile: controlla la connessione.",
++	"layout_manager.error_http": "Il registro ha risposto con un errore (%s).",
++	"layout_manager.error_generic": "Il catalogo ricevuto non è utilizzabile (%s).",
++	"layout_manager.error_record": "L'elenco dei layout installati è illeggibile.",
++	"layout_manager.empty": "Nessun layout di questo catalogo è disponibile per questo sistema.",
++	"layout_manager.result_installed": "«%s» è installato.",
++	"layout_manager.result_installed_not_enabled": "«%s» è installato: aggiungilo in Impostazioni di Sistema > Tastiera > Sorgenti di input.",
++	"layout_manager.result_uninstalled": "«%s» è disinstallato.",
++	"layout_manager.result_selected": "«%s» è il layout attivo.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "è in corso un'altra operazione.",
++	"layout_manager.failure_provided_by_bundle": "il pacchetto Ergopti installato lo fornisce già.",
++	"layout_manager.failure_foreign_file": "esiste già un file con lo stesso nome che ErgoptiPlus non ha installato.",
++	"layout_manager.failure_download": "il download non è riuscito o il file è stato alterato.",
++	"layout_manager.failure_other": "l'operazione non è riuscita (dettagli nel registro).",
+ 	"llm.deps.browser_install_tip": "Scarica Ollama per Windows dalla pagina appena aperta nel browser, esegui l'installer e torna qui — la connessione sarà rilevata automaticamente.",
+ 	"llm.deps.done_success": "✅ Ollama pronto",
+ 	"llm.deps.fail_server_not_responding": "Il programma d’installazione è terminato ma il server Ollama non risponde.",
+diff --git a/static/ergopti_plus/_shared/data/locales/ja.json b/static/ergopti_plus/_shared/data/locales/ja.json
+index 8ea6603d5..27720812d 100644
+--- a/static/ergopti_plus/_shared/data/locales/ja.json
++++ b/static/ergopti_plus/_shared/data/locales/ja.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Ergopti 配列専用：別の配列をエミュレート中",
+ 	"menu.layout.superseded_digit_row": "エミュレート中の配列が数字の列を決めます",
+ 	"layouts.linux_needs_python": "この配列を Linux 用に変換するには Python 3.8 以降（python3）が必要です。インストールしてから、もう一度お試しください。",
++	"layout_manager.window_title": "キーボード配列",
++	"layout_manager.subtitle": "カタログの配列をインストール、更新、またはアンインストールします。",
++	"layout_manager.btn_refresh": "再読み込み",
++	"layout_manager.btn_close": "閉じる",
++	"layout_manager.btn_install": "インストール",
++	"layout_manager.btn_update": "更新",
++	"layout_manager.btn_uninstall": "アンインストール",
++	"layout_manager.btn_select": "使用する",
++	"layout_manager.btn_homepage": "ウェブサイト",
++	"layout_manager.status_installed": "インストール済み",
++	"layout_manager.status_update": "更新あり",
++	"layout_manager.status_available": "利用可能",
++	"layout_manager.status_builtin": "内蔵",
++	"layout_manager.status_provided": "Ergopti バンドルでインストール済み",
++	"layout_manager.status_active": "使用中",
++	"layout_manager.meta_author": "作者：%s",
++	"layout_manager.meta_licence": "ライセンス：%s",
++	"layout_manager.meta_version": "バージョン %s",
++	"layout_manager.meta_installed_version": "インストール済みバージョン：%s",
++	"layout_manager.busy_install": "インストール中…",
++	"layout_manager.busy_uninstall": "アンインストール中…",
++	"layout_manager.source_network": "カタログは最新です。",
++	"layout_manager.source_cache": "前回接続時のカタログです。",
++	"layout_manager.source_bundled": "アプリに同梱のカタログです。",
++	"layout_manager.source_none": "利用できるカタログがありません。",
++	"layout_manager.error_offline": "レジストリに接続できません。接続を確認してください。",
++	"layout_manager.error_http": "レジストリがエラーを返しました（%s）。",
++	"layout_manager.error_generic": "受信したカタログは使用できません（%s）。",
++	"layout_manager.error_record": "インストール済み配列の一覧を読み取れません。",
++	"layout_manager.empty": "このカタログにはこのシステムで使える配列がありません。",
++	"layout_manager.result_installed": "「%s」をインストールしました。",
++	"layout_manager.result_installed_not_enabled": "「%s」をインストールしました。システム設定 > キーボード > 入力ソースで追加してください。",
++	"layout_manager.result_uninstalled": "「%s」をアンインストールしました。",
++	"layout_manager.result_selected": "「%s」が現在の配列です。",
++	"layout_manager.result_failed": "「%s」：%s",
++	"layout_manager.failure_busy": "別の処理を実行中です。",
++	"layout_manager.failure_provided_by_bundle": "インストール済みの Ergopti バンドルがすでに提供しています。",
++	"layout_manager.failure_foreign_file": "ErgoptiPlus がインストールしていない同名のファイルがすでにあります。",
++	"layout_manager.failure_download": "ダウンロードに失敗したか、ファイルが改変されています。",
++	"layout_manager.failure_other": "処理に失敗しました（詳細はログを参照）。",
+ 	"llm.deps.browser_install_tip": "ブラウザで開いたページから Windows 用 Ollama をダウンロードし、インストーラを実行してここに戻ってください。接続は自動的に検出されます。",
+ 	"llm.deps.done_success": "✅ Ollama 準備完了",
+ 	"llm.deps.fail_server_not_responding": "インストーラーが終了しましたが、Ollamaサーバーが応答しません。",
+diff --git a/static/ergopti_plus/_shared/data/locales/ko.json b/static/ergopti_plus/_shared/data/locales/ko.json
+index 0e75d8ab6..5f13cf4f1 100644
+--- a/static/ergopti_plus/_shared/data/locales/ko.json
++++ b/static/ergopti_plus/_shared/data/locales/ko.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Ergopti 자판 전용: 다른 자판을 에뮬레이션하는 중",
+ 	"menu.layout.superseded_digit_row": "에뮬레이션 중인 자판이 숫자 줄을 직접 정합니다",
+ 	"layouts.linux_needs_python": "이 자판을 Linux용으로 변환하려면 Python 3.8 이상(python3)이 필요합니다. 설치한 뒤 다시 시도하세요.",
++	"layout_manager.window_title": "키보드 자판",
++	"layout_manager.subtitle": "카탈로그의 자판을 설치, 업데이트 또는 제거합니다.",
++	"layout_manager.btn_refresh": "새로 고침",
++	"layout_manager.btn_close": "닫기",
++	"layout_manager.btn_install": "설치",
++	"layout_manager.btn_update": "업데이트",
++	"layout_manager.btn_uninstall": "제거",
++	"layout_manager.btn_select": "사용",
++	"layout_manager.btn_homepage": "웹사이트",
++	"layout_manager.status_installed": "설치됨",
++	"layout_manager.status_update": "업데이트 있음",
++	"layout_manager.status_available": "사용 가능",
++	"layout_manager.status_builtin": "내장",
++	"layout_manager.status_provided": "Ergopti 번들로 설치됨",
++	"layout_manager.status_active": "사용 중",
++	"layout_manager.meta_author": "제작자: %s",
++	"layout_manager.meta_licence": "라이선스: %s",
++	"layout_manager.meta_version": "버전 %s",
++	"layout_manager.meta_installed_version": "설치된 버전: %s",
++	"layout_manager.busy_install": "설치 중…",
++	"layout_manager.busy_uninstall": "제거 중…",
++	"layout_manager.source_network": "카탈로그가 최신 상태입니다.",
++	"layout_manager.source_cache": "마지막 연결 때의 카탈로그입니다.",
++	"layout_manager.source_bundled": "앱에 포함된 카탈로그입니다.",
++	"layout_manager.source_none": "사용할 수 있는 카탈로그가 없습니다.",
++	"layout_manager.error_offline": "레지스트리에 연결할 수 없습니다. 연결을 확인하세요.",
++	"layout_manager.error_http": "레지스트리가 오류를 반환했습니다(%s).",
++	"layout_manager.error_generic": "받은 카탈로그를 사용할 수 없습니다(%s).",
++	"layout_manager.error_record": "설치된 자판 목록을 읽을 수 없습니다.",
++	"layout_manager.empty": "이 카탈로그에는 이 시스템용 자판이 없습니다.",
++	"layout_manager.result_installed": "“%s” 설치를 마쳤습니다.",
++	"layout_manager.result_installed_not_enabled": "“%s” 설치를 마쳤습니다. 시스템 설정 > 키보드 > 입력 소스에서 추가하세요.",
++	"layout_manager.result_uninstalled": "“%s” 제거를 마쳤습니다.",
++	"layout_manager.result_selected": "“%s”이(가) 현재 자판입니다.",
++	"layout_manager.result_failed": "“%s”: %s",
++	"layout_manager.failure_busy": "다른 작업이 진행 중입니다.",
++	"layout_manager.failure_provided_by_bundle": "설치된 Ergopti 번들이 이미 제공합니다.",
++	"layout_manager.failure_foreign_file": "ErgoptiPlus가 설치하지 않은 같은 이름의 파일이 이미 있습니다.",
++	"layout_manager.failure_download": "다운로드에 실패했거나 파일이 변조되었습니다.",
++	"layout_manager.failure_other": "작업에 실패했습니다(자세한 내용은 로그 참조).",
+ 	"llm.deps.browser_install_tip": "브라우저에서 열린 페이지에서 Windows용 Ollama를 다운로드하고 설치 프로그램을 실행한 후 다시 돌아오세요 — 연결이 자동으로 감지됩니다.",
+ 	"llm.deps.done_success": "✅ Ollama 逌비됨",
+ 	"llm.deps.fail_server_not_responding": "설치 프로그램이 종료되었지만 Ollama 서버가 응답하지 않습니다.",
+diff --git a/static/ergopti_plus/_shared/data/locales/nl.json b/static/ergopti_plus/_shared/data/locales/nl.json
+index 597e6a495..67d8e7de3 100644
+--- a/static/ergopti_plus/_shared/data/locales/nl.json
++++ b/static/ergopti_plus/_shared/data/locales/nl.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Alleen Ergopti-indeling: een andere indeling wordt geëmuleerd",
+ 	"menu.layout.superseded_digit_row": "De geëmuleerde indeling bepaalt zelf haar cijferrij",
+ 	"layouts.linux_needs_python": "Het omzetten van deze indeling voor Linux vereist Python 3.8 of nieuwer (python3). Installeer het en probeer het opnieuw.",
++	"layout_manager.window_title": "Toetsenbordindelingen",
++	"layout_manager.subtitle": "Installeer, werk bij of verwijder de indelingen uit de catalogus.",
++	"layout_manager.btn_refresh": "Vernieuwen",
++	"layout_manager.btn_close": "Sluiten",
++	"layout_manager.btn_install": "Installeren",
++	"layout_manager.btn_update": "Bijwerken",
++	"layout_manager.btn_uninstall": "Verwijderen",
++	"layout_manager.btn_select": "Gebruiken",
++	"layout_manager.btn_homepage": "Website",
++	"layout_manager.status_installed": "Geïnstalleerd",
++	"layout_manager.status_update": "Update beschikbaar",
++	"layout_manager.status_available": "Beschikbaar",
++	"layout_manager.status_builtin": "Ingebouwd",
++	"layout_manager.status_provided": "Geïnstalleerd door het Ergopti-pakket",
++	"layout_manager.status_active": "Actief",
++	"layout_manager.meta_author": "Auteur: %s",
++	"layout_manager.meta_licence": "Licentie: %s",
++	"layout_manager.meta_version": "Versie %s",
++	"layout_manager.meta_installed_version": "Geïnstalleerde versie: %s",
++	"layout_manager.busy_install": "Bezig met installeren…",
++	"layout_manager.busy_uninstall": "Bezig met verwijderen…",
++	"layout_manager.source_network": "Catalogus is bijgewerkt.",
++	"layout_manager.source_cache": "Catalogus van de laatste verbinding.",
++	"layout_manager.source_bundled": "Catalogus die met de app is meegeleverd.",
++	"layout_manager.source_none": "Geen catalogus beschikbaar.",
++	"layout_manager.error_offline": "Register onbereikbaar: controleer de verbinding.",
++	"layout_manager.error_http": "Het register gaf een fout terug (%s).",
++	"layout_manager.error_generic": "De ontvangen catalogus is onbruikbaar (%s).",
++	"layout_manager.error_record": "De lijst met geïnstalleerde indelingen is onleesbaar.",
++	"layout_manager.empty": "Geen indeling uit deze catalogus is beschikbaar voor dit systeem.",
++	"layout_manager.result_installed": "‘%s’ is geïnstalleerd.",
++	"layout_manager.result_installed_not_enabled": "‘%s’ is geïnstalleerd: voeg de indeling toe in Systeeminstellingen > Toetsenbord > Invoerbronnen.",
++	"layout_manager.result_uninstalled": "‘%s’ is verwijderd.",
++	"layout_manager.result_selected": "‘%s’ is de actieve indeling.",
++	"layout_manager.result_failed": "‘%s’: %s",
++	"layout_manager.failure_busy": "er loopt al een andere bewerking.",
++	"layout_manager.failure_provided_by_bundle": "het geïnstalleerde Ergopti-pakket levert deze al.",
++	"layout_manager.failure_foreign_file": "er bestaat al een bestand met dezelfde naam dat ErgoptiPlus niet heeft geïnstalleerd.",
++	"layout_manager.failure_download": "het downloaden is mislukt of het bestand is gewijzigd.",
++	"layout_manager.failure_other": "de bewerking is mislukt (details in het logboek).",
+ 	"llm.deps.browser_install_tip": "Download Ollama voor Windows van de pagina die net in je browser is geopend, voer het installatieprogramma uit en kom terug — de verbinding wordt automatisch gedetecteerd.",
+ 	"llm.deps.done_success": "✅ Ollama klaar",
+ 	"llm.deps.fail_server_not_responding": "Installatieprogramma beëindigd, maar de Ollama-server reageert niet.",
+diff --git a/static/ergopti_plus/_shared/data/locales/no.json b/static/ergopti_plus/_shared/data/locales/no.json
+index 9b00cce26..32d88f71b 100644
+--- a/static/ergopti_plus/_shared/data/locales/no.json
++++ b/static/ergopti_plus/_shared/data/locales/no.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Kun Ergopti-oppsett: et annet tastaturoppsett emuleres",
+ 	"menu.layout.superseded_digit_row": "Det emulerte oppsettet bestemmer selv tallraden",
+ 	"layouts.linux_needs_python": "Konvertering av dette tastaturoppsettet for Linux krever Python 3.8 eller nyere (python3). Installer det, og prøv igjen.",
++	"layout_manager.window_title": "Tastaturoppsett",
++	"layout_manager.subtitle": "Installer, oppdater eller avinstaller oppsettene i katalogen.",
++	"layout_manager.btn_refresh": "Oppdater",
++	"layout_manager.btn_close": "Lukk",
++	"layout_manager.btn_install": "Installer",
++	"layout_manager.btn_update": "Oppdater",
++	"layout_manager.btn_uninstall": "Avinstaller",
++	"layout_manager.btn_select": "Bruk",
++	"layout_manager.btn_homepage": "Nettsted",
++	"layout_manager.status_installed": "Installert",
++	"layout_manager.status_update": "Oppdatering tilgjengelig",
++	"layout_manager.status_available": "Tilgjengelig",
++	"layout_manager.status_builtin": "Innebygd",
++	"layout_manager.status_provided": "Installert av Ergopti-pakken",
++	"layout_manager.status_active": "Aktiv",
++	"layout_manager.meta_author": "Forfatter: %s",
++	"layout_manager.meta_licence": "Lisens: %s",
++	"layout_manager.meta_version": "Versjon %s",
++	"layout_manager.meta_installed_version": "Installert versjon: %s",
++	"layout_manager.busy_install": "Installerer…",
++	"layout_manager.busy_uninstall": "Avinstallerer…",
++	"layout_manager.source_network": "Katalogen er oppdatert.",
++	"layout_manager.source_cache": "Katalog fra siste tilkobling.",
++	"layout_manager.source_bundled": "Katalog levert med appen.",
++	"layout_manager.source_none": "Ingen katalog tilgjengelig.",
++	"layout_manager.error_offline": "Registeret kan ikke nås: kontroller tilkoblingen.",
++	"layout_manager.error_http": "Registeret svarte med en feil (%s).",
++	"layout_manager.error_generic": "Den mottatte katalogen er ubrukelig (%s).",
++	"layout_manager.error_record": "Listen over installerte oppsett kan ikke leses.",
++	"layout_manager.empty": "Ingen oppsett i denne katalogen er tilgjengelig for dette systemet.",
++	"layout_manager.result_installed": "«%s» er installert.",
++	"layout_manager.result_installed_not_enabled": "«%s» er installert: legg det til i Systeminnstillinger > Tastatur > Inndatakilder.",
++	"layout_manager.result_uninstalled": "«%s» er avinstallert.",
++	"layout_manager.result_selected": "«%s» er det aktive oppsettet.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "en annen handling pågår.",
++	"layout_manager.failure_provided_by_bundle": "den installerte Ergopti-pakken leverer det allerede.",
++	"layout_manager.failure_foreign_file": "det finnes allerede en fil med samme navn som ErgoptiPlus ikke har installert.",
++	"layout_manager.failure_download": "nedlastingen mislyktes, eller filen er endret.",
++	"layout_manager.failure_other": "handlingen mislyktes (detaljer i loggen).",
+ 	"llm.deps.browser_install_tip": "Last ned Ollama for Windows fra siden som åpnet seg i nettleseren, kjør installasjonsprogrammet og kom tilbake — tilkoblingen oppdages automatisk.",
+ 	"llm.deps.done_success": "✅ Ollama klar",
+ 	"llm.deps.fail_server_not_responding": "Installasjonsprogrammet er ferdig, men Ollama-serveren svarer ikke.",
+diff --git a/static/ergopti_plus/_shared/data/locales/pl.json b/static/ergopti_plus/_shared/data/locales/pl.json
+index bb30c1642..9fbc4fb3f 100644
+--- a/static/ergopti_plus/_shared/data/locales/pl.json
++++ b/static/ergopti_plus/_shared/data/locales/pl.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Tylko układ Ergopti: emulowany jest inny układ",
+ 	"menu.layout.superseded_digit_row": "Emulowany układ sam określa rząd cyfr",
+ 	"layouts.linux_needs_python": "Konwersja tego układu dla systemu Linux wymaga Pythona 3.8 lub nowszego (python3). Zainstaluj go i spróbuj ponownie.",
++	"layout_manager.window_title": "Układy klawiatury",
++	"layout_manager.subtitle": "Instaluj, aktualizuj lub odinstalowuj układy z katalogu.",
++	"layout_manager.btn_refresh": "Odśwież",
++	"layout_manager.btn_close": "Zamknij",
++	"layout_manager.btn_install": "Zainstaluj",
++	"layout_manager.btn_update": "Zaktualizuj",
++	"layout_manager.btn_uninstall": "Odinstaluj",
++	"layout_manager.btn_select": "Użyj",
++	"layout_manager.btn_homepage": "Strona",
++	"layout_manager.status_installed": "Zainstalowany",
++	"layout_manager.status_update": "Dostępna aktualizacja",
++	"layout_manager.status_available": "Dostępny",
++	"layout_manager.status_builtin": "Wbudowany",
++	"layout_manager.status_provided": "Zainstalowany przez pakiet Ergopti",
++	"layout_manager.status_active": "Aktywny",
++	"layout_manager.meta_author": "Autor: %s",
++	"layout_manager.meta_licence": "Licencja: %s",
++	"layout_manager.meta_version": "Wersja %s",
++	"layout_manager.meta_installed_version": "Zainstalowana wersja: %s",
++	"layout_manager.busy_install": "Instalowanie…",
++	"layout_manager.busy_uninstall": "Odinstalowywanie…",
++	"layout_manager.source_network": "Katalog jest aktualny.",
++	"layout_manager.source_cache": "Katalog z ostatniego połączenia.",
++	"layout_manager.source_bundled": "Katalog dostarczony z aplikacją.",
++	"layout_manager.source_none": "Brak dostępnego katalogu.",
++	"layout_manager.error_offline": "Rejestr jest niedostępny: sprawdź połączenie.",
++	"layout_manager.error_http": "Rejestr odpowiedział błędem (%s).",
++	"layout_manager.error_generic": "Otrzymany katalog jest nieużyteczny (%s).",
++	"layout_manager.error_record": "Nie można odczytać listy zainstalowanych układów.",
++	"layout_manager.empty": "Żaden układ z tego katalogu nie jest dostępny dla tego systemu.",
++	"layout_manager.result_installed": "„%s” został zainstalowany.",
++	"layout_manager.result_installed_not_enabled": "„%s” został zainstalowany: dodaj go w Ustawieniach systemowych > Klawiatura > Źródła wprowadzania.",
++	"layout_manager.result_uninstalled": "„%s” został odinstalowany.",
++	"layout_manager.result_selected": "„%s” jest aktywnym układem.",
++	"layout_manager.result_failed": "„%s”: %s",
++	"layout_manager.failure_busy": "trwa inna operacja.",
++	"layout_manager.failure_provided_by_bundle": "zainstalowany pakiet Ergopti już go zapewnia.",
++	"layout_manager.failure_foreign_file": "istnieje już plik o tej samej nazwie, którego ErgoptiPlus nie zainstalował.",
++	"layout_manager.failure_download": "pobieranie nie powiodło się lub plik został zmieniony.",
++	"layout_manager.failure_other": "operacja nie powiodła się (szczegóły w dzienniku).",
+ 	"llm.deps.browser_install_tip": "Pobierz Ollama dla Windows ze strony otwartej w przeglądarce, uruchom instalator i wróć tutaj — połączenie zostanie wykryte automatycznie.",
+ 	"llm.deps.done_success": "✅ Ollama gotowy",
+ 	"llm.deps.fail_server_not_responding": "Instalator zakończył działanie, ale serwer Ollama nie odpowiada.",
+diff --git a/static/ergopti_plus/_shared/data/locales/pt.json b/static/ergopti_plus/_shared/data/locales/pt.json
+index a7f2664fd..067a63a4f 100644
+--- a/static/ergopti_plus/_shared/data/locales/pt.json
++++ b/static/ergopti_plus/_shared/data/locales/pt.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Apenas disposição Ergopti: outra disposição está a ser emulada",
+ 	"menu.layout.superseded_digit_row": "A disposição emulada define a sua própria fila de números",
+ 	"layouts.linux_needs_python": "Converter esta disposição para Linux requer Python 3.8 ou mais recente (python3). Instale-o e tente novamente.",
++	"layout_manager.window_title": "Disposições de teclado",
++	"layout_manager.subtitle": "Instale, atualize ou desinstale as disposições do catálogo.",
++	"layout_manager.btn_refresh": "Atualizar",
++	"layout_manager.btn_close": "Fechar",
++	"layout_manager.btn_install": "Instalar",
++	"layout_manager.btn_update": "Atualizar",
++	"layout_manager.btn_uninstall": "Desinstalar",
++	"layout_manager.btn_select": "Usar",
++	"layout_manager.btn_homepage": "Site",
++	"layout_manager.status_installed": "Instalada",
++	"layout_manager.status_update": "Atualização disponível",
++	"layout_manager.status_available": "Disponível",
++	"layout_manager.status_builtin": "Integrada",
++	"layout_manager.status_provided": "Instalada pelo pacote Ergopti",
++	"layout_manager.status_active": "Ativa",
++	"layout_manager.meta_author": "Autor: %s",
++	"layout_manager.meta_licence": "Licença: %s",
++	"layout_manager.meta_version": "Versão %s",
++	"layout_manager.meta_installed_version": "Versão instalada: %s",
++	"layout_manager.busy_install": "A instalar…",
++	"layout_manager.busy_uninstall": "A desinstalar…",
++	"layout_manager.source_network": "Catálogo atualizado.",
++	"layout_manager.source_cache": "Catálogo da última ligação.",
++	"layout_manager.source_bundled": "Catálogo fornecido com a aplicação.",
++	"layout_manager.source_none": "Nenhum catálogo disponível.",
++	"layout_manager.error_offline": "Registo inacessível: verifique a ligação.",
++	"layout_manager.error_http": "O registo respondeu com um erro (%s).",
++	"layout_manager.error_generic": "O catálogo recebido é inutilizável (%s).",
++	"layout_manager.error_record": "A lista das disposições instaladas está ilegível.",
++	"layout_manager.empty": "Nenhuma disposição deste catálogo está disponível para este sistema.",
++	"layout_manager.result_installed": "«%s» está instalada.",
++	"layout_manager.result_installed_not_enabled": "«%s» está instalada: adicione-a em Definições do Sistema > Teclado > Fontes de entrada.",
++	"layout_manager.result_uninstalled": "«%s» está desinstalada.",
++	"layout_manager.result_selected": "«%s» é a disposição ativa.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "outra operação está em curso.",
++	"layout_manager.failure_provided_by_bundle": "o pacote Ergopti instalado já a fornece.",
++	"layout_manager.failure_foreign_file": "já existe um ficheiro com o mesmo nome que o ErgoptiPlus não instalou.",
++	"layout_manager.failure_download": "a transferência falhou ou o ficheiro foi alterado.",
++	"layout_manager.failure_other": "a operação falhou (detalhes no registo).",
+ 	"llm.deps.browser_install_tip": "Baixe o Ollama para Windows da página aberta no seu navegador, execute o instalador e volte aqui — a conexão será detectada automaticamente.",
+ 	"llm.deps.done_success": "✅ Ollama pronto",
+ 	"llm.deps.fail_server_not_responding": "O instalador terminou mas o servidor Ollama não está a responder.",
+diff --git a/static/ergopti_plus/_shared/data/locales/ru.json b/static/ergopti_plus/_shared/data/locales/ru.json
+index f96e711fe..d5f4434e7 100644
+--- a/static/ergopti_plus/_shared/data/locales/ru.json
++++ b/static/ergopti_plus/_shared/data/locales/ru.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Только раскладка Ergopti: эмулируется другая раскладка",
+ 	"menu.layout.superseded_digit_row": "Эмулируемая раскладка сама задаёт ряд цифр",
+ 	"layouts.linux_needs_python": "Для преобразования этой раскладки для Linux нужен Python 3.8 или новее (python3). Установите его и повторите попытку.",
++	"layout_manager.window_title": "Раскладки клавиатуры",
++	"layout_manager.subtitle": "Установка, обновление и удаление раскладок из каталога.",
++	"layout_manager.btn_refresh": "Обновить",
++	"layout_manager.btn_close": "Закрыть",
++	"layout_manager.btn_install": "Установить",
++	"layout_manager.btn_update": "Обновить",
++	"layout_manager.btn_uninstall": "Удалить",
++	"layout_manager.btn_select": "Использовать",
++	"layout_manager.btn_homepage": "Сайт",
++	"layout_manager.status_installed": "Установлена",
++	"layout_manager.status_update": "Доступно обновление",
++	"layout_manager.status_available": "Доступна",
++	"layout_manager.status_builtin": "Встроенная",
++	"layout_manager.status_provided": "Установлена пакетом Ergopti",
++	"layout_manager.status_active": "Активна",
++	"layout_manager.meta_author": "Автор: %s",
++	"layout_manager.meta_licence": "Лицензия: %s",
++	"layout_manager.meta_version": "Версия %s",
++	"layout_manager.meta_installed_version": "Установленная версия: %s",
++	"layout_manager.busy_install": "Установка…",
++	"layout_manager.busy_uninstall": "Удаление…",
++	"layout_manager.source_network": "Каталог актуален.",
++	"layout_manager.source_cache": "Каталог последнего подключения.",
++	"layout_manager.source_bundled": "Каталог, поставляемый с приложением.",
++	"layout_manager.source_none": "Каталог недоступен.",
++	"layout_manager.error_offline": "Реестр недоступен: проверьте подключение.",
++	"layout_manager.error_http": "Реестр ответил ошибкой (%s).",
++	"layout_manager.error_generic": "Полученный каталог непригоден (%s).",
++	"layout_manager.error_record": "Список установленных раскладок нечитаем.",
++	"layout_manager.empty": "В каталоге нет раскладок для этой системы.",
++	"layout_manager.result_installed": "«%s» установлена.",
++	"layout_manager.result_installed_not_enabled": "«%s» установлена: добавьте её в Системных настройках > Клавиатура > Источники ввода.",
++	"layout_manager.result_uninstalled": "«%s» удалена.",
++	"layout_manager.result_selected": "«%s» — активная раскладка.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "выполняется другая операция.",
++	"layout_manager.failure_provided_by_bundle": "установленный пакет Ergopti уже её предоставляет.",
++	"layout_manager.failure_foreign_file": "уже существует файл с тем же именем, не установленный ErgoptiPlus.",
++	"layout_manager.failure_download": "загрузка не удалась или файл изменён.",
++	"layout_manager.failure_other": "операция не удалась (подробности в журнале).",
+ 	"llm.deps.browser_install_tip": "Скачайте Ollama для Windows со страницы, открывшейся в браузере, запустите установщик и вернитесь сюда — подключение будет обнаружено автоматически.",
+ 	"llm.deps.done_success": "✅ Ollama готов",
+ 	"llm.deps.fail_server_not_responding": "Установщик завершился, но сервер Ollama не отвечает.",
+diff --git a/static/ergopti_plus/_shared/data/locales/sv.json b/static/ergopti_plus/_shared/data/locales/sv.json
+index 495f6720a..ac9d59b78 100644
+--- a/static/ergopti_plus/_shared/data/locales/sv.json
++++ b/static/ergopti_plus/_shared/data/locales/sv.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Endast Ergopti-layout: en annan layout emuleras",
+ 	"menu.layout.superseded_digit_row": "Den emulerade layouten bestämmer själv sin sifferrad",
+ 	"layouts.linux_needs_python": "Att konvertera den här tangentbordslayouten för Linux kräver Python 3.8 eller senare (python3). Installera det och försök igen.",
++	"layout_manager.window_title": "Tangentbordslayouter",
++	"layout_manager.subtitle": "Installera, uppdatera eller avinstallera katalogens layouter.",
++	"layout_manager.btn_refresh": "Uppdatera",
++	"layout_manager.btn_close": "Stäng",
++	"layout_manager.btn_install": "Installera",
++	"layout_manager.btn_update": "Uppdatera",
++	"layout_manager.btn_uninstall": "Avinstallera",
++	"layout_manager.btn_select": "Använd",
++	"layout_manager.btn_homepage": "Webbplats",
++	"layout_manager.status_installed": "Installerad",
++	"layout_manager.status_update": "Uppdatering tillgänglig",
++	"layout_manager.status_available": "Tillgänglig",
++	"layout_manager.status_builtin": "Inbyggd",
++	"layout_manager.status_provided": "Installerad av Ergopti-paketet",
++	"layout_manager.status_active": "Aktiv",
++	"layout_manager.meta_author": "Upphovsperson: %s",
++	"layout_manager.meta_licence": "Licens: %s",
++	"layout_manager.meta_version": "Version %s",
++	"layout_manager.meta_installed_version": "Installerad version: %s",
++	"layout_manager.busy_install": "Installerar…",
++	"layout_manager.busy_uninstall": "Avinstallerar…",
++	"layout_manager.source_network": "Katalogen är uppdaterad.",
++	"layout_manager.source_cache": "Katalog från senaste anslutningen.",
++	"layout_manager.source_bundled": "Katalog som följer med appen.",
++	"layout_manager.source_none": "Ingen katalog tillgänglig.",
++	"layout_manager.error_offline": "Registret kan inte nås: kontrollera anslutningen.",
++	"layout_manager.error_http": "Registret svarade med ett fel (%s).",
++	"layout_manager.error_generic": "Den mottagna katalogen går inte att använda (%s).",
++	"layout_manager.error_record": "Listan över installerade layouter går inte att läsa.",
++	"layout_manager.empty": "Ingen layout i katalogen finns för det här systemet.",
++	"layout_manager.result_installed": "”%s” är installerad.",
++	"layout_manager.result_installed_not_enabled": "”%s” är installerad: lägg till den i Systeminställningar > Tangentbord > Inmatningskällor.",
++	"layout_manager.result_uninstalled": "”%s” är avinstallerad.",
++	"layout_manager.result_selected": "”%s” är den aktiva layouten.",
++	"layout_manager.result_failed": "”%s”: %s",
++	"layout_manager.failure_busy": "en annan åtgärd pågår.",
++	"layout_manager.failure_provided_by_bundle": "det installerade Ergopti-paketet tillhandahåller den redan.",
++	"layout_manager.failure_foreign_file": "det finns redan en fil med samma namn som ErgoptiPlus inte har installerat.",
++	"layout_manager.failure_download": "hämtningen misslyckades eller filen har ändrats.",
++	"layout_manager.failure_other": "åtgärden misslyckades (detaljer i loggen).",
+ 	"llm.deps.browser_install_tip": "Ladda ned Ollama för Windows från sidan som öppnats i webbläsaren, kör installationsprogrammet och kom tillbaka — anslutningen upptäcks automatiskt.",
+ 	"llm.deps.done_success": "✅ Ollama redo",
+ 	"llm.deps.fail_server_not_responding": "Installationsprogrammet avslutades men Ollama-servern svarar inte.",
+diff --git a/static/ergopti_plus/_shared/data/locales/tr.json b/static/ergopti_plus/_shared/data/locales/tr.json
+index 1d3030b19..2995dd571 100644
+--- a/static/ergopti_plus/_shared/data/locales/tr.json
++++ b/static/ergopti_plus/_shared/data/locales/tr.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Yalnızca Ergopti düzeni: başka bir düzene öykünülüyor",
+ 	"menu.layout.superseded_digit_row": "Öykünülen düzen kendi rakam sırasını belirler",
+ 	"layouts.linux_needs_python": "Bu klavye düzenini Linux için dönüştürmek Python 3.8 veya daha yenisini (python3) gerektirir. Yükleyip yeniden deneyin.",
++	"layout_manager.window_title": "Klavye düzenleri",
++	"layout_manager.subtitle": "Katalogdaki düzenleri yükleyin, güncelleyin veya kaldırın.",
++	"layout_manager.btn_refresh": "Yenile",
++	"layout_manager.btn_close": "Kapat",
++	"layout_manager.btn_install": "Yükle",
++	"layout_manager.btn_update": "Güncelle",
++	"layout_manager.btn_uninstall": "Kaldır",
++	"layout_manager.btn_select": "Kullan",
++	"layout_manager.btn_homepage": "Web sitesi",
++	"layout_manager.status_installed": "Yüklü",
++	"layout_manager.status_update": "Güncelleme var",
++	"layout_manager.status_available": "Kullanılabilir",
++	"layout_manager.status_builtin": "Yerleşik",
++	"layout_manager.status_provided": "Ergopti paketiyle yüklendi",
++	"layout_manager.status_active": "Etkin",
++	"layout_manager.meta_author": "Yazar: %s",
++	"layout_manager.meta_licence": "Lisans: %s",
++	"layout_manager.meta_version": "Sürüm %s",
++	"layout_manager.meta_installed_version": "Yüklü sürüm: %s",
++	"layout_manager.busy_install": "Yükleniyor…",
++	"layout_manager.busy_uninstall": "Kaldırılıyor…",
++	"layout_manager.source_network": "Katalog güncel.",
++	"layout_manager.source_cache": "Son bağlantıdaki katalog.",
++	"layout_manager.source_bundled": "Uygulamayla gelen katalog.",
++	"layout_manager.source_none": "Kullanılabilir katalog yok.",
++	"layout_manager.error_offline": "Kayıt dizinine ulaşılamıyor: bağlantıyı kontrol edin.",
++	"layout_manager.error_http": "Kayıt dizini bir hatayla yanıt verdi (%s).",
++	"layout_manager.error_generic": "Alınan katalog kullanılamıyor (%s).",
++	"layout_manager.error_record": "Yüklü düzenlerin listesi okunamıyor.",
++	"layout_manager.empty": "Bu katalogda bu sistem için düzen yok.",
++	"layout_manager.result_installed": "“%s” yüklendi.",
++	"layout_manager.result_installed_not_enabled": "“%s” yüklendi: Sistem Ayarları > Klavye > Giriş Kaynakları bölümünden ekleyin.",
++	"layout_manager.result_uninstalled": "“%s” kaldırıldı.",
++	"layout_manager.result_selected": "“%s” etkin düzen.",
++	"layout_manager.result_failed": "“%s”: %s",
++	"layout_manager.failure_busy": "başka bir işlem sürüyor.",
++	"layout_manager.failure_provided_by_bundle": "yüklü Ergopti paketi bunu zaten sağlıyor.",
++	"layout_manager.failure_foreign_file": "ErgoptiPlus'ın yüklemediği aynı adlı bir dosya zaten var.",
++	"layout_manager.failure_download": "indirme başarısız oldu veya dosya değiştirilmiş.",
++	"layout_manager.failure_other": "işlem başarısız oldu (ayrıntılar günlükte).",
+ 	"llm.deps.browser_install_tip": "Tarayıcınızda açılan sayfadan Windows için Ollama'yı indirin, yükleyiciyi çalıştırın ve buraya dönün — bağlantı otomatik olarak algılanacak.",
+ 	"llm.deps.done_success": "✅ Ollama hazır",
+ 	"llm.deps.fail_server_not_responding": "Yükleyici tamamlandı, ancak Ollama sunucusu yanıt vermiyor.",
+diff --git a/static/ergopti_plus/_shared/data/locales/uk.json b/static/ergopti_plus/_shared/data/locales/uk.json
+index f1f291ff7..1dd31a6d7 100644
+--- a/static/ergopti_plus/_shared/data/locales/uk.json
++++ b/static/ergopti_plus/_shared/data/locales/uk.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "Лише розкладка Ergopti: емулюється інша розкладка",
+ 	"menu.layout.superseded_digit_row": "Емульована розкладка сама визначає ряд цифр",
+ 	"layouts.linux_needs_python": "Для перетворення цієї розкладки для Linux потрібен Python 3.8 або новіший (python3). Установіть його та спробуйте ще раз.",
++	"layout_manager.window_title": "Розкладки клавіатури",
++	"layout_manager.subtitle": "Встановлюйте, оновлюйте або видаляйте розкладки з каталогу.",
++	"layout_manager.btn_refresh": "Оновити",
++	"layout_manager.btn_close": "Закрити",
++	"layout_manager.btn_install": "Встановити",
++	"layout_manager.btn_update": "Оновити",
++	"layout_manager.btn_uninstall": "Видалити",
++	"layout_manager.btn_select": "Використати",
++	"layout_manager.btn_homepage": "Сайт",
++	"layout_manager.status_installed": "Встановлено",
++	"layout_manager.status_update": "Доступне оновлення",
++	"layout_manager.status_available": "Доступна",
++	"layout_manager.status_builtin": "Вбудована",
++	"layout_manager.status_provided": "Встановлено пакетом Ergopti",
++	"layout_manager.status_active": "Активна",
++	"layout_manager.meta_author": "Автор: %s",
++	"layout_manager.meta_licence": "Ліцензія: %s",
++	"layout_manager.meta_version": "Версія %s",
++	"layout_manager.meta_installed_version": "Встановлена версія: %s",
++	"layout_manager.busy_install": "Встановлення…",
++	"layout_manager.busy_uninstall": "Видалення…",
++	"layout_manager.source_network": "Каталог актуальний.",
++	"layout_manager.source_cache": "Каталог з останнього підключення.",
++	"layout_manager.source_bundled": "Каталог, що постачається з застосунком.",
++	"layout_manager.source_none": "Каталог недоступний.",
++	"layout_manager.error_offline": "Реєстр недоступний: перевірте з'єднання.",
++	"layout_manager.error_http": "Реєстр відповів помилкою (%s).",
++	"layout_manager.error_generic": "Отриманий каталог непридатний (%s).",
++	"layout_manager.error_record": "Список встановлених розкладок неможливо прочитати.",
++	"layout_manager.empty": "У каталозі немає розкладок для цієї системи.",
++	"layout_manager.result_installed": "«%s» встановлено.",
++	"layout_manager.result_installed_not_enabled": "«%s» встановлено: додайте її в Системних параметрах > Клавіатура > Джерела введення.",
++	"layout_manager.result_uninstalled": "«%s» видалено.",
++	"layout_manager.result_selected": "«%s» — активна розкладка.",
++	"layout_manager.result_failed": "«%s»: %s",
++	"layout_manager.failure_busy": "триває інша операція.",
++	"layout_manager.failure_provided_by_bundle": "встановлений пакет Ergopti вже її надає.",
++	"layout_manager.failure_foreign_file": "уже існує файл із такою самою назвою, який ErgoptiPlus не встановлював.",
++	"layout_manager.failure_download": "завантаження не вдалося або файл змінено.",
++	"layout_manager.failure_other": "операція не вдалася (подробиці в журналі).",
+ 	"llm.deps.browser_install_tip": "Завантажте Ollama для Windows зі сторінки, що відкрилася у браузері, запустіть інсталятор і поверніться сюди — з'єднання буде виявлено автоматично.",
+ 	"llm.deps.done_success": "✅ Ollama готовий",
+ 	"llm.deps.fail_server_not_responding": "Інсталятор завершився, але сервер Ollama не відповідає.",
+diff --git a/static/ergopti_plus/_shared/data/locales/zh.json b/static/ergopti_plus/_shared/data/locales/zh.json
+index 0cf444ade..7bc1523a2 100644
+--- a/static/ergopti_plus/_shared/data/locales/zh.json
++++ b/static/ergopti_plus/_shared/data/locales/zh.json
+@@ -794,6 +794,46 @@
+ 	"menu.layout.superseded_ergopti_only": "仅限 Ergopti 布局：正在模拟其他布局",
+ 	"menu.layout.superseded_digit_row": "所模拟的布局自行决定数字行",
+ 	"layouts.linux_needs_python": "将此键盘布局转换为 Linux 格式需要 Python 3.8 或更高版本（python3）。请安装后重试。",
++	"layout_manager.window_title": "键盘布局",
++	"layout_manager.subtitle": "安装、更新或卸载目录中的布局。",
++	"layout_manager.btn_refresh": "刷新",
++	"layout_manager.btn_close": "关闭",
++	"layout_manager.btn_install": "安装",
++	"layout_manager.btn_update": "更新",
++	"layout_manager.btn_uninstall": "卸载",
++	"layout_manager.btn_select": "使用",
++	"layout_manager.btn_homepage": "网站",
++	"layout_manager.status_installed": "已安装",
++	"layout_manager.status_update": "有可用更新",
++	"layout_manager.status_available": "可用",
++	"layout_manager.status_builtin": "内置",
++	"layout_manager.status_provided": "由 Ergopti 包安装",
++	"layout_manager.status_active": "当前使用",
++	"layout_manager.meta_author": "作者：%s",
++	"layout_manager.meta_licence": "许可证：%s",
++	"layout_manager.meta_version": "版本 %s",
++	"layout_manager.meta_installed_version": "已安装版本：%s",
++	"layout_manager.busy_install": "正在安装…",
++	"layout_manager.busy_uninstall": "正在卸载…",
++	"layout_manager.source_network": "目录已是最新。",
++	"layout_manager.source_cache": "上次连接时的目录。",
++	"layout_manager.source_bundled": "应用自带的目录。",
++	"layout_manager.source_none": "没有可用的目录。",
++	"layout_manager.error_offline": "无法访问布局库：请检查网络连接。",
++	"layout_manager.error_http": "布局库返回了错误（%s）。",
++	"layout_manager.error_generic": "收到的目录无法使用（%s）。",
++	"layout_manager.error_record": "无法读取已安装布局的列表。",
++	"layout_manager.empty": "此目录中没有适用于本系统的布局。",
++	"layout_manager.result_installed": "“%s”已安装。",
++	"layout_manager.result_installed_not_enabled": "“%s”已安装：请在“系统设置 > 键盘 > 输入法”中添加。",
++	"layout_manager.result_uninstalled": "“%s”已卸载。",
++	"layout_manager.result_selected": "“%s”是当前布局。",
++	"layout_manager.result_failed": "“%s”：%s",
++	"layout_manager.failure_busy": "另一项操作正在进行。",
++	"layout_manager.failure_provided_by_bundle": "已安装的 Ergopti 包已提供此布局。",
++	"layout_manager.failure_foreign_file": "已存在一个并非由 ErgoptiPlus 安装的同名文件。",
++	"layout_manager.failure_download": "下载失败或文件已被篡改。",
++	"layout_manager.failure_other": "操作失败（详情见日志）。",
+ 	"llm.deps.browser_install_tip": "请从浏览器打开的页面下载 Windows 版 Ollama，运行安装程序后返回 — 连接将被自动检测。",
+ 	"llm.deps.done_success": "✅ Ollama 已就绪",
+ 	"llm.deps.fail_server_not_responding": "安装程序已退出，但 Ollama 服务器没有响应。",
+diff --git a/static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua b/static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua
+new file mode 100644
+index 000000000..790ed7f7e
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua
+@@ -0,0 +1,186 @@
++--- _shared/lua/layouts/manager_bridge.lua
++
++--- ==============================================================================
++--- MODULE: Layout Manager Bridge (Shared)
++--- DESCRIPTION:
++--- The part of hosting the layout manager page (_shared/ui/layout_manager)
++--- that macOS and Linux do the same way: which messages the page may send,
++--- what each one is allowed to touch, and the state pushed back after every
++--- refresh and operation. The window itself (WKWebView, WebKitGTK) stays with
++--- each driver; the Windows host applies the same rules in
++--- windows/ui/layout_manager/init.ahk.
++---
++--- FEATURES & RATIONALE:
++--- 1. Allowlist: a page message is an action of M.ACTIONS or nothing. Install
++---    and update name a layout of the catalogue the page was shown; uninstall
++---    and select an installed one; open_homepage only opens the https homepage
++---    the catalogue gives for that layout, never a URL the page sends.
++--- 2. One state shape for the three drivers:
++---    { platform, index, source, error, installed, provided, builtin, active,
++---      busy, result, record_error }, so the page decides the rows once.
++--- 3. PURE Lua: the driver injects the layout registry client, the push to the
++---    page, the strings, the URL opener and the window close.
++--- ==============================================================================
++
++local M = {}
++
++--- The only actions the page may send (the page declares the same list).
++M.ACTIONS = {
++	ready = true,
++	refresh = true,
++	install = true,
++	update = true,
++	uninstall = true,
++	select = true,
++	open_homepage = true,
++	close = true,
++}
++
++-- A registry id: the rule of tools/build/build-layouts-index.cjs.
++local ID_PATTERN = "^[a-z][a-z0-9_]*$"
++
++
++
++
++
++-- ========================
++-- ========================
++-- ======= 1/ State =======
++-- ========================
++-- ========================
++
++--- The entry of an id in a decoded index, or nil.
++--- @param index table|nil
++--- @param id string
++--- @return table|nil
++local function index_entry(index, id)
++	for _, entry in ipairs(type(index) == "table" and type(index.layouts) == "table" and index.layouts or {}) do
++		if type(entry) == "table" and entry.id == id then return entry end
++	end
++	return nil
++end
++
++--- The state the page renders.
++--- @param snapshot table The registry client's snapshot.
++--- @param result table|nil The last operation's result.
++--- @return table
++function M.page_state(snapshot, result)
++	return {
++		platform = snapshot.platform,
++		index = snapshot.index,
++		source = snapshot.source,
++		error = snapshot.error,
++		installed = snapshot.installed or {},
++		provided = snapshot.provided or {},
++		builtin = snapshot.builtin or {},
++		active = snapshot.active or "",
++		busy = snapshot.busy,
++		result = result,
++		record_error = snapshot.record_error,
++	}
++end
++
++
++
++
++
++-- =============================
++-- =============================
++-- ======= 2/ Controller =======
++-- =============================
++-- =============================
++
++--- Creates the controller of one page.
++--- deps.registry: { refresh(on_done), snapshot(), install(id, on_done),
++---   uninstall(id, on_done), select(id, on_done) }; on_done(ok, detail_or_code, detail).
++--- deps.push(function_name, payload) evaluates window.<function_name>(payload).
++--- deps.strings() returns the translated strings the page shows.
++--- deps.open_url(url) opens an https URL; deps.close() closes the window.
++--- deps.log(level, message, ...) logs through the driver's logger.
++--- @param deps table
++--- @return table controller { on_message(payload) -> handled }
++function M.new(deps)
++	local controller = { result = nil }
++
++	local function push_state()
++		return deps.push("updateState", M.page_state(deps.registry.snapshot(), controller.result))
++	end
++
++	local function operation_done(id, action)
++		return function(ok, detail_or_code, detail)
++			if ok then
++				local warning = type(detail_or_code) == "table" and detail_or_code.enabled == false and "not_enabled" or nil
++				controller.result = { id = id, action = action, ok = true, warning = warning }
++			else
++				controller.result = { id = id, action = action, ok = false, code = tostring(detail_or_code),
++					detail = detail ~= nil and tostring(detail) or nil }
++			end
++			push_state()
++		end
++	end
++
++	--- Handles one message from the page.
++	--- @param payload any Decoded message.
++	--- @return boolean handled False for anything outside the allowlist.
++	function controller.on_message(payload)
++		if type(payload) ~= "table" or type(payload.action) ~= "string" or not M.ACTIONS[payload.action] then
++			deps.log("warn", "Refused a layout manager message outside the allowlist.")
++			return false
++		end
++		local action, id = payload.action, payload.id
++		if action == "ready" then
++			controller.result = nil
++			deps.push("initData", { strings = deps.strings(),
++				state = M.page_state(deps.registry.snapshot(), nil) })
++			deps.registry.refresh(function() push_state() end)
++			return true
++		end
++		if action == "refresh" then
++			deps.registry.refresh(function() push_state() end)
++			return true
++		end
++		if action == "close" then
++			deps.close()
++			return true
++		end
++		if type(id) ~= "string" or not id:match(ID_PATTERN) then
++			deps.log("warn", "Refused a layout manager '%s' without a valid layout id.", action)
++			return false
++		end
++		local snapshot = deps.registry.snapshot()
++		if action == "open_homepage" then
++			local entry = index_entry(snapshot.index, id) or (snapshot.installed or {})[id]
++			local homepage = type(entry) == "table" and entry.homepage or nil
++			if type(homepage) ~= "string" or not homepage:match("^https://[^%s]+$") then
++				deps.log("warn", "Refused to open the homepage of '%s': none is published over https.", id)
++				return false
++			end
++			deps.open_url(homepage)
++			return true
++		end
++		if action == "install" or action == "update" then
++			if not index_entry(snapshot.index, id) then
++				deps.log("warn", "Refused to %s '%s': the catalogue does not list it.", action, id)
++				return false
++			end
++			deps.registry.install(id, operation_done(id, action))
++			push_state()
++			return true
++		end
++		if not (snapshot.installed or {})[id] then
++			deps.log("warn", "Refused to %s '%s': it is not installed.", action, id)
++			return false
++		end
++		if action == "uninstall" then
++			deps.registry.uninstall(id, operation_done(id, action))
++		else
++			deps.registry.select(id, operation_done(id, action))
++		end
++		push_state()
++		return true
++	end
++
++	return controller
++end
++
++return M
+diff --git a/static/ergopti_plus/_shared/ui/apps.manifest.json b/static/ergopti_plus/_shared/ui/apps.manifest.json
+index d1cea032b..a5afaeb7e 100644
+--- a/static/ergopti_plus/_shared/ui/apps.manifest.json
++++ b/static/ergopti_plus/_shared/ui/apps.manifest.json
+@@ -50,6 +50,13 @@
+       "min_height": 520,
+       "vhost": "ergopti.hotstrings"
+     },
++    "layout_manager": {
++      "width": 720,
++      "height": 560,
++      "min_width": 560,
++      "min_height": 400,
++      "vhost": "ergopti.layoutmanager"
++    },
+     "metrics_apps": {
+       "width": 940,
+       "height": 640,
+diff --git a/static/ergopti_plus/_shared/ui/host_bridge.js b/static/ergopti_plus/_shared/ui/host_bridge.js
+index 079cc61d2..e6a865bda 100644
+--- a/static/ergopti_plus/_shared/ui/host_bridge.js
++++ b/static/ergopti_plus/_shared/ui/host_bridge.js
+@@ -23,6 +23,7 @@
+ //   hsOnboarding              — _shared/ui/onboarding
+ //   hsPaths                   — _shared/ui/paths_editor
+ //   hsPersonalInfo            — _shared/ui/personal_info_editor
++//   layout_manager_bridge     — _shared/ui/layout_manager
+ //   metrics_apps_bridge       — _shared/ui/metrics_apps
+ //   metrics_typing_bridge     — _shared/ui/metrics_typing
+ //   model_browser_bridge      — _shared/ui/model_browser
+diff --git a/static/ergopti_plus/_shared/ui/layout_manager/index.html b/static/ergopti_plus/_shared/ui/layout_manager/index.html
+new file mode 100644
+index 000000000..8416a0f4d
+--- /dev/null
++++ b/static/ergopti_plus/_shared/ui/layout_manager/index.html
+@@ -0,0 +1,35 @@
++<!-- _shared/ui/layout_manager/index.html -->
++<!doctype html>
++<html lang="fr">
++	<head>
++		<meta charset="utf-8" />
++		<title data-i18n="layout_manager.window_title"></title>
++		<link rel="stylesheet" href="style.css" />
++		<script src="../host_bridge.js"></script>
++	</head>
++	<body>
++		<h1 data-i18n="layout_manager.window_title"></h1>
++		<p class="subtitle" data-i18n="layout_manager.subtitle"></p>
++
++		<div class="toolbar">
++			<p id="catalogue-status" class="catalogue-status" role="status"></p>
++			<button
++				type="button"
++				id="btn-refresh"
++				class="secondary"
++				data-i18n="layout_manager.btn_refresh"
++			></button>
++		</div>
++
++		<p id="result" class="result" role="alert" hidden></p>
++
++		<ul id="layout-list" class="layout-list"></ul>
++		<p id="empty" class="empty" data-i18n="layout_manager.empty" hidden></p>
++
++		<div class="btns">
++			<button type="button" id="btn-close" class="secondary" data-i18n="layout_manager.btn_close"></button>
++		</div>
++
++		<script src="script.js"></script>
++	</body>
++</html>
+diff --git a/static/ergopti_plus/_shared/ui/layout_manager/script.js b/static/ergopti_plus/_shared/ui/layout_manager/script.js
+new file mode 100644
+index 000000000..88aad8e3e
+--- /dev/null
++++ b/static/ergopti_plus/_shared/ui/layout_manager/script.js
+@@ -0,0 +1,386 @@
++// _shared/ui/layout_manager/script.js
++
++// ===========================================================================
++// MODULE: Layout Manager Page
++// DESCRIPTION:
++// Lists the layouts of the keyboard-layout registry with their author,
++// licence and version, whether each one is installed, can be updated or is
++// available, and offers the matching install / update / uninstall / use
++// buttons. The three drivers host this page and send it the same state:
++//   { platform, index, source, error, installed, provided, builtin, active,
++//     busy, result }
++// The page decides the rows from that state (one source for every driver)
++// and only ever posts the allowlisted actions below; each host checks them
++// again before acting.
++// ===========================================================================
++
++// ========================================
++// ========================================
++// ======= 1/ State =======================
++// ========================================
++// ========================================
++
++// The only actions a host accepts from this page.
++const LAYOUT_MANAGER_ACTIONS = Object.freeze([
++	'ready',
++	'refresh',
++	'install',
++	'update',
++	'uninstall',
++	'select',
++	'open_homepage',
++	'close'
++]);
++
++// Failure codes the hosts report, each with its own explanation. Any other
++// code falls back to the generic one, with the host's detail as a tooltip.
++const FAILURE_KEYS = Object.freeze({
++	busy: 'layout_manager.failure_busy',
++	provided_by_bundle: 'layout_manager.failure_provided_by_bundle',
++	foreign_file: 'layout_manager.failure_foreign_file',
++	download_failed: 'layout_manager.failure_download',
++	python_missing: 'layouts.linux_needs_python'
++});
++
++// Catalogue error codes (_shared/lua/layouts/catalogue.lua and its AHK twin).
++const CATALOGUE_ERROR_KEYS = Object.freeze({
++	offline: 'layout_manager.error_offline',
++	http: 'layout_manager.error_http'
++});
++
++// Locale strings, pushed by the host with initData.
++let _strings = {};
++// Last state pushed by the host.
++let _state = null;
++
++const _post = makeHostBridge('layout_manager_bridge');
++
++/**
++ * Returns the translated string for key, or key itself when it is missing.
++ * @param {string} key
++ * @returns {string}
++ */
++function _t(key) {
++	return Object.prototype.hasOwnProperty.call(_strings, key) ? _strings[key] : key;
++}
++
++/**
++ * Formats a translated string, replacing each %s in order.
++ * @param {string} key
++ * @param {...*} args
++ * @returns {string}
++ */
++function _fmt(key, ...args) {
++	let position = 0;
++	return _t(key).replace(/%s/g, () => (position < args.length ? String(args[position++]) : ''));
++}
++
++/**
++ * Applies translations to every element carrying data-i18n.
++ */
++function applyDomStrings() {
++	document.querySelectorAll('[data-i18n]').forEach(function (el) {
++		const key = el.getAttribute('data-i18n');
++		if (!Object.prototype.hasOwnProperty.call(_strings, key)) return;
++		if (el.tagName === 'TITLE') document.title = _strings[key];
++		else el.textContent = _strings[key];
++	});
++}
++
++// ========================================
++// ========================================
++// ======= 2/ Catalogue rows ==============
++// ========================================
++// ========================================
++
++/**
++ * One row of the list.
++ * @param {Object|null} entry - Registry index entry (null once the registry dropped it).
++ * @param {Object|undefined} installed - Installed record entry.
++ * @param {boolean} provided - Another package already provides the layout.
++ * @param {boolean} builtin - The driver ships the layout built in.
++ * @param {string} active - Registry id of the active layout.
++ * @returns {Object}
++ */
++function makeRow(entry, installed, provided, builtin, active) {
++	const source = entry || installed;
++	let status;
++	if (builtin) status = 'builtin';
++	else if (provided) status = 'provided';
++	else if (!installed) status = 'available';
++	else if (entry && installed.sha256 !== entry.sha256) status = 'update';
++	else status = 'installed';
++	const isActive = active === source.id;
++	const actions = [];
++	if (status === 'available') actions.push('install');
++	if (status === 'update') actions.push('update');
++	if ((status === 'installed' || status === 'update' || status === 'builtin') && !isActive) actions.push('select');
++	if (status === 'installed' || status === 'update') actions.push('uninstall');
++	return {
++		id: source.id,
++		name: typeof source.name === 'string' && source.name !== '' ? source.name : source.id,
++		author: typeof source.author === 'string' ? source.author : '',
++		licence: typeof source.licence === 'string' ? source.licence : '',
++		homepage: typeof source.homepage === 'string' && /^https:\/\//.test(source.homepage) ? source.homepage : '',
++		version: entry && typeof entry.version === 'string' ? entry.version : '',
++		installedVersion: installed && typeof installed.version === 'string' ? installed.version : '',
++		status,
++		active: isActive,
++		removed: !entry,
++		actions
++	};
++}
++
++/**
++ * Decides every row from the host state: the index entries published for
++ * this platform, then the installed layouts the registry no longer lists.
++ * @param {Object|null} state
++ * @returns {Object[]}
++ */
++function layoutRows(state) {
++	if (!state || typeof state !== 'object') return [];
++	const entries = state.index && Array.isArray(state.index.layouts) ? state.index.layouts : [];
++	const installed = state.installed && typeof state.installed === 'object' ? state.installed : {};
++	const provided = state.provided && typeof state.provided === 'object' ? state.provided : {};
++	const builtin = state.builtin && typeof state.builtin === 'object' ? state.builtin : {};
++	const active = typeof state.active === 'string' ? state.active : '';
++	const rows = [];
++	const listed = new Set();
++	for (const entry of entries) {
++		if (!entry || typeof entry.id !== 'string') continue;
++		const platforms = Array.isArray(entry.platforms) ? entry.platforms : [];
++		if (typeof state.platform === 'string' && !platforms.includes(state.platform)) continue;
++		listed.add(entry.id);
++		rows.push(makeRow(entry, installed[entry.id], Boolean(provided[entry.id]), builtin[entry.id] === true, active));
++	}
++	for (const id of Object.keys(installed).sort()) {
++		if (!listed.has(id) && installed[id] && typeof installed[id].id === 'string') {
++			rows.push(makeRow(null, installed[id], false, false, active));
++		}
++	}
++	return rows;
++}
++
++/**
++ * The catalogue line: where the list comes from and why the network one is
++ * missing, if it is.
++ * @param {Object|null} state
++ * @returns {{text: string, isError: boolean}}
++ */
++function catalogueStatus(state) {
++	const source = state && typeof state.source === 'string' ? state.source : 'none';
++	let text = _t('layout_manager.source_' + source);
++	const error = state && state.error && typeof state.error === 'object' ? state.error : null;
++	if (error) {
++		const key = CATALOGUE_ERROR_KEYS[error.code];
++		const detail = typeof error.detail === 'string' ? error.detail : '';
++		text += ' ' + (key ? _fmt(key, detail) : _fmt('layout_manager.error_generic', error.code));
++	}
++	if (state && typeof state.record_error === 'string' && state.record_error !== '') {
++		text += ' ' + _t('layout_manager.error_record');
++	}
++	return { text, isError: Boolean(error) || Boolean(state && state.record_error) };
++}
++
++/**
++ * The line reporting the last operation.
++ * @param {Object|null} result - { id, action, ok, code, detail, warning }.
++ * @param {Object[]} rows
++ * @returns {{text: string, isError: boolean, detail: string}|null}
++ */
++function resultMessage(result, rows) {
++	if (!result || typeof result !== 'object' || typeof result.id !== 'string') return null;
++	const row = rows.find((candidate) => candidate.id === result.id);
++	const name = row ? row.name : result.id;
++	const detail = typeof result.detail === 'string' ? result.detail : '';
++	if (!result.ok) {
++		const key = FAILURE_KEYS[result.code] || 'layout_manager.failure_other';
++		return { text: _fmt('layout_manager.result_failed', name, _t(key)), isError: true, detail };
++	}
++	if (result.warning === 'not_enabled') {
++		return { text: _fmt('layout_manager.result_installed_not_enabled', name), isError: false, detail };
++	}
++	const keys = {
++		install: 'layout_manager.result_installed',
++		update: 'layout_manager.result_installed',
++		uninstall: 'layout_manager.result_uninstalled',
++		select: 'layout_manager.result_selected'
++	};
++	return { text: _fmt(keys[result.action] || 'layout_manager.result_installed', name), isError: false, detail };
++}
++
++// ========================================
++// ========================================
++// ======= 3/ Rendering ===================
++// ========================================
++// ========================================
++
++/**
++ * Creates an element with an optional class and text.
++ * @param {string} tag
++ * @param {string} className
++ * @param {string} text
++ * @returns {HTMLElement}
++ */
++function element(tag, className, text) {
++	const el = document.createElement(tag);
++	if (className) el.className = className;
++	if (text !== undefined) el.textContent = text;
++	return el;
++}
++
++/**
++ * Builds the list item of one row.
++ * @param {Object} row
++ * @param {Object|null} busy - { id, action } of the operation in flight.
++ * @returns {HTMLElement}
++ */
++function renderRow(row, busy) {
++	const item = element('li', 'layout layout-' + row.status);
++	item.dataset.id = row.id;
++
++	const header = element('div', 'layout-header');
++	header.appendChild(element('span', 'layout-name', row.name));
++	const badges = element('span', 'layout-badges');
++	badges.appendChild(element('span', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status)));
++	if (row.active) badges.appendChild(element('span', 'badge badge-active', _t('layout_manager.status_active')));
++	header.appendChild(badges);
++	item.appendChild(header);
++
++	const meta = element('div', 'layout-meta');
++	if (row.author) meta.appendChild(element('span', '', _fmt('layout_manager.meta_author', row.author)));
++	if (row.licence) meta.appendChild(element('span', '', _fmt('layout_manager.meta_licence', row.licence)));
++	if (row.version) meta.appendChild(element('span', '', _fmt('layout_manager.meta_version', row.version)));
++	if (row.installedVersion && row.installedVersion !== row.version) {
++		meta.appendChild(element('span', '', _fmt('layout_manager.meta_installed_version', row.installedVersion)));
++	}
++	item.appendChild(meta);
++
++	const buttons = element('div', 'layout-actions');
++	if (busy && busy.id === row.id) {
++		const key = busy.action === 'uninstall' ? 'layout_manager.busy_uninstall' : 'layout_manager.busy_install';
++		buttons.appendChild(element('span', 'busy', _t(key)));
++	}
++	if (row.homepage) buttons.appendChild(actionButton('open_homepage', row.id, false, 'link'));
++	for (const action of row.actions) {
++		buttons.appendChild(actionButton(action, row.id, Boolean(busy), action === 'uninstall' ? 'danger' : ''));
++	}
++	item.appendChild(buttons);
++	return item;
++}
++
++/**
++ * Builds one action button.
++ * @param {string} action
++ * @param {string} id
++ * @param {boolean} disabled
++ * @param {string} variant - Extra class.
++ * @returns {HTMLElement}
++ */
++function actionButton(action, id, disabled, variant) {
++	const labels = {
++		install: 'layout_manager.btn_install',
++		update: 'layout_manager.btn_update',
++		uninstall: 'layout_manager.btn_uninstall',
++		select: 'layout_manager.btn_select',
++		open_homepage: 'layout_manager.btn_homepage'
++	};
++	const button = element('button', variant, _t(labels[action]));
++	button.type = 'button';
++	button.disabled = disabled;
++	button.dataset.action = action;
++	button.addEventListener('click', function () {
++		send(action, id);
++	});
++	return button;
++}
++
++/**
++ * Redraws the whole page from the last state.
++ */
++function render() {
++	const rows = layoutRows(_state);
++	const busy = _state && _state.busy && typeof _state.busy.id === 'string' ? _state.busy : null;
++
++	const status = catalogueStatus(_state);
++	const statusEl = document.getElementById('catalogue-status');
++	statusEl.textContent = status.text;
++	statusEl.classList.toggle('is-error', status.isError);
++
++	const refresh = document.getElementById('btn-refresh');
++	refresh.disabled = Boolean(busy);
++
++	const resultEl = document.getElementById('result');
++	const result = resultMessage(_state && _state.result, rows);
++	resultEl.hidden = !result;
++	if (result) {
++		resultEl.textContent = result.text;
++		resultEl.title = result.detail;
++		resultEl.classList.toggle('is-error', result.isError);
++	}
++
++	const list = document.getElementById('layout-list');
++	while (list.firstChild) list.removeChild(list.firstChild);
++	for (const row of rows) list.appendChild(renderRow(row, busy));
++	document.getElementById('empty').hidden = rows.length > 0;
++}
++
++// ========================================
++// ========================================
++// ======= 4/ Host Bridge =================
++// ========================================
++// ========================================
++
++/**
++ * Posts one allowlisted action to the host.
++ * @param {string} action
++ * @param {string} [id] - Registry id the action applies to.
++ */
++function send(action, id) {
++	if (!LAYOUT_MANAGER_ACTIONS.includes(action)) throw new Error('layout manager: unknown action ' + action);
++	const payload = { action };
++	if (id !== undefined) payload.id = id;
++	setTimeout(function () {
++		_post(payload);
++	}, 0);
++}
++
++/**
++ * Called by the host once the page is ready: strings and the first state.
++ * @param {{strings: Object, state: Object}} data
++ */
++window.initData = function (data) {
++	if (!data || typeof data !== 'object') return;
++	if (data.strings && typeof data.strings === 'object') {
++		_strings = data.strings;
++		applyDomStrings();
++	}
++	window.updateState(data.state);
++};
++
++/**
++ * Called by the host after every refresh or operation.
++ * @param {Object} state
++ */
++window.updateState = function (state) {
++	_state = state && typeof state === 'object' ? state : null;
++	render();
++};
++
++// ========================================
++// ========================================
++// ======= 5/ Events & Ready ==============
++// ========================================
++// ========================================
++
++document.getElementById('btn-refresh').addEventListener('click', function () {
++	send('refresh');
++});
++
++document.getElementById('btn-close').addEventListener('click', function () {
++	send('close');
++});
++
++// The hosts also push initData when the navigation completes; this is the
++// page's own hint that its handlers are in place.
++send('ready');
+diff --git a/static/ergopti_plus/_shared/ui/layout_manager/strings.json b/static/ergopti_plus/_shared/ui/layout_manager/strings.json
+new file mode 100644
+index 000000000..47a67981e
+--- /dev/null
++++ b/static/ergopti_plus/_shared/ui/layout_manager/strings.json
+@@ -0,0 +1,46 @@
++{
++	"_comment": "Every locale key the layout manager page shows (index.html data-i18n, script.js). The three hosts send exactly these strings with initData; tools/test/test-layout-manager-page.cjs keeps this list equal to what the page uses.",
++	"keys": [
++		"layout_manager.window_title",
++		"layout_manager.subtitle",
++		"layout_manager.btn_refresh",
++		"layout_manager.btn_close",
++		"layout_manager.btn_install",
++		"layout_manager.btn_update",
++		"layout_manager.btn_uninstall",
++		"layout_manager.btn_select",
++		"layout_manager.btn_homepage",
++		"layout_manager.status_installed",
++		"layout_manager.status_update",
++		"layout_manager.status_available",
++		"layout_manager.status_builtin",
++		"layout_manager.status_provided",
++		"layout_manager.status_active",
++		"layout_manager.meta_author",
++		"layout_manager.meta_licence",
++		"layout_manager.meta_version",
++		"layout_manager.meta_installed_version",
++		"layout_manager.busy_install",
++		"layout_manager.busy_uninstall",
++		"layout_manager.source_network",
++		"layout_manager.source_cache",
++		"layout_manager.source_bundled",
++		"layout_manager.source_none",
++		"layout_manager.error_offline",
++		"layout_manager.error_http",
++		"layout_manager.error_generic",
++		"layout_manager.error_record",
++		"layout_manager.empty",
++		"layout_manager.result_installed",
++		"layout_manager.result_installed_not_enabled",
++		"layout_manager.result_uninstalled",
++		"layout_manager.result_selected",
++		"layout_manager.result_failed",
++		"layout_manager.failure_busy",
++		"layout_manager.failure_provided_by_bundle",
++		"layout_manager.failure_foreign_file",
++		"layout_manager.failure_download",
++		"layout_manager.failure_other",
++		"layouts.linux_needs_python"
++	]
++}
+diff --git a/static/ergopti_plus/_shared/ui/layout_manager/style.css b/static/ergopti_plus/_shared/ui/layout_manager/style.css
+new file mode 100644
+index 000000000..f86c4f056
+--- /dev/null
++++ b/static/ergopti_plus/_shared/ui/layout_manager/style.css
+@@ -0,0 +1,270 @@
++/* _shared/ui/layout_manager/style.css */
++
++/* =========================================================================== */
++/* Layout Manager UI Styles.                                                   */
++/*                                                                             */
++/* The registry layouts as cards: name and status badges, author, licence and  */
++/* versions, then the actions each status offers. Matches the macOS system     */
++/* design language used across all Ergopti webview windows.                    */
++/* =========================================================================== */
++
++/* =============================== */
++/* =============================== */
++/* ======= 1/ Reset & Base ======= */
++/* =============================== */
++/* =============================== */
++
++* {
++	box-sizing: border-box;
++}
++
++html,
++body {
++	height: 100%;
++}
++
++body {
++	background: #f5f5f7;
++	color: #333;
++	display: flex;
++	flex-direction: column;
++	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
++	font-size: 13px;
++	margin: 0;
++	padding: 16px 20px 14px;
++}
++
++h1 {
++	color: #1d1d1f;
++	flex-shrink: 0;
++	font-size: 16px;
++	font-weight: 600;
++	margin: 0 0 2px;
++}
++
++.subtitle {
++	color: #888;
++	flex-shrink: 0;
++	font-size: 11px;
++	margin: 0 0 10px;
++}
++
++/* ================================ */
++/* ================================ */
++/* ======= 2/ Status lines ======== */
++/* ================================ */
++/* ================================ */
++
++.toolbar {
++	align-items: center;
++	display: flex;
++	flex-shrink: 0;
++	gap: 10px;
++	margin-bottom: 8px;
++}
++
++.catalogue-status {
++	color: #555;
++	flex-grow: 1;
++	font-size: 11px;
++	margin: 0;
++}
++
++.catalogue-status.is-error,
++.result.is-error {
++	color: #b3261e;
++}
++
++.result {
++	background: #eef6ee;
++	border-radius: 6px;
++	color: #1e5e22;
++	flex-shrink: 0;
++	font-size: 12px;
++	margin: 0 0 8px;
++	padding: 6px 10px;
++}
++
++.result.is-error {
++	background: #fbeceb;
++}
++
++/* ============================= */
++/* ============================= */
++/* ======= 3/ Layout list ====== */
++/* ============================= */
++/* ============================= */
++
++.layout-list {
++	display: flex;
++	flex-direction: column;
++	flex-grow: 1;
++	gap: 8px;
++	list-style: none;
++	margin: 0;
++	min-height: 0;
++	overflow-y: auto;
++	padding: 0;
++}
++
++.layout {
++	background: #fff;
++	border: 1px solid #e0e0e0;
++	border-radius: 8px;
++	flex-shrink: 0;
++	padding: 9px 12px;
++}
++
++.layout-header {
++	align-items: center;
++	display: flex;
++	gap: 8px;
++	justify-content: space-between;
++}
++
++.layout-name {
++	color: #1d1d1f;
++	font-size: 13px;
++	font-weight: 600;
++}
++
++.layout-badges {
++	display: flex;
++	gap: 4px;
++}
++
++.badge {
++	background: #ececf0;
++	border-radius: 10px;
++	color: #555;
++	font-size: 10px;
++	padding: 2px 8px;
++}
++
++.badge-installed,
++.badge-builtin,
++.badge-provided {
++	background: #e3f1e4;
++	color: #1e5e22;
++}
++
++.badge-update {
++	background: #fff1d6;
++	color: #7a4b00;
++}
++
++.badge-active {
++	background: #dceaff;
++	color: #0b4ea2;
++}
++
++.layout-meta {
++	color: #777;
++	display: flex;
++	flex-wrap: wrap;
++	font-size: 11px;
++	gap: 4px 14px;
++	margin: 4px 0 6px;
++}
++
++.layout-actions {
++	align-items: center;
++	display: flex;
++	gap: 6px;
++	justify-content: flex-end;
++}
++
++.busy {
++	color: #888;
++	flex-grow: 1;
++	font-size: 11px;
++	font-style: italic;
++}
++
++.empty {
++	color: #888;
++	font-size: 12px;
++	text-align: center;
++}
++
++/* ============================== */
++/* ============================== */
++/* ======= 4/ Buttons =========== */
++/* ============================== */
++/* ============================== */
++
++button {
++	background: #007aff;
++	border: none;
++	border-radius: 6px;
++	color: #fff;
++	cursor: pointer;
++	font-size: 12px;
++	padding: 5px 12px;
++}
++
++button:disabled {
++	cursor: default;
++	opacity: 0.45;
++}
++
++button.secondary,
++button.link {
++	background: #e5e5ea;
++	color: #1d1d1f;
++}
++
++button.link {
++	background: transparent;
++	color: #007aff;
++	padding: 5px 6px;
++}
++
++button.danger {
++	background: #e5e5ea;
++	color: #b3261e;
++}
++
++.btns {
++	display: flex;
++	flex-shrink: 0;
++	justify-content: flex-end;
++	margin-top: 10px;
++}
++
++/* =============================== */
++/* =============================== */
++/* ======= 5/ Dark Mode ========== */
++/* =============================== */
++/* =============================== */
++
++@media (prefers-color-scheme: dark) {
++	body {
++		background: #1e1e1e;
++		color: #ddd;
++	}
++
++	h1,
++	.layout-name {
++		color: #f5f5f7;
++	}
++
++	.layout {
++		background: #2a2a2c;
++		border-color: #3a3a3c;
++	}
++
++	.catalogue-status {
++		color: #aaa;
++	}
++
++	button.secondary,
++	button.danger {
++		background: #3a3a3c;
++		color: #f5f5f7;
++	}
++
++	button.danger {
++		color: #ff6b61;
++	}
++}
+diff --git a/static/ergopti_plus/linux/tests/test_manifest.lua b/static/ergopti_plus/linux/tests/test_manifest.lua
+index b83cf88c0..7f2c6beaa 100644
+--- a/static/ergopti_plus/linux/tests/test_manifest.lua
++++ b/static/ergopti_plus/linux/tests/test_manifest.lua
+@@ -254,6 +254,7 @@ return {
+ 	"tests.unit.ui.test_healthcheck_probes",
+ 	"tests.unit.ui.test_healthcheck_recent_issues_source",
+ 	"tests.unit.ui.test_healthcheck_report_issue",
++	"tests.unit.ui.test_layout_manager_bridge",
+ 	"tests.unit.ui.test_llm_menu_toggle_row",
+ 	"tests.unit.ui.test_llm_backend_rows",
+ 	"tests.unit.ui.test_llm_overlay_anchor",
+diff --git a/static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua b/static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua
+index c6dba9a02..4cc921c93 100644
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua
+@@ -42,7 +42,7 @@ helpers.describe("ui.webkit_host", function()
+         "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
+         "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
+         "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
+-        "token_bridge", "healthcheck", "error_dialog",
++        "token_bridge", "healthcheck", "error_dialog", "layout_manager_bridge",
+       }
+       local set = {}
+       for _, n in ipairs(names) do set[n] = true end
+@@ -51,8 +51,8 @@ helpers.describe("ui.webkit_host", function()
+       end
+     end)
+ 
+-    helpers.it("has exactly 16 bridges", function()
+-      helpers.assert_eq(#WH.get_bridge_names(), 16)
++    helpers.it("has exactly 17 bridges", function()
++      helpers.assert_eq(#WH.get_bridge_names(), 17)
+     end)
+   end)
+ 
+diff --git a/static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua b/static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua
+new file mode 100644
+index 000000000..814ab93d8
+--- /dev/null
++++ b/static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua
+@@ -0,0 +1,69 @@
++--- tests/unit/ui/test_layout_manager_bridge.lua
++
++--- ==============================================================================
++--- MODULE: Layout Manager Bridge (Linux)
++--- DESCRIPTION:
++--- The Linux host of the layout manager page wires the shared controller
++--- (_shared/lua/layouts/manager_bridge.lua) to the WebKitGTK window, the Linux
++--- registry client and xdg-open (layout-manager-bridge). These tests inject
++--- each authority and pin the wiring: pushes reach the layout_manager window as
++--- window.<function>(<json>), the strings are the ones strings.json declares,
++--- a homepage opens through a quoted xdg-open, and close hides the window.
++--- ==============================================================================
++
++local helpers = require("tests.helpers")
++
++local INDEX = { layouts = { { id = "ergol", name = "Ergo-L", homepage = "https://ergol.org" } } }
++
++--- The bridge with every authority injected.
++--- @return table bridge, table state, table daemon_state
++local function bridge()
++	local Bridge = helpers.load_module("ui.layout_manager.bridge")
++	Bridge._reset()
++	local state = { pushes = {}, hidden = {}, commands = {}, calls = {} }
++	local daemon_state = {
++		webview_manager = {
++			eval_js = function(app, js) state.pushes[#state.pushes + 1] = { app = app, js = js }; return true end,
++			hide = function(app) state.hidden[#state.hidden + 1] = app; return true end,
++		},
++		shell = {
++			has_command = function(name) return name == "xdg-open" end,
++			quote = function(value) return "'" .. value .. "'" end,
++			run = function(command) state.commands[#state.commands + 1] = command; return true end,
++		},
++		i18n = { get = function(key) return "translated:" .. key end },
++		layout_registry = {
++			snapshot = function() return { platform = "linux", index = INDEX, installed = {}, source = "cache" } end,
++			refresh = function(on_done) state.calls[#state.calls + 1] = "refresh"; on_done({}) end,
++			install = function(id, on_done) state.calls[#state.calls + 1] = "install " .. id; on_done(true, {}) end,
++			uninstall = function() end,
++			select = function() end,
++		},
++	}
++	return Bridge, state, daemon_state
++end
++
++helpers.describe("layout manager bridge (Linux)", function()
++	helpers.it("pushes the page state into the layout_manager window (layout-manager-bridge)", function()
++		local Bridge, state, daemon_state = bridge()
++		helpers.assert_eq(Bridge.bridge_name, "layout_manager_bridge")
++		local result = Bridge.on_message({ action = "ready" }, daemon_state)
++		helpers.assert_true(result.handled)
++		helpers.assert_eq(state.pushes[1].app, "layout_manager")
++		helpers.assert_contains(state.pushes[1].js, "window.initData(")
++		helpers.assert_contains(state.pushes[1].js, '"layout_manager.window_title":"translated:layout_manager.window_title"')
++		helpers.assert_contains(state.pushes[1].js, '"platform":"linux"')
++		helpers.assert_contains(state.pushes[2].js, "window.updateState(")
++		helpers.assert_eq(state.calls[1], "refresh")
++	end)
++
++	helpers.it("opens the catalogue homepage through xdg-open and hides on close (layout-manager-bridge)", function()
++		local Bridge, state, daemon_state = bridge()
++		helpers.assert_true(Bridge.on_message({ action = "open_homepage", id = "ergol" }, daemon_state).handled)
++		helpers.assert_eq(state.commands[1], "xdg-open 'https://ergol.org' >/dev/null 2>&1 &")
++		helpers.assert_true(Bridge.on_message({ action = "close" }, daemon_state).handled)
++		helpers.assert_eq(state.hidden[1], "layout_manager")
++		helpers.assert_true(Bridge.on_message({ action = "shell", id = "ergol" }, daemon_state).handled == false,
++			"an action outside the allowlist is refused")
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/ui/layout_manager/bridge.lua b/static/ergopti_plus/linux/ui/layout_manager/bridge.lua
+new file mode 100644
+index 000000000..4f8213ffa
+--- /dev/null
++++ b/static/ergopti_plus/linux/ui/layout_manager/bridge.lua
+@@ -0,0 +1,109 @@
++--- ui/layout_manager/bridge.lua
++
++--- ==============================================================================
++--- BRIDGE HANDLER: Layout Manager
++--- DESCRIPTION:
++--- Implements the protocol of _shared/ui/layout_manager/script.js on Linux.
++--- Bridge name: "layout_manager_bridge". The message rules and the page state
++--- are shared with macOS (_shared/lua/layouts/manager_bridge.lua); this file
++--- wires them to the Linux registry client, the WebKitGTK window and xdg-open.
++--- ==============================================================================
++
++local M = {}
++M.bridge_name = "layout_manager_bridge"
++
++local Json          = require("json")
++local Logger        = require("logger.shim")
++local Paths         = require("infra.paths")
++local FileSystem    = require("adapters.file_system")
++local ManagerBridge = require("layouts.manager_bridge")
++
++local LOG = "bridge.layout_manager"
++local APP_NAME = "layout_manager"
++-- Every string the page shows, declared next to it.
++local STRINGS_FILE = "ui/layout_manager/strings.json"
++
++-- One controller per daemon: the window manager keeps at most one page.
++local _controller = nil
++
++--- A dependency injected by tests, or the production module.
++--- @param state table
++--- @param field string
++--- @param module_name string
++--- @return table|nil
++local function dependency(state, field, module_name)
++	if type(state[field]) == "table" then return state[field] end
++	local ok, module = pcall(require, module_name)
++	return ok and type(module) == "table" and module or nil
++end
++
++--- The translated strings the page shows.
++--- @param i18n table|nil
++--- @return table
++local function page_strings(i18n)
++	local path = Paths.shared(STRINGS_FILE)
++	local raw = type(path) == "string" and FileSystem.read(path) or nil
++	local ok, doc = pcall(Json.decode, raw or "")
++	local strings = {}
++	if not ok or type(doc) ~= "table" or type(doc.keys) ~= "table" then
++		Logger.error(LOG, "The layout manager strings list %s is unreadable.", tostring(path))
++		return strings
++	end
++	for _, key in ipairs(doc.keys) do
++		strings[key] = type(i18n) == "table" and type(i18n.get) == "function" and i18n.get(key) or key
++	end
++	return strings
++end
++
++--- The controller wired to this daemon.
++--- @param state table
++--- @return table
++local function controller(state)
++	if _controller and not state.fresh_controller then return _controller end
++	local manager = dependency(state, "webview_manager", "ui.webview_manager")
++	local shell = dependency(state, "shell", "adapters.shell_runner")
++	local i18n = dependency(state, "i18n", "infra.i18n")
++	_controller = ManagerBridge.new({
++		registry = dependency(state, "layout_registry", "modules.keymap.layout_registry"),
++		push = function(function_name, payload)
++			local ok, encoded = pcall(Json.encode, payload)
++			if not ok or type(encoded) ~= "string" or not manager then
++				Logger.error(LOG, "The layout manager %s payload could not be pushed.", function_name)
++				return false
++			end
++			local pushed, accepted = pcall(manager.eval_js, APP_NAME,
++				"if(window." .. function_name .. ") window." .. function_name .. "(" .. encoded .. ")")
++			return pushed and accepted == true
++		end,
++		strings = function() return page_strings(i18n) end,
++		open_url = function(url)
++			if not shell or not shell.has_command("xdg-open") then
++				Logger.error(LOG, "xdg-open is unavailable — the layout homepage cannot be opened.")
++				return
++			end
++			shell.run("xdg-open " .. shell.quote(url) .. " >/dev/null 2>&1 &")
++		end,
++		close = function()
++			if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end
++		end,
++		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
++	})
++	return _controller
++end
++
++--- Handles an incoming JS message.
++--- @param payload any Action table from host_bridge.js.
++--- @param state table Daemon state and optional test-injected authorities.
++--- @return table|nil Diagnostic response; page data is pushed through eval_js.
++function M.on_message(payload, state)
++	state = type(state) == "table" and state or {}
++	local handled = controller(state).on_message(payload)
++	return { handled = handled }
++end
++
++--- Test seam: forgets the controller.
++function M._reset()
++	_controller = nil
++end
++
++return M
+diff --git a/static/ergopti_plus/linux/ui/webkit_host.lua b/static/ergopti_plus/linux/ui/webkit_host.lua
+index 7f0e02cdc..c923755b9 100644
+--- a/static/ergopti_plus/linux/ui/webkit_host.lua
++++ b/static/ergopti_plus/linux/ui/webkit_host.lua
+@@ -53,6 +53,7 @@ M.APP_BRIDGES = {
+ 	model_browser            = "model_browser_bridge",
+ 	numeric_prompt           = "numeric_prompt_bridge",
+ 	onboarding               = "hsOnboarding",
++	layout_manager           = "layout_manager_bridge",
+ 	paths_editor             = "hsPaths",
+ 	personal_info_editor     = "hsPersonalInfo",
+ 	prompt_editor            = "prompt_bridge",
+diff --git a/static/ergopti_plus/linux/ui/webview_manager.lua b/static/ergopti_plus/linux/ui/webview_manager.lua
+index 1e045e8c1..12e192f03 100644
+--- a/static/ergopti_plus/linux/ui/webview_manager.lua
++++ b/static/ergopti_plus/linux/ui/webview_manager.lua
+@@ -152,6 +152,7 @@ local BRIDGE_MODULES = {
+ 	metrics_typing        = "ui.metrics_typing.bridge",
+ 	model_browser         = "ui.model_browser.bridge",
+ 	onboarding            = "ui.onboarding.bridge",
++	layout_manager        = "ui.layout_manager.bridge",
+ 	paths_editor          = "ui.paths_editor.bridge",
+ 	personal_info_editor  = "ui.personal_info_editor.bridge",
+ 	numeric_prompt        = "ui.numeric_prompt.bridge",
+@@ -606,6 +607,7 @@ local function _app_title(app_name)
+ 		metrics_typing          = "Metrics — Typing",
+ 		model_browser           = "Model Browser",
+ 		onboarding              = "Setup Wizard",
++		layout_manager          = "Keyboard Layouts",
+ 		paths_editor            = "Paths Editor",
+ 		personal_info_editor    = "Personal Info",
+ 		numeric_prompt          = "Valeur",
+diff --git a/static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua b/static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua
+new file mode 100644
+index 000000000..425aa3caf
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua
+@@ -0,0 +1,47 @@
++--- tests/unit/ui/menu/test_menu_layout_manager.lua
++
++--- ==============================================================================
++--- MODULE: Layout Manager Window (macOS host)
++--- DESCRIPTION:
++--- The macOS host of the layout manager page sends the strings strings.json
++--- declares, and a controller bound to a window pushes into that exact window
++--- only, so a late callback of a closed window never writes into its successor
++--- (layout-manager-bridge).
++--- ==============================================================================
++
++local helpers = require("tests.helpers")
++local Json = require("json")
++
++helpers.describe("layout manager window (macOS)", function()
++	helpers.it("sends every string the page declares, translated (layout-manager-bridge)", function()
++		local Host = helpers.load_with_stubs("ui.menu.menu_layout_manager")
++		local declared = Json.decode(assert(io.open(helpers.shared("ui/layout_manager/strings.json"), "rb")):read("*a"))
++		local strings = Host._page_strings()
++		local count = 0
++		for _, key in ipairs(declared.keys) do
++			helpers.assert_type(strings[key], "string", key .. " is sent to the page")
++			count = count + 1
++		end
++		helpers.assert_true(count >= 35, "the page declares its strings")
++	end)
++
++	helpers.it("pushes only into the window it was created for (layout-manager-bridge)", function()
++		local Host = helpers.load_with_stubs("ui.menu.menu_layout_manager")
++		local refreshed = 0
++		local saved = package.loaded["modules.keymap.layout_registry"]
++		package.loaded["modules.keymap.layout_registry"] = {
++			snapshot = function() return { platform = "macos", installed = {} } end,
++			refresh = function(on_done) refreshed = refreshed + 1; on_done({}) end,
++		}
++		local evaluated = {}
++		local stale = { evaluateJavaScript = function(_, js) evaluated[#evaluated + 1] = js end }
++		local ok, err = pcall(function()
++			local controller = Host._controller_for(stale)
++			helpers.assert_true(controller.on_message({ action = "refresh" }) == true)
++		end)
++		package.loaded["modules.keymap.layout_registry"] = saved
++		helpers.assert_true(ok, tostring(err))
++		helpers.assert_eq(refreshed, 1, "the refresh reached the registry")
++		helpers.assert_eq(#evaluated, 0, "a window that is not the current one receives nothing")
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua b/static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua
+new file mode 100644
+index 000000000..f4ff50200
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua
+@@ -0,0 +1,115 @@
++--- tests/unit/ui/test_layout_manager_bridge.lua
++
++--- ==============================================================================
++--- MODULE: Layout Manager Bridge (shared, replayed on macOS)
++--- DESCRIPTION:
++--- The layout manager page may only ask for the allowlisted actions, each
++--- checked against the catalogue or the installed layouts, and every refresh
++--- or operation pushes the page the same state on every driver
++--- (layout-manager-bridge). These tests drive the shared controller
++--- (_shared/lua/layouts/manager_bridge.lua) with a fake registry client and
++--- record what it pushes, opens and closes.
++--- ==============================================================================
++
++local helpers = require("tests.helpers")
++local ManagerBridge = require("layouts.manager_bridge")
++
++local INDEX = {
++	layouts = {
++		{ id = "ergol", name = "Ergo-L", homepage = "https://ergol.org", sha256 = "b", version = "1.0.2" },
++		{ id = "plain", name = "Plain", homepage = "http://insecure.example.org", sha256 = "c", version = "1.0.0" },
++	},
++}
++
++--- A controller over a fake registry client.
++--- @param installed table Installed entries by id.
++--- @return table controller, table state
++local function controller(installed)
++	local state = { pushes = {}, calls = {}, opened = {}, closed = 0, logs = {}, pending = {} }
++	local snapshot = {
++		platform = "macos", index = INDEX, source = "network", installed = installed or {}, active = "",
++	}
++	local registry = {
++		snapshot = function() return snapshot end,
++		refresh = function(on_done) state.calls[#state.calls + 1] = "refresh"; on_done({}) end,
++		install = function(id, on_done)
++			state.calls[#state.calls + 1] = "install " .. id
++			state.pending[#state.pending + 1] = on_done
++		end,
++		uninstall = function(id, on_done) state.calls[#state.calls + 1] = "uninstall " .. id; on_done(true, { id = id }) end,
++		select = function(id, on_done) state.calls[#state.calls + 1] = "select " .. id; on_done(false, "select_failed", "no") end,
++	}
++	local instance = ManagerBridge.new({
++		registry = registry,
++		push = function(name, payload) state.pushes[#state.pushes + 1] = { name = name, payload = payload }; return true end,
++		strings = function() return { ["layout_manager.window_title"] = "Keyboard layouts" } end,
++		open_url = function(url) state.opened[#state.opened + 1] = url end,
++		close = function() state.closed = state.closed + 1 end,
++		log = function(level, message) state.logs[#state.logs + 1] = level .. ": " .. message end,
++	})
++	return instance, state
++end
++
++helpers.describe("layout manager bridge: what the page may ask", function()
++	helpers.it("answers ready with the strings and the state, then the refreshed state (layout-manager-bridge)", function()
++		local instance, state = controller()
++		helpers.assert_true(instance.on_message({ action = "ready" }))
++		helpers.assert_eq(state.pushes[1].name, "initData")
++		helpers.assert_eq(state.pushes[1].payload.strings["layout_manager.window_title"], "Keyboard layouts")
++		helpers.assert_eq(state.pushes[1].payload.state.platform, "macos")
++		helpers.assert_eq(state.pushes[1].payload.state.index, INDEX)
++		helpers.assert_eq(state.calls[1], "refresh")
++		helpers.assert_eq(state.pushes[2].name, "updateState")
++	end)
++
++	helpers.it("refuses anything outside the allowlist or naming an unknown layout (layout-manager-bridge)", function()
++		local instance, state = controller()
++		for _, payload in ipairs({
++			"install", {}, { action = "rm -rf" }, { action = "install" }, { action = "install", id = "../evil" },
++			{ action = "install", id = "absent" }, { action = "uninstall", id = "ergol" }, { action = "select", id = "ergol" },
++			{ action = "open_homepage", id = "plain" },
++		}) do
++			helpers.assert_true(instance.on_message(payload) == false, "accepted: " .. tostring(payload.action))
++		end
++		helpers.assert_eq(#state.calls, 0, "no refused message reaches the registry")
++		helpers.assert_eq(#state.opened, 0, "no refused message opens anything")
++		helpers.assert_true(#state.logs >= 8, "every refusal is logged")
++	end)
++
++	helpers.it("installs a catalogue layout and reports the result once it settles (layout-manager-bridge)", function()
++		local instance, state = controller()
++		helpers.assert_true(instance.on_message({ action = "install", id = "ergol" }))
++		helpers.assert_eq(state.calls[1], "install ergol")
++		helpers.assert_eq(state.pushes[#state.pushes].payload.result, nil, "no result before the operation settles")
++		state.pending[1](true, { entry = INDEX.layouts[1], enabled = false })
++		local result = state.pushes[#state.pushes].payload.result
++		helpers.assert_eq(result.id, "ergol")
++		helpers.assert_eq(result.ok, true)
++		helpers.assert_eq(result.warning, "not_enabled", "an installed but not enabled layout says so")
++		helpers.assert_true(instance.on_message({ action = "update", id = "ergol" }))
++		state.pending[2](false, "download_failed", "HTTP 404 for x")
++		result = state.pushes[#state.pushes].payload.result
++		helpers.assert_eq(result.ok, false)
++		helpers.assert_eq(result.code, "download_failed")
++		helpers.assert_eq(result.detail, "HTTP 404 for x")
++	end)
++
++	helpers.it("uninstalls and selects installed layouts only (layout-manager-bridge)", function()
++		local instance, state = controller({ ergol = INDEX.layouts[1] })
++		helpers.assert_true(instance.on_message({ action = "uninstall", id = "ergol" }))
++		helpers.assert_true(instance.on_message({ action = "select", id = "ergol" }))
++		helpers.assert_eq(state.calls[1], "uninstall ergol")
++		helpers.assert_eq(state.calls[2], "select ergol")
++		local result = state.pushes[#state.pushes].payload.result
++		helpers.assert_eq(result.action, "select")
++		helpers.assert_eq(result.code, "select_failed")
++	end)
++
++	helpers.it("opens only the https homepage the catalogue gives, and closes on request (layout-manager-bridge)", function()
++		local instance, state = controller()
++		helpers.assert_true(instance.on_message({ action = "open_homepage", id = "ergol", url = "https://evil.test" }))
++		helpers.assert_eq(state.opened[1], "https://ergol.org", "the page never chooses the URL")
++		helpers.assert_true(instance.on_message({ action = "close" }))
++		helpers.assert_eq(state.closed, 1)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua b/static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua
+new file mode 100644
+index 000000000..2b4a0de2c
+--- /dev/null
++++ b/static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua
+@@ -0,0 +1,202 @@
++--- ui/menu/menu_layout_manager.lua
++
++--- ==============================================================================
++--- MODULE: Layout Manager Window (macOS host)
++--- DESCRIPTION:
++--- Hosts the shared layout manager page (_shared/ui/layout_manager) in a
++--- WKWebView: the "Manage layouts…" row of the keyboard-layout submenu opens
++--- it, and it lists, installs, updates, uninstalls and selects the layouts of
++--- the registry through modules/keymap/layout_registry.lua.
++---
++--- FEATURES & RATIONALE:
++--- 1. The message rules and the page state are shared with Linux
++---    (_shared/lua/layouts/manager_bridge.lua): an allowlist of actions, each
++---    checked against the catalogue or the installed layouts before it runs.
++--- 2. Singleton: a second open focuses the existing window. Only the exact
++---    window this module created may receive pushes or close, so a late
++---    callback of a closed window never writes into its successor.
++--- 3. Nothing here runs on the typing path; every operation is asynchronous.
++--- ==============================================================================
++
++local M = {}
++
++local hs            = hs
++local Logger        = require("infra.logger")
++local DeferredWork  = require("infra.deferred_work")
++local i18n          = require("infra.i18n")
++local Paths         = require("infra.paths")
++local FileSystem    = require("adapters.file_system")
++local Json          = require("json")
++local ManagerBridge = require("layouts.manager_bridge")
++
++local LOG = "menu_layout_manager"
++
++-- Name of the page's message handler (_shared/ui/host_bridge.js catalogue).
++local BRIDGE_NAME = "layout_manager_bridge"
++-- Every string the page shows, declared next to it.
++local STRINGS_FILE = "ui/layout_manager/strings.json"
++
++-- The exact window this module created, and its message channel.
++local _webview = nil
++local _usercontent = nil
++local _controller = nil
++
++
++
++
++
++-- ================================
++-- ================================
++-- ======= 1/ Page plumbing =======
++-- ================================
++-- ================================
++
++--- The translated strings the page shows.
++--- @return table key -> text
++local function page_strings()
++	local path = Paths.shared(STRINGS_FILE)
++	local raw = type(path) == "string" and FileSystem.read(path) or nil
++	local ok, doc = pcall(Json.decode, raw or "")
++	local strings = {}
++	if not ok or type(doc) ~= "table" or type(doc.keys) ~= "table" then
++		Logger.error(LOG, "The layout manager strings list %s is unreadable.", tostring(path))
++		return strings
++	end
++	for _, key in ipairs(doc.keys) do strings[key] = i18n.get(key) end
++	return strings
++end
++
++--- Evaluates window.<function_name>(payload) in the exact window.
++--- @param view any The window the push is meant for.
++--- @param function_name string
++--- @param payload table
++--- @return boolean pushed
++local function push_to(view, function_name, payload)
++	if view == nil or view ~= _webview then return false end
++	local ok, encoded = pcall(Json.encode, payload)
++	if not ok or type(encoded) ~= "string" then
++		Logger.error(LOG, "The layout manager %s payload could not be encoded.", function_name)
++		return false
++	end
++	local submitted = pcall(function()
++		view:evaluateJavaScript("if(window." .. function_name .. ")window." .. function_name .. "(" .. encoded .. ")")
++	end)
++	if not submitted then Logger.error(LOG, "The layout manager %s push was refused.", function_name) end
++	return submitted
++end
++
++--- Closes the window this module created.
++local function close_window()
++	local view = _webview
++	_webview, _usercontent, _controller = nil, nil, nil
++	if view ~= nil then
++		local ok, err = pcall(function() view:delete() end)
++		if not ok then Logger.error(LOG, "The layout manager window did not close: %s.", tostring(err)) end
++	end
++end
++
++--- The controller of one window, bound to that exact window.
++--- @param view any
++--- @return table
++local function controller_for(view)
++	return ManagerBridge.new({
++		registry = require("modules.keymap.layout_registry"),
++		push = function(function_name, payload) return push_to(view, function_name, payload) end,
++		strings = page_strings,
++		open_url = function(url)
++			local ok, ui_builder = pcall(require, "ui.ui_builder")
++			if ok then ui_builder.open_http_url(url) end
++		end,
++		close = function()
++			if view == _webview then close_window() end
++		end,
++		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
++	})
++end
++
++
++
++
++
++-- =============================
++-- =============================
++-- ======= 2/ Public API =======
++-- =============================
++-- =============================
++
++--- Opens the layout manager, or focuses it when it is already open.
++--- @return boolean opened
++function M.open()
++	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
++	if not ok_ui then
++		Logger.error(LOG, "The layout manager cannot open: ui_builder is unavailable.")
++		return false
++	end
++	if _webview ~= nil then
++		ui_builder.force_focus(_webview, false)
++		return true
++	end
++	Logger.start(LOG, "Opening the layout manager…")
++	local ok_uc, uc = pcall(hs.webview.usercontent.new, BRIDGE_NAME)
++	if not ok_uc or not uc then
++		Logger.error(LOG, "The layout manager message channel could not be created.")
++		return false
++	end
++	local geo = ui_builder.get_app_geometry("layout_manager")
++	if not geo then return false end
++	local candidate = nil
++	uc:setCallback(function(message)
++		if candidate == nil or candidate ~= _webview or _controller == nil then return end
++		if message and type(message.body) == "table" then _controller.on_message(message.body) end
++	end)
++	local masks = hs.webview.windowMasks
++	local view = ui_builder.show_webview({
++		frame = ui_builder.get_centered_frame(geo.width, geo.height),
++		title = i18n.get("layout_manager.window_title"),
++		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8),
++		usercontent = uc,
++		assets_dir = (Paths.shared("ui/layout_manager") or "") .. "/",
++		on_close = function()
++			if candidate ~= nil and candidate == _webview then
++				_webview, _usercontent, _controller = nil, nil, nil
++			end
++		end,
++		on_navigation = function(action)
++			if action == "didFinishNavigation" and candidate ~= nil and candidate == _webview and _controller then
++				DeferredWork.after(0.05, function()
++					if candidate == _webview and _controller then _controller.on_message({ action = "ready" }) end
++				end, "menu_layout_manager.navigation")
++			end
++			return true
++		end,
++		on_webview_created = function(owned)
++			if _webview ~= nil then return false end
++			candidate = owned
++			_webview, _usercontent = owned, uc
++			_controller = controller_for(owned)
++			return true
++		end,
++		is_current = function() return candidate ~= nil and candidate == _webview end,
++	})
++	if view == nil or view ~= candidate then
++		_webview, _usercontent, _controller = nil, nil, nil
++		Logger.error(LOG, "The layout manager window could not be created.")
++		return false
++	end
++	Logger.success(LOG, "Layout manager opened.")
++	return true
++end
++
++--- Builds the "Manage layouts…" menu command.
++--- @return function
++function M.menu_command()
++	return function()
++		DeferredWork.after(0.05, M.open, "menu_layout_manager.open")
++	end
++end
++
++-- Test seams: the controller factory and the exact-window push.
++M._controller_for = controller_for
++M._page_strings = page_strings
++
++return M
+diff --git a/static/ergopti_plus/windows/ErgoptiPlus.ahk b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+index 41230816f..3b76c961a 100644
+--- a/static/ergopti_plus/windows/ErgoptiPlus.ahk
++++ b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+@@ -1232,6 +1232,7 @@ global _FmtCountCache := Map()
+ #Include ui/action_picker/init.ahk
+ #Include ui/action_picker_webview.ahk
+ #Include ui/paths_editor/init.ahk
++#Include ui/layout_manager/init.ahk
+ #Include ui/personal_info_editor/init.ahk
+ 
+ #Include infra/suppressive_inputhook_ownership.ahk
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index 74a730db8..e41cc6274 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -533,6 +533,8 @@ _LogBootProgress("loading LLM modules")
+ #Include unit/test_accented_shortcuts.ahk
+ #Include unit/test_keylayout_emulation.ahk
+ #Include unit/test_layout_catalogue.ahk
++#Include ../ui/layout_manager/init.ahk
++#Include unit/test_layout_manager_host.ahk
+ #Include unit/test_ergopti_keylayout_tables.ahk
+ #Include unit/test_layout_supersession.ahk
+ ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
+diff --git a/static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk b/static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk
+new file mode 100644
+index 000000000..5017e2d7e
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk
+@@ -0,0 +1,148 @@
++﻿; tests/unit/test_layout_manager_host.ahk
++
++; ==============================================================================
++; MODULE: Layout Manager Host Tests (Windows)
++; DESCRIPTION:
++; The layout manager page may only ask for the allowlisted actions, each
++; checked against the catalogue or the installed layouts, and every refresh or
++; operation pushes the page the state every driver sends
++; (layout-manager-bridge). These tests drive LayoutManager_HandleMessage with
++; injected collaborators and a scratch local folder, and pin which layout the
++; Windows selection writes: the Ergopti layouts select the built-in emulation.
++; ==============================================================================
++
++#Requires AutoHotkey v2.0
++
++
++
++
++
++; ==========================
++; ==========================
++; ======= 1/ Helpers =======
++; ==========================
++; ==========================
++
++_LMH_Index() => JsonParse(FileRead(_StaticDir . "\layouts\registry\index.json", "UTF-8-RAW"))
++
++_LMH_TempDir() {
++	Dir := A_Temp . "\ergopti_layout_manager_" . A_TickCount . "_" . Random(1000, 9999) . "\"
++	DirCreate(Dir)
++	return Dir
++}
++
++; Collaborators that record every call; install settles when the test says so.
++_LMH_Deps(Dir, Log) {
++	Pending := []
++	return Map(
++		"local_dir", Dir,
++		"push", (Name, Payload) => Log.Push(Map("push", Name, "payload", Payload)),
++		"refresh", (OnDone) => (Log.Push(Map("call", "refresh")), OnDone.Call(LayoutCatalogue_Last())),
++		"install", (Id, OnDone) => (Log.Push(Map("call", "install " . Id)), Pending.Push(OnDone)),
++		"uninstall", (Id) => (Log.Push(Map("call", "uninstall " . Id)), Map("ok", true)),
++		"select", (Id) => Log.Push(Map("call", "select " . Id)),
++		"open_url", (Url) => Log.Push(Map("call", "open " . Url)),
++		"close", () => Log.Push(Map("call", "close")),
++		"pending", Pending
++	)
++}
++
++_LMH_Calls(Log) {
++	Calls := []
++	for Item in Log
++		if Item.Has("call")
++			Calls.Push(Item["call"])
++	return Calls
++}
++
++_LMH_LastPush(Log) {
++	Index := Log.Length
++	while (Index > 0) {
++		if Log[Index].Has("push")
++			return Log[Index]
++		Index -= 1
++	}
++	return 0
++}
++
++
++
++
++
++; ====================================
++; ====================================
++; ======= 2/ Allowlist and ids =======
++; ====================================
++; ====================================
++
++Test("layout manager host: only allowlisted actions on known layouts reach the catalogue (layout-manager-bridge)",
++	_LMH_AllowlistCase)
++
++_LMH_AllowlistCase() {
++	global _LayoutCatalogueLast
++	Dir := _LMH_TempDir()
++	Saved := _LayoutCatalogueLast
++	try {
++		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
++		Log := []
++		Deps := _LMH_Deps(Dir, Log)
++		for Payload in ["install", Map(), Map("action", "rm -rf"), Map("action", "install"),
++				Map("action", "install", "id", "..\evil"), Map("action", "install", "id", "absent"),
++				Map("action", "uninstall", "id", "ergol"), Map("action", "select", "id", "ergol")]
++			AssertFalse(LayoutManager_HandleMessage(Payload, Deps), "a message outside the allowlist was accepted")
++		AssertEqual(0, _LMH_Calls(Log).Length, "no refused message reaches the catalogue")
++
++		AssertTrue(LayoutManager_HandleMessage(Map("action", "install", "id", "ergol"), Deps))
++		AssertEqual("install ergol", _LMH_Calls(Log)[1])
++		Deps["pending"][1].Call(true, Map("entry", Map("id", "ergol", "version", "1.0.2"), "source", "network"))
++		Last := _LMH_LastPush(Log)
++		AssertEqual("updateState", Last["push"])
++		AssertEqual("ergol", Last["payload"]["result"]["id"])
++		AssertTrue(Last["payload"]["result"]["ok"])
++
++		AssertTrue(LayoutManager_HandleMessage(Map("action", "select", "id", "ergopti"), Deps),
++			"the built-in Ergopti emulation can be selected without an installation")
++		AssertEqual("select ergopti", _LMH_Calls(Log)[2])
++		AssertTrue(LayoutManager_HandleMessage(Map("action", "open_homepage", "id", "ergol", "url", "https://evil.test"), Deps))
++		AssertEqual("open https://ergol.org", _LMH_Calls(Log)[3], "the page never chooses the URL")
++		AssertTrue(LayoutManager_HandleMessage(Map("action", "close"), Deps))
++		AssertEqual("close", _LMH_Calls(Log)[4])
++	} finally {
++		_LayoutCatalogueLast := Saved
++		DirDelete(Dir, true)
++	}
++}
++
++Test("layout manager host: ready sends the strings and the state every driver sends (layout-manager-bridge)",
++	_LMH_ReadyCase)
++
++_LMH_ReadyCase() {
++	Dir := _LMH_TempDir()
++	try {
++		Log := []
++		AssertTrue(LayoutManager_HandleMessage(Map("action", "ready"), _LMH_Deps(Dir, Log)))
++		AssertEqual("initData", Log[1]["push"])
++		State := Log[1]["payload"]["state"]
++		for Key in ["platform", "index", "source", "error", "installed", "provided", "builtin", "active", "busy",
++				"result", "record_error"]
++			Assert(State.Has(Key), "the page state lacks " . Key)
++		AssertEqual("windows", State["platform"])
++		Assert(State["builtin"].Has(ERGOPTI_LAYOUT_ID), "the built-in Ergopti emulation is listed as such")
++		Strings := Log[1]["payload"]["strings"]
++		Assert(Strings.Count >= 35, "the page receives every string it shows")
++		AssertEqual(t("layout_manager.window_title"), Strings["layout_manager.window_title"])
++		Json := _LayMgrWeb_Json(Log[1]["payload"])
++		Assert(InStr(Json, '"platform":"windows"'), "the state serialises to the page's JSON")
++		Assert(InStr(Json, '"busy":null'), "none serialises to null")
++	} finally DirDelete(Dir, true)
++}
++
++Test("layout manager host: the active layout follows the emulation settings (layout-manager-bridge)", () => (
++	AssertEqual("ergol", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true)))),
++	AssertEqual(ERGOPTI_PLUS_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
++		Map("emulated_layout", "", "ergopti_base", true, "ergopti_plus", true)))),
++	AssertEqual(ERGOPTI_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
++		Map("emulated_layout", "", "ergopti_base", true, "ergopti_plus", false)))),
++	AssertEqual("", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "", "ergopti_base", false))),
++		"without the Ergopti emulation Windows types its own layout")
++))
+diff --git a/static/ergopti_plus/windows/ui/layout_manager/init.ahk b/static/ergopti_plus/windows/ui/layout_manager/init.ahk
+new file mode 100644
+index 000000000..3e447a9a5
+--- /dev/null
++++ b/static/ergopti_plus/windows/ui/layout_manager/init.ahk
+@@ -0,0 +1,486 @@
++﻿; ui/layout_manager/init.ahk
++
++; ==============================================================================
++; MODULE: Layout Manager WebView2 Host
++; DESCRIPTION:
++; Hosts the shared layout manager page (_shared/ui/layout_manager) on Windows
++; through WebView2: the "Manage layouts…" row of the keyboard-layout submenu
++; opens it, and it lists, installs, updates, uninstalls and selects the
++; layouts of the registry through modules/keymap/keylayout/layout_catalogue.ahk.
++;
++; FEATURES & RATIONALE:
++; 1. The same rules as the macOS and Linux hosts
++;    (_shared/lua/layouts/manager_bridge.lua): an allowlist of actions, each
++;    checked against the catalogue or the installed layouts before it runs,
++;    and one page state for the three drivers.
++; 2. Selecting a layout writes [layout] emulated_layout (the Ergopti layouts
++;    select the built-in emulation instead) and reloads, the only moment the
++;    emulation registers its hotkeys.
++; 3. Singleton window; every WebView2 callback is fenced by a session epoch,
++;    so a late callback of a closed window never writes into its successor.
++; ==============================================================================
++
++#Requires AutoHotkey v2.0
++
++
++
++
++
++; ====================================
++; ====================================
++; ======= 1/ State and actions =======
++; ====================================
++; ====================================
++
++global _LayMgrWeb_Gui        := 0
++global _LayMgrWeb_Controller := unset
++global _LayMgrWeb_WebView    := unset
++global _LayMgrWeb_MsgSub     := unset
++global _LayMgrWeb_NavSub     := unset
++global _LayMgrWeb_ResetDone  := false
++global _LayMgrWeb_SessionEpoch := 0
++; Result of the last operation, shown by the page (0 when none).
++global _LayMgrWeb_Result := 0
++
++; Virtual host mapped to _SharedDir (apps.manifest.json).
++global LAYMGR_VHOST := "ergopti.layoutmanager"
++global LAYMGR_HOST_ACCESS_ALLOW := 1
++
++; The only actions the page may send (the page and the Lua hosts declare the
++; same list; tools/test/test-layout-manager-page.cjs pins the three).
++global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
++	"uninstall", true, "select", true, "open_homepage", true, "close", true)
++
++
++
++
++
++; =============================
++; =============================
++; ======= 2/ Page state =======
++; =============================
++; =============================
++
++/**
++ * The Ergopti registry layouts the built-in emulation provides.
++ * @returns {Map} Registry id -> true.
++ */
++LayoutManager_BuiltinIds() {
++	global ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
++	return Map(ERGOPTI_LAYOUT_ID, true, ERGOPTI_PLUS_LAYOUT_ID, true)
++}
++
++/**
++ * The registry id of the layout typing uses now: the emulated registry layout,
++ * the built-in Ergopti emulation (Ergopti or Ergopti+), or "" for the system's.
++ * @param {Map} FeaturesSource - Features Map to read; the live one by default.
++ * @returns {string}
++ */
++LayoutManager_ActiveId(FeaturesSource := unset) {
++	global Features, ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
++	if !IsSet(FeaturesSource) {
++		if !IsSet(Features)
++			return ""
++		FeaturesSource := Features
++	}
++	Selected := KeylayoutEmulation_SelectedId(FeaturesSource)
++	if (Selected != "")
++		return Selected
++	Layout := FeaturesSource.Has("layout") ? FeaturesSource["layout"] : Map()
++	if !(Layout.Get("ergopti_base", false) = true)
++		return ""
++	return (Layout.Get("ergopti_plus", false) = true) ? ERGOPTI_PLUS_LAYOUT_ID : ERGOPTI_LAYOUT_ID
++}
++
++; JSON of the page state. JSON_NULL stands for none.
++_LayMgrWeb_Json(Value) {
++	global JSON_NULL
++	if (Value == JSON_NULL)
++		return "null"
++	if (Value is Map) {
++		Out := ""
++		for Key, Item in Value
++			Out .= (A_Index > 1 ? "," : "") . JsonStringLiteral(Key) . ":" . _LayMgrWeb_Json(Item)
++		return "{" . Out . "}"
++	}
++	if (Value is Array) {
++		Out := ""
++		for Item in Value
++			Out .= (A_Index > 1 ? "," : "") . _LayMgrWeb_Json(Item)
++		return "[" . Out . "]"
++	}
++	if (Value is Integer) || (Value is Float)
++		return String(Value)
++	return JsonStringLiteral(Value)
++}
++
++/**
++ * The state the page renders (the shape every host sends).
++ * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir; the configured one by default.
++ * @returns {Map}
++ */
++LayoutManager_PageState(LocalDir := unset) {
++	global _ConfigDir, _LayMgrWeb_Result, JSON_NULL
++	if !IsSet(LocalDir)
++		LocalDir := LayoutRegistry_LocalDir(_ConfigDir)
++	Last := LayoutCatalogue_Last()
++	Index := Last["index"]
++	if !(Index is Map)
++		Index := LayoutCatalogue_BundledIndex()
++	RecordError := JSON_NULL
++	try Installed := LayoutCatalogue_ReadInstalled(LocalDir)
++	catch as Err {
++		Installed := Map()
++		RecordError := Err.Message
++	}
++	Busy := LayoutCatalogue_Busy()
++	return Map(
++		"platform", LAYOUT_CATALOGUE_PLATFORM,
++		"index", (Index is Map) ? Index : JSON_NULL,
++		"source", Last["source"],
++		"error", (Last["error"] is Map) ? Last["error"] : JSON_NULL,
++		"installed", Installed,
++		"provided", Map(),
++		"builtin", LayoutManager_BuiltinIds(),
++		"active", LayoutManager_ActiveId(),
++		"busy", (Busy is Map) ? Busy : JSON_NULL,
++		"result", (_LayMgrWeb_Result is Map) ? _LayMgrWeb_Result : JSON_NULL,
++		"record_error", RecordError
++	)
++}
++
++; The translated strings the page shows (strings.json next to the page).
++_LayMgrWeb_Strings() {
++	global _SharedDir
++	Path := _SharedDir . "\ui\layout_manager\strings.json"
++	Text := FSRead(Path)
++	if !(Text is String)
++		throw Error("Cannot read " . Path)
++	Strings := Map()
++	for Key in JsonParse(Text)["keys"]
++		Strings[Key] := t(Key)
++	return Strings
++}
++
++
++
++
++
++; ==========================
++; ==========================
++; ======= 3/ Actions =======
++; ==========================
++; ==========================
++
++/**
++ * Handles one page message. Anything outside LAYMGR_ACTIONS, or naming a
++ * layout the catalogue or the installed record does not know, is refused.
++ * @param {Map} Payload - Decoded message.
++ * @param {Map} Deps - "local_dir", "push" (FunctionName, Payload), "install",
++ *   "uninstall", "select", "refresh", "open_url", "close"; the production ones by default.
++ * @returns {boolean} Whether the message was accepted.
++ */
++LayoutManager_HandleMessage(Payload, Deps := 0) {
++	global LAYMGR_ACTIONS, _LayMgrWeb_Result
++	if !(Deps is Map)
++		Deps := _LayMgrWeb_DefaultDeps()
++	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
++			|| !LAYMGR_ACTIONS.Has(Payload["action"]) {
++		LoggerWarn("LayoutManager", "Refused a layout manager message outside the allowlist.")
++		return false
++	}
++	Action := Payload["action"]
++	if (Action == "ready") {
++		_LayMgrWeb_Result := 0
++		Deps["push"].Call("initData", Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"])))
++		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
++		return true
++	}
++	if (Action == "refresh") {
++		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
++		return true
++	}
++	if (Action == "close") {
++		Deps["close"].Call()
++		return true
++	}
++	Id := Payload.Has("id") ? Payload["id"] : ""
++	if !LayoutRegistry_IsValidId(Id) {
++		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)
++		return false
++	}
++	State := LayoutManager_PageState(Deps["local_dir"])
++	Entry := LayoutCatalogue_Entry(State["index"], Id)
++	if (Action == "open_homepage") {
++		Source := (Entry is Map) ? Entry : State["installed"].Get(Id, 0)
++		Homepage := (Source is Map) ? Source.Get("homepage", "") : ""
++		if !RegExMatch(Homepage, "^https://\S+$") {
++			LoggerWarn("LayoutManager", "Refused to open the homepage of '{1}': none is published over https.", Id)
++			return false
++		}
++		Deps["open_url"].Call(Homepage)
++		return true
++	}
++	if (Action == "install" || Action == "update") {
++		if !(Entry is Map) {
++			LoggerWarn("LayoutManager", "Refused to {1} '{2}': the catalogue does not list it.", Action, Id)
++			return false
++		}
++		Deps["install"].Call(Id, _LayMgrWeb_OnDone.Bind(Deps, Id, Action))
++		_LayMgrWeb_PushState(Deps)
++		return true
++	}
++	if (Action == "select" && State["builtin"].Has(Id)) {
++		Deps["select"].Call(Id)
++		return true
++	}
++	if !State["installed"].Has(Id) {
++		LoggerWarn("LayoutManager", "Refused to {1} '{2}': it is not installed.", Action, Id)
++		return false
++	}
++	if (Action == "uninstall") {
++		Outcome := Deps["uninstall"].Call(Id)
++		_LayMgrWeb_OnDone(Deps, Id, Action, Outcome["ok"], Outcome.Get("code", ""), Outcome.Get("detail", ""))
++		return true
++	}
++	Deps["select"].Call(Id)
++	return true
++}
++
++_LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
++	global _LayMgrWeb_Result
++	if Ok
++		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", true)
++	else
++		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", false, "code", String(CodeOrDetail),
++			"detail", String(Detail))
++	_LayMgrWeb_PushState(Deps)
++	if Ok && Deps.Has("after") && HasMethod(Deps["after"], "Call")
++		Deps["after"].Call(Id, Action)
++}
++
++_LayMgrWeb_PushState(Deps, *) {
++	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"]))
++}
++
++/**
++ * Makes ``Id`` the layout typing uses: an Ergopti layout selects the built-in
++ * emulation (with or without Ergopti+), any other installed layout becomes the
++ * emulated layout. Persists, then reloads so the emulation registers.
++ * @param {string} Id
++ * @returns {boolean} Whether the reload was started.
++ */
++LayoutManager_Select(Id) {
++	global Features, ERGOPTI_PLUS_LAYOUT_ID
++	Builtin := LayoutManager_BuiltinIds()
++	if Builtin.Has(Id)
++		Entries := [
++			Map("path", "layout.emulated_layout", "value", ""),
++			Map("path", "layout.ergopti_base", "value", true),
++			Map("path", "layout.ergopti_plus", "value", Id == ERGOPTI_PLUS_LAYOUT_ID),
++		]
++	else
++		Entries := [Map("path", "layout.emulated_layout", "value", Id)]
++	LoggerInfo("LayoutManager", "Selecting the '{1}' layout and reloading.", Id)
++	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
++		return ConfigReportPersistenceFailure("the layout selection")
++	return ReloadPreservingSuspend()
++}
++
++/**
++ * Makes the built-in Ergopti emulation the layout typing uses, keeping its
++ * Ergopti+ setting (the menu's Ergopti row). Persists, then reloads.
++ * @returns {boolean} Whether the reload was started.
++ */
++LayoutManager_SelectBuiltin() {
++	global Features
++	Entries := [
++		Map("path", "layout.emulated_layout", "value", ""),
++		Map("path", "layout.ergopti_base", "value", true),
++	]
++	LoggerInfo("LayoutManager", "Selecting the built-in Ergopti emulation and reloading.")
++	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
++		return ConfigReportPersistenceFailure("the layout selection")
++	return ReloadPreservingSuspend()
++}
++
++; After an operation: an updated emulated layout is reloaded, an uninstalled
++; one is no longer emulated.
++_LayMgrWeb_After(Id, Action) {
++	global Features
++	if (KeylayoutEmulation_SelectedId() != Id)
++		return
++	if (Action == "uninstall") {
++		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
++		if !WriteFeatureV2(Features, "layout.emulated_layout", "")
++			return ConfigReportPersistenceFailure("the layout selection")
++	}
++	return ReloadPreservingSuspend()
++}
++
++_LayMgrWeb_DefaultDeps() {
++	global _ConfigDir
++	return Map(
++		"local_dir", LayoutRegistry_LocalDir(_ConfigDir),
++		"push", _LayMgrWeb_Push,
++		"refresh", (OnDone) => LayoutCatalogue_Refresh(LayoutRegistry_LocalDir(_ConfigDir), OnDone),
++		"install", (Id, OnDone) => LayoutCatalogue_Install(Id, LayoutRegistry_LocalDir(_ConfigDir), OnDone),
++		"uninstall", (Id) => LayoutCatalogue_Uninstall(Id, LayoutRegistry_LocalDir(_ConfigDir)),
++		"select", LayoutManager_Select,
++		"open_url", (Url) => ExternalUrl_OpenHttp(Url),
++		"close", _LayMgrWeb_Close,
++		"after", _LayMgrWeb_After
++	)
++}
++
++
++
++
++
++; ===================================
++; ===================================
++; ======= 4/ Window lifecycle =======
++; ===================================
++; ===================================
++
++_LayMgrWeb_Available() {
++	global _VendorDir
++	return IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
++}
++
++/**
++ * Opens the layout manager, or focuses it when it is already open.
++ * @returns {boolean} Whether the window is shown.
++ */
++LayoutManager_Open(*) {
++	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
++	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _VendorDir, _SharedDir, LAYMGR_VHOST
++	global LAYMGR_HOST_ACCESS_ALLOW
++	if !_LayMgrWeb_Available() {
++		LoggerError("LayoutManager", "The layout manager needs the WebView2 runtime, which is unavailable.")
++		MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
++		return false
++	}
++	if (_LayMgrWeb_Gui != 0) {
++		try WinActivate("ahk_id " . _LayMgrWeb_Gui.Hwnd)
++		return true
++	}
++	LoggerStart("LayoutManager", "Opening the layout manager…")
++	_LayMgrWeb_SessionEpoch += 1
++	SessionEpoch := _LayMgrWeb_SessionEpoch
++	_LayMgrWeb_ResetDone := false
++	g := Gui("+Resize +MinSize560x400", t("layout_manager.window_title"))
++	g.BackColor := "0x1e1e1e"
++	g.MarginX := 0
++	g.MarginY := 0
++	Placeholder := g.Add("Text", "x0 y0 w720 h560", "")
++	g.OnEvent("Close", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_Close))
++	g.OnEvent("Size", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_OnResize))
++	; Shown before the control: a hidden Gui has a zero client rect.
++	g.Show("w720 h560 Center")
++	_LayMgrWeb_Gui := g
++	try {
++		_LayMgrWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
++	} catch as Err {
++		LoggerError("LayoutManager", "WebView2 create failed: {1}", Err.Message)
++		_LayMgrWeb_Close()
++		return false
++	}
++	_LayMgrWeb_WebView := _LayMgrWeb_Controller.CoreWebView2
++	try {
++		s := _LayMgrWeb_WebView.Settings
++		s.AreDevToolsEnabled := false
++		s.AreDefaultContextMenusEnabled := false
++		s.IsStatusBarEnabled := false
++		s.AreBrowserAcceleratorKeysEnabled := false
++		s.IsSwipeNavigationEnabled := false
++	}
++	; Subscription handles live in globals so they are not collected, which
++	; would silently drop the JS->AHK channel.
++	_LayMgrWeb_MsgSub := _LayMgrWeb_WebView.WebMessageReceived(_LayMgrWeb_OnWebMessage.Bind(SessionEpoch))
++	_LayMgrWeb_NavSub := _LayMgrWeb_WebView.NavigationCompleted(_LayMgrWeb_OnNavigationCompleted.Bind(SessionEpoch))
++	_LayMgrWeb_WebView.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
++	_LayMgrWeb_WebView.Navigate("https://" . LAYMGR_VHOST . "/ui/layout_manager/index.html?cb=" . A_TickCount)
++	_LayMgrWeb_Controller.Fill()
++	LoggerSuccess("LayoutManager", "Layout manager opened.")
++	return true
++}
++
++_LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
++	global _LayMgrWeb_SessionEpoch
++	if (SessionEpoch != _LayMgrWeb_SessionEpoch)
++		return
++	try Msg := Args.TryGetWebMessageAsString()
++	catch as Err {
++		LoggerWarn("LayoutManager", "Unreadable layout manager message: {1}", Err.Message)
++		return
++	}
++	try Payload := JsonParse(Msg)
++	catch {
++		LoggerWarn("LayoutManager", "Refused a layout manager message that is not JSON.")
++		return
++	}
++	; A COM callback bypasses Suspend: a paused driver must not install or
++	; reload from a page click, but the page's own ready signal still loads it.
++	if A_IsSuspended && !((Payload is Map) && Payload.Get("action", "") == "ready")
++		return
++	SetTimer(_LayMgrWeb_SessionCall.Bind(SessionEpoch, LayoutManager_HandleMessage, Payload), -1)
++}
++
++_LayMgrWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
++	SetTimer(_LayMgrWeb_SessionCall.Bind(SessionEpoch, LayoutManager_HandleMessage, Map("action", "ready")), -1)
++}
++
++_LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
++	global _LayMgrWeb_SessionEpoch
++	if (SessionEpoch != _LayMgrWeb_SessionEpoch)
++		return false
++	Callback(Params*)
++	return true
++}
++
++; Fire-and-forget push to the page; the window may already be gone.
++_LayMgrWeb_Push(FunctionName, Payload) {
++	global _LayMgrWeb_WebView
++	if !IsSet(_LayMgrWeb_WebView)
++		return false
++	WebView_RunScriptAsync(_LayMgrWeb_WebView,
++		"if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")", "LayoutManager")
++	return true
++}
++
++_LayMgrWeb_OnResize(GuiObj, MinMax, Width, Height) {
++	global _LayMgrWeb_Controller
++	if (MinMax == -1)
++		return
++	if IsSet(_LayMgrWeb_Controller)
++		try _LayMgrWeb_Controller.Fill()
++}
++
++_LayMgrWeb_Close(*) {
++	global _LayMgrWeb_Gui
++	Owned := _LayMgrWeb_Gui
++	_LayMgrWeb_Reset()
++	_LayMgrWeb_Gui := 0
++	if Owned
++		try Owned.Destroy()
++}
++
++; Releases the subscriptions while the controller is alive, then closes it;
++; idempotent, because the page's close and the window's Close event both come here.
++_LayMgrWeb_Reset() {
++	global _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
++	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch
++	if _LayMgrWeb_ResetDone
++		return
++	_LayMgrWeb_ResetDone := true
++	_LayMgrWeb_SessionEpoch += 1
++	try {
++		_LayMgrWeb_MsgSub := unset
++		_LayMgrWeb_NavSub := unset
++		if IsSet(_LayMgrWeb_Controller)
++			_LayMgrWeb_Controller.Close()
++	}
++	_LayMgrWeb_Controller := unset
++	_LayMgrWeb_WebView := unset
++}
+diff --git a/tools/test/run-js-suite.cjs b/tools/test/run-js-suite.cjs
+index 2e380eff9..a285216a4 100644
+--- a/tools/test/run-js-suite.cjs
++++ b/tools/test/run-js-suite.cjs
+@@ -277,6 +277,7 @@ const CHECKS = [
+ 	{ name: 'Karabiner package identity is shared and cached bytes are verified', cmd: 'node', args: ['tools/test/test-karabiner-package-manifest.cjs'], repro: 'node tools/test/test-karabiner-package-manifest.cjs' },
+ 	{ name: 'input-source Python supervisor enforces one bounded process group', cmd: 'node', args: ['tools/test/test-input-source-python-supervisor.cjs'], repro: 'npm run test:input-source-python-supervisor' },
+ 	{ name: 'input-source list edit adds and removes exactly the named layout', cmd: 'node', args: ['tools/test/test-input-source-enabled-list-edit.cjs'], repro: 'npm run test:input-source-enabled-list-edit' },
++	{ name: 'layout manager page decides its rows and posts only allowlisted actions', cmd: 'node', args: ['tools/test/test-layout-manager-page.cjs'], repro: 'npm run test:layout-manager-page' },
+ 	{ name: 'PTY process groups escalate and reap bounded descendants', cmd: 'node', args: ['tools/test/test-pty-process-group-escalation.cjs'], repro: 'npm run test:pty-process-group-escalation' },
+ 	{ name: 'MLX dependency bootstrap fingerprints both dependency manifests', cmd: 'node', args: ['tools/test/test-mlx-deps-lock-fingerprint.cjs'], repro: 'npm run test:mlx-deps-lock-fingerprint' },
+ 	{ name: 'App Cloner shortcuts preserve maximize intent', cmd: 'node', args: ['tools/test/test-app-cloner-shortcut-maximize.cjs'], repro: 'npm run test:app-cloner-shortcut-maximize' },
+diff --git a/tools/test/test-layout-manager-page.cjs b/tools/test/test-layout-manager-page.cjs
+new file mode 100644
+index 000000000..49e855d74
+--- /dev/null
++++ b/tools/test/test-layout-manager-page.cjs
+@@ -0,0 +1,374 @@
++// tools/test/test-layout-manager-page.cjs
++
++/**
++ * ==============================================================================
++ * MODULE: Layout Manager Page Regression
++ * DESCRIPTION:
++ * Executes the shared layout manager page (_shared/ui/layout_manager) against
++ * a minimal DOM and drives it through the host protocol every driver speaks.
++ * Pins what the page decides for all three drivers: the status of each
++ * registry layout (available, installed, update, built in, provided by a
++ * bundle, removed from the registry), the buttons each status offers, the
++ * catalogue line with its error, the result line, the busy state, and that
++ * the page only ever posts the allowlisted actions. Every string it shows
++ * must exist in every locale.
++ * ==============================================================================
++ */
++
++'use strict';
++
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const vm = require('node:vm');
++
++const SHARED = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
++const PAGE = path.join(SHARED, 'ui/layout_manager');
++const source = fs.readFileSync(path.join(PAGE, 'script.js'), 'utf8');
++const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
++const hostBridge = fs.readFileSync(path.join(SHARED, 'ui/host_bridge.js'), 'utf8');
++const LOCALE_DIR = path.join(SHARED, 'data/locales');
++const LOCALES = ['ar', 'cs', 'da', 'de', 'en', 'es', 'fr', 'he', 'hi', 'it', 'ja', 'ko', 'nl', 'no', 'pl', 'pt', 'ru', 'sv',
++	'tr', 'uk', 'zh'];
++
++/**
++ * Reads one locale file as a flat key -> string map.
++ * @param {string} code
++ * @returns {Object<string, string>}
++ */
++function locale(code) {
++	return JSON.parse(fs.readFileSync(path.join(LOCALE_DIR, code + '.json'), 'utf8').replace(/^\uFEFF/, ''));
++}
++
++// ==============================
++// ==============================
++// ======= 1/ Minimal DOM =======
++// ==============================
++// ==============================
++
++/**
++ * Builds a fresh page with every id declared in index.html.
++ * @returns {{context: object, byId: Map, messages: Array}}
++ */
++function loadPage() {
++	const byId = new Map();
++	const i18nElements = [];
++	const messages = [];
++
++	function makeElement(tag) {
++		const classes = new Set();
++		const listeners = {};
++		const el = {
++			tagName: tag.toUpperCase(),
++			textContent: '',
++			hidden: false,
++			disabled: false,
++			title: '',
++			type: '',
++			dataset: {},
++			children: [],
++			attributes: {},
++			get className() {
++				return [...classes].join(' ');
++			},
++			set className(value) {
++				classes.clear();
++				for (const name of String(value).split(/\s+/).filter(Boolean)) classes.add(name);
++			},
++			classList: {
++				toggle(name, on) {
++					if (on) classes.add(name);
++					else classes.delete(name);
++				},
++				contains: (name) => classes.has(name)
++			},
++			get firstChild() {
++				return el.children[0] || null;
++			},
++			appendChild(child) {
++				el.children.push(child);
++				return child;
++			},
++			removeChild(child) {
++				el.children.splice(el.children.indexOf(child), 1);
++				return child;
++			},
++			getAttribute: (name) => el.attributes[name],
++			addEventListener(type, fn) {
++				(listeners[type] = listeners[type] || []).push(fn);
++			},
++			click() {
++				for (const fn of listeners.click || []) fn({ type: 'click' });
++			}
++		};
++		return el;
++	}
++
++	for (const match of html.matchAll(/<(\w+)[^>]*?\bid="([^"]+)"[^>]*>/g)) {
++		byId.set(match[2], makeElement(match[1]));
++	}
++	for (const match of html.matchAll(/<(\w+)[^>]*?data-i18n="([^"]+)"[^>]*>/gs)) {
++		const id = /\bid="([^"]+)"/.exec(match[0]);
++		const el = id ? byId.get(id[1]) : makeElement(match[1]);
++		el.attributes['data-i18n'] = match[2];
++		i18nElements.push(el);
++	}
++
++	const document = {
++		title: '',
++		getElementById: (id) => byId.get(id) || null,
++		createElement: makeElement,
++		querySelectorAll: (selector) => {
++			assert.equal(selector, '[data-i18n]');
++			return i18nElements;
++		}
++	};
++	const window = {
++		webkit: { messageHandlers: { layout_manager_bridge: { postMessage: (payload) => messages.push(payload) } } }
++	};
++	const context = vm.createContext({
++		window,
++		document,
++		console,
++		setTimeout: (fn) => fn(),
++		TextDecoder,
++		atob: (text) => Buffer.from(text, 'base64').toString('binary')
++	});
++	vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });
++	vm.runInContext(source, context, { filename: 'script.js' });
++	return { context, byId, messages, window };
++}
++
++/** A copy of a value made in the page realm, comparable with plain objects. */
++function plain(value) {
++	return JSON.parse(JSON.stringify(value));
++}
++
++/** Collects the text of an element tree. */
++function textOf(el) {
++	return [el.textContent, ...el.children.map(textOf)].join(' ');
++}
++
++/** Finds every descendant matching a predicate. */
++function findAll(el, predicate, out = []) {
++	for (const child of el.children) {
++		if (predicate(child)) out.push(child);
++		findAll(child, predicate, out);
++	}
++	return out;
++}
++
++const index = {
++	layouts: [
++		{ id: 'ergopti', name: 'Ergopti', family: 'ergopti', version: '2.2.2', sha256: 'a', author: 'Adrien Moyaux',
++			licence: 'MIT', homepage: 'https://ergopti.fr', platforms: ['linux', 'macos', 'windows'] },
++		{ id: 'ergol', name: 'Ergo-L', family: 'ergol', version: '1.0.2', sha256: 'b', author: 'NuclearSquid',
++			licence: 'WTFPL', homepage: 'https://ergol.org', platforms: ['linux', 'macos', 'windows'] },
++		{ id: 'fresh', name: 'Fresh', family: 'fresh', version: '3.0.0', sha256: 'c', author: 'Someone',
++			licence: 'MIT', homepage: 'https://example.org', platforms: ['linux', 'macos', 'windows'] },
++		{ id: 'maconly', name: 'Mac only', family: 'mac', version: '1.0.0', sha256: 'd', author: 'Someone',
++			licence: 'MIT', homepage: 'http://insecure.example.org', platforms: ['macos'] }
++	]
++};
++
++const strings = locale('en');
++let failures = 0;
++let passes = 0;
++
++function check(name, fn) {
++	try {
++		fn();
++		passes += 1;
++		console.log(`  ok   ${name}`);
++	} catch (err) {
++		failures += 1;
++		console.error(`  FAIL ${name}\n       ${String(err.message).split('\n').join('\n       ')}`);
++	}
++}
++
++console.log('Layout manager page');
++
++// =======================
++// =======================
++// ======= 2/ Rows =======
++// =======================
++// =======================
++
++check('every status is decided from the host state, per platform', () => {
++	const { context } = loadPage();
++	const rows = context.layoutRows({
++		platform: 'windows',
++		index,
++		installed: {
++			ergol: { id: 'ergol', name: 'Ergo-L', version: '1.0.1', sha256: 'old' },
++			fresh: { id: 'fresh', name: 'Fresh', version: '3.0.0', sha256: 'c' },
++			gone: { id: 'gone', name: 'Gone', version: '0.1.0', sha256: 'e' }
++		},
++		builtin: { ergopti: true },
++		active: 'fresh'
++	});
++	const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
++	assert.deepEqual([...rows].map((row) => row.id), ['ergopti', 'ergol', 'fresh', 'gone'], 'maconly is not published for windows');
++	assert.equal(byId.ergopti.status, 'builtin');
++	assert.deepEqual([...byId.ergopti.actions], ['select']);
++	assert.equal(byId.ergol.status, 'update');
++	assert.deepEqual([...byId.ergol.actions], ['update', 'select', 'uninstall']);
++	assert.equal(byId.ergol.installedVersion, '1.0.1');
++	assert.equal(byId.fresh.status, 'installed');
++	assert.equal(byId.fresh.active, true);
++	assert.deepEqual([...byId.fresh.actions], ['uninstall'], 'the active layout is not offered again');
++	assert.equal(byId.gone.removed, true, 'an installed layout the registry dropped stays listed');
++	assert.deepEqual([...byId.gone.actions], ['select', 'uninstall']);
++
++	const mac = context.layoutRows({ platform: 'macos', index, installed: {}, provided: { ergopti: 'bundle' } });
++	const macById = Object.fromEntries(mac.map((row) => [row.id, row]));
++	assert.equal(macById.ergopti.status, 'provided');
++	assert.deepEqual([...macById.ergopti.actions], [], 'a bundle-provided layout offers no action');
++	assert.equal(macById.ergol.status, 'available');
++	assert.deepEqual([...macById.ergol.actions], ['install']);
++	assert.equal(macById.maconly.homepage, '', 'only an https homepage is offered');
++	assert.deepEqual([...context.layoutRows(null)], []);
++});
++
++// ========================================
++// ========================================
++// ======= 3/ Rendering and actions =======
++// ========================================
++// ========================================
++
++check('the page renders the rows and posts the action of each button', () => {
++	const { context, byId, messages, window } = loadPage();
++	assert.deepEqual(plain(messages), [{ action: 'ready' }], 'the page announces itself');
++	window.initData({
++		strings,
++		state: { platform: 'linux', index, source: 'network', error: null, installed: {}, active: '' }
++	});
++	const list = byId.get('layout-list');
++	assert.equal(list.children.length, 3);
++	assert.ok(textOf(list).includes(strings['layout_manager.status_available']));
++	assert.ok(textOf(list).includes(strings['layout_manager.meta_author'].replace('%s', 'Adrien Moyaux')));
++	assert.equal(byId.get('catalogue-status').textContent, strings['layout_manager.source_network']);
++	assert.equal(byId.get('empty').hidden, true);
++
++	const install = findAll(list, (el) => el.dataset.action === 'install')[1];
++	install.click();
++	assert.deepEqual(plain(messages[messages.length - 1]), { action: 'install', id: 'ergol' });
++	const homepage = findAll(list, (el) => el.dataset.action === 'open_homepage')[0];
++	homepage.click();
++	assert.deepEqual(plain(messages[messages.length - 1]), { action: 'open_homepage', id: 'ergopti' });
++	byId.get('btn-refresh').click();
++	assert.deepEqual(plain(messages[messages.length - 1]), { action: 'refresh' });
++	byId.get('btn-close').click();
++	assert.deepEqual(plain(messages[messages.length - 1]), { action: 'close' });
++	assert.throws(() => context.send('delete_everything'), /unknown action/);
++});
++
++check('an operation in flight disables every button and says what runs', () => {
++	const { byId, window } = loadPage();
++	window.initData({
++		strings,
++		state: { platform: 'linux', index, source: 'cache', installed: {}, busy: { id: 'ergol', action: 'install' } }
++	});
++	const list = byId.get('layout-list');
++	const buttons = findAll(list, (el) => el.tagName === 'BUTTON' && el.dataset.action !== 'open_homepage');
++	assert.ok(buttons.length >= 3);
++	assert.ok(buttons.every((button) => button.disabled), 'no second operation can start');
++	assert.equal(byId.get('btn-refresh').disabled, true);
++	assert.ok(textOf(list).includes(strings['layout_manager.busy_install']));
++});
++
++check('the catalogue line says where the list comes from and why the network one is missing', () => {
++	const { byId, window } = loadPage();
++	window.initData({
++		strings,
++		state: { platform: 'linux', index, source: 'bundled', error: { code: 'offline', detail: 'could not resolve host' } }
++	});
++	const status = byId.get('catalogue-status');
++	assert.ok(status.textContent.startsWith(strings['layout_manager.source_bundled']));
++	assert.ok(status.textContent.includes(strings['layout_manager.error_offline']));
++	assert.ok(status.classList.contains('is-error'));
++	window.updateState({ platform: 'linux', index: null, source: 'none', error: { code: 'too_large', detail: 'x' } });
++	assert.ok(byId.get('catalogue-status').textContent.includes(strings['layout_manager.error_generic'].replace('%s', 'too_large')));
++	assert.equal(byId.get('empty').hidden, false, 'an empty list says so');
++	window.updateState({ platform: 'linux', index, source: 'network', record_error: 'damaged' });
++	assert.ok(byId.get('catalogue-status').textContent.includes(strings['layout_manager.error_record']));
++});
++
++check('the result line reports success, a translated failure and its detail', () => {
++	const { byId, window } = loadPage();
++	window.initData({
++		strings,
++		state: { platform: 'macos', index, installed: {}, result: { id: 'ergol', action: 'install', ok: true } }
++	});
++	const result = byId.get('result');
++	assert.equal(result.hidden, false);
++	assert.equal(result.textContent, strings['layout_manager.result_installed'].replace('%s', 'Ergo-L'));
++	window.updateState({ platform: 'macos', index, installed: {},
++		result: { id: 'ergol', action: 'install', ok: true, warning: 'not_enabled' } });
++	assert.equal(byId.get('result').textContent, strings['layout_manager.result_installed_not_enabled'].replace('%s', 'Ergo-L'));
++	window.updateState({ platform: 'macos', index, installed: {},
++		result: { id: 'ergol', action: 'install', ok: false, code: 'download_failed', detail: 'HTTP 404 for x' } });
++	const failed = byId.get('result');
++	assert.ok(failed.textContent.includes(strings['layout_manager.failure_download']));
++	assert.equal(failed.title, 'HTTP 404 for x', 'the technical detail stays available');
++	assert.ok(failed.classList.contains('is-error'));
++	window.updateState({ platform: 'linux', index, installed: {},
++		result: { id: 'ergol', action: 'install', ok: false, code: 'python_missing' } });
++	assert.ok(byId.get('result').textContent.includes(strings['layouts.linux_needs_python']));
++	window.updateState({ platform: 'linux', index, installed: {},
++		result: { id: 'ergol', action: 'install', ok: false, code: 'foreign_file' } });
++	assert.ok(byId.get('result').textContent.includes(strings['layout_manager.failure_foreign_file']),
++		'a file the driver did not install is named as such');
++	window.updateState({ platform: 'linux', index, installed: {},
++		result: { id: 'ergol', action: 'install', ok: false, code: 'record_failed' } });
++	assert.ok(byId.get('result').textContent.includes(strings['layout_manager.failure_other']));
++	window.updateState({ platform: 'linux', index, installed: {} });
++	assert.equal(byId.get('result').hidden, true);
++});
++
++// ==========================
++// ==========================
++// ======= 4/ Strings =======
++// ==========================
++// ==========================
++
++check('every string the page shows is declared once for the hosts and exists in every locale', () => {
++	const keys = new Set();
++	for (const match of html.matchAll(/data-i18n="([^"]+)"/g)) keys.add(match[1]);
++	for (const match of source.matchAll(/'((?:layout_manager|layouts)\.[a-z_]+)'/g)) keys.add(match[1]);
++	// The status and source keys are composed from the codes the hosts send.
++	for (const status of ['installed', 'update', 'available', 'builtin', 'provided', 'active']) {
++		keys.add('layout_manager.status_' + status);
++	}
++	for (const origin of ['network', 'cache', 'bundled', 'none']) keys.add('layout_manager.source_' + origin);
++	// A literal ending in _ is the prefix of a composed key (status_, source_).
++	const literal = [...keys].filter((key) => !key.endsWith('_')).sort();
++	assert.ok(literal.length >= 35, `only ${literal.length} keys found`);
++	const declared = JSON.parse(fs.readFileSync(path.join(PAGE, 'strings.json'), 'utf8')).keys;
++	assert.deepEqual([...declared].sort(), literal, 'strings.json must list exactly the keys the page shows (the hosts send it)');
++	for (const code of LOCALES) {
++		const table = locale(code);
++		const missing = literal.filter((key) => typeof table[key] !== 'string' || table[key] === '');
++		assert.deepEqual(missing, [], `${code}.json lacks layout manager strings`);
++	}
++});
++
++check('the three hosts accept exactly the actions the page sends', () => {
++	const { context } = loadPage();
++	// A top-level const is not a property of the context: evaluate it there.
++	const page = [...vm.runInContext('LAYOUT_MANAGER_ACTIONS', context)].sort();
++	assert.ok(page.length >= 8, `the page declares only ${page.length} actions`);
++	const lua = fs.readFileSync(path.join(SHARED, 'lua/layouts/manager_bridge.lua'), 'utf8');
++	const luaBlock = /M\.ACTIONS = \{([\s\S]*?)\n\}/.exec(lua);
++	assert.ok(luaBlock, 'manager_bridge.lua declares no M.ACTIONS');
++	const luaActions = [...luaBlock[1].matchAll(/^\t([a-z_]+) = true,$/gm)].map((m) => m[1]).sort();
++	assert.deepEqual(luaActions, page, 'the macOS and Linux hosts accept another list');
++	const ahk = fs.readFileSync(path.resolve(SHARED, '../windows/ui/layout_manager/init.ahk'), 'utf8');
++	const ahkBlock = /global LAYMGR_ACTIONS := Map\(([\s\S]*?)\)\n/.exec(ahk);
++	assert.ok(ahkBlock, 'the Windows host declares no LAYMGR_ACTIONS');
++	const ahkActions = [...ahkBlock[1].matchAll(/"([a-z_]+)", true/g)].map((m) => m[1]).sort();
++	assert.deepEqual(ahkActions, page, 'the Windows host accepts another list');
++});
++
++console.log(`\n${passes} passed, ${failures} failed`);
++if (failures > 0) process.exit(1);
+diff --git a/tools/test/test-webview-geometry-single-source.cjs b/tools/test/test-webview-geometry-single-source.cjs
+index a31efde4e..12e05fbf6 100644
+--- a/tools/test/test-webview-geometry-single-source.cjs
++++ b/tools/test/test-webview-geometry-single-source.cjs
+@@ -107,6 +107,7 @@ const MACOS_MODULES = {
+ 	personal_info_editor: 'ui/personal_info_editor/init.lua',
+ 	onboarding: 'ui/onboarding/init.lua',
+ 	paths_editor: 'ui/menu/menu_paths.lua',
++	layout_manager: 'ui/menu/menu_layout_manager.lua',
+ 	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
+ 	healthcheck: 'ui/healthcheck/core.lua',
+ 	error_dialog: 'ui/error_dialog/init.lua',
+@@ -164,6 +165,10 @@ const WINDOWS_APPS = {
+ 		file: 'ui/paths_editor/init.ahk',
+ 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
+ 	},
++	layout_manager: {
++		file: 'ui/layout_manager/init.ahk',
++		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
++	},
+ 	personal_info_editor: {
+ 		file: 'ui/personal_info_editor/init.ahk',
+ 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
+-- 
+2.50.0.windows.1
+
