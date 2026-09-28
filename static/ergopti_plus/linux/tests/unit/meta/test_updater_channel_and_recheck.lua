@@ -99,13 +99,20 @@ helpers.describe("updater: a found release stays found", function()
 
 	--- Runs one check whose response is delivered by `respond(callback)`.
 	local function check(M, respond)
-		local real = M._fetch_releases
+		local real = M._http_client
 		local result = nil
-		M._fetch_releases = function(_, callback) respond(callback); return true end
+		M._http_client = {
+			get = function(_url, _headers, _options, callback)
+				respond(function(body, status, err)
+					callback({ ok = status == 200 or status == 304, body = body, status = status, error = err })
+				end)
+				return true
+			end,
+		}
 		M.check_for_updates(nil, function(available, release, err)
 			result = { available = available, release = release, err = err }
 		end)
-		M._fetch_releases = real
+		M._http_client = real
 		return result
 	end
 
