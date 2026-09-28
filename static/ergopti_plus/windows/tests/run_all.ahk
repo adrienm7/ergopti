@@ -162,6 +162,7 @@ global _DefaultLogsDir := _LogsDir
 ; test_terminators.ahk and consumed by the tray / config-window delimiter menus.
 #Include ../_generated/terminators.ahk
 #Include ../infra/toml/toml_loader.ahk
+#Include ../infra/hotstrings/extension_packs.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
 #Include ../infra/config_migrate.ahk

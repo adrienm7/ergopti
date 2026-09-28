@@ -429,6 +429,7 @@ if UIASW_IsWorkerInvocation()
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
 #Include infra/toml/toml_loader.ahk
+#Include infra/hotstrings/extension_packs.ahk
 #Include infra/toml/toml_config_loader.ahk
 ; The config.toml schema migration the boot runs before any reader or writer.
 #Include infra/config_migrate.ahk
