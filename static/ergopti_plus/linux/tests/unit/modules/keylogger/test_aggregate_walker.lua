@@ -746,7 +746,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		helpers.assert_not_nil(handle, "the shared keycode catalogue must exist")
 		local body = handle:read("*a")
 		handle:close()
-		local Json = helpers.load_module("json")
+		local Json = require("json")
 		FingerMap._reset()
 		local lookup = FingerMap.load("qwerty", function() return body end, Json.decode, "x")
 		helpers.assert_not_nil(lookup, "the catalogue must decode into a finger lookup")
