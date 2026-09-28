@@ -16,11 +16,10 @@
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
+const { stripComments } = require('../lib/script-source.cjs');
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
 const PREDICTION_SLOTS = { ahk: 'win_space', hs: 'hs_ctrl_space', linux: 'super_space' };
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^\uFEFF/, '');
-const stripComments = (source, marker) => source.split('\n')
-	.filter((line) => !line.trimStart().startsWith(marker)).join('\n');
 
 /**
  * Checks canonical values and the owners that initialize assignments.
@@ -62,7 +61,7 @@ function validate(input) {
 		check(entry && JSON.stringify(entry.platforms) === JSON.stringify([platform]),
 			`platform: ${slot} must belong only to ${platform}`);
 	}
-	const ahk = stripComments(input.ahk, ';');
+	const ahk = stripComments(input.ahk, '.ahk');
 	const assignments = [...ahk.matchAll(/^global KEYBOARD_SHORTCUT_DEFAULTS\s*:=\s*(.+)$/gm)];
 	check(assignments.length === 1
 		&& assignments[0][1].trim() === '_FeatureStateDefaultsForSection("shortcuts.keyboard")',
@@ -73,14 +72,25 @@ function validate(input) {
 		&& /return Values/.test(body) && !/ManifestRecommendedFor/.test(body),
 		'windows-projection: section entries must resolve defaults, never recommendations');
 	for (const [platform, raw] of Object.entries(input.lua)) {
-		const source = stripComments(raw, '--');
+		const source = stripComments(raw, '.lua');
 		const body = (source.match(/^local function manifest_defaults\(\)([\s\S]*?)^end/m) || [])[1] || '';
+		const loader = (source.match(/^local function load_assignments\([^)]*\)([\s\S]*?)^end/m) || [])[1] || '';
+		// Both owners publish one candidate map. macOS seeds it directly; Linux
+		// projects assignable non-neutral rows into it. A dead defaults helper or
+		// an unrelated loop elsewhere cannot satisfy the publication boundary.
+		const direct = loader.match(/local\s+(\w+)\s*=\s*manifest_defaults\(\)/);
+		const projected = loader.match(/for\s+(\w+)\s*,\s*(\w+)\s+in\s+pairs\(manifest_defaults\(\)\)\s+do/);
+		const sink = projected && loader.match(new RegExp(`(\\w+)\\[${projected[1]}\\]\\s*=\\s*${projected[2]}\\b`));
+		const candidate = direct?.[1] || sink?.[1];
+		const published = candidate && (new RegExp(`_actions\\s*,\\s*_loaded\\s*=\\s*${candidate}\\s*,\\s*true\\b`).test(loader)
+			|| new RegExp(`_assignments\\s*=\\s*${candidate}\\b`).test(loader));
+		const overwritten = candidate && new RegExp(`^\\s*${candidate}\\s*=`, 'm').test(loader);
 		check(/local KEYBOARD_SECTION = "shortcuts\.keyboard"/.test(source)
 			&& body !== '' && /ipairs\(Manifest\.features\(\)\)/.test(body)
 			&& /entry\.section == KEYBOARD_SECTION/.test(body)
 			&& /defaults\[entry\.id\] = entry\.default/.test(body)
 			&& /return defaults/.test(body) && !/entry\.recommended/.test(body)
-			&& /for slot, action in pairs\(manifest_defaults\(\)\)/.test(source),
+			&& loader !== '' && Boolean(published) && !overwritten,
 			`${platform}-owner: initialization must consume manifest defaults`);
 	}
 	return { errors, checks };
@@ -110,6 +120,12 @@ const mutations = [
 	...Object.keys(input.lua).map((platform) => [`${platform}-owner`, (copy) => {
 		copy.lua[platform] = copy.lua[platform].replace('defaults[entry.id] = entry.default', 'defaults[entry.id] = entry.recommended');
 	}]),
+	['hs-owner', (copy) => { copy.lua.hs = copy.lua.hs.replace('local loaded = manifest_defaults()', 'local loaded = {}'); }],
+	['hs-owner', (copy) => { copy.lua.hs = copy.lua.hs.replace('_actions, _loaded = loaded, true', '_actions, _loaded = {}, true'); }],
+	['hs-owner', (copy) => { copy.lua.hs = copy.lua.hs.replace('local loaded = manifest_defaults()', 'local loaded = {}') + '\nlocal unused = manifest_defaults()'; }],
+	['hs-owner', (copy) => { copy.lua.hs = copy.lua.hs.replace('_actions, _loaded = loaded, true', 'loaded = {}\n_actions, _loaded = loaded, true'); }],
+	['linux-owner', (copy) => { copy.lua.linux = copy.lua.linux.replace('pairs(manifest_defaults())', 'pairs({})'); }],
+	['linux-owner', (copy) => { copy.lua.linux = copy.lua.linux.replace('_assignments = loaded', '_assignments = {}'); }],
 ];
 for (const [label, mutate] of mutations) {
 	const copy = structuredClone(input);
