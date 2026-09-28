@@ -17,6 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Sandbox = require("test.config_unused_keys_contract").sandbox
+local TomlCodec = require("toml_codec")
 
 -- fr(azerty) and us(intl), cut to the three keys: TLDE (KEY_GRAVE, 41), AE11
 -- (KEY_MINUS, 12) and AE12 (KEY_EQUAL, 13). XKB keycodes are evdev + 8.
@@ -40,14 +42,26 @@ end
 local AZERTY = keymap("twosuperior, asciitilde", "parenright, degree", "equal, plus")
 local US_INTL = keymap("dead_grave, dead_tilde", "minus, underscore", "NoSymbol, NoSymbol")
 
---- A fresh tap_keys module over an in-memory storage, with its deferred work
---- queued rather than run.
+--- A fresh tap_keys module over a real config file, with its deferred work
+--- queued rather than run. Legacy storage remains a separate fixture.
 --- @param stored table|nil Stored assignments, pref key -> value.
 --- @return table tap_keys, table log
 local function fresh(stored)
 	local log = { deferred = {}, executed = {} }
+	local previous = {}
+	for _, name in ipairs({ "adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+		previous[name] = package.loaded[name]
+	end
 	local prefs = {}
 	for key, value in pairs(stored or {}) do prefs[key] = value end
+	local path = os.tmpname()
+	local lines = { "[shortcuts.tap_keys]" }
+	for key, value in pairs(prefs) do
+		lines[#lines + 1] = key:match("([^.]+)$") .. " = " .. string.format("%q", value)
+	end
+	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
+	log.path = path
+	package.loaded["infra.config_paths"] = { config = function() return path end }
 	package.loaded["adapters.storage"] = {
 		get = function(key, default) if prefs[key] == nil then return default end return prefs[key] end,
 		set = function(key, value) prefs[key] = value return true end,
@@ -64,14 +78,75 @@ local function fresh(stored)
 		defer = function(fn) log.deferred[#log.deferred + 1] = fn return true end,
 	})
 	log.restore = function()
-		package.loaded["adapters.storage"] = nil
-		package.loaded["modules.gestures.manager"] = nil
-		package.loaded["modules.shortcuts.tap_keys"] = nil
+		for _, name in ipairs({ "adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+			package.loaded[name] = previous[name]
+		end
+		os.remove(path)
+		os.remove(path .. ".tmp")
 	end
 	return TapKeys, log
 end
 
 helpers.describe("Linux number-row tap keys (tap-keys)", function()
+	helpers.it("tap-config-owner: absent overrides stay native despite legacy storage", function()
+		local TapKeys, log = fresh()
+		local ok, err = pcall(function()
+			package.loaded["adapters.storage"].get = function() return "screen_capture" end
+			os.remove(log.path)
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "none")
+			helpers.assert_true(TapKeys.set_action("number_row_left", "send_text"))
+			TapKeys._reset()
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "send_text")
+			os.remove(log.path)
+			TapKeys._reset()
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "none", "cleared overrides cannot reappear")
+		end)
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("tap-config-owner: refuses malformed input and preserves live assignments on a failed save", function()
+		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
+		local ok, err = pcall(function()
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
+			local broken = "[shortcuts.tap_keys\n"
+			Sandbox.write_bytes(log.path, broken)
+			helpers.assert_eq(TapKeys.set_action("number_row_left", "send_text"), false)
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
+			helpers.assert_eq(Sandbox.read_bytes(log.path), broken)
+			TapKeys._reset()
+			local loaded, failure = pcall(TapKeys.get_action, "number_row_left")
+			helpers.assert_eq(loaded, false)
+			helpers.assert_true(tostring(failure):find("malformed configuration", 1, true) ~= nil)
+		end)
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("tap-config-owner: cleanup retains consumed keys and writes preserve unknown neighbors", function()
+		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
+		local ok, err = pcall(function()
+			Sandbox.write_bytes(log.path, Sandbox.read_bytes(log.path) .. "unknown = \"keep\"\n[other]\nvalue = 42\n")
+			local decoded = TomlCodec.decode(Sandbox.read_bytes(log.path))
+			local marked = {}
+			TapKeys.mark_config_reads(decoded, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
+			helpers.assert_eq(table.concat(marked), "shortcuts.tap_keys.number_row_left")
+			local cleanup = require("ui.menu.unused_keys_cleanup")
+			local live_marked = {}
+			-- Other owners remain real; the action catalogue stub supplies its unused collector.
+			package.loaded["modules.gestures.manager"].mark_config_reads = function() end
+			cleanup.collect(decoded, function(...) live_marked[table.concat({ ... }, ".")] = true end)
+			helpers.assert_eq(live_marked["shortcuts.tap_keys.number_row_left"], true)
+			helpers.assert_eq(live_marked["shortcuts.tap_keys.unknown"], nil)
+			helpers.assert_true(TapKeys.set_action("number_row_left", "send_text"))
+			local saved = TomlCodec.decode(Sandbox.read_bytes(log.path))
+			helpers.assert_eq(saved.shortcuts.tap_keys.unknown, "keep")
+			helpers.assert_eq(saved.other.value, 42)
+		end)
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("a plain tap on an assigned key is consumed and runs its action on the next tick", function()
 		local TapKeys, log = fresh({
 			["shortcuts.tap_keys.number_row_left"] = "screen_capture",
@@ -119,6 +194,11 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 			helpers.assert_eq(TapKeys.get_action("number_row_right_1"), "none")
 			helpers.assert_eq(TapKeys.set_action("number_row_right_1", "send_text"), true)
 			helpers.assert_eq(TapKeys.get_action("number_row_right_1"), "send_text")
+			local saved = TomlCodec.decode(Sandbox.read_bytes(log.path))
+			helpers.assert_eq(saved.shortcuts.tap_keys.number_row_right_1, "send_text",
+				"the canonical config is the durable assignment owner (tap-config-owner)")
+			TapKeys._reset()
+			helpers.assert_eq(TapKeys.get_action("number_row_right_1"), "send_text", "restart reads config.toml")
 			helpers.assert_eq(TapKeys.set_action("number_row_right_1", "no_such_action"), false)
 			helpers.assert_eq(TapKeys.set_action("not_a_key", "send_text"), false)
 		end)

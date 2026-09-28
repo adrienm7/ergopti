@@ -19,10 +19,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Sandbox = require("test.config_unused_keys_contract").sandbox
 
 local Fakes = helpers.load_module("tests.fakes")
 
 local held = {}
+local config_path = nil
 
 local function replace(name, value)
 	if held[name] == nil then held[name] = package.loaded[name] or false end
@@ -33,6 +35,7 @@ local function restore()
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	for name, value in pairs(held) do package.loaded[name] = value ~= false and value or nil end
 	held = {}
+	if config_path then os.remove(config_path) os.remove(config_path .. ".tmp") config_path = nil end
 end
 
 --- A fresh module over stored assignments, with a recording executor and a
@@ -42,6 +45,13 @@ end
 local function fixture(stored)
 	local seen = { executed = {}, deferred = {}, chatgpt = 0 }
 	replace("adapters.storage", Fakes.storage({ initial = stored }))
+	config_path = os.tmpname()
+	local lines = { "[shortcuts.keyboard]" }
+	for key, value in pairs(stored or {}) do
+		lines[#lines + 1] = key:match("([^.]+)$") .. " = " .. string.format("%q", value)
+	end
+	Sandbox.write_bytes(config_path, table.concat(lines, "\n") .. "\n")
+	replace("infra.config_paths", { config = function() return config_path end })
 	replace("modules.shortcuts.chatgpt", { open = function() seen.chatgpt = seen.chatgpt + 1 return true end })
 	replace("modules.gestures.manager", {
 		is_assignable = function(id) return id == "select_line" or id == "script_reload" end,
