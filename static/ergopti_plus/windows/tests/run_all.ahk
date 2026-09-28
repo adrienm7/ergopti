@@ -212,6 +212,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/config_io.ahk
 #Include ../infra/config_scope.ahk
 #Include ../infra/hotstrings/hotstrings_scope.ahk
+#Include ../infra/config_global_scope.ahk
 #Include ../ui/personal_toml_editor.ahk
 #Include ../ui/personal_toml_editor_webview.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
@@ -424,7 +425,12 @@ InstallSendNoOps()
 #Include unit/test_features_manifest.ahk
 #Include unit/test_neutral_config_manifest.ahk
 #Include unit/test_config_scope_manifest.ahk
+#Include unit/test_config_scope_menus.ahk
+#Include unit/test_config_scope_shortcuts.ahk
+#Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_global_config_scope.ahk
+#Include unit/test_gesture_clear_boot_marker.ahk
 #Include unit/test_tap_hold_scope.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk

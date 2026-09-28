@@ -120,6 +120,9 @@ LLM_Menu_BuildSubmenu() {
 		Map("llm_toggle", LLM_Menu_OnToggle),
 		Map("llm_enabled", () => _LLM_Menu["enabled"],
 			"llm_toggle_ready", () => !A_IsSuspended))
+	ScopeCommands := _LLM_ScopeCommands()
+	for Id in ["scope_restore", "scope_clear"]
+		MenuRenderer_AppendCommand(_LLM_Menu_Handle, "llm_menu", Id, ScopeCommands)
 	_LLM_Menu_Handle.Add()  ; separator after the switch, as the manifest declares
 
 	; Warning row — surfaces when the feature is ON but the active backend
@@ -398,4 +401,18 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 	default:
 		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in the shared menu manifest — skipped.", id)
 	}
+}
+
+; The terminal owner preserves credential stores and explicit consent.
+_LLM_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"scope_restore", (*) => _LLM_ApplyScope("recommended", OwnedOptions),
+		"scope_clear", (*) => _LLM_ApplyScope("clear", OwnedOptions))
+}
+
+_LLM_ApplyScope(Mode, Options) {
+	CandidateOptions := Options.Clone()
+	CandidateOptions["supplement"] := _LLM_Menu_ScopeResetOperations
+	return ConfigScopeApply("llm", Mode, Map(), CandidateOptions)
 }

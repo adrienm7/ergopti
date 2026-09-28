@@ -344,6 +344,18 @@ GestureSaveAllAssignments(ActionNameBySlot, WriterFn := 0, NotifyFn := 0) {
 		return true
 }
 
+/** Clear cancels pending native setup; recommendations preserve explicit intent. */
+GestureScopeResetOperations(ScopeId, Mode) {
+	if ScopeId != "gestures" || !(Mode == "recommended" || Mode == "clear")
+		throw ValueError("Gesture persistence cannot reset another configuration scope.")
+	if Mode == "recommended"
+		return []
+	Section := "gestures", Key := "auto_configure_on_next_start"
+	if TomlConfigForeignOwner(Section, Key) != "Gestures"
+		throw Error("The queued native setup marker has no matching gesture owner.")
+	return [{ Section: Section, Key: Key, Delete: true }]
+}
+
 ; Consumes the onboarding marker before arming any elevated/PnP side effect.
 ; TimerFn is injectable so a failed commit can be proven to schedule nothing.
 GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {

@@ -19,6 +19,12 @@
 ; ==================================
 ; ==================================
 
+/**
+ * Registers a personal shortcut without implicitly enabling an absent preference.
+ * @param {String} Name Personal preference identity.
+ * @param {Boolean} DefaultEnabled Retained positional argument; ignored. Absence uses the manifest default.
+ * @param {String} Description User-authored menu description.
+ */
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
 		global _PersonalShortcutsRegistry, Features
 		Name := StrLower(Name)
@@ -43,13 +49,14 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
 						if !Features["shortcuts"].Has("personal") {
 								Features["shortcuts"]["personal"] := Map()
 						}
-						Features["shortcuts"]["personal"][Name] := DefaultEnabled
+						Neutral := ManifestDefaultFor("shortcuts.personal." . Name)
+						Features["shortcuts"]["personal"][Name] := Neutral
 						if MasterGateState()["initialized"] {
 								Desired := MasterGateState()["features"]["shortcuts"]
 								if !Desired.Has("personal")
 										Desired["personal"] := Map()
 								if !Desired["personal"].Has(Name)
-										Desired["personal"][Name] := DefaultEnabled
+										Desired["personal"][Name] := Neutral
 								Features["shortcuts"]["personal"][Name] :=
 										IsCategoryGated("Shortcuts") && Desired["personal"][Name]
 						}
@@ -81,4 +88,24 @@ EnsurePersonalHotstringFeature(SecName) {
 				_ConfigSeedPersonalHotstring(Features, SecName)
 		if MasterGateState()["initialized"]
 				_ConfigSeedPersonalHotstring(MasterGateState()["features"], SecName)
+}
+
+/** Returns only personal shortcut paths registered by the runtime owner. */
+PersonalShortcutScopePaths() {
+	global _PersonalShortcutsRegistry
+	if !IsSet(_PersonalShortcutsRegistry) || !(_PersonalShortcutsRegistry is Map)
+		throw Error("Personal shortcut inventory is unavailable.")
+	Order := _PersonalShortcutsRegistry.Get("__Order", 0)
+	if !(Order is Array)
+		throw TypeError("Personal shortcut order is unavailable.")
+	Paths := []
+	loop Order.Length {
+		if !Order.Has(A_Index) || !(Order[A_Index] is String)
+			throw TypeError("Personal shortcut inventory must contain dense names.")
+		Name := Order[A_Index]
+		if Name == "" || !_PersonalShortcutsRegistry.Has(Name)
+			throw ValueError("Personal shortcut inventory contains an unregistered name.")
+		Paths.Push("shortcuts.personal." . Name)
+	}
+	return Paths
 }

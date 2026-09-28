@@ -223,42 +223,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			}
 
 		} else if (ItemType == "check" or ItemType == "command") {
-			; The declarative row: the manifest carries its label, its checkmark
-			; predicate and its greying predicate, and the driver supplies only a
-			; NAMED behaviour through Commands.
-			;
-			; Every other type that carries behaviour hands the id back to a driver
-			; function that builds the row itself, which is why 639 rows across the
-			; three drivers lived outside their renderers. Here the row is built
-			; ONCE, in each driver's renderer, from one shared declaration — so the
-			; same setting cannot render as a tick on one OS and a checkbox on
-			; another. The Lua renderer implements the identical two types.
-			Id := _MR_Get(Item, "id")
-			I18nKey := _MR_Get(Item, "i18n")
-			CmdId := _MR_Get(Item, "command")
-			if (CmdId == "") {
-				CmdId := Id
-			}
-			if (Id == "" or I18nKey == "") {
-				try LoggerWarn("MenuRenderer", "'{1}' item missing id or i18n in '{2}' — skipped.", ItemType, ManifestKey)
-			} else if !(Commands is Map and Commands.Has(CmdId)) {
-				; Same class of drift as the action branch: a declared row whose
-				; command nobody registered renders one item short, permanently.
-				try LoggerWarn("MenuRenderer", "No command '{1}' for '{2}.{3}' — skipped.", CmdId, ManifestKey, Id)
-			} else {
-				Row := Map("label", t(I18nKey), "action", Commands[CmdId])
-				if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
-					Row["disabled"] := true
-				}
-				; Only "check" carries a tick. Giving a plain command row
-				; checked := false would draw an empty box beside a row that
-				; toggles nothing.
-				if (ItemType == "check") {
-					Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
-				}
-				_MR_RenderRows(Result, [Row], Id, 1)
-				ItemCount++
-			}
+			ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
 
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
@@ -417,6 +382,41 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 		Added++
 	}
 	return Added
+}
+
+; Renders the same declared command/check in full and native-built menus.
+_MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	ItemType := _MR_Get(Item, "type")
+	Id := _MR_Get(Item, "id")
+	I18nKey := _MR_Get(Item, "i18n")
+	CmdId := _MR_Get(Item, "command", Id)
+	if CmdId == ""
+		CmdId := Id
+	if Id == "" || I18nKey == "" || !(Commands is Map) || !Commands.Has(CmdId) {
+		try LoggerError("MenuRenderer", "Missing declaration or command for '{1}.{2}'.", ManifestKey, Id)
+		return 0
+	}
+	Row := Map("label", t(I18nKey), "action", Commands[CmdId])
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
+		Row["disabled"] := true
+	if ItemType == "check"
+		Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+}
+
+/**
+ * Appends one declared command to a menu assembled by its native owner.
+ * @param {Menu} TargetMenu Native menu receiving the command.
+ * @param {String} ManifestKey Canonical menu declaration.
+ * @param {String} CommandId Declared command identifier.
+ * @param {Map} Commands Owner callbacks indexed by command identifier.
+ * @returns {Integer} Number of rows drawn.
+ */
+MenuRenderer_AppendCommand(TargetMenu, ManifestKey, CommandId, Commands, StateGetters := unset) {
+	Item := _MR_FindItemById(ManifestKey, CommandId)
+	if !(Item is Map) || _MR_Get(Item, "type") != "command" || !_MR_IsForAhk(Item)
+		return 0
+	return _MR_RenderCommand(TargetMenu, Item, ManifestKey, Commands, IsSet(StateGetters) ? StateGetters : Map())
 }
 
 ; Renders a category's master switch as a checkbox row, in manifest order.

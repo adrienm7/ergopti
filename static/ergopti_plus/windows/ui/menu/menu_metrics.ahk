@@ -65,7 +65,8 @@ BuildMetricsMenu() {
 	; The category switch is the manifest's `metrics_toggle` row. Its command is
 	; the dedicated writer (security warning + MetricsShortcuts.enabled + save)
 	; rather than the generic CategoryEnabled flip.
-	Commands := Map(
+	Commands := _MET_ScopeCommands()
+	for Id, Handler in Map(
 		"metrics_toggle",  (*) => ToggleMetricsEnabled(),
 		"filter_private",  ToggleFilterPrivate,
 		"filter_secure",   ToggleFilterSecureField,
@@ -75,6 +76,7 @@ BuildMetricsMenu() {
 		"show_typing",     KLUI_ToggleTyping,
 		"show_apps",       KLUI_ToggleApps,
 	)
+		Commands[Id] := Handler
 
 	; The two shortcut pickers and the app-exclusion row left DynHandlers on
 	; 2026-08-07: their labels are computed, so no static declaration can carry
@@ -171,3 +173,8 @@ _MET_WpmWidgetGraph(M, _Cat, Getters) {
 }
 
 ; ── Layout dynamic handlers ────────────────────────────────────────────────────
+
+; Consent is excluded from recommendations by the shared scope declaration.
+_MET_ScopeCommands(Options := unset) {
+	return ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
+}

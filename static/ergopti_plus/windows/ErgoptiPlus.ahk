@@ -1111,6 +1111,7 @@ LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active)
 #Include infra/config_io.ahk
 #Include infra/config_scope.ahk
 #Include infra/hotstrings/hotstrings_scope.ahk
+#Include infra/config_global_scope.ahk
 CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()

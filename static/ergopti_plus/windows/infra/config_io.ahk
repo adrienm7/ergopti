@@ -1775,3 +1775,21 @@ KeyboardSlotRows() {
 		}
 		return Rows
 }
+
+/** Removes custom keyboard slots accepted by this persistence owner's grammar. */
+ConfigIOShortcutScopeOperations(ScopeId, Mode) {
+	global KeyboardShortcutAssignments
+	if ScopeId != "shortcuts" || !(Mode == "recommended" || Mode == "clear")
+		throw ValueError("Shortcut persistence cannot reset another configuration scope.")
+	if !IsSet(KeyboardShortcutAssignments) || !(KeyboardShortcutAssignments is Map)
+		throw Error("Keyboard shortcut inventory is unavailable.")
+	Rows := []
+	for Slot in KeyboardShortcutAssignments {
+		if TomlConfigForeignOwner("shortcuts.keyboard", Slot) != "ConfigIO"
+			continue
+		if ManifestFindEntryByPath("shortcuts.keyboard." . Slot)
+			continue
+		Rows.Push({ Section: "shortcuts.keyboard", Key: Slot, Delete: true })
+	}
+	return Rows
+}

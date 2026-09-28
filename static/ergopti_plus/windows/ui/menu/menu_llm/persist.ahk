@@ -3,6 +3,24 @@
 
 #Requires AutoHotkey v2.0
 
+; Foreign scalar/array preferences belong to this owner, not the Features map.
+; Removing their overrides reuses this owner's existing load-time defaults.
+_LLM_Menu_ScopeResetOperations(ScopeId, Mode) {
+	if ScopeId != "llm" || !(Mode == "recommended" || Mode == "clear")
+		throw ValueError("LLM persistence cannot reset another configuration scope.")
+	Rows := []
+	for Section, Keys in TomlConfigForeignOwnershipRegistry() {
+		for Key, Owner in Keys {
+			if Owner != "LLMMenu"
+				continue
+			if !(Section == "llm" || SubStr(Section, 1, 4) == "llm.")
+				throw ValueError("An LLM preference escaped its owned configuration namespace.")
+			Rows.Push({ Section: Section, Key: Key, Delete: true })
+		}
+	}
+	return Rows
+}
+
 _LLM_Menu_ModifiersStringToArray(s) {
 	global CHORD_SEPARATOR
 	Canonical := LLM_Option_NormalizeModifierString(s)
