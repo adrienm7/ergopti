@@ -172,6 +172,8 @@ end
 M.open_editor = PersonalInfo.open_editor
 M.enable      = PersonalInfo.enable
 M.disable     = PersonalInfo.disable
+M.set_enabled = PersonalInfo.set_enabled
+M.is_enabled  = PersonalInfo.is_enabled
 
 --- Propagates a magic-key change to BOTH dynamic engines.
 ---

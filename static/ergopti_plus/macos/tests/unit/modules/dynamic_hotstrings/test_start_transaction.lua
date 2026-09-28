@@ -149,4 +149,42 @@ helpers.describe("dynamic_hotstrings.start owns both child generations", functio
 	end)
 end)
 
+helpers.describe("personal-information boot admission", function()
+	for _, choice in ipairs({ "absent", "disabled", "enabled" }) do
+		helpers.it("applies the " .. choice .. " canonical choice before admitting keyboard input", function()
+			local fixture = load_fixture(nil)
+			local ok, err = pcall(function()
+				local source, read_error = helpers.read_driver_unit("local function has_common_hotstring_groups")
+				helpers.assert_type(source, "string", tostring(read_error))
+				local body = source:match("(local boot_personal_info = boot_saved_prefs%.personal_info.-\nend)")
+				helpers.assert_type(body, "string", "boot must publish the personal-info preference")
+				local apply_at = source:find(body, 1, true)
+				local input_at = source:find("local keymap_started = keymap.start()", 1, true)
+				helpers.assert_true(input_at ~= nil and apply_at < input_at)
+				helpers.assert_true(fixture.DynamicHotstrings.start("", fixture.keymap, fixture.config_path))
+				local saved = {}
+				if choice ~= "absent" then saved.personal_info = choice == "enabled" end
+				local run = assert(load(body, "personal-info boot choice", "t", setmetatable({
+					boot_saved_prefs = saved, dynamic_hotstrings = fixture.DynamicHotstrings,
+				}, { __index = _G })))
+				run()
+				helpers.assert_eq(fixture.DynamicHotstrings.is_enabled(), choice == "enabled")
+				local intercept = fixture.state.interceptors[#fixture.state.interceptors]
+				local preview = fixture.state.providers[#fixture.state.providers]
+				intercept(event("@"), "")
+				intercept(event("e"), "@")
+				if choice == "enabled" then helpers.assert_type(preview("@e"), "string")
+				else helpers.assert_nil(preview("@e")) end
+				for _, invalid in ipairs({ "true", 1, {} }) do
+					helpers.assert_eq(fixture.DynamicHotstrings.set_enabled(invalid), false)
+					helpers.assert_eq(fixture.DynamicHotstrings.is_enabled(), choice == "enabled")
+				end
+			end)
+			fixture.DynamicHotstrings.stop()
+			os.remove(fixture.config_path)
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 return true

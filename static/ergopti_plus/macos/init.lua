@@ -1552,6 +1552,12 @@ local dynamic_hotstrings_started = dynamic_hotstrings.start(base_dir, keymap, pe
 if dynamic_hotstrings_started ~= true then
 	error("dynamic_hotstrings.start did not commit")
 end
+local boot_personal_info = boot_saved_prefs.personal_info
+if boot_personal_info == nil then boot_personal_info = dynamic_hotstrings.DEFAULT_STATE.personal_info end
+if dynamic_hotstrings.set_enabled(boot_personal_info) ~= true
+	or dynamic_hotstrings.is_enabled() ~= boot_personal_info then
+	error("canonical personal-info preference did not commit before eventtap startup")
+end
 table.insert(hotfiles, "dynamichotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
