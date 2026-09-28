@@ -35,6 +35,12 @@ local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
 local shortcut_row_debt = {}
 
+--- Reports whether previous menu mutations have no retained inverse.
+--- @return boolean idle
+function M.scope_idle()
+	return shortcut_toggle_debt == nil and next(shortcut_row_debt) == nil
+end
+
 
 
 
