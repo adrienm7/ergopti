@@ -410,6 +410,9 @@ swipe_5_left_down = "incremental"
 swipe_5_left_up = "incremental"
 swipe_5_right_down = "incremental"
 swipe_5_right_up = "incremental"
+swipe_3_horiz = "x1"
+swipe_4_horiz = "x1"
+swipe_5_horiz = "x1"
 
 [gestures.sensitivities]
 swipe_2_left = 3.5
@@ -444,6 +447,9 @@ swipe_5_left_down = 3.5
 swipe_5_left_up = 3.5
 swipe_5_right_down = 3.5
 swipe_5_right_up = 3.5
+swipe_3_horiz = 3.5
+swipe_4_horiz = 3.5
+swipe_5_horiz = 3.5
 
 [ui]
 menubar_icon = "v1"

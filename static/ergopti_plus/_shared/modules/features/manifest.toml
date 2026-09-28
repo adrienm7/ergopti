@@ -3462,6 +3462,63 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 # or one an emulated layout decides for itself (the digit row). While a registry
 # layout is emulated (emulated_layout below) the Windows master gate turns it off
 # and the menu greys its row with this reason.
+[[features.gestures.modes]]
+id = "swipe_3_horiz"
+platforms = ["hs"]
+default = "x1"
+recommended = "x1"
+input_altering = false
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.gestures.modes"
+
+[[features.gestures.modes]]
+id = "swipe_4_horiz"
+platforms = ["hs"]
+default = "x1"
+recommended = "x1"
+input_altering = false
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.gestures.modes"
+
+[[features.gestures.modes]]
+id = "swipe_5_horiz"
+platforms = ["hs"]
+default = "x1"
+recommended = "x1"
+input_altering = false
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.gestures.modes"
+
+[[features.gestures.sensitivities]]
+id = "swipe_3_horiz"
+platforms = ["hs"]
+default = 3.5
+recommended = 3.5
+input_altering = false
+type = "number"
+description_key = "menu.gestures.sensitivities"
+
+[[features.gestures.sensitivities]]
+id = "swipe_4_horiz"
+platforms = ["hs"]
+default = 3.5
+recommended = 3.5
+input_altering = false
+type = "number"
+description_key = "menu.gestures.sensitivities"
+
+[[features.gestures.sensitivities]]
+id = "swipe_5_horiz"
+platforms = ["hs"]
+default = 3.5
+recommended = 3.5
+input_altering = false
+type = "number"
+description_key = "menu.gestures.sensitivities"
+
 [[features.layout]]
 id = "ergopti_base"
 platforms = ["ahk"]

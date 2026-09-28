@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Scoped Preferences Owner (macOS)
 --- DESCRIPTION:
---- Bridges the shared single-file transaction to the inline action-parameter
---- table owned by Preferences and the live gesture registry. Other native state
+--- Bridges the shared single-file transaction to the inline gesture tables
+--- owned by Preferences and the live parameter registry. Other native state
 --- stays behind explicit capture/apply/restore ports until its terminal result.
 --- ==============================================================================
 
@@ -13,15 +13,8 @@ local Manifest = require("infra.manifest_reader")
 local Transaction = require("config_scope_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
-local Scanner = require("toml_codec.record_scanner")
+local Preferences = require("infra.preferences")
 local PARAMETER_PREFIX = "gestures.action_parameters."
-
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local out = {}
-	for key, child in pairs(value) do out[key] = clone(child) end
-	return out
-end
 
 local function identifier(value)
 	return type(value) == "string" and value:match("^[a-z0-9_]+$") ~= nil
@@ -62,7 +55,7 @@ function M.new(options)
 		return nil
 	end
 	local owners = { action_parameter_domain = parameter_domain }
-	local source_snapshot, disk_parameters, scope_id
+	local source_snapshot, disk_parameters, disk_gestures, scope_id
 	local transaction
 	local function inventory()
 		local content, status, detail = Writer.read_classified(options.path, options.files)
@@ -70,7 +63,8 @@ function M.new(options)
 		local decoded = Codec.decode(content or "")
 		assert(type(decoded) == "table", "scope source is not valid TOML")
 		source_snapshot = { status = status, content = content }
-		disk_parameters = decoded.gestures and decoded.gestures.action_parameters or nil
+		disk_gestures = decoded.gestures or {}
+		disk_parameters = disk_gestures.action_parameters
 		assert(disk_parameters == nil or type(disk_parameters) == "table", "scope parameter table is malformed")
 		local runtime_parameters = gestures.get_all_action_parameters()
 		assert(type(runtime_parameters) == "table", "scope parameter inventory is unavailable")
@@ -89,39 +83,20 @@ function M.new(options)
 		}, owners)
 	end
 	local function prepare(path, updates, files)
-		local scanned, detail = Scanner.scan_records(source_snapshot.content or "", { quoted_headers = true })
-		if not scanned then return false, detail end
-		local inline = false
-		for _, record in ipairs(scanned.records) do
-			if record.addressable and record.section == "gestures" and record.key == "action_parameters" then inline = true end
-		end
-		local candidate, rows, changed = clone(disk_parameters or {}), {}, false
-		for _, row in ipairs(updates) do
-			local full_path = row.section .. "." .. row.key
-			if inline and full_path:sub(1, #PARAMETER_PREFIX) == PARAMETER_PREFIX then
-				assert(row.delete == true and parameter_domain(full_path), "scope parameter operation is not owned")
-				candidate[row.key] = nil
-				changed = true
-			else rows[#rows + 1] = row end
-		end
-		if changed then
-			rows[#rows + 1] = next(candidate) == nil and { section = "gestures", key = "action_parameters", delete = true }
-				or { section = "gestures", key = "action_parameters", value = candidate }
-		end
+		local rows = Preferences.prepare_gesture_updates(source_snapshot, updates)
 		return Writer.prepare_batch(path, rows, files, source_snapshot)
 	end
 	transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = Manifest, owners = owners, owned_paths = inventory, prepare_batch = prepare,
-		capture = function()
-			local native = options.capture()
+		capture = function(source, candidate, updates)
+			local native = options.capture(source, candidate, updates)
 			assert(type(native) == "table", "scope native capture was not acknowledged")
 			local parameters = gestures.get_all_action_parameters()
 			assert(type(parameters) == "table", "scope parameter capture was not acknowledged")
 			return { native = native, parameters = parameters }
 		end,
-		apply = function(decoded, updates)
-			if options.apply(decoded, updates) ~= true then return false end
+		apply = function(decoded, updates, source, candidate)
 			local parameters = gestures.get_all_action_parameters()
 			for _, row in ipairs(updates) do
 				if parameter_domain(row.section .. "." .. row.key) then
@@ -129,7 +104,8 @@ function M.new(options)
 					parameters[row.key] = nil
 				end
 			end
-			return gestures.replace_action_parameters(parameters) == true
+			if gestures.replace_action_parameters(parameters) ~= true then return false end
+			return options.apply(decoded, updates, source, candidate) == true
 		end,
 		restore = function(snapshot)
 			if gestures.replace_action_parameters(snapshot.parameters) ~= true then return false end

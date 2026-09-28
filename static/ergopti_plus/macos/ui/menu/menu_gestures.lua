@@ -60,7 +60,6 @@ local function slot_label(slot)
 	return i18n.get("gesture.slots." .. slot)
 end
 
-local DISABLED_GESTURE_ACTION = "none"
 
 --- Builds the gestures sub-menu.
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
@@ -400,33 +399,16 @@ function M.build(ctx)
 
 	-- `command` since 2026-08-07: the renderer builds the row and its label from
 	-- the declaration, so this supplies only what the click does.
-	local function cmd_disable_all()
-		local gestures_enabled = state.gestures == true
-		-- The axis slots too: clearing only the single slots left a horizontal
-		-- swipe bound, so the trackpad still answered Ergopti after « Tout effacer ».
-		for _, slots in ipairs({ gestures_mod.SINGLE_SLOTS or {}, gestures_mod.AXIS_SLOTS or {} }) do
-			for _, slot in ipairs(slots) do
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
-			end
+	local function apply_scope(mode)
+		if ctx.paused or type(ctx.apply_gesture_scope) ~= "function" then return false end
+		if gesture_toggle_debt ~= nil then
+			Logger.warn(LOG, "Gesture scope refused while the previous toggle rollback remains pending.")
+			return false
 		end
-		state.gestures = gestures_enabled
-		if gestures_enabled then
-			if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
-		else
-			if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
-		end
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
+		return ctx.apply_gesture_scope(mode) == true
 	end
-
-	local function cmd_restore_defaults()
-		local defaults = gestures_mod.RECOMMENDED_GESTURES
-		for slot, action in pairs(defaults) do
-			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
-		end
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
-	end
+	local function cmd_disable_all() return apply_scope("clear") end
+	local function cmd_restore_defaults() return apply_scope("recommended") end
 
 	-- The row itself is `type = "check"` in the manifest now: the label, the tick
 	-- predicate and the greying predicate are declared, and this is only what the

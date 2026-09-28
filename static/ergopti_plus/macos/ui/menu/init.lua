@@ -485,6 +485,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- raised writer failure can reverse the whole user action in place.
 	local sync_state_to_modules
 	local transactional_save_prefs = nil
+	local preference_checkpoint = nil
 	local llm_handler = nil
 	-- Features whose runtime refused the saved value this session: their state
 	-- shows the real posture while saves keep the value config.toml holds.
@@ -498,7 +499,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			Logger.error(LOG, "Preference transaction used before its boot snapshot was seeded.")
 			return false
 		end
-		return transactional_save_prefs()
+		return run_global_exclusive("Preference save", transactional_save_prefs)
 	end
 
 
@@ -686,14 +687,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 	})
 
-	run_global_exclusive = function(action_label, callback)
+	run_global_exclusive = function(action_label, callback, retained_owner)
 		if not global_actions_owner
 			or type(global_actions_owner.run_exclusive) ~= "function" then
 			Logger.error(LOG, "%s refused because the global action owner is unavailable.",
 				tostring(action_label))
 			return false
 		end
-		return global_actions_owner.run_exclusive(action_label, callback)
+		return global_actions_owner.run_exclusive(action_label, callback, retained_owner)
 	end
 
 	local function reset_all_defaults()
@@ -843,7 +844,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Logger.error(LOG, "Could not capture the initial runtime preference snapshot: %s.",
 			tostring(initial_preferences))
 	end
-	transactional_save_prefs = PreferencesTransaction.bind(Preferences, {
+	transactional_save_prefs, preference_checkpoint = PreferencesTransaction.bind(Preferences, {
 		path                = MenuPaths.get("ConfigTomlPath"),
 		state               = state,
 		hotfiles            = hotfiles,
@@ -1219,7 +1220,43 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ctx is a stable table of upvalue references — fields that are mutable at
 	-- runtime (state, keymap, …) are already live pointers so the menu always
 	-- reads current values without rebuilding the table on every click.
+	local gesture_scope = nil
+	local scope_generation = 0
+	local function apply_gesture_scope(mode)
+		if read_only_reason ~= nil then return false end
+		if not gesture_scope then
+			gesture_scope = require("ui.menu.gesture_scope").new({
+				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				state = state, gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
+				demotions = session_demotions,
+				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+				admission = run_global_exclusive,
+				paused = function()
+					if type(core_mods.shortcuts_mod) ~= "table"
+						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+					return core_mods.shortcuts_mod.is_paused()
+				end,
+				backup_path = function()
+					scope_generation = scope_generation + 1
+					return MenuPaths.get("ConfigTomlPath") .. ".gestures-"
+						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+				end,
+				confirm = function(selected_mode)
+					local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+					local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+					return require("infra.dialog_util").block_alert(i18n.get("menu.gestures.title"), label, no, yes, "warning") == yes
+				end,
+			})
+		end
+		local committed = gesture_scope.apply(mode)
+		if committed == true then
+			Builder.invalidate_cache()
+			updateMenu()
+		end
+		return committed
+	end
 	local ctx = {
+		apply_gesture_scope = apply_gesture_scope,
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,

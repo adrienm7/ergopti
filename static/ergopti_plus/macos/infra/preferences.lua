@@ -621,6 +621,32 @@ function M.adopt_cleanup(prefs_file, previous, content)
 	return true
 end
 
+--- Captures the exact source acknowledged by load or the last publication.
+--- @param path string Configuration path.
+--- @return table|nil snapshot Classified source snapshot.
+function M.source_snapshot(path)
+	local source = _source_snapshots[path]
+	return source and { status = source.status, content = source.content } or nil
+end
+
+--- Exchanges the acknowledged source under the shared writer admission fence.
+--- The caller retains the inverse until its conditional publication commits.
+--- @param path string Configuration path.
+--- @param expected table Exact previous classified source.
+--- @param replacement table Classified candidate or rollback source.
+--- @return boolean exchanged
+function M.replace_source(path, expected, replacement)
+	local current = _source_snapshots[path]
+	local function valid(source)
+		return type(source) == "table" and ((source.status == "absent" and source.content == nil)
+			or (source.status == "ok" and type(source.content) == "string"))
+	end
+	if not valid(expected) or not valid(replacement) or not valid(current)
+		or current.status ~= expected.status or current.content ~= expected.content then return false end
+	_source_snapshots[path] = { status = replacement.status, content = replacement.content }
+	return true
+end
+
 --- Clones persisted values so nested menu tables cannot mutate an acknowledged
 --- rollback snapshot after it has been captured.
 --- @param value any Value to clone.
@@ -630,6 +656,44 @@ local function clone_value(value)
 	local clone = {}
 	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
 	return clone
+end
+
+--- Reconciles leaf operations with existing inline gesture tables without
+--- replacing unknown neighbors. Both ordinary saves and scopes use this owner.
+--- @param source table Exact classified source snapshot.
+--- @param updates table Owned set/delete leaf operations.
+--- @return table updates Equivalent strict-writer operations.
+function M.prepare_gesture_updates(source, updates)
+	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
+	if not scanned then return false, detail end
+	local decoded = TomlCodec.decode(source.content or "")
+	local disk_gestures = decoded.gestures or {}
+	local inline, candidates, rows = {}, {}, {}
+	for _, record in ipairs(scanned.records) do
+		if record.addressable and record.section == "gestures"
+			and (record.key == "action_parameters" or record.key == "modes" or record.key == "sensitivities") then
+			inline["gestures." .. record.key] = record.key
+		end
+	end
+	for _, row in ipairs(updates) do
+		local key = inline[row.section]
+		local empty_runtime_table = row.section == "gestures" and type(row.value) == "table"
+			and next(row.value) == nil and (row.key == "action_parameters" or row.key == "modes" or row.key == "sensitivities")
+		if empty_runtime_table then
+			-- Empty runtime ownership cannot authorize replacing an entire source
+			-- table: unknown or other-domain neighbors may still be stored there.
+		elseif key then
+			assert(type(disk_gestures[key]) == "table", "scope owned table is malformed")
+			local candidate = candidates[key] or clone_value(disk_gestures[key])
+			candidates[key] = candidate
+			if row.delete then candidate[row.key] = nil else candidate[row.key] = clone_value(row.value) end
+		else rows[#rows + 1] = row end
+	end
+	for key, candidate in pairs(candidates) do
+		rows[#rows + 1] = next(candidate) == nil and { section = "gestures", key = key, delete = true }
+			or { section = "gestures", key = key, value = candidate }
+	end
+	return rows
 end
 
 --- Captures the complete flat preference snapshot represented by memory and
@@ -750,7 +814,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		_source_snapshots[prefs_file] = expected_source
 	end
 
-	local ok, updates = pcall(sparse_updates, existing)
+	local ok, updates = pcall(function()
+		return M.prepare_gesture_updates(expected_source, sparse_updates(existing))
+	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.

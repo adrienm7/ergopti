@@ -153,6 +153,18 @@ function M.new()
 		return released
 	end
 
+	--- Detaches only the demotions owned by one explicitly published feature.
+	--- @param feature string Exact synchronisation owner identity.
+	--- @return table released Entries retained for readopt on publication refusal.
+	function registry.release_feature(feature)
+		assert(type(feature) == "string" and feature ~= "", "a demotion feature is required")
+		local released = {}
+		for key, entry in pairs(entries) do
+			if entry.feature == feature then released[key], entries[key] = entry, nil end
+		end
+		return released
+	end
+
 	--- Restores entries detached by release_all() when the explicit save they
 	--- made way for is reversed. Idempotent, so a retried inverse may call it again.
 	--- @param released table Entries returned by release_all().

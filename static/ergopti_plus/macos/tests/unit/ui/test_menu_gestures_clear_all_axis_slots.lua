@@ -71,6 +71,10 @@ local function with_commands(body)
 			gestures = runtime,
 			state = { gestures = true },
 			paused = false,
+			apply_gesture_scope = function(mode)
+				saves.mode = mode
+				return true
+			end,
 			save_prefs = function()
 				saves.count = saves.count + 1
 				return true
@@ -88,25 +92,19 @@ helpers.describe("menu_gestures: clear and restore cover every slot", function()
 	helpers.it("« Tout effacer » unbinds the axis slots as well as the single ones", function()
 		with_commands(function(commands, assigned, saves)
 			helpers.assert_type(commands["disable_all"], "function", "the clear command must be registered")
-			commands["disable_all"]()
-			for _, slot in ipairs(SINGLE) do
-				helpers.assert_eq(assigned[slot], "none", slot .. " must be cleared")
-			end
-			for _, slot in ipairs(AXIS) do
-				helpers.assert_eq(assigned[slot], "none",
-					slot .. " is an axis slot and must be cleared too, or Ergopti keeps answering it")
-			end
-			helpers.assert_eq(saves.count, 1, "the clear must be saved once")
+			helpers.assert_eq(commands["disable_all"](), true)
+			helpers.assert_eq(saves.mode, "clear")
+			helpers.assert_eq(next(assigned), nil, "the menu must not bypass the transaction with direct slot writes")
+			helpers.assert_eq(saves.count, 0, "only the scope owner publishes the complete sparse batch")
 		end)
 	end)
 
 	helpers.it("« Restaurer les valeurs conseillées » puts every declared slot back", function()
-		with_commands(function(commands, assigned)
-			commands["restore_defaults"]()
-			helpers.assert_eq(assigned.tap_3, "left_click_toggle")
-			helpers.assert_eq(assigned.swipe_3_left, "sel_word_prev")
-			helpers.assert_eq(assigned.swipe_3_horiz, "words")
-			helpers.assert_eq(assigned.swipe_4_horiz, "spaces")
+		with_commands(function(commands, assigned, saves)
+			helpers.assert_eq(commands["restore_defaults"](), true)
+			helpers.assert_eq(saves.mode, "recommended")
+			helpers.assert_eq(next(assigned), nil)
+			helpers.assert_eq(saves.count, 0)
 		end)
 	end)
 end)
