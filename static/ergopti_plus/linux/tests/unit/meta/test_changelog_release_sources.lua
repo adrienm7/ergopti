@@ -221,7 +221,10 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	--- Runs `body` with the updater following `channel`.
 	local function following(channel, body)
 		local previous = package.loaded["modules.updater.manager"]
-		package.loaded["modules.updater.manager"] = { get_channel = function() return channel end }
+		local real = require("modules.updater.manager")
+		package.loaded["modules.updater.manager"] = setmetatable({
+			get_channel = function() return channel end,
+		}, { __index = real })
 		local ok, err = pcall(body)
 		package.loaded["modules.updater.manager"] = previous
 		if not ok then error(err, 0) end
@@ -241,10 +244,8 @@ helpers.describe("changelog_bridge: native fetch push", function()
 
 	helpers.it("starts a bounded API fetch when the page is ready", function()
 		local calls, pushed = install()
-		local restore = package.loaded["modules.updater.manager"]
-		package.loaded["modules.updater.manager"] = { get_channel = function() return "stable" end }
-		local initial = Bridge.on_message("ready", {})
-		package.loaded["modules.updater.manager"] = restore
+		local initial
+		following("main", function() initial = Bridge.on_message("ready", {}) end)
 		helpers.assert_eq(initial.action, "releases", "the cached fast path keeps its response shape")
 		helpers.assert_eq(#calls, 1)
 		helpers.assert_eq(calls[1].url, "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=20")
