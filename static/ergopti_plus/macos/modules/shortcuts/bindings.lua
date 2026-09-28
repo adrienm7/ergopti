@@ -895,8 +895,10 @@ function M.resume_rebind_after_pause()
 end
 
 --- Restores hotkeys and the exact keep-awake intent captured by M.pause().
+--- @param activate boolean|nil Explicit configuration activation; omitted preserves the pause snapshot.
 --- @return boolean committed
-function M.resume_after_pause()
+function M.resume_after_pause(activate)
+	if activate == true then pause_restore_intent = true end
 	lifecycle_paused = false
 	invalidate_lifecycle()
 	if started == true and pause_restore_intent ~= true then

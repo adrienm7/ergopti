@@ -375,7 +375,7 @@ function M.resume_bindings(parent, candidate)
 					if committed ~= true or not attempt_is_current() then return false end
 					return true
 				end
-				return (Bindings.resume_after_pause or Bindings.start)()
+				return (Bindings.resume_after_pause or Bindings.start)(candidate ~= nil)
 			end,
 			stop = Bindings.pause or Bindings.stop,
 		},

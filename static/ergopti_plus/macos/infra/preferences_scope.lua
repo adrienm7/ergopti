@@ -35,6 +35,8 @@ function M.new(options)
 		"scope gesture slots are unavailable")
 	assert(type(options.capture) == "function" and type(options.apply) == "function"
 		and type(options.restore) == "function", "scope native terminal ports are incomplete")
+	assert(options.prepare_rows == nil or type(options.prepare_rows) == "function",
+		"scope row preparation must be owned by a function")
 	local slots, domains = {}, {}
 	for _, list in ipairs({ gestures.SINGLE_SLOTS, gestures.AXIS_SLOTS }) do
 		for _, slot in ipairs(list) do slots[slot] = true end
@@ -84,6 +86,7 @@ function M.new(options)
 	end
 	local function prepare(path, updates, files)
 		local rows = Preferences.prepare_gesture_updates(source_snapshot, updates)
+		if options.prepare_rows then rows = options.prepare_rows(source_snapshot, rows) end
 		return Writer.prepare_batch(path, rows, files, source_snapshot)
 	end
 	transaction = Transaction.new({
