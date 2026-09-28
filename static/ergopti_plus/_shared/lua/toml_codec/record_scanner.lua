@@ -11,6 +11,7 @@
 
 local M = {}
 local Bom = require("toml_codec.bom")
+local KeyPath = require("toml_codec.key_path")
 
 --- Finds the end of an already recognized triple-quote closing run.
 --- Value decoding owns validation of the maximum run length.
@@ -162,9 +163,10 @@ end
 --- the record that opened them (the shared record scanner decides), so a line
 --- that merely looks like a header inside a value is data.
 --- @param source string Complete file content.
+--- @param options table|nil Explicit quoted_headers capability for the batch writer.
 --- @return table|nil scan `{ lines, headers, records }`, nil when a value never closes.
 --- @return string|nil error_detail
-function M.scan_records(source)
+function M.scan_records(source, options)
 	local lines = split_lines(source)
 	local headers, records = {}, {}
 	local current = nil
@@ -181,9 +183,10 @@ function M.scan_records(source)
 			if trimmed == "" or trimmed:sub(1, 1) == "#" then
 				open = nil
 			elseif trimmed:sub(1, 1) == "[" then
-				current = parse_header(trimmed)
+				current = options and options.quoted_headers and KeyPath.header(trimmed) or parse_header(trimmed)
 				current.index = index
-				current.section = current.segments and table.concat(current.segments, ".") or nil
+				current.section = current.segments and (options and options.quoted_headers
+					and KeyPath.render(current.segments) or table.concat(current.segments, ".")) or nil
 				headers[#headers + 1] = current
 				open = nil
 			else

@@ -554,3 +554,5 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			"batch_write strings must survive the next parse byte-for-byte")
 	end)
 end)
+
+require("test.toml_quoted_headers_contract")(helpers)

@@ -1,0 +1,108 @@
+--- _shared/lua/test/toml_quoted_headers_contract.lua
+
+--- Exercises quoted table identities through the real shared batch writer.
+--- @param helpers table Driver test helpers.
+return function(helpers)
+	local Writer = require("toml_codec.writer")
+	local Codec = require("toml_codec.codec")
+	local Scanner = require("toml_codec.record_scanner")
+	local function prepare(source, rows)
+		return Writer.prepare_batch("/controlled/quoted-headers.toml", rows, {
+			read_with_status = function() return source, "ok" end,
+			write = function() error("preparation must never publish") end,
+		})
+	end
+	local section = "hotstrings.modules.ext:ergopti:rolls"
+	helpers.describe("shared TOML quoted headers", function()
+		helpers.it("deletes an owned extension leaf while preserving all neighboring bytes", function()
+			local prefix = '# retained\n[hotstrings.modules."ext:ergopti:rolls"] # identity\n'
+			local tail = 'unknown = [\n  "[quoted.data]",\n]\n[neighbor]\ncustom = true\n'
+			local ok, detail, content = prepare(prefix .. 'custom = true\n' .. tail, {
+				{ section = section, key = "custom", delete = true },
+			})
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_eq(content, prefix .. tail)
+		end)
+		helpers.it("inserts and updates through equivalent literal and escaped section spellings", function()
+			for _, header in ipairs({ "'ext:ergopti:rolls'", '"ext:ergopti:rolls"', '"ext:ergopti:roll\\u0073"' }) do
+				local ok, detail, content = prepare('[hotstrings.modules.' .. header .. ']\ncustom = false\n', {
+					{ section = section, key = "custom", value = true },
+					{ section = section, key = "other", value = "configured" },
+				})
+				helpers.assert_eq(ok, true, detail)
+				local group = Codec.decode(content).hotstrings.modules["ext:ergopti:rolls"]
+				helpers.assert_eq(group.custom, true)
+				helpers.assert_eq(group.other, "configured")
+			end
+		end)
+		helpers.it("renders canonical colon segments as valid quoted TOML on first insertion", function()
+			local ok, detail, content = prepare("", { { section = section, key = "custom", value = true } })
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_true(content:find('[hotstrings.modules."ext:ergopti:rolls"]', 1, true) ~= nil)
+			helpers.assert_eq(Codec.decode(content).hotstrings.modules["ext:ergopti:rolls"].custom, true)
+		end)
+		helpers.it("preserves sparse defaults under equivalent quoted owner paths", function()
+			local path = "/controlled/quoted-sparse-defaults.toml"
+			Writer.set_sparse_defaults(path, require("infra.manifest_reader"))
+			local source = '[hotstrings.modules."ext:ergopti:rolls"]\ncustom = true\n'
+			local ok, detail, content = Writer.prepare_batch(path, {
+				{ section = 'hotstrings.modules."ext:ergopti:rolls"', key = "custom", value = false },
+			}, { read_with_status = function() return source, "ok" end })
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_eq(Codec.decode(content).hotstrings.modules["ext:ergopti:rolls"].custom, nil)
+			local literal_ok, literal_detail, literal_content = Writer.prepare_batch(path, {
+				{ section = '"hotstrings.modules".literal', key = "custom", value = false },
+			}, { read_with_status = function() return "", "ok" end })
+			helpers.assert_eq(literal_ok, true, literal_detail)
+			helpers.assert_eq(Codec.decode(literal_content)["hotstrings.modules"].literal.custom, false)
+		end)
+		helpers.it("rejects equivalent batch rows before reading and preserves unrelated case variants", function()
+			local reads = 0
+			local ok = Writer.prepare_batch("/controlled/duplicate-quoted.toml", {
+				{ section = 'a."x"', key = "v", delete = true },
+				{ section = "a.x", key = "v", value = true },
+			}, { read_with_status = function() reads = reads + 1; return "", "ok" end })
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(reads, 0)
+			local source = '[untouched]\nv = true\n[UNTOUCHED]\nv = false\n[a.x]\nv = true\n'
+			local prepared, detail, content = prepare(source, { { section = 'a."x"', key = "v", delete = true } })
+			helpers.assert_eq(prepared, true, detail)
+			helpers.assert_eq(content, source:sub(1, #source - #'v = true\n'))
+		end)
+		helpers.it("keeps quoted dots and bracket characters distinct from nested sections", function()
+			local source = '[a."b.c]"]\nvalue = true\n[a.b.c]\nvalue = true\n'
+			local ok, detail, content = prepare(source, { { section = 'a."b.c]"', key = "value", delete = true } })
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_eq(content, '[a."b.c]"]\n[a.b.c]\nvalue = true\n')
+		end)
+		helpers.it("rejects malformed table paths before acquiring a snapshot", function()
+			for _, bad in ipairs({ 'a..b', '.a', 'a.', 'a."open', 'a."x"tail', 'a."bad\\q"', 'a.[]', 'a. bad space' }) do
+				local reads = 0
+				local ok = Writer.prepare_batch("/controlled/malformed.toml", { { section = bad, key = "value", delete = true } }, {
+					read_with_status = function() reads = reads + 1; return "", "ok" end,
+				})
+				helpers.assert_eq(ok, false, bad)
+				helpers.assert_eq(reads, 0, bad)
+			end
+		end)
+		helpers.it("refuses malformed source headers and equivalent duplicate tables", function()
+			for _, source in ipairs({ '[a..b]\nv = true\n', '[a."open]\nv = true\n', '[a."x"]\nv = true\n[a.\'x\']\nv = false\n' }) do
+				local ok = prepare(source, { { section = "a.x", key = "v", delete = true } })
+				helpers.assert_eq(ok, false, source)
+			end
+		end)
+		helpers.it("refuses ambiguous case-folded targets and array-of-table targets", function()
+			for _, source in ipairs({ '[a."x"]\nv = true\n[A.x]\nv = false\n',
+				'[a."x"]\nv = true\n[A.x]\nneighbor = false\n', '[[a."x"]]\nv = true\n' }) do
+				local ok = prepare(source, { { section = "a.x", key = "v", delete = true } })
+				helpers.assert_eq(ok, false, source)
+			end
+		end)
+		helpers.it("keeps cleanup conservative and quoted assignment keys unaddressable", function()
+			local source = '[a."x"]\nv = true\n'
+			helpers.assert_eq(Scanner.scan_records(source).records[1].addressable, false)
+			local ok = prepare('[a."x"]\n"v" = true\n', { { section = "a.x", key = "v", delete = true } })
+			helpers.assert_eq(ok, false)
+		end)
+	end)
+end

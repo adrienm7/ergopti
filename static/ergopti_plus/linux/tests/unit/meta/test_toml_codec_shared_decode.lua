@@ -315,3 +315,5 @@ describe("toml_codec.decode parses multi-line arrays", function()
 	end)
 
 end)
+
+require("test.toml_quoted_headers_contract")(helpers)
