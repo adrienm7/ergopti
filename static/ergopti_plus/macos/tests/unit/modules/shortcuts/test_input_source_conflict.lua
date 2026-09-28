@@ -40,6 +40,19 @@ local function fresh(reply)
 	local ok, conflict = pcall(helpers.load_with_stubs, SUBJECT)
 	package.loaded["adapters.shell_runner"] = saved
 	if not ok then error(conflict, 0) end
+	-- This is a macOS account even when the Lua harness runs on Windows.
+	local check = conflict.check
+	conflict.check = function(...)
+		local getenv = os.getenv
+		os.getenv = function(name)
+			if name == "HOME" then return "/Users/shortcut-test" end
+			return getenv(name)
+		end
+		local checked, result = pcall(check, ...)
+		os.getenv = getenv
+		if not checked then error(result, 0) end
+		return result
+	end
 	return conflict, spawned
 end
 
