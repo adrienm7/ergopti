@@ -199,6 +199,15 @@ ManifestValueFor(V2Path, Field) {
 ; Dynamic user-authored sections have a declared neutral leaf shape.
 ManifestDynamicEntry(V2Path) {
 	global FEATURES_MANIFEST
+	Prefix := V2Path
+	Loop {
+		if ManifestFindEntryByPath(Prefix)
+			return false
+		Dot := InStr(Prefix, ".", true, -1)
+		if !Dot
+			break
+		Prefix := SubStr(Prefix, 1, Dot - 1)
+	}
 	for _, Scope in FEATURES_MANIFEST["scopes"] {
 		for Definition in Scope.Get("dynamic_defaults", []) {
 			Prefix := Definition["prefix"] . "."
@@ -206,7 +215,8 @@ ManifestDynamicEntry(V2Path) {
 				continue
 			Tail := SubStr(V2Path, StrLen(Prefix) + 1)
 			Parts := StrSplit(Tail, ".")
-			if Parts.Length != Definition["depth"] || InStr(Tail, "..") || SubStr(Tail, -1) == "."
+			if Parts.Length != Definition["depth"] || InStr(Tail, "..")
+					|| SubStr(Tail, 1, 1) == "." || SubStr(Tail, -1) == "."
 				continue
 			if Definition.Has("suffix") && Parts[-1] != Definition["suffix"]
 				continue
@@ -243,7 +253,13 @@ ManifestConfigRow(V2Path, Value := unset, Delete := false) {
 	Dot := InStr(V2Path, ".", true, -1)
 	if !Dot
 		throw Error("Configuration paths require a section and key.")
-	Row := { Section: SubStr(V2Path, 1, Dot - 1), Key: SubStr(V2Path, Dot + 1) }
+	Section := ""
+	for Part in StrSplit(SubStr(V2Path, 1, Dot - 1), ".") {
+		if Part == ""
+			throw ValueError("Configuration paths require nonempty segments.")
+		Section .= (Section == "" ? "" : ".") . TOML_RenderKey(Part)
+	}
+	Row := { Section: Section, Key: SubStr(V2Path, Dot + 1) }
 	if Delete
 		Row.Delete := 1
 	else
@@ -262,28 +278,55 @@ ManifestPathBelongs(Path, Prefix) {
 }
 
 ; Collect a scope and its named children while rejecting registry cycles.
-ManifestCollectScope(ScopeId, Prefixes, Excluded, Visiting) {
+ManifestCollectScope(ScopeId, Prefixes, Excluded, Visiting, Definitions := unset, Presets := unset, ParameterDomains := unset) {
+	if !IsSet(Definitions)
+		Definitions := Map()
+	if !IsSet(Presets)
+		Presets := Map()
+	if !IsSet(ParameterDomains)
+		ParameterDomains := Map()
 	global FEATURES_MANIFEST
 	Scopes := FEATURES_MANIFEST["scopes"]
 	if !Scopes.Has(ScopeId) || Visiting.Has(ScopeId)
 		throw Error("Unknown or cyclic configuration scope: " . ScopeId)
 	Visiting[ScopeId] := true
 	Scope := Scopes[ScopeId]
+	if Scope.Has("action_parameters") {
+		BindingScope := Scope["action_parameters"]
+		if BindingScope["restore"] != "remove"
+			throw ValueError("Unsupported action parameter restoration policy.")
+		for Domain in BindingScope["domains"]
+			ParameterDomains[Domain] := true
+	}
+	for Definition in Scope.Get("dynamic_defaults", [])
+		Definitions[Definition] := true
+	if Scope.Has("preset") {
+		if !(Scope["preset"] is String) || Scope["preset"] == ""
+			throw TypeError("Invalid configuration preset owner.")
+		Presets[ScopeId] := Scope["preset"]
+	}
 	for Prefix in Scope["prefixes"]
 		Prefixes.Push(Prefix)
 	for Path in Scope["restore_exclude"]
 		Excluded.Push(Path)
 	for Child in Scope.Get("includes", [])
-		ManifestCollectScope(Child, Prefixes, Excluded, Visiting)
+		ManifestCollectScope(Child, Prefixes, Excluded, Visiting, Definitions, Presets, ParameterDomains)
 	Visiting.Delete(ScopeId)
 }
 
 ; Produce canonical rows for a selected preset or clear operation.
-ManifestScopeOperations(ScopeId, Mode) {
+ManifestScopeOperations(ScopeId, Mode, OwnedPaths := unset, Owners := unset) {
+	if !IsSet(Owners)
+		Owners := Map()
+	if !IsSet(OwnedPaths)
+		OwnedPaths := []
+	if !(OwnedPaths is Array)
+		throw TypeError("Owned scope paths must be an Array.")
 	if !ManifestEnsureLoaded() || !(Mode == "recommended" || Mode == "clear")
 		throw Error("Invalid configuration scope operation.")
 	Prefixes := [], Excluded := [], Rows := []
-	ManifestCollectScope(ScopeId, Prefixes, Excluded, Map())
+	Definitions := Map(), ParameterDomains := Map()
+	ManifestCollectScope(ScopeId, Prefixes, Excluded, Map(), Definitions, Map(), ParameterDomains)
 	for Entry in ManifestFeatures() {
 		Selected := false
 		for Prefix in Prefixes
@@ -306,7 +349,104 @@ ManifestScopeOperations(ScopeId, Mode) {
 				Rows.Push(Mode == "clear" ? ManifestConfigRow(Path, Value, true) : ManifestSparseOperation(Path, Value))
 		}
 	}
+	Emitted := Map()
+	for Path in OwnedPaths {
+		if !(Path is String)
+			throw TypeError("Owned configuration paths must be strings.")
+		Definition := ManifestDynamicEntry(Path)
+		if !(Definition is Map) {
+			Domain := ManifestScopeParameterDomain(Path, Owners)
+			if Domain == ""
+				throw ValueError("Dynamic scope path is not declared: " . Path)
+			if ParameterDomains.Has(Domain) && !Emitted.Has(Path)
+				Rows.Push(ManifestConfigRow(Path, , true))
+			Emitted[Path] := true
+			continue
+		}
+		if !Definitions.Has(Definition) || Emitted.Has(Path)
+			continue
+		Skip := false
+		if Mode == "recommended" {
+			for Prefix in Excluded
+				Skip := Skip || ManifestPathBelongs(Path, Prefix)
+		}
+		if !Skip
+			Rows.Push(Mode == "clear" ? ManifestConfigRow(Path, , true)
+				: ManifestSparseOperation(Path, Definition["recommended"]))
+		Emitted[Path] := true
+	}
 	return Rows
+}
+
+
+
+
+
+; Collect dynamic identities from explicit runtime owners, never user-file keys.
+ManifestScopeInventory(ScopeId, Providers, Owners := unset) {
+	if !IsSet(Owners)
+		Owners := Map()
+	if !ManifestEnsureLoaded() || !(Providers is Map)
+		throw TypeError("Scope inventory requires named runtime owners.")
+	Definitions := Map(), ParameterDomains := Map()
+	ManifestCollectScope(ScopeId, [], [], Map(), Definitions, Map(), ParameterDomains)
+	Found := Map(), Paths := []
+	for Name, Provider in Providers {
+		if !(Name is String) || Name == "" || !HasMethod(Provider, "Call")
+			throw TypeError("Invalid scope inventory owner.")
+		Owned := Provider.Call()
+		if !(Owned is Array)
+			throw TypeError("Runtime inventory is unavailable: " . Name)
+		Loop Owned.Length {
+			if !Owned.Has(A_Index) || !(Owned[A_Index] is String)
+				throw TypeError("Runtime inventory requires a dense array of paths: " . Name)
+			Path := Owned[A_Index]
+			Definition := ManifestDynamicEntry(Path)
+			; Resolve every supplied path, including paths outside this scope.
+			; Unknown owner output must never become permission to remove data.
+			Domain := ManifestScopeParameterDomain(Path, Owners)
+			if Domain == ""
+				ManifestDefaultFor(Path)
+			Selected := (Definition is Map && Definitions.Has(Definition)) || ParameterDomains.Has(Domain)
+			if Selected && !Found.Has(Path) {
+				Found[Path] := true
+				Position := 1
+				while Position <= Paths.Length && StrCompare(Paths[Position], Path, true) < 0
+					Position += 1
+				Paths.InsertAt(Position, Path)
+			}
+		}
+	}
+	return Paths
+}
+
+; Host action owners validate their actual store and return the binding domain.
+ManifestScopeParameterDomain(Path, Owners) {
+	if !(Owners is Map)
+		throw TypeError("Scope parameter ownership requires a Map.")
+	if !Owners.Has("action_parameter_domain")
+		return ""
+	Owner := Owners["action_parameter_domain"]
+	if !HasMethod(Owner, "Call")
+		throw TypeError("Action parameter ownership is unavailable.")
+	Domain := Owner.Call(Path)
+	if (Domain is Integer) && Domain == 0
+		return ""
+	if !(Domain is String)
+		throw TypeError("Invalid action parameter domain result.")
+	return Domain
+}
+
+; Preserve separate-file ownership requests instead of silently applying half a scope.
+ManifestScopePlan(ScopeId, Mode, OwnedPaths := unset, Owners := unset) {
+	if !IsSet(Owners)
+		Owners := Map()
+	Operations := ManifestScopeOperations(ScopeId, Mode, IsSet(OwnedPaths) ? OwnedPaths : [], Owners)
+	Presets := Map(), Requests := []
+	ManifestCollectScope(ScopeId, [], [], Map(), Map(), Presets)
+	for Id, Preset in Presets
+		Requests.Push({ scope: Id, preset: Preset, mode: Mode })
+	return { scope: ScopeId, mode: Mode, operations: Operations, presets: Requests }
 }
 
 
