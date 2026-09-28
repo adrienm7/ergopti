@@ -7,6 +7,8 @@ local Codec = require("toml_codec")
 
 --- Creates a session owner with explicit platform and runtime boundaries.
 --- Runtime apply/restore must return literal true after terminal completion.
+--- Optional prepare_batch(path, updates, files) delegates an owned inline table
+--- to its host; it must return true, detail, candidate bytes and exact source.
 --- @param options table Path, unique backup path, manifest, files and runtime ports.
 --- @return table owner Transaction owner retaining failed compensation debt.
 function M.new(options)
@@ -19,6 +21,8 @@ function M.new(options)
 	assert(type(options.files) == "table" and type(options.files.read_with_status) == "function"
 		and type(options.files.write) == "function" and type(options.files.write_if_unchanged) == "function",
 		"scope transactions require serialized conditional publication")
+	assert(options.prepare_batch == nil or type(options.prepare_batch) == "function", "invalid scope preparation owner")
+	local prepare_batch = options.prepare_batch or Writer.prepare_batch
 	local owner, debt, busy = {}, nil, false
 	local function compensate()
 		if debt == nil then return true end
@@ -41,9 +45,15 @@ function M.new(options)
 			local plan = options.manifest.scope_plan(scope, mode, owned_paths, options.owners)
 			if #plan.presets > 0 then return false, "scope requires separate preset ownership" end
 			local updates = plan.operations
-			local prepared, why, candidate, source = Writer.prepare_batch(options.path, updates, options.files)
-			if not prepared then return false, why end
+			local prepared, why, candidate, source = prepare_batch(options.path, updates, options.files)
+			if prepared ~= true then return false, why end
+			if type(candidate) ~= "string" or type(source) ~= "table"
+				or (source.status ~= "ok" and source.status ~= "absent")
+				or (source.status == "ok" and type(source.content) ~= "string") then
+				return false, "scope preparation did not return an exact source and candidate"
+			end
 			local decoded = Codec.decode(candidate)
+			if type(decoded) ~= "table" then return false, "scope candidate is not valid TOML" end
 			local snapshot = options.capture()
 			if type(snapshot) ~= "table" then return false, "runtime snapshot was not acknowledged" end
 			if source.status == "ok" then
