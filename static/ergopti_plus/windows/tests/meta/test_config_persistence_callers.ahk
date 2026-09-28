@@ -105,12 +105,12 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	}
 	; Audited inventory: config_io (6), config_shortcuts (2), unused-key cleanup
 	; (2), feature_io (2), gestures (4), and one each in i18n, TOML_Write,
-	; updater, editors, trigger journal, menu rebuild, personal editor, WPM and the error window.
+	; updater, editors, trigger journal, menu rebuild, personal editor, WPM, the error window and scoped configuration.
 	; Both admitted builders and direct-update gateways count. Pin the census so
 	; deleting a caller cannot make this class guard progressively vacuous, while
 	; every future sibling is still inspected by the loop above before the
 	; inventory assertion is reached.
-	AssertEqual(25, Calls,
+	AssertEqual(26, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

@@ -1,0 +1,160 @@
+﻿; infra/config_scope.ahk
+
+; ==============================================================================
+; MODULE: Scoped Configuration Lifecycle
+; DESCRIPTION:
+; Publishes one manifest-owned config.toml scope through the admitted builder and
+; existing conditional WAL. The terminal bundle survives until reload completion
+; or verified rollback. Separate-file presets require a different coordinator.
+; ==============================================================================
+
+/**
+ * Starts one scoped configuration transition without claiming reload completion.
+ * @param {String} ScopeId Manifest scope identifier.
+ * @param {String} Mode "recommended" or "clear".
+ * @param {Map} Providers Explicit runtime inventory callbacks.
+ * @param {Map} Options Injected paths and effect ports for owner tests.
+ * @returns {Map} Mutable receipt: pending, committed, refused, or recovery_required.
+ */
+ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
+	global ConfigurationFile, _PathsFile
+	if !IsSet(Options)
+		Options := Map()
+	if !(Options is Map) || !(Providers is Map)
+		throw TypeError("Scoped configuration requires explicit owner maps.")
+	Owners := Options.Get("owners", Map("action_parameter_domain", ConfigScopeActionParameterDomain))
+	Plan := ManifestScopePlan(ScopeId, Mode, [], Owners)
+	if Plan.presets.Length
+		throw ValueError("This scope requires a separate-file preset coordinator.")
+	Path := Options.Has("path") ? Options["path"] : ConfigurationFile
+	Locator := Options.Has("locator") ? Options["locator"] : _PathsFile
+	Port := Options.Get("port", 0)
+	ReloadFn := Options.Get("reload", ReloadPreservingSuspend)
+	BackupFn := Options.Get("backup", FSWriteCreateDurable)
+	NotifyFn := Options.Get("notify", 0)
+	Stamp := Options.Get("stamp", FormatTime(A_Now, "yyyyMMdd-HHmmss") . "-" . A_TickCount)
+	Backup := ConfigUnusedKeysBackupPath(Path, Stamp)
+	Receipt := Map("status", "refused", "scope", ScopeId, "mode", Mode, "backup", Backup)
+	Acquired := ConfigTransitionAcquireLifecycleBundle(Locator, [Path], Port,
+		Options.Get("acquire", 0), Options.Get("settle", 0))
+	if !ConfigTransitionResultIs(Acquired, "bundle_acquired") {
+		Receipt["detail"] := Acquired
+		ConfigTransitionLogFailure("ConfigScope", Acquired)
+		return Receipt
+	}
+	Bundle := Acquired["bundle"]
+	Transferred := false
+	Target := 0
+	Transition := 0
+	Rollback() {
+		try Resolution := ConfigTransitionRollbackOwned(Locator, Bundle, Port)
+		catch as Err
+			Resolution := Map("status", "fatal", "kind", "rollback_threw", "detail", Err.Message)
+		Receipt["detail"] := Resolution
+		if ConfigTransitionResultIs(Resolution, "absent") || ConfigTransitionResultIs(Resolution, "recovered_old") {
+			Receipt["status"] := "refused"
+			return false
+		}
+		Receipt["status"] := "recovery_required"
+		ConfigTransitionRetainBarrier(Bundle)
+		ConfigTransitionLogFailure("ConfigScope", Resolution)
+		return true
+	}
+	Refused(*) {
+		Retained := false
+		try {
+			Retained := Rollback()
+			ConfigReportPersistenceFailure("the scoped configuration reload", NotifyFn,
+				"the replacement driver refused the configuration handoff", !Retained)
+		} finally {
+			if !Retained
+				_ConfigWriteTerminalRelease(Bundle)
+		}
+	}
+	Build() {
+		Inventory := ManifestScopeInventory(ScopeId, Providers, Owners)
+		Candidate := ManifestScopePlan(ScopeId, Mode, Inventory, Owners)
+		Rows := _ConfigPrepareTypedUpdates(Candidate.operations)
+		Image := TOML_BuildUpdatedContent(Path, Rows)
+		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
+			throw Error("The scoped configuration image could not be rendered.")
+		Expected := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"], Port)
+		Target := ConfigTransitionPresentTarget(Path, Image["content"], Expected)
+		BackedUp := BackupFn.Call(Backup, Image["source_content"])
+		if !(BackedUp is Integer) || BackedUp != 1 || !FSUtf8ExactMatches(Backup, Image["source_content"])
+			throw Error("The exclusive scoped backup could not be created and verified.")
+		return { updates: Rows }
+	}
+	Publish(_Path, _Rows) {
+		Transition := ConfigTransitionCommitOwned(Locator, [Target], Bundle, Port)
+		Receipt["detail"] := Transition
+		return ConfigTransitionResultIs(Transition, "committed_new")
+	}
+	try {
+		Prepare := Options.Get("prepare", ConfigScopePrepareLifecycle)
+		Prepared := Prepare.Call(Path, Bundle)
+		if !(Prepared is Integer) || Prepared != 1 {
+			ConfigReportPersistenceFailure("the scoped configuration", NotifyFn,
+				"native trigger recovery refused lifecycle preparation")
+			return Receipt
+		}
+		if !ConfigCommitBuilt(Path, "the scoped configuration", Build, Publish, NotifyFn, Bundle) {
+			; A throwing writer may have prepared a WAL before its error reached
+			; the gateway. Resolve that debt before reopening admission.
+			Transferred := Rollback()
+			return Receipt
+		}
+		Receipt["status"] := "pending"
+		try Launched := ReloadFn.Call((*) => Receipt["status"] := "committed", Bundle, Refused)
+		catch as Err {
+			Launched := false
+			Receipt["reload_error"] := Err.Message
+		}
+		if (Launched is Integer) && Launched == 1 {
+			Transferred := true
+			return Receipt
+		}
+		Transferred := Rollback()
+		ConfigReportPersistenceFailure("the scoped configuration reload", NotifyFn,
+			"the replacement driver was not launched", !Transferred)
+		return Receipt
+	} finally {
+		if !Transferred
+			_ConfigWriteTerminalRelease(Bundle)
+	}
+}
+
+; Stabilize the existing native/journal owner before rendering the new image.
+; Otherwise a later reload reconciliation could republish old trigger settings.
+ConfigScopePrepareLifecycle(Path, Bundle) {
+	Quiesced := LLM_Menu_QuiesceTriggerForLifecycle(Bundle)
+	if !(Quiesced is Integer) || Quiesced != 1
+		return false
+	Prepared := LLM_TriggerJournalPrepareDestructive(Path, Bundle)
+	return (Prepared is Integer) && Prepared == 1
+}
+
+; The existing action owner validates grammar and catalogue parameter capability.
+ConfigScopeActionParameterDomain(Path) {
+	Prefix := "action_parameters."
+	if SubStr(Path, 1, StrLen(Prefix)) != Prefix
+		return ""
+	Key := SubStr(Path, StrLen(Prefix) + 1)
+	if !TomlConfigActionParameterIsOwned(Key)
+		return ""
+	return SubStr(Key, 1, InStr(Key, "__") - 1)
+}
+
+; Only keys accepted by the binding owner can enter the manifest inventory.
+ConfigScopeActionParameterPaths() {
+	global GestureActionParameters
+	if !IsSet(GestureActionParameters) || !(GestureActionParameters is Map)
+		throw Error("Action parameter inventory is unavailable.")
+	Paths := []
+	for Key in GestureActionParameters {
+		Path := "action_parameters." . Key
+		if ConfigScopeActionParameterDomain(Path) != ""
+			Paths.Push(Path)
+	}
+	return Paths
+}

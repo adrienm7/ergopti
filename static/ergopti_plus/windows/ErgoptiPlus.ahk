@@ -1106,7 +1106,7 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 
 #Include infra/config_io.ahk
-
+#Include infra/config_scope.ahk
 CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()

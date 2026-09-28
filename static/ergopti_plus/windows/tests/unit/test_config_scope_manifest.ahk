@@ -104,3 +104,210 @@ _ScopeBuiltBorrowedOwner() {
 	AssertEqual(Calls, 2, "stale ownership is rejected before the builder")
 }
 Test("config-scope: borrowed candidate admission retains exact lifecycle ownership", _ScopeBuiltBorrowedOwner)
+
+; The filesystem and WAL are real; only replacement-process launch is injected.
+_ScopeOwnerFixture() {
+	Directory := A_Temp . "\ergopti-scope-" . A_TickCount . "-" . Random(10000, 99999)
+	DirCreate(Directory)
+	Source := '[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n'
+	Path := Directory . "\config.toml"
+	Assert(FSWriteDurable(Path, Source))
+	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
+		"settle", (*) => 1, "prepare", (*) => 1, "notify", (*) => 0)
+	return { directory: Directory, path: Path, source: Source, options: Options }
+}
+
+_ScopeOwnerCleanup(Fixture) {
+	Assert(InStr(Fixture.directory, A_Temp . "\ergopti-scope-") == 1)
+	if DirExist(Fixture.directory)
+		DirDelete(Fixture.directory, true)
+}
+
+_ScopeOwnerPendingThenRefused() {
+	Fixture := _ScopeOwnerFixture()
+	Cached := ParseTomlFile(Fixture.path)
+	Refusal := 0, Bundle := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual(Receipt["status"], "pending", "accepted launch is never reported as completed reload")
+		AssertEqual(FSReadUtf8Exact(Receipt["backup"]), Fixture.source)
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		Assert(!Parsed["layout"].Has("ergopti_base"))
+		AssertEqual(Parsed["private"]["credential"], "keep")
+		AssertEqual(Parsed["llm"]["enabled"], true, "another scope's consent is preserved")
+		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object)
+		Refusal.Call("native close refused")
+		AssertEqual(Receipt["status"], "refused")
+		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source, "late refusal restores exact prior bytes")
+		Assert(ObjPtr(ParseTomlFile(Fixture.path)) == ObjPtr(Cached), "the pending image must not replace cached desired authority")
+		Assert(!(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object))
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config-scope: pending reload retains the backup and rolls back late refusal", _ScopeOwnerPendingThenRefused)
+
+_ScopeOwnerImmediateRefusal() {
+	Fixture := _ScopeOwnerFixture()
+	Fixture.options["reload"] := (*) => false
+	try {
+		Receipt := ConfigScopeApply("keyboard_layout", "recommended", Map(), Fixture.options)
+		AssertEqual(Receipt["status"], "refused")
+		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
+		AssertEqual(FSReadUtf8Exact(Receipt["backup"]), Fixture.source)
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("config-scope: refused native launch restores exact desired state", _ScopeOwnerImmediateRefusal)
+
+_ScopeOwnerBackupAndExternalRefusals() {
+	for Scenario in ["collision", "external"] {
+		Fixture := _ScopeOwnerFixture()
+		Launches := 0
+		Launch(*) {
+			Launches += 1
+			return false
+		}
+		Fixture.options["reload"] := Launch
+		Backup := ConfigUnusedKeysBackupPath(Fixture.path, "scope-test")
+		Changed := Fixture.source . '`n[external]`nvalue = "new"`n'
+		if Scenario == "collision"
+			Assert(FSWriteDurable(Backup, "do not overwrite"))
+		else {
+			BackupAndEdit(Path, Content) {
+				Assert(FSWriteCreateDurable(Path, Content))
+				Assert(FSWriteDurable(Fixture.path, Changed))
+				return true
+			}
+			Fixture.options["backup"] := BackupAndEdit
+		}
+		try {
+			Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+			AssertEqual(Receipt["status"], "refused")
+			AssertEqual(Launches, 0, "a failed precondition must never launch a successor")
+			AssertEqual(FSReadUtf8Exact(Fixture.path), Scenario == "collision" ? Fixture.source : Changed)
+			AssertEqual(FSReadUtf8Exact(Backup), Scenario == "collision" ? "do not overwrite" : Fixture.source)
+		} finally _ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config-scope: backup collisions and external edits refuse before publication", _ScopeOwnerBackupAndExternalRefusals)
+
+_ScopeOwnerRejectsPreset() {
+	Calls := 0
+	Acquire(*) {
+		Calls += 1
+		return false
+	}
+	for Scope in ["global", "tap_holds"] {
+		for Mode in ["recommended", "clear"]
+			AssertThrows(() => ConfigScopeApply(Scope, Mode, Map(), Map("acquire", Acquire)))
+	}
+	AssertEqual(Calls, 0, "preset scopes must refuse before any admission or disk effect")
+}
+Test("config-scope: separate-file presets refuse before any effects", _ScopeOwnerRejectsPreset)
+
+_ScopeGestureMenuOwnsParameters() {
+	global GestureActionParameters
+	SavedParameters := GestureActionParameters
+	Fixture := _ScopeOwnerFixture()
+	Source := '[gestures]`nenabled = false`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
+	Assert(FSWriteDurable(Fixture.path, Source))
+	GestureActionParameters := Map("gesture__tap_4__open_url", "https://example.com/old",
+		"keyboard__win_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
+	Refusal := 0, Bundle := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		for Mode in ["recommended", "clear"] {
+			Fixture.options["stamp"] := Mode
+			Receipt := _GES_ApplyScope(Mode, Fixture.options)
+			AssertEqual(Receipt["status"], "pending")
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			Assert(!Parsed["action_parameters"].Has("gesture__tap_4__open_url"), "old binding parameters leave with their scope")
+			AssertEqual(Parsed["action_parameters"]["keyboard__win_a__open_url"], "https://example.com/keep")
+			AssertEqual(Parsed["action_parameters"]["unknown_user_key"], "keep")
+			AssertEqual(Parsed["llm"]["enabled"], true)
+			if Mode == "clear"
+				Assert(!Parsed["gestures"].Has("enabled"), "clear removes the master instead of only assigning none")
+			else
+				AssertEqual(Parsed["gestures"]["enabled"], ManifestRecommendedFor("gestures.enabled"))
+			AssertEqual(GestureActionParameters["gesture__tap_4__open_url"], "https://example.com/old",
+				"pending reload preserves current runtime authority")
+			Refusal.Call("refused")
+			AssertEqual(Receipt["status"], "refused")
+			AssertEqual(FSReadUtf8Exact(Fixture.path), Source)
+		}
+	} finally {
+		GestureActionParameters := SavedParameters
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config-scope: gesture menu includes master and only its owned action parameters", _ScopeGestureMenuOwnsParameters)
+
+_ScopeOwnerRetainsRollbackDebt() {
+	Fixture := _ScopeOwnerFixture()
+	Bundle := 0, RefuseMove := false
+	Port := ConfigTransitionProductionPort()
+	Move(Source, Destination) {
+		return RefuseMove ? false : FSAtomicMoveReplace(Source, Destination)
+	}
+	Port["move_replace"] := Move
+	Launch(_Success, Borrowed, _Refused) {
+		Bundle := Borrowed
+		RefuseMove := true
+		return false
+	}
+	Fixture.options["port"] := Port
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual(Receipt["status"], "recovery_required")
+		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object)
+		Assert(!_ConfigWriteLeaseTryAcquire(Fixture.path, "must remain blocked"))
+		AssertEqual(FSReadUtf8Exact(Receipt["backup"]), Fixture.source)
+		RefuseMove := false
+		Recovered := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
+		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
+		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config-scope: failed rollback retains the exact terminal barrier until recovery", _ScopeOwnerRetainsRollbackDebt)
+
+_ScopeOwnerPreparationRefusal() {
+	Fixture := _ScopeOwnerFixture()
+	Launches := 0
+	Launch(*) {
+		Launches += 1
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	Fixture.options["prepare"] := (*) => false
+	try {
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual(Receipt["status"], "refused")
+		AssertEqual(Launches, 0)
+		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
+		Assert(!FileExist(Receipt["backup"]), "native refusal precedes backup and publication")
+		Lease := _ConfigWriteLeaseTryAcquire(Fixture.path, "after preparation refusal")
+		Assert(Lease is Object)
+		_ConfigWriteLeaseRelease(Lease)
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("config-scope: native recovery refusal precedes backup and publication", _ScopeOwnerPreparationRefusal)
