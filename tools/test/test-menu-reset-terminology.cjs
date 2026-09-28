@@ -47,13 +47,15 @@ const APPROVED = {
 };
 
 // Row ids that mean "restore the preset" and "clear to system behaviour".
-const RESTORE_IDS = new Set(['restore_recommended', 'restore_defaults', 'reset_defaults']);
-const CLEAR_IDS = new Set(['disable_all', 'clear_to_system']);
+const RESTORE_IDS = new Set(['restore_recommended', 'restore_defaults', 'reset_defaults', 'scope_restore']);
+const CLEAR_IDS = new Set(['disable_all', 'clear_to_system', 'scope_clear']);
 
 // Menus that must keep declaring the rows: menu -> [restore rows, clear rows].
 const EXPECTED_ROWS = {
 	configuration_menu: [1, 0],
 	gestures_menu: [1, 1],
+	llm_menu: [1, 1],
+	metrics_menu: [1, 1],
 	tap_holds_menu: [1, 1]
 };
 

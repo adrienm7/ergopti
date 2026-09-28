@@ -3909,6 +3909,16 @@ disabled_when = ["llm_toggle_ready"]
 category = "LLM"
 
 [[menu.llm_menu]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+
+[[menu.llm_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+
+[[menu.llm_menu]]
 type = "---"
 
 [[menu.llm_menu]]
@@ -4377,6 +4387,16 @@ id = "metrics_toggle"
 i18n = "menu.metrics.enable"
 checked_when = ["keylogger_enabled"]
 category = "Metrics"
+
+[[menu.metrics_menu]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+
+[[menu.metrics_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
 
 [[menu.metrics_menu]]
 type = "---"
