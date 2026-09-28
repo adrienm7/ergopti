@@ -74,7 +74,8 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	helpers.assert_nil(item.action, "the Shortcuts parent opens a submenu and must carry no action")
 	local toggle = render_ctx and render_ctx.commands and render_ctx.commands["shortcuts_toggle"]
 	helpers.assert_type(toggle, "function", "the real master toggle command must be reachable")
-	return { action = toggle, state = state, counters = counters, noop = noop }
+	helpers.assert_true(MenuShortcuts.scope_idle())
+	return { action = toggle, state = state, counters = counters, noop = noop, scope_idle = MenuShortcuts.scope_idle }
 end
 
 
@@ -226,6 +227,7 @@ helpers.describe("Shortcuts master menu toggle commits runtime before persistenc
 					pause_bindings = edge("pause", false),
 				}, previous)
 				helpers.assert_eq(fixture.action(), false)
+				helpers.assert_eq(fixture.scope_idle(), false, "a retained master inverse blocks scope capture")
 				helpers.assert_eq(fixture.action(), false,
 					"the next click must retry only the retained inverse")
 				helpers.assert_eq(#calls, 3)

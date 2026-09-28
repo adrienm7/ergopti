@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 -- ===========================================
 
-local function exercise_shortcut_transaction(save_mode, mutation_mode)
+local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_inverse)
 	helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts",
 		"infra.logger",
@@ -42,6 +42,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode)
 		local mutation_calls = 0
 		local function set_enabled(value)
 			mutation_calls = mutation_calls + 1
+			if mutation_calls > 1 and refuse_inverse then return false end
 			enabled = value
 			if mutation_calls == 1 then
 				if mutation_mode == "false" then return false end
@@ -112,7 +113,20 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode)
 			commands = {},
 			state_getters = {},
 		})
+		helpers.assert_true(Menu.scope_idle())
 		local call_ok, committed = pcall(item.submenu[1].action)
+		if refuse_inverse then
+			helpers.assert_true(call_ok)
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(Menu.scope_idle(), false, "a retained row inverse blocks scope capture")
+			helpers.assert_eq(item.submenu[1].action(), false)
+			helpers.assert_eq(mutation_calls, 3, "a retry must settle only its inverse")
+			helpers.assert_eq(saves, 1)
+			refuse_inverse, save_mode = false, "true"
+			helpers.assert_true(item.submenu[1].action())
+			helpers.assert_true(Menu.scope_idle(), "successful settlement releases scope admission")
+			return
+		end
 		helpers.assert_true(call_ok, "runtime and preference refusals must stay inside the row action")
 		local expected_commit = save_mode == "true" and mutation_mode == "true"
 		local expected_enabled = true
@@ -128,6 +142,9 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode)
 end
 
 helpers.describe("menu_shortcuts: per-row toggles are preference transactions", function()
+	helpers.it("exposes row compensation debt until the real retry settles it", function()
+		exercise_shortcut_transaction("false", "true", true)
+	end)
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("rolls runtime back after save " .. mode, function()
 			exercise_shortcut_transaction(mode, "true")

@@ -1276,7 +1276,47 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local metrics_scope = nil
 	local layout_scope = nil
 	local llm_scope = nil
+	local shortcuts_scope = nil
 	apply_preference_scope = function(scope, mode)
+		if scope == "shortcuts" then
+			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
+				or type(menu_mods.shortcuts) ~= "table"
+				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return false end
+			if not shortcuts_scope then
+				shortcuts_scope = require("ui.menu.shortcuts_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, shortcuts = core_mods.shortcuts_mod, gestures = gestures,
+					bindings = require("modules.shortcuts.bindings"),
+					keyboard = require("modules.shortcuts.keyboard_shortcuts"),
+					tap_keys = require("modules.shortcuts.tap_keys"),
+					script_control = require("modules.shortcuts.script_control"),
+					idle = menu_mods.shortcuts.scope_idle,
+					start_script_control = function()
+						return core_mods.shortcuts_mod.start_script_control(keymap, core_mods.shortcuts_mod, gestures, karabiner)
+					end,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".shortcuts-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.shortcuts.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			local committed = shortcuts_scope.apply(mode)
+			if committed == true then Builder.invalidate_cache(); updateMenu() end
+			return committed
+		end
 		if scope == "llm" then
 			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return false end
 			if not llm_scope then

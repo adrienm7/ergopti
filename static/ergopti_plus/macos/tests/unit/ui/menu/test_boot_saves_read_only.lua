@@ -128,4 +128,74 @@ helpers.describe("preferences transaction read-only contract", function()
 	end)
 end)
 
+helpers.describe("shortcut scope menu admission", function()
+	--- Restores the complete module cache changed by the existing menu boot fixture.
+	local function isolated(callback)
+		local saved, old_hs = {}, _G.hs
+		for name, value in pairs(package.loaded) do saved[name] = value end
+		local ok, err = xpcall(callback, debug.traceback)
+		for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(saved) do package.loaded[name] = value end
+		_G.hs = old_hs
+		if not ok then error(err, 0) end
+	end
+	for _, result_name in ipairs({ "true", "false", "nil" }) do
+		helpers.it("routes terminal shortcut result " .. result_name .. " through the real menu fence", function()
+			isolated(function()
+				local fixture = boot()
+				fixture.global_actions()
+				local ctx, selected, constructions, invalidations = fixture.ctx, nil, 0, 0
+				package.loaded["ui.menu.builder"].invalidate_cache = function() invalidations = invalidations + 1 end
+				local idle = true
+				package.loaded["ui.menu.menu_shortcuts"].scope_idle = function() return idle end
+				for _, name in ipairs({ "bindings", "keyboard_shortcuts", "tap_keys", "script_control" }) do
+					package.loaded["modules.shortcuts." .. name] = {}
+				end
+				ctx.shortcuts.start_script_control = function(keymap, shortcuts, gestures, karabiner)
+					helpers.assert_true(keymap == ctx.keymap and shortcuts == ctx.shortcuts)
+					helpers.assert_true(gestures == ctx.gestures and karabiner == ctx.karabiner)
+					return true
+				end
+				local owner = { pending = function() return false end, retry_restore = function() return true end }
+				package.loaded["ui.menu.shortcuts_scope"] = { new = function(options)
+					constructions, selected = constructions + 1, options
+					owner.apply = function(mode)
+						helpers.assert_eq(mode, "clear")
+						return options.admission("shortcut scope wiring", function()
+							helpers.assert_true(options.idle(), "the active global fence is not menu compensation debt")
+							helpers.assert_eq(options.admission("competing mutation", function() error("reentrant mutation") end), false)
+							if result_name == "nil" then return nil end
+							return result_name == "true"
+						end, owner)
+					end
+					return owner
+				end }
+				local expected
+				if result_name ~= "nil" then expected = result_name == "true" end
+				helpers.assert_eq(ctx.apply_preference_scope("shortcuts", "clear"), expected)
+				helpers.assert_eq(constructions, 1)
+				helpers.assert_true(selected.shortcuts == ctx.shortcuts and selected.state == ctx.state)
+				helpers.assert_true(selected.bindings == package.loaded["modules.shortcuts.bindings"])
+				helpers.assert_true(selected.keyboard == package.loaded["modules.shortcuts.keyboard_shortcuts"])
+				helpers.assert_true(selected.tap_keys == package.loaded["modules.shortcuts.tap_keys"])
+				helpers.assert_true(selected.script_control == package.loaded["modules.shortcuts.script_control"])
+				helpers.assert_true(selected.start_script_control())
+				helpers.assert_eq(invalidations, expected == true and 1 or 0)
+				idle = false
+				helpers.assert_eq(selected.idle(), false)
+				helpers.assert_true(type(selected.checkpoint) == "table" and type(selected.demotions) == "table")
+			end)
+		end)
+	end
+	helpers.it("refuses shortcut scope construction after corrupt preferences", function()
+		isolated(function()
+			local fixture = boot({ load_status = "corrupt" })
+			fixture.global_actions()
+			package.loaded["ui.menu.menu_shortcuts"].scope_idle = function() return true end
+			package.loaded["ui.menu.shortcuts_scope"] = { new = function() error("read-only construction") end }
+			helpers.assert_eq(fixture.ctx.apply_preference_scope("shortcuts", "clear"), false)
+		end)
+	end)
+end)
+
 return true
