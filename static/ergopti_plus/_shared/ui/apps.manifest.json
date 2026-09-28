@@ -1,5 +1,11 @@
 {
   "$description": "Per-app geometry and metadata for every webview UI. Read by all three hosts (macOS ui_builder, Windows WebView_Host_Open, future Linux WebKitGTK host) so geometry is defined once. Entry path convention: _shared/ui/<id>/index.html. Locales base convention: _shared/data/locales/. Note: macOS metrics_typing and metrics_apps use screen-relative sizing (sf.w-100, sf.h-100) rather than fixed dimensions — the values here are recommended defaults for non-macOS hosts.",
+  "native_windows": {
+    "console": {
+      "width_ratio": 0.7,
+      "height_ratio": 0.75
+    }
+  },
   "apps": {
     "config_cleanup": {
       "width": 720,

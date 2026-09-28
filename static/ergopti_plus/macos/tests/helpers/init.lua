@@ -332,6 +332,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["modules.keymap.layout_install"] = nil
 	loaded["modules.keymap.input_sources"]  = nil
 	loaded["adapters.one_shot_shift"] = nil
+	-- The console owner captures the native API and must follow the current stub.
+	loaded["ui.console_window"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`

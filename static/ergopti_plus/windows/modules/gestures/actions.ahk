@@ -162,10 +162,10 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => WindowSpy(),
 		},
 		"open_list_vars", {
-				Fn: (*) => ListVars(),
+				Fn: (*) => ConsoleWindow_Open("list_vars"),
 		},
 		"open_key_history", {
-				Fn: (*) => KeyHistory(),
+				Fn: (*) => ConsoleWindow_Open("key_history"),
 		},
 		; --- Advanced system actions ---
 		"screen_capture_instant", {

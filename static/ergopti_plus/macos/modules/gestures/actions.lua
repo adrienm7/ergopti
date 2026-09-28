@@ -1815,7 +1815,7 @@ sg("script_quit",                         function()
 end)
 
 -- Debug
-sg("open_console",                        function() pcall(hs.openConsole) end)
+sg("open_console",                        function() return require("ui.console_window").open() end)
 
 
 

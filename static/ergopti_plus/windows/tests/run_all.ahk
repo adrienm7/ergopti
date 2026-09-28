@@ -106,6 +106,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/tick_count.ahk
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_utils.ahk
+#Include ../ui/console_window.ahk
 #Include ../infra/wall_clock.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
@@ -314,6 +315,7 @@ InstallSendNoOps()
 ; top-level ExitApp would end the suite.
 #Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
+#Include unit/test_console_window.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
 #Include unit/test_text_sender_modifiers.ahk
