@@ -98,13 +98,14 @@ local webview = Manager.webview_for("changelog")
 local expected_channel = Updater.get_channel() == "dev" and "dev" or "main"
 local STATE = "JSON.stringify({"
 	.. "tags: Array.prototype.map.call(document.querySelectorAll('#release-list .release-item-tag'), function (e) { return e.textContent; }),"
-	.. "dev: document.getElementById('btn-dev').classList.contains('active'),"
+	.. "dev: document.querySelector('[data-channel=dev]').classList.contains('active'),"
 	.. "error: (document.getElementById('error-overlay') || {style: {}}).style.display === 'flex',"
 	.. "content: (document.getElementById('release-content') || document.body).textContent.length"
 	.. "})"
 
 local state = wait_for(webview, STATE, function(value) return value:find('"tags":%["') ~= nil end, 45) or ""
 print("  page: " .. state:sub(1, 300))
+expect(state ~= "", "the page state probe returned a value")
 expect(not state:find('"error":true', 1, true), "no error is shown")
 expect(state:find('"tags":["' .. latest .. '"', 1, true) ~= nil,
 	"the newest release (" .. latest .. ") heads the list")
@@ -112,12 +113,12 @@ expect(state:find('"dev":' .. tostring(expected_channel == "dev"), 1, true) ~= n
 	"the list opens on the channel the installation follows (" .. expected_channel .. ")")
 
 -- The other channel, clicked as a user does.
-local other = expected_channel == "dev" and "btn-stable" or "btn-dev"
-eval_sync(webview, "document.getElementById('" .. other .. "').click(); 'clicked'")
+local other = expected_channel == "dev" and "main" or "dev"
+eval_sync(webview, "document.querySelector('[data-channel=" .. other .. "]').click(); 'clicked'")
 -- Settled once the other channel's answer is drawn: its own list, or the
 -- page's "no release" row for a channel with none (stable, while every
 -- release is a prerelease).
-local SETTLED = "JSON.stringify({ dev: document.getElementById('btn-dev').classList.contains('active'),"
+local SETTLED = "JSON.stringify({ dev: document.querySelector('[data-channel=dev]').classList.contains('active'),"
 	.. " loading: (document.getElementById('loading') || {style: {}}).style.display !== 'none',"
 	.. " rows: document.querySelectorAll('#release-list > div').length })"
 wait_for(webview, SETTLED, function(value)
@@ -127,6 +128,7 @@ end, 45)
 local switched = eval_sync(webview, STATE) or ""
 print("  after the click: " .. switched:sub(1, 300))
 expect(switched:find('"dev":' .. tostring(expected_channel ~= "dev"), 1, true) ~= nil, "the channel switches on a click")
+expect(switched ~= "", "the switched page state probe returned a value")
 expect(not switched:find('"error":true', 1, true), "and loads without an error")
 
 if #failures == 0 then os.exit(0) end

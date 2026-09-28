@@ -1013,3 +1013,79 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(found, "menu should contain an updater stub when updater is nil")
 	end)
 end)
+
+-- Keep the full canonical candidate horizon within bounded transport pages.
+
+local helpers = require("tests.helpers")
+local Json = require("json")
+
+helpers.describe("updater bounded pagination", function()
+	local function page(first, count)
+		local entries = {}
+		for i = first, first + count - 1 do
+			entries[#entries + 1] = { tag_name = i == 99 and "v9.9.9" or "v0.0.0-dev." .. i, assets = {}, body = string.rep("x", 25000) }
+		end
+		return Json.encode(entries)
+	end
+
+	helpers.it("collects all 100 candidates through bounded pages and keeps conditional page caches", function()
+		local M = helpers.load_module("modules.updater.manager")
+		local requests, completions, result = 0, 0, nil
+		local cached = false
+		M._http_client = { get = function(url, _, options, cb)
+			requests = requests + 1
+			local index = tonumber(url:match("&page=(%d+)$"))
+			helpers.assert_true(index ~= nil, "requests carry an explicit page")
+			helpers.assert_contains(url, "per_page=20")
+			helpers.assert_eq(options.max_body_bytes, 2 * 1024 * 1024)
+			local response = cached and { status = 304 } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
+			cb(response)
+			cb(response)
+			return true
+		end }
+		for _ = 1, 2 do
+			M._fetch_releases("dev", function(body, _, err)
+				completions = completions + 1
+				helpers.assert_nil(err)
+				result = Json.decode(body)
+			end)
+			cached = true
+		end
+		helpers.assert_eq(requests, 10)
+		helpers.assert_eq(completions, 2)
+		helpers.assert_eq(#result, 100)
+		helpers.assert_eq(result[100].tag_name, "v0.0.0-dev.100")
+		helpers.assert_contains(M._select_channel_release(Json.encode(result), "main"), "v9.9.9")
+		helpers.assert_contains(M._select_channel_release(Json.encode(result), "dev"), "v0.0.0-dev.100")
+	end)
+
+	helpers.it("refuses incomplete invalid and cancelled lists without partial success or duplicate callbacks", function()
+		for _, scenario in ipairs({ "http", "dispatch", "invalid", "cancel" }) do
+			local M = helpers.load_module("modules.updater.manager")
+			local completions, requests, pending, received_error = 0, 0, nil, nil
+			M._http_client = {
+				get = function(_, _, _, cb)
+					requests = requests + 1
+					if requests == 1 then cb({ ok = true, status = 200, body = page(1, 20) }); return true end
+					pending = cb
+					if scenario == "dispatch" then return false end
+					if scenario == "http" then cb({ ok = false, status = 500, error = "failed page" }) end
+					if scenario == "invalid" then cb({ ok = true, status = 200, body = "[invalid]" }) end
+					return true
+				end,
+				cancel = function() return true end,
+			}
+			M._file_digest = { cancel = function() return true end }
+			M._fetch_releases("dev", function(body, _, err)
+				completions = completions + 1
+				helpers.assert_nil(body, "incomplete lists cannot be published")
+				received_error = err
+			end)
+			if scenario == "cancel" then helpers.assert_true(M.cancel_update()) end
+			pending({ ok = true, status = 200, body = page(21, 20) })
+			helpers.assert_eq(requests, 2, scenario)
+			helpers.assert_eq(completions, 1, scenario)
+			helpers.assert_true(type(received_error) == "string", scenario)
+		end
+	end)
+end)
