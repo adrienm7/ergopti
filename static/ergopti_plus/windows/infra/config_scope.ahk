@@ -17,7 +17,6 @@
  * @returns {Map} Mutable receipt: pending, committed, refused, or recovery_required.
  */
 ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
-	global ConfigurationFile, _PathsFile
 	if !IsSet(Options)
 		Options := Map()
 	if !(Options is Map) || !(Providers is Map)
@@ -26,6 +25,23 @@ ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
 	Plan := ManifestScopePlan(ScopeId, Mode, [], Owners)
 	if Plan.presets.Length
 		throw ValueError("This scope requires a separate-file preset coordinator.")
+	Operations() {
+		Inventory := ManifestScopeInventory(ScopeId, Providers, Owners)
+		return ManifestScopePlan(ScopeId, Mode, Inventory, Owners).operations
+	}
+	return ConfigScopeCommitOperations(ScopeId, Mode, Operations, Options)
+}
+
+/**
+ * Publishes owner-validated operations using the same admitted reload transaction.
+ * @param {String} ScopeId Receipt domain, without changing operation ownership.
+ * @param {String} Mode Receipt action.
+ * @param {Func} OperationsFn Validates and builds operations inside the lease.
+ * @param {Map} Options Lifecycle and effect ports.
+ * @returns {Map} Pending or terminal transaction receipt.
+ */
+ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options) {
+	global ConfigurationFile, _PathsFile
 	Path := Options.Has("path") ? Options["path"] : ConfigurationFile
 	Locator := Options.Has("locator") ? Options["locator"] : _PathsFile
 	Port := Options.Get("port", 0)
@@ -72,9 +88,7 @@ ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
 		}
 	}
 	Build() {
-		Inventory := ManifestScopeInventory(ScopeId, Providers, Owners)
-		Candidate := ManifestScopePlan(ScopeId, Mode, Inventory, Owners)
-		Rows := _ConfigPrepareTypedUpdates(Candidate.operations)
+		Rows := _ConfigPrepareTypedUpdates(OperationsFn.Call())
 		Image := TOML_BuildUpdatedContent(Path, Rows)
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			throw Error("The scoped configuration image could not be rendered.")
