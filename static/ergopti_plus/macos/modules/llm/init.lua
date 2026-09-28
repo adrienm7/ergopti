@@ -1575,7 +1575,7 @@ end
 --- Bumps the detection generation so any in-flight auto_detect_backend() probe
 --- that resolves after this call treats its result as stale and discards it.
 --- @param backend string The backend identifier (e.g., "mlx", "ollama").
-function M.set_backend(backend)
+local function apply_backend_identity(backend, start_service)
 	if type(backend) == "string" and backend ~= "" then
 		local identity_changed = CoreState.backend ~= backend
 		-- Invalidate in-flight auto-detect probes before writing the new value
@@ -1608,6 +1608,7 @@ function M.set_backend(backend)
 		if not reset_ok then
 			Logger.error(LOG, "Ollama readiness reset raised during backend transition: %s",
 				tostring(reset_error))
+			return false
 		end
 		if CoreState.backend_transition_generation ~= my_transition_generation
 			or CoreState.backend ~= backend then
@@ -1616,7 +1617,7 @@ function M.set_backend(backend)
 				tostring(backend))
 			return false
 		end
-		if backend == "ollama" then
+		if backend == "ollama" and start_service then
 			local ensure_ok, ensure_result = xpcall(function()
 				return ApiOllama.ensure_running()
 			end, debug.traceback)
@@ -1642,6 +1643,62 @@ function M.set_backend(backend)
 		Logger.warn(LOG, "set_backend(): ignoring invalid backend %s.", tostring(backend))
 		return false
 	end
+end
+
+--- Selects a backend through the ordinary activation path.
+--- @param backend string Backend identifier.
+--- @return boolean committed Backend identity and service acquisition settled.
+function M.set_backend(backend)
+	return apply_backend_identity(backend, true)
+end
+
+--- Clones preference data so callers cannot mutate the live profile registry.
+--- @param value any Configuration value.
+--- @return any copy Detached configuration value.
+local function clone_configuration(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, child in pairs(value) do copy[key] = clone_configuration(child) end
+	return copy
+end
+
+--- Captures actual configuration independently from the menu's desired values.
+--- Credentials and backend request ownership are deliberately outside this scope.
+--- @return table snapshot Detached core configuration.
+function M.configuration_snapshot()
+	return {
+		backend = CoreState.backend,
+		llm_model_mlx = CoreState.llm_model_mlx,
+		llm_model_ollama = CoreState.llm_model_ollama,
+		active_profile_id = CoreState.active_profile_id,
+		user_profiles = clone_configuration(CoreState.user_profiles),
+		user_override_backend = CoreState.user_override_backend,
+	}
+end
+
+--- Replaces configuration only after the prediction owner has closed its gate.
+--- The transaction caller owns compensation after a refused exact native boundary.
+--- Selecting dormant preferences never acquires a daemon or promises model readiness.
+--- @param candidate table Detached complete configuration.
+--- @return boolean settled True only after all synchronous identity owners settle.
+function M.apply_configuration(candidate)
+	if CoreState.runtime_llm_enabled ~= false or type(candidate) ~= "table" then return false end
+	for _, key in ipairs({ "backend", "llm_model_mlx", "llm_model_ollama", "active_profile_id" }) do
+		if type(candidate[key]) ~= "string" then return false end
+	end
+	if candidate.backend ~= "mlx" and candidate.backend ~= "ollama" and candidate.backend ~= "api" then return false end
+	if type(candidate.user_override_backend) ~= "boolean" or type(candidate.user_profiles) ~= "table" then return false end
+	for index, profile in pairs(candidate.user_profiles) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #candidate.user_profiles
+			or type(profile) ~= "table" or type(profile.id) ~= "string" or profile.id == "" then return false end
+	end
+	if apply_backend_identity(candidate.backend, false) ~= true or CoreState.runtime_llm_enabled ~= false then return false end
+	if M.set_llm_model_mlx(candidate.llm_model_mlx) ~= true then return false end
+	if M.set_llm_model_ollama(candidate.llm_model_ollama) ~= true or CoreState.runtime_llm_enabled ~= false then return false end
+	if M.set_user_profiles(clone_configuration(candidate.user_profiles)) ~= true then return false end
+	if M.set_active_profile(candidate.active_profile_id) ~= true then return false end
+	CoreState.user_override_backend = candidate.user_override_backend
+	return true
 end
 
 --- Returns the currently active LLM backend identifier.
@@ -1874,6 +1931,7 @@ function M.set_llm_model_ollama(model_name)
 	if not reset_ok then
 		Logger.error(LOG, "Ollama readiness reset raised during model transition: %s",
 			tostring(reset_error))
+		return false
 	end
 	if CoreState.ollama_model_transition_generation ~= my_transition_generation
 		or CoreState.llm_model_ollama ~= model_name then
