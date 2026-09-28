@@ -54,26 +54,21 @@ _GES_IsEnabled() {
 }
 
 
-; These actions alter bindings only. They deliberately keep the master gesture
-; toggle intact, so an existing user choice to keep gestures off is respected.
+; Whole-scope actions use the manifest owner, including the master and parameters.
 _GES_SetEverySlot(ActionName) {
-	global GESTURE_SLOTS
-	Assignments := Map()
-	for _, Slot in GESTURE_SLOTS
-		Assignments[Slot] := ActionName
-	if !GestureSaveAllAssignments(Assignments)
-		return false
-	return ReloadPreservingSuspend()
+	if ActionName != "none"
+		throw ValueError("The clear command cannot assign an arbitrary action.")
+	return _GES_ApplyScope("clear")
 }
 
 _GES_RestoreFactoryDefaults() {
-	global GESTURE_SLOTS, GESTURE_FACTORY_DEFAULTS
-	Assignments := Map()
-	for _, Slot in GESTURE_SLOTS
-		Assignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
-	if !GestureSaveAllAssignments(Assignments)
-		return false
-	return ReloadPreservingSuspend()
+	return _GES_ApplyScope("recommended")
+}
+
+; The receipt remains pending until the existing terminal reload acknowledges it.
+_GES_ApplyScope(Mode, Options := unset) {
+	return ConfigScopeApply("gestures", Mode,
+		Map("action_parameters", ConfigScopeActionParameterPaths), IsSet(Options) ? Options : Map())
 }
 
 ; List provider: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).

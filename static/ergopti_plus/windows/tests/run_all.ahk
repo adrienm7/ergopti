@@ -209,6 +209,7 @@ global _DefaultLogsDir := _LogsDir
 ; boot-only globals), so including this file is safe — only function
 ; definitions at top level.
 #Include ../infra/config_io.ahk
+#Include ../infra/config_scope.ahk
 #Include ../ui/personal_toml_editor.ahk
 #Include ../ui/personal_toml_editor_webview.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
