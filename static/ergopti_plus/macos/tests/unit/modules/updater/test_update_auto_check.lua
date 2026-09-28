@@ -43,6 +43,7 @@ local function build(opts)
 	local ctx = {
 		timers = {}, requests = {}, values = {}, clock = { now = opts.now }, announced = {},
 		state = opts.state or {}, saves = 0, paused = opts.paused == true, responses = opts.responses or {},
+		channel = "dev", pending = {},
 	}
 	ctx.state_key = defaults.check_state.storage_key
 	if opts.record then ctx.values[ctx.state_key] = opts.record end
@@ -50,7 +51,7 @@ local function build(opts)
 	ctx.owner = AutoCheck.new({
 		state = ctx.state,
 		save = function() ctx.saves = ctx.saves + 1; return opts.save_refused ~= true end,
-		channel = function() return "dev" end,
+		channel = function() return ctx.channel end,
 		is_paused = function() return ctx.paused end,
 		on_available = function(release)
 			ctx.announced[#ctx.announced + 1] = release.tag
@@ -62,11 +63,16 @@ local function build(opts)
 		},
 		timer = {
 			after = function(delay, fn)
+				if opts.timer_refused == true then return nil, false end
 				local handle = { delay = delay, fn = fn, armed = true }
 				ctx.timers[#ctx.timers + 1] = handle
-				return handle, true
+				return handle, opts.timer_refused ~= "live"
 			end,
-			cancel = function(handle) handle.armed = false; return true end,
+			cancel = function(handle)
+				if opts.cancel_refused then return false end
+				handle.armed = false
+				return true
+			end,
 		},
 		storage = {
 			get = function(key, default) local v = ctx.values[key]; if v == nil then return default end; return v end,
@@ -75,6 +81,8 @@ local function build(opts)
 		http = {
 			get = function(url, headers, callback)
 				ctx.requests[#ctx.requests + 1] = { url = url, headers = headers }
+				if opts.http_throw then error("transport refused") end
+				if opts.defer then ctx.pending[#ctx.pending + 1] = callback; return true end
 				local response = table.remove(ctx.responses, 1)
 				callback(response)
 				return true
@@ -97,6 +105,117 @@ local function fire(ctx)
 end
 
 helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check", function()
+	helpers.it("a retired timer cannot replace the current timer (updater-owner-boundary)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		local retired = last_timer(ctx)
+		helpers.assert_true(ctx.owner.stop())
+		helpers.assert_true(ctx.owner.start())
+		local current = last_timer(ctx)
+		retired.fn()
+		helpers.assert_eq(#ctx.timers, 2, "a retired callback must not arm a replacement")
+		helpers.assert_true(ctx.owner.stop())
+		helpers.assert_eq(current.armed, false, "stop must release the current timer")
+	end)
+
+	helpers.it("duplicate completions cannot rewrite a recorded check (updater-owner-boundary)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
+		ctx.pending[1]({ ok = false, status = 0, error = "late failure" })
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0, "one request has one terminal result")
+		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150")
+	end)
+
+	helpers.it("transport exceptions are recorded and allow a retry (updater-owner-boundary)", function()
+		local opts = { now = T0, record = { seed = SEED }, http_throw = true, defer = true }
+		local ctx = build(opts)
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		local ok, err = pcall(fire, ctx)
+		helpers.assert_true(ok, "transport failure must stay inside its owner: " .. tostring(err))
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
+		opts.http_throw = false
+		ctx.clock.now = ctx.clock.now + 2 * 86400
+		ctx.owner._evaluate()
+		helpers.assert_eq(#ctx.requests, 2, "a thrown dispatch must release the in-flight slot")
+	end)
+
+	helpers.it("a refused live timer remains owned until cleanup succeeds", function()
+		local opts = { now = T0, record = { seed = SEED }, timer_refused = "live", cancel_refused = true }
+		local ctx = build(opts)
+		helpers.assert_eq(ctx.owner.start(), false)
+		helpers.assert_true(last_timer(ctx).armed)
+		helpers.assert_eq(ctx.owner.stop(), false, "refused cleanup must remain visible")
+		opts.cancel_refused = false
+		helpers.assert_true(ctx.owner.stop())
+		helpers.assert_eq(last_timer(ctx).armed, false, "the retained timer must be released on retry")
+	end)
+
+	helpers.it("a refused timer leaves no active schedule", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, timer_refused = true })
+		helpers.assert_eq(ctx.owner.start(), false, "start must report failed timer admission")
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		ctx.owner._evaluate()
+		helpers.assert_eq(#ctx.requests, 0, "a failed start must revoke evaluation")
+	end)
+
+	helpers.it("a stopped session cannot complete into its restarted owner", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		helpers.assert_eq(#ctx.pending, 1)
+		helpers.assert_true(ctx.owner.stop())
+		helpers.assert_true(ctx.owner.start())
+		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
+		helpers.assert_eq(#ctx.announced, 0, "an old session cannot announce into a new session")
+		helpers.assert_nil(ctx.values[ctx.state_key].last_check_at)
+	end)
+
+	helpers.it("a channel change discards the previous in-flight offer", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		helpers.assert_eq(#ctx.pending, 1)
+		ctx.channel = "main"
+		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
+		helpers.assert_eq(#ctx.announced, 0, "the abandoned channel cannot announce")
+		helpers.assert_nil(ctx.owner.latest())
+		helpers.assert_nil(ctx.values[ctx.state_key].last_check_at)
+	end)
+
+	helpers.it("malformed successful responses use failure backoff", function()
+		for _, body in ipairs({ "[", '[{"tag_name":', '[{},]', '[{}]' }) do
+			local ctx = build({ now = T0, record = { seed = SEED },
+				responses = { { ok = true, status = 200, body = body, headers = {} } } })
+			helpers.assert_true(ctx.owner.start())
+			ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(ctx.values[ctx.state_key].failures, 1, "invalid JSON is a failed check")
+			helpers.assert_nil(ctx.values[ctx.state_key].last_success_at)
+		end
+	end)
+
+	helpers.it("channel changes revoke an old response even after returning to that channel", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		ctx.channel = "main"
+		ctx.owner.on_channel_changed()
+		ctx.channel = "dev"
+		ctx.owner.on_channel_changed()
+		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
+		helpers.assert_eq(#ctx.announced, 0)
+		helpers.assert_nil(ctx.values[ctx.state_key].last_check_at)
+		ctx.pending[#ctx.pending]({ ok = true, status = 200, body = LIST, headers = {} })
+		helpers.assert_eq(#ctx.announced, 1, "the current generation still publishes")
+	end)
+
 	helpers.it("notification refusal leaves the release retryable", function()
 		for _, refusal in ipairs({ "false", "throw" }) do
 			local response = { ok = true, status = 200, body = LIST, headers = {} }

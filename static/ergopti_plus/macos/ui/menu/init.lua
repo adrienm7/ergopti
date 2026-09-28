@@ -929,6 +929,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		elseif checks_or_err ~= nil then
 			update_checks = checks_or_err
 			M._update_checks = update_checks
+			channel_owner.subscribe("automatic_checks", update_checks.on_channel_changed)
 		end
 	end
 
