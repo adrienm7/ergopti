@@ -24,7 +24,7 @@ local function with_collectors(body)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.updater"] = {
 			current_version = function() return LAUNCHER_VERSION end,
-			default_channel = function() return "stable" end,
+			installed_channel = function() return "main" end,
 		}
 		package.loaded["adapters.system_info"] = {
 			runtime_version = function() return "1.1.1" end,
@@ -40,7 +40,7 @@ helpers.describe("healthcheck: macOS identity rows", function()
 			local versions = H.collect_versions()
 			helpers.assert_eq(versions.ergopti_version, LAUNCHER_VERSION)
 			helpers.assert_eq(versions.runtime, "Hammerspoon 1.1.1")
-			helpers.assert_eq(versions.channel, "stable")
+			helpers.assert_eq(versions.channel, "main")
 		end)
 	end)
 

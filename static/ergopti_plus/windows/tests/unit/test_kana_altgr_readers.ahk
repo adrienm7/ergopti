@@ -144,7 +144,7 @@ Test("kana altgr: a bare Kana AltGr press does not cancel keep-awake (kana-altgr
 ; The readers that decide from key state or key events whether AltGr is
 ; involved. Each must name the layout's AltGr key, never RAlt or vk 0xA5 alone.
 _KAR_EveryAltGrReaderUsesTheLayoutKey() {
-	Readers := ["_HealthCheck_LayoutState", "AwakeIsIgnoredModifierKey", "AwakeCancelOnKeypress",
+	Readers := ["_HealthCheck_Input", "AwakeIsIgnoredModifierKey", "AwakeCancelOnKeypress",
 		"KL_Ergo_UpdatePinky", "KL_Watchers_DetectShortcut", "_CrashReport_StuckModifiers",
 		"_TextSenderKeystroke"]
 	for _, Name in Readers {
