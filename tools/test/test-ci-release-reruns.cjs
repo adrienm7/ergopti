@@ -169,6 +169,16 @@ function repository(name, branch) {
 	git(scratch, 'init', '--quiet', '--bare', origin);
 	git(scratch, 'init', '--quiet', `--initial-branch=${branch}`, work);
 	git(work, 'remote', 'add', 'origin', origin);
+	// The extracted workflow calls the real channel resolver and its registry.
+	for (const relative of [
+		'tools/build/release-channel.cjs',
+		'static/ergopti_plus/_shared/modules/updater/channels.json',
+		'static/ergopti_plus/_shared/ui/update_channels.js',
+	]) {
+		const target = path.join(work, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, relative), target);
+	}
 	return work;
 }
 
