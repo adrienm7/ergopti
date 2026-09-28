@@ -588,7 +588,12 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	local orig_new = _G.hs.eventtap.new
 	_G.hs.eventtap.new = function(_, fn)
 		handler = fn
-		return { start = function() end, stop = function() end, isEnabled = function() return true end }
+		local enabled = false
+		return {
+			start = function() enabled = true end,
+			stop = function() enabled = false end,
+			isEnabled = function() return enabled end,
+		}
 	end
 
 	-- Device-specific right/left modifier masks (mirror real macOS rawFlagMasks).
