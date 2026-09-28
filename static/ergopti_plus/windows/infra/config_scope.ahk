@@ -105,6 +105,8 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			throw Error("The scoped configuration image could not be rendered.")
 		Expected := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"], Port)
+		if !(Expected is Map)
+			throw Error("The scoped configuration precondition could not be established.")
 		Targets := [ConfigTransitionPresentTarget(Path, Image["content"], Expected)]
 		Images := [{ path: Path, image: Image }]
 		if FileOwner is Object {
@@ -117,6 +119,8 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 				if Extra["content"] == Extra["source_content"]
 					continue
 				ExpectedExtra := ConfigTransitionExpectedOld(Extra["source_present"], Extra["source_content"], Port)
+				if !(ExpectedExtra is Map)
+					throw Error("An additional scoped file precondition could not be established.")
 				Targets.Push(ConfigTransitionPresentTarget(Candidate.path, Extra["content"], ExpectedExtra))
 				Images.Push(Candidate)
 			}
