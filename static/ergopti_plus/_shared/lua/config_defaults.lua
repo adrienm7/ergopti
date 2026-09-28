@@ -142,7 +142,8 @@ function M.new(manifest)
 			if mode == "recommended" then
 				for _, prefix in ipairs(excluded) do if belongs(path, prefix) then return end end
 			end
-			operations[#operations + 1] = row(path, value, mode == "clear")
+			operations[#operations + 1] = mode == "clear" and row(path, value, true)
+				or contract.operation(path, value)
 		end
 		for _, entry in ipairs(manifest.features) do
 			local selected = false
