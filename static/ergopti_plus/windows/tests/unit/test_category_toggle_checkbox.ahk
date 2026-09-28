@@ -275,6 +275,22 @@ _CTC_NoHandBuiltCategorySwitch() {
 		"a category switch inserted by hand bypasses the manifest's one declaration")
 }
 
+; Native menu strings use && for one literal ampersand. Provider data stays literal.
+_CTC_ParameterizedLabelsAreLiteral() {
+	Target := Menu()
+	Label := "Open [https://example.org/?q=%s&x=[a]_b]"
+	Row := Map("label", Label, "checked", true, "action", (*) => 0)
+	try {
+		AssertEqual(1, _MR_RenderRows(Target, [Row], "parameter_label", 1))
+		AssertEqual("Open [https://example.org/?q=%s&&x=[a]_b]", _CTC_LabelAt(Target, 0),
+			"the native boundary must not turn URL punctuation into a mnemonic")
+		Assert(_CTC_IsChecked(Target, 0), "escaping must retain the row identity for checkmarks")
+		AssertEqual(Label, Row["label"], "native escaping must not change shared provider data")
+	} finally _CTC_ReleaseMenu(Target)
+}
+
+Test("menu rows preserve literal configured URL punctuation (menu-parameter-literal)",
+	_CTC_ParameterizedLabelsAreLiteral)
 Test("category toggle: every declared toggle renders as a checkbox with one label (category-toggle-checkbox)",
 	_CTC_EveryToggleRendersAsCheckbox)
 Test("category toggle: an unregistered toggle is not drawn (category-toggle-checkbox)",
