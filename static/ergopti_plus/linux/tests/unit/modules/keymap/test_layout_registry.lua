@@ -147,6 +147,22 @@ local function shipped_files()
 end
 
 helpers.describe("layout manager (Linux): installing", function()
+	helpers.it("makes committed layout packs visible before user overrides", function()
+		local Paths = require("infra.paths")
+		local saved_registry = package.loaded["modules.keymap.layout_registry"]
+		local saved_config = package.loaded["infra.config_paths"]
+		package.loaded["modules.keymap.layout_registry"] = {
+			extension_roots = function() return { "/committed/layout/generation" } end,
+		}
+		package.loaded["infra.config_paths"] = { home = function() return "/private/user" end }
+		local ok, roots = pcall(Paths.extension_roots)
+		package.loaded["modules.keymap.layout_registry"] = saved_registry
+		package.loaded["infra.config_paths"] = saved_config
+		helpers.assert_true(ok, tostring(roots))
+		helpers.assert_eq(roots[#roots - 1], "/committed/layout/generation")
+		helpers.assert_eq(roots[#roots], "/private/user/.config/ergopti/extensions")
+	end)
+
 	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true
