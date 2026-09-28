@@ -368,6 +368,8 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			try LoggerWarn("MenuRenderer", "List '{1}' produced a row with no label — skipped.", ListId)
 			continue
 		}
+		; Rows carry literal text; only the native menu syntax treats & as a mnemonic.
+		Label := StrReplace(Label, "&", "&&")
 
 		if (Row.Has("items") and Row["items"] is Array) {
 			SubMenu := Menu()
