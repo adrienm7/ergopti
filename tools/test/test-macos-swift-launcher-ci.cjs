@@ -24,7 +24,7 @@
  * and Release runs only when every lane succeeded. The launcher build and its
  * XCTest then moved into the package job, before the app build, so the lane
  * uses one macOS runner before its launch legs; the tests append to the real
- * ~/Library/Logs/ErgoptiPlus/launcher.log, which the release smoke refuses to
+ * ~/Library/Logs/ergopti_plus/launcher.log, which the release smoke refuses to
  * launch over, and the app that ships must not build in their cached tree.
  *
  * FEATURES & RATIONALE:
@@ -127,7 +127,7 @@ check(JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.s
 	`package-macos must need e2e-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`);
 
 // The launcher build and XCTest precede the app build. LauncherLogTests append
-// to the real ~/Library/Logs/ErgoptiPlus/launcher.log, and the release smoke
+// to the real ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke
 // refuses a launcher log it did not start fresh, so the log goes in between.
 const PACKAGE_ORDER = [
 	'Build release launcher',
@@ -141,9 +141,9 @@ const packageOrder = PACKAGE_ORDER.map((name) => packageStepNames.indexOf(name))
 check(!packageOrder.some((at, index) => at < 0 || (index > 0 && at <= packageOrder[index - 1])),
 	`package-macos must run ${PACKAGE_ORDER.join(' < ')}; got: ${packageStepNames.join(' | ')}`);
 const logCleanup = pipeline.step(pipeline.job('package-macos'), 'Remove the launcher log the Swift tests wrote');
-check(pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ErgoptiPlus"'
+check(pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ergopti_plus"'
 	&& pipeline.stepField(logCleanup, 'if') === null,
-	'package-macos must always remove ~/Library/Logs/ErgoptiPlus, the log the launcher tests write, before the app build');
+	'package-macos must always remove ~/Library/Logs/ergopti_plus, the log the launcher tests write, before the app build');
 check(/if launcher_log\.exists\(\):\s*\n\s*raise RuntimeError\("Release launch requires a fresh launcher log"\)/
 	.test(fs.readFileSync(path.join(ROOT, 'tools', 'diagnostics', 'macos-release-launch.py'), 'utf8')),
 	'the release smoke no longer refuses a stale launcher log; re-derive why package-macos removes it');

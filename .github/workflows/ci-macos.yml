@@ -181,12 +181,12 @@ jobs:
         timeout-minutes: 10
 
       # LauncherLogTests append to the real launcher log,
-      # ~/Library/Logs/ErgoptiPlus/launcher.log, and the release smoke below
+      # ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke below
       # refuses to judge a launch over a launcher log it did not start fresh.
       # On a runner of its own that log never existed; here the tests leave it
       # behind, so it goes before the app is built.
       - name: Remove the launcher log the Swift tests wrote
-        run: rm -rf -- "$HOME/Library/Logs/ErgoptiPlus"
+        run: rm -rf -- "$HOME/Library/Logs/ergopti_plus"
 
       # Once per run instead of once per launch leg: the verdict and the
       # scenario profiles are plain Python, identical on every runner.
