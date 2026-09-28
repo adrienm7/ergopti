@@ -31,6 +31,9 @@ local M = {}
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
+local TomlScanner = require("toml_codec.record_scanner")
+local TomlKeyPath = require("toml_codec.key_path")
+local Extensions = require("hotstrings.extensions")
 local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
@@ -77,6 +80,7 @@ local CATEGORY_DEFAULT_COLORS = {}
 local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
 
 local _state = nil
+local delay_projection
 
 --- Returns the first non-nil argument. Module-level rather than a closure built
 --- inside M.resolve: it captures nothing, and the preview path calls resolve once
@@ -154,10 +158,16 @@ local function parse_overrides(path)
 	local global_depth = 0
 	local global_multiline_quote = nil
 	local global_owned_record = false
+	local record_depth, record_quote = 0, nil
 
 	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
 		raw = raw:gsub("\r$", "")
 		local line = raw:match("^%s*(.-)%s*$")
+
+		if not in_global and (record_depth > 0 or record_quote ~= nil) then
+			record_depth, record_quote = TomlRecordEditor.advance_continuation(raw, record_depth, record_quote)
+			goto continue
+		end
 
 		-- A line that resembles a section header can legally occur inside an
 		-- open multiline global value. Consume continuations before interpreting
@@ -274,6 +284,13 @@ local function parse_overrides(path)
 			current_cat, current_sec = cat_only, nil
 			goto continue
 		end
+
+		-- Unowned headers and open values cannot lend their fields to the prior category.
+		if line:sub(1, 1) == "[" then
+			current_cat, current_sec = nil, nil
+			goto continue
+		end
+		record_depth, record_quote = TomlRecordEditor.advance_continuation(raw, 0, nil)
 
 		-- key = value (delay number, color string)
 		if current_cat then
@@ -470,6 +487,12 @@ local function refresh_after_failed_publication()
 		return
 	end
 	if source_snapshots_equal(source_snapshot, _state.source_snapshot) then return end
+	if _state.delay_transaction
+		and _state.delay_transaction(delay_projection(overrides), function() return true end) ~= true then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Override source adoption refused by the delay owner.")
+		return false
+	end
 	_state.overrides       = overrides
 	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
@@ -478,6 +501,99 @@ local function refresh_after_failed_publication()
 	_state.resolve_cache   = {}
 	Logger.warn(LOG, "Override publication lost a source race; newer external bytes were adopted.")
 end
+
+--- Preserves every unowned record while publishing only changed override leaves.
+--- @param overrides table Candidate known overrides.
+--- @param word_delimiters string|nil Candidate global delimiter choice.
+--- @return string|nil content Prepared source bytes.
+--- @return string|nil detail Refusal reason.
+local function prepare_override_content(overrides, word_delimiters)
+	local updates = {}
+	local function leaves(source)
+		local rows = {}
+		for category, entry in pairs(source) do
+			for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
+				if entry[field] ~= nil then rows[category .. "\0" .. field] = { category, field, entry[field] } end
+			end
+			for section, values in pairs(entry.sections or {}) do
+				for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
+					if values[field] ~= nil then
+						local path = category .. "." .. section
+						rows[path .. "\0" .. field] = { path, field, values[field] }
+					end
+				end
+			end
+		end
+		return rows
+	end
+	local previous, candidate = leaves(_state.overrides), leaves(overrides)
+	for id, row in pairs(candidate) do
+		if previous[id] == nil or previous[id][3] ~= row[3] then
+			updates[#updates + 1] = { section = row[1], key = row[2], value = row[3] }
+		end
+	end
+	for id, row in pairs(previous) do
+		if candidate[id] == nil then updates[#updates + 1] = { section = row[1], key = row[2], delete = true } end
+	end
+	if word_delimiters ~= nil or word_delimiters ~= _state.word_delimiters then
+		updates[#updates + 1] = { section = "__global__", key = "word_delimiters",
+			value = word_delimiters, delete = word_delimiters == nil }
+	end
+	local snapshot = _state.source_snapshot
+	local content = snapshot.status == "ok" and snapshot.content or ""
+	local scan, scan_error = TomlScanner.scan_records(content, { quoted_headers = true })
+	if not scan then return nil, scan_error end
+	local function prefix(path, ancestor)
+		if #path < #ancestor then return false end
+		for index, part in ipairs(ancestor) do if path[index]:lower() ~= part:lower() then return false end end
+		return true
+	end
+	for _, row in ipairs(updates) do
+		local section = TomlKeyPath.parse(row.section)
+		local target = TomlKeyPath.parse(row.section .. "." .. row.key)
+		local headers, fields = 0, 0
+		for _, header in ipairs(scan.headers) do
+			if not header.segments then return nil, "unrecognized TOML table identity" end
+			if header.array and prefix(target, header.segments) then return nil, "array element has no override owner" end
+			if prefix(header.segments, target) then return nil, "override scalar is already a table" end
+			if #header.segments == #section and prefix(section, header.segments) then
+				headers = headers + 1
+				local raw = scan.lines[header.index].text:match("^%s*(.-)%s*$")
+				if raw ~= "[" .. row.section .. "]" then return nil, "override header is not reader-owned" end
+			end
+		end
+		if headers > 1 then return nil, "duplicate override table" end
+		for _, record in ipairs(scan.records) do
+			local raw = scan.lines[record.first].text
+			local key_text = raw:match("^%s*([^=]-)%s*=")
+			local key = key_text and TomlKeyPath.parse(key_text)
+			if key then
+				local path = {}
+				for _, part in ipairs(record.header and record.header.segments or {}) do path[#path + 1] = part end
+				for _, part in ipairs(key) do path[#path + 1] = part end
+				if prefix(target, path) or prefix(path, target) then
+					if #path ~= #target or #key ~= 1 or key_text:match("^%s*(.-)%s*$") ~= row.key then
+						return nil, "override leaf conflicts with an unowned representation"
+					end
+					fields = fields + 1
+				end
+			end
+		end
+		if fields > 1 then return nil, "duplicate override field" end
+		local encoded
+		if not row.delete then
+			if type(row.value) == "string" then encoded = ConfigSchema.encode_basic_string(row.value)
+			elseif row.key == "priority" then encoded = tostring(math.floor(row.value))
+			else encoded = tostring(row.value) end
+		end
+		local detail
+		content, detail = TomlRecordEditor.patch_table_field(content, "[" .. row.section .. "]", row.key,
+			encoded, { remove_empty_section = true })
+		if not content then return nil, detail end
+	end
+	return content
+end
+
 
 --- Persists a candidate override state through the atomic file-system adapter.
 --- @param overrides table Candidate overrides.
@@ -495,12 +611,22 @@ local function save_to_disk(overrides, word_delimiters)
 			tostring(serialize_err))
 		return false
 	end
-	local ok, committed = pcall(
-		FileSystem.write_if_unchanged,
-		_state.path,
-		content,
-		_state.source_snapshot
-	)
+	local prepared, prepare_error = prepare_override_content(overrides, word_delimiters)
+	if not prepared then
+		Logger.error(LOG, "Override source preparation refused: %s.", tostring(prepare_error))
+		refresh_after_failed_publication()
+		return false
+	end
+	content = prepared
+	local function publish()
+		return FileSystem.write_if_unchanged(_state.path, content, _state.source_snapshot) == true
+	end
+	local ok, committed = pcall(function()
+		if _state.delay_transaction then
+			return _state.delay_transaction(delay_projection(overrides), publish)
+		end
+		return publish()
+	end)
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Failed to commit override file against its loaded source snapshot.")
 		refresh_after_failed_publication()
@@ -563,6 +689,7 @@ function M.init(opts)
 	if type(opts) ~= "table"
 		or type(opts.override_path) ~= "string" or opts.override_path == ""
 		or type(opts.toml_resolver) ~= "function"
+		or (opts.delay_transaction ~= nil and type(opts.delay_transaction) ~= "function")
 	then
 		Logger.error(LOG, "M.init(): opts.override_path and opts.toml_resolver are required.")
 		return
@@ -577,6 +704,7 @@ function M.init(opts)
 	_state = {
 		path            = opts.override_path,
 		toml_resolver   = opts.toml_resolver,
+		delay_transaction = opts.delay_transaction,
 		overrides       = overrides,
 		word_delimiters = word_delimiters,
 		global_passthrough = global_passthrough,
@@ -590,6 +718,12 @@ function M.init(opts)
 	}
 	if read_status == "error" then
 		Logger.error(LOG, "Initialization degraded: override source is unreadable and writes are blocked.")
+		return false
+	end
+	if _state.delay_transaction
+		and _state.delay_transaction(delay_projection(overrides), function() return true end) ~= true then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Override delay owner initialization was refused.")
 		return false
 	end
 	Logger.success(LOG, "Initialized (override file: '%s').", opts.override_path)
@@ -626,6 +760,36 @@ local function sanitized_resolution_entry(entry)
 		priority     = type(entry.priority) == "number" and entry.priority or nil,
 	}
 end
+
+--- Builds a pure runtime projection from one unpublished override candidate.
+--- Corpus metadata comes from the registry's already committed parse, never I/O
+--- on the input path. The shared cascade remains the sole precedence owner.
+--- @param overrides table Candidate override tree.
+--- @return function resolve Group/section/corpus resolver in seconds.
+delay_projection = function(overrides)
+	return function(category, section, meta)
+		local extension_id = Extensions.parse_category_key(category)
+		local source_category = category
+		if extension_id then
+			source_category = assert(ConfigSchema.normalize_category("ext." .. extension_id),
+				"extension has no supported override owner")
+		end
+		local user = overrides[source_category] or {}
+		local user_section = (user.sections or {})[section]
+		local meta_section = meta.sections and meta.sections[section]
+		if type(meta_section) ~= "table" and meta.section_delays then
+			meta_section = { delay = meta.section_delays[section] }
+		end
+		return DelayResolver.resolve({
+			user_category = sanitized_resolution_entry(user),
+			user_section = sanitized_resolution_entry(user_section),
+			meta_category = sanitized_resolution_entry(meta),
+			meta_section = sanitized_resolution_entry(meta_section),
+			default_delay = GLOBAL_DEFAULT_DELAY,
+		}).delay
+	end
+end
+
 
 --- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(category, section)
@@ -859,6 +1023,12 @@ function M.reload()
 	if read_status == "error" then
 		_state.writes_blocked = true
 		Logger.error(LOG, "Override reload failed; prior memory retained and writes blocked.")
+		return false
+	end
+	if _state.delay_transaction
+		and _state.delay_transaction(delay_projection(overrides), function() return true end) ~= true then
+		_state.writes_blocked = true
+		Logger.error(LOG, "Override source adoption refused by the delay owner.")
 		return false
 	end
 	_state.overrides       = overrides

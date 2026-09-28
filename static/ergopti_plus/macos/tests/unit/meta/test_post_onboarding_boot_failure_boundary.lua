@@ -24,14 +24,57 @@ local FAILURE_EXIT =
 	"emergency_exit_after_runtime_failure(\"boot\", post_onboarding_boot_error)"
 local BODY_FATAL = "error(\"VS Code caret bridge setup did not commit\")"
 
+-- Required contracts, independently named rather than inferred from production counts.
+local REQUIRED_FATAL_MESSAGES = {
+	"input subsystem pre-start did not commit",
+	"dependency bootstrap pause-owner registration did not commit",
+	"hotstring override owner did not initialize",
+	"dynamic_hotstrings.start did not commit",
+	"canonical personal-info preference did not commit before eventtap startup",
+	"canonical hotstring preferences did not commit before eventtap startup",
+	"keymap.start did not commit",
+	"karabiner.init did not commit",
+	"menu.start did not commit",
+	"infra.vscode_bridge.stop_server is unavailable",
+	"VS Code caret bridge setup did not commit",
+	"file-watcher startup did not commit",
+}
 
---- Removes quoted strings and line comments before executable-token scans.
---- @param line string Source line.
---- @return string code
-local function executable_line(line)
-	local code = line:gsub('"[^"\\]*(\\.[^"\\]*)*"', '""')
-	code = code:gsub("'[^'\\]*(\\.[^'\\]*)*'", "''")
-	return code:gsub("%-%-.*$", "")
+
+--- Masks strings and comments while preserving source offsets and newlines.
+--- @param source string Source text.
+--- @return string code Executable tokens at their original positions.
+local function executable_source(source)
+	local chunks, cursor = {}, 1
+	while cursor <= #source do
+		local start = cursor
+		local comment = source:sub(cursor, cursor + 1) == "--"
+		local bracket_at = comment and cursor + 2 or cursor
+		local equals = source:match("^%[(=*)%[", bracket_at)
+		local quote = source:sub(cursor, cursor)
+		if equals then
+			local close = "]" .. equals .. "]"
+			local finish = source:find(close, bracket_at + #equals + 2, true)
+			cursor = finish and finish + #close or #source + 1
+		elseif comment then
+			cursor = source:find("\n", cursor, true) or #source + 1
+		elseif quote == '"' or quote == "'" then
+			cursor = cursor + 1
+			while cursor <= #source do
+				local char = source:sub(cursor, cursor)
+				cursor = cursor + 1
+				if char == "\\" then cursor = cursor + 1
+				elseif char == quote then break end
+			end
+		else
+			chunks[#chunks + 1] = quote
+			cursor = cursor + 1
+		end
+		if equals or comment or quote == '"' or quote == "'" then
+			chunks[#chunks + 1] = source:sub(start, cursor - 1):gsub("[^\n]", " ")
+		end
+	end
+	return table.concat(chunks)
 end
 
 
@@ -56,21 +99,20 @@ end
 --- @param source string Source string.
 --- @return number count
 local function count_bare_error_calls(source)
-	local count = 0
-	for line in (source .. "\n"):gmatch("([^\n]*)\n") do
-		local code = executable_line(line)
-		local cursor = 1
-		while true do
-			local at, finish = code:find("error%s*%(", cursor)
-			if not at then break end
-			local previous = at > 1 and code:sub(at - 1, at - 1) or ""
-			if previous == "" or not previous:match("[%w_%.:]") then
-				count = count + 1
-			end
-			cursor = finish + 1
+	local count, messages, cursor = 0, {}, 1
+	local code = executable_source(source)
+	while true do
+		local at, finish = code:find("error%s*%(", cursor)
+		if not at then break end
+		local previous = at > 1 and code:sub(at - 1, at - 1) or ""
+		if previous == "" or not previous:match("[%w_%.:]") then
+			count = count + 1
+			local message = source:sub(finish + 1):match('^%s*"([^"\n]*)"%s*%)')
+			if message then messages[message] = (messages[message] or 0) + 1 end
 		end
+		cursor = finish + 1
 	end
-	return count
+	return count, messages
 end
 
 
@@ -78,10 +120,7 @@ end
 --- @param source string Source fragment.
 --- @return boolean present
 local function has_executable_code(source)
-	for line in (source .. "\n"):gmatch("([^\n]*)\n") do
-		if executable_line(line):match("%S") then return true end
-	end
-	return false
+	return executable_source(source):match("%S") ~= nil
 end
 
 
@@ -89,9 +128,10 @@ end
 --- @param source string Original source.
 --- @param needle string Exact text.
 --- @param replacement string Replacement text.
+--- @param start_at number|nil First allowed mutation offset.
 --- @return string mutant
-local function replace_plain(source, needle, replacement)
-	local at = source:find(needle, 1, true)
+local function replace_plain(source, needle, replacement, start_at)
+	local at = source:find(needle, start_at or 1, true)
 	helpers.assert_true(at ~= nil, "mutation precondition missing: " .. needle)
 	return source:sub(1, at - 1) .. replacement .. source:sub(at + #needle)
 end
@@ -121,11 +161,14 @@ local function boundary_is_exact(source)
 	end
 
 	local root_owner_at = source:find(FIRST_INPUT_OWNER, 1, true)
-	local fatal_count = count_bare_error_calls(body)
+	local fatal_count, messages = count_bare_error_calls(body)
 	local total_post_owner_fatals = root_owner_at
 		and count_bare_error_calls(source:sub(root_owner_at)) or 0
-	-- Floor = the live inventory (menu.start joined it), so removing one gate fails.
-	if fatal_count < 9 then return false, fatal_count, "fatal inventory below floor" end
+	for _, message in ipairs(REQUIRED_FATAL_MESSAGES) do
+		if messages[message] ~= 1 then
+			return false, fatal_count, "required fatal gate missing or duplicated: " .. message
+		end
+	end
 	if fatal_count ~= total_post_owner_fatals then
 		return false, fatal_count, "a post-owner fatal gate escaped the boundary"
 	end
@@ -164,7 +207,7 @@ helpers.describe("root boot has one bounded post-onboarding failure boundary", f
 		helpers.assert_true(valid,
 			"post-onboarding input startup through boot success must be one xpcall-owned unit: "
 				.. tostring(reason))
-		helpers.assert_true(fatal_count >= 9,
+		helpers.assert_true(fatal_count >= #REQUIRED_FATAL_MESSAGES,
 			"the guard must cover the complete non-vacuous fatal-gate inventory")
 	end)
 
@@ -191,4 +234,29 @@ helpers.describe("root boot has one bounded post-onboarding failure boundary", f
 		helpers.assert_eq(boundary_is_exact(moved_gate), false)
 		helpers.assert_eq(boundary_is_exact(escaped_statement), false)
 	end)
+	for _, message in ipairs(REQUIRED_FATAL_MESSAGES) do
+		helpers.it("rejects removal or log-only substitution of fatal gate: " .. message, function()
+			local gate = 'error("' .. message .. '")'
+			local boundary_at = assert(root_source:find(BOUNDARY_DECLARATION, 1, true))
+			local removed = replace_plain(root_source, gate, "do end", boundary_at)
+			local logged = replace_plain(root_source, gate, 'Logger.' .. gate, boundary_at)
+			local commented = replace_plain(root_source, gate, "--[[ " .. gate .. " ]] do end", boundary_at)
+			helpers.assert_eq(boundary_is_exact(removed), false, "required fatal gate was removed")
+			helpers.assert_eq(boundary_is_exact(logged), false, "diagnostic is not a fatal gate")
+			helpers.assert_eq(boundary_is_exact(commented), false, "comment is not a fatal gate")
+		end)
+	end
+
+	helpers.it("ignores diagnostics and quoted or commented fatal-looking text", function()
+		local count = count_bare_error_calls([=[
+Logger.error("diagnostic")
+local text = 'error("quoted")'
+local block = [[error("long quoted")]]
+-- error("line comment")
+--[[error("long comment")]]
+error("real gate")
+]=])
+		helpers.assert_eq(count, 1, "only the bare executable call is fatal")
+	end)
+
 end)

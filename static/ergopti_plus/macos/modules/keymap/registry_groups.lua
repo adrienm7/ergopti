@@ -26,6 +26,7 @@ local Logger = require("infra.logger")
 
 local LOG = "keymap.registry"
 
+local _delay_resolver = nil
 local _state     = nil
 local _callbacks = nil  -- {add, sort_mappings, is_section_enabled, resolve_priority, rebuild_lookup, rebuild_tail_indexes}
 
@@ -128,6 +129,7 @@ local function snapshot_registry()
 		group_order_counter        = _state.group_order_counter,
 		current_group              = _state.current_group,
 		word_timeout               = _state.WORD_TIMEOUT_SEC,
+		delay_resolver             = _delay_resolver,
 	}
 end
 
@@ -149,6 +151,7 @@ local function restore_registry(snapshot)
 	_state.group_order_counter        = snapshot.group_order_counter
 	_state.current_group              = snapshot.current_group
 	_state.WORD_TIMEOUT_SEC           = snapshot.word_timeout
+	_delay_resolver                  = snapshot.delay_resolver
 	-- Failed helpers may replace any index table before failing. Rebuild every
 	-- derived structure from the restored corpus instead of retaining aliases to
 	-- tables that the attempted mutation could have modified in place.
@@ -180,6 +183,38 @@ local function run_transaction(label, mutation)
 		.. "(details withheld; terminal type: %s).", tostring(label), type(committed))
 	return false
 end
+
+--- Projects one committed override source onto registered TOML delay owners.
+--- The existing registry transaction restores its caches when publication refuses.
+--- @param resolve function Resolves (group, section, corpus metadata) to seconds.
+--- @param publish function Publishes the exact candidate source, returning true.
+--- @return boolean committed
+function M.with_hotstring_delays(resolve, publish)
+	if not require_state("with_hotstring_delays") then return false end
+	if type(resolve) ~= "function" or type(publish) ~= "function" then return false end
+	local committed = run_transaction("hotstring delay projection", function()
+		for name, group in pairs(_state.groups) do
+			if group.enabled and group.kind == "toml" then
+				local delays = {}
+				for _, section in ipairs(group.sections or {}) do
+					if section.name ~= "-" and not section.is_module_placeholder then
+						local delay = resolve(name, section.name, group.delay_metadata or {})
+						assert(type(delay) == "number" and delay == delay and delay >= 0 and delay < math.huge,
+							"hotstring delay projection must be finite and non-negative")
+						delays[section.name] = delay
+					end
+				end
+				_state.SECTION_DELAYS[name] = delays
+				group.delay_resolved = true
+			end
+		end
+		_state.recompute_word_timeout()
+		return publish() == true
+	end)
+	if committed then _delay_resolver = resolve end
+	return committed
+end
+
 
 --- Replaces one group's complete section-delay ownership and resizes the word timeout.
 --- Passing nil removes the owner; outer multi-step mutations provide rollback.
@@ -491,6 +526,16 @@ function M.load_toml(name, path)
 			end
 		end
 	end
+	if _delay_resolver then
+		for _, section in ipairs(sections_info) do
+			if section.name ~= "-" and not section.is_module_placeholder then
+				local delay = _delay_resolver(name, section.name, data.meta or {})
+				assert(type(delay) == "number" and delay == delay and delay >= 0 and delay < math.huge,
+					"registered hotstring delay must be finite and non-negative")
+				group_section_delays[section.name] = delay
+			end
+		end
+	end
 	replace_group_section_delays(name, group_section_delays)
 
 	-- Preserve group_order across reloads: ensure_group_order() stamped it earlier,
@@ -501,6 +546,8 @@ function M.load_toml(name, path)
 		enabled          = true,
 		kind             = "toml",
 		meta_description = data.meta and data.meta.description or nil,
+		delay_metadata   = data.meta or {},
+		delay_resolved   = _delay_resolver ~= nil,
 		sections         = sections_info,
 		group_order      = existing_order,
 	}
