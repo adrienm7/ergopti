@@ -113,7 +113,7 @@ _HSE_SourcePriority(CategoryName) {
 		Cat := StrLower(CategoryName)
 		if (Cat == "personal")
 				return HSE_PRIORITY_PERSONAL
-		if (SubStr(Cat, 1, 4) == "ext.")
+		if (SubStr(Cat, 1, 4) == "ext." || SubStr(Cat, 1, 4) == "ext:")
 				return HSE_PRIORITY_PACKAGE
 		return HSE_PRIORITY_COMMON
 }

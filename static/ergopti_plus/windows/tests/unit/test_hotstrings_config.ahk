@@ -715,6 +715,8 @@ TestHSE_SourcePriorityHelper() {
 	AssertEqual(50, _HSE_SourcePriority("personal"), "personal source default")
 	AssertEqual(50, _HSE_SourcePriority("PERSONAL"), "source default is case-insensitive")
 	AssertEqual(30, _HSE_SourcePriority("ext.demo"), "extension package source default")
+	AssertEqual(30, _HSE_SourcePriority("ext:ergopti:rolls"), "canonical extension category source default")
+	AssertEqual(30, _HSE_SourcePriority("EXT:ERGOPTI:ROLLS"), "canonical extension source is case-insensitive")
 	AssertEqual(10, _HSE_SourcePriority("autocorrection"), "bundled common source default")
 }
 Test("_HSE_SourcePriority maps personal=50, package=30, common=10",
