@@ -415,6 +415,42 @@ end)
 -- =================================================================
 
 helpers.describe("tray indicator: destroy", function()
+	helpers.it("extra-item removal returns a terminal receipt and can be repeated", function()
+		local ind = with_fake()
+		local handle = ind.new_item("wpm", "icon", {})
+		helpers.assert_not_nil(handle)
+		helpers.assert_eq(ind.remove_item(handle), true)
+		helpers.assert_eq(handle.ptr, nil)
+		helpers.assert_eq(ind.remove_item(handle), true)
+		ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("refused extra-item removal retains its native handle and actions for retry", function()
+		local ind = helpers.load_module("platform.tray.appindicator")
+		local binding, log = fake_binding()
+		ind._set_binding_for_test(binding)
+		local clicks = 0
+		local handle = ind.new_item("wpm", "icon", { { title = "Action", fn = function() clicks = clicks + 1 end } })
+		local pointer, owned = handle.ptr, handle.owned
+		helpers.assert_eq(#owned, 1)
+		log.signals[1].fire()
+		helpers.assert_eq(clicks, 1)
+		local original = binding.indicator.app_indicator_set_status
+		binding.indicator.app_indicator_set_status = function() error("native removal failed") end
+		local called, removed = pcall(ind.remove_item, handle)
+		helpers.assert_eq(called, true)
+		helpers.assert_eq(removed, false)
+		helpers.assert_eq(handle.ptr, pointer)
+		helpers.assert_eq(handle.owned, owned)
+		log.signals[1].fire()
+		helpers.assert_eq(clicks, 2)
+		binding.indicator.app_indicator_set_status = original
+		helpers.assert_eq(ind.remove_item(handle), true)
+		helpers.assert_eq(handle.ptr, nil)
+		log.signals[1].fire()
+		helpers.assert_eq(clicks, 2, "retired actions must stop dispatching")
+		ind._set_binding_for_test(nil)
+	end)
 
 	helpers.it("sets the item passive, which is what removes it", function()
 		local ind, log = with_fake()

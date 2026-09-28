@@ -459,14 +459,23 @@ end
 
 --- Removes an extra item from the panel and drops its menu's actions.
 --- @param handle table From new_item().
+--- @return boolean acknowledged
 function M.remove_item(handle)
+	if type(handle) ~= "table" then return false end
+	if handle.ptr == nil then return true end
 	local lib = bind()
-	if not lib or type(handle) ~= "table" or handle.ptr == nil then return end
-	lib.indicator.app_indicator_set_status(handle.ptr, STATUS_PASSIVE)
+	if not lib then return false end
+	local called, result = pcall(lib.indicator.app_indicator_set_status, handle.ptr, STATUS_PASSIVE)
+	-- This native setter returns void; normal completion acknowledges its work.
+	if not called or result == false then
+		Logger.error(LOG, "The extra tray item did not acknowledge removal.")
+		return false
+	end
 	for _, id in ipairs(handle.owned) do _actions[id] = nil end
 	handle.owned = {}
 	handle.ptr = nil
 	handle.active = false
+	return true
 end
 
 return M

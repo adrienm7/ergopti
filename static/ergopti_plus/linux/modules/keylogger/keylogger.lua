@@ -369,6 +369,7 @@ end
 --- Initialises the keylogger.
 --- @param opts table { log_dir?, password_apps? }
 function M.init(opts)
+	if not Preferences.admit() then return false end
 	local options = type(opts) == "table" and opts or {}
 	-- Validate canonical consent before initializing collectors or persistent data.
 	local preferences = Preferences.snapshot()
@@ -1157,6 +1158,7 @@ end
 --- all; the other two drivers have had one since they shipped.
 --- @param enabled boolean
 function M.set_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
 	if not store_bool("enabled", wanted) then
 		Logger.error(LOG, "Metrics collection state was not persisted — it was not changed.")
@@ -1191,6 +1193,7 @@ end
 --- Toggles the private-browsing filter.
 --- @param enabled boolean
 function M.set_private_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
 	if not store_bool("private_filter_enabled", wanted) then
 		Logger.error(LOG, "Private-browsing filter state was not persisted — it was not changed.")
@@ -1204,6 +1207,7 @@ end
 --- Toggles the secure-field / password-manager filter.
 --- @param enabled boolean
 function M.set_secure_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
 	if not store_bool("secure_filter_enabled", wanted) then
 		Logger.error(LOG, "Secure-field filter state was not persisted — it was not changed.")
@@ -1217,6 +1221,7 @@ end
 --- Toggles the OS authentication-prompt filter.
 --- @param enabled boolean
 function M.set_system_auth_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
 	if not store_bool("system_auth_filter_enabled", wanted) then
 		Logger.error(LOG, "System-auth filter state was not persisted — it was not changed.")
@@ -1233,6 +1238,7 @@ end
 --- @param enabled boolean
 --- @return boolean The posture actually in force after the call.
 function M.set_encrypt_enabled(enabled)
+	if not Preferences.admit() then return false end
 	local want = (enabled == true)
 	if want and not TextCipher.is_available() then
 		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
@@ -1260,6 +1266,7 @@ end
 --- posture. Idempotent: a pass over an already-converted table skips every row.
 --- @return boolean True when a pass is in flight.
 function M.migrate_stored_text()
+	if not Preferences.admit() then return false end
 	TextMigration.cancel()
 	return TextMigration.start(
 		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
@@ -1290,6 +1297,53 @@ end
 --- @return boolean
 function M.is_encrypt_enabled()
 	return _encrypt_enabled
+end
+
+--- Captures configuration without transient focus state or historical data.
+--- @return table|nil Detached native and desired posture; nil during conversion.
+function M.configuration_snapshot()
+	if TextMigration.is_running() then
+		Logger.error(LOG, "Collector configuration is owned by an active historical conversion.")
+		return nil
+	end
+	return {
+		enabled = _enabled,
+		private_filter_enabled = _private_filter_enabled,
+		secure_filter_enabled = _secure_filter_enabled,
+		system_auth_filter_enabled = _system_auth_filter_enabled,
+		encrypt = _encrypt_enabled,
+		cipher_enabled = TextCipher.is_enabled(),
+	}
+end
+
+--- Applies future capture policy without persistence or historical conversion.
+--- The scope owner retains the inverse if a cipher call mutates before refusal.
+--- @param candidate table Configuration snapshot to apply or restore.
+--- @return boolean acknowledged
+function M.apply_configuration(candidate)
+	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
+	for _, key in ipairs({ "enabled", "private_filter_enabled", "secure_filter_enabled",
+		"system_auth_filter_enabled", "encrypt", "cipher_enabled" }) do
+		if type(candidate[key]) ~= "boolean" then return false end
+	end
+	if TextCipher.is_enabled() ~= candidate.cipher_enabled then
+		if candidate.cipher_enabled and not TextCipher.is_available() then
+			Logger.error(LOG, "Collector configuration requires an unavailable cipher.")
+			return false
+		end
+		local called, acknowledged = pcall(TextCipher.set_enabled, candidate.cipher_enabled)
+		if not called or acknowledged ~= true or TextCipher.is_enabled() ~= candidate.cipher_enabled then
+			Logger.error(LOG, "Collector configuration cipher transition was not acknowledged.")
+			return false
+		end
+	end
+	_enabled = candidate.enabled
+	_private_filter_enabled = candidate.private_filter_enabled
+	_secure_filter_enabled = candidate.secure_filter_enabled
+	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
+	_encrypt_enabled = candidate.encrypt
+	Logger.debug(LOG, "Collector configuration applied without historical conversion.")
+	return true
 end
 
 --- Snapshot of the active privacy posture, for the menu and for diagnostics.

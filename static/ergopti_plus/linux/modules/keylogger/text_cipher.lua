@@ -155,9 +155,11 @@ end
 
 --- Turns at-rest encryption on or off.
 --- @param enabled boolean
+--- @return boolean acknowledged
 function M.set_enabled(enabled)
 	_enabled = (enabled == true)
 	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_enabled))
+	return true
 end
 
 --- Returns whether at-rest encryption is active.
