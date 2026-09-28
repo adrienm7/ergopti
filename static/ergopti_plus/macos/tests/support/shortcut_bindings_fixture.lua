@@ -22,22 +22,53 @@
 local helpers = require("tests.helpers")
 
 local M = {}
+local memory_source_serial = 0
 
 --- Selects explicit shortcut intent before a lifecycle test acquires handles.
 --- @param bindings table Fresh real bindings owner.
 function M.prefer_all(bindings)
-	local tap_keys = require("modules.shortcuts.tap_keys")
-	helpers.assert_eq(tap_keys.set_action("number_row_left", "screen_capture",
-		function(id) return id == "screen_capture" end), true)
-	helpers.assert_eq(bindings.pause_hotkeys_only(), true)
-	local count = 0
-	for _, entry in ipairs(bindings.list_shortcuts()) do
-		helpers.assert_eq(bindings.enable(entry.id), true)
-		helpers.assert_eq(bindings.is_bound(entry.id), false)
-		count = count + 1
+	-- Some lifecycle harnesses use real TapKeys, others inject its stateful double.
+	-- Configure either without allowing the real writer to reach the host config.
+	local files = require("adapters.file_system")
+	local paths = require("infra.config_paths")
+	local saved = { read = files.read_with_status, write = files.write,
+		conditional = files.write_if_unchanged, path = paths.get }
+	memory_source_serial = memory_source_serial + 1
+	local path = "bindings-fixture-config-" .. tostring(memory_source_serial)
+	local content
+	paths.get = function(name)
+		assert(name == "ConfigTomlPath", "unexpected fixture config path")
+		return path
 	end
-	helpers.assert_true(count > 0, "explicit preferences require a real registry")
-	helpers.assert_eq(bindings.release_pause_admission(), true)
+	files.read_with_status = function(candidate)
+		if candidate ~= path then return saved.read(candidate) end
+		return content, content and "ok" or "absent"
+	end
+	files.write = function() error("bindings fixture requires conditional publication") end
+	files.write_if_unchanged = function(candidate, encoded, expected)
+		assert(candidate == path, "unexpected fixture config write")
+		if expected.status ~= (content and "ok" or "absent")
+			or (expected.status == "ok" and expected.content ~= content) then return false end
+		content = encoded
+		return true
+	end
+	local ok, detail = xpcall(function()
+		local tap_keys = require("modules.shortcuts.tap_keys")
+		helpers.assert_eq(tap_keys.set_action("number_row_left", "screen_capture",
+			function(id) return id == "screen_capture" end), true)
+		helpers.assert_eq(bindings.pause_hotkeys_only(), true)
+		local count = 0
+		for _, entry in ipairs(bindings.list_shortcuts()) do
+			helpers.assert_eq(bindings.enable(entry.id), true)
+			helpers.assert_eq(bindings.is_bound(entry.id), false)
+			count = count + 1
+		end
+		helpers.assert_true(count > 0, "explicit preferences require a real registry")
+		helpers.assert_eq(bindings.release_pause_admission(), true)
+	end, debug.traceback)
+	files.read_with_status, files.write = saved.read, saved.write
+	files.write_if_unchanged, paths.get = saved.conditional, saved.path
+	if not ok then error(detail, 0) end
 end
 
 --- Runs a configured-user lifecycle scenario with every shortcut selected.
