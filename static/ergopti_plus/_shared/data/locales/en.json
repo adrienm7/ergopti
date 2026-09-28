@@ -821,6 +821,8 @@
 	"layout_manager.meta_licence": "Licence: %s",
 	"layout_manager.meta_version": "Version %s",
 	"layout_manager.meta_installed_version": "Installed version: %s",
+	"layout_manager.extension_content": "Optional content: %s hotstring packs, %s shortcut menus.",
+	"layout_manager.extension_opt_in": "Installing a layout does not enable this content. Enable it separately in the menus.",
 	"layout_manager.busy_install": "Installing…",
 	"layout_manager.busy_uninstall": "Uninstalling…",
 	"layout_manager.source_network": "Catalogue up to date.",

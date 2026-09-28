@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licença: %s",
 	"layout_manager.meta_version": "Versão %s",
 	"layout_manager.meta_installed_version": "Versão instalada: %s",
+	"layout_manager.extension_content": "Conteúdo opcional: %s pacotes de abreviaturas, %s menus de atalhos.",
+	"layout_manager.extension_opt_in": "Instalar um esquema não ativa este conteúdo. Ative-o separadamente nos menus.",
 	"layout_manager.busy_install": "A instalar…",
 	"layout_manager.busy_uninstall": "A desinstalar…",
 	"layout_manager.source_network": "Catálogo atualizado.",

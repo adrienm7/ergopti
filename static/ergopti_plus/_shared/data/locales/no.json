@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Lisens: %s",
 	"layout_manager.meta_version": "Versjon %s",
 	"layout_manager.meta_installed_version": "Installert versjon: %s",
+	"layout_manager.extension_content": "Valgfritt innhold: %s pakker med tekstsnarveier, %s hurtigtastmenyer.",
+	"layout_manager.extension_opt_in": "Installasjon av et oppsett aktiverer ikke dette innholdet. Aktiver det separat i menyene.",
 	"layout_manager.busy_install": "Installerer…",
 	"layout_manager.busy_uninstall": "Avinstallerer…",
 	"layout_manager.source_network": "Katalogen er oppdatert.",

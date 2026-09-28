@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Licentie: %s",
 	"layout_manager.meta_version": "Versie %s",
 	"layout_manager.meta_installed_version": "Geïnstalleerde versie: %s",
+	"layout_manager.extension_content": "Optionele inhoud: %s pakketten met tekstafkortingen, %s sneltoetsmenu’s.",
+	"layout_manager.extension_opt_in": "Het installeren van een indeling schakelt deze inhoud niet in. Schakel deze apart in via de menu’s.",
 	"layout_manager.busy_install": "Bezig met installeren…",
 	"layout_manager.busy_uninstall": "Bezig met verwijderen…",
 	"layout_manager.source_network": "Catalogus is bijgewerkt.",

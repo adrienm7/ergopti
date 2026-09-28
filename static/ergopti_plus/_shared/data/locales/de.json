@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "Lizenz: %s",
 	"layout_manager.meta_version": "Version %s",
 	"layout_manager.meta_installed_version": "Installierte Version: %s",
+	"layout_manager.extension_content": "Optionale Inhalte: %s Textkürzelpakete, %s Tastenkürzelmenüs.",
+	"layout_manager.extension_opt_in": "Die Installation eines Layouts aktiviert diese Inhalte nicht. Aktivieren Sie sie separat in den Menüs.",
 	"layout_manager.busy_install": "Wird installiert…",
 	"layout_manager.busy_uninstall": "Wird deinstalliert…",
 	"layout_manager.source_network": "Katalog ist aktuell.",

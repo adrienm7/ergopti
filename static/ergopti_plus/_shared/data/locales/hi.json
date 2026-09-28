@@ -826,6 +826,8 @@
 	"layout_manager.meta_licence": "लाइसेंस: %s",
 	"layout_manager.meta_version": "संस्करण %s",
 	"layout_manager.meta_installed_version": "इंस्टॉल किया गया संस्करण: %s",
+	"layout_manager.extension_content": "वैकल्पिक सामग्री: %s टेक्स्ट शॉर्टकट पैक, %s कीबोर्ड शॉर्टकट मेनू।",
+	"layout_manager.extension_opt_in": "लेआउट इंस्टॉल करने से यह सामग्री चालू नहीं होती। इसे मेनू में अलग से चालू करें।",
 	"layout_manager.busy_install": "इंस्टॉल हो रहा है…",
 	"layout_manager.busy_uninstall": "अनइंस्टॉल हो रहा है…",
 	"layout_manager.source_network": "कैटलॉग अद्यतन है।",
