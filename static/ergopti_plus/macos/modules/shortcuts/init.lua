@@ -339,7 +339,7 @@ end
 
 --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().
 --- @return boolean committed True only when both child starts committed.
-function M.resume_bindings(parent)
+function M.resume_bindings(parent, candidate)
 	local claim = binding_pause_claim(parent)
 	local owned_claim = binding_pause_claims[claim] == true
 	M.release_bindings_pause_claim(claim)
@@ -381,7 +381,9 @@ function M.resume_bindings(parent)
 		},
 		{
 			name = "keyboard_shortcuts",
-			start = KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start,
+			start = function()
+				return (KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start)(candidate)
+			end,
 			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
 		},
 	})
