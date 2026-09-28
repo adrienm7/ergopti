@@ -381,14 +381,14 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // ==================================================
 
 // The top-level order is a product decision, taken once for the three trays:
-// the keyboard and trackpad features first (Linux's kanata row takes the
-// Tap-Holds slot), then layout, hotstrings and AI, then metrics and the macOS
+// the keyboard and trackpad features first, including daemon-owned Tap-Holds
+// on Linux, then layout, hotstrings and AI, then metrics and the macOS
 // applications, then the configuration tail. The drivers build whatever the
 // manifest declares, so this is the one place a reordering of the manifest is
 // held to the decision rather than silently shipped. Changing the order means
 // changing this list, in the same commit and on purpose.
 const APPROVED_TOP_LEVEL = [
-	'tap_holds', 'kanata', 'shortcuts', 'gestures', SEPARATOR,
+	'tap_holds', 'shortcuts', 'gestures', SEPARATOR,
 	'keyboard_layout', 'hotstrings', 'llm', SEPARATOR,
 	'metrics', 'apps', SEPARATOR,
 	'configuration', 'language', 'updates', 'about', SEPARATOR,

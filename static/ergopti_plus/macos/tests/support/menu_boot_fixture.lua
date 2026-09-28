@@ -212,7 +212,9 @@ function M.boot(opts)
 	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["modules.dynamic_hotstrings"] = {}
-	package.loaded["modules.gestures"] = { SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = {} }
+	package.loaded["modules.gestures"] = {
+		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
+	}
 	package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() return true end }
 
 	local identity = function() return true end
@@ -233,9 +235,10 @@ function M.boot(opts)
 		stop = function() return true end,
 	}
 	package.loaded["modules.shortcuts"] = {
+		DEFAULT_STATE = { script_control_shortcuts = clone(state.script_control_shortcuts) },
 		is_paused = function() return false end,
 		set_on_pause_change = noop,
-		set_shortcut_action = noop,
+		set_shortcut_action = function() return true end,
 		set_extras = noop,
 		set_chatgpt_url = noop,
 		list_shortcuts = function() return {} end,
@@ -250,6 +253,14 @@ function M.boot(opts)
 
 	local runtime = { gestures = false }
 	fixture.runtime = runtime
+	local refuse_gesture_assignment_at = nil
+	fixture.gesture_assignment_refusals = 0
+	fixture.gesture_assignment_calls = 0
+	--- Refuses one setter boundary after a controlled number of calls.
+	--- @param count number Calls until refusal, including the refused call.
+	function fixture.refuse_gesture_assignment_after(count)
+		refuse_gesture_assignment_at = fixture.gesture_assignment_calls + count
+	end
 	local gestures = {
 		-- `runtime.refuse_enable` lets a case refuse ON after a successful boot.
 		enable_all = function()
@@ -266,7 +277,15 @@ function M.boot(opts)
 			return runtime.gestures
 		end,
 		get_action = function() return "none" end,
-		set_action = function() return true end,
+		set_action = function()
+			fixture.gesture_assignment_calls = fixture.gesture_assignment_calls + 1
+			if fixture.gesture_assignment_calls == refuse_gesture_assignment_at then
+				refuse_gesture_assignment_at = nil
+				fixture.gesture_assignment_refusals = fixture.gesture_assignment_refusals + 1
+				return false
+			end
+			return true
+		end,
 	}
 	local keymap = {
 		start = function() return true end,
