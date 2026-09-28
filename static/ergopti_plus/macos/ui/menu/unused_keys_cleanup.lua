@@ -42,6 +42,7 @@ function M.collect(decoded, mark)
 	require("infra.config_overrides").mark_config_reads(decoded, mark)
 	require("infra.preferences").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
+	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
 	require("ui.onboarding")._answers_from_config(decoded, mark)
 end
 

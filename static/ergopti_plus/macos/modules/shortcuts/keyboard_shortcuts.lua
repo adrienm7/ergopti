@@ -11,9 +11,9 @@
 --- FEATURES & RATIONALE:
 --- 1. Unified Registry: Reuses GestActions (gestures/actions.lua) so all action
 ---    labels, icons, and implementations stay in one place.
---- 2. Manifest Defaults: the shipped bindings are the features manifest's
----    shortcuts.keyboard entries for macOS (Ctrl+Space generates an AI
----    prediction); the user can override or clear any slot.
+--- 2. Manifest Defaults: absent assignments remain neutral. Canonical choices
+---    in config.toml are visible even with the master stopped; only start()
+---    acquires native chords for explicitly assigned catalogue slots.
 --- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
 ---    and rebuilt after any assignment change + reload. The OS call itself lives
 ---    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
@@ -27,11 +27,21 @@ local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
-local GestActions = require("modules.gestures.actions")
-local Storage     = require("adapters.storage")
+local GestActions = nil
+local Codec       = require("toml_codec")
+local Writer      = require("toml_codec.writer")
+local Preferences = require("infra.preferences")
+local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
 
 local LOG = "shortcuts.keyboard_shortcuts"
+
+-- Ownership inspection needs only key identities; action initialization belongs
+-- to assignment validation and delivery, not the cleanup reader.
+local function action_catalogue()
+	if GestActions == nil then GestActions = require("modules.gestures.actions") end
+	return GestActions
+end
 
 -- The binding a slot's action is dispatched under. Action parameters are stored
 -- under it too, so a menu that asks for one must use this spelling.
@@ -40,7 +50,8 @@ local BINDING_PREFIX = "keyboard__"
 local _hotkeys   = {}  -- slot_id → registrar handle
 local _actions   = {}  -- slot_id → action_id
 local _started   = false
-local _settings_prefix = "keyboard_shortcut_"
+local _loaded    = false
+local _editing = false
 local _delivery_enabled = false
 local _lifecycle_paused = false
 local _lifecycle_epoch = 0
@@ -166,6 +177,82 @@ local function catalogue_keys()
 	return _catalogue.keys
 end
 
+--- Reads the canonical source without migrating or consulting legacy storage.
+--- @return table decoded
+--- @return table source Exact classification for conditional publication.
+local function read_config()
+	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
+	assert(status == "ok" or status == "absent", "keyboard configuration unavailable: " .. tostring(detail))
+	local decoded = Codec.decode(content or "")
+	assert(type(decoded) == "table", "keyboard configuration is malformed")
+	return decoded, { status = status, content = content }
+end
+
+--- Builds exact host identities from the existing modifier and key catalogues.
+--- @return table index Set of canonical slot IDs.
+local function owned_slots()
+	local keys = assert(catalogue_keys(), "keyboard key catalogue unavailable")
+	local index = {}
+	for _, group in ipairs(SLOT_MODS) do
+		for _, key in ipairs(keys) do index[group[1] .. key.id] = true end
+	end
+	return index
+end
+
+local function walk_assignments(decoded, consume)
+	local shortcuts = decoded.shortcuts
+	if shortcuts == nil then return end
+	assert(type(shortcuts) == "table", "shortcuts must be a table")
+	local assignments = shortcuts.keyboard
+	if assignments == nil then return end
+	assert(type(assignments) == "table", "keyboard assignments must be a table")
+	local known = owned_slots()
+	for slot, action in pairs(assignments) do
+		if known[slot] then consume(slot, action) end
+	end
+end
+
+--- Loads a complete canonical candidate before replacing desired assignments.
+local function load_assignments()
+	local decoded = read_config()
+	local loaded = manifest_defaults()
+	walk_assignments(decoded, function(slot, action)
+		if type(action) == "string" and action_catalogue().is_assignable(action) then
+			loaded[slot] = action
+		else
+			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
+				slot, tostring(action), loaded[slot] or "none")
+		end
+	end)
+	_actions, _loaded = loaded, true
+end
+
+local function ensure_loaded()
+	if not _loaded then load_assignments() end
+end
+
+--- Marks only exact host slots consumed by the canonical loader.
+--- @param decoded table Parsed configuration.
+--- @param mark function Segment-based ownership collector.
+function M.mark_config_reads(decoded, mark)
+	walk_assignments(decoded, function(slot) mark("shortcuts", "keyboard", slot) end)
+end
+
+--- Lists disk and live owned slots for scoped restore/clear without a namespace sweep.
+--- @return table paths Sorted canonical leaf paths.
+function M.get_owned_config_paths()
+	local decoded, found = read_config(), {}
+	walk_assignments(decoded, function(slot) found[slot] = true end)
+	local known = owned_slots()
+	for slot, action in pairs(_actions) do
+		if known[slot] and action ~= "none" then found[slot] = true end
+	end
+	local result = {}
+	for slot in pairs(found) do result[#result + 1] = KEYBOARD_SECTION .. "." .. slot end
+	table.sort(result)
+	return result
+end
+
 --- Key id → display label, from the catalogue.
 --- @return table
 local function key_labels()
@@ -268,7 +355,7 @@ local function bind_slot(slot_id, action_id)
 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, current_action)
 		local ok_action, handled = Logger.callback(LOG,
 			"Configurable shortcut '" .. tostring(slot_id) .. "'",
-			GestActions.execute_single, current_action, M.binding_id(slot_id))
+			action_catalogue().execute_single, current_action, M.binding_id(slot_id))
 		if not ok_action then return false end
 		if handled ~= true then
 			Logger.error(LOG, "Configurable shortcut '%s' was not handled by action '%s'.",
@@ -312,37 +399,6 @@ local function set_slot_enabled(slot_id, enabled)
 	return false
 end
 
---- Reads the exact persisted value before a mutation.
---- @param key string
---- @return boolean ok
---- @return any value_or_error
-local function read_setting(key)
-	local ok, value = Storage.read_exact(key)
-	if not ok then
-		Logger.error(LOG, "Shortcut setting snapshot failed for '%s': %s.", key, tostring(value))
-		return false, value
-	end
-	return true, value
-end
-
---- Writes a value and restores the snapshot when the write raises after mutation.
---- @param key string
---- @param value any
---- @param snapshot any
---- @return boolean committed
-local function persist_setting(key, value, snapshot)
-	if Storage.set(key, value) == true then return true end
-
-	local restored = snapshot == nil and Storage.delete_exact(key) or Storage.set(key, snapshot)
-	if not restored then
-		Logger.error(LOG,
-			"Shortcut setting write failed for '%s'; snapshot restore also failed.", key)
-	else
-		Logger.error(LOG, "Shortcut setting write failed for '%s'; snapshot restored.", key)
-	end
-	return false
-end
-
 --- Releases the hotkey for a slot if active.
 --- @param slot_id string
 --- @return boolean settled True only when the native owner was released.
@@ -372,6 +428,7 @@ end
 --- Returns the full action→slot assignment table (slot_id → action_id).
 --- @return table
 function M.get_assignments()
+	ensure_loaded()
 	return _actions
 end
 
@@ -379,6 +436,7 @@ end
 --- @param slot_id string
 --- @return string action_id or "none".
 function M.get_action(slot_id)
+	ensure_loaded()
 	return _actions[slot_id] or "none"
 end
 
@@ -434,6 +492,7 @@ end
 --- @param prefix string
 --- @return table Array of { id, label, action } for assigned slots only.
 function M.assigned_slots(prefix)
+	ensure_loaded()
 	local out = {}
 	for _, slot in ipairs(M.available_slots(prefix)) do
 		local action = _actions[slot.id]
@@ -452,27 +511,26 @@ function M.binding_id(slot_id)
 end
 
 --- Configures the action for a slot without replacing an already-owned chord.
---- Persists the assignment in hs.settings so it survives reloads.
+--- Publishes the canonical sparse assignment only after native admission.
 --- @param slot_id string
 --- @param action_id string
-function M.set_action(slot_id, action_id)
+local function set_action(slot_id, action_id)
 	if type(slot_id) ~= "string" or type(action_id) ~= "string" then
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
 		return false
 	end
 	-- The same catalogue check the gesture slots and the Windows driver apply: an
 	-- unknown id would be persisted, bound, and then do nothing on every press.
-	if not GestActions.is_assignable(action_id) then
+	if not action_catalogue().is_assignable(action_id) then
 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action_id, slot_id)
 		return false
 	end
 	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
+	if not owned_slots()[slot_id] then return false end
+	ensure_loaded()
 	local old_action = _actions[slot_id] or "none"
-	if old_action == action_id then return true end
-
-	local setting_key = _settings_prefix .. slot_id
-	local snap_ok, persisted_snapshot = read_setting(setting_key)
-	if not snap_ok then return false end
+	local _, source = read_config()
+	local rows = Preferences.prepare_shortcut_updates(source, { Manifest.sparse_operation(KEYBOARD_SECTION .. "." .. slot_id, action_id) })
 
 	local native_transition = nil
 	if _started and old_action == "none" and action_id ~= "none" then
@@ -483,7 +541,7 @@ function M.set_action(slot_id, action_id)
 		native_transition = "disabled"
 	end
 
-	if persist_setting(setting_key, action_id, persisted_snapshot) ~= true then
+	if Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source) ~= true then
 		if native_transition == "enabled" then
 			if set_slot_enabled(slot_id, false) ~= true then
 				Logger.error(LOG,
@@ -506,40 +564,17 @@ function M.set_action(slot_id, action_id)
 	return true
 end
 
---- Loads persisted assignments from hs.settings, seeding defaults first.
-local function load_assignments()
-	-- Seed the manifest defaults; a stored value, "none" included, overrides one.
-	for slot, action in pairs(manifest_defaults()) do
-		if GestActions.is_assignable(action) then
-			_actions[slot] = action
-		else
-			Logger.error(LOG, "Manifest default '%s' for slot '%s' is not in the catalogue — left unbound.",
-				action, slot)
-		end
-	end
-	-- Apply user overrides from hs.settings
-	-- We iterate over all known SG action names to find relevant settings keys.
-	-- Any slot that has been set via M.set_action() will be in hs.settings.
-	-- Since slot ids are open-ended (any modifier+key), we read all settings
-	-- with our prefix and apply them.
-	local all_settings = Storage.keys()
-	local prefix_len = #_settings_prefix
-	for _, k in ipairs(all_settings) do
-		if k:sub(1, prefix_len) == _settings_prefix then
-			local slot = k:sub(prefix_len + 1)
-			local val  = Storage.get(k)
-			-- The check set_action applies, applied to what was stored: an id the
-			-- catalogue does not offer (hand-edited, or retired by an update)
-			-- would bind the chord to a no-op. Windows drops it at load the same
-			-- way and keeps the slot's default.
-			if type(val) == "string" and GestActions.is_assignable(val) then
-				_actions[slot] = val
-			elseif type(val) == "string" then
-				Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
-					slot, val, _actions[slot] or "none")
-			end
-		end
-	end
+--- Serializes one domain edit across native acquisition and exact-source publication.
+--- @param slot_id string Canonical catalogue slot.
+--- @param action_id string Catalogue action identifier.
+--- @return boolean committed
+function M.set_action(slot_id, action_id)
+	if _editing then return false end
+	_editing = true
+	local called, committed = xpcall(set_action, debug.traceback, slot_id, action_id)
+	_editing = false
+	if not called then Logger.error(LOG, "Keyboard assignment failed: %s.", tostring(committed)) end
+	return called and committed == true
 end
 
 --- Starts the keyboard shortcuts module and owns every configured binding.
