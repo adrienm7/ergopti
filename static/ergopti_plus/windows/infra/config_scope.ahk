@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Scoped Configuration Lifecycle
 ; DESCRIPTION:
-; Publishes one manifest-owned config.toml scope through the admitted builder and
-; existing conditional WAL. The terminal bundle survives until reload completion
-; or verified rollback. Separate-file presets require a different coordinator.
+; Publishes manifest-owned settings and detached file-owner images through the
+; admitted builder and existing conditional WAL. The terminal bundle survives
+; until reload completion or verified rollback of the complete cohort.
 ; ==============================================================================
 
 /**
@@ -23,13 +23,19 @@ ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
 		throw TypeError("Scoped configuration requires explicit owner maps.")
 	Owners := Options.Get("owners", Map("action_parameter_domain", ConfigScopeActionParameterDomain))
 	Plan := ManifestScopePlan(ScopeId, Mode, [], Owners)
-	if Plan.presets.Length
-		throw ValueError("This scope requires a separate-file preset coordinator.")
+	PresetOwner := Options.Get("preset_owner", 0)
+	if Plan.presets.Length {
+		if !(PresetOwner is TapHoldScopeOwner) || ScopeId != "tap_holds"
+				|| Plan.presets.Length != 1 || Plan.presets[1].preset != "tap_hold"
+				|| PresetOwner.mode != Mode
+			throw ValueError("This scope requires its matching separate-file preset owner.")
+	} else if !(PresetOwner is Integer) || PresetOwner != 0
+		throw ValueError("This scope does not declare a separate-file preset.")
 	Operations() {
 		Inventory := ManifestScopeInventory(ScopeId, Providers, Owners)
 		return ManifestScopePlan(ScopeId, Mode, Inventory, Owners).operations
 	}
-	return ConfigScopeCommitOperations(ScopeId, Mode, Operations, Options)
+	return ConfigScopeCommitOperations(ScopeId, Mode, Operations, Options, PresetOwner)
 }
 
 /**

@@ -43,13 +43,17 @@
 _THRD_ButtonsAreCommands() {
 	Body := _DriverFuncBody("_BuildTapHoldsSubmenu")
 	Assert(Body != "", "_BuildTapHoldsSubmenu must be present in the driver source")
+	Commands := _DriverFuncBody("_TH_ScopeCommands")
+	Assert(Commands != "", "the terminal command provider must exist")
+	Assert(InStr(Body, "_TH_ScopeCommands()") > 0,
+		"the menu must consume its tested terminal command map")
 
 	; Both buttons reach the renderer as named commands. A `command` row is drawn
 	; by the renderer's _MR_RenderRows path, which registers it — the
 	; driver never adds it, so it cannot add it raw.
 	for _, Id in ["reset_defaults", "disable_all"] {
-		Assert(InStr(Body, Chr(34) . Id . Chr(34)) > 0,
-			"_BuildTapHoldsSubmenu must pass '" . Id . "' to the renderer as a command (HIGH-07)")
+		Assert(InStr(Commands, Chr(34) . Id . Chr(34)) > 0,
+			"the terminal provider must pass '" . Id . "' to the renderer as a command (HIGH-07)")
 	}
 	Assert(!InStr(Body, "RegisterMenuItem("),
 		"_BuildTapHoldsSubmenu must not register rows itself — the renderer owns the menu shape")

@@ -39,12 +39,7 @@
 ; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
 ; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
-	Commands := Map(
-		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
-		"reset_defaults",  _TH_ResetAllToDefaults,
-		"disable_all",     _TH_DisableAll,
-		"edit_nav_layer", LayerEditor_Open
-	)
+	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map("tap_hold_keys", (*) => _TH_KeyRows())
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
@@ -403,4 +398,14 @@ _TH_ReloadTapHoldMenu(Reason, KeyId := "") {
 		return false
 	}
 	return 1
+}
+
+; Existing shared menu identities now reach one compensated two-file owner.
+_TH_ScopeCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
+		"reset_defaults", (*) => TapHoldScopeApply("recommended", OwnedOptions),
+		"disable_all", (*) => TapHoldScopeApply("clear", OwnedOptions),
+		"edit_nav_layer", LayerEditor_Open)
 }
