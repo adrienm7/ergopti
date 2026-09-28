@@ -18,14 +18,14 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 --- @param backend string "api" or "ollama"
 --- @param entry table|nil The active API entry.
 --- @return table engine, table calls, table scheduler, function restore
-local function load(backend, entry, stored_settings)
+local function load(backend, entry, stored_settings, without_local_model)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local calls = { ollama = {}, remote = {} }
+	local calls = { ollama = {}, remote = {}, notices = {} }
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
@@ -47,7 +47,7 @@ local function load(backend, entry, stored_settings)
 	package.loaded["modules.llm.profiles"] = {
 		init = function() end,
 		is_enabled = function() return true end,
-		get_current_model = function() return "ollama-model" end,
+		get_current_model = function() if not without_local_model then return "ollama-model" end end,
 		get_base_url = function() return "http://127.0.0.1:11434" end,
 	}
 	package.loaded["modules.llm.profile_settings"] = {
@@ -68,7 +68,11 @@ local function load(backend, entry, stored_settings)
 		for _ = 1, 10 do scheduler.test.advance(0.6) end
 	end
 	local engine = helpers.load_module("modules.llm.prediction_engine")
-	engine.init({ scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end })
+	engine.init({
+		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
+		engine = { current_buffer = function() return "Bonjour à tous" end },
+		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
+	})
 	return engine, calls, scheduler, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		package.loaded["modules.llm.prediction_engine"] = nil
@@ -77,6 +81,33 @@ local function load(backend, entry, stored_settings)
 end
 
 helpers.describe("prediction backend: the selected backend answers", function()
+
+	helpers.it("manual API prediction works without a local model (manual-selected-backend)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, true)
+		local ok, err = pcall(function()
+			helpers.assert_eq(engine.trigger_now(), true, "the selected API is ready without Ollama")
+			scheduler.settle()
+			helpers.assert_eq(#calls.remote, 3, "the real prediction pipeline reaches the selected API")
+			helpers.assert_eq(calls.remote[1].target, ENTRY)
+			helpers.assert_eq(#calls.ollama, 0)
+			helpers.assert_eq(#calls.notices, 0)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("manual API prediction refuses an absent API entry despite a local model (manual-selected-backend)", function()
+		local engine, calls, scheduler, restore = load("api", nil)
+		local ok, err = pcall(function()
+			helpers.assert_eq(engine.trigger_now(), false, "a local model cannot satisfy API admission")
+			scheduler.settle()
+			helpers.assert_eq(#calls.remote + #calls.ollama, 0)
+			helpers.assert_eq(#calls.notices, 1, "the refusal must reach the visible notice surface")
+			helpers.assert_eq(calls.notices[1], require("infra.i18n").get("llm.manual_prediction.backend_not_ready"))
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("sends to the active API entry, with the provider's default model", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY)

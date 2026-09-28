@@ -43,6 +43,7 @@ local function fixture(state)
 		init = function() end,
 		is_enabled = function() return state.enabled ~= false end,
 		get_current_model = function() return state.model end,
+		get_base_url = function() return "http://127.0.0.1:11434" end,
 	})
 	if state.ollama == false then
 		-- An Ollama client that cannot load: the engine requires it through pcall.
