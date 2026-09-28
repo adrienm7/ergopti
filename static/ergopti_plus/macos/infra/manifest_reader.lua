@@ -61,6 +61,13 @@ local function load_manifest()
 end
 
 local _manifest = load_manifest()
+-- Resolve the existing hardware choice before any default, scope or sparse projection.
+for _, entry in ipairs(_manifest.features) do
+	if entry.path == "llm.models.selected" then
+		local backend = require("modules.llm.backend_detector").auto_default()
+		entry.default, entry.recommended = backend, backend
+	end
+end
 local _defaults = require("config_defaults").new(_manifest)
 
 -- Path index built once at load for O(1) lookups.
