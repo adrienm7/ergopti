@@ -275,11 +275,13 @@ local function load_assignments()
 		return
 	end
 	for slot, action in pairs(manifest_defaults()) do
-		if Gestures.is_assignable(action) then
-			_assignments[slot] = action
-		else
-			Logger.error(LOG, "Manifest default '%s' for %s is not in the catalogue — left unbound.",
-				action, slot)
+		if action ~= "none" then
+			if Gestures.is_assignable(action) then
+				_assignments[slot] = action
+			else
+				Logger.error(LOG, "Manifest default '%s' for %s is not in the catalogue — left unbound.",
+					action, slot)
+			end
 		end
 	end
 	for _, key in ipairs(Storage.keys()) do
