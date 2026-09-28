@@ -233,3 +233,61 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 		helpers.assert_true(ok, tostring(err))
 	end)
 end)
+
+helpers.describe("Tap-key configuration admission", function()
+	for _, scenario in ipairs({ "ordinary rebind", "owned dispatch", "released generation", "new generation", "paused drain" }) do
+		helpers.it("keeps " .. scenario .. " bounded by the actual tap dispatcher", function()
+			local subject, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
+			local ok, err = pcall(function()
+				local code
+				for _, key in ipairs(subject.keys()) do if key.id == "number_row_left" then code = key.linux end end
+				helpers.assert_not_nil(code)
+				local detail = { code = code, mods = {} }
+				helpers.assert_true(subject.on_key(detail))
+				log.deferred[1]()
+				helpers.assert_eq(table.concat(log.executed), "screen_capture@tap_key__number_row_left")
+				log.executed = {}
+				helpers.assert_true(subject.on_key(detail))
+				if scenario == "paused drain" then
+					log.active = false
+					log.deferred[2]()
+					helpers.assert_eq(#log.executed, 0, "pause after queuing must prevent the native action")
+					return
+				end
+				if scenario == "ordinary rebind" then
+					helpers.assert_true(subject.set_action("number_row_left", "send_text"))
+					log.deferred[2]()
+					helpers.assert_eq(#log.executed, 0, "an old assignment must not execute after a successful edit")
+					helpers.assert_true(subject.on_key(detail))
+					log.deferred[3]()
+					helpers.assert_eq(table.concat(log.executed), "send_text@tap_key__number_row_left")
+					return
+				end
+				local token = {}
+				local before = Sandbox.read_bytes(log.path)
+				helpers.assert_true(subject.acquire_configuration(token))
+				helpers.assert_eq(subject.acquire_configuration({}), false)
+				helpers.assert_eq(subject.acquire_configuration(token), false)
+				helpers.assert_eq(subject.release_configuration({}), false)
+				helpers.assert_eq(subject.set_action("number_row_left", "send_text"), false)
+				helpers.assert_eq(Sandbox.read_bytes(log.path), before)
+				helpers.assert_eq(subject.init({ is_active = function() return true end, defer = function() return true end }), false)
+				helpers.assert_eq(subject.on_key(detail), false)
+				helpers.assert_eq(#log.deferred, 2)
+				if scenario == "owned dispatch" then log.deferred[2]() end
+				helpers.assert_eq(#log.executed, 0)
+				helpers.assert_true(subject.release_configuration(token))
+				helpers.assert_eq(subject.release_configuration(token), false)
+				log.deferred[2]()
+				helpers.assert_eq(#log.executed, 0, "release must not replay canceled callbacks")
+				if scenario == "new generation" then
+					helpers.assert_true(subject.on_key(detail))
+					log.deferred[3]()
+					helpers.assert_eq(table.concat(log.executed), "screen_capture@tap_key__number_row_left")
+				end
+			end)
+			log.restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+end)

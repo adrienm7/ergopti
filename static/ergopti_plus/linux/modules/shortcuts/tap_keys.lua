@@ -61,6 +61,28 @@ local _is_active = NEVER_ACTIVE
 
 -- Injected by init(): queues a function for the next loop tick.
 local _defer = nil
+local _configuration_owner = nil
+local _dispatch_generation = 0
+
+--- Exclusively owns mutations and cancels previously queued actions.
+--- @param owner table Exact token retained through runtime compensation.
+--- @return boolean acquired
+function M.acquire_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= nil then return false end
+	_configuration_owner = owner
+	_dispatch_generation = _dispatch_generation + 1
+	return true
+end
+
+--- Releases the same owner without reviving its canceled callbacks.
+--- @param owner table Exact acquisition token.
+--- @return boolean released
+function M.release_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= owner then return false end
+	_configuration_owner = nil
+	return true
+end
+
 
 
 
@@ -178,6 +200,7 @@ end
 --- @param action_id string
 --- @return boolean Whether the assignment was stored.
 function M.set_action(id, action_id)
+	if _configuration_owner ~= nil then return false end
 	load_assignments()
 	if _assignments[id] == nil then
 		Logger.error(LOG, "set_action(): '%s' is not a tap key — nothing bound.", tostring(id))
@@ -198,6 +221,7 @@ function M.set_action(id, action_id)
 		return false
 	end
 	_assignments[id] = action_id
+	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Tap key '%s' → '%s'.", id, action_id)
 	return true
 end
@@ -215,6 +239,7 @@ end
 --- Wires the daemon's state in.
 --- @param opts table { is_active = fn() -> boolean, defer = fn(fn) -> boolean }
 function M.init(opts)
+	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_active) ~= "function" or type(opts.defer) ~= "function" then
 		error("tap_keys.init() needs is_active and defer functions")
 	end
@@ -227,6 +252,7 @@ end
 --- @return boolean consumed True when the press ran a tap key's action and
 ---   must not reach the application.
 function M.on_key(detail)
+	if _configuration_owner ~= nil then return false end
 	if type(detail) ~= "table" or type(detail.code) ~= "number" then return false end
 	local id = nil
 	for _, key in ipairs(M.keys()) do
@@ -243,7 +269,9 @@ function M.on_key(detail)
 		Logger.error(LOG, "Tap key '%s' pressed before init() — the key is typed instead.", id)
 		return false
 	end
+	local generation = _dispatch_generation
 	local queued = _defer(function()
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation or not _is_active() then return end
 		local Gestures = action_catalogue()
 		if not Gestures then return end
 		Logger.debug(LOG, "Tap key '%s' fired → '%s'.", id, action)
@@ -292,6 +320,8 @@ end
 
 --- Test seam: forgets what was loaded.
 function M._reset()
+	_configuration_owner = nil
+	_dispatch_generation = _dispatch_generation + 1
 	_keys = nil
 	_assignments = nil
 	_is_active = NEVER_ACTIVE

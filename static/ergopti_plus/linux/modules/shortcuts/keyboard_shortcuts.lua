@@ -119,6 +119,28 @@ local _assignments = {}
 
 -- Whether the assignments have been read back from config.toml.
 local _loaded = false
+local _configuration_owner = nil
+local _dispatch_generation = 0
+
+--- Exclusively owns mutations and cancels previously queued actions.
+--- @param owner table Exact token retained through runtime compensation.
+--- @return boolean acquired
+function M.acquire_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= nil then return false end
+	_configuration_owner = owner
+	_dispatch_generation = _dispatch_generation + 1
+	return true
+end
+
+--- Releases the same owner without reviving its canceled callbacks.
+--- @param owner table Exact acquisition token.
+--- @return boolean released
+function M.release_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= owner then return false end
+	_configuration_owner = nil
+	return true
+end
+
 
 
 
@@ -361,6 +383,7 @@ end
 --- @param action_id string
 --- @return boolean Whether the assignment was stored.
 function M.set_action(slot_id, action_id)
+	if _configuration_owner ~= nil then return false end
 	if not owns_slot(slot_id) then
 		Logger.error(LOG, "set_action(): '%s' is not a slot this driver knows — nothing bound.",
 			tostring(slot_id))
@@ -381,6 +404,7 @@ function M.set_action(slot_id, action_id)
 			return false
 		end
 		_assignments[slot_id] = nil
+		_dispatch_generation = _dispatch_generation + 1
 		Logger.info(LOG, "Unbound %s.", M.get_slot_label(slot_id))
 		return true
 	end
@@ -405,6 +429,7 @@ function M.set_action(slot_id, action_id)
 		return false
 	end
 	_assignments[slot_id] = action_id
+	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Bound %s → %s.", M.get_slot_label(slot_id), action_id)
 	return true
 end
@@ -539,6 +564,7 @@ end
 --- @param opts table|nil { only_script = boolean }
 --- @return boolean fired, string|nil slot_id
 function M.dispatch(detail, opts)
+	if _configuration_owner ~= nil then return false, nil end
 	local hit = match(detail, type(opts) == "table" and opts.only_script == true)
 	if not hit then return false, nil end
 	if hit.held_back then
@@ -562,13 +588,18 @@ end
 --- @param opts table { only_script = boolean, defer = function(fn): boolean }
 --- @return boolean consumed, string|nil slot_id
 function M.consume(detail, opts)
+	if _configuration_owner ~= nil then return false, nil end
 	if type(opts) ~= "table" or type(opts.defer) ~= "function" then
 		Logger.error(LOG, "consume(): no deferral seam — bound chords reach the application.")
 		return false, nil
 	end
 	local hit = match(detail, opts.only_script == true)
 	if not hit or hit.held_back then return false, nil end
-	if opts.defer(function() fire(hit) end) ~= true then
+	local generation = _dispatch_generation
+	if opts.defer(function()
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
+		fire(hit)
+	end) ~= true then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
 		return false, nil
 	end
@@ -596,6 +627,8 @@ end
 
 --- Test seam: forgets what was loaded so a fresh storage can be read.
 function M._reset()
+	_configuration_owner = nil
+	_dispatch_generation = _dispatch_generation + 1
 	_assignments = {}
 	_loaded = false
 	_catalogue = nil
