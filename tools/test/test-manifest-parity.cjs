@@ -581,17 +581,25 @@ const scopeFixture = { probe: { prefixes: [], restore_exclude: [], dynamic_defau
 	{ prefix: 'enabled', depth: 1, default: false, recommended: true },
 	{ prefix: 'delay', depth: 1, default: 0, recommended: 0 },
 	{ prefix: 'fraction', depth: 1, default: 0, recommended: 0.5 },
-	{ prefix: 'name', depth: 1, default: '', recommended: 'chosen' }
+	{ prefix: 'name', depth: 1, default: '', recommended: 'chosen' },
+	{ prefix: 'mods', depth: 1, default: [], recommended: ['ctrl'] }
 ] } };
 const typed = normalizeScopes(scopeFixture).probe.dynamic_defaults;
 test('dynamic scope types preserve booleans, integers, floats and strings',
-	JSON.stringify(typed.map(row => row.type)) === JSON.stringify(['boolean', 'integer', 'number', 'string']));
+	JSON.stringify(typed.map(row => row.type)) === JSON.stringify(['boolean', 'integer', 'number', 'string', 'array']));
 test('scope normalization does not mutate canonical input', scopeFixture.probe.dynamic_defaults[0].type === undefined);
 for (const patch of [{ recommended: 0 }, { type: 'integer' }, { default: {} }, { default: NaN }]) {
 	let refused = false;
 	try { normalizeScopes({ probe: { dynamic_defaults: [{ ...scopeFixture.probe.dynamic_defaults[0], ...patch }] } }); }
 	catch { refused = true; }
 	test('inconsistent dynamic default metadata is refused: ' + JSON.stringify(patch), refused);
+}
+for (const values of [[[], false], [[{}], []], [[], [["nested"]]], [[Infinity], []]]) {
+	let refused = false;
+	try { normalizeScopes({ probe: { dynamic_defaults: [{ prefix: 'mods', depth: 1,
+		default: values[0], recommended: values[1] }] } }); }
+	catch { refused = true; }
+	test('invalid dynamic arrays are refused: ' + JSON.stringify(values), refused);
 }
 for (const parameters of [{ domains: ['gesture'], restore: 'keep' },
 	{ domains: ['unknown'], restore: 'remove' }, { domains: ['gesture', 'gesture'], restore: 'remove' },

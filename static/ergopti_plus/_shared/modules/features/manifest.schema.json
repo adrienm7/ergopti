@@ -48,10 +48,10 @@
 							"prefix": { "type": "string" },
 							"depth": { "type": "integer", "minimum": 1 },
 							"suffix": { "type": "string" },
-							"type": { "enum": ["boolean", "integer", "number", "string"],
+							"type": { "enum": ["boolean", "integer", "number", "string", "array"],
 								"description": "Derived from neutral and recommended source values by the generator." },
-							"default": { "type": ["boolean", "number", "string"] },
-							"recommended": { "type": ["boolean", "number", "string"] }
+							"default": { "type": ["boolean", "number", "string", "array"], "items": { "type": ["boolean", "number", "string"] } },
+							"recommended": { "type": ["boolean", "number", "string", "array"], "items": { "type": ["boolean", "number", "string"] } }
 						}
 					}
 				}

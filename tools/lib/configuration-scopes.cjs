@@ -6,7 +6,7 @@ const schema = require('../../static/ergopti_plus/_shared/modules/features/manif
 const parameterShape = schema.$defs.configuration_scope.properties.action_parameters;
 
 /**
- * Derives generated scalar types before AHK represents false and zero alike.
+ * Derives generated value types before AHK represents false and zero alike.
  * The source values remain authoritative; conflicting explicit types are errors.
  * @param {object} scopes Canonical scope declarations.
  * @returns {object} Detached scope metadata with typed dynamic defaults.
@@ -23,8 +23,12 @@ function normalizeScopes(scopes) {
 			throw new Error(`Invalid action parameter ownership in scope ${scope}`);
 		}
 		for (const entry of declaration.dynamic_defaults || []) {
-			const kind = typeof entry.default;
-			if (!['boolean', 'number', 'string'].includes(kind) || typeof entry.recommended !== kind ||
+			const kindOf = value => Array.isArray(value) ? 'array' : typeof value;
+			const scalar = value => ['boolean', 'string'].includes(typeof value) ||
+				(typeof value === 'number' && Number.isFinite(value));
+			const kind = kindOf(entry.default);
+			if (!['boolean', 'number', 'string', 'array'].includes(kind) || kindOf(entry.recommended) !== kind ||
+				(kind === 'array' && (!entry.default.every(scalar) || !entry.recommended.every(scalar))) ||
 				(kind === 'number' && (!Number.isFinite(entry.default) || !Number.isFinite(entry.recommended)))) {
 				throw new Error(`Invalid dynamic default values in scope ${scope}: ${entry.prefix}`);
 			}
