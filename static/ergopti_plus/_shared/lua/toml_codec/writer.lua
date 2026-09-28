@@ -40,6 +40,8 @@ end
 local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
 local BasicString = require("toml_codec.basic_string")
+local RecordScanner = require("toml_codec.record_scanner")
+local Codec = require("toml_codec.codec")
 
 
 
@@ -64,6 +66,7 @@ local _refused_writes = {}
 -- this build's version and a later boot never mistakes it for an unstamped,
 -- older file.
 local _create_rows = {}
+local _sparse_defaults = {}
 
 --- The refusal registry key: one spelling per path, whatever the separators.
 --- @param path string
@@ -230,7 +233,7 @@ local function publish_content(path, content, file_adapter, expected_source)
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
 	end
-	if type(file_adapter) == "table" and type(file_adapter.write) == "function" then
+	if type(file_adapter) == "table" then
 		if type(expected_source) == "table" then
 			local current, current_status, current_detail = read_existing(path, file_adapter)
 			if current_status ~= expected_source.status
@@ -248,6 +251,9 @@ local function publish_content(path, content, file_adapter, expected_source)
 			and type(file_adapter.write_if_unchanged) == "function"
 			and file_adapter.write_if_unchanged
 			or file_adapter.write
+		if type(publisher) ~= "function" then
+			return false, "explicit file adapter has no compatible publication method"
+		end
 		local call_ok, written, write_detail = pcall(publisher, path, content, expected_source)
 		if call_ok and written == true then return true end
 		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
@@ -457,19 +463,25 @@ end
 -- ===== 3.2) Batch Write Method =====
 -- ===================================
 
---- Writes or updates a set of key/value pairs in a simple INI-style TOML file
+--- Prepares updates to a simple INI-style TOML file without publishing it
 --- (the driver config.toml used by config_overrides and the onboarding wizard).
 --- Each entry in `updates` is a table `{section, key, value}` where:
 ---   - `section` is the TOML section header without brackets, e.g. `"Script"`.
 ---   - `key`     is the bare key name, e.g. `"Locale"`.
 ---   - `value`   is a Lua string, boolean, or number — serialised to TOML.
+---   - `delete = true` removes the complete assignment instead of setting it.
 ---
 --- Existing keys in the file are updated in-place; new sections and keys are
 --- appended. Lines not matching any update are preserved verbatim.
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
---- @return boolean, string|nil True on success, or false and an error string.
-function M.batch_write(path, updates, file_adapter)
+--- @param file_adapter table|nil Classified platform file adapter.
+--- @param expected_source table|nil Exact source precondition.
+--- @return boolean prepared
+--- @return string|nil detail
+--- @return string|nil content Candidate bytes.
+--- @return table|nil source Exact publication precondition.
+function M.prepare_batch(path, updates, file_adapter, expected_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "batch_write: invalid path.")
 		return false, "Invalid path."
@@ -482,7 +494,28 @@ function M.batch_write(path, updates, file_adapter)
 	-- Validate the complete batch before acquiring the source snapshot. A bad
 	-- row must be a typed refusal with zero filesystem side effects, and two
 	-- rows must never compete for the same logical TOML key.
-	local lookup = {}
+	local lookup, normalized = {}, {}
+	local defaults = _sparse_defaults[refusal_key(path)]
+	local function valid_value(value, visiting)
+		local kind = type(value)
+		if kind == "string" or kind == "boolean" or kind == "number" then return true end
+		if kind ~= "table" or visiting[value] then return false end
+		visiting[value] = true
+		local count, numeric = 0, false
+		for key, child in pairs(value) do
+			count = count + 1
+			if type(key) == "number" then
+				if key < 1 or key % 1 ~= 0 then return false end
+				numeric = true
+			elseif type(key) ~= "string" then return false end
+			if not valid_value(child, visiting) then return false end
+		end
+		if numeric then
+			for index = 1, count do if value[index] == nil then return false end end
+		end
+		visiting[value] = nil
+		return true
+	end
 	local function reject_row(index, reason)
 		local detail = "Invalid update row at index " .. tostring(index) .. ": " .. reason
 		Logger.error(LOG, "batch_write: %s.", detail)
@@ -496,10 +529,19 @@ function M.batch_write(path, updates, file_adapter)
 		if type(u.key) ~= "string" or u.key == "" then
 			return reject_row(index, "key must be a non-empty string")
 		end
-		local value_type = type(u.value)
-		if value_type ~= "string" and value_type ~= "boolean" and value_type ~= "number" then
-			return reject_row(index, "value must be a string, boolean, or number")
+		if u.delete ~= nil and u.delete ~= true then
+			return reject_row(index, "delete must be true when present")
 		end
+		if u.delete == true and u.value ~= nil then
+			return reject_row(index, "delete and value are mutually exclusive")
+		end
+		if not u.delete and not valid_value(u.value, {}) then
+			return reject_row(index, "value must contain only TOML scalars, dense arrays, or dictionaries")
+		end
+		if defaults and not u.delete and defaults.has_default(u.section .. "." .. u.key) then
+			u = defaults.sparse_operation(u.section .. "." .. u.key, u.value)
+		end
+		normalized[#normalized + 1] = u
 
 		local sl = u.section:lower()
 		local kl = u.key:lower()
@@ -507,14 +549,10 @@ function M.batch_write(path, updates, file_adapter)
 		if lookup[sl][kl] then return reject_row(index, "logical key is duplicated") end
 		lookup[sl][kl] = u
 	end
+	updates = normalized
 
 	-- Serialise a Lua value to a TOML literal
-	local function to_toml_value(v)
-		if type(v) == "boolean" then return v and "true" or "false" end
-		if type(v) == "number"  then return tostring(v) end
-		-- String: quote and escape
-		return "\"" .. BasicString.escape_body(tostring(v)) .. "\""
-	end
+	local to_toml_value = Codec.encode_value
 
 	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
@@ -522,6 +560,16 @@ function M.batch_write(path, updates, file_adapter)
 	if read_status == "error" then
 		Logger.error(LOG, "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
 		return false, tostring(read_detail)
+	end
+	if expected_source ~= nil then
+		if type(expected_source) ~= "table" or expected_source.status ~= read_status
+			or (read_status == "ok" and expected_source.content ~= source) then
+			return false, "source changed before preparing the batch"
+		end
+	end
+	local decoded_ok, decoded = pcall(Codec.decode, source or "")
+	if not decoded_ok or type(decoded) ~= "table" then
+		return false, "the existing destination is not valid TOML"
 	end
 	if read_status == "absent" then
 		source = ""
@@ -539,27 +587,19 @@ function M.batch_write(path, updates, file_adapter)
 			updates = seeds
 		end
 	end
-	for line in (source .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
-	if #lines == 1 and lines[1] == "" then lines = {} end
-
-	-- Walk existing lines, replacing matching key lines in-place
-	local current_section = ""
-	local applied = {}   -- Tracks which updates were already applied
-	for idx, line in ipairs(lines) do
-		local trimmed = line:match("^%s*(.-)%s*$") or ""
-		-- Section header
-		local hdr = trimmed:match("^%[([^%[%]]+)%]$")
-		if hdr then
-			current_section = hdr:lower()
-		else
-			local key = trimmed:match("^([%w_%-]+)%s*=")
-			if key then
-				local kl = key:lower()
-				local bucket = lookup[current_section]
-				if bucket and bucket[kl] then
-					local u = bucket[kl]
-					lines[idx] = u.key .. " = " .. to_toml_value(u.value)
-					applied[current_section .. "\0" .. kl] = true
+	local scanned, scan_error = RecordScanner.scan_records(source)
+	if not scanned then return false, scan_error end
+	local applied, replacements, removed = {}, {}, {}
+	for _, record in ipairs(scanned.records) do
+		if record.addressable then
+			local sl, kl = record.section:lower(), record.key:lower()
+			local u = lookup[sl] and lookup[sl][kl]
+			if u then
+				applied[sl .. "\0" .. kl] = true
+				for index = record.first, record.last do removed[index] = true end
+				if not u.delete then
+					replacements[record.first] = u.key .. " = " .. to_toml_value(u.value)
+						.. scanned.lines[record.last].eol
 				end
 			end
 		end
@@ -572,8 +612,39 @@ function M.batch_write(path, updates, file_adapter)
 		local sl = u.section:lower()
 		local kl = u.key:lower()
 		if not applied[sl .. "\0" .. kl] then
+			local node = decoded
+			for segment in u.section:gmatch("[^%.]+") do
+				node = type(node) == "table" and node[segment] or nil
+			end
+			if type(node) == "table" and node[u.key] ~= nil then
+				return false, "the batch cannot address an existing quoted or nested key"
+			end
+		end
+		if not u.delete and not applied[sl .. "\0" .. kl] then
 			if not pending[u.section] then pending[u.section] = {} end
 			pending[u.section][#pending[u.section] + 1] = u
+		end
+	end
+
+	local insertions = {}
+	for _, header in ipairs(scanned.headers) do
+		if header.section and not header.array then
+			for section, entries in pairs(pending) do
+				if section:lower() == header.section:lower() then
+					insertions[header.index] = entries
+					pending[section] = nil
+				end
+			end
+		end
+	end
+	for index, line in ipairs(scanned.lines) do
+		if replacements[index] then lines[#lines + 1] = replacements[index]
+		elseif not removed[index] then lines[#lines + 1] = line.text .. line.eol end
+		if insertions[index] then
+			if line.eol == "" then lines[#lines + 1] = "\n" end
+			for _, u in ipairs(insertions[index]) do
+				lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value) .. "\n"
+			end
 		end
 	end
 
@@ -582,34 +653,41 @@ function M.batch_write(path, updates, file_adapter)
 	table.sort(pending_sections)
 	for _, section in ipairs(pending_sections) do
 		local entries = pending[section]
-		-- Check whether the section header already exists anywhere in lines
-		local section_exists = false
-		for _, line in ipairs(lines) do
-			if (line:match("^%s*%[([^%[%]]+)%]%s*$") or ""):lower() == section:lower() then
-				section_exists = true
-				break
-			end
-		end
-		if not section_exists then
-			lines[#lines + 1] = ""
-			lines[#lines + 1] = "[" .. section .. "]"
-		end
+		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value)
+			lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value) .. "\n"
 		end
 	end
 
-	local content = table.concat(lines, "\n")
-	local published, publish_err = publish_content(path, content, file_adapter, {
+	local content = table.concat(lines)
+	local content_ok, content_value = pcall(Codec.decode, content)
+	if not content_ok or type(content_value) ~= "table" then
+		return false, "the batch cannot address the destination without ambiguous TOML keys"
+	end
+	return true, nil, content, {
 		status = read_status,
 		content = source,
-	})
+	}
+end
+
+--- Prepares and atomically publishes one explicit set/delete batch.
+--- @param path string Destination path.
+--- @param updates table Explicit set/delete operations.
+--- @param file_adapter table|nil Platform file adapter.
+--- @param expected_source table|nil Exact source precondition.
+--- @return boolean committed
+--- @return string|nil detail
+--- @return string|nil content Committed bytes.
+function M.batch_write(path, updates, file_adapter, expected_source)
+	local prepared, detail, content, source = M.prepare_batch(path, updates, file_adapter, expected_source)
+	if not prepared then return false, detail end
+	local published, publish_err = publish_content(path, content, file_adapter, source)
 	if not published then
 		Logger.error(LOG, "batch_write: publication to '%s' failed — %s.", path, tostring(publish_err))
 		return false, tostring(publish_err)
 	end
-	Logger.info(LOG, "batch_write: wrote %d line(s) to '%s'.", #lines, path)
-	return true
+	Logger.info(LOG, "batch_write: committed %d operation(s) to '%s'.", #updates, path)
+	return true, nil, content
 end
 
 
@@ -686,6 +764,20 @@ function M.set_create_rows(path, rows)
 		copy[index] = { section = row.section, key = row.key, value = row.value }
 	end
 	_create_rows[refusal_key(path)] = copy
+end
+
+--- Registers the neutral-value contract for one configuration destination.
+--- Data files stay outside this registry so their false values remain explicit.
+--- @param path string Configuration file path.
+--- @param defaults table Manifest reader with sparse operation methods.
+function M.set_sparse_defaults(path, defaults)
+	assert(type(path) == "string" and path ~= "" and type(defaults) == "table"
+		and type(defaults.has_default) == "function" and type(defaults.sparse_operation) == "function",
+		"sparse defaults require a configuration path and a complete manifest reader")
+	local key = refusal_key(path)
+	assert(_sparse_defaults[key] == nil or _sparse_defaults[key] == defaults,
+		"configuration sparse-default owner cannot be replaced")
+	_sparse_defaults[key] = defaults
 end
 
 --- The rows a writer creating path must add, as a fresh copy, or nil.
