@@ -8,10 +8,10 @@
 --- « Nettoyer config.toml » under Configuration.
 ---
 --- FEATURES & RATIONALE:
---- 1. The driver's rule, from its readers. A key is used when one of the three
+--- 1. The driver's rule, from its readers. A key is used when a canonical
 ---    readers of this file takes it: config_overrides ([script] / [features]
 ---    scalars, applied to hs.settings at boot), Preferences.load (the menu
----    state) and the setup wizard's import of an existing file. Each marks what
+---    state), shortcut assignments and the setup wizard's import of an existing file. Each marks what
 ---    it reads through the walk it applies, so the cleanup cannot drift from
 ---    them.
 --- 2. Same semantics as Windows: a verified byte-exact backup first, a refusal
@@ -41,6 +41,7 @@ local Engine = require("config_unused_keys")
 function M.collect(decoded, mark)
 	require("infra.config_overrides").mark_config_reads(decoded, mark)
 	require("infra.preferences").mark_config_reads(decoded, mark)
+	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
 	require("ui.onboarding")._answers_from_config(decoded, mark)
 end
 

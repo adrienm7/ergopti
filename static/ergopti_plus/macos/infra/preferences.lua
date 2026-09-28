@@ -498,6 +498,7 @@ end
 -- full-document model long after boot. A last-moment check inside the adapter
 -- cannot detect an external edit that landed before save() was called.
 local _source_snapshots = {}
+local _owned_publications = {}
 
 --- Classifies one preference source without interpreting its contents.
 --- @param prefs_file string Destination path.
@@ -598,6 +599,7 @@ end
 --- @return table The decoded preferences (empty when the file is absent or invalid).
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
+	assert(not _owned_publications[prefs_file], "preference publication is still active")
 	local content, read_status = FileSystem.read_with_status(prefs_file)
 	if read_status ~= "ok" then
 		if read_status == "absent" then
@@ -652,6 +654,7 @@ end
 --- @param content string Bytes the cleanup published.
 --- @return boolean adopted
 function M.adopt_cleanup(prefs_file, previous, content)
+	if _owned_publications[prefs_file] then return false end
 	local baseline = _source_snapshots[prefs_file]
 	if type(baseline) ~= "table" or baseline.status ~= "ok" or baseline.content ~= previous
 		or type(content) ~= "string" then
@@ -676,6 +679,7 @@ end
 --- @param replacement table Classified candidate or rollback source.
 --- @return boolean exchanged
 function M.replace_source(path, expected, replacement)
+	if _owned_publications[path] then return false end
 	local current = _source_snapshots[path]
 	local function valid(source)
 		return type(source) == "table" and ((source.status == "absent" and source.content == nil)
@@ -742,7 +746,7 @@ end
 --- @param source table Exact classified source snapshot.
 --- @param updates table Manifest-owned leaf operations.
 --- @return table rows Addressable operations with inline tables retained.
-function M.prepare_llm_updates(source, updates)
+local function prepare_inline_updates(source, updates, root)
 	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
 	assert(scanned, detail)
 	local decoded = TomlCodec.decode(source.content or "")
@@ -755,7 +759,7 @@ function M.prepare_llm_updates(source, updates)
 	for _, record in ipairs(scanned.records) do
 		if record.addressable then
 			local path = record.section == "" and record.key or record.section .. "." .. record.key
-			if path == "llm" or path:sub(1, 4) == "llm." then
+			if path == root or path:sub(1, #root + 1) == root .. "." then
 				local value = decoded
 				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
 				if type(value) == "table" then inline[path] = { record = record, value = value } end
@@ -775,7 +779,7 @@ function M.prepare_llm_updates(source, updates)
 			local missing, ancestry = false, {}
 			for index = 1, #keys - 1 do
 				local child = target[keys[index]]
-				assert(child == nil or type(child) == "table", "LLM inline ownership crosses a scalar")
+				assert(child == nil or type(child) == "table", "inline preference ownership crosses a scalar")
 				if child == nil and row.delete then missing = true; break end
 				if child == nil then child = {}; target[keys[index]] = child end
 				ancestry[#ancestry + 1] = { parent = target, key = keys[index] }
@@ -796,6 +800,42 @@ function M.prepare_llm_updates(source, updates)
 			or { section = record.section, key = record.key, value = candidate }
 	end
 	return rows
+end
+
+--- Prepares declared LLM leaves while preserving inline neighbors.
+--- @param source table Classified source.
+--- @param updates table Owned leaf operations.
+--- @return table Prepared writer operations.
+function M.prepare_llm_updates(source, updates)
+	return prepare_inline_updates(source, updates, "llm")
+end
+
+--- Prepares declared shortcut leaves while preserving inline neighbors.
+--- @param source table Classified source.
+--- @param updates table Owned leaf operations.
+--- @return table Prepared writer operations.
+function M.prepare_shortcut_updates(source, updates)
+	return prepare_inline_updates(source, updates, "shortcuts")
+end
+
+--- Publishes a domain owner's exact batch and advances the ordinary save baseline.
+--- @param path string Canonical configuration path.
+--- @param updates table Already validated owned operations.
+--- @param source table Exact classified source used by the domain owner.
+--- @return boolean committed
+function M.publish_owned(path, updates, source)
+	if _owned_publications[path] then return false end
+	local baseline = _source_snapshots[path]
+	if baseline and not same_source(baseline, source) then return false end
+	_owned_publications[path] = true
+	local called, committed, detail, encoded = pcall(TomlWriter.batch_write, path, updates, FileSystem, source)
+	_owned_publications[path] = nil
+	if not called or committed ~= true then
+		Logger.error(LOG, "Owned preferences were not published: %s.", tostring(called and detail or committed))
+		return false
+	end
+	_source_snapshots[path] = { status = "ok", content = encoded }
+	return true
 end
 
 --- Captures the complete flat preference snapshot represented by memory and
@@ -884,6 +924,7 @@ end
 --- @return table|nil persisted Snapshot written to disk.
 --- @return table|nil runtime Snapshot before session-only preservation.
 function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
+	if _owned_publications[prefs_file] then return false end
 	if snapshot_view ~= nil and type(snapshot_view) ~= "function" then
 		error("snapshot_view must be a function", 2)
 	end
@@ -917,7 +958,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	end
 
 	local ok, updates = pcall(function()
-		return M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing)))
+		return M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing))))
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next

@@ -13,7 +13,7 @@
 ---    key left of 1 has two macOS keycodes: kVK_ANSI_Grave (50) on an ANSI
 ---    keyboard and behind Karabiner's ANSI virtual keyboard, kVK_ISO_Section
 ---    (10) on a bare ISO one.
---- 2. Assignments live in the Storage adapter under their own prefix, beside the
+--- 2. Assignments live in canonical config.toml, beside the
 ---    keyboard slots, and are cached by load(): the shortcut layer's eventtap
 ---    asks decide() on every press of these keys, and an eventtap callback may
 ---    only do bounded in-memory work. A key never stored takes the manifest
@@ -33,13 +33,16 @@ local Manifest   = require("infra.manifest_reader")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
-local Storage    = require("adapters.storage")
+local Writer     = require("toml_codec.writer")
+local Codec      = require("toml_codec")
+local Preferences = require("infra.preferences")
+local ConfigPaths = require("infra.config_paths")
 
 local LOG = "shortcuts.tap_keys"
 
--- The Storage prefix of an assignment, and of the binding its action runs
+-- The canonical assignment section, and the binding its action runs
 -- under (and stores its parameter under).
-local SETTINGS_PREFIX = "tap_key_"
+local CONFIG_SECTION = "shortcuts.tap_keys"
 local BINDING_PREFIX  = "tap_key__"
 
 -- The shared key list, relative to the shared tree.
@@ -87,16 +90,46 @@ function M.binding_id(id)
 	return BINDING_PREFIX .. tostring(id)
 end
 
---- Reads every assignment into memory: the stored action, else the manifest
---- default. An unknown stored id leaves the key alone rather than binding it to
---- a no-op.
---- @param is_assignable function The catalogue check.
-function M.load(is_assignable)
-	if type(is_assignable) ~= "function" then error("tap_keys.load() needs the catalogue check") end
-	local loaded = {}
+--- Reads a complete canonical source without consulting or migrating legacy storage.
+--- @return table decoded
+--- @return table source Classified source for conditional publication.
+local function read_config()
+	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
+	assert(status == "ok" or status == "absent", "tap-key configuration unavailable: " .. tostring(detail))
+	local decoded = Codec.decode(content or "")
+	assert(type(decoded) == "table", "tap-key configuration is malformed")
+	assert(decoded.shortcuts == nil or type(decoded.shortcuts) == "table", "shortcuts must be a table")
+	return decoded, { status = status, content = content }
+end
+
+local function walk_assignments(decoded, consume)
+	local shortcuts = decoded.shortcuts or {}
+	assert(type(shortcuts) == "table", "shortcuts must be a table")
+	local assignments = shortcuts.tap_keys
+	if assignments == nil then return end
+	assert(type(assignments) == "table", "tap-key assignments must be a table")
 	for _, key in ipairs(M.keys()) do
-		local action = Storage.get(SETTINGS_PREFIX .. key.id, nil)
-		if action == nil then action = Manifest.default_for("shortcuts.tap_keys." .. key.id) end
+		if assignments[key.id] ~= nil then consume(key.id, assignments[key.id]) end
+	end
+end
+
+--- Marks precisely the assignment leaves consumed by the actual loader.
+--- @param decoded table Parsed canonical configuration.
+--- @param mark function Segment-based ownership collector.
+function M.mark_config_reads(decoded, mark)
+	walk_assignments(decoded, function(id) mark("shortcuts", "tap_keys", id) end)
+end
+
+--- Loads canonical assignments, using manifest defaults only for absent leaves.
+--- @param is_assignable function Authoritative action catalogue check.
+function M.load(is_assignable)
+	assert(type(is_assignable) == "function", "tap_keys.load() needs the catalogue check")
+	local decoded = read_config()
+	local configured, loaded = {}, {}
+	walk_assignments(decoded, function(id, value) configured[id] = value end)
+	for _, key in ipairs(M.keys()) do
+		local action = configured[key.id]
+		if action == nil then action = Manifest.default_for(CONFIG_SECTION .. "." .. key.id) end
 		if action ~= "none" and is_assignable(action) ~= true then
 			Logger.warn(LOG, "Tap key '%s' holds unknown action '%s' — left alone.", key.id, tostring(action))
 			action = "none"
@@ -148,7 +181,12 @@ function M.set_action(id, action_id, is_assignable)
 			tostring(action_id), id)
 		return false
 	end
-	if Storage.set(SETTINGS_PREFIX .. id, action_id) ~= true then
+	local called, committed = pcall(function()
+		local _, source = read_config()
+		local rows = Preferences.prepare_shortcut_updates(source, { Manifest.sparse_operation(CONFIG_SECTION .. "." .. id, action_id) })
+		return Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source)
+	end)
+	if not called or committed ~= true then
 		Logger.error(LOG, "set_action(): tap key '%s' could not be persisted.", id)
 		return false
 	end

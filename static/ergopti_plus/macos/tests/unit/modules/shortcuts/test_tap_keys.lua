@@ -15,26 +15,29 @@
 
 local helpers = require("tests.helpers")
 
---- A fresh tap_keys module over an in-memory Storage and a stubbed input source.
---- @param stored table|nil Storage key -> value.
+--- A fresh tap_keys module over canonical in-memory TOML and a stubbed input source.
+--- @param stored table|nil Canonical key -> value.
 --- @param characters table Keycode -> the character the input source puts there.
 --- @return table TapKeys, function restore
 local function fresh(stored, characters)
-	local prefs = {}
-	for key, value in pairs(stored or {}) do prefs[key] = value end
+	local content = stored and require("toml_codec").encode({ shortcuts = { tap_keys = stored } }) or nil
 	local owned = { "adapters.storage", "infra.keycodes", "adapters.file_system",
-		"infra.paths", "modules.shortcuts.tap_keys" }
+		"infra.paths", "infra.preferences", "infra.config_paths", "modules.shortcuts.tap_keys" }
 	local saved = {}
 	for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
-	package.loaded["adapters.storage"] = {
-		get = function(key, default) if prefs[key] == nil then return default end return prefs[key] end,
-		set = function(key, value) prefs[key] = value return true end,
-	}
+	package.loaded["adapters.storage"] = nil
+	package.loaded["infra.config_paths"] = { get = function() return "tap-key-test-config" end }
 	package.loaded["infra.keycodes"] = {
 		character_for = function(code) return characters and characters[code] or nil end,
 	}
 	package.loaded["infra.paths"] = { shared = function(rel) return helpers.shared(rel) end }
 	package.loaded["adapters.file_system"] = {
+		read_with_status = function() return content, content and "ok" or "absent" end,
+		write = function() error("conditional publication required") end,
+		write_if_unchanged = function(_, candidate, expected)
+			if expected.content ~= content then return false end
+			content = candidate; return true
+		end,
 		read = function(path)
 			local handle = assert(io.open(path, "r"))
 			local body = handle:read("*a")
@@ -42,7 +45,7 @@ local function fresh(stored, characters)
 			return body
 		end,
 	}
-	package.loaded["modules.shortcuts.tap_keys"] = nil
+	package.loaded["infra.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
 	local TapKeys = require("modules.shortcuts.tap_keys")
 	local function restore()
 		for _, name in ipairs(owned) do package.loaded[name] = saved[name] end
@@ -76,7 +79,7 @@ helpers.describe("macOS number-row tap keys (tap-keys)", function()
 	end)
 
 	helpers.it("an assignment is stored and decided, an unknown one leaves the key alone", function()
-		local TapKeys, restore = fresh({ tap_key_number_row_right_2 = "no_such_action" })
+		local TapKeys, restore = fresh({ number_row_right_2 = "no_such_action" })
 		local ok, err = pcall(function()
 			TapKeys.load(is_assignable)
 			helpers.assert_eq(TapKeys.get_action("number_row_right_2"), "none")
