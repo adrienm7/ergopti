@@ -52,6 +52,7 @@ local RAW_FACTORIES = {
 	bind_layer_scroll = "layer_scroll",
 	bind_wrap_text_if_selected = "wrap_text_if_selected",
 	bind_cmd_star = "cmd_star",
+	bind_tap_keys = "tap_keys",
 }
 
 local INERT_ACTIONS = {
@@ -138,6 +139,7 @@ function M.with_bindings(callback)
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
+		"modules.shortcuts.tap_keys",
 		"infra.i18n",
 		"infra.logger",
 	}, function()
@@ -145,6 +147,10 @@ function M.with_bindings(callback)
 		package.loaded["modules.shortcuts.actions.text"] = facades.text
 		package.loaded["modules.shortcuts.actions.apps"] = facades.apps
 		package.loaded["modules.shortcuts.actions.system"] = facades.system
+		package.loaded["modules.shortcuts.tap_keys"] = {
+			ensure_loaded = function() return true end,
+			decide = function() return nil end,
+		}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...)
 			ctx.errors[#ctx.errors + 1] = string.format(message, ...)
