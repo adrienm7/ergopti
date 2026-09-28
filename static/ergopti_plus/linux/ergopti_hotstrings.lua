@@ -1538,6 +1538,7 @@ local function main()
 				-- Read at every rebuild: the pause toggle rebuilds the menu, which
 				-- greys the feature rows and turns the title row into « resume ».
 				paused        = script_actions.is_paused(),
+				is_paused     = script_actions.is_paused,
 				on_toggle_pause = script_actions.toggle_pause,
 				config        = hotstrings_config,
 				engine        = engine,

@@ -2328,6 +2328,15 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handed to every other submenu builder in this file.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
+	local function apply_metrics_scope(mode)
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.metrics.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local committed = require("infra.metrics_scope").apply(mode, ctx.is_paused)
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
 	getters["metrics_encrypt_enabled"] = privacy("encrypt")
 	render_ctx.state_getters = getters
 	-- Bracketed keys on purpose: the bijection gate resolves "does this driver
@@ -2336,6 +2345,8 @@ local function _manifest_metrics_rows(ctx, k)
 	render_ctx.commands = {
 		-- The category switch, the submenu's first row: appindicator binds
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
+		["scope_restore"] = function() return apply_metrics_scope("recommended") end,
+		["scope_clear"] = function() return apply_metrics_scope("clear") end,
 		["metrics_toggle"] = function()
 			if type(k.set_enabled) ~= "function" then
 				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
@@ -3650,6 +3661,7 @@ end
 --- @param ctx table {
 ---   _version       string   Driver version string.
 ---   paused         boolean  Whether the script is paused (greys the feature rows).
+---   is_paused      function Live pause getter for deferred configuration actions.
 ---   on_toggle_pause function Resumes from the paused title row.
 ---   config         table    Hotstrings_config module.
 ---   layout         string   Current keyboard layout.

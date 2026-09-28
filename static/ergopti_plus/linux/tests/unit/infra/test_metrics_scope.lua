@@ -43,6 +43,7 @@ local function with_scope(body)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
+			controls.files = files
 			local owner = require("infra.metrics_scope").new({ path = path, backup_path = backup,
 				collector = collector, widget = widget, readout = readout, files = files })
 			body(owner, collector, widget, readout, controls, path, backup)
@@ -158,4 +159,109 @@ helpers.describe("Linux metrics scope transaction", function()
 			helpers.assert_eq(status, "absent")
 		end)
 	end)
+end)
+
+helpers.describe("Linux metrics scope rendered commands", function()
+	helpers.it("keeps the daemon menu pause provider live after context construction", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = file:read("*a")
+		file:close()
+		local context = source:match("local function _build_menu_ctx%(%)%s*(.-)on_toggle_pause%s*=")
+		helpers.assert_not_nil(context, "the production context builder must be present")
+		local expression = context:match("\n%s*is_paused%s*=%s*([^,\n]+)")
+		helpers.assert_not_nil(expression, "the production context must pass a live pause provider")
+		local paused = false
+		local read = assert((loadstring or load)("local script_actions = ...; return " .. expression))
+		local getter = read({ is_paused = function() return paused end })
+		helpers.assert_eq(type(getter), "function", "the daemon must pass the getter rather than its snapshot")
+		helpers.assert_eq(getter(), false)
+		paused = true
+		helpers.assert_eq(getter(), true)
+	end)
+	for _, scenario in ipairs({ "clear", "recommended", "cancel", "publication refusal", "pause before confirmation", "pause during confirmation" }) do
+		helpers.it("routes " .. scenario .. " through the actual terminal owner", function()
+			local loaded = {}
+			for name, value in pairs(package.loaded) do loaded[name] = value end
+			local ok, err = pcall(function()
+				package.loaded["adapters.storage"] = {
+					get = function(_, default) return default end,
+					set = function() error("metrics scope must not write legacy storage") end,
+				}
+				with_scope(function(_, collector, widget, readout, controls, path)
+					local renderer = require("infra.manifest_menu")
+					local root = renderer.get_root()
+					local old_rows, old_top = root.metrics_menu, root.top_level
+					local execute = os.execute
+					local old_files = package.loaded["adapters.file_system"]
+					local backups, changed, questions, paused = {}, 0, 0, false
+					local mode = scenario == "recommended" and "recommended" or "clear"
+					local key = mode == "clear" and "common.clear_to_system" or "common.restore_recommended"
+					local id = mode == "clear" and "scope_clear" or "scope_restore"
+					local source = Sandbox.read_bytes(path)
+					local passed, detail = pcall(function()
+						root.metrics_menu = {{ type = "command", id = id, i18n = key }}
+						root.top_level = {{ id = "metrics" }}
+						controls.on_publish = function(target)
+							if target ~= path then backups[#backups + 1] = target end
+						end
+						if scenario == "publication refusal" then controls.refuse = path end
+						package.loaded["adapters.file_system"] = controls.files
+						os.execute = function(command)
+							if command:find("zenity --question", 1, true) then
+								questions = questions + 1
+								helpers.assert_contains(command, require("infra.i18n").get("menu.metrics.title"))
+								if scenario == "pause during confirmation" then paused = true end
+								return scenario == "cancel" and 1 or 0
+							end
+							if command:find("command -v zenity", 1, true) then return 0 end
+							return execute(command)
+						end
+						package.loaded["ui.menu.menu_builder"] = nil
+						local rows = require("ui.menu.menu_builder").build({ keylogger = collector,
+							paused = false, is_paused = function() return paused end,
+							on_menu_changed = function() changed = changed + 1 end })
+						local action
+						local function find(items)
+							for _, row in ipairs(items) do
+								if row.title == require("infra.i18n").get(key) then action = row.fn end
+								if row.menu then find(row.menu) end
+							end
+						end
+						find(rows)
+						helpers.assert_eq(type(action), "function", "the real renderer must bind the scope command")
+						if scenario == "pause before confirmation" then paused = true end
+						action()
+						local committed = scenario == "clear" or scenario == "recommended"
+						helpers.assert_eq(changed, committed and 1 or 0)
+						helpers.assert_eq(questions, scenario == "pause before confirmation" and 0 or 1)
+						if committed then
+							helpers.assert_eq(#backups, 1)
+							helpers.assert_eq(Sandbox.read_bytes(backups[1]), source)
+							helpers.assert_eq(collector.is_enabled(), mode == "recommended")
+							if mode == "clear" then
+								helpers.assert_eq(widget.is_running(), false)
+								helpers.assert_eq(readout.is_running(), false)
+							end
+							local result = Codec.decode(Sandbox.read_bytes(path))
+							helpers.assert_eq(result.metrics.unknown, "keep")
+							helpers.assert_eq(result.other.value, 42)
+						else
+							helpers.assert_eq(#backups, scenario == "publication refusal" and 1 or 0)
+							helpers.assert_eq(Sandbox.read_bytes(path), source)
+							helpers.assert_true(collector.is_enabled())
+							helpers.assert_true(widget.is_running())
+							helpers.assert_true(readout.is_running())
+						end
+					end)
+					root.metrics_menu, root.top_level, os.execute = old_rows, old_top, execute
+					package.loaded["adapters.file_system"] = old_files
+					for _, backup in ipairs(backups) do os.remove(backup) end
+					if not passed then error(detail, 0) end
+				end)
+			end)
+			for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+			for name, value in pairs(loaded) do package.loaded[name] = value end
+			if not ok then error(err, 0) end
+		end)
+	end
 end)
