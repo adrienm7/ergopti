@@ -44,15 +44,10 @@ _HS_PathsAllEnabled(Paths) {
 	return true
 }
 
-; True when every gate of the scope is open and every one of its paths is on —
-; what a scope's « all sections » checkbox shows.
+; Section selection remains independent of the scope's runtime master.
 _HS_ScopeAllOn(Gates, Paths) {
 	if (Gates.Length == 0)
 		return false
-	for _, Gate in Gates {
-		if !IsCategoryGated(Gate)
-			return false
-	}
 	return _HS_PathsAllEnabled(Paths)
 }
 

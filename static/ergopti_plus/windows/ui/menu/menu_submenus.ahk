@@ -144,11 +144,9 @@ _HS_RegisterLanguageMenuCategories() {
 ; is exactly the state ToggleAllHotstrings(true) establishes.
 _HS_AllHotstringsOn() {
 	global Features
-	if !IsCategoryGated("Hotstrings")
-		return false
 	; A detached copy: the collector seeds runtime-discovered personal nodes into
 	; the map it is given, and a menu read must not publish them.
-	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(Features)))
+	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(MasterGateDesiredFeatures(Features))))
 }
 
 ; List provider: one row per language pack, labelled with the language's native
@@ -172,7 +170,7 @@ _HS_LanguageRows() {
 			LanguageTotal += Total
 			Items.Push(Map(
 				"label",   GetCategoryTitle(V1Cat) . " (" . FmtCount(Total) . ")",
-				"checked", (IsGated and IsCategoryGated(V1Cat)) ? true : false,
+				"checked", IsCategoryGated(V1Cat) ? true : false,
 				"submenu", SubMenus[V1Cat]))
 		}
 		; The flag is an icon here, as in the language selector: Win32 menus

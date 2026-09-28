@@ -738,7 +738,7 @@ _ConfigStageFeatureEntries(FeaturesTarget, Entries, Updates) {
 			continue
 		}
 		Loc["v2_node"][Loc["key"]] := Value
-		Updates.Push({ Section: Loc["section"], Key: Loc["key"], Value: Value })
+		Updates.Push(_ConfigSparseOperation(Loc["section"], Loc["key"], Value))
 		Applied += 1
 	}
 	return Applied
@@ -752,52 +752,17 @@ _ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
 	if !FeaturesTarget["hotstrings"].Has("personal")
 		FeaturesTarget["hotstrings"]["personal"] := Map()
 	if !FeaturesTarget["hotstrings"]["personal"].Has(SectionName) {
+		Path := "hotstrings.personal." . SectionName
 		FeaturesTarget["hotstrings"]["personal"][SectionName] := Map(
-			"enabled", false,
-			"time_activation_seconds", 0)
+			"enabled", ManifestDefaultFor(Path . ".enabled"),
+			"time_activation_seconds", ManifestDefaultFor(Path . ".time_activation_seconds"))
 	}
 	return true
 }
 
-; The whole tree's « all sections » checkbox: every hotstring section on or off
-; in one transaction. Ticking also opens the Hotstrings switch and every closed
-; gate of the categories it writes: a closed gate zeroes its sections at boot, so
-; the box stayed unticked however often it was clicked. Unticking leaves every
-; gate as it is, since each is a checkbox of its own; this closed the Hotstrings
-; switch too, which neither macOS nor Linux does.
+; Section selection persists independently of every category's runtime master.
 ToggleAllHotstrings(Value) {
-		global CategoryEnabled, ConfigurationFile, Features, _FLAT_HOTSTRING_V1_CATS
-		Bool := (Value = true or Value = 1)
-		CandidateCategories := CategoryEnabled.Clone()
-		CandidateFeatures := _HSDeepCloneMap(Features)
-		Updates := []
-		if Bool {
-				Gates := ["Hotstrings"]
-				Gates.Push(_FLAT_HOTSTRING_V1_CATS*)
-				for _, Gate in Gates {
-						if (CandidateCategories.Has(Gate) and !CandidateCategories[Gate]) {
-								CandidateCategories[Gate] := true
-								Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Gate), Value: TOML_Bool(true) })
-						}
-				}
-		}
-		Entries := []
-		for V2Path in _CollectAllHotstringsV2Paths(CandidateFeatures)
-				Entries.Push(Map("path", V2Path, "value", Bool))
-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
-		if (Applied != Entries.Length)
-				return ConfigReportPersistenceFailure("the bulk hotstring toggle", 0,
-					"one or more feature paths could not be resolved")
-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the bulk hotstring toggle")
-				return false
-		PreviousCritical := Critical("On")
-		try {
-				CategoryEnabled := CandidateCategories
-				Features := CandidateFeatures
-		} finally {
-				Critical(PreviousCritical)
-		}
-		return ReloadPreservingSuspend()
+	return _ConfigCommitHotstringIntent("all", "", Value, "the bulk hotstring toggle")
 }
 
 IsCategoryAllEnabled(Categories) {
@@ -810,10 +775,15 @@ IsCategoryAllEnabled(Categories) {
 	return true
 }
 
-; Deep-clone a (possibly nested) Map. Used to snapshot per-section hotstring
-; Features so a live category toggle can restore them independently of later
-; mutations. Non-Map values are returned as-is (leaf bool / number / string).
+; Detached transaction candidates must not share mutable Maps or Arrays with
+; either the desired state or the effective runtime.
 _HSDeepCloneMap(M) {
+		if M is Array {
+				Out := []
+				for V in M
+						Out.Push(_HSDeepCloneMap(V))
+				return Out
+		}
 		if (Type(M) != "Map") {
 				return M
 		}
@@ -824,60 +794,15 @@ _HSDeepCloneMap(M) {
 		return Out
 }
 
-; Snapshots a category from detached Features into a detached snapshot Map.
-_HSSnapshotCategoryTo(FeaturesTarget, SnapshotTarget, V2Cat) {
-		if (FeaturesTarget.Has("hotstrings") and FeaturesTarget["hotstrings"].Has(V2Cat))
-				SnapshotTarget[V2Cat] := _HSDeepCloneMap(FeaturesTarget["hotstrings"][V2Cat])
-}
-
-; Restores a category into detached Features from a detached snapshot Map.
-_HSRestoreCategoryFrom(FeaturesTarget, SnapshotTarget, V2Cat) {
-		if !(SnapshotTarget.Has(V2Cat) and FeaturesTarget.Has("hotstrings")
-				and FeaturesTarget["hotstrings"].Has(V2Cat))
-				return
-		Target := FeaturesTarget["hotstrings"][V2Cat]
-		for Section, SecMap in SnapshotTarget[V2Cat]
-				Target[Section] := _HSDeepCloneMap(SecMap)
-}
-
-; Snapshot one category's current (un-gated) section states into _HSCategorySnapshot.
-_HSSnapshotCategory(V2Cat) {
-		global Features, _HSCategorySnapshot
-		if IsSet(Features) and IsSet(_HSCategorySnapshot)
-				_HSSnapshotCategoryTo(Features, _HSCategorySnapshot, V2Cat)
-}
-
-; Snapshot every hotstring category. Called once at boot, before gating.
-_HSSnapshotAllCategories() {
-		global Features
-		if (IsSet(Features) and Features.Has("hotstrings")) {
-				for V2Cat, _ in Features["hotstrings"] {
-						_HSSnapshotCategory(V2Cat)
-				}
-		}
-}
-
-; Restore a category's section states from the snapshot, in place (the category Map
-; keeps its identity; each section entry is replaced with a fresh clone).
-_HSRestoreCategory(V2Cat) {
-		global Features, _HSCategorySnapshot
-		; IsSet on BOTH globals. _HSCategorySnapshot is declared in ErgoptiPlus.ahk,
-		; which the headless test harness does not load, so reading it first threw an
-		; unset error before the IsSet(Features) guard beside it could apply.
-		if !(IsSet(_HSCategorySnapshot) and _HSCategorySnapshot.Has(V2Cat) and IsSet(Features)
-				and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
-				return
-		}
-		_HSRestoreCategoryFrom(Features, _HSCategorySnapshot, V2Cat)
-}
-
 ; Resolves a category gate against a detached candidate rather than the live
 ; global Map, so master-gate application can finish before the atomic publish.
 _ConfigCandidateCategoryEnabled(CategoryTarget, Category) {
 		global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER
 		if CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)
-				return CategoryTarget.Get("Hotstrings", true)
-		return CategoryTarget.Get(Category, true)
+				Category := "Hotstrings"
+		if CategoryTarget.Has(Category)
+				return CategoryTarget[Category]
+		return ManifestDefaultFor("category_enabled." . _CategoryEnabledKey(Category))
 }
 
 ; Hotstring sub-categories whose entire content the live rebuild can apply, so
@@ -891,193 +816,173 @@ _IsLiveHotstringCategory(Category) {
 		return Live.Has(Category)
 }
 
-ToggleCategoryAllFeatures(Category, Value) {
-		global CategoryEnabled, ConfigurationFile, Features, TapHold, _HSCategorySnapshot
-		Bool := (Value = true or Value = 1)
-		if _IsLiveHotstringCategory(Category) {
-				V2Cat := _CategoryEnabledKey(Category)
-				try LoggerDebug("Menu", "Live category toggle: {1} -> {2}.", Category, Bool ? "ON" : "OFF")
-				CandidateFeatures := _HSDeepCloneMap(Features)
-				CandidateCategories := CategoryEnabled.Clone()
-				CandidateTapHold := _HSDeepCloneMap(TapHold)
-				if IsSet(_HSCategorySnapshot)
-						CandidateSnapshot := _HSDeepCloneMap(_HSCategorySnapshot)
-				else
-						CandidateSnapshot := Map()
-				if Bool
-						_HSRestoreCategoryFrom(CandidateFeatures, CandidateSnapshot, V2Cat)
-				else
-						_HSSnapshotCategoryTo(CandidateFeatures, CandidateSnapshot, V2Cat)
-				CandidateCategories[Category] := Bool
-				CandidateGate := (CandidateCategory) => _ConfigCandidateCategoryEnabled(
-						CandidateCategories, CandidateCategory)
-				ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold, CandidateGate, LoggerDebug)
-				Updates := [{ Section: "category_enabled", Key: V2Cat, Value: TOML_Bool(Bool) }]
-				if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
-						return false
-
-				; Only reference swaps sit under Critical. Candidate construction,
-				; manifest I/O and persistence all completed before this window.
-				_TcafCrit := Critical("On")
-				try {
-						Features := CandidateFeatures
-						CategoryEnabled := CandidateCategories
-						TapHold := CandidateTapHold
-						_HSCategorySnapshot := CandidateSnapshot
-				} finally {
-						Critical(_TcafCrit)
-				}
-				LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
-				RebuildHotstringsLive()
-				LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
-				return true
-		}
-		CandidateCategories := CategoryEnabled.Clone()
-		CandidateCategories[Category] := Bool
-		Updates := [{ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: TOML_Bool(Bool) }]
-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
-				return false
-		CategoryEnabled := CandidateCategories
-		return ReloadPreservingSuspend()
+ToggleCategoryAllFeatures(Category, Value, WriterFn := 0, NotifyFn := 0, ApplyFn := 0) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ToggleCategoryAllFeatures(Category, Value, WriterFn, NotifyFn, ApplyFn)
+		finally Critical(InheritedCritical)
+	}
+	Bool := (Value = true or Value = 1)
+	if !ConfigCommitBuilt(ConfigurationFile, "the '" . Category . "' category toggle",
+			_ConfigBuildCategoryIntentPlan.Bind(Category, Bool), WriterFn, NotifyFn)
+		return false
+	if HasMethod(ApplyFn, "Call")
+		return ApplyFn.Call()
+	if _IsLiveHotstringCategory(Category) {
+		LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
+		RebuildHotstringsLive()
+		LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
+		return true
+	}
+	return ReloadPreservingSuspend()
 }
 
-; Force every section of one hotstring category on/off (bulk action), scoped to
-; a single manifest section. Mirrors ToggleAllHotstrings but per-category:
-; enabling also lifts the Hotstrings master gate and (when the category has one)
-; the category gate, so the activation is immediately effective; disabling just
-; clears the sections. ``V1Cat`` is the PascalCase category id (e.g. "Rolls",
-; "DynamicHotstrings").
+; The lease is already held before reading desired, effective, or category state.
+_ConfigBuildCategoryIntentPlan(Category, Bool) {
+	global Features, TapHold, CategoryEnabled
+	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(Features))
+	DesiredTapHold := _HSDeepCloneMap(MasterGateDesiredTapHold(TapHold))
+	CandidateCategories := CategoryEnabled.Clone()
+	if !CandidateCategories.Has(Category)
+		throw Error("Unknown category gate: " . Category)
+	CandidateCategories[Category] := Bool
+	Projected := _HSDeepCloneMap(Desired)
+	ProjectedTapHold := _HSDeepCloneMap(DesiredTapHold)
+	ApplyMasterGatesToFeatures(Projected, ProjectedTapHold,
+		(Name) => _ConfigCandidateCategoryEnabled(CandidateCategories, Name))
+	RuntimePatches := []
+	CandidateTapHold := 0
+	switch Category {
+		case "Layout", "Shortcuts", "Hotstrings":
+			Root := StrLower(Category)
+			if Projected.Has(Root)
+				RuntimePatches.Push({ target: Features, key: Root, value: Projected[Root] })
+		case "TapHolds":
+			CandidateTapHold := ProjectedTapHold
+		default:
+			Root := _CategoryEnabledKey(Category)
+			if !Projected.Has("hotstrings") || !Projected["hotstrings"].Has(Root)
+				throw Error("Unknown hotstring category state: " . Category)
+			RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
+	}
+	Updates := [_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Category), Bool)]
+	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired,
+		RuntimePatches, CandidateCategories, CandidateTapHold) }
+}
+
+; Publishing is a bounded reference swap. No filesystem, manifest, or native
+; acquisition runs while the input thread is excluded.
+_ConfigPublishDesiredState(Desired, RuntimePatches, CandidateCategories := 0, CandidateTapHold := 0) {
+	global TapHold, CategoryEnabled
+	PreviousCritical := Critical("On")
+	try {
+		MasterGateState()["features"] := Desired
+		for Patch in RuntimePatches
+			Patch.target[Patch.key] := Patch.value
+		if CandidateCategories is Map
+			CategoryEnabled := CandidateCategories
+		if CandidateTapHold is Map
+			TapHold := CandidateTapHold
+	} finally Critical(PreviousCritical)
+}
+
+; Select every section of one category while retaining its independent master.
 ToggleCategoryAllSections(V1Cat, Enable) {
-		global CategoryEnabled, ConfigurationFile, _LegacyTopCategoryMap, Features
-		Bool := (Enable = true or Enable = 1)
-		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
-		if (V2Section == "") {
-				try LoggerWarn("Menu", "ToggleCategoryAllSections: no v2 section for '{1}' — skipped.", V1Cat)
-				return
-		}
-		CandidateCategories := CategoryEnabled.Clone()
-		CandidateFeatures := _HSDeepCloneMap(Features)
-		Updates := []
-		if Bool {
-				; Master gate must be on for any hotstring to fire.
-				if !CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"] {
-						CandidateCategories["Hotstrings"] := true
-						Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
-				}
-				; Lift this category's own gate too, when it has one (flat categories do;
-				; DynamicHotstrings / Personal follow the master directly).
-				if (CandidateCategories.Has(V1Cat) and !CandidateCategories[V1Cat]) {
-						CandidateCategories[V1Cat] := true
-						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: TOML_Bool(true) })
-				}
-		}
-		Entries := []
-		for _, Entry in ManifestFeaturesForSection(V2Section)
-				Entries.Push(Map("path", Entry["path"], "value", Bool))
-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
-		if (Applied != Entries.Length)
-				return ConfigReportPersistenceFailure("the '" . V1Cat . "' section toggle", 0,
-					"one or more feature paths could not be resolved")
-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . V1Cat . "' section toggle")
-				return false
-		PreviousCritical := Critical("On")
-		try {
-				CategoryEnabled := CandidateCategories
-				Features := CandidateFeatures
-		} finally {
-				Critical(PreviousCritical)
-		}
-		return ReloadPreservingSuspend()
+	return _ConfigCommitHotstringIntent("category", V1Cat, Enable,
+		"the '" . V1Cat . "' section toggle")
 }
 
-; Force every section of every category of one language pack on/off — the
-; « tout activer » / « tout désactiver » rows of a language submenu. Same
-; contract as ToggleCategoryAllSections, applied to all of the language's
-; categories in ONE persisted transaction: enabling also lifts the Hotstrings
-; master and each category gate so the activation is immediately effective.
-; ``Pack`` is one entry of HotstringsLanguageCategories().
+; Select one language pack in a single transaction without changing its masters.
 ToggleLanguageAllSections(Pack, Enable) {
-		global CategoryEnabled, ConfigurationFile, Features
-		Bool := (Enable = true or Enable = 1)
-		CandidateCategories := CategoryEnabled.Clone()
-		CandidateFeatures := _HSDeepCloneMap(Features)
-		Updates := []
-		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
-				CandidateCategories["Hotstrings"] := true
-				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
-		}
-		Entries := []
-		for _, Cat in Pack["categories"] {
-				if (Bool and CandidateCategories.Has(Cat["v1"]) and !CandidateCategories[Cat["v1"]]) {
-						CandidateCategories[Cat["v1"]] := true
-						Updates.Push({ Section: "category_enabled", Key: Cat["v2"], Value: TOML_Bool(true) })
-				}
-				for _, Entry in ManifestFeaturesForSection("hotstrings." . Cat["v2"])
-						Entries.Push(Map("path", Entry["path"], "value", Bool))
-		}
-		Label := "the '" . Pack["id"] . "' language toggle"
-		if (Entries.Length == 0)
-				throw Error("Language pack '" . Pack["id"] . "' has no manifest feature rows.")
-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
-		if (Applied != Entries.Length)
-				return ConfigReportPersistenceFailure(Label, 0,
-					"one or more feature paths could not be resolved")
-		if !ConfigCommitUpdates(ConfigurationFile, Updates, Label)
-				return false
-		PreviousCritical := Critical("On")
-		try {
-				CategoryEnabled := CandidateCategories
-				Features := CandidateFeatures
-		} finally {
-				Critical(PreviousCritical)
-		}
-		return ReloadPreservingSuspend()
+	return _ConfigCommitHotstringIntent("language", Pack, Enable,
+		"the '" . Pack["id"] . "' language toggle")
 }
 
-; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
-; Personal sections are runtime-discovered, so their v2 paths are built from the
-; TOML section names (hotstrings.personal.<lower(section)>). Enabling lifts the
-; Hotstrings master gate so the sections fire immediately.
+; Personal section paths come from discovered TOML names; selection remains
+; editable while the Hotstrings or Personal master is disabled.
 HS_TogglePersonalAllSections(Enable) {
-		global CategoryEnabled, ConfigurationFile, ScriptInformation, Features
-		Bool := (Enable = true or Enable = 1)
-		PersonalSectionsPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-		if (PersonalSectionsPath == "" or !FileExist(PersonalSectionsPath)) {
-				; Reachable on a fresh install (no personal_hotstrings.toml yet) or after
-				; relocating the config dir: the menu item does nothing and says nothing.
-				; The sibling ToggleCategoryAllSections logs on the equivalent bail.
-				try LoggerWarn("Hotstrings", "Personal sections toggle ignored — no personal hotstrings file at '{1}'.", PersonalSectionsPath)
-				return
+	return _ConfigCommitHotstringIntent("personal", "", Enable,
+		"the personal-hotstring section toggle")
+}
+
+; Section selection never changes a master checkbox. Users may prepare every
+; desired section while all native activation remains disabled.
+_ConfigCommitHotstringIntent(Kind, Selector, Enable, Context) {
+	global ConfigurationFile
+	if !ConfigCommitBuilt(ConfigurationFile, Context,
+			_ConfigBuildHotstringIntentPlan.Bind(Kind, Selector, !!Enable))
+		return false
+	return ReloadPreservingSuspend()
+}
+
+; Scope enumeration and personal discovery occur under the same owner as write
+; and publication, avoiding a stale pre-lease snapshot during another edit.
+_ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
+	global Features, TapHold, CategoryEnabled, _LegacyTopCategoryMap, ScriptInformation
+	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(Features))
+	Entries := []
+	switch Kind {
+		case "all":
+			for Path in _CollectAllHotstringsV2Paths(Desired)
+				Entries.Push(Map("path", Path, "value", Bool))
+		case "category":
+			if !_LegacyTopCategoryMap.Has(Selector)
+				throw Error("Unknown hotstring category: " . Selector)
+			for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Selector])
+				Entries.Push(Map("path", Entry["path"], "value", Bool))
+		case "language":
+			for Category in Selector["categories"] {
+				for Entry in ManifestFeaturesForSection("hotstrings." . Category["v2"])
+					Entries.Push(Map("path", Entry["path"], "value", Bool))
+			}
+		case "personal":
+			PersonalPath := ScriptInformation.Get("PersonalTomlPath", "")
+			if PersonalPath == "" || !FSExists(PersonalPath)
+				throw Error("Personal hotstring configuration is unavailable.")
+			for Section in ReadPersonalToml()["sections_order"] {
+				if Section == "-"
+					continue
+				_ConfigSeedPersonalHotstring(Desired, Section)
+				Entries.Push(Map("path", "hotstrings.personal." . StrLower(Section), "value", Bool))
+			}
+		default:
+			throw Error("Unknown hotstring scope: " . Kind)
+	}
+	if !Entries.Length
+		throw Error("The hotstring scope contains no configurable sections.")
+	Updates := []
+	if _ConfigStageFeatureEntries(Desired, Entries, Updates) != Entries.Length
+		throw Error("A hotstring scope feature could not be resolved.")
+	Projected := _HSDeepCloneMap(Desired)
+	ApplyMasterGatesToFeatures(Projected, Map(), IsCategoryGated)
+	CandidateFeatures := _HSDeepCloneMap(Features)
+	RuntimePatches := []
+	NewPersonalRoot := false
+	for Entry in Entries {
+		Path := Entry["path"]
+		if SubStr(Path, 1, StrLen("hotstrings.personal.")) == "hotstrings.personal."
+			_ConfigSeedPersonalHotstring(CandidateFeatures, SubStr(Path, StrLen("hotstrings.personal.") + 1))
+		Loc := FeatureLocateV2(CandidateFeatures, Path)
+		ProjectedLoc := FeatureLocateV2(Projected, Path)
+		if !(Loc is Map) || !(ProjectedLoc is Map)
+			throw Error("A hotstring runtime path could not be resolved: " . Path)
+		Loc["v2_node"][Loc["key"]] := ProjectedLoc["v2_node"][ProjectedLoc["key"]]
+		Current := FeatureLocateV2(Features, Path)
+		if Current is Map {
+			RuntimePatches.Push({ target: Current["v2_node"], key: Current["key"], value: Loc["v2_node"][Loc["key"]] })
+		} else if Features["hotstrings"].Has("personal") {
+			Section := SubStr(Path, StrLen("hotstrings.personal.") + 1)
+			RuntimePatches.Push({ target: Features["hotstrings"]["personal"], key: Section,
+				value: CandidateFeatures["hotstrings"]["personal"][Section] })
+		} else {
+			NewPersonalRoot := true
 		}
-		CandidateCategories := CategoryEnabled.Clone()
-		CandidateFeatures := _HSDeepCloneMap(Features)
-		Updates := []
-		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
-				CandidateCategories["Hotstrings"] := true
-				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
-		}
-		Data := ReadPersonalToml()
-		Entries := []
-		for _, SecName in Data["sections_order"] {
-				if (SecName != "-") {
-						_ConfigSeedPersonalHotstring(CandidateFeatures, SecName)
-						Entries.Push(Map("path", "hotstrings.personal." . StrLower(SecName), "value", Bool))
-				}
-		}
-		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
-		if (Applied != Entries.Length)
-				return ConfigReportPersistenceFailure("the personal-hotstring section toggle", 0,
-					"one or more personal feature paths could not be resolved")
-		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the personal-hotstring section toggle")
-				return false
-		PreviousCritical := Critical("On")
-		try {
-				CategoryEnabled := CandidateCategories
-				Features := CandidateFeatures
-		} finally {
-				Critical(PreviousCritical)
-		}
-		return ReloadPreservingSuspend()
+	}
+	if NewPersonalRoot
+		RuntimePatches.Push({ target: Features["hotstrings"], key: "personal", value: CandidateFeatures["hotstrings"]["personal"] })
+	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired, RuntimePatches) }
 }
 
 _CategoryEnabledKey(Category) {
@@ -1119,13 +1024,15 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				; Full-save collection is speculative until TOML_BatchWrite commits. Keep
 				; LLM menu reconciliation detached so a refused writer cannot publish a
 				; state that only existed in the failed serialization candidate.
-				FeatureSnapshot := _HSDeepCloneMap(FeatureState)
+				FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))
+				; The dedicated category owner below is authoritative for master gates.
+				if FeatureSnapshot.Has("category_enabled")
+						FeatureSnapshot.Delete("category_enabled")
 				if IsSet(_LLM_Menu_SyncToFeatures)
 						&& MenuReady && (MenuState is Map)
 						&& !_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)
 						throw Error("LLM menu state could not be reconciled into the full-save candidate")
-				_CollectFeatureUpdates(Updates, "",
-						_PruneMasterGatedFeatures(FeatureSnapshot))
+				_CollectFeatureUpdates(Updates, "", FeatureSnapshot)
 				; The version the boot migration reads (infra/config_migrate.ahk).
 				Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
@@ -1192,7 +1099,30 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-		return Updates
+		return _ConfigSparseUpdates(Updates)
+}
+
+; Manifest comparison uses native values; Boolean serialization sentinels belong
+; to the final typed writer boundary, after neutral-value deletion is decided.
+_ConfigSparseOperation(Section, Key, Value) {
+	NativeValue := Value is TOML_Bool ? Value.Value : Value
+	return ManifestSparseOperation(Section . "." . Key, NativeValue)
+}
+
+; Neutral values delete their previous override in the same atomic batch.
+; Schema metadata is owned by migration and is never a user feature default.
+_ConfigSparseUpdates(Updates) {
+	Sparse := []
+	for Update in Updates {
+		OwnedElsewhere := TomlConfigSectionSkipKind(Update.Section) == "foreign"
+			|| (TomlConfigForeignOwner(Update.Section, Update.Key) != ""
+				&& !(ManifestFindEntryByPath(Update.Section . "." . Update.Key) is Map))
+		if OwnedElsewhere || (Update.HasOwnProp("Delete") && Update.Delete == 1)
+			Sparse.Push(Update)
+		else
+			Sparse.Push(_ConfigSparseOperation(Update.Section, Update.Key, Update.Value))
+	}
+	return Sparse
 }
 
 ; Targeted repairs and explicit reset do not serialize the incomplete boot tree.
@@ -1399,74 +1329,6 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 	Result := _ConfigDrainFullSave(WriterFn, TimerFn, OwnerToken, CollectFn)
 	return (Result is Integer) && Result == CONFIG_SAVE_OK
 		&& !_ConfigFullSaveHasPending()
-}
-
-; Resolve the CategoryEnabled master-gate label that owns a Features node key
-; ("layout" -> "Layout", "distances_reduction" -> "DistancesReduction"), or ""
-; when that key has no dedicated gate. Derived from CategoryEnabled through
-; _CategoryEnabledKey rather than a second table, so a new master gate is picked
-; up here automatically instead of being silently unprotected.
-_MasterGateLabelFor(NodeKey) {
-		global CategoryEnabled
-		if !IsSet(CategoryEnabled)
-				return ""
-		for Category, _Bool in CategoryEnabled {
-				if (_CategoryEnabledKey(Category) == NodeKey)
-						return Category
-		}
-		return ""
-}
-
-; True when the Features node named NodeKey may be serialized right now. A node
-; with no gate is always persistable; a gated one only while its master is on.
-_MasterGateAllowsPersist(NodeKey) {
-		Label := _MasterGateLabelFor(NodeKey)
-		if (Label == "")
-				return true
-		return IsCategoryGated(Label)
-}
-
-; Return a shallow view of Features with every master-gated-OFF branch removed,
-; for the walker below to flatten.
-;
-; ApplyMasterGatesToFeatures (infra/master_gates.ahk) zeroes those branches IN
-; PLACE as a RUNTIME gate, and its own contract states the per-feature state on
-; disk is NOT touched and is restored at the next Reload once the master flips
-; back on. SaveFullConfig had no notion of that distinction: it walked the same
-; live map, so the boot-armed save wrote the runtime zeroes back as if they were
-; the user's intent, and re-enabling the category later revealed every child
-; unticked with nothing logged. TOML_BatchWrite preserves keys it does not
-; re-collect, so omitting the branch is exactly what "leave the disk alone"
-; means — the same mechanism the [llm] block already relies on.
-_PruneMasterGatedFeatures(FeaturesMap) {
-		Pruned := Map()
-		if (Type(FeaturesMap) != "Map")
-				return Pruned
-		for TopKey, TopVal in FeaturesMap {
-				; Non-Map top-level entries are skipped by the walker anyway.
-				if (Type(TopVal) != "Map")
-						continue
-				if !_MasterGateAllowsPersist(TopKey) {
-						try LoggerDebug("ConfigIO", "Not serializing '{1}': its master gate is off, so the in-memory tree holds runtime zeroes rather than the user's settings.", TopKey)
-						continue
-				}
-				if (TopKey != "hotstrings") {
-						Pruned[TopKey] := TopVal
-						continue
-				}
-				; Hotstring sub-categories own gates independent of the Hotstrings
-				; master and are zeroed the same way when theirs is off.
-				SubTree := Map()
-				for SubKey, SubVal in TopVal {
-						if (Type(SubVal) == "Map" and !_MasterGateAllowsPersist(SubKey)) {
-								try LoggerDebug("ConfigIO", "Not serializing 'hotstrings.{1}': its sub-category gate is off.", SubKey)
-								continue
-						}
-						SubTree[SubKey] := SubVal
-				}
-				Pruned[TopKey] := SubTree
-		}
-		return Pruned
 }
 
 _CollectFeatureUpdates(Updates, SectionPath, Node) {

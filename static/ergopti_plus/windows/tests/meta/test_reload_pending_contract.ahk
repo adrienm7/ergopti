@@ -102,7 +102,8 @@ _RBL_EveryBundleLenderTakesTheRefusalBack() {
 			Offenders .= (Offenders == "" ? "" : "; ")
 				. "ReloadPreservingSuspend(" . Args[1] . ", " . Args[2] . ")"
 	}
-	Assert(Calls >= 24,
+	; Shared hotstring bulk admission consolidates the audited routed census.
+	Assert(Calls >= 22,
 		"the scan must still find the reload call sites (found " . Calls . ")")
 	Assert(Lenders >= 4,
 		"the scan must still find the bundle lenders: paths editor, onboarding, reset and channel switch (found "

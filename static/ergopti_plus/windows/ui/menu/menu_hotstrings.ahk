@@ -469,7 +469,7 @@ _HS_CategoryRowsStandard() {
 		; if some or all sections inside are off.
 		Rows.Push(Map(
 			"label",   Title,
-			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"checked", IsCategoryGated(Category) ? true : false,
 			"submenu", SubMenus[Category]))
 	}
 	return Rows
@@ -496,7 +496,7 @@ _HS_CategoryRowsDynamic() {
 	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
 	DynAllEnabled := true
 	DynCount := 0
-	for _, DCfg2 in Features["hotstrings"]["dynamic"] {
+	for _, DCfg2 in MasterGateDesiredFeatures(Features)["hotstrings"]["dynamic"] {
 		DynCount++
 		if (IsObject(DCfg2) and DCfg2.Has("enabled") and !DCfg2["enabled"])
 			DynAllEnabled := false
@@ -511,7 +511,7 @@ _HS_CategoryRowsDynamic() {
 	; until a configuration satisfied the condition guarding it.
 	Rows.Push(Map(
 		"label",   DynTitle,
-		"checked", (IsGated and DynAllEnabled and DynCount > 0) ? true : false,
+		"checked", (DynAllEnabled and DynCount > 0) ? true : false,
 		"submenu", DynMenu))
 	return Rows
 }
@@ -531,7 +531,7 @@ _HS_CategoryRowsErgopti() {
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 		Row := Map(
 			"label",   Title,
-			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"checked", IsCategoryGated(Category) ? true : false,
 			"submenu", SubMenus[Category])
 		Rows.Push(Row)
 	}
@@ -802,13 +802,13 @@ _HS_PersonalRows() {
 				and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
 			if PEnabled
 				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
-			else
+			if !ReadFeatureStateV2("hotstrings.personal." . PV2Id).Get("enabled", false)
 				PersonalAllEnabled := false
 		}
 		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
 		Rows.Push(Map(
 			"label",   PersonalTitle,
-			"checked", (IsGated and PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
+			"checked", (PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
 			"submenu", PersonalMenu))
 	}
 

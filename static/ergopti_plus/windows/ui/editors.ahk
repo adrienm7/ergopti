@@ -164,10 +164,22 @@ _EditorDestroyAfterCommit(gui, Context) {
 }
 
 _EditorBuildMagicKeyPlan(NewValue) {
+	global Features
+	if _FeatureUsesDesiredState(Features) {
+		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.trigger_char", NewValue, "")
+		Plan.publish := _EditorPublishDesiredMagicKey.Bind(Plan.publish, NewValue)
+		return Plan
+	}
 	return {
 		updates: [{ Section: "hotstrings", Key: "trigger_char", Value: NewValue }],
 		publish: _EditorPublishMagicKey.Bind(NewValue),
 	}
+}
+
+_EditorPublishDesiredMagicKey(PublishFn, NewValue) {
+	global ScriptInformation
+	PublishFn.Call()
+	ScriptInformation["MagicKey"] := NewValue
 }
 
 _EditorPublishMagicKey(NewValue) {
@@ -198,12 +210,26 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 }
 
 _EditorBuildRepeatKeyPlan() {
-	global HSE_RepeatEnabled
+	global HSE_RepeatEnabled, Features
+	if _FeatureUsesDesiredState(Features) {
+		Candidate := !ReadFeatureStateV2("hotstrings.repeat_key_enabled")["enabled"]
+		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.repeat_key_enabled", Candidate, "")
+		Plan.publish := _EditorPublishDesiredRepeatKey.Bind(Plan.publish)
+		return Plan
+	}
 	Candidate := !HSE_RepeatEnabled
 	return {
 		updates: [{ Section: "hotstrings", Key: "repeat_key_enabled", Value: Candidate }],
 		publish: _EditorPublishRepeatKey.Bind(Candidate),
 	}
+}
+
+_EditorPublishDesiredRepeatKey(PublishFn) {
+	global HSE_RepeatEnabled, Features
+	PublishFn.Call()
+	HSE_RepeatEnabled := Features["hotstrings"]["repeat_key_enabled"]
+	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
+		HSE_AdvanceRuntimeDecisionGeneration()
 }
 
 _EditorPublishRepeatKey(Candidate) {
@@ -353,6 +379,9 @@ GPTLinkEditor(*) {
 }
 
 _EditorBuildLinkPlan(NewValue) {
+	global Features
+	if _FeatureUsesDesiredState(Features)
+		return _FeatureBuildSinglePlan(Features, "shortcuts.gpt", NewValue, "link")
 	return {
 		updates: [{ Section: "shortcuts.gpt", Key: "link", Value: NewValue }],
 		publish: _EditorPublishLink.Bind(NewValue),

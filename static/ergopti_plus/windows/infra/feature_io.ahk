@@ -158,7 +158,7 @@ _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop, WriterName) {
 	CandidateNode := TargetNode.Clone()
 	CandidateNode[Key] := Value
 	return {
-		update: { Section: Loc["section"], Key: Key, Value: Value },
+		update: _ConfigSparseOperation(Loc["section"], Key, Value),
 		target_node: TargetNode,
 		candidate_node: CandidateNode,
 		key: Key
@@ -166,6 +166,9 @@ _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop, WriterName) {
 }
 
 _FeatureBuildSinglePlan(FeaturesMap, V2Path, Value, Prop) {
+	if _FeatureUsesDesiredState(FeaturesMap)
+		return _FeatureBuildDesiredPlan(FeaturesMap,
+			[Map("path", V2Path, "value", Value, "prop", Prop)], { applied: 0 })
 	Candidate := _FeatureBuildCandidate(FeaturesMap, V2Path, Value, Prop,
 		"WriteFeatureV2")
 	if !(Candidate is Object)
@@ -177,6 +180,8 @@ _FeatureBuildSinglePlan(FeaturesMap, V2Path, Value, Prop) {
 }
 
 _FeatureBuildBatchPlan(FeaturesMap, Entries, CommitState) {
+	if _FeatureUsesDesiredState(FeaturesMap)
+		return _FeatureBuildDesiredPlan(FeaturesMap, Entries, CommitState)
 	Updates := []
 	Candidates := []
 	for Entry in Entries {
@@ -204,7 +209,53 @@ _FeaturePublishCandidates(Candidates) {
 		Candidate.target_node[Candidate.key] := Candidate.candidate_node[Candidate.key]
 }
 
-; Read the runtime state of a v2 feature. Returns a Map keyed by the v2 property
+; Explicit detached callers retain their own state. Only the initialized live
+; feature tree participates in the driver's desired/runtime publication pair.
+_FeatureUsesDesiredState(FeaturesMap) {
+	global Features
+	return MasterGateState()["initialized"] && IsSet(Features) && FeaturesMap == Features
+}
+
+; Called after acquiring config.toml ownership. The runtime patch includes only
+; edited leaves, so an unrelated session refusal is never silently reactivated.
+_FeatureBuildDesiredPlan(FeaturesMap, Entries, CommitState) {
+	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(FeaturesMap))
+	Updates := []
+	Resolved := []
+	for Entry in Entries {
+		Path := Entry["path"]
+		Prop := Entry.Get("prop", "")
+		Loc := FeatureLocateV2(Desired, Path, Prop)
+		RuntimeLoc := FeatureLocateV2(FeaturesMap, Path, Prop)
+		if !(Loc is Map) || !(RuntimeLoc is Map)
+			throw Error("A desired feature path could not resolve: " . Path)
+		Loc["v2_node"][Loc["key"]] := Entry["value"]
+		Updates.Push(_ConfigSparseOperation(Loc["section"], Loc["key"], Entry["value"]))
+		Resolved.Push({ path: Path, prop: Prop, target: RuntimeLoc["v2_node"], key: RuntimeLoc["key"] })
+	}
+	CommitState.applied := Updates.Length
+	if !Updates.Length
+		return { noop: true }
+	Runtime := _HSDeepCloneMap(Desired)
+	ApplyMasterGatesToFeatures(Runtime, Map(), IsCategoryGated)
+	for Patch in Resolved {
+		Loc := FeatureLocateV2(Runtime, Patch.path, Patch.prop)
+		Patch.value := Loc["v2_node"][Loc["key"]]
+	}
+	return { updates: Updates, publish: _FeaturePublishDesiredPlan.Bind(Desired, Resolved) }
+}
+
+; All allocations, manifest reads, and durable writes finish before publication.
+_FeaturePublishDesiredPlan(Desired, Patches) {
+	PreviousCritical := Critical("On")
+	try {
+		MasterGateState()["features"] := Desired
+		for Patch in Patches
+			Patch.target[Patch.key] := Patch.value
+	} finally Critical(PreviousCritical)
+}
+
+; Read the desired state of a v2 feature. Returns a Map keyed by the v2 property
 ; names present on the feature node (enabled, letter, link, search_engine, …),
 ; or an empty Map when the path does not resolve. Mirrors the shape the menu
 ; needs while dropping the v1 PascalCase property names.
@@ -216,7 +267,7 @@ ReadFeatureStateV2(V2Path) {
 	State := Map()
 	if !IsSet(Features) or !(Features is Map)
 		return State
-	Loc := FeatureLocateV2(Features, V2Path)
+	Loc := FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)
 	if (Loc == false)
 		return State
 	Node := Loc["v2_node"]

@@ -91,12 +91,12 @@ _FIONG_NoBareCallShapesRemain() {
 Test("menu_engine: every FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 caller resolves Features explicitly (F43)", _FIONG_NoBareCallShapesRemain)
 
 _FIONG_ConfigIoCallersResolveFeatures() {
-	for _, FuncName in ["ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
-		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . " must exist in infra/config_io.ahk")
-		Assert(InStr(Body, "global") > 0 and InStr(Body, "Features") > 0,
-			FuncName . " must reference Features in its global declaration so it can pass it explicitly to WriteFeatureBatchV2 (F43)")
-	}
+	Body := _DriverFuncBody("_ConfigBuildHotstringIntentPlan")
+	Assert(Body != "", "the hotstring candidate builder must exist")
+	Assert(InStr(Body, "global Features") > 0 && InStr(Body, "MasterGateDesiredFeatures(Features)") > 0,
+		"the admitted builder must explicitly capture its global desired source")
+	Assert(InStr(Body, "_ConfigStageFeatureEntries(Desired,") > 0,
+		"the mutation helper must receive a detached explicit target")
 }
 Test("config_io: every WriteFeatureBatchV2 caller resolves Features explicitly (F43)", _FIONG_ConfigIoCallersResolveFeatures)
 
@@ -118,7 +118,7 @@ _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly() {
 	Assert(Body != "", "ReadFeatureStateV2 must exist in infra/feature_io.ahk")
 	Assert(InStr(Body, "global Features") > 0,
 		"ReadFeatureStateV2 is the documented read-only-accessor exception and may bind global Features itself")
-	Assert(InStr(Body, "FeatureLocateV2(Features, V2Path)") > 0,
-		"ReadFeatureStateV2 must pass Features explicitly into FeatureLocateV2, not rely on a delegating wrapper")
+	Assert(InStr(Body, "FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)") > 0,
+		"ReadFeatureStateV2 must pass its explicit desired view into the locator")
 }
 Test("feature_io: ReadFeatureStateV2 binds global Features (documented read-only exception) but calls FeatureLocateV2 explicitly (F43)", _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly)
