@@ -320,6 +320,60 @@ _LCT_ExtensionQuotedSegmentCase() {
 	} finally DirDelete(Dir, true)
 }
 
+Test("layout extensions: user pack overlay owns discovered files (layout-extension-runtime)",
+	_LCT_ExtensionOverlayCase)
+
+_LCT_ExtensionOverlayCase() {
+	Dir := _LCT_TempDir()
+	try {
+		for Root in ["bundled", "installed", "user"] {
+			PackDir := Dir . Root . "\ergopti\"
+			DirCreate(PackDir . "hotstrings")
+			_LCT_WriteRaw(PackDir . "manifest.toml", '[extension]' . "`n" . 'name = "' . Root . '"' . "`n")
+			_LCT_WriteRaw(PackDir . "hotstrings\rolls.toml", '[[comma]]' . "`n" . '"aa" = { output = "b" }' . "`n")
+		}
+		Packs := HotstringExtensions_Scan([Dir . "bundled", Dir . "installed", Dir . "user"])
+		AssertEqual(1, Packs.Length)
+		AssertEqual("user", Packs[1].name)
+		AssertEqual("ext:ergopti:rolls", Packs[1].toml_files[1].category)
+		AssertEqual(Dir . "user\ergopti\hotstrings\rolls.toml", Packs[1].toml_files[1].path)
+		AssertEqual("comma", Packs[1].toml_files[1].sections[1]["name"])
+		AssertEqual(0, HotstringExtensions_Scan([Dir . "missing"]).Length)
+		_LCT_WriteRaw(Dir . "not-a-directory", "content")
+		AssertThrows(() => HotstringExtensions_Scan([Dir . "not-a-directory"]),
+			"invalid roots cannot be published as an empty pack catalogue")
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout extensions: desired choices survive master gating (layout-extension-runtime)",
+	_LCT_ExtensionDesiredCase)
+
+_LCT_ExtensionDesiredCase() {
+	Category := "ext:ergopti:rolls"
+	Packs := [{ id: "ergopti", name: "Ergopti", toml_files: [
+		{ category: Category, path: "private-rolls.toml", sections: [Map("name", "comma"), Map("name", "other")] }
+	]}]
+	Target := Map("hotstrings", Map())
+	HotstringExtensions_Seed(Target, Packs, (*) => false)
+	AssertEqual(0, HotstringExtensions_RegistrationPlan(Target, Packs, true).Length,
+		"discovery cannot activate absent group or section preferences")
+	Target["hotstrings"]["groups"][Category] := true
+	Target["hotstrings"]["modules"][Category]["comma"] := true
+	HotstringExtensions_Seed(Target, Packs, (*) => false)
+	AssertTrue(Target["hotstrings"]["groups"][Category], "refresh preserves the explicit group choice")
+	AssertTrue(Target["hotstrings"]["modules"][Category]["comma"], "refresh preserves explicit section choice")
+	AssertEqual(0, HotstringExtensions_RegistrationPlan(Target, Packs, false).Length)
+	Plan := HotstringExtensions_RegistrationPlan(Target, Packs, true)
+	AssertEqual(1, Plan.Length)
+	AssertEqual(Category, Plan[1].category)
+	AssertEqual("comma", Plan[1].section)
+	AssertEqual("private-rolls.toml", Plan[1].path)
+	AssertFalse(Target["hotstrings"]["modules"][Category]["other"])
+	Target["hotstrings"]["groups"][Category] := "false"
+	AssertThrows(() => HotstringExtensions_RegistrationPlan(Target, Packs, true),
+		"a quoted string must never become an effective activation")
+}
+
 _LCT_ExtensionPublishCase() {
 	Dir := _LCT_TempDir()
 	try {
