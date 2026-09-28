@@ -68,6 +68,22 @@ function M.get(path, absent)
 	return value
 end
 
+--- Resolves related choices from one exact source snapshot.
+--- @param paths table Declared canonical paths.
+--- @return table values Effective values keyed by path.
+--- @return table source Exact bytes used to resolve the values.
+function M.get_many(paths)
+	for _, path in ipairs(paths) do entry(path) end
+	local document, source = read()
+	local values = {}
+	for _, path in ipairs(paths) do
+		local value = lookup(document, path)
+		if value == nil then value = Manifest.default_for(path) end
+		values[path] = value
+	end
+	return values, source
+end
+
 --- Marks exactly one declared leaf through the same lookup as its reader.
 --- @param document table Parsed configuration.
 --- @param path string Reader-owned canonical path.
@@ -82,17 +98,19 @@ end
 
 --- Publishes one complete batch using the exact source observed before writing.
 --- @param values table Canonical path to desired value.
+--- @param expected_source table|nil Exact snapshot used to build a cached candidate.
 --- @return boolean committed
-function M.set_many(values)
+function M.set_many(values, expected_source)
 	local called, committed, detail = pcall(function()
 		assert(type(values) == "table", "AI preference batch requires a table")
+		assert(expected_source == nil or type(expected_source) == "table", "AI preferences require an exact source snapshot")
 		local operations = {}
 		for path, value in pairs(values) do
 			validate(entry(path), value)
 			operations[#operations + 1] = Manifest.sparse_operation(path, value)
 		end
 		local _, source = read()
-		return Writer.batch_write(Paths.config("config.toml"), operations, nil, source)
+		return Writer.batch_write(Paths.config("config.toml"), operations, nil, expected_source or source)
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "AI preferences were not persisted: %s.", tostring(called and detail or committed))
