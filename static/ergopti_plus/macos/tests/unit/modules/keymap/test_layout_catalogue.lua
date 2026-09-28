@@ -32,6 +32,9 @@ end
 
 local vectors = Json.decode(read(VECTORS_PATH))
 
+require("test.layout_catalogue_local_contract")(helpers, Catalogue, Json,
+	{ max_file_bytes = vectors.max_bytes }, vectors.indexes.shipped)
+
 --- The body a vector names.
 --- @param name string
 --- @return string

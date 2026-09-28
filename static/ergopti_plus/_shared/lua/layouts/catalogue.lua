@@ -174,6 +174,7 @@ end
 --- deps.read_cache() -> { text, etag } | nil reads the local cache;
 --- deps.write_cache(text, etag) -> ok, err stores a fresh index;
 --- deps.bundled_index is the decoded index shipped with the app (or nil);
+--- deps.local_source selects the checkout's registry without remote cache or HTTP.
 --- deps.transport.get(url, headers, timeout_ms, callback(status, body, err, headers))
 --- must call back exactly once; deps.decode_json decodes.
 --- on_done(outcome) is called exactly once (see M.resolve_index); a cached
@@ -183,6 +184,13 @@ end
 --- @param deps table
 --- @param on_done function
 function M.refresh(settings, deps, on_done)
+	if deps.local_source then
+		local valid, detail = M.validate_index(deps.bundled_index)
+		on_done({ index = valid and deps.bundled_index or nil,
+			source = valid and M.SOURCE_BUNDLED or M.SOURCE_NONE, store = false,
+			error = not valid and { code = M.ERROR_INVALID_INDEX, detail = detail } or nil })
+		return
+	end
 	local cached = nil
 	local cache_warning = nil
 	local cache = deps.read_cache()

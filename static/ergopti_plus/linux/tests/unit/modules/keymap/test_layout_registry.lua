@@ -19,8 +19,9 @@ local helpers = require("tests.helpers")
 local Json = require("json")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
-local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/main/static/layouts/registry/index.json"
-local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/main/static/layouts/registry/ergol/ergol.keylayout"
+local CHANNEL = require("modules.updater.manager").installed_channel()
+local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/index.json"
+local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/ergol/ergol.keylayout"
 local PYTHON_MESSAGE = "translated: layouts.linux_needs_python"
 local LOCAL_DIR = "/cfg/layouts/"
 local SHIPPED_DIR = "/pkg/linux/static/layouts/registry/"
@@ -132,6 +133,26 @@ local function shipped_files()
 end
 
 helpers.describe("layout manager (Linux): installing", function()
+	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
+		local registry, deps, state = manager({ files = shipped_files() })
+		deps.local_source = true
+		local outcomes = {}
+		local function refreshed(outcome) outcomes[#outcomes + 1] = outcome end
+		registry.refresh(refreshed, deps)
+		helpers.assert_eq(outcomes[1].source, "bundled")
+		helpers.assert_eq(outcomes[1].error, nil)
+		state.files[SHIPPED_DIR .. "index.json"] = '{"layouts":[]}'
+		registry.refresh(refreshed, deps)
+		helpers.assert_eq(#outcomes[2].index.layouts, 0, "refresh must reread the edited local index")
+		state.files[SHIPPED_DIR .. "index.json"] = "invalid"
+		registry.refresh(refreshed, deps)
+		helpers.assert_eq(#outcomes, 3)
+		helpers.assert_eq(outcomes[3].source, "none")
+		helpers.assert_eq(outcomes[3].error.code, "invalid_index")
+		helpers.assert_eq(#state.requests, 0, "a local index must not request the unpublished remote registry")
+		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], nil)
+	end)
+
 	helpers.it("names the shared defaults file it cannot decode (layout-registry-convert)", function()
 		-- The shared json.lua answers nil to invalid JSON instead of raising, so a
 		-- reader that only checks the pcall status loses the reason.

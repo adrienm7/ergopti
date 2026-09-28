@@ -107,7 +107,7 @@ function M.settings()
 	if not layouts then return nil, layouts_err end
 	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
 	if not updater then return nil, updater_err end
-	return Registry.resolve(layouts, updater)
+	return Registry.resolve(layouts, updater, require("modules.updater").installed_channel())
 end
 
 --- The registry folder shipped with the app: the repository folder in a
@@ -130,6 +130,7 @@ local function default_deps(settings)
 	local Install = require("modules.keymap.layout_install")
 	return {
 		settings = settings,
+		local_source = require("modules.updater").is_local_source(),
 		transport = {
 			get = function(url, headers, _timeout_ms, callback)
 				client.get(url, headers, function(result)
@@ -198,12 +199,12 @@ local function write_file(deps, path, content)
 	return true, nil
 end
 
---- The index shipped with the app, decoded once.
+--- The shipped index, reread for source checkouts so Refresh sees local edits.
 --- @param deps table
 --- @return table|nil
 local function bundled_index(deps)
 	if deps.bundled_index ~= nil then return deps.bundled_index or nil end
-	if _bundled_index_read then return _bundled_index end
+	if _bundled_index_read and not deps.local_source then return _bundled_index end
 	_bundled_index_read = true
 	if type(deps.bundled_dir) ~= "string" then return nil end
 	local text = deps.read(deps.bundled_dir .. deps.settings.index_file)
@@ -273,6 +274,7 @@ function M.refresh(on_done, deps)
 	deps = resolved
 	Logger.start(LOG, "Refreshing the layout catalogue…")
 	Catalogue.refresh(deps.settings, {
+		local_source = deps.local_source,
 		read_cache = function()
 			local index_path = deps.local_dir .. deps.settings.index_file
 			if not deps.exists(index_path) then return nil end

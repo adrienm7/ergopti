@@ -131,7 +131,7 @@ _LCT_Tamper(Text, Old, New) {
 ; Runs one installation and returns [Ok, CodeOrDetail, Detail].
 _LCT_Install(Id, Dir, Transport, Bundled := 0, BundledDir := "") {
 	Results := []
-	LayoutCatalogue_Install(Id, Dir, (Args*) => Results.Push(Args), Transport, Bundled, BundledDir)
+	LayoutCatalogue_Install(Id, Dir, (Args*) => Results.Push(Args), Transport, Bundled, BundledDir, false)
 	AssertEqual(1, Results.Length, "OnDone must be called exactly once")
 	Result := Results[1]
 	while (Result.Length < 3)
@@ -203,13 +203,39 @@ _LCT_VectorsCase() {
 Test("layout catalogue: a refresh caches the index with its ETag and sends it back (layout-catalogue)",
 	_LCT_RefreshCase)
 
+Test("layout catalogue: a source checkout refreshes locally without HTTP or cache writes (layout-catalogue-local)",
+	_LCT_LocalRefreshCase)
+
+_LCT_LocalRefreshCase() {
+	Dir := _LCT_TempDir()
+	try {
+		Cache := '{"layouts":[]}'
+		_LCT_WriteRaw(Dir . "index.json", Cache)
+		for Bundled in [_LCT_Index(), 0] {
+			Log := [], Outcomes := []
+			LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Map(), Log), Bundled)
+			AssertEqual(1, Outcomes.Length, "local refresh completes once")
+			AssertEqual(0, Log.Length, "unpublished checkout data must not trigger a remote request")
+			AssertEqual(Cache, _LCT_Read(Dir . "index.json"), "local refresh preserves remote cache")
+			if (Bundled is Map) {
+				AssertEqual("bundled", Outcomes[1]["source"])
+				AssertEqual(Bundled, Outcomes[1]["index"])
+				AssertEqual(0, Outcomes[1]["error"])
+			} else {
+				AssertEqual("none", Outcomes[1]["source"])
+				AssertEqual("invalid_index", Outcomes[1]["error"]["code"])
+			}
+		}
+	} finally DirDelete(Dir, true)
+}
+
 _LCT_RefreshCase() {
 	Dir := _LCT_TempDir()
 	try {
 		Log := []
 		Outcomes := []
 		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome),
-			_LCT_Transport(_LCT_Served(_LCT_LayoutText("ergol")), Log), 0)
+			_LCT_Transport(_LCT_Served(_LCT_LayoutText("ergol")), Log), 0, false)
 		AssertEqual(1, Outcomes.Length)
 		AssertEqual("network", Outcomes[1]["source"])
 		AssertEqual(_LCT_Read(_LCT_RegistryDir() . "index.json"), _LCT_Read(Dir . "index.json"))
@@ -217,12 +243,12 @@ _LCT_RefreshCase() {
 		AssertFalse(Log[1]["headers"].Has("If-None-Match"), "nothing cached yet: no condition")
 
 		Served := Map(LayoutRegistry_RawUrl("index.json"), Map("status", 304, "body", "", "etag", '"e1"'))
-		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Served, Log), 0)
+		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Served, Log), 0, false)
 		AssertEqual('"e1"', Log[2]["headers"]["If-None-Match"], "the cached ETag makes the request conditional")
 		AssertEqual("cache", Outcomes[2]["source"])
 		AssertEqual(0, Outcomes[2]["error"], "an unchanged index is no error")
 
-		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Map(), Log, true), 0)
+		LayoutCatalogue_Refresh(Dir, (Outcome) => Outcomes.Push(Outcome), _LCT_Transport(Map(), Log, true), 0, false)
 		AssertEqual("cache", Outcomes[3]["source"])
 		AssertEqual("offline", Outcomes[3]["error"]["code"])
 		AssertFalse(FileExist(Dir . "index.json" . LAYOUT_REGISTRY_PARTIAL_SUFFIX), "no partial index is left")
@@ -386,3 +412,21 @@ _LCT_DamagedRecordInstallCase() {
 		AssertEqual(0, LayoutCatalogue_Busy(), "the operation slot is released")
 	} finally DirDelete(Dir, true)
 }
+
+_LCT_InstalledChannelUrls() {
+	global BUNDLE_CHANNEL
+	HadChannel := IsSet(BUNDLE_CHANNEL)
+	Original := HadChannel ? BUNDLE_CHANNEL : ""
+	try {
+		for Channel in UpdateChannels_Ids() {
+			BUNDLE_CHANNEL := Channel
+			AssertTrue(InStr(LayoutRegistry_RawUrl("index.json"), "/" . Channel . "/") > 0,
+				"catalogue URLs must use the installed channel")
+		}
+		BUNDLE_CHANNEL := "__UNRELEASED__"
+		AssertTrue(InStr(LayoutRegistry_RawUrl("index.json"), "/" . UpdateChannels_UnreleasedBuildChannel() . "/") > 0)
+	} finally {
+		BUNDLE_CHANNEL := HadChannel ? Original : unset
+	}
+}
+Test("layout catalogue follows packaged and local build channels (layout-registry-channel)", _LCT_InstalledChannelUrls)

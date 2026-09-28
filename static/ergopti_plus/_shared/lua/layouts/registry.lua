@@ -76,10 +76,11 @@ end
 --- Validates the shared defaults and returns the registry settings.
 --- @param layout_defaults table Decoded _shared/modules/layouts/defaults.json.
 --- @param updater_defaults table Decoded _shared/modules/updater/defaults.json.
+--- @param installed_channel string|nil Installed build owner channel; nil for standalone default resolution.
 --- @return table|nil settings { owner, repo, folder, index_file, branch, url_template, timeout_ms,
 ---   max_file_bytes, local_folder, installed_file, etag_file, ergopti_family }
 --- @return string|nil error Exact reason when the defaults are unusable.
-function M.resolve(layout_defaults, updater_defaults)
+function M.resolve(layout_defaults, updater_defaults, installed_channel)
 	local registry = type(layout_defaults) == "table" and layout_defaults.registry or nil
 	if type(registry) ~= "table" then return nil, "layout defaults declare no registry table" end
 	local github = type(updater_defaults) == "table" and updater_defaults.github or nil
@@ -103,7 +104,7 @@ function M.resolve(layout_defaults, updater_defaults)
 		repo = repo,
 		folder = registry.folder,
 		index_file = registry.index_file,
-		branch = registry.branch,
+		branch = installed_channel == nil and registry.branch or installed_channel,
 		url_template = template,
 		local_folder = registry.local_folder,
 		installed_file = registry.installed_file,

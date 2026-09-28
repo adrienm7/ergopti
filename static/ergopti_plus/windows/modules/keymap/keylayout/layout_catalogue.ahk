@@ -370,13 +370,25 @@ _LayoutCatalogueReadCache(LocalDir) {
  * @param {Map} Transport - See LayoutRegistry_Request; injectable for tests.
  * @param Bundled - Index shipped with the driver (0 for none); read from the
  *   shipped registry folder when omitted.
+ * @param {Boolean} LocalSource - Use the checkout registry; defaults to the updater's source mode.
  */
-LayoutCatalogue_Refresh(LocalDir, OnDone, Transport := 0, Bundled := unset) {
+LayoutCatalogue_Refresh(LocalDir, OnDone, Transport := 0, Bundled := unset, LocalSource := unset) {
 	global LAYOUT_REGISTRY_PARTIAL_SUFFIX, LAYOUT_REGISTRY_USER_AGENT
+	global LAYOUT_CATALOGUE_SOURCE_BUNDLED, LAYOUT_CATALOGUE_SOURCE_NONE, LAYOUT_CATALOGUE_ERROR_INVALID_INDEX
 	Settings := LayoutRegistry_Settings()
 	if !IsSet(Bundled)
 		Bundled := LayoutCatalogue_BundledIndex()
 	LoggerStart("LayoutCatalogue", "Refreshing the layout catalogue…")
+	if !IsSet(LocalSource)
+		LocalSource := Updater_IsLocalSource()
+	if LocalSource {
+		Problem := LayoutCatalogue_IndexProblem(Bundled)
+		_LayoutCatalogueFinishRefresh(Map("index", Problem == "" ? Bundled : 0,
+			"source", Problem == "" ? LAYOUT_CATALOGUE_SOURCE_BUNDLED : LAYOUT_CATALOGUE_SOURCE_NONE,
+			"store", false, "etag", "", "error", Problem == "" ? 0
+				: Map("code", LAYOUT_CATALOGUE_ERROR_INVALID_INDEX, "detail", Problem)), OnDone)
+		return
+	}
 	try {
 		if !DirExist(LocalDir)
 			DirCreate(LocalDir)
@@ -492,8 +504,10 @@ _LayoutCatalogueRelease() {
  * @param {Map} Transport - See LayoutRegistry_Request; injectable for tests.
  * @param Bundled - Index shipped with the driver (0 for none); read when omitted.
  * @param {string} BundledDir - Folder of the shipped registry; LayoutRegistry_BundledDir() when omitted.
+ * @param {Boolean} LocalSource - Optional source mode passed to the catalogue refresh.
  */
-LayoutCatalogue_Install(Id, LocalDir, OnDone, Transport := 0, Bundled := unset, BundledDir := unset) {
+LayoutCatalogue_Install(Id, LocalDir, OnDone, Transport := 0, Bundled := unset, BundledDir := unset,
+	LocalSource := unset) {
 	global LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, LAYOUT_CATALOGUE_FAILURE_BUSY, LAYOUT_CATALOGUE_FAILURE_RECORD
 	if !LayoutRegistry_IsValidId(Id) {
 		OnDone.Call(false, LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, "'" . Id . "' is not a registry layout id")
@@ -517,7 +531,7 @@ LayoutCatalogue_Install(Id, LocalDir, OnDone, Transport := 0, Bundled := unset, 
 		return
 	}
 	LayoutCatalogue_Refresh(LocalDir, _LayoutCatalogueOnInstallIndex.Bind(Id, LocalDir, Transport, Bundled,
-		BundledDir, Finish), Transport, Bundled)
+		BundledDir, Finish), Transport, Bundled, LocalSource?)
 }
 
 _LayoutCatalogueFinishInstall(Id, OnDone, Ok, CodeOrDetail, Detail := "") {

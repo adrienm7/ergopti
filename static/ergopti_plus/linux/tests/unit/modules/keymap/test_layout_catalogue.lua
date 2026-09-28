@@ -28,6 +28,9 @@ end
 
 local vectors = Json.decode(read(VECTORS_PATH))
 
+require("test.layout_catalogue_local_contract")(helpers, Catalogue, Json,
+	{ max_file_bytes = vectors.max_bytes }, vectors.indexes.shipped)
+
 --- An empty vector string stands for none.
 --- @param value string
 --- @return string|nil
