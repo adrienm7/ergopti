@@ -88,3 +88,39 @@ _NeutralConfigFirstBoot() {
 	AssertEqual(0, _FeatureStateBootRun("neutral_first_boot"), "real first boot must remain neutral")
 }
 Test("neutral-config: first boot does not seed either recommended bindings or neutral overrides", _NeutralConfigFirstBoot)
+
+; Real restore operations must use the same sparse contract as individual saves.
+_NeutralConfigSparseRestore() {
+	Rows := ManifestScopeOperations("global", "recommended")
+	NeutralScalars := 0, NeutralLeaves := 0, NonNeutral := 0
+	for Row in Rows {
+		Path := Row.Section . "." . Row.Key
+		Recommended := ManifestRecommendedFor(Path)
+		Neutral := ManifestDefaultFor(Path)
+		if ManifestValuesEqual(Recommended, Neutral) {
+			Assert(Row.HasOwnProp("Delete") && Row.Delete == 1, "neutral restore must delete: " . Path)
+			Assert(!Row.HasOwnProp("Value"), "neutral restore must not serialize a value: " . Path)
+			if ManifestFindEntryByPath(Path)
+				NeutralScalars += 1
+			else
+				NeutralLeaves += 1
+		} else {
+			NonNeutral += 1
+			Assert(!Row.HasOwnProp("Delete"), "non-neutral recommendation must remain assigned: " . Path)
+			Assert(ManifestValuesEqual(Row.Value, Recommended), "preserve recommendation: " . Path)
+		}
+		Assert(Path != "llm.enabled" && Path != "metrics.enabled" && Path != "metrics.metrics_enabled"
+			&& Path != "hotstrings.preview_ai_enabled", "restore must never import consent")
+	}
+	Assert(NeutralScalars > 0 && NeutralLeaves > 0 && NonNeutral > 0, "exercise all real recommendation shapes")
+	for Path in ["shortcuts.personal.sparse_probe", "hotstrings.personal.sparse_probe.enabled",
+		"hotstrings.personal.sparse_probe.time_activation_seconds"] {
+		Row := ManifestSparseOperation(Path, ManifestRecommendedFor(Path))
+		AssertEqual(Row.Delete, 1, "runtime-owned neutral recommendation: " . Path)
+		Assert(!Row.HasOwnProp("Value"))
+	}
+	Group := ManifestSparseOperation("hotstrings.groups.sparse_probe", ManifestRecommendedFor("hotstrings.groups.sparse_probe"))
+	AssertEqual(Group.Value, true, "a non-neutral dynamic recommendation stays explicit")
+	Assert(!Group.HasOwnProp("Delete"))
+}
+Test("neutral-config: restore recommended stays sparse (scope-sparse)", _NeutralConfigSparseRestore)

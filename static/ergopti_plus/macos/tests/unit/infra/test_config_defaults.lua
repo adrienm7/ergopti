@@ -102,3 +102,5 @@ helpers.describe("neutral configuration contract", function()
 		end
 	end)
 end)
+
+require("test.scope_sparse_contract")(helpers)

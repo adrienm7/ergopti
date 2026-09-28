@@ -55,3 +55,5 @@ helpers.describe("empty tap-hold configuration is neutral", function()
 		helpers.assert_eq(loaded.keys.left_shift, nil)
 	end)
 end)
+
+require("test.scope_sparse_contract")(helpers)

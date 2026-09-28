@@ -303,7 +303,7 @@ ManifestScopeOperations(ScopeId, Mode) {
 					Skip := Skip || ManifestPathBelongs(Path, Prefix)
 			}
 			if !Skip
-				Rows.Push(ManifestConfigRow(Path, Value, Mode == "clear"))
+				Rows.Push(Mode == "clear" ? ManifestConfigRow(Path, Value, true) : ManifestSparseOperation(Path, Value))
 		}
 	}
 	return Rows
