@@ -88,6 +88,12 @@ TomlConfigForeignOwnershipRegistry() {
 			"nav_modifiers", "LLMMenu"),
 		"llm.trigger", Map(
 			"disabled_apps", "LLMMenu"))
+	; Language packs add category gates through the same catalog FeatureState
+	; seeds at boot. These are owned settings, never unused configuration keys.
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Category in Pack["categories"]
+			Registry["category_enabled"][Category["v2"]] := "FeatureState"
+	}
 	return Registry
 }
 

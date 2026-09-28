@@ -130,6 +130,25 @@ _CUK_MissingFileHasNothingToClean() {
 Test("config unused keys: a missing config has nothing to clean "
 	. "(config-unused-keys-missing)", _CUK_MissingFileHasNothingToClean)
 
+_CUK_LanguageCategoryGatesHaveAnOwner() {
+	Target := ManifestBuildFeaturesMap()
+	Count := 0
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Category in Pack["categories"] {
+			Owner := ""
+			AssertEqual("", TomlConfigUnknownKind(Target, "category_enabled", Category["v2"], &Owner),
+				"FeatureState reads the language gate " . Category["v2"])
+			AssertEqual("FeatureState", Owner, "the generic feature loader must leave this value to its actual reader")
+			Count += 1
+		}
+	}
+	AssertTrue(Count > 0, "the shipped language packs must exercise at least one category gate")
+	AssertEqual("leaf", TomlConfigUnknownKind(Target, "category_enabled", "french_autocorection"),
+		"a language-looking typo must remain an unknown key")
+}
+Test("config language category gates remain owned and cannot be cleaned as unused (language-category-owner)",
+	_CUK_LanguageCategoryGatesHaveAnOwner)
+
 
 
 
