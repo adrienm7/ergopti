@@ -149,6 +149,52 @@ _CUK_LanguageCategoryGatesHaveAnOwner() {
 Test("config language category gates remain owned and cannot be cleaned as unused (language-category-owner)",
 	_CUK_LanguageCategoryGatesHaveAnOwner)
 
+_CUK_UnknownKeysWarnOnceWithoutErrors() {
+	Dir := _CUK_NewDir()
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, "[metrics]`nenabled = true`nobsolete_metric = true`n[old.section]`nenabled = true`n"))
+		ApplyConfigToml(ManifestBuildFeaturesMap(), Path)
+		Errors := 0, Warnings := 0
+		for Line in Lines {
+			if InStr(Line, "[TomlConfigLoader]") {
+				if InStr(Line, "[ERROR]")
+					Errors += 1
+				if InStr(Line, "[WARNING]")
+					Warnings += 1
+			}
+		}
+		AssertEqual(0, Errors, "unused keys are cleanup candidates, not runtime failures")
+		AssertEqual(1, Warnings, "one warning summarizes the whole file")
+	} finally {
+		LoggerClearTestSink()
+		DirDelete(Dir, true)
+	}
+}
+Test("config unused keys: obsolete entries produce one warning and no error (unused-config-warning)",
+	_CUK_UnknownKeysWarnOnceWithoutErrors)
+
+_CUK_StartupOffersTheExistingCleanupWithoutWriting() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteFixture(Dir)
+		Before := FSReadUtf8Exact(Path)
+		Offered := []
+		AssertTrue(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (FilePath) => Offered.Push(FilePath)))
+		AssertEqual(1, Offered.Length, "one file produces one cleanup proposal")
+		AssertEqual(Path, Offered[1], "the proposal targets the exact configuration file")
+		AssertEqual(Before, FSReadUtf8Exact(Path), "offering the tool does not accept cleanup for the user")
+		AssertFalse(ConfigUnusedKeysOffer(Dir . "\absent.toml", ConfigUnusedKeysFind, (*) => Offered.Push("unexpected")))
+		AssertTrue(FSWriteDurable(Path, "[metrics]`nenabled = true`n"))
+		AssertFalse(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (*) => Offered.Push("unexpected")))
+		AssertEqual(1, Offered.Length, "a clean or absent configuration needs no proposal")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: startup offers cleanup once without accepting it (unused-config-warning)",
+	_CUK_StartupOffersTheExistingCleanupWithoutWriting)
+
 
 
 
@@ -308,3 +354,16 @@ _CUK_MenuDeclaresTheAction() {
 }
 Test("config unused keys: the Configuration menu declares and dispatches the cleanup "
 	. "(config-unused-keys-menu)", _CUK_MenuDeclaresTheAction)
+
+_CUK_StartupDefersCleanupUntilReady() {
+	Source := _DriverSourceNoComments()
+	AssertTrue(Source != "", "driver source must be readable")
+	; The entry point stays contiguous in the source helper, so these positions
+	; prove the timer is armed after readiness even when the entry is relocated.
+	Ready := InStr(Source, "_DriverReady := true")
+	Offer := InStr(Source, "SetTimer(ConfigUnusedKeysOffer.Bind(ConfigurationFile), -MENU_BUILD_DEFER_MS)")
+	AssertTrue(Ready > 0, "the driver must publish readiness")
+	AssertTrue(Offer > Ready, "the cleanup prompt must be deferred until after readiness")
+}
+Test("config unused keys: startup schedules the cleanup offer after readiness (unused-config-warning)",
+	_CUK_StartupDefersCleanupUntilReady)

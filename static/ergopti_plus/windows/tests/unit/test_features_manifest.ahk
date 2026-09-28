@@ -664,7 +664,31 @@ TestFMv2_ApplyNestedSubSection() {
 Test("ApplyConfigToml: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
 
-TestFMv2_ApplyHsSectionIsLoudlyRejected() {
+; Unused entries are maintenance: one summary warning, with exact identities
+; available to the cleanup workflow rather than one runtime error per key.
+_FM_AssertUnusedWarning(Captured, Path, ExpectedKeys) {
+	Warnings := []
+	Errors := 0
+	for Line in Captured {
+		if InStr(Line, "[ERROR]", true)
+			Errors += 1
+		if InStr(Line, "[WARNING]", true) && InStr(Line, "[TomlConfigLoader]", true)
+			Warnings.Push(Line)
+	}
+	AssertEqual(0, Errors, "unused entries must not trigger runtime errors")
+	AssertEqual(1, Warnings.Length, "one warning must summarize every unused entry")
+	AssertContains(Warnings[1], "Ignored " . ExpectedKeys.Length . " unused configuration key(s) in '" . Path . "'")
+	Scan := ConfigUnusedKeysFind(Path)
+	AssertEqual("ok", Scan["status"], "the cleanup must be able to inspect the fixture")
+	AssertEqual(ExpectedKeys.Length, Scan["keys"].Length, "only the unused entries may be proposed for cleanup")
+	Actual := Map()
+	for Entry in Scan["keys"]
+		Actual[Entry["section"] . "." . Entry["key"]] := true
+	for Key in ExpectedKeys
+		AssertTrue(Actual.Has(Key), "the cleanup must name the exact unused entry: " . Key)
+}
+
+TestFMv2_ApplyHsSectionOffersCleanup() {
 	OldFeatures := _FM_BeginIsolated()
 	Captured := []
 	LoggerSetTestSink((Line) => Captured.Push(Line))
@@ -675,14 +699,8 @@ TestFMv2_ApplyHsSectionIsLoudlyRejected() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"],
-			"a foreign namespace error must not abort following valid configuration")
-		Errors := []
-		for Line in Captured
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		AssertEqual(1, Errors.Length, "[hs.*] must emit exactly one ERROR")
-		AssertTrue(InStr(Errors[1], "[hs.gestures]", true) > 0,
-			"the loud error must name the rejected foreign section")
+			"a foreign namespace must not abort following valid configuration")
+		_FM_AssertUnusedWarning(Captured, Path, ["hs.gestures.swipe_2_left"])
 		FileDelete(Path)
 	} finally {
 		LoggerClearTestSink()
@@ -691,7 +709,7 @@ TestFMv2_ApplyHsSectionIsLoudlyRejected() {
 		_FM_EndIsolated(OldFeatures)
 	}
 }
-Test("ApplyConfigToml: [hs.*] sections are loudly rejected", TestFMv2_ApplyHsSectionIsLoudlyRejected)
+Test("ApplyConfigToml: unused [hs.*] sections are offered for cleanup", TestFMv2_ApplyHsSectionOffersCleanup)
 
 TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 	OldFeatures := _FM_BeginIsolated()
@@ -706,13 +724,7 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"])
-		Errors := []
-		for Line in Captured
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		AssertEqual(1, Errors.Length, "an unknown section must emit exactly one ERROR")
-		AssertTrue(InStr(Errors[1], "hotstrings.no_such_group", true) > 0,
-			"the error must name the unknown section")
+		_FM_AssertUnusedWarning(Captured, Path, ["hotstrings.no_such_group.foo"])
 		FileDelete(Path)
 	} finally {
 		LoggerClearTestSink()
@@ -740,14 +752,7 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 			"a typo must not create a parasite key in a static section")
 		AssertEqual("es", Features["script"]["locale"],
 			"rejecting a typo must not abort the following valid override")
-		Errors := []
-		for Line in Captured
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		AssertEqual(1, Errors.Length,
-			"an unknown static leaf must emit exactly one ERROR")
-		AssertTrue(InStr(Errors[1], "[script].locael", true) > 0,
-			"the error must name the rejected leaf")
+		_FM_AssertUnusedWarning(Captured, Path, ["script.locael"])
 	} finally {
 		LoggerClearTestSink()
 		if IsSet(Path) && FileExist(Path)
@@ -755,7 +760,7 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 		_FM_EndIsolated(OldFeatures)
 	}
 }
-Test("ApplyConfigToml: unknown static leaf keys are loudly rejected",
+Test("ApplyConfigToml: unused static leaf keys are offered for cleanup",
 	TestFMv2_ApplyUnknownStaticLeafIsRejected)
 
 TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
@@ -790,25 +795,11 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 		AssertEqual(0, Applied,
 			"foreign owners, not the Features loader, must apply these keys")
 
-		Errors := []
 		Joined := ""
-		for Line in Captured {
+		for Line in Captured
 			Joined .= Line . "`n"
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		}
-		AssertEqual(3, Errors.Length,
-			"only the three typo fixtures must be reported as errors")
-		for Expected in ["autocorrectoin", "trigger_shortcut_typo", "win_cc"] {
-			Found := false
-			for Line in Errors {
-				if InStr(Line, Expected, true) {
-					Found := true
-					break
-				}
-			}
-			AssertTrue(Found, "the rejected typo must be named: " . Expected)
-		}
+		_FM_AssertUnusedWarning(Captured, Path,
+			["category_enabled.autocorrectoin", "llm.trigger_shortcut_typo", "shortcuts.keyboard.win_cc"])
 		AssertEqual("ConfigIO",
 			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
 			"a picker-created keyboard slot must name its real config owner")
