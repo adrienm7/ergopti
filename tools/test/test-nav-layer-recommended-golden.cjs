@@ -193,9 +193,8 @@ function parenDelta(text) {
 // The activation special cases: each fixes how a particular hold key enters the
 // layer; none is a binding of the layer itself.
 const SPECIAL_CASES = [
-	{ token: '_AnyShortcutEnabled("lalt_caps_lock")', label: 'SC03A' },
-	{ token: '_LAltIsBackspaceLayer()', label: 'SC038' },
-	{ token: 'TapHoldHoldLayer(TapHold, "space") == "nav"', label: 'SC039' }
+	{ token: '_AnyShortcutEnabled("lalt_caps_lock")', label: '*SC03A' },
+	{ token: '_LAltIsBackspaceLayer()', label: '*SC038' }
 ];
 
 // AutoHotkey sources carry a UTF-8 BOM; drop it before the first label is read.

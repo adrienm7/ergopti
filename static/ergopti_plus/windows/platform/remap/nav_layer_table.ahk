@@ -19,13 +19,10 @@
 ; 2. The repeat count stays Windows' own: repeat_count:<N> sets it, and a
 ;    repeatable action applies it to its last chord, exactly as the
 ;    hand-written "{Up " . Count . "}" did; any sent action then resets it.
-; 3. AltGr has three physical spellings on Windows: LCtrl then RAlt on an AltGr
-;    layout, a bare RAlt on QWERTY, and SC138 alone on Kana/IME layouts. A
-;    binding on AltRight registers all three, and the two RAlt spellings step
-;    aside while the Kana key is physically down, so one press is one action.
-; 4. Pointer inputs (mouse buttons, wheel) fire whatever modifier is held, as
-;    the hand-written wheel hotkeys did: the hand on the mouse is not the one
-;    holding modifiers.
+; 3. AltGr has one physical scan-code owner on every layout. Its LCtrl
+;    combination preserves Ctrl; no virtual RAlt alias competes with SC138.
+; 4. Every physical input is a wildcard, preserving the upstream layer while
+;    modifiers are held, including keyboard keys, mouse buttons and wheels.
 ; 5. Registered once per process, before the table can be half-registered by a
 ;    second caller; a key the file does not bind keeps its normal behaviour.
 ; ==============================================================================
@@ -43,14 +40,9 @@ global NAV_LAYER_COUNT_PLACEHOLDER := "N"
 global NAV_LAYER_HOTKEY_OPTIONS := "I2"
 ; Row criteria, and the HotIf callbacks they stand for (section 3).
 global NAV_LAYER_CRITERION_LAYER := "layer"
-global NAV_LAYER_CRITERION_KANA := "layer_kana"
-; The AltGr spellings a binding on AltRight registers under the plain layer
-; criterion, and the Kana one registered under the Kana criterion.
+; Both AltGr forms share the navigation criterion on every keyboard layout.
 global NAV_LAYER_ALTGR_CODE := "AltRight"
-global NAV_LAYER_ALTGR_LABELS := ["SC01D & ~SC138", "RAlt"]
-global NAV_LAYER_KANA_LABEL := "SC138"
-; Physical-key kinds whose hotkeys fire whatever modifier is held.
-global NAV_LAYER_POINTER_KINDS := Map("mouse_button", true, "wheel", true)
+global NAV_LAYER_ALTGR_LABELS := ["~SC01D & ~SC138", "*SC138"]
 ; Layer-vocabulary modifier -> the chord notation's name, whose AutoHotkey
 ; symbol adapters/hotkey_registrar.ahk owns (HOTKEY_MOD_PREFIXES).
 global NAV_LAYER_MODIFIER_CHORD_NAMES := Map("ctrl", "ctrl", "alt", "alt", "shift", "shift", "meta", "cmd")
@@ -78,8 +70,7 @@ global _NavLayerRegistered := false
  *          counted, count, handler and kana_guard.
  */
 NavLayer_BuildTable(Bindings, Ctx) {
-	global NAV_LAYER_ALTGR_CODE, NAV_LAYER_ALTGR_LABELS, NAV_LAYER_KANA_LABEL
-	global NAV_LAYER_CRITERION_LAYER, NAV_LAYER_CRITERION_KANA, NAV_LAYER_POINTER_KINDS
+	global NAV_LAYER_ALTGR_CODE, NAV_LAYER_ALTGR_LABELS, NAV_LAYER_CRITERION_LAYER
 	if !(Bindings is Map)
 		throw ValueError("NavLayer_BuildTable needs the layer's bindings as a Map.", -1)
 	Rows := []
@@ -89,11 +80,10 @@ NavLayer_BuildTable(Bindings, Ctx) {
 		KeyEntry := Ctx["keys"][KeyCode]
 		if (KeyCode == NAV_LAYER_ALTGR_CODE) {
 			for Label in NAV_LAYER_ALTGR_LABELS
-				Rows.Push(_NavLayer_Row(KeyCode, Label, NAV_LAYER_CRITERION_LAYER, Resolution, Ctx, true))
-			Rows.Push(_NavLayer_Row(KeyCode, NAV_LAYER_KANA_LABEL, NAV_LAYER_CRITERION_KANA, Resolution, Ctx, false))
+				Rows.Push(_NavLayer_Row(KeyCode, Label, NAV_LAYER_CRITERION_LAYER, Resolution, Ctx, false))
 			continue
 		}
-		Label := NAV_LAYER_POINTER_KINDS.Has(KeyEntry["kind"]) ? "*" . KeyEntry["ahk"] : KeyEntry["ahk"]
+		Label := "*" . KeyEntry["ahk"]
 		Rows.Push(_NavLayer_Row(KeyCode, Label, NAV_LAYER_CRITERION_LAYER, Resolution, Ctx, false))
 	}
 	return Rows
@@ -194,7 +184,7 @@ NavLayer_Callback(Row, SendFn := ActionLayer, SetCountFn := SetNumberOfRepetitio
 		Callback := _NavLayer_Swallow
 	else
 		throw ValueError("Unknown navigation-layer action '" . RowAction . "'.", -1)
-	return Row["kana_guard"] ? _NavLayer_KanaGuarded.Bind(Callback) : Callback
+	return Callback
 }
 
 _NavLayer_SendOnce(Text, SendFn, *) {
@@ -219,15 +209,6 @@ _NavLayer_MaximizeWindow(*) {
 	try WinMaximize("A")
 	catch
 		try LoggerDebug("NavLayer", "WinMaximize skipped — no active window.")
-}
-
-; Physical Kana AltGr is SC138 and has its own row. A virtual RAlt alias must
-; not send a second action for the same physical press.
-_NavLayer_KanaGuarded(Callback, ThisHotkey) {
-	global _ALTGR_KANA_FIXUP
-	if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
-		return
-	Callback.Call(ThisHotkey)
 }
 
 
@@ -255,11 +236,6 @@ _NavLayer_LayerActive(*) {
 	return LayerEnabled
 }
 
-_NavLayer_KanaLayerActive(*) {
-	global LayerEnabled, _ALTGR_KANA_FIXUP
-	return LayerEnabled and _ALTGR_KANA_FIXUP
-}
-
 /**
  * Registers the rows as hotkeys under their criteria. Once per process.
  * @param {Array} Rows - From NavLayer_BuildTable.
@@ -269,12 +245,10 @@ _NavLayer_KanaLayerActive(*) {
  */
 NavLayer_Register(Rows, HotkeyFn := Hotkey, HotIfFn := HotIf) {
 	global _NavLayerRegistered, NAV_LAYER_HOTKEY_OPTIONS
-	global NAV_LAYER_CRITERION_LAYER, NAV_LAYER_CRITERION_KANA
+	global NAV_LAYER_CRITERION_LAYER
 	if _NavLayerRegistered
 		throw Error("The navigation layer is already registered.", -1)
-	Criteria := Map(
-		NAV_LAYER_CRITERION_LAYER, _NavLayer_LayerActive,
-		NAV_LAYER_CRITERION_KANA, _NavLayer_KanaLayerActive)
+	Criteria := Map(NAV_LAYER_CRITERION_LAYER, _NavLayer_LayerActive)
 	; Build every callback before the first registration, so a bad row fails
 	; before any hotkey exists rather than halfway through the table.
 	Callbacks := []

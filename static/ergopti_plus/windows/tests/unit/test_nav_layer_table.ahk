@@ -30,7 +30,7 @@
 
 #Requires AutoHotkey v2.0
 
-; Floor: the hand-written layer registered 48 hotkeys. A fixture or a table that
+; Floor: the upstream layer registered 47 hotkeys. A fixture or a table that
 ; stopped being read would otherwise compare nothing.
 global NLT_MIN_GOLDEN_ROWS := 40
 
@@ -150,8 +150,8 @@ _NLT_OneKeyEditChangesOnlyThatKey() {
 			Changed.Push(Identity)
 	}
 	AssertEqual(1, Changed.Length, "exactly one hotkey must change")
-	AssertEqual("SC014 | layer", Changed[1], "the changed hotkey must be KeyT's")
-	AssertEqual("send:{F3}", After["SC014 | layer"])
+	AssertEqual("*SC014 | layer", Changed[1], "the changed hotkey must be KeyT's")
+	AssertEqual("send:{F3}", After["*SC014 | layer"])
 }
 Test("nav layer table: editing one key of layers.toml changes that key's hotkey only (nav-layer-generated)",
 	_NLT_OneKeyEditChangesOnlyThatKey)
@@ -171,17 +171,15 @@ _NLT_PointerAndAltGrLabels() {
 	for Row in Rows
 		Labels[Row["hotkey"]] := Row
 	AssertTrue(Labels.Has("*XButton1"), "a mouse button fires whatever modifier is held")
-	for Label in ["SC01D & ~SC138", "RAlt"] {
-		AssertTrue(Labels.Has(Label), "AltRight must register its " . Label . " spelling")
+	for Label in ["~SC01D & ~SC138", "*SC138"] {
+		AssertTrue(Labels.Has(Label), "AltRight must keep its upstream physical " . Label . " spelling")
 		AssertEqual(NAV_LAYER_CRITERION_LAYER, Labels[Label]["criterion"])
-		AssertTrue(Labels[Label]["kana_guard"], Label . " must step aside while the Kana key is down")
+		AssertFalse(Labels[Label]["kana_guard"], "a physical identity has no virtual RAlt duplicate to defer")
 	}
-	AssertTrue(Labels.Has("SC138"), "AltRight must register the Kana SC138 spelling")
-	AssertEqual(NAV_LAYER_CRITERION_KANA, Labels["SC138"]["criterion"])
-	AssertFalse(Labels["SC138"]["kana_guard"], "the Kana spelling is the one the guard defers to")
-	AssertEqual(4, Rows.Length, "one mouse row and three AltGr rows")
+	AssertFalse(Labels.Has("RAlt"), "RAlt would duplicate the physical scan-code owner")
+	AssertEqual(3, Rows.Length, "one mouse row and the two upstream AltGr rows")
 }
-Test("nav layer table: pointer inputs are wildcards and AltRight registers its three AltGr spellings",
+Test("nav layer table: pointer and AltGr keep the upstream physical identities",
 	_NLT_PointerAndAltGrLabels)
 
 
@@ -211,7 +209,7 @@ _NLT_RegistersEveryRowUnderItsCriterion() {
 			AssertEqual(Row["hotkey"], Registered[RowIndex]["name"])
 			AssertEqual(NAV_LAYER_HOTKEY_OPTIONS, Registered[RowIndex]["options"],
 				Row["hotkey"] . " must carry the layer's input level")
-			Expected := (Row["criterion"] == NAV_LAYER_CRITERION_KANA) ? _NavLayer_KanaLayerActive : _NavLayer_LayerActive
+			Expected := _NavLayer_LayerActive
 			AssertTrue(Registered[RowIndex]["criterion"] == Expected, Row["hotkey"] . " must live under its own criterion")
 		}
 		AssertEqual("reset", HotIfCalls[HotIfCalls.Length], "HotIf is process-wide and must be reset afterwards")
@@ -229,17 +227,17 @@ _NLT_CriteriaFollowTheLayerState() {
 	try {
 		LayerEnabled := false, _ALTGR_KANA_FIXUP := true
 		AssertFalse(_NavLayer_LayerActive(), "no binding fires outside the layer")
-		AssertFalse(_NavLayer_KanaLayerActive(), "no Kana binding fires outside the layer")
 		LayerEnabled := true
 		AssertTrue(_NavLayer_LayerActive())
-		AssertTrue(_NavLayer_KanaLayerActive())
 		_ALTGR_KANA_FIXUP := false
-		AssertFalse(_NavLayer_KanaLayerActive(), "the Kana spelling is registered only for Kana layouts")
+		AssertTrue(_NavLayer_LayerActive(), "physical AltGr works on standard layouts too")
+		LayerEnabled := false
+		AssertFalse(_NavLayer_LayerActive(), "standard layouts also require the navigation gate")
 	} finally {
 		LayerEnabled := SavedLayer, _ALTGR_KANA_FIXUP := SavedKana
 	}
 }
-Test("nav layer table: the criteria follow LayerEnabled and the Kana fix-up", _NLT_CriteriaFollowTheLayerState)
+Test("nav layer table: the criterion follows LayerEnabled on every layout", _NLT_CriteriaFollowTheLayerState)
 
 
 
@@ -263,23 +261,23 @@ _NLT_CallbacksSendWhatTheRowSays() {
 	SetCountFn := (N) => Counts.Push(N)
 	CountFn := () => 3
 
-	NavLayer_Callback(ByLabel["SC01F | layer"], SendFn, SetCountFn, CountFn).Call("SC01F")
+	NavLayer_Callback(ByLabel["*SC01F | layer"], SendFn, SetCountFn, CountFn).Call("SC01F")
 	AssertEqual("{Up 3}", Sent[Sent.Length], "a repeatable action sends its last chord the repeat count times")
-	NavLayer_Callback(ByLabel["SC02F | layer"], SendFn, SetCountFn, CountFn).Call("SC02F")
+	NavLayer_Callback(ByLabel["*SC02F | layer"], SendFn, SetCountFn, CountFn).Call("SC02F")
 	AssertEqual("{End}{Enter 3}", Sent[Sent.Length], "the count applies to the last chord only")
-	NavLayer_Callback(ByLabel["SC010 | layer"], SendFn, SetCountFn, CountFn).Call("SC010")
+	NavLayer_Callback(ByLabel["*SC010 | layer"], SendFn, SetCountFn, CountFn).Call("SC010")
 	AssertEqual("^+{Home}", Sent[Sent.Length], "a non-repeatable action ignores the count")
-	NavLayer_Callback(ByLabel["SC004 | layer"], SendFn, SetCountFn, CountFn).Call("SC004")
+	NavLayer_Callback(ByLabel["*SC004 | layer"], SendFn, SetCountFn, CountFn).Call("SC004")
 	AssertEqual(3, Counts[Counts.Length], "Digit3 sets the repeat count to 3")
-	AssertTrue(NavLayer_Callback(ByLabel["SC031 | layer"]) == _NavLayer_MaximizeWindow,
+	AssertTrue(NavLayer_Callback(ByLabel["*SC031 | layer"]) == _NavLayer_MaximizeWindow,
 		"KeyN runs the maximize handler")
 
 	SavedKana := _ALTGR_KANA_FIXUP
 	try {
 		_ALTGR_KANA_FIXUP := false
 		Before := Sent.Length
-		NavLayer_Callback(ByLabel["RAlt | layer"], SendFn, SetCountFn, CountFn).Call("RAlt")
-		AssertEqual(Before + 1, Sent.Length, "without the Kana fix-up the RAlt spelling sends")
+		NavLayer_Callback(ByLabel["*SC138 | layer"], SendFn, SetCountFn, CountFn).Call("*SC138")
+		AssertEqual(Before + 1, Sent.Length, "without the Kana fix-up the physical AltGr still sends")
 		AssertEqual("{Escape 3}", Sent[Sent.Length])
 	} finally {
 		_ALTGR_KANA_FIXUP := SavedKana
@@ -431,3 +429,19 @@ _NLT_InitWithoutAFileReadsNoRegistry() {
 }
 Test("nav layer boot: without a layers.toml the physical-key registry is not read (nav-layer-generated)",
 	_NLT_InitWithoutAFileReadsNoRegistry)
+
+; Navigation remains active under every held modifier, as the upstream static
+; layer did. Plain scan-code hotkeys would stop matching Ctrl+layer+letter.
+_NLT_PhysicalKeysKeepWildcards() {
+	Ctx := KeymapLayers_LoadContext(_NLT_SharedDir())
+	Rows := _NLT_Rows(Ctx, _NLT_RecommendedText())
+	Checked := 0
+	for Row in Rows {
+		if (Row["code"] == "AltRight")
+			continue
+		AssertEqual("*", SubStr(Row["hotkey"], 1, 1), Row["code"] . " must match under held modifiers")
+		Checked += 1
+	}
+	Assert(Checked >= NLT_MIN_GOLDEN_ROWS, "the wildcard check must cover the recommended physical layer")
+}
+Test("nav layer table: physical bindings retain upstream wildcards", _NLT_PhysicalKeysKeepWildcards)
