@@ -65,7 +65,10 @@ function M.new(options)
 				apply = function(decoded, updates)
 					if runtime.apply(decoded, updates) ~= true then return false end
 					local saved = active_snapshot
-					if options.demotion_feature then saved.demotions = demotions.release_feature(options.demotion_feature) end
+					if options.demotion_feature then
+						local keys = options.demotion_keys and options.demotion_keys(updates) or nil
+						saved.demotions = demotions.release_feature(options.demotion_feature, keys)
+					end
 					if preferences.replace_source(options.path, saved.source, saved.candidate) ~= true then return false end
 					saved.source_staged = true
 					local accepted, candidate_checkpoint = checkpoint.replace(saved.checkpoint, state, options.capture_preferences())

@@ -21,6 +21,7 @@
 local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
+	"ui.menu.metrics_scope",
 	"ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
 	"infra.dialog_util",
@@ -363,6 +364,7 @@ local function with_menu_fixture(options, callback)
 		open_editor = noop,
 	}
 	package.loaded["ui.menu.menu_state"] = {
+		metrics_start_pending = function() return false end,
 		-- Same order as menu_state: the Shortcuts switch opens or closes the
 		-- admission fence first, then every saved key is replayed behind it.
 		sync_state_to_modules = function(live_state, saved)
@@ -1168,6 +1170,49 @@ helpers.describe("layout scope menu composition", function()
 			helpers.assert_eq(received.path, "/virtual/config.toml")
 			selected = "onboarding.btn.yes"
 			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("keyboard_layout", "recommended"), true)
+			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+		end)
+	end)
+end)
+
+helpers.describe("metrics scope menu composition", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+		with_menu_fixture({}, function(observations)
+			local received, selected, dialog_args
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				dialog_args = { ... }
+				return selected
+			end }
+			package.loaded["ui.menu.metrics_scope"] = { new = function(options)
+				received = options
+				return { apply = function(mode)
+					return options.admission("metrics scope fixture", function()
+						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
+							"ordinary save must not enter an owned scope")
+						return options.confirm(mode)
+					end)
+				end }
+			end }
+			selected = "onboarding.btn.no"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("metrics", "clear"), false)
+			helpers.assert_eq(dialog_args[3], "onboarding.btn.no")
+			helpers.assert_eq(dialog_args[4], "onboarding.btn.yes")
+			helpers.assert_eq(dialog_args[2], "common.clear_to_system")
+			helpers.assert_type(received.activation_pending, "function")
+			helpers.assert_type(received.capture_shortcuts, "function")
+			helpers.assert_eq(received.apply_shortcut("metrics_shortcut", { "ctrl" }, "m", false), true)
+			local shortcut = received.capture_shortcuts().metrics_shortcut
+			helpers.assert_eq(shortcut.key, "m")
+			helpers.assert_eq(shortcut.enabled, false)
+			shortcut.mods[1] = "alt"
+			helpers.assert_eq(received.capture_shortcuts().metrics_shortcut.mods[1], "ctrl")
+			helpers.assert_eq(received.apply_shortcut("metrics_shortcut", nil, nil), true)
+			helpers.assert_eq(received.capture_shortcuts().metrics_shortcut, false)
+			helpers.assert_type(received.checkpoint.capture, "function")
+			helpers.assert_type(received.checkpoint.replace, "function")
+			helpers.assert_eq(received.path, "/virtual/config.toml")
+			selected = "onboarding.btn.yes"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("metrics", "recommended"), true)
 			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
 		end)
 	end)

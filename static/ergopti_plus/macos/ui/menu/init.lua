@@ -130,12 +130,26 @@ local function bind_managed_hotkey(mods, key, callback)
 	end
 	local handle = Hotkeys.bind(chord, callback)
 	if not handle then return nil end
+	local posture = true
+	local function set_enabled(value)
+		local result = Hotkeys.setEnabled(handle, value)
+		if result == true then posture = value else posture = nil end
+		return result
+	end
+	local saved_mods = {}
+	for index, value in ipairs(mods) do saved_mods[index] = value end
 	return {
-		enable = function() return Hotkeys.setEnabled(handle, true) end,
-		disable = function() return Hotkeys.setEnabled(handle, false) end,
+		enable = function() return set_enabled(true) end,
+		disable = function() return set_enabled(false) end,
+		snapshot = function()
+			if posture == nil then return nil end
+			local copy = {}
+			for index, value in ipairs(saved_mods) do copy[index] = value end
+			return { mods = copy, key = key, enabled = posture }
+		end,
 		delete = function()
 			if not handle then return true end
-			if Hotkeys.unbind(handle) ~= true then return false end
+			if Hotkeys.unbind(handle) ~= true then posture = nil; return false end
 			handle = nil
 			return true
 		end,
@@ -1255,8 +1269,60 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return committed
 	end
+	local metrics_scope = nil
 	local layout_scope = nil
 	local function apply_preference_scope(scope, mode)
+		if scope == "metrics" then
+			if read_only_reason ~= nil then return false end
+			if not metrics_scope then
+				metrics_scope = require("ui.menu.metrics_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, core = core_mods.keylogger,
+					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
+					script_control = core_mods.shortcuts_mod,
+					activation_pending = MenuState.metrics_start_pending,
+					capture_shortcuts = function()
+						if #_retired_menu_hotkeys > 0 then return nil end
+						local captured = {}
+						for name, box in pairs({ metrics_shortcut = _metrics_hk_box, apps_time_shortcut = _apps_time_hk_box }) do
+							if box[1] then
+								captured[name] = box[1].snapshot()
+								if captured[name] == nil then return nil end
+							else captured[name] = false end
+						end
+						return captured
+					end,
+					apply_shortcut = function(name, mods, key, enabled)
+						local callback = name == "metrics_shortcut" and apply_metrics_shortcut or apply_apps_time_shortcut
+						if callback(mods, key, false) ~= true then return false end
+						local box = name == "metrics_shortcut" and _metrics_hk_box or _apps_time_hk_box
+						if enabled == false and box[1] then return box[1]:disable() == true end
+						return true
+					end,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod) ~= "table"
+							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".metrics-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.metrics.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			local committed = metrics_scope.apply(mode)
+			if committed == true then Builder.invalidate_cache(); updateMenu() end
+			return committed
+		end
 		if scope ~= "keyboard_layout" then return false end
 		if read_only_reason ~= nil then return false end
 		if not layout_scope then

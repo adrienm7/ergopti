@@ -25,6 +25,11 @@ local LOG    = "menu_state"
 -- critical path; a sub-second gap of unlogged keystrokes after boot is harmless.
 local KEYLOGGER_START_DELAY_SEC = 0.5
 local _keylogger_start_generation = 0
+local _keylogger_start_pending = false
+
+--- Reports boot activation that has not reached the native lifecycle owner.
+--- @return boolean pending True until the current deferred start settles.
+function M.metrics_start_pending() return _keylogger_start_pending end
 
 
 
@@ -492,6 +497,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if kl then
 		_keylogger_start_generation = _keylogger_start_generation + 1
 		local keylogger_generation = _keylogger_start_generation
+		_keylogger_start_pending = false
 		if type(kl.set_options) == "function" then
 			try("metrics", "keylogger.set_options", kl.set_options, {
 				encrypt     = state.keylogger_encrypt,
@@ -520,8 +526,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			-- harmless — defer it off the boot critical path so the menubar/UI become
 			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
 			local _shortcuts_ref = core_mods.shortcuts_mod
-			DeferredWork.after(KEYLOGGER_START_DELAY_SEC, function()
+			_keylogger_start_pending = true
+			local scheduling, fired = true, false
+			local function activate()
 				if keylogger_generation ~= _keylogger_start_generation then return end
+				if scheduling then fired = true; return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
 				local start_ok, started = try("metrics", "keylogger.start", kl.start, _shortcuts_ref)
@@ -541,9 +550,16 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 						end
 					end
 				end
+				_keylogger_start_pending = false
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
-			end, "menu_state.keylogger_start")
+			end
+			local scheduled = DeferredWork.after(KEYLOGGER_START_DELAY_SEC, activate, "menu_state.keylogger_start")
+			scheduling = false
+			if scheduled ~= true then
+				_keylogger_start_generation = _keylogger_start_generation + 1
+				_keylogger_start_pending = false
+			elseif fired then activate() end
 		else
 			if type(kl.stop) == "function" then
 				local stop_ok, stopped = try("metrics", "keylogger.stop", kl.stop)

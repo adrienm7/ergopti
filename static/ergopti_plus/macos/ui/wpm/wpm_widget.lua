@@ -574,4 +574,24 @@ function M.set_use_source_colors(enabled)
 	_use_source_colors = enabled ~= false
 end
 
+--- Captures the exact display policy and current native lifecycle posture.
+--- @return table snapshot Detached settings, without canvas or timer handles.
+function M.configuration_snapshot()
+	return { running = M.is_running(), colors = _use_source_colors, graph = _show_graph }
+end
+
+--- Reconciles scope settings through the existing terminal lifecycle owner.
+--- @param config table Previously captured or explicitly planned display settings.
+--- @return boolean committed True only after native resources settle.
+function M.apply_configuration(config)
+	assert(type(config) == "table" and type(config.running) == "boolean"
+		and type(config.colors) == "boolean" and type(config.graph) == "boolean", "invalid WPM scope configuration")
+	M.set_use_source_colors(config.colors)
+	if config.running then return M.start(config.graph) == true end
+	_show_graph = config.graph
+	if M.stop() ~= true then return false end
+	_pause_restore_pending = false
+	return M.is_running() == false
+end
+
 return M
