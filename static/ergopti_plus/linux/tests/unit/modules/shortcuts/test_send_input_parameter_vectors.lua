@@ -18,6 +18,8 @@
 local helpers = require("tests.helpers")
 local json = require("json")
 
+require("test.action_parameter_label_contract")(helpers, json, helpers.driver_root() .. "/../_shared")
+
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/send_input_vectors.json"
 
 local ACTIONS = { text = "send_text", key = "send_key", shortcut = "send_shortcut" }

@@ -16,6 +16,8 @@
 local helpers = require("tests.helpers")
 local json = require("json")
 
+require("test.action_parameter_label_contract")(helpers, json, helpers.shared(""))
+
 local CORPUS = helpers.shared("tests/corpus/action_parameters/send_input_vectors.json")
 
 --- @return table The decoded corpus.

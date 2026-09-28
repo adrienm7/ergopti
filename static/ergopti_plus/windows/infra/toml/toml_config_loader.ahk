@@ -40,6 +40,12 @@
 
 
 
+#Include ../../_generated/action_catalogue.ahk
+
+
+
+
+
 ; =================================
 ; =================================
 ; ======= 1. Value coercion =======
@@ -96,6 +102,15 @@ TomlConfigForeignOwnershipRegistry() {
 	return Registry
 }
 
+; Action parameters use the binding grammar written by the gesture, shortcut
+; and tap-hold owners. Only actions declaring a parameter can consume a value.
+TomlConfigActionParameterIsOwned(Key) {
+	static Actions := GestureActionCatalogueData().Actions
+	if !RegExMatch(Key, "^(?:gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
+		return false
+	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
+}
+
 TomlConfigForeignOwner(SectionPath, Key) {
 	Registry := TomlConfigForeignOwnershipRegistry()
 	if Registry.Has(SectionPath) {
@@ -103,6 +118,8 @@ TomlConfigForeignOwner(SectionPath, Key) {
 		if Section.Has(Key)
 			return Section[Key]
 	}
+	if SectionPath == "action_parameters" && TomlConfigActionParameterIsOwned(Key)
+		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
 	; Admit exactly the prefixes and keys that ShowKeyboardSlotPicker can create;
 	; a broad section exemption would hide misspellings such as win_cc forever.
@@ -151,8 +168,10 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 			Node := Node[Part]
 		else if (IsObject(Node) and Node.HasOwnProp(Part))
 			Node := Node.%Part%
-		else
-			return "section"
+		else {
+			ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
+			return ForeignOwner != "" ? "" : "section"
+		}
 	}
 	if (Type(Node) == "Map")
 		Known := Node.Has(Key)

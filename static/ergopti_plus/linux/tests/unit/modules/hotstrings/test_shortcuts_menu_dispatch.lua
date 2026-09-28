@@ -180,6 +180,7 @@ end)
 --- @param prompt function The zenity prompt test boundary.
 --- @return table { picker, events, prompt_args, items, editor }
 local function open_keyboard_slot_picker(prompt)
+	local keyboard_binding = require("modules.shortcuts.keyboard_shortcuts").binding_id
 	local prior_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 	local prior_gestures = package.loaded["modules.gestures.manager"]
 	local prior_picker = package.loaded["ui.action_picker.bridge"]
@@ -189,6 +190,7 @@ local function open_keyboard_slot_picker(prompt)
 	scene.editor = { send_vocabulary = { keys = {} }, parameter_strings = { save = "Save" } }
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
 		SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
+		binding_id = keyboard_binding,
 		available_slots = function() return { "ctrl_k" } end,
 		get_action = function() return "none" end,
 		get_slot_label = function() return "Ctrl+K" end,
@@ -356,4 +358,46 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 				.. "the user has no way to tell it apart from a feature they never had")
 	end)
 
+end)
+
+helpers.describe("shortcuts menu: configured binding labels", function()
+	for _, surface in ipairs({ "keyboard", "tap" }) do
+		helpers.it("shows the saved value in the real " .. surface .. " provider", function()
+			local owned = { "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys", "modules.gestures.manager" }
+			local saved = {}
+			for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
+			local ok, failure = xpcall(function()
+				local parameters = { ["owner_keyboard__ctrl_k"] = "https://keyboard.example/?q=[x]&p=50%",
+					["owner_tap__number_row_left"] = "https://tap.example" }
+				package.loaded[owned[1]] = {
+					SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
+					available_slots = function() return { "ctrl_k" } end,
+					get_action = function() return "open_url" end,
+					get_slot_label = function() return "Ctrl+K" end,
+					binding_id = function(slot) return "owner_keyboard__" .. slot end,
+				}
+				package.loaded[owned[2]] = {
+					keys = function() return { { id = "number_row_left" } } end,
+					get_action = function() return "open_url" end,
+					display_name = function() return "Left" end,
+					binding_id = function(id) return "owner_tap__" .. id end,
+				}
+				package.loaded[owned[3]] = {
+					get_action_label = function() return "Open [configurable]" end,
+					get_action_parameter = function(binding, action)
+						helpers.assert_eq(action, "open_url")
+						return parameters[binding] or ""
+					end,
+				}
+				local rows = shortcuts_menu()
+				local row = find_row_prefix(rows, surface == "keyboard" and "Ctrl+K" or "Left")
+				helpers.assert_not_nil(row, "the real provider must render its assigned row")
+				local value = parameters[surface == "keyboard" and "owner_keyboard__ctrl_k" or "owner_tap__number_row_left"]
+				helpers.assert_true(row.title:find("Open [" .. value .. "]", 1, true) ~= nil, row.title)
+				helpers.assert_true(row.title:find("[configurable]", 1, true) == nil)
+			end, debug.traceback)
+			for _, name in ipairs(owned) do package.loaded[name] = saved[name] end
+			assert(ok, failure)
+		end)
+	end
 end)

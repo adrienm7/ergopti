@@ -479,3 +479,90 @@ _CUK_WebWindowDeferredClose() {
 }
 Test("config cleanup webview: close during native creation releases the late controller (config-cleanup-webview)",
 	_CUK_WebWindowDeferredClose)
+
+_CUK_ActionParameterOwnership() {
+	Target := ManifestBuildFeaturesMap()
+	for Binding in ["gesture__tap_4", "keyboard__ctrl_k", "script__pause", "tap_hold__caps_lock", "tap_key__number_row_left"] {
+		Owner := ""
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Binding . "__open_url", &Owner),
+			"parameterized bindings must remain owned: " . Binding)
+		AssertEqual("Gestures", Owner)
+	}
+	for Key in ["gesture__tap_4__missing_action", "gesture__tap_4__none", "bogus__tap_4__open_url", "gesture____open_url"]
+		AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", Key), "unknown parameters remain visible: " . Key)
+}
+Test("action parameters have a declared owner without exempting unknown keys (config-action-parameter-owner)",
+	_CUK_ActionParameterOwnership)
+
+_CUK_ActionParameterLabels() {
+	global _I18nCache, _I18nCacheLoaded, _SharedDir, GestureActionParameters
+	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded, SavedParameters := GestureActionParameters
+	try {
+		Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+		AssertEqual(21, Locales.Length)
+		for Locale in Locales {
+			Strings := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+			_I18nCache := Strings, _I18nCacheLoaded := true
+			for Action in ["open_url", "search_web", "wrap_selection", "send_text", "send_key", "send_shortcut"] {
+				Label := Strings["sg_actions." . Action]
+				Assert(RegExMatch(Label, "\[[^\[\]]*\]$", &Marker), Locale . ": " . Action)
+				GestureActionParameters := Map()
+				AssertEqual(Label, GestureActionDisplayLabel(Action, "gesture__tap_4"))
+				for Value in ["https://apple.com", "https://example.org/?q=%s", "[x] 50% & café"] {
+					GestureActionParameters["gesture__tap_4__" . Action] := Value
+					AssertEqual(SubStr(Label, 1, Marker.Pos - 1) . "[" . Value . "]",
+						GestureActionDisplayLabel(Action, "gesture__tap_4"), Locale . ": " . Action)
+				}
+			}
+		}
+	} finally {
+		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded, GestureActionParameters := SavedParameters
+	}
+}
+Test("action labels replace the configurable marker in every locale (action-parameter-label)",
+	_CUK_ActionParameterLabels)
+
+_CUK_ActionParameterRoundTrip() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache
+	OriginalConfig := ConfigurationFile
+	OriginalParameters := GestureActionParameters
+	OriginalAssignments := GestureAssignments.Clone()
+	OriginalCache := _IniCache
+	Dir := _CUK_NewDir()
+	try {
+		ConfigurationFile := Dir . "\config.toml"
+		GestureActionParameters := Map()
+		AssertTrue(GestureSaveAssignment("tap_4", "open_url"))
+		AssertTrue(GestureSetActionParameter("gesture__tap_4", "open_url", "https://apple.com"))
+		AssertTrue(TOML_BatchWrite(ConfigurationFile, [{ Section: "action_parameters", Key: "obsolete", Value: "unused" }]))
+		_IniCache := ParseTomlFile(ConfigurationFile)
+		GestureActionParameters := Map()
+		GestureAssignments["tap_4"] := "none"
+		GesturesReadConfig()
+		AssertEqual("open_url", GestureAssignments["tap_4"])
+		AssertEqual("https://apple.com", GestureGetActionParameter("gesture__tap_4", "open_url"))
+		Found := 0
+		for Row in _GES_SlotRows() {
+			if InStr(Row.Get("label", ""), "https://apple.com") {
+				Found += 1
+				AssertTrue(InStr(Row["label"], t("gesture.slots.tap_4")) > 0)
+			}
+		}
+		AssertEqual(1, Found, "the real four-finger menu row shows the chosen URL after reload")
+		Scan := ConfigUnusedKeysFind(ConfigurationFile)
+		AssertEqual("action_parameters.obsolete=section", _CUK_Join(_CUK_Ids(Scan["keys"])))
+		AssertEqual("removed", ConfigUnusedKeysRemove(ConfigurationFile, Scan["keys"], "20990101-000099")["status"])
+		_IniCache := ParseTomlFile(ConfigurationFile)
+		GesturesReadConfig()
+		AssertEqual("https://apple.com", GestureGetActionParameter("gesture__tap_4", "open_url"),
+			"cleaning an unrelated obsolete key must preserve the configured URL")
+	} finally {
+		ConfigurationFile := OriginalConfig
+		GestureActionParameters := OriginalParameters
+		GestureAssignments := OriginalAssignments
+		_IniCache := OriginalCache
+		DirDelete(Dir, true)
+	}
+}
+Test("four-finger URL survives real persistence reload cleanup and menu rendering (config-action-parameter-owner)",
+	_CUK_ActionParameterRoundTrip)

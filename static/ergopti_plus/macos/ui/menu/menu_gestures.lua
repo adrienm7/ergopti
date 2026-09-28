@@ -24,6 +24,7 @@ local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("infra.logger")
 local DeferredWork   = require("infra.deferred_work")
+local ParameterLabel = require("action_parameter_label")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil
@@ -324,7 +325,7 @@ function M.build(ctx)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
 			or (current or "none")
 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
-		if parameter ~= "" then actionLbl = actionLbl .. " (" .. parameter .. ")" end
+		actionLbl = ParameterLabel.format(actionLbl, parameter)
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 

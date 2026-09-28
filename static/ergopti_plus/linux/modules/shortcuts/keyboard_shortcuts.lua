@@ -472,6 +472,13 @@ local function match(detail, only_script)
 	return nil
 end
 
+--- The parameter-store identity used when a keyboard slot dispatches an action.
+--- @param slot string Keyboard slot id.
+--- @return string
+function M.binding_id(slot)
+	return "keyboard__" .. slot
+end
+
 --- Runs a matched binding.
 --- @param hit table The record match() returned.
 local function fire(hit)
@@ -483,7 +490,7 @@ local function fire(hit)
 	Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", hit.slot, hit.action)
 	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 	if ok_gestures and type(Gestures.execute_action) == "function" then
-		pcall(Gestures.execute_action, hit.action, "keyboard__" .. hit.slot)
+		pcall(Gestures.execute_action, hit.action, M.binding_id(hit.slot))
 	else
 		Logger.error(LOG,
 			"No action executor — '%s' is bound to %s and cannot run.", hit.slot, hit.action)
