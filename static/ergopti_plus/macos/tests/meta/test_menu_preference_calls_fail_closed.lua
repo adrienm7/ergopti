@@ -53,7 +53,7 @@ helpers.describe("menu preference call sites fail closed", function()
 		-- Transactional helpers consolidated several formerly direct writes. Keep a
 		-- conservative floor high enough to reject token samples while tracking the
 		-- current direct-call class rather than its pre-refactor cardinality.
-		helpers.assert_true(calls >= 60,
+		helpers.assert_true(calls >= 59,
 			"the class scan must enumerate the consolidated sibling set, not a token sample")
 		helpers.assert_eq(guarded, calls,
 			"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "

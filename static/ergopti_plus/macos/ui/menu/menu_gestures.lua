@@ -13,7 +13,6 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
 
 local gestures_mod  = require("modules.gestures")
 local MenuUtils = require("ui.menu.menu_utils")
@@ -250,6 +249,10 @@ function M.build(ctx)
 	local function open_action_chooser(slot, names, current)
 		local items = build_items(names)
 		local editor = shortcut_utils.picker_parameter_fields(gestures, items, slot)
+		local function show_conflict(conflict)
+			if type(conflict) ~= "table" then return end
+			return require("ui.gesture_conflict_notice").show(conflict)
+		end
 		ActionPicker.open({
 			title   = slot_label(slot),
 			label   = i18n.get("dialog.action_picker.label"),
@@ -259,9 +262,8 @@ function M.build(ctx)
 			parameter_strings = editor.parameter_strings,
 		}, function(a, picked)
 			local function apply_action()
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
+				if not commit_gesture_row_value("get_action", "set_action", slot, a, "action") then return false end
 				local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
-				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 				return conflict
 			end
@@ -284,11 +286,7 @@ function M.build(ctx)
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
-							if type(conflict) == "table" then
-								DeferredWork.after(0.3, function()
-									pcall(dialog.block_alert, i18n.get("menu.gestures.conflict_title"), conflict.msg or "", i18n.get("menu.gestures.open_settings"), "OK", "warning")
-								end, "menu_gestures.parameter_conflict")
-							end
+							show_conflict(conflict)
 							return
 						end
 						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
@@ -300,16 +298,7 @@ function M.build(ctx)
 				return
 			end
 			local conflict = apply_action()
-			if type(conflict) == "table" then
-				DeferredWork.after(0.3, function()
-					local ok_c, clicked = pcall(dialog.block_alert,
-						i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
-						i18n.get("menu.gestures.open_settings"), "OK", "warning")
-					if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
-						pcall(hs.execute, "open " .. text_utils.shell_quote(conflict.url or ""))
-					end
-				end, "menu_gestures.action_conflict")
-			end
+			show_conflict(conflict)
 		end)
 	end
 
@@ -472,6 +461,25 @@ function M.build(ctx)
 	}
 
 	local providers = {
+		["system_gesture_status"] = function()
+			local conflicts = gestures.system_gesture_conflicts()
+			local rows = {}
+			for _, conflict in ipairs(conflicts) do
+				rows[#rows + 1] = { label = conflict.label, action = gestures.open_system_gestures }
+			end
+			local pinch = gestures.system_pinch_enabled()
+			rows[#rows + 1] = {
+				label = i18n.get("gestures.system.pinch") .. " : "
+					.. i18n.get(pinch == nil and "gestures.system.unknown"
+						or (pinch and "menu.common.enabled" or "common.disabled")),
+				action = gestures.open_system_gestures,
+			}
+			rows[#rows + 1] = { label = i18n.get("ui_apps.btn_refresh"), action = function()
+				return gestures.refresh_system_gestures(ctx.updateMenu)
+			end }
+			return { { label = #conflicts == 0 and i18n.get("gestures.system.clear")
+				or i18n.get("gestures.system.conflicts"):gsub("{1}", function() return tostring(#conflicts) end), items = rows } }
+		end,
 		["gesture_slots_2"] = slots_provider(2),
 		["gesture_slots_3"] = slots_provider(3),
 		["gesture_slots_4"] = slots_provider(4),
@@ -497,6 +505,7 @@ function M.build(ctx)
 	render_ctx.commands["gestures_toggle"] = toggle_gestures
 	render_ctx.commands["disable_all"] = cmd_disable_all
 	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
+	render_ctx.commands["system_gesture_settings"] = gestures.open_system_gestures
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	item.submenu = gm

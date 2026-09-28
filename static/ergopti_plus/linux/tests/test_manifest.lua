@@ -256,6 +256,7 @@ return {
 	"tests.unit.ui.test_diagnostics_window_title",
 	"tests.unit.ui.test_configured_gesture_label",
 	"tests.unit.ui.test_healthcheck_last_error_wired",
+	"tests.unit.ui.test_gesture_conflicts",
 	"tests.unit.ui.test_healthcheck_linux_rows",
 	"tests.unit.ui.test_hotstring_bulk_checkboxes",
 	"tests.unit.ui.test_healthcheck_bridge_actions",

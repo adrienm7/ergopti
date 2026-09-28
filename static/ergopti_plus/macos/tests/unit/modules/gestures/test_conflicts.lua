@@ -94,13 +94,15 @@ local function load_with_macos_preferences(defaults_output)
 		done    = function() end,
 	}
 	package.loaded["adapters.shell_runner"] = {
-		exec = function(command)
-			table.insert(commands, command)
-			return defaults_output
+		spawn = function(command, args, callback)
+			table.insert(commands, { command, args })
+			callback(0, defaults_output, "")
+			return { isSettled = function() return true end }
 		end,
 	}
 
 	local conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
+	conflicts.refresh()
 	local function cleanup()
 		package.loaded["modules.gestures.conflicts"] = nil
 		package.loaded["infra.logger"] = nil
@@ -143,7 +145,7 @@ helpers.describe("Conflicts current macOS preference checks", function()
     TrackpadThreeFingerVertSwipeGesture = 2;
 }
 ]])
-		conflicts.apply_all_overrides({ swipe_3_up = "   ", swipe_3_down = "" })
+		helpers.assert_eq(#conflicts.active_conflicts({ swipe_3_up = "   ", swipe_3_down = "" }), 0)
 		helpers.assert_eq(#warnings, 0, "blank assignments must be treated as disabled gestures")
 		cleanup()
 	end)
@@ -154,13 +156,15 @@ helpers.describe("Conflicts current macOS preference checks", function()
     TrackpadThreeFingerTapGesture = 0;
     TrackpadThreeFingerHorizSwipeGesture = 0;
     TrackpadThreeFingerVertSwipeGesture = 0;
+    TrackpadThreeFingerDrag = 0;
 }
 ]])
-		conflicts.apply_all_overrides({
+		local active = conflicts.active_conflicts({
 			tap_3 = "left_click_toggle",
 			swipe_3_left = "word_prev",
 			swipe_3_up = "tab_prev",
 		})
+		helpers.assert_eq(#active, 0, "both native motion policies must be off")
 		helpers.assert_eq(#warnings, 0, "confirmed macOS opt-outs must leave the diagnostic clean")
 		cleanup()
 	end)

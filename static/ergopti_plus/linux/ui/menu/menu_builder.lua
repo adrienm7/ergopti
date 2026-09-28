@@ -3076,7 +3076,7 @@ local function _build_gestures(ctx)
 	end
 
 	local function assign_action(slot, action, picked)
-		return assign_parameterized_action(
+		local committed = assign_parameterized_action(
 			ctx,
 			ge,
 			slot,
@@ -3084,6 +3084,11 @@ local function _build_gestures(ctx)
 			function() return ge.set_action(slot, action) end,
 			picked
 		)
+		if committed and action ~= "none" then
+			local group = slot:match("^(%a+_%d+)")
+			if group then require("ui.gesture_conflicts").show({ key = group, slot = slot }) end
+		end
+		return committed
 	end
 
 	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
@@ -3091,6 +3096,8 @@ local function _build_gestures(ctx)
 	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
 	-- count, so grouping would mean parsing the names apart only to regroup them.
 	local providers = {}
+	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
+	gesture_commands["system_gesture_settings"] = function() return require("ui.gesture_conflicts").open_settings() end
 	providers["gesture_slots_linux"] = function()
 		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
