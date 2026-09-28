@@ -27,6 +27,9 @@ _HotstringsScopeFixture(PersonalCount := 1) {
 
 _HotstringsScopeRoundTrip() {
 	Fixture := _HotstringsScopeFixture()
+	; Injected owners may retain a spelling different from file discovery.
+	Fixture.options["personal_path"] := StrReplace(Fixture.personal[1], "\", "/")
+	Fixture.catalogue[2].Path := Fixture.options["personal_path"]
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
