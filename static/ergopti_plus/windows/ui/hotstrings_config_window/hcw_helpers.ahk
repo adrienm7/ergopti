@@ -99,7 +99,7 @@ _HCW_InitLocaleStrings() {
 ; 1. Common categories (Group: "common")
 ; 2. Personal TOML files discovered from PersonalHotstringsDir (Group: "personal")
 ; 3. Extension TOML files discovered from the extensions root (Group: "ext:<id>")
-_HCW_BuildCategoryList() {
+_HCW_BuildCategoryList(Publish := true) {
 	global _HCW_CATEGORY_LIST, _HCW_COMMON_CATS, _HCW_CATEGORY_LABELS
 	List := []
 
@@ -239,7 +239,9 @@ _HCW_BuildCategoryList() {
 		}
 	}
 
-	_HCW_CATEGORY_LIST := List
+	if Publish
+		_HCW_CATEGORY_LIST := List
+	return List
 }
 
 ; Build the group list from the category list.
@@ -817,7 +819,7 @@ _HCW_LocaleFromInlineTable(body) {
 }
 
 ; Scan a TOML file to list its [[section]] blocks with titles/descriptions.
-_HCW_GetSections(Entry) {
+_HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 	global ScriptInformation, _StaticDir
 	if Entry.IsPersonal or Entry.IsExtension {
 		Path := Entry.Path
@@ -844,7 +846,7 @@ _HCW_GetSections(Entry) {
 	InMetaSections := false
 	InMetaSecBlock := ""
 	SectionsOrderRaw := ""
-	FileContent := ReadTomlFile(Path)
+	FileContent := ReadFn.Call(Path)
 	loop parse, FileContent, "`n", "`r" {
 		Line := Trim(A_LoopField, " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {

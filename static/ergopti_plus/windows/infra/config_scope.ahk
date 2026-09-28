@@ -38,9 +38,10 @@ ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
  * @param {String} Mode Receipt action.
  * @param {Func} OperationsFn Validates and builds operations inside the lease.
  * @param {Map} Options Lifecycle and effect ports.
+ * @param {Object|Integer} FileOwner Optional owner of additional TOML images.
  * @returns {Map} Pending or terminal transaction receipt.
  */
-ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options) {
+ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0) {
 	global ConfigurationFile, _PathsFile
 	Path := Options.Has("path") ? Options["path"] : ConfigurationFile
 	Locator := Options.Has("locator") ? Options["locator"] : _PathsFile
@@ -51,7 +52,12 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options) {
 	Stamp := Options.Get("stamp", FormatTime(A_Now, "yyyyMMdd-HHmmss") . "-" . A_TickCount)
 	Backup := ConfigUnusedKeysBackupPath(Path, Stamp)
 	Receipt := Map("status", "refused", "scope", ScopeId, "mode", Mode, "backup", Backup)
-	Acquired := ConfigTransitionAcquireLifecycleBundle(Locator, [Path], Port,
+	Paths := [Path]
+	if FileOwner is Object {
+		for OwnedPath in FileOwner.paths
+			Paths.Push(OwnedPath)
+	}
+	Acquired := ConfigTransitionAcquireLifecycleBundle(Locator, Paths, Port,
 		Options.Get("acquire", 0), Options.Get("settle", 0))
 	if !ConfigTransitionResultIs(Acquired, "bundle_acquired") {
 		Receipt["detail"] := Acquired
@@ -60,7 +66,7 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options) {
 	}
 	Bundle := Acquired["bundle"]
 	Transferred := false
-	Target := 0
+	Targets := []
 	Transition := 0
 	Rollback() {
 		try Resolution := ConfigTransitionRollbackOwned(Locator, Bundle, Port)
@@ -93,14 +99,44 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options) {
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			throw Error("The scoped configuration image could not be rendered.")
 		Expected := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"], Port)
-		Target := ConfigTransitionPresentTarget(Path, Image["content"], Expected)
-		BackedUp := BackupFn.Call(Backup, Image["source_content"])
-		if !(BackedUp is Integer) || BackedUp != 1 || !FSUtf8ExactMatches(Backup, Image["source_content"])
-			throw Error("The exclusive scoped backup could not be created and verified.")
+		Targets := [ConfigTransitionPresentTarget(Path, Image["content"], Expected)]
+		Images := [{ path: Path, image: Image }]
+		if FileOwner is Object {
+			for Candidate in FileOwner.Build() {
+				if !(_ConfigWriteLeaseSelectOwner(Bundle, Candidate.path) is Object)
+					throw Error("A scoped file candidate has no admitted owner.")
+				Extra := Candidate.image
+				if !(Extra is Map) || Extra.Get("status", "") != "ok" || Extra.Get("kind", "") != "rendered"
+					throw Error("A scoped file candidate could not be rendered.")
+				if Extra["content"] == Extra["source_content"]
+					continue
+				ExpectedExtra := ConfigTransitionExpectedOld(Extra["source_present"], Extra["source_content"], Port)
+				Targets.Push(ConfigTransitionPresentTarget(Candidate.path, Extra["content"], ExpectedExtra))
+				Images.Push(Candidate)
+			}
+			; The journal owns its format and capacity. Validate the complete
+			; detached cohort before creating even the first user backup.
+			Normalized := _ConfigTransitionNormalizePath(Locator)
+			Built := _ConfigTransitionBuildPreparedRecord(Normalized, Targets,
+				_ConfigTransitionRuntimePort(Port), _ConfigTransitionNewId())
+			if !ConfigTransitionResultIs(Built, "record_built")
+				throw Error("The complete scoped cohort cannot enter the journal: " . Built["kind"])
+			if !(_ConfigTransitionSerialize(Built["record"], Normalized) is String)
+				throw Error("The complete scoped cohort exceeds the journal format.")
+		}
+		Receipt["backups"] := []
+		for Candidate in Images {
+			BackupPath := ConfigUnusedKeysBackupPath(Candidate.path, Stamp)
+			OldContent := Candidate.image["source_content"]
+			BackedUp := BackupFn.Call(BackupPath, OldContent)
+			if !(BackedUp is Integer) || BackedUp != 1 || !FSUtf8ExactMatches(BackupPath, OldContent)
+				throw Error("The exclusive scoped backup could not be created and verified.")
+			Receipt["backups"].Push(BackupPath)
+		}
 		return { updates: Rows }
 	}
 	Publish(_Path, _Rows) {
-		Transition := ConfigTransitionCommitOwned(Locator, [Target], Bundle, Port)
+		Transition := ConfigTransitionCommitOwned(Locator, Targets, Bundle, Port)
 		Receipt["detail"] := Transition
 		return ConfigTransitionResultIs(Transition, "committed_new")
 	}
