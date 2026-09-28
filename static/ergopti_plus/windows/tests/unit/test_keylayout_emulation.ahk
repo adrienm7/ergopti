@@ -296,8 +296,8 @@ Test("keylayout reader: malformed layouts are refused, not half-read (layout-reg
 ; ==================================
 
 Test("layout registry: URL, ids and verification against the index (layout-registry-emulation)", () => (
-	AssertEqual("https://raw.githubusercontent.com/adrienm7/ergopti/main/static/layouts/registry/index.json",
-		LayoutRegistry_RawUrl("index.json"), "the URL is built from the shared defaults"),
+	AssertEqual("https://raw.githubusercontent.com/adrienm7/ergopti/" . _Updater_InstalledChannel() . "/static/layouts/registry/index.json",
+		LayoutRegistry_RawUrl("index.json"), "the URL combines shared registry defaults with the installed channel"),
 	AssertTrue(LayoutRegistry_IsValidId("ergopti_plus_ansi")),
 	AssertFalse(LayoutRegistry_IsValidId("..\evil"), "an id is a file name and must not escape the folder"),
 	AssertFalse(LayoutRegistry_IsValidId("Ergol")),
