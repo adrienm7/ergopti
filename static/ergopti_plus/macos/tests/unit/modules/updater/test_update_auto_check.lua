@@ -52,7 +52,11 @@ local function build(opts)
 		save = function() ctx.saves = ctx.saves + 1; return opts.save_refused ~= true end,
 		channel = function() return "dev" end,
 		is_paused = function() return ctx.paused end,
-		on_available = function(release) ctx.announced[#ctx.announced + 1] = release.tag end,
+		on_available = function(release)
+			ctx.announced[#ctx.announced + 1] = release.tag
+			if ctx.notification_refusal == "throw" then error("notification unavailable") end
+			return ctx.notification_refusal ~= "false"
+		end,
 		config = {
 			timing = defaults.timing, state_key = ctx.state_key, releases_url = URL, timeout_sec = 15,
 		},
@@ -93,6 +97,27 @@ local function fire(ctx)
 end
 
 helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check", function()
+	helpers.it("notification refusal leaves the release retryable", function()
+		for _, refusal in ipairs({ "false", "throw" }) do
+			local response = { ok = true, status = 200, body = LIST, headers = {} }
+			local ctx = build({ now = T0, record = { seed = SEED }, responses = { response, response } })
+			ctx.notification_refusal = refusal
+			helpers.assert_true(ctx.owner.start())
+			ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.announced, 1, "the refusal must occur at the notification boundary")
+			helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag,
+				"a refused notification must not consume the release: " .. refusal)
+			ctx.notification_refusal = nil
+			ctx.clock.now = ctx.clock.now + 2 * 86400
+			ctx.owner.on_wake()
+			ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.announced, 2, "the next successful check must retry the announcement")
+			helpers.assert_eq(ctx.values[ctx.state_key].last_notified_tag, "v0.0.0-dev.150")
+		end
+	end)
+
 	helpers.it("a restart mid-interval does not check at boot", function()
 		local ctx = build({ now = T0 + 3600, record = { seed = SEED, last_check_at = T0, failures = 0 } })
 		helpers.assert_true(ctx.owner.start())

@@ -1902,11 +1902,6 @@ local function main()
 	})
 
 	if updater then
-		-- The one release that has been notified, so a background check every few
-		-- hours does not re-announce the same version for as long as the user
-		-- leaves it uninstalled.
-		local _notified_tag = nil
-
 		local on_available = function(release)
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
 
@@ -1918,11 +1913,11 @@ local function main()
 			-- The tag lands on the REPLACEMENT side of gsub, where "%" is special:
 			-- a release tagged "v2.1%-rc1" would raise inside the notification and
 			-- take the menu rebuild below with it.
-			if notifier and ok_i18n and i18n_mod and release.tag ~= _notified_tag then
-				_notified_tag = release.tag
+			local accepted = false
+			if notifier and ok_i18n and i18n_mod then
 				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
 				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
-				notifier.send(body, {
+				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_title"),
 					level = "info",
 				})
@@ -1932,6 +1927,7 @@ local function main()
 			if tray_menu and menu_builder then
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end
+			return accepted == true
 		end
 		-- A paused driver dispatches no automatic check (the record is kept, so
 		-- the check runs at the first evaluation after resuming).

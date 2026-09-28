@@ -241,11 +241,14 @@ function M.new(opts)
 		end
 		local notified = {}
 		for field, value in pairs(state) do notified[field] = value end
+		Logger.info(LOG, "New release available: %s (channel %s).", release.tag, release.channel)
+		local ok_notify, accepted = pcall(opts.on_available, release)
+		if not ok_notify or accepted ~= true then
+			Logger.error(LOG, "Update notification was not accepted: %s.", tostring(accepted))
+			return
+		end
 		notified.last_notified_tag = release.tag
 		save_record(notified)
-		Logger.info(LOG, "New release available: %s (channel %s).", release.tag, release.channel)
-		local ok_notify, notify_err = pcall(opts.on_available, release)
-		if not ok_notify then Logger.error(LOG, "Update-available handler raised: %s.", tostring(notify_err)) end
 	end
 
 	--- Interprets one release list for the subscribed channel.

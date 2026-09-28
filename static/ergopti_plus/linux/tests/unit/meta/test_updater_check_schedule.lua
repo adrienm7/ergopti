@@ -71,7 +71,11 @@ local function with_manager(opts, body)
 		ctx.M.init({
 			config_path = ctx.config_path,
 			is_paused = function() return opts.paused == true end,
-			on_available = function(release) ctx.available[#ctx.available + 1] = release.tag end,
+			on_available = function(release)
+				ctx.available[#ctx.available + 1] = release.tag
+				if ctx.notification_refusal == "throw" then error("notification unavailable") end
+				return ctx.notification_refusal ~= "false"
+			end,
 		})
 		body(ctx)
 	end)
@@ -98,6 +102,28 @@ local function record(ctx)
 end
 
 helpers.describe("updater (linux): the check schedule follows the persisted record", function()
+	helpers.it("notification refusal leaves the release retryable", function()
+		for _, refusal in ipairs({ "false", "throw" }) do
+			with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+				ctx.notification_refusal = refusal
+				ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+				fire(ctx)
+				ctx.dispatches[1](true, { tag = "v1.4.0" }, nil)
+				helpers.assert_eq(#ctx.available, 1, "the refusal must occur at the notification boundary")
+				helpers.assert_nil(record(ctx).last_notified_tag,
+					"a refused notification must not consume the release: " .. refusal)
+				ctx.notification_refusal = nil
+				ctx.clock.now = ctx.clock.now + 2 * 86400
+				fire(ctx)
+				ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+				fire(ctx)
+				ctx.dispatches[2](true, { tag = "v1.4.0" }, nil)
+				helpers.assert_eq(#ctx.available, 2, "the next successful check must retry the announcement")
+				helpers.assert_eq(record(ctx).last_notified_tag, "v1.4.0")
+			end)
+		end
+	end)
+
 	helpers.it("a restart mid-interval does not check at boot", function()
 		with_manager({ now = T0 + 3600, record = { seed = SEED, last_check_at = T0, failures = 0 } }, function(ctx)
 			local reevaluate = ctx.M.TIMING.reevaluate_sec
