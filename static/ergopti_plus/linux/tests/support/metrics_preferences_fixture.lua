@@ -19,6 +19,7 @@ function M.new(options)
 	local values = {}
 	for key, value in pairs(options.initial or {}) do values[key] = value end
 	local port = { values = values }
+	function port.admit() return true end
 	function port.snapshot()
 		local snapshot = {}
 		for _, entry in ipairs(Manifest.features()) do

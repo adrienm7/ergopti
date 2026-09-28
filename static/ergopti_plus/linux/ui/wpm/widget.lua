@@ -79,6 +79,14 @@ local _state = {
 
 -- The drawing surface; replaceable by tests.
 local _surface = nil
+local _restore_debt = nil
+
+local function clone(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, child in pairs(value) do copy[key] = clone(child) end
+	return copy
+end
 
 
 
@@ -124,6 +132,7 @@ end
 --- @param x number The dropped frame's top-left corner.
 --- @param y number
 local function on_moved(x, y)
+	if _restore_debt or not Preferences.admit() then return end
 	local frame = _state.last_frame
 	local canon = Constants.load()
 	if not frame or not canon then return end
@@ -225,6 +234,7 @@ end
 --- Applies the persisted choices and shows the widget if it was left on.
 --- @return boolean True when the widget is running after this call.
 function M.restore()
+	if _restore_debt or not Preferences.admit() then return false end
 	local preferences = Preferences.snapshot()
 	_state.use_source_colors = preferences[PREF_PATHS.source_colors]
 	_state.graph = preferences[PREF_PATHS.graph]
@@ -237,27 +247,76 @@ function M.restore()
 end
 
 function M.start()
+	if _restore_debt or not Preferences.admit() then return false end
 	return start_widget(true)
 end
 
 local function hide()
 	local Surface = surface()
-	if Surface and type(Surface.hide) == "function" then Surface.hide() end
+	if Surface and type(Surface.hide) == "function" then
+		local called, hidden = pcall(Surface.hide)
+		if not called or hidden ~= true then return false end
+	elseif _state.shown then
+		return false
+	end
 	_state.shown = false
+	return true
+end
+
+--- Captures the exact frame and choices without writing preferences.
+--- @return table snapshot Detached runtime state.
+function M.configuration_snapshot()
+	if _restore_debt then return nil end
+	return clone(_state)
+end
+
+--- Applies a complete runtime image; its transaction owns compensation.
+--- @param candidate table Detached configuration snapshot.
+--- @return boolean acknowledged Native visibility settled.
+function M.apply_configuration(candidate)
+	if type(candidate) ~= "table" then return false end
+	for _, key in ipairs({ "running", "shown", "graph", "use_source_colors" }) do
+		if type(candidate[key]) ~= "boolean" then return false end
+	end
+	if type(candidate.history) ~= "table" or (candidate.shown and not candidate.running) then return false end
+	if candidate.shown then
+		if type(candidate.last_frame) ~= "table" or type(candidate.anchor) ~= "table" then return false end
+		local Surface, canon = surface(), Constants.load()
+		if not Surface or not canon then return false end
+		local x, y = Model.frame_origin(canon, candidate.last_frame, candidate.anchor.x, candidate.anchor.y)
+		local called, drawn = pcall(Surface.draw, clone(candidate.last_frame), x, y)
+		if not called or drawn ~= true then return false end
+	elseif hide() ~= true then
+		return false
+	end
+	_state = clone(candidate)
+	return true
+end
+
+--- Retries an exact inverse retained after an ordinary stop failed.
+--- @return boolean restored
+function M.retry_configuration_restore()
+	if not _restore_debt then return true end
+	local called, restored = pcall(M.apply_configuration, _restore_debt)
+	if not called or restored ~= true then return false end
+	_restore_debt = nil
+	return true
 end
 
 --- Stops the widget and hides its window.
 --- @return boolean
 function M.stop()
+	if _restore_debt or not Preferences.admit() then return false end
 	if not _state.running then return true end
-	if not store_bool("visible", false) then
-		Logger.error(LOG, "The hidden state could not be persisted — the widget stays on.")
+	_restore_debt = clone(_state)
+	local candidate = clone(_state)
+	candidate.running, candidate.shown = false, false
+	if M.apply_configuration(candidate) ~= true or not store_bool("visible", false) then
+		M.retry_configuration_restore()
+		Logger.error(LOG, "The widget stop was refused; its previous state is retained for restoration.")
 		return false
 	end
-	_state.running = false
-	_state.last_frame = nil
-	_state.history = {}
-	hide()
+	_restore_debt = nil
 	Logger.info(LOG, "WPM widget stopped.")
 	return true
 end
@@ -265,6 +324,7 @@ end
 --- @param enabled boolean
 --- @return boolean
 function M.set_use_source_colors(enabled)
+	if _restore_debt or not Preferences.admit() then return false end
 	local wanted = enabled and true or false
 	if not store_bool("source_colors", wanted) then
 		Logger.error(LOG, "The source-colour state could not be persisted — it was not changed.")
@@ -284,6 +344,7 @@ end
 --- @param enabled boolean
 --- @return boolean
 function M.set_graph(enabled)
+	if _restore_debt or not Preferences.admit() then return false end
 	local wanted = enabled and true or false
 	if not store_bool("graph", wanted) then
 		Logger.error(LOG, "The graph state could not be persisted — it was not changed.")
@@ -302,6 +363,7 @@ end
 --- Puts the widget back in its default place.
 --- @return boolean
 function M.reset_position()
+	if _restore_debt or not Preferences.admit() then return false end
 	local Storage = storage()
 	if not Storage then
 		Logger.error(LOG, "No storage adapter — the widget's place was not reset.")
@@ -342,6 +404,7 @@ end
 --- @param now_s number Monotonic seconds.
 --- @return table|nil The frame drawn, for tests and diagnostics.
 function M.tick(stats, now_s)
+	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
 	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
 	_state.last_draw_s = now_s
@@ -401,6 +464,7 @@ end
 
 --- Clears module state. Tests only.
 function M._reset()
+	_restore_debt = nil
 	_state.running = false
 	_state.use_source_colors = DEFAULTS.source_colors
 	_state.graph = DEFAULTS.graph

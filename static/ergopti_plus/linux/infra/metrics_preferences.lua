@@ -15,6 +15,29 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
 local LOG = "infra.metrics_preferences"
+local _scope_owner = nil
+
+--- Admits ordinary preference mutation only outside a retained scope transaction.
+--- @return boolean admitted
+function M.admit() return _scope_owner == nil end
+
+--- Acquires the metrics preference domain before any scope effects.
+--- @param owner table Transaction identity.
+--- @return boolean acquired
+function M.acquire(owner)
+	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
+	_scope_owner = owner
+	return true
+end
+
+--- Releases only the exact owner after all compensation has settled.
+--- @param owner table Transaction identity.
+--- @return boolean released
+function M.release(owner)
+	if _scope_owner ~= owner or owner.pending() then return false end
+	_scope_owner = nil
+	return true
+end
 
 local function owned(path)
 	local entry = type(path) == "string" and Manifest.find_entry_by_path(path) or nil
@@ -23,14 +46,10 @@ local function owned(path)
 	return path:sub(#"metrics." + 1)
 end
 
---- Reads one complete validated metrics preference snapshot.
+--- Resolves owned booleans from one parsed configuration without file effects.
+--- @param config table Parsed canonical configuration.
 --- @return table values Canonical path to effective boolean.
---- @return table source Exact classified source for conditional publication.
-function M.snapshot()
-	local path = ConfigPaths.config("config.toml")
-	local bytes, status, detail = Writer.read_classified(path)
-	assert(status == "ok" or status == "absent", "metrics preferences are unreadable: " .. tostring(detail))
-	local config = Codec.decode(bytes or "")
+function M.resolve(config)
 	assert(type(config) == "table", "metrics preferences contain malformed TOML")
 	assert(config.metrics == nil or type(config.metrics) == "table", "metrics preferences require a table")
 	local values, metrics = {}, config.metrics or {}
@@ -43,7 +62,16 @@ function M.snapshot()
 			values[entry.path] = value
 		end
 	end
-	return values, { status = status, content = bytes }
+	return values
+end
+
+--- Reads validated values and their exact source for conditional publication.
+--- @return table values Canonical effective preferences.
+--- @return table source Classified source bytes.
+function M.snapshot()
+	local bytes, status, detail = Writer.read_classified(ConfigPaths.config("config.toml"))
+	assert(status == "ok" or status == "absent", "metrics preferences are unreadable: " .. tostring(detail))
+	return M.resolve(Codec.decode(bytes or "")), { status = status, content = bytes }
 end
 
 --- Reads one declared boolean without creating a file or caching a refusal.
@@ -59,6 +87,7 @@ end
 --- @param value boolean New preference.
 --- @return boolean committed
 function M.set(path, value)
+	if not M.admit() then return false end
 	local called, committed, detail = pcall(function()
 		owned(path)
 		assert(type(value) == "boolean", "metrics preferences require boolean values")
