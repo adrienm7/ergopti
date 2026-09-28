@@ -990,6 +990,58 @@ function M.set_options(opts)
 	Logger.debug(LOG, "Options updated (at-rest encryption: %s).", tostring(want))
 end
 
+--- Copies only plain configuration data, never native handles or metrics records.
+--- @param value any Configuration value.
+--- @return any copy Detached value.
+local function copy_configuration(value)
+	if type(value) ~= "table" then return value end
+	local result = {}
+	for key, child in pairs(value) do result[key] = copy_configuration(child) end
+	return result
+end
+
+--- Captures native configuration without exposing buffers or persisted metrics.
+--- @return table|nil snapshot Absent while a historical conversion owns encryption.
+function M.configuration_snapshot()
+	if require("modules.keylogger.text_migration").is_running() then return nil end
+	return {
+		enabled = CoreState.is_enabled,
+		options = copy_configuration(CoreState.options),
+		disabled_apps = copy_configuration(CoreState.disabled_apps),
+		private_filter_enabled = CoreState.private_filter_enabled,
+		secure_field_filter_enabled = CoreState.secure_field_filter_enabled,
+		system_auth_filter_enabled = CoreState.system_auth_filter_enabled,
+		cipher_enabled = require("modules.keylogger.text_cipher").is_enabled(),
+	}
+end
+
+--- Applies future capture policy without resuming or starting historical conversion.
+--- Lifecycle start/stop remains with its existing owner and terminal contracts.
+--- @param config table Native configuration captured or explicitly planned by a scope.
+--- @return boolean committed Exact policy acknowledgement.
+function M.apply_configuration(config)
+	assert(type(config) == "table" and type(config.options) == "table"
+		and type(config.disabled_apps) == "table", "invalid metrics configuration")
+	for _, key in ipairs({ "private_filter_enabled", "secure_field_filter_enabled", "system_auth_filter_enabled" }) do
+		assert(type(config[key]) == "boolean", "invalid metrics filter: " .. key)
+	end
+	assert(type(config.options.encrypt) == "boolean", "invalid metrics encryption preference")
+	if require("modules.keylogger.text_migration").is_running() then return false end
+	local cipher = require("modules.keylogger.text_cipher")
+	local enabled = config.cipher_enabled
+	if enabled == nil then enabled = config.options.encrypt end
+	assert(type(enabled) == "boolean", "invalid native encryption posture")
+	if enabled and cipher.is_available() ~= true then return false end
+	cipher.set_enabled(enabled)
+	if cipher.is_enabled() ~= enabled then return false end
+	CoreState.options = copy_configuration(config.options)
+	CoreState.disabled_apps = copy_configuration(config.disabled_apps)
+	CoreState.private_filter_enabled = config.private_filter_enabled
+	CoreState.secure_field_filter_enabled = config.secure_field_filter_enabled
+	CoreState.system_auth_filter_enabled = config.system_auth_filter_enabled
+	return true
+end
+
 --- Replaces the disabled-app list.
 --- @param apps table An array of {bundleID=…} or {appPath=…} entries.
 function M.set_disabled_apps(apps)

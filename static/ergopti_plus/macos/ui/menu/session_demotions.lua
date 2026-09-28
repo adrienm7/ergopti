@@ -155,12 +155,15 @@ function M.new()
 
 	--- Detaches only the demotions owned by one explicitly published feature.
 	--- @param feature string Exact synchronisation owner identity.
+	--- @param keys table|nil Explicitly published state keys; omitted releases the whole feature.
 	--- @return table released Entries retained for readopt on publication refusal.
-	function registry.release_feature(feature)
+	function registry.release_feature(feature, keys)
 		assert(type(feature) == "string" and feature ~= "", "a demotion feature is required")
 		local released = {}
 		for key, entry in pairs(entries) do
-			if entry.feature == feature then released[key], entries[key] = entry, nil end
+			if entry.feature == feature and (keys == nil or keys[entry.key] == true) then
+				released[key], entries[key] = entry, nil
+			end
 		end
 		return released
 	end
