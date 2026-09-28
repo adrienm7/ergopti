@@ -166,8 +166,8 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 }
 
 ; Manifest features an emulated registry layout supersedes: the ones declaring
-; superseded_reason_key (the Ergopti emulation's layers with their overlays,
-; and the digit-row swap, since the emulated layout decides its own digit row).
+; superseded_reason_key. The direct-digit override remains independent despite
+; its historical declaration; registry layers explicitly yield its owned keys.
 ; @returns {Array} Their manifest entries.
 LayoutSupersededFeatures() {
 		Entries := []
@@ -184,6 +184,10 @@ LayoutSupersededFeatures() {
 ; @param {Map} FeaturesSource - Features Map to read; the live one by default.
 ; @returns {string} Locale key of the reason, or "".
 LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
+		; These switches choose registry layers too; only Ergopti-specific
+		; overlays become unavailable when another source is selected.
+		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != "ergopti_plus"
+				return ""
 		Reason := ManifestEntry.Get("superseded_reason_key", "")
 		if (Reason == "")
 				return ""
@@ -203,6 +207,9 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 				Entries := LayoutSupersededFeatures()
 		Count := 0
 		for Entry in Entries {
+				; The direct-digit override is independent of the selected source.
+				if Entry["section"] == "layout" && Entry["id"] == "direct_access_digits"
+						continue
 				Node := FeaturesTarget
 				for Part in StrSplit(Entry["section"], ".") {
 						if !(Node is Map) or !Node.Has(Part) {

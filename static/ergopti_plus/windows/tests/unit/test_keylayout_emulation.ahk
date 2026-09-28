@@ -49,8 +49,8 @@ _KLT_Load(Id) {
 
 ; Runs Fn with the emulation state restored afterwards, whatever Fn loads.
 _KLT_WithEmulation(Fn) {
-	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex
-	Saved := [KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex]
+	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex, KLE_Compositions
+	Saved := [KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex, KLE_Compositions]
 	try Fn()
 	finally {
 		KLE_Model := Saved[1]
@@ -58,6 +58,7 @@ _KLT_WithEmulation(Fn) {
 		KLE_State := Saved[3]
 		KLE_KeyCodes := Saved[4]
 		KLE_LevelIndex := Saved[5]
+		KLE_Compositions := Saved[6]
 	}
 }
 
@@ -362,6 +363,93 @@ _KLT_ReadLocalCase() {
 Test("keylayout emulation: registration covers every key and leaves native chords alone (layout-registry-emulation)",
 	_KLT_RegistrationCase)
 
+Test("keylayout emulation: AltGr alone preserves native AZERTY base and Shift (layout-layer-selection)",
+	() => _KLT_WithEmulation(_KLT_IndependentLayersCase))
+
+_KLT_IndependentLayersCase() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone()]
+	try {
+		Desired := Map("emulated_layout", "ergol", "ergopti_base", false,
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", false)
+		Features := Map("layout", Desired.Clone())
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		Desired := State["features"]["layout"]
+		AssertTrue(Desired["ergopti_alt_gr"], "the source choice retains the requested AltGr layer")
+		AssertFalse(Features["layout"]["ergopti_alt_gr"], "built-in Ergopti AltGr stands down for the registry source")
+		_KLT_Load("ergol")
+		KLE_Registered := false
+		Capture := {Criterion: 0, Rows: Map()}
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, *) => Capture.Rows[Name] := Capture.Criterion,
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+		for Name in ["SC010", "+SC010", "^SC010", "!SC010", "#SC010", "SC002", "+SC002"]
+			AssertFalse(Capture.Rows[Name].Call(), Name . " must stay with the native Windows layout")
+		Azerty := _APRL_Layout("0000040C")
+		Assert(Azerty != 0, "the AZERTY preservation proof requires the installed French layout")
+		AssertEqual("a", _APRL_Text(Azerty, 0x10, []), "the real Windows DLL keeps native base a")
+		AssertEqual("A", _APRL_Text(Azerty, 0x10, [0x10]), "the real Windows DLL keeps native Shift+A")
+		AssertEqual("&", _APRL_Text(Azerty, 0x02, []), "the disabled digit override keeps AZERTY symbols")
+		AssertEqual("1", _APRL_Text(Azerty, 0x02, [0x10]), "native Shift keeps its digit")
+		AssertTrue(KeylayoutEmulation_LayerIsActive("ergopti_alt_gr"), "AltGr has an independent switch")
+		AssertEqual("^", KeylayoutEmulation_Press("SC010", false, false, true))
+		AssertEqual(Chr(0x2081), KeylayoutEmulation_Press("SC002", false, false, true))
+		AssertEqual(Chr(0xB9), KeylayoutEmulation_Press("SC002", true, false, true), "Shift+AltGr uses the selected layout")
+		KeylayoutEmulation_Press("SC010", true, false, true)
+		AssertTrue(Capture.Rows["SC010"].Call(), "a pending AltGr dead key owns only its native continuation")
+		Step := KeylayoutEmulation_PressNative("SC010", false, false, Azerty)
+		AssertEqual(Chr(0xE2), Step["Output"], "the accent composes native AZERTY a, not Ergo-L q")
+		AssertFalse(Step["Native"], "a composed character consumes the physical continuation")
+		AssertFalse(Capture.Rows["SC010"].Call(), "base immediately returns to Windows after composition")
+		KeylayoutEmulation_Press("SC010", true, false, true)
+		AssertEqual(Chr(0xC2), KeylayoutEmulation_PressNative("SC010", false, true, Azerty)["Output"],
+			"native CapsLock is read without changing the user's state")
+		KeylayoutEmulation_Press("SC010", true, false, true)
+		AssertEqual(Chr(0xCA), KeylayoutEmulation_PressNative("SC012", true, false, Azerty)["Output"],
+			"native Shift+E composes to uppercase E circumflex")
+		KeylayoutEmulation_Press("SC010", true, false, true)
+		Step := KeylayoutEmulation_PressNative("SC01A", false, false, Azerty)
+		AssertTrue(Step["Native"], "an OS dead key is replayed to its native state machine")
+		AssertEqual("^", Step["Output"], "the registry dead key terminates before a native dead key")
+		AssertFalse(Capture.Rows["SC010"].Call(), "a native dead key never leaves registry state armed")
+		Features["layout"]["direct_access_digits"] := true
+		KeylayoutEmulation_Press("SC010", true, false, true)
+		; Ergo-L's digit1 action explicitly maps circumflex + 1 to superscript 1.
+		AssertEqual(Chr(0xB9), KeylayoutEmulation_PressNative("SC002", false, false, Azerty)["Output"],
+			"a dead-key continuation composes the direct digit, not the native ampersand")
+		Features["layout"]["direct_access_digits"] := false
+		Desired["ergopti_base"] := true
+		AssertTrue(Capture.Rows["SC010"].Call(), "base can be enabled independently")
+		AssertTrue(Capture.Rows["+SC010"].Call(), "the same base switch owns Shift")
+		AssertTrue(Capture.Rows["^SC010"].Call(), "base owns shortcut letters")
+		AssertEqual("q", KeylayoutEmulation_Press("SC010", false, false, false))
+		Desired["ergopti_alt_gr"] := false
+		AssertFalse(KeylayoutEmulation_LayerIsActive("ergopti_alt_gr"))
+		AssertFalse(Capture.Rows["SC138 & SC010"].Call(), "disabled AltGr must not capture its key")
+		Features["layout"]["direct_access_digits"] := true
+		AssertFalse(Capture.Rows["SC002"].Call(), "direct digits own their unshifted row")
+		AssertTrue(Capture.Rows["SC010"].Call(), "direct digits do not disable letters")
+		CategoryEnabled["Layout"] := false
+		AssertFalse(Capture.Rows["SC010"].Call(), "the master still gates effective behavior")
+		AssertTrue(Desired["ergopti_base"], "gating never mutates the user's choice")
+		CategoryEnabled["Layout"] := true
+		LayerEnabled := true
+		AssertFalse(Capture.Rows["SC010"].Call(), "navigation owns its physical keys")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+	}
+}
+
 _KLT_RegistrationCase() {
 	global KLE_Registered, KLE_DEAD_RESET_KEYS
 	Saved := KLE_Registered
@@ -404,7 +492,7 @@ _KLT_SupersedeCase() {
 		AssertFalse(Features["layout"]["ergopti_base"], "the Ergopti base layer stands down"),
 		AssertFalse(Features["layout"]["ergopti_alt_gr"], "the Ergopti AltGr layer stands down"),
 		AssertFalse(Features["layout"]["ergopti_plus"], "the Ergopti+ changes stand down"),
-		AssertFalse(Features["layout"]["direct_access_digits"], "the emulated layout owns its digit row"),
+		AssertTrue(Features["layout"]["direct_access_digits"], "the independent digit override keeps its choice"),
 		AssertTrue(Features["layout"]["ctrl_magic_save"], "a feature that works on any layout is kept"),
 		AssertEqual("ergol", Features["layout"]["emulated_layout"], "the selection itself is kept")
 	))

@@ -454,16 +454,22 @@ KS_ScancodeToVk(Scancode, Hkl) {
 	}
 }
 
-; What one key types with no modifier under Hkl. ToUnicodeEx is called with
+; What one key types under Hkl, optionally with Shift/Caps. ToUnicodeEx uses
 ; wFlags=0x4 so reading a dead key cannot arm it for the user's next keystroke.
 ; @param Vk {Integer} The virtual key.
 ; @param Scancode {Integer} The physical scancode.
 ; @param Hkl {Integer} The keyboard layout handle to probe.
 ; @return {Object} { Count, Text }: ToUnicodeEx's result (-1 for a dead key,
 ;   0 when the key types nothing or the call failed) and the characters written.
-KS_KeyTextNoStateChange(Vk, Scancode, Hkl) {
+; @param Shift {boolean} Whether to resolve the shifted native character.
+; @param Caps {boolean} Whether CapsLock is toggled in the probed state.
+KS_KeyTextNoStateChange(Vk, Scancode, Hkl, Shift := false, Caps := false) {
 	try {
 		local keyState := Buffer(256, 0)
+		if Shift
+			NumPut("UChar", 0x80, keyState, 0x10)
+		if Caps
+			NumPut("UChar", 1, keyState, 0x14)
 		local charBuf := Buffer(32, 0)
 		local count := DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Scancode, "Ptr", keyState,
 			"Ptr", charBuf, "Int", 16, "UInt", 0x4, "Ptr", Hkl, "Int")

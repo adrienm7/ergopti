@@ -22,9 +22,10 @@
 ;    fires the earliest-created variant whose criterion holds, so the
 ;    emulation wins every key it covers as soon as its layout is loaded, and
 ;    stays inert (criterion false) until then.
-; 4. A selected registry layout supersedes the Ergopti emulation:
-;    ApplyMasterGatesToFeatures (infra/master_gates.ahk) turns the Ergopti
-;    layout features off in memory, on every path that rebuilds Features.
+; 4. The base and AltGr switches select which registry layers are emulated.
+;    MasterGateDesiredFeatures retains those choices while the effective
+;    projection disables the corresponding built-in Ergopti registrations.
+;    The independent direct-digit override keeps ownership of its own keys.
 ; 5. Registration takes injectable Hotkey/HotIf functions and refuses a second
 ;    call, so tests enumerate every hotkey without touching the keyboard.
 ; ==============================================================================
@@ -85,6 +86,8 @@ global KLE_State := KEYLAYOUT_NEUTRAL_STATE
 global KLE_KeyCodes := Map()
 ; "s|c|o" flags (Shift, CapsLock, Option) -> keyMap index, plus "command".
 global KLE_LevelIndex := Map()
+; Dead-key state -> native character -> resolved transition, built at load.
+global KLE_Compositions := Map()
 global KLE_Registered := false
 
 
@@ -112,7 +115,6 @@ KeylayoutEmulation_SelectedId(FeaturesSource := unset) {
 	if !FeaturesSource.Has("layout") || !FeaturesSource["layout"].Has("emulated_layout")
 		return ""
 	Id := FeaturesSource["layout"]["emulated_layout"]
-	; The Layout master gate turns every layout feature to false in memory.
 	return (Id is String) ? Id : ""
 }
 
@@ -128,6 +130,42 @@ KeylayoutEmulation_IsActive(*) {
 	if IsSet(LayerEnabled) && LayerEnabled
 		return false
 	return IsCategoryGated("Layout")
+}
+
+/**
+ * Whether a requested registry layer owns input under the current master.
+ * @param {string} Feature - Layout switch in the retained desired state.
+ * @returns {boolean}
+ */
+KeylayoutEmulation_LayerIsActive(Feature) {
+	global Features
+	if !KeylayoutEmulation_IsActive() || !IsSet(Features)
+		return false
+	Desired := MasterGateDesiredFeatures(Features)
+	return Desired.Has("layout") && Desired["layout"].Get(Feature, false)
+}
+
+_KLE_BaseCriterion(Sc, Shift, *) {
+	global KLE_State, KEYLAYOUT_NEUTRAL_STATE
+	if !KeylayoutEmulation_IsActive()
+		return false
+	if KLE_State != KEYLAYOUT_NEUTRAL_STATE
+		return true
+	return KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift)
+}
+
+_KLE_DigitsOwnKey(Sc, Shift) {
+	global Features, _SHIFT_DIGIT_SCS
+	if !Features["layout"].Get("direct_access_digits", false)
+		return false
+	if Shift
+		return _SHIFT_DIGIT_SCS.Has(Sc) && DigitRowIsSwapped(GetForegroundKeyboardLayout())
+	Code := Integer("0x" . SubStr(Sc, 3))
+	return _SHIFT_DIGIT_SCS.Has(Sc) || ErgoptiNumberRowEdgeMapping().Has(Code)
+}
+
+_KLE_ShortcutCriterion(*) {
+	return KeylayoutEmulation_LayerIsActive("ergopti_base")
 }
 
 
@@ -177,7 +215,7 @@ KeylayoutEmulation_KeyCodes(KeycodeTable, Convention) {
  *   layout, if any, stays loaded.
  */
 KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
-	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex, KEYLAYOUT_NEUTRAL_STATE
+	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
 	KeyCodes := KeylayoutEmulation_KeyCodes(KeycodeTable, Convention)
 	Model := Keylayout_Parse(Text)
 	LevelIndex := Map()
@@ -200,23 +238,52 @@ KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
 	for _, Index in LevelIndex
 		for _, Code in KeyCodes
 			Keylayout_Resolve(Model, Index, Code)
+	Compositions := _KLE_BuildCompositions(Model)
 	KLE_Model := Model
 	KLE_Id := Id
 	KLE_State := KEYLAYOUT_NEUTRAL_STATE
 	KLE_KeyCodes := KeyCodes
 	KLE_LevelIndex := LevelIndex
+	KLE_Compositions := Compositions
 	return KeyCodes.Count
+}
+
+; Native base characters address the layout's actions by their neutral output,
+; never by the physical position of the selected layout's different base layer.
+_KLE_BuildCompositions(Model) {
+	global KEYLAYOUT_NEUTRAL_STATE
+	Result := Map()
+	for _, Action in Model["Actions"] {
+		Neutral := Action.Get(KEYLAYOUT_NEUTRAL_STATE, 0)
+		if !(Neutral is Map) || Neutral["Next"] != "" || !Keylayout_IsPrintable(Neutral["Output"])
+			continue
+		Text := Neutral["Output"]
+		for State, Step in Action {
+			if State == KEYLAYOUT_NEUTRAL_STATE
+				continue
+			if !Result.Has(State)
+				Result[State] := Map()
+			if Result[State].Has(Text) {
+				Previous := Result[State][Text]
+				if Previous["Output"] != Step["Output"] || Previous["Next"] != Step["Next"]
+					throw ValueError("The layout has ambiguous native character composition.", -1, State . ": " . Text)
+			}
+			Result[State][Text] := Step
+		}
+	}
+	return Result
 }
 
 /**
  * Stops emulating: drops the model so every emulation hotkey stands down.
  */
 KeylayoutEmulation_Unload() {
-	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KEYLAYOUT_NEUTRAL_STATE
+	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
 	KLE_Model := 0
 	KLE_Id := ""
 	KLE_State := KEYLAYOUT_NEUTRAL_STATE
 	KLE_KeyCodes := Map()
+	KLE_Compositions := Map()
 }
 
 
@@ -245,6 +312,39 @@ KeylayoutEmulation_Press(Sc, Shift, Caps, Option) {
 	Step := Keylayout_Step(KLE_Model, KLE_State, Index, KLE_KeyCodes[Sc])
 	KLE_State := Step["Next"]
 	return Step["Output"]
+}
+
+/**
+ * Completes a registry dead key with the effective native base character.
+ * @param {string} Sc - Physical AHK scan code.
+ * @param {boolean} Shift - Shift held.
+ * @param {boolean} Caps - CapsLock toggled.
+ * @param {Integer} Hkl - Foreground Windows layout to read without changing it.
+ * @returns {Map} Output and Native (whether the OS must receive the original key).
+ */
+KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
+	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE, Features
+	Code := Integer("0x" . SubStr(Sc, 3))
+	Native := KS_KeyTextNoStateChange(KS_ScancodeToVk(Code, Hkl), Code, Hkl, Shift, Caps)
+	if Features["layout"].Get("direct_access_digits", false) {
+		if !Shift && Code >= 0x02 && Code <= 0x0B
+			Native := {Count: 1, Text: Mod(Code - 1, 10) . ""}
+		else if !Shift && ErgoptiNumberRowEdgeMapping().Has(Code)
+			Native := {Count: 1, Text: ErgoptiNumberRowEdgeMapping()[Code]}
+		else if Shift && DigitRowIsSwapped(Hkl) && Code >= 0x02 && Code <= 0x0B
+			Native := {Count: 1, Text: DigitRowSwapSymbol(Code, Hkl)}
+	}
+	Transitions := KLE_Compositions.Get(KLE_State, Map())
+	if Native.Count > 0 && Transitions.Has(Native.Text) {
+		Step := Transitions[Native.Text]
+		KLE_State := Step["Next"] != "" ? Step["Next"] : KEYLAYOUT_NEUTRAL_STATE
+		return Map("Output", Keylayout_IsPrintable(Step["Output"]) ? Step["Output"] : "", "Native", false)
+	}
+	Prefix := KLE_Model["Terminators"].Get(KLE_State, "")
+	if !Keylayout_IsPrintable(Prefix)
+		Prefix := ""
+	KeylayoutEmulation_ResetDeadKey()
+	return Map("Output", Prefix . (Native.Count > 0 ? Native.Text : ""), "Native", Native.Count <= 0)
 }
 
 /**
@@ -281,7 +381,20 @@ _KLE_Emit(Sc, Shift, Option) {
 }
 
 _KLE_OnKey(Sc, Shift, *) {
-	_KLE_Emit(Sc, Shift, false)
+	if KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift) {
+		_KLE_Emit(Sc, Shift, false)
+		return
+	}
+	_AtCrit := Critical("On")
+	try {
+		Step := KeylayoutEmulation_PressNative(Sc, Shift, GetKeyState("CapsLock", "T"), GetForegroundKeyboardLayout())
+		if Step["Output"] != ""
+			SendNewResult(Step["Output"])
+		if Step["Native"]
+			SendEvent((Shift ? "+" : "") . "{" . Sc . "}")
+	} finally {
+		Critical(_AtCrit)
+	}
 }
 
 _KLE_OnAltGr(Sc, *) {
@@ -307,7 +420,7 @@ _KLE_OnShortcut(Sc, Mods, *) {
 }
 
 _KLE_AltGrCriterion(*) {
-	return KeylayoutEmulation_IsActive() && IsRealAltGrPress()
+	return KeylayoutEmulation_LayerIsActive("ergopti_alt_gr") && IsRealAltGrPress()
 }
 
 _KLE_PendingDeadKeyCriterion(*) {
@@ -348,13 +461,15 @@ KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf) 
 	; interleave with this sequence, and the criterion is reset even on a throw.
 	_AtCrit := Critical("On")
 	try {
-		HotIfFn.Call(KeylayoutEmulation_IsActive)
 		for Sc in ScanCodes {
+			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, false))
 			HotkeyFn.Call(Sc, _KLE_OnKey.Bind(Sc, false), KLE_INPUT_LEVEL)
+			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, true))
 			HotkeyFn.Call("+" . Sc, _KLE_OnKey.Bind(Sc, true), KLE_INPUT_LEVEL)
 			Count += 2
 			if KLE_NATIVE_CHORD_KEYS.Has(Sc)
 				continue
+			HotIfFn.Call(_KLE_ShortcutCriterion)
 			for Prefix in KLE_SHORTCUT_PREFIXES {
 				Level := (SubStr(Prefix, 1, 1) == "!") ? KLE_ALT_INPUT_LEVEL : KLE_INPUT_LEVEL
 				HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
