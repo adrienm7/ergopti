@@ -33,7 +33,7 @@ local SUBSCRIBED_NON_DEFAULT = (function()
 	error("the update channel registry must declare a second channel")
 end)()
 
--- One key of each shape the Linux readers take, and six they never read.
+-- One key of each shape the Linux readers take, and five they never read.
 -- First-use completion survives cleanup because graphical startup reads it.
 local FIXTURE = table.concat({
 	"[script]",
@@ -77,7 +77,6 @@ local EXPECTED = {
 	"metrics.metrics_encrypt=leaf",
 	"gestures.not_a_slot=leaf",
 	"gesture_parameters.broken=leaf",
-	"shortcuts.chatgpt_url=leaf",
 	"stale.section.label=section",
 }
 
@@ -89,6 +88,7 @@ local SURVIVORS = {
 	{ { "gesture_parameters", "tap_3__open_url" }, "https://example.com" },
 	{ { "linux", "gestures", "swipe_3_up" }, "open_url" },
 	{ { "shortcuts", "enabled" }, SHORTCUTS_NON_DEFAULT },
+	{ { "shortcuts", "chatgpt_url" }, "https://chat.example" },
 	{ { "updater", "channel" }, SUBSCRIBED_NON_DEFAULT },
 }
 
@@ -140,6 +140,18 @@ local function driver_state(path)
 	package.loaded["modules.updater.manager"] = previous_updater
 	if not ok_updater then error(updater_err, 0) end
 
+	local paths = require("infra.config_paths")
+	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
+	paths.config = function(name)
+		helpers.assert_eq(name, "config.toml")
+		return path
+	end
+	local ok_url, chatgpt_url = pcall(function()
+		return helpers.load_module("modules.shortcuts.chatgpt").get_url()
+	end)
+	paths.config, package.loaded["modules.shortcuts.chatgpt"] = previous_config, previous_chatgpt
+	if not ok_url then error(chatgpt_url, 0) end
+
 	local decoded = TomlCodec.decode(Sandbox.read_bytes(path))
 	return {
 		needs_onboarding = require("ui.onboarding.startup").should_show(decoded),
@@ -147,6 +159,7 @@ local function driver_state(path)
 		parameter = gestures.get_action_parameter("tap_3", "open_url"),
 		gestures_enabled = enable_requested,
 		shortcuts_enabled = shortcuts.is_enabled(),
+		chatgpt_url = chatgpt_url,
 		update_channel = update_channel,
 		answers = require("ui.onboarding.bridge")._answers_from_config(decoded, ""),
 	}
