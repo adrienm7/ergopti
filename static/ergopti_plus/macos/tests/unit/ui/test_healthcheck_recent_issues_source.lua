@@ -26,13 +26,18 @@ local function with_healthcheck(callback)
 		Logger.set_level("DEBUG")
 		Logger.reset_dedup()
 		Logger.ring_buffer_clear()
+		local saved_path_reader = Logger.today_errors_path
 		local saved_path = Logger.ERRORS_LOG_FILE
+		-- The collector reads the logger's live dated-path owner, independently
+		-- of the append sink cached when the logger started.
+		Logger.today_errors_path = function() return Logger.ERRORS_LOG_FILE end
 		local collectors = helpers.load_with_stubs("ui.healthcheck.helpers")
 		for name, value in pairs(collectors) do
 			if type(value) == "function" then collectors[name] = function() return {} end end
 		end
 		local healthcheck = helpers.load_with_stubs("ui.healthcheck.core")
 		local ok, err = xpcall(callback, debug.traceback, Logger, healthcheck)
+		Logger.today_errors_path = saved_path_reader
 		Logger.ERRORS_LOG_FILE = saved_path
 		if not ok then error(err, 0) end
 	end)

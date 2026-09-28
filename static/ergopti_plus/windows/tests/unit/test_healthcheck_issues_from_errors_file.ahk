@@ -23,8 +23,9 @@
 ; ========================================
 
 ; Writes a Windows-style errors file (BOM, CRLF) and returns its path.
-_THIE_WriteErrorsFile() {
-	Path := A_Temp . "\ergopti_hc_errors_" . A_TickCount . "_" . Random(1000, 9999) . ".log"
+_THIE_WriteErrorsFile(Path := "") {
+	if (Path == "")
+		Path := A_Temp . "\ergopti_hc_errors_" . A_TickCount . "_" . Random(1000, 9999) . ".log"
 	FileAppend(Chr(0xFEFF) . "2026-09-23 10:00:00:001 [WARNING] [Layout] first from the file`r`n"
 		. "2026-09-23 10:00:01:002 [ERROR] [Probe] second from the file`r`n", Path, "UTF-8-RAW")
 	return Path
@@ -92,11 +93,14 @@ Test("HealthCheck: an unreadable errors file is a failure, never the ring (error
 
 
 _THIE_RunReportsTheSource() {
-	global LOGGER_ERRORS_LOG_PATH
-	Saved := LOGGER_ERRORS_LOG_PATH
-	Path := _THIE_WriteErrorsFile()
+	global _LogsDir
+	Saved := _LogsDir
+	Folder := A_Temp . "\ergopti_hc_logs_" . A_TickCount . "_" . Random(1000, 9999)
+	DirCreate(Folder)
+	Path := ""
 	try {
-		LOGGER_ERRORS_LOG_PATH := Path
+		_LogsDir := Folder
+		Path := _THIE_WriteErrorsFile(LoggerTodayErrorsPath())
 		Issues := HealthCheck_Run()["sections"]["issues"]
 		AssertEqual("errors_file", Issues["recent_source"], "the snapshot names its source")
 		; The logger may append its own lines to this file during the run, so
@@ -106,8 +110,9 @@ _THIE_RunReportsTheSource() {
 			Found := Found || (Entry == "2026-09-23 10:00:01:002 [ERROR] [Probe] second from the file")
 		Assert(Found, "the snapshot must carry the errors file's entries")
 	} finally {
-		LOGGER_ERRORS_LOG_PATH := Saved
+		_LogsDir := Saved
 		try FileDelete(Path)
+		try DirDelete(Folder)
 	}
 }
 
