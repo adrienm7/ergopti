@@ -692,7 +692,10 @@ function M.snapshot(state, hotfiles, core_mods)
 		local ok, list = pcall(shortcuts_mod.list_shortcuts)
 		if ok and type(list) == "table" then
 			for _, shortcut in ipairs(list) do
-				if type(shortcut) == "table" and shortcut.id then
+				-- Runtime dispatchers derive their state from assignments; only
+				-- manifest-declared preferences belong in the saved key map.
+				if type(shortcut) == "table" and type(shortcut.id) == "string"
+					and Manifest.has_default("shortcuts.keys." .. shortcut.id) then
 					existing.shortcut_keys[shortcut.id] = shortcut.enabled
 				end
 			end

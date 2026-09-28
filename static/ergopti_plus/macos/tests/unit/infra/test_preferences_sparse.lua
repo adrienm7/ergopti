@@ -27,6 +27,8 @@ helpers.describe("sparse preference transactions", function()
 			local state = prefs.build_initial_state({}, {}, modules)
 			helpers.assert_eq(prefs.save("/sparse/full-neutral.toml", state, {}, modules), true)
 			local decoded = codec.decode(source)
+			helpers.assert_eq(decoded.shortcuts and decoded.shortcuts.keys and decoded.shortcuts.keys.tap_keys, nil,
+				"the tap dispatcher is derived from assignments and has no saved preference")
 			for _, category in ipairs({ "gestures", "shortcuts", "metrics", "hotstrings" }) do
 				helpers.assert_eq(decoded[category] and decoded[category].enabled, nil)
 			end

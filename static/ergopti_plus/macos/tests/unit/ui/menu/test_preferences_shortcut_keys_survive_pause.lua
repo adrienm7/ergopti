@@ -64,13 +64,13 @@ local function save_and_read_keys(preferences, bindings)
 	return saved.shortcut_keys
 end
 
---- Asserts every listed shortcut was persisted with its preference.
+--- Asserts declared preferences survive and the derived dispatcher stays absent.
 --- @param bindings table Real Bindings module.
 --- @param keys table Decoded [shortcuts.keys].
 --- @param context string Diagnostic context.
 local function assert_keys(bindings, keys, context)
 	for id in pairs(Fixture.index(bindings)) do
-		helpers.assert_eq(keys[id], id ~= DISABLED_ID and true or nil,
+		helpers.assert_eq(keys[id], id ~= DISABLED_ID and id ~= "tap_keys" and true or nil,
 			context .. ": [shortcuts.keys] " .. id)
 	end
 end
