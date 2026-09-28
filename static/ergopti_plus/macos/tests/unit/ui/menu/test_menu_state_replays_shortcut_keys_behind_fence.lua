@@ -61,12 +61,14 @@ local function sync(bindings, shortcuts_on, keys)
 	end)
 end
 
---- Builds saved keys with every listed shortcut on except DISABLED_ID.
+--- Builds saved preferences, excluding the dispatcher derived from assignments.
 --- @param bindings table Real Bindings module.
 --- @return table keys Saved [shortcuts.keys].
 local function saved_keys(bindings)
 	local keys = {}
-	for id in pairs(Fixture.index(bindings)) do keys[id] = id ~= DISABLED_ID end
+	for id in pairs(Fixture.index(bindings)) do
+		if id ~= "tap_keys" then keys[id] = id ~= DISABLED_ID end
+	end
 	helpers.assert_eq(keys[DISABLED_ID], false,
 		"the disabled shortcut must be registered, or the replay is one-sided")
 	return keys
@@ -102,6 +104,8 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 
 	helpers.it("records every saved key while Shortcuts is OFF and binds them when it turns ON", function()
 		Fixture.with_bindings(function(bindings, ctx)
+			local tap_keys = require("modules.shortcuts.tap_keys")
+			helpers.assert_eq(tap_keys.set_action("number_row_left", "screen_capture"), true)
 			-- init.lua starts the bindings before the menu applies config.toml.
 			helpers.assert_eq(bindings.start(), true)
 			local keys = saved_keys(bindings)
@@ -114,7 +118,8 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 			helpers.assert_eq(Fixture.live_count(ctx), 0,
 				"Shortcuts OFF must leave no native hotkey")
 			for id, entry in pairs(Fixture.index(bindings)) do
-				helpers.assert_eq(entry.enabled, keys[id],
+				local expected = id == "tap_keys" or keys[id]
+				helpers.assert_eq(entry.enabled, expected,
 					"Shortcuts OFF: preference of " .. id)
 				helpers.assert_eq(entry.bound, false, "Shortcuts OFF: binding of " .. id)
 			end
@@ -123,8 +128,9 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 				"the Shortcuts ON sync must commit")
 			helpers.assert_eq(#ctx.errors, 0, table.concat(ctx.errors, " | "))
 			for id, entry in pairs(Fixture.index(bindings)) do
-				helpers.assert_eq(entry.enabled, keys[id], "Shortcuts ON: preference of " .. id)
-				helpers.assert_eq(entry.bound, keys[id], "Shortcuts ON: binding of " .. id)
+				local expected = id == "tap_keys" or keys[id]
+				helpers.assert_eq(entry.enabled, expected, "Shortcuts ON: preference of " .. id)
+				helpers.assert_eq(entry.bound, expected, "Shortcuts ON: binding of " .. id)
 			end
 		end)
 	end)
