@@ -617,7 +617,7 @@ Test_LLM_Persist_AppOverridesTraverseRealFullSave() {
 	Path := A_Temp . "\ergopti_llm_app_overrides_full_save.toml"
 	try {
 		try FileDelete(Path)
-		CandidateFeatures := _HSDeepCloneMap(Features)
+		CandidateFeatures := ManifestBuildFeaturesMap()
 		CandidateMenu := _LLM_Persist_MakeDefaultTray()
 		CandidateMenu["onboarding_seen"] := false
 		CandidateMenu["app_profile_overrides"] := Map(

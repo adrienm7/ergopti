@@ -1059,17 +1059,10 @@ try {
 #Include *i %LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #Include %A_ScriptDir%
 #InputLevel 0
-; Capture the un-gated per-section hotstring Features BEFORE gating, so a live
-; category toggle (ToggleCategoryAllFeatures) can restore a category's sections on
-; re-enable. Declared + populated here, before gating, so the auto-execute thread
-; never re-inits the Map after filling it.
-global _HSCategorySnapshot := Map()
+; Capture configuration intent once before deriving the effective runtime.
 BootProfile_StageBegin("feature gates")
-try _HSSnapshotAllCategories()
-catch as _SnapErr
-	LoggerError("ErgoptiPlus", "Hotstring category snapshot failed; a live category re-enable may not restore its sections: {1}.", _SnapErr.Message)
 _GateCountsBefore := DiagSnapshot_CountFeatures(Features)
-ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
+MasterGateInitialize(Features, TapHold, IsCategoryGated, LoggerDebug)
 _GateCountsAfter := DiagSnapshot_CountFeatures(Features)
 ; The master gates silently zero whole categories. Without the counts a user log
 ; cannot tell "the feature is off" from "its category is off".

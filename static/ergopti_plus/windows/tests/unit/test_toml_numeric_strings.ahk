@@ -77,9 +77,11 @@ _TNS_WidgetProducers(Mode) {
 		for Update in Updates {
 			if Update.Section == "metrics"
 					&& (Update.Key == WPMWidgetConst.CFG_X || Update.Key == WPMWidgetConst.CFG_Y) {
-				AssertTrue(Update.Value is Integer,
+				Value := Update.HasOwnProp("Delete") && Update.Delete == 1
+					? ManifestDefaultFor(Update.Section . "." . Update.Key) : Update.Value
+				AssertTrue(Value is Integer,
 					"the producer must retain numeric intent before any writer coercion")
-				Coordinates[Update.Key] := Update.Value
+				Coordinates[Update.Key] := Value
 			}
 		}
 		AssertEqual(2, Coordinates.Count)

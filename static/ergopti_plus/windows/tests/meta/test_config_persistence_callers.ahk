@@ -49,7 +49,7 @@ _CPC_LineConsumesResult(Lines, Index) {
 		if _CPC_IsFunctionDeclaration(Lines, Index + A_Index)
 			break
 		if RegExMatch(Candidate,
-			"i)^\s*(?:(?:if|else\s+if)\b[^\r\n]*\b|(?:try\s+)?return\s+)"
+			"i)^\s*(?:(?:if|else\s+if)\b[^\r\n]*\b|(?:try\s+)?return\b[^\r\n]*\b)"
 			. Assignment[1] . "\b")
 			return true
 	}
@@ -73,13 +73,29 @@ _CPC_IsFunctionDeclaration(Lines, Index) {
 	return false
 }
 
+_CPC_ResultConsumptionRecognizesTestedReturns() {
+	Assert(_CPC_LineConsumesResult([
+		"Committed := ConfigCommitBuilt(Path, Context, BuildFn)",
+		"return (Committed is Integer) && Committed == 1"], 1),
+		"a parenthesized strict status return consumes the writer result")
+	AssertFalse(_CPC_LineConsumesResult([
+		"Committed := ConfigCommitBuilt(Path, Context, BuildFn)",
+		"return true"], 1), "an assigned but ignored status must fail")
+	AssertFalse(_CPC_LineConsumesResult([
+		"Committed := ConfigCommitBuilt(Path, Context, BuildFn)",
+		"NextWriter() {", "return Committed"], 1),
+		"a later function cannot consume this writer's result")
+}
+Test("AHK-15-persistence: result scan distinguishes tested and discarded status",
+	_CPC_ResultConsumptionRecognizesTestedReturns)
+
 _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
 	Calls := 0
 	Lines := StrSplit(Src, "`n", "`r")
 	for Index, Line in Lines {
-		if !RegExMatch(Line, "\b(?:TOML_(?:Write|BatchWrite)|ConfigCommitUpdates)\(")
+		if !RegExMatch(Line, "\b(?:TOML_(?:Write|BatchWrite)|ConfigCommit(?:Updates|Built))\(")
 			continue
 		if _CPC_IsFunctionDeclaration(Lines, Index)
 			continue
@@ -87,15 +103,14 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; Audited inventory: config_shortcuts (1), config_io (9, the language-pack
-	; bulk toggle included), gestures (4),
-	; i18n (1), TOML_Write (1), personal editor (1), trigger journal (1),
-	; menu rebuild (1), the unused-key cleanup (1) and the error window's Debug
-	; menu setting (1). Pin the exact census so
+	; Audited inventory: config_io (6), config_shortcuts (2), unused-key cleanup
+	; (2), feature_io (2), gestures (4), and one each in i18n, TOML_Write,
+	; updater, editors, trigger journal, menu rebuild, personal editor, WPM and the error window.
+	; Both admitted builders and direct-update gateways count. Pin the census so
 	; deleting a caller cannot make this class guard progressively vacuous, while
 	; every future sibling is still inspected by the loop above before the
 	; inventory assertion is reached.
-	AssertEqual(21, Calls,
+	AssertEqual(25, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -188,33 +203,31 @@ Test("AHK-15-persistence: every gesture writer gates reload/publication",
 
 _CPC_AssertBulkFunctionStagesBeforePublishing(Name) {
 	Body := _StripFullLineComments(_DriverFuncBody(Name))
-	Assert(Body != "", Name . " must exist for the AHK-15 bulk transaction guard")
-	PersistPos := InStr(Body, "ConfigCommitUpdates(")
-	ReloadPos := InStr(Body, "ReloadPreservingSuspend()")
-	Assert(InStr(Body, "Candidate") > 0,
-		Name . " must build detached candidate state instead of mutating live Maps before persistence")
-	Assert(PersistPos > 0, Name . " must commit through the single boolean-consuming helper")
-	Assert(ReloadPos == 0 or PersistPos < ReloadPos,
-		Name . " must not reload before its durable commit succeeds")
-	Prefix := SubStr(Body, 1, PersistPos - 1)
-	Assert(!RegExMatch(Prefix,
-		"m)^\s*(?:Features|CategoryEnabled|TapHold|GestureAssignments|KeyboardShortcutAssignments|ScriptShortcutAssignments)\s*(?:\[|:=)"),
-		Name . " must not publish or mutate a live shared Map before ConfigCommitUpdates returns true")
-	Assert(!RegExMatch(Prefix, "m)^\s*WPMWidget\.[A-Za-z_][A-Za-z0-9_]*\s*:="),
-		Name . " must not publish WPM state before ConfigCommitUpdates returns true")
-	Assert(InStr(Body, "TOML_Write(") = 0 and InStr(Body, "TOML_BatchWrite(") = 0
-		and InStr(Body, "WriteFeatureV2(") = 0 and InStr(Body, "WriteFeatureBatchV2(") = 0,
-		Name . " must use one ConfigCommitUpdates batch per branch, not sibling read-modify-write calls")
-	ExpectedCommits := (Name == "ToggleCategoryAllFeatures") ? 2 : 1
-	AssertEqual(ExpectedCommits, _CPC_CountOccurrences(Body, "ConfigCommitUpdates("),
-		Name . " must keep exactly one config.toml batch on each mutually exclusive mutation branch")
-	if (Name == "ToggleAllHotstrings") {
-		Assert(InStr(Body, "_CollectAllHotstringsV2Paths(CandidateFeatures)") > 0,
-			"personal hotstring discovery must seed only the detached candidate before persistence")
-		CollectorBody := _DriverFuncBody("_CollectAllHotstringsV2Paths")
-		Assert(InStr(CollectorBody, "_ConfigSeedPersonalHotstring(FeaturesTarget") > 0
-			and InStr(CollectorBody, "EnsurePersonalHotstringFeature(") = 0,
-			"the hotstring path collector must not mutate the live Features global")
+	Assert(Body != "", Name . " must exist")
+	Category := Name == "ToggleCategoryAllFeatures"
+	Owner := Category ? Body : _StripFullLineComments(_DriverFuncBody("_ConfigCommitHotstringIntent"))
+	BuilderName := Category ? "_ConfigBuildCategoryIntentPlan" : "_ConfigBuildHotstringIntentPlan"
+	Builder := _StripFullLineComments(_DriverFuncBody(BuilderName))
+	Assert(Owner != "" && Builder != "", "admission and candidate phases must exist")
+	if !Category
+		Assert(InStr(Body, "return _ConfigCommitHotstringIntent(") > 0, Name . " must consume the common commit result")
+	PersistPos := InStr(Owner, "if !ConfigCommitBuilt(")
+	ReloadPos := InStr(Owner, "ReloadPreservingSuspend(")
+	Assert(PersistPos > 0 && ReloadPos > PersistPos, "durable commit must precede reload")
+	AssertEqual(1, _CPC_CountOccurrences(Owner, "ConfigCommitBuilt("), "one logical edit has one admitted config batch")
+	Assert(InStr(Owner, BuilderName . ".Bind(") > 0, "candidate construction must occur under the config lease")
+	Assert(InStr(Builder, "MasterGateDesiredFeatures(") > 0 && InStr(Builder, "_ConfigPublishDesiredState.Bind(") > 0,
+		"the candidate retains intent and delegates atomic publication to the gateway")
+	for Source in [Body, Builder] {
+		Assert(!RegExMatch(Source, "m)^\s*(?:Features|CategoryEnabled|TapHold)\s*(?:\[|:=)"),
+			Name . " cannot publish shared state before the durable gateway accepts it")
+	}
+	if Name == "ToggleAllHotstrings" {
+		Collector := _DriverFuncBody("_CollectAllHotstringsV2Paths")
+		Assert(Collector != "" && InStr(Builder, "_CollectAllHotstringsV2Paths(Desired)") > 0,
+			"personal discovery must run on a detached desired candidate")
+		Assert(InStr(Collector, "_ConfigSeedPersonalHotstring(FeaturesTarget") > 0 && InStr(Collector, "EnsurePersonalHotstringFeature(") == 0,
+			"discovery cannot mutate the live feature tree")
 	}
 }
 

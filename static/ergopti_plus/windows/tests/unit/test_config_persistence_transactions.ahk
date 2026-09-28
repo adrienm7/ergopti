@@ -19,11 +19,11 @@
 ; MetricsFilters class is included centrally because its persistence paths now
 ; have behavioural global-barrier coverage.
 class WPMWidgetConst {
-	static CFG_VISIBLE := "wpm_visible"
-	static CFG_X := "wpm_x"
-	static CFG_Y := "wpm_y"
-	static CFG_COLORS := "wpm_colors"
-	static CFG_GRAPH := "wpm_graph"
+	static CFG_VISIBLE := "wpm_widget_visible"
+	static CFG_X := "wpm_widget_x"
+	static CFG_Y := "wpm_widget_y"
+	static CFG_COLORS := "wpm_widget_colors"
+	static CFG_GRAPH := "wpm_widget_graph"
 }
 
 class WPMWidget {

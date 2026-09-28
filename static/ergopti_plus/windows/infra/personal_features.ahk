@@ -44,6 +44,15 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
 								Features["shortcuts"]["personal"] := Map()
 						}
 						Features["shortcuts"]["personal"][Name] := DefaultEnabled
+						if MasterGateState()["initialized"] {
+								Desired := MasterGateState()["features"]["shortcuts"]
+								if !Desired.Has("personal")
+										Desired["personal"] := Map()
+								if !Desired["personal"].Has(Name)
+										Desired["personal"][Name] := DefaultEnabled
+								Features["shortcuts"]["personal"][Name] :=
+										IsCategoryGated("Shortcuts") && Desired["personal"][Name]
+						}
 				}
 		}
 }
@@ -69,5 +78,7 @@ EnsurePersonalHotstringFeature(SecName) {
 		if !Features["hotstrings"].Has("personal")
 				Features["hotstrings"]["personal"] := Map()
 		if !Features["hotstrings"]["personal"].Has(SecName)
-				Features["hotstrings"]["personal"][SecName] := Map("enabled", false, "time_activation_seconds", 0)
+				_ConfigSeedPersonalHotstring(Features, SecName)
+		if MasterGateState()["initialized"]
+				_ConfigSeedPersonalHotstring(MasterGateState()["features"], SecName)
 }

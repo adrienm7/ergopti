@@ -65,7 +65,7 @@ _TH_KeyRows() {
 		TapLbl   := TapHoldCurrentTapLabel(KeyId)
 		HoldLbl  := TapHoldCurrentHoldLabel(KeyId)
 
-		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(TapHold, KeyId)
+		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(MasterGateDesiredTapHold(TapHold), KeyId)
 
 		NoneLabel  := t("tap_hold.tap.none")
 		NoneHold   := t("tap_hold.hold.none")

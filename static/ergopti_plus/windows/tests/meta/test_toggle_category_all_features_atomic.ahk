@@ -42,48 +42,27 @@
 ; ===================================================
 
 _TCAF_LiveToggleIsAtomic() {
-	Body := _DriverFuncBody("ToggleCategoryAllFeatures")
-	Assert(Body != "", "ToggleCategoryAllFeatures(Category, Value) declaration must exist in config_io.ahk")
-
-	CritPos := InStr(Body, 'Critical("On")')
-	Assert(CritPos > 0,
-		"ToggleCategoryAllFeatures must enter Critical around the live-category mutation window so a concurrent #HotIf/InputHook evaluation never observes torn Features/TapHold state")
-
-	RestorePos := InStr(Body, "_HSRestoreCategoryFrom(CandidateFeatures")
-	SnapshotPos := InStr(Body, "_HSSnapshotCategoryTo(CandidateFeatures")
-	Assert(RestorePos > 0, "ToggleCategoryAllFeatures must restore the category snapshot on ON")
-	Assert(SnapshotPos > 0, "ToggleCategoryAllFeatures must snapshot the category on OFF")
-	Assert(RestorePos < CritPos and SnapshotPos < CritPos,
-		"snapshot/restore must build detached candidates before Critical; no live Map is exposed yet")
-
-	GatesPos := InStr(Body, "ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold")
-	Assert(GatesPos > 0, "ToggleCategoryAllFeatures must re-apply master gates before rebuilding")
-	Assert(GatesPos < CritPos,
-		"manifest I/O and master-gate application must finish on detached candidates before Critical")
-
-	WritePos := InStr(Body, "ConfigCommitUpdates(ConfigurationFile")
-	Assert(WritePos > GatesPos and WritePos < CritPos,
-		"the detached candidate must persist successfully before the atomic publish window")
-	PublishPos := InStr(Body, "Features := CandidateFeatures")
-	Assert(PublishPos > CritPos,
-		"Critical must begin before the first live candidate reference is published")
-
-	RebuildPos := InStr(Body, "RebuildHotstringsLive()")
-	Assert(RebuildPos > 0, "ToggleCategoryAllFeatures must rebuild the live hotstring engine")
-	Assert(GatesPos < RebuildPos, "master gates must be re-applied before the engine rebuild")
-
-	Assert(InStr(Body, "finally") > 0,
-		"ToggleCategoryAllFeatures must release Critical in a finally block so an exception during publication cannot leak Critical")
-	Assert(InStr(Body, "Critical(_TcafCrit)") > 0,
-		"ToggleCategoryAllFeatures must restore the prior Critical state after the mutation window (no leaked Critical)")
-
-	; F-01: the UPPER bound. Critical must be RELEASED before the rebuild.
-	RelPos := InStr(Body, "Critical(_TcafCrit)")
-	Assert(RelPos < RebuildPos,
-		"ToggleCategoryAllFeatures must RELEASE Critical before RebuildHotstringsLive(): that call re-runs RegisterAllHotstrings (~1.3 s) and, via RebuildTrayMenu -> _HS_InvalidatePersonalCache, a full recursive personal-hotstrings + extensions rescan. Holding Critical across it starves the LL keyboard hook past LowLevelHooksTimeout and Windows silently drops physical keystrokes (F33 regression, reintroduced by this caller)")
-
-	Assert(WritePos < CritPos,
-		"the config write is unbounded file I/O and must sit before the Critical publish span")
+	Body := _StripFullLineComments(_DriverFuncBody("ToggleCategoryAllFeatures"))
+	Builder := _StripFullLineComments(_DriverFuncBody("_ConfigBuildCategoryIntentPlan"))
+	Publish := _StripFullLineComments(_DriverFuncBody("_ConfigPublishDesiredState"))
+	Assert(Body != "" && Builder != "" && Publish != "", "all transaction phases must exist")
+	Assert(InStr(Body, "if !ConfigCommitBuilt(") > 0 && InStr(Body, "_ConfigBuildCategoryIntentPlan.Bind(") > 0,
+		"the category candidate must be built only after config admission")
+	Assert(InStr(Builder, "MasterGateDesiredFeatures(") > 0 && InStr(Builder, "MasterGateDesiredTapHold(") > 0,
+		"both candidates must originate from retained intent, never an already-gated snapshot")
+	Assert(InStr(Builder, "ApplyMasterGatesToFeatures(") > 0 && InStr(Builder, "_ConfigPublishDesiredState.Bind(") > 0,
+		"the detached projection must complete before publication is offered to the gateway")
+	Assert(InStr(Builder, 'Critical("On")') == 0, "manifest reads cannot run under Critical")
+	CritPos := InStr(Publish, 'Critical("On")')
+	ReleasePos := InStr(Publish, "finally Critical(")
+	for Assignment in ["Patch.target[Patch.key] := Patch.value", "TapHold := CandidateTapHold", "CategoryEnabled := CandidateCategories"] {
+		Pos := InStr(Publish, Assignment)
+		Assert(CritPos > 0 && Pos > CritPos && ReleasePos > Pos, "every runtime reference swap must be atomic")
+	}
+	for Forbidden in ["ApplyMasterGatesToFeatures(", "ConfigCommit", "RebuildHotstringsLive(", "ReloadPreservingSuspend("]
+		Assert(InStr(Publish, Forbidden) == 0, "publication must remain memory-only: " . Forbidden)
+	Assert(InStr(Body, 'Critical("On")') == 0 && InStr(Body, "RebuildHotstringsLive(") > 0,
+		"native rebuilding must remain outside the Critical publication window")
 }
 Test("config_io: ToggleCategoryAllFeatures publishes detached candidates atomically (F39)", _TCAF_LiveToggleIsAtomic)
 

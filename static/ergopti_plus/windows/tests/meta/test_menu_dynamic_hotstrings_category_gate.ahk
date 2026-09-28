@@ -40,27 +40,23 @@ _MDHCG_CheckDynamicHotstringsExcluded() {
 	Body := _DriverFuncBody("MenuRowFromManifest")
 	Assert(Body != "", "MenuRowFromManifest must exist in ui/menu/menu_engine.ahk")
 
-	Assert(InStr(Body, '"DynamicHotstrings"') > 0,
-		'MenuRowFromManifest must special-case "DynamicHotstrings" -- it is the one hotstring sub-category with no independent CategoryEnabled entry (it follows the Hotstrings master directly)')
-
-	MasterCheckPos := InStr(Body, "_MasterCategoryFor(V1CategoryPath)")
-	Assert(MasterCheckPos > 0, "MenuRowFromManifest must still check IsCategoryGated(_MasterCategoryFor(V1CategoryPath))")
-
-	ExclusionPos := InStr(Body, '"DynamicHotstrings"')
-	Assert(ExclusionPos > MasterCheckPos,
-		"the DynamicHotstrings exclusion must guard the SECOND (sub-category) gate check, not replace the first (master-gate) check")
+	Assert(InStr(Body, "IsCategoryGated(") == 0,
+		"editable children must not query independent gates, including categories without their own master")
+	Assert(InStr(Body, "ReadFeatureStateV2(") > 0,
+		"the actual row must retain the user's desired choice behind a disabled master")
 }
 Test("menu: MenuRowFromManifest excludes DynamicHotstrings from the redundant sub-category IsCategoryGated check (menu-category-gate-false-positive)",
 	_MDHCG_CheckDynamicHotstringsExcluded)
 
 _MDHCG_CheckOtherHotstringSubcategoriesStillChecked() {
 	Body := _DriverFuncBody("MenuRowFromManifest")
-	; The five real per-file sub-categories must still be gated via
-	; IsCategoryGated(SubCategory) -- only DynamicHotstrings is excluded.
-	Assert(InStr(Body, "IsCategoryGated(SubCategory)") > 0,
-		"MenuRowFromManifest must still check IsCategoryGated(SubCategory) for real per-file sub-categories (Autocorrection, DistancesReduction, SFBsReduction, Rolls, MagicKey)")
+	Assert(Body != "", "the manifest row builder must exist")
+	Projection := _DriverFuncBody("ApplyMasterGatesToFeatures")
+	Assert(Projection != "", "the effective-state projection must exist")
+	Assert(InStr(Projection, "CategoryGateFn.Call(SubV1)") > 0,
+		"real subcategory masters must keep gating native state while the menu remains editable")
 }
-Test("menu: MenuRowFromManifest still gates the five real per-file hotstring sub-categories (menu-category-gate-false-positive)",
+Test("menu: real hotstring subcategories gate runtime independently of editable rows (menu-category-gate-false-positive)",
 	_MDHCG_CheckOtherHotstringSubcategoriesStillChecked)
 
 

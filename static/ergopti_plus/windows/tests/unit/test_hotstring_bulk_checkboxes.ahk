@@ -15,10 +15,9 @@
 ; rows are built by the real builders over the live Features and CategoryEnabled
 ; maps, which each test restores.
 ;
-; The whole tree's checkbox went on calling the pair's old writer, which closed
-; the Hotstrings switch when unticked and never opened a closed category gate
-; when ticked, so it stayed unticked however often it was clicked. Its writer is
-; run here against a scratch config.toml.
+; Bulk selection edits desired section state independently of category masters.
+; The checks below keep those masters closed while selecting every child and
+; exercise the durable writer against a scratch config.toml.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -140,8 +139,8 @@ _HBC_ScopeAllOnReadsEverySection() {
 	Paths := _HS_SectionPaths("hotstrings.rolls")
 	_HBC_WithRolls(true, true, () => AssertTrue(_HS_ScopeAllOn(["Rolls"], Paths),
 		"every section on and the gate on is « all on »"))
-	_HBC_WithRolls(false, true, () => AssertFalse(_HS_ScopeAllOn(["Rolls"], Paths),
-		"a closed gate is not « all on »"))
+	_HBC_WithRolls(false, true, () => AssertTrue(_HS_ScopeAllOn(["Rolls"], Paths),
+		"selected sections stay checked behind a closed gate"))
 	_HBC_WithRolls(true, true, _HBC_OneSectionOff.Bind(Paths))
 	AssertFalse(_HS_ScopeAllOn([], Paths), "a scope with no gate has nothing the checkbox could switch on")
 	AssertFalse(_HS_ScopeAllOn(["Rolls"], []), "a scope with no section has nothing the checkbox could switch on")
@@ -178,7 +177,7 @@ _HBC_AssertCategoryHead(State) {
 	AssertEqual(State, Rows[1]["checked"], "the gate is a checkbox ticked from the category gate")
 	All := _HBC_RowsLabelled(Rows, t("menu.hotstrings.enable_all_sections"))
 	AssertEqual(1, All.Length, "one control for every section of the category")
-	AssertEqual(State, All[1]["checked"], "ticked exactly when the gate and every section are on")
+	AssertTrue(All[1]["checked"], "section selection is independent of the category gate")
 	_HBC_AssertNoRetired(Rows, "the category submenu")
 }
 
@@ -217,6 +216,7 @@ _HBC_WithScratchConfig(Gates, Body) {
 	SavedPath := ConfigurationFile
 	SavedFeatures := Features
 	SavedCategories := CategoryEnabled
+	SavedOwner := MasterGateState().Clone()
 	ReloadsBefore := _Stub_SentText.Length
 	ConfigPath := A_Temp . "\ergopti_hbc_whole_tree_" . A_ScriptHwnd . "_" . A_TickCount . ".toml"
 	try FileDelete(ConfigPath)
@@ -224,9 +224,13 @@ _HBC_WithScratchConfig(Gates, Body) {
 		_FLAT_HOTSTRING_V1_CATS := ["Rolls"]
 		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
 		ConfigurationFile := ConfigPath
+		Features := _HSDeepCloneMap(Features)
 		CategoryEnabled := CategoryEnabled.Clone()
 		for Gate, Value in Gates
 			CategoryEnabled[Gate] := Value
+		_HBC_SetSections("hotstrings.rolls", Gates["Hotstrings"])
+		MasterGateState()["initialized"] := false
+		MasterGateInitialize(Features, Map(), IsCategoryGated)
 		Body(ConfigPath)
 	} finally {
 		_FLAT_HOTSTRING_V1_CATS := unset
@@ -234,6 +238,9 @@ _HBC_WithScratchConfig(Gates, Body) {
 		ConfigurationFile := SavedPath
 		Features := SavedFeatures
 		CategoryEnabled := SavedCategories
+		MasterGateState().Clear()
+		for Key, Value in SavedOwner
+			MasterGateState()[Key] := Value
 		while (_Stub_SentText.Length > ReloadsBefore)
 			_Stub_SentText.Pop()
 		if _ParseTomlCache.Has(ConfigPath)
@@ -276,19 +283,19 @@ _HBC_WholeTreeTickOpensEveryGate() {
 
 _HBC_AssertTickOpensGates(ConfigPath) {
 	global CategoryEnabled
-	AssertFalse(_HS_AllHotstringsOn(), "closed gates leave the checkbox unticked")
+	AssertFalse(_HS_AllHotstringsOn(), "unselected sections leave the checkbox unticked")
 	AssertTrue(ToggleAllHotstrings(true), "the whole-tree write must commit")
-	AssertTrue(CategoryEnabled["Hotstrings"], "ticking every section opens the Hotstrings switch")
-	AssertTrue(CategoryEnabled["Rolls"], "and every closed category gate of the tree")
-	AssertEqual(1, TOML_Read(ConfigPath, "category_enabled", "rolls", -1),
-		"the opened category gate is persisted")
+	AssertFalse(CategoryEnabled["Hotstrings"], "selecting every section leaves the master disabled")
+	AssertFalse(CategoryEnabled["Rolls"], "section selection preserves the category gate")
+	AssertEqual(-1, TOML_Read(ConfigPath, "category_enabled", "rolls", -1),
+		"section selection cannot create a master override")
 	_HBC_ApplyGatesAsAtBoot()
 	AssertTrue(_HS_AllHotstringsOn(), "one click ticks the checkbox, once the reload has applied the gates")
 }
 
 Test("hotstring bulk: the « all sections » row is one checkbox (hotstring-bulk-checkboxes)",
 	_HBC_AllSectionsRowIsACheckbox)
-Test("hotstring bulk: « all on » reads the gate and every section (hotstring-bulk-checkboxes)",
+Test("hotstring bulk: « all on » reads every desired section (hotstring-bulk-checkboxes)",
 	_HBC_ScopeAllOnReadsEverySection)
 Test("hotstring bulk: a category opens with its gate and one « all » checkbox (hotstring-bulk-checkboxes)",
 	_HBC_CategoryHeadRows)
@@ -296,5 +303,5 @@ Test("hotstring bulk: a language opens with one « all » checkbox (hotstring-bu
 	_HBC_LanguageSwitchRowIsACheckbox)
 Test("hotstring bulk: unticking the whole tree keeps every gate (hotstring-bulk-checkboxes)",
 	_HBC_WholeTreeUntickKeepsGates)
-Test("hotstring bulk: ticking the whole tree opens every gate (hotstring-bulk-checkboxes)",
+Test("hotstring bulk: ticking the whole tree preserves disabled gates (hotstring-bulk-checkboxes)",
 	_HBC_WholeTreeTickOpensEveryGate)

@@ -209,7 +209,7 @@ _MI_StageHotstrings() {
 		"repeat_key", ToggleRepeatKeyEnabled,
 	)
 	_HotParamGetters := Map(
-		"hotstrings_repeat_enabled", () => HSE_RepeatEnabled,
+		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
 	)
 
 	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`

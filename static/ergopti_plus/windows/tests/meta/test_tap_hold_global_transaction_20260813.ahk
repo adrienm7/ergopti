@@ -65,7 +65,7 @@ _THGTM_CommitOwnsBeforeSnapshot() {
 	BoundPos := InStr(Body, "BoundPath := _TH_TapHoldConfigPath()")
 	LeasePos := InStr(Body, "_ConfigWriteLeaseTryAcquire(BoundPath")
 	SnapshotPos := InStr(Body, "StartState := TapHold")
-	ClonePos := InStr(Body, "Candidate := _TH_CloneData(StartState)")
+	ClonePos := InStr(Body, "Candidate := _TH_CloneData(MasterGateDesiredTapHold(StartState))")
 	WritePos := InStr(Body, "_TH_WriteTapHoldToml(Candidate")
 	ReleasePos := InStr(Body, "_ConfigWriteLeaseRelease(OwnerToken)")
 	Assert(BoundPos > 0 && LeasePos > BoundPos
@@ -83,7 +83,7 @@ _THGTM_DurableWriterIsUniqueAuthorizedAndAtomic() {
 	StagePos := InStr(Body, "FSWriteDurable(StagePath, Content)")
 	AuthorizePos := InStr(Body, "_TH_AuthorizeTapHoldCommit(OwnerToken")
 	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, BoundPath)")
-	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, OwnerToken")
+	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
 	Assert(StagePos > 0 && AuthorizePos > StagePos
 		&& ReplacePos > AuthorizePos && PublishPos > ReplacePos,
 		"a complete durable stage must be re-authorized, atomically replaced, then published live in order")
@@ -104,7 +104,7 @@ _THGTM_DurableWriterIsUniqueAuthorizedAndAtomic() {
 
 	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
 	Assert(Publisher != "", "_TH_PublishTapHoldCandidate must remain source-visible")
-	Assert(InStr(Publisher, "TapHold := Candidate") > 0,
+	Assert(InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
 		"the one live publisher must swap the detached candidate by reference")
 	Assert(InStr(Publisher, "FS") == 0 && InStr(Publisher, "File") == 0,
 		"the live publication callback must remain memory-only inside Critical")

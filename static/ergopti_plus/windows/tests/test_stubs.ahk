@@ -341,6 +341,8 @@ global CategoryEnabled := Map(
     "Hotstrings", true,
     "TapHolds",   true,
 )
+; Production feature_state is loaded only by the isolated boot smoke harness.
+global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map("DynamicHotstrings", true, "Personal", true)
 IsCategoryGated(Category) {
     global CategoryEnabled
     return CategoryEnabled.Has(Category) ? CategoryEnabled[Category] : true

@@ -3,17 +3,13 @@
 ; ==============================================================================
 ; MODULE: Master Gates application
 ; DESCRIPTION:
-; Applies the per-category master-toggle gating (``CategoryEnabled`` Map) onto
-; ``Features`` at boot, so every #HotIf evaluation reading ``Features["…"]``
-; short-circuits to false while the category is master-disabled. The per-feature
-; state persisted on disk is NOT touched — it stays in the user's config.toml
-; and is restored at next Reload after the master toggle flips back on.
+; Retains configuration intent before projecting category gates onto the runtime
+; Features and TapHold maps. Input hooks read the effective projection; editors,
+; checkmarks, and persistence read the retained choices even while masters are off.
 ;
 ; FEATURES & RATIONALE:
-; 1. Single source of truth for runtime gating. The tray menu greys out items
-;    via ``IsCategoryGated`` (which reads CategoryEnabled directly); this
-;    helper neutralises the underlying behaviour by zeroing Features entries
-;    so the hotkey path doesn't have to consult two flags.
+; 1. Switches become inactive while pure parameters retain their values. Child
+;    editing remains independent of the category master and of the pause fence.
 ; 2. TapHolds gets the same treatment via ``TapHold["keys"]`` — disabling
 ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
 ;    for every physical key.
@@ -36,10 +32,66 @@
 ; =============================================
 ; =============================================
 
-; When a master category gate is off, force every v2 feature in that
-; category to ``false`` so #HotIf evaluations on Features short-circuit.
-; The on-disk persistence is untouched — flipping the master back on +
-; Reload restores the per-feature state from config.toml.
+; Holds the configuration intent separately from the maps read by input hooks.
+MasterGateState() {
+	static State := Map("initialized", false, "features", Map(), "tap_hold", Map())
+	return State
+}
+
+; Boot owns the sole initialization, after configuration and personal entries load.
+MasterGateInitialize(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
+	State := MasterGateState()
+	if State["initialized"]
+		throw Error("Master gate desired state is already initialized.")
+	DesiredFeatures := _HSDeepCloneMap(FeaturesTarget)
+	DesiredTapHold := _HSDeepCloneMap(TapHoldTarget)
+	ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn)
+	State["features"] := DesiredFeatures
+	State["tap_hold"] := DesiredTapHold
+	State["initialized"] := true
+	return true
+}
+
+; Ungated domains keep their existing owners; only gated roots need an intent view.
+MasterGateDesiredFeatures(FeaturesSource) {
+	State := MasterGateState()
+	if !State["initialized"]
+		return FeaturesSource
+	View := FeaturesSource.Clone()
+	for Root in ["layout", "shortcuts", "hotstrings"] {
+		if State["features"].Has(Root)
+			View[Root] := State["features"][Root]
+	}
+	return View
+}
+
+; Tap-hold writers and menu labels consume the retained configuration, not empty runtime keys.
+MasterGateDesiredTapHold(TapHoldSource) {
+	State := MasterGateState()
+	return State["initialized"] ? State["tap_hold"] : TapHoldSource
+}
+
+; Only declared switches and alpha activation flags are runtime gates. Parameters
+; retain their types and values, including numbers, strings, and alpha options.
+_MG_DisableFeatureNode(Node, Prefix) {
+	if InStr(Prefix, ".") && Node.Has("enabled") {
+		Node["enabled"] := false
+		return
+	}
+	for Key, Value in Node {
+		Path := Prefix . "." . Key
+		if Value is Map {
+			_MG_DisableFeatureNode(Value, Path)
+			continue
+		}
+		Entry := ManifestFindEntryByPath(Path)
+		if (Entry is Map) && Entry.Get("type", "") == "boolean"
+			Node[Key] := false
+		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
+			Node[Key] := false
+	}
+}
+
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
 		if !(FeaturesTarget is Map)
 				throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
@@ -54,9 +106,7 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 		; Layout master
 		if !CategoryGateFn.Call("Layout") and FeaturesTarget.Has("layout") {
-				for V2Id, _ in FeaturesTarget["layout"] {
-						FeaturesTarget["layout"][V2Id] := false
-				}
+				_MG_DisableFeatureNode(FeaturesTarget["layout"], "layout")
 		}
 
 		; A selected registry layout supersedes the Ergopti emulation. After the
@@ -65,35 +115,12 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 		; Shortcuts master
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
-				for V2Id, V2Val in FeaturesTarget["shortcuts"] {
-						if (Type(V2Val) == "Map") {
-								; Modélisation α + sub-Maps — flip ``enabled`` if present,
-								; else flip every leaf bool entry.
-								if V2Val.Has("enabled") {
-										V2Val["enabled"] := false
-								} else {
-										for SubId, _ in V2Val {
-												V2Val[SubId] := false
-										}
-								}
-						} else if (Type(V2Val) == "Integer" or V2Val == true or V2Val == false) {
-								FeaturesTarget["shortcuts"][V2Id] := false
-						}
-				}
+				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts")
 		}
 
 		; Hotstrings master (includes Personal sub-category).
 		if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
-				for V2Cat, V2CatMap in FeaturesTarget["hotstrings"] {
-						if (Type(V2CatMap) != "Map") {
-								continue
-						}
-						for V2Id, V2Val in V2CatMap {
-								if (Type(V2Val) == "Map" and V2Val.Has("enabled")) {
-										V2Val["enabled"] := false
-								}
-						}
-				}
+				_MG_DisableFeatureNode(FeaturesTarget["hotstrings"], "hotstrings")
 		}
 
 		; Per-TOML-file hotstring sub-category gates. Independent of the top

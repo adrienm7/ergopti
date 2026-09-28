@@ -152,11 +152,14 @@ _CFAS_BothShortcutReadersReport() {
 _CFAS_BothSectionTogglesReport() {
 	for Name in ["HS_TogglePersonalAllSections", "ToggleCategoryAllSections"] {
 		Body := _DriverFuncBody(Name)
-		if (Body == "")
-			continue
-		Assert(InStr(Body, "Logger") > 0,
-			Name . " must log when it declines to act — a menu item that does nothing and says nothing is indistinguishable from one that is broken")
+		Assert(Body != "" && InStr(Body, "return _ConfigCommitHotstringIntent(") > 0,
+			Name . " must consume the reporting transaction result")
 	}
+	Owner := _DriverFuncBody("_ConfigCommitHotstringIntent")
+	Gateway := _DriverFuncBody("ConfigCommitBuilt")
+	Assert(Owner != "" && Gateway != "", "the common reporting path must exist")
+	Assert(InStr(Owner, "if !ConfigCommitBuilt(") > 0 && InStr(Gateway, "ConfigReportPersistenceFailure(") > 0,
+		"every construction or durable refusal must reach the explicit failure reporter")
 }
 
 ; The bulk toggle now owns only the config.toml master gate. The standalone
@@ -180,7 +183,7 @@ _CFAS_TapHoldDisableIsNotSwallowed() {
 		&& InStr(WriterBody, "if !Replaced") > 0
 		&& InStr(WriterBody, "if !Published") > 0,
 		"every non-throwing persistence refusal must abort explicitly")
-	Assert(InStr(Publisher, "TapHold := Candidate") > 0,
+	Assert(InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
 		"only the post-replacement publisher may swap live TapHold")
 }
 
@@ -203,19 +206,17 @@ Test("meta config: the tap-hold disable failure is not swallowed",
 ; published. Reload is not recovery: it is itself a side effect and cannot be
 ; used to hide a mutation that never committed.
 _CFAS_BulkTogglesRecoverFromAFailedWrite() {
-	for Name in ["ToggleCategoryAllFeatures"] {
-		Body := _StripFullLineComments(_DriverFuncBody(Name))
-		Assert(Body != "", Name . "() must exist")
-		PersistPos := InStr(Body, "ConfigCommitUpdates(")
-		PublishPos := InStr(Body, "Features := CandidateFeatures")
-		ReloadPos := InStr(Body, "ReloadPreservingSuspend()")
-		Assert(PersistPos > 0 and InStr(Body, "if !ConfigCommitUpdates(") > 0,
-			Name . " must test the non-throwing persistence result")
-		Assert(PublishPos == 0 or PublishPos > PersistPos,
-			Name . " must publish detached state only after persistence succeeds")
-		Assert(ReloadPos == 0 or ReloadPos > PersistPos,
-			Name . " must never reload on the failed-commit branch")
-	}
+	Body := _StripFullLineComments(_DriverFuncBody("ToggleCategoryAllFeatures"))
+	Assert(Body != "", "the category writer must exist")
+	PersistPos := InStr(Body, "if !ConfigCommitBuilt(")
+	RefusalPos := InStr(Body, "return false",, PersistPos)
+	RebuildPos := InStr(Body, "RebuildHotstringsLive(")
+	ReloadPos := InStr(Body, "ReloadPreservingSuspend(")
+	Assert(PersistPos > 0 && RefusalPos > PersistPos,
+		"a non-throwing commit refusal must return false")
+	Assert(RebuildPos > RefusalPos && ReloadPos > RefusalPos,
+		"native effects must occur only after the refused-commit exit")
+	Assert(InStr(Body, "Features :=") == 0, "the writer must delegate publication to the durable gateway")
 }
 Test("meta config: a bulk toggle recovers when its write fails",
 	_CFAS_BulkTogglesRecoverFromAFailedWrite)
@@ -224,13 +225,10 @@ Test("meta config: a bulk toggle recovers when its write fails",
 ; agree. None has a caller that reaches it today, which is precisely why they
 ; would have surfaced as a puzzle rather than a regression.
 _CFAS_LatentContractsAreConsistent() {
-	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in infra/, so the
-	; headless harness does not load it. Guarding one global of a pair and not
-	; the other means the unguarded read throws before the guard can apply.
-	Body := _DriverFuncBody("_HSRestoreCategory")
-	Assert(Body != "", "_HSRestoreCategory() must exist")
-	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
-		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside infra/, so reading it first throws under the headless harness")
+	Body := _DriverFuncBody("MasterGateInitialize")
+	Assert(Body != "", "desired-state initialization must exist")
+	Assert(InStr(Body, 'State["initialized"]') > 0 && InStr(Body, "throw Error(") > 0,
+		"duplicate initialization must fail instead of capturing runtime zeroes as intent")
 
 	; AltGr has no prefix symbol on a Kana-style layout, so the keystroke
 	; composer owns it. Without its own case it fell through to the default and
