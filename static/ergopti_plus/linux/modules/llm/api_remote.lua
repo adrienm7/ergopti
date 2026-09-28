@@ -352,7 +352,7 @@ local _active = nil
 --- @param on_done function
 function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local _ = model
-	if _active then M.cancel() end
+	if _active and M.cancel() ~= true then return false end
 	_epoch = _epoch + 1
 	local epoch = _epoch
 	local function done(text, err)
@@ -403,9 +403,10 @@ end
 --- Cancels the request in flight; its callback is not called.
 --- @return boolean
 function M.cancel()
+	if HttpClient.cancel(OWNER) ~= true then return false end
 	_epoch = _epoch + 1
 	_active = nil
-	return HttpClient.cancel(OWNER)
+	return true
 end
 
 --- Returns true while a request is in flight.

@@ -242,4 +242,25 @@ function M.mark_config_reads(document, mark)
 	preferences.mark_config_read(document, "llm.enabled", mark)
 end
 
+--- Captures dormant model identity and the existing consent gate.
+--- @return table snapshot
+function M.configuration_snapshot() return { model = _current_model, enabled = _enabled } end
+
+--- Restores or publishes model identity without starting downloads or inference.
+--- @param snapshot table Owner-issued desired state.
+--- @return boolean applied
+function M.restore_configuration(snapshot)
+	if type(snapshot.enabled) ~= "boolean" then return false end
+	_current_model, _enabled = snapshot.model, snapshot.enabled
+	return true
+end
+
+--- Reads the detached canonical candidate without changing available models.
+--- @return boolean applied
+function M.reload_configuration()
+	local values = require("infra.llm_preferences").get_many({ "llm.models.ollama", "llm.enabled" })
+	if type(values["llm.models.ollama"]) ~= "string" or values["llm.models.ollama"] == "" then return false end
+	return M.restore_configuration({ model = values["llm.models.ollama"], enabled = values["llm.enabled"] })
+end
+
 return M

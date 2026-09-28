@@ -101,7 +101,7 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 		local frames = {}
 		local renderer = {
 			show = function(rows) frames[#frames + 1] = rows; return true end,
-			hide = function() end,
+			hide = function() return true end,
 			is_visible = function() return true end,
 		}
 		helpers.assert_true(overlay.init({ style = {}, renderer = renderer }))
