@@ -6,7 +6,7 @@
 --- The menubar icon was two sibling rows of « Disposition clavier », one per
 --- variant, and the choice lived in hs.settings rather than in config.toml. It
 --- is ONE row now, « Icône de la barre des menus », whose submenu offers v1 and
---- v2 with the current one ticked; it is the last row of the Ergopti section,
+--- v2 with the current one ticked; it is the last row of the custom-layout section,
 --- and choosing a value stores it in the state config.toml [ui] is written from.
 --- Rendered through the exact tray call Builder.generate makes.
 --- ==============================================================================
@@ -75,16 +75,16 @@ helpers.describe("layout submenu: the menubar icon is one choice row", function(
 		helpers.assert_nil(index_of(rows, "menu.layout.logo_custom"), "the per-variant rows are gone")
 	end)
 
-	helpers.it("is the last row of the Ergopti section", function()
+	helpers.it("is the last row of the custom-layout section", function()
 		local rows = tray_rows(make_ctx("v1"))
-		local header = index_of(rows, require("infra.i18n").section("menu.layout.header_ergopti"))
+		local header = index_of(rows, require("infra.i18n").section("menu.layout.header_custom"))
 		local at = index_of(rows, "menu.layout.menubar_icon")
 		helpers.assert_true(header ~= nil and at ~= nil and header < at,
-			"the icon row belongs to the Ergopti section")
+			"the icon row belongs to the custom-layout section")
 		for index = header + 1, at - 1 do
-			helpers.assert_true(rows[index].title ~= "-", "no separator may split the Ergopti section before the icon row")
+			helpers.assert_true(rows[index].title ~= "-", "no separator may split the custom-layout section before the icon row")
 		end
-		helpers.assert_eq(rows[at + 1].title, "-", "a separator must close the Ergopti section right after the icon row")
+		helpers.assert_eq(rows[at + 1].title, "-", "a separator must close the custom-layout section right after the icon row")
 	end)
 
 	helpers.it("choosing a value stores it in the saved state and redraws the icon", function()

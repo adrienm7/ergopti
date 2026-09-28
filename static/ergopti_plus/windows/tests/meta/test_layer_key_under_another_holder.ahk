@@ -126,10 +126,22 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 	}
 	AssertEqual(0, Offenders.Length, "a tap-hold key's hotkey must stand down while another key holds the layer: "
 		. (Offenders.Length ? Offenders[1] : ""))
-	Mapped := ""
-	for Id in LayerMapped
-		Mapped .= (Mapped == "" ? "" : ",") . Id
-	AssertEqual("alt_gr,caps_lock", Mapped,
+	; AltGr is registered from the resolved layer instead of a static label.
+	Ctx := KeymapLayers_LoadContext(A_ScriptDir . "\..\..\_shared")
+	Resolved := KeymapLayers_Load("windows", Ctx, FileRead(A_ScriptDir . "\..\..\_shared\keymap\layers.recommended.toml", "UTF-8"))
+	AssertTrue(Resolved["ok"], "the recommended layer must resolve")
+	AltGrLabels := Map()
+	for Row in NavLayer_BuildTable(Resolved["layers"]["nav"], Ctx) {
+		if (Row["code"] != "AltRight")
+			continue
+		AssertEqual(NAV_LAYER_CRITERION_LAYER, Row["criterion"], "AltGr must only map while the layer is active")
+		AssertEqual("send:{Escape N}", Row["action"], "the recommended AltGr mapping must send Escape")
+		AltGrLabels[Row["hotkey"]] := true
+	}
+	AssertTrue(AltGrLabels.Count == 2 && AltGrLabels.Has("~SC01D & ~SC138") && AltGrLabels.Has("*SC138"),
+		"both physical AltGr spellings must be registered by the layer")
+	LayerMapped["alt_gr"] := true
+	AssertTrue(LayerMapped.Count == 2 && LayerMapped.Has("alt_gr") && LayerMapped.Has("caps_lock"),
 		"the navigation layer maps AltGr (Escape) and CapsLock (BackSpace) among the tap-hold keys; every other one"
 		. " is a plain key on a layer another key holds: its tap types it, its hold auto-repeats")
 	AssertTrue(Swallowed.Count == 1 and Swallowed.Has("left_alt"),

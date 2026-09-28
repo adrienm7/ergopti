@@ -749,29 +749,23 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		{ id = "caps_lock", label = "Caps Lock", from = { key_code = "caps_lock" } },
 		{ id = "spacebar", label = "Space", from = { key_code = "spacebar" } },
 	}
-	-- The layer maps Space (Spotlight, as layer_keys.json does) and not CapsLock.
-	local LAYER_KEYS_PATH = "/fake/data_dir/layer_keys.json"
-	local LAYER_KEYS = {
-		description = "Navigation layer",
-		manipulators = { {
-			type = "basic",
-			conditions = { { type = "variable_if", name = "layer_active", value = 1 } },
-			from = { key_code = "spacebar", modifiers = { optional = { "any" } } },
-			to = { { key_code = "spacebar", modifiers = { "left_command" } } },
-		} },
+	-- The explicit layer maps Space (Spotlight) and not CapsLock.
+	local NAV_LAYER = {
+		bindings = { Space = { kind = "keystroke", action = "spotlight",
+			chords = { { mods = { "meta" }, key = "Space" } } } },
+		registry = { keys = { Space = { karabiner = { key_code = "spacebar" } } } },
 	}
 
 	--- @param left_command_tap string|nil Left Command's tap; Backspace by default.
 	local function build(left_command_tap)
-		_fs_data[LAYER_KEYS_PATH] = _G.hs.json.encode(LAYER_KEYS)
 		local ok, result = pcall(Generator.build_karabiner_json, make_state({
+			nav_layer = NAV_LAYER,
 			tap_hold_config = {
 				left_command = { tap = left_command_tap or "backspace", hold = "layer" },
 				caps_lock = { tap = "return", hold = "layer" },
 				spacebar = { tap = "none", hold = "layer" },
 			},
 		}), { NONE_ACTION, BACKSPACE_ACTION, RETURN_ACTION, LAYER_ACTION }, KEYS, {}, nil, "/fake/data_dir/")
-		_fs_data[LAYER_KEYS_PATH] = nil
 		assert(ok, result)
 		return result.profiles[1].complex_modifications.rules
 	end
@@ -862,6 +856,8 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		local rules = build()
 		local on_layer, rule = first_match(rules, "spacebar", variables(rules, true))
 		helpers.assert_not_nil(on_layer, "on the layer, Space matches the layer's mapping")
+		helpers.assert_eq(on_layer.to[1].key_code, "spacebar")
+		helpers.assert_eq(on_layer.to[1].modifiers, { "command" }, "the layer sends Spotlight, not a plain Space")
 		helpers.assert_true(tostring(rule.description):find("Navigation layer", 1, true) ~= nil,
 			"the layer's rule, not Space's own tap/hold")
 		local alone = first_match(rules, "spacebar", variables(rules, false))

@@ -391,7 +391,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
  * @throws {Error} When the catalogue is missing or malformed.
  */
 ErgoptiLayout_ReadWrapPairs(Path) {
-	Root := JsonParse(FileRead(Path, "UTF-8"))
+	Root := JsonParse(FSReadStrict(Path))
 	if !(Root is Map) || !Root.Has("groups") || !(Root["groups"] is Array)
 		throw Error("The wrap catalogue has no groups: " . Path)
 	Pairs := []

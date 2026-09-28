@@ -89,7 +89,7 @@ _LayoutRegistryReadJson(RelativePath) {
 	Path := _SharedDir . "\" . RelativePath
 	if !FileExist(Path)
 		throw Error("Required shared file is missing: " . Path)
-	return JsonParse(FileRead(Path, "UTF-8"))
+	return JsonParse(FSReadStrict(Path))
 }
 
 /**
