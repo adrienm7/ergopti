@@ -26,6 +26,7 @@ local ActionPicker      = require("ui.action_picker")
 local ShortcutUtils     = require("ui.menu.shortcut_utils")
 local KeyboardSlots     = require("ui.menu.menu_keyboard_slots")
 local TapKeys           = require("modules.shortcuts.tap_keys")
+local Bindings          = require("modules.shortcuts.bindings")
 
 local LOG = "menu.tap_keys"
 
@@ -64,6 +65,10 @@ local function choose_action_for(id, name, ctx)
 		local function bind()
 			if TapKeys.set_action(id, action_id, ctx.gestures.is_assignable) ~= true then
 				Logger.error(LOG, "Tap key edit refused for '%s'.", tostring(id))
+				return false
+			end
+			if Bindings.reconcile_tap_keys() ~= true then
+				Logger.error(LOG, "Tap key dispatcher reconciliation refused for '%s'.", tostring(id))
 				return false
 			end
 			if type(ctx.updateMenu) == "function" then ctx.updateMenu() end

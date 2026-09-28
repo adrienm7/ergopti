@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: Keyboard Shortcuts Seed the Manifest's Bindings
 --- DESCRIPTION:
---- The shipped keyboard-slot bindings are the features manifest's
---- shortcuts.keyboard entries for macOS: Ctrl+Space (hs_ctrl_space) generates an
---- AI prediction. A stored value overrides a default, "none" included, so a
---- binding the user cleared stays cleared after a restart.
+--- The shipped keyboard-slot bindings use the manifest's neutral defaults.
+--- Ctrl+Space remains native until an explicit action is stored. A stored value
+--- overrides the default, "none" included, so clearing an existing assignment
+--- remains effective after restart.
 ---
 --- ROOT CAUSE ENCODED:
 --- The only way to ask for a prediction was the AI menu's own trigger shortcut,
@@ -89,13 +89,22 @@ local function with_subject(store, scenario)
 end
 
 helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function()
-	helpers.it("binds Ctrl+Space to the AI prediction on a fresh install", function()
+	helpers.it("keeps Ctrl+Space native on a fresh install", function()
 		local observed = with_subject({}, function(subject)
 			helpers.assert_eq(subject.start(), true, "the shipped bindings must start")
-			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction",
-				"the manifest's hs_ctrl_space default must be the live binding")
+			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none",
+				"the neutral manifest default must be the live choice")
 		end)
-		helpers.assert_eq(#observed.bound, 1, "exactly the shipped chord owns a native hotkey")
+		helpers.assert_eq(#observed.bound, 0, "no absent shortcut may acquire a native owner")
+	end)
+
+	helpers.it("binds an explicitly saved Ctrl+Space action", function()
+		local observed = with_subject({ ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "llm_generate_prediction" },
+			function(subject)
+				helpers.assert_eq(subject.start(), true)
+				helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
+			end)
+		helpers.assert_eq(#observed.bound, 1, "the explicitly assigned chord owns a native hotkey")
 		helpers.assert_true(tostring(observed.bound[1]):lower():find("space", 1, true) ~= nil,
 			"the native hotkey must be the Space chord, got " .. tostring(observed.bound[1]))
 	end)
@@ -110,14 +119,20 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 		helpers.assert_eq(#observed.bound, 0, "a cleared slot must not own a native hotkey")
 	end)
 
-	helpers.it("persists 'none' when the user clears a shipped binding", function()
-		local store = {}
+	helpers.it("clears an explicit assignment and keeps it native after reload", function()
+		local store = { ["ergopti.keyboard_shortcut_hs_ctrl_space"] = "llm_generate_prediction" }
 		with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
+			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
 			helpers.assert_eq(subject.set_action("hs_ctrl_space", "none"), true)
 		end)
 		helpers.assert_eq(store["ergopti.keyboard_shortcut_hs_ctrl_space"], "none",
-			"clearing a default must be stored, or the default comes back at the next start")
+			"clearing an existing assignment must persist the neutral choice")
+		local restarted = with_subject(store, function(subject)
+			helpers.assert_eq(subject.start(), true)
+			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none")
+		end)
+		helpers.assert_eq(#restarted.bound, 0, "the cleared shortcut remains native after reload")
 	end)
 end)
 

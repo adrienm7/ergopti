@@ -24,3 +24,62 @@ helpers.describe("neutral shortcut registration", function()
 		end)
 	end)
 end)
+
+helpers.describe("tap-key dispatcher ownership", function()
+	helpers.it("reconciles explicit assignments without acquiring behind pause or a stopped master", function()
+		Fixture.with_bindings(function(bindings, ctx)
+			local tap_keys = require("modules.shortcuts.tap_keys")
+			tap_keys.set_action("number_row_left", "screen_capture")
+			helpers.assert_eq(bindings.reconcile_tap_keys(), true)
+			helpers.assert_eq(ctx.created, 0, "an edit behind the stopped master owns no input")
+			helpers.assert_eq(bindings.start(), true)
+			helpers.assert_eq(Fixture.live_count(ctx), 1)
+			helpers.assert_eq(bindings.reconcile_tap_keys(), true)
+			helpers.assert_eq(ctx.created, 1, "reconciliation retains the same native owner")
+			helpers.assert_eq(bindings.pause(), true)
+			tap_keys.set_action("number_row_left", "send_text")
+			helpers.assert_eq(bindings.reconcile_tap_keys(), true)
+			helpers.assert_eq(Fixture.live_count(ctx), 0)
+			helpers.assert_eq(bindings.resume_after_pause(), true)
+			helpers.assert_eq(Fixture.live_count(ctx), 1)
+			tap_keys.set_action("number_row_left", "none")
+			helpers.assert_eq(bindings.reconcile_tap_keys(), true)
+			helpers.assert_eq(Fixture.live_count(ctx), 0, "clearing the last assignment releases its owner")
+			helpers.assert_eq(bindings.enable("tap_keys"), true)
+			helpers.assert_eq(Fixture.live_count(ctx), 0, "the dispatcher is not itself a preset")
+		end)
+	end)
+
+	helpers.it("the real picker reconciles an assignment and its removal after persistence", function()
+		Fixture.with_bindings(function(bindings, ctx)
+			helpers.with_stub_scope({ "ui.menu.menu_tap_keys", "ui.action_picker", "infra.deferred_work",
+				"adapters.input_source_broker", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots" }, function()
+				local picked, updates
+				updates = 0
+				package.loaded["ui.action_picker"] = { open = function(_, callback) picked = callback end }
+				package.loaded["infra.deferred_work"] = { after = function(_, fn) fn() end }
+				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
+				package.loaded["ui.menu.shortcut_utils"] = { picker_parameter_fields = function() return {} end }
+				package.loaded["ui.menu.menu_keyboard_slots"] = { build_action_items = function() return {} end }
+				package.loaded["ui.menu.menu_tap_keys"] = nil
+				local menu = require("ui.menu.menu_tap_keys")
+				local menu_ctx = { gestures = {
+					is_assignable = function() return true end,
+					get_action_label = function(id) return id end,
+					get_action_parameter_spec = function() return nil end,
+				}, updateMenu = function() updates = updates + 1 end }
+				helpers.assert_eq(bindings.start(), true)
+				menu.provide_rows(menu_ctx)[1].action()
+				helpers.assert_eq(picked("screen_capture"), true)
+				helpers.assert_eq(Fixture.live_count(ctx), 1)
+				ctx.refuse_persist = true
+				helpers.assert_eq(picked("none"), false)
+				helpers.assert_eq(Fixture.live_count(ctx), 1, "failed persistence cannot release the owner")
+				ctx.refuse_persist = false
+				helpers.assert_eq(picked("none"), true)
+				helpers.assert_eq(Fixture.live_count(ctx), 0)
+				helpers.assert_eq(updates, 2)
+			end)
+		end)
+	end)
+end)

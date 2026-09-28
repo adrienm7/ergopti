@@ -26,6 +26,9 @@ local M = {}
 --- Selects explicit shortcut intent before a lifecycle test acquires handles.
 --- @param bindings table Fresh real bindings owner.
 function M.prefer_all(bindings)
+	local tap_keys = require("modules.shortcuts.tap_keys")
+	helpers.assert_eq(tap_keys.set_action("number_row_left", "screen_capture",
+		function(id) return id == "screen_capture" end), true)
 	helpers.assert_eq(bindings.pause_hotkeys_only(), true)
 	local count = 0
 	for _, entry in ipairs(bindings.list_shortcuts()) do
@@ -156,7 +159,7 @@ end
 --- @return ... Callback results.
 function M.with_bindings(callback)
 	assert(type(callback) == "function", "bindings fixture callback must be a function")
-	local ctx = { created = 0, live = {}, children = {}, refuse = {}, errors = {} }
+	local ctx = { created = 0, live = {}, children = {}, refuse = {}, errors = {}, tap_assignments = {} }
 	return helpers.with_stub_scope({
 		"modules.shortcuts.bindings",
 		"modules.shortcuts.actions.text",
@@ -174,6 +177,16 @@ function M.with_bindings(callback)
 		package.loaded["modules.shortcuts.tap_keys"] = {
 			ensure_loaded = function() return true end,
 			decide = function() return nil end,
+			has_assignments = function() return next(ctx.tap_assignments) ~= nil end,
+			set_action = function(id, action)
+				if ctx.refuse_persist then return false end
+				ctx.tap_assignments[id] = action ~= "none" and action or nil
+				return true
+			end,
+			get_action = function(id) return ctx.tap_assignments[id] or "none" end,
+			keys = function() return { { id = "number_row_left" } } end,
+			binding_id = function(id) return "tap_key__" .. id end,
+			display_name = function() return "@" end,
 		}
 		-- The unassigned tap-key fixture still initializes through this owner;
 		-- loading the real action catalogue would escape the native boundary.
