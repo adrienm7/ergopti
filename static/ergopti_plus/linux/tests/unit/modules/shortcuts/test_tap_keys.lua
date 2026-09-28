@@ -73,10 +73,13 @@ end
 
 helpers.describe("Linux number-row tap keys (tap-keys)", function()
 	helpers.it("a plain tap on an assigned key is consumed and runs its action on the next tick", function()
-		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_right_2"] = "send_shortcut" })
+		local TapKeys, log = fresh({
+			["shortcuts.tap_keys.number_row_left"] = "screen_capture",
+			["shortcuts.tap_keys.number_row_right_2"] = "send_shortcut",
+		})
 		local ok, err = pcall(function()
 			helpers.assert_eq(TapKeys.on_key({ code = 41, mods = {} }), true,
-				"KEY_GRAVE opens the capture tool by default")
+				"the explicitly assigned KEY_GRAVE opens the capture tool")
 			helpers.assert_eq(TapKeys.on_key({ code = 13, mods = {} }), true, "KEY_EQUAL holds send_shortcut")
 			helpers.assert_eq(#log.executed, 0, "nothing runs inside the consumption callback")
 			for _, fn in ipairs(log.deferred) do fn() end
@@ -90,6 +93,10 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 	helpers.it("a modifier, AltGr, an unassigned key or shortcuts off let the key through", function()
 		local TapKeys, log = fresh()
 		local ok, err = pcall(function()
+			for _, code in ipairs({ 41, 12, 13 }) do
+				helpers.assert_eq(TapKeys.on_key({ code = code, mods = {} }), false,
+					"an absent assignment keeps every edge key native")
+			end
 			for _, name in ipairs({ "ctrl", "shift", "alt", "altgr", "meta" }) do
 				helpers.assert_eq(TapKeys.on_key({ code = 41, mods = { [name] = true } }), false,
 					name .. " keeps the key's own character")

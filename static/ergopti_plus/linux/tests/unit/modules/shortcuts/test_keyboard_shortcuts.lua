@@ -308,14 +308,32 @@ end)
 
 helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function()
 
-	helpers.it("binds Super+Space to the AI prediction on a fresh install", function()
+	helpers.it("leaves Super+Space native on a fresh install", function()
 		local shortcuts = load_over_storage()
 		local action = shortcuts.get_action("super_space")
 		local super_slots = shortcuts.assigned_slots("super_")
+		local queued = 0
+		local consumed = shortcuts.consume(chord("space", { meta = true }), {
+			defer = function() queued = queued + 1 return true end,
+		})
+		drop_storage()
+		helpers.assert_eq(action, "none", "the neutral manifest default keeps native input")
+		helpers.assert_eq(consumed, false, "a neutral default must never consume the native Super+Space chord")
+		helpers.assert_eq(queued, 0, "no inert action may be queued behind the native key")
+		helpers.assert_eq(#super_slots, 0)
+	end)
+
+	helpers.it("binds Super+Space to an explicitly configured prediction action", function()
+		local shortcuts = load_over_storage({ ["shortcuts.keyboard.super_space"] = "llm_generate_prediction" })
+		local action = shortcuts.get_action("super_space")
+		local super_slots = shortcuts.assigned_slots("super_")
+		local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
 		drop_storage()
 		helpers.assert_eq(action, "llm_generate_prediction",
-			"the manifest's super_space default replaces the AI menu's own trigger shortcut")
+			"an explicit saved action remains effective")
 		helpers.assert_eq(#super_slots, 1)
+		helpers.assert_eq(fired, true)
+		helpers.assert_eq(slot, "super_space")
 	end)
 
 	helpers.it("offers a Super group in the menu", function()
@@ -331,7 +349,7 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("keeps a shipped binding the user cleared cleared after a restart", function()
-		local shortcuts, storage = load_over_storage()
+		local shortcuts, storage = load_over_storage({ ["shortcuts.keyboard.super_space"] = "llm_generate_prediction" })
 		helpers.assert_true(shortcuts.set_action("super_space", "none"))
 		local stored = storage.get("shortcuts.keyboard.super_space")
 		shortcuts._reset()

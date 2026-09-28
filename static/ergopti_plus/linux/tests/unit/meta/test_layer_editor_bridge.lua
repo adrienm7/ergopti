@@ -171,6 +171,11 @@ helpers.describe("Linux navigation layer editor bridge", function()
 
 	helpers.it("saves the page's session and the live daemon applies every keyboard edit (e2e)", function()
 		local dir = make_config_dir()
+		local config = assert(io.open(dir .. "/tap_hold.toml", "wb"))
+		config:write('[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.left_alt]\ntime_activation_seconds = 0.2\n'
+			.. 'tap_action = "backspace"\nhold_layer = "nav"\n')
+		config:close()
 		local world = make_state(dir)
 		local hook = { key_text = function() return nil end,
 			held_modifiers = function() return {} end,
@@ -197,6 +202,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		local result = last_call(world, "saveResult")
 		helpers.assert_eq(result.saved, true)
 		helpers.assert_eq(result.applied, true)
+		helpers.assert_type(original, "table", "the explicitly configured layer holder owns the original engine")
 		helpers.assert_true(engine ~= original, "the saved file swaps the actual daemon engine")
 		engine:process(56, 1, 0)
 		helpers.assert_eq(engine:process(20, 1, 10), { { code = 113, value = 1 } }, "KeyT emits mute")
@@ -207,6 +213,33 @@ helpers.describe("Linux navigation layer editor bridge", function()
 			{ code = 29, value = 1 }, { code = 42, value = 1 }, { code = 102, value = 1 },
 		}, "the persisted common binding emits Ctrl+Shift+Home")
 		engine:release_all()
+	end)
+
+	helpers.it("saving layer mappings never enables an unconfigured tap-hold owner", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		local hook = { key_text = function() return nil end,
+			held_modifiers = function() return {} end,
+			held_text_modifier_codes = function() return {} end,
+			held_shortcut_modifier_codes = function() return {} end }
+		function hook.set_remapper(engine) hook.engine = engine end
+		Manager._reset_for_test()
+		Manager.init({ keyboard_hook = hook, execute_action = function() end,
+			action_names = function() return {} end, on_text_injected = function() end,
+			defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+		local original, before_enabled = hook.engine, Manager.file_enabled()
+		world.on_reload = Manager.reload
+		local outcome = Bridge.on_message({ action = "save", text = read_file(FIXTURE) }, world.state)
+		local current, active, keys = hook.engine, Manager.is_active(), Manager.keys()
+		Manager._reset_for_test()
+		remove_config_dir(dir)
+		helpers.assert_eq(before_enabled, false, "absence keeps the file-level master neutral")
+		helpers.assert_nil(original, "no native owner before the edit")
+		helpers.assert_eq(outcome.saved, true)
+		helpers.assert_eq(outcome.applied, true, "reload accepts the new mappings without enabling input")
+		helpers.assert_nil(current, "saving a mapping cannot activate its layer holder")
+		helpers.assert_eq(active, false)
+		helpers.assert_eq(next(keys), nil, "an absent tap-hold file never imports the preset keys")
 	end)
 
 	helpers.it("keeps the window open when the remap restart fails", function()
