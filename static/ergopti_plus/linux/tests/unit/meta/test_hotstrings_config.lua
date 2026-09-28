@@ -100,36 +100,53 @@ helpers.describe("hotstrings_config", function()
     end)
 
     helpers.it("a user directory that does not exist still loads the bundled packs", function()
-      -- This asserted `count == 0` until 2026-08-05, i.e. that a user who has
-      -- written no personal hotstrings has none at all — which would mean the
-      -- product ships nothing. It only passed because the suite ran on Windows,
-      -- where the pack scan shells out to `find` and gets Windows' find.exe. A
-      -- real Linux runner failed it immediately.
-      --
-      -- The contract is the opposite and is the point of M3.5: bundled packs and
-      -- the user's directory are MERGED, so an absent user directory subtracts
-      -- nothing. Choosing one or the other is what used to make creating a single
-      -- personal file hide all five shipped categories.
-      local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
-      local engine = make_engine()
-      cfg.init(engine, "/tmp/nonexistent_ergopti_hs_test_99999")
-      local count = cfg.load_all()
+      -- Discovery is independent of opt-in. Isolate the preference adapter so
+      -- explicit activation cannot leak into other cases or depend on their state.
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
+      package.loaded["adapters.storage"] = Fakes.storage()
+      local ok, err = pcall(function()
+        local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
+        local engine = make_engine()
+        cfg.init(engine, os.tmpname() .. "_absent_hotstring_directory")
+        cfg.load_all()
 
-      helpers.assert_true(type(count) == "number" and count >= 0,
-        "a missing user directory must not crash the load")
+        local Loader = require("modules.hotstrings.loader")
+        local Paths = require("infra.paths")
+        local bundled = Loader.find_toml_files(Paths.shared("modules/hotstrings"))
+        helpers.assert_true(#bundled > 0, "fixture requires the actual bundled TOML inventory")
+        helpers.assert_true(cfg.mapping_count() > 0,
+          "an absent personal directory must not hide discovered bundled mappings")
 
-      -- Asserted against what the scan can actually see, so the case is
-      -- meaningful on Linux and honest on a machine whose `find` is not POSIX:
-      -- if any bundled pack was discovered at all, an absent user directory must
-      -- not have reduced the result to nothing.
-      local Loader = helpers.load_module("modules.hotstrings.loader")
-      local Paths = helpers.load_module("infra.paths")
-      local bundled_dir = Paths.shared and Paths.shared("modules/hotstrings") or nil
-      local bundled = bundled_dir and Loader.find_toml_files(bundled_dir) or {}
-      if #bundled > 0 then
-        helpers.assert_true(count > 0,
-          "the bundled packs are on disk and discoverable, so they must have loaded")
-      end
+        helpers.assert_true(cfg.disable_all() ~= false, "explicit group disable must commit")
+        helpers.assert_eq(#engine._loaded, 0, "disabled groups must leave no effective engine mappings")
+        helpers.assert_true(cfg.mapping_count() > 0,
+          "the discovered inventory must remain available while its groups are disabled")
+        helpers.assert_true(cfg.enable_all() ~= false, "explicit group and section activation must commit")
+        helpers.assert_true(#engine._loaded > 0,
+          "explicit activation must hand the discovered mappings to the real engine")
+
+        -- Replay an actual bundled trigger through the real matcher: recording a
+        -- non-empty argument alone would miss an engine that ignores publication.
+        local matched = false
+        for _, mapping in ipairs(engine._loaded) do
+          if mapping.auto_expand then
+            engine:reset()
+            local result
+            for char in mapping.trigger:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+              result = engine:on_char(char)
+            end
+            if result and result.trigger == mapping.trigger and result.group == mapping.group then
+              matched = true
+              break
+            end
+          end
+        end
+        helpers.assert_true(matched, "the real engine must execute an explicitly activated bundled trigger")
+      end)
+      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
+      if not ok then error(err, 0) end
     end)
   end)
 
