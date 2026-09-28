@@ -30,6 +30,8 @@ function nativeSnapshots() {
 		const resultsFile = path.join(temporary, 'results.txt');
 		const result = spawnSync(ahk, ['/ErrorStdOut', runner, '--only=metrics-history-reopen'], {
 			windowsHide: true, encoding: 'utf8', timeout: 60000, maxBuffer: 16 * 1024 * 1024,
+			// The fixture never reads stdin; do not keep an unused native pipe open.
+			stdio: ['ignore', 'pipe', 'pipe'],
 			env: { ...process.env, TEMP: temporary, TMP: temporary,
 				ERGOPTI_AHK_RESULTS_FILE: resultsFile },
 		});
