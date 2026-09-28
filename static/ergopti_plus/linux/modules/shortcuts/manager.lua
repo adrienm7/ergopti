@@ -40,6 +40,7 @@ local ComboEmitter = require("modules.gestures.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
 local EvdevCodes = require("infra.evdev_codes")
 local LOG = "modules.shortcuts.manager"
+local _configuration_owner = nil
 local ENABLED_PATH = "shortcuts.enabled"
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
@@ -298,6 +299,7 @@ end
 --- @param left string Opening symbol.
 --- @param right string Closing symbol.
 function M.wrap_selection(left, right)
+	if _configuration_owner ~= nil then return false end
 	record("wrap_selection")
 	if type(left) ~= "string" or type(right) ~= "string" then return false end
 	local ok, reason = Clipboard.transform_selection(function(selected)
@@ -329,6 +331,7 @@ end
 
 --- Toggles CapsWord on/off via the menu.
 function M.toggle_caps_word()
+	if _configuration_owner ~= nil then return false end
 	record("caps_word")
 	_caps_word_active = not _caps_word_active
 	_caps_word_triggered = false
@@ -342,6 +345,7 @@ end
 --- @param ch string The character just typed.
 --- @return string|nil Modified character (upper-cased), or nil to pass through.
 function M.process_caps_word(ch)
+	if _configuration_owner ~= nil then return nil end
 	if not _caps_word_active then return nil end
 	if not TextCase.is_single_character(ch) then return nil end
 
@@ -375,6 +379,7 @@ end
 -- =========================================
 
 local function transform_selection(action, transform)
+	if _configuration_owner ~= nil then return false end
 	record(action)
 	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
 	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
@@ -411,6 +416,7 @@ end
 --- the second half used to be sent, which selected from the caret to the start
 --- of the word instead of the word.
 function M.select_word()
+	if _configuration_owner ~= nil then return false end
 	record("select_word")
 	if not ComboEmitter.press("ctrl+Right") then return false end
 	return ComboEmitter.press("ctrl+shift+Left")
@@ -418,6 +424,7 @@ end
 
 --- Selects the entire current line (Home, Shift+End).
 function M.select_line()
+	if _configuration_owner ~= nil then return false end
 	record("select_line")
 	if not ComboEmitter.press("Home") then return false end
 	return ComboEmitter.press("shift+End")
@@ -427,6 +434,7 @@ end
 --- sequence the Windows driver emits for the same action.
 --- @return boolean True when every step was emitted.
 function M.surround_line_with_parens()
+	if _configuration_owner ~= nil then return false end
 	record("surround_parens")
 	local function typed(text)
 		local result = Injector.inject(0, text, false)
@@ -439,6 +447,7 @@ end
 
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
+	if _configuration_owner ~= nil then return false end
 	record("paste_plain")
 	local ok, text, reason = Clipboard.read_checked()
 	if not ok or text == "" then
@@ -518,6 +527,7 @@ end
 --- @param enabled boolean
 --- @return boolean True when the transition was committed.
 function M.set_enabled(enabled)
+	if _configuration_owner ~= nil then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "Shortcut state must be a boolean — nothing changed.")
 		return false
@@ -581,6 +591,7 @@ end
 --- @param enabled boolean
 --- @return boolean True when the state was committed.
 function M.set_wrap_on_type_enabled(enabled)
+	if _configuration_owner ~= nil then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "Wrap-on-type state must be a boolean — nothing changed.")
 		return false
@@ -631,6 +642,7 @@ end
 --- Initialises the shortcuts module.
 --- @param opts table|nil { enabled?, persist?, config_path? }
 function M.init(opts)
+	if _configuration_owner ~= nil then return false end
 	opts = type(opts) == "table" and opts or {}
 	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
 		error("shortcuts enabled override must be a boolean")
@@ -677,6 +689,67 @@ function M.init(opts)
 	_wrap_on_type = wrap_on_type
 	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s, wrap_on_type=%s).",
 		tostring(_enabled), tostring(_wrap_on_type))
+end
+
+
+--- Acquires the initialized shortcut runtime before a scoped publication.
+--- @param owner table Exact transaction token.
+--- @return boolean acquired
+function M.acquire_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= nil or not _persist or not _config_path then return false end
+	_configuration_owner = owner
+	return true
+end
+
+--- Releases the same configuration owner after success or compensation.
+--- @param owner table Exact transaction token.
+--- @return boolean released
+function M.release_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= owner then return false end
+	_configuration_owner = nil
+	return true
+end
+
+--- Keeps desired menu state separate from input admission during a transaction.
+--- @return boolean admitted
+function M.configuration_admitted()
+	return _configuration_owner == nil
+end
+
+--- Resolves the manager's actual two preferences from a detached source.
+--- @param document table Decoded configuration.
+--- @return table state
+function M.configuration_candidate(document)
+	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
+	local section = document.shortcuts or {}
+	local enabled, wrap = section.enabled, section[WRAP_ON_TYPE_KEY]
+	if enabled == nil then enabled = Manifest.default_for(ENABLED_PATH) end
+	if wrap == nil then wrap = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY) end
+	assert(type(enabled) == "boolean" and type(wrap) == "boolean", "shortcut switches must be boolean")
+	return { enabled = enabled, wrap = wrap, caps_word_active = false, caps_word_triggered = false }
+end
+
+--- Captures the exact manager state without touching clipboard or input devices.
+--- @param owner table Exact transaction token.
+--- @return table|nil state
+function M.configuration_snapshot(owner)
+	if _configuration_owner ~= owner then return nil end
+	return { enabled = _enabled, wrap = _wrap_on_type,
+		caps_word_active = _caps_word_active, caps_word_triggered = _caps_word_triggered }
+end
+
+--- Applies a validated runtime state without invoking independent setters.
+--- @param owner table Exact transaction token.
+--- @param state table Candidate or saved state.
+--- @return boolean acknowledged
+function M.apply_configuration(owner, state)
+	if _configuration_owner ~= owner or type(state) ~= "table" then return false end
+	for _, key in ipairs({ "enabled", "wrap", "caps_word_active", "caps_word_triggered" }) do
+		if type(state[key]) ~= "boolean" then return false end
+	end
+	_enabled, _wrap_on_type = state.enabled, state.wrap
+	_caps_word_active, _caps_word_triggered = state.caps_word_active, state.caps_word_triggered
+	return true
 end
 
 return M

@@ -2799,6 +2799,17 @@ local function _build_shortcuts(ctx)
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	local function apply_shortcuts_scope(mode)
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.shortcuts.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+	sc_ctx.commands["scope_restore"] = function() return apply_shortcuts_scope("recommended") end
+	sc_ctx.commands["scope_clear"] = function() return apply_shortcuts_scope("clear") end
 	sc_ctx.commands["shortcuts_toggle"] = function()
 		sc.toggle()
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end

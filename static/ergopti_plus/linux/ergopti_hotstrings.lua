@@ -1218,6 +1218,7 @@ local function main()
 	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
 		is_active = function()
 			return shortcuts ~= nil and shortcuts.is_enabled()
+				and shortcuts.configuration_admitted()
 				and shortcuts.is_wrap_on_type_enabled()
 				and not script_actions.is_paused()
 				and not secure_focus_guard.blocks_text()

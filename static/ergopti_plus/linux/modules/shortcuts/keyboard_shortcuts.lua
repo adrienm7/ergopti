@@ -634,4 +634,72 @@ function M._reset()
 	_catalogue = nil
 end
 
+
+--- Resolves a detached candidate with the same slot catalogue as the reader.
+--- @param document table Decoded configuration.
+--- @return table state
+function M.configuration_candidate(document)
+	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
+	local section = document.shortcuts or {}
+	assert(section.keyboard == nil or type(section.keyboard) == "table", "keyboard assignments are malformed")
+	local catalogue = assert(action_catalogue(), "keyboard action catalogue is unavailable")
+	local assignments = {}
+	for slot, action in pairs(manifest_defaults()) do
+		assert(type(action) == "string" and (action == "none" or catalogue.is_assignable(action)), "invalid keyboard default")
+		if action ~= "none" then assignments[slot] = action end
+	end
+	walk_assignments(document, function(slot, action)
+		assert(type(action) == "string" and (action == "none" or catalogue.is_assignable(action)), "invalid keyboard assignment: " .. slot)
+		assignments[slot] = action ~= "none" and action or nil
+	end)
+	return { assignments = assignments }
+end
+
+--- Enumerates only dynamic slots recognized by this runtime owner.
+--- @param document table Decoded configuration.
+--- @return table paths
+function M.configuration_paths(document)
+	local found = {}
+	walk_assignments(document, function(slot) found[slot] = true end)
+	for slot in pairs(_assignments) do found[slot] = true end
+	local paths = {}
+	for slot in pairs(found) do paths[#paths + 1] = KEYBOARD_SECTION .. "." .. slot end
+	return paths
+end
+
+--- Identifies an actual keyboard parameter binding without inventing slots.
+--- @param binding string Runtime binding identity.
+--- @return string|nil domain
+function M.configuration_domain(binding)
+	local slot = type(binding) == "string" and binding:match("^keyboard__(.+)$") or nil
+	if slot and owns_slot(slot) then return "keyboard" end
+	return nil
+end
+
+--- Captures desired assignments after dispatch admission has closed.
+--- @param owner table Exact acquisition token.
+--- @return table|nil state
+function M.configuration_snapshot(owner)
+	if _configuration_owner ~= owner then return nil end
+	return { assignments = M.get_assignments() }
+end
+
+--- Applies an acknowledged detached assignment map without persistence.
+--- @param owner table Exact acquisition token.
+--- @param state table Validated candidate or saved state.
+--- @return boolean acknowledged
+function M.apply_configuration(owner, state)
+	if _configuration_owner ~= owner or type(state) ~= "table" or type(state.assignments) ~= "table" then return false end
+	local copy = {}
+	local catalogue = action_catalogue()
+	if not catalogue then return false end
+	for slot, action in pairs(state.assignments) do
+		if not owns_slot(slot) or type(action) ~= "string" or not catalogue.is_assignable(action) then return false end
+		copy[slot] = action
+	end
+	_assignments, _loaded = copy, true
+	_dispatch_generation = _dispatch_generation + 1
+	return true
+end
+
 return M

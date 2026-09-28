@@ -881,6 +881,7 @@ local _reading       = false -- the touchpad's evdev node is open and being drai
 local _reader_stop_error = nil -- an unacknowledged close must fence reacquisition
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
+local _parameter_configuration_owner = nil
 local _scope_owner   = nil   -- retains refused runtime compensation
 local _scope_native = false -- admits only the scope's synchronous native inverse
 local _scope_sequence = 0
@@ -888,6 +889,7 @@ local _scope_sequence = 0
 --- Keeps captured preferences exclusively owned until compensation completes.
 --- @return boolean admitted
 local function admit_mutation()
+	if _parameter_configuration_owner ~= nil then return false end
 	if _scope_owner and _scope_owner.pending() then
 		Logger.error(LOG, "Gesture configuration remains owned by a pending scope transaction.")
 		return false
@@ -1235,6 +1237,7 @@ end
 --- @param candidate table Detached scope runtime snapshot.
 --- @return boolean acknowledged
 function M.apply_scope_state(candidate)
+	if _parameter_configuration_owner ~= nil then return false end
 	if type(candidate) ~= "table" or type(candidate.enabled) ~= "boolean"
 		or type(candidate.reading) ~= "boolean" or (candidate.enabled and not candidate.reading)
 		or type(candidate.actions) ~= "table" or type(candidate.parameters) ~= "table" then return false end
@@ -1269,6 +1272,7 @@ end
 --- @return boolean committed
 --- @return string|nil detail
 function M.apply_scope(mode)
+	if _parameter_configuration_owner ~= nil then return false end
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
 	if _is_paused() then return false, "gesture configuration is paused" end
 	if not _persist or type(_config_path) ~= "string" then return false, "gesture persistence is not initialized" end
@@ -1733,6 +1737,72 @@ function M.init(opts)
 
 	Logger.info(LOG, "Gestures manager initialised (enabled=%s).", tostring(_enabled))
 	require("ui.gesture_conflicts").notify_boot(M)
+end
+
+
+--- Acquires only the shared parameter map, without touching the touchpad reader.
+--- @param owner table Exact transaction token.
+--- @return boolean acquired
+function M.acquire_parameter_configuration(owner)
+	if type(owner) ~= "table" or not admit_mutation() then return false end
+	_parameter_configuration_owner = owner
+	return true
+end
+
+--- Releases exact parameter ownership after acknowledged completion.
+--- @param owner table Exact transaction token.
+--- @return boolean released
+function M.release_parameter_configuration(owner)
+	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return false end
+	_parameter_configuration_owner = nil
+	return true
+end
+
+--- Captures parameters independently from evdev acquisition and close state.
+--- @param owner table Exact transaction token.
+--- @return table|nil parameters
+function M.parameter_configuration_snapshot(owner)
+	if _parameter_configuration_owner ~= owner then return nil end
+	return M.get_all_action_parameters()
+end
+
+--- Applies a detached parameter map without changing gesture actions or devices.
+--- @param owner table Exact transaction token.
+--- @param parameters table Validated candidate or exact prior state.
+--- @return boolean acknowledged
+function M.apply_parameter_configuration(owner, parameters)
+	if _parameter_configuration_owner ~= owner or type(parameters) ~= "table" then return false end
+	local copy = {}
+	for key, value in pairs(parameters) do
+		local binding, action = M.split_action_parameter_key(key)
+		if not binding or not M.validate_action_parameter(action, value) then return false end
+		copy[key] = value
+	end
+	_action_params = copy
+	return true
+end
+
+--- Enumerates only recognized parameter bindings consumed by this loader.
+--- @param document table Decoded configuration.
+--- @param recognizes function Binding domain resolver supplied by the runtime owner.
+--- @return table paths Canonical dynamic paths.
+--- @return table legacy Explicit legacy deletions for the same bindings.
+function M.parameter_configuration_inventory(document, recognizes)
+	local paths, legacy = {}, {}
+	walk_user_config(document, {
+		param = function(section, key)
+			local binding = M.split_action_parameter_key(key)
+			if recognizes(binding) then
+				if section == CONFIG_SECTION_PARAMS then paths[#paths + 1] = section .. "." .. key end
+				if section == LEGACY_SECTION_PARAMS then legacy[#legacy + 1] = { section = section, key = key, delete = true } end
+			end
+		end,
+	})
+	for key in pairs(_action_params) do
+		local binding = M.split_action_parameter_key(key)
+		if recognizes(binding) then paths[#paths + 1] = CONFIG_SECTION_PARAMS .. "." .. key end
+	end
+	return paths, legacy
 end
 
 return M

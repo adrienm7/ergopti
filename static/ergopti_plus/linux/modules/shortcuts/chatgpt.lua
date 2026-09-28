@@ -30,6 +30,7 @@ local Codec = require("toml_codec")
 
 local LOG = "modules.shortcuts.chatgpt"
 local FEATURE_PATH = "shortcuts.chatgpt_url"
+local _configuration_owner = nil
 
 M.DEFAULT_URL = Manifest.default_for(FEATURE_PATH)
 
@@ -87,6 +88,7 @@ end
 --- @param value any
 --- @return boolean Whether the durable value was accepted.
 function M.set_url(value)
+	if _configuration_owner ~= nil then return false end
 	if not M.is_valid(value) then
 		Logger.error(LOG, "Refusing an invalid ChatGPT URL.")
 		return false
@@ -107,6 +109,7 @@ end
 --- Opens the current URL in the desktop's default browser.
 --- @return boolean Whether the launch command was accepted.
 function M.open()
+	if _configuration_owner ~= nil then return false end
 	if not Shell.has_command("xdg-open") then
 		Logger.error(LOG, "xdg-open is unavailable — the ChatGPT URL cannot be opened.")
 		return false
@@ -115,6 +118,32 @@ function M.open()
 	local opened = Shell.run("xdg-open " .. Shell.quote(url) .. " >/dev/null 2>&1 &")
 	if not opened then Logger.error(LOG, "The ChatGPT URL could not be opened.") end
 	return opened
+end
+
+
+--- Acquires this leaf alongside the shortcut runtime owners.
+--- @param owner table Exact transaction token.
+--- @return boolean acquired
+function M.acquire_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= nil then return false end
+	_configuration_owner = owner
+	return true
+end
+
+--- Releases the exact leaf owner after acknowledged completion.
+--- @param owner table Exact transaction token.
+--- @return boolean released
+function M.release_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= owner then return false end
+	_configuration_owner = nil
+	return true
+end
+
+--- Validates this same reader against a detached scoped candidate.
+--- @param document table Decoded configuration.
+--- @return string Effective URL.
+function M.configuration_candidate(document)
+	return resolve(document)
 end
 
 return M
