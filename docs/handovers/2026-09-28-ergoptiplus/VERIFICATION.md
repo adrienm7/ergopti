@@ -90,3 +90,36 @@ Real keyboard, Karabiner, desktop-manager, native WebView and installer checks
 still require the corresponding real OS. Passing stubbed suites does not replace
 those checks. The release workflow also compiles, packages and launches builds
 on its target hosts; inspect its actual verdict and assets after publication.
+
+## Second published CI
+
+At `ffb8a80d1`, shared JavaScript, Linux unit, macOS Lua/E2E and all 250 native
+Swift tests pass. The layout-installer workflow passes all 16 jobs, including
+encoding hygiene. Windows exposes an asymmetric path identity case in the
+injected transaction fixture. macOS packaging reaches three Python fixture
+failures: a stale scenario oracle and two scenarios overwriting one test home.
+Their isolated correction passes 23/23 Python tests. Linux live E2E exposes
+opt-in fixture assumptions, an updater response-size refusal and release UI
+failures. Native launch/package/release verdicts are still pending.
+
+## Second corrective checkpoint
+
+Windows passes 7239/7239 unit checks, 4/4 targeted path-identity cases,
+5/5 E2E, production compilation and encoding (1698 files). The earlier
+900-second attempt timed out; the complete later run supersedes it.
+macOS launch-gate Python tests pass 23/23, against three baseline failures.
+
+Linux passes 3578 distinct unit cases in a composite: the whole run passed
+3564 and failed 14 CLI cases because the scratch `luajit -e` invocation
+supplied the wrong interpreter argument to subprocess tests. The unchanged
+CLI module passes 22/22 through a normal file launcher. E2E passes 115/115.
+The applied live-fixture helper passes 28 real configuration/runtime-owner
+assertions under a fresh private HOME. Native GTK/uinput/Ollama execution
+and actual updater installation still require CI.
+
+The complete JavaScript invocation passes 302/303; the Karabiner Python
+child exceeds its local deadline. The exact unchanged wrapper then passes
+in 3.047 seconds (27 cases, one platform skip), completing all 303 checks.
+The original invocation remains exit 1; generated-file writers use the byte-identical export and both
+input trees remain unchanged. Strict conventions report zero violations.
+The next published workflow and its release assets remain the final verdict.
