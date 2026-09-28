@@ -537,6 +537,7 @@ end
 ---        action — the one case where clobbering an unparseable file is the intent.
 --- @return boolean True when the state reached disk, false when nothing was saved.
 function M.save_user_config(state, user_config_path, overwrite_corrupt)
+	local document = {}
 	local source, source_status
 	if not overwrite_corrupt then
 		-- Re-reading before every save is cheap (a few KB, only on user action)
@@ -554,6 +555,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 					user_config_path)
 				return false
 			end
+			document = decoded
 		elseif source_status ~= "absent" then
 			Logger.error(LOG, "Refusing to overwrite user config at '%s' after an unclassified read.",
 				user_config_path)
@@ -561,19 +563,30 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 		end
 	end
 
-	local ok, payload = pcall(TomlCodec.encode, {
-		tap_holds = {
-			enabled = state.tap_holds_enabled ~= false,
-			config = state.tap_hold_config or {},
-			timeout_ms = state.tap_hold_timeout_ms,
-			sticky_timeout_ms = state.sticky_timeout_ms,
-		},
-		mod_combos = {
-			config = state.mod_combos_config or {},
-			simultaneous_threshold_ms = state.simultaneous_threshold_ms,
-			symmetric = state.combo_symmetric == true,
-		},
-	})
+	local ok, payload = pcall(function()
+		local function table_at(parent, key)
+			if parent[key] == nil then parent[key] = {} end
+			assert(type(parent[key]) == "table", "owned remap table conflicts with a scalar")
+			return parent[key]
+		end
+		local function merge_bindings(target, updates, fields)
+			for id, values in pairs(updates or {}) do
+				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
+				local entry = table_at(target, id)
+				for _, field in ipairs(fields) do entry[field] = values[field] end
+			end
+		end
+		local tap_holds = table_at(document, "tap_holds")
+		tap_holds.enabled = state.tap_holds_enabled ~= false
+		tap_holds.timeout_ms = state.tap_hold_timeout_ms
+		tap_holds.sticky_timeout_ms = state.sticky_timeout_ms
+		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" })
+		local mod_combos = table_at(document, "mod_combos")
+		mod_combos.simultaneous_threshold_ms = state.simultaneous_threshold_ms
+		mod_combos.symmetric = state.combo_symmetric == true
+		merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" })
+		return TomlCodec.encode(document)
+	end)
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "Failed to encode user config as TOML.")
 		return false
