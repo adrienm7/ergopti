@@ -629,6 +629,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			userDriver: userDriver,
 			delegate: updateChannelFeed
 		)
+		// A persisted Sparkle preference overrides the bundle's default.
+		sparkle.automaticallyChecksForUpdates = false
 		if let refusal = UpdateConsentPolicy.refusal(for: sparkle) {
 			LauncherLog.write("ERROR: Sparkle updater not started: \(refusal)")
 		} else {
