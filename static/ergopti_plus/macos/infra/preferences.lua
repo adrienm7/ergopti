@@ -99,7 +99,7 @@ local KEY_MAP = {
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
 	llm_trigger_shortcut                 = { sec = "llm", path = "trigger", key = "shortcut"       },
-	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce"       },
+	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = "url_bar_filter_enabled" },
@@ -205,6 +205,29 @@ function M.flat_key_for(path)
 	return _reverse_scalar[section .. ":" .. key] or _reverse_nested[section .. ":" .. key]
 end
 
+--- Converts a scalar at its persistence boundary, preserving native units in memory.
+--- @param spec table Existing scalar ownership declaration.
+--- @param value any Scalar value.
+--- @param reading boolean True when reading canonical disk units.
+--- @return any converted Native or persisted representation.
+local function scalar_units(spec, value, reading)
+	if not spec or not spec.units_per_state then return value end
+	assert(type(value) == "number" and value == value and value >= 0 and value < math.huge,
+		"configuration duration must be a finite non-negative number")
+	local result = reading and value / spec.units_per_state or value * spec.units_per_state
+	assert(result < math.huge, "configuration duration overflows its canonical units")
+	return result
+end
+
+--- Resolves canonical defaults/operations into the units used by their native owner.
+--- @param path string Canonical configuration path.
+--- @param value any Value expressed in persisted units.
+--- @return any converted Native state value.
+function M.state_value_for(path, value)
+	local key = assert(M.flat_key_for(path), "configuration path has no preference owner: " .. path)
+	return scalar_units(KEY_MAP[key], value, true)
+end
+
 
 
 
@@ -264,6 +287,7 @@ local function group_for_disk(flat)
 				set_path(grouped[nested.sec], nested.key, v)
 			end
 		elseif scalar then
+			v = scalar_units(scalar, v, false)
 			local disk_key = scalar.key or k
 			if scalar.path then
 				local sub = grouped[scalar.sec]
@@ -414,6 +438,7 @@ local function flatten_from_disk(grouped, mark)
 			end
 		end
 	end
+	for key, value in pairs(flat) do flat[key] = scalar_units(KEY_MAP[key], value, true) end
 	return flat
 end
 
@@ -598,8 +623,14 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
+	local flattened, values = pcall(flatten_from_disk, tbl)
+	if not flattened then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
+		return {}, "corrupt"
+	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
-	return flatten_from_disk(tbl), "ok"
+	return values, "ok"
 end
 
 --- Marks every config.toml path load() takes into the flat state, through the
