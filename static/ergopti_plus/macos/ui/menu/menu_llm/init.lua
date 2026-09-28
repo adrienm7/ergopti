@@ -1580,11 +1580,11 @@ local function create_menu(deps)
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
-											scope_restore = function()
+											["scope_restore"] = function()
 												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
 												return deps.apply_preference_scope("llm", "recommended") == true
 											end,
-											scope_clear = function()
+											["scope_clear"] = function()
 												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
 												return deps.apply_preference_scope("llm", "clear") == true
 											end,

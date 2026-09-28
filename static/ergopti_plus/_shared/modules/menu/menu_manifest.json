@@ -162,6 +162,16 @@
 			"category": "LLM"
 		},
 		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system"
+		},
+		{
 			"type": "---"
 		},
 		{
@@ -590,6 +600,16 @@
 				"keylogger_enabled"
 			],
 			"category": "Metrics"
+		},
+		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system"
 		},
 		{
 			"type": "---"
