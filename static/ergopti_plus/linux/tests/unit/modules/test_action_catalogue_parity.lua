@@ -92,6 +92,19 @@ end
 
 helpers.describe("action catalogue parity (Linux)", function()
 
+	helpers.it("declares tap actions before the daemon registers their handlers", function()
+		-- TapHold.init reads this catalogue before the daemon calls Gestures.init.
+		-- Handler registration must not make valid persisted taps look unsupported.
+		local M = recording_manager()
+		local available = {}
+		for _, id in ipairs(M.get_executable_action_names()) do available[id] = true end
+		for _, id in ipairs({ "script_pause_toggle", "selection_lowercase", "open_today_log" }) do
+			helpers.assert_true(M.is_assignable(id), id .. " must be a declared fixture action")
+			helpers.assert_true(available[id] == true, id .. " must be known during tap-hold startup")
+		end
+		helpers.assert_nil(available.none, "the no-op is not an executable tap action")
+	end)
+
 	helpers.it("lists every action it can run, and runs every action it lists (action-catalogue-parity)", function()
 		local M = recording_manager()
 		M.init({ enabled = false, persist = false, action_handlers = daemon_handlers() })
