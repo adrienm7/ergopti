@@ -139,6 +139,7 @@
 		"test:manual-prediction-refusals": "node ./tools/test/test-manual-prediction-refusals-single-source.cjs",
 		"test:keyboard-slot-defaults": "node ./tools/test/test-keyboard-slot-recommended-bindings.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
+		"test:gui-title-audit": "node ./tools/test/test-gui-title-audit.cjs",
 		"test:error-dialog-page": "node ./tools/test/test-error-dialog-page.cjs",
 		"test:config-cleanup-page": "node ./tools/test/test-config-cleanup-page.cjs",
 		"test:js-suite-failure-diagnostics": "node ./tools/test/test-js-suite-failure-diagnostics.cjs",

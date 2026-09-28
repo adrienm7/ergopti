@@ -462,6 +462,11 @@ global _HC_ResetDone := false
 ; details are included and the mode it opened in (0 when closed).
 global _HC_Session := 0
 
+; Keep native title construction with the GUI owner, independent of diagnostics collection.
+_HC_NewWindow() {
+	return Gui_Create("+Resize +MinSize640x480", t("menu.debug.healthcheck"))
+}
+
 ; Opens the diagnostics window, replacing any previous one.
 ; @param Mode {String} "report" opens it at the preview and the report button.
 HealthCheck_ShowWindow(Mode := "") {
@@ -474,7 +479,7 @@ HealthCheck_ShowWindow(Mode := "") {
 	_HC_Close()
 	Snapshot := HealthCheck_Run()
 
-	G := Gui_Create("+Resize +MinSize640x480", "ErgoptiPlus — " . t("menu.debug.healthcheck"))
+	G := _HC_NewWindow()
 	G.MarginX := 0
 	G.MarginY := 0
 	ContentCtl := G.Add("Text", "x0 y0 w" . HC_WIDTH . " h" . HC_HEIGHT, "")

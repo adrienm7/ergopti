@@ -20,6 +20,27 @@
 
 #Requires AutoHotkey v2.0
 
+_TED_NativeWindowTitle() {
+	global _I18nCache, _I18nCacheLoaded, _SharedDir
+	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded
+	try {
+		Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+		AssertEqual(21, Locales.Length)
+		for Locale in Locales {
+			Strings := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+			Label := Strings["common.error_title"]
+			_I18nCache := Map("common.error_title", Label), _I18nCacheLoaded := true
+			Window := _ErrorDialog_NewWindow()
+			try AssertEqual("ErgoptiPlus — " . Label, Window.Title, Locale . " native error title")
+			finally Window.Destroy()
+		}
+	} finally {
+		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded
+	}
+}
+Test("error window: the native title has one product prefix in every locale (error-window-title)",
+	_TED_NativeWindowTitle)
+
 ; Captures the timers ErrorDialog_OnError arms instead of arming them.
 global _TED_Timers := []
 

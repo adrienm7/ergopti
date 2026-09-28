@@ -10,6 +10,27 @@
 
 #Requires AutoHotkey v2.0
 
+_TestHC_NativeWindowTitle() {
+	global _I18nCache, _I18nCacheLoaded, _SharedDir
+	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded
+	try {
+		Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+		AssertEqual(21, Locales.Length)
+		for Locale in Locales {
+			Strings := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+			Label := Strings["menu.debug.healthcheck"]
+			_I18nCache := Map("menu.debug.healthcheck", Label), _I18nCacheLoaded := true
+			Window := _HC_NewWindow()
+			try AssertEqual("ErgoptiPlus — " . Label, Window.Title, Locale . " native diagnostics title")
+			finally Window.Destroy()
+		}
+	} finally {
+		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded
+	}
+}
+Test("HealthCheck: native diagnostics title has one product prefix in every locale (diagnostics-window-title)",
+	_TestHC_NativeWindowTitle)
+
 
 ; =============================================
 ; ======= 1/ Counter functions ================
