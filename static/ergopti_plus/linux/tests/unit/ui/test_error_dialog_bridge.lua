@@ -142,6 +142,26 @@ local function page(context)
 end
 
 helpers.describe("error window bridge (linux): policy and deferral (error-dialog-linux)", function()
+	helpers.it("disabling invalidates queued windows across reactivation (error-dialog-cancel)", function()
+		with_bridge(nil, function(bridge, context)
+			helpers.assert_true(bridge.init())
+			bridge.on_error("old", "Old failure", "Old failure")
+			local stale = context.deferred[1].fn
+			context.deferred = {}
+			helpers.assert_true(bridge.set_enabled(false))
+			stale()
+			helpers.assert_eq(context.shown, 0, "disabled windows must not open")
+			helpers.assert_true(bridge.set_enabled(true))
+			bridge.on_error("new", "New failure", "New failure")
+			helpers.assert_eq(#context.deferred, 1, "cancellation must release the pending slot")
+			stale()
+			helpers.assert_eq(context.shown, 0, "reactivation must not revive an old callback")
+			run_deferred(context)
+			helpers.assert_eq(context.shown, 1)
+			helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "new")
+		end)
+	end)
+
 	helpers.it("a logged ERROR defers the window; nothing opens inside the logging call (error-dialog-linux)", function()
 		with_bridge(nil, function(bridge, context)
 			helpers.assert_true(bridge.init(), "the shipped policy must load")

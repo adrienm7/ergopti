@@ -32,8 +32,9 @@ _TED_CaptureTimer(Fn, Period) {
 ; @param Enabled {Boolean} The Debug menu setting.
 _TED_Reset(Enabled := true) {
 	global _ED_Policy, _ED_Decisions, _ED_Enabled, _ED_Busy, _ED_Folded, _ED_Session, _ED_TimerFn, _TED_Timers
-	global _ED_ResetDone, _ED_WindowEpoch
+	global _ED_ResetDone, _ED_WindowEpoch, _ED_PendingRecord
 	_ED_Policy := 0
+	_ED_PendingRecord := 0
 	_ED_Busy := false
 	_ED_Folded := 0
 	_ED_Session := 0
@@ -96,6 +97,36 @@ _TED_UntickedKeepsQuiet() {
 	} finally _TED_Restore()
 }
 Test("error window: nothing opens while the setting is unticked (error-dialog-windows)", _TED_UntickedKeepsQuiet)
+
+_TED_DisablingCancelsPending() {
+	global _TED_Timers, _ED_Busy, _DriverBootPhase, _DriverStartupSmokeDir
+	HadPhase := IsSet(_DriverBootPhase), SavedPhase := HadPhase ? _DriverBootPhase : ""
+	HadSmoke := IsSet(_DriverStartupSmokeDir), SavedSmoke := HadSmoke ? _DriverStartupSmokeDir : ""
+	_TED_Reset()
+	try {
+		_DriverBootPhase := "ready"
+		_DriverStartupSmokeDir := "error-dialog-cancellation-test"
+		ErrorDialog_OnError("old", "Old failure", "Old failure", "t")
+		Stale := _TED_Timers[1]["fn"]
+		Quiet := (*) => 0
+		Writer := (Path, Updates) => true
+		Assert(ErrorDialog_SetEnabled(false, Writer, Quiet, Quiet))
+		AssertEqual(false, _ED_Busy, "disabling releases the pending slot")
+		Assert(ErrorDialog_SetEnabled(true, Writer, Quiet, Quiet))
+		ErrorDialog_OnError("new", "New failure", "New failure", "t")
+		AssertEqual(2, _TED_Timers.Length, "a new error can queue after reactivation")
+		Stale.Call()
+		AssertEqual(true, _ED_Busy, "the stale callback cannot consume the new pending window")
+		_TED_Timers[2]["fn"].Call()
+		AssertEqual(false, _ED_Busy, "the current callback reaches the headless presentation guard")
+	} finally {
+		_DriverBootPhase := HadPhase ? SavedPhase : unset
+		_DriverStartupSmokeDir := HadSmoke ? SavedSmoke : unset
+		_TED_Restore()
+	}
+}
+Test("error window: disabling invalidates queued windows across reactivation (error-dialog-cancel)",
+	_TED_DisablingCancelsPending)
 
 _TED_BeforeInitNothing() {
 	global _ED_Policy, _ED_TimerFn, _TED_Timers

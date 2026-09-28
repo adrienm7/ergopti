@@ -63,6 +63,9 @@ local _enabled = nil
 -- open): the policy folds every error logged in between into it
 local _busy = false
 
+-- Identity of the deferred request; disabling invalidates it before native work.
+local _scheduled = nil
+
 -- Errors folded into the pending or open window
 local _folded = 0
 
@@ -144,6 +147,10 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = enabled
+	if not enabled and _scheduled ~= nil then
+		_scheduled = nil
+		_busy, _folded, _pending = false, 0, nil
+	end
 	Logger.debug(LOG, "Error window %s.", enabled and "enabled" or "disabled")
 	return true
 end
@@ -236,6 +243,7 @@ end
 
 --- Frees the policy for the next window.
 local function settle()
+	_scheduled = nil
 	_busy = false
 	_folded = 0
 	_pending = nil
@@ -275,7 +283,10 @@ end
 local function schedule(record)
 	_busy = true
 	_pending = record
+	_scheduled = record
 	local queued = M.defer(function()
+		if _scheduled ~= record then return end
+		_scheduled = nil
 		local ok, opened = xpcall(open_window, debug.traceback)
 		if not ok then Logger.error(LOG, "The error window could not open: %s", tostring(opened)) end
 		if not ok or not opened then settle() end
