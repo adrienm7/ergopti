@@ -151,6 +151,7 @@ function M.new(opts)
 	local in_flight = false
 	local latest = nil         -- { tag, channel } offered by the last check
 	local active = false
+	local generation = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
@@ -211,15 +212,25 @@ function M.new(opts)
 
 	--- Arms the one schedule timer.
 	local function arm(delay_sec)
-		local handle, committed = opts.timer.after(delay_sec, function()
+		local handle, committed
+		handle, committed = opts.timer.after(delay_sec, function()
+			if not active or handle == nil or timer_handle ~= handle then return end
 			timer_handle = nil
 			evaluate()
 		end)
-		if committed ~= true then
+		timer_handle = handle
+		if committed ~= true or handle == nil then
+			active = false
 			Logger.error(LOG, "The update-check timer could not be armed.")
+			if handle ~= nil then
+				if opts.timer.cancel(handle) == true then
+					timer_handle = nil
+				else
+					Logger.error(LOG, "The refused update-check timer remains owned pending cleanup.")
+				end
+			end
 			return false
 		end
-		timer_handle = handle
 		return true
 	end
 
@@ -275,10 +286,18 @@ function M.new(opts)
 	--- Sends one conditional request for the release list.
 	local function dispatch(channel)
 		in_flight = true
+		local request_generation = generation
 		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
 		if list_cache then headers["If-None-Match"] = list_cache.etag end
-		local sent = opts.http.get(config.releases_url, headers, function(result)
-			if not active then in_flight = false; return end
+		local completed = false
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, headers, function(result)
+			if completed or not active or request_generation ~= generation then return end
+			completed = true
+			if channel ~= opts.channel() then
+				in_flight = false
+				Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
+				return
+			end
 			local status = type(result) == "table" and tonumber(result.status) or 0
 			local body
 			if status == 304 and list_cache then
@@ -286,6 +305,19 @@ function M.new(opts)
 				body = list_cache.body
 			elseif type(result) == "table" and result.ok == true and type(result.body) == "string"
 				and result.body:match("^%s*%[") then
+				local decoded, decode_error = JsonCodec.decode(result.body)
+				if decode_error or type(decoded) ~= "table" then
+					Logger.warn(LOG, "Background check returned a malformed release list: %s.", tostring(decode_error))
+					complete(false, nil)
+					return
+				end
+				for _, entry in pairs(decoded) do
+					if type(entry) ~= "table" or type(entry.tag_name) ~= "string" or entry.tag_name == "" then
+						Logger.warn(LOG, "Background check returned a release without a tag.")
+						complete(false, nil)
+						return
+					end
+				end
 				body = result.body
 				local etag = header_value(result.headers, "etag")
 				list_cache = etag and { body = body, etag = etag } or nil
@@ -297,8 +329,9 @@ function M.new(opts)
 			end
 			complete(true, read_list(body, channel))
 		end)
-		if sent ~= true then
-			Logger.error(LOG, "The update-check request was not dispatched.")
+		if (not ok_dispatch or sent ~= true) and not completed and active and request_generation == generation then
+			completed = true
+			Logger.error(LOG, "The update-check request was not dispatched: %s.", tostring(sent))
 			complete(false, nil)
 		end
 	end
@@ -306,7 +339,7 @@ function M.new(opts)
 	--- One evaluation: re-reads the wall clock, re-arms, and dispatches a due
 	--- check unless the driver is paused.
 	evaluate = function()
-		if not active then return end
+		if not active then return false end
 		local now = opts.now()
 		local due_at, reason = Schedule.next_due({
 			now = now, started_at = started_at, interval = owner.interval(),
@@ -314,24 +347,24 @@ function M.new(opts)
 		})
 		if due_at == nil then
 			Logger.debug(LOG, "Automatic update checks are off.")
-			return
+			return true
 		end
 		if due_at > now then
-			arm(Schedule.delay_until(due_at, now, timing))
-			return
+			return arm(Schedule.delay_until(due_at, now, timing))
 		end
-		arm(timing.reevaluate_sec)
+		if not arm(timing.reevaluate_sec) then return false end
 		if opts.is_paused() == true then
 			Logger.debug(LOG, "Update check due (%s) but the driver is paused; the record is left as it is.", reason)
-			return
+			return true
 		end
 		if in_flight then
 			Logger.info(LOG, "Update check due (%s) while the previous one is in flight.", reason)
-			return
+			return true
 		end
 		local channel = opts.channel()
 		Logger.info(LOG, "Background update check due (%s, channel %s).", reason, channel)
 		dispatch(channel)
+		return true
 	end
 
 	owner._evaluate = function() evaluate() end
@@ -351,14 +384,20 @@ function M.new(opts)
 	--- @return boolean started
 	function owner.start()
 		Logger.start(LOG, "Starting automatic update checks…")
-		active = true
 		started_at = started_at or opts.now()
 		load_record()
 		if not disarm() then
+			active = false
 			Logger.error(LOG, "Automatic update checks could not start: a previous timer is still armed.")
 			return false
 		end
-		evaluate()
+		generation = generation + 1
+		in_flight = false
+		active = true
+		if not evaluate() then
+			Logger.error(LOG, "Automatic update checks could not start: timer admission was refused.")
+			return false
+		end
 		Logger.success(LOG, "Automatic update checks started (every %ds).", owner.interval())
 		return true
 	end
@@ -367,7 +406,18 @@ function M.new(opts)
 	--- @return boolean stopped
 	function owner.stop()
 		active = false
+		generation = generation + 1
+		in_flight = false
 		return disarm()
+	end
+
+	--- Revokes pending results when the durable channel owner publishes a change.
+	function owner.on_channel_changed()
+		generation = generation + 1
+		in_flight = false
+		latest = nil
+		if active and disarm() then return evaluate() end
+		return not active
 	end
 
 	--- Restarts the boot delay at a wake and re-evaluates at once.
