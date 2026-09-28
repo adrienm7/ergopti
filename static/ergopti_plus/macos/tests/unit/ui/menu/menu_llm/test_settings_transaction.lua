@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"modules.llm.backend_detector",
 	"infra.manifest_reader",
 	"adapters.storage",
 	"ui.menu.menu_llm",
@@ -196,6 +197,11 @@ local function with_fixture(options, callback)
 	}
 
 	_G.hs = {
+		execute = function(command)
+			if command == "/usr/bin/uname -m" then return "x86_64" end
+			if command == "/usr/bin/sw_vers -productVersion" then return "14.5" end
+			error("unexpected architecture probe: " .. command)
+		end,
 		http = {
 			asyncGet = function() end,
 		},

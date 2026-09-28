@@ -149,7 +149,7 @@ local is_apple_silicon = BackendPanel.is_apple_silicon()
 
 M.DEFAULT_STATE = {
 		llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
-		llm_backend           = is_apple_silicon and "mlx" or "ollama",
+		llm_backend           = Manifest.default_for("llm.models.selected"),
 		llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
 		llm_model             = is_apple_silicon and llm_mod.DEFAULT_STATE.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_ollama      = llm_mod.DEFAULT_STATE.llm_model_ollama,
