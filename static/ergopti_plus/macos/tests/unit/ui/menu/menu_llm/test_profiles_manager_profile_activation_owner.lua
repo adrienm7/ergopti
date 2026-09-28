@@ -47,6 +47,7 @@ local function with_profiles_fixture(options, body)
 		local notification_count = 0
 		local error_count = 0
 		local editor_calls = 0
+		local timers = {}
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
@@ -59,9 +60,12 @@ local function with_profiles_fixture(options, body)
 		package.loaded["infra.logger"] = logger
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(_, callback)
-				callback()
-				return {settled = true}, true
+				local handle = { callback = callback, timer = {} }
+				timers[#timers + 1] = handle
+				return handle, true
 			end,
+			onSettled = function(handle, callback) handle.on_settled = callback; return true end,
+			cancel = function(handle) handle.timer = nil; if handle.on_settled then handle.on_settled() end; return true end,
 		}
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
@@ -235,6 +239,18 @@ local function with_profiles_fixture(options, body)
 		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
 		manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
 		body({
+			dispatch = function(row)
+				local result = row.action()
+				while #timers > 0 do
+					local timer = table.remove(timers, 1)
+					if timer.timer then
+						timer.callback()
+						timer.timer = nil
+						if timer.on_settled then timer.on_settled() end
+					end
+				end
+				return result
+			end,
 			manager = manager,
 			state = state,
 			selections = selections,
@@ -293,7 +309,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 				local custom = find_row(rows, "Custom")
 				local edit = find_row(custom.items, "menu.profiles.edit_profile")
 				helpers.assert_type(edit.action, "function")
-				edit.action()
+				fixture.dispatch(edit)
 				helpers.assert_eq(#fixture.runtime_profiles, 3,
 					"the refused active identity must be reasserted exactly")
 				helpers.assert_eq(fixture.state.llm_user_profiles[1].label, "Custom")
@@ -319,7 +335,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 				local rows = fixture.manager.get_menu_item().menu
 				local custom = find_row(rows, "Custom")
 				local edit = find_row(custom.items, "menu.profiles.edit_profile")
-				helpers.assert_eq(edit.action(), true,
+				helpers.assert_eq(fixture.dispatch(edit), true,
 					"the editor timer owns dispatch even when its callback rejects")
 				helpers.assert_eq(fixture.registry_calls(), 3)
 				helpers.assert_eq(fixture.active_calls(), 1,
@@ -346,7 +362,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 				local rows = fixture.manager.get_menu_item().menu
 				local custom = find_row(rows, "Custom")
 				local edit = find_row(custom.items, "menu.profiles.edit_profile")
-				helpers.assert_eq(edit.action(), true)
+				helpers.assert_eq(fixture.dispatch(edit), true)
 				helpers.assert_eq(fixture.state.llm_user_profiles[1].label, "Custom")
 				helpers.assert_eq(fixture.runtime_registry()[1].label, "Custom")
 				helpers.assert_eq(fixture.active_calls(),
@@ -381,7 +397,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local custom = find_row(rows, "Custom")
 			local edit = find_row(custom.items, "menu.profiles.edit_profile")
-			helpers.assert_eq(edit.action(), true)
+			helpers.assert_eq(fixture.dispatch(edit), true)
 			helpers.assert_eq(nested_dispatched, false,
 				"the nested edit must be refused before it can acquire a timer")
 			helpers.assert_eq(fixture.editor_calls(), 1,
@@ -402,7 +418,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 				with_profiles_fixture(options, function(fixture)
 					local rows = fixture.manager.get_menu_item().menu
 					local clone = find_row(rows, "menu.profiles.clone_builtin")
-					helpers.assert_eq(clone.action(), true)
+					helpers.assert_eq(fixture.dispatch(clone), true)
 					helpers.assert_eq(#fixture.state.llm_user_profiles, 1)
 					helpers.assert_true(
 						fixture.state.llm_user_profiles[1].label ~= "Updated clone")
@@ -425,7 +441,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local clone = find_row(rows, "menu.profiles.clone_builtin")
 			helpers.assert_type(clone.action, "function")
-			clone.action()
+			fixture.dispatch(clone)
 			helpers.assert_eq(#fixture.selections, 1)
 			helpers.assert_true(fixture.selections[1].id:match("^user_basic_") ~= nil)
 			helpers.assert_eq(fixture.selections[1].registry_size, 1,
@@ -440,7 +456,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local create = find_row(rows, "menu.profiles.create_profile")
 			helpers.assert_type(create.action, "function")
-			create.action()
+			fixture.dispatch(create)
 			helpers.assert_eq(fixture.selections, {{id = "user_created", registry_size = 1}})
 			helpers.assert_eq(fixture.state.llm_active_profile, "user_created")
 			helpers.assert_eq(fixture.direct_saves(), 0)
@@ -457,7 +473,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local custom = find_row(rows, "Custom")
 			local delete = find_row(custom.items, "menu.profiles.delete_profile")
 			helpers.assert_type(delete.action, "function")
-			delete.action()
+			fixture.dispatch(delete)
 			helpers.assert_eq(fixture.selections, {{id = "basic", registry_size = 1}},
 				"the fallback intent must commit while the old profile is still resolvable")
 			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
@@ -479,7 +495,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local custom = find_row(fixture.manager.get_menu_item().menu, "Custom")
 			local delete = find_row(custom.items, "menu.profiles.delete_profile")
 			helpers.assert_type(delete.action, "function")
-			helpers.assert_eq(delete.action(), false)
+			helpers.assert_eq(fixture.dispatch(delete), false)
 			helpers.assert_eq(fixture.selections, {{id = "basic", registry_size = 1}})
 			helpers.assert_eq(fixture.state.llm_active_profile, "user_custom")
 			helpers.assert_eq(fixture.state.llm_user_profiles, {profile})
@@ -494,7 +510,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local auto_detect = find_row(rows, "menu.profiles.auto_detect")
 			helpers.assert_type(auto_detect.action, "function")
-			helpers.assert_eq(auto_detect.action(), false)
+			helpers.assert_eq(fixture.dispatch(auto_detect), false)
 			helpers.assert_eq(#fixture.recommendations, 1)
 			helpers.assert_eq(fixture.recommendations[1].force_dialog, true)
 			helpers.assert_eq(fixture.recommendations[1].dialog_title,
@@ -507,7 +523,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local basic = find_row(rows, "Basic")
 			helpers.assert_type(basic.action, "function")
-			helpers.assert_eq(basic.action(), false)
+			helpers.assert_eq(fixture.dispatch(basic), false)
 			helpers.assert_eq(fixture.selections, {{id = "basic", registry_size = 0}})
 		end)
 	end)
@@ -517,7 +533,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local clone = find_row(rows, "menu.profiles.clone_builtin")
 			helpers.assert_type(clone.action, "function")
-			helpers.assert_eq(clone.action(), false)
+			helpers.assert_eq(fixture.dispatch(clone), false)
 			helpers.assert_eq(#fixture.selections, 1)
 			helpers.assert_eq(fixture.selections[1].registry_size, 1)
 			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
@@ -529,7 +545,7 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			local rows = fixture.manager.get_menu_item().menu
 			local auto_detect = find_row(rows, "menu.profiles.auto_detect")
 			helpers.assert_type(auto_detect.action, "function")
-			helpers.assert_eq(auto_detect.action(), false)
+			helpers.assert_eq(fixture.dispatch(auto_detect), false)
 			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
 			helpers.assert_eq(fixture.notifications(), 1)
 			helpers.assert_eq(fixture.direct_saves(), 0)
