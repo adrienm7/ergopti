@@ -70,10 +70,21 @@ local function manager(options)
 	LayoutRegistry._reset()
 	local settings = assert(LayoutRegistry.settings())
 	local digests = {}
-	for _, entry in ipairs(INDEX.layouts) do digests[registry_file(entry.file)] = entry.sha256 end
+	for _, entry in ipairs(INDEX.layouts) do
+		digests[registry_file(entry.file)] = entry.sha256
+		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
+	end
 	local state = { requests = {}, files = {}, enabled = {}, disabled = {}, selected = {}, deleted = {} }
 	for path, text in pairs(options.files or {}) do state.files[path] = text end
 	local served = options.served or {}
+	if type(served) == "table" and served[INDEX_URL] then
+		for _, entry in ipairs(INDEX.layouts) do
+			for _, file in ipairs(entry.extension.files) do
+				local url = INDEX_URL:gsub("index%.json$", "") .. file.file
+				if served[url] == nil then served[url] = registry_file(file.file) end
+			end
+		end
+	end
 	local deps = {
 		settings = settings,
 		transport = {
@@ -133,7 +144,9 @@ end
 --- @return table
 local function shipped_files()
 	local files = { [SHIPPED_DIR .. "index.json"] = INDEX_TEXT }
-	for _, entry in ipairs(INDEX.layouts) do files[SHIPPED_DIR .. entry.file] = registry_file(entry.file) end
+	for _, entry in ipairs(INDEX.layouts) do
+		for _, file in ipairs(entry.extension.files) do files[SHIPPED_DIR .. file.file] = registry_file(file.file) end
+	end
 	return files
 end
 
@@ -165,6 +178,20 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], nil)
 	end)
 
+	helpers.it("keeps extension content unavailable after a publication failure (layout-extension)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
+		local write = deps.write
+		deps.write = function(path, text)
+			if path:find("/extensions/", 1, true) then return false, "disk full" end
+			return write(path, text)
+		end
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(not result.ok)
+		helpers.assert_eq(#LayoutRegistry.extension_roots(deps), 0)
+		helpers.assert_nil(state.files[LOCAL_DIR .. "installed.json"])
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"])
+	end)
+
 	helpers.it("installs a downloaded layout, enables it and records it last (layout-registry-install)", function()
 		local LayoutRegistry, deps, state = manager({
 			served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = registry_file("ergol/ergol.keylayout") },
@@ -174,13 +201,17 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_eq(result.detail.path, LAYOUTS_DIR .. "ergol.keylayout")
 		helpers.assert_eq(result.detail.source, "network")
 		helpers.assert_true(result.detail.enabled)
-		helpers.assert_eq(#state.requests, 2, "the index then the layout")
+		helpers.assert_eq(#state.requests, 2 + #entry_of("ergol").extension.files, "the index, layout and verified extension")
 		helpers.assert_true(state.files[LAYOUTS_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"),
 			"the installed file is the registry file byte for byte")
 		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"))
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"', "with the ETag it was served with")
 		helpers.assert_eq(record(state).layouts.ergol.sha256, entry_of("ergol").sha256)
+		local roots = LayoutRegistry.extension_roots(deps)
+		helpers.assert_eq(#roots, 1)
+		helpers.assert_eq(state.files[roots[1] .. "/ergol/manifest.toml"], registry_file("ergol/manifest.toml"))
+		helpers.assert_nil(state.files["/cfg/config.toml"], "installation does not persist enable preferences")
 		helpers.assert_eq(state.enabled[1].path, LAYOUTS_DIR .. "ergol.keylayout")
 		local snapshot = LayoutRegistry.snapshot(deps)
 		helpers.assert_eq(snapshot.installed.ergol.version, entry_of("ergol").version)

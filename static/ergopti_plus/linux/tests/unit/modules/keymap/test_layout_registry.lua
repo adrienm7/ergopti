@@ -63,11 +63,22 @@ local function manager(options)
 	LayoutRegistry._reset()
 	local settings = assert(LayoutRegistry.settings())
 	local digests = {}
-	for _, entry in ipairs(INDEX.layouts) do digests[registry_file(entry.file)] = entry.sha256 end
+	for _, entry in ipairs(INDEX.layouts) do
+		digests[registry_file(entry.file)] = entry.sha256
+		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
+	end
 	local state = { requests = {}, files = {}, runs = {}, deleted = {} }
 	for path, text in pairs(options.files or {}) do state.files[path] = text end
 	local runs = options.runs or {}
 	local served = options.served or {}
+	if type(served) == "table" and served[INDEX_URL] then
+		for _, entry in ipairs(INDEX.layouts) do
+			for _, file in ipairs(entry.extension.files) do
+				local url = INDEX_URL:gsub("index%.json$", "") .. file.file
+				if served[url] == nil then served[url] = registry_file(file.file) end
+			end
+		end
+	end
 	local deps = {
 		settings = settings,
 		transport = {
@@ -128,7 +139,10 @@ end
 --- @return table
 local function shipped_files()
 	local files = { [SHIPPED_DIR .. "index.json"] = INDEX_TEXT }
-	for _, entry in ipairs(INDEX.layouts) do files[SHIPPED_DIR .. entry.file] = registry_file(entry.file) end
+	for _, entry in ipairs(INDEX.layouts) do
+		files[SHIPPED_DIR .. entry.file] = registry_file(entry.file)
+		for _, file in ipairs(entry.extension.files) do files[SHIPPED_DIR .. file.file] = registry_file(file.file) end
+	end
 	return files
 end
 
@@ -185,7 +199,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(result.ok, "the installation must succeed: " .. tostring(result.extra))
 		helpers.assert_eq(result.detail.source, "network")
 		helpers.assert_true(result.detail.verified)
-		helpers.assert_eq(#state.requests, 2, "the index then the layout")
+		helpers.assert_eq(#state.requests, 2 + #entry_of("ergol").extension.files, "the index, layout and complete extension")
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"')
 		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == layout, "the verified bytes are converted")
@@ -219,6 +233,13 @@ helpers.describe("layout manager (Linux): installing", function()
 			files = shipped_files(),
 			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
 		})
+		local directories = {}
+		deps.ensure_dir = function(path) directories[path] = true return true end
+		deps.write = function(path, content)
+			if not directories[path:match("^(.*)/[^/]+$")] then return false, "parent missing" end
+			state.files[path] = content
+			return true
+		end
 		local result = run(function(done) LayoutRegistry.install("ergopti", done, deps) end)
 		helpers.assert_true(result.ok, "the shipped Ergopti must install offline: " .. tostring(result.extra))
 		helpers.assert_eq(result.detail.source, "bundled")

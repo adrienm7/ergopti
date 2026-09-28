@@ -38,6 +38,7 @@ local ProcessRunner = require("adapters.process_runner")
 local Json          = require("json")
 local Registry      = require("layouts.registry")
 local Catalogue     = require("layouts.catalogue")
+local Extension     = require("layouts.extension")
 
 local M = {}
 
@@ -305,7 +306,8 @@ end
 --- @return boolean ok
 --- @return string|nil error
 local function write_file(deps, path, content)
-	if not deps.ensure_dir(deps.local_dir) then return false, "cannot create " .. deps.local_dir end
+	local parent = assert(path:match("^(.*)/[^/]+$"), "layout write requires an absolute parent")
+	if not deps.ensure_dir(parent) then return false, "cannot create " .. parent end
 	local written, write_err = deps.write(path, content)
 	if not written then return false, "cannot write " .. path .. ": " .. tostring(write_err) end
 	return true, nil
@@ -656,6 +658,12 @@ function M.install(id, on_done, deps)
 				finish(false, M.FAILURE_DOWNLOAD, detail)
 				return
 			end
+			if entry.extension ~= nil then
+				local staged, stage_err = Extension.stage(deps.local_dir, entry, detail.content, {
+					read = deps.read, write = function(path, text) return write_file(deps, path, text) end,
+				})
+				if not staged then finish(false, M.FAILURE_WRITE, stage_err) return end
+			end
 			local layout_path = deps.local_dir .. id .. ".keylayout"
 			local written, write_err = write_file(deps, layout_path, detail.text)
 			if not written then
@@ -797,6 +805,17 @@ function M._reset()
 	_active = ""
 	_bundled_index = nil
 	_bundled_index_read = false
+end
+
+--- Roots of committed extension generations, without changing activation choices.
+--- @param deps table|nil Optional filesystem collaborators.
+--- @return table
+function M.extension_roots(deps)
+	local resolved, reason = resolve_deps(deps)
+	if not resolved then error(reason, 0) end
+	local record, err = read_installed(resolved)
+	if not record then error(err, 0) end
+	return Extension.roots(resolved.local_dir, record)
 end
 
 return M

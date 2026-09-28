@@ -26,6 +26,7 @@
 --- ==============================================================================
 
 local Registry = require("layouts.registry")
+local Extension = require("layouts.extension")
 
 local M = {}
 
@@ -77,6 +78,10 @@ function M.validate_index(index)
 		if type(entry.file) ~= "string" or type(entry.sha256) ~= "string"
 			or type(entry.size) ~= "number" or type(entry.version) ~= "string" then
 			return false, "the registry entry of '" .. entry.id .. "' has no usable file, checksum, size or version"
+		end
+		if entry.extension ~= nil then
+			local valid, reason = Extension.validate(entry)
+			if not valid then return false, reason end
 		end
 	end
 	return true, nil
@@ -342,7 +347,12 @@ function M.acquire(settings, entry, deps, on_done)
 	local function finish(ok, detail)
 		if finished then return end
 		finished = true
-		on_done(ok, detail)
+		if not ok or entry.extension == nil then on_done(ok, detail) return end
+		Extension.acquire(settings, entry, deps, function(complete, content)
+			if not complete then on_done(false, content) return end
+			detail.content = content
+			on_done(true, detail)
+		end)
 	end
 	if M.bundled_entry(deps.bundled_index, entry) then
 		-- A shipped copy the shipped index lists but that cannot be read is a

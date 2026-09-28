@@ -233,6 +233,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/keylayout/keylayout_emulation.ahk
 #Include ../modules/keymap/keylayout/layout_registry.ahk
 #Include ../modules/keymap/keylayout/layout_catalogue.ahk
+#Include ../modules/keymap/keylayout/layout_extension.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
