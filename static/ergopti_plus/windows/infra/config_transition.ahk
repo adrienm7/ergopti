@@ -10,7 +10,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Strict framing rejects unknown versions, fields, paths, phases, and hashes.
-; 2. Eight-target and 64 KiB limits bound every early-boot journal operation.
+; 2. The 64 KiB frame budget bounds target count and early-boot journal work.
 ; 3. Create-only artifact publication refuses namespace collisions fail-closed.
 ; 4. Phase-directed recovery chooses all-old or all-new without disk heuristics.
 ; 5. Injectable ports and pause seams expose every durable boundary to tests.
@@ -29,12 +29,13 @@
 ; ===========================================
 
 global CONFIG_TRANSITION_WAL_HEADER := "ERGOPTI_CONFIG_TRANSITION_WAL"
-global CONFIG_TRANSITION_WAL_VERSION := 1
+global CONFIG_TRANSITION_WAL_VERSION := 2
+global CONFIG_TRANSITION_LEGACY_WAL_VERSION := 1
+global CONFIG_TRANSITION_LEGACY_MAX_TARGETS := 8
 global CONFIG_TRANSITION_PHASE_PREPARED := "prepared"
 global CONFIG_TRANSITION_PHASE_APPLYING := "applying"
 global CONFIG_TRANSITION_PHASE_COMMITTED_NEW := "committed_new"
 global CONFIG_TRANSITION_PHASE_COMMITTED_OLD := "committed_old"
-global CONFIG_TRANSITION_MAX_TARGETS := 8
 global CONFIG_TRANSITION_MAX_WAL_BYTES := 64 * 1024
 global CONFIG_TRANSITION_MAX_TX_ID_CHARS := 64
 global CONFIG_TRANSITION_MAX_PATH_CHARS := 32767
@@ -42,6 +43,14 @@ global CONFIG_TRANSITION_MAX_COMPONENT_CHARS := 255
 global CONFIG_TRANSITION_WAL_SUFFIX := ".config-transition.wal"
 global CONFIG_TRANSITION_ARTIFACT_TAG := ".ergopti-transition-"
 global CONFIG_TRANSITION_HASH_ABSENT := "-"
+
+; Every legal target has at least this shortest drive path, one-digit index and
+; absent hashes. Derive a conservative allocation bound from the actual codec;
+; complete frames must additionally fit the exact byte budget below.
+global CONFIG_TRANSITION_MAX_TARGETS := CONFIG_TRANSITION_MAX_WAL_BYTES
+	// StrLen(_ConfigTransitionTargetFrame(Map("path", "C:\a",
+		"old_present", 0, "old_hash", CONFIG_TRANSITION_HASH_ABSENT,
+		"new_present", 0, "new_hash", CONFIG_TRANSITION_HASH_ABSENT), 1))
 
 ; Builds a typed result shared by every public operation.
 ; @param Status {String} High-level outcome such as ok, retry, quarantine, or fatal.
@@ -386,7 +395,8 @@ _ConfigTransitionWalStagePath(WalPath, TxId, Phase) {
 ; @param PathsFile {String} Stable locator used to derive the live journal.
 ; @return {Boolean} True only for the exact supported schema.
 _ConfigTransitionRecordIsValid(Record, PathsFile) {
-	global CONFIG_TRANSITION_WAL_VERSION, CONFIG_TRANSITION_MAX_TARGETS
+	global CONFIG_TRANSITION_WAL_VERSION, CONFIG_TRANSITION_LEGACY_WAL_VERSION
+	global CONFIG_TRANSITION_MAX_TARGETS, CONFIG_TRANSITION_LEGACY_MAX_TARGETS
 	if !(Record is Map) || Record.Count != 5
 		return false
 	for Key in ["version", "phase", "tx_id", "locator", "targets"] {
@@ -394,12 +404,15 @@ _ConfigTransitionRecordIsValid(Record, PathsFile) {
 			return false
 	}
 	if !(Record["version"] is Integer)
-		|| Record["version"] !== CONFIG_TRANSITION_WAL_VERSION
+		|| (Record["version"] !== CONFIG_TRANSITION_WAL_VERSION
+			&& Record["version"] !== CONFIG_TRANSITION_LEGACY_WAL_VERSION)
 		|| !_ConfigTransitionPhaseIsValid(Record["phase"])
 		|| !_ConfigTransitionTxIdIsValid(Record["tx_id"])
 		|| !(Record["targets"] is Array)
 		|| Record["targets"].Length < 1
 		|| Record["targets"].Length > CONFIG_TRANSITION_MAX_TARGETS
+		|| (Record["version"] == CONFIG_TRANSITION_LEGACY_WAL_VERSION
+			&& Record["targets"].Length > CONFIG_TRANSITION_LEGACY_MAX_TARGETS)
 		return false
 	WalPath := ConfigTransitionWalPath(PathsFile)
 	NormalizedPathsFile := _ConfigTransitionNormalizePath(PathsFile)
@@ -462,6 +475,16 @@ _ConfigTransitionRecordIsValid(Record, PathsFile) {
 	return true
 }
 
+; Uses one target codec for serialization and the derived allocation bound.
+_ConfigTransitionTargetFrame(Target, Index) {
+	Prefix := "`ntarget." . Index . "."
+	return Prefix . "path=" . _ConfigTransitionEncodeHex(Target["path"])
+		. Prefix . "old_present=" . Target["old_present"]
+		. Prefix . "old_hash=" . Target["old_hash"]
+		. Prefix . "new_present=" . Target["new_present"]
+		. Prefix . "new_hash=" . Target["new_hash"]
+}
+
 ; Serializes one exact record into a bounded line-oriented frame.
 ; @param Record {Map} Validated record.
 ; @param PathsFile {String} Stable locator used for contextual validation.
@@ -476,17 +499,16 @@ _ConfigTransitionSerialize(Record, PathsFile) {
 		"tx_id=" . Record["tx_id"],
 		"locator=" . _ConfigTransitionEncodeHex(Record["locator"]),
 		"target_count=" . Record["targets"].Length]
-	for Index, Target in Record["targets"] {
-		Prefix := "target." . Index . "."
-		Lines.Push(Prefix . "path=" . _ConfigTransitionEncodeHex(Target["path"]))
-		Lines.Push(Prefix . "old_present=" . Target["old_present"])
-		Lines.Push(Prefix . "old_hash=" . Target["old_hash"])
-		Lines.Push(Prefix . "new_present=" . Target["new_present"])
-		Lines.Push(Prefix . "new_hash=" . Target["new_hash"])
-	}
 	Content := ""
 	for Index, Line in Lines
 		Content .= (Index > 1 ? "`n" : "") . Line
+	for Index, Target in Record["targets"] {
+		Content .= _ConfigTransitionTargetFrame(Target, Index)
+		; Stop at the first excess instead of allocating an oversized frame
+		; proportional to every maximal-length path in the catalogue.
+		if StrLen(Content) > CONFIG_TRANSITION_MAX_WAL_BYTES
+			return false
+	}
 	return (StrPut(Content, "UTF-8") - 1 <= CONFIG_TRANSITION_MAX_WAL_BYTES)
 		? Content : false
 }
@@ -497,26 +519,31 @@ _ConfigTransitionSerialize(Record, PathsFile) {
 ; @return {Map|false} Validated record, or false.
 _ConfigTransitionParse(Content, PathsFile) {
 	global CONFIG_TRANSITION_WAL_HEADER, CONFIG_TRANSITION_MAX_WAL_BYTES
-	global CONFIG_TRANSITION_WAL_VERSION, CONFIG_TRANSITION_MAX_TARGETS
+	global CONFIG_TRANSITION_WAL_VERSION, CONFIG_TRANSITION_LEGACY_WAL_VERSION
+	global CONFIG_TRANSITION_MAX_TARGETS, CONFIG_TRANSITION_LEGACY_MAX_TARGETS
 	if !(Content is String) || Content == "" || InStr(Content, "`r", true)
 		|| StrPut(Content, "UTF-8") - 1 > CONFIG_TRANSITION_MAX_WAL_BYTES
 		return false
 	Lines := StrSplit(Content, "`n")
 	if Lines.Length < 11 || Lines[1] !== CONFIG_TRANSITION_WAL_HEADER
-		|| Lines[2] !== "version=" . CONFIG_TRANSITION_WAL_VERSION
+		|| (Lines[2] !== "version=" . CONFIG_TRANSITION_WAL_VERSION
+			&& Lines[2] !== "version=" . CONFIG_TRANSITION_LEGACY_WAL_VERSION)
 		return false
+	Version := Integer(SubStr(Lines[2], StrLen("version=") + 1))
 	if !RegExMatch(Lines[3], "^phase=(.+)$", &PhaseMatch)
 		|| !_ConfigTransitionPhaseIsValid(PhaseMatch[1])
 		|| !RegExMatch(Lines[4], "^tx_id=([A-Za-z0-9_-]+)$", &TxMatch)
 		|| !_ConfigTransitionTxIdIsValid(TxMatch[1])
 		|| !RegExMatch(Lines[5], "^locator=([0-9A-F]+)$", &LocatorMatch)
-		|| !RegExMatch(Lines[6], "^target_count=([0-9])$", &CountMatch)
+		|| !RegExMatch(Lines[6], "^target_count=([1-9][0-9]{0,"
+			. (StrLen(CONFIG_TRANSITION_MAX_TARGETS) - 1) . "})$", &CountMatch)
 		return false
 	DecodedLocator := _ConfigTransitionDecodeHex(LocatorMatch[1])
 	if !DecodedLocator["ok"]
 		return false
 	TargetCount := Integer(CountMatch[1])
 	if TargetCount < 1 || TargetCount > CONFIG_TRANSITION_MAX_TARGETS
+		|| (Version == CONFIG_TRANSITION_LEGACY_WAL_VERSION && TargetCount > CONFIG_TRANSITION_LEGACY_MAX_TARGETS)
 		|| Lines.Length != 6 + (TargetCount * 5)
 		return false
 	Targets := []
@@ -546,7 +573,7 @@ _ConfigTransitionParse(Content, PathsFile) {
 			"new_hash", NewHashMatch[1]))
 	}
 	Record := Map(
-		"version", CONFIG_TRANSITION_WAL_VERSION,
+		"version", Version,
 		"phase", PhaseMatch[1],
 		"tx_id", TxMatch[1],
 		"locator", DecodedLocator["value"],

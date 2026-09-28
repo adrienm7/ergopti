@@ -72,8 +72,8 @@ _HotstringsScopeRoundTrip() {
 Test("hotstrings-scope: all stores publish together and restore exact bytes after native refusal", _HotstringsScopeRoundTrip)
 
 _HotstringsScopeRefusals() {
-	for Scenario in ["backup", "limit", "inventory", "external"] {
-		Fixture := _HotstringsScopeFixture(Scenario == "limit" ? 7 : 1)
+	for Scenario in ["backup", "inventory", "external"] {
+		Fixture := _HotstringsScopeFixture()
 		Backups := 0, Launches := 0
 		Backup(SelectedScenario, State, Path, Content) {
 			Backups += 1
@@ -101,7 +101,7 @@ _HotstringsScopeRefusals() {
 			Receipt := %Apply%("clear", Fixture.options)
 			AssertEqual(Receipt["status"], "refused")
 			AssertEqual(Launches, 0)
-			if Scenario == "limit" || Scenario == "inventory"
+			if Scenario == "inventory"
 				AssertEqual(Backups, 0, "unsupported or changed cohorts refuse before backup effects")
 			else
 				AssertEqual(Backups, Scenario == "backup" ? 2 : 3, "the intended effect boundary was reached")
@@ -112,7 +112,7 @@ _HotstringsScopeRefusals() {
 		} finally _ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("hotstrings-scope: capacity inventory backup and foreign edits refuse without partial publication", _HotstringsScopeRefusals)
+Test("hotstrings-scope: inventory backup and foreign edits refuse without partial publication", _HotstringsScopeRefusals)
 
 _HotstringsScopeRecoveryDebt() {
 	Fixture := _HotstringsScopeFixture()
@@ -189,3 +189,38 @@ _HotstringsScopeProductionInventory() {
 	}
 }
 Test("hotstrings-scope: production discovery inventories fresh personal and canonical extension identities", _HotstringsScopeProductionInventory)
+
+_HotstringsScopeLargeCatalogue() {
+	Fixture := _HotstringsScopeFixture(32)
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := HotstringsScopeApply("clear", Fixture.options)
+		AssertEqual("pending", Receipt["status"], "all 34 changed stores fit one transaction")
+		Journal := ConfigTransitionInspect(Fixture.options["locator"], ConfigTransitionProductionPort())
+		Assert(ConfigTransitionResultIs(Journal, "ready"))
+		AssertEqual(34, Journal["record"]["targets"].Length)
+		AssertEqual(34, Receipt["backups"].Length)
+		for Path in Fixture.personal {
+			Assert(!InStr(FSReadUtf8Exact(Path), "delay = 2.5"))
+			AssertContains(FSReadUtf8Exact(Path), '"abc" = "replacement"')
+			Assert(!_ConfigWriteLeaseTryAcquire(Path, "concurrent-editor"))
+		}
+		Refusal.Call("replacement refused")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+		AssertEqual(Fixture.overrideSource, FSReadUtf8Exact(Fixture.overrides))
+		for Path in Fixture.personal
+			AssertEqual(Fixture.personalSource, FSReadUtf8Exact(Path))
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("hotstrings-capacity: 32 personal files publish and roll back as one journal", _HotstringsScopeLargeCatalogue)
