@@ -154,6 +154,54 @@ local function page_messages(context)
 end
 
 helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)", function()
+	for _, failure in ipairs({ "frame", "chrome" }) do
+		helpers.it("presentation failure releases resources and admits the next error: " .. failure .. " (error-dialog-exception)", function()
+			local dialog, context = load_dialog()
+			local builder = package.loaded["ui.ui_builder"]
+			local saved_screen, saved_chrome = hs.screen.mainScreen, builder.window_chrome_steps
+			if failure == "frame" then
+				hs.screen.mainScreen = function() return { frame = function() error("frame refused") end } end
+			else
+				builder.window_chrome_steps = function() error("chrome refused") end
+			end
+			helpers.assert_true(dialog.init())
+			dialog.on_error("old", "Old failure", "Old failure")
+			local ok, err = pcall(fire_timers, context)
+			hs.screen.mainScreen, builder.window_chrome_steps = saved_screen, saved_chrome
+			helpers.assert_true(ok, "presentation exceptions must be contained: " .. tostring(err))
+			helpers.assert_true(#context.errors > 0, "the presentation failure must be reported")
+			if failure == "chrome" then
+				helpers.assert_eq(context.deleted, 1, "the partially created window must be released")
+				helpers.assert_eq(context.released, 1, "the partial message handler must be released")
+			end
+			dialog.on_error("new", "New failure", "New failure")
+			helpers.assert_eq(#context.timers, 1, "a failed presentation must release the pending slot")
+			fire_timers(context)
+			context.page({ body = "ready" })
+			helpers.assert_eq(page_messages(context)[1].module, "new")
+		end)
+	end
+
+	helpers.it("disabling invalidates queued windows across reactivation (error-dialog-cancel)", function()
+		local dialog, context = load_dialog()
+		helpers.assert_true(dialog.init())
+		dialog.on_error("old", "Old failure", "Old failure")
+		local stale = context.timers[1].fn
+		context.timers = {}
+		helpers.assert_true(dialog.set_enabled(false))
+		stale()
+		helpers.assert_eq(context.windows, nil, "disabled windows must not open")
+		helpers.assert_true(dialog.set_enabled(true))
+		dialog.on_error("new", "New failure", "New failure")
+		helpers.assert_eq(#context.timers, 1, "cancellation must release the pending slot")
+		stale()
+		helpers.assert_eq(context.windows, nil, "reactivation must not revive an old callback")
+		fire_timers(context)
+		helpers.assert_eq(context.windows, 1)
+		context.page({ body = "ready" })
+		helpers.assert_eq(page_messages(context)[1].module, "new")
+	end)
+
 	helpers.it("a logged ERROR arms one timer and opens nothing synchronously (error-dialog-macos)", function()
 		local dialog, context = load_dialog()
 		helpers.assert_true(dialog.init(), "the shipped policy must load")

@@ -60,6 +60,9 @@ local _enabled = nil
 -- the policy folds every error logged in between into it
 local _busy = false
 
+-- Identity of the deferred request; disabling invalidates it before native work.
+local _scheduled = nil
+
 -- Errors folded into the pending or open window
 local _folded = 0
 
@@ -138,6 +141,11 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = enabled
+	if not enabled and _scheduled ~= nil then
+		_scheduled = nil
+		_busy = false
+		_folded = 0
+	end
 	Logger.debug(LOG, "Error window %s.", enabled and "enabled" or "disabled")
 	return true
 end
@@ -327,9 +335,9 @@ local function open_window(record)
 		Logger.error(LOG, "No geometry for 'error_dialog' in apps.manifest.json; the window cannot open.")
 		return false
 	end
-	local ok_scr, screen = pcall(function() return hs.screen.mainScreen() end)
-	local sf = (ok_scr and screen and type(screen.frame) == "function" and screen:frame())
-		or { x = 0, y = 0, w = 1440, h = 900 }
+	local screen = hs.screen.mainScreen()
+	if not screen or type(screen.frame) ~= "function" then error("the main screen is unavailable") end
+	local sf = screen:frame()
 	local frame = {
 		x = math.floor(sf.x + (sf.w - geo.width) / 2),
 		y = math.floor(sf.y + (sf.h - geo.height) / 2),
@@ -416,13 +424,22 @@ end
 --- Opens the window for a decided error, off the logging call's stack.
 --- @param record table
 local function schedule(record)
+	_scheduled = record
 	local _, committed = TimerScheduler.after(_policy.present_delay_ms / 1000, function()
-		if open_window(record) then return end
+		if _scheduled ~= record then return end
+		_scheduled = nil
+		local ok, opened = xpcall(open_window, debug.traceback, record)
+		if ok and opened then return end
+		if not ok then
+			Logger.error(LOG, "The error window could not open: %s", tostring(opened))
+			if _session then close(_session) end
+		end
 		-- A window that could not open frees the policy for the next error
 		_busy = false
 		_folded = 0
 	end)
 	if committed ~= true then
+		_scheduled = nil
 		_busy = false
 		Logger.error(LOG, "The error window could not be scheduled.")
 	end
@@ -464,6 +481,7 @@ end
 --- Test seam: forgets the policy, the decisions and the window.
 function M._reset()
 	if _session then retire(_session) end
+	_scheduled = nil
 	_policy, _decisions, _enabled, _busy, _folded = nil, nil, nil, false, 0
 end
 

@@ -63,6 +63,9 @@ global _ED_Enabled := false
 ; the policy folds every error logged in between into it
 global _ED_Busy := false
 
+; Identity of the deferred request; disabling invalidates it before native work.
+global _ED_PendingRecord := 0
+
 ; Errors folded into the pending or open window
 global _ED_Folded := 0
 
@@ -159,8 +162,13 @@ ErrorDialog_SetEnabled(Enabled, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 }
 
 _ErrorDialog_PublishEnabled(Enabled) {
-	global _ED_Enabled
+	global _ED_Enabled, _ED_PendingRecord, _ED_Busy, _ED_Folded
 	_ED_Enabled := Enabled
+	if !Enabled && (_ED_PendingRecord is Map) {
+		_ED_PendingRecord := 0
+		_ED_Busy := false
+		_ED_Folded := 0
+	}
 }
 
 
@@ -183,6 +191,7 @@ _ErrorDialog_PublishEnabled(Enabled) {
 ; @param Stamp {String} The line's timestamp.
 ErrorDialog_OnError(Tag, Template, Body, Stamp) {
 	global _ED_Policy, _ED_Decisions, _ED_Busy, _ED_Folded, _ED_Enabled, _ED_Session, _ED_TimerFn
+	global _ED_PendingRecord
 	if !(_ED_Policy is Map)
 		return
 	Decision := ErrorPolicy_Decide(_ED_Decisions, _ED_Policy, Map(
@@ -196,6 +205,7 @@ ErrorDialog_OnError(Tag, Template, Body, Stamp) {
 		case "show":
 			_ED_Busy := true
 			Record := Map("kind", "error", "module", String(Tag), "message", String(Body), "time", String(Stamp))
+			_ED_PendingRecord := Record
 			_ED_TimerFn.Call(_ErrorDialog_Present.Bind(Record), -Max(1, _ED_Policy["present_delay_ms"]))
 	}
 }
@@ -270,10 +280,14 @@ _ErrorDialog_BuildReport(Record) {
 ; @param Record {Map} { kind, module, message, time }
 _ErrorDialog_Present(Record) {
 	global _DriverBootPhase, _DriverStartupSmokeDir, ED_BOOT_RETRY_MS, _ED_Busy, _ED_Folded
+	global _ED_PendingRecord, _ED_TimerFn
+	if _ED_PendingRecord != Record
+		return
 	if (!IsSet(_DriverBootPhase) || _DriverBootPhase != "ready") {
-		SetTimer(_ErrorDialog_Present.Bind(Record), -ED_BOOT_RETRY_MS)
+		_ED_TimerFn.Call(_ErrorDialog_Present.Bind(Record), -ED_BOOT_RETRY_MS)
 		return
 	}
+	_ED_PendingRecord := 0
 	; The startup smoke test boots the real driver headless: a window there
 	; would outlive the check, as the fatal MsgBox would (infra/error_net.ahk)
 	if IsSet(_DriverStartupSmokeDir) && (_DriverStartupSmokeDir != "") {
@@ -373,7 +387,8 @@ _ErrorDialog_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
 ; the window; and frees the policy for the next error.
 _ErrorDialog_CloseWindow() {
 	global _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone, _ED_WindowEpoch, _ED_Session
-	global _ED_Busy, _ED_Folded
+	global _ED_Busy, _ED_Folded, _ED_PendingRecord
+	_ED_PendingRecord := 0
 	SavedGui := IsSet(_ED_Gui) ? _ED_Gui : 0
 	if !_ED_ResetDone {
 		_ED_ResetDone := true
