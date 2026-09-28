@@ -48,7 +48,7 @@ local FIXTURE = table.concat({
 	"tap_3 = \"open_url\"",
 	"",
 	"[llm.trigger]",
-	"debounce = 0.3",
+	"debounce_ms = 300",
 	"disabled_apps = [",
 	"  \"com.apple.Terminal\",",
 	"]",
@@ -76,7 +76,7 @@ local SURVIVORS = {
 	{ { "hotstrings", "dynamic", "date" }, true },
 	{ { "metrics", "enabled" }, true },
 	{ { "gestures", "tap_3" }, "open_url" },
-	{ { "llm", "trigger", "debounce" }, 0.3 },
+	{ { "llm", "trigger", "debounce_ms" }, 300 },
 }
 
 -- A plain io adapter with the macOS FileSystem contract the cleanup needs.
