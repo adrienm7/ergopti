@@ -68,6 +68,12 @@ class HotstringsScopeFiles {
 		this.languages := Options.Get("language_paths", _HotstringsScopeLanguagePaths)
 		this.overrides := Options.Has("override_path") ? Options["override_path"] : HotstringsConfigPath()
 		this.personal := Options.Has("personal_path") ? Options["personal_path"] : PersonalTomlPath()
+		; Discovery expands path aliases. Resolve the existing primary source the
+		; same way; an absent source keeps its path and contributes no sections.
+		Loop Files, this.personal {
+			this.personal := A_LoopFileFullPath
+			break
+		}
 		this.paths := [this.overrides]
 		this.owned := Map(StrLower(this.overrides), true)
 		for Entry in this.catalogue.Call() {

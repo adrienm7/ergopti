@@ -158,12 +158,14 @@ _HotstringsScopeProductionInventory() {
 		SavedList := _HCW_CATEGORY_LIST
 		Fixture := _ScopeOwnerFixture()
 		DirCreate(Fixture.directory . "\personal")
+		Assert(FSWriteDurable(Fixture.directory . "\personal\neighbor.toml", '[[neighbor_only]]`n"other" = "entry"`n'))
 		Path := Fixture.directory . "\personal\main.toml"
 		Assert(FSWriteDurable(Path, '[[known]]`n"trigger" = "output"`n'))
 		try {
 			ScriptInformation := SavedInformation.Clone()
 			ScriptInformation["PersonalHotstringsDir"] := Fixture.directory . "\personal\"
-			ScriptInformation["PersonalTomlPath"] := Path
+			; Equivalent spellings must match the canonical discovery identity.
+			ScriptInformation["PersonalTomlPath"] := Fixture.directory . "\personal\.\main.toml"
 			_ConfigDir := Fixture.directory, _ExtensionsDir := Root
 			_HCW_CATEGORY_LIST := [{ Key: "untouched-ui" }]
 			Owner := HotstringsScopeFiles(Map("override_path", Fixture.directory . "\overrides.toml"))
@@ -178,6 +180,7 @@ _HotstringsScopeProductionInventory() {
 			Assert(Found.Has("hotstrings.modules.ext:sample:words.wanted"))
 			Assert(Found.Has("hotstrings.personal.new_section.enabled"), "the scope reads fresh source sections")
 			Assert(Found.Has("hotstrings.personal.new_section.time_activation_seconds"))
+			Assert(!Found.Has("hotstrings.personal.neighbor_only.enabled"), "another personal file is not the primary source")
 			AssertEqual(_HCW_CATEGORY_LIST[1].Key, "untouched-ui")
 			Validated := ManifestScopeInventory("hotstrings", Map("catalogue", Owner.Inventory.Bind(Owner)))
 			Assert(Validated.Length > 0)
