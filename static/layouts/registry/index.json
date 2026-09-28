@@ -26,6 +26,33 @@
 			],
 			"keycode_convention": "ansi",
 			"source_url": "https://github.com/Nuclear-Squid/ergol/releases/download/ergol-v1.0.2/ergol.keylayout",
+			"extension": {
+				"id": "ergol",
+				"name": "Ergo-L",
+				"version": "1.0.2",
+				"description": {},
+				"sha256": "855cfd7c0cee17fefb4773a655babead9cf2f8c7e5dea06f2982550ca21b7d8b",
+				"files": [
+					{
+						"path": "LICENSE",
+						"file": "ergol/LICENSE",
+						"size": 244,
+						"sha256": "c36fd982e5922e39449f44caef74c2e4f5f69622aa421fc74876176af6e14d96"
+					},
+					{
+						"path": "ergol.keylayout",
+						"file": "ergol/ergol.keylayout",
+						"size": 66273,
+						"sha256": "b19d38f7e11ef58983cf2185d8b2097dffeda387d1c4ed8ed0e45ab022e4c189"
+					},
+					{
+						"path": "manifest.toml",
+						"file": "ergol/manifest.toml",
+						"size": 146,
+						"sha256": "c0e980a2c9d57b5babeb1e3610dcbdd515ac03183765e204f5aa609ec0a0c0e7"
+					}
+				]
+			},
 			"source_sha256": "b19d38f7e11ef58983cf2185d8b2097dffeda387d1c4ed8ed0e45ab022e4c189",
 			"licence_file": "LICENSE"
 		},
@@ -57,6 +84,27 @@
 			],
 			"keycode_convention": "iso",
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"extension": {
+				"id": "ergopti",
+				"name": "Ergopti",
+				"version": "2.2.2",
+				"description": {},
+				"sha256": "ae326152e1c620cf46a29f58c994e6f79bd8eadff162ce2b6ff8ac3f48b58cb5",
+				"files": [
+					{
+						"path": "ergopti.keylayout",
+						"file": "ergopti/ergopti.keylayout",
+						"size": 46791,
+						"sha256": "91764c4f3879f8046a3198354259cb4ed324b28973d47b6e2cd0eb1c576a0e83"
+					},
+					{
+						"path": "manifest.toml",
+						"file": "ergopti/manifest.toml",
+						"size": 136,
+						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+					}
+				]
+			},
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -117,6 +165,27 @@
 			],
 			"keycode_convention": "iso",
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"extension": {
+				"id": "ergopti",
+				"name": "Ergopti",
+				"version": "2.2.2",
+				"description": {},
+				"sha256": "2dd9d9aa0affc1937d4bd8194e46187c70d37e070468438f19b3dc042fc1d540",
+				"files": [
+					{
+						"path": "ergopti_ansi.keylayout",
+						"file": "ergopti_ansi/ergopti_ansi.keylayout",
+						"size": 46796,
+						"sha256": "c8b3c7a7e51e1622b305d35628bbc4f2766b3be0b9288ce24b06812541e4d87c"
+					},
+					{
+						"path": "manifest.toml",
+						"file": "ergopti/manifest.toml",
+						"size": 136,
+						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+					}
+				]
+			},
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -177,6 +246,27 @@
 			],
 			"keycode_convention": "iso",
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"extension": {
+				"id": "ergopti",
+				"name": "Ergopti",
+				"version": "2.2.2",
+				"description": {},
+				"sha256": "746d0571f72bdf1613f4ceeedcd399a41ce2bde3fefecb8f045e3e2f5f369ac3",
+				"files": [
+					{
+						"path": "ergopti_plus.keylayout",
+						"file": "ergopti_plus/ergopti_plus.keylayout",
+						"size": 46930,
+						"sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059"
+					},
+					{
+						"path": "manifest.toml",
+						"file": "ergopti/manifest.toml",
+						"size": 136,
+						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+					}
+				]
+			},
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -237,6 +327,27 @@
 			],
 			"keycode_convention": "iso",
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"extension": {
+				"id": "ergopti",
+				"name": "Ergopti",
+				"version": "2.2.2",
+				"description": {},
+				"sha256": "9233f11c99552cfa2e376a46567cdc1151658b358264e45012e267102fb30481",
+				"files": [
+					{
+						"path": "ergopti_plus_ansi.keylayout",
+						"file": "ergopti_plus_ansi/ergopti_plus_ansi.keylayout",
+						"size": 46935,
+						"sha256": "955898fa3afde201ca7d6f68b9ee22675723e6ce68f773e162d9d43336be5757"
+					},
+					{
+						"path": "manifest.toml",
+						"file": "ergopti/manifest.toml",
+						"size": 136,
+						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+					}
+				]
+			},
 			"xkb": {
 				"keysym_overrides": [
 					[

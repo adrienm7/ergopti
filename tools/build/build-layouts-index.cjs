@@ -73,7 +73,7 @@ const REQUIRED_KEYS = [
 	'platforms',
 	'keycode_convention'
 ];
-const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb'];
+const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb', 'extension_source'];
 const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
 const KEYSYM_RE = /^[A-Za-z0-9_]+$/;
 
@@ -158,6 +158,9 @@ function validateMeta(id, meta, fileExists) {
 	}
 	if ('source_sha256' in meta && !(typeof meta.source_sha256 === 'string' && SHA256_RE.test(meta.source_sha256))) {
 		errors.push(`${id}: source_sha256 must be 64 lowercase hex digits`);
+	}
+	if ('extension_source' in meta && !(typeof meta.extension_source === 'string' && ID_RE.test(meta.extension_source))) {
+		errors.push(`${id}: extension_source must identify a registry folder`);
 	}
 	if ('xkb' in meta) validateXkb(errors, id, meta.xkb);
 	if ('licence_file' in meta) {
@@ -277,6 +280,68 @@ function keyboardName(text) {
 // ==========================
 
 /**
+ * Inventories the existing extension format inside one layout folder.
+ * The digest identifies immutable content; installing it never stores activation.
+ * @param {string} folder - Layout folder.
+ * @param {string} id - Registry layout id.
+ * @param {object} meta - Layout metadata, including an optional licence file.
+ * @returns {object} Extension metadata and verified file descriptors.
+ */
+function buildExtension(folder, id, meta) {
+	const sourceId = meta.extension_source || id;
+	if (!ID_RE.test(sourceId)) throw new Error(`${id}: invalid extension source`);
+	const sourceFolder = path.join(path.dirname(folder), sourceId);
+	const manifestPath = path.join(sourceFolder, 'manifest.toml');
+	const manifest = parseToml(fs.readFileSync(manifestPath, 'utf8'));
+	const extension = manifest.extension;
+	if (!extension || extension.id !== sourceId ||
+		!isNonEmptyString(extension.name) || !VERSION_RE.test(extension.version || '')) {
+		throw new Error(`${id}: manifest.toml requires an extension id, name and semantic version`);
+	}
+	const description = extension.description || {};
+	if (typeof description !== 'object' || Array.isArray(description) ||
+		Object.values(description).some((text) => typeof text !== 'string')) {
+		throw new Error(`${id}: invalid extension descriptions in manifest.toml`);
+	}
+	const relativePaths = ['manifest.toml', `${id}.keylayout`];
+	if (meta.licence_file) {
+		if (!/^[A-Za-z0-9_-]+(?:\.txt)?$/.test(meta.licence_file)) {
+			throw new Error(`${id}: extension licence_file must be a plain text filename`);
+		}
+		relativePaths.push(meta.licence_file);
+	}
+	for (const category of ['hotstrings', 'shortcuts']) {
+		const directory = path.join(sourceFolder, category);
+		if (!fs.existsSync(directory)) continue;
+		if (!fs.lstatSync(directory).isDirectory() || fs.lstatSync(directory).isSymbolicLink()) {
+			throw new Error(`${id}: ${category} must be a real extension directory`);
+		}
+		for (const item of fs.readdirSync(directory, { withFileTypes: true })) {
+			const supported = category === 'hotstrings'
+				? /^[a-z][a-z0-9_-]*\.toml$/.test(item.name)
+				: /^menu\.(ahk|lua)$/.test(item.name);
+			if (!item.isFile() || !supported) throw new Error(`${id}: unsupported extension file ${category}/${item.name}`);
+			relativePaths.push(`${category}/${item.name}`);
+		}
+	}
+	const files = relativePaths.sort().map((relative) => {
+		const ownFile = relative === `${id}.keylayout` || relative === meta.licence_file;
+		const filename = path.join(ownFile ? folder : sourceFolder, ...relative.split('/'));
+		if (!fs.lstatSync(filename).isFile() || fs.lstatSync(filename).isSymbolicLink()) {
+			throw new Error(`${id}: extension files must be regular files: ${relative}`);
+		}
+		const bytes = fs.readFileSync(filename);
+		return { path: relative, file: `${ownFile ? id : sourceId}/${relative}`, size: bytes.length,
+			sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+	});
+	if (files.reduce((sum, file) => sum + file.size, 0) > LAYOUT_DEFAULTS.registry.max_file_bytes) {
+		throw new Error(`${id}: extension exceeds the registry download bound`);
+	}
+	return { id: extension.id, name: extension.name, version: extension.version, description,
+		sha256: crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex'), files };
+}
+
+/**
  * Reads, validates and indexes the registry folder.
  * @param {string} registryDir - Absolute registry folder.
  * @returns {{index: object, text: string}} The index and its serialised form.
@@ -290,6 +355,7 @@ function buildIndex(registryDir) {
 	const metas = new Map();
 	const errors = [];
 	const files = new Map();
+	const extensions = new Map();
 	for (const id of ids) {
 		const folder = path.join(registryDir, id);
 		const metaPath = path.join(folder, 'meta.toml');
@@ -314,6 +380,11 @@ function buildIndex(registryDir) {
 		errors.push(...validateKeylayout(id, bytes));
 		metas.set(id, meta);
 		files.set(id, bytes);
+		try {
+			extensions.set(id, buildExtension(folder, id, meta));
+		} catch (err) {
+			errors.push(`${id}: ${err.message}`);
+		}
 	}
 	errors.push(...validateRegistry(metas));
 	if (ids.length === 0) errors.push('the registry folder holds no layout');
@@ -340,7 +411,8 @@ function buildIndex(registryDir) {
 			variants: [...meta.variants].sort(),
 			platforms: [...meta.platforms].sort(),
 			keycode_convention: meta.keycode_convention,
-			source_url: meta.source_url
+			source_url: meta.source_url,
+			extension: extensions.get(id)
 		};
 		if (meta.source_sha256) entry.source_sha256 = meta.source_sha256;
 		if (meta.licence_file) entry.licence_file = meta.licence_file;

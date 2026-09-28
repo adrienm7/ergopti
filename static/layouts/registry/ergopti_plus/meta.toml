@@ -8,6 +8,7 @@ name = "Ergopti+"
 # Catalogue family metadata; geometry hotstrings remain an independent
 # opt-in choice on every layout.
 family = "ergopti"
+extension_source = "ergopti"
 version = "2.2.2"
 author = "Adrien Moyaux"
 licence = "MIT"
