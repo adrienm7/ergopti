@@ -32,6 +32,7 @@ local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 local TomlCodec = require("toml_codec")
+local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
 local ManifestReader = require("infra.manifest_reader")
 
@@ -338,15 +339,15 @@ local function save_overrides(overrides)
 	table.sort(names)
 
 	--- Emits one TOML table, or nothing when it carries no override.
-	--- @param header string
+	--- @param segments table Literal category and optional section identities.
 	--- @param values table
-	local function emit(header, values)
+	local function emit(segments, values)
 		if values.delay == nil and values.color == nil and values.show_tooltip == nil
 			and values.priority == nil
 		then
 			return
 		end
-		lines[#lines + 1] = "[" .. header .. "]"
+		lines[#lines + 1] = "[" .. KeyPath.render(segments) .. "]"
 		if values.delay ~= nil then
 			lines[#lines + 1] = string.format("delay = %s", tostring(values.delay))
 		end
@@ -369,12 +370,12 @@ local function save_overrides(overrides)
 
 	for _, category in ipairs(names) do
 		local entry = overrides[category]
-		emit(category, entry)
+		emit({ category }, entry)
 		local sections = {}
 		for name in pairs(entry.sections or {}) do sections[#sections + 1] = name end
 		table.sort(sections)
 		for _, name in ipairs(sections) do
-			emit(category .. "." .. name, entry.sections[name])
+			emit({ category, name }, entry.sections[name])
 		end
 	end
 
