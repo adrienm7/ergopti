@@ -79,6 +79,14 @@ function M.new(options)
 		if not Preferences.admit() then return Preferences.release(owner) end
 		return true
 	end
+	--- Undoes the last commit under the same preference ownership as apply().
+	function owner.revert()
+		if not Preferences.acquire(owner) then return false, "metrics configuration is already owned" end
+		local reverted, detail = transaction.revert()
+		if not transaction.pending() then Preferences.release(owner) end
+		return reverted, detail
+	end
+	function owner.release() transaction.release() end
 	return owner
 end
 
@@ -101,6 +109,16 @@ function M.apply(mode, is_paused)
 	if committed then Logger.info(LOG, "Metrics scope '%s' completed.", mode)
 	else Logger.error(LOG, "Metrics scope '%s' refused: %s.", mode, tostring(detail)) end
 	return committed, detail
+end
+
+--- The metrics participant of a composed scope, bound to the retained owner.
+--- @param is_paused function Live pause getter.
+--- @return table participant See config_scope_composition.
+function M.participant(is_paused)
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply(mode, is_paused) end,
+		owner = function() return _owner end,
+	})
 end
 
 return M

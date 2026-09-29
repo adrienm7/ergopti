@@ -3347,13 +3347,31 @@ local function _build_configuration(ctx)
 		end
 	end
 
+	-- The global restore composes every category's own scope owner: one
+	-- default-No question, then all of them or none of them.
+	local function apply_global_scope(mode)
+		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.configuration.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local GlobalScope = require("infra.global_scope")
+		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
+		-- « Reverted » is only said when it is true; a pending rollback is an
+		-- ERROR the composition logs, which the error window already reports.
+		if not committed and report.reverted ~= false then
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+
 	-- Every row is `type = "command"` in the manifest, and so is the separator
 	-- between them: labels, order and spacing declared once, with this driver
 	-- supplying only what each row does.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["restore_recommended"] = call_ctx("on_reset_defaults"),
+		["restore_recommended"] = function() return apply_global_scope("recommended") end,
 		["start_at_login"] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
@@ -3826,7 +3844,6 @@ end
 ---   verbose        boolean  Verbose flag.
 ---   on_quit        function Called when Quit is selected.
 ---   webview        table    Webview manager; opens the folders editor.
----   on_reset_defaults function (optional) Reset.
 ---   on_set_log_level function (optional) Log level change.
 ---   on_open_logs   function (optional) Open logs dir.
 ---   on_healthcheck function (optional) Launch healthcheck.
