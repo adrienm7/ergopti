@@ -592,9 +592,16 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		if source_status == "ok" then
 			local decoded_ok, decoded = pcall(TomlCodec.decode, source)
 			if not decoded_ok or type(decoded) ~= "table" then
-				Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
+				if not expected_source then
+					Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or use Tap-Holds › Restore recommended values, which backs it up and rewrites it.",
+						user_config_path)
+					return false
+				end
+				-- A scope already verified a backup of these exact bytes, so its
+				-- candidate may replace them: the only menu path that repairs the file.
+				Logger.warn(LOG, "Rewriting the unparseable user config at '%s'; its exact bytes are in the scope backup.",
 					user_config_path)
-				return false
+				decoded = {}
 			end
 			document = decoded
 		elseif source_status ~= "absent" then

@@ -59,6 +59,22 @@ helpers.describe("remap configuration under a scope transaction", function()
 		end)
 	end)
 
+	helpers.it("rewrites an unparseable file only over the exact bytes a scope backed up", function()
+		local corrupt = "[tap_holds\nenabled = true\n"
+		with_disk(corrupt, function(config, disk)
+			local state = config.build_recommended_state(KEYS, COMBOS)
+			helpers.assert_eq(config.save_user_config(state, "remap.toml", false), false,
+				"an ordinary save still refuses the unparseable file")
+			helpers.assert_eq(disk.writes, 0)
+			helpers.assert_true(config.save_user_config(state, "remap.toml", false,
+				{ status = "ok", content = corrupt }))
+			helpers.assert_eq(disk.writes, 1)
+			local loaded, status = config.load_user_config(KEYS, COMBOS, "remap.toml")
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(loaded.tap_hold_config, state.tap_hold_config)
+		end)
+	end)
+
 	helpers.it("refuses a file created after an absent backup", function()
 		with_disk("[other]\nvalue = 1\n", function(config, disk)
 			local state = config.build_default_state(KEYS, COMBOS)
