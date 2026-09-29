@@ -180,6 +180,20 @@ helpers.describe("updater.check_session: the update-check window's session", fun
 		helpers.assert_eq(ctx.closes, 1)
 	end)
 
+	helpers.it("a retired session shows and does nothing more", function()
+		local ctx = build()
+		ctx.session.start()
+		local pushed = #ctx.pushed
+		ctx.session.retire()
+		ctx.checks[1].answer(AVAILABLE)
+		ctx.session.on_message("ready")
+		ctx.session.on_message({ action = "close" })
+		helpers.assert_eq(#ctx.pushed, pushed, "a late answer of a retired session is not shown")
+		helpers.assert_eq(ctx.closes, 0, "a retired session's page acts on nothing")
+		helpers.assert_eq(ctx.session.start(), false, "a retired session starts no check")
+		helpers.assert_eq(#ctx.checks, 1)
+	end)
+
 	helpers.it("refuses to start without every port", function()
 		local ok = pcall(load_session().new, { push = function() return true end })
 		helpers.assert_eq(ok, false, "a missing port is an error, not a silent no-op")
