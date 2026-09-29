@@ -184,6 +184,7 @@ local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose ter
 local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
+local _bulk_guardian_waiters = {} -- Bulk terminal -> saver, run when the guardian is not ready
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
 local _ke_variables_recovery_observer = nil -- Exact callback owned by this remap lifecycle
@@ -1684,6 +1685,54 @@ local function guardian_regeneration_wait_is_current(wait)
 		and is_current_lifecycle(wait.epoch)
 end
 
+--- Saves every bulk settings edit retained by one guardian wait. The wait polls
+--- without a deadline, so a bulk terminal left in it pinned the transaction
+--- and refused every later edit, disable and reload for the whole session.
+--- Each terminal leaves the retained context before its saver runs, so the
+--- regeneration stays queued and rebuilds once from the settings persisted at
+--- readiness, and the saved edit never sees a second terminal.
+--- @param wait table Exact bundled regeneration wait.
+--- @param wait_status string Non-ready guardian status or probe failure.
+local function release_bulk_guardian_waiters(wait, wait_status)
+	local savers = {}
+	for _, context in ipairs(wait.contexts or {}) do
+		local kept = {}
+		for _, callback in ipairs(context.callbacks or {}) do
+			local saver = _bulk_guardian_waiters[callback]
+			if saver then
+				_bulk_guardian_waiters[callback] = nil
+				savers[#savers + 1] = saver
+			else
+				kept[#kept + 1] = callback
+			end
+		end
+		context.callbacks = kept
+	end
+	for _, saver in ipairs(savers) do
+		invoke_public_callback("bulk settings guardian wait", saver, wait_status)
+	end
+end
+
+--- Detaches one bulk terminal from a guardian wait that already answered not
+--- ready: joining it would otherwise wait for the next poll's answer.
+--- @param callback function Exact bulk terminal handed to M.regenerate().
+--- @return string|nil wait_status The status it waits on, nil when not retained.
+local function detach_bulk_guardian_waiter(callback)
+	local wait = _guardian_regeneration_wait
+	if not wait or not guardian_regeneration_wait_is_current(wait)
+		or wait.last_wait_status == nil then return nil end
+	for _, context in ipairs(wait.contexts) do
+		for index, retained in ipairs(context.callbacks or {}) do
+			if retained == callback then
+				table.remove(context.callbacks, index)
+				_bulk_guardian_waiters[callback] = nil
+				return wait.last_wait_status
+			end
+		end
+	end
+	return nil
+end
+
 --- Moves callbacks from an equivalent duplicate context into the retained one.
 --- @param retained table Existing regeneration context.
 --- @param duplicate table Newly created equivalent context.
@@ -1910,6 +1959,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 			tostring(status), tostring(probe_error or reason))
 		schedule_guardian_regeneration_poll(wait, status or probe_error or reason)
 		release_lease_less_resume_waiters(wait, wait_status)
+		release_bulk_guardian_waiters(wait, wait_status)
 	end
 
 	local observation_timeout_sec = LEASE_GUARDIAN_PROBE_TIMEOUT_SEC
@@ -3506,9 +3556,45 @@ local function finish_bulk_settings_callback(transaction, ok, reason)
 	)
 end
 
+--- Settles a bulk transaction whose settings are persisted while their deploy
+--- waits on a state only the user changes: « Ergopti uses Karabiner » off, or
+--- a remap guardian that is not ready. That later deploy builds from the
+--- persisted settings, so nothing is left to compensate and no sibling edit,
+--- disable or reload may stay refused behind this transaction.
+--- @param transaction table Active bulk transaction.
+--- @param reason string Stable `persisted-…` terminal detail.
+--- @param deploys_when string Diagnostic clause naming what the deploy waits on.
+local function settle_bulk_settings_saved_for_later(transaction, reason, deploys_when)
+	if _bulk_settings_transaction ~= transaction then return end
+	_bulk_settings_transaction = nil
+	if transaction.failure_reason ~= nil then
+		-- A saved inverse restores the prior settings; its candidate still failed.
+		Logger.info(LOG, "%s inverse persisted; it deploys %s (%s).",
+			transaction.label, deploys_when, reason)
+		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+		return
+	end
+	Logger.info(LOG, "%s persisted; it deploys %s (%s).", transaction.label, deploys_when, reason)
+	finish_bulk_settings_callback(transaction, true, reason)
+end
+
+--- Settles a bulk transaction whose regeneration waits behind a guardian that
+--- is not ready, keeping that regeneration queued for the eventual deploy.
+--- @param transaction table Active bulk transaction.
+--- @param wait_status string Non-ready guardian status or probe failure.
+local function save_bulk_settings_for_guardian(transaction, wait_status)
+	settle_bulk_settings_saved_for_later(
+		transaction,
+		"persisted-guardian-" .. tostring(wait_status),
+		"once the remap guardian is ready"
+	)
+end
+
 --- Dispatches regeneration and requires both exact request acceptance and one
 --- exact terminal callback. Synchronous callbacks are held until the request's
 --- return value is known, so a callback followed by false/nil cannot look valid.
+--- A regeneration retained behind a guardian that is not ready settles the
+--- transaction as saved instead: that wait has no deadline.
 --- @param transaction table Active bulk transaction.
 --- @param label string Stable regeneration boundary label.
 --- @param on_terminal function Callback fn(ok, reason).
@@ -3523,8 +3609,11 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 	local dispatching = true
 	local pending_ok = false
 	local pending_reason = nil
+	local saved_status = nil
 
-	local function handle_terminal(ok, reason)
+	local handle_terminal
+	handle_terminal = function(ok, reason)
+		_bulk_guardian_waiters[handle_terminal] = nil
 		if callback_seen then
 			Logger.warn(LOG, "Duplicate %s callback ignored.", tostring(label))
 			return
@@ -3537,19 +3626,39 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 		end
 		on_terminal(ok == true, reason)
 	end
+	local function save_for_guardian(wait_status)
+		if callback_seen then return end
+		callback_seen = true
+		if dispatching then
+			saved_status = wait_status
+			return
+		end
+		save_bulk_settings_for_guardian(transaction, wait_status)
+	end
+	_bulk_guardian_waiters[handle_terminal] = save_for_guardian
 
 	local call_ok, accepted_or_err = xpcall(function()
 		return M.regenerate(handle_terminal)
 	end, debug.traceback)
 	dispatching = false
 	if not call_ok or accepted_or_err ~= true then
+		_bulk_guardian_waiters[handle_terminal] = nil
 		callback_seen = true
 		local reason = call_ok and "regeneration-request-refused" or "regeneration-request-raised"
 		Logger.error(LOG, "%s failed: %s.", tostring(label), tostring(accepted_or_err))
 		on_terminal(false, reason)
 		return false
 	end
-	if callback_seen then on_terminal(pending_ok, pending_reason) end
+	if saved_status ~= nil then
+		save_bulk_settings_for_guardian(transaction, saved_status)
+		return true
+	end
+	if callback_seen then
+		on_terminal(pending_ok, pending_reason)
+		return true
+	end
+	local wait_status = detach_bulk_guardian_waiter(handle_terminal)
+	if wait_status ~= nil then save_for_guardian(wait_status) end
 	return true
 end
 
@@ -3763,9 +3872,11 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 	-- that can never settle and that locks the switch. The next enable builds
 	-- its rules from the settings persisted here.
 	if _state.enabled ~= true then
-		_bulk_settings_transaction = nil
-		Logger.info(LOG, "%s persisted; it deploys when Ergopti uses Karabiner again.", label)
-		finish_bulk_settings_callback(transaction, true, "persisted-integration-off")
+		settle_bulk_settings_saved_for_later(
+			transaction,
+			"persisted-integration-off",
+			"when Ergopti uses Karabiner again"
+		)
 		return true
 	end
 

@@ -208,6 +208,43 @@ local function with_remap(options, body)
 		load_tap_hold_keys = function() return { { id = "left_shift" } } end,
 		load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
 		compute_non_canonical_combos = function() return {} end,
+		-- The bulk commands build their candidate from these presets.
+		build_recommended_state = function(keys, combos)
+			local state = {
+				tap_holds_enabled = true,
+				tap_hold_config = {},
+				mod_combos_config = {},
+				tap_hold_timeout_ms = 200,
+				sticky_timeout_ms = 1000,
+				simultaneous_threshold_ms = 50,
+				combo_symmetric = false,
+			}
+			for _, key in ipairs(keys or {}) do
+				state.tap_hold_config[key.id] = { tap = "escape", hold = "left_shift" }
+			end
+			for _, combo in ipairs(combos or {}) do
+				state.mod_combos_config[combo.id] = { tap = "none", hold = "none", combo = "none" }
+			end
+			return state
+		end,
+		build_default_state = function(keys, combos)
+			local state = {
+				tap_holds_enabled = true,
+				tap_hold_config = {},
+				mod_combos_config = {},
+				tap_hold_timeout_ms = 200,
+				sticky_timeout_ms = 1000,
+				simultaneous_threshold_ms = 50,
+				combo_symmetric = false,
+			}
+			for _, key in ipairs(keys or {}) do
+				state.tap_hold_config[key.id] = { tap = "none", hold = "none" }
+			end
+			for _, combo in ipairs(combos or {}) do
+				state.mod_combos_config[combo.id] = { tap = "none", hold = "none", combo = "none" }
+			end
+			return state
+		end,
 		load_user_config = function()
 			return {
 				enabled = options.enabled ~= false,
