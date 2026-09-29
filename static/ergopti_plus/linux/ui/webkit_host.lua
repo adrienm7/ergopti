@@ -60,6 +60,7 @@ M.APP_BRIDGES = {
 	personal_info_editor     = "hsPersonalInfo",
 	prompt_editor            = "prompt_bridge",
 	token_prompt             = "token_bridge",
+	update_check             = "update_check_bridge",
 }
 
 --- The canonical bridge-name catalogue, derived from page ownership above.

@@ -142,14 +142,17 @@ helpers.describe("updater restart: the tray tells and acts", function()
 		return fake
 	end
 
-	helpers.it("hands a manual check's answer to the daemon", function()
+	helpers.it("hands a manual check's answer to the daemon when no window can show it", function()
 		local fake = fake_updater("idle")
 		fake.check_for_updates = function(_, callback) callback(false, nil, nil); return true end
 		local told = nil
+		local saved = package.loaded["ui.update_check.bridge"]
+		package.loaded["ui.update_check.bridge"] = { open = function() return false end }
 		local rows = updates_rows(fake, { on_update_checked = function(...) told = { ... } end })
 		for _, row in ipairs(rows) do
 			if row.title == "check" then row.fn() end
 		end
+		package.loaded["ui.update_check.bridge"] = saved
 		helpers.assert_true(told ~= nil, "the daemon is told, and redraws the menu")
 		helpers.assert_eq(told[1], false)
 	end)
