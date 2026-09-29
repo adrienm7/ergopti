@@ -23,29 +23,39 @@ local OWNED_MODULES = {
 local ROW = { mlx = 1, ollama = 2, api = 3 }
 
 --- Builds a checker double whose install stays pending until finish().
+--- The real Ollama checker delivers its completions before releasing its
+--- pause-owner intent, so a check started from inside one is refused; the
+--- MLX checker answers a ready runtime before acquiring any intent.
 --- @param installed boolean Whether the runtime exists at the start.
+--- @param refuses_while_completing boolean Models the Ollama checker's refusal.
 --- @return table checker
-local function new_checker(installed)
-	local checker = { installed = installed, running = false, installs = 0, waiters = {} }
+local function new_checker(installed, refuses_while_completing)
+	local checker = {
+		installed = installed, running = false, completing = false,
+		installs = 0, refusals = 0, waiters = {},
+	}
 	local function settle_or_queue(on_complete)
-		if type(on_complete) ~= "function" then return end
+		if refuses_while_completing and checker.completing then
+			checker.refusals = checker.refusals + 1
+			return false
+		end
+		if type(on_complete) ~= "function" then return true end
 		if checker.installed and not checker.running then
 			on_complete(true)
 		else
 			checker.waiters[#checker.waiters + 1] = on_complete
 		end
+		return true
 	end
 	checker.check_and_install_deps = function(on_complete)
-		settle_or_queue(on_complete)
-		return true
+		return settle_or_queue(on_complete)
 	end
 	checker.install_for_selection = function(on_complete)
 		if not checker.installed and not checker.running then
 			checker.installs = checker.installs + 1
 			checker.running = true
 		end
-		settle_or_queue(on_complete)
-		return true
+		return settle_or_queue(on_complete)
 	end
 	checker.runtime_available = function() return checker.installed end
 	checker.runtime_installed = function() return checker.installed end
@@ -55,7 +65,9 @@ local function new_checker(installed)
 		if ok then checker.installed = true end
 		local waiters = checker.waiters
 		checker.waiters = {}
+		checker.completing = true
 		for _, waiter in ipairs(waiters) do waiter(ok) end
+		checker.completing = false
 	end
 	return checker
 end
@@ -71,7 +83,7 @@ local function with_rows(opts, scenario)
 			dialogs = 0,
 			notices = {},
 			mlx = new_checker(opts.mlx_installed ~= false),
-			ollama = new_checker(opts.ollama_installed ~= false),
+			ollama = new_checker(opts.ollama_installed ~= false, true),
 		}
 		local state = {
 			llm_backend = opts.backend,

@@ -266,6 +266,10 @@ end
 --- @param backend string Either "mlx" or "ollama".
 --- @param select_runtime function Selection entry receiving the terminal callback.
 --- @param switch function Starts the backend transition once the runtime exists.
+---   It receives true: the install just settled the runtime (the Ollama one
+---   also started its daemon), so the transition must not select it again —
+---   the checker still holds its intent while delivering this completion and
+---   would refuse a nested check.
 --- @return boolean accepted True when the install (or its offer) was accepted.
 local function switch_after_install(backend, select_runtime, switch)
 	local generation = claim_runtime_selection()
@@ -287,7 +291,7 @@ local function switch_after_install(backend, select_runtime, switch)
 			return false
 		end
 		Logger.info(LOG, "The %s runtime is installed; switching the backend now.", tostring(backend))
-		return switch() == true
+		return switch(true) == true
 	end
 	local accepted = invoke_backend_boundary(backend .. " runtime selection",
 		select_runtime, on_installed)
@@ -594,10 +598,12 @@ function M.build(ctx)
 				if runtime_install_offer.is_installed("mlx") then return true end
 				return check_backend_deps("mlx")
 			end
-			local function activate_mlx()
+			local function activate_mlx(runtime_settled)
 				Logger.info(LOG, "Activating MLX backend…")
 				local committed = publish_backend("mlx", function(debt)
-					if check_backend_deps("mlx") ~= true then return false end
+					if runtime_settled ~= true and check_backend_deps("mlx") ~= true then
+						return false
+					end
 					if not publish_backend_label(debt, "mlx") then return false end
 					local model_ok, target_model = resolve_backend_model(
 						state.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_mlx or "")
@@ -641,10 +647,12 @@ function M.build(ctx)
 				if runtime_install_offer.is_installed("ollama") then return true end
 				return check_backend_deps("ollama")
 			end
-			local function activate_ollama()
+			local function activate_ollama(runtime_settled)
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
 				local function finish_ollama_switch(debt)
-					if check_backend_deps("ollama") ~= true then return false end
+					if runtime_settled ~= true and check_backend_deps("ollama") ~= true then
+						return false
+					end
 					if not publish_backend_label(debt, "ollama") then return false end
 					local model_ok, target_model = resolve_backend_model(
 						state.llm_model_ollama or llm_mod.DEFAULT_STATE.llm_model_ollama or "")
