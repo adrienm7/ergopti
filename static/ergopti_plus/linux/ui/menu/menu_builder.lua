@@ -3320,19 +3320,6 @@ local function _build_configuration(ctx)
 			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		["uninstall"] = function()
-			require("ui.menu.uninstall").run({
-				title = i18n_safe("menu.global.uninstall"),
-				confirmation = i18n_safe("dialog.uninstall.confirm"),
-				failure = i18n_safe("dialog.uninstall.failed"),
-				confirm = function(title, text)
-					return ask_yes_no(title, zenity_plain(text),
-						i18n_safe("button.remove"), i18n_safe("button.cancel"))
-				end,
-				fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
-				quit = call_ctx("on_quit"),
-			})
-		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- opens the shared review page through the driver's WebView owner.
 		["clean_unused_keys"] = function()
@@ -3549,11 +3536,41 @@ end
 
 M._about_update_rows = _about_update_rows
 
---- Builds the about item.
+--- The action of the Uninstall row: the confirmed removal transaction of
+--- ui/menu/uninstall.lua, which quits the daemon through ctx.on_quit once the
+--- removal worker owns the files.
+--- @param ctx table Menu context.
+--- @return function
+local function _uninstall_command(ctx)
+	return function()
+		require("ui.menu.uninstall").run({
+			title = i18n_safe("menu.global.uninstall"),
+			confirmation = i18n_safe("dialog.uninstall.confirm"),
+			failure = i18n_safe("dialog.uninstall.failed"),
+			confirm = function(title, text)
+				return ask_yes_no(title, zenity_plain(text),
+					i18n_safe("button.remove"), i18n_safe("button.cancel"))
+			end,
+			fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
+			quit = function()
+				if type(ctx.on_quit) ~= "function" then
+					Logger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")
+					return
+				end
+				ctx.on_quit()
+			end,
+		})
+	end
+end
+
+--- Builds the about item: the updater block, Versions and its GitHub page, then
+--- Uninstall after a separator. Uninstall sat at the bottom of Configuration
+--- until 2026-09, where it read as one more setting.
 local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		["uninstall"] = _uninstall_command(ctx),
 		-- Opens the release notes. It used to log one line to a file the user
 		-- never sees and call that an About box — while ui/changelog/ was written,
 		-- registered in webview_manager's bridge table and given a window title,

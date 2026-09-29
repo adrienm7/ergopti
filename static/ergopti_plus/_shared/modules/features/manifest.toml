@@ -4069,8 +4069,8 @@ platforms = ["ahk", "hs", "linux"]
 # with the subscribed channel and listing every channel of the shared
 # update-channel registry, right before the check row, the check frequency (a
 # `list`, because its rows come from the registry and the updater state), then
-# Versions and its GitHub page. Linux had its updater as a separate top-level
-# "Updates" entry until 2026-09.
+# Versions and its GitHub page, and last, after a separator, Uninstall. Linux
+# had its updater as a separate top-level "Updates" entry until 2026-09.
 [[menu.about_menu]]
 type = "list"
 id = "about_updates"
@@ -4087,6 +4087,17 @@ i18n = "menu.about.changelog"
 type = "command"
 id = "about_releases_page"
 i18n = "menu.about.open_releases_page"
+
+# Removing Ergopti closes the submenu that names the installed build, set apart
+# by a separator so it is never clicked on the way to Versions. It sat at the
+# bottom of Configuration until 2026-09, where it read as one more setting.
+[[menu.about_menu]]
+type = "---"
+
+[[menu.about_menu]]
+type = "command"
+id = "uninstall"
+i18n = "menu.global.uninstall"
 
 # The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
 # and model of System 1 (fast triage) and System 2 (the actions), and the
@@ -4185,14 +4196,6 @@ type = "check"
 id = "start_at_login"
 i18n = "menu.global.start_at_login"
 checked_when = ["start_at_login_enabled"]
-
-[[menu.configuration_menu]]
-type = "---"
-
-[[menu.configuration_menu]]
-type = "command"
-id = "uninstall"
-i18n = "menu.global.uninstall"
 
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.

@@ -47,7 +47,7 @@ local function build(owner)
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
 	require("infra.i18n").get = function(key) return catalogue[key] or key end
-	local item = About.build({ channel_owner = owner })
+	local item = About.build({ channel_owner = owner }, { uninstall = function() end })
 	return item.submenu, catalogue
 end
 

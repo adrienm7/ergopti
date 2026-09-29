@@ -326,6 +326,14 @@
 			"type": "command",
 			"id": "about_releases_page",
 			"i18n": "menu.about.open_releases_page"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "uninstall",
+			"i18n": "menu.global.uninstall"
 		}
 	],
 	"agent_menu": [
@@ -402,14 +410,6 @@
 			"checked_when": [
 				"start_at_login_enabled"
 			]
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "command",
-			"id": "uninstall",
-			"i18n": "menu.global.uninstall"
 		}
 	],
 	"debug_menu": [

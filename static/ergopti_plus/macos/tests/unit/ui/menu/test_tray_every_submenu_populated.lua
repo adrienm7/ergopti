@@ -322,8 +322,15 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			CONFIG_FOLDER,
 			i18n.get("menu.global.setup_wizard"),
 			i18n.get("menu.global.start_at_login"),
-			"-",
-			i18n.get("menu.global.uninstall"),
 		}, " | "))
+	end)
+
+	-- Uninstall moved from the bottom of Configuration to the bottom of the
+	-- Version / Updates submenu, after a separator.
+	helpers.it("about: Uninstall closes the submenu, after a separator", function()
+		local rows = top_submenu("menu.about.title")
+		helpers.assert_true(type(rows) == "table" and #rows >= 2, "the tray must carry the About submenu")
+		helpers.assert_eq(rows[#rows].title, require("infra.i18n").get("menu.global.uninstall"))
+		helpers.assert_eq(rows[#rows - 1].title, "-", "a separator sets Uninstall apart")
 	end)
 end)

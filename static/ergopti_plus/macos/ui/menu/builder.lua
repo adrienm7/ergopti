@@ -605,7 +605,6 @@ function M.generate(ctx, menu_mods, actions)
 				["clean_unused_keys"]   = clean,
 				["config_folder"]       = actions.open_paths,
 				["setup_wizard"]        = actions.show_setup_wizard,
-				["uninstall"]           = actions.uninstall,
 				["start_at_login"]      = actions.start_at_login,
 			}
 			cfg_ctx.state_getters = {}
@@ -650,7 +649,8 @@ function M.generate(ctx, menu_mods, actions)
 				Logger.warn(LOG, "About module missing — its row is not drawn.")
 				return {}
 			end
-			local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+			-- The actions carry the uninstall transaction, whose row closes it.
+			local ok_a, about_item = pcall(menu_mods.about.build, ctx, actions)
 			if not ok_a then
 				Logger.error(LOG, "Error building the About submenu: %s.", tostring(about_item))
 				return {}
