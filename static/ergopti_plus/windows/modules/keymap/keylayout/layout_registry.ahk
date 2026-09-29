@@ -404,19 +404,23 @@ LayoutRegistry_DeclaredMagicKey(ExtensionId, Packs, BundledDir) {
 
 /**
  * The extension of the layout that types, whose declaration names the magic key.
- * An emulated registry layout is the one it installed; with none, the built-in
- * Ergopti emulation when it is on; with neither, the user's own OS layout,
- * which declares nothing. A damaged installed record is logged and declares
- * nothing: the emulation reports the same record on its own boot path.
- * @param {String} SelectedId - Emulated registry layout id, "" for none.
- * @param {Boolean} ErgoptiBase - Whether the built-in Ergopti emulation is on.
+ * The emulation types only while its base layer (ErgoptiBase) is on: then a
+ * selected registry layout is the one it installed and, with none selected,
+ * the built-in Ergopti layout. With the base layer off the user types on their
+ * own OS layout, which declares nothing, whatever layout stays selected. A
+ * damaged installed record is logged and declares nothing: the emulation
+ * reports the same record on its own boot path.
+ * @param {String} SelectedId - Selected registry layout id, "" for none.
+ * @param {Boolean} ErgoptiBase - Whether the emulation's base layer is on.
  * @param {String} ErgoptiId - Registry id of the built-in Ergopti layout.
  * @param {Func} ReadInstalled - Returns the installed-layouts record.
  * @returns {String} Extension id, or "" when no layout extension types.
  */
 LayoutRegistry_ActiveLayoutExtension(SelectedId, ErgoptiBase, ErgoptiId, ReadInstalled) {
+	if !ErgoptiBase
+		return ""
 	if SelectedId == ""
-		return ErgoptiBase ? ErgoptiId : ""
+		return ErgoptiId
 	try {
 		Installed := ReadInstalled.Call()
 	} catch as Err {

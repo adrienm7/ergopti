@@ -504,15 +504,17 @@ _KLT_MagicKeyDeclarationCase() {
 	Record := Map("ergol", Map("id", "ergol", "extension", Map("id", "ergol")))
 	AssertEqual("ergol", LayoutRegistry_ActiveLayoutExtension("ergol", true, "ergopti", () => Record),
 		"the emulated registry layout wins over the built-in Ergopti emulation")
-	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("bepo", false, "ergopti", () => Record),
+	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("bepo", true, "ergopti", () => Record),
 		"a layout not installed yet declares nothing")
+	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("ergol", false, "ergopti", () => Record),
+		"a layout left selected with the base layer off types nothing: the OS layout is probed")
 	AssertEqual("ergopti", LayoutRegistry_ActiveLayoutExtension("", true, "ergopti", () => Record))
 	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("", false, "ergopti", () => Record),
 		"the user's own OS layout declares nothing")
 	Failing() {
 		throw Error("damaged record")
 	}
-	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("ergol", false, "ergopti", Failing),
+	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("ergol", true, "ergopti", Failing),
 		"a damaged record is logged and declares nothing")
 }
 

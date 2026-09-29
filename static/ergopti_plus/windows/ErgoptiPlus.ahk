@@ -837,7 +837,9 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; declares — the emulated registry layout, or the built-in Ergopti emulation;
 ; then, with no layout emulated, the key that types MagicKeySourceChar ("j" by
 ; default) on the user's own OS layout — on bépo not the SC02E Ergopti/QWERTY
-; position; then the shipped default.
+; position; then the shipped default. A layout is emulated only while the base
+; layer is on (_KLE_BaseCriterion): a layout left selected in the manager with
+; the base layer off types nothing, so the OS layout is still probed.
 ;
 ; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
 ; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
@@ -852,7 +854,7 @@ _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
 			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
 			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
 		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", KeylayoutEmulation_SelectedId() != "" || Features["layout"]["ergopti_base"],
+	"emulated", Features["layout"]["ergopti_base"],
 	"keycodes", LayoutRegistry_Keycodes(),
 	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"])))
 ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
