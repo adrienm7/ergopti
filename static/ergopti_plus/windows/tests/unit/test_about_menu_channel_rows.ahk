@@ -3,56 +3,126 @@
 ; ==============================================================================
 ; MODULE: About Menu Channel Rows Tests
 ; DESCRIPTION:
-; The About submenu lists one row per channel of the shared update-channel
-; registry, ticked on the subscribed channel, right before the check row, and
-; the check-frequency picker after it. The channels used to be a nested
-; "Update channel" submenu with two hardcoded rows (main and dev).
+; The About submenu offers the update channels in ONE submenu right before the
+; check row, titled with the subscribed channel's registry name (« Canal de mise
+; à jour : Dev »), listing every channel of the shared registry in registry
+; order with the subscribed one ticked; the check-frequency picker follows the
+; check row. The channels were once a nested submenu with two hardcoded rows
+; (main and dev), then one flat row each, which read as unrelated commands.
 ;
 ; The row actions are called for real through an injected setter, which also
 ; guards the AHK closure trap: a fat arrow written inside the loop would share
 ; the loop variable and switch every row to the last channel.
 ; ==============================================================================
 
+; Where the channel picker sits: after the version row and its separator.
+global _AMCR_PICKER_AT := 3
+
 _AMCR_RecordChannel(State, Id) {
 	State.Calls.Push(Id)
 	return true
 }
 
-_AMCR_ChannelRowsFollowTheRegistry() {
+; Records the request and persists it the way Updater_SetChannel does.
+_AMCR_PersistChannel(State, Id) {
 	global UPDATER_CHANNEL
+	State.Calls.Push(Id)
+	UPDATER_CHANNEL := Id
+	return true
+}
+
+; The title the picker must read for a subscribed channel, spelled from the
+; translated template and the registry's own name for the channel.
+_AMCR_ExpectedTitle(Id) {
+	return StrReplace(t("menu.about.channel_menu"), "{channel}", t(UpdateChannels_Field(Id, "label_key")))
+}
+
+_AMCR_ChannelPickerFollowsTheRegistry() {
+	global UPDATER_CHANNEL, _AMCR_PICKER_AT
 	SavedChannel := UPDATER_CHANNEL
 	try {
 		Ids := UpdateChannels_Ids()
 		AssertTrue(Ids.Length >= 2, "the registry must declare the channels the menu lists")
-		UPDATER_CHANNEL := Ids[Ids.Length]
-		State := { Calls: [] }
-		Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind(State))
+		AssertTrue(InStr(t("menu.about.channel_menu"), "{channel}") > 0,
+			"the picker's title template must carry its placeholder")
+		for _, Subscribed in Ids {
+			UPDATER_CHANNEL := Subscribed
+			Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
 
-		AssertTrue(InStr(Rows[1]["label"], "ErgoptiPlus ") == 1, "the version row comes first")
-		AssertTrue(Rows[2].Has("separator"), "a separator follows the version row")
-		for Index, Id in Ids {
-			Row := Rows[2 + Index]
-			AssertEqual(t(UpdateChannels_Field(Id, "menu_label_key")), Row["label"],
-				"channel row " . Index . " must read its registry label")
-			AssertEqual(Id == UPDATER_CHANNEL, Row["checked"] ? true : false,
-				"only the subscribed channel is ticked (" . Id . ")")
-			Row["action"].Call("", Index, 0)
+			AssertTrue(InStr(Rows[1]["label"], "ErgoptiPlus ") == 1, "the version row comes first")
+			AssertTrue(Rows[2].Has("separator"), "a separator follows the version row")
+			Picker := Rows[_AMCR_PICKER_AT]
+			AssertTrue(Picker.Has("items"), "the channels are one submenu")
+			AssertEqual(_AMCR_ExpectedTitle(Subscribed), Picker["label"],
+				"the picker's title names the subscribed channel " . Subscribed)
+			Items := Picker["items"]
+			AssertEqual(Ids.Length, Items.Length, "one row per registry channel")
+			Ticked := 0
+			for Index, Id in Ids {
+				AssertEqual(t(UpdateChannels_Field(Id, "menu_label_key")), Items[Index]["label"],
+					"channel row " . Index . " must read its registry label, in registry order")
+				if Items[Index]["checked"] {
+					Ticked += 1
+					AssertEqual(Subscribed, Id, "only the subscribed channel is ticked")
+				}
+			}
+			AssertEqual(1, Ticked, "exactly one channel is ticked for " . Subscribed)
+
+			Check := Rows[_AMCR_PICKER_AT + 1]
+			AssertEqual(Updater_GetUpdateMenuLabel(), Check["label"],
+				"the check row comes right after the channel picker")
+			Frequency := Rows[_AMCR_PICKER_AT + 2]
+			AssertTrue(Frequency.Has("items"), "the check-frequency picker follows the check row")
+			AssertEqual(_AMCR_PICKER_AT + 2, Rows.Length, "nothing else belongs to the updater block")
 		}
-		AssertEqual(Ids.Length, State.Calls.Length, "every channel row must subscribe")
-		for Index, Id in Ids
-			AssertEqual(Id, State.Calls[Index], "row " . Index . " must subscribe to its own channel")
-
-		Check := Rows[3 + Ids.Length]
-		AssertEqual(Updater_GetUpdateMenuLabel(), Check["label"],
-			"the check row comes right after the channel rows")
-		Frequency := Rows[4 + Ids.Length]
-		AssertTrue(Frequency.Has("items"), "the check-frequency picker follows the check row")
-		AssertEqual(4 + Ids.Length, Rows.Length, "nothing else belongs to the updater block")
 	} finally {
 		UPDATER_CHANNEL := SavedChannel
 	}
 }
-Test("About menu: one row per registry channel right before the check row", _AMCR_ChannelRowsFollowTheRegistry)
+Test("About menu: one channel submenu titled with the subscribed channel, right before the check row",
+	_AMCR_ChannelPickerFollowsTheRegistry)
+
+; Every row subscribes to its own channel. The injected setter persists like
+; Updater_SetChannel does, so the next build reads the channel just chosen and
+; the title must follow it.
+_AMCR_ChannelRowSubscribesAndRetitles() {
+	global UPDATER_CHANNEL, _AMCR_PICKER_AT
+	SavedChannel := UPDATER_CHANNEL
+	try {
+		Ids := UpdateChannels_Ids()
+		UPDATER_CHANNEL := Ids[1]
+		State := { Calls: [] }
+		Setter := _AMCR_PersistChannel.Bind(State)
+		for Index, Id in Ids {
+			Rows := _MI_AboutUpdateRows(false, Setter)
+			Rows[_AMCR_PICKER_AT]["items"][Index]["action"].Call("", Index, 0)
+			Rebuilt := _MI_AboutUpdateRows(false, Setter)
+			AssertEqual(_AMCR_ExpectedTitle(Id), Rebuilt[_AMCR_PICKER_AT]["label"],
+				"the rebuilt title names the channel row " . Index . " chose")
+		}
+		AssertEqual(Ids.Length, State.Calls.Length, "every channel row must subscribe")
+		for Index, Id in Ids
+			AssertEqual(Id, State.Calls[Index], "row " . Index . " must subscribe to its own channel")
+	} finally {
+		UPDATER_CHANNEL := SavedChannel
+	}
+}
+Test("About menu: a channel row subscribes to its own channel and the title follows",
+	_AMCR_ChannelRowSubscribesAndRetitles)
+
+; The flat rows are gone: no row of the updater block reads a channel label.
+_AMCR_NoFlatChannelRow() {
+	for _, IsLocal in [false, true] {
+		Rows := _MI_AboutUpdateRows(IsLocal, _AMCR_RecordChannel.Bind({ Calls: [] }))
+		for _, Row in Rows {
+			Label := Row.Get("label", "")
+			for _, Id in UpdateChannels_Ids()
+				AssertTrue(Label != t(UpdateChannels_Field(Id, "menu_label_key")),
+					"the channel " . Id . " must be listed inside the picker only")
+		}
+	}
+}
+Test("About menu: no channel is a flat row of the About submenu any more", _AMCR_NoFlatChannelRow)
 
 ; The frequency picker lists the shared presets (defaults.json, never last) and
 ; its parent row reads the translated label of the preset in force. It used to
@@ -92,10 +162,11 @@ Test("About menu: the frequency picker lists the shared presets with translated 
 	_AMCR_FrequencyPickerReadsTheSharedPresets)
 
 _AMCR_LocalCheckoutListsChannelsOnly() {
-	Ids := UpdateChannels_Ids()
+	global _AMCR_PICKER_AT
 	Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
-	AssertEqual(2 + Ids.Length, Rows.Length,
-		"a local checkout lists the version and the channels, with no check row")
+	AssertEqual(_AMCR_PICKER_AT, Rows.Length,
+		"a local checkout lists the version and the channel picker, with no check row")
+	AssertTrue(Rows[_AMCR_PICKER_AT].Has("items"), "the channel picker closes the local block")
 	AssertTrue(Rows[1].Has("disabled") && Rows[1]["disabled"], "a local checkout's version is a label")
 }
 Test("About menu: a local checkout shows the channels without a check row", _AMCR_LocalCheckoutListsChannelsOnly)

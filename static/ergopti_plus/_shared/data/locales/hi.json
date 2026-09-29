@@ -934,6 +934,7 @@
 	"magickey.textexpansionsymbols": "प्रतीक विस्तार: -->★ = ➜, (v)★ = ✓…",
 	"magickey.textexpansionsymbolstypst": "Typst प्रतीक: $eq.not$★ = ≠, $PP$★ = ℙ…",
 	"menu.about.changelog": "रिलीज़",
+	"menu.about.channel_menu": "अपडेट चैनल: {channel}",
 	"menu.about.check_for_updates": "अपडेट जाँचें",
 	"menu.about.frequency.12h": "हर 12 घंटे",
 	"menu.about.frequency.1d": "हर दिन",

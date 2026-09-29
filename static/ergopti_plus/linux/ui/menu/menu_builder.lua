@@ -3411,27 +3411,18 @@ local function _build_language(ctx)
 	return { label = i18n_safe("menu.global.language"), submenu = rows }
 end
 
---- The updater block of the About submenu, as provider DATA: the version, one
---- row per channel of the shared registry (ticked on the subscribed one) right
---- before the check row, then the check-frequency picker. It used to be a
---- Linux-only top-level "Updates" submenu with its own 'stable'/'dev' rows.
+--- The channel picker of the About submenu: one submenu titled with the
+--- subscribed channel's registry name, one row per registry channel in registry
+--- order, ticked on the subscribed one. A click subscribes through the updater,
+--- which persists the choice; the redraw it asks for retitles the picker.
 --- @param ctx table Menu context.
---- @return table rows
-local function _about_update_rows(ctx)
-	local up = ctx.updater
-	local version = up and up.current_version() or Version.VERSION
-	local out = {
-		{ label = "ErgoptiPlus " .. tostring(version), disabled = true },
-		{ separator = true },
-	}
-	if not up then
-		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
-		return out
-	end
-
+--- @param up table The updater module.
+--- @return table row A provider row with its items.
+local function _channel_picker(ctx, up)
 	local channel = up.get_channel()
+	local rows = {}
 	for _, id in ipairs(up.CHANNELS.ids()) do
-		out[#out + 1] = {
+		rows[#rows + 1] = {
 			label   = i18n_safe(up.CHANNELS.channel(id).menu_label_key),
 			checked = channel == id,
 			action  = function()
@@ -3448,6 +3439,32 @@ local function _about_update_rows(ctx)
 			end,
 		}
 	end
+	return {
+		label = _fill(i18n_safe("menu.about.channel_menu"), "{channel}",
+			i18n_safe(up.CHANNELS.channel(channel).label_key)),
+		items = rows,
+	}
+end
+
+--- The updater block of the About submenu, as provider DATA: the version, the
+--- channel picker right before the check row, then the check-frequency picker.
+--- It used to be a Linux-only top-level "Updates" submenu with its own
+--- 'stable'/'dev' rows.
+--- @param ctx table Menu context.
+--- @return table rows
+local function _about_update_rows(ctx)
+	local up = ctx.updater
+	local version = up and up.current_version() or Version.VERSION
+	local out = {
+		{ label = "ErgoptiPlus " .. tostring(version), disabled = true },
+		{ separator = true },
+	}
+	if not up then
+		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
+		return out
+	end
+
+	out[#out + 1] = _channel_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
 	out[#out + 1] = {

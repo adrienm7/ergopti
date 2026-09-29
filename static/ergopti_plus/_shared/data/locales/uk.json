@@ -934,6 +934,7 @@
 	"magickey.textexpansionsymbols": "Розгортання символів: -->★ = ➜, (v)★ = ✓…",
 	"magickey.textexpansionsymbolstypst": "Символи Typst: $eq.not$★ = ≠, $PP$★ = ℙ…",
 	"menu.about.changelog": "Версії",
+	"menu.about.channel_menu": "Канал оновлень: {channel}",
 	"menu.about.check_for_updates": "Перевірити оновлення",
 	"menu.about.frequency.12h": "Кожні 12 годин",
 	"menu.about.frequency.1d": "Щодня",

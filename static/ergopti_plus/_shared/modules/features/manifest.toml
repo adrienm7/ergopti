@@ -4065,11 +4065,12 @@ platforms = ["ahk", "hs", "linux"]
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.
 #
-# All three drivers show the same block: the version, one row per channel of the
-# shared update-channel registry right before the check row, the check
-# frequency (a `list`, because its rows come from the registry and the updater
-# state), then Versions and its GitHub page. Linux had its updater as a separate
-# top-level "Updates" entry until 2026-09.
+# All three drivers show the same block: the version, one channel submenu titled
+# with the subscribed channel and listing every channel of the shared
+# update-channel registry, right before the check row, the check frequency (a
+# `list`, because its rows come from the registry and the updater state), then
+# Versions and its GitHub page. Linux had its updater as a separate top-level
+# "Updates" entry until 2026-09.
 [[menu.about_menu]]
 type = "list"
 id = "about_updates"

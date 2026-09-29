@@ -14,11 +14,12 @@
 --- 1b. Lua cadence: the frequency picker lists the shared presets and persists
 ---    through the menu session's automatic-check owner (ctx.update_checks); the
 ---    check row names a release that owner found.
---- 2. One channel owner: the rows list every channel of the shared registry and
----    subscribe through the menu session's channel owner (ctx.channel_owner,
----    modules/updater/channel.lua), which persists the choice and
----    tells the launcher which feed Sparkle reads; the check names the same
----    channel, so the menu cannot diverge from Sparkle's feed.
+--- 2. One channel owner: one submenu, titled with the subscribed channel, lists
+---    every channel of the shared registry and subscribes through the menu
+---    session's channel owner (ctx.channel_owner, modules/updater/channel.lua),
+---    which persists the choice and tells the launcher which feed Sparkle
+---    reads; the check names the same channel, so the menu cannot diverge from
+---    Sparkle's feed.
 --- ==============================================================================
 
 local M = {}
@@ -78,15 +79,51 @@ end
 
 
 
---- "Update to {tag}" by plain substitution: a tag is outside data, and a "%" in
---- it would be read as a capture reference in a gsub replacement.
+--- Fills one named placeholder by plain substitution: the value is outside data
+--- (a release tag, a translated channel name), and a "%" in it would be read as
+--- a capture reference in a gsub replacement.
+--- @param template string Translated template.
+--- @param placeholder string Placeholder such as "{tag}".
+--- @param value string Value to put in its place.
+--- @return string label
+local function fill(template, placeholder, value)
+	local at = template:find(placeholder, 1, true)
+	if not at then return template .. " " .. value end
+	return template:sub(1, at - 1) .. value .. template:sub(at + #placeholder)
+end
+
+--- "Update to {tag}".
 --- @param tag string Release tag.
 --- @return string label
 local function update_now_label(tag)
-	local template = i18n.get("menu.about.update_now")
-	local at = template:find("{tag}", 1, true)
-	if not at then return template .. " " .. tag end
-	return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
+	return fill(i18n.get("menu.about.update_now"), "{tag}", tag)
+end
+
+--- The channel picker: one submenu titled with the subscribed channel's name,
+--- one row per registry channel in registry order, ticked on the subscribed
+--- one. A click subscribes through the owner, which persists the choice and
+--- redraws the menu, so the title follows.
+--- @param owner table The menu session's update-channel owner.
+--- @param subscribed string Registry id of the subscribed channel.
+--- @return table row A provider row with its items.
+local function channel_picker(owner, subscribed)
+	local registry = Updater.channels()
+	local rows = {}
+	for _, id in ipairs(registry.ids()) do
+		rows[#rows + 1] = {
+			label = i18n.get(registry.channel(id).menu_label_key),
+			checked = id == subscribed,
+			action = function()
+				Logger.info(LOG, "User chose the update channel '%s'.", id)
+				owner.set(id)
+			end,
+		}
+	end
+	return {
+		label = fill(i18n.get("menu.about.channel_menu"), "{channel}",
+			i18n.get(registry.channel(subscribed).label_key)),
+		items = rows,
+	}
 end
 
 --- The check-frequency picker: one row per shared preset, ticked on the
@@ -156,19 +193,9 @@ function M.build(ctx)
 
 	table.insert(menu_items, { separator = true })
 
-	-- One row per registry channel, ticked on the subscribed one, right before the
-	-- check row. The owner persists the choice and refreshes the menu.
-	local registry = Updater.channels()
-	for _, id in ipairs(owner and registry.ids() or {}) do
-		table.insert(menu_items, {
-			label = i18n.get(registry.channel(id).menu_label_key),
-			checked = id == channel,
-			action = function()
-				Logger.info(LOG, "User chose the update channel '%s'.", id)
-				owner.set(id)
-			end,
-		})
-	end
+	-- The channel picker, right before the check row. Without an owner nothing
+	-- could persist a choice, so the picker is left out rather than drawn dead.
+	if owner then table.insert(menu_items, channel_picker(owner, channel)) end
 
 	if not local_src then
 		-- A packaged build hands the transaction to Sparkle on this click only;
