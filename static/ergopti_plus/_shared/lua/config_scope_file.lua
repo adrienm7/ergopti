@@ -1,12 +1,12 @@
---- infra/scope_file.lua
+--- _shared/lua/config_scope_file.lua
 
 --- ==============================================================================
---- MODULE: Scope Secondary File (Linux)
+--- MODULE: Scope Secondary File (Shared)
 --- DESCRIPTION:
 --- Owns one additional file of a scope transaction beside config.toml: it
 --- prepares the candidate from the exact source, backs that source up and
 --- reads the backup back, publishes only while the source is unchanged, and
---- puts the exact source back when the primary publication is refused.
+--- puts the exact source back when a later step of the scope is refused.
 ---
 --- WHY A PARTICIPANT RATHER THAN A SECOND TRANSACTION:
 --- One user command changes both files. Two independent transactions could each
@@ -18,12 +18,15 @@ local M = {}
 local Writer = require("toml_codec.writer")
 
 --- Creates the participant for one transaction.
---- @param options table { path, backup_path, remove = function(path) -> boolean }.
+--- @param options table { path, backup_path, remove = function(path) -> boolean,
+---   files = platform file adapter or nil for the writer's own I/O }.
 --- @return table participant
 function M.new(options)
 	assert(type(options) == "table" and type(options.path) == "string" and options.path ~= ""
 		and type(options.backup_path) == "string" and options.backup_path ~= options.path
 		and type(options.remove) == "function", "scope file participant ports are incomplete")
+	assert(options.files == nil or type(options.files) == "table", "scope file adapter must be a table")
+	local files = options.files
 	local participant = {}
 	local source, candidate, published = nil, nil, false
 
@@ -40,7 +43,7 @@ function M.new(options)
 	--- @return string|nil reason
 	function participant.prepare(rows)
 		assert(source == nil, "a scope file is prepared once")
-		local prepared, detail, content, exact = Writer.prepare_batch(options.path, rows, nil)
+		local prepared, detail, content, exact = Writer.prepare_batch(options.path, rows, files)
 		if prepared ~= true then return false, detail end
 		source, candidate = exact, content
 		return true
@@ -50,15 +53,30 @@ function M.new(options)
 	--- @return string|nil
 	function participant.candidate() return candidate end
 
+	--- The exact classified source the candidate was prepared from.
+	--- @return table|nil `{ status = "ok"|"absent", content }`
+	function participant.source()
+		return source and { status = source.status, content = source.content } or nil
+	end
+
+	--- The classified source the file holds once the candidate is published.
+	--- @return table `{ status = "ok"|"absent", content }`
+	function participant.target()
+		assert(source ~= nil, "a scope file must be prepared before its target is known")
+		if not changed() then return participant.source() end
+		return { status = "ok", content = candidate }
+	end
+
 	--- Backs up the exact source bytes and verifies the copy before any change.
 	--- @return boolean backed_up
 	--- @return string|nil reason
 	function participant.backup()
 		assert(source ~= nil, "a scope file must be prepared before its backup")
 		if source.status ~= "ok" or not changed() then return true end
-		local written, detail = Writer.publish_if_unchanged(options.backup_path, source.content, nil, { status = "absent" })
+		local written, detail = Writer.publish_if_unchanged(options.backup_path, source.content, files,
+			{ status = "absent" })
 		if written ~= true then return false, "backup refused: " .. tostring(detail) end
-		local observed, status = Writer.read_classified(options.backup_path)
+		local observed, status = Writer.read_classified(options.backup_path, files)
 		if status ~= "ok" or observed ~= source.content then return false, "backup verification failed" end
 		return true
 	end
@@ -69,7 +87,7 @@ function M.new(options)
 	function participant.publish()
 		assert(source ~= nil, "a scope file must be prepared before its publication")
 		if not changed() then return true end
-		local written, detail = Writer.publish_if_unchanged(options.path, candidate, nil, source)
+		local written, detail = Writer.publish_if_unchanged(options.path, candidate, files, source)
 		if written ~= true then return false, detail end
 		published = true
 		return true
@@ -82,10 +100,10 @@ function M.new(options)
 		if not published then return true end
 		local restored
 		if source.status == "ok" then
-			restored = Writer.publish_if_unchanged(options.path, source.content, nil,
+			restored = Writer.publish_if_unchanged(options.path, source.content, files,
 				{ status = "ok", content = candidate }) == true
 		else
-			local current, status = Writer.read_classified(options.path)
+			local current, status = Writer.read_classified(options.path, files)
 			restored = status == "ok" and current == candidate and options.remove(options.path) == true
 		end
 		if restored then published = false end

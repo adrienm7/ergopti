@@ -31,7 +31,7 @@ local LeafRows = require("toml_codec.leaf_rows")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec")
 local Planner = require("hotstrings.scope_overrides")
-local ScopeFile = require("infra.scope_file")
+local ScopeFile = require("config_scope_file")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 
