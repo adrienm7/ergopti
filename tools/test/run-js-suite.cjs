@@ -895,6 +895,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-macos-bundle-layout.cjs'
 	},
 	{
+		name: 'macOS bundle payload ships every path the runtime reads and no excluded group',
+		cmd: 'node',
+		args: ['tools/test/test-macos-bundle-payload.cjs'],
+		repro: 'npm run test:macos-bundle-payload'
+	},
+	{
 		name: 'macOS app ships the keyboard layout bundle its menu resolves (no "No Ergopti bundle found")',
 		cmd: 'node',
 		args: ['tools/test/test-macos-keyboard-layout-bundle.cjs'],
