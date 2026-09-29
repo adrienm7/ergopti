@@ -27,6 +27,7 @@ local M = {}
 -- Resolved at each report, not at load: an entry is reported once per process,
 -- and the logger in place when it is reported is the one that must see it.
 local function logger() return require("logger.shim") end
+local KeyPath = require("toml_codec.key_path")
 local LOG    = "config_outdated"
 local unpack = table.unpack or unpack
 
@@ -49,20 +50,24 @@ local _scans = {}
 -- ==================================
 -- ==================================
 
---- Joins path segments into the dotted spelling the log and cleanup show.
+--- Joins path segments into the TOML spelling the log and cleanup show. A
+--- persisted key can be anything a hand edit wrote, "" included: it is quoted,
+--- never refused, because reporting an entry must not fail the reader.
 --- @param segments table|string Path segments, or an already dotted path.
 --- @return string path
+--- @return boolean offerable Whether every segment is a bare key the cleanup can address.
 local function dotted(segments)
-	if type(segments) == "string" then return segments end
+	if type(segments) == "string" and segments ~= "" then return segments, true end
 	if type(segments) ~= "table" or #segments == 0 then
 		error("config_outdated: a path needs at least one segment", 3)
 	end
-	for _, segment in ipairs(segments) do
-		if type(segment) ~= "string" or segment == "" then
-			error("config_outdated: path segments must be non-empty strings", 3)
-		end
+	local texts, offerable = {}, true
+	for index, segment in ipairs(segments) do
+		texts[index] = tostring(segment)
+		-- The cleanup only cuts bare-key records (config_unused_keys, feature 4).
+		if type(segment) ~= "string" or not segment:match("^[A-Za-z0-9_%-]+$") then offerable = false end
 	end
-	return table.concat(segments, ".")
+	return KeyPath.render(texts), offerable
 end
 
 --- Reports one outdated configuration entry, once per process.
@@ -71,15 +76,21 @@ end
 --- @param sink table|nil The reporting owner's logger; the shared one by default.
 --- @return boolean first True when this call logged the WARNING.
 function M.report(segments, detail, sink)
-	local path = dotted(segments)
+	local path, offerable = dotted(segments)
 	for _, scan in ipairs(_scans) do scan[path] = true end
 	detail = tostring(detail or "this build does not use it")
 	-- The same key holding another stale value is another entry to name.
 	local identity = path .. "\0" .. detail
 	if _reported[identity] then return false end
 	_reported[identity] = true
-	(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); it is offered for cleanup.",
-		path, detail)
+	if offerable then
+		(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); it is offered for cleanup.",
+			path, detail)
+	else
+		-- A quoted key has no line the cleanup can cut; promising it would be false.
+		(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); the config cleanup "
+			.. "cannot remove a quoted key, delete it from config.toml by hand.", path, detail)
+	end
 	return true
 end
 
@@ -104,7 +115,7 @@ function M.partition(prefix, map, is_known, mark)
 		if type(id) == "string" and id ~= "" then known, detail = is_known(id, value) end
 		local segments = {}
 		for index, segment in ipairs(prefix) do segments[index] = segment end
-		segments[#segments + 1] = tostring(id)
+		segments[#segments + 1] = id
 		if known == true then
 			kept[id] = value
 			if mark then mark(unpack(segments)) end

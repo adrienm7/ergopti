@@ -358,6 +358,16 @@ helpers.describe("hotstrings_config", function()
         helpers.assert_eq(Choices.read(path), source, "the file is left for the config cleanup")
       end)
     end)
+
+    helpers.it("an empty category key is outdated, not a refused initialisation (config-outdated-empty-key)", function()
+      -- Reporting "" raised from the choice decoder: init failed and every
+      -- hotstring stayed off, the very failure the outdated rule removes.
+      local source = "[hotstrings.groups]\n\"\" = \"on\"\nprobe = true\n"
+      with_groups(source, function(cfg, engine)
+        helpers.assert_eq(cfg.is_group_enabled("probe"), true, "the valid neighbour still applies")
+        helpers.assert_true(fires(engine), "the valid neighbour reaches the engine")
+      end)
+    end)
   end)
 
   -- ==========================================================================
