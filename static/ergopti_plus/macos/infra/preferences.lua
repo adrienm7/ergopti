@@ -192,15 +192,37 @@ local MANIFEST_CHILD_TABLES = {
 	gesture_sensitivities    = true,
 }
 
+--- Whether a persisted action id names an action this build no longer runs.
+--- The gesture action catalogue judges it once the gesture module has loaded
+--- it, which boot does before loading preferences; without it nothing can be
+--- proved retired. It is never loaded from here: its initialization belongs
+--- to its owner, not to a configuration reader.
+--- @param value any Persisted action id.
+--- @return boolean retired
+--- @return string|nil detail
+function M.action_is_retired(value)
+	if value == "none" then return false end
+	if type(value) ~= "string" then return true, "the value is not an action id" end
+	local catalogue = package.loaded["modules.gestures.actions"]
+	if type(catalogue) ~= "table" or type(catalogue.is_assignable) ~= "function" then return false end
+	if catalogue.is_assignable(value) == true then return false end
+	return true, "action '" .. value .. "' no longer exists"
+end
+
 --- Value rules of owners that accept more than the manifest's Lua type. The
 --- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
 --- edit or an AHK migration can persist "4.5"), so a numeric string is a value
---- it applies, not an outdated one.
+--- it applies, not an outdated one. A script-control slot takes an action id
+--- the catalogue still offers.
 local OWNER_VALUE_RULES = {
 	gesture_sensitivities = function(value)
 		local number = tonumber(value)
 		if type(number) == "number" and number > 0 then return true end
 		return false, "the value is not a positive number"
+	end,
+	script_control_shortcuts = function(value)
+		local retired, detail = M.action_is_retired(value)
+		return not retired, detail
 	end,
 }
 
@@ -586,10 +608,17 @@ local function flatten_from_disk(grouped, mark)
 						if fk then
 							take_value(fk, disk_val, sec_name, disk_key)
 						elseif Manifest.has_default("gestures." .. disk_key) then
-							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures]
-							if not flat.gesture_actions then flat.gesture_actions = {} end
-							flat.gesture_actions[disk_key] = disk_val
-							take(sec_name, disk_key)
+							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures].
+							-- A retired action is outdated: warned once and left for the
+							-- cleanup, instead of a refused set_action at every load.
+							local retired, detail = M.action_is_retired(disk_val)
+							if retired then
+								ConfigOutdated.report({ sec_name, disk_key }, detail)
+							else
+								if not flat.gesture_actions then flat.gesture_actions = {} end
+								flat.gesture_actions[disk_key] = disk_val
+								take(sec_name, disk_key)
+							end
 						end
 					else
 						local lookup = sec_name .. ":" .. disk_key

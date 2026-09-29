@@ -236,8 +236,12 @@ local function load_assignments(candidate)
 			loaded[slot] = action
 		else
 			assert(candidate == nil, "keyboard candidate contains an invalid action")
-			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
-				slot, tostring(action), loaded[slot] or "none")
+			-- Outdated configuration: the slot keeps its manifest action, and
+			-- the entry is named once (the cleanup reports the same detail)
+			-- and offered by the cleanup.
+			local _, detail = Preferences.action_is_retired(action)
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot },
+				detail or ("action '" .. tostring(action) .. "' no longer exists"), Logger)
 		end
 	end, candidate ~= nil)
 	_actions, _loaded = loaded, true
@@ -251,7 +255,16 @@ end
 --- @param decoded table Parsed configuration.
 --- @param mark function Segment-based ownership collector.
 function M.mark_config_reads(decoded, mark)
-	walk_assignments(decoded, function(slot) mark("shortcuts", "keyboard", slot) end)
+	walk_assignments(decoded, function(slot, action)
+		-- A retired action is reported and left unmarked, so the cleanup
+		-- offers it even when the setup wizard also reads the slot.
+		local retired, detail = Preferences.action_is_retired(action)
+		if retired then
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, detail, Logger)
+		else
+			mark("shortcuts", "keyboard", slot)
+		end
+	end)
 end
 
 --- Lists disk and live owned slots for scoped restore/clear without a namespace sweep.
