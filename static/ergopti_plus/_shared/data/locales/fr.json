@@ -1594,6 +1594,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inactifs : autorisez ErgoptiPlus dans Ouverture",
 	"menu.tapholds.guardian_unavailable": "🔴 Inactifs : l’assistant en arrière-plan d’ErgoptiPlus n’est pas enregistré (vérifiez Ouverture, puis quittez et rouvrez ErgoptiPlus)",
 	"menu.tapholds.open_login_items": "Ouvrir les réglages d’Ouverture…",
+	"menu.tapholds.show_login_items_steps": "Afficher les étapes pour autoriser ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Réglages du clavier enregistrés : ils s’appliqueront dès qu’ErgoptiPlus sera autorisé dans Ouverture (cliquer pour ouvrir les réglages).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Réglages du clavier enregistrés : ils s’appliqueront dès qu’ErgoptiPlus aura enregistré son assistant en arrière-plan. Vérifiez qu’ErgoptiPlus est autorisé dans Ouverture, puis quittez et rouvrez ErgoptiPlus (cliquer pour ouvrir les réglages).",
 	"menu.tapholds.saved_until_helper": "💾 Réglages du clavier enregistrés : ils s’appliqueront dès que l’assistant en arrière-plan d’ErgoptiPlus répondra.",

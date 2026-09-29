@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 未生效：请在登录项中允许 ErgoptiPlus",
 	"menu.tapholds.guardian_unavailable": "🔴 未生效：ErgoptiPlus 后台辅助程序未注册（请检查登录项，然后退出并重新打开 ErgoptiPlus）",
 	"menu.tapholds.open_login_items": "打开登录项设置…",
+	"menu.tapholds.show_login_items_steps": "显示允许 ErgoptiPlus 的步骤…",
 	"menu.tapholds.saved_until_guardian": "💾 已保存键盘设置：在登录项中允许 ErgoptiPlus 后即会生效（点击打开设置）。",
 	"menu.tapholds.saved_until_guardian_restart": "💾 已保存键盘设置：ErgoptiPlus 注册其后台助手后即会生效。请确认已在登录项中允许 ErgoptiPlus，然后退出并重新打开 ErgoptiPlus（点击打开设置）。",
 	"menu.tapholds.saved_until_helper": "💾 已保存键盘设置：ErgoptiPlus 后台辅助程序一旦响应即会生效。",

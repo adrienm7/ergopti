@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inativos: permita o ErgoptiPlus em Elementos de início de sessão",
 	"menu.tapholds.guardian_unavailable": "🔴 Inativos: o assistente em segundo plano do ErgoptiPlus não está registado (verifique Elementos de início de sessão e depois feche e abra o ErgoptiPlus novamente)",
 	"menu.tapholds.open_login_items": "Abrir as definições de Elementos de início de sessão…",
+	"menu.tapholds.show_login_items_steps": "Mostrar os passos para permitir o ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Definições do teclado guardadas: aplicam-se assim que o ErgoptiPlus for permitido em Elementos de início de sessão (clique para abrir as definições).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Definições do teclado guardadas: aplicam-se assim que o ErgoptiPlus registar o seu assistente em segundo plano. Verifique que o ErgoptiPlus está permitido em Elementos de início de sessão e depois feche e abra o ErgoptiPlus novamente (clique para abrir as definições).",
 	"menu.tapholds.saved_until_helper": "💾 Definições do teclado guardadas: aplicam-se assim que o assistente em segundo plano do ErgoptiPlus responder.",

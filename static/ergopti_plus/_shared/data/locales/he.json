@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 לא פעיל: אשרו את ErgoptiPlus בפריטי התחברות",
 	"menu.tapholds.guardian_unavailable": "🔴 לא פעיל: עוזר הרקע של ErgoptiPlus אינו רשום (בדקו את פריטי התחברות, ואז צאו מ-ErgoptiPlus ופתחו אותו שוב)",
 	"menu.tapholds.open_login_items": "פתיחת הגדרות פריטי התחברות…",
+	"menu.tapholds.show_login_items_steps": "הצגת השלבים לאישור ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 הגדרות המקלדת נשמרו: הן יחולו ברגע ש-ErgoptiPlus יאושר בפריטי התחברות (לחצו לפתיחת ההגדרות).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 הגדרות המקלדת נשמרו: הן יחולו ברגע ש-ErgoptiPlus ירשום את רכיב העזר שלו ברקע. ודאו ש-ErgoptiPlus מורשה בפריטי התחברות, ואז צאו מ-ErgoptiPlus ופתחו אותו שוב (לחצו לפתיחת ההגדרות).",
 	"menu.tapholds.saved_until_helper": "💾 הגדרות המקלדת נשמרו: הן יחולו ברגע שעוזר הרקע של ErgoptiPlus יגיב.",

@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inaktive: tillat ErgoptiPlus under Påloggingsobjekter",
 	"menu.tapholds.guardian_unavailable": "🔴 Inaktive: bakgrunnshjelperen til ErgoptiPlus er ikke registrert (kontroller Påloggingsobjekter, og avslutt og åpne deretter ErgoptiPlus igjen)",
 	"menu.tapholds.open_login_items": "Åpne innstillingene for Påloggingsobjekter…",
+	"menu.tapholds.show_login_items_steps": "Vis trinnene for å tillate ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Tastaturinnstillinger lagret: de tas i bruk når ErgoptiPlus er tillatt under Påloggingsobjekter (klikk for å åpne innstillingene).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Tastaturinnstillinger lagret: de tas i bruk når ErgoptiPlus har registrert bakgrunnshjelperen sin. Kontroller at ErgoptiPlus er tillatt under Påloggingsobjekter, og avslutt og åpne deretter ErgoptiPlus igjen (klikk for å åpne innstillingene).",
 	"menu.tapholds.saved_until_helper": "💾 Tastaturinnstillinger lagret: de tas i bruk så snart bakgrunnshjelperen til ErgoptiPlus svarer.",

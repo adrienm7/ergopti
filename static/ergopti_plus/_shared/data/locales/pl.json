@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Nieaktywne: zezwól na ErgoptiPlus w Rzeczach otwieranych podczas logowania",
 	"menu.tapholds.guardian_unavailable": "🔴 Nieaktywne: pomocnik ErgoptiPlus działający w tle nie jest zarejestrowany (sprawdź Rzeczy otwierane podczas logowania, a następnie zamknij i ponownie otwórz ErgoptiPlus)",
 	"menu.tapholds.open_login_items": "Otwórz ustawienia Rzeczy otwieranych podczas logowania…",
+	"menu.tapholds.show_login_items_steps": "Pokaż kroki, aby zezwolić ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Ustawienia klawiatury zapisane: zaczną działać, gdy ErgoptiPlus zostanie dozwolony w Rzeczach otwieranych podczas logowania (kliknij, aby otworzyć ustawienia).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Ustawienia klawiatury zapisane: zaczną działać, gdy ErgoptiPlus zarejestruje swojego pomocnika działającego w tle. Sprawdź, czy ErgoptiPlus jest dozwolony w Rzeczach otwieranych podczas logowania, a następnie zamknij i ponownie otwórz ErgoptiPlus (kliknij, aby otworzyć ustawienia).",
 	"menu.tapholds.saved_until_helper": "💾 Ustawienia klawiatury zapisane: zaczną działać, gdy tylko pomocnik ErgoptiPlus działający w tle odpowie.",
