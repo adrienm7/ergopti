@@ -93,14 +93,15 @@ real callback is outside an isolated test include graph.
 
 ### project-compiled-first-launch-extraction-takes-seconds
 
-The compiled exe's first launch expands its ~550-file bundle through Windows
-PowerShell's `Expand-Archive`, and only then commits the staging tree that
-holds `.bundle-version`. On a hosted runner with Defender scanning each file,
-the launch smoke took 8-19 s (runs 582-613), not the ~250 ms the bundle
-comments assume, and a 20 s deadline failed a healthy launch. Action: a launch
-check detects a blocking dialog by the process's `#32770` window, never by a
-wall clock; compare `marker_seconds` in `windows-launch-evidence` across runs
-before tightening the smoke's hang bound.
+The compiled exe's first launch expands its bundle of several hundred files
+through Windows PowerShell's `Expand-Archive`, and only then commits the
+staging tree that holds `.bundle-version`. With Defender scanning every file
+on a hosted runner this takes seconds, so a fixed deadline on the marker failed
+a healthy launch ("did not extract its runtime bundle within 20s", green on
+re-run). Action: a launch check detects a blocking dialog by a `#32770` window
+of the launched process, never by a wall clock. Before tightening the launch
+smoke's hang bound, re-measure from the `OK: ... after N s` lines of recent
+step logs; the `windows-launch-evidence` artifact expires after 7 days.
 
 ### project-ahk-loop-capture-copy-freezes-nothing
 
