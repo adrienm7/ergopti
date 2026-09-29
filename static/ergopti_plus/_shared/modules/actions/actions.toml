@@ -37,7 +37,9 @@
 #             _shared/tests/corpus/llm/vision_vectors.json), or "llm_language"
 #             ("ui" for the interface language, or a locale code of
 #             _shared/data/locale_names.json; rule pinned by
-#             _shared/tests/corpus/llm/translate_vectors.json).
+#             _shared/tests/corpus/llm/translate_vectors.json), or "app" (an
+#             application as the OS launches one, picked in a native chooser;
+#             rule pinned by _shared/tests/corpus/action_parameters/app_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs. Each
 #             driver's dispatcher asks, off the input thread, and runs the
 #             action only on the explicit answer: macOS execute_single
@@ -773,6 +775,16 @@ platform = "all"
 # The centre of the screen under the pointer. Linux, as for teleport_mouse, has
 # no compositor-independent way to warp the pointer.
 platform = "ahk,hs"
+
+[sg_actions.open_app]
+# Opens the application stored for the binding: macOS `open -a` (a name or
+# path) or `open -b` (a bundle identifier), Windows the shell's Run (a program,
+# a Start-menu shortcut, a packaged app), Linux gtk-launch (a desktop-file id).
+# Each binding editor picks the value in a native chooser (/Applications, the
+# Start menu, /usr/share/applications).
+platform = "all"
+requires_linux = ["tool:gtk-launch"]
+parameter = "app"
 
 [sg_actions.quit_frontmost_app]
 # Asks the active application to quit (macOS its Quit command, Windows WM_CLOSE
@@ -1642,6 +1654,7 @@ items = [
     "mic_mute_toggle",
     "clear_clipboard",
     "center_mouse",
+    "open_app",
     "quit_frontmost_app",
     "force_quit_frontmost",
     "empty_trash",

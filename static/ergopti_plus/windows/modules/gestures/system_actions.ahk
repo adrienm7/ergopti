@@ -3,10 +3,10 @@
 ; ==============================================================================
 ; MODULE: System Actions (Windows)
 ; DESCRIPTION:
-; The system actions of the shared catalogue that run a native command: sleep
-; the displays, toggle dark mode and the microphone, clear the clipboard,
-; center the pointer, quit or force-quit the active app, empty the Recycle Bin,
-; eject the removable drives, and the Explorer helpers (unblock the selected
+; The system actions of the shared catalogue that run a native command: open
+; an application, sleep the displays, toggle dark mode and the microphone,
+; clear the clipboard, center the pointer, quit or force-quit the active app,
+; empty the Recycle Bin, eject the removable drives, and the Explorer helpers (unblock the selected
 ; files, open a terminal or create a text file in the current folder).
 ; show_desktop and minimize_all are plain keystrokes (Win+D, Win+M) generated
 ; from the catalogue. Mirrors macos/modules/gestures/system_actions.lua.
@@ -109,6 +109,10 @@ for _SysActionId, _SysActionFn in Map(
 	GESTURE_ACTIONS[_SysActionId] := { Fn: _GestureMakeSystemRunner(_SysActionFn) }
 }
 
+; Not deferred: Launch returns as soon as the shell accepted the target, and the
+; binding id must reach the action to name its application.
+GESTURE_ACTIONS["open_app"] := { Fn: (BindingId := "") => GestureSysOpenApp(BindingId) }
+
 
 
 
@@ -199,6 +203,23 @@ GestureSysCenterMouse(Sys := 0) {
 ; ======= 4/ Applications ==============
 ; ======================================
 ; ======================================
+
+; Opens the application stored for a binding: a program, a Start-menu
+; shortcut, a packaged app (shell:AppsFolder\...) or any target the shell runs.
+GestureSysOpenApp(BindingId := "", Sys := 0) {
+	Sys := _GestureSys(Sys)
+	Value := GestureGetActionParameter(BindingId, "open_app")
+	if !GestureAppParameterIsValid(Value) {
+		LoggerWarn("gestures", "open_app ignored for binding '{1}': no valid application is stored.", BindingId)
+		return
+	}
+	try {
+		Sys.Launch(Value)
+		LoggerInfo("gestures", "Opened the application '{1}'.", Value)
+	} catch as Err {
+		LoggerError("gestures", "The application '{1}' could not be opened: {2}", Value, Err.Message)
+	}
+}
 
 ; Why the active window's process must not be closed.
 ; @param {Object|String} Active { Hwnd, Pid, Class } or "".

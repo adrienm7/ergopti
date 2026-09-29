@@ -176,6 +176,17 @@ helpers.describe("macOS system actions start their exact native command", functi
 		end)
 	end)
 
+	helpers.it("open_app opens by bundle identifier or by name", function()
+		with_system(function(System, record)
+			helpers.assert_eq(System.open_app("com.apple.Safari", PARENT), true)
+			assert_run(record.runs[1], "/usr/bin/open", { "-b", "com.apple.Safari" })
+			System.open_app("/Applications/Visual Studio Code.app", PARENT)
+			assert_run(record.runs[2], "/usr/bin/open", { "-a", "/Applications/Visual Studio Code.app" })
+			helpers.assert_eq(System.open_app(" Safari", PARENT), false)
+			helpers.assert_eq(#record.runs, 2, "an invalid application opens nothing")
+		end)
+	end)
+
 	helpers.it("clear_clipboard drops every pasteboard type", function()
 		with_system(function(System, record)
 			helpers.assert_eq(System.clear_clipboard(), true)

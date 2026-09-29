@@ -184,6 +184,12 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		value = picked
 	elseif type(ctx.prompt_action_parameter) == "function" then
 		value = ctx.prompt_action_parameter(binding, action, spec, prior)
+	elseif spec == "app" then
+		-- An application is picked among the desktop entries, never typed.
+		local chosen, why = require("ui.app_chooser").pick(require("adapters.shell_runner"),
+			gestures.get_action_parameter_prompt(action))
+		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
+		value = chosen
 	else
 		local label = type(gestures.get_action_label) == "function"
 			and gestures.get_action_label(action) or action

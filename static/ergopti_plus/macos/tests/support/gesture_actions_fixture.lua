@@ -11,6 +11,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"_generated.action_catalogue",
+	"app_parameter",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.hotkey_registrar",
