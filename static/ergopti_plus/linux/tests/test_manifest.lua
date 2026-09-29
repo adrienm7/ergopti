@@ -193,6 +193,7 @@ return {
 	"tests.unit.modules.hotstrings.test_dynamic_rule_families",
 	"tests.unit.modules.hotstrings.test_dynamic_unicode_suffix",
 	"tests.unit.modules.hotstrings.test_expansion_delay",
+	"tests.unit.modules.hotstrings.test_ergopti_extension_hotstrings",
 	"tests.unit.modules.hotstrings.test_extension_geometry_routing",
 	"tests.unit.modules.hotstrings.test_hotstrings_menu_skeleton",
 	"tests.unit.modules.hotstrings.test_hotstrings_scope_overrides",

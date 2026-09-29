@@ -92,9 +92,11 @@ _ISRMM_TomlFallbackOmitsIsRepeat() {
 Test("toml loader: LoadHotstringsSection omits IsRepeat, matching the cache (isrepeat-section-name-mismatch-latent-divergence)", _ISRMM_TomlFallbackOmitsIsRepeat)
 
 _ISRMM_RealHeaderHasUnderscore() {
-	Toml := _ISRMM_ReadSharedSource("modules/hotstrings/magickey.toml")
+	; The repeat corrections moved into the Ergopti layout extension, which binds
+	; them to the magic key category under this same section name.
+	Toml := _ISRMM_ReadSharedSource("../../layouts/registry/ergopti/hotstrings/repeatcorrections.toml")
 	; The real section header carries the underscore the old cache literal lacked.
 	Assert(InStr(Toml, "[[repeat_corrections]]") > 0,
-		"magickey.toml must declare the [[repeat_corrections]] header - proving the old 'repeatcorrections' literal could never have matched")
+		"repeatcorrections.toml must declare the [[repeat_corrections]] header - proving the old 'repeatcorrections' literal could never have matched")
 }
 Test("magickey toml: repeat_corrections header exists with the underscore (isrepeat-section-name-mismatch-latent-divergence)", _ISRMM_RealHeaderHasUnderscore)

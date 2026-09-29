@@ -262,6 +262,25 @@ local function read_pack(dir, id, list_files, read_file, skip_file)
 	}
 end
 
+--- The extension directories one root contributes.
+--- A root is a folder of extensions, or `{ pack = dir }` naming one extension
+--- directory itself: the layout extension a driver ships inside its registry
+--- folder sits next to layouts that are not installed, so its parent cannot be
+--- scanned as a root.
+--- @param root any One root entry.
+--- @param list_dirs function Injected directory lister.
+--- @return table Extension directories.
+local function root_dirs(root, list_dirs)
+	if type(root) == "table" then
+		if type(root.pack) ~= "string" or root.pack == "" then
+			error("Invalid extension pack root (content withheld)", 0)
+		end
+		return { (root.pack:gsub("[/\\]+$", "")) }
+	end
+	if type(root) == "string" and root ~= "" then return list_dirs(root) or {} end
+	return {}
+end
+
 --- Scans one or more roots for installed extensions.
 ---
 --- Later roots win on a repeated id, which is what lets a user override a bundled
@@ -274,7 +293,7 @@ end
 --- failure is handed to `on_error({ root, dir, id, path }, err)` and only that
 --- root, pack or file is left out: a driver that must keep booting reports one
 --- broken pack instead of losing every extension, and every bundled feature, to it.
---- @param roots table Array of absolute directory paths, in precedence order.
+--- @param roots table Array of absolute directory paths, or { pack = dir } entries, in precedence order.
 --- @param io_fns table { list_dirs, list_files, read_file, on_error? } — injected I/O.
 --- @return table Array of { id, name, dir, descriptions, toml_files, bound_files, magic_key };
 ---   toml_files entries are { path, stem }, bound_files entries { path, stem, binding },
@@ -291,31 +310,29 @@ function M.scan(roots, io_fns)
 	local by_id, order = {}, {}
 
 	for _, root in ipairs(roots) do
-		if type(root) == "string" and root ~= "" then
-			local listed, dirs = true, nil
-			if on_error then listed, dirs = pcall(list_dirs, root) else dirs = list_dirs(root) end
-			if not listed then
-				on_error({ root = root }, dirs)
-				dirs = {}
-			end
-			for _, dir in ipairs(dirs or {}) do
-				local id = dir:match("([^/\\]+)[/\\]?$")
-				if id and id ~= "" then
-					local read, record = true, nil
-					if on_error then
-						local function skip_file(path, err)
-							on_error({ root = root, dir = dir, id = id, path = path }, err)
-						end
-						read, record = pcall(read_pack, dir, id, list_files, read_file, skip_file)
-					else
-						record = read_pack(dir, id, list_files, read_file)
+		local listed, dirs = true, nil
+		if on_error then listed, dirs = pcall(root_dirs, root, list_dirs) else dirs = root_dirs(root, list_dirs) end
+		if not listed then
+			on_error({ root = root }, dirs)
+			dirs = {}
+		end
+		for _, dir in ipairs(dirs or {}) do
+			local id = dir:match("([^/\\]+)[/\\]?$")
+			if id and id ~= "" then
+				local read, record = true, nil
+				if on_error then
+					local function skip_file(path, err)
+						on_error({ root = root, dir = dir, id = id, path = path }, err)
 					end
-					if read then
-						if not by_id[id] then order[#order + 1] = id end
-						by_id[id] = record
-					else
-						on_error({ root = root, dir = dir, id = id }, record)
-					end
+					read, record = pcall(read_pack, dir, id, list_files, read_file, skip_file)
+				else
+					record = read_pack(dir, id, list_files, read_file)
+				end
+				if read then
+					if not by_id[id] then order[#order + 1] = id end
+					by_id[id] = record
+				else
+					on_error({ root = root, dir = dir, id = id }, record)
 				end
 			end
 		end

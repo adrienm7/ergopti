@@ -22,6 +22,13 @@
 
 global _HotstringExtensionPacks := []
 global _HotstringExtensionPaths := Map()
+; The bundled categories this boot's extensions bind to their own files, keyed
+; by category lowercased without underscores (the spelling every caller of
+; HotstringsBundledTomlPath folds to): Map("path", the file of a whole-category
+; binding or "", "sections", Map(section → file), "extension", "name").
+; Committed once by HotstringExtensions_Prepare; read through
+; HotstringsBoundTomlPath (hotstrings_cache.ahk).
+global _HotstringBoundSources := Map()
 
 ; The only fields a binding may carry: it says where a historical section's
 ; rules live, never whether they are on, so an `enabled` key is refused.
@@ -41,27 +48,58 @@ global EXTENSION_MAGIC_KEY_FIELDS := Map("key", true)
 global EXTENSION_KEY_CODE_PATTERN := "^[A-Z][A-Za-z0-9]*$"
 
 /**
- * Reads the existing roots in bundled, installed, then user precedence order.
+ * Reads the existing roots in bundled, installed, shipped Ergopti, then user
+ * precedence order. The Ergopti extension the driver ships is installed by
+ * shipping: the built-in emulation types it from that copy and machines already
+ * use it without an installed record. It follows the installed generations so a
+ * generation staged before this version cannot hide the files this code expects.
  * @param {String} ConfigDir Configuration directory.
  * @param {String} BundledRoot Shipped extension root.
- * @returns {Array} Discovery roots.
+ * @param {String} RegistryDir Shipped registry folder with its trailing
+ *   backslash; LayoutRegistry_BundledDir() when omitted.
+ * @returns {Array} Discovery roots: folders, and the shipped {pack: Dir}.
  */
-HotstringExtensions_Roots(ConfigDir, BundledRoot) {
+HotstringExtensions_Roots(ConfigDir, BundledRoot, RegistryDir := unset) {
 	Roots := [BundledRoot]
 	for Root in LayoutExtension_Roots(LayoutRegistry_LocalDir(ConfigDir))
 		Roots.Push(Root)
+	Shipped := HotstringExtensions_ShippedRoot(IsSet(RegistryDir) ? RegistryDir : LayoutRegistry_BundledDir())
+	if IsObject(Shipped)
+		Roots.Push(Shipped)
 	Roots.Push(RTrim(ConfigDir, "\/") . "\extensions")
 	return Roots
 }
 
 /**
- * Seeds discovered leaves before the boot config loader resolves user choices.
+ * The extension root of the layout family the driver ships built in, as
+ * layouts/extension.shipped_root does on macOS and Linux: the registry folder
+ * named after registry.ergopti_family, whose layouts declare it as their
+ * extension_source.
+ * @param {String} RegistryDir Shipped registry folder with its trailing backslash.
+ * @returns {Object|String} {pack: Dir}, or "" when the registry ships no such extension.
+ */
+HotstringExtensions_ShippedRoot(RegistryDir) {
+	if !(RegistryDir is String) || RegistryDir == ""
+		return ""
+	Dir := RegistryDir . LayoutRegistry_Settings()["ergopti_family"]
+	if !FileExist(Dir . "\manifest.toml") {
+		LoggerWarn("ExtensionPacks", "No shipped Ergopti extension in {1}.", RegistryDir)
+		return ""
+	}
+	return {pack: Dir}
+}
+
+/**
+ * Seeds discovered leaves before the boot config loader resolves user choices,
+ * and commits where the bound categories load from this boot.
  * @param {Map} Target Desired features before configuration projection.
  * @param {Array} Roots Ordered extension roots.
  * @returns {Array} Complete discovered packs.
  */
 HotstringExtensions_Prepare(Target, Roots) {
+	global _HotstringBoundSources
 	Packs := HotstringExtensions_Scan(Roots)
+	_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
 	HotstringExtensions_Seed(Target, Packs, ManifestDefaultFor)
 	for Pack in Packs {
 		for File in Pack.bound_files
@@ -70,6 +108,37 @@ HotstringExtensions_Prepare(Target, Roots) {
 				Pack.id, File.stem, File.binding["category"])
 	}
 	return Packs
+}
+
+/**
+ * Routes every bound file through HotstringExtensions_Source, which refuses two
+ * owners of one category or section before anything loads.
+ * @param {Array} Packs Discovered packs.
+ * @returns {Map} Category folded to lowercase without underscores → Map("path",
+ *   whole-category file or "", "sections", Map(lowercase section → file),
+ *   "extension", "name": the pack binding it whole, "" otherwise).
+ */
+HotstringExtensions_RouteBound(Packs) {
+	Routes := Map()
+	for Pack in Packs {
+		for File in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
+			Binding := File.binding
+			Category := Binding["category"]
+			Key := StrLower(StrReplace(Category, "_"))
+			if !Routes.Has(Key)
+				Routes[Key] := Map("path", "", "sections", Map(), "extension", "", "name", "")
+			Route := Routes[Key]
+			if !Binding.Has("sections") {
+				Route["path"] := HotstringExtensions_Source(Packs, Category)
+				Route["extension"] := Pack.id
+				Route["name"] := Pack.name
+				continue
+			}
+			for Section in Binding["sections"]
+				Route["sections"][StrLower(Section)] := HotstringExtensions_Source(Packs, Category, Section)
+		}
+	}
+	return Routes
 }
 
 /**
@@ -99,7 +168,17 @@ HotstringExtensions_Register(Target, Packs, MasterOn) {
 HotstringExtensions_Scan(Roots) {
 	ById := Map()
 	for Root in Roots {
-		for PackDir in FSListDirectoryStrict(Root, true) {
+		; A {pack: Dir} root names one extension directory itself: the layout
+		; extension shipped in the registry folder sits beside layouts that are
+		; not installed, so its parent cannot be scanned (extensions.lua root_dirs).
+		if IsObject(Root) {
+			if !Root.HasOwnProp("pack") || !(Root.pack is String) || Root.pack == ""
+				throw ValueError("Invalid extension pack root.")
+			PackDirs := [RTrim(Root.pack, "\/")]
+		} else {
+			PackDirs := FSListDirectoryStrict(Root, true)
+		}
+		for PackDir in PackDirs {
 			SplitPath PackDir, &Id
 			Manifest := ParseTomlFile(PackDir . "\manifest.toml")
 			if TOML_UnreadableFile(PackDir . "\manifest.toml")

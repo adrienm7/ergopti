@@ -150,6 +150,22 @@
 		{
 			"source": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
 			"dest": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/manifest.toml",
+			"dest": "static/layouts/registry/ergopti/manifest.toml"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/rolls.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/rolls.toml"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml"
 		}
 	]
 }

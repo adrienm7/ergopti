@@ -6,7 +6,7 @@
 # ====================
 
 [menu]
-categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
+categories_order = ["distancesreduction", "autocorrection", "magickey"]
 
 
 

@@ -35,16 +35,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.lib.paths import shared  # noqa: E402
 
+_ERGOPTI_HOTSTRINGS = (
+    Path(__file__).resolve().parents[1] / "static/layouts/registry/ergopti/hotstrings"
+)
+
 HOTSTRING_FILES = [
     shared("modules/hotstrings", "distancesreduction.toml"),
-    shared("modules/hotstrings", "sfbsreduction.toml"),
-    shared("modules/hotstrings", "rolls.toml"),
     shared("modules/hotstrings", "autocorrection.toml"),
     shared("modules/hotstrings", "magickey.toml"),
     # Language packs (declared in _index.toml [languages]).
     shared("modules/hotstrings", "french/distancesreduction.toml"),
     shared("modules/hotstrings", "french/autocorrection.toml"),
     shared("modules/hotstrings", "french/magickey.toml"),
+    # The Ergopti layout extension carries the hotstrings written for its key
+    # positions (static/layouts/registry/ergopti/manifest.toml).
+    _ERGOPTI_HOTSTRINGS / "sfbsreduction.toml",
+    _ERGOPTI_HOTSTRINGS / "rolls.toml",
+    _ERGOPTI_HOTSTRINGS / "repeatcorrections.toml",
 ]
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]

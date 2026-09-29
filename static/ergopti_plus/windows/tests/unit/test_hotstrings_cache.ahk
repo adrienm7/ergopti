@@ -95,8 +95,11 @@ TestHsCache_BuildCoversEveryBundledCategory() {
 		Totals[Cat] := (Totals.Has(Cat) ? Totals[Cat] : 0) + RowList.Length
 		Grand += RowList.Length
 	}
-	for Cat in ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
+	for Cat in ["distancesreduction", "autocorrection", "magickey"]
 		Assert(Totals.Has(Cat) and Totals[Cat] > 0, "bundled category '" . Cat . "' must contribute rows")
+	; SFB reduction and rolls are the Ergopti extension's files, loaded from there.
+	for Cat in ["sfbsreduction", "rolls"]
+		Assert(!Totals.Has(Cat), "the extension category '" . Cat . "' must not be compiled into the cache")
 	; Floor well below the ~2992 current total: a builder that silently drops most
 	; entries (regex/flag regression) fails here, while legitimate TOML edits pass.
 	Assert(Grand > 2000, "cache build total must stay in the thousands (got " . Grand . ")")

@@ -15,8 +15,9 @@
 ---    extension generation. A second discovery is refused rather than letting
 ---    a later reader see a different set of packs than the loader registered.
 --- 2. Roots in overlay order: the bundled extensions shipped next to _shared,
----    the committed generations of installed layouts, then the user's folder,
----    whose copy of an id wins, as the hotstring packs' own overlay rule does.
+---    the committed generations of installed layouts, the Ergopti extension the
+---    app ships (installed by shipping), then the user's folder, whose copy of
+---    an id wins, as the hotstring packs' own overlay rule does.
 --- 3. Installing is not enabling: registration never writes a preference. The
 ---    canonical projection gives every new group and section the manifest's
 ---    dynamic default, which is off, until the user turns it on.
@@ -121,22 +122,26 @@ end
 -- ============================
 
 --- Roots in overlay order, the user's copy last so it wins on a repeated id.
---- @return table Absolute extension roots.
+--- The Ergopti extension the app ships follows the installed generations: it is
+--- installed by shipping (layouts/extension.shipped_root).
+--- @return table Absolute extension roots, and the shipped { pack = dir } root.
 function M.roots()
 	local shared = require("infra.paths").shared_root()
 	if not shared then error("The shared extension directory cannot be resolved", 0) end
+	local LayoutRegistry = require("modules.keymap.layout_registry")
 	local roots = { shared .. "/../extensions" }
 	-- The installed-layouts record may have been written by another build or cut
 	-- short by a crash or a sync tool. Its layouts' packs are then missing from
 	-- this boot, reported, while the bundled and the user's packs still load.
 	local ok_installed, installed = pcall(function()
-		return require("modules.keymap.layout_registry").extension_roots()
+		return LayoutRegistry.extension_roots()
 	end)
 	if ok_installed then
 		for _, root in ipairs(installed) do roots[#roots + 1] = root end
 	else
 		Logger.error(LOG, "The installed layouts' extensions are skipped this boot: %s.", tostring(installed))
 	end
+	roots[#roots + 1] = LayoutRegistry.shipped_extension_root()
 	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "extensions"
 	return roots
 end

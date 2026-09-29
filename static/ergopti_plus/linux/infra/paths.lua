@@ -212,9 +212,13 @@ function M.extension_roots()
 		roots[#roots + 1] = shared .. "/../extensions"
 	end
 	-- Resolve lazily: the layout registry itself imports Paths at module load.
-	for _, root in ipairs(require("modules.keymap.layout_registry").extension_roots()) do
+	local LayoutRegistry = require("modules.keymap.layout_registry")
+	for _, root in ipairs(LayoutRegistry.extension_roots()) do
 		roots[#roots + 1] = root
 	end
+	-- The Ergopti extension the driver ships is installed by shipping
+	-- (layouts/extension.shipped_root), after the installed generations.
+	roots[#roots + 1] = LayoutRegistry.shipped_extension_root()
 	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "/extensions"
 	return roots
 end

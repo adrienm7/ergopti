@@ -458,7 +458,12 @@ check(
 			const manifest = parseToml(
 				fs.readFileSync(path.join(REGISTRY_DIR, entry.extension.id, 'manifest.toml'), 'utf8')
 			).extension;
-			assert.deepStrictEqual(validateExtensionManifest(manifest, []), [], entry.id);
+			// A binding must name a file the published inventory carries.
+			const stems = entry.extension.files
+				.map((file) => /^hotstrings\/([a-z][a-z0-9_-]*)\.toml$/.exec(file.path))
+				.filter(Boolean)
+				.map((match) => match[1]);
+			assert.deepStrictEqual(validateExtensionManifest(manifest, stems), [], entry.id);
 		}
 	}
 );

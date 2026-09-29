@@ -7,7 +7,7 @@ _L4RefreshNonselected() {
 		LocalDir := LayoutRegistry_LocalDir(Directory)
 		Assert(_LCT_Install("ergol", LocalDir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())[1])
 		Target := ManifestBuildFeaturesMap()
-		Packs := HotstringExtensions_Prepare(Target, HotstringExtensions_Roots(Directory, Directory . "missing"))
+		Packs := HotstringExtensions_Prepare(Target, HotstringExtensions_Roots(Directory, Directory . "missing", Directory . "missing-registry\"))
 		Calls := 0, Writes := 0, Completion := 0, Refusal := 0, Result := "pending"
 		Reload(Success, Owner, Refused) {
 			Calls += 1
@@ -47,7 +47,7 @@ _L4RefreshNonselected() {
 		Assert(%Refresh%("ergol", "uninstall", Done, Options))
 		AssertEqual(Result, true, "an operation with no selected layout or extension needs no reload")
 		Restarted := HotstringExtensions_Prepare(ManifestBuildFeaturesMap(),
-			HotstringExtensions_Roots(Directory, Directory . "missing"))
+			HotstringExtensions_Roots(Directory, Directory . "missing", Directory . "missing-registry\"))
 		AssertEqual(Restarted.Length, 0)
 	} finally DirDelete(Directory, true)
 }
