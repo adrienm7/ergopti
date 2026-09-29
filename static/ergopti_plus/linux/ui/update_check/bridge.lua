@@ -21,6 +21,9 @@
 ---    the Versions window, and checks the new channel at once.
 --- 4. Pushes go through webview_manager.eval_js into this page only; a message
 ---    of a closed window finds no session and is refused.
+--- 5. The updater refuses a check while busy: a click while the window's check
+---    runs shows that window again, and a click while the updater is otherwise
+---    busy starts nothing, rather than a check that could only fail.
 --- ==============================================================================
 
 local M = {}
@@ -119,10 +122,13 @@ local function new_session(updater)
 	return CheckSession.new({
 		push = push,
 		check = function(channel, on_result)
-			return updater.check_for_updates(channel, function(_, _, _, result)
+			local dispatched = updater.check_for_updates(channel, function(_, _, _, result)
 				on_result(result)
 				hook("on_menu_changed")
 			end)
+			-- The menu greys its check row while the check runs
+			if dispatched == true then hook("on_menu_changed") end
+			return dispatched
 		end,
 		channel = updater.get_channel,
 		current = updater.current_version,
@@ -195,8 +201,27 @@ function M.open(ctx)
 		return false
 	end
 	Logger.start(LOG, "Opening the update-check window…")
-	-- A click while the window is open checks again, over the updater and hooks
-	-- of the menu that asked; the replaced session's late answer is ignored
+	-- While a check runs the updater refuses another one as busy: a click then
+	-- shows the window still waiting for its answer, or does nothing when the
+	-- updater is busy without it (a background check, a download), as on
+	-- Windows. Starting a check would replace the pending answer with a failure
+	if _session ~= nil and _session.result() == nil then
+		_ctx = ctx
+		if require("ui.webview_manager").show(APP) ~= true then
+			Logger.error(LOG, "The update-check window could not be shown again.")
+			return false
+		end
+		Logger.success(LOG, "Update-check window shown; its check is still running.")
+		return true
+	end
+	local busy = ctx.updater.get_state()
+	if busy == "checking" or busy == "downloading" or busy == "installing" then
+		Logger.done(LOG, "Update-check window not opened: the updater is busy (%s).", busy)
+		return true
+	end
+	-- A click while the window shows an answer checks again, over the updater
+	-- and hooks of the menu that asked; the replaced session's late answer is
+	-- ignored
 	if _session ~= nil then _session.retire() end
 	_ctx = ctx
 	local session = new_session(ctx.updater)

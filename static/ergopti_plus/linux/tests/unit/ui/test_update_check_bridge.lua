@@ -13,7 +13,9 @@
 ---    Versions page, and checks the new channel at once;
 --- 4. a failure names today's log, Report goes through the error window's
 ---    report and the log through the menu's opener;
---- 5. a message after the window closed is refused.
+--- 5. a message after the window closed is refused;
+--- 6. a click while the check runs keeps its answer, and a click while the
+---    updater is busy otherwise starts no check that could only fail.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -30,7 +32,7 @@ local function load_bridge(answer)
 	local context = {
 		shown = {}, hidden = 0, pushed = {}, checks = {}, sets = {}, downloads = {}, installs = {},
 		windows = {}, completed = {}, reports = {}, channel_pushes = {}, menu_changes = 0, finished = {},
-		logs_opened = 0, channel = "dev", saved = {},
+		logs_opened = 0, channel = "dev", saved = {}, state = "idle", defer = false, pending = {},
 	}
 	for _, name in ipairs(STUBBED) do context.saved[name] = package.loaded[name] end
 	package.loaded["ui.update_check.bridge"] = nil
@@ -58,9 +60,19 @@ local function load_bridge(answer)
 		current_version = function() return "0.0.0-dev.144" end,
 		check_for_updates = function(channel, callback)
 			context.checks[#context.checks + 1] = channel
+			if context.defer then
+				-- A slow network: the updater stays busy until the answer arrives
+				context.state = "checking"
+				context.pending[#context.pending + 1] = function()
+					context.state = "idle"
+					callback(false, nil, nil, answer(channel))
+				end
+				return true
+			end
 			callback(false, nil, nil, answer(channel))
 			return true
 		end,
+		get_state = function() return context.state end,
 		set_channel = function(id) context.sets[#context.sets + 1] = id; context.channel = id; return true end,
 		get_cached_release = function()
 			return { tag = "v0.0.0-dev.150", download_url = "https://example.invalid/bundle.tar.gz" }
@@ -175,6 +187,29 @@ helpers.describe("update-check window bridge (Linux)", function()
 			helpers.assert_eq(last(context).ok, true)
 			bridge.on_message({ action = "open_log" })
 			helpers.assert_eq(context.logs_opened, 1, "the menu's opener opens today's log")
+		end)
+	end)
+
+	helpers.it("keeps the running check when the row is clicked again", function()
+		scenario(available, function(bridge, context)
+			context.defer = true
+			helpers.assert_true(bridge.open(context.ctx))
+			helpers.assert_true(context.menu_changes >= 1, "the menu greys its check row while the check runs")
+			helpers.assert_true(bridge.open(context.ctx), "a second click shows the window")
+			helpers.assert_eq(context.shown, { "update_check", "update_check" })
+			helpers.assert_eq(context.checks, { "dev" }, "no second check replaces the running one")
+			helpers.assert_eq(last(context).state, "checking")
+			context.pending[1]()
+			helpers.assert_eq(last(context).state, "available", "the running check's answer is shown")
+		end)
+	end)
+
+	helpers.it("starts no check while the updater is busy without the window", function()
+		scenario(available, function(bridge, context)
+			context.state = "downloading"
+			helpers.assert_true(bridge.open(context.ctx))
+			helpers.assert_eq(#context.checks, 0, "a busy updater is not asked for a check it would fail")
+			helpers.assert_eq(#context.pushed, 0, "no failure is shown for a busy updater")
 		end)
 	end)
 
