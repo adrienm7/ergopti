@@ -209,6 +209,7 @@ const SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS = 19;
 const WINDOWS_SMOKE_HANG_HEADROOM = 3;
 // PowerShell names are case-insensitive, so $seconds is the same parameter.
 const WINDOWS_SMOKE_PRINTS_ELAPSED = /Write-Host .*\$Seconds\b/i;
+const WINDOWS_SMOKE_VERDICT = 'if ($crashedEarly -or -not $markerSeen) {';
 
 /**
  * Lists why a Windows exe smoke script would read a slow first-launch
@@ -269,9 +270,34 @@ function windowsSmokeWaitProblems(script) {
 				problems.push(`the Windows exe smoke diagnostics must print ${what} (${pattern.source})`);
 			}
 		}
-		const verdict = pipeline.scriptBlock(code, 'if ($crashedEarly -or -not $markerSeen) {');
-		if (!verdict.some((line) => /^\s*Write-LaunchDiagnostics\b/.test(line))) {
+		const verdict = pipeline.scriptBlock(code, WINDOWS_SMOKE_VERDICT);
+		const callInVerdict = verdict.findIndex((line) => /^\s*Write-LaunchDiagnostics\b/.test(line));
+		if (callInVerdict < 0) {
 			problems.push('the Windows exe smoke must print its diagnostics before it fails');
+		} else {
+			// Write-LaunchDiagnostics reads the live process: once the app is
+			// stopped, the dialog text, windows and children it prints are gone,
+			// and the step still fails, so nothing else would notice the loss.
+			const call =
+				code.findIndex((line) => line.trimStart().startsWith(WINDOWS_SMOKE_VERDICT)) +
+				callInVerdict;
+			const stopperAt = code.findIndex((line) =>
+				line.trimStart().startsWith('function Stop-LaunchedApp')
+			);
+			const stopper = pipeline.scriptBlock(code, 'function Stop-LaunchedApp');
+			const early = code.filter(
+				(line, index) =>
+					index < call &&
+					(index < stopperAt || index >= stopperAt + stopper.length) &&
+					/\bStop-LaunchedApp\b|\bStop-Process\b|\.Kill\(/.test(line)
+			);
+			if (early.length > 0) {
+				problems.push(
+					`the Windows exe smoke must print its diagnostics before it stops the app: ${early
+						.map((line) => line.trim())
+						.join(' | ')}`
+				);
+			}
 		}
 	} catch (error) {
 		problems.push(`the Windows exe smoke lost its failure diagnostics: ${error.message}`);
@@ -303,6 +329,27 @@ if (windowsSmokeStep !== null) {
 		[
 			'diagnostics that never print the elapsed time',
 			(lines) => lines.filter((line) => !WINDOWS_SMOKE_PRINTS_ELAPSED.test(line))
+		],
+		[
+			'diagnostics read after the failure branch stops the app',
+			(lines) => {
+				const call = lines.findIndex((line) => /^\s*Write-LaunchDiagnostics\b/.test(line));
+				const stop = lines.findIndex(
+					(line, index) => index > call && /^\s*Stop-LaunchedApp\b/.test(line)
+				);
+				const swapped = [...lines];
+				[swapped[call], swapped[stop]] = [lines[stop], lines[call]];
+				return swapped;
+			}
+		],
+		[
+			'the app stopped before the verdict',
+			(lines) =>
+				lines.flatMap((line) =>
+					line.trimStart().startsWith(WINDOWS_SMOKE_VERDICT)
+						? ['Stop-LaunchedApp $proc', line]
+						: [line]
+				)
 		],
 		[
 			'evidence without the marker time',
