@@ -75,10 +75,16 @@ M.COMMANDS = {
 	empty_trash = "gio trash --empty",
 	quit_frontmost_app = active_window_signal("TERM"),
 	force_quit_frontmost = active_window_signal("KILL"),
-	-- Best effort, one daemon after the other: dunst, mako, SwayNC.
-	clear_notifications = "dunstctl close-all 2>/dev/null || makoctl dismiss --all 2>/dev/null"
-		.. " || swaync-client --close-all 2>/dev/null",
 }
+
+--- The notification daemons whose client can dismiss every notification.
+--- GNOME Shell and KDE Plasma expose no such command.
+M.NOTIFICATION_CLIENTS = { "dunstctl", "makoctl", "swaync-client" }
+
+--- Best effort, one daemon after the other: the installed client of a daemon
+--- that is not the running one fails, and the next one is tried.
+M.CLEAR_NOTIFICATIONS = "dunstctl close-all 2>/dev/null || makoctl dismiss --all 2>/dev/null"
+	.. " || swaync-client --close-all 2>/dev/null"
 
 --- The command that asks the user first, then runs `command` on Continue.
 --- @param action_label string The action's localized label.
@@ -152,6 +158,19 @@ end
 --- receives { run_background = fn(cmd), clipboard = adapter, emit_combo = fn,
 --- sleep_ms = fn } from the executor.
 M.HANDLERS = {
+	-- Backgrounded, the command's failure is invisible: with none of the
+	-- clients installed nothing could ever be cleared, which is said here.
+	clear_notifications = function(deps)
+		for _, client in ipairs(M.NOTIFICATION_CLIENTS) do
+			if ShellRunner.has_command(client) then
+				deps.run_background("{ " .. M.CLEAR_NOTIFICATIONS .. "; }")
+				Logger.info(LOG, "Clearing the notifications.")
+				return
+			end
+		end
+		Logger.error(LOG, "clear_notifications: none of %s is installed; this desktop's notifications"
+			.. " cannot be cleared by a command.", table.concat(M.NOTIFICATION_CLIENTS, ", "))
+	end,
 	clear_clipboard = function(deps)
 		if deps.clipboard.write("") then
 			Logger.info(LOG, "Clipboard cleared.")

@@ -146,6 +146,23 @@ helpers.describe("Linux system actions", function()
 		end)
 	end)
 
+	-- On GNOME and KDE none of the clients exists: the chain was backgrounded
+	-- anyway, with its failure discarded, and nothing said why nothing happened.
+	helpers.it("clear_notifications starts nothing without a notification client (system-actions)", function()
+		with_recorded_shell(function(commands)
+			Gestures.execute_action("clear_notifications", "tap_3")
+			helpers.assert_eq(#launched(commands), 0)
+			local probed = {}
+			for _, command in ipairs(commands) do
+				if command:find("command -v", 1, true) then probed[#probed + 1] = command end
+			end
+			helpers.assert_eq(#probed, 3, "dunstctl, makoctl and swaync-client are each looked for")
+		end, function(command)
+			if command:find("command -v", 1, true) then return false end
+			return true
+		end)
+	end)
+
 	helpers.it("empty_trash runs nothing when no dialog can ask (system-actions)", function()
 		with_recorded_shell(function(commands)
 			Gestures.execute_action("empty_trash", "tap_3")
