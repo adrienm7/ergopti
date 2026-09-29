@@ -50,6 +50,7 @@ local LOG = "startup_ctrl"
 ---   apply_llm_profile_shortcut function Binds a per-profile shortcut.
 ---   activate_hotkey           function Enables a hs.hotkey object.
 ---   mlx_deps_checker          table    MLX deps checker module.
+---   runtime_installed         function Stat-only presence of a backend's local runtime.
 ---   deps                      table    Full deps table (for update_menu access after reload).
 ---   get_startup_silence       function Returns the current _startup_silence flag.
 ---   set_startup_silence       function Sets the _startup_silence flag.
@@ -65,6 +66,7 @@ function M.new(ctx)
 	local apply_llm_profile_shortcut = ctx.apply_llm_profile_shortcut
 	local activate_hotkey            = ctx.activate_hotkey
 	local mlx_deps_checker           = ctx.mlx_deps_checker
+	local runtime_installed          = ctx.runtime_installed
 	local deps                       = ctx.deps
 	local get_startup_silence        = ctx.get_startup_silence
 	local set_startup_silence        = ctx.set_startup_silence
@@ -760,6 +762,18 @@ function M.new(ctx)
 		-- at doAfter(0), so the first tick may return an empty table.
 		local function do_check_requirements()
 			if not runtime_current(my_pause_epoch) then return end
+			-- A backend whose runtime is not installed cannot pass this check. The
+			-- boot bootstrap already posted the one notice that says so; the
+			-- Ollama daemon restart or the MLX import probe would only add a
+			-- "daemon failed" error that reads like a crash and a duplicate
+			-- notice. Turn the AI off quietly; the backend selection installs it.
+			local presence_ok, runtime_present = Logger.callback(LOG,
+				"Startup AI runtime presence", runtime_installed, state.llm_backend)
+			if presence_ok ~= true or runtime_present ~= true then
+				Logger.warn(LOG, "The %s runtime is not installed; the AI stays off until that backend is selected.",
+					tostring(state.llm_backend))
+				return disable_llm()
+			end
 			local installed = models_mgr.get_installed_models()
 			if _startup_paused == true or not runtime_current(my_pause_epoch) then
 				return false

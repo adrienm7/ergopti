@@ -157,6 +157,7 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		apply_llm_profile_shortcut = function() return true end,
 		activate_hotkey = function() return true end,
 		mlx_deps_checker = {},
+		runtime_installed = function() return true end,
 		deps = {
 			script_control = control,
 			update_menu = function() menu_updates = menu_updates + 1; return true end,
