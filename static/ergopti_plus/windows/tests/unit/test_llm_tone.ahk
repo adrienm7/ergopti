@@ -316,17 +316,27 @@ _LTN_AnswerWithoutRewriteIsDropped() {
 Test("LLM tone: an answer without a rewrite is dropped", _LTN_AnswerWithoutRewriteIsDropped)
 
 _LTN_HotkeysSkipTheLadder() {
-	UserProfiles := []
-	loop 5
-		UserProfiles.Push(Map("id", "user_mine_" . A_Index))
-	Order := LLM_Menu_GetHotkeyProfileOrder(Map("user_profiles", UserProfiles))
-	for ToneId in LLM_TONE_LADDER {
-		for Id in Order
-			Assert(Id != ToneId, "the tone profile " . ToneId . " must not take a Ctrl+<n> hotkey")
+	; The menu index that assigns the limit is not part of the test build.
+	global LLM_PROFILE_HOTKEY_LIMIT
+	HadLimit := IsSet(LLM_PROFILE_HOTKEY_LIMIT)
+	if HadLimit
+		SavedLimit := LLM_PROFILE_HOTKEY_LIMIT
+	LLM_PROFILE_HOTKEY_LIMIT := 9
+	try {
+		UserProfiles := []
+		loop 5
+			UserProfiles.Push(Map("id", "user_mine_" . A_Index))
+		Order := LLM_Menu_GetHotkeyProfileOrder(Map("user_profiles", UserProfiles))
+		for ToneId in LLM_TONE_LADDER {
+			for Id in Order
+				Assert(Id != ToneId, "the tone profile " . ToneId . " must not take a Ctrl+<n> hotkey")
+		}
+		AssertEqual(9, Order.Length, "the hotkeys still fill the number row")
+		AssertEqual("user_mine_1", Order[LLM_PROFILE_BUILTIN_ORDER.Length - LLM_TONE_LADDER.Length + 1],
+			"the first custom profile follows the prediction built-ins")
+	} finally {
+		LLM_PROFILE_HOTKEY_LIMIT := HadLimit ? SavedLimit : unset
 	}
-	AssertEqual(LLM_PROFILE_HOTKEY_LIMIT, Order.Length, "the hotkeys still fill the number row")
-	AssertEqual("user_mine_1", Order[LLM_PROFILE_BUILTIN_ORDER.Length - LLM_TONE_LADDER.Length + 1],
-		"the first custom profile follows the prediction built-ins")
 }
 Test("LLM tone: the ladder profiles leave the Ctrl+<n> hotkeys to prediction prompts",
 	_LTN_HotkeysSkipTheLadder)
