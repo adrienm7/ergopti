@@ -16,12 +16,17 @@
 ---    boot and the grant poll keep running while it is open. A blocking modal
 ---    would park the main runloop, and the non-blocking alert sheet cannot be
 ---    closed by its owner once the grant arrives.
---- 3. One owner: at most one dialog exists. Showing the same permission again
+--- 3. Never takes focus: it is shown at the floating level every ErgoptiPlus
+---    window has, without activating the app. The factory's forced focus finds
+---    the window through Accessibility, which an untrusted process cannot do;
+---    its fallback then set the screen-saver level, above System Settings and
+---    the macOS prompt the steps point to, and took focus from Settings.
+--- 4. One owner: at most one dialog exists. Showing the same permission again
 ---    raises the open window instead of stacking a copy; showing another
 ---    permission replaces it.
---- 4. Closed by its owner: the caller closes it as soon as its poll sees the
+--- 5. Closed by its owner: the caller closes it as soon as its poll sees the
 ---    grant, so nobody has to dismiss a dialog about a permission already given.
---- 5. Names the entry macOS lists: the grant belongs to the running runtime,
+--- 6. Names the entry macOS lists: the grant belongs to the running runtime,
 ---    listed as "Hammerspoon", so the steps name it and give its bundle path for
 ---    the + button. The icon shown is that runtime's own icon, the one beside
 ---    the switch in the list.
@@ -189,13 +194,13 @@ local function dialog_frame(geometry)
 	return frame
 end
 
---- Raises the open window of a session.
+--- Raises the open window of a session within its own level: show() orders
+--- it front without the screen-saver level bringToFront(true) would set.
 --- @param session table The open dialog.
 --- @return boolean raised
 local function raise(session)
 	local ok, err = pcall(function()
 		session.webview:show()
-		session.webview:bringToFront(true)
 	end)
 	if not ok then
 		Logger.warn(LOG, "The %s permission dialog could not be raised: %s.", session.kind, tostring(err))
@@ -273,6 +278,7 @@ function M.show(spec)
 		usercontent   = usercontent,
 		html_string   = M.render(content, spec.bundle_path, app_icon_url()),
 		inject_i18n   = false,
+		focus         = false,
 		on_close      = function()
 			if _session == session then
 				_session = nil
