@@ -42,9 +42,7 @@
  * @returns {Menu} Populated count submenu.
  */
 LLM_Menu_BuildNMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_num_predictions", (*) => _LLM_Menu_NRows())
-	return m
+	return MenuRenderer_NewFromList("llm_menu", "llm_num_predictions", (*) => _LLM_Menu_NRows())
 }
 
 /**
@@ -81,9 +79,7 @@ _LLM_Menu_NRows() {
  * @returns {Menu} Populated trigger submenu.
  */
 LLM_Menu_BuildTriggerMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_trigger", (*) => _LLM_Menu_TriggerRows())
-	return m
+	return MenuRenderer_NewFromList("llm_menu", "llm_trigger", (*) => _LLM_Menu_TriggerRows())
 }
 
 /**
@@ -154,9 +150,7 @@ _LLM_Menu_TriggerRows() {
  * @returns {Menu} Populated live mode submenu.
  */
 LLM_Menu_BuildLiveModeMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_live_mode", (*) => _LLM_Menu_LiveModeRows())
-	return m
+	return MenuRenderer_NewFromList("llm_menu", "llm_live_mode", (*) => _LLM_Menu_LiveModeRows())
 }
 
 /**
@@ -211,9 +205,7 @@ _LLM_Menu_MakeLiveModeHandler(ProfileId) {
  * @returns {Menu} Populated generation submenu.
  */
 LLM_Menu_BuildGenerationMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_generation_settings", (*) => _LLM_Menu_GenerationRows())
-	return m
+	return MenuRenderer_NewFromList("llm_menu", "llm_generation_settings", (*) => _LLM_Menu_GenerationRows())
 }
 
 /**
@@ -305,9 +297,7 @@ _LLM_Menu_GenerationRows() {
  * @returns {Menu} Populated display submenu.
  */
 LLM_Menu_BuildDisplayMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_display", (*) => _LLM_Menu_DisplayRows())
-	return m
+	return MenuRenderer_NewFromList("llm_menu", "llm_display", (*) => _LLM_Menu_DisplayRows())
 }
 
 /**
@@ -407,9 +397,7 @@ _LLM_Menu_DisplayRows() {
  * @returns {Menu} Populated navigation submenu.
  */
 LLM_Menu_BuildNavMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_navigation", (*) => _LLM_Menu_NavRows())
-	return m
+	return MenuRenderer_NewFromList("llm_menu", "llm_navigation", (*) => _LLM_Menu_NavRows())
 }
 
 /**

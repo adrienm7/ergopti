@@ -703,11 +703,13 @@ end
 
 --- The transform callback may return false to decline: nothing is pasted, the
 --- clipboard is restored and `on_declined` runs once the clipboard is released.
+--- With nothing selected, `on_empty` runs once the clipboard is released.
 --- @param transform_func function Receives the selection; returns the text to paste, or false.
 --- @param parent string|nil Stable action parent.
 --- @param on_declined function|nil Runs after a decline released the clipboard.
+--- @param on_empty function|nil Runs after an empty selection released the clipboard.
 --- @return boolean started
-local function do_transform(transform_func, parent, on_declined)
+local function do_transform(transform_func, parent, on_declined, on_empty)
 	local scope = text_scope(parent)
 	if scope.paused == true then return false end
 	if _transform_in_flight then
@@ -885,7 +887,13 @@ local function do_transform(transform_func, parent, on_declined)
 		-- Cmd+C with nothing selected leaves the cleared clipboard empty: the
 		-- user's choice, not a failure
 		if selection == nil or selection == "" then
-			end_without_paste("Text transform skipped: nothing is selected.")
+			if end_without_paste("Text transform skipped: nothing is selected.")
+				and type(on_empty) == "function" then
+				local ok_empty, empty_error = xpcall(on_empty, debug.traceback)
+				if not ok_empty then
+					Logger.error(LOG, "Text transform empty-selection callback failed: %s.", tostring(empty_error))
+				end
+			end
 			return
 		end
 		local ok_transform, transformed = call_text_boundary(owner, transform_func, selection)
@@ -1625,19 +1633,24 @@ end
 
 --- Reads the current selection through the clipboard, like wrap_selection,
 --- without changing the document: the user's clipboard is restored before
---- `on_selection` runs. Nothing selected: logged, and `on_selection` never runs.
+--- `on_selection` runs. Nothing selected: logged, `on_selection` never runs and
+--- `on_empty`, when given, runs once the clipboard is restored.
 --- @param parent string|nil Stable action parent.
 --- @param on_selection function Receives the selected text.
+--- @param on_empty function|nil Runs when nothing is selected.
 --- @return boolean started
-function M.read_copied_selection(parent, on_selection)
+function M.read_copied_selection(parent, on_selection, on_empty)
 	if type(on_selection) ~= "function" then
 		error("read_copied_selection: on_selection must be a function")
+	end
+	if on_empty ~= nil and type(on_empty) ~= "function" then
+		error("read_copied_selection: on_empty must be a function or nil")
 	end
 	local selection = nil
 	return do_transform(function(sel)
 		selection = sel
 		return false
-	end, parent, function() on_selection(selection) end)
+	end, parent, function() on_selection(selection) end, on_empty)
 end
 
 --- Replaces the current selection with `text` and leaves `text` selected, like

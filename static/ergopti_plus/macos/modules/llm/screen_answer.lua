@@ -3,12 +3,13 @@
 --- ==============================================================================
 --- MODULE: Answers to What Is on the Screen
 --- DESCRIPTION:
---- Runs the llm_screen_region and llm_screen_full actions: a screenshot (a
---- region the user draws, or the whole screen the pointer is on) is transcribed
---- by a vision model, then the AI menu's text backend drafts a reply, a
---- translation and an explanation, offered as the prediction tooltip's
---- candidates. Accepting one types it at the caret; nothing is typed without
---- the user's acceptance.
+--- Runs the llm_screen_region, llm_screen_full and llm_screen_error actions: a
+--- screenshot (a region the user draws, or the whole screen the pointer is on)
+--- is transcribed by a vision model, then the AI menu's text backend drafts the
+--- answers of an answer set of vision.json (a reply, a translation and an
+--- explanation; or the cause of an error, then its fix), offered as the
+--- prediction tooltip's candidates. Accepting one types it at the caret;
+--- nothing is typed without the user's acceptance.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Refusals first: a paused script, the AI switched off, a text backend that
@@ -23,7 +24,8 @@
 ---    provider of api_providers.json with its stored API key.
 --- 4. The answers run one after the other on the AI menu's backend, which
 ---    serves one request at a time; each is shown as soon as it arrives, in
----    the order of vision.json.
+---    the order of vision.json. The answer set is a parameter of the flow:
+---    one capture and transcription path serves every screen action.
 --- 5. One screen reading at a time: a new trigger supersedes the previous one,
 ---    whose late results are dropped by generation.
 ---
@@ -46,6 +48,11 @@ local LOG = "llm.screen_answer"
 -- The two capture modes, one per action
 M.MODE_REGION = "region"
 M.MODE_FULL   = "full"
+
+-- The answer sets of vision.json, one per kind of screen action
+M.ANSWERS_SCREEN = "answers"
+M.ANSWERS_ERROR  = "error_answers"
+local ANSWER_SETS = { M.ANSWERS_SCREEN, M.ANSWERS_ERROR }
 
 -- screencapture flags of the region the user draws
 local REGION_FLAGS = { "-i" }
@@ -94,11 +101,13 @@ function M.config()
 		require_field(config, key, "number")
 	end
 	require_field(config, "default_models", "table")
-	require_field(config, "answers", "table")
-	if #config.answers == 0 then error("screen_answer: vision.json lists no answer") end
-	for index, answer in ipairs(config.answers) do
-		if type(answer) ~= "table" or type(answer.id) ~= "string" or type(answer.prompt) ~= "string" then
-			error("screen_answer: vision.json answer " .. index .. " needs an id and a prompt")
+	for _, set in ipairs(ANSWER_SETS) do
+		require_field(config, set, "table")
+		if #config[set] == 0 then error("screen_answer: vision.json lists no answer in '" .. set .. "'") end
+		for index, answer in ipairs(config[set]) do
+			if type(answer) ~= "table" or type(answer.id) ~= "string" or type(answer.prompt) ~= "string" then
+				error("screen_answer: vision.json " .. set .. " entry " .. index .. " needs an id and a prompt")
+			end
 		end
 	end
 	_config = config
@@ -156,21 +165,22 @@ end
 --- @param engine table The prediction engine.
 --- @param session number The tooltip surface.
 --- @param config table vision.json.
+--- @param answer_set table The answers to draft, in tooltip order.
 --- @param screen string The transcribed screen.
-local function draft_answers(generation, engine, session, config, screen)
+local function draft_answers(generation, engine, session, config, answer_set, screen)
 	local answers = {}
 	local waiting_shown = false
 	local user_text = Vision.answer_user_text(screen)
 	local Profiles = require("modules.llm.profiles")
 	local language = Profiles.prompt_language()
-	local total = #config.answers
+	local total = #answer_set
 
 	--- Shows the answers so far; false when the user closed the surface.
 	--- @param remaining number Answers still to come.
 	--- @return boolean shown
 	local function publish(remaining)
 		waiting_shown = remaining > 0
-		if engine.show_screen_answers(session, answers, #answers + remaining) then return true end
+		if engine.show_answers(session, answers, #answers + remaining) then return true end
 		Logger.info(LOG, "Screen reading stopped: its answers were dismissed or replaced.")
 		return false
 	end
@@ -180,7 +190,7 @@ local function draft_answers(generation, engine, session, config, screen)
 	local function finish()
 		if #answers == 0 then
 			Logger.warn(LOG, "Screen reading failed: no answer could be drafted.")
-			engine.close_screen_answers(session)
+			engine.close_answer_surface(session)
 			show_notice("llm.vision.read_failed")
 			return
 		end
@@ -189,14 +199,14 @@ local function draft_answers(generation, engine, session, config, screen)
 	end
 
 	--- Asks for one answer, then the next.
-	--- @param index number Position in config.answers.
+	--- @param index number Position in answer_set.
 	step = function(index)
 		if not is_current(generation, "answer") then return end
 		if index > total then
 			finish()
 			return
 		end
-		local answer = config.answers[index]
+		local answer = answer_set[index]
 		local settled = false
 		--- Moves on once this answer settled, exactly once.
 		--- @param text string|nil The answer, nil when skipped.
@@ -209,7 +219,8 @@ local function draft_answers(generation, engine, session, config, screen)
 			end
 			step(index + 1)
 		end
-		local sent = engine.request_screen_answer(Vision.fill_language(answer.prompt, language), user_text,
+		local sent = engine.request_chat_answer("Screen reading answer",
+			Vision.fill_language(answer.prompt, language), user_text,
 			config.answer_max_tokens,
 			function(raw)
 				local text = Vision.extract(raw, config.answer_tag)
@@ -236,9 +247,10 @@ end
 --- @param backend table { kind = "local"|"remote", provider, format }.
 --- @param model string The vision model.
 --- @param config table vision.json.
+--- @param answer_set table The answers to draft, in tooltip order.
 --- @param outcome string "image", "cancelled" or "failed".
 --- @param data string|nil The base64 PNG, or the failure detail.
-local function on_capture(generation, backend, model, config, outcome, data)
+local function on_capture(generation, backend, model, config, answer_set, outcome, data)
 	if not is_current(generation, "capture") then return end
 	if outcome == "cancelled" then
 		Logger.info(LOG, "Screen reading cancelled: no region was selected.")
@@ -249,9 +261,9 @@ local function on_capture(generation, backend, model, config, outcome, data)
 		show_notice("llm.vision.capture_failed")
 		return
 	end
-	local engine = dependency("modules.llm.prediction_engine", "open_screen_answers")
+	local engine = dependency("modules.llm.prediction_engine", "open_answer_surface")
 	if not engine then return end
-	local session = engine.open_screen_answers()
+	local session = engine.open_answer_surface("Screen reading")
 	if not session then
 		Logger.warn(LOG, "Screen reading stopped: the prediction tooltip could not be opened.")
 		return
@@ -269,7 +281,7 @@ local function on_capture(generation, backend, model, config, outcome, data)
 	--- @param reason string Why, for the log.
 	local function fail(reason)
 		Logger.warn(LOG, "Screen reading failed: %s.", reason)
-		engine.close_screen_answers(session)
+		engine.close_answer_surface(session)
 		show_notice("llm.vision.read_failed")
 	end
 	local function on_text(text)
@@ -279,8 +291,8 @@ local function on_capture(generation, backend, model, config, outcome, data)
 			fail(string.format("the vision answer holds no %s block (%d char(s))", config.screen_tag, #text))
 			return
 		end
-		Logger.info(LOG, "Screen read (%d char(s)); drafting %d answer(s).", #screen, #config.answers)
-		draft_answers(generation, engine, session, config, screen)
+		Logger.info(LOG, "Screen read (%d char(s)); drafting %d answer(s).", #screen, #answer_set)
+		draft_answers(generation, engine, session, config, answer_set, screen)
 	end
 	local function on_fail(reason)
 		if not is_current(generation, "transcription") then return end
@@ -333,17 +345,22 @@ end
 -- =====================================
 -- =====================================
 
---- Reads the screen and offers the answers in the prediction tooltip.
+--- Reads the screen and offers the answers of an answer set in the prediction
+--- tooltip.
 --- @param value string The binding's parameter: "<backend>" or "<backend>|<model>".
 --- @param mode string M.MODE_REGION or M.MODE_FULL.
 --- @param parent string|nil Stable action parent of the screenshot actions.
+--- @param answers string M.ANSWERS_SCREEN or M.ANSWERS_ERROR.
 --- @return boolean started True when the screenshot is being taken.
-function M.run(value, mode, parent)
+function M.run(value, mode, parent, answers)
 	if mode ~= M.MODE_REGION and mode ~= M.MODE_FULL then
 		error("screen_answer.run: mode must be MODE_REGION or MODE_FULL")
 	end
-	local engine = dependency("modules.llm.prediction_engine", "admit_screen_answers")
-	if not engine or not engine.admit_screen_answers() then return false end
+	if answers ~= M.ANSWERS_SCREEN and answers ~= M.ANSWERS_ERROR then
+		error("screen_answer.run: answers must be ANSWERS_SCREEN or ANSWERS_ERROR")
+	end
+	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
+	if not engine or not engine.admit_answer_request("Screen reading") then return false end
 	local parsed, parse_error = Vision.parse(value)
 	if not parsed then
 		Logger.warn(LOG, "Screen reading refused: invalid vision parameter '%s' (%s).",
@@ -351,6 +368,7 @@ function M.run(value, mode, parent)
 		return false
 	end
 	local config = M.config()
+	local answer_set = config[answers]
 	local model = Vision.resolve_model(parsed, config)
 	if not model then
 		Logger.info(LOG, "Screen reading refused: backend '%s' has no default vision model.", parsed.backend)
@@ -373,15 +391,15 @@ function M.run(value, mode, parent)
 	_generation = _generation + 1
 	local generation = _generation
 	local accepted = Capture.capture_image(flags, parent, config.max_image_edge, function(outcome, data)
-		on_capture(generation, backend, model, config, outcome, data)
+		on_capture(generation, backend, model, config, answer_set, outcome, data)
 	end)
 	if not accepted then
 		Logger.warn(LOG, "Screen reading stopped: the screenshot could not start.")
 		show_notice("llm.vision.capture_failed")
 		return false
 	end
-	Logger.info(LOG, "Screen reading %d started (%s, backend '%s', model %s).",
-		generation, mode, parsed.backend, model)
+	Logger.info(LOG, "Screen reading %d started (%s, %s, backend '%s', model %s).",
+		generation, mode, answers, parsed.backend, model)
 	return true
 end
 

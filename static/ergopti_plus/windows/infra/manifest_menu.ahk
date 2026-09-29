@@ -815,6 +815,23 @@ MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
 	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
 }
 
+; Returns a NEW menu filled from one list row's provider.
+;
+; The AI menu rebuilds its submenus on every open, so none of them has an
+; attached object to keep: each builder used to create its own Menu and fill
+; it, one direct Menu() per submenu. Creating it here keeps that platform call
+; in one place.
+;
+; @param MenuKey string Manifest key, for the log.
+; @param ListId string Row id, for the log.
+; @param Provider Func Returns the row array.
+; @returns {Menu} The filled menu (empty when the provider threw).
+MenuRenderer_NewFromList(MenuKey, ListId, Provider) {
+	Target := Menu()
+	MenuRenderer_FillFromList(Target, MenuKey, ListId, Provider)
+	return Target
+}
+
 ; Appends row DATA to an EXISTING menu, at its current end.
 ;
 ; The third entry point, and the narrowest: unlike MenuRenderer_FillFromList it

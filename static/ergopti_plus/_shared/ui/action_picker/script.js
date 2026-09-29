@@ -27,7 +27,9 @@
  * from the list the host passes (`promptChoices`, `defaultCount`), and posts
  * "<profile_id>" or "<profile_id>|<count>". An llm_vision action opens a choice
  * of vision backend (`visionChoices`: {value, label, defaultModel}) and an
- * optional model name, and posts "<backend>" or "<backend>|<model>".
+ * optional model name, and posts "<backend>" or "<backend>|<model>". An
+ * llm_language action opens a choice of target language (`languageChoices`:
+ * {value, label}, the interface language first) and posts its value.
  * Other kinds (a URL, a wrap pair) confirm without one and keep the host's own
  * prompt.
  *
@@ -105,6 +107,7 @@ function init(data) {
 	promptChoices = Array.isArray(data.promptChoices) ? data.promptChoices : null;
 	defaultCount = typeof data.defaultCount === 'number' ? data.defaultCount : null;
 	visionChoices = Array.isArray(data.visionChoices) ? data.visionChoices : null;
+	languageChoices = Array.isArray(data.languageChoices) ? data.languageChoices : null;
 	if (paramStrings) {
 		el('param-back').textContent = paramStrings.back || '';
 		el('param-save').textContent = paramStrings.save || '';
@@ -112,6 +115,7 @@ function init(data) {
 		el('param-count-label').textContent = paramStrings.countLabel || '';
 		el('param-vision-provider-label').textContent = paramStrings.visionProviderLabel || '';
 		el('param-vision-model-label').textContent = paramStrings.visionModelLabel || '';
+		el('param-language-label').textContent = paramStrings.languageLabel || '';
 	}
 	if (editing) closeParamEditor();
 
@@ -433,7 +437,7 @@ function headingDomToEntry(nth) {
 
 // The parameter kinds this page edits itself. Every other kind is left to the
 // host's own prompt, which receives a confirm without a `parameter`.
-const EDITABLE_KINDS = new Set(['text', 'key', 'shortcut', 'llm_prompt', 'llm_vision']);
+const EDITABLE_KINDS = new Set(['text', 'key', 'shortcut', 'llm_prompt', 'llm_vision', 'llm_language']);
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
 // Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
@@ -453,6 +457,10 @@ let defaultCount = null;
 // Host-supplied for llm_vision: the vision backends a binding may use
 // ([{value: id, label, defaultModel}], defaultModel "" when it needs one).
 let visionChoices = null;
+
+// Host-supplied for llm_language: the target languages a binding may name
+// ([{value, label}]: "ui" for the interface language, then every locale).
+let languageChoices = null;
 
 // The entry being edited, or null while the list is shown.
 let editing = null;
@@ -560,6 +568,7 @@ function parseParameter(kind, value) {
 	if (kind === 'shortcut') return parseSendShortcut(value);
 	if (kind === 'llm_prompt') return parseLlmPrompt(value) === null ? null : value;
 	if (kind === 'llm_vision') return parseLlmVision(value) === null ? null : value;
+	if (kind === 'llm_language') return languageChoices !== null && findLanguageChoice(value) !== null ? value : null;
 	return null;
 }
 
@@ -610,6 +619,7 @@ function canEdit(entry) {
 	if (!entry || !EDITABLE_KINDS.has(entry.parameter) || paramStrings === null) return false;
 	if (entry.parameter === 'llm_prompt') return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
 	if (entry.parameter === 'llm_vision') return visionChoices !== null && visionChoices.length > 0;
+	if (entry.parameter === 'llm_language') return languageChoices !== null && languageChoices.length > 0;
 	return SEND_INPUT_KINDS.has(entry.parameter) && sendVocabulary !== null;
 }
 
@@ -678,6 +688,21 @@ function visionChoiceValue() {
 	return choice && choice.defaultModel ? backend : null;
 }
 
+// The language choice a value names, or null.
+function findLanguageChoice(value) {
+	for (const choice of languageChoices) if (choice.value === value) return choice;
+	return null;
+}
+
+// Fills the target languages, selecting the binding's value; a value naming
+// no offered language starts from the first choice (the interface language).
+function fillLanguageChoices(value) {
+	const select = el('param-language-select');
+	select.innerHTML = '';
+	for (const choice of languageChoices) appendOption(select, choice.value, choice.label);
+	select.value = findLanguageChoice(value || '') !== null ? value : languageChoices[0].value;
+}
+
 // The value the prompt choices describe.
 function promptChoiceValue() {
 	const count = el('param-count').value;
@@ -688,14 +713,16 @@ function openParamEditor(entry) {
 	editing = entry;
 	const choosing = entry.parameter === 'llm_prompt';
 	const vision = entry.parameter === 'llm_vision';
+	const language = entry.parameter === 'llm_language';
 	el('param-title').textContent = entry.label;
-	el('param-prompt').textContent = choosing || vision ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
+	el('param-prompt').textContent = choosing || vision || language ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
 	el('param-hint').textContent = entry.parameter === 'key' ? paramStrings.captureKey
 		: entry.parameter === 'shortcut' ? paramStrings.captureShortcut : '';
 	el('param-error').hidden = true;
-	el('param-input').hidden = choosing || vision;
+	el('param-input').hidden = choosing || vision || language;
 	el('param-choice').hidden = !choosing;
 	el('param-vision').hidden = !vision;
+	el('param-language').hidden = !language;
 	el('param').hidden = false;
 	el('list').hidden = true;
 	el('search-bar').hidden = true;
@@ -707,6 +734,11 @@ function openParamEditor(entry) {
 	if (vision) {
 		fillVisionChoices(entry.parameterValue);
 		el('param-vision-provider').focus();
+		return;
+	}
+	if (language) {
+		fillLanguageChoices(entry.parameterValue);
+		el('param-language-select').focus();
 		return;
 	}
 	el('param-input').value = entry.parameterValue || '';
@@ -726,7 +758,8 @@ function closeParamEditor() {
 function saveParameter() {
 	if (!editing) return;
 	const value = editing.parameter === 'llm_prompt' ? promptChoiceValue()
-		: editing.parameter === 'llm_vision' ? visionChoiceValue() : el('param-input').value;
+		: editing.parameter === 'llm_vision' ? visionChoiceValue()
+		: editing.parameter === 'llm_language' ? el('param-language-select').value : el('param-input').value;
 	if (value === null || parseParameter(editing.parameter, value) === null) {
 		el('param-error').textContent = (paramStrings.errors || {})[editing.parameter] || '';
 		el('param-error').hidden = false;
@@ -805,7 +838,8 @@ function onParamKeydown(e) {
 	const input = el('param-input');
 	if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
 	else if (editing.parameter === 'shortcut') onShortcutCaptureKeydown(e, input);
-	else if (editing.parameter === 'llm_prompt' || editing.parameter === 'llm_vision') onChoiceEditorKeydown(e);
+	else if (editing.parameter === 'llm_prompt' || editing.parameter === 'llm_vision'
+		|| editing.parameter === 'llm_language') onChoiceEditorKeydown(e);
 	else onPlainEditorKeydown(e, input);
 	return true;
 }

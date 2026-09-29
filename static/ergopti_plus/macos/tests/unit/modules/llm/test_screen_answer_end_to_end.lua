@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Answers to What Is on the Screen End to End (llm-vision)
 --- DESCRIPTION:
---- Runs the llm_screen_region and llm_screen_full actions without a model or a
---- screen: the real gesture action registry, screen-answer flow, prediction
+--- Runs the llm_screen_region, llm_screen_full and llm_screen_error actions
+--- without a model or a screen: the real gesture action registry, screen-answer flow, prediction
 --- engine refusals and tooltip surface, LLM core dispatcher, remote backend
 --- (an OpenAI entry for the vision request, Cerebras as the AI menu's text
 --- backend) and local backend. Only the boundaries are faked: the screenshot
@@ -19,7 +19,8 @@
 --- request carries the captured image in the provider's dialect with its key,
 --- the answers run on the AI menu's backend with the vision.json prompts, the
 --- tooltip offers them in order, and accepting one types it at the caret
---- without erasing anything.
+--- without erasing anything. The error explanation (llm_screen_error) reuses
+--- that flow with the error_answers of vision.json: the cause, then the fix.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -238,7 +239,9 @@ local function build_world()
 	engine.set_llm_enabled(true)
 	world.flow = require("modules.llm.screen_answer")
 	package.loaded["modules.keymap"] = {
-		request_screen_answers = function(value, mode, parent) return world.flow.run(value, mode, parent) end,
+		request_screen_answers = function(value, mode, parent, answers)
+			return world.flow.run(value, mode, parent, answers)
+		end,
 	}
 	world.language = require("modules.llm.profiles").prompt_language()
 	return world
@@ -261,18 +264,21 @@ local function answer(post, content)
 	post.callback({ ok = true, status = 200, body = completion_body(content), headers = {} })
 end
 
---- Asserts that text request `index` drafts answer `index` of vision.json.
+--- Asserts that text request `index` drafts answer `index` of an answer set of
+--- vision.json.
 --- @param world table
 --- @param index number
-local function assert_answer_request(world, index)
+--- @param set string|nil The answer set, "answers" when omitted.
+local function assert_answer_request(world, index, set)
+	local answers = CONFIG[set or "answers"]
 	local post = world.text_posts[index]
 	helpers.assert_true(post ~= nil, "answer request " .. index .. " is on the wire")
 	helpers.assert_true(post.url:find("https://api.cerebras.ai/v1/chat/completions", 1, true) == 1,
 		"the AI menu's backend answers: " .. tostring(post.url))
 	helpers.assert_eq(post.body.model, TEXT_MODEL)
 	helpers.assert_eq(post.body.messages[1].content,
-		Vision.fill_language(CONFIG.answers[index].prompt, world.language),
-		"the prompt of answer '" .. CONFIG.answers[index].id .. "'")
+		Vision.fill_language(answers[index].prompt, world.language),
+		"the prompt of answer '" .. answers[index].id .. "'")
 	helpers.assert_eq(post.body.messages[2].content, "SCREEN:\n" .. SCREEN, "the transcribed screen, as is")
 	helpers.assert_eq(post.body.max_tokens, CONFIG.answer_max_tokens)
 	helpers.assert_true(post.body.stream ~= true, "no streaming")
@@ -301,9 +307,10 @@ end
 
 --- Runs a region reading up to the transcribed screen.
 --- @param world table
+--- @param action string|nil The screen action, llm_screen_region when omitted.
 --- @return table capture The recorded capture.
-local function read_screen(world)
-	helpers.assert_eq(trigger(world, "llm_screen_region", "openai|gpt-4.1-mini"), true)
+local function read_screen(world, action)
+	helpers.assert_eq(trigger(world, action or "llm_screen_region", "openai|gpt-4.1-mini"), true)
 	local capture = world.captures[#world.captures]
 	capture.on_image("image", IMAGE)
 	answer(world.vision_posts[#world.vision_posts], "SCREEN: " .. SCREEN)
@@ -502,5 +509,73 @@ helpers.describe("screen answers end to end (llm-vision)", function()
 		answer(world.text_posts[2], "ANSWER: " .. ANSWERS[2])
 		helpers.assert_eq(#world.text_posts, 2, "nothing more is asked")
 		helpers.assert_eq(#world.engine.get_predictions(), 0, "nothing reappears")
+	end)
+end)
+
+local ERROR_SCREEN_CAUSE = "La commande npm est introuvable : Node.js n'est pas installé."
+local ERROR_SCREEN_FIX = "brew install node"
+
+helpers.describe("error explanation end to end (llm_screen_error)", function()
+	helpers.it("reads a region, explains the cause, then offers the fix, and types the fix", function()
+		local world = build_world()
+		helpers.assert_eq(trigger(world, "llm_screen_error", "openai|gpt-4.1-mini"), true)
+		helpers.assert_eq(#world.captures, 1, "one screenshot")
+		helpers.assert_true(deep_equal(world.captures[1].flags, { "-i" }), "the user draws the region")
+		world.captures[1].on_image("image", IMAGE)
+		helpers.assert_eq(#world.vision_posts, 1, "the same vision request as the other screen actions")
+		helpers.assert_eq(world.vision_posts[1].body.messages[1].content, CONFIG.read_prompt)
+		answer(world.vision_posts[1], "SCREEN: " .. SCREEN)
+
+		helpers.assert_eq(#CONFIG.error_answers, 2)
+		helpers.assert_eq(#world.text_posts, 1, "the cause is asked first")
+		assert_answer_request(world, 1, "error_answers")
+		helpers.assert_true(world.text_posts[1].body.messages[1].content:find("{language}", 1, true) == nil,
+			"the interface language is filled in, like the other screen answers")
+		answer(world.text_posts[1], "ANSWER: " .. ERROR_SCREEN_CAUSE)
+		helpers.assert_eq(#world.text_posts, 2, "then the fix")
+		assert_answer_request(world, 2, "error_answers")
+		answer(world.text_posts[2], "ANSWER: " .. ERROR_SCREEN_FIX)
+
+		local render = world.renders[#world.renders]
+		helpers.assert_eq(#render.texts, 2)
+		helpers.assert_eq(render.texts[1], ERROR_SCREEN_CAUSE, "the cause comes first")
+		helpers.assert_eq(render.texts[2], ERROR_SCREEN_FIX, "then the fix")
+		helpers.assert_nil(render.loading)
+		helpers.assert_eq(#world.text_posts, 2, "no reply, translation or explanation is drafted")
+
+		local shown = world.engine.get_predictions()
+		helpers.assert_eq(shown[2].deletes, 0)
+		local result, backspaces, typed = accept(shown[2], "$ ")
+		helpers.assert_eq(result.applied, true)
+		helpers.assert_eq(backspaces, 0, "nothing is erased")
+		helpers.assert_eq(typed, ERROR_SCREEN_FIX, "the fix is typed at the caret")
+		helpers.assert_eq(result.state.buffer, "$ " .. ERROR_SCREEN_FIX)
+	end)
+
+	helpers.it("refuses before any capture when the AI is off", function()
+		local world = build_world()
+		world.engine.set_llm_enabled(false)
+		trigger(world, "llm_screen_error", "openai|gpt-4.1-mini")
+		helpers.assert_eq(#world.captures, 0, "no screenshot")
+		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+	end)
+
+	helpers.it("skips a failing answer and fails only when both do", function()
+		local world = build_world()
+		read_screen(world, "llm_screen_error")
+		world.text_posts[1].callback({ ok = false, status = 500, body = "{}", headers = {} })
+		helpers.assert_eq(#world.text_posts, 2, "the fix is still asked")
+		answer(world.text_posts[2], "ANSWER: " .. ERROR_SCREEN_FIX)
+		local shown = world.engine.get_predictions()
+		helpers.assert_eq(#shown, 1, "only the fix")
+		helpers.assert_eq(shown[1].to_type, ERROR_SCREEN_FIX)
+		helpers.assert_eq(#world.notices, 0)
+
+		local failed = build_world()
+		read_screen(failed, "llm_screen_error")
+		answer(failed.text_posts[1], "no tag")
+		answer(failed.text_posts[2], "no tag either")
+		helpers.assert_eq(failed.notices[1], require("infra.i18n").get("llm.vision.read_failed"))
+		helpers.assert_eq(#failed.engine.get_predictions(), 0)
 	end)
 end)

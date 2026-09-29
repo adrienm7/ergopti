@@ -2095,7 +2095,8 @@ end
 --- Sends one chat request with a system prompt of the caller's own to the
 --- current backend and hands back the model's answer unparsed: no profile, no
 --- PREFIX/TAIL turn, no line mode, no streaming. The screen-reading answers
---- (modules/llm/screen_answer.lua) run on it.
+--- (modules/llm/screen_answer.lua) and the selection translation
+--- (modules/llm/selection_translation.lua) run on it.
 --- @param system_prompt string The system prompt, placeholders already filled.
 --- @param user_text string The user turn.
 --- @param model_name string The current model.

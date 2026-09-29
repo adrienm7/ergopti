@@ -2196,59 +2196,65 @@ function M.request_selection_rewrite(profile_id, source, on_raw, on_fail)
 	return true
 end
 
---- Refuses a screen reading (modules/llm/screen_answer.lua) like a manual
---- prediction, before anything is captured, and shows the same notices. The
---- typed context is irrelevant: the text comes from the screen.
---- @return boolean admitted True when the text backend can draft answers.
-function M.admit_screen_answers()
-	if not require_state("admit_screen_answers") then return false end
+--- Refuses an answer request (the screen reading of modules/llm/screen_answer.lua,
+--- the translation of modules/llm/selection_translation.lua) like a manual
+--- prediction, before anything is captured or read, and shows the same notices.
+--- The typed context is irrelevant: the text comes from the screen or the
+--- selection.
+--- @param label string What is refused, for the log ("Screen reading").
+--- @return boolean admitted True when the text backend can answer.
+function M.admit_answer_request(label)
+	if not require_state("admit_answer_request") then return false end
 	local reason = manual_refusal()
 	if reason and reason ~= "empty_context" then
-		Logger.info(LOG, "Screen reading refused (%s).", reason)
+		Logger.info(LOG, "%s refused (%s).", tostring(label), reason)
 		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
 		return false
 	end
 	return true
 end
 
---- Sends one screen-reading answer request to the current backend: a plain
---- chat turn with the caller's system prompt, answered unparsed, with no
+--- Sends one answer request to the current backend: a plain chat turn with the
+--- caller's system prompt, answered unparsed, with no PREFIX/TAIL turn, no
 --- tooltip and no streaming.
---- @param system_prompt string The answer prompt, {language} filled.
---- @param user_text string The user turn (the transcribed screen).
+--- @param label string What is requested, for the log ("Screen reading answer").
+--- @param system_prompt string The system prompt, placeholders filled.
+--- @param user_text string The user turn.
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the model's answer.
 --- @param on_fail function Called when no answer came back.
 --- @return boolean requested True when the request was sent.
-function M.request_screen_answer(system_prompt, user_text, max_tokens, on_raw, on_fail)
-	if not require_state("request_screen_answer") then return false end
+function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_raw, on_fail)
+	if not require_state("request_chat_answer") then return false end
 	local reason = manual_refusal()
 	if reason and reason ~= "empty_context" then
-		Logger.info(LOG, "Screen reading answer refused (%s).", reason)
+		Logger.info(LOG, "%s refused (%s).", tostring(label), reason)
 		return false
 	end
 	local model_ok, model = xpcall(core_llm.get_current_model, debug.traceback)
 	if not model_ok or type(model) ~= "string" or model == "" then
-		Logger.error(LOG, "Screen reading answer refused: no current model (%s).", tostring(model))
+		Logger.error(LOG, "%s refused: no current model (%s).", tostring(label), tostring(model))
 		return false
 	end
 	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_text, debug.traceback,
 		system_prompt, user_text, model, temperature, max_tokens, on_raw, on_fail)
 	if not dispatch_ok then
-		Logger.error(LOG, "Screen reading answer dispatch raised: %s.", tostring(dispatch_err))
+		Logger.error(LOG, "%s dispatch raised: %s.", tostring(label), tostring(dispatch_err))
 		return false
 	end
 	return true
 end
 
---- Opens the prediction tooltip for screen-reading answers: it supersedes any
---- prediction in flight or shown, and shows the loading row until the first
---- answer. The backend is not cancelled: the answers themselves run on it.
+--- Opens the prediction tooltip for answers (screen reading, translation): it
+--- supersedes any prediction in flight or shown, and shows the loading row
+--- until the first answer. The backend is not cancelled: the answers themselves
+--- run on it.
+--- @param label string What the surface shows, for the log ("Screen reading").
 --- @return number|nil session The surface's id, nil when it could not be shown.
-function M.open_screen_answers()
-	if not runtime_available() or not require_state("open_screen_answers") then return nil end
+function M.open_answer_surface(label)
+	if not runtime_available() or not require_state("open_answer_surface") then return nil end
 	if stop_inactivity_timer() ~= true then
-		Logger.error(LOG, "Screen reading surface refused: the prediction timer did not stop.")
+		Logger.error(LOG, "%s surface refused: the prediction timer did not stop.", tostring(label))
 		return nil
 	end
 	pending_predictions = {}
@@ -2264,37 +2270,44 @@ function M.open_screen_answers()
 		return tooltip.show_loading(i18n.get("llm.generating"), is_ai_preview_enabled, tooltip.tint("ai_loading"))
 	end, debug.traceback)
 	if not shown_ok or shown ~= true then
-		Logger.error(LOG, "Screen reading loading surface did not commit (result: %s).", tostring(shown))
+		Logger.error(LOG, "%s loading surface did not commit (result: %s).", tostring(label), tostring(shown))
 		return nil
 	end
 	if fetch_request_counter ~= session then return nil end
-	Logger.debug(LOG, "Screen reading surface %d opened.", session)
+	Logger.debug(LOG, "%s surface %d opened.", tostring(label), session)
 	return session
 end
 
---- Shows the screen-reading answers received so far as the tooltip's
---- candidates, in order, with the usual navigation; accepting one types it at
---- the caret without erasing anything (deletes 0, typed verbatim).
---- @param session number What open_screen_answers returned.
+--- Shows the answers received so far as the tooltip's candidates, in order,
+--- with the usual navigation. Accepting one types it at the caret without
+--- erasing anything (deletes 0, typed verbatim), or, when `on_accept` is given,
+--- hands its text to `on_accept` instead (the translation replaces the
+--- selection).
+--- @param session number What open_answer_surface returned.
 --- @param answers table The answer texts, in answer order.
 --- @param expected number How many answers are still coming in total; a loading
 ---        row stands for the missing ones.
+--- @param on_accept function|nil Receives the accepted text; returns true when
+---        it was applied.
 --- @return boolean shown False when the surface is gone (the user typed,
 ---         accepted or dismissed it, or a newer request replaced it).
-function M.show_screen_answers(session, answers, expected)
-	if not runtime_available() or not require_state("show_screen_answers") then return false end
+function M.show_answers(session, answers, expected, on_accept)
+	if not runtime_available() or not require_state("show_answers") then return false end
 	if type(answers) ~= "table" or #answers == 0 then
-		error("show_screen_answers: at least one answer is required")
+		error("show_answers: at least one answer is required")
+	end
+	if on_accept ~= nil and type(on_accept) ~= "function" then
+		error("show_answers: on_accept must be a function or nil")
 	end
 	if session ~= fetch_request_counter then
-		Logger.info(LOG, "Screen reading answers dropped: their surface is gone.")
+		Logger.info(LOG, "Answers dropped: their surface is gone.")
 		return false
 	end
 	local predictions = {}
 	for _, text in ipairs(answers) do
 		predictions[#predictions + 1] = {
 			deletes = 0, to_type = text, nw = text, chunks = {},
-			has_corrections = false, disable_bold = true, verbatim = true,
+			has_corrections = false, disable_bold = true, verbatim = true, on_accept = on_accept,
 		}
 	end
 	local waiting = #answers < expected
@@ -2307,7 +2320,7 @@ function M.show_screen_answers(session, answers, expected)
 			session, function() return runtime_available() and fetch_request_counter == session end)
 	end, debug.traceback)
 	if not shown_ok or shown ~= true then
-		Logger.error(LOG, "Screen reading answers did not paint (result: %s).", tostring(shown))
+		Logger.error(LOG, "Answers did not paint (result: %s).", tostring(shown))
 		return false
 	end
 	if fetch_request_counter ~= session then return false end
@@ -2317,14 +2330,14 @@ function M.show_screen_answers(session, answers, expected)
 	return true
 end
 
---- Closes a screen-reading surface that ends with no answer, unless the user
---- or a newer request already replaced it.
---- @param session number What open_screen_answers returned.
-function M.close_screen_answers(session)
+--- Closes an answer surface that ends with no answer, unless the user or a
+--- newer request already replaced it.
+--- @param session number What open_answer_surface returned.
+function M.close_answer_surface(session)
 	if session ~= fetch_request_counter then return end
 	local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
 	if not reset_ok or reset_result ~= true then
-		Logger.error(LOG, "Screen reading surface close did not commit (result: %s).", tostring(reset_result))
+		Logger.error(LOG, "Answer surface close did not commit (result: %s).", tostring(reset_result))
 	end
 end
 

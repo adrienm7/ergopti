@@ -552,6 +552,8 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/tone_action.ahk
 #Include ../modules/llm/vision.ahk
 #Include ../modules/llm/vision_action.ahk
+#Include ../modules/llm/translate.ahk
+#Include ../modules/llm/translate_action.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_semantic_config_identity.ahk
@@ -682,6 +684,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_prompt_prediction.ahk
 #Include unit/test_llm_tone.ahk
 #Include unit/test_llm_vision.ahk
+#Include unit/test_llm_translate.ahk
 #Include unit/test_llm_live_mode.ahk
 #Include unit/test_send_input_actions.ahk
 #Include unit/test_tap_keys.ahk

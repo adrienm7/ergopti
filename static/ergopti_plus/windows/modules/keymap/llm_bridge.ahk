@@ -1433,6 +1433,25 @@ LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
 		_LLM_Bridge_OnInjectComplete.Bind(Transaction))
 }
 
+; Selects the text an accepted slot typed again when the slot asks for it: a
+; translation replaces the selection it was made from (llm_translate_selection)
+; and stays selected, like a tone step, so the next action applies to it.
+; @param {Object} Transaction The completed acceptance transaction.
+; @returns {Boolean} True when the typed text was selected again.
+_LLM_Bridge_SelectAcceptedText(Transaction) {
+	Slots := Transaction.Slots
+	Index := Transaction.ActiveIdx
+	if !(Slots is Array) || Index < 1 || Index > Slots.Length
+		return false
+	Slot := Slots[Index]
+	if !IsObject(Slot) || !Slot.HasOwnProp("SelectAfterAccept") || !Slot.SelectAfterAccept
+		return false
+	if TextSelectBack(LLM_Rewrite_CodepointLength(Transaction.Text))
+		return true
+	try LoggerWarn("LLM", "Accepted text typed over the selection but not selected again.")
+	return false
+}
+
 ; Invoked after TextSender atomically emitted the accepted prediction and
 ; committed the canonical metrics row and every RAM mirror. This open-thread
 ; phase owns only tooltip teardown and the acceptance-claim lifecycle.
@@ -1455,6 +1474,9 @@ _LLM_Bridge_OnInjectComplete(Transaction, Ok := true, ErrorMessage := "") {
 			Transaction.PresentedRecord)
 		_LLM_Accept_DeferClaimRelease()
 		HideQueued := true
+		; After the teardown is queued: the selection is a courtesy, never a
+		; reason to leave the accepted offer on screen
+		_LLM_Bridge_SelectAcceptedText(Transaction)
 	} finally {
 		; A failed sender callback (or a failure while committing its state) never
 		; reaches the success path that normally releases the acceptance claim.

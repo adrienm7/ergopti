@@ -31,6 +31,13 @@
  * 7. Live mode (modules/llm/prediction_live.ahk) is included by the prediction
  *    engine, its action is registered, the automatic trigger and the hotstring
  *    chain arm its override, pausing ends it and the AI menu draws its row.
+ * 8. "Why this error?" (llm_screen_error) is a screen action drafting
+ *    vision.json's error_answers; the selection translation port
+ *    (modules/llm/translate.ahk) and its action (translate_action.ahk) are
+ *    included after the screen actions whose sender they share, their test
+ *    replays the shared translate corpus, the llm_language kind is validated,
+ *    prompted and sent to the picker, and an accepted translation is selected
+ *    again by the bridge's completion.
  *
  * ROOT CAUSE ENCODED:
  * A module that no runner includes, or a list restated by hand, fails silently
@@ -117,6 +124,12 @@ for (const [label, list, prefix] of [
 		vision >= 0 && visionAction > vision && gestures > visionAction,
 		`${label} must include vision.ahk, then vision_action.ahk, before the gesture actions registered from them`
 	);
+	const translate = position(list, `${prefix}modules/llm/translate.ahk`);
+	const translateAction = position(list, `${prefix}modules/llm/translate_action.ahk`);
+	check(
+		translate > visionAction && translateAction > translate && gestures > translateAction,
+		`${label} must include translate.ahk, then translate_action.ahk, after vision_action.ahk and before the gesture actions`
+	);
 }
 check(
 	position(bench, '../modules/llm/rewrite.ahk') >= 0 &&
@@ -131,6 +144,7 @@ const TESTS = {
 	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json',
 	'unit/test_llm_tone.ahk': 'tone_vectors.json',
 	'unit/test_llm_vision.ahk': 'vision_vectors.json',
+	'unit/test_llm_translate.ahk': 'translate_vectors.json',
 	'unit/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
@@ -351,6 +365,66 @@ check(
 		'LLM_Bridge_ReissueLiveAfterExpansion()'
 	),
 	'a hotstring expansion must re-issue the live request on the expanded text'
+);
+
+// 8. "Why this error?" and the selection translation.
+check(
+	visionActions.includes('"llm_screen_error", "region"') &&
+		bodyOf(visionActions, 'LLM_Vision_AnswersKey').includes('"error_answers"'),
+	'llm_screen_error must be a region screen action drafting error_answers'
+);
+check(
+	bodyOf(actions, 'GestureScreenVision').includes('LLM_Vision_AnswersKey(ActionId)'),
+	'every screen action must run its own answer list'
+);
+check(
+	bodyOf(visionActions, '_LLM_Vision_NextAnswer').includes('Flow["prompts"]') &&
+		!visionActions.includes('Config["answers"]'),
+	'the screen flow must draft the answer list it was started with, never a fixed one'
+);
+check(
+	bodyOf(read('modules/llm/vision.ahk'), '_LLM_Vision_ValidateConfig').includes('"error_answers"'),
+	'vision.json must be refused without its error answers'
+);
+check(
+	actions.includes('"llm_translate_selection", {') &&
+		bodyOf(actions, 'GestureTranslateSelection').includes('LLM_Translate_Trigger('),
+	'llm_translate_selection must be a registered action running the translation'
+);
+const translateAction = read('modules/llm/translate_action.ahk');
+check(
+	bodyOf(translateAction, 'LLM_Translate_Trigger').includes('LLM_Menu_ManualPredictionRefusal(') &&
+		bodyOf(translateAction, 'LLM_Translate_Trigger').includes('LLM_SelectionReader()'),
+	'the translation must apply the manual-prediction refusals and read the selection like the tone ladder'
+);
+check(
+	bodyOf(translateAction, '_LLM_Translate_OnSelection').includes('LLM_Vision_SendText('),
+	'the translation must ask through the screen answers\' sender'
+);
+check(
+	bodyOf(translateAction, '_LLM_Translate_Show').includes('SelectAfterAccept: true'),
+	'the translation candidate must ask to stay selected once accepted'
+);
+check(
+	bodyOf(bridge, '_LLM_Bridge_OnInjectComplete').includes('_LLM_Bridge_SelectAcceptedText(Transaction)') &&
+		bodyOf(bridge, '_LLM_Bridge_SelectAcceptedText').includes('TextSelectBack('),
+	'a successful acceptance must select again a slot that asks for it'
+);
+for (const [needle, why] of [
+	['if (Spec = "llm_language") {', 'validates the llm_language kind'],
+	['t("dialog.gestures.param_err_llm_language")', "refuses with the kind's error text"],
+	['case "llm_language":', 'prompts for the llm_language kind'],
+	['LLM_Translate_ChoicesText()', 'lists the languages in the prompt']
+]) {
+	check(gestureConfig.includes(needle), `modules/gestures/config.ahk ${why}: ${needle}`);
+}
+for (const field of ['languageChoices', 'languageLabel']) {
+	check(picker.includes(`"${field}"`), `the Windows action picker host must send ${field}`);
+}
+check(
+	picker.includes('_ActPickWeb_Kv("llm_language"') &&
+		bodyOf(picker, '_ActPickWeb_LanguageChoicesJson').includes('LLM_Translate_ShippedChoices()'),
+	'the picker host must send the llm_language prompt, refusal and the shipped choices'
 );
 
 if (errors.length > 0) {

@@ -295,6 +295,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
 		. '"promptChoices":' . _ActPickWeb_PromptChoicesJson() . ","
 		. '"visionChoices":' . _ActPickWeb_VisionChoicesJson() . ","
+		. '"languageChoices":' . _ActPickWeb_LanguageChoicesJson() . ","
 		. '"defaultCount":' . _ActPickWeb_DefaultCount() . ","
 		. _ActPickWeb_Kv("editCurrentLabel", t("dialog.action_picker.edit_current")) . ","
 		. '"items":[' . ItemsJson . "]"
@@ -326,9 +327,11 @@ _ActPickWeb_ParameterStringsJson() {
 	}
 	Prompts .= "," . _ActPickWeb_Kv("llm_prompt", GestureActionParameterPrompt("llm_prompt_prediction"))
 	Errors .= "," . _ActPickWeb_Kv("llm_prompt", t("dialog.gestures.param_err_llm_prompt"))
-	; Both screen actions share the kind, and so its prompt
+	; Every screen action shares the kind, and so its prompt
 	Prompts .= "," . _ActPickWeb_Kv("llm_vision", GestureActionParameterPrompt("llm_screen_region"))
 	Errors .= "," . _ActPickWeb_Kv("llm_vision", t("dialog.gestures.param_err_llm_vision"))
+	Prompts .= "," . _ActPickWeb_Kv("llm_language", GestureActionParameterPrompt("llm_translate_selection"))
+	Errors .= "," . _ActPickWeb_Kv("llm_language", t("dialog.gestures.param_err_llm_language"))
 	return "{"
 		. _ActPickWeb_Kv("save", t("button.save")) . ","
 		. _ActPickWeb_Kv("back", t("dialog.action_picker.back")) . ","
@@ -341,6 +344,7 @@ _ActPickWeb_ParameterStringsJson() {
 		. _ActPickWeb_Kv("visionModelLabel", t("dialog.action_picker.vision_model_label")) . ","
 		. _ActPickWeb_Kv("visionModelDefault", t("dialog.action_picker.vision_model_default")) . ","
 		. _ActPickWeb_Kv("visionModelRequired", t("dialog.action_picker.vision_model_required")) . ","
+		. _ActPickWeb_Kv("languageLabel", t("dialog.action_picker.language_label")) . ","
 		. '"prompts":{' . Prompts . '},"errors":{' . Errors . "}}"
 }
 
@@ -364,6 +368,17 @@ _ActPickWeb_VisionChoicesJson() {
 			. _ActPickWeb_Kv("value", Choice["value"]) . ","
 			. _ActPickWeb_Kv("label", Choice["label"]) . ","
 			. _ActPickWeb_Kv("defaultModel", Choice["defaultModel"]) . "}"
+	return "[" . Json . "]"
+}
+
+; The target languages a llm_language value may name: the interface language,
+; then every shipped locale, as the native prompt lists them.
+_ActPickWeb_LanguageChoicesJson() {
+	Json := ""
+	for Choice in LLM_Translate_ShippedChoices()
+		Json .= (Json = "" ? "" : ",") . "{"
+			. _ActPickWeb_Kv("value", Choice["value"]) . ","
+			. _ActPickWeb_Kv("label", Choice["label"]) . "}"
 	return "[" . Json . "]"
 }
 

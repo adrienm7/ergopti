@@ -45,8 +45,9 @@ global _LLM_Tone_Memory := ""
 ; Generation of the newest step; an answer carrying an older one is stale
 global _LLM_Tone_Generation := 0
 
-; Selection reader, GetSelectionAsync's signature. 0 selects the real clipboard
-; capture; the test suite installs a reader that answers synchronously.
+; Selection reader, GetSelectionAsync's signature, of every selection action
+; (LLM_SelectionReader). 0 selects the real clipboard capture; the test suite
+; installs a reader that answers synchronously.
 global _LLM_Tone_ReadSelection := 0
 
 ; Focus probe returning an identity String ("" when unknown). 0 selects the
@@ -86,14 +87,23 @@ LLM_ToneActions() {
  * @returns {Boolean} True when the selection capture started.
  */
 LLM_Tone_Trigger(Direction, Cycle) {
-	global _LLM_Tone_Generation, _LLM_Tone_ReadSelection
+	global _LLM_Tone_Generation
 	_LLM_Tone_Generation += 1
-	Reader := HasMethod(_LLM_Tone_ReadSelection, "Call") ? _LLM_Tone_ReadSelection : GetSelectionAsync
-	if !Reader.Call(_LLM_Tone_OnSelection.Bind(_LLM_Tone_Generation, Direction, Cycle)) {
+	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(_LLM_Tone_Generation, Direction, Cycle)) {
 		LoggerInfo("LLM", "Tone step skipped: the selection could not be read (paused or clipboard busy).")
 		return false
 	}
 	return true
+}
+
+/**
+ * The selection reader of the actions that work on the selection (the tone
+ * ladder, the translation): GetSelectionAsync, or the test suite's reader.
+ * @returns {Func} Called with OnText; returns false when it cannot read.
+ */
+LLM_SelectionReader() {
+	global _LLM_Tone_ReadSelection
+	return HasMethod(_LLM_Tone_ReadSelection, "Call") ? _LLM_Tone_ReadSelection : GetSelectionAsync
 }
 
 

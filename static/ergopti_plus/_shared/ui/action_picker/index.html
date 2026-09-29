@@ -30,8 +30,8 @@
 		<main id="list" tabindex="-1"></main>
 
 		<!-- The editor of a send_text / send_key / send_shortcut value, or of the
-		     prompt and count of an llm_prompt_prediction or the vision backend of a
-		     screen action, shown in place of the
+		     prompt and count of an llm_prompt_prediction, the vision backend of a
+		     screen action or the target language of a translation, shown in place of the
 		     list once such an action is picked. -->
 		<section id="param" hidden>
 			<h2 id="param-title"></h2>
@@ -49,6 +49,10 @@
 				<select id="param-vision-provider"></select>
 				<label id="param-vision-model-label" for="param-vision-model"></label>
 				<input id="param-vision-model" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+			</div>
+			<div id="param-language" hidden>
+				<label id="param-language-label" for="param-language-select"></label>
+				<select id="param-language-select"></select>
 			</div>
 			<p id="param-error" hidden></p>
 			<div class="param-buttons">

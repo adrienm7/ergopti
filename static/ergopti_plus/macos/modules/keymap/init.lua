@@ -691,6 +691,7 @@ M.set_live_prompt    = LLMBridge.set_live_prompt
 M.get_live_prompt    = LLMBridge.get_live_prompt
 M.request_tone_step = LLMBridge.request_tone_step
 M.request_screen_answers = LLMBridge.request_screen_answers
+M.request_selection_translation = LLMBridge.request_selection_translation
 M.reset_predictions  = LLMBridge.reset_predictions
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 

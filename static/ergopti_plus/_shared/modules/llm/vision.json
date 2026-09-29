@@ -1,5 +1,5 @@
 {
-	"_comment": "Screen reading for the llm_screen_region / llm_screen_full actions (_shared/lua/llm/vision.lua, windows/modules/llm/vision.ahk). A vision model first transcribes the captured screen (read_prompt, answer tagged SCREEN:); the AI menu's text backend then drafts one answer per entry of answers, in order, each tagged ANSWER:, shown as the tooltip's candidates. default_models name the vision model used when a binding names none; a backend absent from it needs a model in the binding. {language} is the user's interface language.",
+	"_comment": "Screen reading for the llm_screen_region / llm_screen_full actions (_shared/lua/llm/vision.lua, windows/modules/llm/vision.ahk). A vision model first transcribes the captured screen (read_prompt, answer tagged SCREEN:); the AI menu's text backend then drafts one answer per entry of answers, in order, each tagged ANSWER:, shown as the tooltip's candidates. default_models name the vision model used when a binding names none; a backend absent from it needs a model in the binding. {language} is the user's interface language. error_answers are the answers of llm_screen_error, in tooltip order: the explanation of the error on SCREEN in the interface language, then the fix the user can type.",
 	"screen_tag": "SCREEN:",
 	"answer_tag": "ANSWER:",
 	"image_mime": "image/png",
@@ -26,6 +26,16 @@
 		{
 			"id": "explain",
 			"prompt": "You write for a keyboard assistant. SCREEN is what the user sees.\nIn {language}, explain the error, code, table or message on SCREEN in a few sentences and, when something is wrong, say how to fix it (give the corrected command or code).\nReply with one block — nothing else:\nANSWER: <explanation>"
+		}
+	],
+	"error_answers": [
+		{
+			"id": "cause",
+			"prompt": "You help a user understand an error. SCREEN is what the user sees: a terminal, a log, a dialog or code showing an error.\nExplain in {language}, in at most three short sentences, what went wrong and its most likely cause. Quote the decisive part of the error message.\nReply with one block — nothing else:\nANSWER: <explanation>"
+		},
+		{
+			"id": "fix",
+			"prompt": "You help a user fix an error. SCREEN is what the user sees: a terminal, a log, a dialog or code showing an error.\nWrite the single most likely fix the user can type: the exact command to run, or the corrected line of code. No explanation, no markdown fence.\nReply with one block — nothing else:\nANSWER: <fix>"
 		}
 	]
 }

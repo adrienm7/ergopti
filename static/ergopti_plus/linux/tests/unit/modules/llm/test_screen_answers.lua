@@ -6,7 +6,8 @@
 --- llm_screen_region / llm_screen_full capture the screen to a private file, a
 --- vision model transcribes it, and the AI menu's text backend drafts the three
 --- answers of vision.json, offered in the prediction tooltip. Accepting one
---- types it at the caret.
+--- types it at the caret. llm_screen_error runs the same region flow with the
+--- error_answers instead: the cause, then the fix.
 ---
 --- The real engine, vision helpers, request builder, remote client, profile
 --- registry and settings run; only the boundaries are scripted: the capture
@@ -504,6 +505,117 @@ helpers.describe("screen actions: a newer action supersedes the previous one", f
 			world.respond(1, "SCREEN: " .. SCREEN)
 			helpers.assert_eq(#world.posts, 1, "no answer is requested")
 			helpers.assert_eq(#world.notices, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 5/ "Why this error?" =================
+-- ==============================================
+-- ==============================================
+
+helpers.describe("llm_screen_error: the region flow with the error answers", function()
+
+	helpers.it("registers the action", function()
+		scenario({}, function(world)
+			helpers.assert_eq(type(world.handlers.llm_screen_error), "function")
+		end)
+	end)
+
+	helpers.it("reads a region, asks the cause then the fix, offers them in order and types the fix", function()
+		scenario({}, function(world)
+			local answers = world.config.error_answers
+			helpers.assert_eq(#answers, 2, "vision.json ships two error answers")
+			helpers.assert_eq(answers[1].id, "cause")
+			helpers.assert_eq(answers[2].id, "fix")
+			helpers.assert_eq(world.handlers.llm_screen_error("tap_3", "openai"), true)
+			local capture = world.captures[1]
+			helpers.assert_eq(capture.mode, "region", "the user draws the region")
+			capture.on_done({ status = "ok", scaled = true })
+			helpers.assert_eq(exists(capture.dir), false, "the screenshot is deleted once read")
+			helpers.assert_eq(world.posts[1].owner, "llm_vision", "one vision request")
+			world.respond(1, "SCREEN: npm ERR! missing script: start")
+			for index, answer in ipairs(answers) do
+				world.wait_for(index + 1)
+				local post = assert(world.posts[index + 1], "error answer request " .. index)
+				helpers.assert_eq(post.url, "https://api.cerebras.ai/v1/chat/completions", "the menu's backend")
+				helpers.assert_eq(post.body.messages[1].content, Vision.fill_language(answer.prompt, language()),
+					answer.id .. ": its own prompt, language filled in")
+				helpers.assert_eq(post.body.messages[2].content, "SCREEN:\nnpm ERR! missing script: start",
+					answer.id .. ": the screen")
+				helpers.assert_eq(post.body.stream, false)
+				world.respond(index + 1, index == 1 and "ANSWER: The package has no start script."
+					or "ANSWER: npm run dev")
+			end
+			helpers.assert_true(world.posts[2].body.messages[1].content:find(language(), 1, true) ~= nil,
+				"the cause is asked in the interface language")
+			world.wait_for(4)
+			helpers.assert_eq(#world.posts, 3, "no third answer: the error list has two")
+			helpers.assert_eq(table.concat(offered(world), "|"), "The package has no start script.|npm run dev",
+				"cause first, fix second")
+			helpers.assert_eq(#world.typed, 0, "nothing is typed before acceptance")
+			helpers.assert_eq(world.engine.handle_shortcut({ key = "2", mods = {} }), true, "2 accepts")
+			helpers.assert_eq(world.typed[1].deletes, 0, "nothing is erased")
+			helpers.assert_eq(world.typed[1].text, "npm run dev", "the fix is typed at the caret")
+		end)
+	end)
+
+	helpers.it("skips a failing answer and offers the other", function()
+		scenario({}, function(world)
+			world.handlers.llm_screen_error("tap_3", "openai")
+			world.captures[1].on_done({ status = "ok", scaled = true })
+			world.respond(1, "SCREEN: " .. SCREEN)
+			world.wait_for(2)
+			world.posts[2].callback({ ok = false, status = 500, error = "HTTP 500" })
+			world.wait_for(3)
+			world.respond(3, "ANSWER: the fix")
+			helpers.assert_eq(table.concat(offered(world), "|"), "the fix")
+			helpers.assert_eq(#world.notices, 0)
+		end)
+	end)
+
+	helpers.it("both answers failing is a failed reading", function()
+		scenario({}, function(world)
+			world.handlers.llm_screen_error("tap_3", "openai")
+			world.captures[1].on_done({ status = "ok", scaled = true })
+			world.respond(1, "SCREEN: " .. SCREEN)
+			world.wait_for(2); world.respond(2, "no tag")
+			world.wait_for(3); world.respond(3, "no tag either")
+			helpers.assert_eq(#world.engine.get_suggestions(), 0)
+			helpers.assert_eq(world.notices[1], notice("llm.vision.read_failed"))
+		end)
+	end)
+
+	helpers.it("refuses before any capture while the AI is off, paused or without a model", function()
+		scenario({ disabled = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_error("tap_3", "openai"), false)
+			helpers.assert_eq(world.notices[1], notice("llm.manual_prediction.disabled"))
+			helpers.assert_eq(#world.captures, 0)
+		end)
+		scenario({ paused = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_error("tap_3", "openai"), false)
+			helpers.assert_eq(world.notices[1], notice("llm.manual_prediction.paused"))
+			helpers.assert_eq(#world.captures, 0)
+		end)
+		scenario({}, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_error("tap_3", "cerebras"), false)
+			helpers.assert_eq(world.notices[1], notice("llm.vision.no_model"))
+			helpers.assert_eq(#world.captures, 0)
+		end)
+	end)
+
+	helpers.it("a newer screen action supersedes it", function()
+		scenario({}, function(world)
+			world.handlers.llm_screen_error("tap_3", "openai")
+			world.handlers.llm_screen_region("tap_3", "openai")
+			helpers.assert_eq(world.captures[1].cancelled, true, "the first capture is stopped")
+			world.captures[1].on_done({ status = "ok", scaled = true })
+			helpers.assert_eq(#world.posts, 0, "the stale capture is not sent")
 		end)
 	end)
 end)

@@ -41,7 +41,7 @@ LLM_Live_Config() {
 	if (Config is Map)
 		return Config
 	Path := _SharedDir . "\modules\llm\live.json"
-	Candidate := JsonParse(FileRead(Path, "UTF-8"))
+	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Live_ValidateConfig(Candidate, Path)
 	Config := Map("debounce_ms", Candidate["debounce_ms"],
 		"min_words", Candidate["min_words"])

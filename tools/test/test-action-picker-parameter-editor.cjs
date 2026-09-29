@@ -107,7 +107,7 @@ const IDS = ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 
 	'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back', 'param-save',
 	'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label', 'btn-edit-current',
 	'param-vision', 'param-vision-provider', 'param-vision-provider-label', 'param-vision-model',
-	'param-vision-model-label'];
+	'param-vision-model-label', 'param-language', 'param-language-label', 'param-language-select'];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
 function loadPage(platform, current) {
@@ -144,14 +144,16 @@ function loadPage(platform, current) {
 			defaultCount: 3,
 			visionChoices: [{ value: 'local', label: 'Local', defaultModel: 'qwen2.5vl:3b' },
 				{ value: 'cerebras', label: 'Cerebras', defaultModel: '' }],
+			languageChoices: [{ value: 'ui', label: 'Menu (Français)' }, { value: 'en', label: 'English' },
+				{ value: 'ja', label: '日本語' }],
 			parameterStrings: {
 				save: 'Save', back: 'Back', captureKey: 'Press a key', captureShortcut: 'Press a shortcut',
 				promptLabel: 'Prompt', countLabel: 'Count', countDefault: 'Menu ({1})',
 				visionProviderLabel: 'Provider', visionModelLabel: 'Model', visionModelDefault: 'Default: {1}',
-				visionModelRequired: 'Required',
+				visionModelRequired: 'Required', languageLabel: 'Translate into',
 				prompts: { text: 'Text?', key: 'Key?', shortcut: 'Shortcut?' },
 				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut', llm_prompt: 'Bad prompt',
-					llm_vision: 'Bad vision' }
+					llm_vision: 'Bad vision', llm_language: 'Bad language' }
 			},
 			items: [
 				{ type: 'action', id: 'send_text', label: 'Type a text', parameter: 'text', parameterValue: 'salut' },
@@ -162,6 +164,8 @@ function loadPage(platform, current) {
 					parameterValue: 'rewrite|2' },
 				{ type: 'action', id: 'llm_screen_region', label: 'Screen', parameter: 'llm_vision',
 					parameterValue: 'cerebras|llama-4-scout' },
+				{ type: 'action', id: 'llm_translate_selection', label: 'Translate', parameter: 'llm_language',
+					parameterValue: 'ja' },
 				{ type: 'action', id: 'enter', label: 'Enter' }
 			]
 		})`,
@@ -424,6 +428,24 @@ function loadPage(platform, current) {
 	second.keydown({ key: 'Enter', code: 'Enter' });
 	check(second.posted.length === 1 && second.posted[0].parameter === 'cerebras|llama-4-scout',
 		'Enter saves the backend and the trimmed model');
+}
+
+// 10. The llm_language editor offers the host's languages, the interface
+//     language first, starts from the binding and saves the chosen value.
+{
+	const page = loadPage('ahk');
+	vm.runInContext("doConfirm('llm_translate_selection')", page.context);
+	check(page.byId['param-language'].hidden === false && page.byId['param-input'].hidden === true
+		&& page.byId['param-vision'].hidden === true, 'the language editor replaces the text field');
+	check(page.byId['param-language-label'].textContent === 'Translate into', 'the language label is shown');
+	check(page.byId['param-language-select'].value === 'ja', 'the editor starts from the binding');
+	check(page.byId['param-language-select'].children[0].value === 'ui', 'the interface language comes first');
+	page.byId['param-language-select'].value = 'ui';
+	page.keydown({ key: 'Enter', code: 'Enter' });
+	check(page.posted.length === 1 && page.posted[0].id === 'llm_translate_selection' && page.posted[0].parameter === 'ui',
+		'Enter saves the chosen language');
+	check(vm.runInContext("parseParameter('llm_language', 'xx')", page.context) === null,
+		'a language the host does not offer is refused');
 }
 
 if (errors.length > 0) {

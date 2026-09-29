@@ -9,6 +9,8 @@
 --- except for the tone actions, which the user fires on a selection precisely
 --- to have it replaced (llm/tone.lua). The screen actions (llm/vision.lua) offer
 --- answers to what is on the screen through the same tooltip and acceptance.
+--- The translation action (llm/translate.lua) offers the selection translated;
+--- accepting it replaces the selection the way a tone step does.
 --- Live mode (llm_live_prompt_toggle) redirects the automatic typing trigger to
 --- a chosen prompt, so a rewrite prompt shows the sentence translated or
 --- rewritten as it is typed; Tab accepts it. It owns no second pipeline.
@@ -25,11 +27,13 @@ local Rewrite = require("llm.rewrite")
 local PromptAction = require("llm.prompt_action")
 local Tone = require("llm.tone")
 local Vision = require("llm.vision")
+local Translate = require("llm.translate")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
 local VisionRequest = require("modules.llm.vision_request")
+local Translation = require("modules.llm.translation")
 local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Inference = require("modules.llm.inference")
@@ -118,11 +122,21 @@ local MANUAL_REFUSAL_KEYS = {
 -- the three drivers declare identically.
 local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
 
--- The screen actions, each with the capture mode it runs, and their notices
-local VISION_ACTIONS = { llm_screen_region = "region", llm_screen_full = "full" }
+-- The screen actions, each with the capture mode it runs and the vision.json
+-- list of answers it offers, in that order; and their notices
+local VISION_ACTIONS = {
+	llm_screen_region = { mode = "region", answers = "answers" },
+	llm_screen_full   = { mode = "full", answers = "answers" },
+	llm_screen_error  = { mode = "region", answers = "error_answers" },
+}
 local VISION_NO_MODEL_KEY = "llm.vision.no_model"
 local VISION_READ_FAILED_KEY = "llm.vision.read_failed"
 local VISION_CAPTURE_FAILED_KEY = "llm.vision.capture_failed"
+
+-- The translation action and its notices
+local TRANSLATE_ACTION = "llm_translate_selection"
+local TRANSLATE_NO_SELECTION_KEY = "llm.translate.no_selection"
+local TRANSLATE_FAILED_KEY = "llm.translate.failed"
 
 -- The live mode's action, its notices and its shipped timing
 local LIVE_ACTION = "llm_live_prompt_toggle"
@@ -905,9 +919,10 @@ function M.action_handlers()
 		local value = PromptAction.format(profile.id)
 		handlers[PRESET_ACTION_PREFIX .. profile.id] = function() return M.trigger_prompt(value) end
 	end
-	for action, mode in pairs(VISION_ACTIONS) do
-		handlers[action] = function(_, parameter) return M.read_screen(mode, parameter) end
+	for action in pairs(VISION_ACTIONS) do
+		handlers[action] = function(_, parameter) return M.read_screen(action, parameter) end
 	end
+	handlers[TRANSLATE_ACTION] = function(_, parameter) return M.translate_selection(parameter) end
 	for _, step in ipairs(TONE_DIRECTIONS) do
 		for _, cycle in ipairs({ false, true }) do
 			handlers[TONE_ACTION_PREFIX .. step.name .. (cycle and TONE_CYCLE_SUFFIX or "")] = function()
@@ -1151,39 +1166,97 @@ local function vision_current(flow)
 	return _vision_flow == flow and flow.generation == _vision_generation
 end
 
---- Asks the AI menu's text backend for each answer of vision.json in turn and
---- offers them as the tooltip's candidates, in that order. Accepting one types
---- it at the caret; nothing is typed otherwise.
+--- Opens an offer that one-off requests on the AI menu's text backend fill
+--- (the screen answers, the translation): the tooltip says something is coming,
+--- and a newer action, typing, Escape or a dismiss supersede it through
+--- _request_epoch. The backends serve one request at a time, so a prediction
+--- pending, in flight or on offer is withdrawn first.
+--- @param action string The catalogue action, for the metrics.
+--- @param label string The tooltip's info bar.
+--- @param model string The text model.
+--- @param focus string|nil The focused window's identity, for an offer whose
+---   acceptance replaces the selection; nil for one typed at the caret.
+--- @return integer epoch The offer's _request_epoch.
+--- @return table meta The tooltip's metadata, loading until the offer settles.
+local function open_offer(action, label, model, focus)
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+	local meta = {
+		model = model,
+		profile = label,
+		loading = true,
+		validation_modifiers = NavigationSettings.get(),
+	}
+	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = action, focus = focus }
+	_offer_notified = false
+	_predicting = true
+	_request_epoch = _request_epoch + 1
+	show_candidates({}, meta)
+	return _request_epoch, meta
+end
+
+--- Sends one request of an offer once the backend's minimum interval allows
+--- it, through the offer's pacing timer. Nothing is sent once the offer is
+--- superseded or the configuration is being changed.
+--- @param epoch integer The offer's _request_epoch.
+--- @param what string What the log names the request.
+--- @param send function Called when the request may go.
+--- @param on_unpaced function Called when the pacing timer could not be armed.
+local function send_paced(epoch, what, send, on_unpaced)
+	if _scope_owner or epoch ~= _request_epoch then return end
+	local kind = M.get_backend()
+	local now = _clock_ms()
+	local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
+	if wait_ms > 0 then
+		_rate_timer = _scheduler.after(wait_ms / 1000, function()
+			if _scope_owner then return end
+			_rate_timer = nil
+			send_paced(epoch, what, send, on_unpaced)
+		end)
+		if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+			_rate_timer = nil
+			Logger.error(LOG, "%s could not be paced: timer unavailable.", what)
+			on_unpaced()
+		end
+		return
+	end
+	_last_request_ms[kind] = now
+	send()
+end
+
+--- The request options of an offer's one-off request: chat mode, no streaming.
+--- @param max_tokens integer
+--- @return table
+local function offer_request_opts(max_tokens)
+	return {
+		stream = false,
+		temperature = Settings.get("temperature"),
+		max_tokens = max_tokens,
+		-- Multi-line answers: the single-line stops would cut them.
+		line_mode = false,
+	}
+end
+
+--- Asks the AI menu's text backend for each answer of the screen action's list
+--- (vision.json answers or error_answers) in turn and offers them as the
+--- tooltip's candidates, in that order. Accepting one types it at the caret;
+--- nothing is typed otherwise.
 --- @param spec table The screen action's request (read_screen).
 --- @param screen string The vision model's transcription.
 local function request_screen_answers(spec, screen)
 	local config = spec.config
+	local answers = spec.answers
 	local backend, target, model = M.resolve_backend()
 	if not backend then
 		clear_offer()
 		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
 		return
 	end
-	-- The backends serve one request at a time.
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
-	if _predicting then M.dismiss() end
-
 	local language = prompt_language()
 	local candidates = {}
 	local index = 0
-	local meta = {
-		model = model,
-		profile = spec.label,
-		loading = true,
-		validation_modifiers = NavigationSettings.get(),
-	}
-	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = spec.action }
-	_offer_notified = false
-	_predicting = true
-	_request_epoch = _request_epoch + 1
-	local epoch = _request_epoch
-	show_candidates({}, meta)
-	Logger.info(LOG, "Requesting %d screen answer(s) (backend=%s, model=%s).", #config.answers, M.get_backend(), model)
+	local epoch, meta = open_offer(spec.action, spec.label, model, nil)
+	Logger.info(LOG, "Requesting %d screen answer(s) (backend=%s, model=%s).", #answers, M.get_backend(), model)
 
 	local function publish()
 		local visible = {}
@@ -1202,44 +1275,20 @@ local function request_screen_answers(spec, screen)
 			show_notice(VISION_READ_FAILED_KEY, "read_failed")
 			return
 		end
-		Logger.info(LOG, "Screen answers on offer: %d of %d.", #candidates, #config.answers)
+		Logger.info(LOG, "Screen answers on offer: %d of %d.", #candidates, #answers)
 		publish()
 	end
 
 	local dispatch
 	dispatch = function()
-		if _scope_owner or epoch ~= _request_epoch then return end
-		local kind = M.get_backend()
-		local now = _clock_ms()
-		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
-		if wait_ms > 0 then
-			_rate_timer = _scheduler.after(wait_ms / 1000, function()
-				if _scope_owner then return end
-				_rate_timer = nil
-				dispatch()
-			end)
-			if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
-				_rate_timer = nil
-				Logger.error(LOG, "Screen answers could not be paced: timer unavailable.")
-				settle()
-			end
-			return
-		end
-		_last_request_ms[kind] = now
 		index = index + 1
-		local answer = config.answers[index]
+		local answer = answers[index]
 		local messages = {
 			{ role = "system", content = Vision.fill_language(answer.prompt, language) },
 			{ role = "user", content = Vision.answer_user_text(screen) },
 		}
 		_inflight_backend = backend
-		backend.chat(target, model, messages, {
-			stream = false,
-			temperature = Settings.get("temperature"),
-			max_tokens = config.answer_max_tokens,
-			-- Multi-line answers: the single-line stops would cut them.
-			line_mode = false,
-		}, nil, function(full_text, err)
+		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens), nil, function(full_text, err)
 			if _scope_owner then return end
 			if epoch ~= _request_epoch then
 				Logger.info(LOG, "Screen answer '%s' ignored: a newer action or an edit superseded it.", answer.id)
@@ -1256,16 +1305,16 @@ local function request_screen_answers(spec, screen)
 						answer.id, config.answer_tag, #(full_text or ""))
 				end
 			end
-			if index < #config.answers then
+			if index < #answers then
 				-- Shown now: the next answer may wait for the backend's interval.
 				if #candidates > 0 then publish() end
-				dispatch()
+				send_paced(epoch, "Screen answers", dispatch, settle)
 				return
 			end
 			settle()
 		end)
 	end
-	dispatch()
+	send_paced(epoch, "Screen answers", dispatch, settle)
 end
 
 --- Reads the vision model's transcription and asks for the answers.
@@ -1369,20 +1418,19 @@ local function finish_capture(flow, spec, outcome)
 	VisionRequest.send(spec.target, body, function(text, err) finish_screen_read(flow, spec, text, err) end)
 end
 
---- Answers what is on the screen: the llm_screen_region and llm_screen_full
---- actions. A vision model transcribes a private screenshot, then the AI menu's
---- text backend drafts the answers of vision.json, offered in the tooltip.
+--- Answers what is on the screen: the llm_screen_region, llm_screen_full and
+--- llm_screen_error actions. A vision model transcribes a private screenshot,
+--- then the AI menu's text backend drafts the action's answers of vision.json
+--- (answers, or error_answers for llm_screen_error), offered in the tooltip.
 --- A new screen action supersedes the one in flight.
---- @param mode string "region" (the user draws it) or "full".
+--- @param action string A key of VISION_ACTIONS.
 --- @param value string The binding's parameter, "<backend>" or "<backend>|<model>".
 --- @return boolean started True when the capture was started.
-function M.read_screen(mode, value)
+function M.read_screen(action, value)
 	if _scope_owner then return false end
-	local action = nil
-	for id, action_mode in pairs(VISION_ACTIONS) do
-		if action_mode == mode then action = id end
-	end
-	if not action then error("read_screen: mode must be \"region\" or \"full\"") end
+	local screen_action = VISION_ACTIONS[action]
+	if not screen_action then error("read_screen: unknown screen action '" .. tostring(action) .. "'") end
+	local mode = screen_action.mode
 	-- Every refusal comes before the capture: nothing is captured for nothing.
 	-- The screen is the context, so an empty typing buffer refuses nothing.
 	local reason = manual_refusal()
@@ -1427,10 +1475,12 @@ function M.read_screen(mode, value)
 		model = model,
 		target = target,
 		config = config,
+		answers = config[screen_action.answers],
 	}
 	local flow = { generation = _vision_generation }
 	_vision_flow = flow
-	Logger.info(LOG, "Screen reading requested (mode=%s, backend=%s, model=%s).", mode, parsed.backend, model)
+	Logger.info(LOG, "Screen reading requested (action=%s, mode=%s, backend=%s, model=%s).",
+		action, mode, parsed.backend, model)
 	local started, handle, capture_err = pcall(_capture_screen, mode, config.max_image_edge, function(outcome)
 		-- A capture that finished before the handle came back is taken up below.
 		if not flow.capture then flow.early = outcome; return end
@@ -1444,6 +1494,126 @@ function M.read_screen(mode, value)
 	end
 	flow.capture = handle
 	if flow.early then finish_capture(flow, spec, flow.early) end
+	return true
+end
+
+--- Offers the translation of a translate request's answer, or tells the user
+--- it failed. The selection and the translation are the user's text: only
+--- their sizes are logged.
+--- @param epoch integer The offer's _request_epoch.
+--- @param meta table The tooltip's metadata.
+--- @param config table Decoded translate.json.
+--- @param full_text string|nil The model's answer.
+--- @param err string|nil The backend's error.
+local function finish_translation(epoch, meta, config, full_text, err)
+	if _scope_owner then return end
+	if epoch ~= _request_epoch then
+		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
+		return
+	end
+	_predicting = false
+	_inflight_backend = nil
+	meta.loading = false
+	if _is_paused() or not _enabled then
+		Logger.info(LOG, "Translation dropped: the AI was paused or switched off while it ran.")
+		clear_offer()
+		return
+	end
+	if err then
+		Logger.warn(LOG, "Translation failed: %s", tostring(err))
+		clear_offer()
+		show_notice(TRANSLATE_FAILED_KEY, "failed")
+		return
+	end
+	local text = Translate.extract(config, Parser.strip_thinking(full_text or ""))
+	if not text then
+		Logger.warn(LOG, "Translation dropped: no %s block (%d chars).", config.tag, #(full_text or ""))
+		clear_offer()
+		show_notice(TRANSLATE_FAILED_KEY, "failed")
+		return
+	end
+	Logger.info(LOG, "Translation on offer (%d byte(s)).", #text)
+	-- Accepting it replaces the selection instead of typing at the caret.
+	show_candidates({ { deletes = 0, to_type = text, replaces_selection = true } }, meta)
+end
+
+--- Translates the selection: the llm_translate_selection action. The AI menu's
+--- text backend translates it into the binding's language, the translation is
+--- offered as one candidate, and accepting it replaces the selection, left
+--- selected as a tone step leaves it. Escape, a dismiss or typing leave the
+--- text untouched; a newer trigger supersedes the one in flight.
+--- @param value string The binding's parameter, "ui" or a locale code.
+--- @return boolean requested True when the translation request was started.
+function M.translate_selection(value)
+	if _scope_owner then return false end
+	if not _read_selection or not _replace_selection then
+		Logger.error(LOG, "Translation refused: no selection surface was injected.")
+		return false
+	end
+	-- Checked before the selection is read: a refused request sends no copy
+	-- chord. The selection is the text, so an empty typing buffer refuses nothing.
+	local reason = manual_refusal()
+	if reason == "empty_context" then reason = nil end
+	if reason then
+		Logger.info(LOG, "Translation refused (%s).", reason)
+		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+		return false
+	end
+	local data = Translation.data()
+	if not data then return false end
+	local config = data.config
+	local target = Translate.parse(value, config, data.names)
+	if not target then
+		Logger.warn(LOG, "Translation refused: invalid parameter '%s'.", tostring(value))
+		return false
+	end
+	local code = Translate.target_locale(target, config, prompt_language())
+	local language = Translate.language_name(code, data.names)
+	if not language then
+		Logger.error(LOG, "Translation refused: the locale '%s' has no native name.", tostring(code))
+		return false
+	end
+	if _is_secure_context() then
+		Logger.debug(LOG, "Translation suppressed: secure field or excluded context.")
+		return false
+	end
+	local read_ok, selection, read_err = _read_selection()
+	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
+		if read_ok or read_err == "no_selection" then
+			Logger.info(LOG, "Translation refused: nothing is selected.")
+			show_notice(TRANSLATE_NO_SELECTION_KEY, "no_selection")
+		else
+			Logger.warn(LOG, "Translation ignored: the selection could not be read (%s).", tostring(read_err))
+		end
+		return false
+	end
+	local backend, backend_target, model = M.resolve_backend()
+	if not backend then
+		Logger.info(LOG, "Translation refused (backend_not_ready).")
+		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+		return false
+	end
+	-- One offer at a time: a screen reading in flight would replace this one,
+	-- and a tone step would rewrite the text being translated.
+	M.drop_vision("superseded")
+	M.drop_tone("superseded")
+	local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model,
+		current_focus())
+	local messages = {
+		{ role = "system", content = Translate.system_prompt(config, language) },
+		{ role = "user", content = Translate.user_text(config, selection) },
+	}
+	Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
+		M.get_backend(), model, code, #selection)
+	send_paced(epoch, "Translation", function()
+		_inflight_backend = backend
+		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens), nil,
+			function(full_text, err) finish_translation(epoch, meta, config, full_text, err) end)
+	end, function()
+		_predicting = false
+		clear_offer()
+		show_notice(TRANSLATE_FAILED_KEY, "failed")
+	end)
 	return true
 end
 
@@ -1484,8 +1654,23 @@ end
 function M.accept(index)
 	if _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
-	if not candidate or type(_apply_prediction) ~= "function" then return false end
-	local ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
+	if not candidate then return false end
+	local ok, committed
+	if candidate.replaces_selection then
+		-- A translation replaces the selection it was made from, left selected as
+		-- a tone step leaves it. Compared like a tone step's focus: in another
+		-- window the text would land where nothing was selected.
+		if not _replace_selection then return false end
+		local focus = _suggestion_context and _suggestion_context.focus or ""
+		if current_focus() ~= focus then
+			Logger.info(LOG, "Translation not inserted: another window has the focus.")
+			return false
+		end
+		ok, committed = pcall(_replace_selection, candidate.to_type)
+	else
+		if type(_apply_prediction) ~= "function" then return false end
+		ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
+	end
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
 		return false

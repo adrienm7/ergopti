@@ -85,8 +85,7 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 
 ; The parameter kind the generated catalogue declares for an action ("url",
 ; "search_url", "wrap_pair", "text", "key", "shortcut", "llm_prompt",
-; "llm_vision"), or "" when
-; it takes none.
+; "llm_vision", "llm_language"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
 		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
@@ -119,6 +118,13 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 				if LLM_Vision_IsValid(Value)
 						return true
 				ErrorText := t("dialog.gestures.param_err_llm_vision")
+				return false
+		}
+		; A closed list: "ui" or a shipped locale code, compared exactly.
+		if (Spec = "llm_language") {
+				if LLM_Translate_IsValid(Value)
+						return true
+				ErrorText := t("dialog.gestures.param_err_llm_language")
 				return false
 		}
 		Value := Trim(Value)
@@ -174,6 +180,9 @@ GestureActionParameterPrompt(ActionName) {
 				case "llm_vision":
 						return StrReplace(t("dialog.gestures.param_llm_vision"), "{1}",
 								LLM_Vision_BackendChoicesText())
+				case "llm_language":
+						return StrReplace(t("dialog.gestures.param_llm_language"), "{1}",
+								LLM_Translate_ChoicesText())
 		}
 		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
 }
@@ -231,6 +240,9 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
 				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
 				Size := Listed ? "w680 h300" : (Spec = "key") ? "w680 h220" : "w680 h160"
+				; One line per shipped locale: the language list needs the height of 22 rows
+				if (Spec = "llm_language")
+						Size := "w680 h560"
 				Result := InputBox(Prompt, Title, Size, Existing)
 				if (Result.Result != "OK")
 						return false

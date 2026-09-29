@@ -3,9 +3,10 @@
 ; ==============================================================================
 ; MODULE: Screen Reading Actions (AHK)
 ; DESCRIPTION:
-; Runs the llm_screen_region and llm_screen_full actions: a screenshot is read
-; by a vision model (modules/llm/vision.ahk), then the AI menu's text backend
-; drafts one answer per entry of vision.json's answers, offered as the
+; Runs the llm_screen_region, llm_screen_full and llm_screen_error actions: a
+; screenshot is read by a vision model (modules/llm/vision.ahk), then the AI
+; menu's text backend drafts one answer per entry of an answer list of
+; vision.json (answers, or error_answers for llm_screen_error), offered as the
 ; prediction tooltip's candidates. Accepting one types it at the caret.
 ;
 ; FEATURES & RATIONALE:
@@ -21,7 +22,7 @@
 ;    of that id, with the key of the menu's API entry for it). The answers go
 ;    to the AI menu's current backend, one after the other: the local server
 ;    runs one request at a time.
-; 4. The answers are shown in vision.json's order as they arrive, through the
+; 4. The answers are shown in their list's order as they arrive, through the
 ;    tooltip's usual candidates, navigation and Tab accept (nothing erased).
 ;    Nothing is typed without the user's acceptance.
 ; 5. One flow at a time: each trigger takes a generation, and a capture or an
@@ -83,8 +84,21 @@ LLM_VisionActions() {
 	static Actions := Map(
 		"llm_screen_region", "region",
 		"llm_screen_full", "full",
+		"llm_screen_error", "region",
 	)
 	return Actions
+}
+
+/**
+ * The answer list of vision.json a screen action drafts: "Why this error?"
+ * explains then fixes, the other screen actions reply, translate and explain.
+ * @param {String} ActionId A key of LLM_VisionActions.
+ * @returns {String} "error_answers" or "answers".
+ */
+LLM_Vision_AnswersKey(ActionId) {
+	if !LLM_VisionActions().Has(ActionId)
+		throw ValueError("LLM_Vision_AnswersKey: unknown screen action " . String(ActionId) . ".")
+	return (ActionId == "llm_screen_error") ? "error_answers" : "answers"
 }
 
 /**
@@ -119,13 +133,16 @@ LLM_Vision_BackendChoicesText() {
  * capture.
  * @param {String} Kind "region" or "full".
  * @param {String} Value The binding's llm_vision parameter.
+ * @param {String} AnswersKey The answer list of vision.json to draft, in order.
  * @returns {Boolean} True when the capture started.
  */
-LLM_Vision_Trigger(Kind, Value) {
+LLM_Vision_Trigger(Kind, Value, AnswersKey := "answers") {
 	global _LLM_Menu, _LLM_Engine, _LLM_Vision_Generation, _LLM_Vision_CaptureFn
 	global LLM_VISION_REFUSAL_CONTEXT
 	if (Kind != "region" && Kind != "full")
 		throw ValueError("LLM_Vision_Trigger: unknown capture kind " . String(Kind) . ".")
+	if (AnswersKey != "answers" && AnswersKey != "error_answers")
+		throw ValueError("LLM_Vision_Trigger: unknown answer list " . String(AnswersKey) . ".")
 	Enabled := _LLM_Menu.Get("enabled", false)
 	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
 		Enabled && _LLM_Menu_BackendIsReadyForUse(), LLM_VISION_REFUSAL_CONTEXT)
@@ -165,13 +182,14 @@ LLM_Vision_Trigger(Kind, Value) {
 		"target", Target,
 		"path", "",
 		"config", Config,
+		"prompts", Config[AnswersKey],
 		"screen", "",
 		"answers", [],
 		"index", 0,
 		"source", ""
 	)
-	LoggerStart("LLM", "Screen reading #{1}: {2} capture for '{3}' ({4}).",
-		Flow["generation"], Kind, Parsed["backend"], Model)
+	LoggerStart("LLM", "Screen reading #{1}: {2} capture for '{3}' ({4}), {5}.",
+		Flow["generation"], Kind, Parsed["backend"], Model, AnswersKey)
 	Capture := HasMethod(_LLM_Vision_CaptureFn, "Call") ? _LLM_Vision_CaptureFn : _LLM_Vision_DefaultCapture
 	try {
 		Flow["path"] := _LLM_Vision_CapturePath(Flow["generation"])
@@ -214,11 +232,9 @@ _LLM_Vision_DefaultCapture(Kind, Path, MaxEdge, OnDone) {
 
 ; @returns {Map} x, y, w, h of the monitor under the mouse pointer.
 _LLM_Vision_PointerMonitorBounds() {
-	Point := Buffer(8, 0)
-	if !DllCall("GetPhysicalCursorPos", "Ptr", Point)
-		throw OSError(A_LastError, -1, "GetPhysicalCursorPos")
-	X := NumGet(Point, 0, "Int")
-	Y := NumGet(Point, 4, "Int")
+	Pointer := MCGetPosStrict()
+	X := Pointer["x"]
+	Y := Pointer["y"]
 	loop MonitorGetCount() {
 		MonitorGet(A_Index, &Left, &Top, &Right, &Bottom)
 		if (X >= Left && X < Right && Y >= Top && Y < Bottom)
@@ -244,19 +260,13 @@ _LLM_Vision_DeleteCapture(Flow) {
 ; @param {String} Path A file.
 ; @returns {String} Its content in base64, without line breaks.
 _LLM_Vision_Base64File(Path) {
-	static CRYPT_STRING_BASE64_NOCRLF := 0x40000001
-	Data := FileRead(Path, "RAW")
+	Data := FSReadBytesStrict(Path)
 	if (Data.Size == 0)
 		throw Error("the screenshot is empty")
-	Chars := 0
-	if !DllCall("Crypt32\CryptBinaryToStringW", "Ptr", Data, "UInt", Data.Size,
-			"UInt", CRYPT_STRING_BASE64_NOCRLF, "Ptr", 0, "UInt*", &Chars)
-		throw OSError(A_LastError, -1, "CryptBinaryToStringW")
-	Out := Buffer(Chars * 2, 0)
-	if !DllCall("Crypt32\CryptBinaryToStringW", "Ptr", Data, "UInt", Data.Size,
-			"UInt", CRYPT_STRING_BASE64_NOCRLF, "Ptr", Out, "UInt*", &Chars)
-		throw OSError(A_LastError, -1, "CryptBinaryToStringW")
-	return StrGet(Out, Chars, "UTF-16")
+	Encoded := CryptoBase64Encode(Data)
+	if (Encoded == "")
+		throw Error("the screenshot could not be encoded")
+	return Encoded
 }
 
 ; The capture ended: read the screenshot, delete it, send the vision request.
@@ -434,37 +444,30 @@ _LLM_Vision_OnReadFail(Flow, Failure := "") {
 	_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
 }
 
-; Sends the next answer request to the AI menu's backend, or ends the flow.
-; @param {Map} Flow The flow.
-_LLM_Vision_NextAnswer(Flow) {
+/**
+ * Sends one chat request to the AI menu's current text backend: the system
+ * prompt and the user turn as they are (no PREFIX/TAIL), streaming off. The
+ * screen answers and the selection translation ask through it.
+ * @param {String} System The system prompt.
+ * @param {String} User The user turn.
+ * @param {Integer} MaxTokens The answer's token budget.
+ * @param {Func} OnSuccess Called with the answer text.
+ * @param {Func} OnFail Called on failure.
+ * @returns {Boolean} False, with nothing sent, when the API backend has no entry.
+ */
+LLM_Vision_SendText(System, User, MaxTokens, OnSuccess, OnFail) {
 	global _LLM_Engine
-	Config := Flow["config"]
-	Answers := Config["answers"]
-	Flow["index"] += 1
-	Index := Flow["index"]
-	if (Index > Answers.Length) {
-		_LLM_Vision_Finish(Flow)
-		return
-	}
-	System := LLM_Vision_FillLanguage(Answers[Index]["prompt"], _LLM_Engine["language"])
-	User := LLM_Vision_AnswerUserText(Flow["screen"])
-	MaxTokens := Config["answer_max_tokens"]
-	OnSuccess := _LLM_Vision_OnAnswer.Bind(Flow, Index)
-	OnFail := _LLM_Vision_OnAnswerFail.Bind(Flow, Index)
 	if (_LLM_Engine.Get("backend", "ollama") == "api") {
 		Entry := _LLM_Engine_GetActiveApiEntry()
-		if !IsObject(Entry) {
-			LoggerWarn("LLM", "Screen reading #{1}: the API backend has no entry configured.", Flow["generation"])
-			_LLM_Vision_Finish(Flow)
-			return
-		}
+		if !IsObject(Entry)
+			return false
 		LLM_Engine_CancelTimer()
 		LLM_Engine_CancelInflight()
 		_LLM_Engine["last_request_tick"] := A_TickCount
 		; No PREFIX/TAIL in these prompts: the user turn goes as it is
 		_LLM_Engine_ResolveRemoteTransport().Call(Entry, System, User,
 			_LLM_Engine["temperature"] + 0.0, OnSuccess, OnFail, "", MaxTokens)
-		return
+		return true
 	}
 	; The local server's chat body, written whole: the prediction payload stops
 	; at the first line break, and an answer may take several lines
@@ -473,11 +476,32 @@ _LLM_Vision_NextAnswer(Flow) {
 		"system", System,
 		"text", User,
 		"max_tokens", MaxTokens)), OnSuccess, OnFail)
+	return true
+}
+
+; Sends the next answer request to the AI menu's backend, or ends the flow.
+; @param {Map} Flow The flow.
+_LLM_Vision_NextAnswer(Flow) {
+	global _LLM_Engine
+	Prompts := Flow["prompts"]
+	Flow["index"] += 1
+	Index := Flow["index"]
+	if (Index > Prompts.Length) {
+		_LLM_Vision_Finish(Flow)
+		return
+	}
+	System := LLM_Vision_FillLanguage(Prompts[Index]["prompt"], _LLM_Engine["language"])
+	User := LLM_Vision_AnswerUserText(Flow["screen"])
+	if !LLM_Vision_SendText(System, User, Flow["config"]["answer_max_tokens"],
+			_LLM_Vision_OnAnswer.Bind(Flow, Index), _LLM_Vision_OnAnswerFail.Bind(Flow, Index)) {
+		LoggerWarn("LLM", "Screen reading #{1}: the API backend has no entry configured.", Flow["generation"])
+		_LLM_Vision_Finish(Flow)
+	}
 }
 
 ; One answer arrived: keep it and show what the flow has so far.
 ; @param {Map} Flow The flow.
-; @param {Integer} Index The answer's position in vision.json.
+; @param {Integer} Index The answer's position in the flow's answer list.
 ; @param {String} Raw The model's answer.
 ; @param {Map} Meta Usage metadata (remote backend), unused.
 _LLM_Vision_OnAnswer(Flow, Index, Raw, Meta := "") {
@@ -486,7 +510,7 @@ _LLM_Vision_OnAnswer(Flow, Index, Raw, Meta := "") {
 			Flow["generation"])
 		return
 	}
-	Id := Flow["config"]["answers"][Index]["id"]
+	Id := Flow["prompts"][Index]["id"]
 	Text := LLM_Vision_Extract(Raw, Flow["config"]["answer_tag"])
 	if (Text == "") {
 		LoggerWarn("LLM", "Screen reading #{1}: the '{2}' answer holds no text ({3} character(s)).",
@@ -495,7 +519,7 @@ _LLM_Vision_OnAnswer(Flow, Index, Raw, Meta := "") {
 		Flow["answers"].Push(Text)
 		LoggerInfo("LLM", "Screen reading #{1}: '{2}' answer ready ({3} character(s)).",
 			Flow["generation"], Id, StrLen(Text))
-		if (Index < Flow["config"]["answers"].Length)
+		if (Index < Flow["prompts"].Length)
 			_LLM_Vision_Show(Flow, false)
 	}
 	_LLM_Vision_NextAnswer(Flow)
@@ -503,13 +527,13 @@ _LLM_Vision_OnAnswer(Flow, Index, Raw, Meta := "") {
 
 ; One answer request failed: the flow goes on without it.
 ; @param {Map} Flow The flow.
-; @param {Integer} Index The answer's position in vision.json.
+; @param {Integer} Index The answer's position in the flow's answer list.
 ; @param {Map} Failure Failure details, when the backend gives them.
 _LLM_Vision_OnAnswerFail(Flow, Index, Failure := "") {
 	if !_LLM_Vision_IsCurrent(Flow)
 		return
 	LoggerWarn("LLM", "Screen reading #{1}: the '{2}' answer request failed ({3}).",
-		Flow["generation"], Flow["config"]["answers"][Index]["id"], _LLM_Vision_FailureReason(Failure))
+		Flow["generation"], Flow["prompts"][Index]["id"], _LLM_Vision_FailureReason(Failure))
 	_LLM_Vision_NextAnswer(Flow)
 }
 

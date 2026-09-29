@@ -65,7 +65,7 @@ end
 --- at all and 38 of the actions this driver runs missing.
 --- @param opts table|nil { title, label, current, allow_native, native_label,
 ---   items, send_vocabulary, parameter_strings, prompt_choices, vision_choices,
----   default_count, edit_current_label }, every field optional.
+---   language_choices, default_count, edit_current_label }, every field optional.
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
 	local o = type(opts) == "table" and opts or {}
@@ -106,6 +106,8 @@ function M.build_init_payload(opts)
 		promptChoices     = o.prompt_choices,
 		-- The llm_vision editor's backends: { value, label, defaultModel }.
 		visionChoices     = o.vision_choices,
+		-- The llm_language editor's target languages: { value, label }, "ui" first.
+		languageChoices   = o.language_choices,
 		defaultCount      = o.default_count,
 		editCurrentLabel  = o.edit_current_label,
 	}

@@ -93,6 +93,18 @@ MCGetPos() {
 	return Info
 }
 
+; Returns the current cursor position in physical pixels, or throws.
+; MCGetPos answers 0,0 when the position cannot be read, which suits a caller
+; that only positions a hint; a caller that acts on the monitor under the
+; pointer (the screen reading's capture) must not act on a made-up position.
+; @return {Map} { "x": Integer, "y": Integer }; throws OSError on failure.
+MCGetPosStrict() {
+	local POINT := Buffer(8, 0)
+	if !DllCall("GetPhysicalCursorPos", "Ptr", POINT)
+		throw OSError(A_LastError, -1, "GetPhysicalCursorPos")
+	return Map("x", NumGet(POINT, 0, "Int"), "y", NumGet(POINT, 4, "Int"))
+}
+
 ; Returns the total number of monitors attached to the system.
 ; @return {Integer} Monitor count (>= 1 normally, 0 on error).
 MCGetMonitorCount() {

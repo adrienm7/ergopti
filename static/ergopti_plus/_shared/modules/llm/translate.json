@@ -1,0 +1,8 @@
+{
+	"_comment": "The llm_translate_selection action: the selected text is translated by the AI menu's current text backend and offered in the prediction tooltip. Its parameter is `ui_value` (the interface language, the default) or a locale code of _shared/data/locale_names.json; {language} in the prompt is that locale's native name. Read by _shared/lua/llm/translate.lua and its AutoHotkey port.",
+	"ui_value": "ui",
+	"tag": "TRANSLATION:",
+	"max_tokens": 800,
+	"user_prefix": "TEXT:\n",
+	"prompt": "You translate for a keyboard assistant. TEXT is what the user selected.\nTranslate TEXT into {language}. Keep its meaning, tone, formatting and line breaks; keep names, code and URLs unchanged. If TEXT is already in {language}, return it unchanged.\nReply with one block — nothing else:\nTRANSLATION: <translation>"
+}

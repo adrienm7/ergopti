@@ -171,6 +171,19 @@ _LVS_ShippedConfig() {
 	AssertTrue(Config["default_models"].Has(LLM_VISION_LOCAL_BACKEND), "a local default model")
 	AssertThrows(() => _LLM_Vision_ValidateConfig(Map("screen_tag", "S:"), "vision.json"),
 		"an incomplete configuration is refused")
+	; "Why this error?": the explanation first, in the interface language, then the fix
+	AssertEqual(2, Config["error_answers"].Length, "cause, then fix")
+	AssertEqual("cause", Config["error_answers"][1]["id"], "the explanation comes first")
+	AssertEqual("fix", Config["error_answers"][2]["id"], "the fix second")
+	AssertContains(Config["error_answers"][1]["prompt"], "{language}", "the explanation is in the interface language")
+	for Answer in Config["error_answers"]
+		AssertContains(Answer["prompt"], Config["answer_tag"], Answer["id"] . " asks for the answer tag")
+	Broken := Map()
+	for Key, Value in Config
+		Broken[Key] := Value
+	Broken.Delete("error_answers")
+	AssertThrows(() => _LLM_Vision_ValidateConfig(Broken, "vision.json"),
+		"a configuration without the error answers is refused")
 }
 Test("LLM vision: vision.json holds what the screen actions need", _LVS_ShippedConfig)
 
@@ -231,10 +244,17 @@ _LVS_ActionsAreRegistered() {
 		AssertTrue(GESTURE_ACTIONS.Has(ActionId), ActionId . " must be a gesture action")
 		AssertEqual("llm_vision", GestureActionParameterSpec(ActionId), ActionId . " takes llm_vision")
 	}
+	AssertEqual(3, LLM_VisionActions().Count, "three screen actions")
 	AssertEqual("region", LLM_VisionActions()["llm_screen_region"], "the region action draws a region")
 	AssertEqual("full", LLM_VisionActions()["llm_screen_full"], "the full action takes the whole screen")
+	AssertEqual("region", LLM_VisionActions()["llm_screen_error"], "the error action draws a region")
+	AssertEqual("answers", LLM_Vision_AnswersKey("llm_screen_region"), "the region action replies")
+	AssertEqual("answers", LLM_Vision_AnswersKey("llm_screen_full"), "so does the full one")
+	AssertEqual("error_answers", LLM_Vision_AnswersKey("llm_screen_error"), "the error action explains and fixes")
+	AssertThrows(() => LLM_Vision_AnswersKey("llm_screen_nope"), "an unknown action is a caller bug")
+	AssertThrows(() => LLM_Vision_Trigger("region", "openai", "nope"), "so is an unknown answer list")
 }
-Test("LLM vision: both screen actions are registered", _LVS_ActionsAreRegistered)
+Test("LLM vision: the three screen actions are registered", _LVS_ActionsAreRegistered)
 
 
 
@@ -315,10 +335,10 @@ _LVS_Invoke(ActionId, Value) {
 	return GestureInvokeAction(ActionId, Binding)
 }
 
-; Asserts that a menu-backend request asks for the answer at Index.
-_LVS_AssertAnswerRequest(Call, Index) {
+; Asserts that a menu-backend request asks for the answer at Index of a list.
+_LVS_AssertAnswerRequest(Call, Index, ListKey := "answers") {
 	Config := LLM_Vision_Config()
-	AssertEqual(LLM_Vision_FillLanguage(Config["answers"][Index]["prompt"], "fr"), Call["system"],
+	AssertEqual(LLM_Vision_FillLanguage(Config[ListKey][Index]["prompt"], "fr"), Call["system"],
 		"answer " . Index . " runs its own prompt in the interface language")
 	AssertEqual("SCREEN:`n" . LVS_SCREEN, Call["ctx"], "the user turn is the transcription")
 	AssertEqual("", Call["tail"], "without a TAIL")
@@ -574,3 +594,111 @@ _LVS_NewTriggerSupersedes() {
 	}
 }
 Test("LLM vision: a new trigger supersedes the reading in progress", _LVS_NewTriggerSupersedes)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 5/ "Why this error?", end to end =======
+; ================================================
+; ================================================
+
+global LVS_ERROR_SCREEN := "Error: Cannot find module 'left-pad'"
+
+_LVS_ErrorEndToEnd() {
+	_LVS_Run(_LPP_Menu(), _Body)
+	_Body(Calls, Lines, Sent, Fx) {
+		global _Stub_LlmPresentedRecord
+		Config := LLM_Vision_Config()
+		AssertTrue(_LVS_Invoke("llm_screen_error", "openai|gpt-4.1-mini"), "the capture starts")
+		AssertEqual(1, Fx.Captures.Length, "one capture")
+		AssertEqual("region", Fx.Captures[1].Kind, "the user draws a region around the error")
+		_LVS_Complete(Fx.Captures[1], true)
+		AssertFalse(FileExist(Fx.Captures[1].Path), "the screenshot is deleted once read")
+		AssertEqual(1, Fx.Vision.Length, "the vision model reads the region")
+		_LPP_Answer(Fx.Vision[1], "SCREEN: " . LVS_ERROR_SCREEN)
+
+		; The explanation, in the interface language, then the fix
+		Answers := ["Le module left-pad n'est pas installé.", "npm install left-pad"]
+		loop 2 {
+			AssertEqual(A_Index, Calls.Length, "the answers are asked one after the other")
+			Call := Calls[A_Index]
+			AssertEqual(LLM_Vision_FillLanguage(Config["error_answers"][A_Index]["prompt"], "fr"), Call["system"],
+				"answer " . A_Index . " runs the error prompt of its rank")
+			AssertEqual("SCREEN:`n" . LVS_ERROR_SCREEN, Call["ctx"], "about the transcribed error")
+			AssertEqual("", Call["tail"], "without a TAIL")
+			AssertEqual(Config["answer_max_tokens"], Call["max_tokens"], "within the answer budget")
+			_LPP_Answer(Call, "ANSWER: " . Answers[A_Index])
+		}
+		AssertEqual(2, Calls.Length, "two answers, no more")
+		AssertFalse(InStr(Calls[1]["system"], "{language}"), "the language is filled in")
+		AssertContains(Calls[1]["system"], "Explain in fr,", "with the interface language")
+		AssertEqual(Config["error_answers"][2]["prompt"], Calls[2]["system"], "the fix prompt names no language")
+		Final := _LPP_LastFinalRender()
+		AssertTrue(IsObject(Final), "the answers reach the tooltip")
+		AssertEqual(2, Final.slots.Length, "two candidates")
+		loop 2
+			AssertEqual(Answers[A_Index], Final.slots[A_Index], "candidate " . A_Index . " in cause-then-fix order")
+		AssertEqual(0, _LVS_LinesMentioning(Lines, "left-pad"), "the screen's text is never logged")
+
+		; The user moves to the fix and accepts it: it is typed at the caret
+		_Stub_LlmPresentedRecord.ActiveIdx := 2
+		Presented := LLM_Tooltip_GetAcceptSnapshot()
+		AssertEqual(Answers[2], Presented.Text, "the fix is the accepted candidate")
+		Transaction := _LPP_AcceptTransaction(Presented)
+		AssertEqual(0, Transaction.Deletes, "accepting erases nothing")
+		TextSend(Transaction.Text, _LLM_Bridge_InjectionOptions(Transaction), (Ok, ErrorMessage := "") => 0)
+		AssertEqual(1, Sent.Length, "one output")
+		AssertEqual("{Text}" . Answers[2], Sent[1], "the fix, typed verbatim at the caret")
+	}
+}
+Test("LLM vision: why this error? explains then fixes, and the fix is typed", _LVS_ErrorEndToEnd)
+
+_LVS_ErrorRefusedBeforeCapture() {
+	_LVS_Run(_LPP_Menu(false), _Body)
+	_Body(Calls, Lines, Sent, Fx) {
+		AssertFalse(_LVS_Invoke("llm_screen_error", "openai"), "an AI switched off")
+		AssertEqual(0, Fx.Captures.Length, "captures nothing")
+		AssertEqual(t("llm.manual_prediction.disabled"), _LPP_PendingNotice(),
+			"with the notice llm_generate_prediction shows")
+	}
+}
+Test("LLM vision: why this error? refuses before the capture", _LVS_ErrorRefusedBeforeCapture)
+
+_LVS_ErrorOneAnswerFailing() {
+	_LVS_Run(_LPP_Menu(), _Body)
+	_Body(Calls, Lines, Sent, Fx) {
+		global _Stub_LlmTooltipCalls
+		_LVS_Invoke("llm_screen_error", "openai")
+		_LVS_Complete(Fx.Captures[1], true)
+		_LPP_Answer(Fx.Vision[1], "SCREEN: " . LVS_ERROR_SCREEN)
+		Calls[1]["on_fail"].Call(_LLMRemote_FailInfo("timeout"))
+		AssertEqual(2, Calls.Length, "a failed explanation still asks for the fix")
+		_LPP_Answer(Calls[2], "ANSWER: npm install left-pad")
+		Final := _LPP_LastFinalRender()
+		AssertTrue(IsObject(Final), "the fix is offered")
+		AssertEqual(1, Final.slots.Length, "alone")
+		AssertEqual("npm install left-pad", Final.slots[1], "the fix")
+		AssertEqual(1, _LPP_LinesWith(Lines, "WARNING", "'cause' answer request failed"),
+			"the failed explanation is logged by its id")
+	}
+}
+Test("LLM vision: why this error? skips a failed answer", _LVS_ErrorOneAnswerFailing)
+
+_LVS_ErrorBothAnswersFailing() {
+	_LVS_Run(_LPP_Menu(), _Body)
+	_Body(Calls, Lines, Sent, Fx) {
+		global _Stub_LlmTooltipCalls
+		_LVS_Invoke("llm_screen_error", "openai")
+		_LVS_Complete(Fx.Captures[1], true)
+		_LPP_Answer(Fx.Vision[1], "SCREEN: " . LVS_ERROR_SCREEN)
+		Calls[1]["on_fail"].Call(_LLMRemote_FailInfo("timeout"))
+		_LPP_Answer(Calls[2], "No tag here")
+		AssertEqual(2, Calls.Length, "two answers asked, no third")
+		AssertEqual(0, _Stub_LlmTooltipCalls.Length, "no candidate is shown")
+		AssertEqual(t("llm.vision.read_failed"), _LPP_PendingNotice(), "the user is told")
+	}
+}
+Test("LLM vision: why this error? without any answer is reported", _LVS_ErrorBothAnswersFailing)

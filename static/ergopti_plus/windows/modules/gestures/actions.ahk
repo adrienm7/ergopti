@@ -244,6 +244,10 @@ global GESTURE_ACTIONS := Map(
 		"llm_live_prompt_toggle", {
 				Fn: (BindingId := "") => GestureLivePromptToggle(BindingId),
 		},
+		; The selection translated into the language the binding names.
+		"llm_translate_selection", {
+				Fn: (BindingId := "") => GestureTranslateSelection(BindingId),
+		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
 		; when the action is triggered via a gesture slot instead.
@@ -307,9 +311,9 @@ for _ToneActionId, _ToneStep in LLM_ToneActions() {
 
 ; ── Answering what is on the screen ────────────────────────────────────────
 ;
-; llm_screen_region and llm_screen_full, one per entry of LLM_VisionActions
-; (modules/llm/vision_action.ahk); the binding's llm_vision parameter names
-; the vision backend.
+; llm_screen_region, llm_screen_full and llm_screen_error, one per entry of
+; LLM_VisionActions (modules/llm/vision_action.ahk); the binding's llm_vision
+; parameter names the vision backend.
 for _VisionActionId, _VisionKind in LLM_VisionActions() {
 		GESTURE_ACTIONS[_VisionActionId] := { Fn: _GestureMakeVisionRunner(_VisionActionId) }
 }
@@ -438,12 +442,21 @@ GestureLivePromptToggle(BindingId := "") {
 
 ; Runs a screen action of one binding: its stored value names the vision
 ; backend, validated and resolved by the trigger, which shows every refusal.
-; @param {String} ActionId llm_screen_region or llm_screen_full.
+; @param {String} ActionId llm_screen_region, llm_screen_full or llm_screen_error.
 ; @param {String} BindingId The binding whose parameter to read.
 ; @returns {Boolean} True when the capture started.
 GestureScreenVision(ActionId, BindingId := "") {
 		return LLM_Vision_Trigger(LLM_VisionActions()[ActionId],
-				GestureGetActionParameter(BindingId, ActionId))
+				GestureGetActionParameter(BindingId, ActionId), LLM_Vision_AnswersKey(ActionId))
+}
+
+; Runs the llm_translate_selection action of one binding: its stored value
+; names the target language, validated by the trigger after the refusals it
+; shares with llm_generate_prediction.
+; @param {String} BindingId The binding whose parameter to read.
+; @returns {Boolean} True when the selection capture started.
+GestureTranslateSelection(BindingId := "") {
+		return LLM_Translate_Trigger(GestureGetActionParameter(BindingId, "llm_translate_selection"))
 }
 
 GestureOpenConfiguredURL(BindingId := "") {

@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: Screen Reading Requests (Linux)
 --- DESCRIPTION:
---- Sends a screenshot to the vision model an llm_screen_region / llm_screen_full
---- binding names and returns the model's answer text. The request bodies come
---- from the shared _shared/lua/llm/vision.lua; this module adds the address and
---- the credentials.
+--- Sends a screenshot to the vision model an llm_screen_region, llm_screen_full
+--- or llm_screen_error binding names and returns the model's answer text. The
+--- request bodies come from the shared _shared/lua/llm/vision.lua; this module
+--- adds the address and the credentials.
 ---
 --- FEATURES & RATIONALE:
 --- 1. "local" is the local Ollama server's /api/chat, whatever backend the AI
@@ -62,11 +62,15 @@ function M.parse_config(text)
 		end
 	end
 	if type(root.default_models) ~= "table" then return nil, "vision.json has no default_models" end
-	if type(root.answers) ~= "table" or #root.answers == 0 then return nil, "vision.json has no answers" end
-	for index, answer in ipairs(root.answers) do
-		if type(answer) ~= "table" or type(answer.id) ~= "string" or type(answer.prompt) ~= "string"
-			or answer.prompt == "" then
-			return nil, "vision.json answer " .. index .. " is invalid"
+	-- answers are the region and full-screen actions', error_answers
+	-- llm_screen_error's: each list is offered in its order.
+	for _, list in ipairs({ "answers", "error_answers" }) do
+		if type(root[list]) ~= "table" or #root[list] == 0 then return nil, "vision.json has no " .. list end
+		for index, answer in ipairs(root[list]) do
+			if type(answer) ~= "table" or type(answer.id) ~= "string" or type(answer.prompt) ~= "string"
+				or answer.prompt == "" then
+				return nil, "vision.json " .. list .. " entry " .. index .. " is invalid"
+			end
 		end
 	end
 	return root, nil
