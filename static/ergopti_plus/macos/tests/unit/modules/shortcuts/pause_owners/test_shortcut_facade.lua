@@ -261,6 +261,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			apply_llm_profile_shortcut = function() return true end,
 			activate_hotkey = function() return true end,
 			mlx_deps_checker = {},
+			runtime_installed = function() return true end,
 			deps = { script_control = shortcuts },
 			get_startup_silence = function() return false end,
 			set_startup_silence = function() return true end,

@@ -147,6 +147,7 @@ local function with_fixture(callback)
 			end,
 			activate_hotkey = function() return true end,
 			mlx_deps_checker = {},
+			runtime_installed = function() return true end,
 			deps = {
 				script_control = script_control,
 				update_menu = function() return true end,

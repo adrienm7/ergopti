@@ -1645,6 +1645,7 @@ local function create_menu(deps)
 				apply_llm_profile_shortcut = apply_llm_profile_shortcut,
 				activate_hotkey            = activate_hotkey,
 				mlx_deps_checker           = mlx_deps_checker,
+				runtime_installed          = runtime_install_offer.is_installed,
 				deps                       = deps,
 				prediction_locks           = prediction_locks,
 				get_startup_silence        = get_startup_silence,
