@@ -171,6 +171,45 @@ helpers.describe("gestures.actions: wrapping Space navigation", function()
 		helpers.assert_eq(spaces.jumps, { 11 }, "the new last Space must wrap to the first")
 	end)
 
+	it("defers the edge jump out of the callback that asked for it", function(fresh_actions)
+		-- gotoSpace waits for Mission Control on the run loop: inside the
+		-- gesture or hotkey callback it would stall the typing tap.
+		local actions, calls = fresh_actions()
+		local spaces = script_spaces(calls, { ["screen-A"] = { 11, 12, 13 } }, 13, true)
+		helpers.assert_true(actions.execute_single("space_next_wrap"))
+		helpers.assert_eq(#calls.after, 1, "the jump must be scheduled, not run")
+		helpers.assert_eq(calls.after[1].label, "space wrap")
+		helpers.assert_eq(spaces.jumps, {}, "nothing may reach Mission Control before the timer fires")
+		helpers.assert_eq(keys(calls), {})
+		fire_deferred(calls)
+		helpers.assert_eq(spaces.jumps, { 11 })
+	end)
+
+	it("steps once without wrapping, and says so, when the layout is unreadable", function(fresh_actions)
+		for _, case in ipairs({
+			{ name = "allSpaces raises", break_it = function(spaces)
+				spaces.allSpaces = function() error("private API gone") end
+			end },
+			{ name = "no focused Space", break_it = function(spaces)
+				spaces.focusedSpace = function() return nil end
+			end },
+			{ name = "focused Space on no screen", break_it = function(spaces)
+				spaces.focusedSpace = function() return 99 end
+			end },
+		}) do
+			local actions, calls = fresh_actions()
+			local spaces = script_spaces(calls, { ["screen-A"] = { 11, 12, 13 } }, 13, true)
+			case.break_it(calls.hs.spaces)
+			local warnings = {}
+			package.loaded["infra.logger"].warn = function(_, message) warnings[#warnings + 1] = message end
+			helpers.assert_true(actions.execute_single("space_next_wrap"), case.name)
+			fire_deferred(calls)
+			helpers.assert_eq(keys(calls), { "ctrl:" .. RIGHT }, case.name .. ": one plain step")
+			helpers.assert_eq(spaces.jumps, {}, case.name .. ": no jump without a layout")
+			helpers.assert_eq(#warnings, 1, case.name .. ": the missed wrap must be logged")
+		end
+	end)
+
 	it("does nothing with a single Space", function(fresh_actions)
 		local actions, calls = fresh_actions()
 		local spaces = script_spaces(calls, { ["screen-A"] = { 11 } }, 11, true)
