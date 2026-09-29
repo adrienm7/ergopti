@@ -283,6 +283,7 @@ return {
 	"tests.unit.modules.test_mt_decoder",
 	"tests.unit.modules.test_touchpad_finder",
 	"tests.unit.ui.test_about_menu_channel_rows",
+	"tests.unit.ui.test_about_menu_uninstall",
 	"tests.unit.ui.test_about_menu_version_row",
 	"tests.unit.ui.test_asset_inlining_is_loud",
 	"tests.unit.ui.test_error_dialog_bridge",

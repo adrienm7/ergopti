@@ -417,7 +417,6 @@ _MI_BuildConfigurationMenu() {
 		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
 		"config_folder",       FilePathsEditor,
 		"setup_wizard",        Onboarding_ShowFromMenu,
-		"uninstall",           ShowUninstallErgopti,
 		"start_at_login",      ToggleStartAtLogin
 	)
 		Commands[Id] := Callback
@@ -427,19 +426,20 @@ _MI_BuildConfigurationMenu() {
 
 
 ; Builds the About submenu (version, channels, update check, check frequency,
-; Versions and its GitHub page).
+; Versions and its GitHub page, then Uninstall after a separator).
 _MI_BuildAboutMenu() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 
 	; The updater block is provider DATA since 2026-08-07: one row per entry,
 	; with the channel and frequency pickers handed over as the native Menus they
-	; already are. The changelog and releases rows are `command` declarations.
-	; Until then the whole submenu was assembled here and described nowhere — on
-	; all three drivers at once.
+	; already are. The changelog, releases and uninstall rows are `command`
+	; declarations. Until then the whole submenu was assembled here and described
+	; nowhere — on all three drivers at once.
 	Providers := Map("about_updates", (*) => _MI_AboutUpdateRows())
 	Commands := Map(
 		"about_changelog",     Updater_ShowChangelog,
-		"about_releases_page", Updater_OpenReleasesPage
+		"about_releases_page", Updater_OpenReleasesPage,
+		"uninstall",           ShowUninstallErgopti
 	)
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
 }

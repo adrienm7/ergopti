@@ -130,7 +130,8 @@ local function version_row(Updater)
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
 	require("infra.i18n").get = function(key) return catalogue[key] or key end
-	local rows = About.build({ channel_owner = { get = function() return "dev" end, set = function() end } }).submenu
+	local owner = { get = function() return "dev" end, set = function() end }
+	local rows = About.build({ channel_owner = owner }, { uninstall = function() end }).submenu
 	return rows[1].title
 end
 

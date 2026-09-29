@@ -161,8 +161,10 @@ end
 
 --- Builds the About / Update sub-menu item.
 --- @param ctx table Menu context.
+--- @param actions table|nil The menu session's actions; its uninstall runs the
+---   row that closes the submenu.
 --- @return table Menu item table for insertion into the parent menu.
-function M.build(ctx)
+function M.build(ctx, actions)
 	local owner = type(ctx) == "table" and ctx.channel_owner or nil
 	if type(owner) ~= "table" then
 		Logger.error(LOG, "No update channel owner in the menu context — the channel rows are left out.")
@@ -216,10 +218,11 @@ function M.build(ctx)
 		end
 	end
 
-	-- The updater block above is the manifest's `about_updates` list; the two rows
-	-- below it are `command` declarations. The separator between them is a `---`
-	-- row. Until 2026-08-07 the whole submenu was assembled here and described
-	-- nowhere, on all three drivers at once.
+	-- The updater block above is the manifest's `about_updates` list; the rows
+	-- below it are `command` declarations, set apart by `---` rows: Versions,
+	-- its GitHub page, then Uninstall, which closes the submenu. Until 2026-08-07
+	-- the whole submenu was assembled here and described nowhere, on all three
+	-- drivers at once.
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = {
@@ -228,6 +231,9 @@ function M.build(ctx)
 			show_changelog(channel, owner)
 		end,
 		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
+		-- The menu session's uninstall transaction; an unregistered command is
+		-- reported by the renderer and draws no row that would do nothing.
+		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
 
 	local rendered = ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {
