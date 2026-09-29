@@ -423,12 +423,12 @@ local function with_fixture(options, callback)
 			row_disabled = function() return false end,
 			has_health_dot = function() return false end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = {
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
-		}
-		package.loaded["modules.llm.ollama_deps_checker"] = {
+		})
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
-		}
+		})
 
 		package.loaded["ui.menu.menu_llm"] = nil
 		local MenuLLM = require("ui.menu.menu_llm")

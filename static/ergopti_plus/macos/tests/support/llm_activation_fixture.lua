@@ -33,6 +33,7 @@ local OWNED_MODULES = {
 	"infra.manifest_menu",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
+	"ui.menu.menu_llm.runtime_install_offer",
 	"adapters.timer_scheduler",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"adapters.event_provenance",
@@ -294,27 +295,33 @@ local function build_fixture(backend, save_results, options)
 			return {}
 		end,
 	}
-	package.loaded["modules.llm.mlx_deps_checker"] = {
-		check_and_install_deps = function(callback)
-			calls.bootstrap = calls.bootstrap + 1
-			if options.bootstrap_throw then error("bootstrap exploded") end
-			if options.bootstrap_double_success then
-				callback(true)
-				callback(true)
-				if options.bootstrap_return ~= nil then return options.bootstrap_return end
-				return true
-			end
-			if options.bootstrap_fail_then_throw then
-				callback(false)
-				error("bootstrap exploded after callback")
-			end
-			calls.bootstrap_callback = callback
-			if options.bootstrap_return == "nil" then return nil end
+	-- The menu reaches the MLX runtime only through its selection entry.
+	local function mlx_selection_bootstrap(callback)
+		calls.bootstrap = calls.bootstrap + 1
+		if options.bootstrap_throw then error("bootstrap exploded") end
+		if options.bootstrap_double_success then
+			callback(true)
+			callback(true)
 			if options.bootstrap_return ~= nil then return options.bootstrap_return end
 			return true
-		end,
+		end
+		if options.bootstrap_fail_then_throw then
+			callback(false)
+			error("bootstrap exploded after callback")
+		end
+		calls.bootstrap_callback = callback
+		if options.bootstrap_return == "nil" then return nil end
+		if options.bootstrap_return ~= nil then return options.bootstrap_return end
+		return true
+	end
+	package.loaded["modules.llm.mlx_deps_checker"] = {
+		install_for_selection = mlx_selection_bootstrap,
+		runtime_installed = function() return options.mlx_installed == true end,
 	}
 	package.loaded["modules.llm.ollama_deps_checker"] = {
+		-- An installed Ollama is reused, so enabling never offers a download.
+		runtime_available = function() return true end,
+		is_task_running = function() return false end,
 		check_and_install_deps = function(callback)
 			calls.bootstrap = calls.bootstrap + 1
 			calls.bootstrap_callback = callback
@@ -443,6 +450,7 @@ local function build_fixture(backend, save_results, options)
 		}
 	end
 
+	package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
 	package.loaded["ui.menu.menu_llm"] = nil
 	MenuLLM = require("ui.menu.menu_llm")
 	deps = {

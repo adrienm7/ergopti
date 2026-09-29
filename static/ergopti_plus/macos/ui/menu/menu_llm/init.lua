@@ -50,7 +50,7 @@ local ManifestMenu     = require("infra.manifest_menu")
 -- manual user action. Both checkers are idempotent and exit silently when
 -- nothing needs doing, so the menu opens instantly in the nominal case.
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
+local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("adapters.shell_runner")
 
 local LOG = "menu_llm"
@@ -81,23 +81,17 @@ local function pcall_log(name, fn, ...)
 	return ok, err
 end
 
---- Triggers the deps checker matching the given backend name. Designed to
---- be safe to call repeatedly: each underlying script is hash-gated /
---- liveness-gated and exits in milliseconds when the backend is already
---- ready, so this is effectively a no-op on a working system.
+--- Starts the runtime of the backend the AI is being enabled with. Enabling
+--- the AI is a selection of that backend, so this reuses an installed runtime
+--- and otherwise goes through the one consent-gated install path.
 --- @param backend string Either "mlx" or "ollama".
---- @return boolean completed True when dispatch returned without raising.
-local function check_backend_deps(backend)
-	if backend == "mlx" then
-		local ok, accepted = pcall_log("mlx_deps_checker.check_and_install_deps",
-			mlx_deps_checker.check_and_install_deps)
-		return ok == true and accepted == true
-	elseif backend == "ollama" then
-		local ok, accepted = pcall_log("ollama_deps_checker.check_and_install_deps",
-			ollama_deps_checker.check_and_install_deps)
-		return ok == true and accepted == true
-	end
-	return true
+--- @param on_complete function|nil Receives the terminal runtime result.
+--- @return boolean completed True when dispatch was accepted.
+local function check_backend_deps(backend, on_complete)
+	if backend ~= "mlx" and backend ~= "ollama" then return true end
+	local ok, accepted = pcall_log("runtime_install_offer.select",
+		runtime_install_offer.select, backend, on_complete)
+	return ok == true and accepted == true
 end
 
 -- Holds the active models manager so M.stop_mlx_server() can reach it from any context
@@ -1506,7 +1500,7 @@ local function create_menu(deps)
 								if attempt.phase == "bootstrap" then
 										if attempt.bootstrap_result == nil then return true end
 										if attempt.bootstrap_result ~= true then
-												return compensate_activation("MLX bootstrap reported failure")
+												return compensate_activation("runtime bootstrap reported failure")
 										end
 										attempt.phase = "requirements"
 										return finish_activation(true)
@@ -1547,14 +1541,20 @@ local function create_menu(deps)
 										return false
 								end
 
-								if state.llm_backend == "mlx" then
+								-- Enabling the AI selects its backend: MLX always settles its
+								-- runtime first, and a missing Ollama is offered for download
+								-- before anything else runs. A decline keeps the AI off.
+								local runtime_backend = state.llm_backend
+								if runtime_backend == "mlx" or (runtime_backend == "ollama"
+									and not runtime_install_offer.is_installed("ollama")) then
 										attempt.phase = "bootstrap"
-										Logger.info(LOG, "Activating LLM — running MLX bootstrap check first.")
+										Logger.info(LOG, "Activating LLM — settling the %s runtime first.",
+											tostring(runtime_backend))
 										local bootstrap_dispatching = true
 										local bootstrap_terminal = false
 										local bootstrap_ok, bootstrap_accepted = pcall_log(
-											"mlx_deps_checker.check_and_install_deps",
-											mlx_deps_checker.check_and_install_deps, function(ok)
+											"runtime_install_offer.select",
+											runtime_install_offer.select, runtime_backend, function(ok)
 													if bootstrap_terminal then return false end
 													bootstrap_terminal = true
 													attempt.bootstrap_result = ok == true
@@ -1567,7 +1567,7 @@ local function create_menu(deps)
 											end)
 										bootstrap_dispatching = false
 										if bootstrap_ok ~= true or bootstrap_accepted ~= true then
-												return compensate_activation("MLX bootstrap dispatch refused")
+												return compensate_activation("runtime selection refused or declined")
 										end
 										if bootstrap_terminal then
 												return resume_attempt(token, false)

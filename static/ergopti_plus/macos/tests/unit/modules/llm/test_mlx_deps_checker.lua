@@ -124,7 +124,7 @@ helpers.describe("mlx_deps_checker: refused native launch settles immediately", 
 			},
 		})
 		local settled = "not called"
-		checker.check_and_install_deps(function(ok) settled = ok end)
+		checker.install_for_selection(function(ok) settled = ok end)
 
 		helpers.assert_eq(false, settled,
 			"a refused launch has no completion callback, so pending callers must be "
@@ -288,7 +288,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 	helpers.it("check_and_install_deps() permanently dead-ends without reset_bootstrap_state (pre-fix behaviour)", function()
 		local checker, fire_with_exit_code = load_fresh_checker()
 
-		checker.check_and_install_deps()
+		checker.install_for_selection()
 		fire_with_exit_code(1)
 		helpers.assert_eq(checker.get_state(), "failed", "a non-zero exit code must flip state to failed")
 
@@ -305,7 +305,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 	helpers.it("reset_bootstrap_state() clears the failed state so retry can proceed", function()
 		local checker, fire_with_exit_code = load_fresh_checker()
 
-		checker.check_and_install_deps()
+		checker.install_for_selection()
 		fire_with_exit_code(1)
 		helpers.assert_eq(checker.get_state(), "failed", "precondition: module must be in the failed state")
 
@@ -318,7 +318,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 		-- bootstrap again (dispatch a new hs.task) rather than short-circuiting
 		-- on a stale cached "failed" state.
 		local completed_with = "not called"
-		checker.check_and_install_deps(function(ok) completed_with = ok end)
+		checker.install_for_selection(function(ok) completed_with = ok end)
 		helpers.assert_eq(completed_with, "not called",
 			"a fresh attempt after reset must actually dispatch a new bootstrap task (async), not short-circuit synchronously")
 	end)
@@ -328,10 +328,10 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 
 		-- Force into failed, reset, then start a fresh attempt WITHOUT firing
 		-- its completion — the module should now consider a task "running".
-		checker.check_and_install_deps()
+		checker.install_for_selection()
 		_fire(1)
 		checker.reset_bootstrap_state()
-		checker.check_and_install_deps()  -- dispatches a new task; never fired
+		checker.install_for_selection()  -- dispatches a new task; never fired
 
 		local reset_ok = checker.reset_bootstrap_state()
 		helpers.assert_eq(reset_ok, false,

@@ -3,18 +3,18 @@
 --- ==============================================================================
 --- MODULE: MLX Dependencies Checker
 --- DESCRIPTION:
---- Auto-bootstraps the project-local Python virtualenv at
---- static/ergopti_plus/macos/.venv from pyproject.toml on every Hammerspoon
---- startup. The heavy lifting lives in modules/llm/ensure-mlx-deps.sh; this
---- module orchestrates the async invocation, streams stdout AND stderr to
---- surface granular progress through the unified download_window UI, and
---- reports the FINAL state to the user.
+--- Provisions the MLX Python virtualenv (venv_dir()) from pyproject.toml the
+--- first time the user selects the MLX backend, and only then. The heavy
+--- lifting lives in modules/llm/ensure-mlx-deps.sh; this module orchestrates
+--- the async invocation, streams stdout AND stderr to surface granular
+--- progress through the unified download_window UI, and reports the FINAL
+--- state to the user.
 ---
 --- FEATURES & RATIONALE:
---- 1. Transparent fast path: the bash script hash-compares pyproject.toml
----    against a marker file and exits silently in milliseconds when nothing
----    changed. The Lua side never even shows the progress UI on a normal
----    reload — exactly what the user expects.
+--- 1. Selection-only bootstrap: an installed runtime (interpreter plus sync
+---    fingerprint) is reused with stat-only probes, so boot, re-selection and
+---    app updates never run the script; a missing runtime is provisioned only
+---    through install_for_selection(). Other checks settle as "missing".
 --- 2. Granular progress UX: the script prints identifiable markers
 ---    (UV_INSTALLING, PYTHON_INSTALLING, VENV_CREATING, DEPS_SYNCING) on
 ---    its stdout when about to start each long-running step. We forward
@@ -108,6 +108,11 @@ local _pending_callbacks = {}
 -- both write the same .venv directory.
 local _task_running = false
 
+-- Bootstrap authority. Only install_for_selection() grants it, when the user
+-- selects the MLX backend; the next check consumes it. Boot, an AI enable with
+-- another backend, a model check or an update therefore never run the script.
+local _install_granted = false
+
 -- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
 -- it goes out of scope as soon as the spawning function returns while the
 -- subprocess is still running — an unreferenced hs.task can be collected mid-run,
@@ -174,6 +179,36 @@ local function resolve_bootstrap_script_path()
 	end
 
 	return Paths.find_from_configdir("modules/llm/ensure-mlx-deps.sh", 12)
+end
+
+--- Names the virtualenv ensure-mlx-deps.sh publishes: the launcher's
+--- read-only bundle redirects it to Application Support, a checkout keeps it
+--- beside the driver. Mirrors the script's own ERGOPTI_CONFIG_DIR rule.
+--- @return string|nil venv_dir Absolute folder, or nil when unresolvable.
+function M.venv_dir()
+	local config_ok, config_dir = pcall(os.getenv, "ERGOPTI_CONFIG_DIR")
+	if config_ok and type(config_dir) == "string" and config_dir ~= "" then
+		local home_ok, home = pcall(os.getenv, "HOME")
+		if not home_ok or type(home) ~= "string" or home:sub(1, 1) ~= "/" then return nil end
+		return home .. "/Library/Application Support/Ergopti/mlx-venv"
+	end
+	local hs_root = resolve_hs_root()
+	return hs_root and (hs_root .. "/.venv") or nil
+end
+
+--- Reports whether a completed MLX runtime exists, with stat-only probes: the
+--- interpreter plus the fingerprint the script writes only after a full sync.
+--- @return boolean installed
+--- @return string|nil python_path Interpreter path when the folder is known.
+function M.runtime_installed()
+	local venv = M.venv_dir()
+	if not venv then return false, nil end
+	local python_path = venv .. "/bin/python"
+	local function is_file(path)
+		local ok, mode = pcall(hs.fs.attributes, path, "mode")
+		return ok and mode == "file"
+	end
+	return is_file(python_path) and is_file(venv .. "/.last_sync_hash"), python_path
 end
 
 --- Shell-quotes an arbitrary string for safe insertion into /bin/bash -c.
@@ -890,6 +925,39 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return true
 	end
 
+	-- An installed runtime is reused without the script, so a boot, a
+	-- re-selection or an app update never reaches the network. A missing one is
+	-- provisioned only under the grant of an MLX backend selection, or when a
+	-- pause replays a script that selection already started.
+	local installed, venv_python = M.runtime_installed()
+	local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
+		and _resume_intent.kind == "task"
+	local install_allowed = _install_granted == true or replaying_install
+	_install_granted = false
+	if installed or not install_allowed then
+		if installed then
+			_bootstrap_state = "ready"
+			_last_failure_message = nil
+			Logger.info(LOG, "MLX runtime already installed (%s); reusing it.", tostring(venv_python))
+		else
+			_bootstrap_state = "missing"
+			_last_failure_message = i18n.get("mlx.runtime_missing_body")
+			Logger.warn(LOG, "MLX runtime is not installed; no bootstrap without an MLX backend selection.")
+		end
+		if replay_token ~= nil then
+			local replay_authorization = _pause_controller.capture(replay_token)
+			if replay_authorization == nil then return false end
+			if fire_pending_callbacks(installed, function()
+				return _pause_controller.is_current(replay_token, replay_authorization)
+			end) ~= true then return false end
+			_terminal_outcome = nil
+			ApiCommon.protected_call(on_complete, "MLX dependency on_complete", installed)
+			return _pause_controller.complete(replay_token)
+		end
+		ApiCommon.protected_call(on_complete, "MLX dependency on_complete", installed)
+		return true
+	end
+
 	local token = replay_token or _pause_controller.begin()
 	local authorization = token and _pause_controller.capture(token) or nil
 	if token == nil or authorization == nil then
@@ -1318,6 +1386,33 @@ function M.has_failed() return _bootstrap_state == "failed" end
 --- @return string|nil Last failure message captured from the bash script
 --- (stderr tail), or nil when bootstrap is pending or successful.
 function M.get_failure_message() return _last_failure_message end
+
+--- @return boolean True when the last check found no runtime and ran nothing.
+function M.is_missing() return _bootstrap_state == "missing" end
+
+--- @return boolean True while the selection's bootstrap script is running.
+function M.is_task_running() return _task_running == true end
+
+--- The only bootstrap entry: the user selected the MLX backend (menu row or
+--- AI enable while MLX is the backend). An installed runtime is reused and the
+--- grant is consumed without running the script; a missing one is provisioned.
+--- A definitive failure is cleared first, since the selection is the retry.
+--- @param on_complete function|nil Called once with the terminal result.
+--- @return boolean accepted
+function M.install_for_selection(on_complete)
+	Logger.info(LOG, "MLX backend selected; bootstrap authorized if the runtime is absent.")
+	-- A running task already is the selection's bootstrap: joining it needs no
+	-- grant, and a leftover one must not leak to a later non-selection check.
+	_install_granted = not _task_running
+	if not _task_running and (_bootstrap_state == "failed" or _bootstrap_state == "missing") then
+		_bootstrap_state = "pending"
+		_last_failure_message = nil
+		_terminal_outcome = nil
+	end
+	local accepted = M.check_and_install_deps(on_complete)
+	if accepted ~= true then _install_granted = false end
+	return accepted
+end
 
 --- Resets a definitively-"failed" bootstrap back to "pending" so the tray
 --- menu's "install now" action (or any subsequent check_and_install_deps

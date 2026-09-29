@@ -482,15 +482,18 @@ function M.new(deps, presets)
 				--   1. bootstrap still running → "patientez", do not flip to error
 				--   2. bootstrap failed        → show the actual stderr cause
 				--   3. unknown                 → previous generic message
-				if mlx_deps_checker and mlx_deps_checker.is_pending and mlx_deps_checker.is_pending() then
-					Logger.info(LOG, "MLX import probe failed but bootstrap still pending — launching install.")
-					local bootstrap_ok, accepted = xpcall(
-						mlx_deps_checker.check_and_install_deps, debug.traceback)
-					if not bootstrap_ok or accepted ~= true then
-						Logger.debug(LOG,
-							"MLX dependency install was rejected by its pause admission.")
-						return settle_cancel("dependency_bootstrap_refused")
-					end
+				-- A model check never provisions the runtime: only selecting the
+				-- MLX backend may, so a restored model cannot start a download.
+				if mlx_deps_checker and mlx_deps_checker.is_task_running
+					and mlx_deps_checker.is_task_running() then
+					Logger.info(LOG, "MLX import probe failed while the selected runtime installs.")
+					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
+						i18n.get("mlx.deps_missing_body"), "info")
+				elseif mlx_deps_checker and mlx_deps_checker.runtime_installed
+					and not mlx_deps_checker.runtime_installed() then
+					Logger.warn(LOG, "MLX import probe failed: the MLX runtime is not installed.")
+					pcall(notifications.notify, i18n.get("mlx.runtime_missing_title"),
+						i18n.get("mlx.runtime_missing_body"), "warning")
 				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
 					local cause = (mlx_deps_checker.get_failure_message and mlx_deps_checker.get_failure_message())
 						or "Cause inconnue. Consultez la console Hammerspoon."

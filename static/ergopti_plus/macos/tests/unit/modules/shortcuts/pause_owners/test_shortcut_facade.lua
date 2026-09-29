@@ -395,8 +395,8 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			render_rows = function(rows) return rows end,
 			build = function() return {} end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = noop }
-		package.loaded["modules.llm.ollama_deps_checker"] = { check_and_install_deps = noop }
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
 		reset_module("ui.menu.menu_llm")
 		local MenuLLM = require("ui.menu.menu_llm")
 		local handler = MenuLLM.create({

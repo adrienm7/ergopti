@@ -5,8 +5,11 @@
  * MODULE: Ollama Bootstrap Network Hardening - Behavioral Guard
  * DESCRIPTION:
  * Executes the production macOS bootstrap in a hermetic HOME with faithful
- * curl/checksum/archive doubles. It proves retry/timeout ownership, pinned
- * integrity, and fail-closed publication without network or elevated writes.
+ * curl/checksum/archive/xattr doubles. It proves retry/timeout ownership,
+ * pinned integrity, localized failure markers, download progress, quarantine
+ * removal only after verification, and fail-closed publication into the
+ * Application Support folder the Lua resolver searches, without network or
+ * elevated writes.
  * ============================================================================
  */
 
@@ -168,27 +171,40 @@ chmod +x "$destination/ollama"
 	);
 
 	writeExecutable(path.join(fakeBin, 'sleep'), '#!/usr/bin/env bash\nexit 0\n');
+	writeExecutable(
+		path.join(fakeBin, 'xattr'),
+		`#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$HOME/xattr-args"
+exit 0
+`
+	);
+
+	const installDir = path.join(homeDir, 'Library', 'Application Support', 'Ergopti', 'ollama');
 
 	return {
 		fixtureRoot,
 		homeDir,
 		scriptPath,
-		installedPath: path.join(fakeBin, 'ollama'),
+		fakeBin,
+		installDir,
+		installedPath: path.join(installDir, 'ollama'),
+		xattrArgsPath: path.join(homeDir, 'xattr-args'),
 		curlCountPath: path.join(homeDir, 'curl-count'),
 		tarCountPath: path.join(homeDir, 'tar-count'),
 		curlArgsPath: path.join(homeDir, 'curl-args')
 	};
 }
 
-function runFixture(bash, fixture, args = []) {
-	return spawnSync(bash, [toBashPath(fixture.scriptPath), ...args.map(toBashPath)], {
+function runFixture(bash, fixture, args = ['', fixture.installDir]) {
+	const bashArgs = args.map((arg) => (arg === '' ? '' : toBashPath(arg)));
+	return spawnSync(bash, [toBashPath(fixture.scriptPath), ...bashArgs], {
 		cwd: fixture.fixtureRoot,
 		encoding: 'utf8',
 		maxBuffer: 16 * 1024 * 1024,
 		env: {
 			...process.env,
 			HOME: toBashPath(fixture.homeDir),
-			PATH: '/usr/bin:/bin',
+			PATH: `${toBashPath(fixture.fakeBin)}:/usr/bin:/bin`,
 			ERGOPTI_FIXTURE_ROOT: toBashPath(fixture.fixtureRoot)
 		}
 	});
@@ -212,8 +228,21 @@ try {
 		runDetail(run)
 	);
 	test(
-		'the pinned archive is published as one executable user-local binary',
+		'the pinned archive is published into the Application Support folder the resolver searches',
 		fs.existsSync(flaky.installedPath) && readCount(flaky.tarCountPath) === 1
+	);
+	test(
+		'the download reports progress markers to the shared window',
+		/^OLLAMA_DOWNLOAD_PROGRESS \d+$/m.test(run.stdout) && /^OLLAMA_VERIFIED$/m.test(run.stdout),
+		runDetail(run)
+	);
+	const xattrArgs = fs.existsSync(flaky.xattrArgsPath)
+		? fs.readFileSync(flaky.xattrArgsPath, 'utf8')
+		: '';
+	test(
+		'quarantine is removed from the verified staged files only',
+		/-dr com\.apple\.quarantine .*\.ollama\.ergopti\./.test(xattrArgs),
+		xattrArgs
 	);
 	const curlArgs = fs.existsSync(flaky.curlArgsPath)
 		? fs.readFileSync(flaky.curlArgsPath, 'utf8')
@@ -227,7 +256,7 @@ try {
 		curlArgs
 	);
 	const beforeFastPath = readCount(flaky.curlCountPath);
-	const fastPath = runFixture(bash, flaky, [flaky.installedPath]);
+	const fastPath = runFixture(bash, flaky, [flaky.installedPath, flaky.installDir]);
 	test(
 		'an exact resolved executable keeps the zero-network fast path',
 		fastPath.status === 0 && readCount(flaky.curlCountPath) === beforeFastPath,
@@ -248,6 +277,11 @@ try {
 			/checksum|SHA-256/i.test(run.stderr),
 		runDetail(run)
 	);
+	test(
+		'a checksum mismatch prints the localized-failure marker and never lifts quarantine',
+		/^OLLAMA_ERROR_CHECKSUM$/m.test(run.stdout) && !fs.existsSync(hostile.xattrArgsPath),
+		runDetail(run)
+	);
 } finally {
 	cleanupFixture(hostile);
 }
@@ -262,8 +296,25 @@ try {
 			!fs.existsSync(offline.installedPath),
 		runDetail(run)
 	);
+	test(
+		'a network failure prints the localized-failure marker',
+		/^OLLAMA_ERROR_NETWORK$/m.test(run.stdout),
+		runDetail(run)
+	);
 } finally {
 	cleanupFixture(offline);
+}
+
+const unnamed = createFixture('success', 'good');
+try {
+	const run = runFixture(bash, unnamed, ['', '']);
+	test(
+		'without a resolver-named install folder nothing is downloaded',
+		run.status !== 0 && readCount(unnamed.curlCountPath) === 0,
+		runDetail(run)
+	);
+} finally {
+	cleanupFixture(unnamed);
 }
 
 const unreadable = createFixture('success', 'fail');
@@ -297,8 +348,13 @@ test(
 	'runtime and bundle build source one pinned Ollama release',
 	releaseSource.includes('OLLAMA_RELEASE_VERSION="0.24.0"') &&
 		releaseSource.includes('OLLAMA_DARWIN_TGZ_SHA256=') &&
+		releaseSource.includes('OLLAMA_DARWIN_TGZ_BYTES=') &&
 		ollamaSource.includes('ollama-release.sh') &&
 		buildSource.includes('ollama-release.sh')
+);
+test(
+	'the install script leaves detection to the Lua resolver',
+	!/command -v ollama/.test(ollamaSource) && !ollamaSource.includes('.local/bin')
 );
 test(
 	'the runtime never pipes remote code into a shell or delegates to Homebrew',

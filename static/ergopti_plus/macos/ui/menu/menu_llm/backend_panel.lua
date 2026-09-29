@@ -21,8 +21,7 @@ local Logger   = require("infra.logger")
 
 local LOG = "backend_panel"
 
-local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
+local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 
 -- Survives menu rebuilds so a deferred settlement callback from an older row
 -- cannot publish a backend after a newer selection has taken ownership.
@@ -235,18 +234,29 @@ local function is_apple_silicon()
 end
 M.is_apple_silicon = is_apple_silicon
 
---- Triggers the deps checker matching the given backend name.
---- Safe to call repeatedly — each script is hash-gated and silent on the fast path.
+--- Starts the runtime of the backend the user just selected. This is the
+--- menu's only install path: an installed runtime is reused, a missing MLX
+--- runtime is provisioned, and Ollama was already offered before the switch.
 --- @param backend string Either "mlx" or "ollama".
 local function check_backend_deps(backend)
 	if backend == "mlx" then
 		return invoke_backend_boundary(
-			"MLX dependency bootstrap", mlx_deps_checker.check_and_install_deps)
+			"MLX runtime selection", runtime_install_offer.select_mlx)
 	elseif backend == "ollama" then
 		return invoke_backend_boundary(
-			"Ollama dependency bootstrap", ollama_deps_checker.check_and_install_deps)
+			"Ollama runtime selection", runtime_install_offer.select_ollama)
 	end
 	return false
+end
+
+--- Labels a local backend row, flagging a runtime that is not installed yet.
+--- Stat-only, so building the menu never spawns a process.
+--- @param base string Row label.
+--- @param backend string Backend identifier.
+--- @return string label
+local function runtime_row_label(base, backend)
+	if runtime_install_offer.is_installed(backend) then return base end
+	return base .. " (" .. i18n.get("menu.llm.backend_runtime_missing") .. ")"
 end
 
 
@@ -523,10 +533,16 @@ function M.build(ctx)
 	-- =====================================================
 
 	table.insert(rows, {
-		label    = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"),
+		label    = runtime_row_label("MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"), "mlx"),
 		checked  = (state.llm_backend == "mlx"),
 		disabled = (not is_apple_silicon()) or paused or nil,
 		action       = not paused and function()
+			if state.llm_backend == "mlx" then
+				-- Selecting the current backend again is how a missing runtime
+				-- is installed; an installed one is reused without any work.
+				if runtime_install_offer.is_installed("mlx") then return true end
+				return check_backend_deps("mlx")
+			end
 			if state.llm_backend ~= "mlx" then
 				Logger.info(LOG, "Activating MLX backend…")
 				local committed = publish_backend("mlx", function(debt)
@@ -560,10 +576,20 @@ function M.build(ctx)
 	-- =====================================================
 
 	table.insert(rows, {
-		label    = "Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"),
+		label    = runtime_row_label("Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"), "ollama"),
 		checked  = (state.llm_backend == "ollama"),
 		disabled = paused or nil,
 		action       = not paused and function()
+			if state.llm_backend == "ollama" then
+				if runtime_install_offer.is_installed("ollama") then return true end
+				return check_backend_deps("ollama")
+			end
+			-- A missing Ollama is offered before any backend state changes, so a
+			-- decline leaves the current backend untouched.
+			if not runtime_install_offer.is_installed("ollama")
+				and runtime_install_offer.select_ollama() ~= true then
+				return false
+			end
 			if state.llm_backend ~= "ollama" then
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
 				local function finish_ollama_switch(debt)

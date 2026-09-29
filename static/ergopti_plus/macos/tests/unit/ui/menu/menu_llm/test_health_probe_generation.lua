@@ -231,12 +231,12 @@ local function with_fixture(callback)
 				return items
 			end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = {
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = accept,
-		}
-		package.loaded["modules.llm.ollama_deps_checker"] = {
+		})
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = accept,
-		}
+		})
 
 		local previous_async_get = hs.http.asyncGet
 		local previous_hs_execute = hs.execute

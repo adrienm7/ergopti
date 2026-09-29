@@ -229,6 +229,18 @@ local function load_fixture(options)
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
 			"resolve_project_root", function() return "/repo" end))
 	end
+	fixture.check_impl = checker.check_and_install_deps
+	if options.backend == "mlx" then
+		-- The MLX script only ever runs for a selected, absent runtime: model
+		-- that state so these cases keep exercising the script's pause owner.
+		checker.runtime_installed = function() return false, "/fixture/venv/bin/python" end
+		local check = checker.check_and_install_deps
+		checker.check_and_install_deps = function(...)
+			helpers.assert_true(set_upvalue(check, "_install_granted", true),
+				"the MLX bootstrap must keep its selection grant")
+			return check(...)
+		end
+	end
 
 	local control
 	if options.real_script_control == true then
@@ -719,7 +731,7 @@ helpers.describe("HS-117 dependency checker callback symmetry", function()
 			local fixture = load_fixture({ backend = backend })
 			local resolver_name = backend == "mlx"
 				and "resolve_bootstrap_script_path" or "resolve_project_root"
-			helpers.assert_true(set_upvalue(fixture.checker.check_and_install_deps,
+			helpers.assert_true(set_upvalue(fixture.check_impl,
 				resolver_name, function() return nil end))
 			local completions = {}
 

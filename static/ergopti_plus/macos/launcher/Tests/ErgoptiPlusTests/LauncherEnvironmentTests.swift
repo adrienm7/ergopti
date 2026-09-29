@@ -699,6 +699,28 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ergopti_plus/launcher.log"))
 	}
 
+	/// The app no longer ships Ollama, so the child gets no bundled path to
+	/// trust: the Lua resolver finds an installed Ollama on its own.
+	func testLaunchExportsNoBundledOllamaPath() throws {
+		let store = try temporaryFatalReportStore()
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertNotNil(childEnvironment["ERGOPTI_CONFIG_DIR"])
+		XCTAssertNil(childEnvironment["ERGOPTI_OLLAMA_BIN"])
+		XCTAssertFalse(childEnvironment.values.contains { $0.contains("/Resources/Tools/Ollama") })
+	}
+
 	/// The startup trail names every exported key but never logs the token value.
 	func testStartupTrailListsExportedKeyNamesWithoutValues() {
 		let environment = launcherChildEnvironment(

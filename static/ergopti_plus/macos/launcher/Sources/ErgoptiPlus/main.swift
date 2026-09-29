@@ -723,13 +723,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		return bundledConfigDir() + "/init.lua"
 	}
 
-	// Path to the vendored Ollama server binary. The Lua driver sets
-	// OLLAMA_MODELS and spawns this binary directly so local LLM inference
-	// works without a separate Ollama install.
-	private func bundledOllamaBinPath() -> String {
-		return "\(Bundle.main.bundlePath)/Contents/Resources/Tools/Ollama/ollama"
-	}
-
 
 
 
@@ -838,7 +831,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
 		env["ERGOPTI_PATHS_FILE"]             = managedPathsFile()
-		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
 		env["ERGOPTI_LAUNCHER_EXECUTABLE"]     = launcherPath
 		env["ERGOPTI_REMAP_GUARDIAN_STATUS"]  = remapGuardianStatus.rawValue
 		env[kFatalReportEnvironment]          = fatalReportStore.path
