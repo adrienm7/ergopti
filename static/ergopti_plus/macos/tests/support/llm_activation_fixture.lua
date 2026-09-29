@@ -130,16 +130,29 @@ local function build_fixture(backend, save_results, options)
 
 	package.loaded["infra.logger"] = {
 		debug = noop, info = noop, warn = noop, error = noop, done = noop,
+		start = noop, success = noop,
 		callback = function(_, _, callback, ...)
 			return xpcall(callback, debug.traceback, ...)
 		end,
 	}
+	calls.runtime_notices = {}
+	calls.offers = 0
 	package.loaded["infra.notifications"] = {
-		notify = function(message)
+		notify = function(message, body)
 			if message == "notify.llm_enabled" or message == "notify.llm_disabled" then
 				calls.notifications = calls.notifications + 1
+			elseif message == "ollama.runtime_missing_title"
+				or message == "mlx.runtime_missing_title" then
+				calls.runtime_notices[#calls.runtime_notices + 1] = body
 			end
 			return true
+		end,
+	}
+	-- The Ollama download offer: the choice is the button label, as i18n echoes keys.
+	package.loaded["infra.dialog_util"] = {
+		block_alert = function()
+			calls.offers = calls.offers + 1
+			return options.ollama_offer_choice or "ollama.offer_website"
 		end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
@@ -318,10 +331,17 @@ local function build_fixture(backend, save_results, options)
 		install_for_selection = mlx_selection_bootstrap,
 		runtime_installed = function() return options.mlx_installed == true end,
 	}
+	calls.ollama_installs = 0
 	package.loaded["modules.llm.ollama_deps_checker"] = {
-		-- An installed Ollama is reused, so enabling never offers a download.
-		runtime_available = function() return true end,
+		-- An installed Ollama is reused, so enabling offers no download unless
+		-- a case sets ollama_installed = false.
+		runtime_available = function() return options.ollama_installed ~= false end,
 		is_task_running = function() return false end,
+		install_for_selection = function(callback)
+			calls.ollama_installs = calls.ollama_installs + 1
+			calls.bootstrap_callback = callback
+			return true
+		end,
 		check_and_install_deps = function(callback)
 			calls.bootstrap = calls.bootstrap + 1
 			calls.bootstrap_callback = callback
