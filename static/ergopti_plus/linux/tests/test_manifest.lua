@@ -237,6 +237,7 @@ return {
 	"tests.unit.modules.llm.test_live_mode",
 	"tests.unit.modules.llm.test_tone_selection",
 	"tests.unit.modules.llm.test_screen_answers",
+	"tests.unit.modules.llm.test_agent_vectors",
 	"tests.unit.modules.llm.test_translate_selection",
 	"tests.unit.modules.llm.test_prediction_triggers",
 	"tests.unit.modules.llm.test_profile_settings",
