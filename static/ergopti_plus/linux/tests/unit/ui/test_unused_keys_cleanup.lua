@@ -264,6 +264,60 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 			helpers.assert_eq(tap.assignments.number_row_left, "none")
 		end)
 
+	helpers.it("unused keys: what the readers warn about is exactly what is offered (config-outdated-warned-offered)",
+		function()
+			-- Unknown gesture slots and invalid parameters were offered but never
+			-- warned about; an invalid AI value was warned about but never offered
+			-- (and a wrong-typed one made every AI preference read raise).
+			local source = table.concat({
+				"[gestures]",
+				"enabled = true",
+				"not_a_slot = \"none\"",
+				"tap_3 = 5",
+				"",
+				"[gesture_parameters]",
+				"broken = \"x\"",
+				"tap_3__open_url = \"not a url\"",
+				"",
+				"[llm]",
+				"enabled = true",
+				"",
+				"[llm.trigger]",
+				"debounce_ms = \"fast\"",
+				"",
+				"[llm.generation]",
+				"temperature = 99",
+				"",
+			}, "\n")
+			local scan
+			local reported = require("config_outdated").collect_reports(function()
+				scan = Engine.find_in_source(source, Cleanup.collect)
+			end)
+			local offered, warned = {}, {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			for path in pairs(reported) do warned[#warned + 1] = path end
+			table.sort(offered)
+			table.sort(warned)
+			helpers.assert_eq(offered, { "gesture_parameters.broken", "gesture_parameters.tap_3__open_url",
+				"gestures.not_a_slot", "gestures.tap_3", "llm.generation.temperature", "llm.trigger.debounce_ms" })
+			helpers.assert_eq(warned, offered)
+
+			-- The wrong-typed AI leaf is read as absent; its neighbours still read.
+			Sandbox.with_config(source, function(path)
+				local paths = require("infra.config_paths")
+				local previous_config, previous_preferences = paths.config, package.loaded["infra.llm_preferences"]
+				paths.config = function() return path end
+				package.loaded["infra.llm_preferences"] = nil
+				local ok, err = pcall(function()
+					local preferences = require("infra.llm_preferences")
+					helpers.assert_eq(preferences.get("llm.enabled", nil), true)
+					helpers.assert_nil(preferences.get("llm.trigger.debounce_ms", nil))
+				end)
+				paths.config, package.loaded["infra.llm_preferences"] = previous_config, previous_preferences
+				if not ok then error(err, 0) end
+			end)
+		end)
+
 	helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)",
 		function()
 			local source = "[shortcuts]\ntap_keys = { number_row_left = \"retired_action_xyz\", "

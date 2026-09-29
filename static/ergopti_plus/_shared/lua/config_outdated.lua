@@ -40,6 +40,11 @@ local _reported = {}
 -- reader (the setup wizard showing the value) also reads it.
 local _scans = {}
 
+--- The detail an owner reports for a stored value its own rule refuses (out
+--- of range, not a modifier chord…). One spelling, so the boot read and the
+--- cleanup name the entry once.
+M.REFUSED = "its owner no longer accepts this value"
+
 
 
 

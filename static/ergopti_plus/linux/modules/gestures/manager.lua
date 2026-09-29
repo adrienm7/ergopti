@@ -1696,22 +1696,37 @@ end
 --- @param visit table `{ action(section, slot, action), param(section, key, value),
 ---   enabled(value) }`; every field is optional.
 local function walk_user_config(config, visit)
+	--- Path segments of one entry of a (possibly dotted) section.
+	--- @param section_name string
+	--- @param key any
+	--- @return table segments
+	local function entry_path(section_name, key)
+		local segments = {}
+		for part in section_name:gmatch("[^.]+") do segments[#segments + 1] = part end
+		segments[#segments + 1] = key
+		return segments
+	end
+
 	--- Visits one section's slot→action pairs the loader binds.
 	--- @param section_name string
 	--- @param section table|nil
 	local function walk_actions(section_name, section)
 		if type(section) ~= "table" or not visit.action then return end
 		for slot, action in pairs(section) do
-			if M.DEFAULT_GESTURES[slot] and type(action) == "string" then
-				-- A retired action is outdated configuration: neither the loader
-				-- nor the cleanup marker takes it, so it is warned about once and
-				-- offered for removal instead of being kept forever.
-				if M.is_assignable(action) then
-					visit.action(section_name, slot, action)
-				else
-					ConfigOutdated.report(section_name .. "." .. slot,
-						"action '" .. action .. "' no longer exists", Logger)
-				end
+			-- An unknown slot, a non-text action or a retired one is outdated
+			-- configuration: neither the loader nor the cleanup marker takes it,
+			-- so it is warned about once and offered for removal instead of
+			-- being skipped in silence. `enabled` is the master switch.
+			if slot == "enabled" and section_name == CONFIG_SECTION then
+				-- Read by the enabled visitor below.
+			elseif not M.DEFAULT_GESTURES[slot] then
+				ConfigOutdated.report(entry_path(section_name, slot), "no gesture slot of this build has this name", Logger)
+			elseif type(action) ~= "string" then
+				ConfigOutdated.report(entry_path(section_name, slot), "the value is not an action id", Logger)
+			elseif M.is_assignable(action) then
+				visit.action(section_name, slot, action)
+			else
+				ConfigOutdated.report(entry_path(section_name, slot), "action '" .. action .. "' no longer exists", Logger)
 			end
 		end
 	end
@@ -1725,6 +1740,11 @@ local function walk_user_config(config, visit)
 			local binding, action = M.split_action_parameter_key(key)
 			if binding and action and M.validate_action_parameter(action, value) then
 				visit.param(section_name, key, value)
+			else
+				-- Outdated configuration, named once and offered by the cleanup.
+				ConfigOutdated.report(entry_path(section_name, key), binding and action
+					and "the value no longer fits its action's parameter"
+					or "no action parameter of this build has this name", Logger)
 			end
 		end
 	end
