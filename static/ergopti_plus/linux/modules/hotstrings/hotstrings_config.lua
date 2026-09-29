@@ -296,6 +296,36 @@ local function overrides_path()
 	return override_config_dir() .. "/" .. OVERRIDES_FILE
 end
 
+--- Interprets override file bytes, raising when they are not valid TOML.
+--- @param content string Exact file bytes.
+--- @return table overrides { [category] = { delay, color, show_tooltip, priority, sections } }
+local function parse_override_content(content)
+	local parsed = TomlCodec.decode(content)
+	assert(type(parsed) == "table", "the override file is not valid TOML")
+	local function override_fields(values)
+		return {
+			delay = tonumber(values.delay),
+			color = values.color,
+			show_tooltip = values.show_tooltip,
+			priority = tonumber(values.priority),
+		}
+	end
+	local overrides = {}
+	for category, values in pairs(parsed) do
+		if type(values) == "table" then
+			local entry = override_fields(values)
+			entry.sections = {}
+			for section, section_values in pairs(values) do
+				if type(section_values) == "table" then
+					entry.sections[section] = override_fields(section_values)
+				end
+			end
+			overrides[category] = entry
+		end
+	end
+	return overrides
+end
+
 --- Reads the override file into memory. A missing file is the normal case.
 local function load_overrides()
 	_overrides = {}
@@ -306,38 +336,15 @@ local function load_overrides()
 	if not fh then return end
 	local read_ok, content = pcall(fh.read, fh, "*a")
 	local close_ok, closed = pcall(fh.close, fh)
-	local ok, parsed = pcall(TomlCodec.decode, content)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true
-		or not ok or type(parsed) ~= "table"
-	then
+	local ok, parsed = pcall(parse_override_content, content)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true or not ok then
 		-- Loud, not silent: a malformed override file means the user's delays are
 		-- being ignored, and the only symptom otherwise is "my settings did
 		-- nothing".
 		Logger.error(LOG, "Override file '%s' is malformed — user delays and colours ignored.", path)
 		return
 	end
-
-	local function override_fields(values)
-		return {
-			delay = tonumber(values.delay),
-			color = values.color,
-			show_tooltip = values.show_tooltip,
-			priority = tonumber(values.priority),
-		}
-	end
-
-	for category, values in pairs(parsed) do
-		if type(values) == "table" then
-			local entry = override_fields(values)
-			entry.sections = {}
-			for section, section_values in pairs(values) do
-				if type(section_values) == "table" then
-					entry.sections[section] = override_fields(section_values)
-				end
-			end
-			_overrides[category] = entry
-		end
-	end
+	_overrides = parsed
 end
 
 --- Copies the override tree for a persistence transaction.
@@ -1433,6 +1440,108 @@ function M.refresh_choices()
 	end
 	notify_change()
 	return true
+end
+
+--- The override file this owner reads and the scope publishes.
+--- @return string
+function M.override_path()
+	return overrides_path()
+end
+
+--- The delay a section inherits once every user override is removed: its
+--- corpus rungs, then the shared default. The scope compares it with the
+--- manifest recommendation instead of assuming deletion restores it.
+--- @param category string Loaded category.
+--- @param section string Section name.
+--- @return number seconds
+function M.inherited_delay(category, section)
+	local meta = _categories[category]
+	assert(type(meta) == "table", "unknown hotstring category: " .. tostring(category))
+	return DelayResolver.resolve({
+		meta_category = meta,
+		meta_section = (meta.sections or {})[section],
+		default_delay = GLOBAL_DEFAULT_DELAY,
+	}).delay
+end
+
+--- The categories shipped with the product: the bundled file stems and the
+--- declared language packs. Personal and extension packs are user content.
+--- @return table Set of category ids.
+function M.bundled_categories()
+	local set = {}
+	local bundled = Paths.shared("modules/hotstrings")
+	for _, path in ipairs(Loader.find_toml_files(bundled)) do
+		local stem = path:match("([^/\\]+)%.toml$")
+		if stem and not in_language_folder(path, bundled) then set[stem] = true end
+	end
+	for _, pack in ipairs(M.language_packs()) do
+		for _, stem in ipairs(pack.categories) do set[Languages.group_id(pack.id, stem)] = true end
+	end
+	return set
+end
+
+--- Acquires the configuration for one scope transaction; ordinary setters are
+--- refused until it releases.
+--- @param owner table Transaction identity.
+--- @return boolean acquired
+function M.acquire(owner)
+	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
+	_scope_owner = owner
+	return true
+end
+
+--- Releases the configuration held by an owner.
+--- @param owner table Transaction identity.
+--- @return boolean released
+function M.release(owner)
+	if _scope_owner ~= owner then return false end
+	_scope_owner = nil
+	return true
+end
+
+--- Detached runtime state a scope restores after a refused publication.
+--- @return table|nil snapshot nil while the choices are unreadable.
+function M.configuration_snapshot()
+	if not _choices then return nil end
+	return { choices = copy_choices(_choices), overrides = copy_overrides(_overrides),
+		magic_key = _magic_key, canonical_magic_key = _canonical_magic_key }
+end
+
+--- Publishes a candidate configuration to the engine without writing a file.
+--- The previous catalogue stays effective when the engine refuses.
+--- @param owner table The acquiring transaction.
+--- @param document table Decoded config.toml candidate.
+--- @param override_content string Override file candidate bytes.
+--- @return boolean applied
+function M.apply_configuration(owner, document, override_content)
+	if _scope_owner ~= owner then return false end
+	local decoded, choices = pcall(decode_choices, document)
+	local parsed, overrides = pcall(parse_override_content, override_content)
+	if not decoded or not parsed then
+		Logger.error(LOG, "Candidate hotstring configuration refused: %s.", tostring(decoded and overrides or choices))
+		return false
+	end
+	local previous_choices, previous_overrides = _choices, _overrides
+	_choices, _overrides, _resolve_cache = choices, overrides, {}
+	local _, committed, reason = M.load_all()
+	if committed == true then return true end
+	_choices, _overrides, _resolve_cache = previous_choices, previous_overrides, {}
+	local _, restored = M.load_all()
+	Logger.error(LOG, "Candidate hotstring catalogue refused (%s); previous catalogue %s.",
+		tostring(reason), restored == true and "republished" or "NOT republished")
+	return false
+end
+
+--- Republishes an exact snapshot taken before a scope.
+--- @param owner table The acquiring transaction.
+--- @param snapshot table Result of M.configuration_snapshot().
+--- @return boolean restored
+function M.restore_configuration(owner, snapshot)
+	if _scope_owner ~= owner or type(snapshot) ~= "table" then return false end
+	_choices, _overrides, _resolve_cache = copy_choices(snapshot.choices), copy_overrides(snapshot.overrides), {}
+	_magic_key, _canonical_magic_key = snapshot.magic_key, snapshot.canonical_magic_key
+	local _, committed = M.load_all()
+	return committed == true
 end
 
 --- Marks the choices this owner consumes for the unused-key cleanup: every
