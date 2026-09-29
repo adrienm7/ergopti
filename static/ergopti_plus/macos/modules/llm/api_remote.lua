@@ -47,6 +47,9 @@ local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
 local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests
 local _check_client  = _http_adapter.new(_http_options)   -- used for explicit availability checks
 local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independent cancellation ownership
+-- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
+-- need not be the active entry: its requests never share the prediction owner
+local _vision_client = _http_adapter.new(_http_options)
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -1835,10 +1838,128 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Called on a credential, transport, HTTP or empty-answer failure.
-function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail)
+--- @param _options table|nil { chat = true } as for api_ollama.request_raw: a remote
+---        request is always a chat turn, so there is nothing to change.
+function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail,
+                       _options)
 	if type(on_raw) ~= "function" then error("api_remote.request_raw: on_raw must be a function") end
 	post_and_parse(model_name, system_prompt, full_text, tail_text,
 		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw)
+end
+
+--- Finds the API entry a vision request to a provider runs with: the active
+--- entry when it belongs to that provider, else the first one configured for it.
+--- @param provider_id string Provider id of api_providers.json.
+--- @return table|nil entry
+local function find_provider_entry(provider_id)
+	local active = find_active_entry()
+	if active and active.provider == provider_id then return active end
+	for _, entry in ipairs(_entries) do
+		if entry.provider == provider_id then return entry end
+	end
+	return nil
+end
+
+--- Tells whether a vision request can be sent to a provider, before anything
+--- is captured: the provider exists and an API entry with a key is configured.
+--- @param provider_id string Provider id of api_providers.json.
+--- @return boolean ready
+--- @return string|nil reason "unknown_provider", "no_entry" or "missing_token".
+function M.vision_provider_status(provider_id)
+	if type(provider_id) ~= "string" or M.PROVIDERS[provider_id] == nil then
+		return false, "unknown_provider"
+	end
+	local entry = find_provider_entry(provider_id)
+	if not entry then return false, "no_entry" end
+	if type(entry.token) ~= "string" or entry.token == "" then return false, "missing_token" end
+	return true, nil
+end
+
+--- The request format of a provider ("openai", "anthropic" or "gemini").
+--- @param provider_id string Provider id of api_providers.json.
+--- @return string|nil format Nil for an unknown provider.
+function M.provider_format(provider_id)
+	local provider = M.PROVIDERS[provider_id]
+	return provider and provider.format or nil
+end
+
+--- Posts one prebuilt vision request body to a provider with its stored API
+--- key, through the same URL, header and answer rules as a prediction. The
+--- body carries a screenshot: neither it nor the answer is ever logged.
+--- @param provider_id string Provider id of api_providers.json.
+--- @param model string The vision model (Gemini puts it in the URL).
+--- @param body table The request body (llm/vision.lua build_request).
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+--- @return boolean sent True when the key resolution started.
+function M.request_vision(provider_id, model, body, on_text, on_fail)
+	if type(on_text) ~= "function" or type(on_fail) ~= "function" then
+		error("api_remote.request_vision: on_text and on_fail must be functions")
+	end
+	local function fail(reason)
+		ApiCommon.protected_call(on_fail, "on_fail", reason)
+		return false
+	end
+	local ready, reason = M.vision_provider_status(provider_id)
+	if not ready then
+		Logger.error(LOG, "Vision request refused for provider '%s': %s.", tostring(provider_id), tostring(reason))
+		return fail(reason)
+	end
+	if type(model) ~= "string" or model == "" or type(body) ~= "table" then
+		error("api_remote.request_vision: a model and a body are required")
+	end
+	local provider = M.PROVIDERS[provider_id]
+	local entry = find_provider_entry(provider_id)
+	TokenCrypto.decrypt_async(entry.token, function(decrypted, token, token_reason)
+		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			Logger.error(LOG, "Vision request for provider '%s' has no usable key (entry '%s'): %s.",
+				provider_id, tostring(entry.id), tostring(token_reason))
+			fail("missing_token")
+			return
+		end
+		local base, base_error = resolve_base_url(entry, provider)
+		if not base then
+			log_endpoint_refusal("vision", entry, base_error)
+			fail("invalid_endpoint")
+			return
+		end
+		local url, url_error = build_url(base, provider.format, model, token)
+		if not url then
+			log_endpoint_refusal("vision", entry, url_error)
+			fail("invalid_endpoint")
+			return
+		end
+		local encoded, encode_error = JsonCodec.encode(body)
+		if not encoded then
+			Logger.error(LOG, "Vision request body encode failed: %s.", tostring(encode_error))
+			fail("encode_failed")
+			return
+		end
+		local t0 = TimerScheduler.now()
+		Logger.info(LOG, "Vision request to provider '%s' (model %s, %d byte(s)) -> %s.",
+			provider_id, model, #encoded, redact_url(url))
+		_vision_client.post(url, build_headers(provider.format, token), encoded, function(r)
+			Logger.pcall(LOG, function()
+				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+				if not r.ok then
+					Logger.error(LOG, "Vision request to provider '%s' failed in %dms: HTTP %s (%s).",
+						provider_id, ms, tostring(r.status), tostring(extract_server_message(r.body) or r.error or ""))
+					fail("http_" .. tostring(r.status or "unknown"))
+					return
+				end
+				local text = Parser.strip_thinking(ResponseClassifier.classify(provider.format, r.body).text)
+				if type(text) ~= "string" or text == "" then
+					Logger.warn(LOG, "Vision answer of provider '%s' holds no text (%dms).", provider_id, ms)
+					fail("empty_answer")
+					return
+				end
+				Logger.info(LOG, "Vision answer of provider '%s' received in %dms (%d char(s)).",
+					provider_id, ms, #text)
+				ApiCommon.protected_call(on_text, "on_text", text)
+			end)
+		end)
+	end)
+	return true
 end
 
 --- Sends the shared minimal probe (api_providers.json test_request, verbatim)

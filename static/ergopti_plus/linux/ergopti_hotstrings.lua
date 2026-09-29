@@ -1122,6 +1122,12 @@ local function main()
 				local info = window_info.getFocused()
 				return (info.appId or "") .. "\1" .. (info.windowTitle or "")
 			end or nil,
+			-- The screen actions capture to a private file with the screenshot
+			-- actions' tools; the engine reads and deletes it.
+			capture_screen = function(mode, max_edge, on_done)
+				if opts.dry_run then return nil, "dry run" end
+				return require("adapters.screen_capture").capture(mode, max_edge, on_done)
+			end,
 			on_offer = function(context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keylogger.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))

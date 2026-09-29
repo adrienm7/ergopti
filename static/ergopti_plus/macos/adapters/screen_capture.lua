@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Reads and requests the macOS Screen Recording permission, and owns the
 --- pasteboard image boundary used to prove that a screenshot reached the
---- clipboard.
+--- clipboard, and encodes a captured image for a vision request.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Distinct identity: the packaged runtime is its own application
@@ -161,6 +161,31 @@ function M.copy_image_file_to_clipboard(path)
 		return false, present == nil and read_err or "the pasteboard holds no image after the write"
 	end
 	return true
+end
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 4/ Image Encoding ===========
+-- =====================================
+-- =====================================
+
+--- Encodes the bytes of a captured image as base64, the form a vision request
+--- carries the screenshot in.
+--- @param data string Raw image bytes.
+--- @return string|nil encoded Base64 text without line breaks.
+--- @return string|nil detail Exact failure otherwise.
+function M.encode_base64(data)
+	if type(data) ~= "string" or data == "" then return nil, "image data must be a non-empty string" end
+	local encode, missing = native("base64", "encode")
+	if not encode then return nil, missing end
+	local ok, encoded = pcall(encode, data)
+	if not ok then return nil, "base64 encoding raised: " .. tostring(encoded) end
+	if type(encoded) ~= "string" or encoded == "" then return nil, "base64 encoding returned no text" end
+	return (encoded:gsub("%s", ""))
 end
 
 return M

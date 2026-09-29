@@ -83,7 +83,8 @@ const byId = {};
 for (const id of ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 'empty', 'count', 'toc',
 	'toc-inner', 'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back',
 	'param-save', 'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label',
-	'btn-edit-current']) {
+	'btn-edit-current', 'param-vision', 'param-vision-provider',
+	'param-vision-provider-label', 'param-vision-model', 'param-vision-model-label']) {
 	byId[id] = new FakeElement('div', id);
 }
 const docListeners = {};

@@ -565,6 +565,8 @@ LLM_Defaults_Load()
 #Include modules/llm/prompt_action.ahk
 #Include modules/llm/tone.ahk
 #Include modules/llm/tone_action.ahk
+#Include modules/llm/vision.ahk
+#Include modules/llm/vision_action.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk

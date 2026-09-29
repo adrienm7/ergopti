@@ -301,6 +301,15 @@ for _ToneActionId, _ToneStep in LLM_ToneActions() {
 		GESTURE_ACTIONS[_ToneActionId] := { Fn: _GestureMakeToneRunner(_ToneStep.Direction, _ToneStep.Cycle) }
 }
 
+; ── Answering what is on the screen ────────────────────────────────────────
+;
+; llm_screen_region and llm_screen_full, one per entry of LLM_VisionActions
+; (modules/llm/vision_action.ahk); the binding's llm_vision parameter names
+; the vision backend.
+for _VisionActionId, _VisionKind in LLM_VisionActions() {
+		GESTURE_ACTIONS[_VisionActionId] := { Fn: _GestureMakeVisionRunner(_VisionActionId) }
+}
+
 ; Every persisted gesture action must name the live catalogue.  The empty
 ; sentinel is exclusive to tap-hold, where it means native key passthrough.
 GestureActionIsAssignable(ActionName, AllowNative := false) {
@@ -332,6 +341,11 @@ _GestureMakePromptPresetRunner(ProfileId) {
 ; Same reason: the direction and the cycle flag arrive as parameters.
 _GestureMakeToneRunner(Direction, Cycle) {
 		return (*) => LLM_Tone_Trigger(Direction, Cycle)
+}
+
+; Same reason: the action id arrives as a parameter.
+_GestureMakeVisionRunner(ActionId) {
+		return (BindingId := "") => GestureScreenVision(ActionId, BindingId)
 }
 
 
@@ -398,6 +412,16 @@ GesturePromptPrediction(BindingId := "", FireFn := 0) {
 		}
 		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
 				Parsed.Get("num_predictions", 0), FireFn)
+}
+
+; Runs a screen action of one binding: its stored value names the vision
+; backend, validated and resolved by the trigger, which shows every refusal.
+; @param {String} ActionId llm_screen_region or llm_screen_full.
+; @param {String} BindingId The binding whose parameter to read.
+; @returns {Boolean} True when the capture started.
+GestureScreenVision(ActionId, BindingId := "") {
+		return LLM_Vision_Trigger(LLM_VisionActions()[ActionId],
+				GestureGetActionParameter(BindingId, ActionId))
 }
 
 GestureOpenConfiguredURL(BindingId := "") {

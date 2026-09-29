@@ -30,7 +30,12 @@ ports `_shared/lua/llm/prompt_action.lua` (the `llm_prompt` value of the
 `tone.ahk` ports `_shared/lua/llm/tone.lua` (the tone ladder, pinned to
 `tone_vectors.json`) and `tone_action.ahk` runs the `llm_tone_*` actions on it:
 the selection is rewritten one register up or down, typed over itself and
-selected again.
+selected again. `vision.ahk` ports `_shared/lua/llm/vision.lua` (the
+`llm_vision` binding value, the vision model it resolves to, the request body of
+each API dialect and the tagged-answer reader, pinned to `vision_vectors.json`)
+and `vision_action.ahk` runs `llm_screen_region` / `llm_screen_full` on it: a
+screenshot is transcribed by a vision model, then the AI menu's backend drafts
+the answers offered as tooltip candidates.
 
 ## Public API
 

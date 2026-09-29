@@ -23,6 +23,11 @@
  * 5. The tone ladder port (modules/llm/tone.ahk) and its actions
  *    (modules/llm/tone_action.ahk) are included before the gesture actions
  *    registered from them, and their test replays the shared tone corpus.
+ * 6. The screen reading port (modules/llm/vision.ahk) and its actions
+ *    (modules/llm/vision_action.ahk) are included the same way, their test
+ *    replays the shared vision corpus, the llm_vision parameter kind is
+ *    validated, prompted and sent to the picker, and the capture and request
+ *    seams they run through exist.
  *
  * ROOT CAUSE ENCODED:
  * A module that no runner includes, or a list restated by hand, fails silently
@@ -103,6 +108,12 @@ for (const [label, list, prefix] of [
 		tone >= 0 && toneAction > tone && gestures > toneAction,
 		`${label} must include tone.ahk, then tone_action.ahk, before the gesture actions registered from them`
 	);
+	const vision = position(list, `${prefix}modules/llm/vision.ahk`);
+	const visionAction = position(list, `${prefix}modules/llm/vision_action.ahk`);
+	check(
+		vision >= 0 && visionAction > vision && gestures > visionAction,
+		`${label} must include vision.ahk, then vision_action.ahk, before the gesture actions registered from them`
+	);
 }
 check(
 	position(bench, '../modules/llm/rewrite.ahk') >= 0 &&
@@ -115,7 +126,8 @@ const TESTS = {
 	'unit/test_llm_prompt_action.ahk': 'llm_prompt_vectors.json',
 	'unit/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
 	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json',
-	'unit/test_llm_tone.ahk': 'tone_vectors.json'
+	'unit/test_llm_tone.ahk': 'tone_vectors.json',
+	'unit/test_llm_vision.ahk': 'vision_vectors.json'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
 	check(runAll.includes(test), `tests/run_all.ahk must #Include ${test}`);
@@ -235,6 +247,65 @@ check(
 check(
 	/Parameter := \(Kind != ""\)/.test(picker),
 	'every parameterized action must carry its kind and value'
+);
+
+// 6. Screen reading: actions, parameter kind, picker payload and seams.
+check(
+	/for _VisionActionId, _VisionKind in LLM_VisionActions\(\) \{/.test(actions),
+	'the llm_screen_* actions must be registered from LLM_VisionActions'
+);
+const visionActions = read('modules/llm/vision_action.ahk');
+for (const id of ['llm_screen_region', 'llm_screen_full']) {
+	check(visionActions.includes(`"${id}", "`), `LLM_VisionActions must declare ${id}`);
+}
+const gestureConfig = read('modules/gestures/config.ahk');
+for (const [needle, why] of [
+	['if (Spec = "llm_vision") {', 'validates the llm_vision kind'],
+	['t("dialog.gestures.param_err_llm_vision")', 'refuses with the kind\'s error text'],
+	['case "llm_vision":', 'prompts for the llm_vision kind'],
+	['LLM_Vision_BackendChoicesText()', 'lists the vision backends in the prompt']
+]) {
+	check(gestureConfig.includes(needle), `modules/gestures/config.ahk ${why}: ${needle}`);
+}
+for (const field of [
+	'visionChoices',
+	'visionProviderLabel',
+	'visionModelLabel',
+	'visionModelDefault',
+	'visionModelRequired',
+	'defaultModel'
+]) {
+	check(picker.includes(`"${field}"`), `the Windows action picker host must send ${field}`);
+}
+check(
+	picker.includes('_ActPickWeb_Kv("llm_vision"'),
+	'the picker host must send the llm_vision prompt and refusal'
+);
+const remote = read('modules/llm/api_remote.ahk');
+check(
+	bodyOf(remote, 'LLM_RemotePostBody_Async').includes('_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload'),
+	'a caller-written remote body must go through the curl transport'
+);
+const streaming = read('modules/llm/api_ollama/ollama_streaming.ahk');
+check(
+	bodyOf(streaming, '_LLM_Ollama_DispatchAsync').includes('job.Get("payload", "")'),
+	'the local dispatcher must send a caller-written chat body as it is'
+);
+check(
+	/^LLM_OllamaChat_Async\(payload, on_success, on_fail\) \{$/m.test(streaming),
+	'the local server must accept a caller-written chat body'
+);
+const screenshots = read('modules/gestures/screenshots.ahk');
+check(
+	bodyOf(screenshots, '_GestureScreenshotDirectScript').includes('_GestureScreenshotDownscaleScript("$bmp", MaxEdge)') &&
+		bodyOf(screenshots, '_GestureScreenshotRegionSaveScript').includes(
+			'_GestureScreenshotDownscaleScript("$img", MaxEdge)'
+		),
+	'both capture scripts must shrink the image to the requested longest edge'
+);
+check(
+	bodyOf(screenshots, 'GestureRegionCaptureFinish').includes('_GestureRegionNotify(State.Get("callback", 0)'),
+	'a region capture must report its end to the owner that asked for it'
 );
 
 if (errors.length > 0) {

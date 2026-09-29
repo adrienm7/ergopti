@@ -30,7 +30,8 @@
 		<main id="list" tabindex="-1"></main>
 
 		<!-- The editor of a send_text / send_key / send_shortcut value, or of the
-		     prompt and count of an llm_prompt_prediction, shown in place of the
+		     prompt and count of an llm_prompt_prediction or the vision backend of a
+		     screen action, shown in place of the
 		     list once such an action is picked. -->
 		<section id="param" hidden>
 			<h2 id="param-title"></h2>
@@ -42,6 +43,12 @@
 				<select id="param-profile"></select>
 				<label id="param-count-label" for="param-count"></label>
 				<select id="param-count"></select>
+			</div>
+			<div id="param-vision" hidden>
+				<label id="param-vision-provider-label" for="param-vision-provider"></label>
+				<select id="param-vision-provider"></select>
+				<label id="param-vision-model-label" for="param-vision-model"></label>
+				<input id="param-vision-model" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
 			</div>
 			<p id="param-error" hidden></p>
 			<div class="param-buttons">
