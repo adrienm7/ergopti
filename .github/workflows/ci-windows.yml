@@ -666,50 +666,235 @@ jobs:
         # through fully-green CI. This step launches the actual compiled exe
         # and proves it gets past first-launch bundle extraction instead of
         # dying on the very first line of the auto-execute section.
+        #
+        # The wait ends on what it observes: the marker of the extracted bundle
+        # (pass), the process exiting (crash), or a dialog window of the process,
+        # the blocking MsgBox a runtime error raises (fail at once, with its
+        # text). Elapsed time is no verdict. The first launch expands about 550
+        # files through Windows PowerShell while Defender scans each of them,
+        # and this step took 8-19 s on the green runs 582-613, so the former
+        # 20 s deadline read the slow end of a healthy extraction as a dialog
+        # (run 613, green on re-run). The hang bound only stops a launch that
+        # neither finishes nor raises a dialog.
         shell: pwsh
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: |
           $exe = "$env:RUNNER_TEMP\package\ergopti_plus\windows\ErgoptiPlus.exe"
-          $markerFile = "$env:LOCALAPPDATA\Ergopti\bundle\.bundle-version"
-          Remove-Item "$env:LOCALAPPDATA\Ergopti\bundle" -Recurse -Force -ErrorAction SilentlyContinue
+          $ergoptiDir = "$env:LOCALAPPDATA\Ergopti"
+          $bundleDir = "$ergoptiDir\bundle"
+          $markerFile = "$bundleDir\.bundle-version"
+          Remove-Item $bundleDir -Recurse -Force -ErrorAction SilentlyContinue
           $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
           $stderr = "$env:TEMP\ergopti_smoke_stderr.txt"
+          # Six times the slowest green smoke measured when this bound was set.
+          $hangBoundSeconds = 120
+
+          # Compiled before the launch, so its one-off cost stays out of the timings.
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Collections.Generic;
+          using System.Runtime.InteropServices;
+          using System.Text;
+
+          public static class SmokeWindows
+          {
+              private delegate bool EnumWindowsProc(IntPtr window, IntPtr parameter);
+
+              [DllImport("user32.dll")]
+              private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr parameter);
+
+              [DllImport("user32.dll")]
+              private static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr parameter);
+
+              [DllImport("user32.dll")]
+              private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+              [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+              private static extern int GetClassName(IntPtr window, StringBuilder name, int capacity);
+
+              [DllImport("user32.dll")]
+              private static extern bool IsWindowVisible(IntPtr window);
+
+              [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+              private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr capacity,
+                  StringBuilder text, uint flags, uint timeoutMs, out IntPtr result);
+
+              private const uint WmGetText = 0x000D;
+              private const uint SmtoAbortIfHung = 0x0002;
+              // Every dialog-box window has this class: MsgBox and AutoHotkey's error dialog alike.
+              private const string DialogClass = "#32770";
+
+              private static string ClassOf(IntPtr window)
+              {
+                  var name = new StringBuilder(256);
+                  GetClassName(window, name, name.Capacity);
+                  return name.ToString();
+              }
+
+              // WM_GETTEXT, because GetWindowText cannot read a control of another process.
+              private static string TextOf(IntPtr window)
+              {
+                  var text = new StringBuilder(2048);
+                  IntPtr ignored;
+                  SendMessageTimeout(window, WmGetText, (IntPtr)text.Capacity, text, SmtoAbortIfHung, 1000, out ignored);
+                  return text.ToString();
+              }
+
+              // Hidden windows included: a process started hidden can own a hidden dialog.
+              private static List<IntPtr> TopLevelWindows(int processId)
+              {
+                  var found = new List<IntPtr>();
+                  EnumWindows((window, parameter) =>
+                  {
+                      uint owner;
+                      GetWindowThreadProcessId(window, out owner);
+                      if (owner == (uint)processId) found.Add(window);
+                      return true;
+                  }, IntPtr.Zero);
+                  return found;
+              }
+
+              public static bool HasDialog(int processId)
+              {
+                  foreach (var window in TopLevelWindows(processId))
+                      if (ClassOf(window) == DialogClass) return true;
+                  return false;
+              }
+
+              public static List<string> Describe(int processId)
+              {
+                  var lines = new List<string>();
+                  foreach (var window in TopLevelWindows(processId))
+                  {
+                      var windowClass = ClassOf(window);
+                      lines.Add(string.Format("window class={0} visible={1} title='{2}'",
+                          windowClass, IsWindowVisible(window), TextOf(window)));
+                      if (windowClass != DialogClass) continue;
+                      EnumChildWindows(window, (child, parameter) =>
+                      {
+                          var text = TextOf(child);
+                          if (text.Length > 0)
+                              lines.Add(string.Format("  control class={0} text='{1}'", ClassOf(child), text));
+                          return true;
+                      }, IntPtr.Zero);
+                  }
+                  return lines;
+              }
+          }
+          '@
+
+          # Reads the live process, so it runs before the process is stopped.
+          function Write-LaunchDiagnostics([System.Diagnostics.Process]$Process, [double]$Seconds, $StagingSeconds) {
+              Write-Host "---- launch diagnostics, $([math]::Round($Seconds, 1)) s after launch ----"
+              if ($null -eq $StagingSeconds) {
+                  Write-Host "Staging directory: not observed during the wait"
+              } else {
+                  Write-Host "Staging directory: first observed $([math]::Round($StagingSeconds, 1)) s after launch"
+              }
+              if ($Process.HasExited) {
+                  Write-Host "Process: exited with code $($Process.ExitCode)"
+              } else {
+                  Write-Host "Process: running as PID $($Process.Id); its top-level windows:"
+                  try {
+                      [SmokeWindows]::Describe($Process.Id) | ForEach-Object { Write-Host "  $_" }
+                  } catch {
+                      Write-Host "  unavailable: $($_.Exception.Message)"
+                  }
+                  Write-Host "Child processes:"
+                  try {
+                      Get-CimInstance Win32_Process -Filter "ParentProcessId = $($Process.Id)" |
+                          ForEach-Object { Write-Host "  [$($_.ProcessId)] $($_.CommandLine)" }
+                  } catch {
+                      Write-Host "  unavailable: $($_.Exception.Message)"
+                  }
+              }
+              Write-Host "Bundle tree under ${ergoptiDir}:"
+              try {
+                  Get-ChildItem -LiteralPath $ergoptiDir -Force | ForEach-Object {
+                      if ($_.PSIsContainer) {
+                          $files = @(Get-ChildItem -LiteralPath $_.FullName -Recurse -File -Force).Count
+                          $marker = Join-Path $_.FullName '.bundle-version'
+                          $version = '(no marker)'
+                          if (Test-Path -LiteralPath $marker) { $version = "$(Get-Content -LiteralPath $marker -Raw)".Trim() }
+                          Write-Host "  $($_.Name)\ files=$files marker=$version"
+                      } else {
+                          Write-Host "  $($_.Name) bytes=$($_.Length)"
+                      }
+                  }
+              } catch {
+                  Write-Host "  unavailable: $($_.Exception.Message)"
+              }
+              Write-Host "Embedded bundle archives left in ${env:TEMP}:"
+              try {
+                  $archives = @(Get-ChildItem -LiteralPath $env:TEMP -Filter 'ergopti_bundle_*.zip' -Force)
+                  if ($archives.Count -eq 0) { Write-Host "  (none)" }
+                  $archives | ForEach-Object { Write-Host "  $($_.Name) bytes=$($_.Length)" }
+              } catch {
+                  Write-Host "  unavailable: $($_.Exception.Message)"
+              }
+              try {
+                  Write-Host "Defender real-time protection: $((Get-MpComputerStatus).RealTimeProtectionEnabled)"
+              } catch {
+                  Write-Host "Defender real-time protection: unavailable: $($_.Exception.Message)"
+              }
+              Write-Host "---- stdout ----"; Get-Content $stdout -ErrorAction SilentlyContinue
+              Write-Host "---- stderr ----"; Get-Content $stderr -ErrorAction SilentlyContinue
+          }
+
+          # This is a resident tray app with a keyboard hook: never leave it
+          # running on the runner, whatever the outcome.
+          function Stop-LaunchedApp([System.Diagnostics.Process]$Process) {
+              if (-not $Process.HasExited) {
+                  Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+              }
+          }
 
           # /ErrorStdOut only routes LOAD-time errors (parse / missing include)
           # to stderr; a RUNTIME error like the one this step guards against
           # still pops a blocking MsgBox, so the real signal below is
-          # behavioural (marker file written / early exit), not the exit code.
+          # behavioural (marker file written / dialog / early exit), not the exit code.
+          $clock = [System.Diagnostics.Stopwatch]::StartNew()
           $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -WindowStyle Hidden -PassThru `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          # Holding the handle keeps ExitCode readable once the process has exited.
+          $null = $proc.Handle
 
-          $deadline = (Get-Date).AddSeconds(20)
           $markerSeen = $false
-          while ((Get-Date) -lt $deadline) {
+          $dialogSeen = $false
+          $stagingSeconds = $null
+          while ($clock.Elapsed.TotalSeconds -lt $hangBoundSeconds) {
+              # The moment Bundle_Init creates its staging directory splits the
+              # launch time into interpreter start-up and the extraction itself.
+              if ($null -eq $stagingSeconds -and (Test-Path -Path "${bundleDir}.staging-*")) {
+                  $stagingSeconds = $clock.Elapsed.TotalSeconds
+              }
               if ($proc.HasExited) { break }
-              if (Test-Path $markerFile) { $markerSeen = $true; break }
+              if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }
+              if ([SmokeWindows]::HasDialog($proc.Id)) { $dialogSeen = $true; break }
               Start-Sleep -Milliseconds 250
           }
+          $seconds = $clock.Elapsed.TotalSeconds
           $crashedEarly = $proc.HasExited
           $exitCode = $null
           if ($crashedEarly) { $exitCode = $proc.ExitCode }
 
-          # Always clean up — this is a resident tray app with a keyboard hook;
-          # never leave it running on the runner regardless of outcome.
-          if (-not $proc.HasExited) {
-              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-          }
-
           if ($crashedEarly -or -not $markerSeen) {
-              Write-Host "---- stdout ----"; Get-Content $stdout -ErrorAction SilentlyContinue
-              Write-Host "---- stderr ----"; Get-Content $stderr -ErrorAction SilentlyContinue
+              Write-LaunchDiagnostics $proc $seconds $stagingSeconds
+              Stop-LaunchedApp $proc
               if ($crashedEarly) {
                   Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
+              } elseif ($dialogSeen) {
+                  Write-Error "ErgoptiPlus.exe raised a dialog before extracting its runtime bundle (crash-on-launch) — its text is above."
               } else {
-                  Write-Error "ErgoptiPlus.exe did not extract its runtime bundle within 20s — a blocking startup dialog is likely (crash-on-launch)."
+                  Write-Error "ErgoptiPlus.exe neither extracted its runtime bundle nor raised a dialog within ${hangBoundSeconds}s — see the diagnostics above."
               }
               exit 1
           }
-          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile"
+          Stop-LaunchedApp $proc
+          $markerSeconds = [math]::Round($seconds, 1)
+          $stagingNote = 'not observed'
+          if ($null -ne $stagingSeconds) { $stagingNote = "$([math]::Round($stagingSeconds, 1)) s" }
+          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile after $markerSeconds s (staging directory seen after $stagingNote)"
           $evidence = @{
               schema_version = 1
               platform = 'windows'
@@ -719,6 +904,7 @@ jobs:
               package_sha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
               marker_seen = $markerSeen
               crashed_early = $crashedEarly
+              marker_seconds = $markerSeconds
               failures = @()
           }
           $evidence | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
