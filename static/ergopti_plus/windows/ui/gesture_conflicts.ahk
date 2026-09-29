@@ -114,8 +114,12 @@ GestureSystemNotice(Slot, OnDone := 0) {
 		State["callbacks"][Group] := []
 	if IsObject(OnDone)
 		State["callbacks"][Group].Push(OnDone)
-	if State["windows"].Has(Group)
+	if State["windows"].Has(Group) {
+		; Requested again: bring the open notice back in front. A reload the
+		; user asked for waits on it, and an ordinary window can be covered.
+		WMPresentWindow(State["windows"][Group])
 		return true
+	}
 	G := Gui("", t("menu.gestures.conflict_title"))
 	G.AddText("w440", t("gesture.slots." . Slot) . "`n" . t("gestures.system.not_configured"))
 	G.AddButton("xm", t("menu.gestures.open_settings")).OnEvent("Click",
@@ -125,7 +129,9 @@ GestureSystemNotice(Slot, OnDone := 0) {
 	G.OnEvent("Close", (*) => GestureSystemFinishNotice(Group, G, "close"))
 	G.OnEvent("Escape", (*) => GestureSystemFinishNotice(Group, G, "close"))
 	State["windows"][Group] := G
-	G.Show("NoActivate")
+	; Shown and focused: an ErgoptiPlus window is never kept on top, so a
+	; notice left inactive was covered by the next click in another app.
+	G.Show()
 	return true
 }
 
