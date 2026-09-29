@@ -876,6 +876,11 @@ local function discard_pending_callbacks()
 end
 
 function M.check_and_install_deps(on_complete, replay_token)
+	-- Every call consumes the selection's grant, whatever path it takes: one
+	-- left behind by a selection that found the runtime ready would let a
+	-- later plain check install without any selection.
+	local install_granted = _install_granted == true
+	_install_granted = false
 	if not _pause_controller.is_admitted() then
 		Logger.debug(LOG, "MLX dependency bootstrap rejected by pause admission.")
 		return false
@@ -940,8 +945,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 	local installed, venv_python = M.runtime_installed()
 	local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
 		and _resume_intent.kind == "task"
-	local install_allowed = _install_granted == true or replaying_install
-	_install_granted = false
+	local install_allowed = install_granted or replaying_install
 	if installed or not install_allowed then
 		if installed then
 			_bootstrap_state = "ready"

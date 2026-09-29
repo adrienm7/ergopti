@@ -281,6 +281,24 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		state.tasks[1].done(0, "", "")
 	end))
 
+	helpers.it("never lets a found Ollama's grant reach a later plain check", scoped(function()
+		local state = new_state()
+		local brew = "/opt/homebrew/bin/ollama"
+		state.executables[brew] = true
+		local checker = load_ollama_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_eq(state.tasks[1].args[6], "")
+		state.tasks[1].done(0, "", "")
+
+		-- brew uninstall: a later non-selection check must not download.
+		state.executables[brew] = nil
+		local result
+		helpers.assert_true(checker.check_and_install_deps(function(ok) result = ok end))
+		helpers.assert_eq(#state.tasks, 1, "a plain check must never download without the offer")
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(checker.get_state(), "missing")
+	end))
+
 	helpers.it("installs once on the first selection and never on re-selection", scoped(function()
 		local state = new_state()
 		local daemon = { calls = 0 }
@@ -401,6 +419,27 @@ helpers.describe("MLX bootstraps only on its selection (ai-runtime-mlx)", functi
 		helpers.assert_true(checker.install_for_selection(function(ok) results[#results + 1] = ok end))
 		helpers.assert_eq(#state.tasks, 1, "a re-selection must reuse the installed runtime")
 		helpers.assert_eq(results[#results], true)
+	end))
+
+	helpers.it("never lets a ready runtime's grant reach a later plain check", scoped(function()
+		local state = new_state()
+		state.absent = {}
+		state.files[MLX_VENV .. "/bin/python"] = true
+		state.files[MLX_VENV .. "/.last_sync_hash"] = true
+		local checker = load_mlx_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		-- Re-selecting a ready runtime takes the early "ready" return.
+		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_eq(#state.tasks, 0)
+
+		state.files = {}
+		state.absent = {
+			[MLX_VENV .. "/bin/python"] = true,
+			[MLX_VENV .. "/.last_sync_hash"] = true,
+		}
+		helpers.assert_true(checker.check_and_install_deps())
+		helpers.assert_eq(#state.tasks, 0, "a plain check must never install without a selection")
+		helpers.assert_eq(checker.get_state(), "missing")
 	end))
 
 	helpers.it("reinstalls a runtime removed after it was ready", scoped(function()

@@ -667,6 +667,11 @@ end
 --- @param replay_token table|nil Internal pause-owner replay capability.
 --- @return boolean accepted
 function M.check_and_install_deps(on_complete, replay_token)
+	-- Every call consumes the selection's grant, whatever path it takes: one
+	-- left behind by a selection that found Ollama would let a later plain
+	-- check download without the offer.
+	local install_granted = _install_granted == true
+	_install_granted = false
 	if not _pause_controller.is_admitted() then
 		Logger.debug(LOG, "Ollama dependency bootstrap rejected by pause admission.")
 		return false
@@ -742,12 +747,12 @@ function M.check_and_install_deps(on_complete, replay_token)
 	if resolved_bin then
 		Logger.info(LOG, "Ollama executable found (%s): %s", tostring(resolved_source), resolved_bin)
 	else
-		-- A replayed task was already an accepted download; any other caller
-		-- needs the grant install_for_selection() gives after the user's consent.
+		-- Only a replayed download the user accepted may download again; a
+		-- replayed fast path for a found executable never had that consent.
+		-- Any other caller needs the grant install_for_selection() gives.
 		local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
-			and _resume_intent.kind == "task"
-		local install_allowed = _install_granted == true or replaying_install
-		_install_granted = false
+			and _resume_intent.kind == "task" and _resume_intent.download == true
+		local install_allowed = install_granted or replaying_install
 		if not install_allowed then
 			Logger.warn(LOG, "Ollama is not installed (%s); no download without the user's consent.",
 				tostring(resolve_err))
@@ -1065,7 +1070,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		end
 		return false
 	end
-	_resume_intent = { kind = "task" }
+	_resume_intent = { kind = "task", download = install_dir ~= nil }
 	owner.dispatching = false
 	for _, args in ipairs(owner.pending_streams) do
 		if not owner_is_current()
