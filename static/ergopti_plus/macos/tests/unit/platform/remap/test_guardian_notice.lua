@@ -14,11 +14,12 @@ local helpers = require("tests.helpers")
 local GuardianNotice = helpers.load_with_stubs("platform.remap.guardian_notice")
 
 --- Builds a notice over recording doubles.
---- @param opts table|nil { deliver = boolean, open_ok = boolean }
+--- @param opts table|nil { deliver = boolean, open_ok = boolean, present = boolean }
 --- @return table notice, table rec
 local function make(opts)
 	opts = opts or {}
-	local rec = { sent = {}, opened = 0, login_items = 0, errors = 0, error_lines = {} }
+	local rec = { sent = {}, opened = 0, login_items = 0, errors = 0, error_lines = {}, presented = 0,
+		warn_lines = {} }
 	local notice = GuardianNotice.new({
 		notify = function(message, detail, kind, on_click)
 			rec.sent[#rec.sent + 1] = { message = message, detail = detail, kind = kind, on_click = on_click }
@@ -36,12 +37,19 @@ local function make(opts)
 			on_done(opts.open_ok ~= false, opts.open_ok == false and "open-exited-non-zero" or "opened")
 			return true
 		end,
+		-- The presenter declines unless a case says the steps took the episode.
+		present_approval = function()
+			rec.presented = rec.presented + 1
+			return opts.present == true
+		end,
 		logger = {
 			error = function(_, message, ...)
 				rec.errors = rec.errors + 1
 				rec.error_lines[#rec.error_lines + 1] = string.format(message, ...)
 			end,
-			warn = function() end,
+			warn = function(_, message, ...)
+				rec.warn_lines[#rec.warn_lines + 1] = string.format(message, ...)
+			end,
 			info = function() end,
 		},
 		log = "test",
@@ -142,6 +150,33 @@ helpers.describe("guardian approval notice", function()
 			if line:find("status is 'unavailable'", 1, true) then status_lines = status_lines + 1 end
 		end
 		helpers.assert_eq(status_lines, 1)
+	end)
+
+	-- The approval used to reach the user only as a banner, which a fresh
+	-- install may never display; the numbered steps now take the episode.
+	helpers.it("lets the Login Items steps take the approval episode (guardian-approval-steps)", function()
+		local notice, rec = make({ present = true })
+		helpers.assert_true(notice.observe("requires_approval"), "the steps announce the episode")
+		helpers.assert_eq(rec.presented, 1)
+		helpers.assert_eq(#rec.sent, 0, "a banner on top of the steps would announce the episode twice")
+		helpers.assert_true(not notice.observe("requires_approval"), "a repeated poll is the same episode")
+		helpers.assert_eq(rec.presented, 1, "the steps are offered once per episode, not per poll")
+		helpers.assert_eq(rec.errors, 0, "an approval not given yet is not an error")
+		helpers.assert_eq(#rec.warn_lines, 1)
+		helpers.assert_contains(rec.warn_lines[1], "awaits Login Items approval")
+	end)
+
+	helpers.it("keeps the banner when the steps decline and never offers them for unavailable", function()
+		local declined, rec = make()
+		helpers.assert_true(declined.observe("requires_approval"))
+		helpers.assert_eq(rec.presented, 1, "the steps are asked first")
+		helpers.assert_eq(#rec.sent, 1, "a declined offer (already shown this launch) falls back to the banner")
+		helpers.assert_eq(rec.sent[1].message, "karabiner.guardian_approval_required")
+
+		local unavailable, other = make({ present = true })
+		helpers.assert_true(unavailable.observe("unavailable"))
+		helpers.assert_eq(other.presented, 0, "the approval steps cannot register a missing helper")
+		helpers.assert_eq(other.sent[1].message, "karabiner.guardian_unavailable")
 	end)
 
 	helpers.it("rejects an incomplete dependency set", function()

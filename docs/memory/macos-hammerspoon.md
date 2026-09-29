@@ -418,6 +418,17 @@ Turning it off removes only marked rules by byte-span surgery proven by decoded
 equality; never re-serialize `karabiner.json`, which would rewrite personal
 rules.
 
+### project-hs-guardian-approval-has-one-native-poller
+
+A guardian held for Background Items approval keeps every rule inert. Its first
+`requires_approval` answer reaches `guardian_notice`, which offers the boot's
+presenter (`platform.remap.set_approval_presenter`, wired in `init.lua`) before
+its banner: `ui/permission_dialog/login_items_guide.lua` opens the dialog's
+`login_items` steps once per launch, focused and never floating. The guide polls
+only the in-memory `guardian_state()`; the remap readiness wait stays the one
+native poller and the one path that deploys the retained regeneration on
+`ready`. Do not add a second status probe or deploy path for the dialog.
+
 ### project-hs-kc-ledger-process-lifecycle
 
 The Karabiner physical-key ledger keeps draining when metrics are disabled.

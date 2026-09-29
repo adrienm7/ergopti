@@ -182,6 +182,7 @@ local _lease_recovery          = nil   -- One bounded retry series across replac
 local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop must be retried
 local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
 local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
+local _approval_presenter       = nil   -- Login Items steps the boot registered, or nil
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
 local _bulk_guardian_waiters = {} -- Bulk terminal -> saver, run when the guardian is not ready
@@ -3037,6 +3038,38 @@ end
 --- Opens the Karabiner-Elements GUI for the user on explicit request.
 function M.open_gui() KeLifecycle.open_gui() end
 
+--- Offers the Login Items steps to the presenter the boot registered. The
+--- remap bridge owns no window; without a presenter (a bare bridge, as in
+--- its unit fixtures) the approval notice keeps its banner.
+--- @return boolean presented True when the steps took the announcement.
+local function present_approval_steps()
+	if _approval_presenter == nil then return false end
+	local ok, presented = xpcall(_approval_presenter, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "The Login Items steps raised; the approval notice is used instead: %s.",
+			tostring(presented))
+		return false
+	end
+	return presented == true
+end
+
+--- Registers the one presenter of the Login Items steps, shown when the
+--- guardian first awaits approval (ui/permission_dialog/login_items_guide).
+--- @param present function fn() -> boolean, true when the steps reach the user.
+--- @return boolean registered False when a presenter is already registered.
+function M.set_approval_presenter(present)
+	if type(present) ~= "function" then
+		error("platform.remap.set_approval_presenter(): present must be a function", 2)
+	end
+	if _approval_presenter ~= nil then
+		Logger.error(LOG, "The Login Items approval presenter is already registered; keeping the first one.")
+		return false
+	end
+	_approval_presenter = present
+	Logger.debug(LOG, "Login Items approval presenter registered.")
+	return true
+end
+
 --- Opens System Settings at Login Items, whatever the guardian status: the
 --- approval opener refuses every status but `requires_approval`, while an
 --- `unavailable` helper is fixed from that same pane.
@@ -5617,6 +5650,7 @@ function M.init(file_system)
 		text          = i18n.get,
 		open_settings = function(on_done) return M.open_guardian_settings(on_done) end,
 		open_login_items = function(on_done) return M.open_login_items(on_done) end,
+		present_approval = function() return present_approval_steps() end,
 		logger        = Logger,
 		log           = LOG,
 	})
