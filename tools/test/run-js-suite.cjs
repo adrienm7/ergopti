@@ -271,6 +271,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-menu-enable-disable-all-retired.cjs'
 	},
 	{
+		name: 'the circular Spaces toggle stays retired (no setting, row, label or handler; the migration still deletes it)',
+		cmd: 'node',
+		args: ['tools/test/test-space-wrap-toggle-retired.cjs'],
+		repro: 'npm run test:space-wrap-retired'
+	},
+	{
 		name: 'every restore / clear row reads the two shared labels (restore recommended, clear to system)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-reset-terminology.cjs'],

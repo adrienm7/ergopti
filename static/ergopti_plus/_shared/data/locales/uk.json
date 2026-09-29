@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "Обрамлювальні символи",
 	"menu.gestures.auto_configure": "🔧 Автоналаштування (реєстр)",
 	"menu.gestures.change_action": "Змінити дію",
-	"menu.gestures.circular_spaces": "Циклічна навігація по Spaces (1 ↔ N)",
 	"menu.gestures.conflict_title": "Конфлікт жестів",
 	"menu.gestures.default_sensitivity": "(Загальне значення за замовчуванням)",
 	"menu.gestures.enabled": "️ Жести",

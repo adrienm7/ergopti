@@ -12,7 +12,7 @@ local function fixture(source)
 	helpers.load_with_stubs("modules.gestures.actions")
 	local gestures = helpers.load_with_stubs("modules.gestures")
 	local controls, state, files = {}, { gestures = true }, {}
-	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nspace_wrap = false\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__cmd_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
+	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__cmd_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
 	files.config = original
 	if source == false then files.config = nil end
 	local enabled, writes = true, 0
@@ -30,7 +30,6 @@ local function fixture(source)
 	gestures.set_action("tap_4", "open_url")
 	gestures.set_mode("swipe_3_horiz", "incremental")
 	gestures.set_sensitivity("swipe_3_horiz", 9)
-	gestures.set_space_wrap(false)
 	gestures.set_action_parameter("tap_4", "open_url", "https://apple.com")
 	gestures.set_action_parameter("keyboard__cmd_k", "open_url", "https://example.com")
 	local files_port = {
@@ -207,13 +206,13 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(prefs.source_snapshot("config").content, files.config)
 		local gestures, controls, original
 		owner, gestures, files, _, controls, prefs, _, _, original = fixture()
-		local setter = gestures.set_space_wrap
-		gestures.set_space_wrap = function(value) setter(value); return "accepted" end
+		local setter = gestures.set_action
+		gestures.set_action = function(slot, value) setter(slot, value); return "accepted" end
 		helpers.assert_eq(owner.apply("clear"), false)
 		helpers.assert_eq(files.config, original)
 		helpers.assert_eq(prefs.source_snapshot("config").content, original)
 		helpers.assert_eq(owner.pending(), true)
-		gestures.set_space_wrap = setter
+		gestures.set_action = setter
 		helpers.assert_eq(owner.retry_restore(), true)
 	end)
 	helpers.it("rechecks pause after the modal confirmation returns", function()

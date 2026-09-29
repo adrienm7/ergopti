@@ -415,17 +415,6 @@ function M.build(ctx)
 	local function cmd_disable_all() return apply_scope("clear") end
 	local function cmd_restore_defaults() return apply_scope("recommended") end
 
-	-- The row itself is `type = "check"` in the manifest now: the label, the tick
-	-- predicate and the greying predicate are declared, and this is only what the
-	-- row DOES.
-	local function cmd_circular_spaces()
-		if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
-			pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
-			if ctx.save_prefs() ~= true then return false end
-			ctx.updateMenu()
-		end
-	end
-
 	-- Build a slot group from the manifest gesture_slots table.
 	-- One provider per finger count. The slot ids come from the manifest's own
 	-- `gesture_slots` table, so these rows were already manifest DATA appended by
@@ -475,20 +464,15 @@ function M.build(ctx)
 
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
-	render_ctx.commands = { ["circular_spaces"] = cmd_circular_spaces }
 	render_ctx.state_getters = {
-		gesture_space_wrap = function()
-			return type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap() or false
-		end,
-		-- The switch's tick and the circular-Spaces greying read the same key, so
-		-- it answers the stored preference. The pause greys the whole submenu
-		-- from its parent row, and the switch refuses while paused.
+		-- The switch's tick answers the stored preference. The pause greys the
+		-- whole submenu from its parent row, and the switch refuses while paused.
 		gestures_enabled = function() return state.gestures == true end,
 	}
 
 	-- The two whole-tree actions are `command` rows: the renderer builds them from
 	-- the declaration and this driver registers only the behaviour.
-	render_ctx.commands = render_ctx.commands or {}
+	render_ctx.commands = {}
 	render_ctx.commands["gestures_toggle"] = toggle_gestures
 	render_ctx.commands["disable_all"] = cmd_disable_all
 	render_ctx.commands["restore_defaults"] = cmd_restore_defaults

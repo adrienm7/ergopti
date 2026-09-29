@@ -8,9 +8,9 @@
 ---
 --- ROOT CAUSE ENCODED — A DOCUMENTED ASSUMPTION THAT WAS NEVER TRUE:
 --- tests/unit/adapters/test_toml_cache.lua states outright that
---- "scratch_test_dir is gitignored and absent in CI", and two other tests
---- (test_preferences_gesture_space_wrap.lua, test_jsonl_survives_sqlite_open_failure.lua)
---- write into it on that basis. The repository .gitignore listed
+--- "scratch_test_dir is gitignored and absent in CI", and other tests (such as
+--- test_jsonl_survives_sqlite_open_failure.lua) write into it on that basis.
+--- The repository .gitignore listed
 --- static/ergopti_plus/scratch/ and .scratch/ but never the test scratch path, so
 --- the assumption was false: test_jsonl_survives_sqlite_open_failure creates a
 --- by_device/<uuid>/ tree and removes only its log file, leaving data.sql,

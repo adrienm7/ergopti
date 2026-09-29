@@ -53,7 +53,6 @@ local KEY_MAP = {
 	-- ── Gestures ──────────────────────────────────────────────────────────
 	-- Gesture slot scalars are merged into [gestures] via NESTED_KEY_MAP.
 	gestures                             = { sec = "gestures",   key = "enabled"                      },
-	gesture_space_wrap                   = { sec = "gestures",   key = "space_wrap"                   },
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
@@ -447,10 +446,10 @@ local function flatten_from_disk(grouped, mark)
 				else
 					-- Scalar value
 					if sec_name == "gestures" and disk_key ~= "enabled" then
-						-- Check the reverse map first: keys like space_wrap have a flat
-						-- state entry (gesture_space_wrap) via KEY_MAP and must not be
-						-- merged into gesture_actions — that would create a phantom slot
-						-- and leave the real state key un-restored on reload.
+						-- Check the reverse map first: a [gestures] scalar with its own
+						-- flat state entry in KEY_MAP must not be merged into
+						-- gesture_actions — that would create a phantom slot and leave
+						-- the real state key un-restored on reload.
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
 						if fk then
@@ -968,11 +967,6 @@ function M.snapshot(state, hotfiles, core_mods)
 		(gestures and type(gestures.get_all_action_parameters) == "function")
 			and gestures.get_all_action_parameters() or {}
 	)
-	if gestures and type(gestures.get_space_wrap) == "function" then
-		existing.gesture_space_wrap = gestures.get_space_wrap()
-	else
-		existing.gesture_space_wrap = true
-	end
 
 	existing.shortcut_keys = {}
 	local shortcuts_mod = core_mods.shortcuts_mod

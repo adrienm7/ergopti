@@ -124,7 +124,7 @@ end)
 
 -- The A2 follow-up wired more macOS modules to the manifest: keylogger (the
 -- cross-driver metrics filter/encrypt flags), dynamic_hotstrings (per-category
--- toggles, read via the feature toggle's `.enabled`), and gestures (space_wrap).
+-- toggles, read via the feature toggle's `.enabled`).
 -- A drift in manifest.toml would silently change those runtime defaults — these
 -- pin the wired source values so it turns red first.
 helpers.describe("manifest_reader: extended module wiring parity", function()
@@ -146,9 +146,5 @@ helpers.describe("manifest_reader: extended module wiring parity", function()
 		for _, path in ipairs(paths) do
 			helpers.assert_eq(Manifest.default_for(path).enabled, false, path .. ".enabled")
 		end
-	end)
-
-	helpers.it("gestures space_wrap default", function()
-		helpers.assert_eq(Manifest.default_for("gestures.space_wrap"), true, "space_wrap default")
 	end)
 end)

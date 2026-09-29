@@ -296,7 +296,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.keyboard.hs_ctrl_space", "section", "shortcuts.keyboard", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.keyboard.ctrl_g", "section", "shortcuts.keyboard", "reason_key", "", "platforms", ["linux"]),
         Map("path", "shortcuts.keyboard.super_space", "section", "shortcuts.keyboard", "reason_key", "", "platforms", ["linux"]),
-        Map("path", "gestures.space_wrap", "section", "gestures", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.swipe_2_left", "section", "gestures", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "gestures.swipe_5_up", "section", "gestures", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "gestures.swipe_5_down", "section", "gestures", "reason_key", "", "platforms", ["hs", "linux"]),

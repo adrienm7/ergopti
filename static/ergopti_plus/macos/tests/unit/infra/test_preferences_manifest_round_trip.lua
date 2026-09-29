@@ -161,7 +161,6 @@ helpers.describe("every manifest setting survives config.toml load and save (pre
 					get_all_modes = function() return state.gesture_modes or {} end,
 					get_all_sensitivities = function() return state.gesture_sensitivities or {} end,
 					get_all_action_parameters = function() return state.gesture_action_parameters or {} end,
-					get_space_wrap = function() return state.gesture_space_wrap end,
 				},
 				shortcuts_mod = {
 					list_shortcuts = function()

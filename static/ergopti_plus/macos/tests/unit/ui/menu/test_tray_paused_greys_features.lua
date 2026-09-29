@@ -111,7 +111,6 @@ local function build_tray(paused)
 			get_action_parameter = function() return nil end,
 			get_mode = function() return "single" end,
 			get_sensitivity = function() return 1 end,
-			get_space_wrap = function() return false end,
 		},
 		shortcuts  = {
 			list_shortcuts = function() return {} end,

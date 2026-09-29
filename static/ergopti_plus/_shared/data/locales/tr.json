@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "Çevreleyen semboller",
 	"menu.gestures.auto_configure": "🔧 Otomatik yapılandır (kayıt defteri)",
 	"menu.gestures.change_action": "Eylemi değiştir",
-	"menu.gestures.circular_spaces": "Döngüsel Alan gezintisi (1 ↔ N)",
 	"menu.gestures.conflict_title": "Hareket çakışması",
 	"menu.gestures.default_sensitivity": "(Genel varsayılan)",
 	"menu.gestures.enabled": "️ Hareketler",

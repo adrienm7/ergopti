@@ -92,7 +92,6 @@ local function gestures_double()
 		get_action_parameter = function() return nil end,
 		get_mode = function() return "single" end,
 		get_sensitivity = function() return 1 end,
-		get_space_wrap = function() return false end,
 	}
 end
 

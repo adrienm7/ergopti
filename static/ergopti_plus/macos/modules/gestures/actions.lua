@@ -676,7 +676,7 @@ end
 --- the step is then the plain one, and the log says the wrap was not possible.
 --- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
 --- @return boolean handled
-local function space_wrap(direction)
+local function wrapping_space_step(direction)
 	local spaces = _spaces_module()
 	if not spaces then
 		Logger.warn(LOG, "The Spaces binding is unavailable — moving one Space without wrapping.")
@@ -699,24 +699,6 @@ local function space_wrap(direction)
 	return AuxOwner.after(0, "space wrap", function()
 		return goto_space_or_walk(spaces, target_id, steps)
 	end, current_action_parent())
-end
-
---- Navigates between macOS Spaces (Desktops).
-local function spaceNav(goNext)
-	local direction = goNext and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS
-	-- space_wrap is persisted, restored and exposed as a menu checkbox. macOS
-	-- itself stops at the first and last Space, so honouring the setting means
-	-- suppressing the navigation at the edge rather than asking the OS to wrap.
-	if _state and _state.space_wrap == false then
-		local spaces = _spaces_module()
-		local list, index = nil, nil
-		if spaces then list, index = focused_screen_spaces(spaces) end
-		if list and DesktopNavigation.target(index, #list, direction, false) == index then
-			Logger.debug(LOG, "Space navigation suppressed at the edge (space_wrap disabled).")
-			return
-		end
-	end
-	space_step(direction)
 end
 
 --- Opens Mission Control or App Exposé through the Dock itself. The F3 key and
@@ -772,8 +754,8 @@ ax("windows",
 	function() winNav(true) end)
 
 ax("spaces",     
-	function() spaceNav(false) end, 
-	function() spaceNav(true) end)
+	function() space_step(DesktopNavigation.PREVIOUS) end, 
+	function() space_step(DesktopNavigation.NEXT) end)
 
 ax("volume",     
 	function() sysKey("SOUND_DOWN") end, 
@@ -997,10 +979,10 @@ sg("maximize",                     function()
 		return win:maximize()
 	end)
 end)
-sg("space_prev",             function() spaceNav(false) end)
-sg("space_next",               function() spaceNav(true) end)
-sg("space_prev_wrap",        function() return space_wrap(DesktopNavigation.PREVIOUS) end)
-sg("space_next_wrap",        function() return space_wrap(DesktopNavigation.NEXT) end)
+sg("space_prev",             function() space_step(DesktopNavigation.PREVIOUS) end)
+sg("space_next",               function() space_step(DesktopNavigation.NEXT) end)
+sg("space_prev_wrap",        function() return wrapping_space_step(DesktopNavigation.PREVIOUS) end)
+sg("space_next_wrap",        function() return wrapping_space_step(DesktopNavigation.NEXT) end)
 sg("mission_control",        function() return dock_toggle("toggleMissionControl") end)
 sg("app_expose",             function() return dock_toggle("toggleAppExpose") end)
 
