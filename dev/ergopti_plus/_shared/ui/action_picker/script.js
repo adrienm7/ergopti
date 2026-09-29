@@ -121,7 +121,12 @@ function init(data) {
 
 	entries = [];
 	if (data.allowNative) {
-		entries.push({ kind: 'action', id: '__native__', label: data.nativeLabel || '', special: true });
+		entries.push({
+			kind: 'action',
+			id: '__native__',
+			label: data.nativeLabel || '',
+			special: true
+		});
 	}
 	entries.push({ kind: 'action', id: 'none', label: data.noneLabel || '', special: true });
 	(data.items || []).forEach(function (it) {
@@ -177,7 +182,9 @@ function focusSearch() {
 	const s = el('search');
 	if (!s) return;
 	s.focus();
-	setTimeout(function () { s.focus(); }, 60);
+	setTimeout(function () {
+		s.focus();
+	}, 60);
 }
 
 // ============================================================
@@ -266,7 +273,10 @@ function render() {
 
 	let start = 0;
 	for (let k = 0; k < visible.length; k++) {
-		if (visible[k].id === currentId) { start = k; break; }
+		if (visible[k].id === currentId) {
+			start = k;
+			break;
+		}
 	}
 	if (visible.length) setActive(start, true);
 }
@@ -311,7 +321,9 @@ function buildHeadingRow(i, e) {
 	// (search already expands only the relevant matches).
 	const searching = el('search').value.trim() !== '';
 	if (!searching) {
-		row.addEventListener('click', function () { toggleFold(i); });
+		row.addEventListener('click', function () {
+			toggleFold(i);
+		});
 	} else {
 		row.classList.add('static');
 	}
@@ -321,7 +333,10 @@ function buildHeadingRow(i, e) {
 function buildActionRow(e, depth) {
 	const row = document.createElement('div');
 	row.className =
-		'row' + (e.special ? ' special' : '') + (e.id === currentId ? ' current' : '') + (e.disabled ? ' disabled' : '');
+		'row' +
+		(e.special ? ' special' : '') +
+		(e.id === currentId ? ' current' : '') +
+		(e.disabled ? ' disabled' : '');
 	row.dataset.id = e.id;
 	row.style.paddingLeft = 12 + (depth || 0) * 16 + 'px';
 
@@ -346,8 +361,12 @@ function buildActionRow(e, depth) {
 	}
 
 	const idx = visible.length;
-	row.addEventListener('click', function () { doConfirm(e.id); });
-	row.addEventListener('mousemove', function () { setActive(idx); });
+	row.addEventListener('click', function () {
+		doConfirm(e.id);
+	});
+	row.addEventListener('mousemove', function () {
+		setActive(idx);
+	});
 	return row;
 }
 
@@ -393,7 +412,9 @@ function buildToc() {
 		a.className = 'toc-item lvl' + lvl;
 		a.style.paddingLeft = 10 + (lvl - 1) * 16 + 'px';
 		a.textContent = e.text;
-		a.addEventListener('click', function () { tocGoto(i); });
+		a.addEventListener('click', function () {
+			tocGoto(i);
+		});
 		inner.appendChild(a);
 	}
 }
@@ -437,7 +458,14 @@ function headingDomToEntry(nth) {
 
 // The parameter kinds this page edits itself. Every other kind is left to the
 // host's own prompt, which receives a confirm without a `parameter`.
-const EDITABLE_KINDS = new Set(['text', 'key', 'shortcut', 'llm_prompt', 'llm_vision', 'llm_language']);
+const EDITABLE_KINDS = new Set([
+	'text',
+	'key',
+	'shortcut',
+	'llm_prompt',
+	'llm_vision',
+	'llm_language'
+]);
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
 // Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
@@ -513,13 +541,18 @@ function parseSendShortcut(value) {
 	if (modTokens.length === 0) return null;
 	const held = new Set();
 	for (const token of modTokens) {
-		const entry = findVocabularyEntry(sendVocabulary.modifiers, asciiLower(token.replace(TRIM, '')));
+		const entry = findVocabularyEntry(
+			sendVocabulary.modifiers,
+			asciiLower(token.replace(TRIM, ''))
+		);
 		if (!entry || held.has(entry.id)) return null;
 		held.add(entry.id);
 	}
 	const key = parseSendKey(keyToken, true);
 	if (key === null) return null;
-	const mods = sendVocabulary.modifiers.filter((entry) => held.has(entry.id)).map((entry) => entry.id);
+	const mods = sendVocabulary.modifiers
+		.filter((entry) => held.has(entry.id))
+		.map((entry) => entry.id);
 	return mods.concat([key]).join('+');
 }
 
@@ -568,15 +601,28 @@ function parseParameter(kind, value) {
 	if (kind === 'shortcut') return parseSendShortcut(value);
 	if (kind === 'llm_prompt') return parseLlmPrompt(value) === null ? null : value;
 	if (kind === 'llm_vision') return parseLlmVision(value) === null ? null : value;
-	if (kind === 'llm_language') return languageChoices !== null && findLanguageChoice(value) !== null ? value : null;
+	if (kind === 'llm_language')
+		return languageChoices !== null && findLanguageChoice(value) !== null ? value : null;
 	return null;
 }
 
 // KeyboardEvent.key values of the keys send_keys.json names.
 const NAMED_KEYS = {
-	Enter: 'enter', Tab: 'tab', Escape: 'escape', Backspace: 'backspace', Delete: 'delete',
-	Insert: 'insert', ' ': 'space', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left',
-	ArrowRight: 'right', Home: 'home', End: 'end', PageUp: 'page_up', PageDown: 'page_down'
+	Enter: 'enter',
+	Tab: 'tab',
+	Escape: 'escape',
+	Backspace: 'backspace',
+	Delete: 'delete',
+	Insert: 'insert',
+	' ': 'space',
+	ArrowUp: 'up',
+	ArrowDown: 'down',
+	ArrowLeft: 'left',
+	ArrowRight: 'right',
+	Home: 'home',
+	End: 'end',
+	PageUp: 'page_up',
+	PageDown: 'page_down'
 };
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'OS', 'CapsLock']);
 
@@ -617,9 +663,11 @@ function captureShortcut(e) {
 
 function canEdit(entry) {
 	if (!entry || !EDITABLE_KINDS.has(entry.parameter) || paramStrings === null) return false;
-	if (entry.parameter === 'llm_prompt') return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
+	if (entry.parameter === 'llm_prompt')
+		return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
 	if (entry.parameter === 'llm_vision') return visionChoices !== null && visionChoices.length > 0;
-	if (entry.parameter === 'llm_language') return languageChoices !== null && languageChoices.length > 0;
+	if (entry.parameter === 'llm_language')
+		return languageChoices !== null && languageChoices.length > 0;
 	return SEND_INPUT_KINDS.has(entry.parameter) && sendVocabulary !== null;
 }
 
@@ -646,7 +694,8 @@ function fillPromptChoices(value) {
 	profile.value = selected;
 	const defaultLabel = (paramStrings.countDefault || '{1}').replace('{1}', String(defaultCount));
 	appendOption(count, '', defaultLabel);
-	for (let n = LLM_PROMPT_MIN_PREDICTIONS; n <= LLM_PROMPT_MAX_PREDICTIONS; n++) appendOption(count, String(n), String(n));
+	for (let n = LLM_PROMPT_MIN_PREDICTIONS; n <= LLM_PROMPT_MAX_PREDICTIONS; n++)
+		appendOption(count, String(n), String(n));
 	count.value = current && current.numPredictions !== null ? String(current.numPredictions) : '';
 }
 
@@ -659,9 +708,10 @@ function findVisionChoice(value) {
 // Shows the selected backend's default model, or that it needs one.
 function updateVisionModelHint() {
 	const choice = findVisionChoice(el('param-vision-provider').value);
-	el('param-vision-model').placeholder = choice && choice.defaultModel
-		? (paramStrings.visionModelDefault || '{1}').replace('{1}', choice.defaultModel)
-		: paramStrings.visionModelRequired || '';
+	el('param-vision-model').placeholder =
+		choice && choice.defaultModel
+			? (paramStrings.visionModelDefault || '{1}').replace('{1}', choice.defaultModel)
+			: paramStrings.visionModelRequired || '';
 }
 
 // Fills the backend choices and the model field from the binding's value.
@@ -715,9 +765,14 @@ function openParamEditor(entry) {
 	const vision = entry.parameter === 'llm_vision';
 	const language = entry.parameter === 'llm_language';
 	el('param-title').textContent = entry.label;
-	el('param-prompt').textContent = choosing || vision || language ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
-	el('param-hint').textContent = entry.parameter === 'key' ? paramStrings.captureKey
-		: entry.parameter === 'shortcut' ? paramStrings.captureShortcut : '';
+	el('param-prompt').textContent =
+		choosing || vision || language ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
+	el('param-hint').textContent =
+		entry.parameter === 'key'
+			? paramStrings.captureKey
+			: entry.parameter === 'shortcut'
+				? paramStrings.captureShortcut
+				: '';
 	el('param-error').hidden = true;
 	el('param-input').hidden = choosing || vision || language;
 	el('param-choice').hidden = !choosing;
@@ -757,9 +812,14 @@ function closeParamEditor() {
 
 function saveParameter() {
 	if (!editing) return;
-	const value = editing.parameter === 'llm_prompt' ? promptChoiceValue()
-		: editing.parameter === 'llm_vision' ? visionChoiceValue()
-		: editing.parameter === 'llm_language' ? el('param-language-select').value : el('param-input').value;
+	const value =
+		editing.parameter === 'llm_prompt'
+			? promptChoiceValue()
+			: editing.parameter === 'llm_vision'
+				? visionChoiceValue()
+				: editing.parameter === 'llm_language'
+					? el('param-language-select').value
+					: el('param-input').value;
 	if (value === null || parseParameter(editing.parameter, value) === null) {
 		el('param-error').textContent = (paramStrings.errors || {})[editing.parameter] || '';
 		el('param-error').hidden = false;
@@ -769,7 +829,14 @@ function saveParameter() {
 }
 
 // The keys that move or erase inside a field that holds text.
-const FIELD_EDITING_KEYS = new Set(['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
+const FIELD_EDITING_KEYS = new Set([
+	'Backspace',
+	'Delete',
+	'ArrowLeft',
+	'ArrowRight',
+	'Home',
+	'End'
+]);
 
 function isAltGr(e) {
 	return typeof e.getModifierState === 'function' && e.getModifierState('AltGraph') === true;
@@ -777,7 +844,9 @@ function isAltGr(e) {
 
 // Whether the next character typed replaces the whole value.
 function fieldIsReplaced(input) {
-	return input.value === '' || (input.selectionStart === 0 && input.selectionEnd === input.value.length);
+	return (
+		input.value === '' || (input.selectionStart === 0 && input.selectionEnd === input.value.length)
+	);
 }
 
 function setCaptured(e, value) {
@@ -838,8 +907,12 @@ function onParamKeydown(e) {
 	const input = el('param-input');
 	if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
 	else if (editing.parameter === 'shortcut') onShortcutCaptureKeydown(e, input);
-	else if (editing.parameter === 'llm_prompt' || editing.parameter === 'llm_vision'
-		|| editing.parameter === 'llm_language') onChoiceEditorKeydown(e);
+	else if (
+		editing.parameter === 'llm_prompt' ||
+		editing.parameter === 'llm_vision' ||
+		editing.parameter === 'llm_language'
+	)
+		onChoiceEditorKeydown(e);
 	else onPlainEditorKeydown(e, input);
 	return true;
 }
@@ -861,11 +934,21 @@ function onChoiceEditorKeydown(e) {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function () {
-	el('search').addEventListener('input', function () { render(); });
-	el('param-back').addEventListener('click', function () { closeParamEditor(); });
-	el('param-save').addEventListener('click', function () { saveParameter(); });
-	el('btn-edit-current').addEventListener('click', function () { editCurrent(); });
-	el('param-vision-provider').addEventListener('change', function () { updateVisionModelHint(); });
+	el('search').addEventListener('input', function () {
+		render();
+	});
+	el('param-back').addEventListener('click', function () {
+		closeParamEditor();
+	});
+	el('param-save').addEventListener('click', function () {
+		saveParameter();
+	});
+	el('btn-edit-current').addEventListener('click', function () {
+		editCurrent();
+	});
+	el('param-vision-provider').addEventListener('change', function () {
+		updateVisionModelHint();
+	});
 
 	document.addEventListener('keydown', function (e) {
 		// While a value is being edited every key belongs to the editor: Escape
@@ -882,7 +965,10 @@ document.addEventListener('DOMContentLoaded', function () {
 			if (visible.length && visible[activeIndex]) doConfirm(visible[activeIndex].id);
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
-			if (!el('toc').hidden) { el('toc').hidden = true; return; }
+			if (!el('toc').hidden) {
+				el('toc').hidden = true;
+				return;
+			}
 			doCancel();
 		}
 	});

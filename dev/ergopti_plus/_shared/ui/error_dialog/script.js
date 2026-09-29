@@ -104,7 +104,9 @@
 		}
 		var crash = state.kind === 'crash';
 		heading.textContent = t(crash ? 'error_dialog.heading_crash' : 'error_dialog.heading');
-		document.getElementById('intro').textContent = t(crash ? 'error_dialog.intro_crash' : 'error_dialog.intro');
+		document.getElementById('intro').textContent = t(
+			crash ? 'error_dialog.intro_crash' : 'error_dialog.intro'
+		);
 		document.getElementById('module').textContent = state.module;
 		document.getElementById('message').textContent = state.message;
 		document.getElementById('logged').textContent = t(

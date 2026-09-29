@@ -204,13 +204,19 @@ def report_host() -> None:
     item("Python", f"{platform.python_version()} ({sys.executable})")
     item("Shell", os.environ.get("SHELL") or "?")
     home, uid, gid = resolve_user_identity()
-    item("Utilisateur", f"uid={uid} gid={gid} home={home} root={'oui' if running_as_root() else 'non'}")
+    item(
+        "Utilisateur",
+        f"uid={uid} gid={gid} home={home} root={'oui' if running_as_root() else 'non'}",
+    )
     for name in ("SUDO_USER", "DOAS_USER", "PKEXEC_UID"):
         if os.environ.get(name):
             item(f"  {name}", os.environ[name])
     for candidate in ("/etc/NIXOS", "/run/current-system", "/run/ostree-booted"):
         if Path(candidate).exists():
-            item("Système particulier", f"{candidate} présent (NixOS / ostree : /usr non modifiable ?)")
+            item(
+                "Système particulier",
+                f"{candidate} présent (NixOS / ostree : /usr non modifiable ?)",
+            )
 
 
 def report_session() -> None:
@@ -321,11 +327,15 @@ def report_legacy(roots: InstallerRoots) -> None:
     ]
     for target in targets:
         mentions = count_mentions(target)
-        backups = sorted(
-            candidate.name
-            for candidate in target.parent.glob(f"{target.name}.*")
-            if candidate.name[len(target.name) + 1 :].isdigit()
-        ) if target.parent.is_dir() else []
+        backups = (
+            sorted(
+                candidate.name
+                for candidate in target.parent.glob(f"{target.name}.*")
+                if candidate.name[len(target.name) + 1 :].isdigit()
+            )
+            if target.parent.is_dir()
+            else []
+        )
         state = "absent" if mentions is None else f"{mentions} ligne(s) mentionnant ergopti"
         item(str(target), f"{state}; sauvegardes : {', '.join(backups) or 'aucune'}")
     variants = legacy_variants(roots.system_root)
@@ -338,7 +348,10 @@ def report_desktop_settings() -> None:
     if shutil.which("gsettings"):
         for key in (GNOME_KEY, GNOME_MRU_KEY):
             code, output = command_output(["gsettings", "get", GNOME_SCHEMA, key])
-            item(f"gsettings {key}", output if code == 0 else f"échec (code {code}) : {first_line(output)}")
+            item(
+                f"gsettings {key}",
+                output if code == 0 else f"échec (code {code}) : {first_line(output)}",
+            )
     else:
         item("gsettings", "absent (pas de bureau GNOME, ou outils non installés)")
     reader = next((name for name in ("kreadconfig6", "kreadconfig5") if shutil.which(name)), None)
@@ -373,8 +386,16 @@ def report_desktop_settings() -> None:
             )
     if shutil.which("setxkbmap") and os.environ.get("DISPLAY"):
         code, output = command_output(["setxkbmap", "-query"])
-        summary = ", ".join(line.strip() for line in output.splitlines()) if code == 0 else f"échec (code {code})"
-        note = " (Xwayland : peut ne pas refléter le compositeur)" if session_type() == "wayland" else ""
+        summary = (
+            ", ".join(line.strip() for line in output.splitlines())
+            if code == 0
+            else f"échec (code {code})"
+        )
+        note = (
+            " (Xwayland : peut ne pas refléter le compositeur)"
+            if session_type() == "wayland"
+            else ""
+        )
         item("setxkbmap -query", summary + note)
     home, _, _ = resolve_user_identity()
     compose = home / ".XCompose"
@@ -417,7 +438,10 @@ def report_compilation(roots: InstallerRoots) -> None:
             )
         )
     if not candidates:
-        item("Compilation", "aucune disposition Ergopti installée (ni paquet Clean, ni section Legacy)")
+        item(
+            "Compilation",
+            "aucune disposition Ergopti installée (ni paquet Clean, ni section Legacy)",
+        )
         return
     for label, spec, probe in candidates:
         print(f"{label} « {spec.gnome_id} » :")
@@ -428,8 +452,13 @@ def report_compilation(roots: InstallerRoots) -> None:
             extensions_root=extensions_root,
             xkbcomp_probe=probe,
         )
-        item("  verdict", {True: "utilisable", False: "INUTILISABLE", None: "non vérifiable"}[verdict])
-        print(f"  Configurations testées : {describe_rmlvo([spec])}, {describe_rmlvo([spec, COMPANION_LAYOUT])}, {describe_rmlvo([COMPANION_LAYOUT, spec])}")
+        item(
+            "  verdict",
+            {True: "utilisable", False: "INUTILISABLE", None: "non vérifiable"}[verdict],
+        )
+        print(
+            f"  Configurations testées : {describe_rmlvo([spec])}, {describe_rmlvo([spec, COMPANION_LAYOUT])}, {describe_rmlvo([COMPANION_LAYOUT, spec])}"
+        )
     if shutil.which("xkbcli"):
         environment = None
         if roots.sandboxed:
@@ -464,7 +493,9 @@ def report_compilation(roots: InstallerRoots) -> None:
 
 def main(argv: list[str]) -> int:
     if any(argument in ("-h", "--help") for argument in argv):
-        print("Usage : python3 xkb_diagnose.py\nAffiche un rapport de diagnostic de l'installation Ergopti XKB.")
+        print(
+            "Usage : python3 xkb_diagnose.py\nAffiche un rapport de diagnostic de l'installation Ergopti XKB."
+        )
         return EXIT_OK
     roots = resolve_roots()
     print(f"===== Diagnostic Ergopti XKB (format {REPORT_VERSION}) =====")

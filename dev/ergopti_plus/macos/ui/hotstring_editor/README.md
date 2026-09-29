@@ -6,9 +6,9 @@ WKWebView-based interface for creating, editing, and managing custom hotstrings 
 
 ## Key files
 
-| File      | Description                                                                |
-| --------- | -------------------------------------------------------------------------- |
-| `init.lua`| `M.show()` — singleton host; bridge handler for create/update/delete/save  |
+| File       | Description                                                               |
+| ---------- | ------------------------------------------------------------------------- |
+| `init.lua` | `M.show()` — singleton host; bridge handler for create/update/delete/save |
 
 ## Usage
 

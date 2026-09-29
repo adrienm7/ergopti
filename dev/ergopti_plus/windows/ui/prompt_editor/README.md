@@ -6,9 +6,9 @@ WebView2 host for the LLM prompt-profile editor. Loads the shared `_shared/ui/pr
 
 ## Key files
 
-| File      | Description                                                           |
-| --------- | --------------------------------------------------------------------- |
-| `init.ahk`| Singleton host: `PromptEditor_Show(profile)` — opens / focuses window  |
+| File       | Description                                                           |
+| ---------- | --------------------------------------------------------------------- |
+| `init.ahk` | Singleton host: `PromptEditor_Show(profile)` — opens / focuses window |
 
 ## Shared frontend
 

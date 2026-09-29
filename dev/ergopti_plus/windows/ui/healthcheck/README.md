@@ -17,14 +17,14 @@ opt-in details.
 
 ## Key files
 
-| File          | Description                                                                    |
-| ------------- | ------------------------------------------------------------------------------ |
-| `init.ahk`    | Index: includes the files below                                                |
-| `core.ahk`    | Session counters, `HealthCheck_Run()` (phase A), the window and its messages   |
-| `helpers.ahk` | One synchronous collector per section, and the recent warnings and errors     |
+| File          | Description                                                                     |
+| ------------- | ------------------------------------------------------------------------------- |
+| `init.ahk`    | Index: includes the files below                                                 |
+| `core.ahk`    | Session counters, `HealthCheck_Run()` (phase A), the window and its messages    |
+| `helpers.ahk` | One synchronous collector per section, and the recent warnings and errors       |
 | `probes.ahk`  | The asynchronous probes, each answering once: its result, a timeout or an error |
-| `report.ahk`  | The page's actions (copy, save, report, open) and the Debug menu's reports     |
-| `actions.ahk` | Validation of the page's messages against the schema's allowlist              |
+| `report.ahk`  | The page's actions (copy, save, report, open) and the Debug menu's reports      |
+| `actions.ahk` | Validation of the page's messages against the schema's allowlist                |
 
 ## Usage
 

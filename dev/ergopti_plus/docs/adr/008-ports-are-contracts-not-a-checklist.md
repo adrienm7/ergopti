@@ -1,11 +1,11 @@
 # 008 — Ports are contracts, not a checklist
 
-| Field         | Value                          |
-| ------------- | ------------------------------ |
-| **Date**      | 2026-08-02                     |
-| **Status**    | Accepted                       |
-| **Supersedes** | ADR-001, in part               |
-| **Deciders**  | Maintainer                     |
+| Field          | Value            |
+| -------------- | ---------------- |
+| **Date**       | 2026-08-02       |
+| **Status**     | Accepted         |
+| **Supersedes** | ADR-001, in part |
+| **Deciders**   | Maintainer       |
 
 ---
 

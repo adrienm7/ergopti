@@ -47,6 +47,7 @@ a `[menu.hotstring_category_keys]` gate (`npm run test:hotstring-language-packs`
 checks that nothing is missing).
 
 Every bundled hotstring section ships **disabled**; the user opts in.
+
 ## TOML file schema
 
 Each `.toml` file under a category folder contains one `[[entry]]` array:

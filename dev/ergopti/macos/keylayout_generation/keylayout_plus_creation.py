@@ -83,9 +83,7 @@ def ergopti_plus_magic_modifications(body: str) -> str:
         body0 = body0.rstrip() + '\n\t\t\t<key code="30" output="j"/>'
         return f"{header}{body0}{footer}"
 
-    body = re.sub(
-        r'(<keyMap index="0">)(.*?)(</keyMap>)', repl0, body, flags=re.DOTALL
-    )
+    body = re.sub(r'(<keyMap index="0">)(.*?)(</keyMap>)', repl0, body, flags=re.DOTALL)
 
     # Couche 6 : action="¨"
     def repl6(match):
@@ -94,9 +92,7 @@ def ergopti_plus_magic_modifications(body: str) -> str:
         body6 = body6.rstrip() + '\n\t\t\t<key code="30" action="¨"/>'
         return f"{header}{body6}{footer}"
 
-    body = re.sub(
-        r'(<keyMap index="6">)(.*?)(</keyMap>)', repl6, body, flags=re.DOTALL
-    )
+    body = re.sub(r'(<keyMap index="6">)(.*?)(</keyMap>)', repl6, body, flags=re.DOTALL)
 
     return body
 

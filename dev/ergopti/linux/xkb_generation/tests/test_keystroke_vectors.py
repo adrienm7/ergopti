@@ -25,7 +25,15 @@ import unittest
 from support import KEYCODES_PATH, STATIC_DIR, convert_registry_layout, keylayout_to_xkb
 from test_registry_conversion import parse_compose
 
-VECTORS_PATH = STATIC_DIR / "ergopti_plus" / "_shared" / "tests" / "corpus" / "layouts" / "keylayout_vectors.json"
+VECTORS_PATH = (
+    STATIC_DIR
+    / "ergopti_plus"
+    / "_shared"
+    / "tests"
+    / "corpus"
+    / "layouts"
+    / "keylayout_vectors.json"
+)
 
 # XKB level index of each modifier set of a vector (keylayout_to_xkb.XKB_LEVELS order).
 LEVELS = {
@@ -90,7 +98,9 @@ class KeystrokeVectorReplay(unittest.TestCase):
         borrowed = self.conversions[layout].borrowed
         if text in borrowed:
             return borrowed[text]
-        self.assertEqual(len(text), 1, "a multi-character output needs a borrowed keysym: %r" % text)
+        self.assertEqual(
+            len(text), 1, "a multi-character output needs a borrowed keysym: %r" % text
+        )
         return self.keysyms.get(text) or keylayout_to_xkb.unicode_keysym(text)
 
     def key_keysym(self, layout: str, press: str) -> str:
@@ -113,7 +123,9 @@ class KeystrokeVectorReplay(unittest.TestCase):
                 if vector["types"] == "":
                     self.assertEqual(keysym, "NoSymbol")
                 else:
-                    self.assertEqual(keysym, self.keysym_for_text(vector["layout"], vector["types"]))
+                    self.assertEqual(
+                        keysym, self.keysym_for_text(vector["layout"], vector["types"])
+                    )
                 replayed += 1
         self.assertGreaterEqual(replayed, 20)
 
@@ -125,8 +137,11 @@ class KeystrokeVectorReplay(unittest.TestCase):
             with self.subTest(vector=vector["id"]):
                 layout = vector["layout"]
                 sequence = tuple(self.key_keysym(layout, press) for press in vector["press"])
-                self.assertEqual(self.compose[layout].get(sequence), vector["types"],
-                                 "Compose sequence %r" % (sequence,))
+                self.assertEqual(
+                    self.compose[layout].get(sequence),
+                    vector["types"],
+                    "Compose sequence %r" % (sequence,),
+                )
                 replayed += 1
         self.assertGreaterEqual(replayed, 6)
 
@@ -137,7 +152,9 @@ class KeystrokeVectorReplay(unittest.TestCase):
                 continue
             with self.subTest(vector=vector["id"]):
                 layout = vector["layout"]
-                keysym = self.conversions[layout].key_symbols[self.names[vector["shortcut"]]][COMMAND_LEVEL]
+                keysym = self.conversions[layout].key_symbols[self.names[vector["shortcut"]]][
+                    COMMAND_LEVEL
+                ]
                 self.assertEqual(keysym, self.keysym_for_text(layout, vector["sends"]))
                 replayed += 1
         self.assertGreaterEqual(replayed, 3)

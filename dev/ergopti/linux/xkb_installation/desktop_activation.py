@@ -105,7 +105,17 @@ _DIAGNOSTIC_NOISE = (
     "are not supported by x",
 )
 # Words that mark a line worth showing even when it does not name the component.
-_DIAGNOSTIC_SIGNALS = ("error", "can't", "cannot", "couldn't", "could not", "abandon", "exiting", "not defined", "no such")
+_DIAGNOSTIC_SIGNALS = (
+    "error",
+    "can't",
+    "cannot",
+    "couldn't",
+    "could not",
+    "abandon",
+    "exiting",
+    "not defined",
+    "no such",
+)
 
 # Desktops whose keyboard layout list lives in the GNOME input-sources schema.
 GNOME_DESKTOP_TOKENS = frozenset(
@@ -450,7 +460,9 @@ def shell_quote(value: str) -> str:
 def shell_join(command: list[str], environment: dict[str, str] | None = None) -> str:
     """Render a command line the user can paste back into a terminal."""
     prefix = [f"{key}={shell_quote(value)}" for key, value in sorted((environment or {}).items())]
-    return " ".join(prefix + [shell_quote(part) if " " in part or not part else part for part in command])
+    return " ".join(
+        prefix + [shell_quote(part) if " " in part or not part else part for part in command]
+    )
 
 
 def build_drop_command(
@@ -637,16 +649,29 @@ def _gnome_schema_status() -> CommandCaptureStatus:
     """Distinguish no schemas at all from a failed schema-registry query."""
     try:
         result = subprocess.run(
-            ["gsettings", "list-schemas"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, timeout=15, check=False, env={**os.environ, "LC_ALL": "C"},
+            ["gsettings", "list-schemas"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+            check=False,
+            env={**os.environ, "LC_ALL": "C"},
         )
     except (subprocess.TimeoutExpired, OSError):
         return CommandCaptureStatus.FAILED
     if result.returncode == 0:
-        return CommandCaptureStatus.SUCCEEDED if GNOME_SCHEMA in result.stdout.splitlines() else CommandCaptureStatus.ABSENT
+        return (
+            CommandCaptureStatus.SUCCEEDED
+            if GNOME_SCHEMA in result.stdout.splitlines()
+            else CommandCaptureStatus.ABSENT
+        )
     # GLib exits 1 before command dispatch when its default schema source is
     # absent. Require that exact C-locale diagnostic, not any nonzero result.
-    if result.returncode == 1 and not result.stdout.strip() and result.stderr.strip() == "No schemas installed":
+    if (
+        result.returncode == 1
+        and not result.stdout.strip()
+        and result.stderr.strip() == "No schemas installed"
+    ):
         return CommandCaptureStatus.ABSENT
     return CommandCaptureStatus.FAILED
 
@@ -672,8 +697,7 @@ def apply_gnome(specs: list[LayoutSpec], tokens: set[str]) -> bool:
     current_sources = parse_gsettings_sources(current_raw)
     if current_sources is None:
         print(
-            "   ⚠️  Valeur gsettings illisible : elle est laissée intacte "
-            f"({current_raw.strip()})."
+            f"   ⚠️  Valeur gsettings illisible : elle est laissée intacte ({current_raw.strip()})."
         )
         return False
     wanted = [("xkb", spec.gnome_id) for spec in specs]
@@ -748,7 +772,9 @@ def _kde_display_names(
     if not names_value:
         return None
     names = names_value.split(",")
-    by_spec = {spec: names[index] if index < len(names) else "" for index, spec in enumerate(previous)}
+    by_spec = {
+        spec: names[index] if index < len(names) else "" for index, spec in enumerate(previous)
+    }
     return ",".join(by_spec.get(spec, "") for spec in merged)
 
 
@@ -756,7 +782,13 @@ def _kde_reload() -> None:
     """Tell the keyboard daemon (X11) and KWin (Wayland) to reread kxkbrc."""
     if shutil.which("dbus-send"):
         run_reported(
-            ["dbus-send", "--session", "--type=signal", "/Layouts", "org.kde.keyboard.reloadConfig"],
+            [
+                "dbus-send",
+                "--session",
+                "--type=signal",
+                "/Layouts",
+                "org.kde.keyboard.reloadConfig",
+            ],
             "KDE : rechargement de la configuration clavier",
         )
     reconfigure = next(
@@ -799,16 +831,19 @@ def apply_kde(specs: list[LayoutSpec], tokens: set[str]) -> bool:
     applied = True
     if changed:
         layout_list, variant_list = format_kde_layouts(merged)
-        applied = _kde_write(writer, KDE_LAYOUTS_KEY, layout_list, "KDE : dispositions") and _kde_write(
-            writer, KDE_VARIANTS_KEY, variant_list, "KDE : variantes"
-        )
+        applied = _kde_write(
+            writer, KDE_LAYOUTS_KEY, layout_list, "KDE : dispositions"
+        ) and _kde_write(writer, KDE_VARIANTS_KEY, variant_list, "KDE : variantes")
         names = _kde_display_names(current, names_value, merged)
         if names is not None:
             applied = _kde_write(writer, KDE_NAMES_KEY, names, "KDE : noms affichés") and applied
     else:
         print("   ✅ KDE : la disposition est déjà en première position.")
     if use_value.lower() != "true":
-        applied = _kde_write(writer, KDE_USE_KEY, "true", "KDE : liste de dispositions activée") and applied
+        applied = (
+            _kde_write(writer, KDE_USE_KEY, "true", "KDE : liste de dispositions activée")
+            and applied
+        )
     if applied:
         _kde_reload()
     return applied
@@ -860,8 +895,7 @@ def manual_instructions(spec: LayoutSpec, tokens: set[str], kind: str) -> list[s
     if is_gnome_session(tokens):
         return [
             "   ℹ️  Réessayez depuis votre session graphique, sans sudo :",
-            f"        gsettings set {GNOME_SCHEMA} {GNOME_KEY} "
-            f'"[(\'xkb\', \'{spec.gnome_id}\')]"',
+            f"        gsettings set {GNOME_SCHEMA} {GNOME_KEY} \"[('xkb', '{spec.gnome_id}')]\"",
         ]
     if is_kde_session(tokens):
         return [
@@ -1050,7 +1084,9 @@ def describe_rmlvo(layouts: list[LayoutSpec]) -> str:
     return ",".join(spec.gnome_id for spec in layouts)
 
 
-def relevant_diagnostics(diagnostics: str, needles: tuple[str, ...] = (), limit: int = 12) -> list[str]:
+def relevant_diagnostics(
+    diagnostics: str, needles: tuple[str, ...] = (), limit: int = 12
+) -> list[str]:
     """Keep the compiler lines that explain a failure.
 
     Errors and every mention of ``needles`` (the component under test) are
@@ -1076,7 +1112,9 @@ def relevant_diagnostics(diagnostics: str, needles: tuple[str, ...] = (), limit:
     return chosen[-limit:]
 
 
-def inspect_keymap(keymap: str, required_type: str, probe_key: str = PROBE_KEY, group: int = 1) -> list[str]:
+def inspect_keymap(
+    keymap: str, required_type: str, probe_key: str = PROBE_KEY, group: int = 1
+) -> list[str]:
     """Return every reason a compiled keymap would leave the Ergopti layers dead.
 
     "It compiles" is not enough: a key whose type is unknown falls back to
@@ -1112,7 +1150,9 @@ def inspect_keymap(keymap: str, required_type: str, probe_key: str = PROBE_KEY, 
     return problems
 
 
-def describe_probe(keymap: str, required_type: str, probe_key: str = PROBE_KEY, group: int = 1) -> str:
+def describe_probe(
+    keymap: str, required_type: str, probe_key: str = PROBE_KEY, group: int = 1
+) -> str:
     """Summarise what the probe key does, for the success line and diagnostics."""
     symbols = keymap_key_symbols(keymap, probe_key, group)
     level = keymap_type_level(keymap, required_type, CONTROL_MODIFIER)
@@ -1123,7 +1163,9 @@ def describe_probe(keymap: str, required_type: str, probe_key: str = PROBE_KEY, 
     return f"{probe_key} : {len(symbols)} niveaux {symbols}{control}"
 
 
-def _report_failure(label: str, problems: list[str], result: CompileResult, needles: tuple[str, ...]) -> None:
+def _report_failure(
+    label: str, problems: list[str], result: CompileResult, needles: tuple[str, ...]
+) -> None:
     print(f"   ❌ {label}")
     for problem in problems:
         print(f"      • {problem}")
@@ -1158,7 +1200,12 @@ def _verify_with_xkbcli(
             return False
         problems = inspect_keymap(result.keymap or "", required_type, probe_key, group)
         if problems:
-            _report_failure(f"libxkbcommon : « {label} » compile mais la disposition est inutilisable.", problems, result, needles)
+            _report_failure(
+                f"libxkbcommon : « {label} » compile mais la disposition est inutilisable.",
+                problems,
+                result,
+                needles,
+            )
             return False
         if not summary:
             summary = describe_probe(result.keymap or "", required_type, probe_key, group)
@@ -1169,7 +1216,9 @@ def _verify_with_xkbcli(
     return True
 
 
-def _verify_with_xkbcomp(xkbcomp: str, probe: XkbcompProbe, spec: LayoutSpec, required_type: str, probe_key: str) -> bool:
+def _verify_with_xkbcomp(
+    xkbcomp: str, probe: XkbcompProbe, spec: LayoutSpec, required_type: str, probe_key: str
+) -> bool:
     needles = (required_type, spec.layout, spec.variant, "ergopti")
     result = compile_with_xkbcomp(xkbcomp, probe)
     if not result.succeeded:
@@ -1177,7 +1226,12 @@ def _verify_with_xkbcomp(xkbcomp: str, probe: XkbcompProbe, spec: LayoutSpec, re
         return False
     problems = inspect_keymap(result.keymap or "", required_type, probe_key, 1)
     if problems:
-        _report_failure("xkbcomp (Xorg) compile la disposition mais elle est inutilisable.", problems, result, needles)
+        _report_failure(
+            "xkbcomp (Xorg) compile la disposition mais elle est inutilisable.",
+            problems,
+            result,
+            needles,
+        )
         return False
     print(
         f"   ✅ Keymap vérifiée par xkbcomp (Xorg) : « {probe.symbols} » compile avec {required_type} "
@@ -1211,7 +1265,11 @@ def verify_keymap(
     verdicts: list[bool] = []
     xkbcli = shutil.which("xkbcli")
     if xkbcli:
-        verdicts.append(_verify_with_xkbcli(xkbcli, spec, required_type, include_roots, extensions_root, probe_key))
+        verdicts.append(
+            _verify_with_xkbcli(
+                xkbcli, spec, required_type, include_roots, extensions_root, probe_key
+            )
+        )
     else:
         print(
             "   ℹ️  xkbcli absent : la résolution de la disposition par libxkbcommon (sessions Wayland) "
@@ -1220,7 +1278,9 @@ def verify_keymap(
     if xkbcomp_probe is not None:
         xkbcomp = shutil.which("xkbcomp")
         if xkbcomp:
-            verdicts.append(_verify_with_xkbcomp(xkbcomp, xkbcomp_probe, spec, required_type, probe_key))
+            verdicts.append(
+                _verify_with_xkbcomp(xkbcomp, xkbcomp_probe, spec, required_type, probe_key)
+            )
         else:
             print("   ℹ️  xkbcomp absent : la compilation Xorg n'est pas vérifiée.")
     if False in verdicts:
@@ -1248,9 +1308,7 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
     changed = False
     failed = False
 
-    gnome_status, current_raw = run_capture_status(
-        ["gsettings", "get", GNOME_SCHEMA, GNOME_KEY]
-    )
+    gnome_status, current_raw = run_capture_status(["gsettings", "get", GNOME_SCHEMA, GNOME_KEY])
     if gnome_status is CommandCaptureStatus.FAILED:
         if _gnome_schema_status() is CommandCaptureStatus.ABSENT:
             gnome_status = CommandCaptureStatus.ABSENT
@@ -1267,7 +1325,10 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
                 if not (pair[0] == "xkb" and owned(LayoutSpec.parse(pair[1])))
             ]
             if kept != current_sources:
-                if _gnome_set(GNOME_KEY, kept, "GNOME : sources Ergopti retirées") and _gnome_get(GNOME_KEY) == kept:
+                if (
+                    _gnome_set(GNOME_KEY, kept, "GNOME : sources Ergopti retirées")
+                    and _gnome_get(GNOME_KEY) == kept
+                ):
                     changed = True
                 else:
                     failed = True
@@ -1281,7 +1342,12 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
                     if not (pair[0] == "xkb" and owned(LayoutSpec.parse(pair[1])))
                 ]
                 if kept_mru != mru:
-                    if _gnome_set(GNOME_MRU_KEY, kept_mru, "GNOME : dispositions récentes nettoyées") and _gnome_get(GNOME_MRU_KEY) == kept_mru:
+                    if (
+                        _gnome_set(
+                            GNOME_MRU_KEY, kept_mru, "GNOME : dispositions récentes nettoyées"
+                        )
+                        and _gnome_get(GNOME_MRU_KEY) == kept_mru
+                    ):
                         changed = True
                     else:
                         failed = True
@@ -1294,16 +1360,23 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
         elif layouts_status is CommandCaptureStatus.SUCCEEDED:
             variants_status, variants_value = _kde_read(reader, KDE_VARIANTS_KEY)
             names_status, names_value = _kde_read(reader, KDE_NAMES_KEY)
-            if any(status is not CommandCaptureStatus.SUCCEEDED for status in (variants_status, names_status)):
+            if any(
+                status is not CommandCaptureStatus.SUCCEEDED
+                for status in (variants_status, names_status)
+            ):
                 return CleanupStatus.FAILED
             current = parse_kde_layouts(layouts_value, variants_value)
             kept, removed = remove_layout_specs(current, owned)
             if removed:
                 writer = _kde_writer()
                 layout_list, variant_list = format_kde_layouts(kept)
-                if writer and _kde_write(
-                    writer, KDE_LAYOUTS_KEY, layout_list, "KDE : dispositions Ergopti retirées"
-                ) and _kde_write(writer, KDE_VARIANTS_KEY, variant_list, "KDE : variantes"):
+                if (
+                    writer
+                    and _kde_write(
+                        writer, KDE_LAYOUTS_KEY, layout_list, "KDE : dispositions Ergopti retirées"
+                    )
+                    and _kde_write(writer, KDE_VARIANTS_KEY, variant_list, "KDE : variantes")
+                ):
                     names = _kde_display_names(current, names_value, kept)
                     if names is not None:
                         if not _kde_write(writer, KDE_NAMES_KEY, names, "KDE : noms affichés"):
@@ -1370,9 +1443,7 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
         print(f"   ℹ️  Réglage KDE ignoré : le bureau « {desktop} » ne le lit pas.")
     x11_applied = apply_x11(primary, environ)
     handled = (
-        (gnome_applied and owner == "gnome")
-        or (kde_applied and owner == "kde")
-        or x11_applied
+        (gnome_applied and owner == "gnome") or (kde_applied and owner == "kde") or x11_applied
     )
     if not handled:
         for line in manual_instructions(primary, tokens, kind):
@@ -1381,11 +1452,12 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
         for line in persistence_instructions(primary):
             print(line)
     if handled:
-        print("   ✅ Disposition activée pour cette session ; elle sera rechargée à la prochaine connexion.")
+        print(
+            "   ✅ Disposition activée pour cette session ; elle sera rechargée à la prochaine connexion."
+        )
     else:
-        print("   ⚠️  Disposition non activée automatiquement : appliquez les instructions ci-dessus.")
-    print(
-        "   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition "
-        "n'est pas active."
-    )
+        print(
+            "   ⚠️  Disposition non activée automatiquement : appliquez les instructions ci-dessus."
+        )
+    print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
     return gnome_applied or kde_applied or x11_applied

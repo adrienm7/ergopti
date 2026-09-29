@@ -8,14 +8,10 @@ def extract_terminators(file_content: str):
     """
     Extracts (state, output) tuples from the <terminators> block.
     """
-    block = re.search(
-        r"<terminators>(.*?)</terminators>", file_content, re.DOTALL
-    )
+    block = re.search(r"<terminators>(.*?)</terminators>", file_content, re.DOTALL)
     if not block:
         raise ValueError("No <terminators> block found.")
-    return re.findall(
-        r'<when state="([^"]+)" output="([^"]+)"\s*/>', block.group(1)
-    )
+    return re.findall(r'<when state="([^"]+)" output="([^"]+)"\s*/>', block.group(1))
 
 
 def build_state_map(terminators):
@@ -50,9 +46,7 @@ def replace_id_next_references(file_content: str, state_map: dict) -> str:
     Replace all id="..." and next="..." references using the state_map.
     """
     for old, new in state_map.items():
-        file_content = re.sub(
-            rf'(id|next)="{re.escape(old)}"', rf'\1="{new}"', file_content
-        )
+        file_content = re.sub(rf'(id|next)="{re.escape(old)}"', rf'\1="{new}"', file_content)
     return file_content
 
 
@@ -66,9 +60,7 @@ def replace_terminators_block(file_content: str, state_map: dict) -> str:
         new_state = state_map.get(old_state, old_state)
         return f'<when state="{new_state}" output="{output}"/>'
 
-    return re.sub(
-        r'<when state="([^"]+)" output="([^"]+)"\s*/>', repl_term, file_content
-    )
+    return re.sub(r'<when state="([^"]+)" output="([^"]+)"\s*/>', repl_term, file_content)
 
 
 def replace_layer_names_in_file(file_content: str) -> str:

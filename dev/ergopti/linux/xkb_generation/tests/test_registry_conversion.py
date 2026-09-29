@@ -67,22 +67,33 @@ class KeylayoutOracle:
     def __init__(self, text: str):
         body = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
         self.key_maps = {}
-        for index, inner in re.findall(r'<keyMap index="(\d+)"[^>]*>(.*?)</keyMap>', body, re.DOTALL):
+        for index, inner in re.findall(
+            r'<keyMap index="(\d+)"[^>]*>(.*?)</keyMap>', body, re.DOTALL
+        ):
             keys = {}
-            for code, kind, value in re.findall(r'<key code="(\d+)"\s+(output|action)="([^"]*)"', inner):
+            for code, kind, value in re.findall(
+                r'<key code="(\d+)"\s+(output|action)="([^"]*)"', inner
+            ):
                 keys.setdefault(int(code), (kind, html.unescape(value)))
             self.key_maps[int(index)] = keys
         self.actions = {}
-        for action_id, inner in re.findall(r'<action id="([^"]*)"\s*>(.*?)</action>', body, re.DOTALL):
+        for action_id, inner in re.findall(
+            r'<action id="([^"]*)"\s*>(.*?)</action>', body, re.DOTALL
+        ):
             whens = {}
             for attrs in re.findall(r"<when\s+([^>]*?)/?>", inner):
                 fields = dict(re.findall(r'(\w+)="([^"]*)"', attrs))
-                whens[fields["state"]] = (html.unescape(fields.get("output", "")), fields.get("next"))
+                whens[fields["state"]] = (
+                    html.unescape(fields.get("output", "")),
+                    fields.get("next"),
+                )
             self.actions[html.unescape(action_id)] = whens
         terminators = re.search(r"<terminators>(.*?)</terminators>", body, re.DOTALL).group(1)
         self.terminators = {
             state: html.unescape(output)
-            for state, output in re.findall(r'<when\s+state="([^"]*)"\s+output="([^"]*)"', terminators)
+            for state, output in re.findall(
+                r'<when\s+state="([^"]*)"\s+output="([^"]*)"', terminators
+            )
         }
 
     def cell(self, index: int, code: int):
@@ -143,8 +154,12 @@ class ErgolCompletenessTests(unittest.TestCase):
             (key["xkb"], key["mac"]["ansi"] if isinstance(key["mac"], dict) else key["mac"])
             for key in table["keys"]
         ]
-        symbols = json.loads((keylayout_to_xkb.DATA_DIR / "key_sym.json").read_text(encoding="utf-8"))
-        cls.keysym_names = {name: char for char, name in symbols["keysyms"].items() if len(char) == 1}
+        symbols = json.loads(
+            (keylayout_to_xkb.DATA_DIR / "key_sym.json").read_text(encoding="utf-8")
+        )
+        cls.keysym_names = {
+            name: char for char, name in symbols["keysyms"].items() if len(char) == 1
+        }
 
     def cells(self):
         for xkb, code in self.keys:
@@ -178,8 +193,12 @@ class ErgolCompletenessTests(unittest.TestCase):
 
     def test_dead_key_triggers_are_unique_to_dead_keys(self):
         triggers = set(self.result.dead_triggers.values())
-        self.assertGreaterEqual(len(triggers), 15, "Ergo-L has at least 15 dead keys on the main block")
-        self.assertEqual(len(triggers), len(self.result.dead_triggers), "two dead keys share a trigger")
+        self.assertGreaterEqual(
+            len(triggers), 15, "Ergo-L has at least 15 dead keys on the main block"
+        )
+        self.assertEqual(
+            len(triggers), len(self.result.dead_triggers), "two dead keys share a trigger"
+        )
         typed = {keysym for *_rest, (kind, _v), _a, keysym in self.cells() if kind == "text"}
         self.assertEqual(triggers & typed, set(), "a plain key types a dead-key trigger")
 
@@ -222,7 +241,10 @@ class ErgolCompletenessTests(unittest.TestCase):
                     checked += 1
                     sequence = prefix + (keysym,)
                     if self.compose.get(sequence) != output:
-                        missing.append("%s -> %r (got %r)" % (" ".join(sequence), output, self.compose.get(sequence)))
+                        missing.append(
+                            "%s -> %r (got %r)"
+                            % (" ".join(sequence), output, self.compose.get(sequence))
+                        )
         self.assertEqual(missing, [])
         self.assertGreater(checked, 500)
 

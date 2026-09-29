@@ -164,16 +164,24 @@ let appliedTypingAssetsRevision = -1;
  */
 window.publishTypingMetricsData = function (payload, metadata) {
 	const validRevision = (revision) => Number.isSafeInteger(revision) && revision >= 0;
-	if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
+	if (
+		!metadata ||
+		typeof metadata !== 'object' ||
+		Array.isArray(metadata) ||
 		!validRevision(metadata.manifest_revision) ||
-		(metadata.assets_revision !== undefined && !validRevision(metadata.assets_revision))) {
+		(metadata.assets_revision !== undefined && !validRevision(metadata.assets_revision))
+	) {
 		throw new TypeError('Typing metrics publication requires valid component revisions');
 	}
 	// LuaSkin represents empty Lua maps as empty arrays, which remain valid empty maps here
-	const validMap = (value) => value !== null && typeof value === 'object' &&
-		(!Array.isArray(value) || value.length === 0);
-	if (!payload || !validMap(payload.manifest) ||
-		(metadata.assets_revision !== undefined && (!validMap(payload.app_icons) || !validMap(payload.kc_layout)))) {
+	const validMap = (value) =>
+		value !== null && typeof value === 'object' && (!Array.isArray(value) || value.length === 0);
+	if (
+		!payload ||
+		!validMap(payload.manifest) ||
+		(metadata.assets_revision !== undefined &&
+			(!validMap(payload.app_icons) || !validMap(payload.kc_layout)))
+	) {
 		throw new TypeError('Typing metrics publication requires manifest and selected asset maps');
 	}
 	let manifestChanged = false;
@@ -184,7 +192,10 @@ window.publishTypingMetricsData = function (payload, metadata) {
 		appliedTypingManifestRevision = metadata.manifest_revision;
 		manifestChanged = true;
 	}
-	if (metadata.assets_revision !== undefined && metadata.assets_revision > appliedTypingAssetsRevision) {
+	if (
+		metadata.assets_revision !== undefined &&
+		metadata.assets_revision > appliedTypingAssetsRevision
+	) {
 		window.app_icons = payload.app_icons;
 		window.keycode_layout = payload.kc_layout;
 		appliedTypingAssetsRevision = metadata.assets_revision;
@@ -215,8 +226,7 @@ function process_manifest() {
 		});
 
 		const previous_selection = new Set(app_state.selected_apps);
-		const previous_mode =
-			app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
+		const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
 
 		app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
 
@@ -1363,7 +1373,9 @@ function toggle_sfb_same_key() {
 	const btn = document.getElementById('sfb_same_key_btn');
 	if (btn) {
 		btn.classList.toggle('active', _sfb_include_same_key);
-		btn.textContent = _sfb_include_same_key ? _t('ui_typing.btn_doublings_included') : _t('ui_typing.btn_doublings_excluded');
+		btn.textContent = _sfb_include_same_key
+			? _t('ui_typing.btn_doublings_included')
+			: _t('ui_typing.btn_doublings_excluded');
 	}
 	render_sfb_kpi();
 }
@@ -2345,8 +2357,14 @@ function render_roi_kpi() {
 		`${format_number(total_saved)}<span class="stat-unit">${_t('ui_typing.unit_chars_saved')}</span>`
 	);
 	set('roi_time_saved', total_saved > 0 ? fmt_duration(time_saved_ms) : '—');
-	set('roi_hs_saved', `${format_number(hs_saved)} (${hs_triggers} ${_t('ui_typing.unit_triggers')})`);
-	set('roi_llm_saved', `${format_number(llm_saved)} (${llm_triggers} ${_t('ui_typing.unit_triggers')})`);
+	set(
+		'roi_hs_saved',
+		`${format_number(hs_saved)} (${hs_triggers} ${_t('ui_typing.unit_triggers')})`
+	);
+	set(
+		'roi_llm_saved',
+		`${format_number(llm_saved)} (${llm_triggers} ${_t('ui_typing.unit_triggers')})`
+	);
 	set(
 		'roi_llm_acc',
 		llm_suggested > 0
@@ -2635,7 +2653,10 @@ function render_sessions_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('sessions_val', `${format_number(count)}<span class="stat-unit">${_t('ui_typing.unit_sessions')}</span>`);
+	set(
+		'sessions_val',
+		`${format_number(count)}<span class="stat-unit">${_t('ui_typing.unit_sessions')}</span>`
+	);
 	set('sessions_total_time', count > 0 ? _fmt_duration_ms(total_active_ms) : '—');
 	set('sessions_longest_time', longest_ms > 0 ? _fmt_duration_ms(longest_ms) : '—');
 	set('sessions_longest_chars', longest_chars > 0 ? `${format_number(longest_chars)} car.` : '—');
@@ -3316,7 +3337,8 @@ function request_cache_reset() {
 	app_state.cache_reset_pending_range = null;
 	window._lua_request = JSON.stringify({ action: 'clear_cache', reset_id });
 	app_state.cache_reset_watchdog = setTimeout(
-		() => complete_cache_reset(reset_id, false), RANGE_REQUEST_WATCHDOG_MS
+		() => complete_cache_reset(reset_id, false),
+		RANGE_REQUEST_WATCHDOG_MS
 	);
 }
 
@@ -3327,8 +3349,13 @@ function request_cache_reset() {
  * @returns {boolean} Whether this outcome retired the active Reset.
  */
 function complete_cache_reset(reset_id, succeeded) {
-	if (!Number.isSafeInteger(reset_id) || reset_id <= 0 ||
-		reset_id !== app_state.active_cache_reset_id || typeof succeeded !== 'boolean') return false;
+	if (
+		!Number.isSafeInteger(reset_id) ||
+		reset_id <= 0 ||
+		reset_id !== app_state.active_cache_reset_id ||
+		typeof succeeded !== 'boolean'
+	)
+		return false;
 	clearTimeout(app_state.cache_reset_watchdog);
 	const pending_range = app_state.cache_reset_pending_range;
 	app_state.cache_reset_watchdog = null;
@@ -3462,7 +3489,10 @@ function request_range_data(show_loader = true) {
 			window.webkit?.messageHandlers?.metrics_typing_bridge
 		) {
 			try {
-				window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'range', ...req });
+				window.webkit.messageHandlers.metrics_typing_bridge.postMessage({
+					action: 'range',
+					...req
+				});
 				return;
 			} catch (_) {
 				complete_range_request(request_id, 'failed');

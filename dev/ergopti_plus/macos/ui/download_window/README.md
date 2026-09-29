@@ -6,9 +6,9 @@ Unified progress window for all long-running LLM operations: model downloads (by
 
 ## Key files
 
-| File      | Description                                                                        |
-| --------- | ---------------------------------------------------------------------------------- |
-| `init.lua`| `M.open(opts)` / `M.update(progress)` / `M.close()` — singleton lifecycle          |
+| File       | Description                                                               |
+| ---------- | ------------------------------------------------------------------------- |
+| `init.lua` | `M.open(opts)` / `M.update(progress)` / `M.close()` — singleton lifecycle |
 
 ## Usage
 

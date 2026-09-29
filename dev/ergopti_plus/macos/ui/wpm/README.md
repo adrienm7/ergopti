@@ -6,11 +6,11 @@ Floating `hs.canvas` widget showing real-time typing speed (WPM net). Renders a 
 
 ## Key files
 
-| File              | Description                                                     |
-| ----------------- | --------------------------------------------------------------- |
-| `init.lua`        | `M.init(state)` / `M.start()` / `M.stop()` lifecycle            |
-| `wpm_widget.lua`  | Canvas drawing, tick handler, colour and geometry logic           |
-| `wpm_menubar.lua` | Menu bar WPM item (always visible, no canvas window)             |
+| File              | Description                                             |
+| ----------------- | ------------------------------------------------------- |
+| `init.lua`        | `M.init(state)` / `M.start()` / `M.stop()` lifecycle    |
+| `wpm_widget.lua`  | Canvas drawing, tick handler, colour and geometry logic |
+| `wpm_menubar.lua` | Menu bar WPM item (always visible, no canvas window)    |
 
 ## Shared constants
 

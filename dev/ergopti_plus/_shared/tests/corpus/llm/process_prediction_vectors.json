@@ -11,7 +11,14 @@
 			"block": "TAIL_CORRECTED: hello café\nNEXT_WORDS: caféine tomorrow",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " caféine tomorrow", "nw": " caféine tomorrow", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " caféine tomorrow",
+				"nw": " caféine tomorrow",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_complete_word_overlap",
@@ -21,7 +28,14 @@
 			"block": "TAIL_CORRECTED: hello é\nNEXT_WORDS: é tomorrow",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " tomorrow", "nw": " tomorrow", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " tomorrow",
+				"nw": " tomorrow",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_raw_nonapostrophe_join",
@@ -31,7 +45,14 @@
 			"block": "then left",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " then left", "nw": " then left", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " then left",
+				"nw": " then left",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_advanced_nonapostrophe_join",
@@ -41,7 +62,14 @@
 			"block": "TAIL_CORRECTED: hello”\nNEXT_WORDS: then left",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " then left", "nw": " then left", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " then left",
+				"nw": " then left",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_raw_em_dash_prefix",
@@ -51,7 +79,14 @@
 			"block": "— completion",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " — completion", "nw": " — completion", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " — completion",
+				"nw": " — completion",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_advanced_currency_prefix",
@@ -61,7 +96,14 @@
 			"block": "TAIL_CORRECTED: hello\nNEXT_WORDS: € completion",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " € completion", "nw": " € completion", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " € completion",
+				"nw": " € completion",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_raw_ligature_suffix",
@@ -71,7 +113,14 @@
 			"block": "completion æ",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " completion æ", "nw": " completion æ", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " completion æ",
+				"nw": " completion æ",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "unicode_advanced_ligature_suffix",
@@ -81,7 +130,14 @@
 			"block": "TAIL_CORRECTED: hello\nNEXT_WORDS: completion æ",
 			"min_words": 1,
 			"max_words": 0,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " completion æ", "nw": " completion æ", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " completion æ",
+				"nw": " completion æ",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "basic_completion_no_tags",
@@ -91,7 +147,14 @@
 			"block": "content de vous voir",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": "content de vous voir", "nw": "content de vous voir", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": "content de vous voir",
+				"nw": "content de vous voir",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_full_tail_correction",
@@ -101,7 +164,14 @@
 			"block": "TAIL_CORRECTED: je envoie\nNEXT_WORDS: ce mail",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 1, "to_type": "e ce mail", "nw": " ce mail", "has_corrections": true, "disable_bold": true }
+			"expected": {
+				"is_nil": false,
+				"deletes": 1,
+				"to_type": "e ce mail",
+				"nw": " ce mail",
+				"has_corrections": true,
+				"disable_bold": true
+			}
 		},
 		{
 			"id": "advanced_tail_unchanged_only_new",
@@ -111,7 +181,14 @@
 			"block": "TAIL_CORRECTED: bonjour comment\nNEXT_WORDS: allez vous",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " allez vous", "nw": " allez vous", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " allez vous",
+				"nw": " allez vous",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_partial_intra_word",
@@ -121,7 +198,14 @@
 			"block": "TAIL_CORRECTED: bonjour messieurs\nNEXT_WORDS: ravi",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": "rs ravi", "nw": " ravi", "has_corrections": true, "disable_bold": true }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": "rs ravi",
+				"nw": " ravi",
+				"has_corrections": true,
+				"disable_bold": true
+			}
 		},
 		{
 			"id": "advanced_word_cap_two",
@@ -131,7 +215,14 @@
 			"block": "TAIL_CORRECTED: je\nNEXT_WORDS: suis tres content de vous",
 			"min_words": 1,
 			"max_words": 2,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": "suis tres", "nw": "suis tres", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": "suis tres",
+				"nw": "suis tres",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_empty_next_words",
@@ -161,7 +252,14 @@
 			"block": "TAIL_CORRECTED: the cats\nNEXT_WORDS: are here",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": "s are here", "nw": " are here", "has_corrections": true, "disable_bold": true }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": "s are here",
+				"nw": " are here",
+				"has_corrections": true,
+				"disable_bold": true
+			}
 		},
 		{
 			"id": "advanced_accented_intra_word",
@@ -171,7 +269,14 @@
 			"block": "TAIL_CORRECTED: je préfère\nNEXT_WORDS: ce choix",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 5, "to_type": "éfère ce choix", "nw": " ce choix", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 5,
+				"to_type": "éfère ce choix",
+				"nw": " ce choix",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_apostrophe_insert",
@@ -181,7 +286,14 @@
 			"block": "TAIL_CORRECTED: je l'envoie\nNEXT_WORDS: demain",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 9, "to_type": " l’envoie demain", "nw": " demain", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 9,
+				"to_type": " l’envoie demain",
+				"nw": " demain",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_multi_word_change",
@@ -201,7 +313,14 @@
 			"block": "TAIL_CORRECTED: je vais\nNEXT_WORDS: vais manger",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " manger", "nw": " manger", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " manger",
+				"nw": " manger",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_punctuation_next",
@@ -211,7 +330,14 @@
 			"block": "TAIL_CORRECTED: bonjour\nNEXT_WORDS: , comment allez",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": ", comment allez", "nw": ", comment allez", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": ", comment allez",
+				"nw": ", comment allez",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_long_buffer_window",
@@ -221,7 +347,14 @@
 			"block": "TAIL_CORRECTED: here weather\nNEXT_WORDS: today",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 2, "to_type": "her today", "nw": " today", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 2,
+				"to_type": "her today",
+				"nw": " today",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_utf8_url_window",
@@ -231,7 +364,14 @@
 			"block": "TAIL_CORRECTED: daaéa/aa漢漢漢漢漢漢漢漢aaa\nNEXT_WORDS: next",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 19, "to_type": "daaéa/aa漢漢漢漢漢漢漢漢aaa next", "nw": " next", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 19,
+				"to_type": "daaéa/aa漢漢漢漢漢漢漢漢aaa next",
+				"nw": " next",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_append_only_no_change",
@@ -241,7 +381,14 @@
 			"block": "TAIL_CORRECTED: the cat sat\nNEXT_WORDS: on the mat",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": " on the mat", "nw": " on the mat", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": " on the mat",
+				"nw": " on the mat",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "basic_next_prefix_stripped",
@@ -251,7 +398,14 @@
 			"block": "NEXT: world how are you",
 			"min_words": 1,
 			"max_words": 15,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": "world how are you", "nw": "world how are you", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": "world how are you",
+				"nw": "world how are you",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "advanced_word_cap_one",
@@ -261,7 +415,14 @@
 			"block": "TAIL_CORRECTED: je\nNEXT_WORDS: suis tres content",
 			"min_words": 1,
 			"max_words": 1,
-			"expected": { "is_nil": false, "deletes": 0, "to_type": "suis", "nw": "suis", "has_corrections": false, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 0,
+				"to_type": "suis",
+				"nw": "suis",
+				"has_corrections": false,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "rewrite_whole_sentence",
@@ -271,7 +432,14 @@
 			"block": "REWRITE: Ok pour jeudi 14 h, je t'envoie le document avant.",
 			"min_words": 1,
 			"max_words": 5,
-			"expected": { "is_nil": false, "deletes": 28, "to_type": "Ok pour jeudi 14 h, je t’envoie le document avant.", "nw": "", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 28,
+				"to_type": "Ok pour jeudi 14 h, je t’envoie le document avant.",
+				"nw": "",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "rewrite_minimal_suffix",
@@ -281,7 +449,14 @@
 			"block": "REWRITE: je suis là",
 			"min_words": 1,
 			"max_words": 5,
-			"expected": { "is_nil": false, "deletes": 3, "to_type": "s là", "nw": "", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 3,
+				"to_type": "s là",
+				"nw": "",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "rewrite_keeps_trailing_space",
@@ -291,7 +466,14 @@
 			"block": "REWRITE: Ok pour jeudi.",
 			"min_words": 1,
 			"max_words": 5,
-			"expected": { "is_nil": false, "deletes": 10, "to_type": "Ok pour jeudi. ", "nw": "", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 10,
+				"to_type": "Ok pour jeudi. ",
+				"nw": "",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "rewrite_bracket_tag_lowercase",
@@ -301,7 +483,14 @@
 			"block": "[rewrite] Thanks for your help!\nNEXT_WORDS: see you",
 			"min_words": 1,
 			"max_words": 5,
-			"expected": { "is_nil": false, "deletes": 13, "to_type": "Thanks for your help!", "nw": "", "has_corrections": true, "disable_bold": false }
+			"expected": {
+				"is_nil": false,
+				"deletes": 13,
+				"to_type": "Thanks for your help!",
+				"nw": "",
+				"has_corrections": true,
+				"disable_bold": false
+			}
 		},
 		{
 			"id": "rewrite_unchanged_is_nil",

@@ -37,7 +37,11 @@ class XComposeSyntaxGuard(unittest.TestCase):
                         continue
                     checked += 1
                     self.assertRegex(line, self.STRING_RE, f"{compose.name}:{number}: {line!r}")
-                    self.assertNotIn(": '", line, f"{compose.name}:{number}: single quotes are not Compose strings")
+                    self.assertNotIn(
+                        ": '",
+                        line,
+                        f"{compose.name}:{number}: single quotes are not Compose strings",
+                    )
         self.assertGreater(checked, 1000)
 
 

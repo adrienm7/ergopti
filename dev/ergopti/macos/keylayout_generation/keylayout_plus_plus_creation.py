@@ -58,13 +58,9 @@ def create_keylayout_plus_plus(content: str, variant_number: int):
             continue
 
         # Create the new dead key
-        content = ensure_key_uses_action_and_not_output(
-            content, trigger_key, EXTRA_KEYS
-        )
+        content = ensure_key_uses_action_and_not_output(content, trigger_key, EXTRA_KEYS)
         content = ensure_action_block_exists(content, trigger_key)
-        content = assign_layer_to_action_block_none(
-            content, trigger_key, layer_name
-        )
+        content = assign_layer_to_action_block_none(content, trigger_key, layer_name)
         content = add_terminator_state(content, trigger_key, layer_name)
 
         # Add all dead key outputs
@@ -88,14 +84,10 @@ def create_keylayout_plus_plus(content: str, variant_number: int):
 
             # Ensure any <key ... output="trigger"> is converted to action="trigger"
             # This is necessary, otherwise the key will always have the same output, despite being in a dead key layer
-            content = ensure_key_uses_action_and_not_output(
-                content, trigger, EXTRA_KEYS
-            )
+            content = ensure_key_uses_action_and_not_output(content, trigger, EXTRA_KEYS)
 
             # Add the new output on the key when in the dead key layer
-            content = add_action_when_state(
-                content, trigger, layer_name, output
-            )
+            content = add_action_when_state(content, trigger, layer_name, output)
 
     content = replace_action_to_output_extra_keys(content, EXTRA_KEYS)
     content = sort_keylayout(content)

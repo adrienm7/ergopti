@@ -6,9 +6,9 @@ Floating WKWebView window that fetches GitHub release notes and renders them as 
 
 ## Key files
 
-| File      | Description                                                            |
-| --------- | ---------------------------------------------------------------------- |
-| `init.lua`| `M.show()` — singleton; owns the async fetch and `evaluateJavaScript` injection |
+| File       | Description                                                                     |
+| ---------- | ------------------------------------------------------------------------------- |
+| `init.lua` | `M.show()` — singleton; owns the async fetch and `evaluateJavaScript` injection |
 
 ## Shared frontend
 

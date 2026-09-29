@@ -15,9 +15,7 @@ def fix_invalid_symbols(body: str) -> str:
     Fix invalid XML symbols for <, > and &.
     This function won’t be necessary anymore in new versions of KbdEdit.
     """
-    logger.info(
-        "%s🔹 Fixing invalid symbols for <, > and &…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Fixing invalid symbols for <, > and &…", LOGS_INDENTATION + "\t")
     body = body.replace("&lt;", "&#x003C;")  # <
     body = body.replace("&gt;", "&#x003E;")  # >
     body = body.replace("&amp;", "&#x0026;")  # &
@@ -63,9 +61,7 @@ def normalize_attribute_entities(body: str) -> str:
     return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replace_attribute, body)
 
 
-def replace_action_to_output_extra_keys(
-    body: str, extra_keys: list[int]
-) -> str:
+def replace_action_to_output_extra_keys(body: str, extra_keys: list[int]) -> str:
     """Replace action="..." to output="..." for extra keys."""
 
     def repl(match):
@@ -104,9 +100,7 @@ def replace_action_to_output_extra_keys(
 
 def modify_accented_letters_shortcuts(body: str) -> str:
     """Replace the output value for accented letters key codes."""
-    logger.info(
-        "%s🔹 Modifying accented letter shortcuts…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Modifying accented letter shortcuts…", LOGS_INDENTATION + "\t")
 
     replacements = {
         "6": "c",
@@ -128,13 +122,7 @@ def modify_accented_letters_shortcuts(body: str) -> str:
 
 def fix_ctrl_symbols(body: str) -> str:
     """Correct the symbols for Ctrl + and Ctrl - in a keyMap body."""
-    logger.info(
-        "%s🔹 Fixing keymap 4 symbols in body…", LOGS_INDENTATION + "\t"
-    )
-    body = re.sub(
-        r'(<key code="24"[^>]*(output|action)=")[^"]*(")', r"\1+\3", body
-    )
-    body = re.sub(
-        r'(<key code="27"[^>]*(output|action)=")[^"]*(")', r"\1-\3", body
-    )
+    logger.info("%s🔹 Fixing keymap 4 symbols in body…", LOGS_INDENTATION + "\t")
+    body = re.sub(r'(<key code="24"[^>]*(output|action)=")[^"]*(")', r"\1+\3", body)
+    body = re.sub(r'(<key code="27"[^>]*(output|action)=")[^"]*(")', r"\1-\3", body)
     return body

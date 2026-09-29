@@ -94,7 +94,9 @@
 		var coresOverlap = a.core === CORE_SEMVER || b.core === CORE_SEMVER || a.core === b.core;
 		if (!coresOverlap) return false;
 		if (a.prerelease === null || b.prerelease === null) return a.prerelease === b.prerelease;
-		return a.prerelease.label === b.prerelease.label && a.prerelease.counter === b.prerelease.counter;
+		return (
+			a.prerelease.label === b.prerelease.label && a.prerelease.counter === b.prerelease.counter
+		);
 	}
 
 	// =========================================
@@ -123,10 +125,16 @@
 		// false, not null: the shared Lua JSON decoder turns a null into a sentinel.
 		if (tag.prerelease === false) return { core: tag.core, prerelease: null };
 		var pre = tag.prerelease;
-		if (!pre || typeof pre !== 'object' || typeof pre.label !== 'string' || !PRERELEASE_LABEL.test(pre.label)) {
+		if (
+			!pre ||
+			typeof pre !== 'object' ||
+			typeof pre.label !== 'string' ||
+			!PRERELEASE_LABEL.test(pre.label)
+		) {
 			_fail('channel ' + id + ' has an invalid prerelease label');
 		}
-		if (typeof pre.counter !== 'boolean') _fail('channel ' + id + ' has no prerelease counter flag');
+		if (typeof pre.counter !== 'boolean')
+			_fail('channel ' + id + ' has no prerelease counter flag');
 		return { core: tag.core, prerelease: { label: pre.label, counter: pre.counter } };
 	}
 
@@ -143,23 +151,28 @@
 		var byId = {};
 		var aliases = {};
 		registry.channels.forEach(function (entry, index) {
-			if (!entry || typeof entry !== 'object') _fail('channel #' + (index + 1) + ' is not an object');
+			if (!entry || typeof entry !== 'object')
+				_fail('channel #' + (index + 1) + ' is not an object');
 			var id = entry.id;
-			if (typeof id !== 'string' || !CHANNEL_ID.test(id)) _fail('channel #' + (index + 1) + ' has an invalid id');
-			if (_hasOwn(byId, id) || _hasOwn(aliases, id)) _fail('channel id ' + id + ' is declared twice');
+			if (typeof id !== 'string' || !CHANNEL_ID.test(id))
+				_fail('channel #' + (index + 1) + ' has an invalid id');
+			if (_hasOwn(byId, id) || _hasOwn(aliases, id))
+				_fail('channel id ' + id + ' is declared twice');
 			['label_key', 'menu_label_key'].forEach(function (field) {
 				if (typeof entry[field] !== 'string' || !LOCALE_KEY.test(entry[field])) {
 					_fail('channel ' + id + ' has an invalid ' + field);
 				}
 			});
-			if (typeof entry.github_prerelease !== 'boolean') _fail('channel ' + id + ' has no github_prerelease flag');
+			if (typeof entry.github_prerelease !== 'boolean')
+				_fail('channel ' + id + ' has no github_prerelease flag');
 			if (typeof entry.sparkle_feed !== 'string' || !SPARKLE_FEED.test(entry.sparkle_feed)) {
 				_fail('channel ' + id + ' has an invalid sparkle_feed');
 			}
 			if (!Array.isArray(entry.aliases)) _fail('channel ' + id + ' has no aliases list');
 			var rule = _validateRule(id, entry.tag);
 			order.forEach(function (previous) {
-				if (_rulesOverlap(previous.rule, rule)) _fail('channels ' + previous.id + ' and ' + id + ' claim the same tags');
+				if (_rulesOverlap(previous.rule, rule))
+					_fail('channels ' + previous.id + ' and ' + id + ' claim the same tags');
 			});
 			var record = {
 				id: id,
@@ -176,8 +189,10 @@
 		});
 		order.forEach(function (record) {
 			record.aliases.forEach(function (alias) {
-				if (typeof alias !== 'string' || !CHANNEL_ID.test(alias)) _fail('channel ' + record.id + ' has an invalid alias');
-				if (_hasOwn(byId, alias) || _hasOwn(aliases, alias)) _fail('alias ' + alias + ' is declared twice');
+				if (typeof alias !== 'string' || !CHANNEL_ID.test(alias))
+					_fail('channel ' + record.id + ' has an invalid alias');
+				if (_hasOwn(byId, alias) || _hasOwn(aliases, alias))
+					_fail('alias ' + alias + ' is declared twice');
 				aliases[alias] = record.id;
 			});
 		});

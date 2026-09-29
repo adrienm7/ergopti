@@ -213,7 +213,9 @@ def extract_xkb_info(xkb_file: Path) -> Tuple[str, str]:
 
 
 def update_lst_file(
-    lst_path: Path, symbol_name: str, display_name: str,
+    lst_path: Path,
+    symbol_name: str,
+    display_name: str,
     rollback: Optional[list[tuple[Path, Path]]] = None,
 ) -> Optional[Path]:
     """Register the variant in ``evdev.lst``; returns the backup taken."""
@@ -256,7 +258,9 @@ def update_lst_file(
 
 
 def update_xml_file(
-    xml_path: Path, symbol_name: str, display_name: str,
+    xml_path: Path,
+    symbol_name: str,
+    display_name: str,
     rollback: Optional[list[tuple[Path, Path]]] = None,
 ) -> Optional[Path]:
     """Register the variant in ``evdev.xml``; returns the backup taken."""
@@ -311,7 +315,9 @@ def update_xml_file(
 
 
 def update_xkb_symbols_file(
-    source_xkb: Path, symbol_name: str, dest_symbols_file: Path,
+    source_xkb: Path,
+    symbol_name: str,
+    dest_symbols_file: Path,
     rollback: Optional[list[tuple[Path, Path]]] = None,
 ) -> Optional[Path]:
     """Append or replace the layout section in ``symbols/fr``."""
@@ -346,7 +352,8 @@ def update_xkb_symbols_file(
 
 
 def update_xkb_types_file(
-    source_types: Path, dest_types_file: Path,
+    source_types: Path,
+    dest_types_file: Path,
     rollback: Optional[list[tuple[Path, Path]]] = None,
 ) -> Optional[Path]:
     """Insert the custom key types inside the ``xkb_types`` section of ``types/extra``."""
@@ -374,7 +381,9 @@ def update_xkb_types_file(
 # Content of the backup written when no ``~/.XCompose`` existed before the
 # installation: restoring it means removing the file, not emptying it (an
 # empty Compose file would silence the locale's own sequences).
-XCOMPOSE_ABSENT_SENTINEL = "# Ergopti legacy installer: no .XCompose existed before the installation\n"
+XCOMPOSE_ABSENT_SENTINEL = (
+    "# Ergopti legacy installer: no .XCompose existed before the installation\n"
+)
 
 
 def install_xcompose_file(xcompose_file: Path, force: bool = True) -> None:
@@ -471,9 +480,14 @@ def cleanup_previous_generations(roots: InstallerRoots) -> None:
 # Verification
 # ---------------------------------------------------------------------------
 
+
 def xkbcomp_probe_for(roots: InstallerRoots, spec: LayoutSpec) -> XkbcompProbe:
     """Explicit components that let Xorg's compiler check the patched tree."""
-    symbols = f"pc+{spec.layout}({spec.variant})+inet(evdev)" if spec.variant else f"pc+{spec.layout}+inet(evdev)"
+    symbols = (
+        f"pc+{spec.layout}({spec.variant})+inet(evdev)"
+        if spec.variant
+        else f"pc+{spec.layout}+inet(evdev)"
+    )
     return XkbcompProbe(
         symbols=symbols,
         types="complete",
@@ -708,7 +722,9 @@ def run_activation_phase(layout_id: Optional[str], roots: InstallerRoots) -> int
         )
         return EXIT_INSTALL_ABORTED
     if verdict is None:
-        print("   ⚠️  Disposition activée sans vérification : installez xkbcli ou xkbcomp pour la contrôler.")
+        print(
+            "   ⚠️  Disposition activée sans vérification : installez xkbcli ou xkbcomp pour la contrôler."
+        )
     activate_layout([spec])
     return EXIT_OK
 
@@ -743,7 +759,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Apply Ergopti XKB installation (non-interactive, legacy method)."
     )
-    parser.add_argument("--xkb", type=Path, help="Path to the .xkb file (required unless --uninstall).")
+    parser.add_argument(
+        "--xkb", type=Path, help="Path to the .xkb file (required unless --uninstall)."
+    )
     parser.add_argument("--xcompose", type=Path, help="Path to the .XCompose file.")
     parser.add_argument(
         "--types",
@@ -757,7 +775,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="When provided, overwrite the user's ~/.XCompose without prompting.",
     )
     parser.add_argument(
-        "--uninstall", action="store_true", help="Restore the files this installer previously backed up."
+        "--uninstall",
+        action="store_true",
+        help="Restore the files this installer previously backed up.",
     )
     parser.add_argument(
         "--skip-activation",
@@ -774,7 +794,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Remove the layout from the desktop session without touching any file.",
     )
-    parser.add_argument("--layout-id", help="Layout identifier to activate, e.g. fr+Ergopti_v2_2_1.")
+    parser.add_argument(
+        "--layout-id", help="Layout identifier to activate, e.g. fr+Ergopti_v2_2_1."
+    )
     args = parser.parse_args(argv)
     if args.activate_only and args.deactivate_only:
         parser.error("--activate-only is incompatible with --deactivate-only")

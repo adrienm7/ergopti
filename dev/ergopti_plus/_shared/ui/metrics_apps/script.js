@@ -68,10 +68,8 @@ function $id(id) {
 // from _shared/data/metrics_general_category_aliases.json. Falls back to the two
 // spellings that predate the generated file so the dashboard still resolves the
 // common cases if the host has not supplied it.
-const GENERAL_CATEGORY_ALIASES = (typeof window !== 'undefined' && window.GeneralCategoryAliases) || [
-	'General',
-	'Général'
-];
+const GENERAL_CATEGORY_ALIASES = (typeof window !== 'undefined' &&
+	window.GeneralCategoryAliases) || ['General', 'Général'];
 
 const MAC_CATEGORIES_FR = {
 	Productivity: 'Productivité',
@@ -309,7 +307,6 @@ function precomputeIconColors() {
 		)
 	).then(() => undefined);
 }
-
 
 function formatDuration(ms) {
 	if (!ms && ms !== 0) return '0m';

@@ -6,15 +6,15 @@ Cross-driver data for the LLM subsystem. Contains the shared defaults file consu
 
 ## Key files
 
-| File                    | Description                                                              |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `defaults.json`         | Canonical LLM defaults (temperature, debounce, token budget, port, …)   |
-| `inference.json`        | Stop-token sequences for all backends (unified batch/line keys)          |
-| `models.json`           | Model catalogue (name, size, RAM estimate, engine compatibility)          |
-| `profiles.json`         | Named prompt profiles with system prompt and generation parameters        |
-| `api_providers.json`    | Remote API provider list (name, endpoint template, auth header name)      |
-| `install_ollama*.sh`    | Ollama installation scripts bundled with the driver                       |
-| `install_mlx*.sh`       | MLX installation scripts for Apple Silicon                                |
+| File                 | Description                                                           |
+| -------------------- | --------------------------------------------------------------------- |
+| `defaults.json`      | Canonical LLM defaults (temperature, debounce, token budget, port, …) |
+| `inference.json`     | Stop-token sequences for all backends (unified batch/line keys)       |
+| `models.json`        | Model catalogue (name, size, RAM estimate, engine compatibility)      |
+| `profiles.json`      | Named prompt profiles with system prompt and generation parameters    |
+| `api_providers.json` | Remote API provider list (name, endpoint template, auth header name)  |
+| `install_ollama*.sh` | Ollama installation scripts bundled with the driver                   |
+| `install_mlx*.sh`    | MLX installation scripts for Apple Silicon                            |
 
 ## SSoT rules
 

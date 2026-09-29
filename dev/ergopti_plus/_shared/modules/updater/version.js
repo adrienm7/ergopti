@@ -152,10 +152,4 @@ function versionTestVectors() {
 	];
 }
 
-export {
-	normalizeTag,
-	parseVersion,
-	compareVersions,
-	isNewerVersion,
-	versionTestVectors
-};
+export { normalizeTag, parseVersion, compareVersions, isNewerVersion, versionTestVectors };

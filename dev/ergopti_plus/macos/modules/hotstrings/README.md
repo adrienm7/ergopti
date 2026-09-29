@@ -6,10 +6,10 @@ Resolves the effective expansion delay and tooltip colour for each hotstring gro
 
 ## Ports used (`_shared/core/ports/`)
 
-| Port           | Usage                                                            |
-| -------------- | ---------------------------------------------------------------- |
-| `FileSystem`   | Reading the personal overrides TOML and the shared defaults TOML |
-| `TomlCodec`    | Parsing the merged config tables                                  |
+| Port         | Usage                                                            |
+| ------------ | ---------------------------------------------------------------- |
+| `FileSystem` | Reading the personal overrides TOML and the shared defaults TOML |
+| `TomlCodec`  | Parsing the merged config tables                                 |
 
 ## Shared data (`_shared/modules/hotstrings/`)
 
@@ -17,11 +17,11 @@ Resolves the effective expansion delay and tooltip colour for each hotstring gro
 
 ## Public API
 
-| Function                   | Description                                                       |
-| -------------------------- | ----------------------------------------------------------------- |
-| `M.init(state)`            | Initialize with shared state; reads and merges config layers       |
-| `M.get_config(group, sec)` | Returns `{delay_ms, color}` for the given group / section path    |
-| `M.reload()`               | Re-reads all layers (called after the config window saves)        |
+| Function                   | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| `M.init(state)`            | Initialize with shared state; reads and merges config layers   |
+| `M.get_config(group, sec)` | Returns `{delay_ms, color}` for the given group / section path |
+| `M.reload()`               | Re-reads all layers (called after the config window saves)     |
 
 ## Init pattern
 

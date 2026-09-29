@@ -23,7 +23,11 @@ body {
 body {
 	background: #ffffff;
 	color: #1a1a1a;
-	font-family: 'Segoe UI', -apple-system, 'Helvetica Neue', sans-serif;
+	font-family:
+		'Segoe UI',
+		-apple-system,
+		'Helvetica Neue',
+		sans-serif;
 	font-size: 13px;
 	line-height: 1.55;
 	overflow-wrap: anywhere;

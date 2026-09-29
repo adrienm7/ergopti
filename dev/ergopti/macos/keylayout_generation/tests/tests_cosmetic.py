@@ -41,9 +41,7 @@ def check_indentation_consistency(body: str) -> None:
         # Self-closing tag
         if self_closing_re.match(stripped):
             if stack and current_indent <= parent_indent:
-                inconsistencies.append(
-                    (line_number, parent_indent, current_indent, line.strip())
-                )
+                inconsistencies.append((line_number, parent_indent, current_indent, line.strip()))
             continue
 
         # Closing tag
@@ -53,15 +51,11 @@ def check_indentation_consistency(body: str) -> None:
             if not stack:
                 # Top-level closing tag allowed at zero indentation
                 if current_indent != 0:
-                    inconsistencies.append(
-                        (line_number, None, current_indent, line.strip())
-                    )
+                    inconsistencies.append((line_number, None, current_indent, line.strip()))
                 continue
             parent_tag, opening_indent = stack.pop()
             if tag != parent_tag or current_indent != opening_indent:
-                inconsistencies.append(
-                    (line_number, opening_indent, current_indent, line.strip())
-                )
+                inconsistencies.append((line_number, opening_indent, current_indent, line.strip()))
             continue
 
         # Opening tag
@@ -70,22 +64,16 @@ def check_indentation_consistency(body: str) -> None:
             tag = opening_match.group(1)
             # Allow top-level opening tags at zero indent
             if stack and current_indent <= parent_indent:
-                inconsistencies.append(
-                    (line_number, parent_indent, current_indent, line.strip())
-                )
+                inconsistencies.append((line_number, parent_indent, current_indent, line.strip()))
             stack.append((tag, current_indent))
             continue
 
         # Regular content line inside a block
         if stack and current_indent <= parent_indent:
-            inconsistencies.append(
-                (line_number, parent_indent, current_indent, line.strip())
-            )
+            inconsistencies.append((line_number, parent_indent, current_indent, line.strip()))
 
     if inconsistencies:
-        logger.error(
-            "%sIndentation inconsistencies detected:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%sIndentation inconsistencies detected:", LOGS_INDENTATION + "\t")
         for line_number, parent, current, content_line in inconsistencies:
             parent_str = parent if parent is not None else 0
             logger.error(
@@ -97,9 +85,7 @@ def check_indentation_consistency(body: str) -> None:
             )
             logger.error("%s%s", LOGS_INDENTATION + "\t\t\t", content_line)
     else:
-        logger.success(
-            "%sNo indentation inconsistencies found.", LOGS_INDENTATION + "\t"
-        )
+        logger.success("%sNo indentation inconsistencies found.", LOGS_INDENTATION + "\t")
 
 
 def check_no_empty_lines(body: str) -> None:
@@ -114,9 +100,7 @@ def check_no_empty_lines(body: str) -> None:
     empty_lines_info = []
     for i, line in enumerate(lines, start=1):
         if not line.strip():
-            prev_line_content = (
-                lines[i - 2].strip() if i - 2 >= 0 else "<start of file>"
-            )
+            prev_line_content = lines[i - 2].strip() if i - 2 >= 0 else "<start of file>"
             empty_lines_info.append((i, prev_line_content))
 
     if empty_lines_info:
@@ -142,14 +126,10 @@ def check_ascending_keymaps(body: str) -> None:
         LOGS_INDENTATION,
     )
 
-    keymapset_blocks = re.findall(
-        r"<keyMapSet[^>]*>(.*?)</keyMapSet>", body, flags=re.DOTALL
-    )
+    keymapset_blocks = re.findall(r"<keyMapSet[^>]*>(.*?)</keyMapSet>", body, flags=re.DOTALL)
     all_ok = True
     for idx, keymapset_body in enumerate(keymapset_blocks):
-        keymap_matches = re.findall(
-            r'<keyMap\s+index=["\'](\d+)["\']', keymapset_body
-        )
+        keymap_matches = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', keymapset_body)
         indices = [int(i) for i in keymap_matches]
         last_index = -1
         out_of_order = []
@@ -173,9 +153,7 @@ def check_ascending_keymaps(body: str) -> None:
                 )
             all_ok = False
     if not keymapset_blocks:
-        logger.warning(
-            "%sNo <keyMapSet> blocks found.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <keyMapSet> blocks found.", LOGS_INDENTATION + "\t")
     if all_ok:
         logger.success(
             "%sAll <keyMap> indices are in ascending order in each <keyMapSet>.",
@@ -196,16 +174,12 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
     issues_found = {}
 
     # Iterate over each <keyMap> block
-    for keymap_match in re.finditer(
-        r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL
-    ):
+    for keymap_match in re.finditer(r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL):
         keymap_block = keymap_match.group(0)
 
         # Extract index
         index_match = re.search(r'index=["\']([^"\']+)["\']', keymap_block)
-        keymap_label = (
-            f'index="{index_match.group(1)}"' if index_match else "<unknown>"
-        )
+        keymap_label = f'index="{index_match.group(1)}"' if index_match else "<unknown>"
 
         # Extract codes from <key> elements
         key_matches = re.findall(r'<key[^>]*code=["\'](\d+)["\']', keymap_block)
@@ -215,19 +189,13 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
         last_code = -1
         for i, code in enumerate(codes):
             if code <= last_code:
-                issues_found.setdefault(keymap_label, []).append(
-                    (i, code, last_code)
-                )
+                issues_found.setdefault(keymap_label, []).append((i, code, last_code))
             last_code = code
 
     if issues_found:
-        logger.error(
-            "%sOut-of-order <key> codes detected:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%sOut-of-order <key> codes detected:", LOGS_INDENTATION + "\t")
         for keymap_name, problems in issues_found.items():
-            logger.error(
-                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
-            )
+            logger.error("%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name)
             for pos, code, prev in problems:
                 logger.error(
                     "%s— Position %d: code %d follows %d",

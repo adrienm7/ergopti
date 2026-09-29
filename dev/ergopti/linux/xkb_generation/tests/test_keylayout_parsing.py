@@ -20,7 +20,9 @@ from support import INDEX_PATH, KEYCODES_PATH, keylayout_to_xkb, registry_keylay
 HEADER = '<?xml version="1.1" encoding="UTF-8"?>\n<!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">\n'
 
 
-def synthetic(key_maps: str, actions: str = "", terminators: str = "", modifier_map: str = "") -> str:
+def synthetic(
+    key_maps: str, actions: str = "", terminators: str = "", modifier_map: str = ""
+) -> str:
     modifiers = modifier_map or (
         '<modifierMap id="m" defaultIndex="0">'
         '<keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect>'
@@ -36,8 +38,12 @@ def synthetic(key_maps: str, actions: str = "", terminators: str = "", modifier_
         + '<keyMapSet id="s">'
         + key_maps
         + "</keyMapSet>"
-        + "<actions>" + actions + "</actions>"
-        + "<terminators>" + terminators + "</terminators>"
+        + "<actions>"
+        + actions
+        + "</actions>"
+        + "<terminators>"
+        + terminators
+        + "</terminators>"
         + "</keyboard>"
     )
 
@@ -62,7 +68,9 @@ class ModifierMapTests(unittest.TestCase):
     def test_an_unlisted_pressed_modifier_does_not_match(self):
         layout = keylayout_to_xkb.parse_keylayout(synthetic('<keyMap index="0"/>'))
         self.assertEqual(layout.key_map_index(frozenset({"shift", "caps"})), 1, "caps? is optional")
-        self.assertEqual(layout.key_map_index(frozenset({"shift", "option"})), 0, "shift+option is unlisted")
+        self.assertEqual(
+            layout.key_map_index(frozenset({"shift", "option"})), 0, "shift+option is unlisted"
+        )
 
     def test_an_unknown_modifier_token_is_rejected(self):
         broken = synthetic(
@@ -76,10 +84,14 @@ class ModifierMapTests(unittest.TestCase):
 class ParsingTests(unittest.TestCase):
     def test_entities_and_control_characters(self):
         layout = keylayout_to_xkb.parse_keylayout(
-            synthetic('<keyMap index="0"><key code="0" output="&#x0022;"/><key code="1" output="&#x0010;"/></keyMap>')
+            synthetic(
+                '<keyMap index="0"><key code="0" output="&#x0022;"/><key code="1" output="&#x0010;"/></keyMap>'
+            )
         )
         self.assertEqual(keylayout_to_xkb.resolve(layout, 0, 0).text, '"')
-        self.assertEqual(keylayout_to_xkb.resolve(layout, 0, 1).kind, "none", "a control output types nothing")
+        self.assertEqual(
+            keylayout_to_xkb.resolve(layout, 0, 1).kind, "none", "a control output types nothing"
+        )
 
     def test_base_map_set_fills_missing_keys(self):
         layout = keylayout_to_xkb.parse_keylayout(
@@ -89,11 +101,15 @@ class ParsingTests(unittest.TestCase):
             )
         )
         self.assertEqual(keylayout_to_xkb.resolve(layout, 1, 0).text, "A")
-        self.assertEqual(keylayout_to_xkb.resolve(layout, 1, 1).text, "s", "inherited from keyMap 0")
+        self.assertEqual(
+            keylayout_to_xkb.resolve(layout, 1, 1).text, "s", "inherited from keyMap 0"
+        )
 
     def test_comments_hiding_tags_are_ignored(self):
         layout = keylayout_to_xkb.parse_keylayout(
-            synthetic('<!-- <key code="0" output="x"/> --><keyMap index="0"><key code="0" output="a"/></keyMap>')
+            synthetic(
+                '<!-- <key code="0" output="x"/> --><keyMap index="0"><key code="0" output="a"/></keyMap>'
+            )
         )
         self.assertEqual(keylayout_to_xkb.resolve(layout, 0, 0).text, "a")
 
@@ -124,9 +140,11 @@ class DeadKeyConversionTests(unittest.TestCase):
             terminators='<when state="acute" output="´"/><when state="doubleacute" output="˝"/>',
         )
         result = self.convert(text)
-        self.assertEqual(result.key_symbols["AC01"][0], "dead_acute", "named after a standard dead keysym")
-        self.assertIn("<dead_acute> <e>\t: \"é\"", result.compose_text)
-        self.assertIn("<dead_acute> <dead_acute> <e>\t: \"ő\"", result.compose_text)
+        self.assertEqual(
+            result.key_symbols["AC01"][0], "dead_acute", "named after a standard dead keysym"
+        )
+        self.assertIn('<dead_acute> <e>\t: "é"', result.compose_text)
+        self.assertIn('<dead_acute> <dead_acute> <e>\t: "ő"', result.compose_text)
 
     def test_a_dead_key_without_keysym_borrows_one_nobody_types(self):
         text = synthetic(
@@ -155,7 +173,9 @@ class DeadKeyConversionTests(unittest.TestCase):
         self.assertEqual(result.compose_text.count("<dead_grave> <a>"), 1)
 
     def test_multi_character_outputs_go_through_compose(self):
-        text = synthetic('<keyMap index="0"><key code="0" output="où"/><key code="1" output="s"/></keyMap>')
+        text = synthetic(
+            '<keyMap index="0"><key code="0" output="où"/><key code="1" output="s"/></keyMap>'
+        )
         result = self.convert(text)
         keysym = result.key_symbols["AC01"][0]
         self.assertIn(keysym, keylayout_to_xkb.BORROWED_KEYSYMS)
@@ -188,11 +208,24 @@ class CommandLineTests(unittest.TestCase):
             keylayout.write_text(registry_keylayout("ergol"), encoding="utf-8")
             out = Path(tmp) / "out"
             with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
-                code = keylayout_to_xkb.main([
-                    "--keylayout", str(keylayout), "--keycodes", str(KEYCODES_PATH),
-                    "--convention", "ansi", "--layout-id", "ergol",
-                    "--display-name", "Ergo-L 1.0.2", "--index", str(INDEX_PATH), "--out", str(out),
-                ])
+                code = keylayout_to_xkb.main(
+                    [
+                        "--keylayout",
+                        str(keylayout),
+                        "--keycodes",
+                        str(KEYCODES_PATH),
+                        "--convention",
+                        "ansi",
+                        "--layout-id",
+                        "ergol",
+                        "--display-name",
+                        "Ergo-L 1.0.2",
+                        "--index",
+                        str(INDEX_PATH),
+                        "--out",
+                        str(out),
+                    ]
+                )
             self.assertEqual(code, 0)
             for name in ("ergol.xkb", "ergol.XCompose", "xkb_types.txt"):
                 self.assertTrue((out / name).is_file(), name)
@@ -204,11 +237,22 @@ class CommandLineTests(unittest.TestCase):
             keylayout.write_text("<keyboard/>", encoding="utf-8")
             stderr = io.StringIO()
             with redirect_stderr(stderr):
-                code = keylayout_to_xkb.main([
-                    "--keylayout", str(keylayout), "--keycodes", str(KEYCODES_PATH),
-                    "--convention", "iso", "--layout-id", "broken",
-                    "--display-name", "Broken", "--out", str(Path(tmp) / "out"),
-                ])
+                code = keylayout_to_xkb.main(
+                    [
+                        "--keylayout",
+                        str(keylayout),
+                        "--keycodes",
+                        str(KEYCODES_PATH),
+                        "--convention",
+                        "iso",
+                        "--layout-id",
+                        "broken",
+                        "--display-name",
+                        "Broken",
+                        "--out",
+                        str(Path(tmp) / "out"),
+                    ]
+                )
             self.assertEqual(code, 3)
             self.assertIn("keylayout_to_xkb:", stderr.getvalue())
 

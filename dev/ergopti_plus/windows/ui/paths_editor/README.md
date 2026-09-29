@@ -6,9 +6,9 @@ WebView2 host for the config-folder editor. Loads the shared `_shared/ui/paths_e
 
 ## Key files
 
-| File      | Description                                                          |
-| --------- | -------------------------------------------------------------------- |
-| `init.ahk`| Singleton host: `PathsEditor_Show()` — opens / focuses the window    |
+| File       | Description                                                       |
+| ---------- | ----------------------------------------------------------------- |
+| `init.ahk` | Singleton host: `PathsEditor_Show()` — opens / focuses the window |
 
 ## Shared frontend
 

@@ -45,22 +45,114 @@
 		{ "id": "unknown_view", "view": "beta", "tag": "v1.2.3", "expect": false }
 	],
 	"offer": [
-		{ "id": "same_channel_newer", "latest": "v1.3.0", "current": "1.2.0", "selected": "main", "installed": "main", "expect": true },
-		{ "id": "same_channel_equal", "latest": "v1.2.0", "current": "1.2.0", "selected": "main", "installed": "main", "expect": false },
-		{ "id": "same_channel_older", "latest": "v1.1.9", "current": "1.2.0", "selected": "main", "installed": "main", "expect": false },
-		{ "id": "dev_newer", "latest": "v0.0.0-dev.134", "current": "0.0.0-dev.133", "selected": "dev", "installed": "dev", "expect": true },
-		{ "id": "dev_counter_order", "latest": "v0.0.0-dev.10", "current": "0.0.0-dev.9", "selected": "dev", "installed": "dev", "expect": true },
-		{ "id": "dev_older", "latest": "v0.0.0-dev.132", "current": "0.0.0-dev.133", "selected": "dev", "installed": "dev", "expect": false },
-		{ "id": "switch_main_to_dev", "latest": "v0.0.0-dev.10", "current": "1.2.0", "selected": "dev", "installed": "main", "expect": true },
-		{ "id": "switch_dev_to_main", "latest": "v1.0.0", "current": "0.0.0-dev.133", "selected": "main", "installed": "dev", "expect": true },
-		{ "id": "candidate_outside_selected", "latest": "v0.0.0-dev.200", "current": "0.0.0-dev.133", "selected": "main", "installed": "dev", "expect": false },
-		{ "id": "unknown_installed", "latest": "v1.3.0", "current": "local", "selected": "main", "installed": "", "expect": false },
-		{ "id": "unknown_selected", "latest": "v1.3.0", "current": "1.2.0", "selected": "beta", "installed": "main", "expect": false }
+		{
+			"id": "same_channel_newer",
+			"latest": "v1.3.0",
+			"current": "1.2.0",
+			"selected": "main",
+			"installed": "main",
+			"expect": true
+		},
+		{
+			"id": "same_channel_equal",
+			"latest": "v1.2.0",
+			"current": "1.2.0",
+			"selected": "main",
+			"installed": "main",
+			"expect": false
+		},
+		{
+			"id": "same_channel_older",
+			"latest": "v1.1.9",
+			"current": "1.2.0",
+			"selected": "main",
+			"installed": "main",
+			"expect": false
+		},
+		{
+			"id": "dev_newer",
+			"latest": "v0.0.0-dev.134",
+			"current": "0.0.0-dev.133",
+			"selected": "dev",
+			"installed": "dev",
+			"expect": true
+		},
+		{
+			"id": "dev_counter_order",
+			"latest": "v0.0.0-dev.10",
+			"current": "0.0.0-dev.9",
+			"selected": "dev",
+			"installed": "dev",
+			"expect": true
+		},
+		{
+			"id": "dev_older",
+			"latest": "v0.0.0-dev.132",
+			"current": "0.0.0-dev.133",
+			"selected": "dev",
+			"installed": "dev",
+			"expect": false
+		},
+		{
+			"id": "switch_main_to_dev",
+			"latest": "v0.0.0-dev.10",
+			"current": "1.2.0",
+			"selected": "dev",
+			"installed": "main",
+			"expect": true
+		},
+		{
+			"id": "switch_dev_to_main",
+			"latest": "v1.0.0",
+			"current": "0.0.0-dev.133",
+			"selected": "main",
+			"installed": "dev",
+			"expect": true
+		},
+		{
+			"id": "candidate_outside_selected",
+			"latest": "v0.0.0-dev.200",
+			"current": "0.0.0-dev.133",
+			"selected": "main",
+			"installed": "dev",
+			"expect": false
+		},
+		{
+			"id": "unknown_installed",
+			"latest": "v1.3.0",
+			"current": "local",
+			"selected": "main",
+			"installed": "",
+			"expect": false
+		},
+		{
+			"id": "unknown_selected",
+			"latest": "v1.3.0",
+			"current": "1.2.0",
+			"selected": "beta",
+			"installed": "main",
+			"expect": false
+		}
 	],
 	"pick": [
-		{ "id": "main_highest_semver", "channel": "main", "tags": ["v0.0.0-dev.5", "v1.2.0", "v1.10.0", "v1.9.9"], "expect": "v1.10.0" },
-		{ "id": "dev_counter_not_text", "channel": "dev", "tags": ["v1.2.0", "v0.0.0-dev.9", "v0.0.0-dev.10", "v0.0.0-dev.2"], "expect": "v0.0.0-dev.10" },
-		{ "id": "main_without_stable", "channel": "main", "tags": ["v0.0.0-dev.5", "v0.0.0-dev.6"], "expect": "" },
+		{
+			"id": "main_highest_semver",
+			"channel": "main",
+			"tags": ["v0.0.0-dev.5", "v1.2.0", "v1.10.0", "v1.9.9"],
+			"expect": "v1.10.0"
+		},
+		{
+			"id": "dev_counter_not_text",
+			"channel": "dev",
+			"tags": ["v1.2.0", "v0.0.0-dev.9", "v0.0.0-dev.10", "v0.0.0-dev.2"],
+			"expect": "v0.0.0-dev.10"
+		},
+		{
+			"id": "main_without_stable",
+			"channel": "main",
+			"tags": ["v0.0.0-dev.5", "v0.0.0-dev.6"],
+			"expect": ""
+		},
 		{ "id": "dev_empty_list", "channel": "dev", "tags": [], "expect": "" },
 		{ "id": "tie_keeps_first", "channel": "main", "tags": ["1.2.0", "v1.2.0"], "expect": "1.2.0" },
 		{ "id": "unknown_channel", "channel": "beta", "tags": ["v1.2.0"], "expect": "" }

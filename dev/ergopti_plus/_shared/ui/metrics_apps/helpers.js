@@ -98,29 +98,29 @@ const _labelToId = {};
 // Pre-seed the French legacy labels so existing user categories stored with
 // the old hardcoded French strings still resolve to the correct id.
 const _FRENCH_LEGACY_LABELS = {
-	'Productivité': 'productivity',
+	Productivité: 'productivity',
 	'Réseaux sociaux': 'social',
-	'Jeux': 'games',
-	'Divertissement': 'entertainment',
-	'Utilitaires': 'utility',
-	'Éducation': 'education',
-	'Finance': 'finance',
-	'Business': 'business',
+	Jeux: 'games',
+	Divertissement: 'entertainment',
+	Utilitaires: 'utility',
+	Éducation: 'education',
+	Finance: 'finance',
+	Business: 'business',
 	'Design graphique': 'graphics_design',
-	'Photographie': 'photography',
-	'Vidéo': 'video',
-	'Musique': 'music',
-	'Médical': 'medical',
+	Photographie: 'photography',
+	Vidéo: 'video',
+	Musique: 'music',
+	Médical: 'medical',
 	'Santé & Forme': 'health',
 	'Style de vie': 'lifestyle',
-	'Actualités': 'news',
-	'Météo': 'weather',
-	'Sport': 'sports',
-	'Voyage': 'travel',
-	'Navigation': 'navigation',
-	'Références': 'reference',
-	'Développement': 'development',
-	'Général': 'general'
+	Actualités: 'news',
+	Météo: 'weather',
+	Sport: 'sports',
+	Voyage: 'travel',
+	Navigation: 'navigation',
+	Références: 'reference',
+	Développement: 'development',
+	Général: 'general'
 };
 
 // Perceptually distinct palette — spread across hue wheel to avoid blue clustering
@@ -299,7 +299,6 @@ function precomputeIconColors() {
 		)
 	).then(() => undefined);
 }
-
 
 function formatDuration(ms) {
 	if (!ms && ms !== 0) return '0m';

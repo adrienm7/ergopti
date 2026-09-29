@@ -6,9 +6,9 @@ WKWebView-based first-run wizard shown automatically when `config.toml` is absen
 
 ## Key files
 
-| File      | Description                                                             |
-| --------- | ----------------------------------------------------------------------- |
-| `init.lua`| `M.start()` — detects absent config, opens wizard; bridge message router |
+| File       | Description                                                              |
+| ---------- | ------------------------------------------------------------------------ |
+| `init.lua` | `M.start()` — detects absent config, opens wizard; bridge message router |
 
 ## Shared frontend
 
