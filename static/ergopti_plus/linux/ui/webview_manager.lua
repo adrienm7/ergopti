@@ -160,6 +160,7 @@ local BRIDGE_MODULES = {
 	numeric_prompt        = "ui.numeric_prompt.bridge",
 	prompt_editor         = "ui.prompt_editor.bridge",
 	token_prompt          = "ui.token_prompt.bridge",
+	update_check          = "ui.update_check.bridge",
 }
 
 --- Loads a bridge handler module by pcall-requiring it.
@@ -596,6 +597,7 @@ local function _app_title(app_name)
 		config_cleanup          = "dialog.unused_keys.title",
 		error_dialog            = "common.error_title",
 		healthcheck             = "menu.debug.healthcheck",
+		update_check            = "update_check.window_title",
 	}
 	if title_keys[app_name] then
 		return require("infra.i18n").get(title_keys[app_name])

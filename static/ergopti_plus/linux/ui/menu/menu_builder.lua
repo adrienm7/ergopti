@@ -3486,6 +3486,18 @@ local function _about_update_rows(ctx)
 		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
 			or up.get_state() == "installing",
 		action = function()
+			-- The answer is shown in the shared update-check window, with Update
+			-- and the other channels' newer releases
+			local opened = require("ui.update_check.bridge").open({
+				updater            = up,
+				on_menu_changed    = ctx.on_menu_changed,
+				on_update_finished = ctx.on_update_finished,
+				on_open_today_log  = ctx.on_open_today_log,
+			})
+			if opened then return end
+			-- Without a window (no WebKitGTK, no display) the answer is announced
+			-- by a notification instead
+			Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
 			up.check_for_updates(nil, function(available, release, err)
 				if available and release then
 					Logger.info(LOG, "Update available: %s.", release.tag)
