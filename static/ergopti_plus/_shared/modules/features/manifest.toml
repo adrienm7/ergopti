@@ -3993,14 +3993,10 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
-[[menu.llm_menu]]
-type = "dynamic"
-id = "llm_num_predictions"
-i18n = "menu.llm.num_predictions_label"
-disabled_when_off = true
-health_dot = false
-platforms = ["ahk", "hs", "linux"]
-
+# The suggestion count ("Nombre de suggestions") is a generation parameter: it
+# is the first row of the generation settings on every driver (the
+# `llm_generation_settings` submenu, or Linux's inline `llm_generation` list),
+# not a row of this top level.
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_trigger"

@@ -795,7 +795,7 @@ local function create_menu(deps)
 								end
 						})
 				end
-				return ManifestMenu.render_rows(rows, "llm_num_predictions")
+				return ManifestMenu.render_rows(rows, "llm_generation_settings")
 		end
 
 
@@ -1113,24 +1113,7 @@ local function create_menu(deps)
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				row_for("llm_profile", profiles_item)
-
-				row_for("llm_num_predictions", { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused), menu = build_num_pred_menu() })
-				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
-						row_for("llm_num_predictions", {
-								title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
-								disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused),
-								fn       = function()
-										return settings_mgr.apply_setting_transaction({
-												key = "llm_num_predictions",
-												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
-												runtime_fn = "set_llm_num_predictions",
-												publish_setting = false,
-										})
-								end
-						})
-				end
-
-				row_for("llm_num_predictions", { title = "-" })
+				row_for("llm_profile", { title = "-" })
 
 
 				-- ===== Trigger submenu =====
@@ -1166,6 +1149,29 @@ local function create_menu(deps)
 				-- ===== Generation settings submenu =====
 
 				local generation_rows = {}
+
+				-- The suggestion count is a generation parameter, the first one on
+				-- every driver; its choices are build_num_pred_menu's tree, handed over whole.
+				table.insert(generation_rows, {
+						label    = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)),
+						disabled = is_disabled or nil,
+						submenu  = build_num_pred_menu(),
+				})
+				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
+						table.insert(generation_rows, {
+								label    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
+								disabled = is_disabled or nil,
+								action   = function()
+										return settings_mgr.apply_setting_transaction({
+												key = "llm_num_predictions",
+												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
+												runtime_fn = "set_llm_num_predictions",
+												publish_setting = false,
+										})
+								end,
+						})
+				end
+				table.insert(generation_rows, { separator = true })
 
 				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.set_context_length })
 				if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then

@@ -277,7 +277,6 @@ local function with_fixture(options, callback)
 		build = function(_, _, handlers)
 			local items = {}
 			for _, id in ipairs({
-				"llm_num_predictions",
 				"llm_generation_settings",
 				"llm_navigation",
 			}) do
@@ -419,7 +418,6 @@ local function with_fixture(options, callback)
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
 			row_ids = function()
 				return {
-					"llm_num_predictions",
 					"llm_generation_settings",
 					"llm_navigation",
 				}
@@ -444,9 +442,9 @@ local function with_fixture(options, callback)
 			active_tasks = {},
 		})
 		local submenu = handler.build_item().submenu
-		local predictions = find_item(submenu, "menu.llm.num_predictions_label")
 		local generation = find_item(submenu, "menu.llm.generation_menu_title")
-		local reset_predictions = find_item(submenu, "menu.llm.reset_label")
+		local predictions = find_item(generation.menu, "menu.llm.num_predictions_label")
+		local reset_predictions = find_item(generation.menu, "menu.llm.reset_label")
 		local reset_on_nav = find_item(generation.menu, "menu.llm.reset_on_nav")
 		reset_observations()
 		return {

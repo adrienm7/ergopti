@@ -1926,31 +1926,6 @@ local function _build_llm(ctx)
 		}, "llm_profile")
 	end
 
-	dynamic_handlers["llm_num_predictions"] = function(target)
-		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
-		if not ok_profiles then return end
-		local current = ProfileSettings.get("num_predictions") or 1
-		local rows = {}
-		for value = 1, 10 do
-			-- One key per plural form, the rows macOS and Windows draw.
-			local count_key = value == 1 and "menu.llm.prediction_count_label_one"
-				or "menu.llm.prediction_count_label_other"
-			rows[#rows + 1] = {
-				label = string.format(i18n_safe(count_key), value),
-				checked = current == value,
-				action = function()
-					ProfileSettings.set("num_predictions", value)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
-		end
-		append_rendered_row(target, {
-			label = string.format(i18n_safe("menu.llm.num_predictions_label"), current),
-			items = rows,
-			disabled = not enabled or nil,
-		}, "llm_num_predictions")
-	end
-
 	dynamic_handlers["llm_display"] = function(target)
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
@@ -2069,10 +2044,42 @@ local function _build_llm(ctx)
 		}, ctx.on_menu_changed, ollama_model_rows)
 	end
 
-	-- Temperature and context length. The manifest has declared both as features
-	-- for as long as it has existed and this driver read them from the canonical
-	-- defaults with no way to change either — constants wearing the shape of
-	-- settings.
+	--- The suggestion count row: a generation parameter, the first one on every
+	--- driver, with one choice per count from 1 to 10.
+	--- @return table|nil row Nil, with the failure logged, when the profile settings cannot load.
+	local function suggestion_count_row()
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then
+			Logger.error(LOG, "LLM profile settings unavailable — the suggestion count row cannot be built: %s.",
+				tostring(ProfileSettings))
+			return nil
+		end
+		local current = ProfileSettings.get("num_predictions")
+		local choices = {}
+		for value = 1, 10 do
+			-- One key per plural form, the rows macOS and Windows draw.
+			local count_key = value == 1 and "menu.llm.prediction_count_label_one"
+				or "menu.llm.prediction_count_label_other"
+			choices[#choices + 1] = {
+				label = string.format(i18n_safe(count_key), value),
+				checked = current == value,
+				action = function()
+					ProfileSettings.set("num_predictions", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		return {
+			label = string.format(i18n_safe("menu.llm.num_predictions_label"), tostring(current)),
+			items = choices,
+			disabled = not enabled or nil,
+		}
+	end
+
+	-- The suggestion count, temperature and context length. The manifest has
+	-- declared the last two as features for as long as it has existed and this
+	-- driver read them from the canonical defaults with no way to change either —
+	-- constants wearing the shape of settings.
 	providers["llm_generation"] = function()
 		local ok_settings, Settings = pcall(require, "modules.llm.settings")
 		if not ok_settings then
@@ -2080,6 +2087,7 @@ local function _build_llm(ctx)
 			return {}
 		end
 		local rows = {}
+		rows[#rows + 1] = suggestion_count_row()
 		for _, setting in ipairs({
 			{ name = "temperature", key = "menu.llm.generation.temperature" },
 			{ name = "context_length", key = "menu.llm.generation.context_length" },
