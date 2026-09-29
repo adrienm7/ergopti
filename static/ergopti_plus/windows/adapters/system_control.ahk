@@ -153,6 +153,35 @@ class SystemControl {
 		return { Hwnd: Hwnd, Pid: WinGetPID("ahk_id " . Hwnd), Class: WinGetClass("ahk_id " . Hwnd) }
 	}
 
+	; @returns {Integer} The process id of the desktop shell, whose explorer.exe
+	;   owns the desktop and the taskbar, or 0 when no shell is running.
+	ShellPid() {
+		Hwnd := DllCall("GetShellWindow", "Ptr")
+		return Hwnd ? this._WindowPid(Hwnd) : 0
+	}
+
+	; The process of the packaged app an ApplicationFrameWindow frames: its
+	; Windows.UI.Core.CoreWindow child is the only child owned by another
+	; process than the shared ApplicationFrameHost.exe.
+	; @returns {Integer} The app's process id, or 0 when the frame holds none (a
+	;   minimized or suspended app takes its CoreWindow out of the frame).
+	FramedAppPid(FrameHwnd) {
+		FramePid := this._WindowPid(FrameHwnd)
+		for Child in WinGetControlsHwnd("ahk_id " . FrameHwnd) {
+			Pid := this._WindowPid(Child)
+			if (Pid && Pid != FramePid)
+				return Pid
+		}
+		return 0
+	}
+
+	; @returns {Integer} The process id owning a window or control, 0 if none.
+	_WindowPid(Hwnd) {
+		Pid := 0
+		DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid, "UInt")
+		return Pid
+	}
+
 	; @returns {Array} The visible top-level windows of one process.
 	WindowsOfProcess(Pid) {
 		return WinGetList("ahk_pid " . Pid)
