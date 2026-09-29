@@ -94,8 +94,20 @@ _GestureSys(Sys) {
 
 ; Built in a helper rather than inline: a closure created in a loop would
 ; capture the loop variable, and every action would run the last one.
-_GestureMakeSystemRunner(ActionFn) {
-	return (*) => SystemControl().Defer(ActionFn)
+; @param {Object} Sys The SystemControl that defers it (a double in tests).
+_GestureMakeSystemRunner(ActionId, ActionFn, Sys := 0) {
+	return (*) => _GestureSys(Sys).Defer(_GestureRunSystemAction.Bind(ActionId, ActionFn))
+}
+
+; Runs one deferred system action. Its body runs after _GestureRunAction's
+; containment has returned, so a failure is contained and logged here rather
+; than escaping the timer thread into the global error handler.
+_GestureRunSystemAction(ActionId, ActionFn) {
+	try {
+		ActionFn.Call()
+	} catch as Err {
+		LoggerError("gestures", "System action '{1}' threw: {2}.", ActionId, Err.Message)
+	}
 }
 
 for _SysActionId, _SysActionFn in Map(
@@ -111,7 +123,7 @@ for _SysActionId, _SysActionFn in Map(
 	"unblock_file_selection", GestureSysUnblockFileSelection,
 	"open_terminal_here", GestureSysOpenTerminalHere,
 	"new_text_file_here", GestureSysNewTextFileHere) {
-	GESTURE_ACTIONS[_SysActionId] := { Fn: _GestureMakeSystemRunner(_SysActionFn) }
+	GESTURE_ACTIONS[_SysActionId] := { Fn: _GestureMakeSystemRunner(_SysActionId, _SysActionFn) }
 }
 
 ; Not deferred: Launch returns as soon as the shell accepted the target, and the
