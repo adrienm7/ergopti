@@ -367,6 +367,16 @@ bundle-bound lease helper does not yet satisfy this bootstrap requirement.
 Ergopti owns only token-scoped Karabiner rules and variables. It never owns
 Karabiner's shared UI, daemon, grabber, or VirtualHID processes.
 
+### project-hs-karabiner-switch-precedes-lease-and-guardian
+
+`[karabiner] enabled` in `config_karabiner.toml` is read before any token,
+lease worker, or guardian registration, at boot and on toggle. The launcher
+never registers the guardian LaunchAgent; the Lua lease controller's first
+guardian observation of a lifecycle does (`--register-remap-guardian`), so a
+user with the switch off never gets a Login Items entry. Turning it off
+removes only marked rules by byte-span surgery proven by decoded equality;
+never re-serialize `karabiner.json`, which would rewrite personal rules.
+
 ### project-hs-kc-ledger-process-lifecycle
 
 The Karabiner physical-key ledger keeps draining when metrics are disabled.
