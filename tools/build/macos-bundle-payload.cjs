@@ -328,6 +328,8 @@ function resolvePayload(manifest, tracked) {
 
 /**
  * Creates a directory chain, refusing a symbolic link or a non-directory on it.
+ * The walk stops at a directory already in `known`, which stage() seeds with
+ * the resolved destination root.
  * @param {string} directory Absolute directory path.
  * @param {Set<string>} known Directories already verified.
  */
@@ -352,10 +354,18 @@ function ensureDirectory(directory, known) {
  */
 function stage(root, staticRoot) {
 	const repository = fs.realpathSync(root);
-	const destination = path.resolve(staticRoot);
 	const manifest = loadManifest(repository);
 	const { files } = resolvePayload(manifest, trackedFiles(repository, manifest));
-	const known = new Set();
+	// The caller chooses where the static root lives, and its ancestors may be
+	// symbolic links the stager does not own (macOS /var and /tmp point into
+	// /private). Resolving the root once keeps them out of the symlink refusal,
+	// which then applies only to the directories staged below it.
+	fs.mkdirSync(staticRoot, { recursive: true });
+	const destination = fs.realpathSync(staticRoot);
+	if (!fs.statSync(destination).isDirectory()) {
+		throw new Error(`Payload destination is not a directory: ${staticRoot}`);
+	}
+	const known = new Set([destination]);
 	for (const file of files) {
 		const from = path.join(repository, ...file.source.split('/'));
 		const to = path.join(destination, ...file.target.split('/'));
