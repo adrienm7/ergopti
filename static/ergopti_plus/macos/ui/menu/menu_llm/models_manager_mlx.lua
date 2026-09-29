@@ -25,10 +25,10 @@ local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_regi
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
 M._active_tasks = {}
 
--- Optional dependency: the auto-bootstrap status lives in this module so we
--- can differentiate "still installing" from "definitively failed" when the
--- MLX import probe below fails. If the module is absent (unusual layout),
--- we fall back to the previous generic behaviour.
+-- The MLX runtime owner: it names the venv folder and holds the bootstrap
+-- status, so a failed import probe below can tell "installing", "not
+-- installed", "failed" and "broken" apart. If the module cannot load (unusual
+-- layout), no interpreter can be named and MLX stays unavailable.
 local ok_mlx_deps, mlx_deps_checker = pcall(require, "modules.llm.mlx_deps_checker")
 if not ok_mlx_deps then mlx_deps_checker = nil end
 
@@ -82,36 +82,26 @@ function M.new(deps, presets)
 	-- "fixing" mismatches with zombie kills and forced restarts was chasing a
 	-- phantom. The registration side outlived its only invoker and read as live.
 
-	local module_source = debug.getinfo(1, "S").source:sub(2)
-	local project_root = module_source:match("^(.*)/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx%.lua$")
 	-- Single, canonical Python interpreter for every Hammerspoon-driven MLX
-	-- invocation. This venv is provisioned by modules/llm/ensure-mlx-deps.sh
-	-- on first launch from the pinned pyproject.toml, so its absolute path is
-	-- the only one we ever shell out to. Any consumer that hits a missing
-	-- interpreter must fail fast — silent fallback to a system python would
-	-- bypass the pinned mlx-lm version and reintroduce the very drift we are
-	-- trying to eliminate.
-	local hs_root = project_root and (project_root .. "/static/ergopti_plus/macos") or ""
-	local project_venv_python = hs_root ~= "" and (hs_root .. "/.venv/bin/python") or ""
+	-- invocation. modules/llm/ensure-mlx-deps.sh provisions its venv from the
+	-- pinned pyproject.toml the first time the user selects the MLX backend
+	-- (ui/menu/menu_llm/runtime_install_offer), never at startup. The folder
+	-- comes from mlx_deps_checker.venv_dir(), the same answer its "installed"
+	-- verdict reads, so the menu and the interpreter launched here can never
+	-- name two different venvs. Any consumer that hits a missing interpreter
+	-- must fail fast — silent fallback to a system python would bypass the
+	-- pinned mlx-lm version and reintroduce the very drift we are trying to
+	-- eliminate.
+	local venv_dir = mlx_deps_checker and type(mlx_deps_checker.venv_dir) == "function"
+		and mlx_deps_checker.venv_dir() or nil
+	local project_venv_python = type(venv_dir) == "string" and (venv_dir .. "/bin/python") or ""
 
-	-- When the Swift launcher is running (ERGOPTI_CONFIG_DIR is set), the
-	-- bundle is read-only and ensure-mlx-deps.sh redirected the venv to
-	-- ~/Library/Application Support/Ergopti/mlx-venv (same logic as the
-	-- shell script). Override the computed in-bundle path accordingly.
-	local _ergopti_config_dir = os.getenv("ERGOPTI_CONFIG_DIR")
-	if _ergopti_config_dir and _ergopti_config_dir ~= "" then
-		local home = os.getenv("HOME") or ""
-		if home ~= "" then
-			project_venv_python = home .. "/Library/Application Support/Ergopti/mlx-venv/bin/python"
-		end
-	end
-
-	if project_venv_python == "" or not hs.fs.attributes(project_venv_python, "mode") then
-		-- The auto-bootstrap (modules/llm/mlx_deps_checker) provisions this interpreter
-		-- on every reload; if it is still missing here the bootstrap failed and
-		-- the user has already been notified.
-		Logger.warn(LOG, "Project venv python introuvable à %s — bootstrap auto en échec.",
-			tostring(project_venv_python))
+	if project_venv_python == "" then
+		Logger.error(LOG, "The MLX runtime folder cannot be named; MLX stays unavailable.")
+	elseif not hs.fs.attributes(project_venv_python, "mode") then
+		-- Normal for anyone who never selected MLX: nothing failed.
+		Logger.debug(LOG, "MLX runtime not installed at %s; it installs when the MLX backend is selected.",
+			project_venv_python)
 	end
 	local project_venv_python_escaped = project_venv_python:gsub("\\", "\\\\"):gsub("\"", "\\\"")
 

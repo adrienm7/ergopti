@@ -341,6 +341,25 @@ end)
 -- ================================================
 
 helpers.describe("MLX bootstraps only on its selection (ai-runtime-mlx)", function()
+	helpers.it("names one venv per layout, as ensure-mlx-deps.sh does", function()
+		helpers.with_stub_scope(STUBBED_MODULES, function()
+			with_environment(DEFAULT_ENV, function()
+				helpers.assert_eq(load_mlx_checker(new_state()).venv_dir(), MLX_VENV,
+					"the launcher's read-only bundle keeps the venv in Application Support")
+			end)
+			local checkout_env = {}
+			for key, value in pairs(DEFAULT_ENV) do checkout_env[key] = value end
+			checkout_env.ERGOPTI_CONFIG_DIR = false
+			with_environment(checkout_env, function()
+				local venv = load_mlx_checker(new_state()).venv_dir()
+				helpers.assert_type(venv, "string")
+				helpers.assert_eq(venv:sub(-#"/.venv"), "/.venv",
+					"a checkout keeps the venv beside the driver")
+				helpers.assert_true(venv:find("Application Support", 1, true) == nil)
+			end)
+		end)
+	end)
+
 	helpers.it("settles a boot check as missing without any task", scoped(function()
 		local state = new_state()
 		local checker = load_mlx_checker(state)
