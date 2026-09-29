@@ -4,10 +4,11 @@
 --- MODULE: System actions run their exact command (Linux)
 --- DESCRIPTION:
 --- Runs every system action through the real gesture executor with a recording
---- shell and asserts the exact command it backgrounds; empty_trash, the one the
---- catalogue asks to confirm here, is chained behind zenity or kdialog and runs
---- nothing when neither can ask; make_executable_selection reads the file
---- manager's text/uri-list and chmods exactly the paths it names.
+--- shell and asserts the exact command it backgrounds; empty_trash and
+--- force_quit_frontmost, the ones the catalogue asks to confirm here, are
+--- chained behind zenity or kdialog and run nothing when neither can ask;
+--- make_executable_selection reads the file manager's text/uri-list and chmods
+--- exactly the paths it names.
 ---
 --- ROOT CAUSES ENCODED:
 --- 1. The approved system actions did not exist on Linux.
@@ -16,6 +17,8 @@
 --- 3. The daemon holds the grabbed keyboard, so every command is backgrounded.
 --- 4. sleep_displays powered the displays off at once, so the release of the
 ---    keys that fired it woke them straight back up.
+--- 5. force_quit_frontmost killed unasked (decision of 2026-09-29), and a kill
+---    confirmed in a dialog must target the window active before the question.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -76,11 +79,6 @@ local EXPECTED = {
 		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
 		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -TERM "$pid"; }',
-	force_quit_frontmost = "{ win=$(xdotool getactivewindow 2>/dev/null)"
-		.. ' && kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
-		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
-		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
-		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -KILL "$pid"; }',
 	clear_notifications = "{ dunstctl close-all 2>/dev/null || makoctl dismiss --all 2>/dev/null"
 		.. " || swaync-client --close-all 2>/dev/null; }",
 }
@@ -99,14 +97,110 @@ helpers.describe("Linux system actions", function()
 		end)
 	end
 
-	helpers.it("the catalogue asks to confirm exactly empty_trash on Linux (system-actions)", function()
+	helpers.it("the catalogue asks to confirm exactly empty_trash and force_quit_frontmost (system-actions)", function()
 		local confirmed = {}
 		for id, meta in pairs(Catalogue.actions) do
 			if meta.confirm == true then confirmed[#confirmed + 1] = id end
 		end
-		helpers.assert_eq(#confirmed, 1)
-		helpers.assert_eq(confirmed[1], "empty_trash")
+		table.sort(confirmed)
+		helpers.assert_eq(confirmed, { "empty_trash", "force_quit_frontmost" })
 	end)
+
+	-- The window is read before the question: once zenity's own window is gone,
+	-- the one the window manager focuses may be another application's.
+	local FORCE_QUIT_KILL = 'kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
+		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
+		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
+		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -KILL "$pid"'
+
+	helpers.it("force_quit_frontmost kills only behind zenity's question, window read first (force-quit-confirm)",
+		function()
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("force_quit_frontmost", "tap_3")
+				local run = launched(commands)
+				helpers.assert_eq(#run, 1)
+				local head = "{ win=$(xdotool getactivewindow 2>/dev/null)"
+					.. " && zenity --question --no-markup --default-cancel "
+				helpers.assert_eq(run[1]:sub(1, #head), head,
+					"the active window is read, then the question comes, with Cancel focused: " .. run[1])
+				local chained = " && { " .. FORCE_QUIT_KILL .. "; }; } 2>/dev/null &"
+				helpers.assert_eq(run[1]:sub(-#chained), chained, "the kill runs only on Continue")
+				helpers.assert_eq(select(2, run[1]:gsub("getactivewindow", "")), 1,
+					"the window is never read again after the question")
+			end, function(command)
+				if command:find("command -v", 1, true) then return command:find("zenity", 1, true) ~= nil end
+				return true
+			end)
+		end)
+
+	helpers.it("force_quit_frontmost kills only behind kdialog's No, Cancel as default (force-quit-confirm)", function()
+		with_recorded_shell(function(commands)
+			Gestures.execute_action("force_quit_frontmost", "tap_3")
+			local run = launched(commands)
+			helpers.assert_eq(#run, 1)
+			helpers.assert_true(run[1]:find("^{ win=%$%(xdotool getactivewindow 2>/dev/null%) && { kdialog ") ~= nil,
+				run[1])
+			local chained = "; [ $? -eq 1 ]; } && { " .. FORCE_QUIT_KILL .. "; }; } 2>/dev/null &"
+			helpers.assert_eq(run[1]:sub(-#chained), chained)
+		end, function(command)
+			if command:find("command -v", 1, true) then return command:find("kdialog", 1, true) ~= nil end
+			return true
+		end)
+	end)
+
+	helpers.it("force_quit_frontmost kills nothing when no dialog can ask (force-quit-confirm)", function()
+		with_recorded_shell(function(commands)
+			Gestures.execute_action("force_quit_frontmost", "tap_3")
+			helpers.assert_eq(#launched(commands), 0)
+		end, function(command)
+			if command:find("command -v", 1, true) then return false end
+			return true
+		end)
+	end)
+
+	-- Executed, not only spelled: a real shell runs the confirmed command with
+	-- stub tools whose active window changes once the question was asked.
+	helpers.it("force_quit_frontmost: Cancel kills nothing, Continue kills the first window (force-quit-confirm)",
+		function()
+			local SystemActions = require("modules.gestures.system_actions")
+			local command = SystemActions.command_for("force_quit_frontmost", "Force quit", true,
+				function(binary) return binary == "zenity" end)
+			helpers.assert_true(type(command) == "string", "a confirmed command is built")
+			local dir = os.tmpname()
+			os.remove(dir)
+			helpers.assert_true(os.execute("mkdir -p '" .. dir .. "/bin'") ~= nil)
+			local function write(path, text)
+				local f = assert(io.open(path, "w"))
+				f:write(text)
+				f:close()
+			end
+			local function stub(name, body)
+				write(dir .. "/bin/" .. name, "#!/bin/sh\n" .. body .. "\n")
+				os.execute("chmod +x '" .. dir .. "/bin/" .. name .. "'")
+			end
+			stub("xdotool", 'case "$1" in getactivewindow) if [ -f "' .. dir .. '/asked" ]; then echo 222;'
+				.. ' else echo 111; fi;; getwindowpid) echo "$(( $2 * 100 ))";; esac')
+			stub("xprop", "echo '_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_NORMAL'")
+			stub("zenity", 'touch "' .. dir .. '/asked"; [ "$(cat "' .. dir .. '/answer")" = continue ]')
+			-- kill is a shell builtin: a function shadows it with a recorder.
+			write(dir .. "/run.sh", "kill() { echo \"$@\" >> '" .. dir .. "/killed'; }\n" .. command .. "\n")
+			local function run(answer)
+				os.remove(dir .. "/asked")
+				os.remove(dir .. "/killed")
+				write(dir .. "/answer", answer)
+				os.execute("PATH='" .. dir .. "/bin':\"$PATH\" sh '" .. dir .. "/run.sh' >/dev/null 2>&1")
+				local k = io.open(dir .. "/killed", "r")
+				if not k then return nil end
+				local out = k:read("*a")
+				k:close()
+				return out
+			end
+			local cancelled = run("cancel")
+			local continued = run("continue")
+			os.execute("rm -rf '" .. dir .. "'")
+			helpers.assert_eq(cancelled, nil, "Cancel kills nothing")
+			helpers.assert_eq(continued, "-KILL 11100\n", "Continue kills the window active before the question")
+		end)
 
 	helpers.it("empty_trash runs only behind zenity's question, Cancel as default (system-actions)", function()
 		with_recorded_shell(function(commands)

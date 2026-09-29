@@ -267,7 +267,7 @@ return {
 		["end"] = { family = "sg", label_key = "sg_actions.end" },
 		["enter"] = { family = "sg", label_key = "sg_actions.enter" },
 		["escape"] = { family = "sg", label_key = "sg_actions.escape" },
-		["force_quit_frontmost"] = { family = "sg", label_key = "sg_actions.force_quit_frontmost" },
+		["force_quit_frontmost"] = { family = "sg", label_key = "sg_actions.force_quit_frontmost", confirm = true },
 		["fullscreen"] = { family = "sg", label_key = "sg_actions.fullscreen" },
 		["home"] = { family = "sg", label_key = "sg_actions.home" },
 		["layer_off"] = { family = "sg", label_key = "sg_actions.layer_off" },
