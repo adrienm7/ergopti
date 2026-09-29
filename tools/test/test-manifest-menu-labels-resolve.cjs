@@ -119,42 +119,8 @@ function t(key) {
 	return key;
 }
 
-const strip = (s) => s.split('_').join('');
-
-// Port of _MenuLabelCandidateKeys (AHK SubStr is 1-based; offsets adjusted).
-function candidateKeys(descKey, entryPath) {
-	const out = [];
-	if (descKey !== '') out.push(descKey);
-	if (descKey.length > 5 && descKey.slice(0, 5) === 'menu.') {
-		const noMenu = descKey.slice(5);
-		out.push(noMenu, strip(noMenu));
-		if (noMenu.length > 11 && noMenu.slice(0, 11) === 'hotstrings.') {
-			const noHs = noMenu.slice(11);
-			out.push(noHs, strip(noHs));
-		}
-	}
-	if (entryPath !== '' && entryPath !== descKey) {
-		out.push(entryPath);
-		let trimmed = entryPath;
-		if (trimmed.length > 4 && trimmed.slice(0, 4) === 'ahk.') {
-			trimmed = trimmed.slice(4);
-			out.push(trimmed);
-		}
-		if (trimmed.length > 11 && trimmed.slice(0, 11) === 'hotstrings.') {
-			trimmed = trimmed.slice(11);
-			out.push(trimmed);
-		}
-		out.push(strip(trimmed));
-	}
-	const combined = descKey !== '' ? descKey : entryPath;
-	const dyn = combined.indexOf('.dynamic.');
-	if (dyn >= 0) {
-		const section = combined.slice(dyn + 9);
-		if (section !== '')
-			out.push(`dynamichotstrings.${section}`, `dynamichotstrings.${strip(section)}`);
-	}
-	return out;
-}
+// The driver's candidate chain, shared with the onboarding catalogue generator.
+const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
 
 // Port of TryMenuLabelFromDescriptionKey: first candidate that resolves wins.
 function resolvesToALabel(descKey, entryPath) {

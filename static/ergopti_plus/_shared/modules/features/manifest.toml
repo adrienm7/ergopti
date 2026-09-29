@@ -5802,3 +5802,119 @@ restore_exclude = ["metrics.enabled", "metrics.metrics_enabled"]
 includes = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
 prefixes = ["script"]
 restore_exclude = []
+
+
+
+# =================================================
+# =================================================
+# ======= 6. First-run configuration wizard =======
+# =================================================
+# =================================================
+
+# The shared wizard (_shared/ui/onboarding) asks, after the language and
+# configuration-folder steps, one question per page in the approved menu order.
+# tools/codegen/codegen-onboarding-catalogue.cjs projects these declarations
+# into _shared/ui/_generated/onboarding_catalogue.{js,json}: the page renders
+# them and every host validates the finished answers against the same data.
+#
+# `order` lists the pages; each [onboarding.pages.<scope>] declares:
+#   master       Per-platform manifest path of the category switch the question
+#                sets. A platform without one keeps the question as the import
+#                decision only; nothing is persisted for the answer itself.
+#   checklist    "recommended": every input-altering feature of the page's scope
+#                whose recommendation differs from its neutral default.
+#                "hotstrings": every bundled section, language -> file ->
+#                section from _shared/modules/hotstrings/_index.toml.
+#                "none": the question alone (AI and metrics consent).
+#   exclude      Scope prefixes left out of a "recommended" checklist.
+#   labels       Label keys for recommended items whose manifest description
+#                key resolves to no locale entry.
+#   hint_key     Per-platform warning shown under the question.
+#   note_key     Per-platform explanation for a page without a question.
+#   consent      The answer is a privacy consent: never pre-selected.
+# The wizard persists only manifest paths. A checklist's pre-selection is the
+# manifest `recommended` value, and every question starts at No.
+[onboarding]
+order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
+
+[onboarding.pages.tap_holds]
+title_key = "menu.tapholds.title"
+question_key = "menu.tapholds.enable"
+description_key = "onboarding.page.tap_holds.description"
+master = { ahk = "category_enabled.tap_holds", hs = "tap_holds.enabled", linux = "tap_holds.enabled" }
+checklist = "none"
+
+[onboarding.pages.shortcuts]
+title_key = "menu.shortcuts.title"
+question_key = "menu.shortcuts.enable"
+description_key = "onboarding.page.shortcuts.description"
+master = { ahk = "category_enabled.shortcuts", hs = "shortcuts.enabled", linux = "shortcuts.enabled" }
+checklist = "recommended"
+# The user's own shortcut toggles: their labels come from the personal file.
+exclude = ["shortcuts.personal"]
+
+[onboarding.pages.shortcuts.labels]
+"shortcuts.select_line" = "sg_actions.select_line"
+"shortcuts.script_control.script_altgr_backspace" = "sg_labels.script_altgr_backspace"
+"shortcuts.script_control.script_altgr_delete" = "sg_labels.script_altgr_delete"
+"shortcuts.script_control.script_altgr_enter" = "sg_labels.script_altgr_enter"
+"shortcuts.script_control.script_altgr_escape" = "sg_labels.script_altgr_escape"
+"shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
+"shortcuts.script_control.return_key" = "menu.shortcuts.right_opt_return"
+"shortcuts.script_control.backspace" = "menu.shortcuts.right_opt_back"
+"shortcuts.script_control.escape" = "menu.shortcuts.right_opt_escape"
+
+[onboarding.pages.gestures]
+title_key = "menu.gestures.title"
+question_key = "menu.gestures.enable"
+description_key = "onboarding.gestures.desc"
+master = { ahk = "gestures.enabled", hs = "gestures.enabled", linux = "gestures.enabled" }
+checklist = "recommended"
+hint_key = { hs = "dialog.gestures.warning_msg", linux = "gestures.system.warning" }
+
+[onboarding.pages.keyboard_layout]
+title_key = "menu.layout.title"
+question_key = "menu.layout.enable"
+description_key = "onboarding.page.keyboard_layout.description"
+master = { ahk = "category_enabled.layout" }
+checklist = "recommended"
+# The AltGr virtual-key compensation answers a custom layout detected at
+# runtime; it is not one of Ergopti's preferences to import.
+exclude = ["script.alt_gr_is_kana_remap"]
+# macOS installs the layout as a system input source and Linux through its
+# desktop: both are chosen in the keyboard-layout menu, not switched here.
+note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboarding.page.keyboard_layout.system_note" }
+
+[onboarding.pages.hotstrings]
+title_key = "menu.hotstrings.title"
+question_key = "menu.hotstrings.enable"
+description_key = "onboarding.page.hotstrings.description"
+master = { ahk = "category_enabled.hotstrings", hs = "hotstrings.enabled" }
+checklist = "hotstrings"
+# {group} is the manifest section id (distances_reduction, french_autocorrection);
+# {stem} is the loaded group id (distancesreduction, french_autocorrection).
+file_path = { ahk = "category_enabled.{group}", hs = "hotstrings.groups.{stem}", linux = "hotstrings.groups.{stem}" }
+section_path = { ahk = "hotstrings.{group}.{section}.enabled", hs = "hotstrings.modules.{stem}.{section}", linux = "hotstrings.modules.{stem}.{section}" }
+neutral_label_key = "onboarding.hotstrings.all_languages"
+
+[onboarding.pages.hotstrings.magic_key]
+path = "hotstrings.trigger_char"
+label_key = "onboarding.magic_key.desc"
+hint_key = "onboarding.magic_key.choose_freely"
+custom_label_key = "onboarding.magic_key.option_custom"
+options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave" }, { value = ";", label_key = "onboarding.magic_key.option_semicolon" }]
+
+[onboarding.pages.llm]
+title_key = "menu.llm.title"
+question_key = "menu.llm.enable"
+description_key = "onboarding.page.llm.description"
+master = { ahk = "llm.enabled", hs = "llm.enabled", linux = "llm.enabled" }
+checklist = "none"
+
+[onboarding.pages.metrics]
+title_key = "menu.metrics.title"
+question_key = "menu.metrics.enable"
+description_key = "onboarding.metrics.desc"
+master = { ahk = "metrics.metrics_enabled", hs = "metrics.enabled", linux = "metrics.enabled" }
+checklist = "none"
+consent = true
