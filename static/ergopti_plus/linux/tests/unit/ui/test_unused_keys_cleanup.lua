@@ -264,6 +264,28 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 			helpers.assert_eq(tap.assignments.number_row_left, "none")
 		end)
 
+	helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)",
+		function()
+			local source = "[shortcuts]\ntap_keys = { number_row_left = \"retired_action_xyz\", "
+				.. "number_row_right_1 = \"none\" }\n"
+			Sandbox.with_config(source, function(path)
+				local before = driver_state(path)
+				local keys = Cleanup.find(path).keys
+				helpers.assert_eq(#keys, 1)
+				helpers.assert_eq({ keys[1].section, keys[1].key }, { "shortcuts.tap_keys", "number_row_left" })
+				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP })
+				helpers.assert_eq(result.status, "removed")
+				helpers.assert_eq(Sandbox.read_bytes(path),
+					"[shortcuts]\ntap_keys = { number_row_right_1 = \"none\" }\n")
+				-- The setup wizard shows the raw stale value; every runtime reader
+				-- already ignored it.
+				local after = driver_state(path)
+				before.wizard, after.wizard = nil, nil
+				helpers.assert_eq(after, before, "the live member keeps its value")
+				helpers.assert_eq(#Cleanup.find(path).keys, 0)
+			end)
+		end)
+
 	helpers.it("unused keys: an old-shape hotstring choice is offered, not fatal (config-outdated-hotstrings)",
 		function()
 			-- One retired pack in a legacy spelling used to raise in the choice
