@@ -1932,8 +1932,11 @@ local function _build_llm(ctx)
 		local current = ProfileSettings.get("num_predictions") or 1
 		local rows = {}
 		for value = 1, 10 do
+			-- One key per plural form, the rows macOS and Windows draw.
+			local count_key = value == 1 and "menu.llm.prediction_count_label_one"
+				or "menu.llm.prediction_count_label_other"
 			rows[#rows + 1] = {
-				label = tostring(value),
+				label = string.format(i18n_safe(count_key), value),
 				checked = current == value,
 				action = function()
 					ProfileSettings.set("num_predictions", value)

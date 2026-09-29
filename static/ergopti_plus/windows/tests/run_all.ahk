@@ -545,6 +545,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_api_test_entry.ahk
 #Include unit/test_llm_menu_backend_model_labels.ahk
 #Include unit/test_llm_menu_build_submenu.ahk
+#Include unit/test_llm_menu_prediction_count.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
 #Include unit/test_llm_curl_literal_paths.ahk
 #Include unit/test_ollama_http_terminal_classification.ahk

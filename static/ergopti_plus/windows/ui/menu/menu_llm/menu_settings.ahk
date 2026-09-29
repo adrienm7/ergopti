@@ -53,8 +53,11 @@ _LLM_Menu_NRows() {
 	global _LLM_Menu
 	Rows := []
 	for n in LLM_MENU_N_OPTIONS {
+		; One key per plural form: an injected "s" is French and English only.
+		CountKey := (n == 1) ? "menu.llm.prediction_count_label_one"
+			: "menu.llm.prediction_count_label_other"
 		Rows.Push(Map(
-			"label",   StrReplace(StrReplace(t("menu.llm.prediction_count_label"), "%d", n), "%s", (n > 1 ? "s" : "")),
+			"label",   StrReplace(t(CountKey), "%d", n),
 			"checked", (n == _LLM_Menu["n_predictions"]),
 			"action",  _LLM_Menu_MakeSetNHandler(n)))
 	}

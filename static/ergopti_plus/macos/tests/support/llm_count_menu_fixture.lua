@@ -28,7 +28,8 @@ return function(callback)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["infra.i18n"] = { get = function(key)
-			if key == "menu.llm.prediction_count_label" then return "%d prediction%s" end
+			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
+			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
 			return key
 		end, section = function(key) return key end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,

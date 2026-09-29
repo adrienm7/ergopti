@@ -306,6 +306,7 @@ return {
 	"tests.unit.ui.test_layout_manager_bridge",
 	"tests.unit.ui.test_llm_menu_toggle_row",
 	"tests.unit.ui.test_llm_backend_rows",
+	"tests.unit.ui.test_llm_menu_prediction_count",
 	"tests.unit.ui.test_llm_overlay_anchor",
 	"tests.unit.ui.test_webview_page_messages",
 	"tests.unit.ui.test_log_openers",
