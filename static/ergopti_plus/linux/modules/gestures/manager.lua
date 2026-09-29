@@ -45,6 +45,7 @@ local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
 local PromptAction = require("llm.prompt_action")
 local Vision = require("llm.vision")
+local AppParameter = require("app_parameter")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
@@ -480,6 +481,17 @@ local BUILTIN_HANDLERS = {
 		if M.validate_action_parameter("open_url", url) then
 			run_background("xdg-open " .. shell_quote(url))
 		end
+	end,
+	-- The binding's desktop-file id, launched the way the desktop's own
+	-- launcher does (its Exec line, environment and startup notification).
+	["open_app"] = function(binding)
+		local app = M.get_action_parameter(binding, "open_app")
+		if not M.validate_action_parameter("open_app", app) then
+			Logger.warn(LOG, "open_app ignored for binding '%s': no valid application is stored.", tostring(binding))
+			return
+		end
+		Logger.info(LOG, "Opening the application '%s'.", app)
+		run_background("gtk-launch " .. shell_quote(app))
 	end,
 	["search_web"] = function(binding)
 		local template = M.get_action_parameter(binding, "search_web")
@@ -1113,6 +1125,8 @@ function M.validate_action_parameter(action_name, value)
 	if spec == "llm_vision" then return Vision.is_valid(value) end
 	-- A closed list: "ui" or a shipped locale code (translate.lua).
 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
+	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
+	if spec == "app" then return AppParameter.is_valid(value) end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1131,6 +1145,7 @@ function M.get_action_parameter_prompt(action_name)
 	local spec = M.get_action_parameter_spec(action_name)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
 		local WrapPair = require("wrap_pair")
@@ -1179,6 +1194,7 @@ function M.get_action_parameter_error(action_name)
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))

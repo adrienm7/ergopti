@@ -27,6 +27,7 @@ local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local WrapPair      = require("wrap_pair")
 local DesktopNavigation = require("desktop_navigation")
 local SendInput     = require("send_input")
+local AppParameter  = require("app_parameter")
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
 local Tone          = require("llm.tone")
@@ -1374,6 +1375,21 @@ local SYSTEM_ACTIONS = {
 for _, system_action in ipairs(SYSTEM_ACTIONS) do
 	sg(system_action, owner_action("modules.gestures.system_actions", system_action))
 end
+-- The application is the binding's own parameter, as for open_url.
+sg("open_app", function(binding)
+	local value = M.get_action_parameter(binding, "open_app")
+	if not M.validate_action_parameter("open_app", value) then
+		Logger.warn(LOG, "open_app ignored for binding '%s': no valid application is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	local ok, System = pcall(require, "modules.gestures.system_actions")
+	if not ok or type(System) ~= "table" or type(System.open_app) ~= "function" then
+		Logger.error(LOG, "open_app is unavailable: %s.", tostring(System))
+		return false
+	end
+	return System.open_app(value, current_action_parent())
+end)
 
 -- Applications and Stats
 -- These four target the same modules the menu dispatches to (ui/menu/init.lua),
@@ -2191,6 +2207,8 @@ function M.validate_action_parameter(action, value)
 	-- Syntax only too: whether the provider exists is checked when the action runs
 	if spec == "llm_vision" then return Vision.is_valid(value) end
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
+	-- Syntax only: whether the application is installed is checked when it opens
+	if spec == "app" then return AppParameter.is_valid(value) end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2211,6 +2229,7 @@ function M.parameter_prompt(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "text" then
 		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2259,6 +2278,7 @@ function M.parameter_error(action)
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))

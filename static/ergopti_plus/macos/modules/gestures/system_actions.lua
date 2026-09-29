@@ -4,9 +4,9 @@
 --- MODULE: System Actions (macOS)
 --- DESCRIPTION:
 --- The system actions of the shared catalogue that run a native command:
---- minimize every window, quit or force-quit the active app, clear the
---- clipboard, center the pointer, toggle the microphone and dark mode, sleep
---- the displays, empty the trash, eject the disks, and the Finder selection
+--- open an application, minimize every window, quit or force-quit the active
+--- app, clear the clipboard, center the pointer, toggle the microphone and dark
+--- mode, sleep the displays, empty the trash, eject the disks, and the Finder selection
 --- helpers (quarantine removal, make executable, terminal and new text file in
 --- the current folder). modules/gestures/actions.lua registers each one.
 ---
@@ -34,6 +34,7 @@ local MouseControl = require("adapters.mouse_control")
 local FileSystem = require("adapters.file_system")
 local TccGrant = require("adapters.tcc_grant")
 local FileSelection = require("file_selection")
+local AppParameter = require("app_parameter")
 
 local LOG = "gestures.system_actions"
 
@@ -233,6 +234,19 @@ local function with_frontmost(label, on_front, parent)
 		end
 		on_front(pid, bundle_id)
 	end, parent)
+end
+
+--- Opens an application by name, path or bundle identifier.
+--- @param value string A valid app parameter (_shared/lua/app_parameter).
+--- @param parent string|nil
+--- @return boolean started
+function M.open_app(value, parent)
+	local args = AppParameter.macos_open_args(value)
+	if not args then
+		Logger.error(LOG, "open_app refused an invalid application '%s'.", tostring(value))
+		return false
+	end
+	return run_logged(M.OPEN_BIN, args, "Open " .. value, parent)
 end
 
 --- Asks the frontmost application to quit, as its own Quit command does.

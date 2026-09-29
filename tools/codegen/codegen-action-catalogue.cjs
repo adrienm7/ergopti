@@ -69,7 +69,8 @@ const PARAMETER_KINDS = new Set([
 	'shortcut',
 	'llm_prompt',
 	'llm_vision',
-	'llm_language'
+	'llm_language',
+	'app'
 ]);
 
 const SG_FIELDS = new Set([

@@ -160,6 +160,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "mic_mute_toggle" })
 	Items.Push({ Kind: "action", Id: "clear_clipboard" })
 	Items.Push({ Kind: "action", Id: "center_mouse" })
+	Items.Push({ Kind: "action", Id: "open_app" })
 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
 	Items.Push({ Kind: "action", Id: "empty_trash" })
@@ -298,6 +299,7 @@ GestureActionCatalogueData() {
 	Actions["notification_center"] := { Family: "sg", LabelKey: "sg_actions.notification_center", Parameter: "", Confirm: false }
 	Actions["ocr_screenshot"] := { Family: "sg", LabelKey: "sg_actions.ocr_screenshot", Parameter: "", Confirm: false }
 	Actions["one_shot_shift"] := { Family: "sg", LabelKey: "sg_actions.one_shot_shift", Parameter: "", Confirm: false }
+	Actions["open_app"] := { Family: "sg", LabelKey: "sg_actions.open_app", Parameter: "app", Confirm: false }
 	Actions["open_config"] := { Family: "sg", LabelKey: "sg_actions.open_config", Parameter: "", Confirm: false }
 	Actions["open_downloads"] := { Family: "sg", LabelKey: "sg_actions.open_downloads", Parameter: "", Confirm: false }
 	Actions["open_emoji_picker"] := { Family: "sg", LabelKey: "sg_actions.open_emoji_picker", Parameter: "", Confirm: false }

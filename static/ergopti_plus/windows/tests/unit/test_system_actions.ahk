@@ -370,3 +370,55 @@ _SysActions_ConfirmGate() {
 	}
 }
 Test("system actions: GestureInvokeAction asks before every confirm action", _SysActions_ConfirmGate)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 5/ open_app ==================
+; ======================================
+; ======================================
+
+; Replays _shared/tests/corpus/action_parameters/app_vectors.json, which the
+; macOS and Linux suites replay too.
+_SysActions_AppCorpus() {
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\action_parameters\app_vectors.json"
+	AssertTrue(FileExist(Path) != "", "the app corpus must exist at " . Path)
+	Corpus := JsonParse(FileRead(Path, "UTF-8"))
+	AssertEqual("app", GestureActionParameterSpec("open_app"), "open_app parameter kind")
+	Checked := 0
+	for _, Vector in Corpus["vectors"] {
+		Valid := !Vector.Has("valid") || Vector["valid"]
+		ErrorText := ""
+		AssertEqual(Valid, GestureValidateActionParameter("open_app", Vector["value"], &ErrorText),
+			Vector["id"] . ": validation")
+		if !Valid
+			AssertEqual(t("dialog.gestures.param_err_app"), ErrorText, Vector["id"] . ": the kind's own refusal")
+		Checked += 1
+	}
+	AssertTrue(Checked >= 15, "expected at least 15 app vectors, found " . Checked)
+}
+Test("system actions: the app parameter replays the shared corpus", _SysActions_AppCorpus)
+
+_SysActions_OpenApp() {
+	global GestureActionParameters
+	Saved := GestureActionParameters
+	try {
+		Target := "shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+		GestureActionParameters := Map(GestureActionParameterKey("keyboard__ctrl_k", "open_app"), Target)
+		Fake := _SysActionsFake()
+		GestureSysOpenApp("keyboard__ctrl_k", Fake)
+		Launches := _SysActions_CallsNamed(Fake, "Launch")
+		AssertEqual(1, Launches.Length)
+		AssertEqual(Target, Launches[1][2], "the binding's own application, as the shell runs it")
+		Fake := _SysActionsFake()
+		GestureSysOpenApp("tap_3", Fake)
+		AssertEqual(0, Fake.Calls.Length, "a binding with no application opens nothing")
+	} finally {
+		GestureActionParameters := Saved
+	}
+}
+Test("system actions: open_app launches the application stored for its binding", _SysActions_OpenApp)

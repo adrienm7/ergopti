@@ -230,6 +230,26 @@ function M.action_parameter_title(label)
 	return template:sub(1, at - 1) .. tostring(label) .. template:sub(at + 3)
 end
 
+--- Asks for one parameter value the way its kind is chosen: an application is
+--- picked in the /Applications chooser, every other kind is typed.
+--- @param gestures table The gestures facade.
+--- @param action string The action being configured.
+--- @param spec string Its parameter kind.
+--- @param title string The prompt's title.
+--- @param prior string The value shown first.
+--- @return string|nil value Nil when the user cancelled.
+function M.ask_parameter_value(gestures, action, spec, title, prior)
+	local prompt = gestures.parameter_prompt(action)
+	if spec == "app" then
+		return dialog.choose_application(prompt)
+	end
+	local save_btn = i18n.get("button.save")
+	local prompt_ok, button, typed = pcall(dialog.text_prompt,
+		title, prompt, prior, save_btn, i18n.get("button.cancel"))
+	if not prompt_ok or button ~= save_btn then return nil end
+	return typed
+end
+
 --- Prompts for an action's required parameter and stores it against `binding`.
 ---
 --- Some actions (open_url, search_web) carry no useful behaviour without a value:
@@ -254,23 +274,18 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked)
 
 	local label  = (type(gestures.get_action_label) == "function" and gestures.get_action_label(action)) or action
 	local prior  = (type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(binding, action)) or ""
-	-- The prompt and its refusal text belong to the parameter kind; the gestures
-	-- module owns them for every binding editor.
-	local prompt = gestures.parameter_prompt(action)
 
 	-- Loop until the value validates or the user cancels: accepting an invalid one
 	-- would store a parameter the action's own validator later rejects, which is
-	-- the silent no-op this prompt exists to prevent.
+	-- the silent no-op this prompt exists to prevent. The prompt and its refusal
+	-- text belong to the parameter kind; the gestures module owns them.
 	local title    = M.action_parameter_title(label)
-	local save_btn = i18n.get("button.save")
 	local value    = type(picked) == "string" and picked or nil
 
 	while true do
 		if value == nil then
-			local prompt_ok, button, typed = pcall(dialog.text_prompt,
-				title, prompt, prior, save_btn, i18n.get("button.cancel"))
-			if not prompt_ok or button ~= save_btn then return false end
-			value = typed
+			value = M.ask_parameter_value(gestures, action, spec, title, prior)
+			if value == nil then return false end
 		end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then

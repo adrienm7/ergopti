@@ -275,17 +275,15 @@ function M.build(ctx)
 			if spec then
 				DeferredWork.after(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					-- The prompt and its refusal text belong to the parameter kind.
-					local prompt = gestures.parameter_prompt(a)
 					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
-					local save_btn = i18n.get("button.save")
 					-- A value the picker's editor collected is stored without asking.
 					local value = type(picked) == "string" and picked or nil
 					while true do
 						if value == nil then
-							local button, typed = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
-							if button ~= save_btn then return end
-							value = typed
+							-- The prompt (or the application chooser) and its refusal
+							-- text belong to the parameter kind.
+							value = shortcut_utils.ask_parameter_value(gestures, a, spec, title, prior)
+							if value == nil then return end
 						end
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
 							pcall(gestures.set_action_parameter, slot, a, value)

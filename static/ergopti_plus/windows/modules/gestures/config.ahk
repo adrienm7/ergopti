@@ -85,7 +85,7 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 
 ; The parameter kind the generated catalogue declares for an action ("url",
 ; "search_url", "wrap_pair", "text", "key", "shortcut", "llm_prompt",
-; "llm_vision", "llm_language"), or "" when it takes none.
+; "llm_vision", "llm_language", "app"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
 		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
@@ -118,6 +118,14 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 				if LLM_Vision_IsValid(Value)
 						return true
 				ErrorText := t("dialog.gestures.param_err_llm_vision")
+				return false
+		}
+		; Syntax only, before the trim too: the shared rule refuses a padded value.
+		; Whether the application exists is checked when it opens.
+		if (Spec = "app") {
+				if GestureAppParameterIsValid(Value)
+						return true
+				ErrorText := t("dialog.gestures.param_err_app")
 				return false
 		}
 		; A closed list: "ui" or a shipped locale code, compared exactly.
@@ -165,6 +173,8 @@ GestureActionParameterPrompt(ActionName) {
 						return t("dialog.gestures.param_search_url")
 				case "url":
 						return t("dialog.gestures.param_link")
+				case "app":
+						return t("dialog.gestures.param_app")
 				case "wrap_pair":
 						return StrReplace(t("dialog.gestures.param_wrap_pair"), "{1}",
 								WrapPairDescribe(_WS_BUILTIN_PAIRS))
@@ -236,6 +246,8 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		}
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
+		if (Spec = "app")
+				return _GesturePickApplication(BindingId, ActionName, Prompt)
 		loop {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
 				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
@@ -256,6 +268,36 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 				Existing := Value
 		}
+}
+
+; The shared app rule (_shared/tests/corpus/action_parameters/app_vectors.json):
+; not empty, no leading or trailing whitespace, no control character.
+; @param {Any} Value
+; @returns {Boolean}
+GestureAppParameterIsValid(Value) {
+		return (Value is String) && (Value != "") && !RegExMatch(Value, "^\s|\s$|[\x00-\x1F\x7F]")
+}
+
+; FileSelect: the file and its path must exist, and a Start-menu shortcut is
+; kept as the shortcut rather than resolved to its target.
+global GESTURE_APP_CHOOSER_OPTIONS := 1 + 2 + 32
+
+; Picks the application an open_app binding launches, starting in the
+; Start menu, instead of asking for a name to type.
+; @returns {Map|false} The parameter candidate, false when cancelled or refused.
+_GesturePickApplication(BindingId, ActionName, Prompt) {
+		global GESTURE_APP_CHOOSER_OPTIONS
+		Picked := FileSelect(GESTURE_APP_CHOOSER_OPTIONS, A_ProgramsCommon, Prompt,
+				t("dialog.gestures.param_app_filter") . " (*.exe; *.lnk)")
+		if (Picked = "")
+				return false
+		ErrorText := ""
+		if GestureValidateActionParameter(ActionName, Picked, &ErrorText)
+				return Map("has_value", true,
+						"key", GestureActionParameterKey(BindingId, ActionName),
+						"value", Picked)
+		MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+		return false
 }
 
 ; Commits an assignment and its optional parameter as one logical TOML batch,
