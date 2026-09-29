@@ -565,7 +565,8 @@ function M.set_window_title(view, title)
 end
 
 --- Centralized factory to create a webview window with consistent properties.
---- @param opts table The configuration options for the webview.
+--- @param opts table The configuration options for the webview; focus = false
+---        shows the window without activating the app or changing its level.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
@@ -763,13 +764,22 @@ function M.show_webview(opts)
 	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
 	-- UI opened through this factory automatically comes to the foreground and receives
 	-- keyboard focus without each caller having to remember to call it.
+	-- A window opened with focus = false is shown at its chrome level and left
+	-- there. The forced focus activates Hammerspoon and, once its window lookup
+	-- has failed for a second, raises the window to the screen-saver level
+	-- above every app. That lookup goes through Accessibility, so it always
+	-- fails in an untrusted process: a window meant to sit beside another app
+	-- (System Settings) would cover it.
 	if not apply_required_webview_mutation(function() wv:show() end, "show") then
 		return abandon_required_mutation()
 	end
-	local focused = M.force_focus(wv, true, {
-		schedule_after = opts.schedule_after,
-		is_current = opts.is_current,
-	})
+	local focused = true
+	if opts.focus ~= false then
+		focused = M.force_focus(wv, true, {
+			schedule_after = opts.schedule_after,
+			is_current = opts.is_current,
+		})
+	end
 	if strict_lifecycle and focused ~= true then return abandon_required_mutation() end
 	if not webview_current() then return abandon_required_mutation() end
 	if _factory_build_owner == wv then _factory_build_owner = nil end

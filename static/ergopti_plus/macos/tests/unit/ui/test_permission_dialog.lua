@@ -47,8 +47,8 @@ local function with_dialog(body)
 			show_webview = function(opts)
 				if h.factory_error then error(h.factory_error) end
 				local wv = { opts = opts, raised = 0, deleted = false }
-				function wv.show(self) return self end
-				function wv.bringToFront(self) self.raised = self.raised + 1; return self end
+				-- The factory double shows nothing itself, so show() is a raise.
+				function wv.show(self) self.raised = self.raised + 1; return self end
 				function wv.delete(self)
 					self.deleted = true
 					opts.on_close()
@@ -103,7 +103,80 @@ local function with_dialog(body)
 	end)
 end
 
+--- Runs one case against the real window factory while the process is
+--- untrusted: the webview's window lookup goes through Accessibility, so it
+--- finds nothing, and every deferred focus retry is captured to be drained.
+--- @param body function Receives the harness.
+local function with_untrusted_factory(body)
+	local owned = { "ui.permission_dialog", "ui.ui_builder", "infra.deferred_work", "infra.i18n" }
+	helpers.with_stub_scope(owned, function()
+		local h = { deferred = {}, activations = 0, levels = {}, fronts = {}, shows = 0 }
+		package.loaded["infra.deferred_work"] = {
+			after = function(_, callback)
+				h.deferred[#h.deferred + 1] = callback
+				return true
+			end,
+		}
+		local view = {}
+		for _, name in ipairs({ "windowTitle", "windowStyle", "shadow", "allowTextEntry", "allowGestures",
+			"windowCallback", "navigationCallback", "html" }) do
+			view[name] = function(self) return self end
+		end
+		function view.level(self, level) h.levels[#h.levels + 1] = level; return self end
+		function view.show(self) h.shows = h.shows + 1; return self end
+		function view.bringToFront(self, above_all) h.fronts[#h.fronts + 1] = above_all == true; return self end
+		function view.hswindow() return nil end
+		function view.delete(self) return self end
+		local LEVELS = { floating = 3, screenSaver = 1000 }
+		h.floating = LEVELS.floating
+		helpers.load_with_stubs("ui.permission_dialog", {
+			webview = {
+				windowMasks = { titled = 1, closable = 2, utility = 16 },
+				new = function() return view end,
+				usercontent = { new = function()
+					return { setCallback = function(self) return self end }
+				end },
+			},
+			drawing = { windowLevels = LEVELS },
+			focus = function() h.activations = h.activations + 1 end,
+			screen = { mainScreen = function()
+				return { frame = function() return { x = 0, y = 25, w = 1280, h = 775 } end }
+			end },
+			processInfo = { bundlePath = BUNDLE_PATH, bundleID = "com.ergoptiplus.app.hammerspoon" },
+		})
+		h.dialog = require("ui.permission_dialog")
+		h.permission = require("adapters.accessibility_permission")
+		--- Runs every deferred focus retry, including those each retry schedules.
+		function h.drain()
+			local ran = 0
+			while #h.deferred > 0 and ran < 100 do
+				table.remove(h.deferred, 1)()
+				ran = ran + 1
+			end
+		end
+		body(h)
+	end)
+end
+
 helpers.describe("permission dialog (permission-dialog-native)", function()
+	helpers.it("stays at the floating level and never takes focus while untrusted", function()
+		with_untrusted_factory(function(h)
+			h.dialog.guide_accessibility(h.permission)
+			helpers.assert_eq(h.dialog.is_open("accessibility"), true)
+			h.drain()
+			h.dialog.guide_accessibility(h.permission)
+			h.drain()
+			helpers.assert_eq(h.shows, 2, "shown once, then raised within its level")
+			for _, above_all in ipairs(h.fronts) do
+				helpers.assert_eq(above_all, false,
+					"the screen-saver level would cover System Settings and the macOS prompt")
+			end
+			helpers.assert_eq(#h.levels, 1)
+			helpers.assert_eq(h.levels[1], h.floating, "the chrome level is the only level set")
+			helpers.assert_eq(h.activations, 0, "activating Hammerspoon pulls focus away from System Settings")
+		end)
+	end)
+
 	helpers.it("shows a native window with the localized title, steps and buttons", function()
 		with_dialog(function(h)
 			local close = h.dialog.guide_accessibility(h.permission)
