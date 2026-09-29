@@ -9,23 +9,22 @@ Update the completed item and its verification before moving to the next item.
 ## Delivery checkpoint
 
 The overhaul is not finished. Eight reviewed integration commits ended at
-`eaa06eeba`, followed by the published handoff and five CI repair commits.
-Current published checkpoint: `ffb8a80d1`. Shared JavaScript, Linux unit tests,
-all 16 layout-installer jobs, macOS Lua/E2E and 250 native Swift tests pass.
-Remaining CI blockers: Windows mixed path identities, macOS Python launch-gate
-fixtures, and Linux live scenarios (explicit opt-in, updater response size and
-release UI). The corrections are applied locally. macOS Python passes 23/23;
-Windows full unit checks pass 7239/7239, scope checks 4/4, compilation and E2E pass; Linux unit
-coverage passes 3578/3578 in a documented composite, E2E 115/115 and explicit
-live-preference owner probes 28/28. All 303 JavaScript checks pass, with unchanged source hashes.
-The corrective checkpoint is ready to publish; no new release is verified.
-The only registered worktree is the main repository. Nine temporary local
-branches have been retired after their useful content was accounted for.
-Originals and unfinished proposals are preserved in the handoff package.
+`eaa06eeba`, followed by the published handoff and CI repairs. The macOS
+cold-start errors were then fixed on `dev` (`d8d171fcd`, `56eeb70dc`,
+`8ee659e17`) and CI published `v0.0.0-dev.144` on 2026-09-29. Two stricter
+local macOS corrections followed on top of that release: gesture event-tap
+acquisition deferred to explicit startup, and configuration consumers required
+only after path initialization.
+
+Work continues from a fresh clone on a Linux container. The Windows workstation
+no longer holds any worktree, branch or external working directory: `D:/ewt`
+was deleted after its useful content was committed here. The historical
+workflow context (prompts, task status, feature map, analysis reports and
+journal) is in the handoff package's `workflow-context-2026-09-24.zip`.
 
 The user authorizes publishing `dev` and necessary CI repairs, forbids force
 pushes and new feature branches, and wants a cloneable GitHub handoff. Preserve
-unrelated changes and stage exact paths. Do not reload the live Windows driver.
+unrelated changes and stage exact paths.
 After CI and a verified new release, continue one TODO item at a time without
 parallel agents. Update this file after each finished unit and reserve enough
 quota to commit, publish and document the final clean checkpoint.
@@ -81,11 +80,9 @@ These are software implementations; final hardware verification remains below.
        update (`c4f5973`) to review. These are preserved, not silently merged.
        The retired-worktree audit also recovered unapplied D4 model labels/21
        locales and L4 boot/test changes; their exact deltas are in the same package.
-4. [ ] Finish publication: `ffb8a80d1` is on GitHub. The first Linux unit,
-       encoding and native Swift failures are resolved. Correct the remaining
-       Windows mixed-spelling case, macOS Python fixtures and Linux live tests
-       (opt-in setup, updater response size, release UI); publish, then verify
-       all workflow verdicts and release assets. A clean tree is not a release.
+4. [x] Finish publication: every Windows, Linux, shared and macOS job passed
+       and CI published `v0.0.0-dev.144`. Verify the CI verdict of the two
+       later local macOS corrections before starting item 5.
 5. [ ] Complete W1 neutral configuration and recommended/clear scopes. Finish
        macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
        composition. Keep unknown fields, verified backups, exact runtime
@@ -112,10 +109,10 @@ These are software implementations; final hardware verification remains below.
         registry values through one owner.
 14. [ ] Run final cross-driver, shared, encoding, convention and 21-locale gates;
         record real-device checks still unavailable on this Windows host.
-15. [ ] Finish storage cleanup after all useful work is recoverable from GitHub.
-        `C:/ewt` and `C:/ewtb` were removed earlier. `D:/ewt` still contains active
-        test/runtime material and recovery data. An earlier automatic approval
-        review rejected baseline deletion; do not bypass that rejection.
+15. [x] Finish storage cleanup after all useful work is recoverable from GitHub.
+        `C:/ewt`, `C:/ewtb` and `D:/ewt` are deleted. Their unique commits,
+        pending patches and specifications are in the handoff package; their
+        full-tree exports differed from `dev` only by formatting.
 16. [ ] Publish final corrective commits, verify CI and release assets, and write
         the final report with completed scope, limitations and manual test results.
 
@@ -132,5 +129,5 @@ features while leaving uncommitted work or external-only specifications.
 Portable specifications, pending changes, branch accounting and verification
 results are in [the handoff package](handovers/2026-09-28-ergoptiplus/README.md).
 Read its `VERIFICATION.md` and `VERIFICATION.json` for composite gate results.
-Detailed local logs remain under `D:/ewt/_scratch/`; those are optional evidence,
-not a dependency for continuing from GitHub.
+Paths under `D:/ewt/` in those files are historical; that directory no longer
+exists.
