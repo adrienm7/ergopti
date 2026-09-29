@@ -61,14 +61,14 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		throw TypeError("LLM saved options must be a Map.")
 	static _str_keys := ["model", "profile_id", "temperature",
 		"nav_modifiers", "val_modifiers", "trigger_shortcut", "backend",
-		"api_entry_id"]
+		"api_entry_id", "agent_system1", "agent_system2", "agent_mode"]
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",
 		"ctx_chars", "pred_indent", "ollama_port"]
 	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring",
 		"reset_on_nav", "disable_url_bars", "disable_password_fields",
 		"show_info_bar", "streaming", "show_all_at_once", "auto_raise_temp",
 		"auto_profile_for_model", "onboarding_seen", "inline_autotype"]
-	static _arr_keys := ["user_profiles", "disabled_apps"]
+	static _arr_keys := ["user_profiles", "disabled_apps", "agent_disabled_apps"]
 	for key in _str_keys {
 		if !saved_opts.Has(key)
 			continue

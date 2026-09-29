@@ -28,6 +28,7 @@ local WarmupCtrl       = require("ui.menu.menu_llm.warmup_controller")
 local BackendPanel     = require("ui.menu.menu_llm.backend_panel")
 local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local LiveModePanel    = require("ui.menu.menu_llm.live_mode_panel")
+local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
@@ -178,6 +179,12 @@ M.DEFAULT_STATE = {
 		llm_streaming           = llm_mod.DEFAULT_STATE.llm_streaming,
 		llm_streaming_multi     = llm_mod.DEFAULT_STATE.llm_streaming_multi,
 		llm_instant_on_word_end = llm_mod.DEFAULT_STATE.llm_instant_on_word_end,
+		-- The AI agent's settings (modules/llm/agent_runner.lua); its top-level
+		-- menu is built by ui/menu/menu_llm/agent_panel.lua
+		llm_agent_system1       = Manifest.default_for("llm.agent_system1"),
+		llm_agent_system2       = Manifest.default_for("llm.agent_system2"),
+		llm_agent_mode          = Manifest.default_for("llm.agent_mode"),
+		llm_agent_disabled_apps = {},
 }
 
 
@@ -1679,11 +1686,24 @@ local function create_menu(deps)
 			display_model = switcher.get_display_model_name, model_power = switcher.get_model_power_level,
 			backend_label = BackendPanel.runtime_label, reset_health = M.reset_llm_health_status,
 		})
+		-- The AI agent's top-level menu shares this menu's setting transaction: its
+		-- settings live in [llm] and are reset with the AI scope.
+		local function build_agent_item()
+				return AgentPanel.build({ state = state, settings_mgr = settings_mgr })
+		end
+		-- The llm_agent_auto_toggle action persists the mode it switches to
+		-- through the same transaction as the menu.
+		require("modules.llm.agent_runner").set_mode_persister(function(mode)
+				return settings_mgr.apply_setting_transaction({
+						key = "llm_agent_mode", value = mode, runtime_fn = "set_llm_agent_mode", publish_setting = false,
+				})
+		end)
 		return {
 				scope_runtime = scope_runtime,
 				scope_profiles = llm_mod.get_all_profiles,
 				build_item          = build_item,
 				build_download_item = build_download_item,
+				build_agent_item    = build_agent_item,
 				check_startup       = check_startup,
 				set_llm_preference_runtime = prediction_locks.apply_preference,
 				restore_preference_runtime = trigger_orch.restore_shortcuts,

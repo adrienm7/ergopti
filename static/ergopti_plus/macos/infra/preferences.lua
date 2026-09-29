@@ -117,6 +117,10 @@ local KEY_MAP = {
 	llm_pred_indent                      = { sec = "llm", path = "display", key = "pred_indent"   },
 	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = "arrow_nav_enabled" },
 	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = "val_modifiers" },
+	-- The AI agent (modules/llm/agent_runner.lua): System 1 and System 2 backends and the mode
+	llm_agent_system1                    = { sec = "llm", key = "agent_system1"                     },
+	llm_agent_system2                    = { sec = "llm", key = "agent_system2"                     },
+	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
@@ -171,6 +175,7 @@ local NESTED_KEY_MAP = {
 	llm_profile_shortcuts    = { sec = "llm",        key = "profiles.shortcuts"         },
 	llm_user_models          = { sec = "llm",        key = "models.user_models"         },
 	llm_user_profiles        = { sec = "llm",        key = "profiles.user_profiles"     },
+	llm_agent_disabled_apps  = { sec = "llm",        key = "agent_disabled_apps"        },
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
 	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },

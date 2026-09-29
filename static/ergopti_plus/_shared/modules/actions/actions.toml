@@ -1024,6 +1024,29 @@ parameter = "llm_vision"
 platform = "all"
 parameter = "llm_language"
 
+[sg_actions.llm_agent_selection]
+# "What can I do with this?": System 2 (llm.agent_system2) reads the
+# SELECTION and proposes at most three actions of the closed schema of
+# _shared/modules/llm/agent.json (calendar event, reminder, mail draft, one of
+# the user's shortcuts) as tooltip candidates; accepting one hands it to the
+# driver's connector. Nothing runs without that acceptance. Nothing selected:
+# a notice. It refuses like llm_generate_prediction, and with a notice when
+# no System 2 is chosen.
+platform = "all"
+
+[sg_actions.llm_agent_command]
+# llm_agent_selection on a command the user types in a dialog ("meeting
+# tomorrow 9am with the product team") instead of the selection.
+platform = "all"
+
+[sg_actions.llm_agent_auto_toggle]
+# Switches the agent between its automatic mode and "on action"
+# (llm.agent_mode "auto" <-> "action"; from "off" it goes to "auto"). In the
+# automatic mode, after a pause in typing, System 1 triages the sentence and,
+# above the learned threshold of its intent in the current app, System 2
+# proposes actions in the tooltip; Tab runs the selected one.
+platform = "all"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1449,6 +1472,9 @@ items = [
     "llm_screen_full",
     "llm_screen_error",
     "llm_translate_selection",
+    "llm_agent_selection",
+    "llm_agent_command",
+    "llm_agent_auto_toggle",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",

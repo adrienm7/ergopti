@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Read-only environment probes for the boot diagnostic snapshot: macOS and
 --- Hammerspoon versions, architecture, screens, keyboard input source and the
---- process owner. Kept in the adapter layer so the collector in
+--- process owner; and the system time zone the AI agent resolves dates in. Kept in the adapter layer so the collector in
 --- infra/diagnostic_snapshot.lua stays free of hs.* calls and is testable with
 --- a plain table.
 ---
@@ -78,6 +78,16 @@ end
 --- @return string|nil The user's home directory.
 function M.home()
 	return os.getenv("HOME")
+end
+
+--- The IANA name of the system time zone ("Europe/Paris"): /etc/localtime is a
+--- link into the zoneinfo database, and the zone is the path below it.
+--- @return string|nil Time zone name, nil when it cannot be read.
+function M.time_zone()
+	return probe(function()
+		local target = hs.fs.pathToAbsolute("/etc/localtime")
+		return type(target) == "string" and target:match("/zoneinfo/(.+)$") or nil
+	end)
 end
 
 return M

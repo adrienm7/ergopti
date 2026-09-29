@@ -105,7 +105,9 @@ const OPENS_SUBMENU = {
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six
 	// subsections described capabilities with no rows behind them.
-	llm: 'llm_menu'
+	llm: 'llm_menu',
+	// The AI agent submenu (_shared/modules/llm/agent.json), on every driver.
+	agent: 'agent_menu'
 };
 
 const errors = [];
@@ -543,7 +545,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // linux 13 → 12 in 2026-09: the Updates submenu folded into About (about_menu
 // renders the same rows on all three drivers), so one menu key went away
 // without any row leaving the renderer.
-const RENDERED_THROUGH_SHARED = { hs: 13, linux: 12 };
+const RENDERED_THROUGH_SHARED = { hs: 14, linux: 13 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

@@ -34,6 +34,7 @@ local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
+local TextPrompt = require("ui.text_prompt")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
@@ -109,7 +110,8 @@ local function succeeded(status)
 	return status == true or status == 0
 end
 
---- Asks the user for a line of text.
+--- Asks the user for a line of text (ui/text_prompt.lua, shared with the AI
+--- agent's command dialog).
 ---
 --- Declared here, above every closure that calls it: a `local` declared after a
 --- closure that uses it is captured as a nil GLOBAL, and the call fails at click
@@ -121,25 +123,7 @@ end
 --- @param hidden boolean|nil Mask the typed text (an API key).
 --- @return string|nil The entered text, or nil when the dialog was cancelled.
 local function prompt_text(title, prompt, initial, hidden)
-	local command = "zenity --entry --title=" .. shell_quote(title)
-		.. " --text=" .. shell_quote(prompt)
-		.. " --entry-text=" .. shell_quote(initial or "")
-		.. (hidden and " --hide-text" or "") .. " 2>/dev/null"
-	local value, ok = Modal.run(function()
-		local pipe = io.popen(command, "r")
-		if not pipe then return nil, nil end
-		local text = pipe:read("*a") or ""
-		return text, pipe:close()
-	end)
-	if value == nil then
-		Logger.error(LOG, "Zenity is unavailable: cannot prompt for '%s'.", tostring(title))
-		return nil
-	end
-	-- A non-zero exit is Cancel or the window being closed. Distinguished from an
-	-- empty entry, which exits zero: the first must change nothing, the second is
-	-- a value the caller gets to refuse with its own message.
-	if not succeeded(ok) then return nil end
-	return (value:gsub("[\r\n]+$", ""))
+	return TextPrompt.ask(title, prompt, initial, hidden)
 end
 
 --- Shows a message the user must acknowledge.
@@ -2189,6 +2173,22 @@ local function _build_llm(ctx)
 	return { label = i18n_safe("menu.llm.title"), checked = enabled, submenu = items }
 end
 
+--- Builds the AI agent submenu (ui/menu/agent_rows.lua).
+--- @param ctx table Menu context.
+--- @return table Row data { label, submenu }.
+local function _build_agent(ctx)
+	if not ManifestMenu then
+		Logger.error(LOG, "Manifest renderer unavailable — the AI agent submenu cannot be built.")
+		return { label = i18n_safe("menu.agent.title"), disabled = true }
+	end
+	return require("ui.menu.agent_rows").build(ctx, {
+		prompt = function(title, text, initial, hidden, choices)
+			return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+		end,
+		error = function(text) show_error(zenity_plain(text)) end,
+	})
+end
+
 --- Builds the metrics/keylogger submenu.
 --- Reports the at-rest migration and offers to stop it.
 --- Converting a year of stored rows takes minutes, and without this entry the
@@ -3767,6 +3767,7 @@ function M.build(ctx)
 		["keyboard_layout"] = _build_layouts,
 		["hotstrings"]      = _build_hotstrings,
 		["llm"]             = _build_llm,
+		["agent"]           = _build_agent,
 		["metrics"]         = _build_metrics,
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,

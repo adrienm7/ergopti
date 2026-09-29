@@ -299,6 +299,18 @@ M.features = {
 		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = true,
 	},
 	{
+		path = "llm.agent_system1", id = "agent_system1", section = "llm", default = "", type = "string", description_key = "menu.agent.system1_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
+	},
+	{
+		path = "llm.agent_system2", id = "agent_system2", section = "llm", default = "", type = "string", description_key = "menu.agent.system2_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
+	},
+	{
+		path = "llm.agent_mode", id = "agent_mode", section = "llm", default = "off", type = "string", description_key = "menu.agent.mode_title", platforms = { "ahk", "hs", "linux" }, recommended = "off", input_altering = false,
+	},
+	{
+		path = "llm.agent_disabled_apps", id = "agent_disabled_apps", section = "llm", default = {  }, type = "array", description_key = "menu.agent.disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
+	},
+	{
 		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false,
 	},
 	{

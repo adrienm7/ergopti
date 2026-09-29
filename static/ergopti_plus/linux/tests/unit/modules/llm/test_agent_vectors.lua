@@ -18,6 +18,7 @@ local json = require("json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local Agent = require("llm.agent")
+local Vision = require("llm.vision")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -91,6 +92,12 @@ helpers.describe("agent helpers replay the shared agent corpus", function()
 			assert_triage(Agent.parse_jev(config, v.response), v.triage, v.id)
 		end)
 	end
+	for _, v in ipairs(corpus.jev_questions) do
+		helpers.it("jev questions '" .. v.id .. "'", function()
+			local ok, why = deep_equal(Agent.jev_questions(config), v.questions)
+			helpers.assert_true(ok, v.id .. ": " .. tostring(why))
+		end)
+	end
 	for _, v in ipairs(corpus.should_act) do
 		helpers.it("should act '" .. v.id .. "'", function()
 			helpers.assert_eq(Agent.should_act(v.triage, v.threshold), v.act, v.id)
@@ -141,6 +148,12 @@ helpers.describe("agent helpers replay the shared agent corpus", function()
 	for _, v in ipairs(corpus.applescript) do
 		helpers.it("applescript '" .. v.id .. "'", function()
 			helpers.assert_eq(Agent.applescript_string(v.text), v.literal, v.id)
+		end)
+	end
+	for _, v in ipairs(corpus.resolve_model) do
+		helpers.it("resolve model '" .. v.id .. "'", function()
+			local providers = read_json("modules/llm/api_providers.json")
+			helpers.assert_eq(Agent.resolve_model(Vision.parse(v.value), config, providers), v.expected.model, v.id)
 		end)
 	end
 	for _, v in ipairs(corpus.learn) do

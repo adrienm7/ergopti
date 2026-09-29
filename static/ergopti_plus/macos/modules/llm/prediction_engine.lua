@@ -2214,6 +2214,16 @@ function M.admit_answer_request(label)
 	return true
 end
 
+--- Tells whether the focused field or application refuses AI text: a secure
+--- (password) field, a window the keymap ignores, or one of `excluded_apps`.
+--- The AI agent asks it before it reads the selection or the typing.
+--- @param excluded_apps table|nil Exclusion descriptors ({ name, bundleID, appPath }).
+--- @return boolean blocked
+function M.is_focus_blocked(excluded_apps)
+	if not require_state("is_focus_blocked") then return true end
+	return AppFilter.is_blocked(_state, type(excluded_apps) == "table" and excluded_apps or {}, false, true) == true
+end
+
 --- Sends one answer request to the current backend: a plain chat turn with the
 --- caller's system prompt, answered unparsed, with no PREFIX/TAIL turn, no
 --- tooltip and no streaming.
@@ -2282,32 +2292,47 @@ end
 --- with the usual navigation. Accepting one types it at the caret without
 --- erasing anything (deletes 0, typed verbatim), or, when `on_accept` is given,
 --- hands its text to `on_accept` instead (the translation replaces the
---- selection).
+--- selection). `on_accept` may also be a list with one handler per answer: the
+--- AI agent's candidates are labels, and each runs its own action.
 --- @param session number What open_answer_surface returned.
 --- @param answers table The answer texts, in answer order.
 --- @param expected number How many answers are still coming in total; a loading
 ---        row stands for the missing ones.
---- @param on_accept function|nil Receives the accepted text; returns true when
----        it was applied.
+--- @param on_accept function|table|nil Receives the accepted text; returns true
+---        when it was applied. A table holds one such function per answer.
+--- @param on_dismiss function|nil Runs once when the answers are dismissed
+---        (Escape, typing over them, the dismiss delay), never on an acceptance
+---        or when a newer request replaces them.
 --- @return boolean shown False when the surface is gone (the user typed,
 ---         accepted or dismissed it, or a newer request replaced it).
-function M.show_answers(session, answers, expected, on_accept)
+function M.show_answers(session, answers, expected, on_accept, on_dismiss)
 	if not runtime_available() or not require_state("show_answers") then return false end
 	if type(answers) ~= "table" or #answers == 0 then
 		error("show_answers: at least one answer is required")
 	end
-	if on_accept ~= nil and type(on_accept) ~= "function" then
-		error("show_answers: on_accept must be a function or nil")
+	if type(on_accept) == "table" then
+		for index = 1, #answers do
+			if type(on_accept[index]) ~= "function" then
+				error("show_answers: on_accept must hold one function per answer")
+			end
+		end
+	elseif on_accept ~= nil and type(on_accept) ~= "function" then
+		error("show_answers: on_accept must be a function, a list of functions or nil")
+	end
+	if on_dismiss ~= nil and type(on_dismiss) ~= "function" then
+		error("show_answers: on_dismiss must be a function or nil")
 	end
 	if session ~= fetch_request_counter then
 		Logger.info(LOG, "Answers dropped: their surface is gone.")
 		return false
 	end
 	local predictions = {}
-	for _, text in ipairs(answers) do
+	for index, text in ipairs(answers) do
 		predictions[#predictions + 1] = {
 			deletes = 0, to_type = text, nw = text, chunks = {},
-			has_corrections = false, disable_bold = true, verbatim = true, on_accept = on_accept,
+			has_corrections = false, disable_bold = true, verbatim = true,
+			on_accept = type(on_accept) == "table" and on_accept[index] or on_accept,
+			on_dismiss = on_dismiss,
 		}
 	end
 	local waiting = #answers < expected
@@ -2554,6 +2579,15 @@ function M.reset(options)
 			cleanup_committed = false
 			Logger.error(LOG, "Prediction dismissal telemetry could not be scheduled (result: %s).",
 				tostring(handle_or_err))
+		end
+	end
+	-- Answers that learn from a dismissal (the AI agent's automatic suggestions)
+	-- are told once, after their surface is gone
+	local on_dismiss = dismissed_predictions and dismissed_predictions[1].on_dismiss or nil
+	if type(on_dismiss) == "function" then
+		local dismiss_ok, dismiss_error = xpcall(on_dismiss, debug.traceback)
+		if not dismiss_ok then
+			Logger.error(LOG, "Answer dismissal callback raised: %s.", tostring(dismiss_error))
 		end
 	end
 	log_request_cancellation(cancelled_log_id, "reset")

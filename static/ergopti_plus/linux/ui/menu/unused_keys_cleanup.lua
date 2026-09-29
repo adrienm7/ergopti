@@ -46,6 +46,7 @@ function M.collect(decoded, mark)
 		require("modules.llm." .. name).mark_config_reads(decoded, mark)
 	end
 	require("modules.llm.profiles").mark_config_reads(decoded, mark)
+	require("modules.llm.agent_settings").mark_config_reads(decoded, mark)
 	require("infra.llm_preferences").mark_config_read(decoded, "llm.models.selected", mark)
 	require("modules.updater.manager").mark_config_reads(decoded, mark)
 	require("ui.onboarding.bridge")._answers_from_config(decoded, "", mark)

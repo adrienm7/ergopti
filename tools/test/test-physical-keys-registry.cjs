@@ -293,7 +293,8 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	const NAMED = {
 		LEFTSHIFT: 'ShiftLeft', RIGHTSHIFT: 'ShiftRight', LEFTCTRL: 'ControlLeft', RIGHTCTRL: 'ControlRight',
 		LEFTALT: 'AltLeft', RIGHTALT: 'AltRight', LEFTMETA: 'MetaLeft', RIGHTMETA: 'MetaRight',
-		CAPSLOCK: 'CapsLock', BACKSPACE: 'Backspace', TAB: 'Tab', ENTER: 'Enter', ESC: 'Escape'
+		CAPSLOCK: 'CapsLock', BACKSPACE: 'Backspace', TAB: 'Tab', ENTER: 'Enter', ESC: 'Escape',
+		UP: 'ArrowUp', DOWN: 'ArrowDown'
 	};
 	const consts = {};
 	for (const m of src.matchAll(/^M\.KEY_([A-Z]+)\s*=\s*(\d+)/gm)) consts[m[1]] = Number(m[2]);

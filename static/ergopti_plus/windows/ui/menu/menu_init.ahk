@@ -113,6 +113,7 @@ _MI_TopLevelBuilders() {
 		"keyboard_layout", _MI_StageLayout,
 		"hotstrings",      _MI_StageHotstrings,
 		"llm",             _MI_StageLlm,
+		"agent",           _MI_StageAgent,
 		"metrics",         _MI_StageMetrics,
 		"shortcuts",       _MI_StageShortcuts,
 		"tap_holds",       _MI_StageTapHolds,
@@ -275,6 +276,17 @@ _MI_StageLlm() {
 	_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)
 	LLM_Menu_Init(_LlmSavedOpts)
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
+}
+
+
+; ── 🤖 AI agent — its own top-level submenu (ui/menu/menu_llm/menu_agent.ahk),
+; ticked while the agent is not off.
+_MI_StageAgent() {
+	AgentTitle := t("menu.agent.title")
+	TrayMenuStage_AddFeature(AgentTitle, LLM_Agent_MenuBuild())
+	if (LLM_Agent_Setting("agent_mode") != "off")
+		TrayMenuStage_Check(AgentTitle)
+	BootProfile_Mark("MENU/initMenu: agent menu")
 }
 
 

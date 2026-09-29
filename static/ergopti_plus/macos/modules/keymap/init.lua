@@ -676,6 +676,10 @@ M.set_llm_streaming_multi        = LLMBridge.set_llm_streaming_multi
 M.set_llm_url_bar_filter_enabled      = LLMBridge.set_llm_url_bar_filter_enabled
 M.set_llm_secure_field_filter_enabled = LLMBridge.set_llm_secure_field_filter_enabled
 M.set_llm_instant_on_word_end         = LLMBridge.set_llm_instant_on_word_end
+M.set_llm_agent_system1               = LLMBridge.set_llm_agent_system1
+M.set_llm_agent_system2               = LLMBridge.set_llm_agent_system2
+M.set_llm_agent_mode                  = LLMBridge.set_llm_agent_mode
+M.set_llm_agent_disabled_apps         = LLMBridge.set_llm_agent_disabled_apps
 
 M.set_preview_enabled             = LLMBridge.set_preview_enabled
 M.set_preview_star_enabled        = LLMBridge.set_preview_star_enabled
@@ -692,6 +696,9 @@ M.get_live_prompt    = LLMBridge.get_live_prompt
 M.request_tone_step = LLMBridge.request_tone_step
 M.request_screen_answers = LLMBridge.request_screen_answers
 M.request_selection_translation = LLMBridge.request_selection_translation
+M.request_agent_selection = LLMBridge.request_agent_selection
+M.request_agent_command = LLMBridge.request_agent_command
+M.toggle_agent_auto = LLMBridge.toggle_agent_auto
 M.reset_predictions  = LLMBridge.reset_predictions
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 

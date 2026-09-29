@@ -977,6 +977,10 @@ LLM_Bridge_OnChar(ch) {
 		return
 
 	_LLM_Bridge_ApplyBufferEdit(0, ch)
+	; The AI agent's automatic mode waits for a pause in the same typing, and
+	; every keystroke retires its flow in flight, hotstring tooltip or not
+	if IsSet(LLM_Agent_OnTyping)
+		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
@@ -1053,6 +1057,8 @@ LLM_Bridge_OnBackspace() {
 		return
 
 	_LLM_Bridge_ApplyBufferEdit(1, "")
+	if IsSet(LLM_Agent_OnTyping)
+		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 
 	; Same hotstring-priority guard as OnChar.
 	if TooltipIsVisible()
@@ -1421,6 +1427,15 @@ LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
 		text, AdmissionSeed, RequestId, false, Slots?, ActiveIdx,
 		PresentedRecord, PresentedLifecycle,
 		_LLM_Bridge_AcceptedSlotEdit(text, Slots?, ActiveIdx))
+	; A slot with an accept handler of its own (an AI agent action) runs it
+	; instead of typing anything: the offer is retired like a typed one, then
+	; the handler runs on a fresh thread, off the Tab key's
+	Handler := _LLM_Bridge_AcceptedSlotHandler(Transaction)
+	if HasMethod(Handler, "Call") {
+		_LLM_Bridge_OnInjectComplete(Transaction, true)
+		SetTimer(Handler, -1)
+		return
+	}
 	; The completion callback owns the tooltip and the acceptance claim, so a
 	; refusal goes through it exactly like a sender that rejected the output.
 	if !_LLM_Bridge_RewriteStillApplies(Transaction) {
@@ -1431,6 +1446,21 @@ LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
 	}
 	TextSend(text, _LLM_Bridge_InjectionOptions(Transaction),
 		_LLM_Bridge_OnInjectComplete.Bind(Transaction))
+}
+
+; The accept handler of the accepted slot, when it has one: the AI agent's
+; candidates carry the action they run in place of a text to type.
+; @param {Object} Transaction The acceptance transaction.
+; @returns {Func|String} The handler, "" for an ordinary slot.
+_LLM_Bridge_AcceptedSlotHandler(Transaction) {
+	Slots := Transaction.Slots
+	Index := Transaction.ActiveIdx
+	if !(Slots is Array) || Index < 1 || Index > Slots.Length
+		return ""
+	Slot := Slots[Index]
+	if !IsObject(Slot) || !Slot.HasOwnProp("OnAccept") || !HasMethod(Slot.OnAccept, "Call")
+		return ""
+	return Slot.OnAccept
 }
 
 ; Selects the text an accepted slot typed again when the slot asks for it: a
