@@ -793,6 +793,17 @@ end
 -- =========================================
 -- =========================================
 
+--- The extensions installed on this machine, as the shared scanner reports them.
+--- @return table Array of extension records (toml_files, bound_files, …).
+function M.discover_extensions()
+	if type(Paths.extension_roots) ~= "function" then return {} end
+	return Extensions.scan(Paths.extension_roots(), {
+		list_dirs  = Loader.list_subdirs,
+		list_files = Loader.find_toml_files,
+		read_file  = Loader.read_file,
+	})
+end
+
 --- The extension packs installed on this machine, as loader entries.
 ---
 --- Separate from the bundled/user merge below because extensions answer a
@@ -800,15 +811,10 @@ end
 --- this one is "what did the user install on top". Returned in the shape
 --- load_catalogue understands directly, so no caller has to know the namespacing
 --- rule that keeps a third party's `rolls.toml` from displacing the bundled one.
+--- @param found table|nil Records from discover_extensions(); discovered when nil.
 --- @return table Array of { path, category, extension }.
-function M.extension_packs()
-	if type(Paths.extension_roots) ~= "function" then return {} end
-
-	local found = Extensions.scan(Paths.extension_roots(), {
-		list_dirs  = Loader.list_subdirs,
-		list_files = Loader.find_toml_files,
-		read_file  = Loader.read_file,
-	})
+function M.extension_packs(found)
+	found = found or M.discover_extensions()
 
 	local entries = {}
 	for _, extension in ipairs(found) do
@@ -824,6 +830,67 @@ function M.extension_packs()
 		Logger.info(LOG, "Extensions: %d pack(s) from %d extension(s).", #entries, #found)
 	end
 	return entries
+end
+
+--- Routes the bundled categories an extension binds to the files it ships.
+---
+--- A whole-category binding replaces the bundled file; a section binding loads
+--- those sections from the extension file and every other section, and the
+--- category's metadata, from the bundled one. The rules keep their category and
+--- common source tier, so existing preferences still address them. Every bound
+--- source is resolved through the shared owner, which refuses two owners.
+--- @param paths table Loader sources: paths, or { path, category, … } tables.
+--- @param found table Records from discover_extensions().
+--- @return table The sources with the bound files routed in.
+function M.route_bound_sources(paths, found)
+	local bound_sections, section_files, whole, whole_order = {}, {}, {}, {}
+	for _, extension in ipairs(found) do
+		for _, file in ipairs(extension.bound_files or {}) do
+			local binding = file.binding
+			if binding.sections == nil then
+				whole[binding.category] = Extensions.bound_source(found, binding.category)
+				whole_order[#whole_order + 1] = binding.category
+			else
+				for _, section in ipairs(binding.sections) do
+					Extensions.bound_source(found, binding.category, section)
+					local skipped = bound_sections[binding.category] or {}
+					skipped[#skipped + 1] = section
+					bound_sections[binding.category] = skipped
+				end
+				section_files[#section_files + 1] = {
+					path = file.path, category = binding.category, only_sections = binding.sections,
+				}
+			end
+		end
+	end
+
+	local routed, placed = {}, {}
+	for _, source in ipairs(paths) do
+		local path = type(source) == "table" and source.path or source
+		local category = type(source) == "table" and source.category or path:match("([^/\\]+)%.toml$")
+		if whole[category] then
+			routed[#routed + 1] = { path = whole[category], category = category }
+		elseif bound_sections[category] then
+			local entry = type(source) == "table" and source or { path = path }
+			routed[#routed + 1] = {
+				path = entry.path, category = category, extension = entry.extension,
+				skip_sections = bound_sections[category],
+			}
+		else
+			routed[#routed + 1] = source
+		end
+		placed[category] = true
+	end
+	-- A category the bundled catalogue no longer carries is still the file's.
+	for _, category in ipairs(whole_order) do
+		if not placed[category] then routed[#routed + 1] = { path = whole[category], category = category } end
+	end
+	-- After the bundled files, so the category record starts from their metadata.
+	for _, entry in ipairs(section_files) do routed[#routed + 1] = entry end
+	if next(whole) or #section_files > 0 then
+		Logger.info(LOG, "Extensions: routed %d section file(s) into bundled categories.", #section_files)
+	end
+	return routed
 end
 
 --- The language packs declared by the shared hotstring index, read once.
@@ -920,7 +987,9 @@ local function resolve_paths()
 	-- namespaced category key so a third party shipping `rolls.toml` cannot
 	-- replace the bundled category of that name. Appended rather than merged for
 	-- the same reason — an extension adds categories, it never substitutes one.
-	for _, entry in ipairs(M.extension_packs()) do
+	local found = M.discover_extensions()
+	paths = M.route_bound_sources(paths, found)
+	for _, entry in ipairs(M.extension_packs(found)) do
 		paths[#paths + 1] = entry
 	end
 
