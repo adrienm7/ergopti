@@ -31,9 +31,6 @@ M.SCHEMA_VERSION = 1
 -- Where the generated catalogue lives, relative to the shared tree.
 M.CATALOGUE_PATH = "ui/_generated/onboarding_catalogue.json"
 
--- The trigger character is typed by one key: a short value, never text.
-local MAX_TRIGGER_CHARACTERS = 3
-
 
 
 
@@ -92,7 +89,11 @@ function M.load(text, driver)
 	for _, page in ipairs(platform.pages) do
 		if type(page.master) == "table" then claim(page.master.path, { kind = "switch", default = false }) end
 		if type(page.magic_key) == "table" then
-			claim(page.magic_key.path, { kind = "character", default = page.magic_key.default })
+			local limit = page.magic_key.max_characters
+			assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0,
+				"the onboarding catalogue gives the trigger character no length limit")
+			claim(page.magic_key.path, { kind = "character", default = page.magic_key.default,
+				max_characters = limit })
 		end
 		walk(page.groups)
 	end
@@ -144,8 +145,8 @@ local function refusal(entry, value)
 		return "the trigger character must be visible text"
 	end
 	local length = utf8_length(value)
-	if not length or length > MAX_TRIGGER_CHARACTERS then
-		return "the trigger character is at most " .. MAX_TRIGGER_CHARACTERS .. " characters"
+	if not length or length > entry.max_characters then
+		return "the trigger character is at most " .. entry.max_characters .. " characters"
 	end
 	return nil
 end

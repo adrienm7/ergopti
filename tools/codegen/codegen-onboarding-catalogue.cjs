@@ -627,6 +627,9 @@ function magicKeyFor(id, page, platform, projection, labels) {
 	if (!options.some((option) => option.value === values.default)) {
 		throw new Error(`${choice.path} options must include its default ${values.default}`);
 	}
+	if (!Number.isInteger(choice.max_characters) || choice.max_characters < 1) {
+		throw new Error(`[onboarding.pages.${id}.magic_key] needs a positive max_characters`);
+	}
 	return {
 		path: choice.path,
 		default: values.default,
@@ -634,6 +637,7 @@ function magicKeyFor(id, page, platform, projection, labels) {
 		label_key: labels.requireKey(choice.label_key, choice.path),
 		hint_key: labels.requireKey(choice.hint_key, choice.path),
 		custom_label_key: labels.requireKey(choice.custom_label_key, choice.path),
+		max_characters: choice.max_characters,
 		options
 	};
 }
@@ -726,20 +730,28 @@ function buildCatalogue() {
 		};
 	}
 	// One answer per path: two rows writing one key would race in the batch.
+	// Answers are Booleans or strings: AutoHotkey's JSON reader has no Boolean
+	// type, so a numeric answer could not be told from a switch there.
 	for (const [driver, data] of Object.entries(platforms)) {
 		const seen = new Set();
-		const claim = (entryPath) => {
-			if (seen.has(entryPath))
-				throw new Error(`${driver}: ${entryPath} is written by two wizard rows`);
-			seen.add(entryPath);
+		const claim = (entry) => {
+			if (seen.has(entry.path))
+				throw new Error(`${driver}: ${entry.path} is written by two wizard rows`);
+			seen.add(entry.path);
+			for (const field of ['value', 'default']) {
+				const kind = typeof entry[field];
+				if (field in entry && kind !== 'boolean' && kind !== 'string') {
+					throw new Error(`${driver}: ${entry.path} ${field} must be a Boolean or a string`);
+				}
+			}
 		};
 		for (const page of data.pages) {
-			if (page.master) claim(page.master.path);
-			if (page.magic_key) claim(page.magic_key.path);
+			if (page.master) claim(page.master);
+			if (page.magic_key) claim(page.magic_key);
 			(function walk(groups) {
 				for (const group of groups) {
-					if (group.path) claim(group.path);
-					for (const item of group.items || []) claim(item.path);
+					if (group.path) claim(group);
+					for (const item of group.items || []) claim(item);
 					walk(group.groups || []);
 				}
 			})(page.groups);
