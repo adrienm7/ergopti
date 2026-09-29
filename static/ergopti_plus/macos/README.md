@@ -74,7 +74,10 @@ feature logic lives in the modules it loads.
 > AI runtimes: neither is bundled, and neither is fetched at startup, when the
 > AI is enabled with another backend, or after an update. The first selection
 > of the MLX backend runs `modules/llm/ensure-mlx-deps.sh`, which builds the
-> venv from the pinned `pyproject.toml`; later selections reuse it. The first
+> venv from the pinned `pyproject.toml`; later selections reuse it. When its
+> packages stop importing (a `uv.lock` bump in an update, a partial venv), the
+> model check marks it not installed and the next MLX selection rebuilds it.
+> A backend row switches only after its runtime install succeeds. The first
 > selection of the Ollama backend reuses an installed Ollama
 > (`modules/llm/ollama_binary.lua`: Ollama.app, `~/Applications`, Homebrew,
 > Ergopti's Application Support copy, then `PATH`) or offers to download the
