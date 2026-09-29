@@ -69,16 +69,35 @@ function M.bind(preferences, opts)
 	local committed_preferences = clone_value(opts.initial_preferences)
 	local rolling_back = false
 	local revision = 0
+	-- The earlier revision whose exact content restore() reinstated, until the
+	-- next change: an owner that committed before the one just reverted still
+	-- holds that revision, and must be able to revert in turn.
+	local reinstated = nil
 	local checkpoint = {}
 	function checkpoint.capture()
 		return { state = clone_value(committed_state), preferences = clone_value(committed_preferences), revision = revision }
 	end
 	function checkpoint.replace(expected, next_state, next_preferences)
-		if rolling_back or type(expected) ~= "table" or expected.revision ~= revision
+		if rolling_back or type(expected) ~= "table"
+			or (expected.revision ~= revision and (reinstated == nil or expected.revision ~= reinstated))
 			or type(next_state) ~= "table" or type(next_preferences) ~= "table" then return false end
 		committed_state, committed_preferences = clone_value(next_state), clone_value(next_preferences)
-		revision = revision + 1
+		revision, reinstated = revision + 1, nil
 		return true, checkpoint.capture()
+	end
+	--- Reinstates an earlier capture in place of `expected`, the exact inverse of
+	--- a scoped publication. Content only changes with the revision, so the
+	--- result equals that earlier revision's and still answers to it.
+	--- @param expected table The capture the inverted publication produced.
+	--- @param prior table The capture taken before that publication.
+	--- @return boolean restored
+	--- @return table|nil capture
+	function checkpoint.restore(expected, prior)
+		if type(prior) ~= "table" or type(prior.revision) ~= "number" then return false end
+		local accepted, captured = checkpoint.replace(expected, prior.state, prior.preferences)
+		if accepted ~= true then return false end
+		reinstated = prior.revision
+		return true, captured
 	end
 
 	local function rollback()
@@ -122,7 +141,7 @@ function M.bind(preferences, opts)
 			opts.builder,
 			opts.hot_counter,
 			function(saved_snapshot, runtime_snapshot)
-				revision = revision + 1
+				revision, reinstated = revision + 1, nil
 				committed_state = clone_value(state)
 				if opts.snapshot_view then
 					if type(runtime_snapshot) ~= "table" then

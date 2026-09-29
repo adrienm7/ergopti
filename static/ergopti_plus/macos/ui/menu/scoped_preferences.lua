@@ -26,7 +26,8 @@ function M.new(options)
 			and type(demotions.readopt) == "function", "scope needs the session demotion owner")
 	end
 	assert(type(checkpoint) == "table" and type(checkpoint.capture) == "function"
-		and type(checkpoint.replace) == "function", "scope needs the ordinary-save checkpoint")
+		and type(checkpoint.replace) == "function" and type(checkpoint.restore) == "function",
+		"scope needs the ordinary-save checkpoint")
 	for _, name in ipairs({ "capture", "apply", "restore" }) do
 		assert(type(runtime[name]) == "function", "scope runtime port missing: " .. name)
 	end
@@ -110,8 +111,9 @@ function M.new(options)
 						snapshot.source_staged = false
 					end
 					if snapshot.staged_checkpoint then
-						if checkpoint.replace(snapshot.staged_checkpoint, snapshot.checkpoint.state,
-							snapshot.checkpoint.preferences) ~= true then return false end
+						-- restore, not replace: a later owner of this checkpoint, reverted
+						-- first, advanced the revision this staged capture holds.
+						if checkpoint.restore(snapshot.staged_checkpoint, snapshot.checkpoint) ~= true then return false end
 						snapshot.staged_checkpoint = nil
 					end
 					return true
