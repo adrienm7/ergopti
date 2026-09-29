@@ -203,7 +203,9 @@ function M.new(options)
 			done(false, report)
 			return false
 		end
-		local resolved, steps, skipped = pcall(resolve, options.manifest.scopes(), options.scope, options.participants())
+		local resolved, steps, skipped = pcall(function()
+			return resolve(options.manifest.scopes(), options.scope, options.participants())
+		end)
 		if not resolved then
 			report.detail = tostring(steps)
 			logger.error(LOG, "Scope %s cannot be composed: %s.", options.scope, report.detail)

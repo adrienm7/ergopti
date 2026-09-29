@@ -205,6 +205,16 @@ return function(helpers)
 			helpers.assert_eq(trace, {})
 		end)
 
+		helpers.it("reports a registry provider that raises instead of letting it escape", function()
+			local owner = Composition.new({ manifest = Manifest, scope = "global", logger = recording_logger(),
+				participants = function() error("gesture owner unavailable") end })
+			local accepted, ok, report = run(owner, "recommended")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(report.detail:find("gesture owner unavailable", 1, true) ~= nil, report.detail)
+			helpers.assert_eq(owner.pending(), false)
+		end)
+
 		helpers.it("refuses an incomplete participant and an unknown mode before any change", function()
 			local trace = {}
 			local incomplete = participant(trace, "gestures")
