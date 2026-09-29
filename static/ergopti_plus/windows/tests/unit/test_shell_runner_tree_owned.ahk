@@ -20,7 +20,11 @@ global SRTOW_PID_WAIT_MS := 5000
 global SRTOW_PID_POLL_MS := 10
 global SRTOW_LATE_EFFECT_WAIT_MS := 1800
 global SRTOW_TERMINATE_RETURN_MAX_MS := 1500
-global SRTOW_EXIT_SIGNAL_SETTLE_MS := 500
+; Ceiling of every bounded wait for an asynchronous native exit or cleanup
+; signal. The waits return as soon as the signal arrives, so the ceiling only
+; costs time on a genuine failure; it matches the other event waits because a
+; loaded CI runner once took over 500 ms to signal a terminated job child.
+global SRTOW_EXIT_SIGNAL_SETTLE_MS := 5000
 global SRTOW_NATURAL_CHILD_DELAY_MS := 800
 global SRTOW_NATURAL_WAIT_MS := 5000
 global SRTOW_ONDONE_SETTLE_MS := 250

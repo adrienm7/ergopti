@@ -87,8 +87,9 @@ _SRTNR_RefusedRequest(Mode := "deliver") {
 		if Mode = "pause"
 			Suspend(true)
 		AssertTrue(DllCall("Kernel32\TerminateJobObject", "Ptr", Scope.GuardianJob,
-			"UInt", SR_TREE_TERMINATE_EXIT_CODE, "Int"))
-		AssertTrue(_SRTOW_WaitForExactProcessExit(Scope.Observer))
+			"UInt", SR_TREE_TERMINATE_EXIT_CODE, "Int"), "the full-rights guardian must terminate the child")
+		AssertTrue(_SRTOW_WaitForExactProcessExit(Scope.Observer),
+			"the guardian's termination must signal the exact child's exit")
 		; Release the independent reference before asking job accounting to drain
 		AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Scope.Observer, "Int"))
 		Scope.Observer := 0
