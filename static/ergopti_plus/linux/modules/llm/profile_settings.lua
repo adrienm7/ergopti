@@ -297,6 +297,59 @@ function M.resolve(current_model)
 		M.effective_profile(current_model), load_user_profiles(), profiles())
 end
 
+--- Returns the profile with exactly this ID, built-in or user-defined.
+--- For a request that names its own profile (an llm_prompt binding): unlike
+--- resolve(), an unknown ID is nil, because a binding naming a deleted prompt
+--- must be refused, never run with "basic" instead.
+--- @param profile_id string
+--- @return table|nil profile Detached copy, nil when no profile has this ID.
+function M.resolve_id(profile_id)
+	if type(profile_id) ~= "string" or profile_id == "" then return nil end
+	for _, profile in ipairs(Selector.get_all_profiles(load_user_profiles(), profiles())) do
+		if profile.id == profile_id then return copy_profile(profile) end
+	end
+	return nil
+end
+
+--- Replaces one placeholder when the template holds it. Plain indices, never
+--- gsub: a user label may hold "%".
+--- @param template string
+--- @param placeholder string
+--- @param value string
+--- @return string
+local function fill_if_present(template, placeholder, value)
+	local at = template:find(placeholder, 1, true)
+	if not at then return template end
+	return template:sub(1, at - 1) .. value .. template:sub(at + #placeholder)
+end
+
+--- The label the AI menu lists a profile under: a user profile's own label, a
+--- built-in's translation with its prediction count filled in.
+--- @param profile table A profile record from list(), list_built_in() or list_user().
+--- @param count number The AI menu's prediction count.
+--- @return string label
+function M.menu_label(profile, count)
+	if not built_in_exists(profile.id) then return profile.label end
+	local label = require("infra.i18n").get("llm.profile." .. profile.id .. ".label")
+	label = fill_if_present(label, "{n}", tostring(count))
+	return fill_if_present(label, "{s}", count == 1 and "" or "s")
+end
+
+--- The prompts a binding may run, as the action picker lists them: the
+--- built-ins in menu order, then the user's own, each with its menu label.
+--- @return table { { value = profile_id, label = string }, ... }
+function M.choices()
+	local count = M.get("num_predictions")
+	local choices = {}
+	for _, profile in ipairs(profiles()) do
+		choices[#choices + 1] = { value = profile.id, label = M.menu_label(profile, count) }
+	end
+	for _, profile in ipairs(load_user_profiles()) do
+		choices[#choices + 1] = { value = profile.id, label = M.menu_label(profile, count) }
+	end
+	return choices
+end
+
 --- Returns the merged built-in and user-defined catalogue.
 --- @return table
 function M.list()

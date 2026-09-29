@@ -43,6 +43,7 @@ local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
+local PromptAction = require("llm.prompt_action")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
@@ -1083,6 +1084,9 @@ function M.validate_action_parameter(action_name, value)
 		local Shortcuts = shortcuts_manager()
 		return Shortcuts ~= nil and Shortcuts.parse_send_input(spec, value) ~= nil
 	end
+	-- Syntax only: whether the named prompt still exists is checked when the
+	-- action runs, so deleting a custom prompt does not drop its bindings.
+	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1116,6 +1120,13 @@ function M.get_action_parameter_prompt(action_name)
 			or require("send_input").describe_keys(vocabulary)
 		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec), detail)
 	end
+	if spec == "llm_prompt" then
+		local lines = {}
+		for _, choice in ipairs(require("modules.llm.profile_settings").choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_prompt"), table.concat(lines, "\n"))
+	end
 	error("no prompt for parameter kind '" .. tostring(spec) .. "'")
 end
 
@@ -1125,6 +1136,7 @@ end
 function M.get_action_parameter_error(action_name)
 	local spec = M.get_action_parameter_spec(action_name)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))
@@ -1158,32 +1170,43 @@ function M.get_action_parameter(binding, action_name)
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
---- Readies picker items for the picker's own parameter editor: each action whose
---- parameter is a text, a key or a shortcut is marked with its kind and the value
---- `binding` holds for it, and the returned fields give the page the send-input
---- vocabulary and the same prompts and refusals as the zenity prompt.
+--- Readies picker items for the picker's own parameter editor: each action that
+--- takes a parameter is marked with its kind and the value `binding` holds for
+--- it, so the page's "edit the current action" button can reopen any of them.
+--- The page edits a text, a key, a shortcut or a prompt itself, with the
+--- prompts, refusals, vocabulary and prompt choices returned here; any other
+--- kind is confirmed without a value and prompted for natively.
 --- @param items table get_picker_items() output, marked in place.
 --- @param binding string|nil The binding the pick is for; nil marks no value.
---- @return table { send_vocabulary, parameter_strings }, the options the picker
----   bridge's open() reads.
+--- @return table { send_vocabulary, parameter_strings, prompt_choices,
+---   default_count, edit_current_label }, the options the picker bridge's open() reads.
 function M.get_picker_parameter_fields(items, binding)
 	local prompts, errors = {}, {}
 	for _, item in ipairs(items) do
 		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
-		if SEND_INPUT_KINDS[kind] then
+		if kind then
 			item.parameter = kind
 			item.parameterValue = binding and M.get_action_parameter(binding, item.id) or ""
-			prompts[kind] = M.get_action_parameter_prompt(item.id)
-			errors[kind] = M.get_action_parameter_error(item.id)
+			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" then
+				prompts[kind] = M.get_action_parameter_prompt(item.id)
+				errors[kind] = M.get_action_parameter_error(item.id)
+			end
 		end
 	end
+	local ProfileSettings = require("modules.llm.profile_settings")
 	return {
 		send_vocabulary = send_vocabulary(),
+		prompt_choices = ProfileSettings.choices(),
+		default_count = ProfileSettings.get("num_predictions"),
+		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {
 			save = i18n.get("button.save"),
 			back = i18n.get("dialog.action_picker.back"),
 			captureKey = i18n.get("dialog.action_picker.capture_key"),
 			captureShortcut = i18n.get("dialog.action_picker.capture_shortcut"),
+			promptLabel = i18n.get("dialog.action_picker.prompt_label"),
+			countLabel = i18n.get("dialog.action_picker.count_label"),
+			countDefault = i18n.get("dialog.action_picker.count_default"),
 			prompts = prompts,
 			errors = errors,
 		},
