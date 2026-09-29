@@ -84,6 +84,7 @@ if Storage.migrate_legacy_namespace() ~= true then
 end
 local SyntheticInput     = require("adapters.synthetic_input")
 local AccessibilityPermission = require("adapters.accessibility_permission")
+local AccessibilityWait       = require("infra.accessibility_wait")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -1054,6 +1055,18 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
+--- Shows the on-screen banner naming the exact switch to turn on.
+--- @return function close Removes the banner.
+local function show_accessibility_guidance()
+	local shown, alert_id = pcall(hs.alert.show, i18n.get("startup.accessibility_waiting"),
+		{ atScreenEdge = 2 }, hs.screen.mainScreen(), AccessibilityWait.DEADLINE_SECONDS)
+	if not shown then
+		Logger.warn(LOG, "Accessibility guidance banner could not be shown: %s.", tostring(alert_id))
+		return function() end
+	end
+	return function() pcall(hs.alert.closeSpecific, alert_id, 0) end
+end
+
 -- Pre-start the keyboard input owners so they are active before menu.lua reads
 -- saved prefs. Menu.lua will honor saved state and pause/resume them as needed.
 -- Both share one transaction because continuing after a refused start leaves a
@@ -1077,18 +1090,43 @@ Boot.stage("Accessibility permission")
 -- that never enable. The packaged runtime is its own app identity, so a user
 -- whose onboarding was skipped (config.toml already present) may never have
 -- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
--- Ask macOS for the prompt and name the one action that fixes it.
+-- Each ad hoc signed build also invalidates the previous grant while System
+-- Settings still shows it checked, so exiting with instructions left users
+-- stuck. The wait clears that stale entry, prompts, opens the pane, and runs
+-- this boot again once macOS trusts the process.
 local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
-if accessibility_trusted ~= true then
-	local prompted, prompt_err = AccessibilityPermission.request_prompt()
-	if not prompted then
-		Logger.error(LOG, "Accessibility prompt could not be requested: %s.", tostring(prompt_err))
-	end
+if accessibility_trusted == nil then
 	emergency_exit_after_runtime_failure("accessibility",
-		accessibility_trusted == nil
-			and ("Accessibility state query failed: " .. tostring(accessibility_err))
-			or "Accessibility permission is not granted to the embedded ErgoptiPlus runtime",
+		"Accessibility state query failed: " .. tostring(accessibility_err),
 		"startup.accessibility_required")
+	return
+end
+if accessibility_trusted ~= true then
+	local close_guidance = function() end
+	local waiting, wait_err = AccessibilityWait.start({
+		permission = AccessibilityPermission,
+		every = TimerScheduler.every,
+		cancel = TimerScheduler.cancel,
+		show_guidance = function() close_guidance = show_accessibility_guidance() end,
+		close_guidance = function() close_guidance() end,
+		-- Same guard as the first run below: a raise ends in the named exit.
+		on_trusted = function()
+			local resumed_ok, resumed_error = xpcall(finish_boot_after_onboarding, debug.traceback)
+			if resumed_ok ~= true then
+				emergency_exit_after_runtime_failure("boot", resumed_error)
+			end
+		end,
+		on_timeout = function(elapsed)
+			emergency_exit_after_runtime_failure("accessibility",
+				"Accessibility permission was not granted within " .. tostring(elapsed) .. " s",
+				"startup.accessibility_required")
+		end,
+	})
+	if not waiting then
+		emergency_exit_after_runtime_failure("accessibility",
+			"Accessibility wait could not start: " .. tostring(wait_err),
+			"startup.accessibility_required")
+	end
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
