@@ -205,7 +205,12 @@ helpers.describe("Audit-hs-final fixes", function()
 		assert(src:find("_infer_client", 1, true), "api_remote.lua: must declare _infer_client for POST inference")
 		assert(src:find("_check_client", 1, true), "api_remote.lua: must declare _check_client for GET health-checks")
 		assert(src:find("_infer_client%.post", 1, false), "api_remote.lua: inference must use _infer_client.post")
-		assert(src:find("_check_client%.get",  1, false), "api_remote.lua: health-checks must use _check_client.get")
+		-- Health checks go through dispatch_probe, whose models GET (or Backboard
+		-- assistant creation) runs on the client it is handed: _check_client
+		assert(src:find("dispatch_probe%(_check_client", 1, false),
+			"api_remote.lua: health-checks must dispatch on _check_client")
+		assert(src:find("return client%.get%(build_models_url", 1, false),
+			"api_remote.lua: the models probe must be a GET on the client it is handed")
 	end)
 
 end)

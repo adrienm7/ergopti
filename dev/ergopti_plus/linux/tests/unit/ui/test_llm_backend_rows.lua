@@ -19,9 +19,14 @@ local function setup(backend)
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local state = { backend = backend, entries = {}, active = nil, prompts = {}, infos = {}, errors = {}, tests = {} }
 	local cerebras = { id = "cerebras", label = "Cerebras", base_url = "https://api.cerebras.ai/v1", default_model = "qwen" }
+	-- A provider that is no chat model: the agent's System 1 only
+	local jev = { id = "typesafe", label = "TypeSafe (Jev)", base_url = "https://api.typesafe.ai/v1/systemone",
+		default_model = "jev-latest" }
+	local by_id = { cerebras = cerebras, typesafe = jev }
 	package.loaded["modules.llm.api_remote"] = {
-		providers = function() return { cerebras } end,
-		provider = function() return cerebras end,
+		providers = function() return { cerebras, jev } end,
+		provider = function(id) return by_id[id] end,
+		serves = function(id, use) return use ~= "chat" or id ~= "typesafe" end,
 		normalize_base_url = function(url) return url end,
 		test = function(entry, on_done)
 			state.tests[#state.tests + 1] = entry
@@ -48,7 +53,11 @@ local function setup(backend)
 	}
 	local llm = {
 		get_backend = function() return state.backend end,
-		set_backend = function(kind) state.backend = kind; return true end,
+		set_backend = function(kind)
+			state.backend = kind
+			state.backend_sets = (state.backend_sets or 0) + 1
+			return true
+		end,
 	}
 	state.answers = {}
 	local dialogs = {
@@ -149,6 +158,42 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		restore()
 		helpers.assert_eq(kept, 1)
 		helpers.assert_eq(#state.entries, 0)
+	end)
+
+end)
+
+helpers.describe("AI menu: a key for the agent's System 1 only (Jev)", function()
+
+	helpers.it("is stored and tested, but predictions keep their backend and entry", function()
+		local build, state, restore = setup("api")
+		state.answers = { "k", "qwen", "tsk-1", "jev-latest" }
+		find(build(), "➕ Cerebras").action()
+		local cerebras = state.active
+		local sets = state.backend_sets
+		find(build(), "➕ TypeSafe (Jev)").action()
+		restore()
+		helpers.assert_eq(#state.entries, 2, "the key is stored")
+		helpers.assert_eq(state.entries[2].provider, "typesafe")
+		helpers.assert_eq(state.active, cerebras, "the predictions' entry is still the active one")
+		helpers.assert_eq(state.backend_sets, sets, "the predictions' backend is not touched")
+		helpers.assert_eq(state.tests[2], state.entries[2], "the new key is tested at once")
+	end)
+
+	helpers.it("is listed with its own test and removal, never as the predictions' entry", function()
+		local build, state, restore = setup("api")
+		state.answers = { "tsk-1", "jev-latest" }
+		find(build(), "➕ TypeSafe (Jev)").action()
+		local rows = build()
+		local row = find(rows, "TypeSafe (Jev) — jev-latest")
+		helpers.assert_true(row ~= nil and row.items ~= nil, "a submenu, not a radio row")
+		helpers.assert_eq(row.checked, nil, "never checked")
+		helpers.assert_eq(row.action, nil, "never selected")
+		row.items[1].action()
+		helpers.assert_eq(#state.tests, 2, "its own test")
+		state.confirm = true
+		row.items[2].action()
+		restore()
+		helpers.assert_eq(#state.entries, 0, "its own removal")
 	end)
 
 end)

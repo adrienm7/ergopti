@@ -11,6 +11,7 @@
 local M = {}
 
 local JsonCodec = require("adapters.json_codec")
+local Formats   = require("llm.remote_formats")
 
 local function empty_usage()
 	return { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 }
@@ -54,6 +55,7 @@ end
 
 local function extract_text(format, root)
 	if type(root) ~= "table" then return "" end
+	if format == "backboard" then return Formats.backboard_text(root) or "" end
 	if format == "anthropic" then
 		local content = root.content
 		if type(content) == "table" then
@@ -91,7 +93,7 @@ local function extract_text(format, root)
 end
 
 --- Decode exactly once so completion and usage have one immutable owner.
---- @param format string "openai" | "anthropic" | "gemini"
+--- @param format string "openai" | "anthropic" | "gemini" | "backboard"
 --- @param body string Raw provider response body.
 --- @return table { text, usage, valid_json }
 function M.classify(format, body)

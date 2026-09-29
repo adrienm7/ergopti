@@ -19,16 +19,22 @@
 ---    llm.agent_disabled_apps lists the applications the automatic mode ignores.
 ---    The keymap bridge sets them; the AI menu reads and resets them like its
 ---    other native settings.
---- 3. Refusals first: a paused script, the AI switched off or a text backend
----    that is not ready refuse with the notices of llm_generate_prediction, then
----    the agent's own (mode off, no System 2), before anything is read. A secure
----    field refuses like the tone actions.
+--- 3. Refusals first: a paused script refuses with the notice of
+---    llm_generate_prediction, then the agent's own (mode off, no usable System
+---    2), before anything is read. The agent never uses the AI menu's
+---    prediction backend: the AI switched off or that backend not ready refuses
+---    nothing. A secure field refuses like the tone actions.
 --- 4. One transport per system, each behind one function taking the backend and
----    its payload, so a new request format plugs in there. Both post a plain
----    chat body built by llm/vision.lua, to the local server or a provider with
----    its stored key. Neither the text nor the answer is ever logged.
+---    its payload, so a new request format plugs in there. A chat backend gets
+---    a plain chat body built by llm/vision.lua (the local server, a chat
+---    provider) or a Backboard message. System 1 has a second kind: Jev, asked
+---    its choice question through a decisions provider (TypeSafe's System One
+---    protocol) or through Backboard with a "typesafe/" model. Neither the text
+---    nor the answer is ever logged.
 --- 5. Supersession by generation: a newer run, or a keystroke for the
----    automatic mode, drops the answers still in flight.
+---    automatic mode, drops the answers still in flight. The automatic mode is
+---    not held back by an automatic next-word prediction: its actions replace
+---    that tooltip.
 --- 6. Learning: an accepted automatic suggestion lowers the threshold of its
 ---    intent in that application, a dismissed one raises it
 ---    (modules/llm/agent_learning.lua).
@@ -42,6 +48,8 @@ local M = {}
 local Agent          = require("llm.agent")
 local Vision         = require("llm.vision")
 local Rewrite        = require("llm.rewrite")
+local Formats        = require("llm.remote_formats")
+local ProviderUses   = require("modules.llm.provider_uses")
 local Logger         = require("infra.logger")
 local i18n           = require("infra.i18n")
 local Paths          = require("infra.paths")
@@ -56,6 +64,12 @@ local LOG = "llm.agent_runner"
 
 -- What the engine's shared answer seams log this flow as
 local LABEL = "AI agent"
+
+-- The Backboard model prefix of Jev: such a System 1 asks Jev's questions
+local JEV_BACKBOARD_PREFIX = "typesafe/"
+
+-- The notice of a paused script, shared with llm_generate_prediction
+local PAUSED_KEY = "llm.manual_prediction.paused"
 
 M.MODE_OFF    = "off"
 M.MODE_ACTION = "action"
@@ -214,9 +228,12 @@ end
 
 --- Resolves a System setting to where its requests go.
 --- @param value string The setting: "" (off), "<backend>" or "<backend>|<model>".
+--- @param use string|nil provider_uses.SYSTEM1 or SYSTEM2 (the default).
 --- @return table|nil backend { kind = "local"|"remote", provider, format, model }.
---- @return string|nil reason "off", "invalid", "no_model" or the provider's refusal.
-function M.resolve_backend(value)
+--- @return string|nil reason "off", "invalid", "no_model" or the provider's refusal
+---         ("unknown_provider", "unsupported", "no_entry", "missing_token").
+function M.resolve_backend(value, use)
+	use = use or ProviderUses.SYSTEM2
 	if value == nil or value == "" then return nil, "off" end
 	local parsed = Vision.parse(value)
 	if not parsed then return nil, "invalid" end
@@ -226,7 +243,7 @@ function M.resolve_backend(value)
 	if parsed.backend == Vision.LOCAL_BACKEND then
 		return { kind = "local", format = "ollama", model = model, backend = parsed.backend }
 	end
-	local ready, reason = Remote.vision_provider_status(parsed.backend)
+	local ready, reason = Remote.provider_status(parsed.backend, use)
 	if not ready then return nil, tostring(reason) end
 	return { kind = "remote", provider = parsed.backend, format = Remote.provider_format(parsed.backend),
 		model = model, backend = parsed.backend }
@@ -248,7 +265,22 @@ end
 --- @param payload table { system, text, max_tokens }.
 --- @param on_text function Receives the answer.
 --- @param on_fail function Receives a short reason.
-local function chat(backend, payload, on_text, on_fail)
+local function chat(backend, payload, on_text, on_fail, use)
+	if backend.format == "backboard" then
+		local Remote = dependency("modules.llm.api_remote", "request_backboard")
+		if not Remote then return on_fail("the remote backend is unavailable") end
+		Remote.request_backboard(backend.provider, {
+			model = backend.model, system = payload.system, text = payload.text,
+		}, function(answer)
+			local text = Formats.backboard_text(answer)
+			if type(text) ~= "string" or text == "" then return on_fail("empty_answer") end
+			on_text(text)
+		end, on_fail, use)
+		return
+	end
+	if not ProviderUses.format_serves(backend.format, ProviderUses.SYSTEM2) and backend.kind ~= "local" then
+		return on_fail("a " .. tostring(backend.format) .. " provider is not a chat model")
+	end
 	local body = Vision.build_request(backend.format, {
 		model = backend.model, system = payload.system, text = payload.text, max_tokens = payload.max_tokens,
 	})
@@ -260,16 +292,99 @@ local function chat(backend, payload, on_text, on_fail)
 	end
 	local Remote = dependency("modules.llm.api_remote", "request_chat")
 	if not Remote then return on_fail("the remote backend is unavailable") end
-	Remote.request_chat(backend.provider, backend.model, body, on_text, on_fail)
+	Remote.request_chat(backend.provider, backend.model, body, on_text, on_fail, use)
 end
 
---- The System 1 transport: triages a sentence. A new System 1 backend (a
---- dedicated classifier) plugs in here.
+--- Decodes a JSON text, raising on an invalid one (what the shared parsers expect).
+--- @param text string
+--- @return any value
+local function decode_json(text)
+	-- A chat answer is plain text: refused here, not reported by the codec
+	if type(text) ~= "string" or not text:match("^%s*[%[{]") then error("not a JSON text") end
+	local value, decode_error = JsonCodec.decode(text)
+	if decode_error then error(decode_error) end
+	return value
+end
+
+--- Names the top-level keys of a decoded answer, never its values.
+--- @param value any
+--- @return string keys
+local function top_level_keys(value)
+	if type(value) ~= "table" then return type(value) end
+	local keys = {}
+	for key in pairs(value) do keys[#keys + 1] = tostring(key) end
+	table.sort(keys)
+	return table.concat(keys, ", ")
+end
+
+--- The state Jev's questions are about: the application and the sentence.
+--- @param sentence string
+--- @param ctx table { app }.
+--- @return string state
+local function jev_state(sentence, ctx)
+	return "App: " .. tostring(ctx.app or "") .. "\nText: " .. sentence
+end
+
+--- Tells whether a System 1 backend asks Jev's questions rather than a chat prompt.
+--- @param backend table What resolve_backend returned.
+--- @return boolean jev
+function M.is_jev_backend(backend)
+	if type(backend) ~= "table" then return false end
+	if backend.format == "decisions" then return true end
+	return backend.format == "backboard" and type(backend.model) == "string"
+		and backend.model:sub(1, #JEV_BACKBOARD_PREFIX) == JEV_BACKBOARD_PREFIX
+end
+
+--- Asks Jev its triage question, through a decisions provider or Backboard.
+--- @param backend table What resolve_backend returned.
+--- @param sentence string The sentence being typed.
+--- @param ctx table { app }.
+--- @param on_triage function Receives { intent, probability }, or nil when unreadable.
+local function jev_triage(backend, sentence, ctx, on_triage)
+	local config = M.config()
+	local questions = Agent.jev_questions(config)
+	local state = jev_state(sentence, ctx)
+	local function on_fail(reason)
+		Logger.warn(LOG, "System 1 (Jev) gave no answer (%s).", tostring(reason))
+		on_triage(nil)
+	end
+	local Remote
+	if backend.format == "decisions" then
+		Remote = dependency("modules.llm.api_remote", "request_decisions")
+		if not Remote then return on_fail("the remote backend is unavailable") end
+		Remote.request_decisions(backend.provider, backend.model, state, questions, function(answers)
+			on_triage(Agent.parse_jev_answers(config, answers))
+		end, on_fail)
+		return
+	end
+	Remote = dependency("modules.llm.api_remote", "request_backboard")
+	if not Remote then return on_fail("the remote backend is unavailable") end
+	Remote.request_backboard(backend.provider, {
+		model = backend.model, system = "", text = state, questions = questions,
+	}, function(answer)
+		local answers, where = Formats.backboard_decision_answers(answer, decode_json)
+		if not answers then
+			-- Where Backboard puts Jev's answers is not documented: the keys tell
+			-- where to look, the values are never logged
+			Logger.warn(LOG, "System 1 (Jev through Backboard): no answers in the reply (top-level keys: %s).",
+				top_level_keys(answer))
+			on_triage(nil)
+			return
+		end
+		Logger.info(LOG, "System 1 (Jev through Backboard): answers read from '%s'.", tostring(where))
+		on_triage(Agent.parse_jev_answers(config, answers))
+	end, on_fail, ProviderUses.SYSTEM1)
+end
+
+--- The System 1 transport: triages a sentence, with a chat prompt or, for
+--- Jev (a decisions provider, or Backboard with a "typesafe/" model), its
+--- choice question.
 --- @param backend table What resolve_backend returned.
 --- @param sentence string The sentence being typed.
 --- @param ctx table { app, tools }.
 --- @param on_triage function Receives { intent, probability }, or nil when unreadable.
 function M.system1_transport(backend, sentence, ctx, on_triage)
+	if M.is_jev_backend(backend) then return jev_triage(backend, sentence, ctx, on_triage) end
 	local config = M.config()
 	chat(backend, {
 		system = Agent.system1_prompt(config, ctx), text = sentence, max_tokens = config.system1.max_tokens,
@@ -278,7 +393,7 @@ function M.system1_transport(backend, sentence, ctx, on_triage)
 	end, function(reason)
 		Logger.warn(LOG, "System 1 gave no answer (%s).", tostring(reason))
 		on_triage(nil)
-	end)
+	end, ProviderUses.SYSTEM1)
 end
 
 --- The System 2 transport: asks for the actions of a text. A new System 2
@@ -288,7 +403,7 @@ end
 --- @param on_raw function Receives the raw answer.
 --- @param on_fail function Receives a short reason.
 function M.system2_transport(backend, payload, on_raw, on_fail)
-	chat(backend, payload, on_raw, on_fail)
+	chat(backend, payload, on_raw, on_fail, ProviderUses.SYSTEM2)
 end
 
 --- Calls back with the user's Shortcuts, read again when older than
@@ -397,11 +512,7 @@ end
 --- @param learning table|nil { app, intent } of an automatic suggestion.
 local function offer_actions(generation, engine, session, raw, tools, learning)
 	local config = M.config()
-	local actions, rejected = Agent.parse_actions(config, raw, function(text)
-		local value, decode_error = JsonCodec.decode(text)
-		if decode_error then error(decode_error) end
-		return value
-	end, { tools = tools })
+	local actions, rejected = Agent.parse_actions(config, raw, decode_json, { tools = tools })
 	for _, reason in ipairs(rejected) do Logger.warn(LOG, "Agent action refused: %s.", tostring(reason)) end
 	if actions == nil then
 		Logger.warn(LOG, "Agent failed: the answer holds no %s block (%d char(s)).", config.system2.tag, #tostring(raw))
@@ -501,24 +612,28 @@ local function run_agent(generation, source, text, focus, backend, learning)
 	end)
 end
 
---- The refusals every action shares, before anything is read.
+--- The refusals every action shares, before anything is read. The agent never
+--- uses the AI menu's prediction backend: that menu off, or its backend not
+--- ready, refuses nothing here.
 --- @return table|nil backend System 2's backend, nil after the refusal was shown.
 local function admit()
-	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
-	if not engine or not engine.admit_answer_request(LABEL) then return nil end
+	local engine = dependency("modules.llm.prediction_engine", "is_focus_blocked")
+	if not engine then return nil end
+	if is_paused() then
+		Logger.info(LOG, "Agent refused: the script is paused.")
+		show_notice(PAUSED_KEY)
+		return nil
+	end
 	if settings().llm_agent_mode == M.MODE_OFF then
 		Logger.info(LOG, "Agent refused: its mode is off.")
 		show_notice("llm.agent.off_notice")
 		return nil
 	end
-	local backend, reason = M.resolve_backend(settings().llm_agent_system2)
+	local backend, reason = M.resolve_backend(settings().llm_agent_system2, ProviderUses.SYSTEM2)
 	if not backend then
+		-- Not chosen, not a chat model, or no API entry or key for its provider
 		Logger.info(LOG, "Agent refused: System 2 is not usable (%s).", tostring(reason))
-		if reason == "off" or reason == "invalid" or reason == "no_model" then
-			show_notice("llm.agent.no_system2")
-		else
-			show_notice("llm.agent.failed")
-		end
+		show_notice("llm.agent.no_system2")
 		return nil
 	end
 	if engine.is_focus_blocked({}) then
@@ -768,9 +883,13 @@ local function auto_blocker()
 	if is_paused() then return "paused" end
 	local engine = package.loaded["modules.llm.prediction_engine"]
 	if type(engine) ~= "table" then return "no engine" end
-	if engine.get_llm_enabled() ~= true then return "AI off" end
 	if engine.get_live_prompt() ~= nil then return "live mode" end
-	if engine.is_visible() then return "AI tooltip shown" end
+	-- An automatic next-word prediction shows before the typing pause ends: it
+	-- holds nothing back, the agent's actions replace it. Anything the user
+	-- asked for (an explicit prediction, an answer, the agent's own offer) does.
+	local activity = engine.ai_activity()
+	if activity == "explicit" then return "AI action in flight or shown" end
+	if engine.is_visible() and activity ~= "automatic" then return "AI tooltip shown" end
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_hotstring_visible) == "function"
 		and tooltip.is_hotstring_visible() == true then
@@ -797,8 +916,8 @@ local function on_pause(typing)
 		Logger.debug(LOG, "Agent triage skipped: this sentence was already triaged.")
 		return
 	end
-	local system1, reason1 = M.resolve_backend(settings().llm_agent_system1)
-	local system2, reason2 = M.resolve_backend(settings().llm_agent_system2)
+	local system1, reason1 = M.resolve_backend(settings().llm_agent_system1, ProviderUses.SYSTEM1)
+	local system2, reason2 = M.resolve_backend(settings().llm_agent_system2, ProviderUses.SYSTEM2)
 	if not system1 or not system2 then
 		Logger.debug(LOG, "Agent triage skipped: System 1 (%s) or System 2 (%s) is not usable.",
 			tostring(reason1 or "ok"), tostring(reason2 or "ok"))

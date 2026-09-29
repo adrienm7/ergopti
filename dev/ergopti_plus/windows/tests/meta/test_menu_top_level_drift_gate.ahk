@@ -182,6 +182,7 @@ global _DG_BUILDER_TITLES := Map(
 	"keyboard_layout", 't("menu.layout.title")',
 	"hotstrings",      't("menu.hotstrings.title")',
 	"llm",             't("menu.llm.title")',
+	"agent",           't("menu.agent.title")',
 	"metrics",         't("menu.metrics.title")',
 	"shortcuts",       'GetCategoryTitle("Shortcuts")',
 	"tap_holds",       'GetCategoryTitle("TapHolds")',

@@ -9,8 +9,10 @@
 ; slot whose rows are handed to the renderer as data.
 ;
 ; FEATURES & RATIONALE:
-; 1. The backend lists are the screen reading's: the local server, then every
-;    provider of api_providers.json in its order (LLM_Vision_BackendChoices).
+; 1. The backend lists are the local server, then every provider of
+;    api_providers.json in its order that can serve the system
+;    (LLM_Agent_BackendChoices): a decisions provider (Jev) is listed for
+;    System 1 only.
 ; 2. A setting is stored as "<backend>" or "<backend>|<model>", like the
 ;    llm_vision binding value; an empty model prompt keeps the default model.
 ; 3. Every change goes through the AI menu's config.toml transaction
@@ -101,7 +103,7 @@ _LLM_Agent_SystemRow(Key) {
 		"checked", Current == "",
 		"action", _LLM_Agent_MenuSetBackend.Bind(Key, ""))]
 	CurrentLabel := t("menu.agent.off")
-	for Choice in LLM_Vision_BackendChoices() {
+	for Choice in LLM_Agent_BackendChoices(Key) {
 		Label := (Choice["value"] == LLM_VISION_LOCAL_BACKEND)
 			? Choice["value"] . " — " . Choice["label"] : Choice["label"]
 		if (Choice["value"] == Current)

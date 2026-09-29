@@ -191,12 +191,29 @@ helpers.describe("api_remote.test_request", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("treats an empty reply as failure", function()
+	helpers.it("treats a blank reply as failure", function()
 		local api, inference = fresh_backend()
-		local post_and_parse = get_upvalue(api.test_request, "post_and_parse_resolved")
-		local parser = get_upvalue(post_and_parse, "Parser")
-		local original_process = parser.process_prediction
-		parser.process_prediction = function(_, _, _) return { to_type = "" } end
+		local original_post = inference.post
+		local replies, failures = {}, {}
+		inference.post = function(_, _, _, callback)
+			callback({ ok = true, status = 200, body = [[{"choices":[{"message":{"content":"  \n "}}]}]] })
+			return true
+		end
+		local ok, err = xpcall(function()
+			helpers.assert_true(api.test_request(entry(), SPEC,
+				function(text) replies[#replies + 1] = text end,
+				function(reason) failures[#failures + 1] = reason end))
+			helpers.assert_eq(#replies, 0, "a reply with no text proves nothing about the model")
+			helpers.assert_eq(#failures, 1)
+		end, debug.traceback)
+		inference.post = original_post
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("accepts the one-word OK through the real parser (probe-min-words)", function()
+		-- The probe asks for "OK". Routed through the prediction parser, the
+		-- menu's minimum word count refused it and every real key failed its test.
+		local api, inference = fresh_backend()
 		local original_post = inference.post
 		local replies, failures = {}, {}
 		inference.post = function(_, _, _, callback)
@@ -207,12 +224,10 @@ helpers.describe("api_remote.test_request", function()
 			helpers.assert_true(api.test_request(entry(), SPEC,
 				function(text) replies[#replies + 1] = text end,
 				function(reason) failures[#failures + 1] = reason end))
-			helpers.assert_eq(#replies, 0, "a prediction with no text proves nothing about the model")
-			helpers.assert_eq(#failures, 1)
-			helpers.assert_eq(failures[1], "empty_reply")
+			helpers.assert_eq(#failures, 0, "a correct probe reply must not fail: " .. tostring(failures[1]))
+			helpers.assert_eq(replies[1], "OK")
 		end, debug.traceback)
 		inference.post = original_post
-		parser.process_prediction = original_process
 		if not ok then error(err, 0) end
 	end)
 

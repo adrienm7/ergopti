@@ -599,6 +599,10 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 				; Hotstrings win over live mode: it asks again on the expanded text
 				if IsSet(LLM_Bridge_ReissueLiveAfterExpansion)
 						LLM_Bridge_ReissueLiveAfterExpansion()
+		} else if IsSet(LLM_Bridge_MirrorAgentEdit) {
+				; Predictions are off: only the AI agent's own context follows it
+				LLM_Bridge_MirrorAgentEdit(Effect.DeleteFromEnd, Effect.InsertedText,
+						Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
 		}
 }
 

@@ -189,9 +189,24 @@ _LLM_Menu_AskTestNewApiEntry() {
 ; updates it in place. The dialog stays InputBox-driven (one field per call)
 ; so it works on the AHK v2 baseline with no custom Gui — same UX as the
 ; existing single-field prompts the menu already uses.
-_LLM_Menu_BuildApiProviderChoices(providers) {
+; @param {Map} providers Provider id -> descriptor, as the catalogue publishes.
+; @param {Array} order The ids in the catalogue's provider_order; 0 lists the
+;     Map's own order.
+_LLM_Menu_BuildApiProviderChoices(providers, order := 0) {
 	choices := ""
-	for providerId, descriptor in providers {
+	ids := []
+	if (order is Array) {
+		for providerId in order {
+			if !providers.Has(providerId)
+				throw Error("API provider order names a provider the catalogue lacks: " . providerId)
+			ids.Push(providerId)
+		}
+	} else {
+		for providerId in providers
+			ids.Push(providerId)
+	}
+	for providerId in ids {
+		descriptor := providers[providerId]
 		if !(descriptor is Map) or !descriptor.Has("Label") or Type(descriptor["Label"]) != "String"
 			throw Error("API provider catalogue published an invalid menu descriptor: " . providerId)
 		choices .= providerId . " (" . descriptor["Label"] . "), "
@@ -207,7 +222,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		try return _LLM_Menu_PromptApiEntry(EditId)
 		finally Critical(InheritedCritical)
 	}
-	global _LLM_Menu, LLM_API_PROVIDERS
+	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
 	existing := ""
 	if (EditId != "") {
 		for e in _LLM_Menu["api_entries"] {
@@ -219,7 +234,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	}
 
 	; Step 1 — provider id.
-	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
+	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
 	ib := InputBox(
 		Format(t("menu.llm.api_prompt_provider"), provider_choices),
@@ -295,13 +310,13 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return false
 
 	; Creation only: offer the full end-to-end probe on the just-saved
-	; entry (committing made it active), so a bad token or model surfaces
-	; here with its server message instead of mid-typing. A declined
-	; offer keeps the save.
-	if ((EditId == "") && _LLM_Menu["api_entry_id"] == new_entry["Id"]) {
+	; entry, so a bad token or model surfaces here with its server message
+	; instead of mid-typing. A declined offer keeps the save. The entry is
+	; named: a decisions entry does not become the active one.
+	if (EditId == "") {
 		try {
 			if _LLM_Menu_AskTestNewApiEntry()
-				_LLM_Menu_TestActiveApiEntry()
+				_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
 		} catch as AskErr {
 			try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
 				AskErr.Message)
@@ -317,6 +332,11 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
 	; the save path returns immediately and the result is surfaced from the
 	; poll callback once it resolves.
+	if !LLM_RemoteHasReadyPing(provider_id) {
+		try LoggerInfo("LLM", "API entry '{1}' saved: {2} has no reachability ping, the Test action probes it.",
+			new_name, provider_id)
+		return true
+	}
 	ValidationOwner := LLM_AuxBegin("api_validation:" . new_entry["Id"], Map(
 		"backend", "api",
 		"endpoint", new_entry["BaseUrl"],
@@ -347,7 +367,8 @@ _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
 		for Index, Entry in Candidate["api_entries"] {
 			if _LLM_MenuApiEntryGet(Entry, "Id", "") == EditId {
 				Candidate["api_entries"][Index] := LLM_Menu_DeepClone(NewEntry)
-				Candidate["api_entry_id"] := NewEntry["Id"]
+				if _LLM_Menu_ApiEntryTakesActive(Candidate, NewEntry, EditId)
+					Candidate["api_entry_id"] := NewEntry["Id"]
 				return true
 			}
 		}
@@ -355,9 +376,27 @@ _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
 	}
 	if (_LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], NewEntry["Id"]) != 0)
 		return false
+	TakesActive := _LLM_Menu_ApiEntryTakesActive(Candidate, NewEntry, "")
 	Candidate["api_entries"].Push(LLM_Menu_DeepClone(NewEntry))
-	Candidate["api_entry_id"] := NewEntry["Id"]
+	if TakesActive
+		Candidate["api_entry_id"] := NewEntry["Id"]
 	return true
+}
+
+; Tells whether a saved entry becomes the active one, the prediction backend's.
+; A decisions entry (TypeSafe's Jev) only lends its key to the agent's System 1
+; and cannot answer a prediction: it leaves another active entry in place.
+; @param {Map} Candidate The menu candidate, before the entry is added.
+; @param {Map} NewEntry The saved entry.
+; @param {String} EditId The edited entry's id, "" for a creation.
+; @returns {Boolean}
+_LLM_Menu_ApiEntryTakesActive(Candidate, NewEntry, EditId) {
+	if (LLM_RemoteProviderFormat(NewEntry["Provider"]) != "decisions")
+		return true
+	Current := Candidate.Get("api_entry_id", "")
+	if !(Current is String) || Current == "" || Current == EditId
+		return true
+	return _LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], Current) != 1
 }
 
 ; Builds the async validation callback for an API save. The stable entry id and
@@ -618,11 +657,17 @@ _LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
 ; @param NotifyFn function|nil Optional test seam receiving (ok, detail-map).
 ;   When absent every outcome (refusal, dispatch failure, completion) goes to
 ;   a blocking MsgBox, never a TrayTip.
+; @param EntryId string The entry to probe, "" for the active one.
 ; @return boolean True when a probe was dispatched.
-_LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
+;
+; A Backboard entry sends one message with the same probe; a decisions entry
+; (not a chat model) asks api_providers.json's decisions_test questions and
+; succeeds when answers come back.
+_LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST,
-		LLM_API_TEST_TIMEOUT_MS
-	active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
+		LLM_API_TEST_TIMEOUT_MS, LLM_REMOTE_DECISIONS_TEST
+	active_id := (EntryId != "") ? EntryId
+		: (_LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : "")
 	entry := ""
 	if (active_id != "" && _LLM_Menu.Has("api_entries")
 			&& (_LLM_Menu["api_entries"] is Array)) {
@@ -655,6 +700,13 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 		try LoggerError("LLM", "API test refused: active entry failed field validation.")
 		return false
 	}
+	IsDecisions := LLM_RemoteProviderFormat(snapshot["Provider"]) == "decisions"
+	if IsDecisions && (!(LLM_REMOTE_DECISIONS_TEST is Map) || LLM_REMOTE_DECISIONS_TEST.Count == 0) {
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_providers_unavailable"), "Iconx", false, NotifyFn)
+		try LoggerError("LLM", "API test refused: shared decisions probe unavailable.")
+		return false
+	}
 	spec := LLM_REMOTE_TEST_REQUEST
 	EntryId := snapshot["Id"]
 	Name := snapshot["Name"]
@@ -685,10 +737,20 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 		; Tag the reservation with the owned-probe kind so the engine's
 		; keystroke cancels (ResetPredictions, CancelInflight) spare it, and
 		; give the probe its own longer budget for cold models.
-		ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
-			spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
-			spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
-			LLM_API_TEST_TIMEOUT_MS)
+		if IsDecisions {
+			Resolved := _LLMRemoteResolveEntry(snapshot)
+			if !(Resolved is Map)
+				throw Error("the entry has no usable key, address or model")
+			ReqId := LLM_RemoteDecisions_Async(Resolved, LLM_REMOTE_DECISIONS_TEST["state"],
+				LLM_REMOTE_DECISIONS_TEST["questions"],
+				(Answers, Usage := "") => OnSucc(LLM_RemoteFormats_Encode(Answers), Usage),
+				OnFail, LLM_REMOTE_KIND_API_TEST, LLM_API_TEST_TIMEOUT_MS)
+		} else {
+			ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
+				spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
+				spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
+				LLM_API_TEST_TIMEOUT_MS)
+		}
 		_LLM_Menu_ApiTestProgress["req_id"] := ReqId
 	} catch as Err {
 		try LLM_AuxFinish(Owner)

@@ -13,6 +13,8 @@
 --- ROOT CAUSE ENCODED:
 --- validate_action_parameter raises on a kind it does not know, so a
 --- configuration holding a screen-action binding could not even be loaded.
+--- The catalogue now holds providers that read no image (Backboard's message
+--- carries none, Jev is no chat model): the editors must not offer them.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,6 +22,8 @@ local json = require("json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local ACTIONS = { "llm_screen_region", "llm_screen_full", "llm_screen_error" }
+-- The provider formats whose requests carry no image
+local NO_IMAGE_FORMATS = { backboard = true, decisions = true }
 
 --- @param relative string Path under _shared/.
 --- @return table decoded
@@ -118,16 +122,32 @@ helpers.describe("llm_vision parameter: what the binding editors show", function
 	local providers = read_json("modules/llm/api_providers.json")
 	local config = read_json("modules/llm/vision.json")
 	local i18n = require("infra.i18n")
+	-- The providers a screen action may name, in catalogue order
+	local vision_ids, excluded = {}, {}
+	for _, id in ipairs(providers.provider_order) do
+		if NO_IMAGE_FORMATS[providers.providers[id].format] then
+			excluded[#excluded + 1] = id
+		else
+			vision_ids[#vision_ids + 1] = id
+		end
+	end
+
+	helpers.it("the shared catalogue holds providers that read no image", function()
+		helpers.assert_true(#excluded >= 3, "backboard and the two Jev providers: " .. table.concat(excluded, ","))
+	end)
 
 	helpers.it("the zenity prompt lists local first, then every provider in catalogue order", function()
 		local prompt = Gestures.get_action_parameter_prompt("llm_screen_region")
 		helpers.assert_true(prompt:find("{1}", 1, true) == nil, "the placeholder is filled")
 		local expected = { "local \226\128\148 " .. i18n.get("llm.vision.local_backend") }
-		for _, id in ipairs(providers.provider_order) do
+		for _, id in ipairs(vision_ids) do
 			expected[#expected + 1] = id .. " \226\128\148 " .. providers.providers[id].label
 		end
 		local listing = table.concat(expected, "\n")
 		helpers.assert_true(prompt:find(listing, 1, true) ~= nil, "the backends, one per line: " .. prompt)
+		for _, id in ipairs(excluded) do
+			helpers.assert_true(prompt:find("\n" .. id .. " \226\128\148 ", 1, true) == nil, id .. " is not offered")
+		end
 	end)
 
 	helpers.it("the refusal is the kind's own", function()
@@ -146,11 +166,11 @@ helpers.describe("llm_vision parameter: what the binding editors show", function
 		helpers.assert_eq(items[1].parameterValue, "openai|gpt-4.1-mini", "the value its binding holds")
 		helpers.assert_eq(items[2].parameterValue, "", "the other action holds nothing yet")
 		local choices = fields.vision_choices
-		helpers.assert_eq(#choices, 1 + #providers.provider_order, "local and every provider")
+		helpers.assert_eq(#choices, 1 + #vision_ids, "local and every provider that reads images")
 		helpers.assert_eq(choices[1].value, "local")
 		helpers.assert_eq(choices[1].label, i18n.get("llm.vision.local_backend"))
 		helpers.assert_eq(choices[1].defaultModel, config.default_models["local"])
-		for index, id in ipairs(providers.provider_order) do
+		for index, id in ipairs(vision_ids) do
 			local choice = choices[index + 1]
 			helpers.assert_eq(choice.value, id)
 			helpers.assert_eq(choice.label, providers.providers[id].label)

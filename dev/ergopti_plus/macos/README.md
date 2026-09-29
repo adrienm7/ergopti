@@ -13,6 +13,44 @@ The macOS implementation of ErgoptiPlus.
 > The layout remap lives in `platform/remap/` plus
 > `modules/keymap/{layout_install,input_sources}.lua`.
 
+## Install with Homebrew
+
+Releases are published as casks in the
+[`adrienm7/homebrew-ergopti`](https://github.com/adrienm7/homebrew-ergopti) tap,
+one cask per update channel of
+[`_shared/modules/updater/channels.json`](../_shared/modules/updater/channels.json):
+
+```bash
+brew tap adrienm7/ergopti
+brew install --cask ergoptiplus        # main (stable) channel
+brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prerelease
+```
+
+- **Channel.** The cask installs that channel's newest build, and a build
+  follows its own channel until another one is picked in the app's About menu.
+  The two casks conflict: to switch, `brew uninstall --cask ergoptiplus@dev`
+  then `brew install --cask ergoptiplus` (or the reverse); the settings in
+  `~/.config/ergopti_plus/` stay. A channel chosen in the About menu is kept in
+  `config.toml` and wins over the installed build's channel. The stable cask
+  exists once the first stable release is published.
+- **Updates.** Sparkle updates the app in place, as for a manual install. The
+  casks declare `auto_updates true`, so `brew upgrade` leaves the app to
+  Sparkle; `brew upgrade --greedy` reinstalls the cask's own version, which is
+  never older than what the channel published.
+- **Gatekeeper.** The app is not notarised; the cask clears its quarantine
+  flag after installing, as the manual `xattr` step does.
+- **Uninstall.** `brew uninstall --cask ergoptiplus` removes the app;
+  `--zap` also removes `~/.config/ergopti_plus/` and the launcher's
+  preferences and caches.
+
+The release job (`Publish Homebrew cask` in
+[`ci.yml`](../../../.github/workflows/ci.yml)) renders the released channel's
+cask with [`tools/build/homebrew-cask.cjs`](../../../tools/build/homebrew-cask.cjs)
+and pushes it to the tap. It needs the `HOMEBREW_TAP_TOKEN` repository secret:
+a fine-grained token with *Contents: read and write* on
+`adrienm7/homebrew-ergopti` only. Without it the release still publishes and
+warns that the tap kept its previous cask.
+
 ## Entry point
 
 `init.lua` is the driver entry: it requires the modules, wires shared state, and

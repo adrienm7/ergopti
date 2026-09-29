@@ -7,7 +7,8 @@
 --- parameter: "<backend>" or "<backend>|<model>". This replays the parse
 --- vectors of _shared/tests/corpus/llm/vision_vectors.json through the real
 --- gesture validator, and checks the native prompt and the picker's choices
---- list the local server first, then the API providers in catalogue order.
+--- list the local server first, then the API providers that take an image
+--- (not Backboard, not a decisions provider) in catalogue order.
 ---
 --- ROOT CAUSE ENCODED:
 --- The parameter validator knew no llm_vision kind: a screen-reading binding
@@ -55,7 +56,7 @@ helpers.describe("llm_screen_* parameter replays the shared vision corpus", func
 end)
 
 helpers.describe("llm_vision parameter: native prompt, picker choices and refusal", function()
-	helpers.it("lists the local server, then every API provider in catalogue order", function()
+	helpers.it("lists the local server, then every vision provider in catalogue order", function()
 		local config = read_json("modules/llm/vision.json")
 		local catalogue = read_json("modules/llm/api_providers.json")
 		local i18n = package.loaded["infra.i18n"]
@@ -71,11 +72,19 @@ helpers.describe("llm_vision parameter: native prompt, picker choices and refusa
 				return saved_get(key)
 			end
 			local choices = Actions.llm_vision_choices()
-			helpers.assert_eq(#choices, 1 + #catalogue.provider_order, "the local server and every provider")
+			-- Backboard carries no image and a decisions provider (Jev) is no
+			-- chat model: neither takes a vision request
+			local vision_order = {}
+			for _, provider_id in ipairs(catalogue.provider_order) do
+				local format = catalogue.providers[provider_id].format
+				if format ~= "backboard" and format ~= "decisions" then vision_order[#vision_order + 1] = provider_id end
+			end
+			helpers.assert_true(#vision_order < #catalogue.provider_order, "the catalogue holds non-vision providers")
+			helpers.assert_eq(#choices, 1 + #vision_order, "the local server and every vision provider")
 			helpers.assert_eq(choices[1].value, "local", "the local server comes first")
 			helpers.assert_eq(choices[1].label, "Local server")
 			helpers.assert_eq(choices[1].defaultModel, config.default_models["local"])
-			for index, provider_id in ipairs(catalogue.provider_order) do
+			for index, provider_id in ipairs(vision_order) do
 				local choice = choices[index + 1]
 				helpers.assert_eq(choice.value, provider_id, "catalogue order")
 				helpers.assert_eq(choice.label, catalogue.providers[provider_id].label)
@@ -88,6 +97,11 @@ helpers.describe("llm_vision parameter: native prompt, picker choices and refusa
 				"the localized template, the local server on the first line: " .. prompt)
 			helpers.assert_true(prompt:find("anthropic — " .. catalogue.providers.anthropic.label, 1, true) ~= nil,
 				"each provider is listed as '<id> — <label>': " .. prompt)
+			helpers.assert_true(prompt:find("groq — Groq", 1, true) ~= nil, "a new openai-format provider is listed")
+			for _, excluded in ipairs({ "backboard", "typesafe", "openrouter_jev" }) do
+				helpers.assert_true(prompt:find("\n" .. excluded .. " — ", 1, true) == nil,
+					excluded .. " takes no vision request: " .. prompt)
+			end
 		end)
 		i18n.get = saved_get
 		if not ok then error(err, 0) end

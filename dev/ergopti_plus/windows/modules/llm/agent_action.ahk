@@ -10,14 +10,19 @@
 ; per-application thresholds the automatic mode learns.
 ;
 ; FEATURES & RATIONALE:
-; 1. The refusals of the manual prediction trigger (paused, AI off, backend not
-;    ready) come first, then the agent's own: its mode is off, or System 2 is
-;    not chosen. Nothing is read for a request that cannot run.
+; 1. The agent never uses the AI menu's prediction backend, so it refuses only
+;    while paused, when its mode is off, or when System 2 is not chosen or its
+;    provider has no API entry with a key: the AI menu switched off or its
+;    backend not ready refuse nothing. Nothing is read for a request that
+;    cannot run.
 ; 2. System 1 and System 2 each go through ONE transport function taking the
 ;    backend and the payload (LLM_Agent_System1Request,
 ;    LLM_Agent_System2Request): a new API format plugs in there. The backend is
 ;    "local" (the local Ollama server) or an API provider, whose key is the one
-;    of the menu's API entry for it, like the screen reading's backend.
+;    of the menu's API entry for it, like the screen reading's backend. System 1
+;    has a second kind: Jev, TypeSafe's decisions model, asked the triage as a
+;    typed question (a decisions provider, or Backboard with a "typesafe/"
+;    model).
 ; 3. Every proposed action is a tooltip candidate with its OWN accept handler:
 ;    Tab runs the connector, nothing is typed.
 ; 4. One flow at a time: each flow takes a generation, and a selection, a
@@ -25,9 +30,12 @@
 ;    the flow in flight, as it cancels the requests of the prediction engine.
 ; 5. The automatic mode asks System 1 about the current sentence once the user
 ;    pauses, never twice about the same sentence, never while paused, in a
-;    secure field, in an excluded application, in live mode or while another
-;    AI or hotstring tooltip is shown. Above the learned threshold of the
-;    sentence's intent in that application, System 2 proposes its actions.
+;    secure field, in an excluded application, in live mode or while a
+;    hotstring tooltip or another AI tooltip is shown. An automatic next-word
+;    prediction does not hold it back: it appears before the pause ends, and
+;    the actions replace it when they arrive for the same sentence. Above the
+;    learned threshold of the sentence's intent in that application, System 2
+;    proposes its actions.
 ; 6. Accepting an automatic suggestion lowers that threshold, dismissing it
 ;    raises it; the map lives in the driver's local state store (the Storage
 ;    adapter), never in config.toml, bounded to the most recent applications.
@@ -67,6 +75,13 @@ global LLM_AGENT_LEARNING_SAVE_DELAY_MS := 2000
 
 ; Most sentences the automatic mode remembers having triaged
 global LLM_AGENT_TRIAGED_MEMORY := 64
+
+; Model prefix of Jev served through Backboard: such a System 1 asks the triage
+; as a decisions question instead of the chat prompt
+global LLM_AGENT_JEV_BACKBOARD_PREFIX := "typesafe/"
+
+; The state a Jev triage is about: the application and the sentence
+global LLM_AGENT_JEV_STATE := "App: {app}`nText: {text}"
 
 ; English weekday names, A_WDay order (1 = Sunday): the prompt is English
 global LLM_AGENT_WEEKDAYS := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -153,9 +168,40 @@ LLM_Agent_Backend(Key, &Reason := "") {
 		Reason := "no model for '" . Parsed["backend"] . "'"
 		return ""
 	}
+	Fmt := LLM_RemoteProviderFormat(Parsed["backend"])
+	if (Key == "agent_system2" && Fmt != "" && !LLM_RemoteFormatServes(Fmt, "chat")) {
+		Reason := "'" . Parsed["backend"] . "' answers typed questions only, it cannot write actions"
+		return ""
+	}
+	; A provider without an API entry with a key cannot answer
+	if !(_LLM_Vision_TryResolveTarget(Parsed["backend"], Model, &Why) is Map) {
+		Reason := Why
+		return ""
+	}
 	Reason := ""
 	return Map("backend", Parsed["backend"], "model", Model,
 		"label", LLM_Agent_BackendLabel(Parsed["backend"]))
+}
+
+/**
+ * The backends System 1 or System 2 may run, in menu order: the local server,
+ * then every API provider of api_providers.json in its order that can serve
+ * it. A chat provider serves both; a decisions provider (TypeSafe's Jev)
+ * answers typed questions, so it serves System 1 only.
+ * @param {String} Key "agent_system1" or "agent_system2".
+ * @returns {Array} Maps ("value", "label").
+ */
+LLM_Agent_BackendChoices(Key) {
+	global LLM_VISION_LOCAL_BACKEND, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
+	if (Key != "agent_system1" && Key != "agent_system2")
+		throw ValueError("LLM_Agent_BackendChoices: unknown system " . String(Key) . ".")
+	Choices := [Map("value", LLM_VISION_LOCAL_BACKEND, "label", t("llm.vision.local_backend"))]
+	for ProviderId in LLM_API_PROVIDER_ORDER {
+		Provider := LLM_API_PROVIDERS[ProviderId]
+		if (Key == "agent_system1" || LLM_RemoteFormatServes(Provider["Format"], "chat"))
+			Choices.Push(Map("value", ProviderId, "label", Provider["Label"]))
+	}
+	return Choices
 }
 
 /**
@@ -164,7 +210,7 @@ LLM_Agent_Backend(Key, &Reason := "") {
  * @returns {String}
  */
 LLM_Agent_BackendLabel(Backend) {
-	for Choice in LLM_Vision_BackendChoices() {
+	for Choice in LLM_Agent_BackendChoices("agent_system1") {
 		if (Choice["value"] == Backend)
 			return Choice["label"]
 	}
@@ -316,25 +362,21 @@ LLM_Agent_TriggerCommand() {
 		"backend", Backend, "auto", false), Answer["value"])
 }
 
-; Applies the refusals every agent action shares, with their notices.
+; Applies the refusals every agent action shares, with their notices. The agent
+; never uses the AI menu's prediction backend: the AI switched off or its
+; backend not ready refuse nothing here, only the pause does.
 ; @returns {Map|String} The System 2 backend, "" when the action is refused.
 _LLM_Agent_ManualRefusal() {
-	global _LLM_Menu, LLM_AGENT_REFUSAL_CONTEXT
-	Enabled := _LLM_Menu.Get("enabled", false)
-	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
-		Enabled && _LLM_Menu_BackendIsReadyForUse(), LLM_AGENT_REFUSAL_CONTEXT)
+	global LLM_AGENT_REFUSAL_CONTEXT
+	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, true, true, LLM_AGENT_REFUSAL_CONTEXT)
 	; A pause outranks everything, the agent's own switch included
-	if (Refusal == "paused") {
+	if (Refusal != "") {
 		_LLM_Menu_ShowManualPredictionRefusal(Refusal, 0)
 		return ""
 	}
 	if (LLM_Agent_Setting("agent_mode") == "off") {
 		LoggerInfo("LLM", "AI agent refused: its mode is off.")
 		_LLM_Menu_ShowManualPredictionNotice("llm.agent.off_notice")
-		return ""
-	}
-	if (Refusal != "") {
-		_LLM_Menu_ShowManualPredictionRefusal(Refusal, 0)
 		return ""
 	}
 	Backend := LLM_Agent_Backend("agent_system2", &Reason)
@@ -518,6 +560,10 @@ _LLM_Agent_Show(Flow, Actions) {
 		"is_final", true,
 		"render_guard", _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])
 	)
+	; Still the same sentence, no keystroke since: the actions take the place
+	; of the automatic prediction shown meanwhile
+	if Flow["auto"]
+		_LLM_Agent_RetirePrediction(Flow)
 	LLM_Tooltip_Show(Slots, 1, true, Meta)
 	if Flow["auto"]
 		_LLM_Agent_Auto["offer"] := Map("app", Flow["context"]["app"], "intent", Flow["intent"],
@@ -668,9 +714,23 @@ _LLM_Agent_TimeZone() {
 ; =================================
 
 /**
- * Called by the LLM bridge on every typed character and Backspace: settles a
- * suggestion the user typed over, retires the flow in flight and, in the
- * automatic mode, arms the pause timer on the new buffer.
+ * Tells whether the automatic mode watches the typing: its mode is "auto" and
+ * Ergopti+ is not paused. While predictions are off the LLM bridge feeds
+ * LLM_Agent_OnTyping on this alone, so the AI menu's switch never starves the
+ * automatic mode; the agent's mode and the pause start and stop that feed.
+ * @returns {Boolean}
+ */
+LLM_Agent_WatchesTyping() {
+	if A_IsSuspended
+		return false
+	return LLM_Agent_Setting("agent_mode") == "auto"
+}
+
+/**
+ * Called by the LLM bridge on every typed character and Backspace, with the
+ * predictions on or, in the automatic mode, off: settles a suggestion the user
+ * typed over, retires the flow in flight and, in the automatic mode, arms the
+ * pause timer on the new buffer.
  * @param {String} Buffer The typed context, most recent character last.
  * @returns {Boolean} True when the pause timer was armed.
  */
@@ -689,7 +749,9 @@ LLM_Agent_OnTyping(Buffer) {
 
 /**
  * Sends one System 1 request and reads its triage: the one transport of
- * System 1.
+ * System 1. A chat model reads the triage prompt; Jev (a decisions provider,
+ * or Backboard with a "typesafe/" model) answers the triage as a typed
+ * question about the application and the sentence.
  * @param {Map} Backend LLM_Agent_Backend's record.
  * @param {String} Sentence The sentence being typed.
  * @param {Map} Ctx Map("app", "tools").
@@ -697,7 +759,11 @@ LLM_Agent_OnTyping(Buffer) {
  * @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
  */
 LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage) {
+	global LLM_AGENT_JEV_STATE
 	Config := LLM_Agent_Config()
+	if _LLM_Agent_IsJev(Backend)
+		return _LLM_Agent_Decide(Backend, _LLM_Agent_Fill(LLM_AGENT_JEV_STATE,
+			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage)
 	Payload := Map(
 		"system", LLM_Agent_System1Prompt(Config, Ctx),
 		"user", Sentence,
@@ -711,6 +777,56 @@ _LLM_Agent_OnSystem1Answer(Config, OnTriage, Raw, Meta := "") {
 	OnTriage.Call(LLM_Agent_ParseSystem1(Config, Raw))
 }
 
+; @returns {Boolean} True when a System 1 backend is Jev: a decisions provider,
+;     or Backboard running a "typesafe/" model.
+_LLM_Agent_IsJev(Backend) {
+	global LLM_AGENT_JEV_BACKBOARD_PREFIX
+	Fmt := LLM_RemoteProviderFormat(Backend["backend"])
+	if (Fmt == "decisions")
+		return true
+	return Fmt == "backboard"
+		&& SubStr(Backend["model"], 1, StrLen(LLM_AGENT_JEV_BACKBOARD_PREFIX)) == LLM_AGENT_JEV_BACKBOARD_PREFIX
+}
+
+; Asks Jev the triage question about a state: System 1's second transport.
+; @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
+_LLM_Agent_Decide(Backend, State, Config, OnTriage) {
+	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
+	if !(Target is Map)
+		return false
+	Questions := LLM_Agent_JevQuestions(Config)
+	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage)
+	if (Target["format"] == "decisions") {
+		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
+			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
+		return true
+	}
+	LLM_RemoteBackboard_Async(Target["resolved"],
+		Map("model", Backend["model"], "system", "", "text", State, "questions", Questions),
+		_LLM_Agent_OnBackboardJev.Bind(Config, OnTriage), OnFail)
+	return true
+}
+
+; Jev answered through a decisions provider: hand its triage on.
+_LLM_Agent_OnJevAnswers(Config, OnTriage, Answers, Usage := "") {
+	OnTriage.Call(LLM_Agent_ParseJevAnswers(Config, Answers))
+}
+
+; Jev answered through Backboard: find its answers, say where they were, and
+; hand the triage on. Where Backboard puts them is not documented, so a miss
+; names the answer's top-level keys (never its content) to locate them.
+_LLM_Agent_OnBackboardJev(Config, OnTriage, Response, Usage := "") {
+	Answers := LLM_RemoteFormats_BackboardDecisionAnswers(Response, &Where)
+	if !IsObject(Answers) {
+		LoggerWarn("LLM", "AI agent: Backboard returned no Jev answers (top-level keys: {1}).",
+			LLM_RemoteTopLevelKeys(Response))
+		OnTriage.Call("")
+		return
+	}
+	LoggerInfo("LLM", "AI agent: Jev's answers read from Backboard's '{1}'.", Where)
+	OnTriage.Call(LLM_Agent_ParseJevAnswers(Config, Answers))
+}
+
 ; The System 1 request failed: there is no triage.
 _LLM_Agent_OnSystem1Fail(OnTriage, Failure := "") {
 	LoggerWarn("LLM", "AI agent: the System 1 request failed ({1}).", _LLM_Vision_FailureReason(Failure))
@@ -719,13 +835,14 @@ _LLM_Agent_OnSystem1Fail(OnTriage, Failure := "") {
 
 ; The typing paused: triage the current sentence when everything allows it.
 _LLM_Agent_OnPause(Generation, Buffer) {
-	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Menu, _LLM_Agent_SecureFieldFn
+	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn
 	_LLM_Agent_Auto["timer"] := 0
 	if (Generation != _LLM_Agent_Generation) || A_IsSuspended
 		return false
-	if (LLM_Agent_Setting("agent_mode") != "auto") || !_LLM_Menu.Get("enabled", false)
+	; The AI menu's switch is not the agent's: only its own mode counts
+	if (LLM_Agent_Setting("agent_mode") != "auto")
 		return false
-	if LLM_Engine_LiveIsActive() || LLM_Tooltip_IsVisible() || _LLM_Engine_HotstringTooltipShown() {
+	if LLM_Engine_LiveIsActive() || _LLM_Agent_SurfaceIsHeld() || _LLM_Engine_HotstringTooltipShown() {
 		LoggerDebug("LLM", "AI agent: no triage, live mode or another tooltip holds the surface.")
 		return false
 	}
@@ -805,6 +922,43 @@ _LLM_Agent_RememberTriaged(Sentence) {
 		_LLM_Agent_Auto["triaged"].Delete(_LLM_Agent_Auto["order"].RemoveAt(1))
 }
 
+; Tells whether a tooltip the automatic mode must not cover is shown: any AI
+; tooltip but an automatic next-word prediction (its candidates or its spinner).
+; @returns {Boolean}
+_LLM_Agent_SurfaceIsHeld() {
+	if !LLM_Tooltip_IsVisible()
+		return false
+	return !_LLM_Agent_IsAutoPrediction(LLM_Tooltip_GetPresentedToken())
+}
+
+; Tells whether a presented tooltip record is an automatic prediction: offered
+; by the prediction engine (its request id), neither live mode's nor one the
+; user asked for (llm_generate_prediction and its presets).
+; @param {Object} Record LLM_Tooltip_GetPresentedToken's record, 0 when none.
+; @returns {Boolean}
+_LLM_Agent_IsAutoPrediction(Record) {
+	global _LLM_Engine
+	if !IsObject(Record) || !Record.HasOwnProp("Lifecycle") || !IsObject(Record.Lifecycle)
+		return false
+	OfferId := Record.Lifecycle.OfferId
+	if !(OfferId is Integer) || OfferId <= 0
+		return false
+	return (OfferId != _LLM_Engine.Get("explicit_request_id", 0)) && !_LLM_Engine_RequestIsLive(OfferId)
+}
+
+; Retires the automatic prediction the actions of an automatic flow replace:
+; its pending and in-flight requests, whose late answer would cover the
+; actions, and its tooltip.
+_LLM_Agent_RetirePrediction(Flow) {
+	LLM_Engine_CancelTimer()
+	LLM_Engine_CancelInflight()
+	Record := LLM_Tooltip_GetPresentedToken()
+	if _LLM_Agent_IsAutoPrediction(Record) {
+		LLM_Tooltip_HideExact(Record)
+		LoggerInfo("LLM", "AI agent #{1}: its actions replace the prediction tooltip.", Flow["generation"])
+	}
+}
+
 ; Retires the armed pause timer.
 _LLM_Agent_CancelPause() {
 	global _LLM_Agent_Auto
@@ -813,22 +967,52 @@ _LLM_Agent_CancelPause() {
 	_LLM_Agent_Auto["timer"] := 0
 }
 
-; Leaves the automatic mode's state behind.
+; Leaves the automatic mode's state behind, the bridge's agent-only typing
+; feed included.
 _LLM_Agent_StopAuto(Reason) {
 	global _LLM_Agent_Auto
 	_LLM_Agent_CancelPause()
 	_LLM_Agent_SettleOffer(false)
 	_LLM_Agent_Auto["triaged"] := Map()
 	_LLM_Agent_Auto["order"] := []
+	if IsSet(LLM_Bridge_ResetAgentFeed)
+		LLM_Bridge_ResetAgentFeed(Reason)
 	LoggerInfo("LLM", "AI agent automatic mode stopped ({1}).", Reason)
 }
 
-; SetTimer, or the test suite's scheduler.
+/**
+ * Pause step of the lifecycle ("pause = tout éteint"): retires the flow in
+ * flight, whose answer could otherwise land after the resume, the armed pause
+ * timer, which native Suspend does not stop, and the bridge's agent-only typing
+ * feed with its context. The suggestion the pause hid is dropped unlearned:
+ * the user did not dismiss it. Resuming needs nothing: the next keystroke
+ * starts the feed again when the agent still watches the typing.
+ * @returns {Boolean} True, the lifecycle step's contract.
+ */
+LLM_Agent_OnSuspend() {
+	global _LLM_Agent_Generation, _LLM_Agent_Auto
+	_LLM_Agent_Generation += 1
+	_LLM_Agent_CancelPause()
+	_LLM_Agent_Auto["offer"] := ""
+	if IsSet(LLM_Bridge_ResetAgentFeed)
+		LLM_Bridge_ResetAgentFeed("Ergopti+ was paused")
+	LoggerInfo("LLM", "AI agent #{1}: typing watch and flow in flight retired by the pause.", _LLM_Agent_Generation)
+	return true
+}
+
+; Arms a one-shot timer (a negative period) or cancels one (0), through the
+; test suite's scheduler when it is set. The agent never repeats a timer: its
+; pause and its learning write run once, re-armed on demand, since a repeating
+; timer would tick on the keystroke thread.
 _LLM_Agent_Schedule(Callback, Period) {
 	global _LLM_Agent_ScheduleFn
+	if !(Period is Integer) || Period > 0
+		throw ValueError("_LLM_Agent_Schedule: a one-shot period is negative, a cancel 0, got " . String(Period) . ".")
 	if HasMethod(_LLM_Agent_ScheduleFn, "Call")
 		return _LLM_Agent_ScheduleFn.Call(Callback, Period)
-	return SetTimer(Callback, Period)
+	if (Period == 0)
+		return SetTimer(Callback, 0)
+	return SetTimer(Callback, -Abs(Period))
 }
 
 ; Sends one chat request to an agent backend: the local server or an API
@@ -843,6 +1027,15 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
 	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
 	if !(Target is Map)
 		return false
+	if Target.Has("resolved") && !LLM_RemoteFormatServes(Target["format"], "chat")
+		throw ValueError("The AI agent cannot chat with '" . Backend["backend"] . "': it answers typed questions only.")
+	; Backboard's exchange writes its own bodies; it takes no temperature
+	if (Target["format"] == "backboard") {
+		if CancelEngine
+			_LLM_Vision_CancelEngine()
+		LLM_RemoteBackboardChat_Async(Target["resolved"], Payload["system"], Payload["user"], OnSuccess, OnFail)
+		return true
+	}
 	if Target.Has("resolved") {
 		Resolved := Target["resolved"]
 		Body := _LLMRemoteBuildPayload(Resolved["Format"], Resolved["Model"], Payload["system"],
