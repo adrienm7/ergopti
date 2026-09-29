@@ -565,14 +565,25 @@ end
 --- @param user_config_path string Absolute path to config_karabiner.toml.
 --- @param overwrite_corrupt boolean|nil True only for the explicit reset-to-defaults
 ---        action — the one case where clobbering an unparseable file is the intent.
+--- @param expected_source table|nil `{ status, content }` a scope transaction read
+---        and backed up: the save refuses when the file no longer holds exactly it.
 --- @return boolean True when the state reached disk, false when nothing was saved.
-function M.save_user_config(state, user_config_path, overwrite_corrupt)
+function M.save_user_config(state, user_config_path, overwrite_corrupt, expected_source)
+	assert(expected_source == nil or (not overwrite_corrupt and type(expected_source) == "table"
+		and (expected_source.status == "absent" or (expected_source.status == "ok"
+			and type(expected_source.content) == "string"))), "invalid remap source precondition")
 	local document = {}
 	local source, source_status
 	if not overwrite_corrupt then
 		-- Re-reading before every save is cheap (a few KB, only on user action)
 		-- and is the only way to notice that the file went bad since boot.
 		source, source_status = FileSystem.read_with_status(user_config_path)
+		if expected_source and (source_status ~= expected_source.status
+			or (source_status == "ok" and source ~= expected_source.content)) then
+			Logger.error(LOG, "Refusing to overwrite '%s': it changed after its backup — settings NOT saved.",
+				user_config_path)
+			return false
+		end
 		if source_status == "error" then
 			Logger.error(LOG, "Refusing to overwrite the unsafe user config at '%s' — settings NOT saved.",
 				user_config_path)
