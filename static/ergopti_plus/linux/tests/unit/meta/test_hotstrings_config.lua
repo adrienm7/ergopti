@@ -347,20 +347,16 @@ helpers.describe("hotstrings_config", function()
       end)
     end)
 
-    helpers.it("refuses malformed choices instead of guessing them", function()
-      local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
-      local ok, err = pcall(Choices.with_file, cfg, "[hotstrings]\ngroups = { probe = \"yes\" }\n", function(path)
-        local engine = make_engine()
-        helpers.assert_eq(cfg.init(engine, "virtual.toml"), false, "malformed choices must refuse initialisation")
-        local _, committed, reason = cfg.load_all()
-        helpers.assert_eq(committed, false, "no catalogue is published over unreadable choices")
-        helpers.assert_eq(reason, "choices-unavailable")
-        helpers.assert_eq(cfg.is_group_enabled("probe"), false)
-        helpers.assert_eq(cfg.enable_group("probe"), false, "a setter cannot overwrite unreadable choices")
-        helpers.assert_eq(Choices.read(path), "[hotstrings]\ngroups = { probe = \"yes\" }\n")
+    helpers.it("ignores an old-shape choice without guessing it or refusing the catalogue (config-outdated-hotstrings)", function()
+      -- An old-shape choice is outdated configuration: never guessed ("yes" is
+      -- not a switch), never a refusal that turns every hotstring off. The
+      -- fixture asserts that init reads the choices and the catalogue publishes.
+      local source = "[hotstrings]\ngroups = { probe = \"yes\" }\n"
+      with_groups(source, function(cfg, engine, path)
+        helpers.assert_eq(cfg.is_group_enabled("probe"), false, "the outdated choice is not guessed")
+        helpers.assert_eq(fires(engine, "pq", "probe-result"), false, "the category keeps its neutral gate")
+        helpers.assert_eq(Choices.read(path), source, "the file is left for the config cleanup")
       end)
-      package.loaded["modules.hotstrings.hotstrings_config"] = nil
-      if not ok then error(err, 0) end
     end)
   end)
 

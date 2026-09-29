@@ -25,6 +25,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Loader = require("modules.hotstrings.loader")
 local Shell = require("adapters.shell_runner")
 local Writer = require("toml_codec.writer")
@@ -119,31 +120,73 @@ local function copy_choices(source)
 end
 
 --- Extracts the explicit category and section choices of a decoded config.toml.
---- Malformed choices raise: a guessed choice is how a whole corpus switches on.
+--- A choice of the wrong shape, written by an older build, is never guessed:
+--- it is outdated configuration, left absent (the neutral value), warned about
+--- once and offered by the config cleanup. Raising here turned every
+--- hotstring off for the session over one entry nothing reads.
 --- @param document table Decoded configuration.
 --- @return table choices Explicit choices only; absence stays absent.
 local function decode_choices(document)
 	assert(type(document) == "table", "hotstring configuration must be a table")
-	local hotstrings = document.hotstrings
-	assert(hotstrings == nil or type(hotstrings) == "table", "[hotstrings] must be a table")
 	local choices = { groups = {}, modules = {} }
+	local hotstrings = document.hotstrings
+	if hotstrings ~= nil and type(hotstrings) ~= "table" then
+		ConfigOutdated.report({ "hotstrings" }, "[hotstrings] is not a table", Logger)
+		return choices
+	end
 	local groups = hotstrings and hotstrings.groups
-	assert(groups == nil or type(groups) == "table", "hotstrings.groups must be a table")
+	if groups ~= nil and type(groups) ~= "table" then
+		ConfigOutdated.report({ "hotstrings", "groups" }, "category choices are not a table", Logger)
+		groups = nil
+	end
 	for id, value in pairs(groups or {}) do
-		assert(type(id) == "string" and type(value) == "boolean", "hotstring category choices must be booleans")
-		choices.groups[id] = value
+		if type(id) == "string" and type(value) == "boolean" then
+			choices.groups[id] = value
+		else
+			ConfigOutdated.report({ "hotstrings", "groups", tostring(id) }, "a category choice takes true or false", Logger)
+		end
 	end
 	local modules = hotstrings and hotstrings.modules
-	assert(modules == nil or type(modules) == "table", "hotstrings.modules must be a table")
+	if modules ~= nil and type(modules) ~= "table" then
+		ConfigOutdated.report({ "hotstrings", "modules" }, "section choices are not a table", Logger)
+		modules = nil
+	end
 	for id, sections in pairs(modules or {}) do
-		assert(type(id) == "string" and type(sections) == "table", "hotstring section choices must be tables")
-		choices.modules[id] = {}
-		for name, value in pairs(sections) do
-			assert(type(name) == "string" and type(value) == "boolean", "hotstring section choices must be booleans")
-			choices.modules[id][name] = value
+		if type(id) == "string" and type(sections) == "table" then
+			choices.modules[id] = {}
+			for name, value in pairs(sections) do
+				if type(name) == "string" and type(value) == "boolean" then
+					choices.modules[id][name] = value
+				else
+					ConfigOutdated.report({ "hotstrings", "modules", id, tostring(name) },
+						"a section choice takes true or false", Logger)
+				end
+			end
+		else
+			ConfigOutdated.report({ "hotstrings", "modules", tostring(id) }, "section choices are not a table", Logger)
 		end
 	end
 	return choices
+end
+
+--- Reports the choices naming a category or section the loaded catalogue no
+--- longer has: ignored at runtime, offered by the config cleanup.
+--- @param choices table Decoded choices.
+--- @param categories table Loaded categories, keyed by id.
+local function report_retired_choices(choices, categories)
+	for id in pairs(choices.groups) do
+		if not categories[id] then
+			ConfigOutdated.report({ "hotstrings", "groups", id }, "no loaded hotstring category has this id", Logger)
+		end
+	end
+	for id, sections in pairs(choices.modules) do
+		local category = categories[id]
+		for name in pairs(sections) do
+			if not (category and (category.sections or {})[name]) then
+				ConfigOutdated.report({ "hotstrings", "modules", id, name }, "no loaded hotstring section has this name", Logger)
+			end
+		end
+	end
 end
 
 --- Reads the canonical choices with the exact bytes they came from.
@@ -1212,6 +1255,7 @@ function M.load_all()
 	_mappings = staged_mappings
 	_categories = staged_categories
 	_resolve_cache = {}
+	report_retired_choices(choices, _categories)
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 		#filtered, _count_groups(filtered), _parse_errors)
@@ -1664,6 +1708,7 @@ end
 --- @param mark function mark(...segments).
 function M.mark_config_reads(document, mark)
 	local choices = decode_choices(document)
+	report_retired_choices(choices, _categories)
 	for id in pairs(choices.groups) do
 		if _categories[id] then mark("hotstrings", "groups", id) end
 	end
