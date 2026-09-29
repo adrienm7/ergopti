@@ -7,7 +7,8 @@
 # ONE SOURCE. tools/codegen/codegen-touchpad-registry.cjs turns this file into
 # windows/_generated/touchpad_registry.ahk, and both writers read that data:
 # the in-process registry writer (modules/gestures/config.ahk) and the elevated
-# PowerShell script of the first-run wizard (ui/onboarding/steps_metrics.ahk).
+# PowerShell script of the first-run wizard
+# (ui/onboarding/gesture_registration.ahk).
 # modules/gestures/touchpad_registry.ahk owns every write: it backs up the
 # prior values before the first one, and restores them on request.
 #

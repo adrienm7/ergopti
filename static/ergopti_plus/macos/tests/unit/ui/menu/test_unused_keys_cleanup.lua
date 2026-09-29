@@ -82,6 +82,11 @@ local SURVIVORS = {
 -- A plain io adapter with the macOS FileSystem contract the cleanup needs.
 local IoAdapter = {
 	read_with_status = function(path) return TomlWriter.read_classified(path, nil) end,
+	-- Shipped data: the setup wizard's catalogue names the keys it reads.
+	read = function(path)
+		local content, status = TomlWriter.read_classified(path, nil)
+		return status == "ok" and content or nil
+	end,
 	write_if_unchanged = function(path, content, expected_source)
 		return TomlWriter.publish_if_unchanged(path, content, nil, expected_source)
 	end,
@@ -139,7 +144,7 @@ helpers.with_stub_scope(MODULES, function()
 			overrides = overrides,
 			flat = flat,
 			status = status,
-			answers = Onboarding._answers_from_config(decoded),
+			answers = Onboarding.config_values(decoded),
 		}
 	end
 
@@ -188,11 +193,13 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq(scan.keys[1].key, "broken")
 		end)
 
-		helpers.it("unused keys: the Windows import keys the wizard reads are kept", function()
-			local source = "[Layout]\nErgoptiBase = true\nStale = 1\n"
+		helpers.it("unused keys: the wizard keeps its manifest paths and no Windows import key", function()
+			-- The wizard reads the manifest paths of its pages, never the former
+			-- Windows PascalCase import keys, so those are offered like any stale key.
+			local source = "[Layout]\nErgoptiBase = true\n[gestures]\nenabled = true\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
 			helpers.assert_eq(#scan.keys, 1)
-			helpers.assert_eq(scan.keys[1].key, "Stale")
+			helpers.assert_eq(scan.keys[1].key, "ErgoptiBase")
 		end)
 	end)
 

@@ -86,7 +86,8 @@ helpers.describe("onboarding metrics path", function()
 			with_delivery(function(_, state, pending)
 				fixture.dispatch(route, state, pending)
 				local strings = last_payload(state).strings
-				helpers.assert_eq(strings["dialog.metrics.enable_warning"], "dialog.metrics.enable_warning")
+				helpers.assert_true(strings["dialog.metrics.enable_warning"]:find("{1}", 1, true) ~= nil,
+					"the page receives the locale file's raw template")
 				helpers.assert_nil(strings["dialog.metrics.enable_warning_formatted"],
 					"a pre-formatted warning freezes the path at open time")
 			end)

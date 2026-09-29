@@ -2,18 +2,29 @@
 
 ## Purpose
 
-Multi-step first-run wizard shown automatically when `config.toml` is absent. Built on WebView2 (`_shared/ui/onboarding/` frontend); features live locale preview (the wizard re-renders in the chosen language before step 2), page-as-destroy navigation so each step has clean state, and a single atomic TOML write at the end followed by a driver reload. A native `InputBox` fallback handles systems without WebView2.
+First-run wizard shown automatically when `config.toml` is absent, and re-run
+from Configuration > Setup wizard over the configuration in force. The WebView2
+host renders the shared page at `_shared/ui/onboarding/`: after the language and
+configuration-folder steps, one opt-in question per feature category (default
+No), with the recommended choices to import. The page answers with manifest
+paths; they are validated against the generated catalogue and written in one
+transaction, then the driver reloads once. Without WebView2 the wizard cannot be
+shown: the user is told so and a first run exits.
 
 ## Key files
 
-| File        | Description                                                           |
-| ----------- | --------------------------------------------------------------------- |
-| `init.ahk`  | Entry: `Onboarding_Start()` — detects absence of config, opens wizard |
-| `steps.ahk` | Step definitions and per-step validation / mutation logic             |
+| File                       | Description                                                            |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `init.ahk`                 | Includes the sub-modules                                               |
+| `core.ahk`                 | Entry points `Onboarding_Run()` and `Onboarding_ShowFromMenu()`        |
+| `answers.ahk`              | Catalogue index, answer validation, values read from a config.toml     |
+| `webview.ahk`              | WebView2 host and the page's action protocol                           |
+| `finish.ahk`               | Transactional write of config.toml (and paths.toml) followed by Reload |
+| `gesture_registration.ahk` | Elevated touchpad gesture registration from the gestures page          |
 
 ## Usage
 
 ```ahk
 ; Called automatically by ErgoptiPlus.ahk boot when config is absent:
-Onboarding_Start()
+Onboarding_Run()
 ```

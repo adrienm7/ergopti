@@ -93,8 +93,8 @@ _OTB_NoHostReimplementsTheBoolTest() {
 	Assert(Src != "", "the onboarding source must be readable")
 	Assert(InStr(Src, 'StrLower(') == 0 or InStr(Src, '== "true"') == 0,
 		'no onboarding host may test a TOML boolean with StrLower(x) == "true" — IniCacheGet returns a real boolean, so that comparison is always false; use TomlCacheBool')
-	Assert(InStr(Src, "TomlCacheBool(") > 0,
-		"the onboarding hosts must read TOML booleans through the shared TomlCacheBool helper")
+	Assert(InStr(Src, "TOML_ParseFreshFileTyped(") > 0,
+		"the onboarding host must read config.toml through the typed parse, which keeps a TOML Boolean a Boolean for the page")
 }
 
 ; §5.2: the helper must exist in exactly one place.

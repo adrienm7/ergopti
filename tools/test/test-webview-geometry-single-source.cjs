@@ -207,7 +207,14 @@ const WINDOWS_APPS = {
 	},
 	onboarding: {
 		file: 'ui/onboarding/webview.ahk',
-		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
+		// Reads the manifest itself and bounds it by the work area, as the
+		// config_cleanup host does: the check is that it reads its own entry.
+		checks: () => [
+			/ONBOARDING_APP_ID := "onboarding"/,
+			/FileRead\(_SharedDir \. "\\ui\\apps\.manifest\.json"/,
+			/Apps\[ONBOARDING_APP_ID\]/,
+			/Geo := _OnbWeb_Geometry\(\)/
+		]
 	},
 	paths_editor: {
 		file: 'ui/paths_editor/init.ahk',

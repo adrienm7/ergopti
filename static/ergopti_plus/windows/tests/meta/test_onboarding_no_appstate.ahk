@@ -45,20 +45,6 @@
 ; =====================================================
 ; =====================================================
 
-_ONA_NativeLocaleNextDoesNotPublishPreview() {
-	Body := _StripFullLineComments(_DriverFuncBody("_Step1_Next"))
-	Assert(Body != "", "the native onboarding locale Next handler must remain source-visible")
-	AssertFalse(InStr(Body, "_I18nLocale") || InStr(Body, "_I18nCacheLoaded"),
-		"native Next must keep the preview locale detached until Finish commits it")
-	AnswerPos := InStr(Body, "global _ob_locale := locale.Code")
-	NavigatePos := InStr(Body, "_Onboarding_Navigate(_Onboarding_StepConfigDir)")
-	Assert(AnswerPos > 0 && NavigatePos > AnswerPos,
-		"native Next must still retain the selected answer before navigating to the next page")
-}
-Test("onboarding native locale Next remains detached until Finish "
-	. "(ahk6-02-onboarding-locale-preview)",
-	_ONA_NativeLocaleNextDoesNotPublishPreview)
-
 _ONA_CommitDoesNotUseAppState() {
 	Seg := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in the driver source")
@@ -71,7 +57,6 @@ Test("onboarding: _Onboarding_Commit does not access AppState (UnsetError crash 
 
 _ONA_CommitPublishesOnlyAfterPersistence() {
         Seg := _DriverFuncBody("_Onboarding_Commit")
-        NativeFinish := _DriverFuncBody("_Step5_Finish")
         WebFinish := _DriverFuncBody("_OnbWeb_Finish")
 		BuildPos := InStr(Seg, "TOML_BuildUpdatedContent(")
 		TargetsPos := InStr(Seg, "TargetSpecs := [ConfigTransitionPresentTarget(CandidateConfig")
@@ -102,11 +87,7 @@ _ONA_CommitPublishesOnlyAfterPersistence() {
 		"onboarding must not carry a stale canonicalization workaround after the batch writer stopped re-entering SaveFullConfig")
 	Assert(InStr(Seg, "FileOpen(") == 0 && InStr(Seg, "FSMove(") == 0,
 		"onboarding must not publish config or locator outside the transition WAL")
-		Assert(InStr(NativeFinish,
-			"_Onboarding_Commit(_Onboarding_DestroyActive)") > 0,
-				"native onboarding must lend teardown to the owned reload hand-off")
-		Assert(InStr(WebFinish,
-			"_Onboarding_Commit(_OnbWeb_Reset)") > 0,
+		Assert(RegExMatch(WebFinish, "_Onboarding_Commit\([^\r\n]*, _OnbWeb_Reset\)") > 0,
 				"WebView onboarding must retain its retry UI until the owned reload hand-off accepts")
 }
 Test("onboarding: commit persists transactionally before publishing or reloading", _ONA_CommitPublishesOnlyAfterPersistence)
@@ -121,7 +102,9 @@ _ONA_CommitErrorsUseSelectedLocale() {
 		. _StripFullLineComments(
 			_DriverFuncBody("_Onboarding_RollbackRefusedReload"))
 	ErrorBody := _StripFullLineComments(
-		_DriverFuncBody("_Onboarding_CommitError"))
+		_DriverFuncBody("_Onboarding_ShowError"))
+	Assert(InStr(_DriverFuncBody("_Onboarding_CommitError"), "_Onboarding_ShowError(Key)") > 0,
+		"commit failures must be shown by the one renderer that follows the wizard's language")
 	Assert(CommitBody != "" && ErrorBody != "",
 		"onboarding commit and its error renderer must remain source-visible")
 	RegExReplace(CommitBody, "_Onboarding_CommitError\(", "",

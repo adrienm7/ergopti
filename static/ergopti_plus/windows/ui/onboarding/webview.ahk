@@ -5,30 +5,32 @@
 ; DESCRIPTION:
 ; Renders the first-run wizard with an embedded WebView2 control that loads the
 ; cross-driver frontend at _shared/ui/onboarding/ — the SAME HTML/JS/CSS the
-; macOS driver uses — instead of the native AHK Gui pages in steps.ahk. The
-; native pages remain as a graceful fallback (see _OnbWeb_Available): when
-; WebView2 is unavailable or RAM is tight, Onboarding_Run/ShowFromMenu fall back
-; to _Onboarding_Step1.
+; macOS and Linux drivers use. It is the only renderer: without WebView2 the
+; wizard cannot be shown, and the entry points say so instead of asking fewer
+; questions in a second, native wizard.
 ;
 ; FEATURES & RATIONALE:
-; 1. Shared UX: one onboarding frontend for both drivers — fixing a wording or
-;    a step there updates Windows and macOS at once. The bridge mirrors the
-;    proven model_browser WebView2 host (infra/webview_utils + vendor/WebView2).
-; 2. Reuses the existing commit: the frontend collects exactly the six answers
-;    the native wizard collects (locale, config_dir, use_ergopti, magic_key,
-;    use_metrics, use_gestures). The "finish" handler funnels them into the
-;    SAME _ob_* globals and calls _Onboarding_Commit, so the config written to
-;    disk is byte-for-byte what the native path produced — no behavior change.
-; 3. Blocking contract preserved: the host sets the shared _ob_gui sentinel so
+; 1. Shared UX: one onboarding frontend for every driver — fixing a wording or
+;    a page there updates them all. The bridge mirrors the proven
+;    model_browser WebView2 host (infra/webview_utils + vendor/WebView2).
+; 2. Manifest answers: the page answers with manifest paths and values from
+;    the generated catalogue; ui/onboarding/answers.ahk validates them and
+;    _Onboarding_Commit writes them in one transaction before a single Reload.
+; 3. Re-runs start from the configuration in force, and from the chosen
+;    folder's configuration when the user picks another one.
+; 4. Blocking contract preserved: the host sets the shared _ob_gui sentinel so
 ;    Onboarding_Run's "park until the wizard resolves" loop works unchanged.
 ;
 ; Functions/globals are hoisted; #Include'd from ui/onboarding/init.ahk.
 ; ==============================================================================
 
 ; French keyboard LANGID (low word of the HKL). When the active OS layout is
-; French we hint the frontend (system_layout = "french") so step 3 pre-selects
-; the "u-grave" magic key, matching _Onboarding_PickDefaultMagicKey.
+; French we hint the frontend (system_layout = "french") so the hotstrings page
+; proposes the "u-grave" trigger character when no configuration names one.
 global ONBOARDING_LANGID_FRENCH := 0x040C
+
+; The wizard's id in _shared/ui/apps.manifest.json, which sizes it.
+global ONBOARDING_APP_ID := "onboarding"
 
 ; Virtual host names mapped to local folders so the wizard loads from a stable
 ; origin (https://<host>/…) instead of an opaque file:// origin. Chromium treats
@@ -40,14 +42,13 @@ global ONBOARDING_LANGID_FRENCH := 0x040C
 ; packaged local web UI. Mappings are per-CoreWebView2 instance, so this does not
 ; affect the model_browser host that shares the same environment.
 global ONBOARDING_VHOST        := "ergopti.onboarding"   ; -> _SharedDir\ui\onboarding
-global ONBOARDING_VHOST_ASSETS := "ergopti.assets"       ; -> _StaticDir (flags, layout jpg)
+global ONBOARDING_VHOST_ASSETS := "ergopti.assets"       ; -> _StaticDir (language flags)
 ; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW — let the page load these mapped
 ; resources, including cross-origin from the assets host.
 global WEBVIEW_HOST_ACCESS_ALLOW := 1
 
-; WebView2 host state — kept separate from the native wizard's _ob_gui handle
-; usage (the host stores its Gui in _ob_gui too, so the Onboarding_Run loop and
-; the close paths behave identically to the native pages).
+; WebView2 host state. The host stores its Gui in the shared _ob_gui sentinel,
+; which the Onboarding_Run loop parks on.
 global _OnbWeb_Controller := unset
 global _OnbWeb_WebView    := unset
 global _OnbWeb_Ready       := false
@@ -86,28 +87,39 @@ global _OnbWeb_SessionEpoch := 0
 ; Unlike the model_browser gate, onboarding intentionally does NOT apply the
 ; low-RAM native fallback (WebView_ShouldUseNativeFallback): the first-run wizard
 ; is a one-off and the shared webview UX is wanted even on a RAM-starved machine.
-; Chromium may cold-boot slowly under pressure, but that cost is paid once, and
-; WebView2.create is still wrapped in a try/catch that degrades to the native
-; pages if the control genuinely cannot be created.
+; Chromium may cold-boot slowly under pressure, but that cost is paid once.
 _OnbWeb_Available() {
 	global _VendorDir
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	return IsSet(WebView2) && FileExist(loader)
 }
 
-; Attempts to show the wizard in a WebView2 window. Returns true on success
-; (the caller must NOT also launch the native pages), false to fall back to the
-; native _Onboarding_Step1 flow. Sets the shared _ob_gui sentinel so the
-; Onboarding_Run park-loop and the standard close handling apply unchanged.
+; The wizard's size from _shared/ui/apps.manifest.json, as every driver reads
+; it, bounded by the primary monitor's work area so the footer buttons stay on
+; screen: the page scrolls its content instead.
+; @returns {Object} { w, h, min_w, min_h } in DPI-independent pixels.
+_OnbWeb_Geometry() {
+	global _SharedDir, ONBOARDING_APP_ID
+	Apps := JsonParse(FileRead(_SharedDir . "\ui\apps.manifest.json", "UTF-8"))["apps"]
+	Entry := Apps[ONBOARDING_APP_ID]
+	MonitorGetWorkArea(MonitorGetPrimary(), &Left, &Top, &Right, &Bottom)
+	Scale := A_ScreenDPI / 96
+	W := Min(Entry["width"], Floor((Right - Left) / Scale))
+	H := Min(Entry["height"], Floor((Bottom - Top - SysGet(4) - 2 * SysGet(33)) / Scale))
+	return { w: W, h: H, min_w: Min(Entry["min_width"], W), min_h: Min(Entry["min_height"], H) }
+}
+
+; Attempts to show the wizard in a WebView2 window. Returns true on success,
+; false when it cannot be shown (the caller tells the user). Sets the shared
+; _ob_gui sentinel so the Onboarding_Run park-loop and the standard close
+; handling apply.
 _Onboarding_TryWeb() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
 	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
-	global _ob_gui, _VendorDir, _SharedDir
+	global _ob_gui, _ob_locale, _VendorDir, _SharedDir
 
 	if !_OnbWeb_Available() {
-		; Log WHY we fall back so the path taken is unambiguous in the logs —
-		; identical-looking native pages otherwise hide which renderer ran.
-		try LoggerInfo("Onboarding", "WebView2 unavailable ({1}) — using native AHK pages.", _OnbWeb_UnavailableReason())
+		try LoggerError("Onboarding", "The wizard cannot be shown: WebView2 is unavailable ({1}).", _OnbWeb_UnavailableReason())
 		return false
 	}
 	; Singleton — bring the existing wizard window to the front instead of
@@ -133,11 +145,17 @@ _Onboarding_TryWeb() {
 	_OnbWeb_Ready := false
 	_OnbWeb_Queue := []
 
-	g := Gui("+Resize +MinSize480x520", t("onboarding.welcome.title"))
+	try Geo := _OnbWeb_Geometry()
+	catch as Err {
+		try LoggerError("Onboarding", "The wizard cannot be sized from apps.manifest.json: {1}.", Err.Message)
+		return false
+	}
+	; The title follows the wizard's language, as the page's own title does.
+	g := Gui("+Resize +MinSize" . Geo.min_w . "x" . Geo.min_h, _Onboarding_Translate(_ob_locale, "onboarding.welcome.title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
-	Placeholder := g.Add("Text", "x0 y0 w480 h560", "")
+	Placeholder := g.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
 	g.OnEvent("Close",  _OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_OnClose))
 	g.OnEvent("Size",   _OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_OnResize))
 
@@ -146,18 +164,18 @@ _Onboarding_TryWeb() {
 	; zero/placeholder client rect, so it paints the empty gray default and never
 	; lays out the navigated page — the model_browser host shows first for exactly
 	; this reason.
-	g.Show("w480 h560 Center")
+	g.Show("w" . Geo.w . " h" . Geo.h . " Center")
 	_ob_gui := g
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	try {
 		_OnbWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
-		try LoggerError("Onboarding", "WebView2 create failed: {1} — falling back to native pages.", Err.Message)
+		try LoggerError("Onboarding", "WebView2 create failed: {1} — the wizard cannot be shown.", Err.Message)
 		try g.Destroy()
 		_OnbWeb_Reset()
-		; The window was shown before create() — clear the shared sentinel so the
-		; native fallback (which sets its own _ob_gui) starts from a clean slate.
+		; The window was shown before create(): clear the shared sentinel so the
+		; caller's park-loop and a later retry start from a clean slate.
 		_ob_gui := 0
 		return false
 	}
@@ -184,8 +202,8 @@ _Onboarding_TryWeb() {
 	; Map virtual hosts BEFORE navigating so the document and every relative
 	; asset resolve through a real origin (see ONBOARDING_VHOST comment for why
 	; file:// is avoided). The frontend folder serves index.html/script.js/style.css;
-	; the static folder serves the flag PNGs + layout JPG injected as absolute URLs.
-		; Map the SHARED-UI parent folder (not just onboarding/) so relative paths
+	; the static folder serves the flag PNGs injected as absolute URLs.
+	; Map the SHARED-UI parent folder (not just onboarding/) so relative paths
 	; like ../host_bridge.js resolve correctly inside the mapped origin. WebView2
 	; blocks any path that escapes the VHOST root — mapping the parent keeps
 	; every shared ui/ asset reachable without duplicating host_bridge.js.
@@ -204,7 +222,7 @@ _Onboarding_TryWeb() {
 }
 
 ; Returns a short human-readable reason why the WebView2 path is unavailable,
-; used purely for the fallback log line so the cause is visible at a glance.
+; used purely for the log line so the cause is visible at a glance.
 _OnbWeb_UnavailableReason() {
 	global _VendorDir
 	if !IsSet(WebView2)
@@ -228,7 +246,8 @@ _OnbWeb_UnavailableReason() {
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
 ; "action" field. Handled actions: ready, previewLocale, localeSelected,
-; pickConfigDir, resolveMetricsPath, loadExistingConfig, finish.
+; pickConfigDir, resolveMetricsPath, loadExistingConfig, registerGesturesAuto,
+; registerGesturesManual, finish.
 _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	if !_OnbWeb_SessionCurrent(SessionEpoch)
 		return
@@ -249,13 +268,16 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		return
 	if (Action == "ready") {
 		_OnbWeb_FlushQueue()
-		_OnbWeb_InjectInitData()
+		; Reading the configuration and the catalogue, and closing the window when
+		; they cannot be read, must not run on the WebMessageReceived stack.
+		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_InjectInitData), -1)
 	} else if (Action == "previewLocale") {
 		_OnbWeb_PreviewLocale(Payload.Has("locale") ? Payload["locale"] : "")
 	} else if (Action == "localeSelected") {
 		global _ob_locale
-		if (Payload.Has("locale") && Payload["locale"] != "")
-			_ob_locale := Payload["locale"]
+		Locale := Payload.Get("locale", "")
+		if _OnbWeb_LocaleShipped(Locale)
+			_ob_locale := Locale
 	} else if (Action == "pickConfigDir") {
 		_OnbWeb_PickConfigDir(Payload.Has("current") ? Payload["current"] : "")
 	} else if (Action == "resolveMetricsPath") {
@@ -265,10 +287,16 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		}
 		_OnbWeb_ResolveMetricsPath(Payload.Has("config_dir") ? Payload["config_dir"] : "", Payload["request"])
 	} else if (Action == "loadExistingConfig") {
-		_OnbWeb_LoadExistingConfig(Payload.Has("config_dir") ? Payload["config_dir"] : "")
+		; The request number lets the page drop a reply for a folder it left.
+		if (!Payload.Has("request") || !(Payload["request"] is Integer)) {
+			try LoggerError("Onboarding", "loadExistingConfig refused: request number missing.")
+			return
+		}
+		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_LoadExistingConfig,
+			Payload.Get("config_dir", ""), Payload["request"]), -1)
 	} else if (Action == "registerGesturesAuto") {
-		; Defer out of the COM callback: the auto-config does a blocking elevated
-		; RunWait (UAC + PnP cycle), which must not run inside WebMessageReceived.
+		; Defer out of the COM callback: launching the elevated worker shows the
+		; UAC prompt, which must not run inside WebMessageReceived.
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_RegisterGesturesAuto), -1)
 	} else if (Action == "registerGesturesManual") {
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_RegisterGesturesManual), -1)
@@ -360,37 +388,55 @@ _OnbWeb_SessionCall(SessionEpoch, Callback, Params*) {
 ; =====================================
 ; ==============================================================
 
-; Builds and injects window.initData(...) — the initial locale, the sorted
-; locale list (code/name/flag), pre-filled answers, the OS-default config dir,
-; the system-layout hint and the layout-preview image URL, plus the strings for
-; the current locale.
+; Builds and injects window.initData(...): the platform whose catalogue pages
+; the page shows, the wizard's locale and the sorted locale list, the OS-default
+; and current configuration folders, the values the configuration in force
+; holds for every wizard path, the system-layout hint, the metrics store and
+; the strings of the current locale. A configuration that cannot be read never
+; opens neutral pages: committing them would overwrite answers the user gave.
 _OnbWeb_InjectInitData() {
-	global _ob_locale, _ob_config_dir, _DefaultConfigDir
-	defaultDir := IsSet(_DefaultConfigDir) ? _DefaultConfigDir : ""
-	answers := "{config_dir:" . _OnbWeb_JsStr(IsSet(_ob_config_dir) ? _ob_config_dir : "") . "}"
+	global _ob_locale, _DefaultConfigDir, ConfigurationFile, ONBOARDING_CATALOGUE_DRIVER
+	try Index := OnboardingCatalogue()
+	catch as Err {
+		_OnbWeb_OpenFailed("the onboarding catalogue is unavailable: " . Err.Message)
+		return
+	}
+	Values := OnboardingReadCurrentValues(Index, ConfigurationFile)
+	if !(Values is Map) {
+		_OnbWeb_OpenFailed(Values)
+		return
+	}
+	ConfigDir := _OnbWeb_CustomConfigDir()
 	js := "window.initData({"
-		. "locale:" . _OnbWeb_JsStr(_ob_locale)
+		. "platform:" . _OnbWeb_JsStr(ONBOARDING_CATALOGUE_DRIVER)
+		. ",locale:" . _OnbWeb_JsStr(_ob_locale)
 		. ",locales:" . _OnbWeb_LocalesJson()
-		. ",answers:" . answers
-		. ",default_config_dir:" . _OnbWeb_JsStr(defaultDir)
+		. ",default_config_dir:" . _OnbWeb_JsStr(_DefaultConfigDir)
+		. ",config_dir:" . _OnbWeb_JsStr(ConfigDir)
+		. ",current:" . OnboardingValuesJson(Values)
 		. ",system_layout:" . _OnbWeb_JsStr(_OnbWeb_SystemLayoutHint())
-		. ",layout_image_url:" . _OnbWeb_JsStr(_OnbWeb_LayoutImageUrl())
-		; Platform hint: the gestures step (5) renders Windows-only auto/manual
-		; registration buttons, whereas macOS shows only the system-gesture warning.
-		. ",platform:" . _OnbWeb_JsStr("windows")
-		; The page fills the step-4 consent warning with this path; later folder
+		; The page fills the metrics consent warning with this path; later folder
 		; changes arrive through resolveMetricsPath -> window.setMetricsPath.
-		. ",metrics_path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(IsSet(_ob_config_dir) ? _ob_config_dir : ""))
+		. ",metrics_path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(ConfigDir))
 		. ",strings:" . _OnbWeb_LocaleStringsJson(_ob_locale)
 		. "})"
 	_OnbWeb_Eval(js)
+}
+
+; Tells the user the wizard cannot start, then closes it. On a first run the
+; park-loop then exits: the driver cannot run on a configuration nobody chose.
+; @param Detail string Why, for the log.
+_OnbWeb_OpenFailed(Detail) {
+	try LoggerError("Onboarding", "The wizard cannot start: {1}.", Detail)
+	_Onboarding_ShowError("onboarding.error.open_failed")
+	_OnbWeb_OnClose()
 }
 
 ; Loads the strings for a previewed locale and pushes them as an envelope so
 ; the frontend can discard stale rapid-switch replies.
 _OnbWeb_PreviewLocale(Code) {
 	global _ob_gui
-	if (Code == "")
+	if !_OnbWeb_LocaleShipped(Code)
 		return
 	js := "window.applyStrings({locale:" . _OnbWeb_JsStr(Code)
 		. ",strings:" . _OnbWeb_LocaleStringsJson(Code) . "})"
@@ -410,14 +456,12 @@ _OnbWeb_PreviewLocale(Code) {
 _OnbWeb_PickConfigDir(Current) {
 	chosen := ""
 	try chosen := DirSelect("*" . Current, 3, t("dialog.config_folder.title"))
-	if (chosen != "") {
-		global _ob_config_dir := chosen
+	if (chosen != "")
 		_OnbWeb_Eval("window.setConfigDir(" . _OnbWeb_JsStr(chosen) . ")")
-	}
 }
 
 ; Answers the page with the metrics store of the folder confirmed on the config
-; step, so the step-4 consent warning names where keystrokes will really go.
+; step, so the metrics consent warning names where keystrokes will really go.
 ; The request number is echoed so the page drops replies for a stale folder.
 _OnbWeb_ResolveMetricsPath(Dir, Request) {
 	_OnbWeb_Eval(_OnbWeb_MetricsPathJs(Dir, Request))
@@ -433,61 +477,72 @@ _OnbWeb_MetricsPathJs(Dir, Request) {
 		. ",path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(Dir)) . "})"
 }
 
-; Reads an existing config.toml at the chosen directory (if present) and pushes
-; the saved answers back so steps 2-5 open pre-selected, mirroring the native
-; StepConfigDir pre-fill.
-_OnbWeb_LoadExistingConfig(Dir) {
+; Answers the page with the configuration of the folder chosen on the config
+; page: its values when it holds a config.toml, none when it does not. The
+; request number is echoed so the page drops a reply for a folder it left.
+; @param Dir string Wizard field value; "" is the OS default.
+; @param Request Integer Page request number.
+; @returns {Boolean} Whether the values were sent.
+_OnbWeb_LoadExistingConfig(Dir, Request) {
 	global _AhkSubDir
-	if (Dir == "")
-		return
-	if !RegExMatch(Dir, "\\$")
-		Dir .= "\"
-	path := Dir . _AhkSubDir . "config.toml"
-	if !FileExist(path)
-		return
-	c := ParseTomlFile(path)
-	if !c.Count
-		return
-	saved := "{use_ergopti:" . (TomlCacheBool(c, "layout", "ergopti_base") ? "true" : "false")
-		. ",use_metrics:" . (TomlCacheBool(c, "metrics", "metrics_enabled") ? "true" : "false")
-		. ",use_gestures:" . (TomlCacheBool(c, "gestures", "enabled") ? "true" : "false")
-	mk := IniCacheGet(c, "hotstrings", "trigger_char")
-	if (mk != "_" && mk != "")
-		saved .= ",magic_key:" . _OnbWeb_JsStr(mk)
-	saved .= "}"
-	_OnbWeb_Eval("window.applyExistingAnswers(" . saved . ")")
+	Folder := (Dir is String) ? ConfigTransitionNormalizeConfigDir(_Onboarding_ConfigDirFor(Dir)) : false
+	if !(Folder is String) {
+		try LoggerError("Onboarding", "loadExistingConfig refused: the folder is not a valid absolute path.")
+		return false
+	}
+	try Index := OnboardingCatalogue()
+	catch as Err {
+		try LoggerError("Onboarding", "loadExistingConfig refused: {1}.", Err.Message)
+		return false
+	}
+	Values := OnboardingReadCurrentValues(Index, Folder . _AhkSubDir . "config.toml")
+	if !(Values is Map)
+		return false
+	_OnbWeb_Eval("window.applyCurrentValues({request:" . Request
+		. ",values:" . OnboardingValuesJson(Values) . "})")
+	return true
 }
 
-; Funnels the six collected answers into the shared _ob_* globals and runs the
-; existing _Onboarding_Commit (which writes config.toml + paths.toml and
-; Reloads). Gesture registry auto-config is intentionally NOT triggered here —
-; matching the native path where enabling gestures without clicking the
-; "Auto-register" button leaves _ob_register_pending false; the user runs the
-; tray "auto configure" action when ready.
-_OnbWeb_Finish(answers) {
-	global _ob_locale, _ob_config_dir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures
-	global _ob_register_pending, _OB_ALTGR_PASSTHROUGH, _ob_magic_key_explicit
+; Validates the page's finish payload before anything changes.
+; @param Answers any The payload's "answers" value.
+; @returns {Map|String} "locale", "config_dir" and "rows", or why it was refused.
+_OnbWeb_FinishPlan(Answers) {
+	if !(Answers is Map)
+		return "the answers are not an object"
+	Locale := Answers.Get("locale", "")
+	if !_OnbWeb_LocaleShipped(Locale)
+		return "the language is not a shipped locale"
+	ConfigDir := Answers.Get("config_dir", "")
+	if !(ConfigDir is String)
+		return "the configuration folder is not text"
+	try Index := OnboardingCatalogue()
+	catch as Err
+		return "the onboarding catalogue is unavailable: " . Err.Message
+	Rows := OnboardingAnswerRows(Index, Answers.Get("operations", ""))
+	if !(Rows is Array)
+		return Rows
+	return Map("locale", Locale, "config_dir", ConfigDir, "rows", Rows)
+}
+
+; Commits the validated answers through _Onboarding_Commit (config.toml and,
+; when the folder moves, paths.toml in one transaction, then Reload). A refused
+; payload writes nothing and leaves the wizard open.
+; @param Answers any The payload's "answers" value.
+; @returns {Boolean}
+_OnbWeb_Finish(Answers) {
+	global _ob_locale, _OB_ALTGR_PASSTHROUGH
 	if A_IsSuspended
 		return false
-	if !(answers is Map)
+	if !(Answers is Map)
 		return false
-
-	if (answers.Has("locale") && answers["locale"] != "")
-		_ob_locale := answers["locale"]
-	if answers.Has("config_dir")
-		_ob_config_dir := answers["config_dir"]
-	_ob_layout   := answers.Has("use_ergopti")  && _OnbWeb_Truthy(answers["use_ergopti"])
-	_ob_metrics  := answers.Has("use_metrics")  && _OnbWeb_Truthy(answers["use_metrics"])
-	_ob_gestures := answers.Has("use_gestures") && _OnbWeb_Truthy(answers["use_gestures"])
-	; Braced deliberately: a brace-less v2 `if` takes exactly ONE statement, so the
-	; provenance flag used to be set unconditionally while the indentation claimed
-	; it belonged to the branch — marking a magic key as explicitly chosen for a
-	; payload that carried none.
-	if (answers.Has("magic_key") && answers["magic_key"] != "") {
-		_ob_magic_key := answers["magic_key"]
-		_ob_magic_key_explicit := true
+	Plan := _OnbWeb_FinishPlan(Answers)
+	if !(Plan is Map) {
+		try LoggerError("Onboarding", "Finish refused: {1}.", Plan)
+		_Onboarding_ShowError("onboarding.error.invalid_answers")
+		return false
 	}
-	_ob_register_pending := false
+	try LoggerInfo("Onboarding", "Committing {1} wizard answer row(s).", Plan["rows"].Length)
+	_ob_locale := Plan["locale"]
 	_OB_ALTGR_PASSTHROUGH := false
 
 	; Do not tear the wizard down until persistence succeeds. Otherwise a failed
@@ -495,15 +550,14 @@ _OnbWeb_Finish(answers) {
 	; Close the WebView2 controller only from the accepted reload hand-off. The
 	; config/path owners remain held until that callback, and a refused reload
 	; leaves this retry surface intact.
-	_Onboarding_Commit(_OnbWeb_Reset)
+	return _Onboarding_Commit(Plan["locale"], Plan["config_dir"], Plan["rows"], _OnbWeb_Reset)
 }
 
-; Runs the synchronous, elevated touchpad-gesture configuration (same registry
-; value set + PnP cycle as the native step's _Step5_AutoRegister) and pushes a
-; green/red result back to the page via window.setGestureRegisterStatus. Mirrors
-; the native auto-register path so the webview and native wizards configure
-; gestures identically. Scheduled out of the WebMessageReceived callback because
-; the elevated RunWait blocks while the UAC prompt + touchpad cycle complete.
+; Starts the elevated touchpad-gesture configuration (registry value set + PnP
+; cycle, ui/onboarding/gesture_registration.ahk) and pushes a green/red result
+; back to the page via window.setGestureRegisterStatus once the worker publishes
+; it. Scheduled out of the WebMessageReceived callback because the launch shows
+; the UAC prompt.
 _OnbWeb_RegisterGesturesAuto() {
 	global _OnbWeb_SessionEpoch
 	if A_IsSuspended
@@ -602,9 +656,9 @@ _OnbWeb_LocaleStringsJson(Code) {
 	return "{}"
 }
 
-; Maps the active OS keyboard layout to the substring the frontend's
-; _pickDefaultMagicKey matches: "french" for the French LANGID, "" otherwise
-; (so QWERTY-family layouts fall through to ";" and Ergopti users keep "*").
+; Maps the active OS keyboard layout to the substring the page's
+; _contextMagicKey matches: "french" for the French LANGID, "" otherwise (so
+; QWERTY-family layouts fall through to ";").
 _OnbWeb_SystemLayoutHint() {
 	global ONBOARDING_LANGID_FRENCH
 	try {
@@ -616,14 +670,50 @@ _OnbWeb_SystemLayoutHint() {
 	return ""
 }
 
-; Returns the layout preview JPG URL via the assets virtual host, or "" when the
-; asset is missing (the frontend then renders step 2 without the image).
-_OnbWeb_LayoutImageUrl() {
-	global _StaticDir, ONBOARDING_VHOST_ASSETS
-	path := _StaticDir . "\img\ergopti.jpg"
-	if !FileExist(path)
-		return ""
-	return "https://" . ONBOARDING_VHOST_ASSETS . "/img/ergopti.jpg"
+; Whether a locale code is one this driver ships.
+; @param Code any
+; @returns {Boolean}
+_OnbWeb_LocaleShipped(Code) {
+	if !(Code is String) || Code == ""
+		return false
+	for Loc in _I18nSortedLocales() {
+		if (Loc.Code == Code)
+			return true
+	}
+	return false
+}
+
+; The configuration folder the config page starts on: "" while the driver uses
+; the OS default, as on the other drivers, else the folder in force.
+; @returns {String}
+_OnbWeb_CustomConfigDir() {
+	global _ConfigDir
+	return (_Onboarding_ConfigDirFor(_ConfigDir) = _Onboarding_ConfigDirFor("")) ? "" : _ConfigDir
+}
+
+; The config folder a wizard field value commits to. _ConfigDir is deliberately
+; NOT updated until the commit succeeds, so any page rendered after the folder
+; step must resolve through here — reading _ConfigDir shows the boot folder,
+; which is how the keystroke-logging consent text ended up naming a path that
+; keystrokes were never going to be written to. An empty field means "use the
+; OS default" exactly as _Onboarding_Commit resolves it.
+; @param Chosen string Wizard field value.
+; @return string Folder with a trailing backslash.
+_Onboarding_ConfigDirFor(Chosen) {
+	global _DefaultConfigDir
+	Dir := (Chosen != "") ? Chosen : _DefaultConfigDir
+	if (Dir != "" and !RegExMatch(Dir, "[/\\]$"))
+		Dir .= "\"
+	return Dir
+}
+
+; Metrics store shown in the keystroke-logging consent text for a wizard field
+; value, through the keylogger's own rule (KL_MetricsDirFor). Forward slashes
+; match the cross-driver locale text.
+; @param Chosen string Wizard field value.
+; @return string
+_Onboarding_MetricsPathFor(Chosen) {
+	return StrReplace(KL_MetricsDirFor(_Onboarding_ConfigDirFor(Chosen)), "\", "/")
 }
 
 ; Returns the virtual-host URL for _shared/ui/onboarding/index.html. Served from
@@ -644,12 +734,6 @@ _OnbWeb_HtmlUrl() {
 ; ======= 5/ Utilities ========
 ; =============================
 ; ==============================================================
-
-; Coerces a JSON-decoded value to a boolean — JsonParse may yield real
-; booleans, 0/1, or the strings "true"/"false" depending on the parser.
-_OnbWeb_Truthy(v) {
-	return (v == true || v == 1 || v == "true" || v == "1")
-}
 
 ; Escapes a string for safe injection into a JS double-quoted literal.
 _OnbWeb_JsStr(s) {

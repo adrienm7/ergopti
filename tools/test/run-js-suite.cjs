@@ -1782,7 +1782,7 @@ const CHECKS = [
 		repro: 'npm run test:model-browser-session'
 	},
 	{
-		name: 'onboarding page title, folder picker and metrics consent path follow the host',
+		name: 'onboarding wizard asks one No-first page per scope and emits manifest paths only',
 		cmd: 'node',
 		args: ['tools/test/test-onboarding-wizard-page.cjs'],
 		repro: 'npm run test:onboarding-wizard-page'

@@ -681,13 +681,16 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/config.ahk
 ; Load the definitions-only onboarding worker owner so its elevated-launch
 ; reservation can be exercised without constructing the wizard UI.
-#Include ../ui/onboarding/steps_metrics.ahk
-; The WebView host is definitions-only until _Onboarding_TryWeb is called.
-; Include it so malformed finish payloads are rejected before they reach the
-; persistence/reload boundary.
+#Include ../ui/onboarding/gesture_registration.ahk
+; The answers contract, the commit and the WebView host are definitions-only
+; until _Onboarding_TryWeb is called. Include them so the finish payload is
+; followed to the candidate config.toml without the persistence/reload boundary.
+#Include ../ui/onboarding/answers.ahk
+#Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
 #Include unit/test_screenshot_worker_ownership.ahk
 #Include unit/test_onboarding_finish_payload.ahk
+#Include unit/test_onboarding_answers.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
 #Include unit/test_virtual_desktops.ahk
@@ -1341,9 +1344,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_no_onexit_keylogger_flush.ahk
 #Include meta/test_onboarding_no_appstate.ahk
 #Include meta/test_onboarding_toml_bool_reads.ahk
-#Include meta/test_onboarding_magic_key_sentinel.ahk
 #Include meta/test_onboarding_effective_config_dir.ahk
-#Include meta/test_onboarding_back_keeps_answers.ahk
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/test_oneshotshift_suspend_guard.ahk
@@ -1779,7 +1780,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_json_string_literal_single_source.ahk
 #Include meta/test_json_string_decoder_single_source.ahk
 #Include meta/test_toml_string_codec_single_source.ahk
-#Include meta/test_onboarding_gesture_msgbox_zorder.ahk
 #Include meta/test_ui_style_llm_tray_i18n.ahk
 #Include meta/test_ollama_webview_msgsub_retained.ahk
 #Include meta/test_open_downloads_catch.ahk

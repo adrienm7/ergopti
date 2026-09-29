@@ -224,11 +224,11 @@ end
 
 --- The value a decoded configuration holds at a dotted path, or nil.
 --- @param decoded table
---- @param path string
+--- @param segments table Path segments.
 --- @return any
-local function lookup(decoded, path)
+local function lookup(decoded, segments)
 	local node = decoded
-	for segment in path:gmatch("[^%.]+") do
+	for _, segment in ipairs(segments) do
 		if type(node) ~= "table" then return nil end
 		node = node[segment]
 	end
@@ -239,14 +239,22 @@ end
 --- left out so the page shows their neutral value.
 --- @param index table From M.load.
 --- @param decoded table Decoded config.toml, or an empty table.
+--- @param mark function|nil mark(...segments) for each key present and read;
+---   the unused-key cleanup never offers a key the wizard reads.
 --- @return table values `{ [path] = value }`.
-function M.current_values(index, decoded)
+function M.current_values(index, decoded, mark)
 	assert(type(index) == "table" and type(index.entries) == "table", "no catalogue index")
 	assert(type(decoded) == "table", "the configuration must be decoded")
+	assert(mark == nil or type(mark) == "function", "the read marker must be a function")
 	local values = {}
 	for path in pairs(index.entries) do
-		local value = lookup(decoded, path)
-		if value ~= nil then values[path] = value end
+		local segments = {}
+		for segment in path:gmatch("[^%.]+") do segments[#segments + 1] = segment end
+		local value = lookup(decoded, segments)
+		if value ~= nil then
+			values[path] = value
+			if mark then mark((table.unpack or unpack)(segments)) end
+		end
 	end
 	return values
 end
