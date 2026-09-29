@@ -177,7 +177,6 @@ _UWTE_EveryRetryablePreflightRefusalRearms() {
 		"if !(ShutdownOwners is Object)",
 		"if !SyntheticReleased",
 		"if !((FullSaveSettled is Integer)",
-		"if !((TriggerJournalCanExit is Integer)",
 		"if !RecoveryCanExit",
 		"if !FireDrainComplete",
 		"if !TerminalCommitted"

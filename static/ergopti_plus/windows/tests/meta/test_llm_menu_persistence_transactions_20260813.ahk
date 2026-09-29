@@ -4,8 +4,8 @@
 ; MODULE: LLM menu persistence transaction class guard
 ; DESCRIPTION:
 ; Enumerates the complete persistent action class. Every user path must enter a
-; detached transaction (or the dedicated trigger journal), and API CRUD must
-; keep config.toml plus api_entries.json under one transition WAL.
+; detached transaction, and API CRUD must keep config.toml plus
+; api_entries.json under one transition WAL.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -44,8 +44,6 @@ _LMPT_EveryPersistentActionUsesDetachedTransaction() {
 			"_LLM_Menu_RemoveActiveApiEntry"]
 		_LMPT_AssertTransactionBody(FuncName,
 			"LLM_Menu_CommitApiEntriesMutation(")
-	_LMPT_AssertTransactionBody("LLM_Menu_PromptTriggerShortcut",
-		"LLM_Menu_CommitTriggerShortcut(")
 }
 Test("meta LLM menu: all persistent handlers use detached transactions "
 	. "(llm-menu-persistence-class-guard)",

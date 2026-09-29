@@ -190,7 +190,7 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 	if !(OwnerBundle is Object) {
 		OwnerBundle := ConfigTransitionRetainedBarrier()
 		if !(OwnerBundle is Object) {
-			OwnerBundle := LLM_Menu_AcquireLifecycleBundle()
+			OwnerBundle := ConfigWriteAcquireLifecycleBundle()
 			OwnBundle := OwnerBundle is Object
 		}
 	}
@@ -207,15 +207,8 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 			_ConfigWriteTerminalRelease(OwnerBundle)
 		return false
 	}
-	; Quiesce retained native handles before reconciling stable shortcut
-	; authority. A refused recovery aborts with no new hand-off debris.
 	Launched := false
 	try {
-		if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
-			try LoggerError("Lifecycle", "Reload refused because LLM trigger recovery is incomplete.")
-			ReportStage.Call("llm-trigger-recovery", ConfigurationFile)
-			return false
-		}
 		Path := A_IsSuspended ? _SuspendMarkerPath() : ""
 		; The intent names this reload, so a refusal after the terminal commit
 		; retracts the marker it published and never another transition's.
@@ -695,13 +688,9 @@ _SuspendStateWatchdog() {
 		if (A_IsSuspended == _LastSuspendState) {
 				if !A_IsSuspended {
 						RootService := 0
-						TriggerService := 0
 						if IsSet(_TrayRootServiceRetained)
 								RootService := _TrayRootServiceRetained
-						if IsSet(LLM_Menu_ServiceTriggerRecovery)
-								TriggerService := LLM_Menu_ServiceTriggerRecovery
-						_TrayRootServiceRetainedWork(
-								RootService, TriggerService)
+						_TrayRootServiceRetainedWork(RootService)
 				}
 				return
 		}
@@ -854,7 +843,7 @@ Ergopti_OnShutdown(reason, code) {
 			: ((SupersededReload is Map)
 				? SupersededReload["bundle"]
 				: ((RetainedTransition is Object)
-					? RetainedTransition : LLM_Menu_AcquireLifecycleBundle()))
+					? RetainedTransition : ConfigWriteAcquireLifecycleBundle()))
 		if !(ShutdownOwners is Object) {
 			try LoggerError("Lifecycle", "Shutdown refused because another configuration transaction is still active.")
 			try _Updater_DeferExitIntentRetry()
@@ -886,26 +875,6 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("an accepted full configuration save remains non-durable")
-		}
-		TriggerJournalCanExit := false
-		; AutoHotkey documents OnExit callbacks as non-interruptible by hotkeys,
-		; menu callbacks and timers. Once native+WAL quiescence succeeds here, no
-		; fresh trigger edit can enter before the remaining shutdown gates finish.
-		; A byte-preserved malformed trigger WAL must not make ordinary Quit
-		; impossible. Reload and every destructive transition remain strict: only a
-		; non-Reload process exit may accept read-only quarantine and leave the
-		; artifact for the next visible boot diagnostic.
-		AllowReadOnlyTriggerJournal := !(TerminalHandoff is Map)
-			&& StrCompare(reason, "Reload", true) != 0
-		try TriggerJournalCanExit := LLM_Menu_QuiesceTriggerForLifecycle(
-			ShutdownOwners, 0, 0, 0, "", AllowReadOnlyTriggerJournal)
-		catch as Err
-			try LoggerError("Lifecycle", "LLM trigger journal shutdown recovery failed: {1}.", Err.Message)
-		if !((TriggerJournalCanExit is Integer) && TriggerJournalCanExit == 1) {
-			try LoggerError("Lifecycle", "Shutdown refused because LLM trigger journal recovery is incomplete.")
-			try _Updater_DeferExitIntentRetry()
-			try _Updater_DeferRecoveryHandoffRetry()
-			return _LifecycleRefuseShutdown("LLM trigger journal recovery is incomplete")
 		}
 		RecoveryCanExit := false
 		try RecoveryCanExit := _Updater_RecoveryMayEnterTerminalShutdown()

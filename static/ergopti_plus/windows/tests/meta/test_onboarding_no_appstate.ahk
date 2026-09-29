@@ -126,12 +126,11 @@ _ONA_CommitErrorsUseSelectedLocale() {
 		"onboarding commit and its error renderer must remain source-visible")
 	RegExReplace(CommitBody, "_Onboarding_CommitError\(", "",
 		&ErrorCallCount)
-	AssertEqual(9, ErrorCallCount,
+	AssertEqual(8, ErrorCallCount,
 		"the complete onboarding commit failure class must remain enumerated")
 	for Key in [
 		"onboarding.error.commit_invalid_config_dir",
 		"onboarding.error.commit_transaction_busy",
-		"onboarding.error.commit_trigger_recovery",
 		"onboarding.error.commit_candidate_render",
 		"onboarding.error.commit_source_verification",
 		"onboarding.error.commit_redirect_render",

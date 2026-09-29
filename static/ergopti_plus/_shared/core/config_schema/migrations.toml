@@ -73,11 +73,14 @@ ops = [
 [steps.v3_to_v4]
 from = 3
 to = 4
-drivers = ["hs"]
+drivers = ["ahk", "hs"]
 reason = "The AI menu's dedicated trigger shortcut is retired: a prediction on demand is the llm_generate_prediction action in a keyboard slot."
-# An unset shortcut is saved as the key `shortcut = false`, a bound one as the
-# [llm.trigger.shortcut] table (mods, key): both spellings go.
+# macOS saves an unset shortcut as the key `shortcut = false` and a bound one as
+# the [llm.trigger.shortcut] table (mods, key); Windows saves the chord text as
+# [llm] trigger_shortcut. Every spelling goes, and each is absent on the other
+# driver, where its delete is a no-op.
 ops = [
 	{ op = "delete", section = "llm.trigger", key = "shortcut" },
 	{ op = "delete", section = "llm.trigger.shortcut" },
+	{ op = "delete", section = "llm", key = "trigger_shortcut" },
 ]

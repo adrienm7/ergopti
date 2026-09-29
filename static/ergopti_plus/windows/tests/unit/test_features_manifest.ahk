@@ -779,8 +779,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			. "[llm]`r`n"
 			. 'api_entry_id = "api-a"' . "`r`n"
 			. "ollama_port = 11434`r`n"
-			. 'trigger_shortcut = "Ctrl+Space"' . "`r`n"
-			. 'trigger_shortcut_typo = "Ctrl+T"' . "`r`n"
+			. "ollama_port_typo = 11435`r`n"
 			. "[llm.navigation]`r`n"
 			. "nav_modifiers = []`r`n"
 			. "[llm.trigger]`r`n"
@@ -799,7 +798,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 		for Line in Captured
 			Joined .= Line . "`n"
 		_FM_AssertUnusedWarning(Captured, Path,
-			["category_enabled.autocorrectoin", "llm.trigger_shortcut_typo", "shortcuts.keyboard.win_cc"])
+			["category_enabled.autocorrectoin", "llm.ollama_port_typo", "shortcuts.keyboard.win_cc"])
 		AssertEqual("ConfigIO",
 			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
 			"a picker-created keyboard slot must name its real config owner")

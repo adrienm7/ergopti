@@ -52,24 +52,17 @@ Test("LLM nav event owner: complete twelve-route plan crosses one native generat
 
 _LNEO_ProductionBindingSelectsInjectedNativeOwner() {
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavSlotPlans
-	global _LLM_Menu_NavActiveSlot, _LLM_Menu_TriggerAhk
-	global _LLM_Menu_TriggerHandle, _LLM_Menu_TriggerRecoveryHandles
+	global _LLM_Menu_NavActiveSlot
 	Saved := {
 		Bound: _LLM_Menu_NavHotkeysBound,
 		SlotPlans: _LLM_Menu_NavSlotPlans,
-		ActiveSlot: _LLM_Menu_NavActiveSlot,
-		TriggerAhk: _LLM_Menu_TriggerAhk,
-		TriggerHandle: _LLM_Menu_TriggerHandle,
-		RecoveryHandles: _LLM_Menu_TriggerRecoveryHandles
+		ActiveSlot: _LLM_Menu_NavActiveSlot
 	}
 	State := 0
 	try {
 		_LLM_Menu_NavHotkeysBound := []
 		_LLM_Menu_NavSlotPlans := Map(1, [], 2, [])
 		_LLM_Menu_NavActiveSlot := 0
-		_LLM_Menu_TriggerAhk := ""
-		_LLM_Menu_TriggerHandle := ""
-		_LLM_Menu_TriggerRecoveryHandles := []
 		State := _LNEO_Setup()
 		CandidateMenu := Map(
 			"nav_modifiers", "ctrl", "val_modifiers", "alt")
@@ -121,9 +114,6 @@ _LNEO_ProductionBindingSelectsInjectedNativeOwner() {
 		_LLM_Menu_NavHotkeysBound := Saved.Bound
 		_LLM_Menu_NavSlotPlans := Saved.SlotPlans
 		_LLM_Menu_NavActiveSlot := Saved.ActiveSlot
-		_LLM_Menu_TriggerAhk := Saved.TriggerAhk
-		_LLM_Menu_TriggerHandle := Saved.TriggerHandle
-		_LLM_Menu_TriggerRecoveryHandles := Saved.RecoveryHandles
 		if IsObject(State)
 			_LNEO_Teardown()
 	}

@@ -349,9 +349,10 @@ IsCategoryGated(Category) {
 }
 
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
-; Stable locator used by the LLM trigger WAL. Boot is intentionally not loaded
-; by the unit runner, so give lifecycle tests a process-private absent journal
-; instead of letting owner discovery fail because the production global is unset.
+; Stable locator used by the configuration-transition WAL. Boot is intentionally
+; not loaded by the unit runner, so give lifecycle tests a process-private absent
+; journal instead of letting owner discovery fail because the production global
+; is unset.
 global _PathsFile := A_Temp . "\ergopti_test_paths_" . A_ScriptHwnd . ".toml"
 global SpaceAroundSymbols := ""
 

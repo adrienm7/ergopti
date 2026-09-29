@@ -507,7 +507,7 @@ _TrayRootServiceRetained(LogFn := 0) {
 	return _TrayRootDrain(true, LogFn)
 }
 
-_TrayRootServiceRetainedWork(RootFn := 0, NextFn := 0, LogFn := 0) {
+_TrayRootServiceRetainedWork(RootFn := 0) {
 	if HasMethod(RootFn, "Call") {
 		try RootFn.Call()
 		catch as Err {
@@ -516,18 +516,6 @@ _TrayRootServiceRetainedWork(RootFn := 0, NextFn := 0, LogFn := 0) {
 			; watchdog pass before any other native hotkey mutation runs.
 			if Err is TrayRootFatalContextError
 				return false
-		}
-	}
-	if HasMethod(NextFn, "Call") {
-		try NextFn.Call()
-		catch as Err {
-			if HasMethod(LogFn, "Call") {
-				try LogFn.Call(Err)
-			} else {
-				try LoggerError("Lifecycle",
-					"LLM trigger recovery watchdog service failed: {1}.",
-					Err.Message)
-			}
 		}
 	}
 	return true

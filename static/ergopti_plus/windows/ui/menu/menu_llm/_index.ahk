@@ -22,7 +22,8 @@
 ; 4. Lazy bootstrap: Ollama is never touched until the user explicitly enables IA.
 ; 5. User profiles: custom prompts created/edited/deleted via InputBox dialogs.
 ; 6. App exclusion: reuses the shared AppPicker_Show() to blacklist processes.
-; 7. Trigger shortcut: optional hotkey that fires a prediction on demand.
+; 7. No dedicated trigger shortcut: a prediction on demand is the
+;    llm_generate_prediction action, bound in a keyboard slot (Win+Space).
 ;
 ; SUB-MODULE LAYOUT:
 ;   menu_llm/init.ahk            — Bootstrap (LLM_Menu_Init).
@@ -30,8 +31,9 @@
 ;   menu_llm/menu_models.ahk     — Backend + Model submenus + model handlers.
 ;   menu_llm/menu_api_entries.ahk — Remote API entries + JSON storage.
 ;   menu_llm/menu_profiles.ahk   — Profile menu + per-app + user CRUD + hotkeys.
-;   menu_llm/menu_settings.ahk   — N / Trigger / Gen / Display / Nav menus +
-;                                  numeric / modifier / shortcut prompts.
+;   menu_llm/hotkey_identity.ahk — Chord translation + physical hotkey identities.
+;   menu_llm/menu_settings.ahk   — Trigger / Gen / Display / Nav menus +
+;                                  numeric / modifier prompts.
 ;   menu_llm/menu_agent.ahk      — The tray's top-level AI agent submenu.
 ;   menu_llm/actions.ahk         — Toggles, setters, health probe, Ollama
 ;                                  bootstrap, app picker, lifecycle callbacks.
@@ -159,11 +161,9 @@ global _LLM_Menu := Map(
 	; Placeholder only: LLM_Menu_ApplySharedDefaults() overwrites it from
 	; defaults.json ("" = bare digits select a prediction).
 	"val_modifiers",              "",
-	; On-demand prediction shortcut. Ctrl+Space is the default — same key
-	; combo as Copilot's "trigger inline suggestion" so muscle memory
-	; carries over. The user can rebind it via the tray menu; setting it
-	; to the empty string disables the feature entirely.
-	"trigger_shortcut",           "Ctrl+Space",
+	; No on-demand prediction shortcut here: a prediction on request is the
+	; llm_generate_prediction action, bound in a keyboard slot (Win+Space
+	; recommended, neutral by default) like every other action.
 	; Inline auto-type mode (Copilot-style). When ON, the prediction is
 	; typed directly into the active app instead of being shown in a
 	; tooltip. Forces n_predictions = 1 internally because typing N
@@ -307,8 +307,7 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 #Include menu_models.ahk
 #Include menu_api_entries.ahk
 #Include menu_profiles.ahk
-#Include trigger_journal.ahk
-#Include trigger_shortcut.ahk
+#Include hotkey_identity.ahk
 #Include menu_settings.ahk
 #Include menu_agent.ahk
 #Include actions.ahk

@@ -19,8 +19,7 @@ _LMBCM_AllProducersUseTheCoordinator() {
 		"_LLM_Menu_ApplyCurrentDepsFailure",
 		"_LLM_Menu_ApplyOllamaPortCommitted",
 		"_LLM_Menu_AuxBuild",
-		"_LLM_Menu_PullModel",
-		"_LLM_Menu_RunClaimedTriggerRecovery"
+		"_LLM_Menu_PullModel"
 	]
 	for _, Name in RequestProducers {
 		Body := _DriverFuncBody(Name)

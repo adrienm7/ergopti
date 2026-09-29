@@ -109,7 +109,7 @@ _CTT_DetachedLlm(Injected) {
 	try {
 		AssertTrue(LLM_Menu_CommitApiEntriesMutation("typed detached regression",
 			_LMT_ApiMutate, _LMT_Apply, ConfigTransitionProductionPort(),
-			_LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Quiesce, Collect,
+			_LMT_Notify, _LMT_Acquire, _LMT_Settle, Collect,
 			Injected ? Build : 0, _LMT_ApiSerialize))
 		Target := ManifestBuildFeaturesMap()
 		Target["llm"]["enabled"] := false

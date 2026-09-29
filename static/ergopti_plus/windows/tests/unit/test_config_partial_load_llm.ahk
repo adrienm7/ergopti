@@ -4,7 +4,7 @@
 ; MODULE: Partial Configuration Load LLM Tests
 ; DESCRIPTION:
 ; Detached LLM transactions must refuse incomplete boot state before invoking
-; any admission, quiescence, collection or persistence callback.
+; any admission, settlement, collection or persistence callback.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -22,10 +22,10 @@ _CPL_LlmRefusesBeforeAdmission(Api, Unreadable) {
 		if Api {
 			Result := LLM_Menu_CommitApiEntriesMutation("partial boot test",
 				Probe, Probe, ConfigTransitionProductionPort(), _LMT_Notify,
-				Probe, Probe, Probe, Probe, Probe, Probe)
+				Probe, Probe, Probe, Probe, Probe)
 		} else {
 			Result := LLM_Menu_CommitMutation("partial boot test",
-				Probe, Probe, Probe, _LMT_Notify, Probe, Probe, Probe, Probe)
+				Probe, Probe, Probe, _LMT_Notify, Probe, Probe, Probe)
 		}
 		AssertFalse(Result)
 		AssertEqual(0, Calls.Length,

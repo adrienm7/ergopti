@@ -151,12 +151,8 @@ _LTLG_CheckTypedTrayRootErrorsStaySilent() {
 	ServiceFatalPos := InStr(ServiceBody, "TrayRootFatalContextError")
 	ServiceReturnPos := ServiceFatalPos > 0
 		? InStr(ServiceBody, "return false", , ServiceFatalPos) : 0
-	ServiceNextPos := InStr(ServiceBody, "NextFn.Call()")
-	ServiceLogPos := InStr(ServiceBody, "LoggerError")
-	Assert(ServiceFatalPos > 0 && ServiceReturnPos > ServiceFatalPos
-		&& ServiceNextPos > ServiceReturnPos
-		&& ServiceLogPos > ServiceReturnPos,
-		"a fatal retained root must end the watchdog pass before sibling work or logging")
+	Assert(ServiceFatalPos > 0 && ServiceReturnPos > ServiceFatalPos,
+		"a fatal retained root must end the watchdog pass")
 
 	DeferredBody := _DriverFuncBody("BuildTrayMenuDeferred")
 	Assert(DeferredBody != "",

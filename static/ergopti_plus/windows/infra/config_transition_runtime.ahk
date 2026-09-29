@@ -301,7 +301,7 @@ _ConfigTransitionAcquireLifecycleBundleNonCritical(PathsFile, IntendedPaths,
 	}
 	try Bundle := HasMethod(AcquireFn, "Call")
 		? AcquireFn.Call(AdditionalPaths)
-		: LLM_Menu_AcquireLifecycleBundle(AdditionalPaths)
+		: ConfigWriteAcquireLifecycleBundle(AdditionalPaths)
 	catch as Err {
 		return _ConfigTransitionResult("retry", "terminal_barrier_failed",
 			"Terminal bundle acquisition threw: " . Err.Message)

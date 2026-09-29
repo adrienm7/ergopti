@@ -81,7 +81,6 @@ _LLM_Persist_MakeDefaultTray() {
 		"auto_raise_temp",            true,
 		"nav_modifiers",              "",
 		"val_modifiers",              "alt",
-		"trigger_shortcut",           "Ctrl+Space",
 		"api_entry_id",               "api_primary",
 		"ollama_port",                11434,
 		"inline_autotype",            false,
@@ -668,14 +667,6 @@ _LLM_Persist_AssertCompositeScalarRejected(Key, Literal, Slug) {
 		try FileDelete(Path)
 	}
 }
-
-Test_LLM_Persist_CompositeTriggerShortcutRejected() {
-	_LLM_Persist_AssertCompositeScalarRejected(
-		"trigger_shortcut", '["Ctrl+Space"]', "trigger-shortcut")
-}
-Test("LLM persist: composite trigger shortcut fails closed "
-	. "(llm-persisted-option-type-boundary-trigger-shortcut)",
-	Test_LLM_Persist_CompositeTriggerShortcutRejected)
 
 Test_LLM_Persist_CompositeApiEntryIdRejected() {
 	_LLM_Persist_AssertCompositeScalarRejected(

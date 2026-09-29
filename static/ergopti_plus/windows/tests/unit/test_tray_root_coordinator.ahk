@@ -15,7 +15,6 @@ global _TRC_Builds := []
 global _TRC_ApplyCalls := 0
 global _TRC_FailureMode := ""
 global _TRC_ExpectedError := 0
-global _TRC_TriggerCalls := 0
 global _TRC_PermanentFailureMode := ""
 global _TRC_TerminalReports := []
 
@@ -46,7 +45,6 @@ _TRC_ResetState() {
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
 	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	global _TRC_Builds, _TRC_ApplyCalls, _TRC_FailureMode
-	global _TRC_TriggerCalls
 	_TrayMenuStage := false
 	_TrayRootRequestedGeneration := 0
 	_TrayRootPublishedGeneration := 0
@@ -59,7 +57,6 @@ _TRC_ResetState() {
 	_TRC_Builds := []
 	_TRC_ApplyCalls := 0
 	_TRC_FailureMode := ""
-	_TRC_TriggerCalls := 0
 }
 
 _TRC_RestoreState(Saved) {
@@ -494,24 +491,11 @@ _TRC_PendingRetainedService() {
 	throw TrayRootRetryPendingError("injected safe retained retry")
 }
 
-_TRC_TriggerRecoverySpy() {
-	global _TRC_TriggerCalls
-	_TRC_TriggerCalls += 1
-	return true
-}
-
 _TRC_WatchdogStopsAfterFatalContext() {
-	global _TRC_TriggerCalls
-	_TRC_TriggerCalls := 0
-	AssertFalse(_TrayRootServiceRetainedWork(
-		_TRC_FatalRetainedService, _TRC_TriggerRecoverySpy),
+	AssertFalse(_TrayRootServiceRetainedWork(_TRC_FatalRetainedService),
 		"a fatal root context must terminate the current watchdog pass")
-	AssertEqual(0, _TRC_TriggerCalls,
-		"no later native hotkey recovery may run under a poisoned HotIf context")
-	AssertTrue(_TrayRootServiceRetainedWork(
-		_TRC_PendingRetainedService, _TRC_TriggerRecoverySpy),
-		"a proven-reset pending root may continue to sibling recovery")
-	AssertEqual(1, _TRC_TriggerCalls)
+	AssertTrue(_TrayRootServiceRetainedWork(_TRC_PendingRetainedService),
+		"a proven-reset pending root lets the watchdog pass continue")
 }
 Test("tray root: watchdog stops after fatal dynamic context (tray-root-fatal-watchdog)",
 	_TRC_WatchdogStopsAfterFatalContext)
