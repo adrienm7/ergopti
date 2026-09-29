@@ -1782,6 +1782,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_json_string_decoder_single_source.ahk
 #Include meta/test_toml_string_codec_single_source.ahk
 #Include meta/test_magic_key_editor_reopen_presents.ahk
+#Include meta/test_gesture_notice_presented.ahk
 #Include meta/test_ui_style_llm_tray_i18n.ahk
 #Include meta/test_ollama_webview_msgsub_retained.ahk
 #Include meta/test_open_downloads_catch.ahk
