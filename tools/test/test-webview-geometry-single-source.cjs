@@ -237,6 +237,13 @@ const WINDOWS_APPS = {
 			/LAYER_EDITOR_APP_ID := "layer_editor"/
 		]
 	},
+	update_check: {
+		file: 'ui/update_check/init.ahk',
+		checks: (m) => [
+			new RegExp(`UC_WIDTH\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`UC_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
+	},
 	download_window: {
 		file: 'modules/llm/ollama_webview.ahk',
 		checks: (m) => [
@@ -256,10 +263,7 @@ const WINDOWS_EXCLUSIONS = {
 		'no Windows host — the token dialog is a native InputBox, which has no manifest geometry',
 	numeric_prompt:
 		'no Windows host — InputBox asks for a number natively, same reason as ' +
-		'token_prompt above. Linux has no equivalent and needs a webview to ask at all',
-	update_check:
-		'no Windows host yet — the manual check still answers with the update prompt; ' +
-		'the WebView host replaces this exclusion with a geometry check'
+		'token_prompt above. Linux has no equivalent and needs a webview to ask at all'
 };
 
 // ── Linux: the manager must resolve geometry generically, for every app ───────
