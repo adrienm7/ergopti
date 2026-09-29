@@ -66,18 +66,27 @@ return function(helpers)
 			helpers.assert_eq(decoded.hotstrings.modules["ext:demo:rolls"], { keep = true, new = true })
 		end)
 
-		helpers.it("refuses a quoted key under an existing table header instead of misparsing it", function()
-			local source = "[hotstrings.groups]\nrolls = true\n"
-			helpers.assert_throws(function()
-				LeafRows.prepare(source, { { path = { "hotstrings", "groups", "ext:demo:rolls" }, value = true } })
-			end, "an unaddressable key must be refused")
+		-- A bare sibling written first creates the table header; an extension
+		-- pack's identity must still be switchable under it afterwards.
+		helpers.it("sets, updates and removes a quoted key under an existing table header", function()
+			local source = "[hotstrings.groups]\nrolls = true\n\n[other]\nvalue = 1\n"
+			local decoded, bytes = apply(source, {
+				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, value = true } })
+			helpers.assert_eq(decoded.hotstrings.groups, { rolls = true, ["ext:demo:rolls"] = true })
+			helpers.assert_eq(decoded.other.value, 1)
+			helpers.assert_true(bytes:find('"ext:demo:rolls" = true', 1, true) ~= nil, "the identity is quoted")
+			local updated, changed = apply(bytes, {
+				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, value = false } })
+			helpers.assert_eq(updated.hotstrings.groups["ext:demo:rolls"], false)
+			local _, count = changed:gsub("ext:demo:rolls", "")
+			helpers.assert_eq(count, 1, "the quoted line is replaced, not duplicated")
+			local removed, final = apply(changed, {
+				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, delete = true } })
+			helpers.assert_eq(removed.hotstrings.groups, { rolls = true })
+			helpers.assert_eq(final, source)
 			helpers.assert_eq(#LeafRows.prepare(source, {
 				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, delete = true } }), 0,
 				"an absent quoted key needs no removal")
-			helpers.assert_throws(function()
-				LeafRows.prepare('[hotstrings.groups]\n"ext:demo:rolls" = true\n', {
-					{ path = { "hotstrings", "groups", "ext:demo:rolls" }, delete = true } })
-			end, "a present quoted key under a header cannot be removed by line")
 		end)
 
 		helpers.it("deletes nothing where the source holds a scalar instead of the leaf's table", function()

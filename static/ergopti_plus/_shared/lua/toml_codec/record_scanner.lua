@@ -195,6 +195,7 @@ function M.scan_records(source, options)
 					first = index,
 					last = index,
 					header = current,
+					key_text = key_text,
 					key_segments = key_text and bare_segments(key_text) or nil,
 					value_parts = { value_text or "" },
 				}
@@ -215,17 +216,27 @@ function M.scan_records(source, options)
 	end
 	for _, record in ipairs(records) do
 		local header = record.header
-		local addressable = header ~= nil and header.segments ~= nil and not header.array
-			and record.key_segments ~= nil
-		if addressable then
+		local table_owned = header ~= nil and header.segments ~= nil and not header.array
+		if table_owned then
 			for _, prefix in ipairs(array_prefixes) do
 				if starts_with(header.segments, prefix) then
-					addressable = false
+					table_owned = false
 					break
 				end
 			end
 		end
+		local addressable = table_owned and record.key_segments ~= nil
 		record.addressable = addressable
+		-- One quoted key, such as an extension pack's `"ext:pack:stem"`, is
+		-- exposed apart from `addressable` so only the batch writer, which renders
+		-- it back quoted, can edit its line; cleanup and path readers stay unchanged.
+		-- A quoted dot would collide with a dotted key's identity, so none is offered.
+		if table_owned and not addressable and record.key_text then
+			local key = KeyPath.parse(record.key_text)
+			if key and #key == 1 and not key[1]:find(".", 1, true) then
+				record.quoted = { section = header.section, key = key[1] }
+			end
+		end
 		if addressable then
 			record.section = header.section
 			record.key = table.concat(record.key_segments, ".")

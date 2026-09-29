@@ -14,9 +14,9 @@
 --- such as an extension pack's `ext:demo:rolls` is not a bare key. The first is
 --- rewritten as one replacement of the whole inline value, cloned from the
 --- decoded file so unknown entries survive; the second is created inside a new
---- inline table, whose keys the encoder quotes. A non-bare key under an
---- existing table header cannot be addressed by line and is refused rather than
---- written in a form a later read would misparse.
+--- inline table, whose keys the encoder quotes, when an ancestor is absent. Under
+--- an existing table header it is an ordinary row: the writer quotes it and
+--- addresses its quoted line, so a bare sibling written first never locks it out.
 --- ==============================================================================
 
 local M = {}
@@ -121,13 +121,15 @@ function M.prepare(content, operations)
 	for _, operation in ipairs(operations) do
 		local path = operation.path
 		if not operation.delete and not is_bare(path[#path]) then
-			local anchor = nil
+			local anchor, folded = nil, false
+			for depth = 1, #path - 1 do
+				if inline[identity(path, depth)] then folded = true; break end
+			end
 			for depth = 2, #path - 1 do
+				if folded then break end
 				if lookup(decoded, path, depth) == nil then anchor = depth; break end
 			end
-			assert(anchor and is_bare(path[anchor]), "TOML key cannot be written under a table header: "
-				.. KeyPath.render(path))
-			created[identity(path, anchor)] = anchor
+			if anchor then created[identity(path, anchor)] = anchor end
 		end
 	end
 
@@ -156,13 +158,9 @@ function M.prepare(content, operations)
 		end
 		if anchor then
 			fold(prefix(path, anchor), operation)
-		elseif is_bare(path[#path]) then
+		else
 			rows[#rows + 1] = { section = KeyPath.render(prefix(path, #path - 1)), key = path[#path],
 				value = clone(operation.value), delete = operation.delete }
-		else
-			-- Only a deletion of a present quoted key reaches here, and under a
-			-- table header it cannot be addressed by line without misparsing it.
-			error("TOML key cannot be removed under a table header: " .. KeyPath.render(path))
 		end
 	end
 	for _, operation in ipairs(operations) do plan(operation) end
