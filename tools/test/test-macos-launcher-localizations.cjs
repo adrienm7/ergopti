@@ -65,7 +65,14 @@ expect(
 );
 
 // 2. The helper declares every shipped locale in macOS identifiers
-const run = spawnSync('python3', [HELPER], { encoding: 'utf8' });
+// A Windows checkout usually installs Python as `python`, as the sibling
+// Python-backed checks expect
+const PYTHON_CANDIDATES = process.platform === 'win32' ? ['python', 'python3'] : ['python3'];
+const python = PYTHON_CANDIDATES.find(
+	(command) => spawnSync(command, ['--version'], { encoding: 'utf8', timeout: 10000 }).status === 0
+);
+if (!python) throw new Error('Python is required to run tools/build/launcher_localizations.py');
+const run = spawnSync(python, [HELPER], { encoding: 'utf8' });
 expect(run.status === 0, `launcher_localizations.py failed: ${(run.stderr || '').trim()}`);
 const declared = [...(run.stdout || '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
 const order = JSON.parse(
