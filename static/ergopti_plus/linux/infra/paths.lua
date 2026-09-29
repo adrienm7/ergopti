@@ -198,8 +198,11 @@ end
 --- either: extensions are shipped to all three drivers from one place, which is
 --- why the Windows driver's `_ExtensionsDir` points at the same directory. The
 --- committed layout generations come next. The user root comes last, preserving
---- its precedence over bundled and layout-installed packs with the same id.
---- @return table Array of absolute paths; may be empty when neither exists.
+--- its precedence over bundled and layout-installed packs with the same id. It is
+--- the `extensions` folder of the effective configuration directory, as on macOS
+--- and Windows, so an XDG_CONFIG_HOME or a relocated configuration folder moves it
+--- with the layouts the manager installs there.
+--- @return table Array of absolute paths.
 function M.extension_roots()
 	local roots = {}
 	local shared = M.shared_root()
@@ -208,14 +211,11 @@ function M.extension_roots()
 		-- one anchor already probed for existence above.
 		roots[#roots + 1] = shared .. "/../extensions"
 	end
-	local ok_cfg, ConfigPaths = pcall(require, "infra.config_paths")
 	-- Resolve lazily: the layout registry itself imports Paths at module load.
 	for _, root in ipairs(require("modules.keymap.layout_registry").extension_roots()) do
 		roots[#roots + 1] = root
 	end
-	if ok_cfg and type(ConfigPaths.home) == "function" then
-		roots[#roots + 1] = ConfigPaths.home() .. "/.config/ergopti/extensions"
-	end
+	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "/extensions"
 	return roots
 end
 
