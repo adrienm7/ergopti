@@ -12,9 +12,11 @@
 
 global _MagicKeyEditorInputHook := ""
 global _MagicKeyEditorStopDebt := false
+; The window of the live capture, published with its hook.
+global _MagicKeyEditorGui := ""
 
 MagicKeyEditor(*) {
-		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
+		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
 		; Tray callbacks remain reachable while native Suspend is active. Refuse a
 		; fresh capture before creating UI, then re-check atomically at publication
 		; because a suspend callback can still interrupt between ordinary lines.
@@ -23,8 +25,15 @@ MagicKeyEditor(*) {
 		if IsObject(_MagicKeyEditorInputHook) {
 				; An active editor keeps its owner. Only a terminal Stop debt from an
 				; earlier rollback may be retried before opening a successor.
-				if !_MagicKeyEditorStopDebt
+				if !_MagicKeyEditorStopDebt {
+						; Requested again: bring the live editor back in front. Its
+						; hook swallows the next key typed anywhere, so a covered
+						; editor would turn a keystroke in another app into the
+						; new magic key.
+						if IsObject(_MagicKeyEditorGui)
+								WMPresentWindow(_MagicKeyEditorGui)
 						return
+				}
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
@@ -44,6 +53,7 @@ MagicKeyEditor(*) {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
 								return
 						_MagicKeyEditorInputHook := IH
+						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
 				} finally {
@@ -54,6 +64,8 @@ MagicKeyEditor(*) {
 				IH.Wait()
 		} finally {
 				_MagicKeyEditorStopOwned(IH)
+				if (_MagicKeyEditorGui == GuiToShow)
+						_MagicKeyEditorGui := ""
 				; The Close event may already have destroyed the native window.
 				try GuiToShow.Destroy()
 				Critical(_InheritedCritical)
