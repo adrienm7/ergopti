@@ -7,7 +7,8 @@
 ; generated as UpdateChannelRegistryData() in _generated/update_channels.ahk):
 ; which channel a release tag belongs to, how a persisted value maps to a
 ; channel, which releases a channel's Versions view lists, whether an update
-; check offers a candidate, and which release is a channel's latest.
+; check offers a candidate, which release is a channel's latest, and which
+; other channels published a newer release than the installed build.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Port of the canonical JavaScript matcher (_shared/ui/update_channels.js).
@@ -209,4 +210,53 @@ UpdateChannels_PickLatest(Tags, Id) {
 			Best := Index
 	}
 	return Best
+}
+
+; Reports whether a publish time is exactly as GitHub writes it (UTC, whole
+; seconds), so text order is time order without a date parser.
+_UpdateChannels_IsPublishTime(Value) {
+	return (Value is String) && RegExMatch(Value, "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\z") ? true : false
+}
+
+; Lists, in registry order, every channel other than the checked one whose
+; latest release was published strictly after the installed build, as an Array
+; of Map("channel", Id, "tag", Tag). Releases is the release list in its order,
+; an Array of Map("tag", Tag, "published_at", Time). The installed build's time
+; is that of the first listed release of the same version; a build that is not
+; listed (older than the list, or a source checkout), or listed without a valid
+; time, predates the list.
+UpdateChannels_NewerElsewhere(Releases, Selected, Installed) {
+	Found := []
+	if !(Releases is Array) || !UpdateChannels_IsKnown(Selected)
+		return Found
+	Tags := []
+	for _, Release in Releases {
+		Tag := (Release is Map) ? Release.Get("tag", "") : ""
+		Tags.Push(Tag is String ? Tag : "")
+	}
+	InstalledAt := ""
+	if (UpdateChannels_ForTag(Installed) != "") {
+		for Index, Tag in Tags {
+			if (UpdateChannels_ForTag(Tag) == "" or _Updater_CompareVersions(Tag, Installed) != 0)
+				continue
+			Own := Releases[Index].Get("published_at", "")
+			InstalledAt := _UpdateChannels_IsPublishTime(Own) ? Own : ""
+			break
+		}
+	}
+	for _, Channel in _UpdateChannels_Registry().Order {
+		Id := Channel["id"]
+		if (Id == Selected)
+			continue
+		Index := UpdateChannels_PickLatest(Tags, Id)
+		if !Index
+			continue
+		At := Releases[Index].Get("published_at", "")
+		if !_UpdateChannels_IsPublishTime(At)
+			continue
+		if (InstalledAt != "" and StrCompare(At, InstalledAt, true) <= 0)
+			continue
+		Found.Push(Map("channel", Id, "tag", Tags[Index]))
+	}
+	return Found
 }

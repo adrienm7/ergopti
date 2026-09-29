@@ -1,5 +1,5 @@
 {
-	"_comment": "Cross-driver update-channel vectors, written by hand against channels.json. Every port replays this file: the JavaScript matcher (_shared/ui/update_channels.js, tools/test/test-update-channels-contract.cjs), the Lua port (_shared/lua/updater/channels.lua, one test per Lua driver) and the AHK port (windows/modules/updater/channels.ahk, tests/unit/test_updater_channel_registry.ahk). An empty string means no channel: the shared Lua JSON decoder turns a JSON null into a non-nil sentinel, so the shared data never uses null. tag: channel_for_tag(tag) must return channel. resolve: resolve(value) maps a persisted value or an alias to a channel id (exact and case-sensitive). visible: whether a release tag is listed in the Versions view of a channel (its own tags and those of every more stable channel). offer: should_offer(latest, current, selected, installed); a switch to another channel offers that channel's latest release even when semver orders it lower. pick: the tag pick_latest returns among tags, by semver order within the channel, first occurrence on a tie.",
+	"_comment": "Cross-driver update-channel vectors, written by hand against channels.json. Every port replays this file: the JavaScript matcher (_shared/ui/update_channels.js, tools/test/test-update-channels-contract.cjs), the Lua port (_shared/lua/updater/channels.lua, one test per Lua driver) and the AHK port (windows/modules/updater/channels.ahk, tests/unit/test_updater_channel_registry.ahk). An empty string means no channel: the shared Lua JSON decoder turns a JSON null into a non-nil sentinel, so the shared data never uses null. tag: channel_for_tag(tag) must return channel. resolve: resolve(value) maps a persisted value or an alias to a channel id (exact and case-sensitive). visible: whether a release tag is listed in the Versions view of a channel (its own tags and those of every more stable channel). offer: should_offer(latest, current, selected, installed); a switch to another channel offers that channel's latest release even when semver orders it lower. pick: the tag pick_latest returns among tags, by semver order within the channel, first occurrence on a tie. newer_elsewhere: newer_elsewhere(releases, selected, installed) lists, in registry order, every channel other than the checked one whose latest release (pick rule) was published strictly after the installed build; the installed build's publish time is that of the first listed release of the same version, and a build that is not listed, or listed without a valid time, predates the whole list. A publish time is valid only as GitHub writes it (YYYY-MM-DDTHH:MM:SSZ, UTC), so text order is time order; a channel whose latest release has no valid time is left out.",
 	"tag": [
 		{ "id": "stable_plain", "tag": "v1.2.3", "channel": "main" },
 		{ "id": "stable_without_v", "tag": "1.2.3", "channel": "main" },
@@ -156,5 +156,147 @@
 		{ "id": "dev_empty_list", "channel": "dev", "tags": [], "expect": "" },
 		{ "id": "tie_keeps_first", "channel": "main", "tags": ["1.2.0", "v1.2.0"], "expect": "1.2.0" },
 		{ "id": "unknown_channel", "channel": "beta", "tags": ["v1.2.0"], "expect": "" }
+	],
+	"newer_elsewhere": [
+		{
+			"id": "dev_newer_than_installed_main",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.150" }]
+		},
+		{
+			"id": "dev_older_than_installed_main",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v1.2.0", "published_at": "2026-09-21T10:00:00Z" },
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "main_newer_than_installed_dev",
+			"selected": "dev",
+			"installed": "v0.0.0-dev.140",
+			"releases": [
+				{ "tag": "v1.0.0", "published_at": "2026-09-15T08:30:00Z" },
+				{ "tag": "v0.0.0-dev.140", "published_at": "2026-09-10T08:30:00Z" }
+			],
+			"expect": [{ "channel": "main", "tag": "v1.0.0" }]
+		},
+		{
+			"id": "checked_channel_is_never_listed",
+			"selected": "dev",
+			"installed": "v0.0.0-dev.140",
+			"releases": [
+				{ "tag": "v0.0.0-dev.141", "published_at": "2026-09-11T08:30:00Z" },
+				{ "tag": "v0.0.0-dev.140", "published_at": "2026-09-10T08:30:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "channel_latest_is_its_highest_semver",
+			"selected": "main",
+			"installed": "1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.9", "published_at": "2026-09-25T00:00:00Z" },
+				{ "tag": "v0.0.0-dev.10", "published_at": "2026-09-19T00:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-18T00:00:00Z" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.10" }]
+		},
+		{
+			"id": "channel_latest_older_than_installed_hides_channel",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.9", "published_at": "2026-09-25T00:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-18T00:00:00Z" },
+				{ "tag": "v0.0.0-dev.10", "published_at": "2026-09-17T00:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "same_publish_time_is_not_newer",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-20T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "installed_not_listed_predates_the_list",
+			"selected": "main",
+			"installed": "v1.0.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.150" }]
+		},
+		{
+			"id": "unreleased_build_predates_the_list",
+			"selected": "dev",
+			"installed": "local",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": [{ "channel": "main", "tag": "v1.2.0" }]
+		},
+		{
+			"id": "latest_without_publish_time_is_skipped",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "latest_with_offset_time_is_skipped",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00+02:00" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "installed_without_publish_time_predates_the_list",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-08-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.150" }]
+		},
+		{
+			"id": "no_other_channel_release",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v1.3.0", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "unknown_selected_channel",
+			"selected": "beta",
+			"installed": "v1.2.0",
+			"releases": [{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" }],
+			"expect": []
+		},
+		{ "id": "empty_list", "selected": "main", "installed": "v1.2.0", "releases": [], "expect": [] }
 	]
 }

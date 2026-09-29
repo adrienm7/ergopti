@@ -69,7 +69,7 @@ const SWIFT_FEEDS_PATH = path.join(
 	'UpdateChannels.generated.swift'
 );
 const LOCALE_COUNT = 21;
-const MIN_VECTORS = { tag: 20, resolve: 5, visible: 5, offer: 8, pick: 5 };
+const MIN_VECTORS = { tag: 20, resolve: 5, visible: 5, offer: 8, pick: 5, newer_elsewhere: 10 };
 
 const failures = [];
 let checks = 0;
@@ -154,6 +154,15 @@ function checkVectors(channels, vectors, compareVersions) {
 		expect(
 			got === none(v.expect),
 			`pick ${v.id}: pickLatest = ${JSON.stringify(got)}, expected ${JSON.stringify(v.expect)}`
+		);
+	}
+	for (const v of vectors.newer_elsewhere || []) {
+		const got = JSON.stringify(
+			channels.newerElsewhere(v.releases, v.selected, v.installed, compareVersions)
+		);
+		expect(
+			got === JSON.stringify(v.expect),
+			`newer_elsewhere ${v.id}: newerElsewhere = ${got}, expected ${JSON.stringify(v.expect)}`
 		);
 	}
 }
