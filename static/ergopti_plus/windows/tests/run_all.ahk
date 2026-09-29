@@ -321,6 +321,7 @@ InstallSendNoOps()
 ; top-level ExitApp would end the suite.
 #Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
+#Include unit/test_window_manager_present_window.ahk
 #Include unit/test_console_window.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk

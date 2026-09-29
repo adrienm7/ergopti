@@ -131,7 +131,7 @@ _Onboarding_TryWeb() {
 	; whichever Gui _ob_gui currently points to, so it tears down the SECOND
 	; (live) window instead of the orphaned first one.
 	if (_ob_gui != 0) {
-		try WinActivate("ahk_id " . _ob_gui.Hwnd)
+		WMPresentWindow(_ob_gui)
 		return true
 	}
 	; A duplicate request must leave the live session's callbacks and teardown

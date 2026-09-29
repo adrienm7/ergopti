@@ -112,7 +112,7 @@ class ConfigCleanupWindow extends WebViewHost {
 		if IsObject(Existing) && !Existing.ResetDone {
 			if Existing.Building || Existing.Cancelled
 				return false
-			return WMActivate(Existing.Gui.Hwnd)
+			return WMPresentWindow(Existing.Gui)
 		}
 		WebViewHost._LoadManifest()
 		Host := ConfigCleanupWindow()

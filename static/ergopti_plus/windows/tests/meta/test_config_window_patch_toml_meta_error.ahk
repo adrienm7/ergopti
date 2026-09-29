@@ -605,7 +605,7 @@ _PTME_ExistingEditorsRefreshBeforeTheyAreShown() {
 	CapturePos := InStr(Native, "_HCW_CaptureSelection()")
 	BuildPos := InStr(Native, "_HCW_BuildCategoryList()")
 	RefreshPos := InStr(Native, "_HCW_RefreshExistingControls(")
-	ShowPos := InStr(Native, "_HCWGui.Show()")
+	ShowPos := InStr(Native, "WMPresentWindow(_HCWGui)")
 	Assert(CapturePos > 0 and BuildPos > CapturePos and RefreshPos > BuildPos
 		and ShowPos > RefreshPos,
 		"the native singleton must capture stable keys, rebuild its catalogue, repopulate controls, and only then show — stale dropdown indexes can otherwise retarget an edit to another file")
@@ -613,7 +613,7 @@ _PTME_ExistingEditorsRefreshBeforeTheyAreShown() {
 	Web := _DriverFuncBody("_HCWWeb_TryOpen")
 	WebBuildPos := InStr(Web, "_HCW_BuildCategoryList()")
 	WebPushPos := InStr(Web, "_HCWWeb_PushState()")
-	ActivatePos := InStr(Web, "WinActivate(")
+	ActivatePos := InStr(Web, "WMPresentWindow(_HCWWeb_Gui)")
 	Assert(WebBuildPos > 0 and WebPushPos > WebBuildPos
 		and ActivatePos > WebPushPos,
 		"the WebView singleton must rebuild and push canonical state before activation")

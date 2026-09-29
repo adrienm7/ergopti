@@ -71,7 +71,7 @@ _PiEdWeb_TryOpen() {
 		return false
 
 	if (_PiEdWeb_Gui != 0) {
-		try WinActivate("ahk_id " . _PiEdWeb_Gui.Hwnd)
+		WMPresentWindow(_PiEdWeb_Gui)
 		return true
 	}
 	_PiEdWeb_SessionEpoch += 1

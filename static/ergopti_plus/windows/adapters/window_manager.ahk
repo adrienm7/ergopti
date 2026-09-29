@@ -207,6 +207,23 @@ class _WMForegroundNative {
 	static Activate(HWnd) {
 		return WMActivate(HWnd)
 	}
+
+	static IsIconic(HWnd) {
+		return DllCall("IsIconic", "Ptr", HWnd, "Int") != 0
+	}
+
+	static IsWindowVisible(HWnd) {
+		return DllCall("IsWindowVisible", "Ptr", HWnd, "Int") != 0
+	}
+
+	; ShowWindow returns the previous visibility, not a success flag.
+	static Restore(HWnd) {
+		DllCall("ShowWindow", "Ptr", HWnd, "Int", 9, "Int")
+	}
+
+	static Show(HWnd) {
+		DllCall("ShowWindow", "Ptr", HWnd, "Int", 5, "Int")
+	}
 }
 
 ; Bypasses foreground-stealing protection before focusing an HWND. Success is
@@ -251,6 +268,39 @@ WMForceForeground(HWnd, Native := _WMForegroundNative) {
 		}
 	}
 	return Success
+}
+
+; The driver's one "present window" step for an ErgoptiPlus window requested
+; again while it is open (a first open is Gui.Show, which activates the new
+; window): restores it when minimized, shows it when hidden, then raises it and
+; gives it the keyboard through WMForceForeground. It never touches the topmost
+; flag: a window is focused, never kept above the windows the user opens
+; afterwards (maintainer rule 2026-09-29). A refusal is logged; the window then
+; only flashes in the taskbar.
+; @param Window {Gui|Integer} The window, or its handle. A Gui is read here so
+;   a window destroyed behind its owner's back is reported, not thrown.
+; @param Native {Object} Injectable Win32 boundary (tests).
+; @return {Boolean} True when the window became the foreground window.
+WMPresentWindow(Window, Native := _WMForegroundNative) {
+	HWnd := 0
+	try {
+		HWnd := IsObject(Window) ? Window.Hwnd : Window
+		if !HWnd || !Native.IsWindow(HWnd) {
+			LoggerWarn("WindowManager", "Window {1} no longer exists and cannot be presented.", HWnd)
+			return false
+		}
+		if Native.IsIconic(HWnd)
+			Native.Restore(HWnd)
+		else if !Native.IsWindowVisible(HWnd)
+			Native.Show(HWnd)
+	} catch as Err {
+		LoggerWarn("WindowManager", "Window {1} could not be prepared for presenting: {2}.", HWnd, Err.Message)
+		return false
+	}
+	if WMForceForeground(HWnd, Native)
+		return true
+	LoggerWarn("WindowManager", "Window {1} was refused the foreground; it only flashes in the taskbar.", HWnd)
+	return false
 }
 
 ; Port dispatch map (ADAPTER_WINDOW_MANAGER) — the single-source-of-truth contract

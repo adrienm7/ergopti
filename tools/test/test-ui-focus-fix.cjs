@@ -77,7 +77,8 @@ function record(label, ok, details = []) {
 // it may use. These surfaces are not windows: they never take focus, most are
 // click-through, and they are useless unless they stay above the application
 // the user is typing in. Anything else that reaches for a level or a topmost
-// flag is a window and must only be focused.
+// flag is a window and must only be focused. The one entry that is not an
+// overlay is the Windows window factory, which names the option to refuse it.
 const ALLOWLIST = [
 	{
 		file: 'macos/ui/tooltip/renderer.lua',
@@ -118,6 +119,11 @@ const ALLOWLIST = [
 		file: 'windows/adapters/graphics_renderer.ahk',
 		kinds: ['win.alwaysOnTop', 'win.exTopmost'],
 		reason: 'layered overlay adapter (spotlight and feedback overlays)'
+	},
+	{
+		file: 'windows/infra/ui_style.ahk',
+		kinds: ['win.alwaysOnTop'],
+		reason: 'Gui_Create names AlwaysOnTop only to refuse it for every window'
 	},
 	{
 		file: 'windows/ui/spotlight/init.ahk',
