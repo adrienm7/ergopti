@@ -120,6 +120,15 @@ while [ "$#" -gt 0 ]; do
   fi
   shift
 done
+if [ "$mode" = 'resume' ] && [ -n "$output" ]; then
+  if [ "$count" -eq 1 ]; then
+    printf '%s' 'fixture ' > "$output"
+    exit 28
+  fi
+  printf 'resumed-from=%s\\n' "$(wc -c < "$output" | tr -d ' ')" >> "$HOME/curl-resume"
+  printf '%s\\n' 'archive' >> "$output"
+  exit 0
+fi
 if [ -n "$output" ]; then
   printf '%s\\n' 'fixture archive' > "$output"
 else
@@ -248,11 +257,14 @@ try {
 		? fs.readFileSync(flaky.curlArgsPath, 'utf8')
 		: '';
 	test(
-		'every download attempt carries the shared bounded curl policy',
+		'every download attempt carries the shared stall-bounded, resumable curl policy',
 		curlArgs.includes('--connect-timeout 30') &&
-			curlArgs.includes('--max-time 600') &&
+			curlArgs.includes('--speed-limit 1024') &&
+			curlArgs.includes('--speed-time 60') &&
+			curlArgs.includes('--continue-at -') &&
 			curlArgs.includes('--retry 5') &&
-			curlArgs.includes('--retry-all-errors'),
+			curlArgs.includes('--retry-all-errors') &&
+			!curlArgs.includes('--max-time'),
 		curlArgs
 	);
 	const beforeFastPath = readCount(flaky.curlCountPath);
@@ -264,6 +276,24 @@ try {
 	);
 } finally {
 	cleanupFixture(flaky);
+}
+
+const slowLink = createFixture('resume', 'good');
+try {
+	const run = runFixture(bash, slowLink);
+	const resumeLog = fs.existsSync(path.join(slowLink.homeDir, 'curl-resume'))
+		? fs.readFileSync(path.join(slowLink.homeDir, 'curl-resume'), 'utf8')
+		: '';
+	test(
+		'an attempt cut off part way resumes its bytes instead of restarting from zero',
+		run.status === 0 &&
+			readCount(slowLink.curlCountPath) === 2 &&
+			resumeLog.trim() === 'resumed-from=8' &&
+			fs.existsSync(slowLink.installedPath),
+		`${resumeLog} ${runDetail(run)}`
+	);
+} finally {
+	cleanupFixture(slowLink);
 }
 
 const hostile = createFixture('success', 'bad');
