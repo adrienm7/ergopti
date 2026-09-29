@@ -19,9 +19,10 @@ local TomlWriter = require("toml_codec.writer")
 
 local Sandbox = Contract.sandbox
 
--- One key of each shape the macOS readers take, and five they never read: an
--- unknown leaf in three known sections and an unknown section holding a
--- multiline string whose text looks like a header.
+-- One key of each shape the macOS readers take, and seven they never read: an
+-- unknown leaf in three known sections, two outdated children of a known
+-- table, and an unknown section holding a multiline string whose text looks
+-- like a header.
 local FIXTURE = table.concat({
 	"# ErgoptiPlus configuration",
 	"[script]",
@@ -47,6 +48,11 @@ local FIXTURE = table.concat({
 	"enabled = false",
 	"tap_3 = \"open_url\"",
 	"",
+	"[gestures.modes]",
+	"swipe_2_left = \"incremental\"",
+	"tap_3 = \"x1\"",
+	"swipe_2_up = \"x9\"",
+	"",
 	"[llm.trigger]",
 	"debounce_ms = 300",
 	"disabled_apps = [",
@@ -65,6 +71,10 @@ local EXPECTED = {
 	"hotstrings.stale_toggle=leaf",
 	"hotstrings.dynamic.obsolete_rule=leaf",
 	"metrics.metrics_encrypt=leaf",
+	-- Outdated children of a known table (config-outdated-entries): a slot
+	-- with no mode and a retired mode value.
+	"gestures.modes.tap_3=leaf",
+	"gestures.modes.swipe_2_up=leaf",
 	"stale.section.label=section",
 	"stale.section.note=section",
 }
@@ -76,6 +86,7 @@ local SURVIVORS = {
 	{ { "hotstrings", "dynamic", "date" }, true },
 	{ { "metrics", "enabled" }, true },
 	{ { "gestures", "tap_3" }, "open_url" },
+	{ { "gestures", "modes", "swipe_2_left" }, "incremental" },
 	{ { "llm", "trigger", "debounce_ms" }, 300 },
 }
 
@@ -184,6 +195,23 @@ helpers.with_stub_scope(MODULES, function()
 			end
 			helpers.assert_eq(checked, #SURVIVORS + 3,
 				"every used record of the fixture must be exercised")
+		end)
+
+		helpers.it("unused keys: a removed [shortcuts.keys] hotkey is offered alone (config-outdated-at-hash)", function()
+			local source = "[shortcuts.keys]\nctrl_s = true\nat_hash = true\n"
+			Sandbox.with_config(source, function(path)
+				local before = driver_state(path)
+				local keys = Cleanup.find(path, IoAdapter).keys
+				helpers.assert_eq(#keys, 1)
+				helpers.assert_eq({ keys[1].section, keys[1].key, keys[1].kind },
+					{ "shortcuts.keys", "at_hash", "leaf" })
+				helpers.assert_eq(before.flat.shortcut_keys, { ctrl_s = true })
+				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP,
+					file_adapter = IoAdapter })
+				helpers.assert_eq(result.status, "removed")
+				helpers.assert_eq(driver_state(path), before,
+					"the removed hotkey must be one no macOS reader applies")
+			end)
 		end)
 
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
