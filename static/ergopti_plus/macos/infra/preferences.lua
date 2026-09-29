@@ -202,6 +202,32 @@ local function manifest_child_fits(path, value)
 	return ConfigOutdated.manifest_value_fits(Manifest.find_entry_by_path(path), value, "hs")
 end
 
+-- Built-in terminator keys, from the generated catalogue the registry loads.
+local BUILTIN_TERMINATORS = {}
+for _, def in ipairs(require("keymap.terminators_catalogue")) do
+	if type(def.key) == "string" then BUILTIN_TERMINATORS[def.key] = true end
+end
+
+--- Builds the owner check of [hotstrings.terminator_states]: a state belongs to
+--- a built-in terminator or to a custom one the same file still defines.
+--- @param document table Decoded config.toml.
+--- @return function is_known `is_known(key, enabled)`.
+local function terminator_state_owner(document)
+	local custom = {}
+	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
+	local defs = type(hotstrings.terminators) == "table" and hotstrings.terminators or {}
+	for _, def in ipairs(defs) do
+		if type(def) == "table" and type(def.key) == "string" then custom[def.key] = true end
+	end
+	return function(key, enabled)
+		if not BUILTIN_TERMINATORS[key] and not custom[key] then
+			return false, "no built-in or custom delimiter has this key"
+		end
+		if type(enabled) ~= "boolean" then return false, "the value is not a boolean" end
+		return true
+	end
+end
+
 --- Set of known top-level section names for fast lookup.
 local _known_sections = {}
 for _, s in ipairs(SECTIONS) do _known_sections[s] = true end
@@ -422,6 +448,9 @@ local function flatten_from_disk(grouped, mark)
 							local prefix = sec_name .. "." .. disk_key .. "."
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
 								function(id, value) return manifest_child_fits(prefix .. id, value) end, mark)
+						elseif nested_fk == "terminator_states" then
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								terminator_state_owner(grouped), mark)
 						else
 							flat[nested_fk] = owned
 							take(sec_name, disk_key)
