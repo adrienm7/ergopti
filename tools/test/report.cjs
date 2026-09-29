@@ -13,7 +13,8 @@
  * On GitHub Actions it emits one ::error:: annotation per failing test and a
  * ::notice:: summary; always writes a JSON summary (--json) and a step summary
  * if GITHUB_STEP_SUMMARY is set. Exits with the wrapped command's exit code so
- * CI gating is unchanged.
+ * CI gating is unchanged. Counts read by people (annotations, step summary,
+ * final line) group thousands; the JSON keeps plain numbers for tools.
  *
  * USAGE:
  *   node tools/test/report.cjs --name <label> [--json out.json] -- <cmd> [args…]
@@ -93,6 +94,19 @@ function parseResults(out) {
 // ======= 3/ Emission =================
 // =====================================
 
+// Narrow no-break space: groups thousands as French typography does, and a
+// count never wraps between its groups.
+const THOUSANDS_SEPARATOR = '\u202F';
+
+/**
+ * Formats a count for people: 11507 → "11 507".
+ * @param {number} n A non-negative integer count.
+ * @returns {string} The count with its thousands grouped.
+ */
+function formatCount(n) {
+	return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEPARATOR);
+}
+
 function ghEscape(s) {
 	return String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 }
@@ -103,10 +117,10 @@ function emit(opts, res, code) {
 		for (const f of res.failures) {
 			process.stdout.write(`::error title=${ghEscape(opts.name)} test failed::${ghEscape(f)}\n`);
 		}
-		const summary = `${opts.name}: ${res.passed} passed, ${res.failed} failed`;
+		const summary = `${opts.name}: ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {
-			const md = `### ${opts.name}\n\n- ✅ ${res.passed} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${res.failed} failed\n`
+			const md = `### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n`
 				+ (res.failures.length ? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n` : '');
 			try { fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md); } catch { /* best-effort */ }
 		}
@@ -118,7 +132,7 @@ function emit(opts, res, code) {
 	}
 
 	const tag = res.failed > 0 || code !== 0 ? '\x1b[31mFAIL\x1b[0m' : '\x1b[32mPASS\x1b[0m';
-	process.stdout.write(`\n[report:${opts.name}] ${tag} — ${res.passed} passed, ${res.failed} failed (exit ${code}, format ${res.format}).\n`);
+	process.stdout.write(`\n[report:${opts.name}] ${tag} — ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed (exit ${code}, format ${res.format}).\n`);
 }
 
 
@@ -163,4 +177,4 @@ function main() {
 // self-test) must expose parseResults without spawning anything.
 if (require.main === module) main();
 
-module.exports = { parseResults };
+module.exports = { parseResults, formatCount };
