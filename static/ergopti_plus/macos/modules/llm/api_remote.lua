@@ -13,9 +13,12 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Provider catalogue — each entry declares Label, BaseUrl, DefaultModel
----    and Format (openai / anthropic / gemini). Adding a new provider is a
----    single table entry plus (optionally) a new branch in the formatter and
----    parser helpers; the engine and menu stay unchanged.
+---    and Format (openai / anthropic / gemini / backboard / decisions). Adding
+---    a provider of a known format is a single catalogue entry; the engine and
+---    menus list it wherever its format serves (modules/llm/provider_uses.lua).
+---    Backboard (a message on a new thread, naming the key's assistant, which
+---    is created once per key and session) and decisions (TypeSafe's Jev, the
+---    agent's System 1 only) take the shapes of _shared/lua/llm/remote_formats.lua.
 --- 2. Async non-streaming — every call goes through ``hs.http.asyncPost`` so
 ---    the main thread never blocks. Remote streaming is intentionally OFF:
 ---    the three popular streaming flavours (OpenAI SSE / Anthropic event
@@ -50,10 +53,15 @@ local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independ
 -- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
 -- need not be the active entry: its requests never share the prediction owner
 local _vision_client = _http_adapter.new(_http_options)
+-- The Test-API probe of an entry that is not the prediction backend (a
+-- decisions provider): it must cancel neither a prediction nor an agent request
+local _probe_client = _http_adapter.new(_http_options)
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ResponseClassifier = require("modules.llm.remote_response_classifier")
+local Formats        = require("llm.remote_formats")
+local ProviderUses   = require("modules.llm.provider_uses")
 local LOG            = "llm.api_remote"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -74,15 +82,16 @@ if not ok_kl then keylogger = nil end
 --- Returns (providers_table, order_array, prices_table) on success, or three
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
+-- The request formats a provider may declare
+local CATALOG_FORMATS = { openai = true, anthropic = true, gemini = true, backboard = true, decisions = true }
+
 local function catalog_descriptor_is_valid(provider_id, desc)
 	if type(desc) ~= "table" then return false end
 	for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
 		if type(desc[key]) ~= "string" then return false end
 	end
 	if desc.label:match("^%s*$") then return false end
-	if desc.format ~= "openai" and desc.format ~= "anthropic" and desc.format ~= "gemini" then
-		return false
-	end
+	if not CATALOG_FORMATS[desc.format] then return false end
 	if provider_id ~= "openai_compat"
 		and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$"))
 	then
@@ -154,6 +163,20 @@ local function parse_test_request(node)
 	return { system_prompt = sys, user_text = user, temperature = temp, max_tokens = toks }
 end
 
+--- Validates the shared Test-API probe of a decisions provider (api_providers.json
+--- decisions_test): the state and the questions both drivers send verbatim.
+--- @param node any root.decisions_test value.
+--- @return table|nil { state, questions } or nil.
+local function parse_decisions_test(node)
+	local valid = type(node) == "table" and type(node.state) == "string" and node.state ~= ""
+		and type(node.questions) == "table" and next(node.questions) ~= nil
+	if not valid then
+		Logger.error("llm.api_remote", "api_providers.json: decisions_test must hold a non-empty state and questions.")
+		return nil
+	end
+	return { state = node.state, questions = node.questions }
+end
+
 local function load_api_providers()
 	local path = Paths.shared_llm_path("api_providers.json")
 	if not path then
@@ -167,7 +190,7 @@ local function load_api_providers()
 	-- Wrap the entire parse/validate phase in pcall so a corrupted or schema-
 	-- mismatched file degrades to an empty catalogue instead of raising at require
 	-- time, which would abort the full keymap → llm → api_remote require chain.
-	local ok, providers, order, prices, test_request = pcall(function()
+	local ok, providers, order, prices, test_request, decisions_test = pcall(function()
 		local fh = io.open(path, "r")
 		if not fh then
 			Logger.error("llm.api_remote", "api_providers.json unreadable at %s — empty catalogue.", tostring(path))
@@ -227,20 +250,37 @@ local function load_api_providers()
 			end
 		end
 		local out_test = parse_test_request(root.test_request)
+		local out_decisions_test = parse_decisions_test(root.decisions_test)
 		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #out_order, path)
-		return out_providers, out_order, out_prices, out_test
+		return out_providers, out_order, out_prices, out_test, out_decisions_test
 	end)
 
 	if not ok then
 		-- pcall itself failed (should never happen given the guards above, but be safe)
 		Logger.error("llm.api_remote", "api_providers.json: unexpected error during load — empty catalogue: %s", tostring(providers))
-		return {}, {}, {}, nil
+		return {}, {}, {}, nil, nil
 	end
-	return providers or {}, order or {}, prices or {}, test_request
+	return providers or {}, order or {}, prices or {}, test_request, decisions_test
 end
 
 local MODEL_PRICES
-M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES, M.TEST_REQUEST = load_api_providers()
+M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES, M.TEST_REQUEST, M.DECISIONS_TEST = load_api_providers()
+
+--- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
+--- the catalogue's order.
+--- @param use string A use of provider_uses ("prediction", "system1", "system2", "vision").
+--- @return table ids
+function M.provider_ids(use)
+	return ProviderUses.provider_ids(M.PROVIDER_ORDER, M.PROVIDERS, use)
+end
+
+--- Tells whether a provider serves one use.
+--- @param provider_id string Provider id of api_providers.json.
+--- @param use string A use of provider_uses.
+--- @return boolean serves
+function M.provider_serves(provider_id, use)
+	return ProviderUses.provider_serves(M.PROVIDERS, provider_id, use)
+end
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy from _shared/modules/llm/inference.json (api_common.lua) so the
@@ -1095,9 +1135,18 @@ end
 
 --- Compute the per-provider auth headers. Gemini carries auth via the URL
 --- query string and has nothing to add here; OpenAI uses Bearer; Anthropic
---- uses x-api-key + a fixed version pin.
+--- uses x-api-key + a fixed version pin; Backboard its own key header, with no
+--- Bearer; a decisions provider a Bearer header (llm/remote_formats.lua).
 local function build_headers(format, token)
 	local headers = { ["Content-Type"] = "application/json" }
+	if format == "backboard" then
+		if token and token ~= "" then headers[Formats.BACKBOARD_KEY_HEADER] = token end
+		return headers
+	end
+	if format == "decisions" then
+		if token and token ~= "" then headers[Formats.DECISIONS_KEY_HEADER] = Formats.decisions_key_value(token) end
+		return headers
+	end
 	if format == "anthropic" then
 		if token and token ~= "" then headers["x-api-key"] = token end
 		headers["anthropic-version"] = "2023-06-01"
@@ -1124,6 +1173,11 @@ end
 local function models_response_is_valid(format, response)
 	if type(response) ~= "table" or response.ok ~= true then
 		return false, "HTTP request failed"
+	end
+	-- Backboard lists no models: its probe is the creation of the assistant
+	if format == "backboard" then
+		if type(response.assistant_id) ~= "string" then return false, "assistant id is missing" end
+		return true, "ok"
 	end
 	if type(response.body) ~= "string" or response.body == "" then
 		return false, "response body is empty"
@@ -1209,6 +1263,168 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 	return payload
 end
 M.__build_payload_for_test = build_payload
+
+--- Extracts the provider's own error text (error.message, else a top-level
+--- message as in the Cerebras error shape) without promoting content
+--- decoys. Trimmed for notifications; nil when there is nothing to show.
+--- @param body any Response body.
+--- @return string|nil Message or nil.
+local function extract_server_message(body)
+	if type(body) ~= "string" or body == "" then return nil end
+	local ok, root = pcall(JsonCodec.decode, body)
+	if not ok or type(root) ~= "table" then return nil end
+	local err = root.error
+	if type(err) == "table" and type(err.message) == "string" and err.message ~= "" then
+		return err.message:sub(1, 200)
+	end
+	if type(root.message) == "string" and root.message ~= "" then
+		return root.message:sub(1, 200)
+	end
+	return nil
+end
+M.__extract_server_message_for_test = extract_server_message
+
+--- Builds the failure detail a caller shows: the status and the provider's own message.
+--- @param reason string Short reason.
+--- @param response table|nil The HTTP response, when one came back.
+--- @return table detail { reason, status, message }
+local function failure_detail(reason, response)
+	local status = type(response) == "table" and tonumber(response.status) or 0
+	local body = type(response) == "table" and response.body or nil
+	return { reason = reason, status = status or 0, message = extract_server_message(body) or "" }
+end
+
+--- Decodes a JSON response body.
+--- @param body any Response body.
+--- @return table|nil decoded Nil when the body is not a JSON object or array.
+local function decode_body(body)
+	if type(body) ~= "string" or body == "" then return nil end
+	local ok, decoded = pcall(JsonCodec.decode, body)
+	if not ok or type(decoded) ~= "table" then return nil end
+	return decoded
+end
+
+--- Names the top-level keys of a decoded answer, never its values: what a log
+--- may say about an answer whose shape was not the expected one.
+--- @param value any Decoded answer.
+--- @return string keys Sorted, comma-separated, or the value's type.
+local function top_level_keys(value)
+	if type(value) ~= "table" then return type(value) end
+	local keys = {}
+	for key in pairs(value) do keys[#keys + 1] = tostring(key) end
+	table.sort(keys)
+	return table.concat(keys, ", ")
+end
+M.__top_level_keys_for_test = top_level_keys
+
+-- The Backboard assistant of each base URL and key, for this session: it is
+-- created at the first request of the key, then every message names it
+local _backboard_assistants = {}
+
+--- Calls back with the Backboard assistant of a key, creating it first when
+--- this session has none. A failed creation caches nothing: the next request
+--- tries again.
+--- @param client table HTTP client that sends the creation.
+--- @param base string Validated base URL.
+--- @param token string Decrypted key.
+--- @param on_id function Receives the assistant id.
+--- @param on_fail function Receives (reason, response|nil).
+--- @return boolean dispatched True when the id was known or its creation was sent.
+local function ensure_backboard_assistant(client, base, token, on_id, on_fail)
+	local cache_key = base .. "\0" .. token
+	local cached = _backboard_assistants[cache_key]
+	if cached then
+		on_id(cached)
+		return true
+	end
+	local request = Formats.backboard_assistant_request(base)
+	local encoded, encode_error = JsonCodec.encode(request.body)
+	if not encoded then
+		Logger.error(LOG, "Backboard assistant request encode failed: %s.", tostring(encode_error))
+		on_fail("encode_failed", nil)
+		return false
+	end
+	Logger.info(LOG, "Backboard assistant requested for this key -> %s.", redact_url(request.url))
+	return client.post(request.url, build_headers("backboard", token), encoded, function(r)
+		Logger.pcall(LOG, function()
+			if type(r) ~= "table" or r.ok ~= true then
+				local status = type(r) == "table" and r.status or nil
+				Logger.error(LOG, "Backboard assistant creation failed: HTTP %s (%s).", tostring(status),
+					tostring(type(r) == "table" and (extract_server_message(r.body) or r.error) or ""))
+				on_fail("assistant_http_" .. tostring(status or "unknown"), r)
+				return
+			end
+			local decoded = decode_body(r.body)
+			local id = Formats.backboard_assistant_id(decoded)
+			if not id then
+				Logger.error(LOG, "Backboard assistant creation answered no assistant_id (keys: %s).",
+					top_level_keys(decoded))
+				on_fail("assistant_missing", r)
+				return
+			end
+			_backboard_assistants[cache_key] = id
+			Logger.info(LOG, "Backboard assistant created; every request of this key names it.")
+			on_id(id)
+		end)
+	end) == true
+end
+
+--- Sends one Backboard message on a new thread, creating the key's assistant
+--- first when needed. Backboard's message shape has no temperature or token
+--- budget: none is sent.
+--- @param client table HTTP client.
+--- @param base string Validated base URL.
+--- @param token string Decrypted key.
+--- @param spec table { model = "<llm_provider>/<model_name>", system, text, questions? }
+--- @param on_response function Receives the HTTP response of the message.
+--- @param on_fail function Receives (reason, detail) when no message could be sent.
+--- @return boolean dispatched
+local function post_backboard_message(client, base, token, spec, on_response, on_fail)
+	if not Formats.backboard_split_model(spec.model) then
+		Logger.error(LOG, "Backboard request refused: model '%s' names no provider (<llm_provider>/<model_name>).",
+			tostring(spec.model))
+		on_fail("invalid_model", failure_detail("invalid_model", nil))
+		return false
+	end
+	return ensure_backboard_assistant(client, base, token, function(assistant_id)
+		local request = Formats.backboard_message_request(base, {
+			assistant_id = assistant_id, model = spec.model, system = spec.system or "",
+			text = spec.text or "", questions = spec.questions,
+		})
+		local encoded, encode_error = JsonCodec.encode(request.body)
+		if not encoded then
+			Logger.error(LOG, "Backboard message encode failed: %s.", tostring(encode_error))
+			on_fail("encode_failed", failure_detail("encode_failed", nil))
+			return
+		end
+		client.post(request.url, build_headers("backboard", token), encoded, on_response)
+	end, function(reason, r)
+		on_fail(reason, failure_detail(reason, r))
+	end)
+end
+
+--- Sends a provider's readiness probe: its models list, or for Backboard the
+--- creation of the key's assistant, answered as { ok, status, assistant_id }.
+--- @param client table HTTP client.
+--- @param base string Validated base URL.
+--- @param format string Provider wire format.
+--- @param token string Decrypted key.
+--- @param callback function Receives the response.
+--- @return boolean dispatched
+local function dispatch_probe(client, base, format, token, callback)
+	if format == "backboard" then
+		return ensure_backboard_assistant(client, base, token, function(id)
+			callback({ ok = true, status = 200, assistant_id = id })
+		end, function(_, r)
+			if type(r) == "table" and r.ok == true then
+				callback({ ok = true, status = r.status })
+				return
+			end
+			callback(type(r) == "table" and r or { ok = false, status = 0 })
+		end)
+	end
+	return client.get(build_models_url(base, format, token), build_headers(format, token), callback)
+end
 
 local function estimate_cost(model, in_tokens, out_tokens)
 	if not model or model == "" or not MODEL_PRICES[model] then return 0.0 end
@@ -1315,7 +1531,14 @@ function M.warmup(_model_name, _profile, on_acquired)
 
 		local identity_entry = find_active_entry()
 		local format = provider.format
-		local ping_url = build_models_url(base, format, token)
+		if not ProviderUses.format_serves(format, ProviderUses.PREDICTION) then
+			_warmup_active = false
+			accepted = false
+			Logger.warn(LOG, "warmup: provider '%s' serves the agent's System 1 only, not predictions.",
+				tostring(entry.provider))
+			report_acquisition(false)
+			return
+		end
 
 		local dispatch_committed = false
 		local pending_response = nil
@@ -1341,7 +1564,7 @@ function M.warmup(_model_name, _profile, on_acquired)
 			end
 		end
 		local dispatch_ok, dispatched_or_err = xpcall(function()
-			return _warmup_client.get(ping_url, build_headers(format, token), function(r)
+			return dispatch_probe(_warmup_client, base, format, token, function(r)
 				if dispatch_committed ~= true then
 					pending_response = r
 					return
@@ -1538,10 +1761,16 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 		local identity_entry = find_active_entry()
 		local format = provider.format
 		local my_identity = _identity_generation
-		local url = build_models_url(base, format, entry.token)
+		if not ProviderUses.format_serves(format, ProviderUses.PREDICTION) then
+			Logger.warn(LOG, "Availability check refused: provider '%s' serves the agent's System 1 only.",
+				tostring(entry.provider))
+			accepted = false
+			finish_availability_owner(owner, "missing", false)
+			return
+		end
 
 		local dispatch_ok, dispatched_or_err = xpcall(function()
-			return _check_client.get(url, build_headers(format, entry.token), function(r)
+			return dispatch_probe(_check_client, base, format, entry.token, function(r)
 				if owner.done == true then return end
 				local callback_paused, _, callback_state_ok = read_script_pause_state()
 				if my_availability ~= _availability_generation
@@ -1589,31 +1818,12 @@ end
 
 local _req_counter = 0
 
+
 --- Fire a single non-streaming remote request and turn the response into one
 --- or more prediction objects via ``Parser.process_prediction`` /
 --- ``Parser.split_blocks``. The signature mirrors api_ollama's
 --- ``post_and_parse`` so the higher-level fetch_* strategies can keep their
 --- structure unchanged.
---- Extracts the provider's own error text (error.message, else a top-level
---- message as in the Cerebras error shape) without promoting content
---- decoys. Trimmed for notifications; nil when there is nothing to show.
---- @param body any Response body.
---- @return string|nil Message or nil.
-local function extract_server_message(body)
-	if type(body) ~= "string" or body == "" then return nil end
-	local ok, root = pcall(JsonCodec.decode, body)
-	if not ok or type(root) ~= "table" then return nil end
-	local err = root.error
-	if type(err) == "table" and type(err.message) == "string" and err.message ~= "" then
-		return err.message:sub(1, 200)
-	end
-	if type(root.message) == "string" and root.message ~= "" then
-		return root.message:sub(1, 200)
-	end
-	return nil
-end
-M.__extract_server_message_for_test = extract_server_message
-
 local function post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
                                         temperature, max_tokens, num_predictions, is_batch,
                                         on_success, on_fail, dedup_stats, on_raw)
@@ -1664,30 +1874,18 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		end
 	end
 
-	local url, url_error = build_url(base, provider.format, model, entry.token or "")
-	if not url then
-		log_endpoint_refusal("inference", entry, url_error)
+	if not ProviderUses.format_serves(provider.format, ProviderUses.PREDICTION) then
+		Logger.error(LOG, "[%s] #%d refused: provider '%s' serves the agent's System 1 only, not text requests.",
+			tostring(model), req_id, tostring(entry.provider))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
-	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
-	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
-		provider_extras)
-	local encoded, enc_err = JsonCodec.encode(payload)
-	if not encoded then
-		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
-		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
-		return
-	end
+	local t0 = TimerScheduler.now()
 
-	local headers = build_headers(provider.format, entry.token or "")
-	local t0      = TimerScheduler.now()
-
-	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
-		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
-
-	_infer_client.post(url, headers, encoded, function(r)
+	--- Handles the provider's answer: the chat completion, or the Backboard message.
+	--- @param r table HTTP response.
+	local function on_response(r)
 		if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then
 			Logger.debug(LOG, "[%s] #%d response discarded after remote identity changed.",
 				tostring(model), req_id)
@@ -1807,7 +2005,43 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			end
 			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 		end)
-	end)
+	end
+
+	if provider.format == "backboard" then
+		Logger.debug(LOG, "[%s] #%d Backboard message (%d chars prompt)", model, req_id, #(user_prompt or ""))
+		post_backboard_message(_infer_client, base, entry.token or "",
+			{ model = model, system = final_sys or "", text = user_prompt },
+			on_response,
+			function(_, detail)
+				if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", detail) end
+			end)
+		return
+	end
+
+	local url, url_error = build_url(base, provider.format, model, entry.token or "")
+	if not url then
+		log_endpoint_refusal("inference", entry, url_error)
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
+	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
+	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
+		provider_extras)
+	local encoded, enc_err = JsonCodec.encode(payload)
+	if not encoded then
+		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
+	local headers = build_headers(provider.format, entry.token or "")
+
+	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
+		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
+
+	_infer_client.post(url, headers, encoded, on_response)
 end
 
 --- Resolves the credential asynchronously before constructing any request.
@@ -1860,22 +2094,35 @@ local function find_provider_entry(provider_id)
 	return nil
 end
 
---- Tells whether a vision request can be sent to a provider, before anything
---- is captured: the provider exists and an API entry with a key is configured.
+--- Tells whether a request of one use can be sent to a provider, before
+--- anything is captured: the provider exists, serves that use
+--- (modules/llm/provider_uses.lua) and an API entry with a key is configured.
 --- @param provider_id string Provider id of api_providers.json.
+--- @param use string A use of provider_uses ("vision", "system1", "system2").
 --- @return boolean ready
---- @return string|nil reason "unknown_provider", "no_entry" or "missing_token".
-function M.vision_provider_status(provider_id)
+--- @return string|nil reason "unknown_provider", "unsupported", "no_entry" or "missing_token".
+function M.provider_status(provider_id, use)
 	if type(provider_id) ~= "string" or M.PROVIDERS[provider_id] == nil then
 		return false, "unknown_provider"
 	end
+	if not M.provider_serves(provider_id, use) then return false, "unsupported" end
 	local entry = find_provider_entry(provider_id)
 	if not entry then return false, "no_entry" end
 	if type(entry.token) ~= "string" or entry.token == "" then return false, "missing_token" end
 	return true, nil
 end
 
---- The request format of a provider ("openai", "anthropic" or "gemini").
+--- Tells whether a vision request can be sent to a provider (provider_status
+--- for the vision use).
+--- @param provider_id string Provider id of api_providers.json.
+--- @return boolean ready
+--- @return string|nil reason As provider_status.
+function M.vision_provider_status(provider_id)
+	return M.provider_status(provider_id, ProviderUses.VISION)
+end
+
+--- The request format of a provider ("openai", "anthropic", "gemini",
+--- "backboard" or "decisions").
 --- @param provider_id string Provider id of api_providers.json.
 --- @return string|nil format Nil for an unknown provider.
 function M.provider_format(provider_id)
@@ -1883,47 +2130,24 @@ function M.provider_format(provider_id)
 	return provider and provider.format or nil
 end
 
---- Posts one prebuilt request body to a provider with its stored API key,
---- through the same URL, header and answer rules as a prediction. The body
---- carries private text or a screenshot: neither it nor the answer is ever
---- logged.
---- @param client table The HTTP client that posts it.
+--- Resolves the key and the address of a provider's request, then hands them
+--- over. The request carries private text or a screenshot: neither it nor the
+--- answer is ever logged.
 --- @param label string What is requested, for the log ("Vision", "Agent").
 --- @param provider_id string Provider id of api_providers.json.
---- @param model string The model (Gemini puts it in the URL).
---- @param body table The request body (llm/vision.lua build_request).
---- @param on_text function Receives the answer text, thinking blocks stripped.
---- @param on_fail function Receives a short reason when no answer came back.
---- @param with_extras boolean|nil Merge the model's model_extras of
----        api_providers.json into an OpenAI-shape body, as a prediction does.
---- @return boolean sent True when the key resolution started.
-local function request_prebuilt(client, label, provider_id, model, body, on_text, on_fail, with_extras)
-	if type(on_text) ~= "function" or type(on_fail) ~= "function" then
-		error("api_remote." .. label .. " request: on_text and on_fail must be functions")
-	end
-	local function fail(reason)
-		ApiCommon.protected_call(on_fail, "on_fail", reason)
-		return false
-	end
-	local ready, reason = M.vision_provider_status(provider_id)
+--- @param use string The use it serves (provider_status).
+--- @param fail function Receives a short reason when nothing can be sent.
+--- @param on_ready function Receives (provider, entry, token, base).
+--- @return boolean started True when the key resolution started.
+local function with_provider_key(label, provider_id, use, fail, on_ready)
+	local ready, reason = M.provider_status(provider_id, use)
 	if not ready then
 		Logger.error(LOG, "%s request refused for provider '%s': %s.", label, tostring(provider_id), tostring(reason))
-		return fail(reason)
-	end
-	if type(model) ~= "string" or model == "" or type(body) ~= "table" then
-		error("api_remote." .. label .. " request: a model and a body are required")
+		fail(reason)
+		return false
 	end
 	local provider = M.PROVIDERS[provider_id]
 	local entry = find_provider_entry(provider_id)
-	local extras = with_extras and provider.format == "openai" and provider.model_extras
-		and provider.model_extras[model] or nil
-	if extras then
-		-- A reasoning model left at its default effort spends a small budget
-		-- thinking and answers nothing; the body's own fields win
-		for field, value in pairs(extras) do
-			if body[field] == nil then body[field] = value end
-		end
-	end
 	TokenCrypto.decrypt_async(entry.token, function(decrypted, token, token_reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
 			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
@@ -1936,6 +2160,64 @@ local function request_prebuilt(client, label, provider_id, model, body, on_text
 			log_endpoint_refusal(label:lower(), entry, base_error)
 			fail("invalid_endpoint")
 			return
+		end
+		on_ready(provider, entry, token, base)
+	end)
+	return true
+end
+
+--- Wraps a caller's failure callback so it is called once, protected.
+--- @param on_fail function Receives a short reason.
+--- @return function fail Returns false, for the refusals.
+local function failure_callback(on_fail)
+	return function(reason)
+		ApiCommon.protected_call(on_fail, "on_fail", reason)
+		return false
+	end
+end
+
+--- Posts one prebuilt request body to a provider with its stored API key,
+--- through the same URL, header and answer rules as a prediction.
+--- @param client table The HTTP client that posts it.
+--- @param label string What is requested, for the log ("Vision", "Agent").
+--- @param use string The use it serves (provider_status).
+--- @param provider_id string Provider id of api_providers.json.
+--- @param model string The model (Gemini puts it in the URL).
+--- @param body table The request body (llm/vision.lua build_request).
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+--- @param with_extras boolean|nil Merge the model's model_extras of
+---        api_providers.json into an OpenAI-shape body, as a prediction does.
+--- @return boolean sent True when the key resolution started.
+local function request_prebuilt(client, label, use, provider_id, model, body, on_text, on_fail, with_extras)
+	if type(on_text) ~= "function" or type(on_fail) ~= "function" then
+		error("api_remote." .. label .. " request: on_text and on_fail must be functions")
+	end
+	local fail = failure_callback(on_fail)
+	local ready, reason = M.provider_status(provider_id, use)
+	if not ready then
+		Logger.error(LOG, "%s request refused for provider '%s': %s.", label, tostring(provider_id), tostring(reason))
+		return fail(reason)
+	end
+	if type(model) ~= "string" or model == "" or type(body) ~= "table" then
+		error("api_remote." .. label .. " request: a model and a body are required")
+	end
+	local format = M.provider_format(provider_id)
+	if format == "backboard" or format == "decisions" then
+		-- Their requests are not chat bodies: request_backboard / request_decisions
+		Logger.error(LOG, "%s request refused for provider '%s': a %s provider takes no prebuilt body.",
+			label, tostring(provider_id), format)
+		return fail("unsupported")
+	end
+	return with_provider_key(label, provider_id, use, fail, function(provider, entry, token, base)
+		local extras = with_extras and provider.format == "openai" and provider.model_extras
+			and provider.model_extras[model] or nil
+		if extras then
+			-- A reasoning model left at its default effort spends a small budget
+			-- thinking and answers nothing; the body's own fields win
+			for field, value in pairs(extras) do
+				if body[field] == nil then body[field] = value end
+			end
 		end
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then
@@ -1973,7 +2255,6 @@ local function request_prebuilt(client, label, provider_id, model, body, on_text
 			end)
 		end)
 	end)
-	return true
 end
 
 --- Posts one prebuilt vision request body (a screenshot and its prompt) to a
@@ -1985,7 +2266,7 @@ end
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @return boolean sent True when the key resolution started.
 function M.request_vision(provider_id, model, body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Vision", provider_id, model, body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Vision", ProviderUses.VISION, provider_id, model, body, on_text, on_fail)
 end
 
 --- Posts one prebuilt text chat body (llm/vision.lua build_request without an
@@ -1997,9 +2278,168 @@ end
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
+--- @param use string|nil The use it serves (default: System 2).
 --- @return boolean sent True when the key resolution started.
-function M.request_chat(provider_id, model, body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Agent", provider_id, model, body, on_text, on_fail, true)
+function M.request_chat(provider_id, model, body, on_text, on_fail, use)
+	return request_prebuilt(_vision_client, "Agent", use or ProviderUses.SYSTEM2, provider_id, model, body,
+		on_text, on_fail, true)
+end
+
+--- Sends one Backboard message to a provider with its stored API key, for the
+--- AI agent: a chat turn, or Jev's questions (spec.questions) through
+--- Backboard. The key's assistant is created at its first request.
+--- @param provider_id string A "backboard" provider of api_providers.json.
+--- @param spec table { model = "<llm_provider>/<model_name>", system, text, questions? }
+--- @param on_answer function Receives the decoded answer.
+--- @param on_fail function Receives a short reason when no answer came back.
+--- @param use string|nil The use it serves (default: System 2).
+--- @return boolean sent True when the key resolution started.
+function M.request_backboard(provider_id, spec, on_answer, on_fail, use)
+	if type(on_answer) ~= "function" or type(on_fail) ~= "function" or type(spec) ~= "table" then
+		error("api_remote.request_backboard: a spec, on_answer and on_fail are required")
+	end
+	local fail = failure_callback(on_fail)
+	if M.provider_format(provider_id) ~= "backboard" then
+		Logger.error(LOG, "Backboard request refused: provider '%s' is not a Backboard provider.", tostring(provider_id))
+		return fail("unsupported")
+	end
+	return with_provider_key("Agent", provider_id, use or ProviderUses.SYSTEM2, fail, function(_, _, token, base)
+		local t0 = TimerScheduler.now()
+		Logger.info(LOG, "Agent request to provider '%s' (model %s, %d byte(s)).",
+			provider_id, tostring(spec.model), #tostring(spec.text or ""))
+		post_backboard_message(_vision_client, base, token, spec, function(r)
+			Logger.pcall(LOG, function()
+				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+				if not r.ok then
+					Logger.error(LOG, "Agent request to provider '%s' failed in %dms: HTTP %s (%s).",
+						provider_id, ms, tostring(r.status), tostring(extract_server_message(r.body) or r.error or ""))
+					fail("http_" .. tostring(r.status or "unknown"))
+					return
+				end
+				local decoded = decode_body(r.body)
+				if not decoded then
+					Logger.warn(LOG, "Agent answer of provider '%s' is not JSON (%dms).", provider_id, ms)
+					fail("empty_answer")
+					return
+				end
+				Logger.info(LOG, "Agent answer of provider '%s' received in %dms.", provider_id, ms)
+				ApiCommon.protected_call(on_answer, "on_answer", decoded)
+			end)
+		end, function(reason) fail(reason) end)
+	end)
+end
+
+--- Posts one decisions request to a provider (TypeSafe's System One protocol:
+--- its base_url is the full endpoint) and hands back the answers.
+--- @param client table HTTP client.
+--- @param provider_id string A "decisions" provider, for the log.
+--- @param base string Validated endpoint.
+--- @param token string Decrypted key.
+--- @param body table decisions_body().
+--- @param on_answers function Receives the `answers` object.
+--- @param fail function Receives (reason, detail).
+local function post_decisions(client, provider_id, base, token, body, on_answers, fail)
+	local encoded, encode_error = JsonCodec.encode(body)
+	if not encoded then
+		Logger.error(LOG, "Decisions request body encode failed: %s.", tostring(encode_error))
+		fail("encode_failed", failure_detail("encode_failed", nil))
+		return
+	end
+	local t0 = TimerScheduler.now()
+	Logger.info(LOG, "Decisions request to provider '%s' (model %s, %d byte(s)) -> %s.",
+		provider_id, tostring(body.model), #encoded, redact_url(base))
+	client.post(base, build_headers("decisions", token), encoded, function(r)
+		Logger.pcall(LOG, function()
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+			if not r.ok then
+				Logger.error(LOG, "Decisions request to provider '%s' failed in %dms: HTTP %s (%s).",
+					provider_id, ms, tostring(r.status), tostring(extract_server_message(r.body) or r.error or ""))
+				fail("http_" .. tostring(r.status or "unknown"), failure_detail("http_" .. tostring(r.status), r))
+				return
+			end
+			local decoded = decode_body(r.body)
+			local answers = Formats.decisions_answers(decoded)
+			if not answers then
+				Logger.warn(LOG, "Decisions answer of provider '%s' holds no answers (keys: %s).",
+					provider_id, top_level_keys(decoded))
+				fail("no_answers", failure_detail("no_answers", nil))
+				return
+			end
+			Logger.info(LOG, "Decisions answer of provider '%s' received in %dms.", provider_id, ms)
+			on_answers(answers, ms)
+		end)
+	end)
+end
+
+--- Asks a decisions provider (Jev) its questions about a state, for the AI
+--- agent's System 1.
+--- @param provider_id string A "decisions" provider of api_providers.json.
+--- @param model string e.g. "jev-latest".
+--- @param state string|table What the questions are about.
+--- @param questions table { [id] = { type, instructions, criteria } }
+--- @param on_answers function Receives the `answers` object.
+--- @param on_fail function Receives a short reason when no answer came back.
+--- @return boolean sent True when the key resolution started.
+function M.request_decisions(provider_id, model, state, questions, on_answers, on_fail)
+	if type(on_answers) ~= "function" or type(on_fail) ~= "function" then
+		error("api_remote.request_decisions: on_answers and on_fail must be functions")
+	end
+	local fail = failure_callback(on_fail)
+	if M.provider_format(provider_id) ~= "decisions" then
+		Logger.error(LOG, "Decisions request refused: provider '%s' is not a decisions provider.", tostring(provider_id))
+		return fail("unsupported")
+	end
+	return with_provider_key("Agent", provider_id, ProviderUses.SYSTEM1, fail, function(_, _, token, base)
+		post_decisions(_vision_client, provider_id, base, token, Formats.decisions_body(model, state, questions),
+			function(answers) ApiCommon.protected_call(on_answers, "on_answers", answers) end,
+			function(reason) fail(reason) end)
+	end)
+end
+
+--- Sends the shared decisions probe (api_providers.json decisions_test,
+--- verbatim) to one explicit decisions entry: it succeeds when the answer
+--- holds answers. Such an entry is never the prediction backend, so the probe
+--- runs on its own client whatever entry is active.
+--- @param entry table API entry record.
+--- @param provider table Its provider descriptor.
+--- @param on_ok function Called with (answers_json, elapsed_ms).
+--- @param on_fail function Called with (reason_string, detail_table_or_nil).
+--- @return boolean True when a probe was dispatched.
+local function test_decisions(entry, provider, on_ok, on_fail)
+	local function fail(reason, detail)
+		Logger.error(LOG, "API test probe failed: %s", tostring(reason))
+		if type(on_fail) == "function" then
+			ApiCommon.protected_call(on_fail, "test_request_fail", tostring(reason), detail)
+		end
+		return false
+	end
+	local probe = M.DECISIONS_TEST
+	if type(probe) ~= "table" then return fail("no shared decisions probe") end
+	local base, base_error = resolve_base_url(entry, provider)
+	if not base then
+		log_endpoint_refusal("test", entry, base_error)
+		return fail("invalid_endpoint")
+	end
+	local model = (type(entry.model) == "string" and entry.model ~= "") and entry.model or provider.default_model
+	local body = Formats.decisions_body(model, probe.state, probe.questions)
+	local function send(token)
+		post_decisions(_probe_client, tostring(entry.provider), base, token, body, function(answers, ms)
+			local encoded = JsonCodec.encode(answers)
+			if type(on_ok) == "function" then
+				ApiCommon.protected_call(on_ok, "test_request_ok", encoded or "answers", ms)
+			end
+		end, fail)
+	end
+	local stored = entry.token
+	if type(stored) ~= "string" or stored == "" then return fail("missing_token") end
+	TokenCrypto.decrypt_async(stored, function(decrypted, token, reason)
+		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			fail("missing_token: " .. tostring(reason))
+			return
+		end
+		send(token)
+	end)
+	return true
 end
 
 --- Sends the shared minimal probe (api_providers.json test_request, verbatim)
@@ -2024,6 +2464,8 @@ function M.test_request(entry, spec, on_ok, on_fail)
 		return false
 	end
 	if type(entry) ~= "table" then return fail("no entry") end
+	local provider = M.PROVIDERS[entry.provider]
+	if provider and provider.format == "decisions" then return test_decisions(entry, provider, on_ok, on_fail) end
 	if type(spec) ~= "table" then return fail("no shared probe spec") end
 	for _, key in ipairs({ "system_prompt", "user_text" }) do
 		if type(spec[key]) ~= "string" or spec[key] == "" then return fail("invalid probe text") end

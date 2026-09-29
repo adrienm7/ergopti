@@ -117,15 +117,33 @@ helpers.describe("AI agent menu (macOS)", function()
 		end)
 	end)
 
-	helpers.it("lists off, the local server and every provider in order, the current one checked", function()
+	helpers.it("lists off, the local server and every chat provider in order, the current one checked", function()
 		with_panel(base_state(), function(build, world)
 			local Remote = require("modules.llm.api_remote")
 			local system2 = row_starting(build().submenu, "🧠")
 			local expected = { "Off", "Local (Ollama)" }
-			for _, id in ipairs(Remote.PROVIDER_ORDER) do expected[#expected + 1] = Remote.PROVIDERS[id].label end
+			for _, id in ipairs(Remote.PROVIDER_ORDER) do
+				-- A decisions provider (Jev) is not a chat model: System 1 only
+				if Remote.PROVIDERS[id].format ~= "decisions" then
+					expected[#expected + 1] = Remote.PROVIDERS[id].label
+				end
+			end
+			helpers.assert_true(#expected < #Remote.PROVIDER_ORDER + 2, "the catalogue holds a decisions provider")
 			expected[#expected + 1] = "-"
 			expected[#expected + 1] = "Model… (qwen-3.8-27b)"
 			helpers.assert_eq(table.concat(titles(system2.menu), " | "), table.concat(expected, " | "))
+			for _, label in ipairs({ "Groq", "OpenRouter", "Together AI", "Fireworks AI", "Backboard" }) do
+				helpers.assert_true(row_starting(system2.menu, label) ~= nil, label .. " is a System 2 choice")
+			end
+
+			-- System 1 lists every provider, the decisions ones included
+			local system1 = row_starting(build().submenu, "⚡")
+			local expected1 = { "Off", "Local (Ollama)" }
+			for _, id in ipairs(Remote.PROVIDER_ORDER) do expected1[#expected1 + 1] = Remote.PROVIDERS[id].label end
+			expected1[#expected1 + 1] = "-"
+			expected1[#expected1 + 1] = "Model… (Off)"
+			helpers.assert_eq(table.concat(titles(system1.menu), " | "), table.concat(expected1, " | "))
+			helpers.assert_true(row_starting(system1.menu, "TypeSafe (Jev)") ~= nil, "Jev is a System 1 choice")
 			for _, row in ipairs(system2.menu) do
 				helpers.assert_eq(row.checked == true, row.title == "Cerebras", "only the current backend is checked: " .. row.title)
 			end

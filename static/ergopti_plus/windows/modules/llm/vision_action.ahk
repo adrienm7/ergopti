@@ -103,7 +103,9 @@ LLM_Vision_AnswersKey(ActionId) {
 
 /**
  * The vision backends a binding may name, in picker order: the local server,
- * then the API providers in api_providers.json's order.
+ * then the API providers in api_providers.json's order whose format reads an
+ * image (Backboard's messages carry text only, a decisions provider answers
+ * typed questions only).
  * @returns {Array} Maps ("value", "label", "defaultModel"); defaultModel is
  *     vision.json's default for that backend, "" when it has none.
  */
@@ -111,8 +113,10 @@ LLM_Vision_BackendChoices() {
 	global LLM_VISION_LOCAL_BACKEND, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
 	Config := LLM_Vision_Config()
 	Choices := [_LLM_Vision_Choice(LLM_VISION_LOCAL_BACKEND, t("llm.vision.local_backend"), Config)]
-	for ProviderId in LLM_API_PROVIDER_ORDER
-		Choices.Push(_LLM_Vision_Choice(ProviderId, LLM_API_PROVIDERS[ProviderId]["Label"], Config))
+	for ProviderId in LLM_API_PROVIDER_ORDER {
+		if LLM_RemoteFormatServes(LLM_API_PROVIDERS[ProviderId]["Format"], "images")
+			Choices.Push(_LLM_Vision_Choice(ProviderId, LLM_API_PROVIDERS[ProviderId]["Label"], Config))
+	}
 	return Choices
 }
 
@@ -153,6 +157,13 @@ LLM_Vision_Trigger(Kind, Value, AnswersKey := "answers") {
 	Parsed := LLM_Vision_Parse(Value, &Reason)
 	if !(Parsed is Map) {
 		LoggerWarn("LLM", "Screen reading ignored: the binding's vision backend is invalid ({1}).", Reason)
+		return false
+	}
+	Fmt := LLM_RemoteProviderFormat(Parsed["backend"])
+	if (Fmt != "" && !LLM_RemoteFormatServes(Fmt, "images")) {
+		LoggerWarn("LLM", "Screen reading refused: '{1}' cannot read an image ({2} format).",
+			Parsed["backend"], Fmt)
+		_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
 		return false
 	}
 	Config := LLM_Vision_Config()
@@ -337,16 +348,32 @@ _LLM_Vision_OnCaptured(Flow, Ok, Reason := "") {
 ; @returns {Map|String} Map("format"[, "resolved", "url"]), "" when the backend
 ;     is an unknown provider or has no API entry with a key.
 _LLM_Vision_ResolveTarget(Backend, Model, Caller := "Screen reading") {
+	Target := _LLM_Vision_TryResolveTarget(Backend, Model, &Reason)
+	if !(Target is Map)
+		LoggerWarn("LLM", "{1} refused: {2}.", Caller, Reason)
+	return Target
+}
+
+/**
+ * Resolves a backend like _LLM_Vision_ResolveTarget, without logging: the AI
+ * agent checks its systems with it before any request.
+ * @param {String} Backend The backend id: "local" or an API provider.
+ * @param {String} Model The model the request runs.
+ * @param {VarRef} Reason Receives why it is not reachable, "" when it is.
+ * @returns {Map|String} Map("format"[, "resolved", "url"]), "" when unreachable.
+ */
+_LLM_Vision_TryResolveTarget(Backend, Model, &Reason := "") {
 	global LLM_VISION_LOCAL_BACKEND, LLM_API_PROVIDERS
+	Reason := ""
 	if (Backend == LLM_VISION_LOCAL_BACKEND)
 		return Map("format", "ollama")
 	if !LLM_API_PROVIDERS.Has(Backend) {
-		LoggerWarn("LLM", "{1} refused: '{2}' is not an API provider.", Caller, Backend)
+		Reason := "'" . Backend . "' is not an API provider"
 		return ""
 	}
 	Entry := _LLM_Vision_ProviderEntry(Backend)
 	if !IsObject(Entry) {
-		LoggerWarn("LLM", "{1} refused: no API entry is configured for '{2}'.", Caller, Backend)
+		Reason := "no API entry is configured for '" . Backend . "'"
 		return ""
 	}
 	; The entry lends its address and key; the model is the vision one
@@ -355,8 +382,7 @@ _LLM_Vision_ResolveTarget(Backend, Model, Caller := "Screen reading") {
 		Candidate[Field] := _LLMRemoteEntryGet(Entry, Field, "")
 	Resolved := _LLMRemoteResolveEntry(Candidate)
 	if !(Resolved is Map) {
-		LoggerWarn("LLM", "{1} refused: the API entry for '{2}' has no usable key or address.",
-			Caller, Backend)
+		Reason := "the API entry for '" . Backend . "' has no usable key or address"
 		return ""
 	}
 	return Map(
@@ -366,15 +392,18 @@ _LLM_Vision_ResolveTarget(Backend, Model, Caller := "Screen reading") {
 }
 
 ; The menu's API entry for a provider: the active one when it is that provider,
-; else the first one.
+; else the first one. The AI menu's state owns the entries even while the AI is
+; off, which the AI agent does not depend on.
 ; @param {String} ProviderId The provider.
 ; @returns {Map|Object|String} The entry, "" when there is none.
 _LLM_Vision_ProviderEntry(ProviderId) {
-	global _LLM_Engine
-	Entries := _LLM_Engine.Get("api_entries", [])
+	global _LLM_Menu
+	if !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return ""
+	Entries := _LLM_Menu.Get("api_entries", [])
 	if !(Entries is Array)
 		return ""
-	ActiveId := _LLM_Engine.Get("api_entry_id", "")
+	ActiveId := _LLM_Menu.Get("api_entry_id", "")
 	First := ""
 	for Entry in Entries {
 		if (_LLMRemoteEntryGet(Entry, "Provider", "") != ProviderId)
@@ -396,13 +425,9 @@ _LLM_Vision_ProviderEntry(ProviderId) {
 ;     way: every request the user asked for; the AI agent's automatic triage,
 ;     which the user did not ask for, leaves the prediction running.
 _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true) {
-	global _LLM_Engine, _LLM_Vision_RemoteTransport, _LLM_Vision_OllamaTransport
-	; A pending or in-flight prediction would hold the backend's slot
-	if CancelEngine {
-		LLM_Engine_CancelTimer()
-		LLM_Engine_CancelInflight()
-		_LLM_Engine["last_request_tick"] := A_TickCount
-	}
+	global _LLM_Vision_RemoteTransport, _LLM_Vision_OllamaTransport
+	if CancelEngine
+		_LLM_Vision_CancelEngine()
 	if Target.Has("resolved") {
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : LLM_RemotePostBody_Async
@@ -412,6 +437,17 @@ _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true) {
 	Transport := HasMethod(_LLM_Vision_OllamaTransport, "Call")
 		? _LLM_Vision_OllamaTransport : LLM_OllamaChat_Async
 	Transport.Call(Body, OnSuccess, OnFail)
+}
+
+/**
+ * Makes a pending or in-flight prediction give way to a request the user asked
+ * for: it would hold the backend's slot.
+ */
+_LLM_Vision_CancelEngine() {
+	global _LLM_Engine
+	LLM_Engine_CancelTimer()
+	LLM_Engine_CancelInflight()
+	_LLM_Engine["last_request_tick"] := A_TickCount
 }
 
 ; The vision model answered: extract the screen, then ask for the answers.

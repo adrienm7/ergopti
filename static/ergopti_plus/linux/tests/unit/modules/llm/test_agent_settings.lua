@@ -169,7 +169,12 @@ helpers.describe("AI agent menu: a top-level submenu", function()
 				local sub = find(agent.menu, Scenario.text("menu.agent." .. system, { current }))
 				helpers.assert_not_nil(sub, system .. " shows its backend")
 				local expected = { i18n.get("menu.agent.off"), i18n.get("llm.vision.local_backend") }
-				for _, provider in ipairs(Remote.providers()) do expected[#expected + 1] = provider.label end
+				-- System 1 also offers Jev (no chat model); System 2 only chat models.
+				for _, provider in ipairs(Remote.providers()) do
+					if system == "system1" or provider.format ~= "decisions" then
+						expected[#expected + 1] = provider.label
+					end
+				end
 				expected[#expected + 1] = "-"
 				local model = system == "system1" and "qwen3:14b" or "qwen-3.8-27b"
 				expected[#expected + 1] = Scenario.text("menu.agent.model", { model })

@@ -95,11 +95,14 @@ function M.config()
 end
 
 --- The backends a binding or a setting may name, for the editors: the local
---- server first, then the API providers in catalogue order. The screen actions
---- use vision.json's default models; the agent passes agent.json's.
+--- server first, then the API providers serving the use in catalogue order
+--- (api_remote.serves: Backboard and Jev read no image, Jev chats with no one).
+--- The screen actions use vision.json's default models; the agent passes
+--- agent.json's.
 --- @param default_models table|nil backend -> default model; nil for vision.json's.
+--- @param use string|nil "vision" (default), "chat" or "system1".
 --- @return table Array of { value, label, defaultModel } ("" when the backend has no default).
-function M.backend_choices(default_models)
+function M.backend_choices(default_models, use)
 	local defaults = default_models
 	if defaults == nil then
 		local config = M.config()
@@ -110,7 +113,7 @@ function M.backend_choices(default_models)
 		label = require("infra.i18n").get("llm.vision.local_backend"),
 		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
 	} }
-	for _, provider in ipairs(require("modules.llm.api_remote").providers()) do
+	for _, provider in ipairs(require("modules.llm.api_remote").providers_for(use or "vision")) do
 		choices[#choices + 1] = { value = provider.id, label = provider.label, defaultModel = defaults[provider.id] or "" }
 	end
 	return choices
@@ -155,6 +158,7 @@ function M.resolve_target(backend, model)
 	end
 	local Remote = require("modules.llm.api_remote")
 	if not Remote.provider(backend) then return nil, "unknown provider " .. backend end
+	if not Remote.serves(backend, "vision") then return nil, "the provider " .. backend .. " reads no image" end
 	local entry = M.entry_for(backend)
 	if not entry then return nil, "no API key is stored for " .. backend end
 	return Remote.endpoint(entry, model)

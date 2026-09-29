@@ -49,8 +49,10 @@ local BASE_PREFERENCES = {
 
 --- Runs body against the real engine with scripted boundaries.
 --- @param opts table { stored?, selection?, command?, tools?, has_xdg_email?, run_fails?, paused?,
----   disabled?, window?, learning_path? } stored overrides BASE_PREFERENCES; a
----   stored value of false-y "" is kept.
+---   disabled?, window?, learning_path?, entries?, active_entry? } stored overrides
+---   BASE_PREFERENCES; a stored value of false-y "" is kept. entries are the stored
+---   API keys ({ ENTRY } by default); active_entry is the predictions' one (the
+---   first entry by default, false for none).
 --- @param body function Receives the scenario's world.
 function M.run(opts, body)
 	local stored = {}
@@ -72,8 +74,9 @@ function M.run(opts, body)
 			isUrlBar = function() return false end,
 		}
 		package.loaded["adapters.http_client"] = {
-			post = function(url, _, request_body, callback)
-				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
+			post = function(url, headers, request_body, callback)
+				world.posts[#world.posts + 1] = { url = url, headers = headers, body = Json.decode(request_body),
+					callback = callback }
 				return true
 			end,
 			cancel = function()
@@ -81,9 +84,12 @@ function M.run(opts, body)
 				return true
 			end,
 		}
+		local entries = opts.entries or { M.ENTRY }
+		local active_entry = entries[1]
+		if opts.active_entry ~= nil then active_entry = opts.active_entry or nil end
 		package.loaded["modules.llm.api_entries"] = {
-			active = function() return M.ENTRY end,
-			list = function() return { M.ENTRY } end,
+			active = function() return active_entry end,
+			list = function() return entries end,
 		}
 		local ai_on = opts.disabled ~= true
 		package.loaded["modules.llm.profiles"] = {
@@ -182,6 +188,18 @@ function M.run(opts, body)
 			local post = assert(world.posts[index], "no request " .. index .. " was sent")
 			post.callback({ ok = true, status = 200,
 				body = Json.encode({ choices = { { message = { role = "assistant", content = text } } } }) })
+		end
+
+		--- The remote server answers request `index` with a JSON body.
+		function world.respond_json(index, root)
+			local post = assert(world.posts[index], "no request " .. index .. " was sent")
+			post.callback({ ok = true, status = 200, body = Json.encode(root) })
+		end
+
+		--- The remote server refuses request `index`.
+		function world.refuse(index, status, message)
+			local post = assert(world.posts[index], "no request " .. index .. " was sent")
+			post.callback({ ok = false, status = status, body = "", error_body = Json.encode({ message = message }) })
 		end
 
 		--- Lets the pacing timer run until request `index` is sent, or long past it.

@@ -15,6 +15,10 @@
 ---    reported while the user is still looking, with the provider's own reason.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
 ---    window the keyboard grab would starve (ui/modal.lua).
+--- 4. A provider that is no chat model (Jev, for the agent's System 1 only) is
+---    offered for its key like any other, but its entry never becomes the
+---    predictions' one: it is listed with its own test and removal, and adding
+---    it keeps the entry predictions already use.
 --- ==============================================================================
 
 local M = {}
@@ -102,6 +106,8 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if model == "" then model = provider.default_model end
 	if model == "" then return end
 
+	local chat = remote.serves(provider.id, "chat")
+	local previous = entries.active()
 	local entry, err = entries.add({
 		provider = provider.id,
 		token = token,
@@ -113,7 +119,16 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		dialogs.error(tostring(err), heading)
 		return
 	end
-	llm.set_backend("api")
+	if chat then
+		llm.set_backend("api")
+	else
+		-- Only the agent's System 1 reads this key: predictions keep their entry.
+		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
+			entry.label)
+		if previous and entries.set_active(previous.id) ~= true then
+			Logger.error(LOG, "The predictions' API entry '%s' could not be selected again.", previous.label)
+		end
+	end
 	if type(on_changed) == "function" then on_changed() end
 	run_test(remote, dialogs, entry)
 end
@@ -160,11 +175,25 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 	for _, entry in ipairs(list) do
 		local provider = remote.provider(entry.provider)
 		local model = entry.model ~= "" and entry.model or (provider and provider.default_model or "")
-		rows[#rows + 1] = {
-			label = string.format("%s — %s", entry.label, model),
-			checked = active ~= nil and entry.id == active.id,
-			action = function() entries.set_active(entry.id); changed() end,
-		}
+		local label = string.format("%s — %s", entry.label, model)
+		if remote.serves(entry.provider, "chat") then
+			rows[#rows + 1] = {
+				label = label,
+				checked = active ~= nil and entry.id == active.id,
+				action = function() entries.set_active(entry.id); changed() end,
+			}
+		else
+			-- Never the predictions' entry: its own test and removal instead.
+			rows[#rows + 1] = { label = label, items = {
+				{ label = tr("menu.llm.api_test_entry"), action = function() run_test(remote, dialogs, entry) end },
+				{ label = "🗑️ " .. tr("menu.llm.api_remove_entry"), action = function()
+					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return entry.label end))
+					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return end
+					entries.remove(entry.id)
+					changed()
+				end },
+			} }
+		end
 	end
 	rows[#rows + 1] = { separator = true }
 

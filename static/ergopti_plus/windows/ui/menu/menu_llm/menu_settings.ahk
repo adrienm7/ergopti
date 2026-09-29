@@ -789,7 +789,15 @@ LLM_Menu_TriggerPrediction(FireFn := 0) {
 	LoggerInfo("LLM", "Manual prediction requested ({1} context character(s)).", StrLen(Context))
 	Fire := HasMethod(FireFn, "Call") ? FireFn : LLM_Engine_FirePrediction
 	Fire(Context)
+	_LLM_Menu_MarkExplicitPrediction()
 	return true
+}
+
+; Marks the prediction request just fired as one the user asked for: the AI
+; agent's automatic mode lets an automatic prediction tooltip be, never this one.
+_LLM_Menu_MarkExplicitPrediction() {
+	global _LLM_Engine
+	_LLM_Engine["explicit_request_id"] := _LLM_Engine.Get("request_id", 0)
 }
 
 /**
@@ -833,12 +841,14 @@ LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0) {
 	Override := Map("profile_id", ProfileId, "num_predictions", NumPredictions)
 	if HasMethod(FireFn, "Call") {
 		FireFn(Context, Override)
+		_LLM_Menu_MarkExplicitPrediction()
 		return true
 	}
 	; A debounce armed by the last keystroke would otherwise fire right after
 	; and supersede this request with the active profile.
 	LLM_Engine_CancelTimer()
 	LLM_Engine_FirePrediction(Context, , Override)
+	_LLM_Menu_MarkExplicitPrediction()
 	return true
 }
 
