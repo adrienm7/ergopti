@@ -128,6 +128,22 @@ local SAVED_UNTIL_GUARDIAN_KEYS = {
 -- Items pane where everything may already be allowed would mislead.
 local SAVED_UNTIL_HELPER_KEY = "menu.tapholds.saved_until_helper"
 
+--- Tells the user a Login Items pane did not open, as the guardian's own
+--- notice does: one localized notice. A launch the system refused is already
+--- logged as an error by the runner, and every error line raises a developer
+--- notification of its own, so this side records the detail as a warning.
+--- @param opened boolean Whether the pane opened.
+--- @param detail any Opener failure detail.
+local function report_login_items_opened(opened, detail)
+	if opened == true then return end
+	Logger.warn(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
+	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+		i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
+	if not ok or sent_or_err ~= true then
+		Logger.error(LOG, "Login Items failure notice was not delivered: %s.", tostring(sent_or_err))
+	end
+end
+
 --- Tells the user a bulk edit is saved but waits for the remap guardian: the
 --- menu shows the new settings, yet nothing applies them until the guardian
 --- is ready, and the notice says what makes it ready. When Login Items can,
@@ -144,11 +160,7 @@ local function announce_saved_until_guardian(karabiner, method_name, reason)
 		key = SAVED_UNTIL_HELPER_KEY
 	elseif type(karabiner.open_login_items) == "function" then
 		on_click = function()
-			return karabiner.open_login_items(function(ok, detail)
-				if ok ~= true then
-					Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
-				end
-			end) == true
+			return karabiner.open_login_items(report_login_items_opened) == true
 		end
 	end
 	local ok, sent_or_err = pcall(require("infra.notifications").notify,
@@ -946,11 +958,7 @@ local function guardian_status_rows(karabiner, tap_holds_on)
 			label = i18n.get("menu.tapholds.open_login_items"),
 			action = function()
 				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)
-				return opener(function(opened, detail)
-					if opened ~= true then
-						Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
-					end
-				end) == true
+				return opener(report_login_items_opened) == true
 			end,
 		}
 	end

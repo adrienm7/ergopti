@@ -3043,22 +3043,27 @@ function M.open_gui() KeLifecycle.open_gui() end
 --- @param on_done function|nil Callback fn(ok, reason).
 --- @return boolean accepted
 function M.open_login_items(on_done)
-	-- The opener reports its own refusals through the callback too.
 	local settled = false
+	local dispatching = true
+	local function settle(ok, reason)
+		if settled then return end
+		settled = true
+		invoke_public_callback("open Login Items", on_done, ok, reason)
+	end
 	local call_ok, accepted_or_err = pcall(function()
 		return require("adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
-			if settled then return end
-			settled = true
-			invoke_public_callback("open Login Items", on_done, ok == true,
-				ok == true and "opened" or "open-exited-non-zero")
+			-- The runner answers a launch it refused synchronously, after
+			-- logging that refusal itself.
+			settle(ok == true, ok == true and "opened"
+				or dispatching and "open-request-rejected" or "open-exited-non-zero")
 		end)
 	end)
+	dispatching = false
 	if call_ok and accepted_or_err == true then return true end
-	Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(accepted_or_err))
-	if not settled then
-		settled = true
-		invoke_public_callback("open Login Items", on_done, false, "open-request-rejected")
+	if not call_ok then
+		Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(accepted_or_err))
 	end
+	settle(false, call_ok and "open-request-rejected" or "open-request-raised")
 	return false
 end
 
