@@ -447,6 +447,28 @@ _SysActions_ConfirmGate() {
 }
 Test("system actions: GestureInvokeAction asks before every confirm action", _SysActions_ConfirmGate)
 
+_SysActions_Throw(*) {
+	throw Error("probe failure")
+}
+
+; A system action runs in a deferred thread, after _GestureRunAction's try has
+; returned: one that threw escaped into the global error handler instead of
+; the single contained log line every other action produces.
+_SysActions_DeferredContainment() {
+	Fake := _SysActionsFake()
+	Runner := _GestureMakeSystemRunner("probe", _SysActions_Throw, Fake)
+	Runner()
+	AssertEqual(1, Fake.Deferred.Length, "the dispatching thread only schedules the action")
+	Threw := false
+	try {
+		Fake.Deferred[1].Call()
+	} catch {
+		Threw := true
+	}
+	AssertEqual(false, Threw, "the deferred body contains its own failure")
+}
+Test("system actions: a deferred system action that throws is contained", _SysActions_DeferredContainment)
+
 
 
 

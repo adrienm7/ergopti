@@ -150,7 +150,12 @@ class SystemControl {
 		Hwnd := WinExist("A")
 		if !Hwnd
 			return ""
-		return { Hwnd: Hwnd, Pid: WinGetPID("ahk_id " . Hwnd), Class: WinGetClass("ahk_id " . Hwnd) }
+		; A menu, a tooltip or a quitting app can close between the reads: it is
+		; then no longer the active window, and there is none to report.
+		try
+			return { Hwnd: Hwnd, Pid: WinGetPID(Hwnd), Class: WinGetClass(Hwnd) }
+		catch TargetError
+			return ""
 	}
 
 	; @returns {Integer} The process id of the desktop shell, whose explorer.exe
