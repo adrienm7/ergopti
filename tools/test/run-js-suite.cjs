@@ -979,6 +979,12 @@ const CHECKS = [
 		repro: 'npm run test:linux-canonical-pack-upgrade'
 	},
 	{
+		name: 'Linux checkout installs ship the layout registry and its Ergopti extension hotstrings',
+		cmd: 'node',
+		args: ['tools/test/test-linux-install-layout-registry.cjs'],
+		repro: 'npm run test:linux-install-layout-registry'
+	},
+	{
 		name: 'openSUSE CI package installs use the coherent origin instead of a redirecting mirror',
 		cmd: 'node',
 		args: ['tools/test/test-opensuse-ci-origin.cjs'],

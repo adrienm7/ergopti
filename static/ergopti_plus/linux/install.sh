@@ -557,6 +557,13 @@ fi
 echo ""
 echo "=== Installation des fichiers ==="
 
+# The layout registry travels below the installed driver. Resolved before the
+# first copy: a source without it must stop here, not after replacing an
+# installation whose Ergopti hotstrings it would then drop.
+# shellcheck source=install/layout_registry.sh
+source "${SRC_DRIVER}/install/layout_registry.sh"
+SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
+
 # Create destination directories.
 install -d "${LIB_DIR}/linux"
 install -d "${DEST_SHARED}"
@@ -579,9 +586,17 @@ migrate_canonical_packs \
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
 cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
+install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"
 install -d "${LIB_DIR}/bin"
 install -m 755 "${SRC_DRIVER}/install/standalone_launcher.sh" "${LIB_DIR}/bin/ergopti-hotstrings"
-bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
+# A registry copied from the checkout is the installer's too, so uninstall.sh
+# removes it with the driver.
+if [ -n "${SRC_REGISTRY}" ]; then
+	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}" \
+		"${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}"
+else
+	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
+fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER

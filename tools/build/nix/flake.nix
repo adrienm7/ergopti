@@ -53,6 +53,12 @@
               cp -r static/ergopti_plus/linux/. $out/lib/ergopti/
               mkdir -p $out/lib/ergopti/_shared
               cp -r static/ergopti_plus/_shared/. $out/lib/ergopti/_shared/
+              # The layout registry below the driver root, where the packages
+              # carry it (modules/keymap/layout_registry.lua bundled_dir): the
+              # Ergopti extension inside it supplies SFB reduction, rolls and
+              # the magic key's repeat corrections.
+              mkdir -p $out/lib/ergopti/static/layouts/registry
+              cp -r static/layouts/registry/. $out/lib/ergopti/static/layouts/registry/
 
               # The shared tree is a SIBLING of the driver at runtime and the
               # daemon resolves it that way, so the layout above is part of the

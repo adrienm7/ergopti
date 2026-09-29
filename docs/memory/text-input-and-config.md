@@ -72,7 +72,10 @@ file through the bound-source owner (`HotstringsBoundTomlPath`, macOS
 `ExtensionPacks.route`, Linux `route_bound_sources`), never the shared folder;
 the Windows TSV cache must not compile them. "Installed" is discovery: the
 manager's committed generations plus the shipped Ergopti `{ pack = dir }` root,
-placed after them so a stale generation cannot hide the bindings.
+placed after them so a stale generation cannot hide the bindings. Every install
+shape must therefore carry `static/layouts/registry/` below the driver root: a
+Linux checkout install copies it through `install/layout_registry.sh` and the
+Nix flake copies it too; any new packager needs the same step.
 
 ### project-hotstrings-self-healing-cache
 

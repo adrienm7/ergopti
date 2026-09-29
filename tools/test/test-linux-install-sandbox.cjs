@@ -227,6 +227,18 @@ const errors = [];
 			'ergopti_hotstrings.lua'
 		);
 		if (!fs.existsSync(daemon)) errors.push('the driver tree was not copied');
+		// The daemon reads the layout registry below its driver root, and the
+		// Ergopti extension inside it supplies SFB reduction, rolls and the magic
+		// key's repeat corrections; a checkout keeps it outside the copied trees.
+		// Its ownership and discovery run in test-linux-install-layout-registry.cjs,
+		// since sha256sum is a stub here.
+		const extension = path.join(
+			run.home,
+			...'.local/lib/ergopti/linux/static/layouts/registry/ergopti/hotstrings/rolls.toml'.split('/')
+		);
+		if (!fs.existsSync(extension)) {
+			errors.push('a checkout install does not ship the Ergopti extension of the layout registry');
+		}
 		// Root cause 1: the tap-holds run in the daemon; nothing kanata is installed.
 		if (fs.existsSync(path.join(run.home, '.config', 'systemd', 'user', 'kanata.service'))) {
 			errors.push(

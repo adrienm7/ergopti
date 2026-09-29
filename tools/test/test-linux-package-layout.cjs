@@ -277,6 +277,18 @@ if (!read(NIX_FLAKE).includes('cp -r static/ergopti_plus/_shared/. $out/lib/ergo
 		`${NIX_FLAKE}: the direct-source Nix path must copy the complete shared tree, including ui/.`
 	);
 }
+// The daemon finds the layout registry only below its driver root, and the
+// Ergopti extension inside it supplies SFB reduction, rolls and the magic key's
+// repeat corrections: a Nix build without it drops those hotstrings.
+if (
+	!read(NIX_FLAKE).includes(
+		'cp -r static/layouts/registry/. $out/lib/ergopti/static/layouts/registry/'
+	)
+) {
+	errors.push(
+		`${NIX_FLAKE}: the direct-source Nix path must ship the layout registry below the driver root.`
+	);
+}
 
 // ─── 5. Every packaged unit must launch the daemon with a user-facing surface ──
 //

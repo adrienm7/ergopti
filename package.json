@@ -293,6 +293,7 @@
 		"test:linux-webview-security": "node ./tools/test/test-linux-webview-security.cjs",
 		"test:linux-metrics-webview-lifecycle": "node ./tools/test/test-linux-metrics-webview-lifecycle.cjs",
 		"test:linux-canonical-pack-upgrade": "node ./tools/test/test-linux-canonical-pack-upgrade.cjs",
+		"test:linux-install-layout-registry": "node ./tools/test/test-linux-install-layout-registry.cjs",
 		"test:opensuse-ci-origin": "node ./tools/test/test-opensuse-ci-origin.cjs",
 		"test:release-packaging-workflow": "node ./tools/test/test-release-packaging-workflow.cjs",
 		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",

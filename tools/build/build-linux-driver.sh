@@ -200,6 +200,13 @@ REQUIRED_FILES=(
 	"linux/xkb_installation/layout_package.py"
 	"linux/xkb_installation/desktop_activation.py"
 	"linux/static/layouts/registry/index.json"
+	# The Ergopti extension the driver ships: it supplies SFB reduction, rolls
+	# and the magic key's repeat corrections, which no other file carries.
+	"linux/static/layouts/registry/ergopti/manifest.toml"
+	"linux/static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml"
+	"linux/static/layouts/registry/ergopti/hotstrings/rolls.toml"
+	"linux/static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml"
+	"linux/install/layout_registry.sh"
 	"_shared/modules/updater/defaults.json"
 	# The daemon migrates config.toml at start; without the registry or the
 	# engine every session would refuse to write it.
