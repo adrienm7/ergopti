@@ -116,7 +116,10 @@ install.
 **macOS — `ErgoptiPlus.app.zip`**
 
 A self-contained app bundling Hammerspoon. On first run, it downloads and
-installs Karabiner-Elements when it is missing.
+installs Karabiner-Elements when it is missing. The AI runtimes are not
+bundled: the first time you select the Ollama backend, the app reuses an
+installed Ollama or offers to download the official release, and the first
+time you select the MLX backend, it installs its Python runtime.
 
 With [Homebrew](https://brew.sh), pick the stable or the dev channel:
 
