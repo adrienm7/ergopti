@@ -1,0 +1,704 @@
+// tools/test/test-macos-bundle-payload.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: macOS Bundle Payload Guard
+ * DESCRIPTION:
+ * Stages the packaged app's Contents/Resources/static payload exactly as
+ * build_macos_app.sh does (tools/build/macos-bundle-payload.cjs) and proves
+ * that every path the macOS runtime reads is inside it, and that no group the
+ * runtime never reads has come back.
+ *
+ * ROOT CAUSE ENCODED:
+ * The app builder copied whole trees, so v0.0.0-dev.146 shipped a second copy
+ * of every locale, website screenshots, tests, documentation and debug
+ * symbols. Trimming that by hand is only safe when a guard knows what the
+ * runtime reads; without one, the next exclusion that catches a real runtime
+ * file ships an app that fails in the field.
+ *
+ * FEATURES & RATIONALE:
+ * 1. The staged set is the real stager's output, compared with the resolver,
+ *    so the guard judges the bytes the build ships, with their modes.
+ * 2. Runtime references are read from the staged sources themselves: every
+ *    require(), every path-like literal of the Lua, shell and JavaScript files
+ *    (relative to the file, the driver root and the shared root), and every
+ *    src/href of the WebView pages. A reference that resolves in the complete
+ *    repository trees must resolve in the staged set too, so an exclusion can
+ *    never remove a file the runtime opens.
+ * 3. Reads that no literal shows (a file name joined at run time, the
+ *    launcher's init.lua) are listed in CURATED_READS; each entry is pinned to
+ *    the source text that makes it, so a moved reader invalidates the entry
+ *    instead of leaving it stale. Every staged image must be one of them.
+ * 4. Excluded groups are judged independently of the manifest (tests,
+ *    documentation, debug symbols, developer tooling, launcher sources,
+ *    duplicate top-level copies, a checkout's own state), so deleting a
+ *    manifest exclusion cannot quietly bring its files back.
+ * 5. A self-check removes one runtime file per reference kind and injects one
+ *    forbidden file per group: the guard must report each, or it could not
+ *    fail for the regression it exists to catch.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const payload = require('../build/macos-bundle-payload.cjs');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const BUILD_REL = 'tools/build/build_macos_app.sh';
+const BUILD = fs.readFileSync(path.join(ROOT, BUILD_REL), 'utf8');
+
+// Static-root-relative roots the runtime resolves literals against
+const DRIVER_ROOT = 'ergopti_plus/macos';
+const SHARED_ROOT = 'ergopti_plus/_shared';
+
+// Static-root entries the packaged app may contain: the staged trees plus the
+// directories the keyboard-layout and registry functions own
+const ALLOWED_TOP_LEVEL = new Set(['ergopti_plus', 'img', 'ergopti', 'layouts']);
+
+// Reads that no path literal of the reader shows. `reader` is a staged target
+// or, for the launcher, a repository path; every `needle` must still be in it.
+const CURATED_READS = [
+	{
+		reader: 'repo:static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift',
+		needles: ['/Contents/Resources/static/ergopti_plus/macos"', 'bundledConfigDir() + "/init.lua"'],
+		targets: ['ergopti_plus/macos/init.lua'],
+		why: 'the launcher points MJConfigFile at the bundled init.lua'
+	},
+	{
+		reader: 'ergopti_plus/macos/ui/menu/init.lua',
+		needles: [
+			'base_dir .. "../../img/logo/"',
+			'"logo_simple.png"',
+			'"logo_simple_disabled.png"',
+			'"logo_black.png"',
+			'"logo_white.png"'
+		],
+		targets: [
+			'img/logo/logo_simple.png',
+			'img/logo/logo_simple_disabled.png',
+			'img/logo/logo_black.png',
+			'img/logo/logo_white.png'
+		],
+		why: 'the menu bar icon joins one of four logo names to the logo folder'
+	},
+	{
+		reader: 'ergopti_plus/macos/infra/notifications.lua',
+		needles: ['_base .. "../../../img/logo/logo_simple.png"'],
+		targets: ['img/logo/logo_simple.png'],
+		why: 'notifications carry the logo'
+	},
+	{
+		reader: 'ergopti_plus/macos/ui/onboarding/init.lua',
+		needles: ['ASSETS_DIR .. "../../../../img/ergopti.jpg"'],
+		targets: ['img/ergopti.jpg'],
+		why: 'the onboarding wizard previews the layout from the shared UI folder'
+	},
+	{
+		reader: 'ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh',
+		needles: [
+			'HS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"',
+			'"$HS_ROOT/pyproject.toml"',
+			'"$HS_ROOT/uv.lock"'
+		],
+		targets: ['ergopti_plus/macos/pyproject.toml', 'ergopti_plus/macos/uv.lock'],
+		why: 'the MLX bootstrap fingerprints and syncs the committed Python project'
+	}
+];
+
+// Paths that must never be staged, whatever the manifest says
+const FORBIDDEN = [
+	{ group: 'tests', test: (target) => /(^|\/)tests\//.test(target) },
+	{ group: 'tests', test: (target) => target.startsWith(`${SHARED_ROOT}/lua/test/`) },
+	{ group: 'tests', test: (target) => /(^|\/)test_[^/]*\.py$/.test(target) },
+	{
+		group: 'documentation',
+		test: (target) => target.endsWith('.md') && !/(^|\/)LICENSES?\.md$/.test(target)
+	},
+	{ group: 'documentation', test: (target) => target.includes('/config_schema/examples/') },
+	{ group: 'debug-symbols', test: (target) => target.includes('.dSYM/') },
+	{ group: 'launcher-sources', test: (target) => target.startsWith(`${DRIVER_ROOT}/launcher/`) },
+	{
+		group: 'developer-tooling',
+		test: (target) =>
+			/(^|\/)(generate_models|validate_[^/]*)\.py$/.test(target) ||
+			target.startsWith(`${SHARED_ROOT}/modules/llm/install/`)
+	},
+	{
+		group: 'duplicate-copies',
+		test: (target) => !ALLOWED_TOP_LEVEL.has(target.split('/')[0])
+	},
+	{
+		// The former rsync excluded these by name; a checkout's own state must
+		// never ship (paths.toml is a user file, prefetch caches hold metrics)
+		group: 'developer-state',
+		test: (target) =>
+			/(^|\/)(paths\.toml|prefetch\.json)$/.test(target) ||
+			/(^|\/)(\.venv|\.pytest_cache|__pycache__|\.build)\//.test(target)
+	}
+];
+
+const errors = [];
+const check = (condition, message) => {
+	if (!condition) errors.push(message);
+};
+
+// ===========================================
+// ===========================================
+// ======= 1/ Path sets ======================
+// ===========================================
+// ===========================================
+
+/**
+ * Indexes a file set with every directory prefix, so a literal naming a
+ * folder resolves when the set holds a file below it.
+ * @param {Iterable<string>} files Static-root-relative file paths.
+ * @return {{files: Set<string>, directories: Set<string>}}
+ */
+function indexPaths(files) {
+	const index = { files: new Set(), directories: new Set() };
+	for (const file of files) {
+		index.files.add(file);
+		const parts = file.split('/');
+		for (let length = 1; length < parts.length; length += 1) {
+			index.directories.add(parts.slice(0, length).join('/'));
+		}
+	}
+	return index;
+}
+
+/**
+ * Tells whether a path is present in an index or owned by an external entry.
+ * @param {{files: Set<string>, directories: Set<string>}} index Indexed set.
+ * @param {string[]} externals External target paths.
+ * @param {string} target Static-root-relative path.
+ * @param {boolean} directory True when the literal names a folder.
+ * @return {boolean}
+ */
+function present(index, externals, target, directory) {
+	for (const external of externals) {
+		if (target === external || target.startsWith(`${external}/`)) return true;
+		if (directory && external.startsWith(`${target}/`)) return true;
+	}
+	return directory ? index.directories.has(target) : index.files.has(target);
+}
+
+/**
+ * Joins a literal to a static-root-relative base; null when it leaves the root.
+ * @param {string} base Folder relative to the static root ('' for the root).
+ * @param {string} literal Path literal from a source file.
+ * @return {string|null}
+ */
+function joinWithin(base, literal) {
+	const trimmed = literal.replace(/^\/+/, '');
+	const joined = path.posix.normalize(base ? `${base}/${trimmed}` : trimmed).replace(/\/+$/, '');
+	if (joined === '.' || joined === '' || joined === '..' || joined.startsWith('../')) return null;
+	return joined;
+}
+
+// ===========================================
+// ===========================================
+// ======= 2/ Runtime reference scanners =====
+// ===========================================
+// ===========================================
+
+/**
+ * Removes Lua comments while keeping string contents, one line at a time.
+ * @param {string} line One source line.
+ * @return {string}
+ */
+function stripLuaComment(line) {
+	let quote = null;
+	for (let index = 0; index < line.length; index += 1) {
+		const character = line[index];
+		if (quote) {
+			if (character === '\\') index += 1;
+			else if (character === quote) quote = null;
+		} else if (character === '"' || character === "'") {
+			quote = character;
+		} else if (character === '-' && line[index + 1] === '-') {
+			return line.slice(0, index);
+		}
+	}
+	return line;
+}
+
+// A literal is a path candidate when it holds a slash and none of the
+// characters of a pattern, a URL, a shell expansion or a user path
+const NOT_A_PATH = /[%*^$\\<>(){}|?~:\s]|^\/tmp\//;
+
+/**
+ * Lists the ways one path literal can resolve for its reader.
+ * @param {string} reader Static-root-relative path of the reading file.
+ * @param {string} literal The literal.
+ * @param {string} kind 'lua', 'shell', 'js' or 'html'.
+ * @return {string[]}
+ */
+function interpretations(reader, literal, kind) {
+	const readerDir = path.posix.dirname(reader);
+	const bases = [readerDir];
+	if (kind === 'lua' || kind === 'shell') bases.push(DRIVER_ROOT, SHARED_ROOT);
+	const out = [];
+	for (const base of bases) {
+		const joined = joinWithin(base, literal);
+		if (joined) out.push(joined);
+	}
+	if (literal.startsWith('/static/')) {
+		const joined = joinWithin('', literal.slice('/static/'.length));
+		if (joined) out.push(joined);
+	}
+	return out;
+}
+
+/**
+ * Extracts every runtime reference of one staged source file.
+ * @param {string} reader Static-root-relative path.
+ * @param {string} text File contents.
+ * @return {{reader: string, line: number, literal: string, candidates: string[], directory: boolean, require?: boolean}[]}
+ */
+function referencesOf(reader, text) {
+	const references = [];
+	const lines = text.split('\n');
+	if (reader.endsWith('.lua')) {
+		lines.forEach((raw, index) => {
+			const line = stripLuaComment(raw);
+			const requirePattern =
+				/\brequire\s*\(?\s*["']([A-Za-z0-9_.]+)["']|pcall\s*\(\s*require\s*,\s*["']([A-Za-z0-9_.]+)["']/g;
+			let match;
+			while ((match = requirePattern.exec(line))) {
+				const name = match[1] || match[2];
+				const touchdevice = /^hs\._asm\.undocumented\.touchdevice(?:\.(\w+))?$/.exec(name);
+				const candidates = touchdevice
+					? [
+							`${DRIVER_ROOT}/vendor/hs_asm/undocumented/touchdevice/${
+								touchdevice[1] ? `${touchdevice[1]}.so` : 'init.lua'
+							}`
+						]
+					: [SHARED_ROOT + '/lua', DRIVER_ROOT].flatMap((root) => {
+							const stem = `${root}/${name.replace(/\./g, '/')}`;
+							return [`${stem}.lua`, `${stem}/init.lua`];
+						});
+				references.push({
+					reader,
+					line: index + 1,
+					literal: `require("${name}")`,
+					candidates,
+					directory: false,
+					require: true
+				});
+			}
+			const literalPattern = /"([^"\n]*)"|'([^'\n]*)'/g;
+			while ((match = literalPattern.exec(line))) {
+				const literal = match[1] ?? match[2];
+				if (!literal.includes('/') || NOT_A_PATH.test(literal)) continue;
+				references.push({
+					reader,
+					line: index + 1,
+					literal,
+					candidates: interpretations(reader, literal, 'lua'),
+					directory: literal.endsWith('/')
+				});
+			}
+		});
+	} else if (reader.endsWith('.sh')) {
+		lines.forEach((line, index) => {
+			if (/^\s*#/.test(line)) return;
+			const pattern = /\$\{?(?:SCRIPT_DIR|HS_ROOT)\}?\/([A-Za-z0-9_./-]+)/g;
+			let match;
+			while ((match = pattern.exec(line))) {
+				const root = match[0].includes('HS_ROOT') ? DRIVER_ROOT : path.posix.dirname(reader);
+				const joined = joinWithin(root, match[1]);
+				if (!joined) continue;
+				references.push({
+					reader,
+					line: index + 1,
+					literal: match[0],
+					candidates: [joined],
+					directory: match[1].endsWith('/')
+				});
+			}
+		});
+	} else if (reader.endsWith('.html')) {
+		lines.forEach((line, index) => {
+			const pattern = /\b(?:src|href)\s*=\s*["']([^"'#?]+)/g;
+			let match;
+			while ((match = pattern.exec(line))) {
+				const literal = match[1];
+				if (/^(?:[a-z]+:|\/)/i.test(literal) || literal.includes('{')) continue;
+				const joined = joinWithin(path.posix.dirname(reader), literal);
+				if (!joined) continue;
+				references.push({
+					reader,
+					line: index + 1,
+					literal,
+					candidates: [joined],
+					directory: false
+				});
+			}
+		});
+	} else if (reader.endsWith('.js')) {
+		lines.forEach((line, index) => {
+			if (/^\s*(\/\/|\*)/.test(line)) return;
+			const pattern = /["'`](\.\.?\/[^"'`\n]*)["'`]/g;
+			let match;
+			while ((match = pattern.exec(line))) {
+				const literal = match[1];
+				if (NOT_A_PATH.test(literal)) continue;
+				references.push({
+					reader,
+					line: index + 1,
+					literal,
+					candidates: interpretations(reader, literal, 'js'),
+					directory: literal.endsWith('/')
+				});
+			}
+		});
+	}
+	return references;
+}
+
+// ===========================================
+// ===========================================
+// ======= 3/ Audit ==========================
+// ===========================================
+// ===========================================
+
+/**
+ * Judges one staged payload. Pure: the self-check reruns it on mutated sets.
+ * @param {object} input
+ * @param {Set<string>} input.staged Staged static-root-relative files.
+ * @param {Set<string>} input.unfiltered Every file the trees would ship unfiltered.
+ * @param {string[]} input.externals External target paths.
+ * @param {function(string): string} input.read Reads a staged target or a repo: path.
+ * @return {{problems: string[], checked: number}} Problems found, and how many
+ *   runtime references resolved in the repository and were therefore judged.
+ */
+function audit({ staged, unfiltered, externals, read }) {
+	const problems = [];
+	let checked = 0;
+	const stagedIndex = indexPaths(staged);
+	const knownIndex = indexPaths([...unfiltered, ...staged]);
+
+	// Every reference the complete trees can satisfy must survive the exclusions
+	for (const reader of [...staged].sort()) {
+		if (!/\.(lua|sh|html|js)$/.test(reader)) continue;
+		for (const reference of referencesOf(reader, read(reader))) {
+			const known = reference.candidates.filter((candidate) =>
+				present(knownIndex, externals, candidate, reference.directory)
+			);
+			if (known.length === 0) continue;
+			checked += 1;
+			const satisfied = known.some((candidate) =>
+				present(stagedIndex, externals, candidate, reference.directory)
+			);
+			if (!satisfied) {
+				problems.push(
+					`${reader}:${reference.line} reads ${reference.literal}, which resolves to ${known.join(
+						' or '
+					)} in the repository but is missing from the staged payload`
+				);
+			}
+		}
+	}
+
+	// Curated reads: the source still makes them, and their targets are staged
+	for (const entry of CURATED_READS) {
+		const readerStaged = entry.reader.startsWith('repo:') || staged.has(entry.reader);
+		if (!readerStaged) {
+			problems.push(`curated reader ${entry.reader} is not staged (${entry.why})`);
+			continue;
+		}
+		const text = read(entry.reader);
+		for (const needle of entry.needles) {
+			if (!text.includes(needle)) {
+				problems.push(`${entry.reader} no longer contains ${needle}: re-inventory "${entry.why}"`);
+			}
+		}
+		for (const target of entry.targets) {
+			if (!present(stagedIndex, externals, target, false)) {
+				problems.push(
+					`${target} is missing from the staged payload (${entry.why}, ${entry.reader})`
+				);
+			}
+		}
+	}
+
+	// Images have no literal-shaped reader: each one must be curated
+	const curatedTargets = new Set(CURATED_READS.flatMap((entry) => entry.targets));
+	for (const target of staged) {
+		if (target.startsWith('img/') && !curatedTargets.has(target)) {
+			problems.push(
+				`${target} is staged but no runtime read of it is inventoried in CURATED_READS`
+			);
+		}
+	}
+
+	// License notices ship with the third-party code they cover
+	for (const target of unfiltered) {
+		if (/(^|\/)LICEN[CS]ES?(\.[^/]*)?$/i.test(target) && !staged.has(target)) {
+			problems.push(
+				`${target} is a license notice of bundled code but is missing from the staged payload`
+			);
+		}
+	}
+
+	// Groups the runtime never reads stay out, whatever the manifest says
+	for (const target of staged) {
+		for (const rule of FORBIDDEN) {
+			if (rule.test(target)) problems.push(`${target} belongs to the excluded group ${rule.group}`);
+		}
+	}
+	return { problems, checked };
+}
+
+// ===========================================
+// ===========================================
+// ======= 4/ Build script contract ==========
+// ===========================================
+// ===========================================
+
+/**
+ * Extracts one shell function body from a build script.
+ * @param {string} source Build script text.
+ * @param {string} name Function name.
+ * @return {string} Body, or '' when absent.
+ */
+function shellFunction(source, name) {
+	const match = new RegExp(`^${name}\\(\\) \\{\\n[\\s\\S]*?\\n\\}\\n`, 'm').exec(source);
+	return match ? match[0] : '';
+}
+
+// The only functions allowed to copy repository static files themselves
+const OWNED_COPIES = new Set(['bundle_keyboard_layout', 'bundle_layout_registry']);
+
+/**
+ * Judges how a build script fills Contents/Resources. Pure: the self-check
+ * reruns it on mutated scripts.
+ * @param {string} source Build script text.
+ * @param {{target: string, owner: string}[]} externals Manifest external entries.
+ * @return {string[]} Problems found.
+ */
+function buildScriptProblems(source, externals) {
+	const problems = [];
+	const assembleApp = shellFunction(source, 'assemble_app');
+	if (assembleApp === '') problems.push(`${BUILD_REL}: assemble_app() not found`);
+	if (
+		!/^\tnode "\$REPO_ROOT\/tools\/build\/macos-bundle-payload\.cjs" stage "\$REPO_ROOT" "\$static_root"$/m.test(
+			assembleApp
+		)
+	) {
+		problems.push(
+			`${BUILD_REL}: assemble_app() must stage the payload with macos-bundle-payload.cjs into "$static_root"`
+		);
+	}
+	if (/\brsync\b/.test(source)) problems.push(`${BUILD_REL}: rsync bypasses the payload manifest`);
+	for (const match of source.matchAll(/^([a-z_]+)\(\) \{\n[\s\S]*?\n\}\n/gm)) {
+		if (OWNED_COPIES.has(match[1])) continue;
+		for (const line of match[0].split('\n')) {
+			if (/^\s*#/.test(line) || !/\bcp\b[^\n]*\$REPO_ROOT\/static\//.test(line)) continue;
+			problems.push(
+				`${BUILD_REL}: ${match[1]}() copies repository static files outside the payload manifest: ${line.trim()}`
+			);
+		}
+	}
+	for (const entry of externals) {
+		if (!source.includes(entry.owner)) {
+			problems.push(
+				`${BUILD_REL}: external payload ${entry.target} names owner ${entry.owner}, which the build never runs`
+			);
+		}
+	}
+	return problems;
+}
+
+const manifest = payload.loadManifest(ROOT);
+errors.push(...buildScriptProblems(BUILD, manifest.external));
+
+// Self-check: each way of bypassing the manifest must be reported
+const stageLine =
+	'\tnode "$REPO_ROOT/tools/build/macos-bundle-payload.cjs" stage "$REPO_ROOT" "$static_root"\n';
+const bypasses = [
+	['the staging call removed', BUILD.replace(stageLine, '')],
+	[
+		'a tree copied with rsync',
+		BUILD.replace(
+			stageLine,
+			`${stageLine}\trsync -a "$REPO_ROOT/static/img/" "$static_root/img/"\n`
+		)
+	],
+	[
+		'a duplicate copy at the static root',
+		BUILD.replace(
+			stageLine,
+			`${stageLine}\tcp -R "$REPO_ROOT/static/ergopti_plus/_shared/data/locales" "$static_root/"\n`
+		)
+	]
+];
+for (const [label, mutated] of bypasses) {
+	check(mutated !== BUILD, `self-check: the staging call drifted; re-derive "${label}"`);
+	check(
+		buildScriptProblems(mutated, manifest.external).length > 0,
+		`self-check: a build script with ${label} went unreported`
+	);
+}
+
+// ===========================================
+// ===========================================
+// ======= 5/ Real staging and audit =========
+// ===========================================
+// ===========================================
+
+/**
+ * Lists every regular file below a folder, relative to it.
+ * @param {string} directory Absolute folder.
+ * @return {string[]}
+ */
+function walk(directory) {
+	const out = [];
+	const visit = (absolute, relative) => {
+		for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {
+			const childAbsolute = path.join(absolute, entry.name);
+			const childRelative = relative ? `${relative}/${entry.name}` : entry.name;
+			if (entry.isDirectory()) visit(childAbsolute, childRelative);
+			else out.push(childRelative);
+		}
+	};
+	visit(directory, '');
+	return out;
+}
+
+const resolved = payload.resolvePayload(manifest, payload.trackedFiles(ROOT, manifest));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-macos-payload-'));
+let staged;
+let checkedReferences = 0;
+try {
+	const staticRoot = path.join(scratch, 'static');
+	const copied = payload.stage(ROOT, staticRoot);
+	staged = new Set(walk(staticRoot));
+	check(
+		copied === resolved.files.length,
+		`stage() copied ${copied} files, the resolver lists ${resolved.files.length}`
+	);
+	const expected = new Set(resolved.files.map((file) => file.target));
+	for (const target of expected) check(staged.has(target), `stage() did not write ${target}`);
+	for (const target of staged) check(expected.has(target), `stage() wrote unexpected ${target}`);
+	if (process.platform !== 'win32') {
+		for (const file of resolved.files) {
+			const sourceMode = fs.statSync(path.join(ROOT, file.source)).mode & 0o111;
+			const stagedMode = fs.statSync(path.join(staticRoot, file.target)).mode & 0o111;
+			check(sourceMode === stagedMode, `stage() changed the executable bits of ${file.target}`);
+		}
+	}
+	const read = (target) =>
+		target.startsWith('repo:')
+			? fs.readFileSync(path.join(ROOT, target.slice('repo:'.length)), 'utf8')
+			: fs.readFileSync(path.join(staticRoot, target), 'utf8');
+	const externals = manifest.external.map((entry) => entry.target);
+	const verdict = audit({ staged, unfiltered: resolved.unfiltered, externals, read });
+	errors.push(...verdict.problems);
+	checkedReferences = verdict.checked;
+	check(
+		checkedReferences > 1000,
+		`only ${checkedReferences} runtime references were judged: a scanner went blind`
+	);
+
+	// ===========================================
+	// ===========================================
+	// ======= 6/ Self-check =====================
+	// ===========================================
+	// ===========================================
+
+	// One removal per reference kind: the audit must name the missing file
+	const removals = [
+		['ergopti_plus/_shared/lua/json.lua', 'a required shared Lua module'],
+		['ergopti_plus/macos/modules/llm/network-retry.sh', 'a file a bootstrap script sources'],
+		['ergopti_plus/_shared/ui/host_bridge.js', 'a script a WebView page loads'],
+		['ergopti_plus/_shared/modules/hotstrings/defaults.toml', 'a shared data file'],
+		['img/ergopti.jpg', 'a curated image read'],
+		['ergopti_plus/macos/uv.lock', 'the committed MLX lock file'],
+		['ergopti_plus/_shared/ui/vendor/LICENSES.md', 'the vendored code license notice']
+	];
+	for (const [removed, kind] of removals) {
+		check(staged.has(removed), `self-check: ${removed} (${kind}) is not staged to begin with`);
+		const mutated = new Set([...staged].filter((target) => target !== removed));
+		const found = audit({
+			staged: mutated,
+			unfiltered: resolved.unfiltered,
+			externals,
+			read
+		}).problems;
+		check(
+			found.some((problem) => problem.includes(removed)),
+			`self-check: removing ${kind} (${removed}) went unreported`
+		);
+	}
+
+	// One injection per forbidden group: the audit must refuse it
+	const injections = [
+		`${DRIVER_ROOT}/tests/run.lua`,
+		`${SHARED_ROOT}/tests/corpus/x.json`,
+		`${SHARED_ROOT}/lua/test/format.lua`,
+		`${DRIVER_ROOT}/README.md`,
+		`${DRIVER_ROOT}/vendor/hs_asm/undocumented/touchdevice/watcher.so.dSYM/Contents/Info.plist`,
+		`${DRIVER_ROOT}/launcher/Package.swift`,
+		`${SHARED_ROOT}/modules/llm/validate_api_providers.py`,
+		'locales/fr.json',
+		'img/og_image.jpg',
+		`${DRIVER_ROOT}/paths.toml`
+	];
+	for (const injected of injections) {
+		const mutated = new Set([...staged, injected]);
+		const found = audit({
+			staged: mutated,
+			unfiltered: resolved.unfiltered,
+			externals,
+			read: (target) => (target === injected ? '' : read(target))
+		}).problems;
+		check(
+			found.some((problem) => problem.startsWith(injected)),
+			`self-check: staging ${injected} went unreported`
+		);
+	}
+
+	// Dropping a manifest exclusion must bring its files into the audit's view
+	const withoutTests = payload.parseManifest(
+		JSON.stringify({
+			...JSON.parse(fs.readFileSync(path.join(ROOT, payload.MANIFEST_REL), 'utf8')),
+			exclude: manifest.exclude
+				.filter((group) => group.group !== 'tests')
+				.map(({ group, reason, patterns }) => ({ group, reason, patterns }))
+		})
+	);
+	const leaked = payload.resolvePayload(withoutTests, payload.trackedFiles(ROOT, withoutTests));
+	const leakedSet = new Set(leaked.files.map((file) => file.target));
+	const leakedFound = audit({
+		staged: leakedSet,
+		unfiltered: leaked.unfiltered,
+		externals,
+		read: (target) =>
+			target.startsWith('repo:')
+				? read(target)
+				: fs.readFileSync(
+						path.join(ROOT, leaked.files.find((file) => file.target === target).source),
+						'utf8'
+					)
+	}).problems;
+	check(
+		leakedFound.some((problem) => problem.includes('excluded group tests')),
+		'self-check: a manifest without its tests exclusion went unreported'
+	);
+} finally {
+	fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+if (errors.length > 0) {
+	console.error('\x1b[31m[ERROR] macOS bundle payload guard:\x1b[0m');
+	for (const error of errors) console.error(`  - ${error}`);
+	process.exit(1);
+}
+console.log(
+	`\x1b[32m[OK] macOS bundle payload: ${staged.size} staged files, ${checkedReferences} runtime references resolve, no excluded group is shipped, and the self-check caught every seeded regression.\x1b[0m`
+);

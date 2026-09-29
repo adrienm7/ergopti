@@ -15,11 +15,12 @@
  * dev checkout.
  *
  * ROOT CAUSE ENCODED:
- * The bundle must mirror the repo layout exactly: build_macos_app.sh bundles the
- * driver into static/ergopti_plus/macos (and _shared into
- * static/ergopti_plus/_shared), and main.swift points MJConfigDir at the same
- * path. This guard fails if either reverts to the legacy drivers/ prefix or the
- * two stop agreeing.
+ * The bundle must mirror the repo layout exactly: the payload manifest
+ * (tools/build/macos-bundle-manifest.json, staged by build_macos_app.sh into
+ * Contents/Resources/static) maps the driver to static/ergopti_plus/macos and
+ * _shared to static/ergopti_plus/_shared, and main.swift points MJConfigDir at
+ * the same path. This guard fails if either reverts to the legacy drivers/
+ * prefix or the two stop agreeing.
  * ==============================================================================
  */
 
@@ -32,6 +33,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const build = read('tools/build/build_macos_app.sh');
+const manifest = JSON.parse(read('tools/build/macos-bundle-manifest.json'));
 const swift = read('static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift');
 
 const errors = [];
@@ -47,12 +49,28 @@ if (/drivers\/_shared/.test(build)) {
 		'build_macos_app.sh: still bundles _shared under drivers/_shared — must be ergopti_plus/_shared.'
 	);
 }
-// ...and must place both at the repo-mirroring location.
-if (!/ergopti_plus\/macos\//.test(build)) {
-	errors.push('build_macos_app.sh: must rsync the driver into static/ergopti_plus/macos/.');
+// ...and the payload manifest must place both at the repo-mirroring location,
+// below the Contents/Resources/static root the build stages it into.
+const mirrors = (source, target) =>
+	manifest.trees.some((tree) => tree.source === source && tree.target === target);
+if (!mirrors('static/ergopti_plus/macos', 'ergopti_plus/macos')) {
+	errors.push(
+		'macos-bundle-manifest.json: must map static/ergopti_plus/macos to ergopti_plus/macos.'
+	);
 }
-if (!/ergopti_plus\/_shared/.test(build)) {
-	errors.push('build_macos_app.sh: must copy the shared tree into static/ergopti_plus/_shared.');
+if (!mirrors('static/ergopti_plus/_shared', 'ergopti_plus/_shared')) {
+	errors.push(
+		'macos-bundle-manifest.json: must map static/ergopti_plus/_shared to ergopti_plus/_shared.'
+	);
+}
+if (
+	!build.includes('local static_root="$res/static"') ||
+	!build.includes('local res="$APP_PATH/Contents/Resources"') ||
+	!build.includes('macos-bundle-payload.cjs" stage "$REPO_ROOT" "$static_root"')
+) {
+	errors.push(
+		'build_macos_app.sh: must stage the payload manifest into Contents/Resources/static.'
+	);
 }
 
 // 2. The Swift launcher's MJConfigDir must agree with that layout.

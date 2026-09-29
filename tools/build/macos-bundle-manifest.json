@@ -1,0 +1,91 @@
+{
+	"description": "Repository files ErgoptiPlus.app ships under Contents/Resources/static, at their repository-relative layout. Read by tools/build/macos-bundle-payload.cjs, the only stager, and judged by tools/test/test-macos-bundle-payload.cjs against every path the macOS runtime reads.",
+	"trees": [
+		{
+			"source": "static/ergopti_plus/macos",
+			"target": "ergopti_plus/macos",
+			"reason": "The Hammerspoon driver: MJConfigFile points at its init.lua, and every require, dofile and script path resolves inside it."
+		},
+		{
+			"source": "static/ergopti_plus/_shared",
+			"target": "ergopti_plus/_shared",
+			"reason": "Shared Lua modules, WebView applications, locales, hotstrings, database schema and defaults, resolved through infra/paths.lua (Paths.shared)."
+		},
+		{
+			"source": "static/img",
+			"target": "img",
+			"reason": "Only the images the driver opens: the menu bar and notification logos (ui/menu/init.lua, infra/notifications.lua) and the onboarding layout preview (ui/onboarding/init.lua). The other images belong to the website and the Windows onboarding flags.",
+			"only": [
+				"ergopti.jpg",
+				"logo/logo_black.png",
+				"logo/logo_simple.png",
+				"logo/logo_simple_disabled.png",
+				"logo/logo_white.png"
+			]
+		}
+	],
+	"external": [
+		{
+			"target": "ergopti/macos/bundles",
+			"owner": "bundle_keyboard_layout",
+			"reason": "The newest keyboard layout bundle, selected by version in tools/build/build_macos_app.sh."
+		},
+		{
+			"target": "layouts/registry",
+			"owner": "bundle_layout_registry",
+			"reason": "The offline keyboard-layout registry, copied whole by tools/build/build_macos_app.sh."
+		},
+		{
+			"target": "ergopti_plus/_shared/build_stamp.txt",
+			"owner": "write_build_stamp.sh",
+			"reason": "The commit stamp the diagnostics read in a bundle without .git."
+		},
+		{
+			"target": "ergopti_plus/macos/socket.lua",
+			"owner": "bundle-macos-luasocket.sh",
+			"reason": "LuaSocket, which Hammerspoon does not ship, built for both architectures."
+		},
+		{
+			"target": "ergopti_plus/macos/socket/core.so",
+			"owner": "bundle-macos-luasocket.sh",
+			"reason": "The native half of the bundled LuaSocket."
+		}
+	],
+	"exclude": [
+		{
+			"group": "launcher-sources",
+			"reason": "The Swift launcher is compiled into Contents/MacOS; its sources, package manifest and XCTests are never read by the running app.",
+			"patterns": ["ergopti_plus/macos/launcher/**"]
+		},
+		{
+			"group": "tests",
+			"reason": "Unit, meta, E2E and conformance suites, their fixtures and corpora, and the shared test contracts only run under tests/run.lua and the JS gates.",
+			"patterns": [
+				"ergopti_plus/macos/tests/**",
+				"ergopti_plus/_shared/tests/**",
+				"ergopti_plus/_shared/lua/test/**",
+				"ergopti_plus/macos/data/test_*.py"
+			]
+		},
+		{
+			"group": "documentation",
+			"reason": "READMEs, specifications and configuration examples document the repository; no runtime path opens them. The third-party license notice ships with the vendored code it covers.",
+			"patterns": ["**/*.md", "ergopti_plus/_shared/core/config_schema/examples/**"],
+			"except": ["**/LICENSES.md"]
+		},
+		{
+			"group": "debug-symbols",
+			"reason": "dSYM bundles only serve crash symbolication on a developer machine; dyld and Lua load the .so beside them.",
+			"patterns": ["**/*.dSYM/**"]
+		},
+		{
+			"group": "developer-tooling",
+			"reason": "Maintainer scripts that regenerate or validate committed data, and installer scripts no driver invokes.",
+			"patterns": [
+				"ergopti_plus/macos/data/generate_models.py",
+				"ergopti_plus/_shared/modules/llm/validate_*.py",
+				"ergopti_plus/_shared/modules/llm/install/**"
+			]
+		}
+	]
+}

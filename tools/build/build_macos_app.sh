@@ -5,7 +5,8 @@
 # MODULE: macOS .app builder
 # DESCRIPTION:
 # Assembles Ergopti.app — a self-contained macOS bundle that embeds a vendored
-# Hammerspoon.app plus our entire Lua config tree, fronted by a Swift launcher
+# Hammerspoon.app plus the driver payload declared in
+# tools/build/macos-bundle-manifest.json, fronted by a Swift launcher
 # (compiled from static/ergopti_plus/macos/launcher) that hosts Sparkle and
 # spawns the embedded Hammerspoon under a rebranded bundle id.
 #
@@ -18,7 +19,7 @@
 # REQUIREMENTS (runtime on the build host):
 #  - macOS 13+ (build script runs on macos-latest GitHub runner)
 #  - Xcode command-line tools (swift, codesign, iconutil, sips, plutil)
-#  - curl, unzip, zip
+#  - curl, unzip, zip, git, node
 #
 # RATIONALE:
 #  - The script is idempotent: every run wipes build/macos so the output is a
@@ -433,9 +434,10 @@ bundle_layout_registry() {
 	[ -f "$dest_dir/index.json" ] || fail "Keyboard-layout registry was not packaged at $dest_dir"
 }
 
-# Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, drop our
-# Lua config into Resources/config/, and stamp Info.plist. The embedded
-# Hammerspoon's bundle id is rewritten so its preferences land under our id.
+# Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, stage the
+# driver payload under Resources/static/, and bundle the third-party tools. The
+# embedded Hammerspoon's bundle id is rewritten so its preferences land under
+# our id.
 assemble_app() {
 	local launcher_bin="$1"
 	local ke_app_path="$2"
@@ -475,30 +477,18 @@ assemble_app() {
 	# ``static/ergopti_plus/macos`` subtree.
 	local res="$APP_PATH/Contents/Resources"
 	local static_root="$res/static"
-	mkdir -p "$static_root/ergopti_plus"
+	mkdir -p "$static_root"
 
-	# Lua config tree — what Hammerspoon will load. Exclude dev-only paths.
-	rsync -a \
-		--exclude='.venv' \
-		--exclude='.pytest_cache' \
-		--exclude='tests' \
-		--exclude='paths.toml' \
-		--exclude='launcher' \
-		"$REPO_ROOT/static/ergopti_plus/macos/" \
-		"$static_root/ergopti_plus/macos/"
-
-	# Shared tree (WebView HTML/CSS/JS, LLM defaults, DB schema, locales, hotstrings).
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"      "$static_root/ergopti_plus/_shared"
+	# The driver, the shared tree and the images the runtime opens, from the one
+	# payload manifest (tools/build/macos-bundle-manifest.json): tracked files
+	# only, minus the groups no runtime path reads (tests, documentation, debug
+	# symbols, developer tooling, the launcher sources, website images).
+	# tools/test/test-macos-bundle-payload.cjs proves every runtime reference
+	# still resolves in this set.
+	node "$REPO_ROOT/tools/build/macos-bundle-payload.cjs" stage "$REPO_ROOT" "$static_root"
 	# The bundle has no .git: the stamp is how the driver's diagnostics name the
 	# commit this app was built from. Written before codesign seals the resources.
 	bash "$REPO_ROOT/tools/build/write_build_stamp.sh" write "$static_root/ergopti_plus/_shared"
-
-	# Static assets.
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/menu/menu_manifest.json" "$static_root/"
-	cp -R "$REPO_ROOT/static/version.json"        "$static_root/" 2>/dev/null || true
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/data/locales"            "$static_root/"
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/hotstrings"         "$static_root/"
-	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
 
 	bundle_keyboard_layout "$static_root"
 	bundle_layout_registry "$static_root"
@@ -864,7 +854,7 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
-	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil rsync hdiutil shasum; do
+	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil hdiutil shasum git node; do
 		require_cmd "$cmd"
 	done
 	check_signing_configuration
