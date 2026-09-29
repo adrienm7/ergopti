@@ -73,6 +73,9 @@ local LOG        = "config_paths"
 -- its init.lua lives inside the signed application resources.
 local PATHS_FILENAME = "paths.toml"
 
+-- The file adapter's detail for a lookup through a folder that does not exist
+local MISSING_PREFIX = "missing path prefix: "
+
 -- Exact path exported by the native packaged launcher. Ignore a missing,
 -- relative, or empty inherited value so standalone Hammerspoon development keeps
 -- using the source-adjacent bootstrap and never writes through an ambiguous cwd.
@@ -236,7 +239,19 @@ end
 --- @return string|nil detail
 --- @return string|nil raw Exact source bytes when status is `ok`.
 local function read_bootstrap(path)
-	local raw, status, detail = FileSystem.read_with_status(path)
+	-- The managed bootstrap lives in a folder the first save creates. The file
+	-- adapter reports a missing folder as a missing path prefix, an error for a
+	-- path that must exist; here it proves the file absent, so a first launch
+	-- logs nothing. Every other failure is still logged as one.
+	local failed_step = nil
+	local raw, status, detail = FileSystem.read_with_status(path, function(step) failed_step = step end)
+	if status == "error" and type(detail) == "string" and detail:find(MISSING_PREFIX, 1, true) == 1 then
+		return nil, "absent"
+	end
+	if status == "error" then
+		Logger.error(LOG, "Cannot read the path bootstrap '%s' (%s) — %s.",
+			path, tostring(failed_step), tostring(detail))
+	end
 	if status ~= "ok" then return nil, status, detail end
 	local parsed = parse_toml(raw)
 	if parsed[CONFIG_DIR_KEY] ~= nil then
