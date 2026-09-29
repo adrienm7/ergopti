@@ -27,20 +27,25 @@ local function fixture()
 	local PT = require("ui.menu.preferences_transaction")
 	local save, checkpoint = PT.bind(prefs, { path = "config", state = state, hotfiles = {}, core_modules = {},
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, {}), restore_runtime = function() return true end })
-	local owner = require("ui.menu.scoped_preferences").new({
-		scope = "keyboard_layout", path = "config", state = state, files = adapter, preferences = prefs,
-		checkpoint = checkpoint, demotions = require("ui.menu.session_demotions").new(),
-		capture_preferences = function() return prefs.snapshot(state, {}, {}) end,
-		backup_path = function() return "backup" end,
-		admission = function(_, callback) return callback() end,
-		paused = function() return false end, confirm = function() return controls.confirm ~= false end,
-		runtime = {
-			capture = function() return Layout.capture_scope(state) end,
-			apply = function(_, rows) return Layout.apply_scope(state, rows) end,
-			restore = function(snapshot) return Layout.restore_scope(state, snapshot) end,
-		},
-	})
-	return owner, Layout, state, files, controls, prefs, save, function() return writes end, original
+	--- A layout owner over this fixture's file, preferences and checkpoint.
+	--- @param backup string|nil Its backup path; the first owner uses "backup".
+	--- @return table owner
+	local function new_owner(backup)
+		return require("ui.menu.scoped_preferences").new({
+			scope = "keyboard_layout", path = "config", state = state, files = adapter, preferences = prefs,
+			checkpoint = checkpoint, demotions = require("ui.menu.session_demotions").new(),
+			capture_preferences = function() return prefs.snapshot(state, {}, {}) end,
+			backup_path = function() return backup or "backup" end,
+			admission = function(_, callback) return callback() end,
+			paused = function() return false end, confirm = function() return controls.confirm ~= false end,
+			runtime = {
+				capture = function() return Layout.capture_scope(state) end,
+				apply = function(_, rows) return Layout.apply_scope(state, rows) end,
+				restore = function(snapshot) return Layout.restore_scope(state, snapshot) end,
+			},
+		})
+	end
+	return new_owner(), Layout, state, files, controls, prefs, save, function() return writes end, original, new_owner
 end
 
 helpers.describe("macOS keyboard-layout scope", function()
@@ -201,6 +206,32 @@ helpers.describe("macOS scoped preferences under a composition", function()
 		owner.release()
 		helpers.assert_eq(owner.revert(), false)
 		helpers.assert_eq(files.config, committed)
+	end)
+
+	helpers.it("reverts two owners of one checkpoint newest first, as a refused composition does", function()
+		local first, _, state, files, _, prefs, save, _, original, new_owner = fixture()
+		local second = new_owner("backup-second")
+		helpers.assert_eq(first.apply("clear", true), true)
+		local between = files.config
+		helpers.assert_eq(second.apply("recommended", true), true)
+		helpers.assert_eq(second.revert(), true)
+		helpers.assert_eq(files.config, between)
+		helpers.assert_eq(first.revert(), true, "the older owner still holds the reinstated revision")
+		helpers.assert_eq(files.config, original)
+		helpers.assert_eq(state.layout_on_pause, "French")
+		helpers.assert_eq(prefs.source_snapshot("config").content, original)
+		helpers.assert_eq(first.pending(), false)
+		helpers.assert_eq(save(), true, "the ordinary writer continues from the fully reverted checkpoint")
+	end)
+
+	helpers.it("a reinstated revision is forgotten once an ordinary save changes the checkpoint", function()
+		local first, _, _, _, _, _, save, _, _, new_owner = fixture()
+		local second = new_owner("backup-second")
+		helpers.assert_eq(first.apply("clear", true), true)
+		helpers.assert_eq(second.apply("recommended", true), true)
+		helpers.assert_eq(second.revert(), true)
+		helpers.assert_eq(save(), true)
+		helpers.assert_eq(first.revert(), false, "an interleaved save is never overwritten by an old inverse")
 	end)
 
 	helpers.it("a composed request skips the per-scope question it already asked", function()
