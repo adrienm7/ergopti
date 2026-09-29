@@ -60,7 +60,9 @@ local COLOR_SCHEME = "org.gnome.desktop.interface color-scheme"
 M.COMMANDS = {
 	-- wmctrl -m reports the EWMH "showing the desktop" mode; -k sets it.
 	show_desktop = "case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac",
-	sleep_displays = "xset dpms force off",
+	-- Releasing the keys that fired it is input that would wake the displays
+	-- straight back up: they are powered off once that release has happened.
+	sleep_displays = "sleep 1 && xset dpms force off",
 	toggle_dark_mode = "case \"$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null)\" in"
 		.. " *prefer-dark*) gsettings set " .. COLOR_SCHEME .. " default;;"
 		.. " *) gsettings set " .. COLOR_SCHEME .. " prefer-dark;; esac",
