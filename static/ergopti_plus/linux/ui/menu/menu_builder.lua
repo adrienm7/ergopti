@@ -3123,8 +3123,19 @@ local function _build_tap_holds(ctx)
 		if ok and want then ok = th.set_enabled(true) end
 		changed(ok)
 	end
-	render_ctx.commands["reset_defaults"] = function() changed(Writer.reset_all()) end
-	render_ctx.commands["disable_all"] = function() changed(Writer.disable_all()) end
+	-- The two whole-section rows run the shared scope transaction: both files
+	-- backed up, the engine acknowledging the candidate before it is published.
+	local function apply_scope(mode)
+		if ctx.paused == true then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.tapholds.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
+		changed(committed)
+		return committed
+	end
+	render_ctx.commands["reset_defaults"] = function() return apply_scope("recommended") end
+	render_ctx.commands["disable_all"] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
