@@ -229,10 +229,9 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
 		loop {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
-				Result := InputBox(Prompt, Title,
-						(Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt"
-								|| Spec = "llm_vision") ? "w680 h300"
-						: (Spec = "key") ? "w680 h220" : "w680 h160", Existing)
+				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
+				Size := Listed ? "w680 h300" : (Spec = "key") ? "w680 h220" : "w680 h160"
+				Result := InputBox(Prompt, Title, Size, Existing)
 				if (Result.Result != "OK")
 						return false
 				; A text to type keeps its spaces; every other kind is trimmed.
