@@ -1019,7 +1019,9 @@ local function create_menu(deps)
 						end
 				end
 
-				local rich_model_title = health_dot .. i18n.get("menu.llm.active_model_label")
+				-- The row's label is the manifest's own key (menu.llm.model_label), the
+				-- one Windows and Linux draw too: one wording in every driver.
+				local model_text
 				if state.llm_backend == "api" then
 						-- The local llm_model slot is stale on this backend: show the
 						-- active API entry's configured name instead, without
@@ -1028,13 +1030,13 @@ local function create_menu(deps)
 						if type(ApiPanel.active_entry_display_name) == "function" then
 							entry_name = ApiPanel.active_entry_display_name()
 						end
-						rich_model_title = rich_model_title
-							.. (entry_name or i18n.get("menu.llm.no_model_none"))
+						model_text = entry_name or i18n.get("menu.llm.no_model_none")
 				elseif not state.llm_model or state.llm_model == "" then
-						rich_model_title = rich_model_title .. i18n.get("menu.llm.no_model_none")
+						model_text = i18n.get("menu.llm.no_model_none")
 				else
-						rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)
+						model_text = string.format("%s%s%s", active_display_model, type_str, params_ram_str)
 				end
+				local rich_model_title = health_dot .. string.format(i18n.get("menu.llm.model_label"), model_text)
 
 				local model_submenu
 				if state.llm_backend == "api" then

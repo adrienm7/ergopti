@@ -133,8 +133,25 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	run_test(remote, dialogs, entry)
 end
 
+--- The name of the model that answers predictions: the active API entry's
+--- under the API backend, as macOS and Windows show it, else Ollama's model.
+--- @param llm table Prediction engine.
+--- @param backend string The selected backend.
+--- @param entries table|nil The API entries module, nil when it cannot load.
+--- @return string|nil name Nil when no model is selected.
+local function selected_model_name(llm, backend, entries)
+	if backend == "api" then
+		local active = entries and entries.active() or nil
+		if type(active) ~= "table" then return nil end
+		if type(active.label) == "string" and active.label ~= "" then return active.label end
+		return type(active.model) == "string" and active.model ~= "" and active.model or nil
+	end
+	local model = type(llm.get_current_model) == "function" and llm.get_current_model() or nil
+	return type(model) == "string" and model ~= "" and model or nil
+end
+
 --- Rows choosing the backend, and the rows of the API backend.
---- @param llm table Prediction engine (get_backend, set_backend).
+--- @param llm table Prediction engine (get_backend, set_backend, get_current_model).
 --- @param dialogs table { prompt(heading, text, initial, hidden), error(text, heading), info(heading, text), confirm(heading, text) }
 --- @param on_changed function|nil Rebuilds the menu.
 --- @param ollama_rows function Returns the Ollama model rows.
@@ -146,7 +163,14 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 	local backend = llm.get_backend()
 	local function changed() if type(on_changed) == "function" then on_changed() end end
 
+	-- The selected model heads the list under the key macOS and Windows give
+	-- their model row, so the three trays name it with one wording.
+	local selected = selected_model_name(llm, backend, ok_entries and entries or nil)
 	local rows = {
+		{
+			label = string.format(tr("menu.llm.model_label"), selected or tr("menu.llm.no_model_none")),
+			disabled = true,
+		},
 		{
 			label = "Ollama 🦙 — " .. tr("menu.llm.backend_ollama_suffix"),
 			checked = backend == "ollama",
