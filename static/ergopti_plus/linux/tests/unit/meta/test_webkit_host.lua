@@ -401,4 +401,50 @@ helpers.describe("ui.webkit_host", function()
     end)
   end)
 
+  -- (harness-loads-production-page) tests/hardware/run_page_errors.lua is the
+  -- only place a real WebKitGTK parses these pages. It built them itself,
+  -- without the catalogue, so the seeded boot script every window runs never
+  -- ran in a real engine and a seed WebKitGTK rejected would have stayed green.
+  helpers.describe("webview_manager.build_page_html()", function()
+    helpers.it("builds the page a window loads, with the whole catalogue seeded (harness-loads-production-page)", function()
+      local manager = require("ui.webview_manager")
+      helpers.assert_true(type(manager.build_page_html) == "function",
+        "webview_manager must expose the one builder show() loads")
+      local catalogue = require("infra.locale").catalogue()
+      local expected = 0
+      for _ in pairs(catalogue) do expected = expected + 1 end
+      helpers.assert_true(expected > 1000, "the locale catalogue must load for this check to mean anything")
+
+      local html = manager.build_page_html("healthcheck", "en")
+      local marker = "window._i18n_strings="
+      local seed_at = html:find(marker, 1, true)
+      local i18n_at = html:find("function resolve_locale_url", 1, true)
+      helpers.assert_true(seed_at ~= nil, "the page must carry its strings")
+      helpers.assert_true(i18n_at ~= nil and seed_at < i18n_at, "the strings must be in place before i18n.js runs")
+      -- "<" is escaped inside the seed, so the first "</script>" ends the boot script
+      local seed_end = html:find(";</script>", seed_at, true)
+      helpers.assert_true(seed_end ~= nil, "the seed statement must close the boot script")
+      local seeded = require("json").decode(html:sub(seed_at + #marker, seed_end - 1))
+      local count = 0
+      for _ in pairs(seeded) do count = count + 1 end
+      helpers.assert_eq(count, expected, "the page must carry every string of the catalogue")
+      helpers.assert_eq(seeded["healthcheck.toolbar.close"], catalogue["healthcheck.toolbar.close"],
+        "the page's labels must read as text, not as keys")
+    end)
+
+    helpers.it("is what the WebKitGTK page-error harness loads (harness-loads-production-page)", function()
+      local handle = io.open(DRIVER_ROOT .. "/tests/hardware/run_page_errors.lua", "r")
+      local source = handle and handle:read("*a") or nil
+      if handle then handle:close() end
+      helpers.assert_true(type(source) == "string" and source ~= "", "run_page_errors.lua must be readable")
+      local code = source:gsub("%-%-[^\n]*", "")
+      helpers.assert_true(code:find("build_page_html(", 1, true) ~= nil,
+        "the harness must build each page through webview_manager.build_page_html()")
+      helpers.assert_true(code:find("build_app_html(", 1, true) == nil,
+        "the harness must not build its own copy of a page")
+      helpers.assert_true(code:find('inspect("healthcheck"', 1, true) ~= nil,
+        "the harness must load the diagnostics page, the one a failed boot sends users to")
+    end)
+  end)
+
 end)
