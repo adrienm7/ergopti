@@ -641,6 +641,29 @@ function cataloguePaths(driver) {
 	);
 })();
 
+(function triggerLengthMatchesTheConfigurationSchema() {
+	// config.schema.json is what the Windows boot validator enforces: a longer
+	// wizard answer is saved, then stops the driver at every start.
+	const schema = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'core/config_schema/config.schema.json'), 'utf8')
+	);
+	const limit = schema.$defs.hotstrings.properties.trigger_char.maxLength;
+	assert.ok(Number.isInteger(limit) && limit >= 1, 'the schema bounds the trigger character');
+	let checked = 0;
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		for (const page of CATALOGUE.platforms[driver].pages) {
+			if (!page.magic_key) continue;
+			checked += 1;
+			assert.equal(
+				page.magic_key.max_characters,
+				limit,
+				`${driver}/${page.id}: the wizard accepts exactly what the configuration schema accepts`
+			);
+		}
+	}
+	assert.equal(checked, Object.keys(DRIVER_MANIFESTS).length, 'every driver asks for the trigger');
+})();
+
 (function magicKeyFollowsTheSystemLayoutAndRefusesAnEmptyCustomValue() {
 	const page = openWizard({ platform: 'macos', system_layout: 'French - PC' });
 	page.platform = 'macos';

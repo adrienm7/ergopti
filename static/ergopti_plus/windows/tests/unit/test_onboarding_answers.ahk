@@ -85,8 +85,8 @@ _TOAN_CatalogueIndexesEveryPage() {
 	AssertEqual(7, Masters, "every Windows page asks through a category switch")
 	AssertTrue(Index["entries"].Count > 20, "the catalogue lists the Windows checklist paths")
 	AssertEqual("character", Index["entries"]["hotstrings.trigger_char"]["kind"])
-	AssertEqual(3, Index["entries"]["hotstrings.trigger_char"]["max_characters"],
-		"the trigger length limit comes from the manifest")
+	AssertEqual(1, Index["entries"]["hotstrings.trigger_char"]["max_characters"],
+		"the trigger length limit comes from the manifest, as config.schema.json bounds it")
 }
 Test("onboarding answers: the catalogue indexes every Windows page (onboarding-answers-windows)",
 	_TOAN_CatalogueIndexesEveryPage)
@@ -140,7 +140,7 @@ _TOAN_AnyInvalidAnswerRefusesTheBatch() {
 		[[_TOAN_Op("gestures.enabled", "true")], "true or false"],
 		[[_TOAN_Op("script.onboarding_done", true)], "names no wizard path"],
 		[[_TOAN_Op("gestures.enabled", true), _TOAN_Op("gestures.enabled", false)], "answered twice"],
-		[[_TOAN_Op("hotstrings.trigger_char", "abcd")], "at most 3"],
+		[[_TOAN_Op("hotstrings.trigger_char", "ab")], "at most 1"],
 		[[_TOAN_Op("hotstrings.trigger_char", " ")], "visible text"],
 		[[_TOAN_Op("hotstrings.trigger_char", "a`nb")], "visible text"],
 		[[Map("path", "gestures.enabled")], "a path and a value"],
@@ -159,10 +159,10 @@ Test("onboarding answers: any invalid answer refuses the whole batch (onboarding
 _TOAN_TriggerLengthCountsCharacters() {
 	Index := OnboardingCatalogue()
 	Emoji := Chr(0x1F600)
-	AssertTrue(OnboardingAnswerRows(Index, [_TOAN_Op("hotstrings.trigger_char", Emoji . Emoji . Emoji)]) is Array,
-		"three characters outside the BMP are three characters, not six UTF-16 units")
+	AssertTrue(OnboardingAnswerRows(Index, [_TOAN_Op("hotstrings.trigger_char", Emoji)]) is Array,
+		"a character outside the BMP is one character, not two UTF-16 units")
 	AssertTrue(OnboardingAnswerRows(Index,
-		[_TOAN_Op("hotstrings.trigger_char", Emoji . Emoji . Emoji . Emoji)]) is String)
+		[_TOAN_Op("hotstrings.trigger_char", Emoji . Emoji)]) is String)
 }
 Test("onboarding answers: the trigger length counts characters (onboarding-answers-windows)",
 	_TOAN_TriggerLengthCountsCharacters)
