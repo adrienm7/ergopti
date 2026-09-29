@@ -54,9 +54,8 @@
 
 ; Title is resolved at call-time via a function — never at load-time —
 ; so the active language is already set when the menu is built or rebuilt.
-
-; Available prediction count choices (mirrors HS: for i = 1, 10 do)
-global LLM_MENU_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+; The suggestion count choices live beside their only reader, in
+; menu_settings.ahk (LLM_MENU_N_OPTIONS).
 
 ; Available backend IDs — Ollama is the only Windows backend today; the list
 ; is kept as an array so adding a future backend only requires appending here.
