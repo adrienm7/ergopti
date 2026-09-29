@@ -126,7 +126,7 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 		local fixture = boot({ gestures_enable = false })
 		-- Runtime sync writes first; refuse the reset owner's explicit setter.
 		fixture.refuse_gesture_assignment_after(2)
-		helpers.assert_eq(fixture.global_actions().reset_defaults(), false,
+		helpers.assert_eq(fixture.global_actions().factory_reset(), false,
 			"a refused candidate assignment must fail the reset")
 		helpers.assert_eq(fixture.gesture_assignment_refusals, 1, "the candidate must reach the injected refusal")
 		helpers.assert_eq(fixture.gesture_assignment_calls, 3, "the refused candidate must be followed by its inverse")
@@ -144,7 +144,7 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 		helpers.assert_eq(fixture.state.keylogger_enabled, false)
 		-- The following third call must be the reset owner's inverse.
 		fixture.refuse_gesture_assignment_after(2)
-		helpers.assert_eq(fixture.global_actions().reset_defaults(), false,
+		helpers.assert_eq(fixture.global_actions().factory_reset(), false,
 			"a refused candidate assignment must fail the reset")
 		helpers.assert_eq(fixture.gesture_assignment_refusals, 1, "the candidate must reach the injected refusal")
 		helpers.assert_eq(fixture.gesture_assignment_calls, 3, "the refused candidate must be followed by its inverse")

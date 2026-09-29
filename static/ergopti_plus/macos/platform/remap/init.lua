@@ -4340,6 +4340,18 @@ function M.clear_all_bindings(on_done, scope)
 	end, on_done)
 end
 
+--- Whether a bulk settings transaction or its retained inverse is unsettled.
+--- @return boolean pending
+function M.settings_pending()
+	return _bulk_settings_transaction ~= nil
+end
+
+--- Retries a retained bulk inverse once; its regeneration may settle later.
+--- @return boolean settled True only when no bulk owner or debt remains.
+function M.retry_settings_recovery()
+	return retry_bulk_settings_recovery() == true
+end
+
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
 local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos" }

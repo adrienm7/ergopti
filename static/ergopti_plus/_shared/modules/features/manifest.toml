@@ -4152,8 +4152,9 @@ id = "locales"
 # « Tout désactiver » were retired, and the two top-level rows that opened the
 # folders editor and the setup wizard.
 #
-# Restores Ergopti's recommended values: each driver's factory reset, the same
-# transaction the global actions ran under « Valeurs par défaut ».
+# Restores Ergopti's recommended values: each driver composes every category's
+# own scope owner in the [scopes.global] order, all or nothing, after one
+# confirmation. AI and metrics consent are never granted by it.
 [[menu.configuration_menu]]
 type = "command"
 id = "restore_recommended"

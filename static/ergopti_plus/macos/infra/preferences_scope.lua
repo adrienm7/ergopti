@@ -118,6 +118,8 @@ function M.new(options)
 	return {
 		pending = transaction.pending,
 		retry_restore = transaction.retry_restore,
+		revert = transaction.revert,
+		release = transaction.release,
 		apply = function(scope, mode)
 			if transaction.pending() then return false, "a configuration transaction is still pending" end
 			local planned, plan = pcall(Manifest.scope_plan, scope, mode)
