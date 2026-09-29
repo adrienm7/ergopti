@@ -781,7 +781,9 @@ platform = "ahk,hs"
 # path) or `open -b` (a bundle identifier), Windows the shell's Run (a program,
 # a Start-menu shortcut, a packaged app), Linux gtk-launch (a desktop-file id).
 # Each binding editor picks the value in a native chooser (/Applications, the
-# Start menu, /usr/share/applications).
+# Start menu, /usr/share/applications). The Windows chooser returns only .exe
+# and .lnk files: a packaged app without a Start-menu shortcut
+# (shell:AppsFolder\<AUMID>) is still written in config.toml by hand.
 platform = "all"
 requires_linux = ["tool:gtk-launch"]
 parameter = "app"
