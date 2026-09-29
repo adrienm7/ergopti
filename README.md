@@ -115,7 +115,8 @@ install.
 
 **macOS — `ErgoptiPlus.app.zip`**
 
-A self-contained app bundling Hammerspoon and Karabiner-Elements.
+A self-contained app bundling Hammerspoon. On first run, it downloads and
+installs Karabiner-Elements when it is missing.
 
 With [Homebrew](https://brew.sh), pick the stable or the dev channel:
 

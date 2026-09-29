@@ -803,7 +803,7 @@ jobs:
 
           | Asset | Description |
           |---|---|
-          | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
+          | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon bundled; Karabiner-Elements installed on first run) |
 
           **Installation with [Homebrew](https://brew.sh):**
           \`\`\`bash

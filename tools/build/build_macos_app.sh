@@ -63,12 +63,10 @@ ERGOPTI_BUILD="${ERGOPTI_BUILD:-1}"
 # defaults to main.
 ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 
-# Karabiner-Elements version bundled for key-remapping. The DMG is downloaded
-# at build time and vendored inside Resources/Tools/ so users never need a
-# separate download; the Lua driver opens the installer on first use if KE is
-# not yet installed (a one-time system-extension approval is still required).
-KARABINER_MANIFEST_DATA="$(python3 "$REPO_ROOT/tools/build/karabiner_manifest.py")"
-IFS=$'\t' read -r KARABINER_VERSION KARABINER_FILE_NAME KARABINER_SHA256 KARABINER_SOURCE_URL <<< "$KARABINER_MANIFEST_DATA"
+# Karabiner-Elements is not bundled: platform/remap/onboarding.lua downloads the
+# DMG pinned in vendor/karabiner-elements/manifest.json, verifies its SHA-256
+# and installs it on first use. The 49 MB installer this build used to vendor
+# under Resources/Tools/ was never opened by any runtime path.
 
 # Every language the driver ships, as the launcher's CFBundleLocalizations.
 # Without them AppKit resolves the bundle to its development region and the
@@ -203,73 +201,7 @@ download_hammerspoon() {
 
 # ==================================================
 # ==================================================
-# ======= 4/ Karabiner-Elements download ===========
-# ==================================================
-# ==================================================
-
-# Download the Karabiner-Elements DMG and extract Karabiner-Elements.app so
-# it can be vendored inside the bundle. Bundling the installer eliminates any
-# runtime download; when the Lua driver first needs KE it detects whether it
-# is installed, and if not, opens the bundled .app — the user then steps
-# through the one-time system-extension approval prompt.
-download_karabiner() {
-	local cache_dir="$BUILD_DIR/cache"
-	local dmg_name="$KARABINER_FILE_NAME"
-	local dmg_path="$cache_dir/$dmg_name"
-	local ke_extracted="$BUILD_DIR/Karabiner-Elements-$KARABINER_SHA256"
-	local url="$KARABINER_SOURCE_URL"
-	mkdir -p "$cache_dir"
-	if [ ! -f "$dmg_path" ]; then
-		log "Downloading Karabiner-Elements $KARABINER_VERSION from $url"
-		curl -sSfL "$url" -o "$dmg_path" || fail "Karabiner-Elements download failed."
-	else
-		log "Using cached $dmg_path"
-	fi
-	local actual_checksum
-	actual_checksum="$(shasum -a 256 "$dmg_path")" || fail "Karabiner checksum calculation failed."
-	[ "${actual_checksum%% *}" = "$KARABINER_SHA256" ] || fail "Karabiner package checksum mismatch."
-	if [ ! -e "$ke_extracted" ]; then
-		log "Extracting Karabiner-Elements.app from DMG"
-		local mount_point
-		mount_point="$(mktemp -d)"
-		log "DMG path: $dmg_path (size: $(wc -c < "$dmg_path") bytes)"
-		local plist_out
-		plist_out="$(echo y | hdiutil attach "$dmg_path" -nobrowse -noverify -plist 2>/dev/null)" \
-			|| fail "hdiutil attach failed."
-		local actual_mount
-		actual_mount="$(echo "$plist_out" | python3 -c "
-import sys, plistlib
-p = plistlib.loads(sys.stdin.buffer.read())
-for e in p.get('system-entities', []):
-    mp = e.get('mount-point')
-    if mp:
-        print(mp)
-" | tail -1)"
-		log "Detected mount: '$actual_mount'"
-		[ -n "$actual_mount" ] || fail "Could not detect mount point from hdiutil plist output."
-		log "DMG contents:"
-		find "$actual_mount" -maxdepth 5 2>&1 | head -60 | while IFS= read -r line; do log "  $line"; done
-		local ke_in_dmg
-		ke_in_dmg="$(find "$actual_mount" -maxdepth 5 \( -name "*.app" -o -name "*.pkg" \) | head -1)"
-		[ -n "$ke_in_dmg" ] \
-			|| fail "No .app or .pkg found in DMG at $actual_mount."
-		local ke_src_ext="${ke_in_dmg##*.}"
-		log "Found: $ke_in_dmg (ext: $ke_src_ext)"
-		cp -R "$ke_in_dmg" "$ke_extracted.$ke_src_ext"
-		ln -sf "$ke_extracted.$ke_src_ext" "$ke_extracted"
-		hdiutil detach "$actual_mount" -quiet || true
-		rmdir "$mount_point" 2>/dev/null || true
-	fi
-	[ -e "$ke_extracted" ] || fail "Karabiner-Elements not extracted."
-	echo "$ke_extracted"
-}
-
-
-
-
-# ==================================================
-# ==================================================
-# ======= 5/ Ollama download =======================
+# ======= 4/ Ollama download =======================
 # ==================================================
 # ==================================================
 
@@ -307,7 +239,7 @@ download_ollama() {
 
 # =====================================================
 # =====================================================
-# ======= 6/ Swift launcher compilation ==============
+# ======= 5/ Swift launcher compilation ==============
 # =====================================================
 # =====================================================
 
@@ -340,7 +272,7 @@ build_launcher() {
 
 # ====================================================
 # ====================================================
-# ======= 7/ App bundle assembly =====================
+# ======= 6/ App bundle assembly =====================
 # ====================================================
 # ====================================================
 
@@ -435,13 +367,11 @@ bundle_layout_registry() {
 }
 
 # Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, stage the
-# driver payload under Resources/static/, and bundle the third-party tools. The
-# embedded Hammerspoon's bundle id is rewritten so its preferences land under
-# our id.
+# driver payload under Resources/static/, and bundle Ollama. The embedded
+# Hammerspoon's bundle id is rewritten so its preferences land under our id.
 assemble_app() {
 	local launcher_bin="$1"
-	local ke_app_path="$2"
-	local ollama_bin_path="$3"
+	local ollama_bin_path="$2"
 	log "Assembling $APP_PATH"
 	mkdir -p "$APP_PATH/Contents/MacOS"
 	mkdir -p "$APP_PATH/Contents/Resources/config"
@@ -493,18 +423,12 @@ assemble_app() {
 	bundle_keyboard_layout "$static_root"
 	bundle_layout_registry "$static_root"
 
-	# Bundle third-party tools so they are available on first launch with no
-	# runtime download. KE remains an installer app (a one-time system-extension
-	# approval prompt is unavoidable); Ollama is the CLI server binary and runs
-	# directly — models are pulled on demand.
+	# Bundle the Ollama CLI server so local inference needs no separate install;
+	# models are still pulled on demand. The launcher exports this path as
+	# ERGOPTI_OLLAMA_BIN, which modules/llm/ollama_binary.lua treats as
+	# authoritative.
 	local tools_dir="$APP_PATH/Contents/Resources/Tools"
-	mkdir -p "$tools_dir/Karabiner"
 	mkdir -p "$tools_dir/Ollama"
-	local ke_real
-	ke_real="$(readlink "$ke_app_path" 2>/dev/null || echo "$ke_app_path")"
-	local ke_ext="${ke_real##*.}"
-	log "Bundling Karabiner-Elements $KARABINER_VERSION (source: $ke_real ext: $ke_ext)"
-	cp -R "$ke_real" "$tools_dir/Karabiner/Karabiner-Elements.$ke_ext"
 	log "Bundling Ollama $OLLAMA_VERSION"
 	cp "$ollama_bin_path" "$tools_dir/Ollama/ollama"
 	chmod +x "$tools_dir/Ollama/ollama"
@@ -515,7 +439,7 @@ assemble_app() {
 
 # ===========================================
 # ===========================================
-# ======= 8/ Icon generation ================
+# ======= 7/ Icon generation ================
 # ===========================================
 # ===========================================
 
@@ -543,7 +467,7 @@ build_icon() {
 
 # =====================================================
 # =====================================================
-# ======= 9/ Info.plist generation ====================
+# ======= 8/ Info.plist generation ====================
 # =====================================================
 # =====================================================
 
@@ -604,7 +528,7 @@ generate_info_plist() {
 
 # ===============================================
 # ===============================================
-# ======= 10/ Codesign + zip ====================
+# ======= 9/ Codesign + zip =====================
 # ===============================================
 # ===============================================
 
@@ -792,10 +716,6 @@ codesign_app() {
 	[ -f "$luasocket" ] || fail "Bundled LuaSocket extension missing: $luasocket"
 	sign_code "$luasocket"
 	sign_code --deep "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
-	local ke_app="$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
-	if [ -d "$ke_app" ]; then
-		sign_code --deep "$ke_app"
-	fi
 
 	codesign_native_runtime
 
@@ -814,7 +734,7 @@ zip_app() {
 
 # ==========================================
 # ==========================================
-# ======= 11/ Entrypoint ===================
+# ======= 10/ Entrypoint ===================
 # ==========================================
 # ==========================================
 
@@ -854,7 +774,7 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
-	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil hdiutil shasum git node; do
+	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done
 	check_signing_configuration
@@ -866,11 +786,9 @@ main() {
 	launcher_bin="${launcher_bin%%$'\n'*}"
 	log "launcher_bin resolved: '$launcher_bin'"
 	[ -f "$launcher_bin" ] || fail "launcher_bin does not exist: $launcher_bin"
-	local ke_app_path
-	ke_app_path="$(download_karabiner)"
 	local ollama_bin_path
 	ollama_bin_path="$(download_ollama)"
-	assemble_app "$launcher_bin" "$ke_app_path" "$ollama_bin_path"
+	assemble_app "$launcher_bin" "$ollama_bin_path"
 	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
 	build_icon
 	generate_info_plist
@@ -886,7 +804,6 @@ main() {
 	log "  version    : $ERGOPTI_VERSION ($ERGOPTI_BUILD)"
 	log "  channel    : $ERGOPTI_CHANNEL"
 	log "  hammerspoon: $HAMMERSPOON_VERSION"
-	log "  karabiner  : $KARABINER_VERSION"
 	log "  ollama     : $OLLAMA_VERSION"
 }
 

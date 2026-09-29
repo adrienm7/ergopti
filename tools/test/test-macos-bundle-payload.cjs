@@ -10,11 +10,12 @@
  * runtime never reads has come back.
  *
  * ROOT CAUSE ENCODED:
- * The app builder copied whole trees, so v0.0.0-dev.146 shipped a second copy
- * of every locale, website screenshots, tests, documentation and debug
- * symbols. Trimming that by hand is only safe when a guard knows what the
- * runtime reads; without one, the next exclusion that catches a real runtime
- * file ships an app that fails in the field.
+ * The app builder copied whole trees, so v0.0.0-dev.146 shipped 99 MB: an
+ * unused 49 MB Karabiner-Elements installer (onboarding downloads its own
+ * pinned DMG), a second copy of every locale, website screenshots, tests,
+ * documentation and debug symbols. Trimming that by hand is only safe when a
+ * guard knows what the runtime reads; without one, the next exclusion that
+ * catches a real runtime file ships an app that fails in the field.
  *
  * FEATURES & RATIONALE:
  * 1. The staged set is the real stager's output, compared with the resolver,
@@ -31,8 +32,9 @@
  *    instead of leaving it stale. Every staged image must be one of them.
  * 4. Excluded groups are judged independently of the manifest (tests,
  *    documentation, debug symbols, developer tooling, launcher sources,
- *    duplicate top-level copies, a checkout's own state), so deleting a
- *    manifest exclusion cannot quietly bring its files back.
+ *    duplicate top-level copies, a checkout's own state, the Karabiner
+ *    installer), so deleting a manifest exclusion cannot quietly bring its
+ *    files back.
  * 5. A self-check removes one runtime file per reference kind and injects one
  *    forbidden file per group: the guard must report each, or it could not
  *    fail for the regression it exists to catch.
@@ -504,6 +506,11 @@ function buildScriptProblems(source, externals) {
 			);
 		}
 	}
+	if (/Tools\/Karabiner|download_karabiner|Karabiner-Elements\.(?:app|pkg)/.test(source)) {
+		problems.push(
+			`${BUILD_REL}: the Karabiner-Elements installer is back in the bundle; onboarding downloads its own pinned DMG (platform/remap/onboarding.lua)`
+		);
+	}
 	for (const entry of externals) {
 		if (!source.includes(entry.owner)) {
 			problems.push(
@@ -534,6 +541,13 @@ const bypasses = [
 		BUILD.replace(
 			stageLine,
 			`${stageLine}\tcp -R "$REPO_ROOT/static/ergopti_plus/_shared/data/locales" "$static_root/"\n`
+		)
+	],
+	[
+		'the Karabiner installer vendored again',
+		BUILD.replace(
+			stageLine,
+			`${stageLine}\tmkdir -p "$APP_PATH/Contents/Resources/Tools/Karabiner"\n`
 		)
 	]
 ];

@@ -48,8 +48,11 @@ const RESOLVERS = new Set(['tools/lib/git-bash.cjs', 'tools/lib/git_bash.py']);
 const SELF = 'tools/test/test-bash-resolution.cjs';
 
 // Floors: the scripts migrated to the shared resolvers when this guard landed.
+// The Python floor dropped from 3 when karabiner_manifest_test.py stopped
+// replaying the build's Karabiner download, which left with the bundled
+// installer (the app no longer vendors it); it spawns no shell any more.
 const MIN_JS_CONSUMERS = 15;
-const MIN_PY_CONSUMERS = 3;
+const MIN_PY_CONSUMERS = 2;
 const MIN_SCANNED = 100;
 
 // ==================================================
