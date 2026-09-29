@@ -57,13 +57,37 @@ helpers.describe("Linux global scope: registry and composition", function()
 			for id in pairs(registry) do ids[#ids + 1] = id end
 			table.sort(ids)
 			helpers.assert_eq(ids, { "llm", "tap_holds" })
-			local gestures = { scope_participant = function() return stub(trace, "gestures") end }
+			local gestures = { scope_participant = function() return stub(trace, "gestures") end,
+				scope_available = function() return true end }
 			registry = GlobalScope.participants({ shortcuts = {}, gestures = gestures, keylogger = {} })
 			ids = {}
 			for id in pairs(registry) do ids[#ids + 1] = id end
 			table.sort(ids)
 			helpers.assert_eq(ids, { "gestures", "metrics", "shortcuts" })
 		end)
+	end)
+
+	helpers.it("skips the gestures of a machine without a touchpad instead of refusing the row", function()
+		local names = { "modules.gestures.touchpad_finder", "modules.gestures.manager" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		package.loaded["modules.gestures.touchpad_finder"] = {
+			find = function() return nil, "no device reports multitouch slots" end,
+		}
+		package.loaded["modules.gestures.manager"] = nil
+		local ok, err = pcall(with_modules, function()
+			local Manager = require("modules.gestures.manager")
+			helpers.assert_eq(Manager.scope_available(), false)
+			local GlobalScope = require("infra.global_scope")
+			local registry = GlobalScope.participants({ gestures = Manager, is_paused = function() return false end })
+			helpers.assert_nil(registry.gestures, "a gesture reader that cannot start refuses every restore")
+			registry.tap_holds = stub({}, "tap_holds")
+			local committed, report = GlobalScope.apply("recommended", registry)
+			helpers.assert_eq(committed, true, report.detail)
+			helpers.assert_eq(report.skipped[2], "gestures")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("applies the manifest order and reports every category without an owner", function()

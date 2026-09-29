@@ -1388,6 +1388,15 @@ function M.apply_scope(mode)
 	return committed, detail, backup
 end
 
+--- Whether a gesture scope can be acknowledged on this machine: the reader is
+--- already running, or the finder selects a touchpad to start it on. Without
+--- one, « recommended » can never start the reader it requires.
+--- @return boolean available
+function M.scope_available()
+	if _reading then return true end
+	return require("modules.gestures.touchpad_finder").find() ~= nil
+end
+
 --- The gesture participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.scope_participant()
