@@ -26,6 +26,11 @@
  * upload and Stamp after Compile, and removed the exe smoke's failing exit,
  * with every test green: the job's step order and the smoke's verdict are
  * pinned too, and so is the order of the macOS package job.
+ * The exe smoke later failed a healthy launch because a 20 s wall clock was
+ * its only dialog detector while the first-launch extraction takes up to
+ * 19 s on a hosted runner: its wait must end on a dialog window of the
+ * launched process, keep a hang bound well above the measured extraction and
+ * print what tells a slow extraction from a stuck one.
  */
 
 'use strict';
@@ -187,6 +192,118 @@ if (windowsSmokeStep !== null) {
 		}
 	} catch (error) {
 		errors.push(`the Windows exe smoke lost its crash verdict: ${error.message}`);
+	}
+}
+
+// Run 613 failed this smoke with "did not extract its runtime bundle within
+// 20s — a blocking startup dialog is likely" and passed on re-run: the 20 s
+// wall clock was its only dialog detector. The first launch extracts about 550
+// files through Windows PowerShell while Defender scans each one, and the green
+// smokes of runs 582-613 took 8-19 s, so the slow end of a healthy extraction
+// read as a dialog. The wait now ends on what it names: the marker, the process
+// exiting, or a dialog window (class #32770) of the launched process. Its wall
+// clock only bounds a hang that raises no dialog, so it must stay well above
+// the measured extraction time, and a failure prints the timings, windows,
+// child processes and bundle tree that tell a slow extraction from a stuck one.
+const SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS = 19;
+const WINDOWS_SMOKE_HANG_HEADROOM = 3;
+
+/**
+ * Lists why a Windows exe smoke script would read a slow first-launch
+ * extraction as a blocking dialog, or fail without the evidence that tells
+ * the two apart.
+ * @param {string[]} script Script lines, such as pipeline.runOf() returns.
+ * @returns {string[]}
+ */
+function windowsSmokeWaitProblems(script) {
+	const problems = [];
+	const code = script.filter((line) => !line.trimStart().startsWith('#'));
+	const bounds = code
+		.map((line) => /^\$hangBoundSeconds = (\d+)$/.exec(line.trim()))
+		.filter((match) => match !== null);
+	const floor = SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS * WINDOWS_SMOKE_HANG_HEADROOM;
+	if (bounds.length !== 1) {
+		problems.push('the Windows exe smoke must set its hang bound $hangBoundSeconds exactly once');
+	} else if (Number(bounds[0][1]) < floor) {
+		problems.push(
+			`the Windows exe smoke hang bound (${bounds[0][1]} s) must be at least ` +
+				`${WINDOWS_SMOKE_HANG_HEADROOM} x the slowest green smoke ` +
+				`(${SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS} s): it bounds a hang, it does not detect a dialog`
+		);
+	}
+	if (!code.some((line) => line.includes('"#32770"'))) {
+		problems.push('the Windows exe smoke must recognise a dialog by its window class #32770');
+	}
+	try {
+		const wait = pipeline.scriptBlock(code, 'while (');
+		if (!wait[0].includes('$hangBoundSeconds')) {
+			problems.push('the Windows exe smoke wait must be bounded by $hangBoundSeconds');
+		}
+		if (
+			!wait.some(
+				(line) =>
+					line.includes('[SmokeWindows]::HasDialog($proc.Id)') &&
+					line.includes('$dialogSeen = $true; break')
+			)
+		) {
+			problems.push(
+				'the Windows exe smoke wait must stop at the first dialog window of the launched process'
+			);
+		}
+	} catch (error) {
+		problems.push(`the Windows exe smoke lost its wait loop: ${error.message}`);
+	}
+	try {
+		const diagnostics = pipeline.scriptBlock(code, 'function Write-LaunchDiagnostics');
+		for (const [token, what] of [
+			['$Seconds', 'the elapsed time'],
+			['[SmokeWindows]::Describe', 'the windows of the process'],
+			['Win32_Process', 'its child processes'],
+			['$ergoptiDir', 'the bundle tree']
+		]) {
+			if (!diagnostics.some((line) => line.includes(token))) {
+				problems.push(`the Windows exe smoke diagnostics must print ${what} (${token})`);
+			}
+		}
+		const verdict = pipeline.scriptBlock(code, 'if ($crashedEarly -or -not $markerSeen) {');
+		if (!verdict.some((line) => /^\s*Write-LaunchDiagnostics\b/.test(line))) {
+			problems.push('the Windows exe smoke must print its diagnostics before it fails');
+		}
+	} catch (error) {
+		problems.push(`the Windows exe smoke lost its failure diagnostics: ${error.message}`);
+	}
+	if (!code.some((line) => /^\s*marker_seconds = /.test(line))) {
+		problems.push('the Windows exe smoke evidence must record how long the marker took');
+	}
+	return problems;
+}
+
+if (windowsSmokeStep !== null) {
+	const script = pipeline.runOf(windowsSmokeStep) ?? [];
+	errors.push(...windowsSmokeWaitProblems(script));
+	// Each rule must be able to fail on the live script, or it proves nothing.
+	for (const [what, mutate] of [
+		[
+			'a 20 s hang bound',
+			(lines) =>
+				lines.map((line) => line.replace(/^\$hangBoundSeconds = \d+$/, '$hangBoundSeconds = 20'))
+		],
+		[
+			'a wait blind to dialogs',
+			(lines) => lines.filter((line) => !line.includes('[SmokeWindows]::HasDialog($proc.Id)'))
+		],
+		[
+			'a failure without diagnostics',
+			(lines) => lines.filter((line) => !/^\s*Write-LaunchDiagnostics\b/.test(line))
+		],
+		[
+			'evidence without the marker time',
+			(lines) => lines.filter((line) => !/^\s*marker_seconds = /.test(line))
+		]
+	]) {
+		if (windowsSmokeWaitProblems(mutate(script)).length === 0) {
+			errors.push(`the Windows exe smoke wait check cannot detect ${what}`);
+		}
 	}
 }
 

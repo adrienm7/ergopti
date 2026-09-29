@@ -91,6 +91,17 @@ AHK v2's `Func` is a class, not the v1 string resolver: `Func("Callback")`
 raises `ValueError: Invalid base`. Return a local wrapper's `.Bind()` when the
 real callback is outside an isolated test include graph.
 
+### project-compiled-first-launch-extraction-takes-seconds
+
+The compiled exe's first launch expands its ~550-file bundle through Windows
+PowerShell's `Expand-Archive`, and only then commits the staging tree that
+holds `.bundle-version`. On a hosted runner with Defender scanning each file,
+the launch smoke took 8-19 s (runs 582-613), not the ~250 ms the bundle
+comments assume, and a 20 s deadline failed a healthy launch. Action: a launch
+check detects a blocking dialog by the process's `#32770` window, never by a
+wall clock; compare `marker_seconds` in `windows-launch-evidence` across runs
+before tightening the smoke's hang bound.
+
 ### project-ahk-loop-capture-copy-freezes-nothing
 
 Copying a loop variable into another outer local does not freeze it for a
