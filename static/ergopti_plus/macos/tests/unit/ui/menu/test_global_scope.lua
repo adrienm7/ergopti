@@ -64,10 +64,16 @@ local function build(trace, options)
 		local owner = options.missing ~= name and scoped_owner(trace, name, options.refuse == name) or nil
 		owners[name] = function() return owner end
 	end
+	observed.deferred = {}
 	local global = require("ui.menu.global_scope").new({
 		owners = owners,
 		remap = options.remap,
 		backup_path = function(scope) return "/remap.toml.global-" .. scope end,
+		defer = function(continuation)
+			if options.refuse_defer then return false end
+			observed.deferred[#observed.deferred + 1] = continuation
+			return true
+		end,
 		paused = function() return options.paused == true end,
 		confirm = function() observed.confirmations = observed.confirmations + 1; return options.decline ~= true end,
 		refresh = function(committed, report) observed.refreshes[#observed.refreshes + 1] = { committed, report } end,
@@ -85,9 +91,12 @@ helpers.describe("macOS global scope", function()
 		helpers.assert_eq(trace, { "remap:tap_holds:recommended" }, "the next category waits for the terminal")
 		helpers.assert_eq(global.pending(), true)
 		remap.settle(true)
+		helpers.assert_eq(#trace, 1, "the next category never runs on the Karabiner terminal's stack")
+		table.remove(observed.deferred, 1)()
 		helpers.assert_eq(trace[2], "shortcuts:recommended:preconfirmed")
 		helpers.assert_eq(trace[3], "remap:shortcuts:recommended", "the chords follow the shortcut preferences")
 		remap.settle(true)
+		table.remove(observed.deferred, 1)()
 		helpers.assert_eq({ trace[4], trace[5], trace[6], trace[7] }, { "gestures:recommended:preconfirmed",
 			"keyboard_layout:recommended:preconfirmed", "llm:recommended:preconfirmed", "metrics:recommended:preconfirmed" })
 		helpers.assert_eq(remap.requests[1].backup_path, "/remap.toml.global-tap_holds")
@@ -101,7 +110,7 @@ helpers.describe("macOS global scope", function()
 	helpers.it("reverts every committed category, the remap one through its snapshot", function()
 		local trace = {}
 		local remap = remap_double(trace, true)
-		local global, observed = build(trace, { remap = remap, refuse = "llm" })
+		local global, observed = build(trace, { remap = remap, refuse = "llm", refuse_defer = true })
 		helpers.assert_eq(global.apply("clear"), true)
 		remap.settle(true)
 		remap.settle(true)

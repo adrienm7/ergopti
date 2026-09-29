@@ -1468,6 +1468,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					return MenuPaths.get("KarabinerConfigPath") .. ".global-" .. scope .. "-"
 						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 				end,
+				defer = function(continuation)
+					return DeferredWork.after(0, continuation, "menu.global_scope") == true
+				end,
 				paused = function()
 					if type(core_mods.shortcuts_mod) ~= "table"
 						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end

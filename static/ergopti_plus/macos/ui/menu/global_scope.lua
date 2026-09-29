@@ -29,26 +29,37 @@ local LOG = "menu.global_scope"
 
 --- The remap engine's part of one scope, as an asynchronous participant: its
 --- inverse is the settings snapshot the engine restores through the same gate.
+--- The next category never runs on the Karabiner terminal's own stack: the
+--- continuation is deferred, so a second regeneration is not requested from
+--- inside the callback that settles the first.
 --- @param remap table Remap facade (apply_scope, snapshot/restore_settings).
 --- @param scope string Manifest scope id served by the remap file.
 --- @param backup_path function scope -> unique backup path.
+--- @param defer function fn -> true once fn is scheduled off this stack.
 --- @return table participant See config_scope_composition.
-local function remap_participant(remap, scope, backup_path)
+local function remap_participant(remap, scope, backup_path, defer)
 	local snapshot, committed = nil, false
 	local participant = {}
+	local function settle(done, ok, reason)
+		if defer(function() return done(ok, reason) end) == true then return end
+		-- The terminal is already known, so settling here is exact, only earlier
+		-- than intended; an unscheduled continuation would orphan the rollback.
+		Logger.warn(LOG, "Remap %s continuation could not be deferred; settling in place.", scope)
+		return done(ok, reason)
+	end
 	function participant.apply(mode, done)
 		snapshot, committed = remap.snapshot_settings(), false
 		if type(snapshot) ~= "table" then return done(false, "remap settings are owned by another transaction") end
 		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason)
 			committed = ok == true
-			return done(committed, reason)
+			return settle(done, committed, reason)
 		end)
 	end
 	function participant.revert(done)
 		if not committed then return done(false, "no committed remap scope to revert") end
 		remap.restore_settings(snapshot, function(ok, reason)
 			if ok == true then committed = false end
-			return done(ok == true, reason)
+			return settle(done, ok == true, reason)
 		end)
 	end
 	function participant.release() snapshot, committed = nil, false end
@@ -60,11 +71,11 @@ end
 --- Creates the global owner from the menu's scope owners.
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), backup_path(scope),
----   confirm(mode), paused() and refresh(committed, report).
+---   defer(fn), confirm(mode), paused() and refresh(committed, report).
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
-	for _, name in ipairs({ "backup_path", "confirm", "paused", "refresh" }) do
+	for _, name in ipairs({ "backup_path", "defer", "confirm", "paused", "refresh" }) do
 		assert(type(options[name]) == "function", "the global scope needs " .. name)
 	end
 	local function participants()
@@ -81,8 +92,8 @@ function M.new(options)
 		end
 		local remap = options.remap
 		if type(remap) == "table" and type(remap.get_enabled) == "function" and remap.get_enabled() == true then
-			registry.tap_holds = remap_participant(remap, "tap_holds", options.backup_path)
-			local chords = remap_participant(remap, "shortcuts", options.backup_path)
+			registry.tap_holds = remap_participant(remap, "tap_holds", options.backup_path, options.defer)
+			local chords = remap_participant(remap, "shortcuts", options.backup_path, options.defer)
 			registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
 		end
 		return registry
