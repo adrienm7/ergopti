@@ -100,6 +100,47 @@ helpers.describe("Linux global scope: registry and composition", function()
 	end)
 end)
 
+helpers.describe("Linux global scope: hotstring categories", function()
+	--- A real category manager with no persisted gate and one known category.
+	local function fresh_config()
+		require("adapters.storage").set("hotstrings.disabled_categories", "")
+		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		Config.init({ load_mappings = function() end }, os.tmpname() .. "_absent.toml", nil)
+		Config._set_categories_for_test({ autocorrection = { id = "autocorrection", sections = {} } })
+		helpers.assert_true(Config.disable_group("autocorrection"))
+		helpers.assert_eq(Config.is_group_enabled("autocorrection"), false)
+		return Config
+	end
+
+	helpers.it("the Configuration row still reopens every hotstring category", function()
+		with_modules(function()
+			local Config = fresh_config()
+			local GlobalScope = require("infra.global_scope")
+			local registry = GlobalScope.participants({ config = Config, is_paused = function() return false end })
+			helpers.assert_not_nil(registry.hotstrings, "hotstrings take part in the global restore")
+			local committed, report = GlobalScope.apply("recommended", registry)
+			helpers.assert_eq(committed, true, report.detail)
+			helpers.assert_eq(report.applied, { "hotstrings" })
+			for _, id in ipairs(report.skipped) do helpers.assert_true(id ~= "hotstrings", "hotstrings were skipped") end
+			helpers.assert_eq(Config.is_group_enabled("autocorrection"), true)
+		end)
+	end)
+
+	helpers.it("a later refusal closes the exact category gates again", function()
+		with_modules(function()
+			local Config = fresh_config()
+			local GlobalScope = require("infra.global_scope")
+			local registry = GlobalScope.participants({ config = Config, is_paused = function() return false end })
+			registry.llm = stub({}, "llm", true)
+			local committed, report = GlobalScope.apply("recommended", registry)
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(report.applied, { "hotstrings" })
+			helpers.assert_eq(report.reverted, true)
+			helpers.assert_eq(Config.is_group_enabled("autocorrection"), false)
+		end)
+	end)
+end)
+
 helpers.describe("Linux global scope: the Configuration row", function()
 	--- Builds the tray and returns the Configuration restore row, with zenity
 	--- answering `answer` and the global scope recorded.

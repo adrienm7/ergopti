@@ -1071,6 +1071,25 @@ function M.reset_defaults()
 	return changed
 end
 
+--- Copies the persisted category gates, the exact inverse of a bulk change.
+--- @return table snapshot Detached disabled set for restore_disabled().
+function M.capture_disabled()
+	return copy_disabled(_disabled_groups)
+end
+
+--- Reinstates category gates captured by capture_disabled(): persisted first,
+--- then published and reloaded, like every other category change.
+--- @param snapshot table Disabled set from capture_disabled().
+--- @return boolean restored
+function M.restore_disabled(snapshot)
+	assert(type(snapshot) == "table", "restore_disabled requires a captured disabled set")
+	if not commit_disabled(copy_disabled(snapshot)) then return false end
+	M.load_all()
+	notify_change()
+	Logger.info(LOG, "Hotstring categories restored to their previous gates.")
+	return true
+end
+
 function M.is_group_enabled(group_name)
 	return not _disabled_groups[group_name]
 end
