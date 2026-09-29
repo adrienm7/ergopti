@@ -296,9 +296,14 @@
 			list.push({ key: 'healthcheck.problem.paused', args: [], action: null });
 		}
 		(sectionData(snapshot, 'permissions').items || []).forEach(function (item) {
-			if (item.state !== 'missing') return;
+			// `unavailable`: granted in principle but not working (the macOS remap
+			// guardian), which leaves the feature inert just like a missing grant
+			if (item.state !== 'missing' && item.state !== 'unavailable') return;
 			list.push({
-				key: 'healthcheck.problem.permission',
+				key:
+					item.state === 'missing'
+						? 'healthcheck.problem.permission'
+						: 'healthcheck.problem.unavailable',
 				args: [{ key: 'healthcheck.permission.' + item.id }],
 				action:
 					permissions[item.id] && permissions[item.id].settings
@@ -418,7 +423,7 @@
 	function itemState(section, item) {
 		if (section.id === 'permissions') {
 			if (item.state === 'granted') return 'ok';
-			if (item.state === 'missing') return 'fail';
+			if (item.state === 'missing' || item.state === 'unavailable') return 'fail';
 			return 'muted';
 		}
 		if (section.id === 'features') return isTrue(item.enabled) ? 'ok' : 'muted';
@@ -473,7 +478,15 @@
 			columns.forEach(function (column, index) {
 				var cell = escapeHtml(itemText(section, schema, column, item[column], t));
 				if (section.id === 'permissions' && index === columns.length - 1) {
-					if (item.state !== 'granted' && permissions[item.id] && permissions[item.id].settings) {
+					// `not_used`: the feature needing it is switched off, so there is
+					// nothing to grant (the macOS remap guardian while Ergopti does not
+					// use Karabiner)
+					if (
+						item.state !== 'granted' &&
+						item.state !== 'not_used' &&
+						permissions[item.id] &&
+						permissions[item.id].settings
+					) {
 						cell +=
 							' ' + actionButton('open_settings', item.id, t('healthcheck.action.open_settings'));
 					}

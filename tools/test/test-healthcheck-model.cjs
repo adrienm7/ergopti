@@ -197,6 +197,8 @@ for (const key of [
 	'healthcheck.state.granted',
 	'healthcheck.state.missing',
 	'healthcheck.state.unknown',
+	'healthcheck.state.unavailable',
+	'healthcheck.state.not_used',
 	'healthcheck.probe.pending',
 	'healthcheck.probe.timeout',
 	'healthcheck.probe.error',
@@ -205,6 +207,7 @@ for (const key of [
 	'healthcheck.problem.none',
 	'healthcheck.problem.paused',
 	'healthcheck.problem.permission',
+	'healthcheck.problem.unavailable',
 	'healthcheck.problem.network',
 	'healthcheck.problem.ai',
 	'healthcheck.problem.errors',
@@ -513,6 +516,34 @@ if (Model.renderHtml(hostile, schema, t).includes('<img src=x'))
 	const html = Model.renderHtml(snapshot, schema, t);
 	if (!html.includes('data-action="open_settings"'))
 		fail('the page renders no settings button for a missing permission');
+	// The remap guardian: unavailable leaves every remap inert and needs Login
+	// Items; « not used » is the Karabiner switch turned off, not a problem.
+	const guardianState = (state) => {
+		const shot = fixture('macos');
+		for (const item of shot.sections.permissions.items) {
+			item.state = item.id === 'login_items' ? state : 'granted';
+		}
+		return shot;
+	};
+	const loginItemsButton = 'data-action="open_settings" data-id="login_items"';
+	const unavailable = guardianState('unavailable');
+	const unavailableProblem = Model.problems(unavailable, schema).find(
+		(problem) => problem.key === 'healthcheck.problem.unavailable'
+	);
+	if (
+		!unavailableProblem ||
+		!unavailableProblem.action ||
+		unavailableProblem.action.id !== 'login_items'
+	) {
+		fail('an unavailable remap guardian is not a problem that opens Login Items');
+	}
+	if (!Model.renderHtml(unavailable, schema, t).includes(loginItemsButton))
+		fail('an unavailable remap guardian row offers no Login Items button');
+	const notUsed = guardianState('not_used');
+	if (Model.problems(notUsed, schema).some((problem) => /permission|unavailable/.test(problem.key)))
+		fail('a Karabiner switch turned off is reported as a problem');
+	if (Model.renderHtml(notUsed, schema, t).includes(loginItemsButton))
+		fail('an unused remap guardian row still offers the Login Items button');
 	const healthy = fixture('windows');
 	healthy.probes.github_api = { state: 'ok', ms: 80 };
 	healthy.probes.ai_health = { state: 'disabled' };

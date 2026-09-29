@@ -82,6 +82,11 @@ local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 local LAYOUT_REFRESH_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local REMAP_GUARDIAN_STATUS_ENV = "ERGOPTI_REMAP_GUARDIAN_STATUS"
 local REMAP_GUARDIAN_READY = "ready"
+-- The native statuses a guardian observation can cache, and the two states
+-- the diagnostics add: the switch is off, or nothing was observed yet.
+local GUARDIAN_OBSERVED_STATES = { ready = true, requires_approval = true, unavailable = true }
+local GUARDIAN_STATE_NOT_USED = "not_used"
+local GUARDIAN_STATE_UNKNOWN = "unknown"
 -- General > Login Items, where the guardian's Background Items switch lives.
 -- Opened directly for an `unavailable` guardian, which the approval-gated
 -- opener refuses by design.
@@ -3102,6 +3107,21 @@ local ONBOARDING_STOP_JOINED = {}
 function M.get_enabled()
 	if not _state then return false end
 	return _state.enabled == true
+end
+
+--- The remap guardian's state for the diagnostics permissions table, read
+--- from memory without any native observation or side effect.
+--- @return string state `ready`, `requires_approval`, `unavailable`,
+---   `not_used` (« Ergopti uses Karabiner » is off) or `unknown` (not yet
+---   observed in this lifecycle, or unreadable).
+function M.guardian_state()
+	if not _state then return GUARDIAN_STATE_UNKNOWN end
+	if _state.enabled ~= true then return GUARDIAN_STATE_NOT_USED end
+	local ok, _, snapshot = pcall(LeaseController.status)
+	if not ok or type(snapshot) ~= "table" then return GUARDIAN_STATE_UNKNOWN end
+	local status = snapshot.guardian_status
+	if GUARDIAN_OBSERVED_STATES[status] then return status end
+	return GUARDIAN_STATE_UNKNOWN
 end
 
 --- Enables or disables the Karabiner integration and persists the choice.
