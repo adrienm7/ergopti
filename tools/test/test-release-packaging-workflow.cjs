@@ -210,6 +210,14 @@ const WINDOWS_SMOKE_HANG_HEADROOM = 3;
 // PowerShell names are case-insensitive, so $seconds is the same parameter.
 const WINDOWS_SMOKE_PRINTS_ELAPSED = /Write-Host .*\$Seconds\b/i;
 const WINDOWS_SMOKE_VERDICT = 'if ($crashedEarly -or -not $markerSeen) {';
+const WINDOWS_SMOKE_WAIT_OPENER = 'while ($clock.Elapsed.TotalSeconds -lt $hangBoundSeconds) {';
+// The only ways out of the wait, in order. Any other exit, such as a
+// wall-clock deadline, turns a slow extraction back into a false failure.
+const WINDOWS_SMOKE_WAIT_EXITS = [
+	'if ($proc.HasExited) { break }',
+	'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }',
+	'if ([SmokeWindows]::HasDialog($proc.Id)) { $dialogSeen = $true; break }'
+];
 
 /**
  * Lists why a Windows exe smoke script would read a slow first-launch
@@ -234,23 +242,67 @@ function windowsSmokeWaitProblems(script) {
 				`(${SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS} s): it bounds a hang, it does not detect a dialog`
 		);
 	}
-	if (!code.some((line) => line.includes('"#32770"'))) {
+	if (
+		code.filter((line) => line.trim() === 'private const string DialogClass = "#32770";').length !==
+		1
+	) {
 		problems.push('the Windows exe smoke must recognise a dialog by its window class #32770');
+	}
+	// A token anywhere in the probe proves nothing: the class could be compared
+	// to another constant, or the windows of another process read.
+	for (const [opener, required, what] of [
+		[
+			'public static bool HasDialog(int processId)',
+			[
+				'foreach (var window in TopLevelWindows(processId))',
+				'if (ClassOf(window) == DialogClass) return true;'
+			],
+			'compare each window of the process to DialogClass'
+		],
+		[
+			'private static List<IntPtr> TopLevelWindows(int processId)',
+			[
+				'GetWindowThreadProcessId(window, out owner);',
+				'if (owner == (uint)processId) found.Add(window);'
+			],
+			'keep only the windows of the launched process'
+		]
+	]) {
+		try {
+			const method = pipeline.scriptBlock(code, opener).map((line) => line.trim());
+			if (!required.every((statement) => method.includes(statement))) {
+				problems.push(`the Windows exe smoke dialog probe must ${what}`);
+			}
+		} catch (error) {
+			problems.push(`the Windows exe smoke lost its dialog probe: ${error.message}`);
+		}
 	}
 	try {
 		const wait = pipeline.scriptBlock(code, 'while (');
-		if (!wait[0].includes('$hangBoundSeconds')) {
-			problems.push('the Windows exe smoke wait must be bounded by $hangBoundSeconds');
-		}
-		if (
-			!wait.some(
-				(line) =>
-					line.includes('[SmokeWindows]::HasDialog($proc.Id)') &&
-					line.includes('$dialogSeen = $true; break')
-			)
-		) {
+		if (wait[0].trim() !== WINDOWS_SMOKE_WAIT_OPENER) {
 			problems.push(
-				'the Windows exe smoke wait must stop at the first dialog window of the launched process'
+				`the Windows exe smoke wait must be bounded by $hangBoundSeconds alone: ${WINDOWS_SMOKE_WAIT_OPENER}`
+			);
+		}
+		const body = wait.slice(1, -1).map((line) => line.trim());
+		const exits = body.filter((line) =>
+			/\b(?:break|exit|return|throw)\b|\bWrite-Error\b/i.test(line)
+		);
+		if (exits.join('\n') !== WINDOWS_SMOKE_WAIT_EXITS.join('\n')) {
+			problems.push(
+				`the Windows exe smoke wait must end only on a crash, the marker or a dialog: ` +
+					`expected ${WINDOWS_SMOKE_WAIT_EXITS.join(' | ')}; got ${exits.join(' | ')}`
+			);
+		}
+		const clockReads = body.filter(
+			(line) =>
+				/\bElapsed\b|Get-Date|\[DateTime\]|\bTicks\b|\bTickCount|\bTotal(?:Milli)?Seconds\b/i.test(
+					line
+				) && line !== '$stagingSeconds = $clock.Elapsed.TotalSeconds'
+		);
+		if (clockReads.length > 0) {
+			problems.push(
+				`the Windows exe smoke wait may read the clock only to time the staging directory: ${clockReads.join(' | ')}`
 			);
 		}
 	} catch (error) {
@@ -321,6 +373,59 @@ if (windowsSmokeStep !== null) {
 		[
 			'a wait blind to dialogs',
 			(lines) => lines.filter((line) => !line.includes('[SmokeWindows]::HasDialog($proc.Id)'))
+		],
+		[
+			'a disabled dialog exit',
+			(lines) =>
+				lines.map((line) =>
+					line.replace(
+						'if ([SmokeWindows]::HasDialog($proc.Id))',
+						'if ($false -and [SmokeWindows]::HasDialog($proc.Id))'
+					)
+				)
+		],
+		[
+			'the 20 s wall clock back inside the wait',
+			(lines) =>
+				lines.flatMap((line) =>
+					line.trim() === WINDOWS_SMOKE_WAIT_OPENER
+						? [line, '    if ($clock.Elapsed.TotalSeconds -gt 20) { break }']
+						: [line]
+				)
+		],
+		[
+			'a second deadline in the wait condition',
+			(lines) =>
+				lines.map((line) =>
+					line.replace(
+						'-lt $hangBoundSeconds) {',
+						'-lt $hangBoundSeconds -and $clock.Elapsed.TotalSeconds -lt 20) {'
+					)
+				)
+		],
+		[
+			'a dialog probe that tests another window class',
+			(lines) =>
+				lines.map((line) =>
+					line.replace(
+						'if (ClassOf(window) == DialogClass) return true;',
+						'if (ClassOf(window) == "AutoHotkeyGUI") return true;'
+					)
+				)
+		],
+		[
+			'a dialog class other than #32770',
+			(lines) =>
+				lines.map((line) =>
+					line.replace('DialogClass = "#32770";', 'DialogClass = "AutoHotkeyGUI";')
+				)
+		],
+		[
+			'a dialog probe that ignores the launched process',
+			(lines) =>
+				lines.map((line) =>
+					line.replace('if (owner == (uint)processId) found.Add(window);', 'found.Add(window);')
+				)
 		],
 		[
 			'a failure without diagnostics',
