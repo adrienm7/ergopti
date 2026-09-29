@@ -97,6 +97,28 @@ function M.refresh()
 	return true
 end
 
+--- Makes a scope's validated candidate effective before its file is published.
+--- @param document table Decoded configuration candidate.
+--- @return boolean adopted
+function M.adopt_configuration(document)
+	local called, value = pcall(resolve_setting, document)
+	if not called then
+		Logger.error(LOG, "Candidate repeat configuration refused: %s.", tostring(value))
+		return false
+	end
+	_enabled = value
+	return true
+end
+
+--- Restores the exact runtime value a scope captured before a refused publication.
+--- @param enabled boolean Captured value.
+--- @return boolean restored
+function M.restore_configuration(enabled)
+	if type(enabled) ~= "boolean" then return false end
+	_enabled = enabled
+	return true
+end
+
 --- Whether repeat is active, with no repeated disk IO on the input path.
 --- @return boolean enabled
 function M.is_enabled()

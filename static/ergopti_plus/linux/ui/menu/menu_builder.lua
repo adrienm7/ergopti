@@ -1548,7 +1548,23 @@ local function _manifest_hotstring_rows(ctx, config)
 	local function all_groups_on() return _all_hotstring_groups_on(config) end
 	local whole_tree = all_sections_row(all_category_ids())
 
+	--- Restores or clears the Hotstrings scope after the user confirms it.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean committed
+	local function apply_hotstrings_scope(mode)
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.hotstrings.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
+			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+
 	hs_ctx.commands = {
+		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
+		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
 		["hotstrings_all_sections"] = whole_tree.action,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.

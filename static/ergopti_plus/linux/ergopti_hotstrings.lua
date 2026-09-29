@@ -1605,6 +1605,9 @@ local function main()
 				-- hotstring_categories_dynamic used to resolve to: this driver's
 				-- groups come from TOML file stems, and there is no dynamic TOML.
 				dyn_hotstrings = dyn_hotstrings,
+				-- The preview renderer's own copy of the four toggles, which a
+				-- hotstrings scope refreshes alongside their canonical leaves.
+				tooltip_preview = tooltip_preview,
 				layout        = opts.layout,
 				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes
