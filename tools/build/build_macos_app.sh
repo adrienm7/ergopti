@@ -69,6 +69,11 @@ ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 KARABINER_MANIFEST_DATA="$(python3 "$REPO_ROOT/tools/build/karabiner_manifest.py")"
 IFS=$'\t' read -r KARABINER_VERSION KARABINER_FILE_NAME KARABINER_SHA256 KARABINER_SOURCE_URL <<< "$KARABINER_MANIFEST_DATA"
 
+# Every language the driver ships, as the launcher's CFBundleLocalizations.
+# Without them AppKit resolves the bundle to its development region and the
+# frameworks it hosts (Sparkle's remaining windows) stay English.
+LAUNCHER_LOCALIZATIONS="$(python3 "$REPO_ROOT/tools/build/launcher_localizations.py")"
+
 # Ollama CLI version bundled for local LLM inference. The universal binary is
 # downloaded at build time and stored in Resources/Tools/ so the app can run
 # local models on first launch without any manual install step. Users still
@@ -571,6 +576,8 @@ generate_info_plist() {
 			<key>CFBundleShortVersionString</key>     <string>$ERGOPTI_VERSION</string>
 			<key>CFBundleVersion</key>                <string>$ERGOPTI_BUILD</string>
 			<key>CFBundleIconFile</key>               <string>ErgoptiPlus</string>
+			<key>CFBundleDevelopmentRegion</key>      <string>en</string>
+			<key>CFBundleLocalizations</key>          <array>$LAUNCHER_LOCALIZATIONS</array>
 			<key>LSMinimumSystemVersion</key>         <string>11.0</string>
 			<key>LSUIElement</key>                    <false/>
 			<key>LSMultipleInstancesProhibited</key>  <true/>

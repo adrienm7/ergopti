@@ -1440,6 +1440,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-macos-sparkle-feed.cjs'
 	},
 	{
+		name: 'macOS launcher declares every driver language so Sparkle windows follow it',
+		cmd: 'node',
+		args: ['tools/test/test-macos-launcher-localizations.cjs'],
+		repro: 'npm run test:macos-launcher-localizations'
+	},
+	{
 		name: 'macOS embedded Hammerspoon and native helper cannot update themselves',
 		cmd: 'node',
 		args: ['tools/test/test-macos-sparkle-disarmed-bundles.cjs'],

@@ -119,6 +119,7 @@
 		"test:macos-swift-launcher": "node ./tools/test/run-macos-swift-launcher.cjs",
 		"test:macos-remap-launchagent": "node ./tools/test/test-macos-remap-launchagent.cjs",
 		"test:macos-sparkle-feed": "node ./tools/test/test-macos-sparkle-feed.cjs",
+		"test:macos-launcher-localizations": "node ./tools/test/test-macos-launcher-localizations.cjs",
 		"test:macos-sparkle-disarmed-bundles": "node ./tools/test/test-macos-sparkle-disarmed-bundles.cjs",
 		"test:macos-stable-signing-identity": "node ./tools/test/test-macos-stable-signing-identity.cjs",
 		"test:homebrew-cask": "node ./tools/test/test-homebrew-cask.cjs",
