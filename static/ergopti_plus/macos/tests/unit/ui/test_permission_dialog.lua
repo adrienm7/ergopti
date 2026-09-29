@@ -207,6 +207,12 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_contains(html, "rouvrez ErgoptiPlus pour revoir ces étapes",
 				"Later must say how to get the steps back")
 			helpers.assert_contains(html, "Activez « Hammerspoon » dans la liste")
+			-- A stock Hammerspoon with its own grant is listed under the same name
+			-- and icon, switched on; the reset leaves the ErgoptiPlus entry off.
+			helpers.assert_contains(html, "S’il y en a deux, activez celui qui est désactivé.",
+				"with two “Hammerspoon” entries the step must say which one to turn on")
+			helpers.assert_true(html:find("S’il semble déjà activé", 1, true) == nil,
+				"toggling an entry that looks on would flip the stock Hammerspoon one")
 			helpers.assert_contains(html, '<html lang="fr" dir="auto">')
 			helpers.assert_contains(html, '<code dir="ltr">' .. BUNDLE_PATH .. "</code>")
 			helpers.assert_contains(html, ">Ouvrir les Réglages</button>")

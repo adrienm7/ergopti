@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "Autoriser ErgoptiPlus dans Accessibilité",
 	"permission_dialog.accessibility.body": "ErgoptiPlus a besoin de cette autorisation pour lire le clavier. Il démarre tout seul dès qu’elle est activée, sans redémarrage. Si vous fermez cette fenêtre, rouvrez ErgoptiPlus pour revoir ces étapes.",
 	"permission_dialog.accessibility.step_opened": "Réglages Système > Confidentialité et sécurité > Accessibilité vient de s’ouvrir.",
-	"permission_dialog.accessibility.step_toggle": "Activez « Hammerspoon » dans la liste : c’est le moteur d’ErgoptiPlus. S’il semble déjà activé, désactivez-le puis réactivez-le.",
+	"permission_dialog.accessibility.step_toggle": "Activez « Hammerspoon » dans la liste : c’est le moteur d’ErgoptiPlus. S’il y en a deux, activez celui qui est désactivé. Si le seul présent semble déjà activé, désactivez-le puis réactivez-le.",
 	"startup.linux_input_access_body": "Ergopti+ ne peut pas encore lire le clavier ni écrire dans /dev/uinput. Déconnectez-vous puis reconnectez-vous (ou redémarrez) pour que les groupes « input » et « uinput » ajoutés par l’installateur prennent effet. Si le problème persiste, lancez : {1}",
 	"startup.linux_input_access_title": "Ergopti+ ne peut pas encore utiliser le clavier",
 	"startup.manifest_missing": "Erreur de démarrage : le fichier _generated/features_manifest.ahk est absent ou corrompu.\n\nLancez `npm run build:manifest` depuis le répertoire du projet, puis relancez le script.",

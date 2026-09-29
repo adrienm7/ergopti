@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "एक्सेसिबिलिटी में ErgoptiPlus को अनुमति दें",
 	"permission_dialog.accessibility.body": "कीबोर्ड पढ़ने के लिए ErgoptiPlus को यह अनुमति चाहिए। अनुमति चालू होते ही यह बिना रीस्टार्ट के अपने-आप शुरू हो जाता है। अगर आप यह विंडो बंद करते हैं, तो ये चरण फिर से देखने के लिए ErgoptiPlus को दोबारा खोलें।",
 	"permission_dialog.accessibility.step_opened": "सिस्टम सेटिंग्ज़ > गोपनीयता और सुरक्षा > एक्सेसिबिलिटी अभी खुली है।",
-	"permission_dialog.accessibility.step_toggle": "सूची में “Hammerspoon” चालू करें: यह ErgoptiPlus का इंजन है। अगर यह पहले से चालू दिखे, तो इसे बंद करके फिर से चालू करें।",
+	"permission_dialog.accessibility.step_toggle": "सूची में “Hammerspoon” चालू करें: यह ErgoptiPlus का इंजन है। अगर दो दिखें, तो जो बंद है उसे चालू करें। अगर अकेली प्रविष्टि पहले से चालू दिखे, तो उसे बंद करके फिर से चालू करें।",
 	"startup.linux_input_access_body": "Ergopti+ अभी कीबोर्ड पढ़ नहीं सकता या /dev/uinput में लिख नहीं सकता। इंस्टॉलर द्वारा जोड़े गए “input” और “uinput” समूह लागू हों, इसके लिए लॉग आउट करके फिर से लॉग इन करें (या रीस्टार्ट करें)। समस्या बनी रहे तो चलाएँ: {1}",
 	"startup.linux_input_access_title": "Ergopti+ अभी कीबोर्ड का उपयोग नहीं कर सकता",
 	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",

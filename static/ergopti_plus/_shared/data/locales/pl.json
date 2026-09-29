@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "Zezwól ErgoptiPlus w Dostępności",
 	"permission_dialog.accessibility.body": "ErgoptiPlus potrzebuje tego uprawnienia, aby odczytywać klawiaturę. Uruchomi się sam, gdy tylko uprawnienie zostanie włączone, bez ponownego uruchamiania. Jeśli zamkniesz to okno, otwórz ponownie ErgoptiPlus, aby znów zobaczyć te kroki.",
 	"permission_dialog.accessibility.step_opened": "Właśnie otworzyły się Ustawienia systemowe > Prywatność i ochrona > Dostępność.",
-	"permission_dialog.accessibility.step_toggle": "Włącz „Hammerspoon” na liście: to silnik ErgoptiPlus. Jeśli wygląda na już włączony, wyłącz go i włącz ponownie.",
+	"permission_dialog.accessibility.step_toggle": "Włącz „Hammerspoon” na liście: to silnik ErgoptiPlus. Jeśli są dwa, włącz ten wyłączony. Jeśli jedyny wygląda na już włączony, wyłącz go i włącz ponownie.",
 	"startup.linux_input_access_body": "Ergopti+ nie może jeszcze odczytać klawiatury ani zapisywać do /dev/uinput. Wyloguj się i zaloguj ponownie (lub uruchom ponownie komputer), aby grupy „input” i „uinput” dodane przez instalator zaczęły obowiązywać. Jeśli problem nie ustąpi, uruchom: {1}",
 	"startup.linux_input_access_title": "Ergopti+ nie może jeszcze używać klawiatury",
 	"startup.manifest_missing": "Błąd uruchomienia: plik _generated/features_manifest.ahk jest nieobecny lub uszkodzony.\n\nUruchom `npm run build:manifest` z katalogu projektu i zrestartuj skrypt.",

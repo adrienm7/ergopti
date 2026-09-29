@@ -37,9 +37,9 @@
 		},
 		"permission_dialog": {
 			"width": 560,
-			"height": 400,
+			"height": 500,
 			"min_width": 560,
-			"min_height": 400,
+			"min_height": 500,
 			"vhost": "ergopti.permissiondialog"
 		},
 		"error_dialog": {
