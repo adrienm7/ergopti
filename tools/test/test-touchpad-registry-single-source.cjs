@@ -171,7 +171,7 @@ function functionBody(source, name) {
 		configure.includes('TouchpadRegistryApply(') && !configure.includes('Reg_WriteDword'),
 		'the in-process writer must write through the owner, never on its own'
 	);
-	const wizard = read(path.join(WIN, 'ui', 'onboarding', 'steps_metrics.ahk'));
+	const wizard = read(path.join(WIN, 'ui', 'onboarding', 'gesture_registration.ahk'));
 	const script = functionBody(wizard, '_Onboarding_BuildGesturePsScript');
 	check(
 		script.includes('TouchpadRegistryPowerShellKey()') &&

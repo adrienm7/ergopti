@@ -33,7 +33,8 @@ local SUBSCRIBED_NON_DEFAULT = (function()
 	error("the update channel registry must declare a second channel")
 end)()
 
--- One key of each shape the Linux readers take, and five they never read.
+-- One key of each shape the Linux readers take, and six they never read.
+-- Linux has no hotstring master switch: the setup wizard asks per section.
 local FIXTURE = table.concat({
 	"[hotstrings]",
 	"enabled = false",
@@ -69,6 +70,7 @@ local FIXTURE = table.concat({
 }, "\n")
 
 local EXPECTED = {
+	"hotstrings.enabled=leaf",
 	"hotstrings.stale_toggle=leaf",
 	"metrics.metrics_encrypt=leaf",
 	"gestures.not_a_slot=leaf",
@@ -155,7 +157,7 @@ local function driver_state(path)
 		shortcuts_enabled = shortcuts.is_enabled(),
 		chatgpt_url = chatgpt_url,
 		update_channel = update_channel,
-		answers = require("ui.onboarding.bridge")._answers_from_config(decoded, ""),
+		wizard = require("ui.onboarding.bridge").config_values(decoded),
 	}
 end
 
@@ -192,7 +194,7 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 				checked = checked + 1
 			end
 		end
-		helpers.assert_eq(checked, #SURVIVORS + 2,
+		helpers.assert_eq(checked, #SURVIVORS + 1,
 			"every used record of the fixture must be exercised")
 	end)
 

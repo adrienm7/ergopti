@@ -80,13 +80,14 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 		end)
 		helpers.it("(webview-focus-owner) onboarding retirement revokes focus, delete refused=" .. tostring(refused), function()
 			with_window("ui.onboarding", function(onboarding, state)
+				require("tests.support.onboarding_shared_data").install()
 				helpers.assert_true(onboarding.run("/virtual/config.toml"))
 				require("tests.support.webview_focus_fixture").check(state.view,
 					function() return onboarding.run("/virtual/config.toml") end,
 					function()
 						if refused then
 							state.refused = true
-							state.receiver({ body = { action = "finish", answers = { locale = "en" } } })
+							state.receiver({ body = { action = "finish", answers = { locale = "en", config_dir = "", operations = {} } } })
 							helpers.assert_eq(state.deleted, 1)
 						else
 							state.view.options.on_close()
@@ -97,6 +98,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 	end
 	helpers.it("(webview-focus-owner) onboarding constructor close revokes factory focus", function()
 		with_window("ui.onboarding", function(onboarding, state)
+			require("tests.support.onboarding_shared_data").install()
 			state.close_during_create = true
 			helpers.assert_eq(onboarding.run("/virtual/config.toml"), false)
 			helpers.assert_eq(state.view.options.is_current(), false)

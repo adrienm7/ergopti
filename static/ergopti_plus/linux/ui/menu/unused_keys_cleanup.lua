@@ -52,7 +52,7 @@ function M.collect(decoded, mark)
 	require("modules.llm.agent_settings").mark_config_reads(decoded, mark)
 	require("infra.llm_preferences").mark_config_read(decoded, "llm.models.selected", mark)
 	require("modules.updater.manager").mark_config_reads(decoded, mark)
-	require("ui.onboarding.bridge")._answers_from_config(decoded, "", mark)
+	require("ui.onboarding.bridge").config_values(decoded, mark)
 end
 
 --- Lists the unused keys of a config file under the Linux rule.

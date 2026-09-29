@@ -5,11 +5,20 @@
  * MODULE: Onboarding Wizard Page Regression
  * DESCRIPTION:
  * Executes the shared first-run wizard page against a minimal DOM and drives it
- * through the host protocol every driver speaks. Pins the three reported
- * regressions at the page boundary: the title follows the previewed locale and
- * names the product once, a folder picked natively lands in the field and in
- * the finish payload, and the metrics consent warning names the store of the
- * folder chosen on the config step rather than the one known at open time.
+ * through the host protocol every driver speaks, for each driver platform of
+ * the generated catalogue.
+ *
+ * FEATURES & RATIONALE:
+ * 1. One page per configuration scope, in the approved menu order, after the
+ *    language and folder steps; every question starts at No.
+ * 2. The finish payload carries manifest paths only: each one is checked
+ *    against the driver's own generated manifest, not against the catalogue
+ *    that produced it.
+ * 3. A Yes imports the recommended items, a re-run starts from the values in
+ *    force and writes only what the answers change.
+ * 4. The earlier regressions stay pinned: the title follows the previewed
+ *    locale and names the product once, a folder picked natively reaches the
+ *    payload, and the metrics consent names the store of the chosen folder.
  * ==============================================================================
  */
 
@@ -19,13 +28,49 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const TOML = require('smol-toml');
 
-const SHARED = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
+const ROOT = path.resolve(__dirname, '../..');
+const SP = path.join(ROOT, 'static/ergopti_plus');
+const SHARED = path.join(SP, '_shared');
 const source = fs.readFileSync(path.join(SHARED, 'ui/onboarding/script.js'), 'utf8');
 const hostBridge = fs.readFileSync(path.join(SHARED, 'ui/host_bridge.js'), 'utf8');
+const catalogueScript = fs.readFileSync(
+	path.join(SHARED, 'ui/_generated/onboarding_catalogue.js'),
+	'utf8'
+);
 const html = fs.readFileSync(path.join(SHARED, 'ui/onboarding/index.html'), 'utf8');
 const LOCALE_DIR = path.join(SHARED, 'data/locales');
 const PRODUCT = 'ErgoptiPlus';
+
+// The approved first-run order: the Tap-Holds, Shortcuts, Gestures, keyboard
+// layout, Hotstrings, AI and Metrics submenus.
+const APPROVED_ORDER = [
+	'tap_holds',
+	'shortcuts',
+	'gestures',
+	'keyboard_layout',
+	'hotstrings',
+	'llm',
+	'metrics'
+];
+
+// Each driver's own generated manifest: the independent authority on which
+// paths exist for it.
+const DRIVER_MANIFESTS = {
+	windows: {
+		file: 'windows/_generated/features_manifest.ahk',
+		row: /Map\("path", "([^"]+)"[^\n]*?"type", "([^"]+)"/g
+	},
+	macos: {
+		file: 'macos/_generated/features_manifest.lua',
+		row: /path = "([^"]+)"[^\n]*?type = "([^"]+)"/g
+	},
+	linux: {
+		file: 'linux/_generated/features_manifest.lua',
+		row: /path = "([^"]+)"[^\n]*?type = "([^"]+)"/g
+	}
+};
 
 /**
  * Reads one locale file as a flat key -> string map.
@@ -34,7 +79,7 @@ const PRODUCT = 'ErgoptiPlus';
  */
 function locale(code) {
 	return JSON.parse(
-		fs.readFileSync(path.join(LOCALE_DIR, code + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		fs.readFileSync(path.join(LOCALE_DIR, code + '.json'), 'utf8').replace(/^﻿/, '')
 	);
 }
 
@@ -49,23 +94,64 @@ function occurrences(haystack, needle) {
 }
 
 // ======================================
-// ======= 1/ Minimal DOM ===============
+// ======= 1/ Declared manifest paths ===
+// ======================================
+
+const manifestToml = TOML.parse(
+	fs
+		.readFileSync(path.join(SHARED, 'modules/features/manifest.toml'), 'utf8')
+		.replace(
+			/^\[\[features\.([^\]]+)\]\]\r?$/gm,
+			(_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
+		)
+);
+
+/**
+ * Builds a predicate telling whether a path is a configuration key the driver
+ * declares: one of its features, a feature table's `enabled`, or a leaf of a
+ * scope's dynamic defaults.
+ * @param {string} driver
+ * @returns {function(string): boolean}
+ */
+function declaredPaths(driver) {
+	const spec = DRIVER_MANIFESTS[driver];
+	const text = fs.readFileSync(path.join(SP, spec.file), 'utf8');
+	const features = new Map();
+	for (const match of text.matchAll(spec.row)) features.set(match[1], match[2]);
+	assert.ok(features.size > 100, `${driver}: the generated manifest yields its features`);
+	const dynamics = [];
+	for (const scope of Object.values(manifestToml.scopes))
+		dynamics.push(...(scope.dynamic_defaults || []));
+	return function declared(entryPath) {
+		if (features.has(entryPath)) return true;
+		if (entryPath.endsWith('.enabled') && features.get(entryPath.slice(0, -8)) === 'feature')
+			return true;
+		return dynamics.some((definition) => {
+			if (!entryPath.startsWith(definition.prefix + '.')) return false;
+			const parts = entryPath.slice(definition.prefix.length + 1).split('.');
+			if (parts.length !== definition.depth || parts.includes('')) return false;
+			return !definition.suffix || parts[parts.length - 1] === definition.suffix;
+		});
+	};
+}
+
+// ======================================
+// ======= 2/ Minimal DOM ===============
 // ======================================
 
 /**
  * Builds a fresh page with every id declared in index.html.
- * @returns {{context: object, elements: Map, messages: Array, click: Function}}
+ * @returns {object} Page handle.
  */
 function loadPage() {
 	const elements = new Map();
-	const radios = [];
 	const messages = [];
 
 	function makeElement(tag, id) {
 		const classes = new Set();
 		const listeners = {};
 		const el = {
-			tagName: tag,
+			tagName: tag.toUpperCase(),
 			id,
 			textContent: '',
 			value: '',
@@ -73,11 +159,26 @@ function loadPage() {
 			hidden: false,
 			disabled: false,
 			checked: false,
+			indeterminate: false,
+			type: '',
+			name: '',
 			src: '',
+			alt: '',
+			maxLength: -1,
+			scrollTop: 0,
 			style: {},
 			dataset: {},
 			children: [],
-			className: '',
+			get className() {
+				return [...classes].join(' ');
+			},
+			set className(value) {
+				classes.clear();
+				String(value)
+					.split(/\s+/)
+					.filter(Boolean)
+					.forEach((name) => classes.add(name));
+			},
 			classList: {
 				add: (...names) => names.forEach((n) => classes.add(n)),
 				remove: (...names) => names.forEach((n) => classes.delete(n)),
@@ -108,15 +209,12 @@ function loadPage() {
 			get innerHTML() {
 				return '';
 			},
-			hasClass(n) {
-				return classes.has(n) || el.className.split(/\s+/).includes(n);
-			},
 			querySelectorAll(selector) {
 				const wanted = selector.split('.').filter(Boolean);
 				const out = [];
 				(function walk(node) {
 					node.children.forEach((child) => {
-						if (wanted.every((n) => child.hasClass(n))) out.push(child);
+						if (wanted.every((n) => child.classList.contains(n))) out.push(child);
 						walk(child);
 					});
 				})(el);
@@ -131,24 +229,13 @@ function loadPage() {
 		return el;
 	}
 
-	for (const match of html.matchAll(/<(\w+)[^>]*\sid="([^"]+)"/g)) {
-		elements.set(match[2], makeElement(match[1], match[2]));
-	}
-	for (const match of html.matchAll(
-		/<input type="radio" name="(\w+)" value="([^"]*)"( checked)?/g
-	)) {
-		const radio = makeElement('input', '');
-		radio.name = match[1];
-		radio.value = match[2];
-		radio.checked = !!match[3];
-		radio.type = 'radio';
-		radios.push(radio);
-	}
-
-	function radioQuery(selector) {
-		const m = selector.match(/^input\[name='(\w+)'\](:checked)?$/);
-		if (!m) throw new Error('unsupported selector ' + selector);
-		return radios.filter((r) => r.name === m[1] && (!m[2] || r.checked));
+	for (const match of html.matchAll(/<(\w+)([^>]*)\sid="([^"]+)"([^>]*)>/g)) {
+		const el = makeElement(match[1], match[3]);
+		const attributes = match[2] + ' ' + match[4];
+		const classMatch = attributes.match(/class="([^"]*)"/);
+		if (classMatch) el.className = classMatch[1];
+		el.checked = /\schecked(\s|$|\/)/.test(attributes);
+		elements.set(match[3], el);
 	}
 
 	const document = {
@@ -156,8 +243,6 @@ function loadPage() {
 		title: '',
 		getElementById: (id) => elements.get(id) || null,
 		createElement: (tag) => makeElement(tag, ''),
-		querySelectorAll: radioQuery,
-		querySelector: (selector) => radioQuery(selector)[0] || null,
 		addEventListener() {}
 	};
 	const window = {
@@ -167,31 +252,36 @@ function loadPage() {
 			}
 		}
 	};
-	const context = vm.createContext({ console, window, document });
+	const context = vm.createContext({ console, window, document, JSON });
 	vm.runInContext(hostBridge, context);
+	vm.runInContext(catalogueScript, context);
 	vm.runInContext(source, context);
 	return {
-		context,
 		window,
 		document,
 		elements,
 		messages,
-		radios,
-		click: (id) => elements.get(id).click(),
-		chooseRadio(name, value) {
-			radios
-				.filter((r) => r.name === name)
-				.forEach((r) => {
-					r.checked = r.value === value;
-				});
-		}
+		el: (id) => elements.get(id),
+		click: (id) => elements.get(id).click()
 	};
 }
 
 /**
+ * The catalogue the page renders.
+ * @returns {object}
+ */
+function catalogue() {
+	const sandbox = { window: {} };
+	vm.runInNewContext(catalogueScript, sandbox);
+	return JSON.parse(JSON.stringify(sandbox.window.ONBOARDING_CATALOGUE));
+}
+
+const CATALOGUE = catalogue();
+
+/**
  * Loads the page and performs the host's initData handshake.
  * @param {object} [extra] Extra initData fields.
- * @returns {ReturnType<typeof loadPage>}
+ * @returns {object} Page handle.
  */
 function openWizard(extra) {
 	const page = loadPage();
@@ -206,7 +296,8 @@ function openWizard(extra) {
 					{ code: 'en', flag: '', name: 'English' },
 					{ code: 'fr', flag: '', name: 'Français' }
 				],
-				answers: { locale: 'en', config_dir: '' },
+				config_dir: '',
+				current: {},
 				metrics_path: '/Volumes/Fixture/me/.config/ergopti_plus/metrics',
 				platform: 'macos'
 			},
@@ -217,17 +308,457 @@ function openWizard(extra) {
 }
 
 /**
- * Walks from the config step to the metrics step.
- * @param {ReturnType<typeof loadPage>} page
+ * Advances with Next the given number of times.
+ * @param {object} page
+ * @param {number} count
  */
-function advanceToMetrics(page) {
-	page.click('sc-next');
-	page.click('s2-next');
-	page.click('s3-next');
+function next(page, count) {
+	for (let i = 0; i < count; i++) page.click('btn-next');
+}
+
+/**
+ * Walks from the language step to the configuration page with the given id.
+ * @param {object} page
+ * @param {string} id
+ */
+function goToPage(page, id) {
+	next(page, 2 + APPROVED_ORDER.indexOf(id));
+	assert.equal(page.el('page-title').textContent, locale('en')[pageOf(page, id).title_key]);
+}
+
+/**
+ * The catalogue page of the open wizard's platform.
+ * @param {object} page
+ * @param {string} id
+ * @returns {object}
+ */
+function pageOf(page, id) {
+	const platform = page.platform || 'macos';
+	return CATALOGUE.platforms[platform].pages.find((candidate) => candidate.id === id);
+}
+
+/**
+ * Answers the visible question.
+ * @param {object} page
+ * @param {boolean} yes
+ */
+function answer(page, yes) {
+	page.el('page-yes').checked = yes;
+	page.el('page-no').checked = !yes;
+	page.el(yes ? 'page-yes' : 'page-no').dispatch('change');
+}
+
+/**
+ * Clicks Next until the wizard posts its finish message, and returns it.
+ * @param {object} page
+ * @returns {object}
+ */
+function finish(page) {
+	page.messages.splice(0);
+	for (let guard = 0; guard < 20; guard++) {
+		page.click('btn-next');
+		const done = page.messages.find((m) => m.action === 'finish');
+		if (done) return done;
+	}
+	throw new Error('the wizard never finished');
+}
+
+/**
+ * Every checkbox row under the checklist body, with its label.
+ * @param {object} page
+ * @returns {Array<{text: string, box: object}>}
+ */
+function checkRows(page) {
+	return page
+		.el('page-checklist-body')
+		.querySelectorAll('check-row')
+		.map((row) => ({ text: row.children[1].textContent, box: row.children[0] }));
+}
+
+/**
+ * Toggles one checkbox row.
+ * @param {{box: object}} row
+ */
+function toggle(row) {
+	row.box.checked = !row.box.checked;
+	row.box.dispatch('change');
+}
+
+/**
+ * Every path a platform's catalogue lets the wizard write.
+ * @param {string} driver
+ * @returns {Set<string>}
+ */
+function cataloguePaths(driver) {
+	const paths = new Set();
+	for (const page of CATALOGUE.platforms[driver].pages) {
+		if (page.master) paths.add(page.master.path);
+		if (page.magic_key) paths.add(page.magic_key.path);
+		(function walk(groups) {
+			for (const group of groups) {
+				if (group.path) paths.add(group.path);
+				(group.items || []).forEach((item) => paths.add(item.path));
+				walk(group.groups || []);
+			}
+		})(page.groups);
+	}
+	return paths;
 }
 
 // ======================================
-// ======= 2/ Window title ==============
+// ======= 3/ Pages and defaults ========
+// ======================================
+
+(function everyScopeHasAPageInTheApprovedOrder() {
+	const scopes = Object.keys(manifestToml.scopes).filter((scope) => scope !== 'global');
+	assert.deepEqual([...scopes].sort(), [...APPROVED_ORDER].sort(), 'the wizard covers every scope');
+	assert.deepEqual(manifestToml.onboarding.order, APPROVED_ORDER);
+	assert.deepEqual(CATALOGUE.order, APPROVED_ORDER);
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const pages = CATALOGUE.platforms[driver].pages.map((page) => page.id);
+		assert.deepEqual(pages, APPROVED_ORDER, `${driver}: one page per scope, in order`);
+		const page = openWizard({ platform: driver });
+		assert.equal(
+			page.el('step-bar').children.length,
+			2 + APPROVED_ORDER.length,
+			`${driver}: language, folder, then one dot per page`
+		);
+	}
+})();
+
+(function everyQuestionStartsAtNo() {
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const page = openWizard({ platform: driver });
+		page.platform = driver;
+		next(page, 2);
+		let asked = 0;
+		for (const id of APPROVED_ORDER) {
+			const described = pageOf(page, id);
+			const asks = !!described.master || described.groups.length > 0;
+			assert.equal(page.el('page-question').classList.contains('hidden'), !asks, `${driver}/${id}`);
+			if (asks) {
+				asked += 1;
+				assert.equal(page.el('page-no').checked, true, `${driver}/${id} starts at No`);
+				assert.equal(page.el('page-yes').checked, false, `${driver}/${id} is not pre-answered`);
+				for (const row of checkRows(page)) {
+					assert.equal(row.box.checked, false, `${driver}/${id}: ${row.text} unchecked while No`);
+					assert.equal(row.box.disabled, true, `${driver}/${id}: ${row.text} inactive while No`);
+				}
+			}
+			page.click('btn-next');
+		}
+		assert.ok(asked >= 5, `${driver}: most pages ask their question`);
+		const done = page.messages.find((m) => m.action === 'finish');
+		assert.ok(done, `${driver}: the last page finishes`);
+		const masters = CATALOGUE.platforms[driver].pages
+			.filter((p) => p.master)
+			.map((p) => p.master.path);
+		assert.deepEqual(
+			done.answers.operations,
+			masters.map((master) => ({ path: master, value: false })),
+			`${driver}: declining everything writes each category switch off and nothing else`
+		);
+	}
+})();
+
+(function emittedKeysAreManifestPaths() {
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const declared = declaredPaths(driver);
+		const allowed = cataloguePaths(driver);
+		assert.ok(allowed.size > 10, `${driver}: the catalogue lists paths`);
+		for (const entryPath of allowed) {
+			assert.ok(
+				declared(entryPath),
+				`${driver}: ${entryPath} is declared by the driver's manifest`
+			);
+		}
+		const page = openWizard({ platform: driver });
+		page.platform = driver;
+		next(page, 2);
+		for (const id of APPROVED_ORDER) {
+			if (!page.el('page-question').classList.contains('hidden')) answer(page, true);
+			page.click('btn-next');
+		}
+		const done = page.messages.find((m) => m.action === 'finish');
+		assert.ok(
+			done.answers.operations.length > APPROVED_ORDER.length,
+			`${driver}: Yes everywhere imports items`
+		);
+		const seen = new Set();
+		for (const operation of done.answers.operations) {
+			assert.deepEqual(Object.keys(operation).sort(), ['path', 'value']);
+			assert.ok(allowed.has(operation.path), `${driver}: ${operation.path} is a wizard path`);
+			assert.ok(declared(operation.path), `${driver}: ${operation.path} is a manifest path`);
+			assert.ok(!seen.has(operation.path), `${driver}: ${operation.path} is written once`);
+			seen.add(operation.path);
+		}
+	}
+})();
+
+(function yesImportsExactlyTheRecommendedItems() {
+	const page = openWizard({ platform: 'windows' });
+	page.platform = 'windows';
+	goToPage(page, 'shortcuts');
+	const described = pageOf(page, 'shortcuts');
+	answer(page, true);
+	const rows = checkRows(page);
+	const items = described.groups[0].items;
+	assert.equal(rows.length, items.length, 'one row per recommended shortcut');
+	assert.ok(
+		rows.every((row) => row.box.checked && !row.box.disabled),
+		'Yes pre-checks every recommendation'
+	);
+	// A slot row names the chord and the action it imports.
+	const slot = items.find((item) => item.path === 'shortcuts.keyboard.win_a');
+	assert.ok(slot, 'Win + A is a recommended keyboard slot');
+	const slotRow = rows[items.indexOf(slot)];
+	assert.equal(slotRow.text, 'Win + A → ' + locale('en')[slot.value_label.key]);
+	toggle(slotRow);
+	const done = finish(page);
+	const imported = done.answers.operations.filter((operation) =>
+		operation.path.startsWith('shortcuts.')
+	);
+	assert.equal(
+		imported.length,
+		items.length - 1,
+		'every checked item is imported, the unchecked one is not'
+	);
+	for (const item of items) {
+		const operation = imported.find((candidate) => candidate.path === item.path);
+		if (item === slot) assert.equal(operation, undefined);
+		else assert.deepEqual(operation, { path: item.path, value: item.value });
+	}
+	assert.deepEqual(
+		done.answers.operations.find((operation) => operation.path === 'category_enabled.shortcuts'),
+		{ path: 'category_enabled.shortcuts', value: true }
+	);
+})();
+
+(function macosScriptControlLabelsFillTheirPlaceholder() {
+	const page = openWizard({ platform: 'macos' });
+	page.platform = 'macos';
+	goToPage(page, 'shortcuts');
+	answer(page, true);
+	const texts = checkRows(page).map((row) => row.text);
+	const expected = locale('en')
+		['menu.shortcuts.right_opt_return'].split('%s')
+		.join(locale('en')['sg_actions.script_pause_toggle']);
+	assert.ok(texts.includes(expected), 'the action fills the %s of the slot label');
+	assert.ok(
+		texts.every((text) => !text.includes('%s')),
+		'no row shows a raw placeholder'
+	);
+})();
+
+(function consentIsNeverPreSelected() {
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const metrics = CATALOGUE.platforms[driver].pages.find((page) => page.id === 'metrics');
+		assert.equal(metrics.consent, true, `${driver}: metrics is a consent page`);
+		assert.equal(metrics.groups.length, 0, `${driver}: metrics imports nothing but its consent`);
+		const llm = CATALOGUE.platforms[driver].pages.find((page) => page.id === 'llm');
+		assert.ok(llm.master && llm.groups.length === 0, `${driver}: the AI page only enables AI`);
+	}
+	const page = openWizard();
+	goToPage(page, 'metrics');
+	assert.equal(
+		page.el('page-no').checked,
+		true,
+		'metrics starts at No although the manifest recommends it'
+	);
+	assert.equal(
+		page.el('page-consent').classList.contains('hidden'),
+		false,
+		'the consent text is shown'
+	);
+})();
+
+(function informationalPagesAskNothing() {
+	const page = openWizard({ platform: 'macos' });
+	page.platform = 'macos';
+	goToPage(page, 'keyboard_layout');
+	assert.equal(page.el('page-question').classList.contains('hidden'), true);
+	assert.equal(
+		page.el('page-note').textContent,
+		locale('en')['onboarding.page.keyboard_layout.system_note']
+	);
+	assert.equal(page.el('page-checklist').classList.contains('hidden'), true);
+})();
+
+// ======================================
+// ======= 4/ Hotstrings ================
+// ======================================
+
+(function hotstringsGroupLanguageFileSection() {
+	const page = openWizard({ platform: 'linux' });
+	page.platform = 'linux';
+	goToPage(page, 'hotstrings');
+	const described = pageOf(page, 'hotstrings');
+	assert.equal(described.master, undefined, 'Linux has no hotstring category switch');
+	assert.equal(
+		page.el('page-question').classList.contains('hidden'),
+		false,
+		'the import question is still asked'
+	);
+	assert.ok(described.groups.length >= 2, 'the neutral categories, then each language pack');
+	assert.equal(described.groups[0].label[0].key, 'onboarding.hotstrings.all_languages');
+	assert.ok(
+		described.groups[1].label[0].text.includes('Français'),
+		'a language pack is named by its locale'
+	);
+	assert.ok(described.groups.every((group) => group.select_all === true && !group.path));
+	for (const language of described.groups) {
+		for (const file of language.groups) {
+			assert.ok(
+				file.path.startsWith('hotstrings.groups.'),
+				'each file is gated by its group switch'
+			);
+			assert.ok(file.items.length > 0, file.path + ' lists its sections');
+		}
+	}
+	answer(page, true);
+	// The whole-language checkbox selects every section of the pack.
+	const french = described.groups[1];
+	const frenchRow = checkRows(page).find((row) => row.text === french.label[0].text);
+	assert.ok(frenchRow, 'the language pack has its own checkbox');
+	toggle(frenchRow);
+	const done = finish(page);
+	const operations = done.answers.operations;
+	for (const file of french.groups) {
+		assert.ok(
+			operations.some((op) => op.path === file.path && op.value === true),
+			file.path + ' switched on'
+		);
+		for (const item of file.items) {
+			assert.ok(
+				operations.some((op) => op.path === item.path && op.value === true),
+				item.path + ' imported'
+			);
+		}
+	}
+	assert.ok(
+		operations.some((op) => op.path === 'hotstrings.trigger_char'),
+		'a Yes also sets the trigger character'
+	);
+})();
+
+(function magicKeyFollowsTheSystemLayoutAndRefusesAnEmptyCustomValue() {
+	const page = openWizard({ platform: 'macos', system_layout: 'French - PC' });
+	page.platform = 'macos';
+	goToPage(page, 'hotstrings');
+	answer(page, true);
+	const options = page.el('page-magic-options');
+	const checked = options.children.find((row) => row.children[0].checked);
+	assert.equal(checked.children[0].value, 'ù', 'French layouts propose ù');
+	const custom = options.children[options.children.length - 1];
+	custom.children[0].checked = true;
+	custom.children[0].dispatch('change');
+	const input = page.el('page-magic-options').querySelector('magic-input');
+	const hotstrings = CATALOGUE.platforms.macos.pages.find(
+		(described) => described.id === 'hotstrings'
+	);
+	assert.equal(
+		input.maxLength,
+		hotstrings.magic_key.max_characters,
+		'the custom trigger length comes from the manifest the hosts validate against'
+	);
+	input.value = '  ';
+	input.dispatch('input');
+	page.messages.splice(0);
+	page.click('btn-next');
+	assert.equal(
+		page.el('page-title').textContent,
+		locale('en')['menu.hotstrings.title'],
+		'an empty custom key blocks Next'
+	);
+	assert.ok(input.classList.contains('invalid'));
+	input.value = '§';
+	input.dispatch('input');
+	const done = finish(page);
+	assert.deepEqual(
+		done.answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),
+		{ path: 'hotstrings.trigger_char', value: '§' }
+	);
+})();
+
+// ======================================
+// ======= 5/ Re-run from the menu ======
+// ======================================
+
+(function aRerunShowsAndKeepsTheValuesInForce() {
+	const described = CATALOGUE.platforms.macos.pages.find((page) => page.id === 'gestures');
+	const items = described.groups[0].items;
+	const custom = items[0];
+	const kept = items[1];
+	const current = { 'gestures.enabled': true, [kept.path]: kept.value, [custom.path]: 'tab_close' };
+	const page = openWizard({ platform: 'macos', current });
+	page.platform = 'macos';
+	goToPage(page, 'gestures');
+	assert.equal(page.el('page-yes').checked, true, 'the switch shows the value in force');
+	const rows = checkRows(page);
+	assert.equal(rows[items.indexOf(kept)].box.checked, true, 'an imported item shows checked');
+	assert.equal(
+		rows[items.indexOf(custom)].box.checked,
+		false,
+		'a customised slot is not the recommendation'
+	);
+	assert.ok(
+		rows.filter((row) => row.box.checked).length === 1,
+		'nothing else is pre-checked on a re-run'
+	);
+	const done = finish(page);
+	const gestures = done.answers.operations.filter((op) => op.path.startsWith('gestures.'));
+	assert.deepEqual(
+		gestures,
+		[{ path: 'gestures.enabled', value: true }],
+		'an untouched page rewrites only its switch'
+	);
+})();
+
+(function uncheckingAnImportedItemRestoresItsNeutralValue() {
+	const described = CATALOGUE.platforms.macos.pages.find((page) => page.id === 'gestures');
+	const item = described.groups[0].items[0];
+	const page = openWizard({
+		platform: 'macos',
+		current: { 'gestures.enabled': true, [item.path]: item.value }
+	});
+	page.platform = 'macos';
+	goToPage(page, 'gestures');
+	toggle(checkRows(page)[0]);
+	const done = finish(page);
+	assert.deepEqual(
+		done.answers.operations.find((op) => op.path === item.path),
+		{ path: item.path, value: item.default }
+	);
+})();
+
+(function aFolderWithItsOwnConfigurationRestartsThePages() {
+	const page = openWizard({ platform: 'macos' });
+	page.platform = 'macos';
+	page.click('btn-next');
+	page.window.setConfigDir('/Volumes/Other/');
+	page.messages.splice(0);
+	page.click('btn-next');
+	const request = page.messages.find((m) => m.action === 'loadExistingConfig');
+	assert.deepEqual(request, {
+		action: 'loadExistingConfig',
+		config_dir: '/Volumes/Other/',
+		request: 1
+	});
+	page.window.applyCurrentValues({ request: 0, values: { 'tap_holds.enabled': true } });
+	assert.equal(page.el('page-no').checked, true, 'a stale reply is dropped');
+	page.window.applyCurrentValues({ request: 1, values: { 'tap_holds.enabled': true } });
+	assert.equal(page.el('page-yes').checked, true, 'the chosen folder answers for its pages');
+	// Returning to the same folder does not reload it over the user's answers.
+	answer(page, false);
+	page.click('btn-back');
+	page.messages.splice(0);
+	page.click('btn-next');
+	assert.equal(page.messages.filter((m) => m.action === 'loadExistingConfig').length, 0);
+	assert.equal(page.el('page-no').checked, true, 'the answer survives a back-and-forth');
+})();
+
+// ======================================
+// ======= 6/ Window title ==============
 // ======================================
 
 (function titleFollowsTheSelectedLanguage() {
@@ -238,7 +769,7 @@ function advanceToMetrics(page) {
 		'title at open uses the current locale'
 	);
 
-	const frRow = page.elements.get('lang-list').children.find((row) => row.dataset.code === 'fr');
+	const frRow = page.el('lang-list').children.find((row) => row.dataset.code === 'fr');
 	assert.ok(frRow, 'the injected locale list renders a French row');
 	frRow.click();
 	assert.deepEqual(page.messages.splice(0), [{ action: 'previewLocale', locale: 'fr' }]);
@@ -248,7 +779,7 @@ function advanceToMetrics(page) {
 		locale('fr')['onboarding.welcome.title'],
 		'title follows the previewed locale'
 	);
-	assert.equal(page.elements.get('s1-title').textContent, locale('fr')['onboarding.welcome.title']);
+	assert.equal(page.el('language-title').textContent, locale('fr')['onboarding.welcome.title']);
 
 	// A stale reply for a locale the user already left must not retitle the page.
 	page.window.applyStrings({ locale: 'en', strings: locale('en') });
@@ -258,8 +789,8 @@ function advanceToMetrics(page) {
 		'stale locale replies are ignored'
 	);
 
-	// The title stays in step on later steps too.
-	page.click('s1-next');
+	page.click('btn-next');
+	assert.deepEqual(page.messages.splice(0), [{ action: 'localeSelected', locale: 'fr' }]);
 	page.window.applyStrings({ locale: 'fr', strings: locale('de') });
 	assert.equal(page.document.title, locale('de')['onboarding.welcome.title']);
 })();
@@ -285,7 +816,6 @@ function advanceToMetrics(page) {
 			0,
 			code + ': the native title key is brand-less'
 		);
-		// Every host composes "<product> — <window_title>".
 		assert.equal(occurrences(PRODUCT + ' — ' + windowTitle, PRODUCT), 1, code + ': composed title');
 	}
 	assert.equal(
@@ -295,19 +825,45 @@ function advanceToMetrics(page) {
 	);
 })();
 
+(function everyStringThePageReadsIsTranslated() {
+	const keys = new Set();
+	for (const match of source.matchAll(/_t\('([^']+)'\)/g)) keys.add(match[1]);
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		for (const page of CATALOGUE.platforms[driver].pages) {
+			for (const field of [
+				'title_key',
+				'question_key',
+				'description_key',
+				'hint_key',
+				'note_key'
+			]) {
+				if (page[field]) keys.add(page[field]);
+			}
+		}
+	}
+	assert.ok(keys.size > 30, 'the scan finds the page strings');
+	for (const code of fs.readdirSync(LOCALE_DIR).filter((n) => n.endsWith('.json'))) {
+		const strings = locale(code.slice(0, -5));
+		for (const key of keys) {
+			assert.equal(typeof strings[key], 'string', `${code}: ${key}`);
+			assert.notEqual(strings[key], '', `${code}: ${key} is empty`);
+		}
+	}
+})();
+
 // ======================================
-// ======= 3/ Native folder picker ======
+// ======= 7/ Native folder picker ======
 // ======================================
 
 (function pickedFolderFillsTheFieldAndTheAnswers() {
 	const page = openWizard();
-	page.click('s1-next');
-	const input = page.elements.get('sc-input');
+	page.click('btn-next');
+	const input = page.el('config-input');
 	assert.equal(input.value, '', 'the field starts empty over the default');
 	assert.equal(input.placeholder, '/Volumes/Fixture/me/.config/ergopti_plus/');
 	page.messages.splice(0);
 
-	page.click('sc-browse');
+	page.click('config-browse');
 	assert.deepEqual(page.messages.splice(0), [{ action: 'pickConfigDir', current: '' }]);
 
 	page.window.setConfigDir('/Volumes/Fixture/me/Ergopti Data/');
@@ -325,57 +881,62 @@ function advanceToMetrics(page) {
 		'the chosen folder survives a re-render'
 	);
 
-	advanceToMetrics(page);
-	page.click('s4-next');
-	page.messages.splice(0);
-	page.click('s5-finish');
-	const finish = page.messages.pop();
-	assert.equal(finish.action, 'finish');
+	const done = finish(page);
 	assert.equal(
-		finish.answers.config_dir,
+		done.answers.config_dir,
 		'/Volumes/Fixture/me/Ergopti Data/',
 		'the finish payload uses the chosen folder'
 	);
+	assert.equal(done.answers.locale, 'en');
 })();
 
 (function cancelledPickerLeavesTheFieldAlone() {
 	const page = openWizard();
-	page.click('s1-next');
-	const input = page.elements.get('sc-input');
+	page.click('btn-next');
+	const input = page.el('config-input');
 	input.value = '/typed/by/hand';
 	page.window.setConfigDir('');
 	page.window.setConfigDir(null);
 	assert.equal(input.value, '/typed/by/hand');
 })();
 
-(function backFromLayoutKeepsThePickedFolder() {
+(function backFromThePagesKeepsThePickedFolder() {
 	const page = openWizard();
-	page.click('s1-next');
+	page.click('btn-next');
 	page.window.setConfigDir('/picked/');
-	page.click('sc-next');
-	page.click('s2-back');
-	assert.equal(page.elements.get('sc-input').value, '/picked/');
+	page.click('btn-next');
+	page.click('btn-back');
+	assert.equal(page.el('config-input').value, '/picked/');
 })();
 
 // ======================================
-// ======= 4/ Metrics consent path ======
+// ======= 8/ Metrics consent path ======
 // ======================================
+
+/**
+ * Advances from the config step to the metrics page.
+ * @param {object} page
+ */
+function advanceToMetrics(page) {
+	next(page, APPROVED_ORDER.length);
+	assert.equal(page.el('page-title').textContent, locale('en')['menu.metrics.title']);
+}
 
 (function consentNamesTheInitialStore() {
 	const page = openWizard();
-	page.click('s1-next');
+	page.click('btn-next');
 	advanceToMetrics(page);
-	const warning = page.elements.get('s4-warning').textContent;
+	const warning = page.el('page-consent').textContent;
 	assert.ok(warning.includes('/Volumes/Fixture/me/.config/ergopti_plus/metrics'), warning);
 	assert.ok(!warning.includes('{1}'), 'the placeholder is filled');
 })();
 
 (function consentFollowsTheChosenFolder() {
 	const page = openWizard();
-	page.click('s1-next');
+	page.click('btn-next');
 	page.window.setConfigDir('/Volumes/Data/Ergopti/');
 	page.messages.splice(0);
-	page.click('sc-next');
+	page.click('btn-next');
 	const request = page.messages.find((m) => m.action === 'resolveMetricsPath');
 	assert.deepEqual(request, {
 		action: 'resolveMetricsPath',
@@ -383,9 +944,8 @@ function advanceToMetrics(page) {
 		request: 1
 	});
 	page.window.setMetricsPath({ request: 1, path: '/Volumes/Data/Ergopti/metrics' });
-	page.click('s2-next');
-	page.click('s3-next');
-	const warning = page.elements.get('s4-warning').textContent;
+	next(page, APPROVED_ORDER.length - 1);
+	const warning = page.el('page-consent').textContent;
 	assert.ok(warning.includes('/Volumes/Data/Ergopti/metrics'), warning);
 	assert.ok(
 		!warning.includes('/Volumes/Fixture/me/.config/ergopti_plus/metrics'),
@@ -393,68 +953,76 @@ function advanceToMetrics(page) {
 	);
 })();
 
-(function consentUpdatesWhenTheReplyArrivesOnStepFour() {
+(function consentUpdatesWhenTheReplyArrivesOnTheMetricsPage() {
 	const page = openWizard();
-	page.click('s1-next');
-	page.elements.get('sc-input').value = '/late/';
+	page.click('btn-next');
+	page.el('config-input').value = '/late/';
 	advanceToMetrics(page);
 	page.window.setMetricsPath({ request: 1, path: '/late/metrics' });
 	assert.ok(
-		page.elements.get('s4-warning').textContent.includes('/late/metrics'),
-		'the visible step re-renders'
+		page.el('page-consent').textContent.includes('/late/metrics'),
+		'the visible page re-renders'
 	);
 })();
 
 (function goingBackAndChangingTheFolderIsLive() {
 	const page = openWizard();
-	page.click('s1-next');
+	page.click('btn-next');
 	page.window.setConfigDir('/first/');
-	page.click('sc-next');
+	page.click('btn-next');
 	page.window.setMetricsPath({ request: 1, path: '/first/metrics' });
-	page.click('s2-back');
+	page.click('btn-back');
 	page.window.setConfigDir('/second/');
 	page.messages.splice(0);
-	page.click('sc-next');
+	page.click('btn-next');
 	assert.equal(page.messages.find((m) => m.action === 'resolveMetricsPath').request, 2);
 	// The late reply for the first folder must not overwrite the second one.
 	page.window.setMetricsPath({ request: 2, path: '/second/metrics' });
 	page.window.setMetricsPath({ request: 1, path: '/first/metrics' });
-	page.click('s2-next');
-	page.click('s3-next');
-	const warning = page.elements.get('s4-warning').textContent;
+	next(page, APPROVED_ORDER.length - 1);
+	const warning = page.el('page-consent').textContent;
 	assert.ok(warning.includes('/second/metrics'), warning);
 	assert.ok(!warning.includes('/first/metrics'), 'a stale reply is dropped');
 })();
 
 (function consentFollowsALanguageSwitch() {
 	const page = openWizard({ metrics_path: '/m' });
-	page.click('s1-next');
+	page.click('btn-next');
 	advanceToMetrics(page);
 	page.window.applyStrings({ locale: 'en', strings: locale('fr') });
 	const expected = locale('fr')['dialog.metrics.enable_warning'].split('{1}').join('/m');
-	assert.equal(page.elements.get('s4-warning').textContent, expected);
+	assert.equal(page.el('page-consent').textContent, expected);
 })();
 
 (function pathIsInsertedLiterally() {
 	const page = openWizard({ metrics_path: "/odd/$&$'/metrics" });
-	page.click('s1-next');
+	page.click('btn-next');
 	advanceToMetrics(page);
 	assert.ok(
-		page.elements.get('s4-warning').textContent.includes("/odd/$&$'/metrics"),
+		page.el('page-consent').textContent.includes("/odd/$&$'/metrics"),
 		'no replacement patterns'
 	);
 })();
 
 (function malformedRepliesAreIgnored() {
 	const page = openWizard({ metrics_path: '/kept' });
-	page.click('s1-next');
-	page.click('sc-next');
+	page.click('btn-next');
+	page.click('btn-next');
 	page.window.setMetricsPath(null);
 	page.window.setMetricsPath({ request: 1 });
 	page.window.setMetricsPath({ request: '1', path: '/wrong' });
-	page.click('s2-next');
-	page.click('s3-next');
-	assert.ok(page.elements.get('s4-warning').textContent.includes('/kept'));
+	next(page, APPROVED_ORDER.length - 1);
+	assert.ok(page.el('page-consent').textContent.includes('/kept'));
 })();
 
-console.log('Onboarding wizard page: title, folder picker and metrics consent path passed.');
+(function anUnknownPlatformIsRefused() {
+	const page = loadPage();
+	assert.throws(
+		() => page.window.initData({ platform: 'amiga', strings: {}, current: {} }),
+		/unknown platform/
+	);
+})();
+
+console.log(
+	'Onboarding wizard page: pages, defaults, manifest paths, re-run, title, folder and consent passed.'
+);

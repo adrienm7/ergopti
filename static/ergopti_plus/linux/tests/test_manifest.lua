@@ -37,6 +37,7 @@ return {
 	"tests.unit.infra.test_config_migrate",
 	"tests.unit.infra.test_config_scope_composition",
 	"tests.unit.infra.test_config_scope_transaction",
+	"tests.unit.infra.test_daemon_restart",
 	"tests.unit.infra.test_gesture_scope",
 	"tests.unit.infra.test_global_scope",
 	"tests.unit.infra.test_hotstring_preferences",

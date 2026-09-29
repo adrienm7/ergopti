@@ -3,8 +3,11 @@
 --- ==============================================================================
 --- BRIDGE HANDLER: Onboarding Wizard (Linux)
 --- DESCRIPTION:
---- Implements the action protocol emitted by _shared/ui/onboarding/script.js
---- and commits its answers through the Linux runtime authorities.
+--- Implements the action protocol emitted by _shared/ui/onboarding/script.js.
+--- The page answers with manifest paths and values; the shared
+--- onboarding_answers contract validates them against the generated catalogue
+--- and they reach config.toml in one versioned batch, after which the daemon
+--- restarts so every module starts from the file.
 --- ==============================================================================
 
 local M = {}
@@ -25,11 +28,20 @@ local Json = require("json")
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local TomlCodec = require("toml_codec")
+local Answers = require("onboarding_answers")
 local ConfigDirPicker = require("ui.config_dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
+-- The catalogue platform this host reads and the id the config migration
+-- registry knows this driver by.
+local CATALOGUE_DRIVER = "linux"
+local MIGRATION_DRIVER = "linux"
+local CONFIG_FILE = "config.toml"
 -- Brand-less window title; webview_manager prefixes the product name.
 local WINDOW_TITLE_KEY = "onboarding.window_title"
+
+-- The generated catalogue of this driver, loaded by the first use.
+local _catalogue = nil
 
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
@@ -80,15 +92,24 @@ local function locale_available(i18n, code)
 	return false
 end
 
+--- Reads one shipped data file of the shared tree.
+--- @param relative string Path under _shared/.
+--- @return string|nil content
+local function read_shared(relative)
+	local path = Paths.shared(relative)
+	local fh = path and io.open(path, "r") or nil
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
 local function locale_strings(code)
-	local locale_path = Paths.shared("data/locales/" .. code .. ".json")
-	local fh = locale_path and io.open(locale_path, "r") or nil
-	if not fh then
+	local raw = read_shared("data/locales/" .. tostring(code) .. ".json")
+	if not raw then
 		Logger.error(LOG, "Onboarding locale '%s' is unreadable.", tostring(code))
 		return nil
 	end
-	local raw = fh:read("*a")
-	fh:close()
 	local ok, strings = pcall(Json.decode, raw)
 	if not ok or type(strings) ~= "table" then
 		Logger.error(LOG, "Onboarding locale '%s' is invalid.", tostring(code))
@@ -97,90 +118,92 @@ local function locale_strings(code)
 	return strings
 end
 
-local function all_hotstrings_enabled(config)
-	if not config or type(config.get_categories) ~= "function"
-		or type(config.is_group_enabled) ~= "function" then return false end
-	for id in pairs(config.get_categories() or {}) do
-		if not config.is_group_enabled(id) then return false end
+--- The wizard catalogue of this driver, read once from the generated file.
+--- Raises when it is missing or malformed: nothing can be asked or validated.
+--- @return table index From onboarding_answers.load.
+local function catalogue()
+	if _catalogue then return _catalogue end
+	local text = read_shared(Answers.CATALOGUE_PATH)
+	if not text then error("the onboarding catalogue is unreadable") end
+	_catalogue = Answers.load(text, CATALOGUE_DRIVER)
+	return _catalogue
+end
+
+--- The configured value of every wizard path of a decoded config.toml. The
+--- wizard reads the file on a re-run, so the unused-key cleanup marks what it
+--- takes through the same projection.
+--- @param decoded table Decoded config.toml.
+--- @param mark function|nil mark(...segments) for each key present and read.
+--- @return table values `{ [path] = value }`.
+function M.config_values(decoded, mark)
+	return Answers.current_values(catalogue(), decoded, mark)
+end
+
+--- The configured value of every wizard path in a config file.
+--- @param path string Absolute config.toml path.
+--- @return table|nil values Empty for an absent file, nil when unreadable.
+local function values_of(path)
+	local fh, err, code = io.open(path, "r")
+	if not fh then
+		if code == 2 then return {} end
+		Logger.error(LOG, "The configuration in force could not be read: %s.", tostring(err))
+		return nil
 	end
-	return true
+	local raw = fh:read("*a")
+	fh:close()
+	local ok, parsed = pcall(TomlCodec.decode, raw)
+	if not ok or type(parsed) ~= "table" then
+		Logger.error(LOG, "The configuration in force could not be decoded.")
+		return nil
+	end
+	return M.config_values(parsed)
 end
 
 local function build_init_data(state)
 	local i18n = dependency(state, "i18n", "infra.i18n")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
-	local magic_key = dependency(state, "magic_key", "modules.hotstrings.magic_key")
-	if not i18n or not config_paths or not magic_key then return nil end
+	if not i18n or not config_paths then return nil end
+	local ok_catalogue, catalogue_error = pcall(catalogue)
+	if not ok_catalogue then
+		Logger.error(LOG, "The onboarding catalogue is unavailable: %s.", tostring(catalogue_error))
+		return nil
+	end
 
 	local current_locale = i18n.get_locale()
+	local strings = locale_strings(current_locale)
 	local current_dir = config_paths.get_config_dir()
 	local default_dir = config_paths.default_config_dir()
-	local keylogger = state.keylogger
-	local gestures = state.gestures
+	local values = values_of(config_paths.config(CONFIG_FILE))
+	if not strings or not values then return nil end
 	return {
+		platform = CATALOGUE_DRIVER,
 		locale = current_locale,
-		strings = locale_strings(current_locale) or {},
+		strings = strings,
 		default_config_dir = default_dir,
-		-- The page fills the step-4 consent warning with this path.
+		config_dir = current_dir ~= default_dir and current_dir or "",
+		-- The consent text names the metrics store.
 		metrics_path = config_paths.metrics_path(),
 		system_layout = type(state.layout) == "string" and state.layout or "",
-		platform = "linux",
 		locales = require("_generated.locale_table"),
-		answers = {
-			locale = current_locale,
-			use_ergopti = all_hotstrings_enabled(state.config),
-			magic_key = magic_key.get(),
-			config_dir = current_dir ~= default_dir and current_dir or "",
-			use_metrics = type(keylogger) == "table" and type(keylogger.is_enabled) == "function"
-				and keylogger.is_enabled() or false,
-			use_gestures = type(gestures) == "table" and type(gestures.is_enabled) == "function"
-				and gestures.is_enabled() or false,
-		},
+		current = values,
 	}
 end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
-local function canonical_bool(value, fallback)
-	if value == nil then return fallback end
-	return value == true or value == "true"
-end
-
---- Extracts wizard answers from a decoded config.toml table.
---- @param parsed table Decoded config.toml.
---- @param config_dir string Directory shown to the wizard.
---- @param mark function|nil mark(...segments) for each key present and read;
----   the unused-key cleanup never offers a key this import reads.
---- @return table answers
-local function answers_from_config(parsed, config_dir, mark)
-	if type(parsed) ~= "table" then return { config_dir = config_dir } end
-	local function section(name)
-		local values = type(parsed[name]) == "table" and parsed[name] or {}
-		return function(key)
-			local value = values[key]
-			if value ~= nil and mark then mark(name, key) end
-			return value
-		end
+--- Tells the user why the wizard saved nothing, as the other hosts' dialogs do;
+--- the window stays open for a retry.
+--- @param state table Daemon state.
+--- @param key string Locale key of the message.
+local function report_failure(state, key)
+	if type(state.notify_error) ~= "function" then
+		Logger.error(LOG, "Onboarding failure '%s' has no notifier to reach the user.", key)
+		return
 	end
-	local hotstrings = section("hotstrings")
-	local metrics = section("metrics")
-	local gestures = section("gestures")
-	local trigger_char = hotstrings("trigger_char")
-	return {
-		config_dir = config_dir,
-		use_ergopti = canonical_bool(hotstrings("enabled"), true),
-		magic_key = type(trigger_char) == "string" and trigger_char or nil,
-		use_metrics = canonical_bool(metrics("enabled"), false),
-		use_gestures = canonical_bool(gestures("enabled"), false),
-	}
-end
-
-local function category_snapshot(config)
-	local snapshot = {}
-	for id in pairs(config.get_categories() or {}) do
-		snapshot[id] = config.is_group_enabled(id) == true
+	local ok, err = pcall(state.notify_error, key)
+	if not ok then
+		Logger.error(LOG, "Onboarding failure '%s' could not be shown: %s.", key, tostring(err))
 	end
-	return snapshot
 end
 
 local function call_confirmed(label, fn)
@@ -191,54 +214,34 @@ local function call_confirmed(label, fn)
 	return false
 end
 
-local function restore_snapshot(state, authorities, snapshot)
+--- Restores the language and the folder the wizard changed before a failed write.
+--- @param authorities table
+--- @param snapshot table
+local function restore_snapshot(authorities, snapshot)
 	local function rollback(label, fn)
 		if not call_confirmed("rollback for " .. label, fn) then
 			Logger.error(LOG, "Onboarding rollback debt remains for %s.", label)
 		end
 	end
-
 	rollback("config directory", function()
 		return authorities.config_paths.set_config_dir(snapshot.config_dir)
 	end)
 	rollback("locale", function() return authorities.i18n.set_locale(snapshot.locale) end)
-	rollback("gestures", function() return state.gestures.set_enabled(snapshot.gestures) end)
-	rollback("metrics", function() return state.keylogger.set_enabled(snapshot.metrics) end)
-	rollback("magic key", function()
-		if snapshot.magic_custom then return authorities.magic_key.set(snapshot.magic_key) end
-		return authorities.magic_key.reset()
-	end)
-	for id, enabled in pairs(snapshot.categories) do
-		rollback("hotstring category " .. id, function()
-			if enabled then return state.config.enable_group(id) end
-			return state.config.disable_group(id)
-		end)
-	end
 end
 
-local function validate_finish(state, authorities, answers)
-	if type(answers) ~= "table" then return false, "answers are missing" end
-	if type(answers.use_ergopti) ~= "boolean" or type(answers.use_metrics) ~= "boolean"
-		or type(answers.use_gestures) ~= "boolean" then
-		return false, "feature choices must be booleans"
-	end
-	if not locale_available(authorities.i18n, answers.locale) then return false, "locale is invalid" end
-	if not authorities.magic_key.validate(answers.magic_key) then return false, "magic key is invalid" end
-	if not normalize_config_dir(authorities.config_paths, answers.config_dir) then
-		return false, "configuration directory must be absolute"
-	end
-	local required = {
-		{ state.config, "get_categories" }, { state.config, "is_group_enabled" },
-		{ state.config, "enable_all" }, { state.config, "disable_all" },
-		{ state.config, "enable_group" }, { state.config, "disable_group" },
-		{ state.keylogger, "is_enabled" }, { state.keylogger, "set_enabled" },
-		{ state.gestures, "is_enabled" }, { state.gestures, "set_enabled" },
-	}
-	for _, port in ipairs(required) do
-		if type(port[1]) ~= "table" or type(port[1][port[2]]) ~= "function" then
-			return false, "daemon port " .. port[2] .. " is unavailable"
-		end
-	end
+--- Versions a config.toml the wizard is about to write: the boot migration ran
+--- on the folder the daemon started with, and the wizard may target another.
+--- @param path string Destination config.toml.
+--- @return boolean writable
+--- @return string|nil detail
+local function prepare_destination(path)
+	local ConfigMigrate = require("config_migrate")
+	local result = ConfigMigrate.boot({
+		path          = path,
+		driver        = MIGRATION_DRIVER,
+		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
+	})
+	if result.read_only then return false, result.detail end
 	return true
 end
 
@@ -246,71 +249,87 @@ local function finish(state, answers)
 	local authorities = {
 		i18n = dependency(state, "i18n", "infra.i18n"),
 		config_paths = dependency(state, "config_paths", "infra.config_paths"),
-		magic_key = dependency(state, "magic_key", "modules.hotstrings.magic_key"),
+		manifest = dependency(state, "manifest", "infra.manifest_reader"),
 		writer = dependency(state, "writer", "toml_codec.writer"),
+		prepare = type(state.prepare_destination) == "function" and state.prepare_destination
+			or prepare_destination,
 	}
-	if not authorities.i18n or not authorities.config_paths or not authorities.magic_key
+	if not authorities.i18n or not authorities.config_paths or not authorities.manifest
 		or not authorities.writer or type(authorities.writer.batch_write) ~= "function" then
 		Logger.error(LOG, "Onboarding finish refused — a persistence authority is unavailable.")
+		report_failure(state, "onboarding.error.write_failed")
 		return { done = false }
 	end
-	local valid, reason = validate_finish(state, authorities, answers)
-	if not valid then
-		Logger.error(LOG, "Onboarding finish refused — %s.", tostring(reason))
+	-- The whole payload is validated before anything changes.
+	if type(answers) ~= "table" then
+		Logger.error(LOG, "Onboarding finish refused — answers are missing.")
+		report_failure(state, "onboarding.error.invalid_answers")
+		return { done = false }
+	end
+	local catalogue_ok, index = pcall(catalogue)
+	if not catalogue_ok then
+		Logger.error(LOG, "Onboarding finish refused — %s.", tostring(index))
+		report_failure(state, "onboarding.error.invalid_answers")
+		return { done = false }
+	end
+	local rows, refusal = Answers.rows(index, answers.operations, authorities.manifest)
+	local target_dir = normalize_config_dir(authorities.config_paths, answers.config_dir)
+	if not rows or not locale_available(authorities.i18n, answers.locale) or not target_dir then
+		Logger.error(LOG, "Onboarding finish refused — %s.",
+			tostring(refusal or "the language or the configuration folder is invalid"))
+		report_failure(state, "onboarding.error.invalid_answers")
 		return { done = false }
 	end
 
 	local snapshot = {
-		categories = category_snapshot(state.config),
-		magic_key = authorities.magic_key.get(),
-		magic_custom = authorities.magic_key.is_customised(),
-		metrics = state.keylogger.is_enabled(),
-		gestures = state.gestures.is_enabled(),
 		locale = authorities.i18n.get_locale(),
 		config_dir = authorities.config_paths.get_config_dir(),
 	}
-	local target_dir = normalize_config_dir(authorities.config_paths, answers.config_dir)
-	local operations = {
-		{ "hotstring state", function()
-			if answers.use_ergopti then return state.config.enable_all() end
-			return state.config.disable_all()
-		end },
-		{ "magic key", function() return authorities.magic_key.set(answers.magic_key) end },
-		{ "metrics state", function() return state.keylogger.set_enabled(answers.use_metrics) end },
-		{ "gesture state", function() return state.gestures.set_enabled(answers.use_gestures) end },
-		{ "locale", function() return authorities.i18n.set_locale(answers.locale) end },
-		{ "config directory", function() return authorities.config_paths.set_config_dir(target_dir) end },
-	}
-	for _, operation in ipairs(operations) do
+	for _, operation in ipairs({
+		{ "locale", function() return authorities.i18n.set_locale(answers.locale) end,
+			"onboarding.error.locale_persist_failed" },
+		{ "config directory", function() return authorities.config_paths.set_config_dir(target_dir) end,
+			"paths_editor.save_failed" },
+	}) do
 		if not call_confirmed(operation[1], operation[2]) then
-			restore_snapshot(state, authorities, snapshot)
+			restore_snapshot(authorities, snapshot)
+			report_failure(state, operation[3])
 			return { done = false }
 		end
 	end
 
-	local write_call_ok, wrote, write_err = pcall(authorities.writer.batch_write,
-		target_dir .. "/config.toml", {
-			{ section = "hotstrings", key = "enabled", value = answers.use_ergopti },
-			{ section = "hotstrings", key = "trigger_char", value = answers.magic_key },
-			{ section = "metrics", key = "enabled", value = answers.use_metrics },
-			{ section = "gestures", key = "enabled", value = answers.use_gestures },
-			{ section = "script", key = "onboarding_done", value = true },
-		})
-	if not write_call_ok or wrote ~= true then
-		Logger.error(LOG, "Onboarding config write failed: %s.",
-			tostring(write_call_ok and write_err or wrote))
-		restore_snapshot(state, authorities, snapshot)
+	local committed, write_err = Answers.commit({
+		index = index,
+		operations = answers.operations,
+		manifest = authorities.manifest,
+		path = target_dir .. "/" .. CONFIG_FILE,
+		prepare = authorities.prepare,
+		write = function(path, batch) return authorities.writer.batch_write(path, batch) end,
+	})
+	if not committed then
+		Logger.error(LOG, "Onboarding config write failed: %s.", tostring(write_err))
+		restore_snapshot(authorities, snapshot)
+		report_failure(state, "onboarding.error.write_failed")
 		return { done = false }
 	end
+	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 
-	if type(state.on_config_changed) == "function" then
-		local notified, notify_err = pcall(state.on_config_changed)
-		if not notified then Logger.error(LOG, "Onboarding menu refresh failed: %s.", tostring(notify_err)) end
-	end
 	local manager = webview(state)
 	if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end
-	Logger.success(LOG, "Onboarding answers committed.")
-	return { done = true }
+	-- Every module reads config.toml when it starts, so the daemon restarts on
+	-- the new file, as hs.reload() and the Windows Reload do.
+	local restarted = false
+	if type(state.restart) == "function" then
+		local ok, result = pcall(state.restart, "the setup wizard")
+		restarted = ok and result == true
+	end
+	if not restarted then
+		Logger.error(LOG, "The daemon could not restart on the new configuration; it applies at the next start.")
+		if type(state.notify_restart_required) == "function" then
+			pcall(state.notify_restart_required)
+		end
+	end
+	return { done = true, restarted = restarted }
 end
 
 local function pick_config_dir(state, current)
@@ -367,23 +386,23 @@ function M.on_message(payload, state)
 		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }),
 			path = path }
 	elseif action == "loadExistingConfig" then
+		-- The pages restart from the chosen folder's config.toml: its values when
+		-- it exists, the neutral ones when it does not.
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		local chosen = config_paths and normalize_config_dir(config_paths, payload.config_dir) or nil
-		if not chosen then return { loaded = false } end
-		local fh = io.open(chosen .. "/config.toml", "r")
-		if not fh then return { loaded = false } end
-		local raw = fh:read("*a")
-		fh:close()
-		local ok, parsed = pcall(TomlCodec.decode, raw)
-		if not ok or type(parsed) ~= "table" then return { loaded = false } end
-		local answers = answers_from_config(parsed,
-			chosen ~= config_paths.default_config_dir() and chosen or "")
-		return { loaded = push(state, "applyExistingAnswers", answers), answers = answers }
+		if not chosen or type(payload.request) ~= "number" then
+			Logger.error(LOG, "loadExistingConfig refused — folder or request number invalid.")
+			return { loaded = false }
+		end
+		local ok_values, values = pcall(values_of, chosen .. "/" .. CONFIG_FILE)
+		if not ok_values or not values then return { loaded = false } end
+		return { loaded = push(state, "applyCurrentValues", { request = payload.request, values = values }),
+			values = values }
 	elseif action == "finish" then
 		return finish(state, payload.answers)
 	elseif action == "registerGesturesAuto" or action == "registerGesturesManual" then
-		-- These controls are hidden when initData.platform is Linux. Recognising
-		-- them still keeps the shared action vocabulary exhaustive and fail-closed.
+		-- These controls are shown on Windows only. Recognising them still keeps
+		-- the shared action vocabulary exhaustive and fail-closed.
 		return { supported = false }
 	end
 
@@ -391,7 +410,6 @@ function M.on_message(payload, state)
 	return nil
 end
 
-M._answers_from_config = answers_from_config
 M._build_init_data = build_init_data
 
 return M

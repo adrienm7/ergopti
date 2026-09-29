@@ -1,8 +1,8 @@
 ﻿; tests/meta/test_onboarding_unbraced_if_scope.ahk
 
 ; ==============================================================================
-; MODULE: Regression — the onboarding WebView finish handler must brace the
-;         magic-key branch (onboarding-unbraced-if-scope)
+; MODULE: Regression — no brace-less if in the onboarding module owns two
+;         statements (onboarding-unbraced-if-scope)
 ; DESCRIPTION:
 ; _OnbWeb_Finish read:
 ;
@@ -15,12 +15,11 @@
 ; chosen by the user" for a payload that carried none, while the indentation
 ; claimed the opposite.
 ;
-; ROOT CAUSE ENCODED: indentation-implied block without braces. The existing
-; provenance guard (test_onboarding_magic_key_sentinel.ahk) only asserts that
-; "_ob_magic_key_explicit := true" appears SOMEWHERE in each writer's body, which
-; this shape satisfies while having the flag outside the branch — so a substring
-; check can never see it. This file asserts the SCOPE instead, and does it for
-; the whole onboarding module rather than for the one line that was wrong.
+; ROOT CAUSE ENCODED: indentation-implied block without braces. A substring
+; check cannot see it, since the statement is present, only outside the branch.
+; This file asserts the SCOPE instead, and does it for the whole onboarding
+; module rather than for the one line that was wrong (that handler now takes
+; manifest answers and no longer has the branch).
 ;
 ; SCOPE: source-level over ui/onboarding — the wizard registers a WebView2 window
 ; at open time and is outside the headless include graph.
@@ -64,32 +63,7 @@ _OUIS_NextCodeLine(Lines, Start) {
 
 ; ==================================================================
 ; ==================================================================
-; ======= 2/ The magic-key branch is braced ========================
-; ==================================================================
-; ==================================================================
-
-_OUIS_MagicKeyBranchIsBraced() {
-	Body := _DriverFuncBody("_OnbWeb_Finish")
-	Assert(Body != "", "_OnbWeb_Finish must exist in the driver source")
-
-	Assert(InStr(Body, "_ob_magic_key := answers") > 0,
-		"prerequisite: _OnbWeb_Finish still takes the magic key from the page payload")
-	Assert(InStr(Body, "_ob_magic_key_explicit := true") > 0,
-		"prerequisite: _OnbWeb_Finish still records the provenance of that value")
-
-	Assert(RegExMatch(Body, 'm)^\s*if \([^\r\n]*magic_key[^\r\n]*\)\s*\{\s*$') > 0,
-		"the magic-key branch in _OnbWeb_Finish must be BRACED. A brace-less `if` takes exactly one statement in AHK v2, so the provenance flag on the following line runs unconditionally — the wizard then reports a magic key as explicitly chosen when the page sent none, and the indentation hides it from every reader")
-}
-Test("meta onboarding-unbraced-if-scope: the magic-key branch is braced in _OnbWeb_Finish",
-	_OUIS_MagicKeyBranchIsBraced)
-
-
-
-
-
-; ==================================================================
-; ==================================================================
-; ======= 3/ The class: no brace-less if owns two statements =======
+; ======= 2/ The class: no brace-less if owns two statements =======
 ; ==================================================================
 ; ==================================================================
 

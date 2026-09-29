@@ -106,10 +106,10 @@
 			"vhost": "ergopti.numericprompt"
 		},
 		"onboarding": {
-			"width": 480,
-			"height": 560,
-			"min_width": 480,
-			"min_height": 520,
+			"width": 720,
+			"height": 640,
+			"min_width": 560,
+			"min_height": 480,
 			"vhost": "ergopti.onboarding"
 		},
 		"paths_editor": {

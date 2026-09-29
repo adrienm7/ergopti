@@ -1957,6 +1957,29 @@ local function main()
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
+			-- The setup wizard writes config.toml, which every module reads when
+			-- it starts: the daemon restarts on it, as the other drivers reload.
+			restart = function(reason)
+				local launch_args = {}
+				for index = 1, #arg do launch_args[index] = arg[index] end
+				local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args })
+				if how == "relay" then shutdown.request(reason) end
+				return how ~= nil
+			end,
+			notify_restart_required = function()
+				if notifier and ok_i18n and i18n_mod then
+					notifier.send(i18n_mod.get("onboarding.done.restart_required"), {
+						title = i18n_mod.get("onboarding.done.title"), level = "warning",
+					})
+				end
+			end,
+			notify_error = function(key)
+				if notifier and ok_i18n and i18n_mod then
+					notifier.send(i18n_mod.get(key), {
+						title = i18n_mod.get("onboarding.error.title"), level = "error",
+					})
+				end
+			end,
 		})
 		Logger.info(LOG, "WebView manager daemon state wired.")
 	end

@@ -61,7 +61,9 @@ const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'modules', 'features', 'manif
 // 2026-09-28: 11 -> 7 after recognizing declared dynamic namespaces. Keep
 // the measured floor tight: four corrected false positives are not new slack.
 // 2026-09-28: 7 -> 5 after reading the scope-owned hotstring namespaces.
-const BASELINE = 5;
+// 2026-09-29: 5 -> 3 once the setup wizard wrote catalogue paths only: the
+// Linux [hotstrings] enabled answer and [script] onboarding_done are gone.
+const BASELINE = 3;
 
 const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
