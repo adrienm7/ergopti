@@ -141,7 +141,7 @@ and reinstalling or updating preserves the choice made in this menu.
 
 ### Uninstallation
 
-Choose **Global actions → Uninstall Ergopti…** in the tray menu and confirm.
+Choose **Version / Updates → Uninstall Ergopti…** in the tray menu and confirm.
 Ergopti finishes saving its data and closes before removing the application.
 Native packages request administrator authorization through the desktop.
 
