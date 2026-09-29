@@ -164,6 +164,31 @@ gates also render a shuffled top level. The rows a pause greys carry
 pause test holds each Windows builder's `TrayMenuStage_AddFeature` to it, and a
 new feature row needs the mark, never a driver-side id list.
 
+### project-tap-hold-key-catalogue
+
+`[tap_hold.catalog] keys` in `_shared/tap_hold/defaults.toml` owns which keys
+each Tap-Hold tray lists, in which order, under which hand and with which
+label key. Each driver column (`ahk`, `hs`, `linux`) must equal the keys its
+engine can remap — the Windows `platform/remap/*.ahk` hotkeys, macOS
+`tap_hold_keys.json` in the same order, Linux `KEY_CODES` — which
+`test-tap-hold-key-catalog-single-source.cjs` pins and the Linux manager
+refuses at load. Keep it one multi-line inline-table array under a
+single-bracket header: the Windows narrow tap-hold parser recognises only
+`[x]` headers, so the lines after a `[[x]]` header would land in the previous
+`[tap_hold.keys.*]` section. Action: add a key to the catalogue and to its
+engine in the same change.
+
+### project-key-combinations-have-their-own-gate
+
+The modifier combinations are the Shortcuts group `key_combinations_group`
+with a switch of their own. macOS persists it as `[mod_combos] enabled` in
+`config_karabiner.toml`; absent, it follows the Tap-Holds switch, and that
+rule lives only in `Generator.key_combinations_enabled`. Windows keeps it as
+the `KeyCombinations` sub-gate of Shortcuts, whose families the master gate
+reads from the group's `feature` rows. Action: never mark combo rules as
+Tap-Holds feature rules again, and add a Windows family as a row of the
+group, not as a gate list.
+
 ### project-two-keys-for-one-row-is-two-menus
 
 Two manifest keys that describe one visible row create two sources of truth.
