@@ -1,0 +1,253 @@
+--- _shared/lua/onboarding_answers.lua
+
+--- ==============================================================================
+--- MODULE: Onboarding Answers (shared)
+--- DESCRIPTION:
+--- The one contract between the first-run wizard page and the Lua hosts: the
+--- generated catalogue (_shared/ui/_generated/onboarding_catalogue.json) says
+--- which manifest paths the wizard may write on a platform, and this module
+--- turns the page's finish payload into the configuration rows the shared TOML
+--- writer publishes in one atomic batch.
+---
+--- FEATURES & RATIONALE:
+--- 1. No interpretation: every answer is a manifest path and a value. A host
+---    never translates a question into keys of its own.
+--- 2. Fail-closed validation: a path outside the platform's catalogue, a value
+---    the row cannot take, a duplicate or a malformed payload refuses the whole
+---    batch before anything is written.
+--- 3. Neutral values are deletions: the manifest reader's sparse operation
+---    decides, so a declined feature leaves the file as empty as a fresh one.
+--- 4. A re-run starts from the values in force, read from the decoded file by
+---    the same paths.
+--- ==============================================================================
+
+local M = {}
+
+local Json = require("json")
+
+-- The catalogue format this module reads; the generator emits the same number.
+M.SCHEMA_VERSION = 1
+
+-- Where the generated catalogue lives, relative to the shared tree.
+M.CATALOGUE_PATH = "ui/_generated/onboarding_catalogue.json"
+
+-- The trigger character is typed by one key: a short value, never text.
+local MAX_TRIGGER_CHARACTERS = 3
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 1/ Catalogue index =======
+-- ==================================
+-- ==================================
+
+--- Structural equality over decoded JSON scalars and tables.
+--- @param left any
+--- @param right any
+--- @return boolean
+local function same(left, right)
+	if type(left) ~= type(right) then return false end
+	if type(left) ~= "table" then return left == right end
+	for key, value in pairs(left) do
+		if not same(value, right[key]) then return false end
+	end
+	for key in pairs(right) do
+		if left[key] == nil then return false end
+	end
+	return true
+end
+
+--- Indexes one driver's writable paths.
+--- @param text string The catalogue JSON.
+--- @param driver string "macos", "linux" or "windows".
+--- @return table index `{ driver, pages, entries = { [path] = entry } }`.
+function M.load(text, driver)
+	assert(type(text) == "string", "the onboarding catalogue must be text")
+	local catalogue = Json.decode(text)
+	assert(type(catalogue) == "table", "the onboarding catalogue is not valid JSON")
+	assert(catalogue.schema_version == M.SCHEMA_VERSION, "the onboarding catalogue has an unsupported format")
+	local platform = type(catalogue.platforms) == "table" and catalogue.platforms[driver] or nil
+	assert(type(platform) == "table" and type(platform.pages) == "table",
+		"the onboarding catalogue has no pages for " .. tostring(driver))
+	local entries = {}
+	local function claim(path, entry)
+		assert(type(path) == "string" and path ~= "", "the onboarding catalogue has an unnamed row")
+		assert(entries[path] == nil, "the onboarding catalogue writes " .. path .. " twice")
+		entries[path] = entry
+	end
+	local function walk(groups)
+		for _, group in ipairs(groups or {}) do
+			if group.path ~= nil then
+				claim(group.path, { kind = "choice", value = group.value, default = group.default })
+			end
+			for _, item in ipairs(group.items or {}) do
+				claim(item.path, { kind = "choice", value = item.value, default = item.default })
+			end
+			walk(group.groups)
+		end
+	end
+	for _, page in ipairs(platform.pages) do
+		if type(page.master) == "table" then claim(page.master.path, { kind = "switch", default = false }) end
+		if type(page.magic_key) == "table" then
+			claim(page.magic_key.path, { kind = "character", default = page.magic_key.default })
+		end
+		walk(page.groups)
+	end
+	return { driver = driver, pages = platform.pages, entries = entries }
+end
+
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 2/ Finish payload =======
+-- =================================
+-- =================================
+
+--- Counts the characters of a UTF-8 string, or nil when it is not UTF-8.
+--- @param text string
+--- @return number|nil
+local function utf8_length(text)
+	local count, position = 0, 1
+	while position <= #text do
+		local byte = text:byte(position)
+		local width = byte < 0x80 and 1 or byte >= 0xF0 and byte < 0xF5 and 4
+			or byte >= 0xE0 and byte < 0xF0 and 3 or byte >= 0xC2 and byte < 0xE0 and 2 or nil
+		if not width or position + width - 1 > #text then return nil end
+		for index = position + 1, position + width - 1 do
+			local continuation = text:byte(index)
+			if continuation < 0x80 or continuation > 0xBF then return nil end
+		end
+		count, position = count + 1, position + width
+	end
+	return count
+end
+
+--- Why a value cannot be written to an entry, or nil when it can.
+--- @param entry table Catalogue entry.
+--- @param value any Decoded payload value.
+--- @return string|nil
+local function refusal(entry, value)
+	if entry.kind == "switch" then
+		return type(value) ~= "boolean" and "a category switch takes true or false" or nil
+	end
+	if entry.kind == "choice" then
+		if same(value, entry.value) or same(value, entry.default) then return nil end
+		return "an imported item takes its recommendation or its neutral value"
+	end
+	if type(value) ~= "string" or value:match("^%s*$") or value:find("[%c]") then
+		return "the trigger character must be visible text"
+	end
+	local length = utf8_length(value)
+	if not length or length > MAX_TRIGGER_CHARACTERS then
+		return "the trigger character is at most " .. MAX_TRIGGER_CHARACTERS .. " characters"
+	end
+	return nil
+end
+
+--- Turns the page's operations into configuration rows.
+--- @param index table From M.load.
+--- @param operations any The payload's `operations` array.
+--- @param manifest table Manifest reader with `sparse_operation(path, value)`.
+--- @return table|nil rows `{ section, key, value | delete }` for the TOML writer.
+--- @return string|nil reason Why the batch was refused.
+function M.rows(index, operations, manifest)
+	if type(index) ~= "table" or type(index.entries) ~= "table" then return nil, "no catalogue index" end
+	if type(manifest) ~= "table" or type(manifest.sparse_operation) ~= "function" then
+		return nil, "no manifest reader"
+	end
+	if type(operations) ~= "table" then return nil, "the answers carry no operations" end
+	local count, highest = 0, 0
+	for key in pairs(operations) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then return nil, "the operations are not a list" end
+		count, highest = count + 1, math.max(highest, key)
+	end
+	if highest ~= count then return nil, "the operations are not a list" end
+	local rows, seen = {}, {}
+	for position = 1, count do
+		local operation = operations[position]
+		if type(operation) ~= "table" then return nil, "operation " .. position .. " is not a table" end
+		local path, value = operation.path, operation.value
+		local entry = type(path) == "string" and index.entries[path] or nil
+		if not entry then return nil, "operation " .. position .. " names no wizard path" end
+		if seen[path] then return nil, path .. " is answered twice" end
+		seen[path] = true
+		local why = refusal(entry, value)
+		if why then return nil, path .. ": " .. why end
+		local ok, row = pcall(manifest.sparse_operation, path, value)
+		if not ok or type(row) ~= "table" then
+			return nil, path .. " is not a configuration path of this driver: " .. tostring(row)
+		end
+		rows[#rows + 1] = row
+	end
+	return rows
+end
+
+--- Commits the answers: validates them, versions the destination, then writes
+--- every row in one atomic batch.
+--- @param opts table `{ index, operations, manifest, path, prepare(path) -> true | false, detail,
+---   write(path, rows) -> true | false, detail }`.
+--- @return boolean committed
+--- @return string|nil detail Refusal or failure reason.
+function M.commit(opts)
+	assert(type(opts) == "table" and type(opts.path) == "string" and opts.path ~= ""
+		and type(opts.prepare) == "function" and type(opts.write) == "function",
+		"onboarding commit requires a destination and its prepare and write owners")
+	local rows, why = M.rows(opts.index, opts.operations, opts.manifest)
+	if not rows then return false, why end
+	local prepared_ok, prepared, prepare_detail = pcall(opts.prepare, opts.path)
+	if not prepared_ok or prepared ~= true then
+		return false, "the destination cannot be written: "
+			.. tostring(prepared_ok and prepare_detail or prepared)
+	end
+	local write_ok, written, write_detail = pcall(opts.write, opts.path, rows)
+	if not write_ok then return false, tostring(written) end
+	if written ~= true then return false, tostring(write_detail or "the write was not confirmed") end
+	return true
+end
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 3/ Values in force =======
+-- ==================================
+-- ==================================
+
+--- The value a decoded configuration holds at a dotted path, or nil.
+--- @param decoded table
+--- @param path string
+--- @return any
+local function lookup(decoded, path)
+	local node = decoded
+	for segment in path:gmatch("[^%.]+") do
+		if type(node) ~= "table" then return nil end
+		node = node[segment]
+	end
+	return node
+end
+
+--- The configured value of every wizard path the file sets; absent paths are
+--- left out so the page shows their neutral value.
+--- @param index table From M.load.
+--- @param decoded table Decoded config.toml, or an empty table.
+--- @return table values `{ [path] = value }`.
+function M.current_values(index, decoded)
+	assert(type(index) == "table" and type(index.entries) == "table", "no catalogue index")
+	assert(type(decoded) == "table", "the configuration must be decoded")
+	local values = {}
+	for path in pairs(index.entries) do
+		local value = lookup(decoded, path)
+		if value ~= nil then values[path] = value end
+	end
+	return values
+end
+
+return M
