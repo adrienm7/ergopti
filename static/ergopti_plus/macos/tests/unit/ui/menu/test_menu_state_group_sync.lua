@@ -382,5 +382,64 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 	end)
 end)
 
+-- A config.toml holding a built-in delimiter state, a custom delimiter and its
+-- state, and the state of a delimiter no build defines any more.
+local DELIMITER_CONFIG = table.concat({
+	"[hotstrings]",
+	"terminators = [ { key = \"custom_at\", char = \"@\", label = \"at\", consume = false } ]",
+	"",
+	"[hotstrings.terminator_states]",
+	"comma = false",
+	"custom_at = false",
+	"retired_pipe = true",
+	"",
+}, "\n")
+
+helpers.describe("menu_state: saved delimiter states replay without ERROR (config-outdated-terminators)", function()
+	helpers.it("applies built-in and custom states and only warns about a retired key", function()
+		helpers.with_fresh_modules({ "logger.shim", "keymap.terminators", "config_outdated", "infra.preferences" },
+			function()
+				local errors, warnings = {}, {}
+				local shim = helpers.make_logger_stub()
+				shim.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+				shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+				package.loaded["logger.shim"] = shim
+				local Terminators = require("keymap.terminators")
+				local Preferences = helpers.load_with_stubs("infra.preferences")
+				local saved = Preferences.flatten_document(require("toml_codec").decode(DELIMITER_CONFIG))
+				helpers.assert_eq(saved.terminator_states, { comma = false, custom_at = false })
+
+				local state = {
+					hotstrings = {},
+					custom_terminators = saved.custom_terminators,
+					terminator_states = saved.terminator_states,
+				}
+				local committed = MenuState.sync_state_to_modules(state, saved, false, {
+					keymap = {
+						set_llm_model = function() return true end,
+						get_terminator_defs = Terminators.get_terminator_defs,
+						set_terminator_enabled = Terminators.set_terminator_enabled,
+						validate_custom_terminator = Terminators.validate_custom_terminator,
+						add_custom_terminator = Terminators.add_custom_terminator,
+						remove_custom_terminator = Terminators.remove_custom_terminator,
+					},
+					core_mods = {}, hotstring_editor = {},
+				})
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(errors, {}, "a saved delimiter state is never an ERROR")
+				helpers.assert_eq(Terminators.is_terminator_enabled("comma"), false)
+				helpers.assert_eq(Terminators.is_terminator_enabled("custom_at"), false)
+				helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
+				helpers.assert_true(warnings[1]:find("'hotstrings.terminator_states.retired_pipe'", 1, true) ~= nil,
+					warnings[1])
+				local scan = require("config_unused_keys").find_in_source(DELIMITER_CONFIG,
+					Preferences.mark_config_reads)
+				helpers.assert_eq(#scan.keys, 1)
+				helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key },
+					{ "hotstrings.terminator_states", "retired_pipe" })
+			end)
+	end)
+end)
+
 package.loaded["infra.deferred_work"] = original_deferred_work
 package.loaded["ui.menu.menu_state"] = original_subject
