@@ -202,6 +202,29 @@ class SystemControl {
 		return ComObject("Shell.Application")
 	}
 
+	; The active tab of an Explorer frame: the topmost ShellTabWindowClass child
+	; (the inactive tabs are hidden below it).
+	; @returns {Integer} Its HWND, or 0 for an Explorer without tabs.
+	ActiveExplorerTab(FrameHwnd) {
+		; A frame without that control is an Explorer from before tabs, whose one
+		; Shell.Application window is matched by the frame's HWND alone.
+		try
+			return ControlGetHwnd("ShellTabWindowClass1", FrameHwnd)
+		catch TargetError
+			return 0
+	}
+
+	; The tab one Shell.Application window draws in, from its IShellBrowser
+	; (IOleWindow::GetWindow).
+	; @returns {Integer} The tab's HWND.
+	ExplorerTabOf(Window) {
+		static IID_IShellBrowser := "{000214E2-0000-0000-C000-000000000046}"
+		Browser := ComObjQuery(Window, IID_IShellBrowser, IID_IShellBrowser)
+		Tab := 0
+		ComCall(3, Browser, "Ptr*", &Tab)
+		return Tab
+	}
+
 	; @returns {String} The letters of the removable drives, e.g. "EF".
 	RemovableDrives() {
 		return DriveGetList("REMOVABLE")

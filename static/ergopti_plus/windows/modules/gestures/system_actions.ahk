@@ -19,9 +19,10 @@
 ;    action (Sys.Defer) and returns; COM, broadcasts and Explorer queries run
 ;    in their own thread afterwards.
 ; 3. Explorer's selection is read from the Shell.Application window whose HWND
-;    is the active window. A virtual item (This PC, a library root, Control
-;    Panel) has no path a file operation can take: it refuses the whole
-;    selection rather than acting on part of it.
+;    is the active window and, on Windows 11, whose tab is the frame's active
+;    tab (every tab shares the frame's HWND). A virtual item (This PC, a
+;    library root, Control Panel) has no path a file operation can take: it
+;    refuses the whole selection rather than acting on part of it.
 ; 4. Confirmation is not asked here: GestureInvokeAction (config.ahk) asks for
 ;    every action the catalogue declares `confirm = true` before it runs.
 ; ==============================================================================
@@ -360,12 +361,18 @@ GestureSysIsFileSystemPath(Path) {
 	return (Path is String) && RegExMatch(Path, "^(?:[A-Za-z]:\\|\\\\[^\\]+\\[^\\]+)") > 0
 }
 
-; The Shell.Application window whose HWND is Hwnd.
+; The Shell.Application window of the tab an Explorer frame shows. Windows 11
+; lists one window per tab, every one with the frame's HWND: only the tab's
+; own shell browser window tells them apart.
 ; @param Windows Shell.Application.Windows(), or any enumerable of windows.
+; @param {Integer} TabHwnd The frame's active tab, 0 for a frame without tabs.
+; @param {Object} Sys The SystemControl that reads each window's tab.
 ; @returns {Object|String} The window, or "".
-GestureSysExplorerWindowFor(Windows, Hwnd) {
+GestureSysExplorerWindowFor(Windows, Hwnd, TabHwnd := 0, Sys := 0) {
 	for Window in Windows {
-		if (Window.HWND = Hwnd)
+		if (Window.HWND != Hwnd)
+			continue
+		if (!TabHwnd || Sys.ExplorerTabOf(Window) = TabHwnd)
 			return Window
 	}
 	return ""
@@ -398,7 +405,8 @@ _GestureSysActiveExplorer(Sys, Active) {
 	global GESTURE_SYS_EXPLORER_CLASS
 	if !IsObject(Active) || (Active.Class != GESTURE_SYS_EXPLORER_CLASS)
 		return ""
-	return GestureSysExplorerWindowFor(Sys.ShellApplication().Windows(), Active.Hwnd)
+	return GestureSysExplorerWindowFor(Sys.ShellApplication().Windows(), Active.Hwnd,
+		Sys.ActiveExplorerTab(Active.Hwnd), Sys)
 }
 
 ; The folder of the active Explorer window, or the Desktop when the desktop

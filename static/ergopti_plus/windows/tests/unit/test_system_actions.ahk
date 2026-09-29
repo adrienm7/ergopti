@@ -35,6 +35,7 @@ class _SysActionsFake {
 		this.Muted := false
 		this.Drives := ""
 		this.Shell := ""
+		this.ActiveTab := 0
 		this.Directories := Map()
 		this.Terminal := ""
 		this.CreateStatuses := []
@@ -63,6 +64,8 @@ class _SysActionsFake {
 	WindowsOfProcess(Pid) => (this._Log("WindowsOfProcess", Pid), this.Windows)
 	Activate(Hwnd) => this._Log("Activate", Hwnd)
 	ShellApplication() => this.Shell
+	ActiveExplorerTab(FrameHwnd) => this.ActiveTab
+	ExplorerTabOf(Window) => Window.Tab
 	RemovableDrives() => this.Drives
 	DeleteZoneIdentifier(Path) => (this._Log("DeleteZoneIdentifier", Path), "removed")
 	CreateNewFile(Path) {
@@ -344,6 +347,27 @@ _SysActions_UnblockSelection() {
 	AssertEqual(1, _SysActions_CallsNamed(Fake, "Notify").Length)
 }
 Test("system actions: unblock_file_selection deletes each Zone.Identifier stream", _SysActions_UnblockSelection)
+
+; Windows 11 lists one Shell.Application window per Explorer tab, every one
+; with the frame's HWND: the first one was taken, so a confirmed unblock acted
+; on a background tab's selection and the folder helpers on its folder.
+_SysActions_ExplorerTabs() {
+	Background := { HWND: 0x42, Tab: 0x501, Document: { Folder: { Self: { Path: "C:\Users\ana\Downloads" } },
+		SelectedItems: (this) => [{ Path: "C:\Users\ana\Downloads\setup.exe" }] } }
+	Foreground := { HWND: 0x42, Tab: 0x502, Document: { Folder: { Self: { Path: "C:\Users\ana\Documents" } },
+		SelectedItems: (this) => [{ Path: "C:\Users\ana\Documents\report.pdf" }] } }
+	Fake := _SysActionsFake()
+	Fake.Active := { Hwnd: 0x42, Pid: 7, Class: "CabinetWClass" }
+	Fake.Shell := { Windows: (this) => [Background, Foreground] }
+	Fake.ActiveTab := 0x502
+	GestureSysUnblockFileSelection(Fake)
+	Deletes := _SysActions_CallsNamed(Fake, "DeleteZoneIdentifier")
+	AssertEqual(1, Deletes.Length)
+	AssertEqual("C:\Users\ana\Documents\report.pdf", Deletes[1][2], "the active tab's selection, not the first tab's")
+	GestureSysOpenTerminalHere(Fake)
+	AssertEqual("C:\Users\ana\Documents", _SysActions_CallsNamed(Fake, "Launch")[1][3], "the active tab's folder")
+}
+Test("system actions: the Explorer helpers act on the active tab of a tabbed window", _SysActions_ExplorerTabs)
 
 _SysActions_TerminalAndNewFile() {
 	Fake := _SysActionsFake()
