@@ -45,6 +45,10 @@
  *    candidate's own handler instead of typing, the tray builds its top-level
  *    submenu, its settings ride the AI menu's persistence, every COM and
  *    process call goes through the adapters and a mail is never sent.
+ * 10. The remote formats port (modules/llm/remote_formats.ahk: Backboard and
+ *    TypeSafe's decisions) is included before the remote API layer that calls
+ *    it, its test replays the shared remote formats corpus, and System 1 has
+ *    its Jev transport next to the chat one.
  *
  * ROOT CAUSE ENCODED:
  * A module that no runner includes, or a list restated by hand, fails silently
@@ -137,6 +141,11 @@ for (const [label, list, prefix] of [
 		translate > visionAction && translateAction > translate && gestures > translateAction,
 		`${label} must include translate.ahk, then translate_action.ahk, after vision_action.ahk and before the gesture actions`
 	);
+	const remoteFormats = position(list, `${prefix}modules/llm/remote_formats.ahk`);
+	check(
+		remoteFormats >= 0 && remoteFormats < position(list, `${prefix}modules/llm/api_remote.ahk`),
+		`${label} must include remote_formats.ahk before api_remote.ahk, which builds its requests with it`
+	);
 	const agent = position(list, `${prefix}modules/llm/agent.ahk`);
 	const agentConnectors = position(list, `${prefix}modules/llm/agent_connectors.ahk`);
 	const agentAction = position(list, `${prefix}modules/llm/agent_action.ahk`);
@@ -165,6 +174,7 @@ const TESTS = {
 	'unit/test_llm_vision.ahk': 'vision_vectors.json',
 	'unit/test_llm_translate.ahk': 'translate_vectors.json',
 	'unit/test_llm_agent.ahk': 'agent_vectors.json',
+	'unit/test_llm_remote_formats.ahk': 'remote_formats_vectors.json',
 	'unit/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
@@ -492,6 +502,12 @@ check(
 		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('LLM_Engine_LiveIsActive()') &&
 		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('SFD_IsSecureField()'),
 	'the automatic mode must skip a triaged sentence, live mode and secure fields'
+);
+check(
+	bodyOf(agentAction, 'LLM_Agent_System1Request').includes('_LLM_Agent_Decide(') &&
+		bodyOf(agentAction, '_LLM_Agent_Decide').includes('LLM_RemoteDecisions_Async(') &&
+		bodyOf(agentAction, '_LLM_Agent_Decide').includes('LLM_RemoteBackboard_Async('),
+	'System 1 must ask Jev through a decisions provider or Backboard next to its chat transport'
 );
 check(
 	bodyOf(agentAction, '_LLM_Agent_LearningState').includes('ST_Get') &&

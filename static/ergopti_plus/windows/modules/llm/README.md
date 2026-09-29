@@ -53,6 +53,13 @@ action as a tooltip candidate whose acceptance runs its connector in
 `agent_connectors.ahk` (Outlook through COM, else an .ics file or a mailto:
 link; the user's tools of `<config dir>/agent_tools/`). The tray's top-level
 AI agent submenu is `ui/menu/menu_llm/menu_agent.ahk`.
+`remote_formats.ahk` ports `_shared/lua/llm/remote_formats.lua` (pinned to
+`remote_formats_vectors.json`): the request and answer shapes of the Backboard
+provider (one assistant per key, then one message per request, key in
+`X-API-Key`) and of the decisions providers (TypeSafe's Jev, typed questions
+only, offered solely as the agent's System 1). `api_remote.ahk` sends both
+through the same curl transport; neither format is a vision backend, and a
+decisions provider is never sent a chat request.
 `prediction_live.ahk` owns live mode
 (`llm_live_prompt_toggle` and the AI menu's live mode submenu): while it is on,
 the automatic typing trigger runs its prompt and count through the same

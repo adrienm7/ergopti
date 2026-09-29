@@ -227,11 +227,24 @@ _LVS_ParameterKind() {
 	AssertEqual(t("llm.vision.local_backend"), Choices[1]["label"], "under its localized label")
 	AssertEqual(LLM_Vision_Config()["default_models"]["local"], Choices[1]["defaultModel"],
 		"with its default model")
-	AssertEqual(LLM_API_PROVIDER_ORDER.Length + 1, Choices.Length, "then every provider")
-	for Index, ProviderId in LLM_API_PROVIDER_ORDER {
+	; Backboard's messages carry text only and a decisions provider answers
+	; typed questions only: neither can read the screenshot
+	Readers := []
+	for ProviderId in LLM_API_PROVIDER_ORDER {
+		if LLM_RemoteFormatServes(LLM_API_PROVIDERS[ProviderId]["Format"], "images")
+			Readers.Push(ProviderId)
+	}
+	AssertTrue(Readers.Length < LLM_API_PROVIDER_ORDER.Length, "some providers cannot read an image")
+	AssertEqual(Readers.Length + 1, Choices.Length, "then every provider that reads an image")
+	for Index, ProviderId in Readers {
 		AssertEqual(ProviderId, Choices[Index + 1]["value"], "providers keep their order")
 		AssertEqual(LLM_API_PROVIDERS[ProviderId]["Label"], Choices[Index + 1]["label"], ProviderId . " label")
 	}
+	for Choice in Choices
+		AssertFalse(Choice["value"] == "backboard" || LLM_RemoteProviderFormat(Choice["value"]) == "decisions",
+			Choice["value"] . " is no vision backend")
+	AssertFalse(InStr(GestureActionParameterPrompt("llm_screen_region"), "typesafe"),
+		"the prompt does not list a decisions provider")
 	Prompt := GestureActionParameterPrompt("llm_screen_region")
 	AssertContains(Prompt, "local — " . t("llm.vision.local_backend") . "`n", "the prompt lists the local server")
 	AssertContains(Prompt, "openai — " . LLM_API_PROVIDERS["openai"]["Label"], "and the providers")
@@ -534,6 +547,18 @@ _LVS_ProviderWithoutKeyIsRefused() {
 	}
 }
 Test("LLM vision: a provider without a key or an unknown one is refused", _LVS_ProviderWithoutKeyIsRefused)
+
+_LVS_TextOnlyProviderIsRefused() {
+	_LVS_Run(_LPP_Menu(), _Body)
+	_Body(Calls, Lines, Sent, Fx) {
+		AssertFalse(_LVS_Invoke("llm_screen_region", "backboard|openai/gpt-4o-mini"), "Backboard reads no image")
+		AssertFalse(_LVS_Invoke("llm_screen_full", "typesafe"), "nor does a decisions provider")
+		AssertEqual(0, Fx.Captures.Length, "neither captures")
+		AssertEqual(t("llm.vision.read_failed"), _LPP_PendingNotice(), "the user is told")
+		AssertEqual(2, _LPP_LinesWith(Lines, "WARNING", "cannot read an image"), "and the log says why")
+	}
+}
+Test("LLM vision: a provider that cannot read an image is refused before the capture", _LVS_TextOnlyProviderIsRefused)
 
 _LVS_VisionFailureIsShown() {
 	_LVS_Run(_LPP_Menu(), _Body)

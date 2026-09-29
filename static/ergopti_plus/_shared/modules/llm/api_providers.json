@@ -1,5 +1,5 @@
 {
-	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver.",
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver. `format` is openai, anthropic, gemini, backboard (Backboard's assistant/thread API, key in X-API-Key, models written <llm_provider>/<model_name>) or decisions (TypeSafe's System One protocol: typed questions in, answers with probabilities out; base_url is the full endpoint and the key goes in Authorization: Bearer). A decisions provider serves Jev, which is not a chat model: it is offered only as the agent's System 1. The request shapes of backboard and decisions live in _shared/lua/llm/remote_formats.lua.",
 	"provider_order": [
 		"openai",
 		"anthropic",
@@ -9,6 +9,13 @@
 		"deepseek",
 		"cohere",
 		"cerebras",
+		"openrouter",
+		"groq",
+		"together",
+		"fireworks",
+		"backboard",
+		"typesafe",
+		"openrouter_jev",
 		"openai_compat"
 	],
 	"providers": {
@@ -64,6 +71,48 @@
 				"qwen-3.8-27b": { "reasoning_effort": "none" }
 			}
 		},
+		"openrouter": {
+			"label": "OpenRouter",
+			"base_url": "https://openrouter.ai/api/v1",
+			"default_model": "openai/gpt-4o-mini",
+			"format": "openai"
+		},
+		"groq": {
+			"label": "Groq",
+			"base_url": "https://api.groq.com/openai/v1",
+			"default_model": "llama-3.3-70b-versatile",
+			"format": "openai"
+		},
+		"together": {
+			"label": "Together AI",
+			"base_url": "https://api.together.xyz/v1",
+			"default_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+			"format": "openai"
+		},
+		"fireworks": {
+			"label": "Fireworks AI",
+			"base_url": "https://api.fireworks.ai/inference/v1",
+			"default_model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+			"format": "openai"
+		},
+		"backboard": {
+			"label": "Backboard",
+			"base_url": "https://app.backboard.io/api",
+			"default_model": "openai/gpt-4o-mini",
+			"format": "backboard"
+		},
+		"typesafe": {
+			"label": "TypeSafe (Jev)",
+			"base_url": "https://api.typesafe.ai/v1/systemone",
+			"default_model": "jev-latest",
+			"format": "decisions"
+		},
+		"openrouter_jev": {
+			"label": "OpenRouter (Jev)",
+			"base_url": "https://openrouter.ai/api/alpha/decisions",
+			"default_model": "typesafe/jev-1.13",
+			"format": "decisions"
+		},
 		"openai_compat": {
 			"label": "OpenAI-compatible",
 			"base_url": "",
@@ -77,6 +126,11 @@
 		"user_text": "ping",
 		"temperature": 0,
 		"max_tokens": 16
+	},
+	"decisions_test": {
+		"_comment": "Minimal probe the Test-API action sends to a decisions provider, verbatim: one yes/no question about a fixed state.",
+		"state": "ping",
+		"questions": { "ok": { "type": "noul", "instructions": "The state is the word ping." } }
 	},
 	"model_prices": {
 		"gpt-4o-mini": { "in": 0.15, "out": 0.6 },

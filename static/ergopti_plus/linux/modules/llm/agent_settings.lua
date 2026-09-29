@@ -21,7 +21,11 @@
 ---    every other llm.* setting, sparsely against the manifest's defaults.
 --- 3. A remote backend reuses the key the user stored for that provider
 ---    (vision_request.entry_for), with the system's model.
---- 4. The local context of a System 2 request (now, weekday, time zone) is read
+--- 4. Each system lists only the providers that serve it (api_remote.serves):
+---    System 1 also offers the decisions providers (Jev), which are no chat
+---    model; System 2 chats, so it never names one. A stored value naming a
+---    provider its system cannot use reads as not configured.
+--- 5. The local context of a System 2 request (now, weekday, time zone) is read
 ---    here from the system clock and the system time zone, never guessed.
 --- ==============================================================================
 
@@ -40,6 +44,8 @@ local CONFIG_FILE = "modules/llm/agent.json"
 
 -- The setting of each system
 M.SYSTEM_PATHS = { system1 = "llm.agent_system1", system2 = "llm.agent_system2" }
+-- What each system asks of a provider (api_remote.serves)
+local SYSTEM_USES = { system1 = "system1", system2 = "chat" }
 local MODE_PATH = "llm.agent_mode"
 local DISABLED_APPS_PATH = "llm.agent_disabled_apps"
 
@@ -192,6 +198,18 @@ function M.get_spec(system)
 	return value
 end
 
+--- Reports whether a system may use a backend: the local server, or a
+--- provider that serves the system. An unknown provider is left to
+--- chat_target(), which names it.
+--- @param system string "system1" or "system2".
+--- @param backend string
+--- @return boolean
+local function backend_fits(system, backend)
+	if backend == Vision.LOCAL_BACKEND then return true end
+	local Remote = require("modules.llm.api_remote")
+	return Remote.provider(backend) == nil or Remote.serves(backend, SYSTEM_USES[system])
+end
+
 --- Stores the backend of a system.
 --- @param system string "system1" or "system2".
 --- @param value string "" (off), "<backend>" or "<backend>|<model>".
@@ -201,6 +219,10 @@ function M.set_spec(system, value)
 	if not path then error("agent_settings: unknown system " .. tostring(system), 2) end
 	if not M.is_valid_spec(value) then
 		Logger.error(LOG, "set_spec(): '%s' is not a backend for %s — refused.", tostring(value), system)
+		return false
+	end
+	if value ~= "" and not backend_fits(system, Vision.parse(value).backend) then
+		Logger.error(LOG, "set_spec(): '%s' cannot serve %s — refused.", tostring(value), system)
 		return false
 	end
 	if not write(path, value) then
@@ -332,23 +354,30 @@ end
 
 --- The parsed backend of a system with its model.
 --- @param system string "system1" or "system2".
---- @return table|nil resolved { backend, model, spec }, string|nil reason ("off" or "no_model")
+--- @return table|nil resolved { backend, model, spec }, string|nil reason ("off", "no_model"
+---   or "wrong_use" for a provider the system cannot use)
 function M.resolve(system)
 	local spec = M.get_spec(system)
 	if spec == "" then return nil, "off" end
 	local config = M.config()
 	if not config then return nil, "off" end
 	local parsed = Vision.parse(spec)
+	if not backend_fits(system, parsed.backend) then
+		report_invalid(M.SYSTEM_PATHS[system], spec)
+		return nil, "wrong_use"
+	end
 	local model = Agent.resolve_model(parsed, config, M.providers_catalogue())
 	if not model then return nil, "no_model" end
 	return { backend = parsed.backend, model = model, spec = spec }, nil
 end
 
---- Where a system's chat request goes: the module that sends it (api_ollama or
+--- Where a system's request goes: the module that sends it (api_ollama or
 --- api_remote, whose chat() share one shape), its target and the model.
+--- `decision` marks a System 1 that asks Jev its typed question
+--- (api_remote.decide) instead of sending the chat triage prompt.
 --- @param system string "system1" or "system2".
---- @return table|nil chat { module, target, model, kind, backend }, string|nil reason
----   ("off", "no_model", or why the backend cannot answer)
+--- @return table|nil chat { module, target, model, kind, backend, decision }, string|nil reason
+---   ("off", "no_model", "wrong_use", or why the backend cannot answer)
 function M.chat_target(system)
 	local resolved, reason = M.resolve(system)
 	if not resolved then return nil, reason end
@@ -357,7 +386,7 @@ function M.chat_target(system)
 		local base_url = profiles.get_base_url() or require("infra.llm_bridge").resolve_base_url()
 		if type(base_url) ~= "string" or base_url == "" then return nil, "no Ollama address" end
 		return { module = require("modules.llm.api_ollama"), target = base_url, model = resolved.model,
-			kind = "ollama", backend = resolved.backend }, nil
+			kind = "ollama", backend = resolved.backend, decision = false }, nil
 	end
 	local Remote = require("modules.llm.api_remote")
 	if not Remote.provider(resolved.backend) then return nil, "unknown provider " .. resolved.backend end
@@ -368,7 +397,7 @@ function M.chat_target(system)
 	for key, value in pairs(entry) do target[key] = value end
 	target.model = resolved.model
 	return { module = Remote, target = target, model = resolved.model, kind = "api",
-		backend = resolved.backend }, nil
+		backend = resolved.backend, decision = system == "system1" and Remote.is_decision_entry(target) }, nil
 end
 
 --- The API providers as agent.resolve_model reads them: api_providers.json's
@@ -382,17 +411,21 @@ function M.providers_catalogue()
 end
 
 --- The backends a system may name, for the menu: the local server, then the
---- API providers in catalogue order, each with the model it runs by default
---- ("" when the backend needs one named).
+--- API providers that serve the system in catalogue order, each with the
+--- model it runs by default ("" when the backend needs one named).
+--- @param system string "system1" or "system2".
 --- @return table Array of { value, label, defaultModel }.
-function M.backend_choices()
+function M.backend_choices(system)
+	local use = SYSTEM_USES[system]
+	if not use then error("agent_settings.backend_choices: unknown system " .. tostring(system), 2) end
+	local VisionRequest = require("modules.llm.vision_request")
 	local config = M.config()
 	local catalogue = M.providers_catalogue()
 	local defaults = {}
-	for _, choice in ipairs(require("modules.llm.vision_request").backend_choices({})) do
+	for _, choice in ipairs(VisionRequest.backend_choices({}, use)) do
 		defaults[choice.value] = config and Agent.resolve_model({ backend = choice.value }, config, catalogue) or nil
 	end
-	return require("modules.llm.vision_request").backend_choices(defaults)
+	return VisionRequest.backend_choices(defaults, use)
 end
 
 

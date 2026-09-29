@@ -265,7 +265,7 @@ _LAG_SystemRows() {
 		Row := _LLM_Agent_SystemRow("agent_system2")
 		AssertEqual(StrReplace(t("menu.agent.system2"), "{1}", "Cerebras"), Row["label"], "the current backend")
 		Items := Row["items"]
-		Choices := LLM_Vision_BackendChoices()
+		Choices := LLM_Agent_BackendChoices("agent_system2")
 		AssertEqual(Choices.Length + 3, Items.Length, "off, every backend, a separator and the model")
 		AssertEqual(t("menu.agent.off"), Items[1]["label"], "off first")
 		AssertFalse(Items[1]["checked"], "unchecked")
@@ -377,6 +377,18 @@ _LAG_CerebrasEntry() {
 		"Token", "key-c", "Model", "some-chat-model")
 }
 
+; The menu's API entry for TypeSafe, whose key System 1 borrows for Jev.
+_LAG_JevEntry() {
+	return Map("Id", "typesafe-a", "Provider", "typesafe", "BaseUrl", "https://typesafe.invalid/v1/systemone",
+		"Token", "key-t", "Model", "jev-latest")
+}
+
+; The menu's API entry for Backboard.
+_LAG_BackboardEntry() {
+	return Map("Id", "backboard-a", "Provider", "backboard", "BaseUrl", "https://backboard.invalid/api",
+		"Token", "key-b", "Model", "openai/gpt-4o-mini")
+}
+
 ; The fixed context: Mail's "Re: devis" window on Tuesday 2026-09-29 at 14:05.
 _LAG_Context(Fx) {
 	return Map("app", Fx.App, "window", "Re: devis", "now", "2026-09-29T14:05", "weekday", "Tuesday",
@@ -392,6 +404,7 @@ _LAG_Run(Menu, Screen, Body) {
 	global _LLM_Agent_CommitFn, _LLM_Agent_RebuildFn, _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_Learning
 	global _LLM_AgentConnector_Tools, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
 	global _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
+	global _LLM_Remote_PostBodyFn, _LLM_Remote_BackboardAssistants
 	Saved := {
 		Locale: _I18nLocale, Remote: _LLM_Vision_RemoteTransport, Ollama: _LLM_Vision_OllamaTransport,
 		Prompt: _LLM_Agent_PromptFn, Context: _LLM_Agent_ContextProbe, Source: _LLM_Agent_SourceProbe,
@@ -400,9 +413,10 @@ _LAG_Run(Menu, Screen, Body) {
 		Rebuild: _LLM_Agent_RebuildFn, Generation: _LLM_Agent_Generation, Auto: _LLM_Agent_Auto,
 		Learning: _LLM_Agent_Learning, Tools: _LLM_AgentConnector_Tools, List: _LLM_AgentConnector_ListFn,
 		Ensure: _LLM_AgentConnector_EnsureDirFn, Visible: _Stub_LlmTooltipVisible,
-		Presented: _Stub_LlmPresentedRecord
+		Presented: _Stub_LlmPresentedRecord, Post: _LLM_Remote_PostBodyFn,
+		Assistants: _LLM_Remote_BackboardAssistants
 	}
-	Fx := { Remote: [], Ollama: [], Connector: [], ConnectorResult: Map("ok", true, "path", "fake"),
+	Fx := { Remote: [], Ollama: [], Posts: [], Connector: [], ConnectorResult: Map("ok", true, "path", "fake"),
 		Prompts: [], PromptAnswers: [], Scheduled: [], Commits: [], Rebuilds: 0, Stored: "", Written: [],
 		App: "Mail", Secure: false }
 	try {
@@ -428,6 +442,8 @@ _LAG_Run(Menu, Screen, Body) {
 		_LLM_AgentConnector_EnsureDirFn := (Dir) => false
 		_Stub_LlmTooltipVisible := false
 		_Stub_LlmPresentedRecord := 0
+		_LLM_Remote_PostBodyFn := _LRF_FakePost.Bind(Fx)
+		_LLM_Remote_BackboardAssistants := Map()
 		_LTN_Run(Menu, Screen, _Inner)
 	} finally {
 		_I18nLocale := Saved.Locale
@@ -451,10 +467,16 @@ _LAG_Run(Menu, Screen, Body) {
 		_LLM_AgentConnector_EnsureDirFn := Saved.Ensure
 		_Stub_LlmTooltipVisible := Saved.Visible
 		_Stub_LlmPresentedRecord := Saved.Presented
+		_LLM_Remote_PostBodyFn := Saved.Post
+		_LLM_Remote_BackboardAssistants := Saved.Assistants
 	}
 	_Inner(Calls, Lines, Sent) {
-		global _LLM_Engine
-		_LLM_Engine["api_entries"].Push(_LAG_CerebrasEntry())
+		global _LLM_Engine, _LLM_Menu
+		; The agent borrows the AI menu's entries, which it owns even while the AI is off
+		for Entry in [_LAG_CerebrasEntry(), _LAG_JevEntry(), _LAG_BackboardEntry()] {
+			_LLM_Menu["api_entries"].Push(Entry)
+			_LLM_Engine["api_entries"].Push(Entry.Clone())
+		}
 		Body.Call(Fx, Lines, Sent)
 	}
 }
@@ -600,19 +622,42 @@ _LAG_Refusals() {
 		AssertFalse(_LAG_Invoke("llm_agent_command"), "the agent is off")
 		AssertEqual(t("llm.agent.off_notice"), _LPP_PendingNotice(), "is told")
 		_LLM_Menu["agent_mode"] := "action"
-		_LLM_Menu["enabled"] := false
-		AssertFalse(_LAG_Invoke("llm_agent_selection"), "the AI is off")
-		AssertEqual(t("llm.manual_prediction.disabled"), _LPP_PendingNotice(),
-			"with the notice llm_generate_prediction shows")
-		_LLM_Menu["enabled"] := true
 		_LLM_Menu["agent_system2"] := "anthropic"
-		_LAG_Invoke("llm_agent_selection")
-		AssertEqual(t("llm.agent.failed"), _LPP_PendingNotice(), "a provider without an API entry cannot answer")
+		AssertFalse(_LAG_Invoke("llm_agent_selection"), "a provider without an API entry")
+		AssertEqual(t("llm.agent.no_system2"), _LPP_PendingNotice(), "is not a usable System 2")
+		_LLM_Menu["agent_system2"] := "typesafe"
+		AssertFalse(_LAG_Invoke("llm_agent_selection"), "a decisions provider cannot write actions")
+		AssertEqual(t("llm.agent.no_system2"), _LPP_PendingNotice(), "the same notice")
+		AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "answers typed questions only"), "and the log says why")
+		_LLM_Menu["agent_system2"] := "cerebras"
+		Suspend(true)
+		try AssertFalse(_LAG_Invoke("llm_agent_selection"), "paused, nothing runs")
+		finally Suspend(false)
+		AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "Manual prediction refused (paused)"), "and the pause is logged")
 		AssertEqual(0, Fx.Remote.Length, "no request left")
 		AssertEqual(0, Fx.Prompts.Length, "and no dialog opened")
 	}
 }
-Test("LLM agent: no System 2, an agent off or an AI off refuse with their notice", _LAG_Refusals)
+Test("LLM agent: no usable System 2, an agent off or a pause refuse with their notice", _LAG_Refusals)
+
+; The agent never uses the AI menu's prediction backend: the AI switched off
+; or its backend not ready refuse nothing.
+_LAG_AiMenuOffDoesNotRefuse() {
+	Screen := _LTN_Screen(LAG_SELECTION)
+	_LAG_Run(_LAG_Menu("action", "", "cerebras", false), Screen, _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu
+		AssertTrue(_LAG_Invoke("llm_agent_selection"), "the AI menu is off, the agent still runs")
+		AssertEqual(1, Fx.Remote.Length, "System 2 is asked")
+		AssertEqual("cerebras", Fx.Remote[1]["resolved"]["Provider"], "with its own provider's key")
+		_LLM_Menu["enabled"] := true
+		_LLM_Menu["api_entry_id"] := "missing"
+		Fx.PromptAnswers.Push(Map("ok", true, "value", "réunion demain"))
+		AssertTrue(_LAG_Invoke("llm_agent_command"), "a prediction backend not ready refuses nothing either")
+		AssertEqual(2, Fx.Remote.Length, "the command is sent")
+	}
+}
+Test("LLM agent: the actions run with the AI menu off or its backend not ready", _LAG_AiMenuOffDoesNotRefuse)
 
 _LAG_AnswersRefusedOrFailing() {
 	Screen := _LTN_Screen(LAG_SELECTION)
@@ -1030,3 +1075,219 @@ _LAG_DismissByTyping() {
 	}
 }
 Test("LLM agent: typing over an automatic suggestion dismisses it", _LAG_DismissByTyping)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 8/ Providers: Jev, Backboard, choices =======
+; =====================================================
+; =====================================================
+
+_LAG_BackendChoices() {
+	_LAG_Run(_LAG_Menu("action", "", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		Positions := Map("agent_system1", Map(), "agent_system2", Map())
+		for Key, Found in Positions {
+			for Choice in LLM_Agent_BackendChoices(Key)
+				Found[Choice["value"]] := A_Index
+		}
+		System1 := Positions["agent_system1"]
+		System2 := Positions["agent_system2"]
+		AssertTrue(System1.Has("typesafe") && System1.Has("openrouter_jev"), "Jev is offered as System 1")
+		AssertFalse(System2.Has("typesafe") || System2.Has("openrouter_jev"), "never as System 2")
+		for ProviderId in ["openrouter", "groq", "together", "fireworks", "backboard"]
+			AssertTrue(System1.Has(ProviderId) && System2.Has(ProviderId), ProviderId . " serves both systems")
+		Previous := 0
+		for ProviderId in LLM_API_PROVIDER_ORDER {
+			AssertTrue(System1[ProviderId] > Previous, ProviderId . " keeps provider_order's place")
+			Previous := System1[ProviderId]
+		}
+		AssertThrows(() => LLM_Agent_BackendChoices("agent_system3"), "an unknown system is refused")
+		Row := _LLM_Agent_SystemRow("agent_system1")
+		AssertEqual(System1.Count + 3, Row["items"].Length, "System 1's submenu lists its own backends")
+		Row := _LLM_Agent_SystemRow("agent_system2")
+		AssertEqual(System2.Count + 3, Row["items"].Length, "System 2's lists only chat backends")
+		AssertEqual(LLM_API_PROVIDERS["typesafe"]["Label"], LLM_Agent_BackendLabel("typesafe"), "Jev keeps its label")
+	}
+}
+Test("LLM agent: Jev is offered as System 1 only, every chat provider as both", _LAG_BackendChoices)
+
+; The Jev answer of the triage fixtures, with or without a stated choice.
+_LAG_JevAnswers(Choice := "") {
+	return '{"intent":{"type":"choice",' . (Choice != "" ? '"choice":"' . Choice . '",' : "")
+		. '"probabilities":{"calendar":0.9,"reminder":0.05,"none":0.05}}}'
+}
+
+_LAG_JevThroughDecisions() {
+	_LAG_Run(_LAG_Menu("auto", "typesafe", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		Config := LLM_Agent_Config()
+		Fx.App := "Slack"
+		TooltipHide("AgentTest", true)
+		AssertTrue(_LAG_Type(Fx, LAG_TYPED).Call(), "the pause triages through Jev")
+		AssertEqual(0, Fx.Remote.Length, "no chat request")
+		AssertEqual(1, Fx.Posts.Length, "one decisions request")
+		Post := Fx.Posts[1]
+		AssertEqual(_LAG_JevEntry()["BaseUrl"], Post["url"], "to the entry's full endpoint")
+		AssertContains(_LLMRemote_BuildCurlConfig(Post["resolved"]["Format"], Post["resolved"]["Token"], Post["url"]),
+			"Authorization: Bearer key-t", "with the key as a Bearer")
+		Expected := LLM_RemoteFormats_DecisionsBody("jev-latest", "App: Slack`nText: " . LAG_SELECTION,
+			LLM_Agent_JevQuestions(Config))
+		AssertEqual("", _LVS_DeepEqual(JsonParse(LLM_RemoteFormats_Encode(Expected)), Post["body"]),
+			"asking the triage question about the application and the sentence")
+		Post["on_success"].Call('{"answers":' . _LAG_JevAnswers("calendar") . ',"model":"jev-latest"}')
+		AssertEqual(1, Fx.Remote.Length, "the chosen intent wakes System 2")
+		AssertEqual(_LAG_System2Prompt("typing", "Slack"), _LAG_Request(Fx.Remote[1])["system"],
+			"about what is being typed")
+
+		AssertTrue(_LAG_Type(Fx, "Autre chose : rappelle-moi le garage demain matin").Call(), "another sentence")
+		Fx.Posts[2]["on_success"].Call('{"answers":' . _LAG_JevAnswers() . '}')
+		AssertEqual(2, Fx.Remote.Length, "without a choice, the most probable intent wakes System 2")
+		AssertEqual(0, _LVS_LinesMentioning(Lines, "garage"), "the sentence is never logged")
+	}
+}
+Test("LLM agent: System 1 asks Jev through a decisions provider", _LAG_JevThroughDecisions)
+
+_LAG_JevThroughBackboard() {
+	_LAG_Run(_LAG_Menu("auto", "backboard|typesafe/jev-latest", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		Config := LLM_Agent_Config()
+		Fx.App := "Slack"
+		TooltipHide("AgentTest", true)
+		Answers := _LAG_JevAnswers("calendar")
+		Locations := [
+			["system_one", "Envoie le devis à Paul demain matin", '{"system_one":{"answers":' . Answers . '},"thread_id":"t"}'],
+			["answers", "Réunion avec Claire vendredi à midi", '{"answers":' . Answers . ',"thread_id":"t"}'],
+			["content", "Rappelle-moi le dentiste lundi soir",
+				'{"content":' . JsonStringLiteral('{"answers":' . Answers . '}') . ',"thread_id":"t"}']
+		]
+		for Index, Location in Locations {
+			Before := Fx.Posts.Length
+			AssertTrue(_LAG_Type(Fx, Location[2]).Call(), Location[1] . ": the pause triages through Backboard")
+			if (Index == 1) {
+				AssertEqual(Before + 1, Fx.Posts.Length, "the first triage creates the assistant")
+				AssertContains(Fx.Posts[Before + 1]["url"], "/assistants", "at /assistants")
+				Fx.Posts[Before + 1]["on_success"].Call('{"assistant_id":"asst_7"}')
+			}
+			AssertEqual(Before + (Index == 1 ? 2 : 1), Fx.Posts.Length, Location[1] . ": then one message")
+			Message := Fx.Posts[Fx.Posts.Length]
+			AssertContains(Message["url"], "/threads/messages", Location[1] . ": on a new thread")
+			Body := Message["body"]
+			AssertEqual("", _LVS_DeepEqual(JsonParse(LLM_RemoteFormats_Encode(LLM_Agent_JevQuestions(Config))),
+				Body["system_one"]["questions"]), Location[1] . ": the questions ride system_one")
+			AssertEqual("App: Slack`nText: " . Location[2], Body["content"], Location[1] . ": about the sentence")
+			AssertEqual("", Body["system_prompt"], Location[1] . ": without a system prompt")
+			AssertEqual("typesafe", Body["llm_provider"], Location[1] . ": Jev's provider")
+			AssertEqual("jev-latest", Body["model_name"], Location[1] . ": and model")
+			AssertEqual("asst_7", Body["assistant_id"], Location[1] . ": the assistant is reused")
+			RemoteBefore := Fx.Remote.Length
+			Message["on_success"].Call(Location[3])
+			AssertEqual(RemoteBefore + 1, Fx.Remote.Length, Location[1] . ": the triage wakes System 2")
+			AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "read from Backboard's '" . Location[1] . "'"),
+				Location[1] . ": where the answers were is logged")
+		}
+		AssertTrue(_LAG_Type(Fx, "Commande du papier pour le bureau").Call(), "a fourth sentence")
+		RemoteBefore := Fx.Remote.Length
+		Fx.Posts[Fx.Posts.Length]["on_success"].Call('{"content":"I think calendar.","status":"COMPLETED","thread_id":"t"}')
+		AssertEqual(RemoteBefore, Fx.Remote.Length, "no answers, no System 2")
+		AssertEqual(1, _LPP_LinesWith(Lines, "WARNING", "top-level keys: content, status, thread_id"),
+			"a miss names the answer's top-level keys")
+		AssertEqual(0, _LVS_LinesMentioning(Lines, "I think"), "never its content")
+	}
+}
+Test("LLM agent: System 1 asks Jev through Backboard and logs where the answers were", _LAG_JevThroughBackboard)
+
+_LAG_System2ThroughBackboard() {
+	_LAG_Run(_LAG_Menu("action", "", "backboard"), _LTN_Screen(LAG_SELECTION), _Body)
+	_Body(Fx, Lines, Sent) {
+		Config := LLM_Agent_Config()
+		AssertTrue(_LAG_Invoke("llm_agent_selection"), "the selection goes to Backboard")
+		Fx.Posts[1]["on_success"].Call('{"assistant_id":"asst_2"}')
+		Body := Fx.Posts[2]["body"]
+		AssertEqual(_LAG_System2Prompt("selection"), Body["system_prompt"], "with the System 2 prompt")
+		AssertEqual("SOURCE:`n" . LAG_SELECTION, Body["content"], "the selection is the message")
+		AssertEqual("openai", Body["llm_provider"], "the entry's default model's provider")
+		Fx.Posts[2]["on_success"].Call('{"content":' . JsonStringLiteral(LAG_ANSWER) . ',"status":"COMPLETED"}')
+		AssertEqual(2, _LPP_LastFinalRender().slots.Length, "its actions are offered")
+	}
+}
+Test("LLM agent: System 2 chats through Backboard", _LAG_System2ThroughBackboard)
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 9/ The automatic mode's surface =======
+; ===============================================
+; ===============================================
+
+_LAG_AutoOverPrediction() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmPresentedRecord, _TooltipActiveSurface
+		global _LLM_Agent_Generation
+		Fx.App := "Slack"
+		TooltipHide("AgentTest", true)
+		_LLM_Engine["explicit_request_id"] := 0
+		Pause := _LAG_Type(Fx, LAG_TYPED)
+		; The automatic prediction appears before the pause ends
+		LLM_Tooltip_Show(["demain"], 1, true, Map("offer_id", 41))
+		AssertTrue(Pause.Call(), "an automatic prediction tooltip does not hold the triage back")
+		Fx.Remote[1]["on_success"].Call("INTENT: calendar`nPROBABILITY: 0.9")
+		AssertEqual(2, Fx.Remote.Length, "System 2 is asked")
+		Calls := _Stub_LlmTooltipCalls.Length
+		Fx.Remote[2]["on_success"].Call(LAG_ANSWER)
+		AssertTrue(_Stub_LlmTooltipCalls.Length > Calls && _Stub_LlmTooltipCalls[Calls + 1].HasOwnProp("hide"),
+			"the prediction is dismissed")
+		AssertEqual("agent_" . _LLM_Agent_Generation, _Stub_LlmPresentedRecord.Lifecycle.OfferId,
+			"and the actions take its place")
+		AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "replace the prediction tooltip"), "which is logged")
+
+		; A prediction the user asked for holds the surface
+		LLM_Tooltip_Show(["demain"], 1, true, Map("offer_id", 42))
+		_LLM_Engine["explicit_request_id"] := 42
+		AssertFalse(_LAG_Type(Fx, "Envoie le devis à Paul demain").Call(), "an explicit prediction holds it")
+		_LLM_Engine["explicit_request_id"] := 0
+		; Another AI action's tooltip too
+		LLM_Tooltip_Show(["x"], 1, true, Map("offer_id", "vision_3"))
+		AssertFalse(_LAG_Type(Fx, "Envoie le devis à Paul demain").Call(), "another AI action's tooltip holds it")
+		; A hotstring tooltip still does, over an automatic prediction
+		LLM_Tooltip_Show(["demain"], 1, true, Map("offer_id", 43))
+		_TooltipActiveSurface := {}
+		try AssertFalse(_LAG_Type(Fx, "Envoie le devis à Paul demain").Call(), "a hotstring tooltip holds it")
+		finally _TooltipActiveSurface := 0
+		AssertEqual(2, Fx.Remote.Length, "none of these sent anything")
+		AssertTrue(_LAG_Type(Fx, "Envoie le devis à Paul demain").Call(),
+			"the automatic prediction alone lets it through")
+	}
+}
+Test("LLM agent: the automatic mode triages over an automatic prediction and replaces it",
+	_LAG_AutoOverPrediction)
+
+_LAG_ManualPredictionIsExplicit() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Engine, _LLM_Bridge_Buffer
+		_LLM_Bridge_Buffer := "On se voit"
+		AssertTrue(LLM_Menu_TriggerPrediction((Context) => _LLM_Engine["request_id"] := 77),
+			"a manual prediction is requested")
+		AssertEqual(77, _LLM_Engine["explicit_request_id"], "and marked as asked for")
+		AssertFalse(_LLM_Agent_IsAutoPrediction({ Lifecycle: { OfferId: 77 } }), "so its tooltip is no automatic one")
+		AssertTrue(_LLM_Agent_IsAutoPrediction({ Lifecycle: { OfferId: 78 } }), "unlike the next automatic one")
+		AssertFalse(_LLM_Agent_IsAutoPrediction(0), "no tooltip is none")
+	}
+}
+Test("LLM agent: a manual prediction's tooltip is not an automatic one", _LAG_ManualPredictionIsExplicit)
+
+; A repeating timer would tick on the keystroke thread: the agent's scheduler
+; takes one-shots and cancels only (test_fast_timer_inventory reads its source).
+_LAG_SchedulerIsOneShot() {
+	AssertThrows(() => _LLM_Agent_Schedule((*) => 0, 250), "a repeating period is refused")
+	AssertThrows(() => _LLM_Agent_Schedule((*) => 0, "-5"), "a period is an integer")
+}
+Test("LLM agent: the agent's timers are one-shots", _LAG_SchedulerIsOneShot)

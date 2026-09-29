@@ -4,8 +4,10 @@
 --- MODULE: Remote LLM Providers (Linux)
 --- DESCRIPTION:
 --- Sends predictions to a hosted API (Cerebras, OpenAI, Anthropic, Gemini,
---- Mistral, any OpenAI-compatible server) described by the shared catalogue
---- _shared/modules/llm/api_providers.json, the same file macOS and Windows read.
+--- Mistral, OpenRouter, Groq, Backboard, any OpenAI-compatible server)
+--- described by the shared catalogue _shared/modules/llm/api_providers.json,
+--- the same file macOS and Windows read, and asks the agent's System 1 question
+--- to Jev (TypeSafe's decisions protocol, directly or through Backboard).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Same wire contract as macOS api_remote.lua: one non-streaming request per
@@ -17,6 +19,11 @@
 ---    stdin. Logged URLs are redacted.
 --- 3. Same chat() surface as api_ollama, so the prediction engine only chooses
 ---    which backend to call.
+--- 4. A provider's format decides what it serves (serves()): a chat request,
+---    an image, or only the agent's System 1. Backboard chats through an
+---    assistant created once per key and remembered for the session; a
+---    decisions provider (Jev) is not a chat model and only answers decide().
+---    Their request shapes are the shared _shared/lua/llm/remote_formats.lua.
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +36,7 @@ local HttpClient = require("adapters.http_client")
 local PromptBuilder = require("llm.prompt_builder")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
+local Formats = require("llm.remote_formats")
 
 local LOG = "modules.llm.api_remote"
 
@@ -36,7 +44,21 @@ local LOG = "modules.llm.api_remote"
 -- cancels a model download or an update check.
 local OWNER = "llm_remote"
 local ANTHROPIC_VERSION = "2023-06-01"
-local FORMATS = { openai = true, anthropic = true, gemini = true }
+-- What each format serves: "chat" (predictions, tone, translation, the screen
+-- answers' text step, the agent's System 2 and chat triage), "vision" (an image
+-- request, vision_request.lua) and "system1" (the agent's triage, a chat or a
+-- Jev decision). Backboard's verified message shape carries no image, and Jev
+-- is not a chat model.
+local FORMAT_USES = {
+	openai = { chat = true, vision = true, system1 = true },
+	anthropic = { chat = true, vision = true, system1 = true },
+	gemini = { chat = true, vision = true, system1 = true },
+	backboard = { chat = true, system1 = true },
+	decisions = { system1 = true },
+}
+-- The Backboard model prefix that runs Jev: System 1 asks it through system_one
+-- questions instead of the chat triage prompt
+local BACKBOARD_JEV_PREFIX = "typesafe/"
 local EXTRA_FIELD = "^[A-Za-z_][A-Za-z0-9_]*$"
 -- How much of a provider's refusal is shown: enough for "invalid API key",
 -- never a whole HTML error page.
@@ -62,7 +84,7 @@ local function descriptor_is_valid(id, desc)
 	for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
 		if type(desc[key]) ~= "string" then return false end
 	end
-	if desc.label:match("^%s*$") or not FORMATS[desc.format] then return false end
+	if desc.label:match("^%s*$") or not FORMAT_USES[desc.format] then return false end
 	-- Only the generic OpenAI-compatible entry leaves its URL and model to the user.
 	if id ~= "openai_compat" and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$")) then
 		return false
@@ -104,11 +126,22 @@ local function parse_test_request(node)
 	return { system_prompt = sys, user_text = user, temperature = temp, max_tokens = tokens }
 end
 
+--- Validates the probe the Test-API action sends to a decisions provider.
+--- @param node any
+--- @return table|nil { state, questions }
+local function parse_decisions_test(node)
+	if type(node) ~= "table" then return nil end
+	local state, questions = node.state, node.questions
+	if (type(state) ~= "string" or state == "") and type(state) ~= "table" then return nil end
+	if type(questions) ~= "table" or next(questions) == nil then return nil end
+	return { state = state, questions = questions }
+end
+
 --- Parses a catalogue document. Exposed for tests over the shared corpus.
 --- @param text string|nil
---- @return table { providers, order, test_request }
+--- @return table { providers, order, test_request, decisions_test }
 function M.parse_catalogue(text)
-	local catalogue = { providers = {}, order = {}, test_request = nil }
+	local catalogue = { providers = {}, order = {}, test_request = nil, decisions_test = nil }
 	local root = type(text) == "string" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.providers) ~= "table" or type(root.provider_order) ~= "table" then
 		Logger.error(LOG, "api_providers.json is missing or malformed — no remote provider is available.")
@@ -133,6 +166,7 @@ function M.parse_catalogue(text)
 		end
 	end
 	catalogue.test_request = parse_test_request(root.test_request)
+	catalogue.decisions_test = parse_decisions_test(root.decisions_test)
 	return catalogue
 end
 
@@ -167,6 +201,42 @@ end
 --- @return table|nil
 function M.test_request_spec()
 	return catalogue().test_request
+end
+
+--- Reports whether a provider serves a use. Every list of providers (the
+--- prediction backend, the screen actions, the agent's two systems) filters
+--- the catalogue order with it, so a new provider needs no code here.
+--- @param id string A provider id.
+--- @param use string "chat", "vision" or "system1".
+--- @return boolean
+function M.serves(id, use)
+	local provider = catalogue().providers[id]
+	local uses = provider and FORMAT_USES[provider.format] or nil
+	return uses ~= nil and uses[use] == true
+end
+
+--- The providers serving a use, in catalogue order.
+--- @param use string "chat", "vision" or "system1".
+--- @return table Array of descriptors.
+function M.providers_for(use)
+	local list = {}
+	for _, provider in ipairs(M.providers()) do
+		if M.serves(provider.id, use) then list[#list + 1] = provider end
+	end
+	return list
+end
+
+--- Reports whether an entry's System 1 is a Jev decision rather than the chat
+--- triage: a decisions provider, or a Backboard model of TypeSafe.
+--- @param entry table { provider, model? }
+--- @return boolean
+function M.is_decision_entry(entry)
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not provider then return false end
+	if provider.format == "decisions" then return true end
+	if provider.format ~= "backboard" then return false end
+	local model = (type(entry.model) == "string" and entry.model ~= "") and entry.model or provider.default_model
+	return model:sub(1, #BACKBOARD_JEV_PREFIX) == BACKBOARD_JEV_PREFIX
 end
 
 
@@ -230,6 +300,9 @@ end
 --- a Bearer key, anthropic base_url/messages with x-api-key, gemini
 --- base_url/models/{model}:generateContent with the key in the URL. The screen
 --- actions send their image bodies to the same address (vision_request.lua).
+--- backboard and decisions return the base URL itself with the key's header:
+--- Backboard's paths are appended per request by remote_formats, and a
+--- decisions base_url is the full endpoint.
 --- @param entry table { provider, base_url?, token }
 --- @param model string The model the request names.
 --- @return table|nil endpoint { url, headers, format }, string|nil reason
@@ -253,6 +326,12 @@ function M.endpoint(entry, model)
 	elseif provider.format == "gemini" then
 		local name = model:gsub("^models/", "")
 		url = base .. "/models/" .. percent_encode(name) .. ":generateContent?key=" .. percent_encode(token)
+	elseif provider.format == "backboard" then
+		url = base
+		headers[Formats.BACKBOARD_KEY_HEADER] = token
+	elseif provider.format == "decisions" then
+		url = base
+		headers[Formats.DECISIONS_KEY_HEADER] = Formats.decisions_key_value(token)
 	else
 		url = base .. "/chat/completions"
 		headers["Authorization"] = "Bearer " .. token
@@ -260,7 +339,19 @@ function M.endpoint(entry, model)
 	return { url = url, headers = headers, format = provider.format }
 end
 
---- Builds one request for an entry.
+--- The system and user turns of a PromptBuilder message list.
+--- @param messages table Array of { role, content }.
+--- @return string system, string user
+local function split_messages(messages)
+	local system, user = "", ""
+	for _, message in ipairs(type(messages) == "table" and messages or {}) do
+		if message.role == "system" then system = message.content else user = message.content end
+	end
+	return system, user
+end
+
+--- Builds one chat completion request for an entry (openai, anthropic and
+--- gemini formats; Backboard's two-step exchange is chat()'s own).
 --- @param entry table { provider, base_url?, model?, token }
 --- @param messages table Array of { role, content } (PromptBuilder.build_messages).
 --- @param opts table|nil { temperature?, max_tokens? }
@@ -269,14 +360,14 @@ function M.build_request(entry, messages, opts)
 	if type(entry) ~= "table" then return nil, "no API entry" end
 	local provider = M.provider(entry.provider)
 	if not provider then return nil, "unknown provider " .. tostring(entry.provider) end
+	if provider.format == "backboard" or provider.format == "decisions" then
+		return nil, provider.label .. " is not sent chat completions"
+	end
 	local model = model_of(entry, provider)
 	local endpoint, reason = M.endpoint(entry, model)
 	if not endpoint then return nil, reason end
 
-	local system, user = "", ""
-	for _, message in ipairs(type(messages) == "table" and messages or {}) do
-		if message.role == "system" then system = message.content else user = message.content end
-	end
+	local system, user = split_messages(messages)
 	local options = type(opts) == "table" and opts or {}
 	local temperature = tonumber(options.temperature) or LlmBridge.DEFAULT_TEMPERATURE
 	local max_tokens = tonumber(options.max_tokens) or PromptBuilder.DEFAULT_MAX_TOKENS
@@ -365,49 +456,167 @@ end
 
 local _epoch = 0
 local _active = nil
+-- The Backboard assistant of each key, created by the first request and reused
+-- for the session: { [base_url .. "\n" .. key] = assistant_id }. In memory only.
+local _assistants = {}
+
+--- Opens one exchange, cancelling the one in flight. Its terminal callback runs
+--- at most once, and only while the exchange is still the current one.
+--- @param on_done function|nil
+--- @return integer|nil epoch Nil when the exchange in flight could not be cancelled.
+--- @return function|nil done
+local function open_exchange(on_done)
+	if _active and M.cancel() ~= true then return nil end
+	_epoch = _epoch + 1
+	local epoch = _epoch
+	local finished = false
+	_active = { epoch = epoch }
+	local function done(...)
+		if finished or epoch ~= _epoch then return end
+		finished = true
+		_active = nil
+		if type(on_done) == "function" then
+			local ok, callback_err = pcall(on_done, ...)
+			if not ok then Logger.error(LOG, "Terminal callback raised — %s", tostring(callback_err)) end
+		end
+	end
+	return epoch, done
+end
+
+--- Why a request failed, with the provider's own explanation when it gives one.
+--- @param result any The HTTP adapter's result.
+--- @return string
+local function failure_detail(result)
+	local status = type(result) == "table" and result.status or 0
+	local server = type(result) == "table" and M.server_message(result.error_body) or nil
+	if status ~= 0 then return string.format("HTTP %d%s", status, server and (": " .. server) or "") end
+	return tostring(type(result) == "table" and result.error or "transport failed")
+end
+
+--- The sorted top-level keys of a decoded answer, never its values: they may
+--- hold the user's text.
+--- @param root table
+--- @return string
+local function top_level_keys(root)
+	local keys = {}
+	for key in pairs(root) do keys[#keys + 1] = tostring(key) end
+	table.sort(keys)
+	return #keys > 0 and table.concat(keys, ", ") or "none"
+end
+
+--- Posts one JSON body within an exchange. on_answer(root) runs with the
+--- decoded answer while the exchange is current; a transport or HTTP failure,
+--- or an answer that is not a JSON object, goes to fail(detail).
+--- @param epoch integer The exchange.
+--- @param url string
+--- @param headers table
+--- @param payload table The body, encoded here.
+--- @param fail function
+--- @param on_answer function
+local function post_json(epoch, url, headers, payload, fail, on_answer)
+	local body = Json.encode(payload)
+	if type(body) ~= "string" then
+		fail("request could not be encoded")
+		return
+	end
+	local dispatched = HttpClient.post(url, headers, body, function(result)
+		if epoch ~= _epoch then return end
+		if type(result) ~= "table" or result.ok ~= true then
+			fail(failure_detail(result))
+			return
+		end
+		local root = type(result.body) == "string" and Json.decode(result.body) or nil
+		if type(root) ~= "table" then
+			fail("the answer is not a JSON object")
+			return
+		end
+		on_answer(root)
+	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000 })
+	if dispatched ~= true then fail("HTTP transport unavailable") end
+end
+
+--- The address, headers and model of a Backboard request for an entry.
+--- @param entry table
+--- @return table|nil prepared { endpoint, model }, string|nil reason
+local function prepare_backboard(entry)
+	local provider = M.provider(entry.provider)
+	local model = model_of(entry, provider)
+	if not Formats.backboard_split_model(model) then
+		return nil, string.format("the Backboard model '%s' names no provider (<llm_provider>/<model_name>)",
+			tostring(model))
+	end
+	local endpoint, reason = M.endpoint(entry, model)
+	if not endpoint then return nil, reason end
+	return { endpoint = endpoint, model = model }, nil
+end
+
+--- Sends one Backboard message, creating the key's assistant first when this
+--- session has none yet. A failed creation fails the request and caches
+--- nothing, so the next request tries again.
+--- @param epoch integer The exchange.
+--- @param prepared table prepare_backboard() output.
+--- @param spec table { system, text, questions? }
+--- @param fail function fail(detail)
+--- @param on_answer function on_answer(root)
+local function backboard_send(epoch, prepared, spec, fail, on_answer)
+	local endpoint = prepared.endpoint
+	local cache_key = endpoint.url .. "\n" .. endpoint.headers[Formats.BACKBOARD_KEY_HEADER]
+	local function send_message(assistant_id)
+		local request = Formats.backboard_message_request(endpoint.url, {
+			assistant_id = assistant_id, model = prepared.model, system = spec.system, text = spec.text,
+			questions = spec.questions,
+		})
+		post_json(epoch, request.url, endpoint.headers, request.body, fail, on_answer)
+	end
+	if _assistants[cache_key] then
+		send_message(_assistants[cache_key])
+		return
+	end
+	local creation = Formats.backboard_assistant_request(endpoint.url)
+	Logger.info(LOG, "Creating the Backboard assistant for this key.")
+	-- fail() logs the reason with the request it fails.
+	post_json(epoch, creation.url, endpoint.headers, creation.body, function(detail)
+		fail("the Backboard assistant could not be created: " .. detail)
+	end, function(root)
+		local assistant_id = Formats.backboard_assistant_id(root)
+		if not assistant_id then
+			Logger.warn(LOG, "The Backboard assistant could not be created: no assistant_id (keys: %s).",
+				top_level_keys(root))
+			fail("the Backboard assistant could not be created: no assistant_id in the answer")
+			return
+		end
+		_assistants[cache_key] = assistant_id
+		Logger.info(LOG, "Backboard assistant created; reused for this key until the daemon stops.")
+		send_message(assistant_id)
+	end)
+end
 
 --- Sends one completion. Same shape as api_ollama.chat, with the entry in
 --- place of the base URL: on_done(full_text, err) is called exactly once.
+--- A Backboard entry sends one message (its assistant created first when
+--- needed); a decisions entry is refused, Jev being no chat model.
 --- @param entry table
 --- @param model string|nil Ignored: the entry names its model.
 --- @param messages table
---- @param opts table|nil { temperature?, max_tokens? }
+--- @param opts table|nil { temperature?, max_tokens? } Backboard's message has
+---   no such fields: they are not sent to it.
 --- @param on_chunk function|nil Called once with the whole text (no streaming).
 --- @param on_done function
 function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local _ = model
-	if _active and M.cancel() ~= true then return false end
-	_epoch = _epoch + 1
-	local epoch = _epoch
-	local function done(text, err)
-		if epoch ~= _epoch then return end
-		_active = nil
-		if type(on_done) == "function" then
-			local ok, callback_err = pcall(on_done, text or "", err)
-			if not ok then Logger.error(LOG, "chat(): terminal callback raised — %s", tostring(callback_err)) end
-		end
-	end
-	local request, reason = M.build_request(entry, messages, opts)
-	if not request then
+	local epoch, done = open_exchange(on_done)
+	if not epoch then return false end
+	local function refuse(reason)
 		Logger.error(LOG, "Remote request refused before dispatch: %s.", tostring(reason))
 		done("", reason)
 		return false
 	end
-	_active = { epoch = epoch }
+	local function fail(detail)
+		Logger.warn(LOG, "Remote request failed: %s.", detail)
+		done("", detail)
+	end
 	local started = Monotonic.now_ms()
-	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
-		if epoch ~= _epoch then return end
-		if type(result) ~= "table" or result.ok ~= true then
-			local status = type(result) == "table" and result.status or 0
-			local server = type(result) == "table" and M.server_message(result.error_body) or nil
-			local detail = status ~= 0 and string.format("HTTP %d%s", status, server and (": " .. server) or "")
-				or tostring(type(result) == "table" and result.error or "transport failed")
-			Logger.warn(LOG, "Remote request failed: %s.", detail)
-			done("", detail)
-			return
-		end
-		local text = M.extract_text(request.format, result.body)
+	local function deliver(text)
 		if not text or text == "" then
 			Logger.warn(LOG, "Remote response held no completion text.")
 			done("", "empty reply")
@@ -416,12 +625,97 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, Monotonic.now_ms() - started)
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end
 		done(text, nil)
+	end
+
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if provider and provider.format == "backboard" then
+		local prepared, reason = prepare_backboard(entry)
+		if not prepared then return refuse(reason) end
+		local system, user = split_messages(messages)
+		Logger.debug(LOG, "chat() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
+		backboard_send(epoch, prepared, { system = system, text = user }, fail, function(root)
+			deliver(Formats.backboard_text(root))
+		end)
+		return _active ~= nil and _active.epoch == epoch
+	end
+
+	local request, reason = M.build_request(entry, messages, opts)
+	if not request then return refuse(reason) end
+	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
+	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+		if epoch ~= _epoch then return end
+		if type(result) ~= "table" or result.ok ~= true then
+			fail(failure_detail(result))
+			return
+		end
+		deliver(M.extract_text(request.format, result.body))
 	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000 })
-	if dispatched ~= true and _active and _active.epoch == epoch then
+	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
 		return false
 	end
 	return true
+end
+
+--- Asks Jev one set of typed questions for the agent's System 1: a decisions
+--- provider receives decisions_body(); a Backboard entry sends a message with
+--- the questions in system_one, and where Backboard put the answers is logged
+--- (its clients do not document it). on_done(answers, err) is called once.
+--- @param entry table A decisions or Backboard entry.
+--- @param state string|table What the questions are about.
+--- @param questions table { [id] = { type, instructions, criteria? } }
+--- @param on_done function
+--- @return boolean dispatched
+function M.decide(entry, state, questions, on_done)
+	local epoch, done = open_exchange(on_done)
+	if not epoch then return false end
+	local function refuse(reason)
+		Logger.error(LOG, "Decision request refused before dispatch: %s.", tostring(reason))
+		done(nil, reason)
+		return false
+	end
+	local function fail(detail)
+		Logger.warn(LOG, "Decision request failed: %s.", detail)
+		done(nil, detail)
+	end
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if not provider then return refuse("unknown provider " .. tostring(type(entry) == "table" and entry.provider)) end
+
+	if provider.format == "decisions" then
+		local model = model_of(entry, provider)
+		local endpoint, reason = M.endpoint(entry, model)
+		if not endpoint then return refuse(reason) end
+		Logger.debug(LOG, "decide() → %s (model=%s)", M.redact_url(endpoint.url), model)
+		post_json(epoch, endpoint.url, endpoint.headers, Formats.decisions_body(model, state, questions), fail,
+			function(root)
+				local answers = Formats.decisions_answers(root)
+				if not answers then
+					fail("the answer holds no answers (keys: " .. top_level_keys(root) .. ")")
+					return
+				end
+				done(answers, nil)
+			end)
+		return _active ~= nil and _active.epoch == epoch
+	end
+
+	if provider.format == "backboard" then
+		local prepared, reason = prepare_backboard(entry)
+		if not prepared then return refuse(reason) end
+		if type(state) ~= "string" then return refuse("a Backboard message carries a text state only") end
+		Logger.debug(LOG, "decide() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
+		backboard_send(epoch, prepared, { system = "", text = state, questions = questions }, fail, function(root)
+			local answers, where = Formats.backboard_decision_answers(root, Json.decode)
+			if not answers then
+				Logger.warn(LOG, "Backboard returned no Jev answers; its top-level keys: %s.", top_level_keys(root))
+				done(nil, "Backboard returned no Jev answers")
+				return
+			end
+			Logger.info(LOG, "Jev answers read from Backboard's '%s'.", where)
+			done(answers, nil)
+		end)
+		return _active ~= nil and _active.epoch == epoch
+	end
+	return refuse(provider.label .. " does not answer typed questions")
 end
 
 --- Cancels the request in flight; its callback is not called.
@@ -439,17 +733,30 @@ function M.is_active()
 	return _active ~= nil
 end
 
---- Sends the shared connectivity probe with one entry.
+--- Sends the connectivity probe with one entry: the shared test_request as a
+--- chat (a Backboard entry as one message), or decisions_test to a decisions
+--- provider, which passes when the answer holds answers.
 --- @param entry table
 --- @param on_done function Called with (ok, detail, elapsed_ms): detail is the reply or the error.
 --- @return boolean Whether the probe was dispatched.
 function M.test(entry, on_done)
+	local started = Monotonic.now_ms()
+	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	if provider and provider.format == "decisions" then
+		local probe = catalogue().decisions_test
+		if not probe then
+			on_done(false, "the API provider list is invalid", 0)
+			return false
+		end
+		return M.decide(entry, probe.state, probe.questions, function(answers, err)
+			on_done(err == nil, err or Json.encode(answers) or "", Monotonic.now_ms() - started)
+		end)
+	end
 	local spec = M.test_request_spec()
 	if not spec then
 		on_done(false, "the API provider list is invalid", 0)
 		return false
 	end
-	local started = Monotonic.now_ms()
 	return M.chat(entry, nil, {
 		{ role = "system", content = spec.system_prompt },
 		{ role = "user", content = spec.user_text },
@@ -458,11 +765,12 @@ function M.test(entry, on_done)
 	end)
 end
 
---- Forgets the loaded catalogue (tests).
+--- Forgets the loaded catalogue and the Backboard assistants (tests).
 function M._reset_for_test()
 	_catalogue = nil
 	_epoch = _epoch + 1
 	_active = nil
+	_assistants = {}
 end
 
 return M

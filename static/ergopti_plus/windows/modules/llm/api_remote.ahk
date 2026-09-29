@@ -19,6 +19,10 @@
 ; 3. No async streaming yet — every call is request/response, which keeps error
 ;    handling trivial and matches the rest of the AHK LLM pipeline. Streaming
 ;    can be layered on later without changing the public signature.
+;    Backboard (assistant/thread API, key in X-API-Key) and the decisions
+;    providers (TypeSafe's Jev, typed questions only) go through the same curl
+;    transport; their shapes live in remote_formats.ahk, and a decisions
+;    provider is never sent a chat request.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,6 +43,36 @@
 ; _LLMRemoteParseResponse.
 global LLM_API_PROVIDERS := Map()
 global LLM_API_PROVIDER_ORDER := []
+
+; The formats a catalogue provider may declare, each with what it serves:
+; "chat" (text in, text out), "images" (a chat that also reads a screenshot).
+; "backboard" chats through Backboard's assistant/thread API and
+; "decisions" answers typed questions only (TypeSafe's Jev): see
+; modules/llm/remote_formats.ahk for their shapes.
+global LLM_REMOTE_CATALOG_FORMATS := Map(
+    "openai",    Map("chat", true,  "images", true),
+    "anthropic", Map("chat", true,  "images", true),
+    "gemini",    Map("chat", true,  "images", true),
+    "backboard", Map("chat", true,  "images", false),
+    "decisions", Map("chat", false, "images", false))
+
+; The formats whose answer is read whole by remote_formats.ahk, not as a chat
+; completion: their classified text is the JSON body itself.
+global LLM_REMOTE_RAW_FORMATS := Map("backboard", true, "decisions", true)
+
+; Backboard assistant id per base URL and key, created by the first request
+; with that key and kept for the session. A failed creation stores nothing, so
+; the next request tries again.
+global _LLM_Remote_BackboardAssistants := Map()
+
+; Test seam, 0 in production: the transport of the Backboard and decisions
+; requests, with LLM_RemotePostBody_Async's signature.
+global _LLM_Remote_PostBodyFn := 0
+
+; The shared decisions probe of the Test-API action (api_providers.json
+; decisions_test): Map("state", "questions"). Empty until the catalogue
+; validates it; the action then refuses a decisions entry loudly.
+global LLM_REMOTE_DECISIONS_TEST := Map()
 
 ; Shared Test-API probe (system/user prompt, temperature, token budget) from
 ; api_providers.json test_request — the exact request both drivers send
@@ -120,8 +154,21 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     }
     reservation["format"] := resolved["Format"]
     reservation["model_id_at_dispatch"] := resolved["Model"]
+    if !LLM_RemoteFormatServes(resolved["Format"], "chat") {
+        try LoggerWarn("LLM.remote",
+            "Remote generation refused: '{1}' answers typed questions only, it is not a chat model.",
+            resolved["Provider"])
+        _LLMRemote_FailReserved(req_id, reservation, on_fail, "not_chat")
+        return req_id
+    }
 
     req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
+    if (resolved["Format"] == "backboard") {
+        ; Backboard's own two-step exchange owns its requests from here
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return LLM_RemoteBackboardChat_Async(resolved, req["system"], req["user"],
+            on_success, on_fail, Kind, timeout_ms)
+    }
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
     Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
         resolved.Has("Extras") ? resolved["Extras"] : Map())
@@ -149,9 +196,10 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
  * @param {function} on_success - Called with the completion text and usage.
  * @param {function} on_fail    - Called with _LLMRemote_FailInfo's Map.
  * @param {number}   TimeoutMs  - Override for this request (0 keeps the shared one).
+ * @param {string}   Kind       - Reservation kind, as LLM_RemoteGenerate_Async's.
  * @returns {Integer} Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0) {
+LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0, Kind := "") {
     global _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
     if !(Resolved is Map)
         throw TypeError("LLM_RemotePostBody_Async needs a resolved entry.")
@@ -161,6 +209,7 @@ LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs 
         : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
         timeout_ms, A_TickCount, Resolved)
+    reservation["kind"] := Kind
     if (_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload, on_success,
             on_fail, timeout_ms, 0, reservation))
         return req_id
@@ -168,6 +217,232 @@ LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs 
         "Remote request refused because the non-blocking curl transport is unavailable.")
     _LLMRemote_FailReserved(req_id, reservation, on_fail)
     return req_id
+}
+
+
+
+; ===================================
+; ===== Backboard and decisions =====
+; ===================================
+
+/**
+ * Tells whether a catalogue format serves a capability.
+ * @param {String} Fmt A provider's format.
+ * @param {String} Capability "chat" or "images".
+ * @returns {Boolean} False for an unknown format.
+ */
+LLM_RemoteFormatServes(Fmt, Capability) {
+    global LLM_REMOTE_CATALOG_FORMATS
+    if !(Fmt is String) || !LLM_REMOTE_CATALOG_FORMATS.Has(Fmt)
+        return false
+    return LLM_REMOTE_CATALOG_FORMATS[Fmt].Get(Capability, false) ? true : false
+}
+
+/**
+ * The format of a catalogue provider.
+ * @param {String} ProviderId The provider.
+ * @returns {String} Its format, "" for an unknown provider.
+ */
+LLM_RemoteProviderFormat(ProviderId) {
+    global LLM_API_PROVIDERS
+    if !(ProviderId is String) || !LLM_API_PROVIDERS.Has(ProviderId)
+        return ""
+    return LLM_API_PROVIDERS[ProviderId]["Format"]
+}
+
+/**
+ * Tells whether the save-time reachability ping knows a provider's format:
+ * the chat APIs list their models, Backboard and the decisions endpoints have
+ * no such verified route, and only the Test action probes them.
+ * @param {String} ProviderId The provider.
+ * @returns {Boolean}
+ */
+LLM_RemoteHasReadyPing(ProviderId) {
+    Fmt := LLM_RemoteProviderFormat(ProviderId)
+    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini"
+}
+
+/**
+ * Names the top-level keys of a decoded answer, never its values: what a log
+ * may say about an answer whose shape was not the expected one.
+ * @param {Any} Response The decoded answer.
+ * @returns {String} The keys, comma-separated, or the answer's type.
+ */
+LLM_RemoteTopLevelKeys(Response) {
+    if !(Response is Map)
+        return "(" . Type(Response) . ")"
+    Keys := ""
+    for Key in Response
+        Keys .= (Keys == "" ? "" : ", ") . Key
+    return (Keys == "") ? "(none)" : Keys
+}
+
+/**
+ * Sends one Backboard message and hands its decoded answer on. The first
+ * request with a key creates the driver's assistant; its id is kept for the
+ * session, and a failed creation fails this request, the next one trying again.
+ * Backboard's message API takes no temperature and no token budget.
+ * @param {Map}      Resolved   - _LLMRemoteResolveEntry's record of a backboard provider.
+ * @param {Map}      Spec       - Map("model", "system", "text"[, "questions"]).
+ * @param {Func}     on_success - Called with the decoded answer Map and the usage.
+ * @param {Func}     on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {String}   Kind       - Reservation kind of every request of the exchange.
+ * @param {Integer}  TimeoutMs  - Override per request (0 keeps the shared one).
+ * @returns {Integer} Id of the first request, 0 when nothing was sent.
+ */
+LLM_RemoteBackboard_Async(Resolved, Spec, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+    global _LLM_Remote_BackboardAssistants
+    if !(Resolved is Map) || Resolved["Format"] != "backboard"
+        throw ValueError("LLM_RemoteBackboard_Async needs a resolved backboard entry.")
+    if !(LLM_RemoteFormats_BackboardSplitModel(Spec["model"]) is Map) {
+        try LoggerWarn("LLM.remote",
+            "Backboard request refused: the model '{1}' names no provider (expected <llm_provider>/<model_name>).",
+            Spec["model"])
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("invalid_model"))
+        return 0
+    }
+    Key := _LLMRemote_BackboardKey(Resolved)
+    if _LLM_Remote_BackboardAssistants.Has(Key)
+        return _LLMRemote_BackboardMessage(Resolved, _LLM_Remote_BackboardAssistants[Key], Spec,
+            on_success, on_fail, Kind, TimeoutMs)
+    Request := LLM_RemoteFormats_BackboardAssistantRequest(RTrim(Resolved["BaseUrl"], "/"))
+    try LoggerInfo("LLM.remote", "Backboard: creating the driver's assistant for this key.")
+    return _LLMRemote_PostBody(Resolved, Request["url"], LLM_RemoteFormats_Encode(Request["body"]),
+        _LLMRemote_OnBackboardAssistant.Bind(Resolved, Key, Spec, on_success, on_fail, Kind, TimeoutMs),
+        _LLMRemote_OnBackboardAssistantFail.Bind(on_fail), TimeoutMs, Kind)
+}
+
+/**
+ * Sends one chat message through Backboard: the entry's model answers the
+ * system prompt and the text, and on_success gets the answer's text.
+ * @param {Map}     Resolved   - _LLMRemoteResolveEntry's record of a backboard provider.
+ * @param {String}  System     - The system prompt.
+ * @param {String}  Text       - The user turn.
+ * @param {Func}    on_success - Called with the answer text and the usage.
+ * @param {Func}    on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {String}  Kind       - Reservation kind.
+ * @param {Integer} TimeoutMs  - Override per request (0 keeps the shared one).
+ * @returns {Integer} Id of the first request, 0 when nothing was sent.
+ */
+LLM_RemoteBackboardChat_Async(Resolved, System, Text, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+    return LLM_RemoteBackboard_Async(Resolved,
+        Map("model", Resolved["Model"], "system", System, "text", Text),
+        _LLMRemote_OnBackboardChat.Bind(on_success, on_fail), on_fail, Kind, TimeoutMs)
+}
+
+/**
+ * Asks a decisions provider typed questions about a state. The provider's
+ * base_url is the full endpoint and the key travels as a Bearer header.
+ * @param {Map}        Resolved   - _LLMRemoteResolveEntry's record of a decisions provider.
+ * @param {String|Map} State      - What the questions are about.
+ * @param {Map}        Questions  - question_id -> Map("type", "instructions"[, "criteria"]).
+ * @param {Func}       on_success - Called with the decoded answers and the usage.
+ * @param {Func}       on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {String}     Kind       - Reservation kind.
+ * @param {Integer}    TimeoutMs  - Override (0 keeps the shared one).
+ * @returns {Integer} Request id.
+ */
+LLM_RemoteDecisions_Async(Resolved, State, Questions, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+    if !(Resolved is Map) || Resolved["Format"] != "decisions"
+        throw ValueError("LLM_RemoteDecisions_Async needs a resolved decisions entry.")
+    Body := LLM_RemoteFormats_Encode(LLM_RemoteFormats_DecisionsBody(Resolved["Model"], State, Questions))
+    Url := _LLMRemoteBuildUrl(Resolved["BaseUrl"], Resolved["Format"], Resolved["Token"], Resolved["Model"])
+    return _LLMRemote_PostBody(Resolved, Url, Body,
+        _LLMRemote_OnJsonObject.Bind(_LLMRemote_OnDecisions.Bind(on_success, on_fail), on_fail),
+        on_fail, TimeoutMs, Kind)
+}
+
+; The transport of the Backboard and decisions requests, or the test seam.
+_LLMRemote_PostBody(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind) {
+    global _LLM_Remote_PostBodyFn
+    Post := HasMethod(_LLM_Remote_PostBodyFn, "Call") ? _LLM_Remote_PostBodyFn : LLM_RemotePostBody_Async
+    return Post.Call(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind)
+}
+
+; The assistant cache key: one assistant per address and key.
+_LLMRemote_BackboardKey(Resolved) {
+    return RTrim(Resolved["BaseUrl"], "/") . "`n" . Resolved["Token"]
+}
+
+; Sends the message of a Backboard exchange once the assistant is known.
+_LLMRemote_BackboardMessage(Resolved, AssistantId, Spec, on_success, on_fail, Kind, TimeoutMs) {
+    MessageSpec := Map("assistant_id", AssistantId, "model", Spec["model"],
+        "system", Spec["system"], "text", Spec["text"])
+    if Spec.Has("questions")
+        MessageSpec["questions"] := Spec["questions"]
+    Request := LLM_RemoteFormats_BackboardMessageRequest(RTrim(Resolved["BaseUrl"], "/"), MessageSpec)
+    return _LLMRemote_PostBody(Resolved, Request["url"], LLM_RemoteFormats_Encode(Request["body"]),
+        _LLMRemote_OnJsonObject.Bind(on_success, on_fail), on_fail, TimeoutMs, Kind)
+}
+
+; The assistant was created: keep its id, then send the message.
+_LLMRemote_OnBackboardAssistant(Resolved, Key, Spec, on_success, on_fail, Kind, TimeoutMs, Body, Usage := "") {
+    global _LLM_Remote_BackboardAssistants
+    Response := _LLMRemote_DecodeObject(Body)
+    Id := LLM_RemoteFormats_BackboardAssistantId(Response)
+    if (Id == "") {
+        try LoggerWarn("LLM.remote",
+            "Backboard assistant creation failed: the answer carries no assistant_id (keys: {1}); the next request tries again.",
+            LLM_RemoteTopLevelKeys(Response))
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("backboard_assistant"))
+        return
+    }
+    _LLM_Remote_BackboardAssistants[Key] := Id
+    try LoggerInfo("LLM.remote", "Backboard assistant created, kept for this session.")
+    _LLMRemote_BackboardMessage(Resolved, Id, Spec, on_success, on_fail, Kind, TimeoutMs)
+}
+
+; The assistant creation failed: nothing is cached, the request fails.
+_LLMRemote_OnBackboardAssistantFail(on_fail, Info := "") {
+    Reason := (Info is Map) ? Info.Get("reason", "unknown") : "unknown"
+    try LoggerWarn("LLM.remote", "Backboard assistant creation failed ({1}); the next request tries again.", Reason)
+    _LLM_InvokeCallback(on_fail, "on_fail", (Info is Map) ? Info : _LLMRemote_FailInfo("backboard_assistant"))
+}
+
+; A Backboard chat answer: its text, or a failure when it carries none.
+_LLMRemote_OnBackboardChat(on_success, on_fail, Response, Usage := "") {
+    if !LLM_RemoteFormats_BackboardText(Response, &Text) || Text == "" {
+        Status := Response.Get("status", "")
+        try LoggerWarn("LLM.remote", "Backboard answer carried no text (status: {1}).",
+            (Status is String) ? Status : "none")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("canonical_empty"))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Text, Usage)
+}
+
+; A decisions answer: its answers, or a failure naming the keys it holds.
+_LLMRemote_OnDecisions(on_success, on_fail, Response, Usage := "") {
+    Answers := LLM_RemoteFormats_DecisionsAnswers(Response)
+    if !IsObject(Answers) {
+        try LoggerWarn("LLM.remote", "Decisions answer carried no answers (keys: {1}).",
+            LLM_RemoteTopLevelKeys(Response))
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("unsupported_shape"))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Answers, Usage)
+}
+
+; Decodes the JSON object a raw-format request answered, then hands it on.
+_LLMRemote_OnJsonObject(on_success, on_fail, Body, Usage := "") {
+    Response := _LLMRemote_DecodeObject(Body)
+    if !(Response is Map) {
+        try LoggerWarn("LLM.remote", "Remote answer is not a JSON object ({1} character(s)).",
+            (Body is String) ? StrLen(Body) : 0)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("unsupported_json_root"))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Response, Usage)
+}
+
+; @returns {Map|String} The decoded JSON object, "" when Body is not one.
+_LLMRemote_DecodeObject(Body) {
+    if !(Body is String) || Body == ""
+        return ""
+    try Decoded := JsonParse(Body)
+    catch
+        return ""
+    return (Decoded is Map) ? Decoded : ""
 }
 
 _LLMRemote_ReserveRequest(req_id, on_success, on_fail, timeout_ms, start_tick,
@@ -322,6 +597,7 @@ _LLMRemote_CurlConfQuote(Value) {
 ; same boundary the request payload already accepted, and it is deleted on every
 ; completion path.
 _LLMRemote_BuildCurlConfig(Format, Token, Url) {
+    global LLM_BACKBOARD_KEY_HEADER, LLM_DECISIONS_KEY_HEADER
     if !_LLMRemote_ConfigScalarIsSafe(Format)
             || !_LLMRemote_ConfigScalarIsSafe(Token)
             || !_LLMRemote_ConfigScalarIsSafe(Url)
@@ -338,6 +614,17 @@ _LLMRemote_BuildCurlConfig(Format, Token, Url) {
     }
     if (Format == "gemini")
         return cfg
+    if (Format == "backboard") {
+        if (Token != "")
+            cfg .= "header = " . _LLMRemote_CurlConfQuote(LLM_BACKBOARD_KEY_HEADER . ": " . Token) . "`n"
+        return cfg
+    }
+    if (Format == "decisions") {
+        if (Token != "")
+            cfg .= "header = " . _LLMRemote_CurlConfQuote(LLM_DECISIONS_KEY_HEADER . ": "
+                . LLM_RemoteFormats_DecisionsKeyValue(Token)) . "`n"
+        return cfg
+    }
     if (Token != "")
         cfg .= "header = " . _LLMRemote_CurlConfQuote("Authorization: Bearer " . Token) . "`n"
     return cfg
@@ -484,6 +771,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
 
 ; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
 _LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
+    global LLM_REMOTE_RAW_FORMATS
     if !_LLM_CurlTerminalOk(Terminal) {
         ; The readable body still goes through classification (never promotion:
         ; error content cannot become completion text) so a 4xx provider
@@ -494,6 +782,10 @@ _LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
             && Terminal.Has("body")) ? Terminal["body"] : ""
         Result := _LLMRemoteClassifyResponse(Format, ReadBody, Model)
         Result["terminal_ok"] := false
+        ; A Backboard or decisions body is handed on whole, so a readable
+        ; non-2xx one classifies as a completion: it is the provider's verdict
+        if (Result["reason"] == "completion" && LLM_REMOTE_RAW_FORMATS.Has(Format))
+            Result["reason"] := "provider_error"
         if (Terminal["exit"] != 0 || !Terminal["body_read"])
             Result["reason"] := "transport"
         return Result
@@ -999,6 +1291,15 @@ _LLMRemoteBuildUrl(BaseUrl, Fmt, Token, Model) {
     if (Fmt == "anthropic") {
         return Trimmed . "/messages"
     }
+    if (Fmt == "decisions") {
+        ; A decisions provider's base_url is its full endpoint.
+        return BaseUrl
+    }
+    if (Fmt == "backboard") {
+        ; Backboard's routes (/assistants, /threads/messages) hang off the
+        ; base; remote_formats.ahk writes each one.
+        return Trimmed
+    }
     if (Fmt == "gemini") {
         ; Gemini's path is /models/<model>:generateContent?key=<token>.
         ; Google API keys are alphanumeric + dash + underscore (URL-safe by
@@ -1017,6 +1318,7 @@ _LLMRemoteBuildUrl(BaseUrl, Fmt, Token, Model) {
 ; Sets the per-provider auth headers on a WinHTTP request. Gemini's auth is in
 ; the query string; everything else uses a header.
 _LLMRemoteSetAuthHeaders(Http, Format, Token) {
+    global LLM_BACKBOARD_KEY_HEADER, LLM_DECISIONS_KEY_HEADER
     if (Format == "anthropic") {
         if (Token != "")
             Http.SetRequestHeader("x-api-key", Token)
@@ -1025,6 +1327,16 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
     }
     if (Format == "gemini") {
         ; Token is in the URL; nothing to set on the header.
+        return
+    }
+    if (Format == "backboard") {
+        if (Token != "")
+            Http.SetRequestHeader(LLM_BACKBOARD_KEY_HEADER, Token)
+        return
+    }
+    if (Format == "decisions") {
+        if (Token != "")
+            Http.SetRequestHeader(LLM_DECISIONS_KEY_HEADER, LLM_RemoteFormats_DecisionsKeyValue(Token))
         return
     }
     ; OpenAI / OpenAI-compatible all use bearer auth.
@@ -1095,6 +1407,7 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
 ; decoys that are not assistant output. Compatibility extraction is allowed only
 ; for valid JSON maps that carry no canonical container and no provider error.
 _LLMRemoteClassifyResponse(Format, Body, Model := "") {
+    global LLM_REMOTE_RAW_FORMATS
     Result := Map(
         "ok", false, "valid_json", false, "recognized", false,
         "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body",
@@ -1120,9 +1433,24 @@ _LLMRemoteClassifyResponse(Format, Body, Model := "") {
         ServerMsg := Root["error"]["message"]
     else if (Root.Has("message") && Root["message"] is String)
         ServerMsg := Root["message"]
+    else if (LLM_REMOTE_RAW_FORMATS.Has(Format) && Root.Has("detail") && Root["detail"] is String)
+        ServerMsg := Root["detail"]
     if (StrLen(ServerMsg) > 200)
         ServerMsg := SubStr(ServerMsg, 1, 200) . "..."
     Result["server_message"] := ServerMsg
+    ; Backboard and decisions answers are no chat completion: the caller reads
+    ; the decoded object (remote_formats.ahk), so the body itself is the text.
+    if LLM_REMOTE_RAW_FORMATS.Has(Format) {
+        Result["recognized"] := true
+        if Root.Has("error") {
+            Result["reason"] := "provider_error"
+            return Result
+        }
+        Result["text"] := Body
+        Result["ok"] := true
+        Result["reason"] := "completion"
+        return Result
+    }
     State := _LLMRemoteParseStructuredRootState(Format, Root)
     Result["recognized"] := State["recognized"]
     Result["usage"] := _LLMRemoteExtractUsageRoot(Format, Root, Model)
@@ -1233,6 +1561,7 @@ _LLMRemoteJsonUnescape(s) {
 ; ============================================
 
 _LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
+    global LLM_REMOTE_CATALOG_FORMATS
     if !(desc is Map)
         return false
     for req in ["label", "base_url", "default_model", "format"] {
@@ -1244,7 +1573,7 @@ _LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
     baseUrl := desc["base_url"]
     defaultModel := desc["default_model"]
     format := desc["format"]
-    if (Trim(label) = "" or (format != "openai" and format != "anthropic" and format != "gemini"))
+    if (Trim(label) = "" or !LLM_REMOTE_CATALOG_FORMATS.Has(format))
         return false
 
     ; The compatibility row is a user-supplied endpoint/model template. Every
@@ -1319,8 +1648,32 @@ _LLMRemote_CatalogTestRequestIsValid(req) {
     return true
 }
 
+; Validates the shared decisions probe section: a non-empty state and at least
+; one question, each with a type and instructions. Soft-degrade like
+; test_request: a malformed section disables only the Test action of a
+; decisions entry.
+_LLMRemote_CatalogDecisionsTestIsValid(Section) {
+    if !(Section is Map)
+        return false
+    if !(Section.Get("state", "") is String) || Section["state"] == ""
+        return false
+    Questions := Section.Get("questions", "")
+    if !(Questions is Map) || Questions.Count == 0
+        return false
+    for QuestionId, Question in Questions {
+        if !(Question is Map)
+            return false
+        for Field in ["type", "instructions"] {
+            if !(Question.Get(Field, "") is String) || Question[Field] == ""
+                return false
+        }
+    }
+    return true
+}
+
 _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
+    global LLM_REMOTE_DECISIONS_TEST
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
@@ -1401,12 +1754,23 @@ _LLMRemote_LoadCatalog() {
         try LoggerWarn("LLM.remote", "api_providers.json: test_request section missing or invalid — Test-API action disabled.")
     }
 
+    DecisionsTest := root.Has("decisions_test") ? root["decisions_test"] : ""
+    candidateDecisionsTest := Map()
+    if _LLMRemote_CatalogDecisionsTestIsValid(DecisionsTest) {
+        candidateDecisionsTest := Map(
+            "state", DecisionsTest["state"],
+            "questions", DecisionsTest["questions"])
+    } else {
+        try LoggerWarn("LLM.remote", "api_providers.json: decisions_test section missing or invalid — Test-API action disabled for decisions providers.")
+    }
+
     ; Publish only the completely validated candidates. A failed/partial parse
     ; can never leak raw catalogue scalars to the menu or inference path.
     LLM_API_PROVIDERS := candidateProviders
     LLM_API_PROVIDER_ORDER := candidateOrder
     LLM_REMOTE_MODEL_PRICES := candidatePrices
     LLM_REMOTE_TEST_REQUEST := candidateTestRequest
+    LLM_REMOTE_DECISIONS_TEST := candidateDecisionsTest
 }
 
 ; AHK-05: a corrupt or user-edited api_providers.json must disable only the remote
@@ -1418,5 +1782,6 @@ catch as _e {
 	LLM_API_PROVIDER_ORDER := []
 	LLM_REMOTE_MODEL_PRICES := Map()
 	LLM_REMOTE_TEST_REQUEST := Map()
+	LLM_REMOTE_DECISIONS_TEST := Map()
 	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
 }
