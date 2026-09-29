@@ -26,6 +26,14 @@
  *    nobody runs. Braces on the if/else bodies are the fix.
  * 4. JavaScript's strict-equality operator (`===`). AHK v2's case-sensitive
  *    equality operator is `==`; `===` aborts parsing with `Missing operand`.
+ * 5. an unbalanced bracket: one `)` too many in a test's nested call
+ *    (`Unexpected ")"`) stopped the whole suite from loading.
+ * 6. a line that starts with `(` and has no `)` opens a continuation section,
+ *    whose remainder AHK reads as section options. A multi-line condition
+ *    split that way inside an InputBox call (`Invalid option`) stopped every
+ *    script from loading. Both shipped in one push because AutoHotkey was not
+ *    available where the code was written; the checks self-test on those exact
+ *    lines before scanning.
  *
  * FEATURES & RATIONALE:
  * - Cross-platform: runs in the JS validation layer (npm run test:js) so a parse
@@ -115,6 +123,77 @@ const RESERVED_LOWER = new Set(
 		'Return', 'Throw', 'Goto', 'Global', 'Static', 'Local'
 	].map((w) => w.toLowerCase())
 );
+
+// Options a genuine continuation section may carry after its opening "(".
+const SECTION_OPTION = /^(Join.*|LTrim0?|RTrim0|Comments?|Com|C|%|,|`)$/i;
+
+/**
+ * Reports whether a line opens a continuation section and whether its options
+ * are ones AHK accepts.
+ * @param {string} line Source line with comments already blanked.
+ * @returns {null|{valid: boolean}} null when the line opens no section.
+ */
+function sectionOpening(line) {
+	const trimmed = line.trim();
+	// Another bracket on the line makes it an expression, e.g. `(_Sib => Test(`.
+	if (!trimmed.startsWith('(') || /[()]/.test(trimmed.slice(1))) return null;
+	const options = trimmed.slice(1).trim().split(/\s+/).filter(Boolean);
+	return { valid: options.every((option) => SECTION_OPTION.test(option)) };
+}
+
+/**
+ * Finds bracket and continuation-section errors in comment-blanked code lines.
+ * @param {string[]} codeLines Lines with comments blanked, numbering preserved.
+ * @returns {{line: number, message: string}[]}
+ */
+function bracketErrors(codeLines) {
+	const found = [];
+	let depth = 0;
+	let inSection = false;
+	codeLines.forEach((line, i) => {
+		if (inSection) {
+			if (line.trim().startsWith(')')) inSection = false;
+			return;
+		}
+		const opening = sectionOpening(line);
+		if (opening) {
+			if (!opening.valid) {
+				found.push({ line: i + 1, message: 'a line starting with "(" and no ")" opens a ' +
+					'continuation section, and its text is not section options (`Invalid option` at load). ' +
+					'Keep the "(" on the previous line or compute the value first.' });
+			} else {
+				inSection = true;
+			}
+			return;
+		}
+		for (const char of stripAhkStringsAndComment(line)) {
+			if (char === '(' || char === '[') depth += 1;
+			else if (char === ')' || char === ']') {
+				depth -= 1;
+				if (depth < 0) {
+					found.push({ line: i + 1, message: 'a closing bracket with no opening one ' +
+						'(`Unexpected ")"` at load).' });
+					depth = 0;
+				}
+			}
+		}
+	});
+	if (depth !== 0) found.push({ line: codeLines.length, message: `${depth} bracket(s) never closed.` });
+	return found;
+}
+
+// The two lines that shipped: the gate must see both before it may pass a tree.
+const SELF_TEST = [
+	['\t\tExpected := JsonParse(Build("openai", Map(', '\t\t\t"image", "QUJD", "max_tokens", 1))))'],
+	['\t\tResult := InputBox(Prompt, Title,', '\t\t\t(Spec = "wrap_pair" || Spec = "llm_prompt"',
+		'\t\t\t\t|| Spec = "llm_vision") ? "w680 h300" : "w680 h160", Existing)'],
+];
+for (const sample of SELF_TEST) {
+	if (bracketErrors(sample).length === 0) {
+		console.error('The bracket check no longer detects a line that aborted the AHK suite:\n' + sample.join('\n'));
+		process.exit(1);
+	}
+}
 
 for (const file of files) {
 	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
@@ -208,6 +287,8 @@ for (const file of files) {
 			);
 		}
 	});
+
+	for (const problem of bracketErrors(codeLines)) errors.push(`${rel}:${problem.line}: ${problem.message}`);
 
 	const joined = codeLines.join('\n');
 	let m;
