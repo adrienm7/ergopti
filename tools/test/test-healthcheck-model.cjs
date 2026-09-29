@@ -431,7 +431,7 @@ for (const driver of DRIVERS) {
 
 // =====================================
 // =====================================
-// ======= 7/ Issue Summary And Name ===
+// ======= 7/ Issue Fields And Name =====
 // =====================================
 // =====================================
 
@@ -452,12 +452,7 @@ for (const driver of DRIVERS) {
 const vectors = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'tests', 'corpus', 'diagnostics', 'issue_report_vectors.json'), 'utf8')
 );
-if (!Array.isArray(vectors.summary_vectors) || vectors.summary_vectors.length < 2) fail('fewer than 2 summary vectors');
 if (!Array.isArray(vectors.file_name_vectors) || vectors.file_name_vectors.length < 2) fail('fewer than 2 file name vectors');
-for (const vector of vectors.summary_vectors || []) {
-	const got = Model.issueSummary(vector.info, vector.file_name);
-	if (got !== vector.expected) fail(`summary ${vector.id}: got ${JSON.stringify(got)}`);
-}
 for (const vector of vectors.file_name_vectors || []) {
 	const got = Model.fileName(vector.info);
 	if (got !== vector.expected) fail(`file name ${vector.id}: got ${got}`);
@@ -465,10 +460,19 @@ for (const vector of vectors.file_name_vectors || []) {
 {
 	const info = Model.reportInfo(fixture('windows'));
 	if (info.file_stamp !== '20260924T100000Z') fail(`the file stamp of 2026-09-24T10:00:00Z is ${info.file_stamp}`);
-	const fields = Model.issueFields(info, Model.fileName(info));
-	for (const id of ['version', 'os', 'driver', 'diagnostics']) {
+	const fields = Model.issueFields(info);
+	for (const id of ['version', 'os', 'driver']) {
 		if (typeof fields[id] !== 'string' || fields[id] === '') fail(`the issue field ${id} is empty`);
 	}
+	// The host fills the report field with the whole report: a summary sent
+	// by the page would be refused by its validator
+	const templates = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'issue_templates.json'), 'utf8')
+	);
+	if (Object.prototype.hasOwnProperty.call(fields, templates.templates.bug.report_field)) {
+		fail(`the page must not fill the report field ${templates.templates.bug.report_field}`);
+	}
+	if ('issueSummary' in Model) fail('the model still exports a short issue summary');
 }
 
 // =========================

@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "Sugestões de IA",
 	"notify.personal_info": "Informações pessoais",
 	"notify.quit_refused": "Não é possível sair agora, outra operação ainda está em andamento. Tente novamente em instantes.",
-	"notify.report_bug_body": "O diagnóstico foi copiado e salvo (o arquivo é exibido). Cole-o no formulário do GitHub que acabou de abrir.",
+	"notify.report_bug_body": "O formulário do GitHub está aberto e preenchido com o diagnóstico (também copiado para a área de transferência, caso tenha sido encurtado).",
 	"notify.screenshot_copied": "Captura de tela copiada",
 	"notify.screenshot_saved": "Captura de tela salva",
 	"notify.screenshot_saved_path": "Salvo: %s",

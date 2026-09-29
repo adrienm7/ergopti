@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "اقتراحات الذكاء الاصطناعي",
 	"notify.personal_info": "معلومات شخصية",
 	"notify.quit_refused": "تعذّر الإنهاء الآن، لا تزال عملية أخرى قيد التنفيذ. حاول مرة أخرى بعد لحظة.",
-	"notify.report_bug_body": "تم نسخ التشخيص وحفظه (يُعرض الملف). الصقه في نموذج GitHub الذي فُتح للتو.",
+	"notify.report_bug_body": "نموذج GitHub مفتوح ومعبأ مسبقًا بالتشخيص (ونُسخ أيضًا إلى الحافظة، في حال اختُصر).",
 	"notify.screenshot_copied": "تم نسخ لقطة الشاشة",
 	"notify.screenshot_saved": "تم حفظ لقطة الشاشة",
 	"notify.screenshot_saved_path": "محفوظ: %s",

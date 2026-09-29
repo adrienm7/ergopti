@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the bug-report text: dump (every snapshot field, keys sorted; integral numbers without a fraction, others with two decimals; an empty table is (none) and an empty string (empty); continuation lines of a multi-line value are indented two spaces), the issue-form summary, the Markdown report (its fence outgrows every backtick run of the body) and the saved file's name. Booleans and nulls are left out because the AHK JSON reader has neither. Replayed by the macOS and Linux Lua suites and the AHK suite.",
+	"description": "Golden vectors for the bug-report text: dump (every snapshot field, keys sorted; integral numbers without a fraction, others with two decimals; an empty table is (none) and an empty string (empty); continuation lines of a multi-line value are indented two spaces), the Markdown report (its fence outgrows every backtick run of the body) and the saved file's name. Booleans and nulls are left out because the AHK JSON reader has neither. dump and markdown are replayed by the macOS and Linux Lua suites and the AHK suite; the file name, which only the diagnostics page's Save button uses, by the page model (tools/test/test-healthcheck-model.cjs).",
 	"dump_vectors": [
 		{
 			"id": "sorted_nested_and_lists",
@@ -27,20 +27,6 @@
 				"coverage": { "entries": [{ "path": "gestures", "reason": "macOS only" }, { "path": "apps", "reason": "not here" }], "total": 2 }
 			},
 			"expected": "coverage:\n  entries:\n    -\n      path: gestures\n      reason: macOS only\n    -\n      path: apps\n      reason: not here\n  total: 2"
-		}
-	],
-	"summary_vectors": [
-		{
-			"id": "full_summary",
-			"info": { "version": "2.1.0", "commit": "f58d15798 (build)", "os": "Windows 11 Home 26100.9457", "driver": "windows", "warn_count": 3, "err_count": 1, "last_error": "2026-09-23 10:00:01:002 [ERROR] [Probe] boom\nstack traceback:" },
-			"file_name": "ergopti-diagnostics-windows-2.1.0-20260923T100000Z.md",
-			"expected": "Version: 2.1.0, commit f58d15798 (build)\nOS: Windows 11 Home 26100.9457\nDriver: windows\nWarnings / errors this session: 3 / 1\nLast error: 2026-09-23 10:00:01:002 [ERROR] [Probe] boom\n\n<!-- The full diagnostics are in your clipboard: paste them below, or attach ergopti-diagnostics-windows-2.1.0-20260923T100000Z.md. -->"
-		},
-		{
-			"id": "no_commit_no_error",
-			"info": { "version": "local", "commit": "", "os": "macOS 15.1", "driver": "macos", "warn_count": 0, "err_count": 0, "last_error": "" },
-			"file_name": "report.md",
-			"expected": "Version: local\nOS: macOS 15.1\nDriver: macos\nWarnings / errors this session: 0 / 0\nLast error: none\n\n<!-- The full diagnostics are in your clipboard: paste them below, or attach report.md. -->"
 		}
 	],
 	"markdown_vectors": [

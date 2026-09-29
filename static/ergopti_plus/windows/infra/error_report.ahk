@@ -5,13 +5,14 @@
 ; DESCRIPTION:
 ; AHK port of _shared/lua/diagnostics/error_report.lua: what the error window
 ; (_shared/ui/error_dialog/) shows, copies and sends to GitHub for one logged
-; error — the Markdown report, the saved file's name and the prefilled fields
-; of the bug form. Both ports replay
+; error — the Markdown report and the prefilled fields of the bug form. Both
+; ports replay
 ; _shared/tests/corpus/diagnostics/error_report_vectors.json.
 ;
 ; FEATURES & RATIONALE:
-; 1. Built from infra/issue_report.ahk, the bug report of the diagnostics
-;    window: the same identity table, file name and form summary.
+; 1. Built from infra/issue_report.ahk: the same identity table and dump rules
+;    as any other bug report. The report itself fills the form's report field
+;    (HealthCheck_PerformAction), so no field here repeats it.
 ; 2. The issue's title is the error's module and the first line of its
 ;    message: what a maintainer triages by.
 ; 3. The recent warnings and errors of today's errors file travel with the
@@ -55,8 +56,8 @@ _ErrorReport_Check(Err) {
 
 ; Builds the report of one error.
 ; @param Err {Map} { kind: "error"|"crash", module, message, time, recent: Array }
-; @param Identity {Map} { version, commit, os, driver, generated_utc, file_stamp, warn_count, err_count }
-; @returns {Map} { name, text, fields: { title, version, os, driver, diagnostics } }
+; @param Identity {Map} { version, commit, os, driver, generated_utc, warn_count, err_count }
+; @returns {Map} { text, fields: { title, version, os, driver } }
 ErrorReport_Compose(Err, Identity) {
 	_ErrorReport_Check(Err)
 	if !(Identity is Map)
@@ -66,18 +67,13 @@ ErrorReport_Compose(Err, Identity) {
 	if (Err["recent"].Length > 0)
 		Body["recent_issues"] := Err["recent"]
 
-	Name := IssueReport_FileName(Identity)
-	SummaryInfo := Identity.Clone()
-	SummaryInfo["last_error"] := "[" . Err["module"] . "] " . Err["message"]
 	FirstLine := StrSplit(StrReplace(Err["message"], "`r", "`n"), "`n")[1]
 
 	return Map(
-		"name", Name,
 		"text", IssueReport_Markdown(Identity, IssueReport_Dump(Body)),
 		"fields", Map(
-			"title",       Err["module"] . ": " . FirstLine,
-			"version",     Identity["version"],
-			"os",          Identity["os"],
-			"driver",      Identity["driver"],
-			"diagnostics", IssueReport_Summary(SummaryInfo, Name)))
+			"title",   Err["module"] . ": " . FirstLine,
+			"version", Identity["version"],
+			"os",      Identity["os"],
+			"driver",  Identity["driver"]))
 }

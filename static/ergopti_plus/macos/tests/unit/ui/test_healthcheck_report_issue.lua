@@ -5,11 +5,12 @@
 --- DESCRIPTION:
 --- The diagnostics page asks, the host does (ui.healthcheck.report.perform):
 --- copy the report, save it as a Markdown file under the logs folder and
---- reveal it, report it on GitHub (copy, save, reveal, then open the bug form
---- with the page's short summary), open a folder it collected or a settings
---- page the schema declares. Whatever the page sent, the home folder and the
---- account name reach neither the clipboard, the file nor the URL
---- (report-bug-flow). Debug > Report a bug opens the window at its preview.
+--- reveal it, report it on GitHub (copy the report, then open the bug form
+--- with that whole report prefilled, the browser last so the form keeps the
+--- focus), open a folder it collected or a settings page the schema declares.
+--- Whatever the page sent, the home folder and the account name reach neither
+--- the clipboard, the file nor the URL (report-bug-flow). Debug > Report a bug
+--- opens the window at its preview.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -63,7 +64,27 @@ local function load_report()
 		open_url = function(url) calls.open_url[#calls.open_url + 1] = url; return true end,
 		notify = function() return true end,
 	}
+	-- Every side effect in the order it ran, to prove what runs last
+	calls.order = {}
+	for name, fn in pairs(overrides) do
+		if name ~= "identity" then
+			overrides[name] = function(...)
+				calls.order[#calls.order + 1] = name
+				return fn(...)
+			end
+		end
+	end
 	return Report, calls, overrides
+end
+
+--- Decodes one percent-encoded query parameter of a URL.
+--- @param url string
+--- @param key string
+--- @return string|nil
+local function query_value(url, key)
+	local raw = url:match("[?&]" .. key .. "=([^&]*)")
+	if raw == nil then return nil end
+	return (raw:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
 end
 
 --- The snapshot's paths section of the fixture.
@@ -87,21 +108,19 @@ local function perform(action, adjust)
 end
 
 helpers.describe("healthcheck page actions (report-bug-flow)", function()
-	helpers.it("report copies, saves, reveals, then opens the bug form, all redacted (report-bug-flow)", function()
-		local result, calls = perform({ action = "report", text = REPORT, name = NAME, fields = {
-			version = "2.4.0", os = "macOS 15.1", driver = "macos",
-			diagnostics = "Errors: 1 — log at /Users/jdoe/Library/Logs",
+	helpers.it("report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {
+			version = "2.4.0", os = "macOS 15.1 (/Users/jdoe)", driver = "macos",
 		} })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#calls.copy, 1)
 		helpers.assert_eq(calls.copy[1], "# ErgoptiPlus diagnostics\n\nconfig_dir: ~/.config/ergopti_plus (<user>)\n")
-		helpers.assert_eq(calls.save[1].dir, LOGS .. "/diagnostics")
-		helpers.assert_eq(calls.save[1].name, NAME)
-		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved file is what was copied")
-		helpers.assert_eq(calls.reveal[1], LOGS .. "/diagnostics/" .. NAME)
-		helpers.assert_eq(result.path, LOGS .. "/diagnostics/" .. NAME)
+		helpers.assert_eq(result.path, nil, "a report names no file")
 
 		local url = calls.open_url[1]
+		helpers.assert_eq(query_value(url, "diagnostics"), calls.copy[1],
+			"the form's diagnostics field is the report the clipboard holds")
+		helpers.assert_eq(query_value(url, "os"), "macOS 15.1 (~)")
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
 		helpers.assert_eq(url:sub(1, #prefix), prefix)
@@ -110,8 +129,35 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_true(not url:find("%2FUsers%2F", 1, true), "the URL carries no home folder: " .. url)
 	end)
 
+	-- The report used to be saved and revealed in Finder too: the reveal
+	-- finished after the browser opened, so Finder took the focus from the
+	-- form (report-focus)
+	helpers.it("report saves nothing, reveals nothing and opens the browser last (report-focus)", function()
+		local _, calls = perform({ action = "report", text = REPORT, fields = { driver = "macos" } })
+		helpers.assert_eq(#calls.save, 0, "a report saves no file")
+		helpers.assert_eq(#calls.reveal, 0, "a report reveals nothing in Finder")
+		helpers.assert_eq(#calls.open, 0, "a report opens no folder")
+		helpers.assert_eq(calls.order, { "copy", "open_url" }, "the browser opens last, after the clipboard")
+	end)
+
+	helpers.it("report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)", function()
+		local long = REPORT .. string.rep("line of diagnostics é\n", 2000)
+		local result, calls = perform({ action = "report", text = long, fields = { version = "2.4.0", driver = "macos" } })
+		helpers.assert_eq(result.ok, true)
+		local templates = documents().templates
+		helpers.assert_eq(#calls.copy[1] > templates.max_url_bytes, true, "the fixture exceeds the URL budget")
+		local url = calls.open_url[1]
+		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
+		helpers.assert_eq(query_value(url, "version"), "2.4.0", "the identity fields survive the cut")
+		local prefilled = query_value(url, "diagnostics")
+		local marker = templates.truncation_marker
+		helpers.assert_eq(prefilled:sub(-#marker), marker, "the cut report ends with the truncation marker")
+		local kept = prefilled:sub(1, #prefilled - #marker)
+		helpers.assert_eq(calls.copy[1]:sub(1, #kept), kept, "the prefill is the start of the copied report")
+	end)
+
 	helpers.it("report stops before the browser when the clipboard refuses (report-bug-flow)", function()
-		local result, calls = perform({ action = "report", text = REPORT, name = NAME, fields = { driver = "macos" } },
+		local result, calls = perform({ action = "report", text = REPORT, fields = { driver = "macos" } },
 			function(overrides) overrides.copy = function() return false end end)
 		helpers.assert_eq(result.ok, false)
 		helpers.assert_eq(#calls.save, 0, "nothing is saved")

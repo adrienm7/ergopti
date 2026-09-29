@@ -191,8 +191,7 @@ _TED_ActionsUseTheHostsReport() {
 	try {
 		Performed := []
 		Perform := (Action, Paths, Config) => (Performed.Push(Map("action", Action, "paths", Paths)), Map("ok", true))
-		Report := Map("text", "# ErgoptiPlus diagnostics`n", "name", "ergopti-diagnostics-windows-2.1.0-x.md",
-			"fields", Map("title", "Mod: boom"))
+		Report := Map("text", "# ErgoptiPlus diagnostics`n", "fields", Map("title", "Mod: boom"))
 		_ED_Session := Map("epoch", _ED_WindowEpoch, "report", Report, "open_id", "errors_today",
 			"paths", Map("errors_today", "C:\x\errors.log"), "config", Map())
 		_ED_ResetDone := false
@@ -205,6 +204,9 @@ _TED_ActionsUseTheHostsReport() {
 		AssertEqual(Report["text"], Performed[1]["action"]["text"], "the page cannot choose what is copied")
 		AssertEqual("report", Performed[2]["action"]["action"])
 		AssertEqual("Mod: boom", Performed[2]["action"]["fields"]["title"])
+		; The host prefills the report itself and saves no file (report-focus)
+		AssertEqual(Report["text"], Performed[2]["action"]["text"], "report sends the report copy sends")
+		AssertFalse(Performed[2]["action"].Has("name"), "a report names no file to save")
 		AssertEqual("open_path", Performed[3]["action"]["action"])
 		AssertEqual("errors_today", Performed[3]["action"]["id"], "open_log opens today's errors file, by id")
 		_ErrorDialog_HandleMessage(_ED_WindowEpoch + 1, '{"action":"copy"}', Perform)

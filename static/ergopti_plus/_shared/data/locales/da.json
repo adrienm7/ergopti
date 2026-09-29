@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "AI-forslag",
 	"notify.personal_info": "Personlige oplysninger",
 	"notify.quit_refused": "Kan ikke afslutte lige nu, en anden handling er stadig i gang. Prøv igen om et øjeblik.",
-	"notify.report_bug_body": "Diagnosen er kopieret og gemt (filen vises). Indsæt den i GitHub-formularen, der lige er åbnet.",
+	"notify.report_bug_body": "GitHub-formularen er åben og udfyldt med diagnosen (også kopieret til udklipsholderen, hvis den er blevet forkortet).",
 	"notify.screenshot_copied": "Skærmbillede kopieret",
 	"notify.screenshot_saved": "Skærmbillede gemt",
 	"notify.screenshot_saved_path": "Gemt: %s",

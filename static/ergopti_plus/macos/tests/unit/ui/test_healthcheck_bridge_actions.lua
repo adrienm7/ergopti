@@ -38,7 +38,7 @@ local function load_window(controls)
 
 	local context = {
 		scripts = {}, deleted = 0, released = 0, every = 0, cancelled_probes = 0, started_probes = 0,
-		copied = {}, warnings = {}, errors = {},
+		copied = {}, warnings = {}, errors = {}, opened_urls = {}, spawned = {}, focused = 0, effects = {},
 	}
 	local logger = helpers.make_logger_stub()
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
@@ -58,6 +58,7 @@ local function load_window(controls)
 	package.loaded["adapters.clipboard"] = {
 		write = function(text)
 			context.copied[#context.copied + 1] = text
+			context.effects[#context.effects + 1] = "copy"
 			return controls.clipboard ~= false
 		end,
 	}
@@ -73,8 +74,16 @@ local function load_window(controls)
 		window_chrome_steps = function() return {} end,
 		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
 		get_app_geometry = function() return { width = 860, height = 720 } end,
-		force_focus = function() return true end,
-		open_http_url = function() return true end,
+		force_focus = function()
+			context.focused = context.focused + 1
+			context.effects[#context.effects + 1] = "focus"
+			return true
+		end,
+		open_http_url = function(url)
+			context.opened_urls[#context.opened_urls + 1] = url
+			context.effects[#context.effects + 1] = "open_url"
+			return true
+		end,
 	}
 
 	local webview = {}
@@ -199,6 +208,41 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].type, "action")
 			helpers.assert_eq(messages[#messages].action, "copy")
+			helpers.assert_eq(messages[#messages].ok, true)
+		end)
+	end)
+
+	-- The report was also saved and revealed in Finder, which finished after
+	-- the browser opened and took the focus from the form (report-focus)
+	helpers.it("report copies, then opens the prefilled form last, with no Finder (report-focus)", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window()
+			local focused_at_open = context.focused
+			context.effects = {}
+			-- /usr/bin/open: what revealing a file in Finder would run
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(bin, args)
+					context.spawned[#context.spawned + 1] = { bin = bin, args = args }
+					context.effects[#context.effects + 1] = "spawn"
+					return { start = function() return true end }
+				end,
+			}
+			local ok, err = pcall(context.page, { body = { action = "report",
+				text = "log at /Users/jdoe/Library/Logs by jdoe",
+				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } } })
+			package.loaded["adapters.shell_runner"] = nil
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_eq(context.copied, { "log at ~/Library/Logs by <user>" })
+			helpers.assert_eq(#context.opened_urls, 1, "the bug form opens once")
+			local encoded = context.opened_urls[1]:match("[?&]diagnostics=([^&]*)")
+			local diagnostics = encoded and encoded:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
+			helpers.assert_eq(diagnostics, context.copied[1], "the form holds the report the clipboard holds")
+			helpers.assert_eq(context.spawned, {}, "nothing is revealed in Finder")
+			helpers.assert_eq(context.focused, focused_at_open, "the window is not brought back to the front")
+			helpers.assert_eq(context.effects, { "copy", "open_url" }, "the browser opens last")
+			local messages = page_messages(context)
+			helpers.assert_eq(messages[#messages].action, "report")
 			helpers.assert_eq(messages[#messages].ok, true)
 		end)
 	end)

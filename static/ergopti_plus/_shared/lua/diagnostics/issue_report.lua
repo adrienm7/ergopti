@@ -4,18 +4,18 @@
 --- MODULE: Bug Report Text (Shared Lua)
 --- DESCRIPTION:
 --- The text of a bug report, for the macOS and Linux drivers: the full
---- diagnostics as Markdown (copied to the clipboard and saved as a .md file),
---- the short summary prefilled into the GitHub issue form, and the saved
---- file's name. Pure; the AHK port (windows/infra/issue_report.ahk) replays
---- the same vectors (_shared/tests/corpus/diagnostics/issue_report_vectors.json).
+--- diagnostics as Markdown, copied to the clipboard and prefilled into the
+--- GitHub issue form. Pure; the AHK port (windows/infra/issue_report.ahk)
+--- replays the same vectors
+--- (_shared/tests/corpus/diagnostics/issue_report_vectors.json).
 ---
 --- FEATURES & RATIONALE:
 --- 1. dump() writes every field of a diagnostic snapshot, keys sorted, so the
 ---    report is complete and two reports of one state are byte-identical.
 ---    Each driver's snapshot differs; the format does not.
---- 2. The prefill carries only a summary: GitHub cannot receive a file
----    through a URL and answers 414 a little above 8 KB, so the full report
----    travels through the clipboard and the saved file.
+--- 2. The whole report is prefilled: GitHub answers 414 a little above 8 KB,
+---    so the issue link cuts it to its budget, and the clipboard keeps it
+---    whole.
 --- 3. Nothing here redacts: the caller redacts the finished text with
 ---    diagnostics.redact, the single place that decides what leaves the
 ---    machine.
@@ -118,19 +118,11 @@ end
 
 
 
--- ===========================================
--- ===========================================
--- ======= 2/ Summary, Report And Name =======
--- ===========================================
--- ===========================================
-
---- The first line of a possibly multi-line text.
---- @param text any
---- @return string
-local function first_line(text)
-	if type(text) ~= "string" or text == "" then return "none" end
-	return (text:match("^([^\r\n]*)"))
-end
+-- ==================================
+-- ==================================
+-- ======= 2/ Markdown Report =======
+-- ==================================
+-- ==================================
 
 --- Escapes a Markdown table cell.
 --- @param value any
@@ -150,27 +142,6 @@ local function fence_for(text)
 		if #run > longest then longest = #run end
 	end
 	return string.rep("`", math.max(3, longest + 1))
-end
-
---- The short diagnostics summary prefilled into the issue form.
---- @param info table { version, commit, os, driver, warn_count, err_count, last_error }
---- @param file_name string The saved report's name.
---- @return string
-function M.summary(info, file_name)
-	local version = tostring(info.version)
-	if type(info.commit) == "string" and info.commit ~= "" then
-		version = version .. ", commit " .. info.commit
-	end
-	return table.concat({
-		"Version: " .. version,
-		"OS: " .. tostring(info.os),
-		"Driver: " .. tostring(info.driver),
-		string.format("Warnings / errors this session: %s / %s", scalar(info.warn_count), scalar(info.err_count)),
-		"Last error: " .. first_line(info.last_error),
-		"",
-		"<!-- The full diagnostics are in your clipboard: paste them below, or attach "
-			.. tostring(file_name) .. ". -->",
-	}, "\n")
 end
 
 --- The full report, as a Markdown document.
@@ -196,19 +167,6 @@ function M.markdown(info, body)
 		fence,
 		"",
 	}, "\n")
-end
-
---- The saved report's name: driver, version and UTC time, file-name safe.
---- @param info table { driver, version, file_stamp }
---- @return string
-function M.file_name(info)
-	local function safe(value)
-		-- One "_" per code point: a UTF-8 sequence is one character
-		local text = tostring(value):gsub("[\192-\247][\128-\191]*", "_")
-		return (text:gsub("[^A-Za-z0-9%._%-]", "_"))
-	end
-	return "ergopti-diagnostics-" .. safe(info.driver) .. "-" .. safe(info.version)
-		.. "-" .. safe(info.file_stamp) .. ".md"
 end
 
 return M

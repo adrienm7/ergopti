@@ -6,23 +6,24 @@
 ; What the diagnostics page's buttons do on this machine once
 ; HealthCheck_ValidateAction accepted them: copy the report, save it as a
 ; Markdown file under the logs folder and select it in Explorer, report it on
-; GitHub (copy, save, select, then open the bug form with a short summary
-; prefilled) and open a folder. Also the Debug menu's "Report a bug", which
-; opens the diagnostics window at its preview, and "Suggest a feature".
+; GitHub (copy it, then open the bug form with the report prefilled) and open
+; a folder. Also the Debug menu's "Report a bug", which opens the diagnostics
+; window at its preview, and "Suggest a feature".
 ;
 ; FEATURES & RATIONALE:
 ; 1. Every text that leaves the machine goes through Redact_Apply again here,
 ;    whatever the page did: the profile folder, the account name and
 ;    token-like secrets are removed from the clipboard, the file and the URL.
-; 2. GitHub cannot receive a file through a URL and answers 414 a little above
-;    8 KB, which is why the full report travels through the clipboard and the
-;    saved file, and the form gets a summary.
+; 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
+;    report to its budget; the clipboard holds it whole. A report saves no
+;    file and selects nothing: Explorer would take the focus from the form.
 ; 3. Paths come from the snapshot the host collected, by field id; a folder
 ;    that does not exist yet is created before it is opened; a file that does
 ;    not exist yet (today's errors file before the day's first warning) is
 ;    said to the page, not logged as a failure.
 ; 4. Side effects are one Map so a test can observe each of them; the browser
-;    opens last, after the clipboard holds what it asks for.
+;    opens last, after the clipboard holds what it asks for, and nothing
+;    follows it that could take the focus back.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -139,6 +140,25 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 	return Path
 }
 
+; Reports on GitHub: copies the full report, then opens the bug form with that
+; same report prefilled. Nothing is saved and nothing is selected: the browser
+; opening is the last side effect, so the form keeps the focus.
+; @param Action {Map} { text, fields } The page's text and identity fields.
+; @throws {Error} When the clipboard or the browser refuses.
+_HCReport_Report(Effects, Config, Action, Rules, Context) {
+	Text := Redact_Apply(Action["text"], Rules, Context)
+	; First, and whole: the link may cut the report to fit GitHub's budget
+	if !Effects["copy"].Call(Text)
+		throw Error("The clipboard refused the report.")
+	Fields := Map()
+	for Id, Value in Action["fields"]
+		Fields[Id] := Redact_Apply(Value, Rules, Context)
+	Fields[Config["templates"]["templates"]["bug"]["report_field"]] := Text
+	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
+	if !Effects["open_url"].Call(Url)
+		throw Error("The browser could not be opened.")
+}
+
 ; Performs one action of the diagnostics page, already validated.
 ; @param Action {Map} From HealthCheck_ValidateAction (copy, save, report, open_path).
 ; @param Paths {Map} The snapshot's paths section.
@@ -164,16 +184,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0) {
 				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"],
 					Redact_Apply(Action["text"], Rules, Context))
 			case "report":
-				Text := Redact_Apply(Action["text"], Rules, Context)
-				if !Effects["copy"].Call(Text)
-					throw Error("The clipboard refused the report.")
-				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
-				Fields := Map()
-				for Id, Value in Action["fields"]
-					Fields[Id] := Redact_Apply(Value, Rules, Context)
-				Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
-				if !Effects["open_url"].Call(Url)
-					throw Error("The browser could not be opened.")
+				_HCReport_Report(Effects, Config, Action, Rules, Context)
 			case "open_path":
 				Id := Action["id"]
 				if !Paths.Has(Id)
@@ -214,7 +225,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0) {
 ; =============================
 
 ; Opens the diagnostics window at its preview: the user reviews exactly what
-; is shared before the report button copies, saves and opens GitHub.
+; is shared before the report button copies it and opens GitHub.
 HealthCheck_ReportBug() {
 	HealthCheck_ShowWindow("report")
 }

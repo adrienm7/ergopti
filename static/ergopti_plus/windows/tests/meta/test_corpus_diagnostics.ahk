@@ -16,8 +16,7 @@
 ;    Redact_Apply with the rules of _shared/modules/diagnostics/redaction.json
 ;    (what leaves the machine).
 ; 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
-;    IssueReport_Dump, IssueReport_Summary, IssueReport_Markdown and
-;    IssueReport_FileName (the bug report text, summary and file name).
+;    IssueReport_Dump and IssueReport_Markdown (the bug report text).
 ; 5. _shared/tests/corpus/healthcheck/action_vectors.json through
 ;    HealthCheck_ValidateAction (what the diagnostics page may ask its host to
 ;    do).
@@ -160,16 +159,12 @@ Test("corpus:diagnostics: redaction vectors (redaction-corpus)", _TCD_Redaction)
 
 _TCD_IssueReport() {
 	Data := _TCD_Corpus("tests\corpus\diagnostics\issue_report_vectors.json")
-	for List in ["dump_vectors", "summary_vectors", "markdown_vectors", "file_name_vectors"]
+	for List in ["dump_vectors", "markdown_vectors"]
 		Assert(Data[List].Length >= 2, "the bug-report corpus must hold its " . List)
 	for Vector in Data["dump_vectors"]
 		AssertEqual(Vector["expected"], IssueReport_Dump(Vector["input"]), Vector["id"])
-	for Vector in Data["summary_vectors"]
-		AssertEqual(Vector["expected"], IssueReport_Summary(Vector["info"], Vector["file_name"]), Vector["id"])
 	for Vector in Data["markdown_vectors"]
 		AssertEqual(Vector["expected"], IssueReport_Markdown(Vector["info"], Vector["body"]), Vector["id"])
-	for Vector in Data["file_name_vectors"]
-		AssertEqual(Vector["expected"], IssueReport_FileName(Vector["info"]), Vector["id"])
 }
 
 Test("corpus:diagnostics: bug report text vectors (issue-report-corpus)", _TCD_IssueReport)
@@ -285,7 +280,7 @@ _TCD_ErrorReport() {
 	for Vector in Data["vectors"] {
 		Got := ErrorReport_Compose(Vector["error"], Vector["identity"])
 		Expected := Vector["expected"]
-		AssertEqual(Expected["name"], Got["name"], Vector["id"] . ": name")
+		AssertEqual(Expected.Count, Got.Count, Vector["id"] . ": the report carries extra keys")
 		AssertEqual(Expected["text"], Got["text"], Vector["id"] . ": text")
 		for Id, Value in Expected["fields"]
 			AssertEqual(Value, Got["fields"].Get(Id, ""), Vector["id"] . ": " . Id)
