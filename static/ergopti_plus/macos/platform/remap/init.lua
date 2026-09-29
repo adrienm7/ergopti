@@ -1685,6 +1685,29 @@ local function guardian_regeneration_wait_is_current(wait)
 		and is_current_lifecycle(wait.epoch)
 end
 
+-- Deploy clause of a bulk edit saved while the guardian is not ready.
+local GUARDIAN_NOT_READY_DEPLOYS = "once the remap guardian is ready"
+
+-- Guardian wait cancellations after which a later regeneration certainly
+-- builds from the persisted settings, with the terminal detail and deploy
+-- clause of a bulk edit they find retained. Such an edit built nothing yet:
+-- failing it reverted a saved edit, with error notices, because a pause or a
+-- reload happened to precede the guardian's first answer.
+local GUARDIAN_CANCEL_SAVES_BULK_EDIT = {
+	["script-pause-requested"] = {
+		reason = "persisted-script-paused", deploys_when = "when the script resumes",
+	},
+	["explicit-lease-stop-requested"] = {
+		reason = "persisted-lease-stopped", deploys_when = "when the lease starts again",
+	},
+	["lease-revocation-requested"] = {
+		reason = "persisted-lifecycle-ending", deploys_when = "at the next launch",
+	},
+	["local-teardown"] = {
+		reason = "persisted-lifecycle-ending", deploys_when = "at the next launch",
+	},
+}
+
 --- Saves every bulk settings edit retained by one guardian wait. The wait polls
 --- without a deadline, so a bulk terminal left in it pinned the transaction
 --- and refused every later edit, disable and reload for the whole session.
@@ -1692,8 +1715,9 @@ end
 --- regeneration stays queued and rebuilds once from the settings persisted at
 --- readiness, and the saved edit never sees a second terminal.
 --- @param wait table Exact bundled regeneration wait.
---- @param wait_status string Non-ready guardian status or probe failure.
-local function release_bulk_guardian_waiters(wait, wait_status)
+--- @param reason string Stable `persisted-…` terminal detail.
+--- @param deploys_when string Diagnostic clause naming what the deploy waits on.
+local function release_bulk_guardian_waiters(wait, reason, deploys_when)
 	local savers = {}
 	for _, context in ipairs(wait.contexts or {}) do
 		local kept = {}
@@ -1709,8 +1733,19 @@ local function release_bulk_guardian_waiters(wait, wait_status)
 		context.callbacks = kept
 	end
 	for _, saver in ipairs(savers) do
-		invoke_public_callback("bulk settings guardian wait", saver, wait_status)
+		invoke_public_callback("bulk settings guardian wait", saver, reason, deploys_when)
 	end
+end
+
+--- Saves the bulk edit the current guardian wait retains before a lifecycle
+--- boundary refuses to run behind it: the boundary cancels that wait anyway,
+--- so the controlled reload no longer waits on the guardian's first answer.
+--- @param cancel_reason string Key of GUARDIAN_CANCEL_SAVES_BULK_EDIT.
+local function save_bulk_edits_retained_by_guardian_wait(cancel_reason)
+	local wait = _guardian_regeneration_wait
+	local saved = GUARDIAN_CANCEL_SAVES_BULK_EDIT[cancel_reason]
+	if not wait or not saved or not guardian_regeneration_wait_is_current(wait) then return end
+	release_bulk_guardian_waiters(wait, saved.reason, saved.deploys_when)
 end
 
 --- Detaches one bulk terminal from a guardian wait that already answered not
@@ -1823,6 +1858,8 @@ local function cancel_guardian_regeneration_wait(reason)
 		) then all_clean = false end
 	end
 
+	local saved = GUARDIAN_CANCEL_SAVES_BULK_EDIT[reason]
+	if saved then release_bulk_guardian_waiters(wait, saved.reason, saved.deploys_when) end
 	local contexts = wait.contexts
 	wait.contexts = {}
 	for _, context in ipairs(contexts) do
@@ -2006,7 +2043,8 @@ start_guardian_regeneration_probe = function(wait, reason)
 			tostring(status), tostring(probe_error or reason))
 		schedule_guardian_regeneration_poll(wait, status or probe_error or reason)
 		release_lease_less_resume_waiters(wait, wait_status)
-		release_bulk_guardian_waiters(wait, wait_status)
+		release_bulk_guardian_waiters(wait, "persisted-guardian-" .. wait_status,
+			GUARDIAN_NOT_READY_DEPLOYS)
 		release_enable_guardian_waiter(wait, wait_status)
 	end
 
@@ -3662,23 +3700,12 @@ local function settle_bulk_settings_saved_for_later(transaction, reason, deploys
 	finish_bulk_settings_callback(transaction, true, reason)
 end
 
---- Settles a bulk transaction whose regeneration waits behind a guardian that
---- is not ready, keeping that regeneration queued for the eventual deploy.
---- @param transaction table Active bulk transaction.
---- @param wait_status string Non-ready guardian status or probe failure.
-local function save_bulk_settings_for_guardian(transaction, wait_status)
-	settle_bulk_settings_saved_for_later(
-		transaction,
-		"persisted-guardian-" .. tostring(wait_status),
-		"once the remap guardian is ready"
-	)
-end
-
 --- Dispatches regeneration and requires both exact request acceptance and one
 --- exact terminal callback. Synchronous callbacks are held until the request's
 --- return value is known, so a callback followed by false/nil cannot look valid.
 --- A regeneration retained behind a guardian that is not ready settles the
---- transaction as saved instead: that wait has no deadline.
+--- transaction as saved instead: that wait has no deadline. So does one whose
+--- wait a pause, a lease stop or a lifecycle end cancels before it built.
 --- @param transaction table Active bulk transaction.
 --- @param label string Stable regeneration boundary label.
 --- @param on_terminal function Callback fn(ok, reason, refused_before_deploy),
@@ -3694,7 +3721,7 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 	local dispatching = true
 	local pending_ok = false
 	local pending_reason = nil
-	local saved_status = nil
+	local saved = nil
 
 	local handle_terminal
 	handle_terminal = function(ok, reason)
@@ -3711,16 +3738,16 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 		end
 		on_terminal(ok == true, reason)
 	end
-	local function save_for_guardian(wait_status)
+	local function save_for_later(reason, deploys_when)
 		if callback_seen then return end
 		callback_seen = true
 		if dispatching then
-			saved_status = wait_status
+			saved = { reason = reason, deploys_when = deploys_when }
 			return
 		end
-		save_bulk_settings_for_guardian(transaction, wait_status)
+		settle_bulk_settings_saved_for_later(transaction, reason, deploys_when)
 	end
-	_bulk_guardian_waiters[handle_terminal] = save_for_guardian
+	_bulk_guardian_waiters[handle_terminal] = save_for_later
 
 	local call_ok, accepted_or_err = xpcall(function()
 		return M.regenerate(handle_terminal)
@@ -3730,7 +3757,7 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 		_bulk_guardian_waiters[handle_terminal] = nil
 		-- A refusal reports its own reason through the terminal it already
 		-- fired; a request that fired none keeps the generic detail.
-		local refusal = call_ok and callback_seen and saved_status == nil
+		local refusal = call_ok and callback_seen and saved == nil
 			and pending_ok ~= true and type(pending_reason) == "string"
 			and pending_reason or nil
 		callback_seen = true
@@ -3741,8 +3768,8 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 		on_terminal(false, reason, REGENERATION_REFUSED_BEFORE_DEPLOY[refusal] == true)
 		return false
 	end
-	if saved_status ~= nil then
-		save_bulk_settings_for_guardian(transaction, saved_status)
+	if saved ~= nil then
+		settle_bulk_settings_saved_for_later(transaction, saved.reason, saved.deploys_when)
 		return true
 	end
 	if callback_seen then
@@ -3750,7 +3777,9 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 		return true
 	end
 	local wait_status = detach_bulk_guardian_waiter(handle_terminal)
-	if wait_status ~= nil then save_for_guardian(wait_status) end
+	if wait_status ~= nil then
+		save_for_later("persisted-guardian-" .. wait_status, GUARDIAN_NOT_READY_DEPLOYS)
+	end
 	return true
 end
 
@@ -3833,12 +3862,16 @@ end
 --- A retryable inverse is attempted exactly once; an accepted asynchronous retry
 --- keeps the same transaction owner, so revoke/teardown callers must retry only
 --- after its terminal callback. Candidate terminals already in flight are never
---- guessed or cancelled here.
+--- guessed or cancelled here; one still waiting on the guardian built nothing,
+--- and is saved for the next launch as the boundary's own cancellation would.
 --- @param boundary string Stable lifecycle boundary label.
+--- @param cancel_reason string Guardian wait cancellation the boundary performs.
 --- @return boolean settled True only when no bulk owner or debt remains.
-local function settle_bulk_settings_before_lifecycle(boundary)
+local function settle_bulk_settings_before_lifecycle(boundary, cancel_reason)
 	local transaction = _bulk_settings_transaction
 	if not transaction then return true end
+	save_bulk_edits_retained_by_guardian_wait(cancel_reason)
+	if _bulk_settings_transaction == nil then return true end
 	local phase = transaction.phase
 	if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 		retry_bulk_settings_recovery()
@@ -5778,7 +5811,7 @@ end
 --- disabled hotkey with an unfenced Karabiner generation.
 --- @return boolean stopped True only when every local resource was released.
 function M.teardown_local()
-	if settle_bulk_settings_before_lifecycle("Karabiner local teardown") ~= true then
+	if settle_bulk_settings_before_lifecycle("Karabiner local teardown", "local-teardown") ~= true then
 		return false
 	end
 	local status_ok, phase = xpcall(LeaseController.status, debug.traceback)
@@ -5808,7 +5841,8 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
-	if settle_bulk_settings_before_lifecycle("Karabiner lease revocation") ~= true then
+	if settle_bulk_settings_before_lifecycle("Karabiner lease revocation",
+		"lease-revocation-requested") ~= true then
 		invoke_public_callback(
 			"revoke",
 			on_done,
