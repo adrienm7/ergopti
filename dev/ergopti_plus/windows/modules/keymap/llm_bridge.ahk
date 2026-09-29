@@ -194,11 +194,18 @@ _LLM_Bridge_MakeTextAdmission(Seed, RequestId) {
 
 _LLM_Bridge_NewInjectionTransaction(Text, Seed, RequestId,
 		Inline := false, Slots := unset, ActiveIdx := 1,
-		PresentedRecord := 0, PresentedLifecycle := 0) {
+		PresentedRecord := 0, PresentedLifecycle := 0, Edit := 0) {
 	Admission := _LLM_Bridge_MakeTextAdmission(Seed, RequestId)
 	SlotSnapshot := (IsSet(Slots) and Slots is Array) ? Slots.Clone() : [Text]
+	; A rewrite erases the end of what the user typed before typing Text; every
+	; other prediction only appends. The count is in Backspace presses (one per
+	; codepoint), the text is what they erase, in the buffer's UTF-16 units.
+	HasEdit := (Edit is Map)
 	return {
 		Text: Text,
+		Deletes: HasEdit ? Edit["deletes"] : 0,
+		DeletedText: HasEdit ? Edit["deleted_text"] : "",
+		RewriteSpan: HasEdit ? Edit["span"] : "",
 		SourceHwnd: Admission.Expected["hwnd"],
 		SourceControl: Admission.Expected["control"],
 		Inline: Inline ? true : false,
@@ -219,7 +226,9 @@ _LLM_Bridge_CommitInjectedText(Transaction) {
 	global _LLM_Engine
 	if !A_IsCritical
 		throw Error("LLM injected-text commit requires a Critical output transaction.")
-	_LLM_Bridge_ApplyBufferEdit(0, Transaction.Text)
+	; A rewrite's Backspaces erased DeletedText from the screen in the same OS
+	; batch as the text: the buffer mirrors both, as a delete then an insert.
+	_LLM_Bridge_ApplyBufferEdit(StrLen(Transaction.DeletedText), Transaction.Text)
 	if Transaction.Inline {
 		if !(_LLM_Engine is Map)
 			throw Error("LLM engine state is unavailable during inline commit.")
@@ -296,6 +305,7 @@ _LLM_Bridge_InjectionOptions(Transaction) {
 	return Map(
 		"mode", "auto",
 		"atomic_input", true,
+		"erase_before", Transaction.Deletes,
 		"admission", Transaction.Admission,
 		"atomic_prepare", _LLM_Bridge_PrepareOutputJournal.Bind(Transaction),
 		"atomic_journal", _LLM_Bridge_CommitOutputJournal,
@@ -310,8 +320,8 @@ _LLM_Bridge_PrepareOutputJournal(Transaction) {
 		"prediction", Transaction.Text,
 		"all_predictions", Transaction.Slots,
 		"chosen_index", Transaction.ActiveIdx,
-		"deletes", 0,
-		"deleted_text", "",
+		"deletes", Transaction.Deletes,
+		"deleted_text", Transaction.DeletedText,
 		; Inline output has no rendered tooltip, so its suggestion denominator
 		; must be committed with the accepted row. Tab acceptance already has a
 		; suggested row from the final tooltip render.
@@ -1326,8 +1336,49 @@ _LLM_PointerWatch_OnMoveTick(*) {
 }
 
 /**
+ * The erasure the accepted slot performs, read from the slot the tooltip
+ * shows: a rewrite slot (_LLM_Engine_RewriteDisplaySlot) carries it, every
+ * other slot erases nothing.
+ * @param {String} Text The accepted text.
+ * @param {Array} Slots The presented slots.
+ * @param {Integer} ActiveIdx The accepted slot.
+ * @returns {Map|Integer} Map("deletes", "deleted_text", "span"), or 0.
+ */
+_LLM_Bridge_AcceptedSlotEdit(Text, Slots := unset, ActiveIdx := 1) {
+	if !IsSet(Slots) || !(Slots is Array) || ActiveIdx < 1 || ActiveIdx > Slots.Length
+		return 0
+	Slot := Slots[ActiveIdx]
+	if !IsObject(Slot) || !Slot.HasOwnProp("Deletes")
+		return 0
+	if !Slot.HasOwnProp("Text") || !(Slot.Text == Text)
+		throw Error("The accepted text is not the text of the slot that carries its erasure.")
+	return Map("deletes", Slot.Deletes, "deleted_text", Slot.DeletedText,
+		"span", Slot.RewriteSpan)
+}
+
+/**
+ * Tells whether a rewrite still applies to the text before the caret. The
+ * model rewrote a span that ended the buffer; a keystroke admitted meanwhile
+ * (the tooltip's minimum-display window keeps it up) moved that end, and
+ * erasing the recorded count would then delete the wrong characters.
+ * @param {Object} Transaction The acceptance transaction.
+ * @returns {Integer} True when nothing is erased, or the span still ends the buffer.
+ */
+_LLM_Bridge_RewriteStillApplies(Transaction) {
+	global _LLM_Bridge_Buffer
+	if (Transaction.Deletes <= 0)
+		return true
+	Span := Transaction.RewriteSpan
+	BufferLength := StrLen(_LLM_Bridge_Buffer)
+	SpanLength := StrLen(Span)
+	return (SpanLength > 0 and SpanLength <= BufferLength
+		and SubStr(_LLM_Bridge_Buffer, BufferLength - SpanLength + 1) == Span)
+}
+
+/**
  * Called when the user accepts the suggestion (e.g. pressing Tab over tooltip).
- * Appends the accepted text to the buffer and types it into the active window.
+ * Types the accepted text into the active window, after erasing the typed
+ * text a rewrite replaces, and mirrors both edits in the buffer.
  * @param {string} text - The accepted prediction text.
  */
 LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
@@ -1342,8 +1393,17 @@ LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
 	if !(RequestId is Integer) or RequestId < 0
 		throw Error("LLM acceptance requires initialized engine state.")
 	Transaction := _LLM_Bridge_NewInjectionTransaction(
-		text, AdmissionSeed, RequestId, false, Slots, ActiveIdx,
-		PresentedRecord, PresentedLifecycle)
+		text, AdmissionSeed, RequestId, false, Slots?, ActiveIdx,
+		PresentedRecord, PresentedLifecycle,
+		_LLM_Bridge_AcceptedSlotEdit(text, Slots?, ActiveIdx))
+	; The completion callback owns the tooltip and the acceptance claim, so a
+	; refusal goes through it exactly like a sender that rejected the output.
+	if !_LLM_Bridge_RewriteStillApplies(Transaction) {
+		try LoggerWarn("LLM", "Rewrite not applied: the text it replaces changed since it was generated.")
+		_LLM_Bridge_OnInjectComplete(Transaction, false,
+			"the rewritten sentence no longer ends the typed text")
+		return
+	}
 	TextSend(text, _LLM_Bridge_InjectionOptions(Transaction),
 		_LLM_Bridge_OnInjectComplete.Bind(Transaction))
 }

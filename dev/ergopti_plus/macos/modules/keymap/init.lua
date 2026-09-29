@@ -685,6 +685,7 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.request_manual_prediction = LLMBridge.request_manual_prediction
+M.request_prompt_prediction = LLMBridge.request_prompt_prediction
 M.reset_predictions  = LLMBridge.reset_predictions
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 

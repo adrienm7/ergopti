@@ -126,6 +126,20 @@ function M.get_active_profile(active_id, user_profiles)
 	return { id = "raw", batch = false, system_single = "{context}" }
 end
 
+--- Finds a profile by its exact id, among the built-ins and the user profiles.
+--- Unlike get_active_profile it never migrates nor falls back: a binding that
+--- names a deleted custom prompt must be refused, not silently run another one.
+--- @param id string The profile id to find.
+--- @param user_profiles table|nil Current user-defined profiles.
+--- @return table|nil profile The profile with that id (user profiles shadow built-ins), or nil.
+function M.find_profile(id, user_profiles)
+	if type(id) ~= "string" or id == "" then return nil end
+	for _, profile in ipairs(Selector.get_all_profiles(user_profiles, LOADED_PROFILES)) do
+		if type(profile) == "table" and profile.id == id then return profile end
+	end
+	return nil
+end
+
 
 
 

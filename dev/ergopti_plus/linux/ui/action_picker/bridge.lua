@@ -64,7 +64,8 @@ end
 --- to be a flat, alphabetical list of a hard-coded 42-id table, with no heading
 --- at all and 38 of the actions this driver runs missing.
 --- @param opts table|nil { title, label, current, allow_native, native_label,
----   items, send_vocabulary, parameter_strings }, every field optional.
+---   items, send_vocabulary, parameter_strings, prompt_choices, default_count,
+---   edit_current_label }, every field optional.
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
 	local o = type(opts) == "table" and opts or {}
@@ -100,6 +101,11 @@ function M.build_init_payload(opts)
 		platform          = "linux",
 		sendVocabulary    = o.send_vocabulary,
 		parameterStrings  = o.parameter_strings,
+		-- The llm_prompt editor's choices and the "edit the current action"
+		-- button, from the same get_picker_parameter_fields.
+		promptChoices     = o.prompt_choices,
+		defaultCount      = o.default_count,
+		editCurrentLabel  = o.edit_current_label,
 	}
 end
 

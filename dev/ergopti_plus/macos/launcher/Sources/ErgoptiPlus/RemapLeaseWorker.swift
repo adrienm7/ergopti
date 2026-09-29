@@ -3059,7 +3059,10 @@ enum KarabinerLeaseWorker {
 						+ "directoryLinks=\(directoryAttributes.st_nlink) "
 						+ "fileStatus=\(fileStatus) fileInode=\(fileAttributes.st_ino).\n"
 					_ = writeLauncherLogData(Data(diagnostic.utf8), descriptor: STDERR_FILENO)
-				}
+				},
+				// This debug role proves append integrity across processes. Retention
+				// rotation is covered independently and must not discard its records.
+				maximumBytes: off_t.max
 			), boundaryWriteSucceeded
 			else { return LeaseWorkerExit.innerFailed.rawValue }
 		}

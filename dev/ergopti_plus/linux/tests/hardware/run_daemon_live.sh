@@ -44,8 +44,11 @@ LLM_READY="$(mktemp -u)"
 export ERGOPTI_LIVE_LLM_PORT=18431
 export ERGOPTI_LIVE_LLM_LOG="$(mktemp)"
 export ERGOPTI_LIVE_LLM_REPLY=" que tout le monde va bien"
+# What a model answers the rewrite prompt, which Super+Space runs in the probe.
+export ERGOPTI_LIVE_LLM_REWRITE_REPLY="REWRITE: Ok pour jeudi"
 python3 tests/hardware/fake_llm_server.py --port "${ERGOPTI_LIVE_LLM_PORT}" --log "${ERGOPTI_LIVE_LLM_LOG}" \
-	--reply "${ERGOPTI_LIVE_LLM_REPLY}" --ready-file "${LLM_READY}" &
+	--reply "${ERGOPTI_LIVE_LLM_REPLY}" --rewrite-reply "${ERGOPTI_LIVE_LLM_REWRITE_REPLY}" \
+	--ready-file "${LLM_READY}" &
 PIDS="${PIDS} $!"
 for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
 [ -f "${LLM_READY}" ] || { echo "ENVIRONMENT: the fake LLM API never started" >&2; exit 2; }

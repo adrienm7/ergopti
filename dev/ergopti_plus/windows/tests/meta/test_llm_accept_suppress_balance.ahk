@@ -80,11 +80,13 @@ Test("llm_bridge: inline output owns no temporal prefix suppression (llm-accept-
 
 
 _LASB_FinallyGuardsPwRelease() {
+	; A rewrite's Backspaces lead the same SendInput string (erase prefix), so the
+	; erasure is as InputHook-invisible as the text it precedes.
 	Sender := _DriverFuncBody("TextSend")
-	Assert(InStr(Sender, '_AHK_SendInput.Bind("{Text}" . Text)') > 0,
+	Assert(InStr(Sender, '_AHK_SendInput.Bind(ErasePrefix . "{Text}" . Text)') > 0,
 		"direct atomic LLM output must use SendInput text mode, which InputHook ignores without a suppression counter")
 	Clipboard := _DriverFuncBody("_TextSendClipboard")
-	Assert(InStr(Clipboard, '_AHK_SendInput.Bind("^v")') > 0,
+	Assert(InStr(Clipboard, '_AHK_SendInput.Bind(_TextSenderErasePrefix(Opts) . "^v")') > 0,
 		"clipboard atomic LLM output must use the same InputHook-invisible SendInput primitive")
 }
 

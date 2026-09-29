@@ -62,7 +62,12 @@ final class UpdaterCommandRouter {
 			url.fragment == nil else {
 			return false
 		}
-		let components = url.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+		// URL.path can remove a directory-style trailing slash. Commands require
+		// the exact encoded path, including empty components and escaped bytes.
+		guard let commandPath = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath else {
+			return false
+		}
+		let components = commandPath.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
 		guard components.first == "" else { return false }
 		let command = Array(components.dropFirst())
 		if command == ["check"] {

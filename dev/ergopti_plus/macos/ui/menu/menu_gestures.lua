@@ -259,6 +259,9 @@ function M.build(ctx)
 			items   = items,
 			send_vocabulary   = editor.send_vocabulary,
 			parameter_strings = editor.parameter_strings,
+			prompt_choices    = editor.prompt_choices,
+			default_count     = editor.default_count,
+			edit_current_label = editor.edit_current_label,
 		}, function(a, picked)
 			local function apply_action()
 				if not commit_gesture_row_value("get_action", "set_action", slot, a, "action") then return false end

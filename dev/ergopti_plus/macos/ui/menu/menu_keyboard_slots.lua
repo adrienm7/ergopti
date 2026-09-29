@@ -154,6 +154,9 @@ local function choose_action_for(slot_id, ctx)
 		items   = items,
 		send_vocabulary   = editor.send_vocabulary,
 		parameter_strings = editor.parameter_strings,
+		prompt_choices    = editor.prompt_choices,
+		default_count     = editor.default_count,
+		edit_current_label = editor.edit_current_label,
 	}, function(action_id, picked)
 		if type(action_id) ~= "string" then return end
 		local function bind()

@@ -1268,6 +1268,22 @@ function M.get_active_profile()
 	return Profiles.get_active_profile(CoreState.active_profile_id, CoreState.user_profiles)
 end
 
+--- Finds a profile by its exact id without touching the active one: the prompt
+--- actions run a chosen profile for one request.
+--- @param id string The profile id.
+--- @return table|nil profile The profile, or nil when no built-in or user profile has that id.
+function M.find_profile(id)
+	return Profiles.find_profile(id, CoreState.user_profiles)
+end
+
+--- Returns the user-defined profiles, in menu order.
+--- @return table profiles A new array holding the registry's profile records.
+function M.get_user_profiles()
+	local copy = {}
+	for index, profile in ipairs(CoreState.user_profiles) do copy[index] = profile end
+	return copy
+end
+
 --- Reads the current global pause epoch without requiring ScriptControl during
 --- the core module's bootstrap cycle.
 --- @return number epoch Monotonic pause generation, or zero when unavailable.
@@ -2019,8 +2035,10 @@ end
 --- @param force boolean If true, bypasses application exclusions.
 --- @param request_id_provider function Callback returning the current request identifier.
 --- @param on_partial function|nil Optional token-by-token streaming callback.
+--- @param profile_override table|nil Profile to run instead of the active one, for this request only.
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
-                                  max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider, on_partial)
+                                  max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider, on_partial,
+                                  profile_override)
 
 	-- The app-exclusion filter lives in modules/llm/app_filter.lua and is applied
 	-- by prediction_engine before it ever dispatches. A second copy lived here and
@@ -2031,7 +2049,11 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	-- prediction?" is the divergence, not the answer either gave.
 
 	num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
-	local profile = M.get_active_profile()
+	if profile_override ~= nil and type(profile_override) ~= "table" then
+		error("fetch_llm_prediction: the profile override must be a profile table, got "
+			.. type(profile_override))
+	end
+	local profile = profile_override or M.get_active_profile()
 	local api = get_api()
 
 	if type(profile) == "table" and (not profile.batch) then

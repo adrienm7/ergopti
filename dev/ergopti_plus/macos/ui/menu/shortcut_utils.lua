@@ -287,18 +287,24 @@ end
 -- What picker_parameter_fields reads from the gestures facade.
 local PICKER_EDITOR_FACADE = {
 	"get_action_parameter_spec", "get_action_parameter", "parameter_prompt", "parameter_error", "send_vocabulary",
+	"llm_prompt_choices", "llm_prompt_default_count",
 }
 
---- Readies picker items for the picker's own parameter editor: each action whose
---- parameter is a text, a key or a shortcut is marked with its kind and the value
---- `binding` holds for it, and the returned fields give the page the send-input
---- vocabulary and the same prompts and refusals as the native prompt.
+--- Readies picker items for the picker's own parameter editor: each action with
+--- a parameter is marked with its kind and the value `binding` holds for it, so
+--- the page can reopen the current one ("edit the current action"). The page
+--- edits a text, a key, a shortcut and a prompt choice itself; for any other
+--- kind it confirms without a value and the native prompt asks for it. The
+--- returned fields give the page the send-input vocabulary, the prompt profiles,
+--- the AI menu's prediction count and the same prompts and refusals as the
+--- native prompt.
 --- @param gestures table The gestures facade.
 --- @param items table Picker items, marked in place.
 --- @param binding string|nil The binding the pick is for; nil marks no value.
---- @return table { send_vocabulary, parameter_strings }, the options ActionPicker.open
----   reads; empty, with an error logged, when the facade lacks what the editor
----   needs, and every value is then asked by the native prompt.
+--- @return table { send_vocabulary, parameter_strings, prompt_choices, default_count,
+---   edit_current_label }, the options ActionPicker.open reads; empty, with an error
+---   logged, when the facade lacks what the editor needs, and every value is then
+---   asked by the native prompt.
 function M.picker_parameter_fields(gestures, items, binding)
 	for _, name in ipairs(PICKER_EDITOR_FACADE) do
 		if type(gestures) ~= "table" or type(gestures[name]) ~= "function" then
@@ -309,20 +315,29 @@ function M.picker_parameter_fields(gestures, items, binding)
 	local prompts, errors = {}, {}
 	for _, item in ipairs(items) do
 		local kind = item.type == "action" and gestures.get_action_parameter_spec(item.id) or nil
-		if kind and SendInput.KINDS[kind] then
+		if kind then
 			item.parameter = kind
 			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
-			prompts[kind] = gestures.parameter_prompt(item.id)
-			errors[kind] = gestures.parameter_error(item.id)
+			if SendInput.KINDS[kind] or kind == "llm_prompt" then
+				prompts[kind] = gestures.parameter_prompt(item.id)
+				errors[kind] = gestures.parameter_error(item.id)
+			end
 		end
 	end
 	return {
 		send_vocabulary = gestures.send_vocabulary(),
+		prompt_choices = gestures.llm_prompt_choices(),
+		default_count = gestures.llm_prompt_default_count(),
+		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {
 			save = i18n.get("button.save"),
 			back = i18n.get("dialog.action_picker.back"),
 			captureKey = i18n.get("dialog.action_picker.capture_key"),
 			captureShortcut = i18n.get("dialog.action_picker.capture_shortcut"),
+			promptLabel = i18n.get("dialog.action_picker.prompt_label"),
+			countLabel = i18n.get("dialog.action_picker.count_label"),
+			-- Raw: the page substitutes {1} with the count it shows
+			countDefault = i18n.get("dialog.action_picker.count_default"),
 			prompts = prompts,
 			errors = errors,
 		},

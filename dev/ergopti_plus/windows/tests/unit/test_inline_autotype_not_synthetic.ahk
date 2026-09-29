@@ -51,6 +51,9 @@ _IANS_InlineCompletionCommitsOnlySuccessfulOutput() {
 		_PrefixBuffer := "stale"
 		Transaction := {
 			Text: "vous remercier",
+			Deletes: 0,
+			DeletedText: "",
+			RewriteSpan: "",
 			Inline: true,
 			SourceControl: 1001,
 			Slots: ["vous remercier"],
