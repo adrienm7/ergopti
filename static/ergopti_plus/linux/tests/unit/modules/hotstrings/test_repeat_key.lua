@@ -203,14 +203,34 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 		end)
 	end)
 
-	helpers.it("refuses malformed canonical data instead of silently using a legacy value", function()
+	helpers.it("keeps malformed canonical data neutral instead of using a legacy value", function()
 		with_repeat('[hotstrings]\nrepeat_key_enabled = "bad"\n', function(subject, _, path, _, sandbox)
 			local before = sandbox.read_bytes(path)
-			helpers.assert_throws(function() subject.is_enabled() end, "could not be initialized")
+			helpers.assert_eq(subject.is_enabled(), false)
 			helpers.assert_eq(subject.set_enabled(false), false)
 			helpers.assert_eq(sandbox.read_bytes(path), before)
 		end)
 	end)
+
+	-- The typing path calls is_enabled() for every unmatched character inside the
+	-- keyboard hook's guarded callback, whose error handler emergency-stops the
+	-- hook: one malformed leaf must neither raise nor reread the disk per key.
+	for _, source in ipairs({ '[hotstrings]\nrepeat_key_enabled = "true"\n', "[hotstrings\nbroken" }) do
+		helpers.it("never raises on the typing path for " .. source:gsub("\n", " "), function()
+			with_repeat(source, function(subject)
+				local writer = require("toml_codec.writer")
+				local read = writer.read_classified
+				local calls = 0
+				writer.read_classified = function(...) calls = calls + 1; return read(...) end
+				local ok, err = pcall(function()
+					for _ = 1, 50 do helpers.assert_eq(subject.is_enabled(), false) end
+				end)
+				writer.read_classified = read
+				if not ok then error(err, 0) end
+				helpers.assert_eq(calls, 1, "a refused read is cached, not retried per keystroke")
+			end)
+		end)
+	end
 
 	helpers.it("does not coerce a nonboolean setter into activation", function()
 		with_repeat(SOURCE, function(subject, _, path, _, sandbox)
