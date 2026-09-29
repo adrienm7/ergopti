@@ -1260,9 +1260,11 @@ end
 --- @param on_success function Callback triggering on successful parse.
 --- @param on_fail function Callback triggering on failure.
 --- @param dedup_stats table Dedup stats metrics.
+--- @param on_raw function|nil Receives the model's answer unparsed instead of on_success
+---        (M.request_raw): a caller that reads its own answer format.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats)
+                               on_success, on_fail, dedup_stats, on_raw)
     _req_counter = _req_counter + 1
     local req_id = _req_counter
 
@@ -1349,6 +1351,10 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                 local raw     = Parser.strip_thinking(content)
                 local ms_req  = math.floor((TimerScheduler.now() - t0_req) * 1000)
                 Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
+                if type(on_raw) == "function" then
+                    ApiCommon.protected_call(on_raw, "on_raw", raw)
+                    return
+                end
                 local results = {}
 
                 if not is_batch then
@@ -1689,6 +1695,23 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 		on_fail,
 		dedup_stats,
 		streaming and on_partial or nil)
+end
+
+--- Sends one non-streaming request and hands back the model's answer unparsed.
+--- For callers that read their own answer format (the tone actions rewrite a
+--- selection, not the typed buffer the prediction parser aligns against).
+--- @param model_name string Name of the targeted local model.
+--- @param system_prompt string The resolved system prompt.
+--- @param full_text string PREFIX (or the context of a non PREFIX/TAIL prompt).
+--- @param tail_text string TAIL.
+--- @param temperature number Sampling temperature.
+--- @param max_tokens number Output token budget.
+--- @param on_raw function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Called on a transport, HTTP or empty-answer failure.
+function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail)
+	if type(on_raw) ~= "function" then error("api_ollama.request_raw: on_raw must be a function") end
+	post_and_parse(model_name, system_prompt, full_text, tail_text,
+		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw)
 end
 
 --- Dispatches multiple sequential API requests.

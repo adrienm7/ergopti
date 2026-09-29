@@ -332,6 +332,64 @@ function M.paste_text(text, uinput, sleep_ms)
 	return true
 end
 
+--- Copies the focused selection into the clipboard, which the caller restores.
+---
+--- A sentinel goes in first: an application with nothing selected leaves the
+--- clipboard alone on Ctrl+C, and without the sentinel the previous content
+--- would read as the selection.
+--- @param b table The session's clipboard backend.
+--- @param emit_combo function combo -> boolean
+--- @param sleep_ms function Blocking millisecond wait.
+--- @return boolean ok
+--- @return string selected_or_reason The selection, or why there is none.
+local function copy_selection(b, emit_combo, sleep_ms)
+	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
+	if not write_backend_checked(b, sentinel) then return false, "clipboard_probe_write_failed" end
+	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
+	if not copy_ok or copied ~= true then return false, "copy_chord_failed" end
+	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed" end
+	local selection_ok, selected, selection_error = read_backend_checked(b)
+	if not selection_ok then return false, selection_error or "selection_read_failed" end
+	if selected == sentinel then return false, "no_selection" end
+	return true, selected
+end
+
+--- Checks the injected dependencies of a selection probe.
+--- @param emit_combo any
+--- @param sleep_ms any
+--- @return table|nil backend The session's clipboard backend.
+--- @return string|nil reason Why the probe cannot run.
+local function selection_backend(emit_combo, sleep_ms)
+	if type(emit_combo) ~= "function" or type(sleep_ms) ~= "function" then
+		return nil, "invalid_dependencies"
+	end
+	local b = backend()
+	if not b then
+		local _, why = M.is_available()
+		return nil, why
+	end
+	return b, nil
+end
+
+--- Reads the focused selection by copying it, then puts the clipboard back.
+--- The selection is left as it was, for a caller that replaces it later.
+--- @param emit_combo function combo -> boolean
+--- @param sleep_ms function Blocking millisecond wait.
+--- @return boolean ok
+--- @return string text The selection ("" when there is none).
+--- @return string|nil reason "no_selection", or why the read failed.
+function M.read_selection(emit_combo, sleep_ms)
+	local b, why = selection_backend(emit_combo, sleep_ms)
+	if not b then return false, "", why end
+	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
+	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
+	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
+	if not copied then return false, "", selected end
+	Logger.debug(LOG, "Read a %d-byte selection via %s.", #selected, b.name)
+	return true, selected, nil
+end
+
 --- Copies and replaces the focused selection while preserving the clipboard.
 --- @param transform function selected_text -> replacement_text
 --- @param emit_combo function combo -> boolean
@@ -339,19 +397,12 @@ end
 --- @return boolean ok
 --- @return string|nil reason
 function M.transform_selection(transform, emit_combo, sleep_ms)
-	if type(transform) ~= "function" or type(emit_combo) ~= "function"
-			or type(sleep_ms) ~= "function" then
-		return false, "invalid_dependencies"
-	end
-	local b = backend()
-	if not b then
-		local _, why = M.is_available()
-		return false, why
-	end
+	if type(transform) ~= "function" then return false, "invalid_dependencies" end
+	local b, why = selection_backend(emit_combo, sleep_ms)
+	if not b then return false, why end
 
 	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
 	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
-	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
 
 	local function restore()
 		return write_backend_checked(b, saved)
@@ -360,19 +411,8 @@ function M.transform_selection(transform, emit_combo, sleep_ms)
 		if not restore() then return false, "clipboard_restore_failed" end
 		return false, reason
 	end
-	if not write_backend_checked(b, sentinel) then
-		return fail("clipboard_probe_write_failed")
-	end
-
-	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
-	if not copy_ok or copied ~= true then return fail("copy_chord_failed") end
-	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return fail("copy_settle_failed") end
-
-	local selection_ok, selected, selection_error = read_backend_checked(b)
-	if not selection_ok then
-		return fail(selection_error or "selection_read_failed")
-	end
-	if selected == sentinel then return fail("no_selection") end
+	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
+	if not copied then return fail(selected) end
 
 	local transformed_ok, replacement = pcall(transform, selected)
 	if not transformed_ok or type(replacement) ~= "string" then

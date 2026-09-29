@@ -783,6 +783,20 @@ TextEraseChars(Count) {
 	return true
 }
 
+; Selects the Count characters left of the caret: Shift+Left Count times, in
+; one SendInput batch. One Left moves over one character, a surrogate pair (an
+; emoji) included, so Count is a codepoint count, not a UTF-16 one. The caret
+; move is declared to the hotstring buffers like every other key press.
+; @param Count {Integer} Number of characters to select.
+; @return {Boolean} True when the keystrokes were sent (nothing to select counts).
+TextSelectBack(Count) {
+	if !(Count is Integer) or Count < 0
+		throw ValueError("TextSelectBack expects a non-negative integer count.")
+	if (Count == 0)
+		return true
+	return _TextSenderSendInput("+{Left " . Count . "}", "modified key press")
+}
+
 ; Sends the menu mask key (A_MenuMaskKey) without releasing held modifiers. A
 ; lone Alt or Win tap makes Windows put the focused window's menu bar in menu
 ; mode (or open the Start menu); a keystroke between the modifier's Down and Up

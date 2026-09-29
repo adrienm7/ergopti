@@ -1613,7 +1613,7 @@ M.__extract_server_message_for_test = extract_server_message
 
 local function post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
                                         temperature, max_tokens, num_predictions, is_batch,
-                                        on_success, on_fail, dedup_stats)
+                                        on_success, on_fail, dedup_stats, on_raw)
 	local provider = M.PROVIDERS[entry.provider]
 	local my_identity = _identity_generation
 	local identity_entry = find_active_entry()
@@ -1749,6 +1749,11 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			end
 
 			local raw     = Parser.strip_thinking(raw_text)
+			if type(on_raw) == "function" then
+				Logger.debug(LOG, "[%s] #%d RAW answer in %dms (%d chars).", model, req_id, ms, #raw)
+				ApiCommon.protected_call(on_raw, "on_raw", raw)
+				return
+			end
 			local results = {}
 			if not is_batch then
 				local pred = Parser.process_prediction(full_text, tail_text, raw)
@@ -1807,7 +1812,7 @@ end
 --- Keychain can delay/fail one request without freezing keyboard processing.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, max_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats)
+                               on_success, on_fail, dedup_stats, on_raw)
 	M.resolve_active_entry(function(resolved, entry)
 		if resolved ~= true or not entry then
 			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -1815,8 +1820,25 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		end
 		post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
 			temperature, max_tokens, num_predictions, is_batch,
-			on_success, on_fail, dedup_stats)
+			on_success, on_fail, dedup_stats, on_raw)
 	end)
+end
+
+--- Sends one request and hands back the model's answer unparsed. For callers
+--- that read their own answer format (the tone actions rewrite a selection, not
+--- the typed buffer the prediction parser aligns against).
+--- @param model_name string|nil Model id; nil uses the active entry's.
+--- @param system_prompt string The resolved system prompt.
+--- @param full_text string PREFIX (or the context of a non PREFIX/TAIL prompt).
+--- @param tail_text string TAIL.
+--- @param temperature number Sampling temperature.
+--- @param max_tokens number Output token budget.
+--- @param on_raw function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Called on a credential, transport, HTTP or empty-answer failure.
+function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail)
+	if type(on_raw) ~= "function" then error("api_remote.request_raw: on_raw must be a function") end
+	post_and_parse(model_name, system_prompt, full_text, tail_text,
+		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw)
 end
 
 --- Sends the shared minimal probe (api_providers.json test_request, verbatim)

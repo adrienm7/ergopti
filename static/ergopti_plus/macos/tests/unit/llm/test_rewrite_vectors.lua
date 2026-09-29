@@ -21,6 +21,7 @@ local shared_lua = helpers.shared("lua/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
 local Rewrite = require("llm.rewrite")
+local Tone = require("llm.tone")
 
 local CORPUS = helpers.shared("tests/corpus/llm/rewrite_vectors.json")
 
@@ -97,14 +98,23 @@ helpers.describe("the shipped rewrite profile is a rewrite prompt", function()
 		helpers.assert_eq(found.batch, false, "a rewrite is one request per prediction")
 	end)
 
-	helpers.it("no other built-in profile is a rewrite profile", function()
+	-- The tone ladder (llm/tone.lua) rewrites a selection into a register: its
+	-- four rungs are rewrite prompts too, and nothing else may be one
+	helpers.it("no other built-in profile than the tone ladder is a rewrite profile", function()
 		local fh = assert(io.open(helpers.shared("modules/llm/profiles.json"), "r"))
 		local profiles = json.decode(fh:read("*a"))
 		fh:close()
+		local ladder = {}
+		for _, id in ipairs(Tone.LADDER) do ladder[id] = true end
+		local rungs = 0
 		for _, profile in ipairs(profiles) do
-			if profile.id ~= "rewrite" then
+			if ladder[profile.id] then
+				helpers.assert_eq(Rewrite.is_rewrite_profile(profile), true, profile.id)
+				rungs = rungs + 1
+			elseif profile.id ~= "rewrite" then
 				helpers.assert_eq(Rewrite.is_rewrite_profile(profile), false, profile.id)
 			end
 		end
+		helpers.assert_eq(rungs, #Tone.LADDER, "every rung of the tone ladder must ship")
 	end)
 end)

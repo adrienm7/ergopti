@@ -293,6 +293,14 @@ for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER {
 		GESTURE_ACTIONS["llm_predict_" . _PresetProfileId] := { Fn: _GestureMakePromptPresetRunner(_PresetProfileId) }
 }
 
+; ── The tone ladder on the selection ────────────────────────────────────────
+;
+; llm_tone_more_formal / _familiar and their _cycle variants, one per
+; direction x cycle entry of LLM_ToneActions (modules/llm/tone_action.ahk).
+for _ToneActionId, _ToneStep in LLM_ToneActions() {
+		GESTURE_ACTIONS[_ToneActionId] := { Fn: _GestureMakeToneRunner(_ToneStep.Direction, _ToneStep.Cycle) }
+}
+
 ; Every persisted gesture action must name the live catalogue.  The empty
 ; sentinel is exclusive to tap-hold, where it means native key passthrough.
 GestureActionIsAssignable(ActionName, AllowNative := false) {
@@ -319,6 +327,11 @@ _GestureMakeSeqEmitter(Seq) {
 ; Same reason: the profile id arrives as a parameter, so each preset keeps its own.
 _GestureMakePromptPresetRunner(ProfileId) {
 		return (*) => LLM_Menu_TriggerPredictionWith(ProfileId, 0)
+}
+
+; Same reason: the direction and the cycle flag arrive as parameters.
+_GestureMakeToneRunner(Direction, Cycle) {
+		return (*) => LLM_Tone_Trigger(Direction, Cycle)
 }
 
 

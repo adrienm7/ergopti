@@ -28,6 +28,7 @@ local WrapPair      = require("wrap_pair")
 local SendInput     = require("send_input")
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
+local Tone          = require("llm.tone")
 local JsonCodec     = require("adapters.json_codec")
 local LOG           = "gestures.actions"
 
@@ -1107,6 +1108,25 @@ for _, profile in ipairs(BUILTIN_PROMPT_PROFILES) do
 	local profile_id = profile.id
 	local action = "llm_predict_" .. profile_id
 	sg(action, function() return request_prompt_prediction(action, PromptAction.format(profile_id)) end)
+end
+-- The tone ladder on the selection (llm_tone_*): one registration per
+-- direction and end behaviour, through the keymap bridge like the predictions.
+local TONE_ACTIONS = {
+	{ id = "llm_tone_more_formal", direction = Tone.MORE_FORMAL, cycle = false },
+	{ id = "llm_tone_more_familiar", direction = Tone.MORE_FAMILIAR, cycle = false },
+	{ id = "llm_tone_more_formal_cycle", direction = Tone.MORE_FORMAL, cycle = true },
+	{ id = "llm_tone_more_familiar_cycle", direction = Tone.MORE_FAMILIAR, cycle = true },
+}
+for _, tone_action in ipairs(TONE_ACTIONS) do
+	local spec = tone_action
+	sg(spec.id, function()
+		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_tone_step) ~= "function" then
+			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
+			return false
+		end
+		return keymap.request_tone_step(spec.direction, spec.cycle, current_action_parent())
+	end)
 end
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")

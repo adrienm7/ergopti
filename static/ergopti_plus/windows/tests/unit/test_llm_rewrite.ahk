@@ -112,12 +112,13 @@ _LRW_ShippedProfiles() {
 	for Id in LLM_PROFILE_BUILTIN_ORDER {
 		Profile := LLM_FindProfile(Id)
 		AssertTrue(Profile is Map, "every built-in in the menu order must exist in profiles.json: " . Id)
-		if (Id != "rewrite")
-			AssertFalse(LLM_Rewrite_IsRewriteProfile(Profile),
-				"the continuation built-in '" . Id . "' must not be taken for a rewrite")
+		; The tone ladder profiles are rewrites too: they rewrite a selection
+		IsRewrite := (Id == "rewrite" || SubStr(Id, 1, 5) == "tone_")
+		AssertEqual(IsRewrite, LLM_Rewrite_IsRewriteProfile(Profile) ? true : false,
+			"the built-in '" . Id . "' is " . (IsRewrite ? "a rewrite" : "a continuation"))
 		Checked += 1
 	}
-	AssertEqual(5, Checked, "the five built-ins, rewrite included, must be checked")
+	AssertEqual(9, Checked, "the nine built-ins, rewrite and the tone ladder included, must be checked")
 	AssertTrue(LLM_Rewrite_IsRewriteProfile(Map("id", "user_x", "raw_prompt", "Reply REWRITE: <t>")),
 		"a custom prompt cloned from the rewrite one is a rewrite prompt through its raw prompt too")
 	AssertFalse(LLM_Rewrite_IsRewriteProfile(""), "no profile is no rewrite")

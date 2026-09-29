@@ -20,6 +20,9 @@
  *    refuses every other erasure; the accept path erases in the same SendInput
  *    batch as the text, for both the direct and the clipboard sender.
  * 4. The action picker host sends what the page's prompt editor needs.
+ * 5. The tone ladder port (modules/llm/tone.ahk) and its actions
+ *    (modules/llm/tone_action.ahk) are included before the gesture actions
+ *    registered from them, and their test replays the shared tone corpus.
  *
  * ROOT CAUSE ENCODED:
  * A module that no runner includes, or a list restated by hand, fails silently
@@ -94,6 +97,12 @@ for (const [label, list, prefix] of [
 		validation >= 0 && gestures > validation,
 		`${label} must include option_validation.ahk (LLM_PROFILE_BUILTIN_ORDER) before the gesture actions registered from it`
 	);
+	const tone = position(list, `${prefix}modules/llm/tone.ahk`);
+	const toneAction = position(list, `${prefix}modules/llm/tone_action.ahk`);
+	check(
+		tone >= 0 && toneAction > tone && gestures > toneAction,
+		`${label} must include tone.ahk, then tone_action.ahk, before the gesture actions registered from them`
+	);
 }
 check(
 	position(bench, '../modules/llm/rewrite.ahk') >= 0 &&
@@ -105,7 +114,8 @@ const TESTS = {
 	'unit/test_llm_rewrite.ahk': 'rewrite_vectors.json',
 	'unit/test_llm_prompt_action.ahk': 'llm_prompt_vectors.json',
 	'unit/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
-	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json'
+	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json',
+	'unit/test_llm_tone.ahk': 'tone_vectors.json'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
 	check(runAll.includes(test), `tests/run_all.ahk must #Include ${test}`);
@@ -134,6 +144,19 @@ check(
 	actions.includes('"llm_prompt_prediction", {'),
 	'llm_prompt_prediction must be a registered action'
 );
+check(
+	/for _ToneActionId, _ToneStep in LLM_ToneActions\(\) \{/.test(actions),
+	'the llm_tone_* actions must be registered from LLM_ToneActions'
+);
+const toneActions = read('modules/llm/tone_action.ahk');
+for (const id of [
+	'llm_tone_more_formal',
+	'llm_tone_more_familiar',
+	'llm_tone_more_formal_cycle',
+	'llm_tone_more_familiar_cycle'
+]) {
+	check(toneActions.includes(`"${id}", {`), `LLM_ToneActions must declare ${id}`);
+}
 const menuProfiles = read('ui/menu/menu_llm/menu_profiles.ahk');
 check(
 	!/for id in \["raw"/.test(menuProfiles) && !/Map\("raw", true/.test(menuProfiles),
