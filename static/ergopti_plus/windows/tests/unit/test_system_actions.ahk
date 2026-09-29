@@ -554,23 +554,29 @@ Test("system actions: force_quit_frontmost kills only on OK, the window it was a
 ; window once they run: emptying the Recycle Bin reads none, and ran before
 ; the confirmation refused every action in that case.
 _SysActions_ConfirmWithoutFocusBack() {
+	for Id, Runs in Map("empty_trash", 1, "unblock_file_selection", 0, "force_quit_frontmost", 0)
+		_SysActions_ConfirmWithoutFocusBackCase(Id, Runs)
+}
+
+; One case per call: the recorder closure must read a parameter, because a
+; closure over a for-loop variable is not captured and would throw inside the
+; runner's try, recording nothing.
+_SysActions_ConfirmWithoutFocusBackCase(Id, Runs) {
 	global GESTURE_ACTIONS
-	for Id, Runs in Map("empty_trash", 1, "unblock_file_selection", 0, "force_quit_frontmost", 0) {
-		Saved := GESTURE_ACTIONS[Id]
-		Ran := []
-		GESTURE_ACTIONS[Id] := { Fn: (*) => Ran.Push(Id) }
-		try {
-			Fake := _SysActionsFake()
-			Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
-			Fake.Answer := "OK"
-			Fake.ActivateResult := false
-			GestureInvokeAction(Id, "", Fake)
-			Fake.Deferred[1].Call()
-			AssertEqual(1, _SysActions_CallsNamed(Fake, "Activate").Length, Id . ": the focus is asked back")
-			AssertEqual(Runs, Ran.Length, Id . ": runs " . Runs . " time(s) once the focus cannot come back")
-		} finally {
-			GESTURE_ACTIONS[Id] := Saved
-		}
+	Saved := GESTURE_ACTIONS[Id]
+	Ran := []
+	GESTURE_ACTIONS[Id] := { Fn: (*) => Ran.Push(Id) }
+	try {
+		Fake := _SysActionsFake()
+		Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
+		Fake.Answer := "OK"
+		Fake.ActivateResult := false
+		GestureInvokeAction(Id, "", Fake)
+		Fake.Deferred[1].Call()
+		AssertEqual(1, _SysActions_CallsNamed(Fake, "Activate").Length, Id . ": the focus is asked back")
+		AssertEqual(Runs, Ran.Length, Id . ": runs " . Runs . " time(s) once the focus cannot come back")
+	} finally {
+		GESTURE_ACTIONS[Id] := Saved
 	}
 }
 Test("system actions: a lost focus refuses only the actions that read the active window (confirm-focus-scope)",
