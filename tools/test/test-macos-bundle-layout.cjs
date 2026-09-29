@@ -83,6 +83,42 @@ if (!/static\/ergopti_plus\/macos/.test(swift)) {
 	errors.push('main.swift: must point the bundled config dir at static/ergopti_plus/macos.');
 }
 
+// 3. Every bundled tool the launcher points the driver at must be one the build
+// creates, and every launcher key the boot trail reports must still be exported:
+// the launcher kept exporting ERGOPTI_KARABINER_INSTALLER, and the boot trail
+// kept reporting it present, after the build stopped vendoring that installer.
+const launcherSources = path.join(ROOT, 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus');
+const launcherSwift = fs
+	.readdirSync(launcherSources)
+	.filter((name) => name.endsWith('.swift'))
+	.map((name) => fs.readFileSync(path.join(launcherSources, name), 'utf8'))
+	.join('\n');
+const launcherTools = [
+	...launcherSwift.matchAll(/Contents\/Resources\/Tools\/([A-Za-z0-9_-]+)\//g)
+].map((match) => match[1]);
+if (launcherTools.length === 0) {
+	errors.push('main.swift: no Contents/Resources/Tools path found; the tool scan went blind.');
+}
+for (const tool of new Set(launcherTools)) {
+	if (!build.includes(`"$tools_dir/${tool}/`)) {
+		errors.push(
+			`launcher: points at Contents/Resources/Tools/${tool}, which build_macos_app.sh never bundles.`
+		);
+	}
+}
+const environmentLua = read('static/ergopti_plus/macos/infra/launcher_environment.lua');
+const reportedKeys = [...environmentLua.matchAll(/^\t"(ERGOPTI_[A-Z_]+)",$/gm)].map(
+	(match) => match[1]
+);
+if (reportedKeys.length === 0) {
+	errors.push('launcher_environment.lua: no exported key found; the key scan went blind.');
+}
+for (const key of reportedKeys) {
+	if (!launcherSwift.includes(`"${key}"`)) {
+		errors.push(`launcher_environment.lua: reports ${key}, which the Swift launcher never sets.`);
+	}
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] macOS bundle layout diverges from the repo layout:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);
