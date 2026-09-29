@@ -32,6 +32,7 @@
 ;   menu_llm/menu_profiles.ahk   — Profile menu + per-app + user CRUD + hotkeys.
 ;   menu_llm/menu_settings.ahk   — N / Trigger / Gen / Display / Nav menus +
 ;                                  numeric / modifier / shortcut prompts.
+;   menu_llm/menu_agent.ahk      — The tray's top-level AI agent submenu.
 ;   menu_llm/actions.ahk         — Toggles, setters, health probe, Ollama
 ;                                  bootstrap, app picker, lifecycle callbacks.
 ;   menu_llm/tab_accept.ahk      — Tab-accept hotkey + slot navigation.
@@ -309,5 +310,6 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 #Include trigger_journal.ahk
 #Include trigger_shortcut.ahk
 #Include menu_settings.ahk
+#Include menu_agent.ahk
 #Include actions.ahk
 #Include tab_accept.ahk

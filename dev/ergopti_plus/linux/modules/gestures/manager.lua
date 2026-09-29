@@ -44,6 +44,7 @@ local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
 local PromptAction = require("llm.prompt_action")
+local Vision = require("llm.vision")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
@@ -1087,6 +1088,11 @@ function M.validate_action_parameter(action_name, value)
 	-- Syntax only: whether the named prompt still exists is checked when the
 	-- action runs, so deleting a custom prompt does not drop its bindings.
 	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
+	-- Syntax only as well: whether the provider exists, has a key and a
+	-- default model is checked when the action runs.
+	if spec == "llm_vision" then return Vision.is_valid(value) end
+	-- A closed list: "ui" or a shipped locale code (translate.lua).
+	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1127,6 +1133,20 @@ function M.get_action_parameter_prompt(action_name)
 		end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_prompt"), table.concat(lines, "\n"))
 	end
+	if spec == "llm_vision" then
+		local lines = {}
+		for _, choice in ipairs(require("modules.llm.vision_request").backend_choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
+	end
+	if spec == "llm_language" then
+		local lines = {}
+		for _, choice in ipairs(require("modules.llm.translation").choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), table.concat(lines, "\n"))
+	end
 	error("no prompt for parameter kind '" .. tostring(spec) .. "'")
 end
 
@@ -1137,6 +1157,8 @@ function M.get_action_parameter_error(action_name)
 	local spec = M.get_action_parameter_spec(action_name)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
+	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
+	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))
@@ -1173,13 +1195,15 @@ end
 --- Readies picker items for the picker's own parameter editor: each action that
 --- takes a parameter is marked with its kind and the value `binding` holds for
 --- it, so the page's "edit the current action" button can reopen any of them.
---- The page edits a text, a key, a shortcut or a prompt itself, with the
---- prompts, refusals, vocabulary and prompt choices returned here; any other
---- kind is confirmed without a value and prompted for natively.
+--- The page edits a text, a key, a shortcut, a prompt, a vision backend or a
+--- target language itself, with the prompts, refusals, vocabulary and choices
+--- returned here; any other kind is confirmed without a value and prompted for
+--- natively.
 --- @param items table get_picker_items() output, marked in place.
 --- @param binding string|nil The binding the pick is for; nil marks no value.
 --- @return table { send_vocabulary, parameter_strings, prompt_choices,
----   default_count, edit_current_label }, the options the picker bridge's open() reads.
+---   vision_choices, language_choices, default_count, edit_current_label },
+---   the options the picker bridge's open() reads.
 function M.get_picker_parameter_fields(items, binding)
 	local prompts, errors = {}, {}
 	for _, item in ipairs(items) do
@@ -1187,7 +1211,7 @@ function M.get_picker_parameter_fields(items, binding)
 		if kind then
 			item.parameter = kind
 			item.parameterValue = binding and M.get_action_parameter(binding, item.id) or ""
-			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" then
+			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" then
 				prompts[kind] = M.get_action_parameter_prompt(item.id)
 				errors[kind] = M.get_action_parameter_error(item.id)
 			end
@@ -1197,6 +1221,8 @@ function M.get_picker_parameter_fields(items, binding)
 	return {
 		send_vocabulary = send_vocabulary(),
 		prompt_choices = ProfileSettings.choices(),
+		vision_choices = require("modules.llm.vision_request").backend_choices(),
+		language_choices = require("modules.llm.translation").choices(),
 		default_count = ProfileSettings.get("num_predictions"),
 		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {
@@ -1207,6 +1233,12 @@ function M.get_picker_parameter_fields(items, binding)
 			promptLabel = i18n.get("dialog.action_picker.prompt_label"),
 			countLabel = i18n.get("dialog.action_picker.count_label"),
 			countDefault = i18n.get("dialog.action_picker.count_default"),
+			visionProviderLabel = i18n.get("dialog.action_picker.vision_provider_label"),
+			visionModelLabel = i18n.get("dialog.action_picker.vision_model_label"),
+			-- Raw: the page fills {1} with the chosen backend's default model.
+			visionModelDefault = i18n.get("dialog.action_picker.vision_model_default"),
+			visionModelRequired = i18n.get("dialog.action_picker.vision_model_required"),
+			languageLabel = i18n.get("dialog.action_picker.language_label"),
 			prompts = prompts,
 			errors = errors,
 		},

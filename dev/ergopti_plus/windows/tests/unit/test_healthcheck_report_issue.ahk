@@ -11,8 +11,10 @@
 ;    that keeps the window (nothing closes here);
 ; 2. save writes the redacted report under the snapshot's diagnostics folder
 ;    and selects it in Explorer;
-; 3. report copies, saves, selects, then opens the bug form last, its fields
-;    redacted, and a refused clipboard stops it before the browser;
+; 3. report copies the report, then opens the bug form last with that whole
+;    report prefilled (cut to the URL budget), its fields redacted; it saves
+;    and selects nothing, so the form keeps the focus, and a refused clipboard
+;    stops it before the browser;
 ; 4. open_path opens the path the host collected, creating a missing folder,
 ;    and refuses a file that does not exist;
 ; 5. an unknown profile folder refuses everything: nothing could be redacted;
@@ -105,28 +107,75 @@ _THPA_SaveUnderDiagnostics() {
 Test("Diagnostics page: save writes under the diagnostics folder and selects it (page-actions)",
 	_THPA_SaveUnderDiagnostics)
 
-_THPA_ReportOrder() {
-	Calls := []
-	Name := "ergopti-diagnostics-windows-2.1.0-x.md"
-	Fields := Map("version", "2.1.0", "os", "Windows 11", "driver", "windows",
-		"diagnostics", "Last error: C:\Users\JDoe\boom")
-	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "name", Name, "fields", Fields),
-		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
-	AssertTrue(Outcome["ok"])
-	AssertEqual(4, Calls.Length, _THPA_Join(Calls))
-	AssertTrue(InStr(Calls[1], "copy:") = 1 && InStr(Calls[2], "save:") = 1 && InStr(Calls[3], "reveal:") = 1
-		&& InStr(Calls[4], "open_url:https://github.com/") = 1, "the browser must open last: " . _THPA_Join(Calls))
-	AssertTrue(InStr(Calls[4], "template=bug_report.yml") > 0, Calls[4])
-	AssertTrue(InStr(Calls[4], "JDoe") = 0, "the prefilled fields must be redacted: " . Calls[4])
+; The value of one query parameter of a URL, still percent-encoded.
+_THPA_QueryValue(Url, Key) {
+	return RegExMatch(Url, "[?&]" . Key . "=([^&]*)", &Match) ? Match[1] : ""
 }
-Test("Diagnostics page: report copies, saves, selects, then opens the bug form (report-bug-flow)",
-	_THPA_ReportOrder)
+
+_THPA_ReportPrefillsTheReport() {
+	Calls := []
+	Fields := Map("version", "2.1.0", "os", "Windows 11 (C:\Users\JDoe)", "driver", "windows")
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report at C:\Users\JDoe\boom",
+		"fields", Fields), _THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
+	AssertTrue(Outcome["ok"])
+	AssertEqual(2, Calls.Length, _THPA_Join(Calls))
+	AssertEqual("copy:report at ~\boom", Calls[1])
+	AssertTrue(InStr(Calls[2], "open_url:https://github.com/") = 1, Calls[2])
+	AssertTrue(InStr(Calls[2], "template=bug_report.yml") > 0, Calls[2])
+	AssertEqual(IssueLink_PercentEncode("report at ~\boom"), _THPA_QueryValue(Calls[2], "diagnostics"),
+		"the form's diagnostics field is the report the clipboard holds")
+	AssertEqual(IssueLink_PercentEncode("Windows 11 (~)"), _THPA_QueryValue(Calls[2], "os"))
+	AssertTrue(InStr(Calls[2], "JDoe") = 0, "the prefilled fields must be redacted: " . Calls[2])
+	AssertFalse(Outcome.Has("path"), "a report names no file")
+}
+Test("Diagnostics page: report copies, then opens the bug form with the whole report (report-bug-flow)",
+	_THPA_ReportPrefillsTheReport)
+
+; The report used to be saved and selected in Explorer too: Explorer came up
+; after the browser and took the focus from the form (report-focus).
+_THPA_ReportSavesNothing() {
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "fields",
+		Map("driver", "windows")), _THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
+	AssertTrue(Outcome["ok"])
+	for Call in Calls
+		AssertTrue(InStr(Call, "save:") != 1 && InStr(Call, "reveal:") != 1 && InStr(Call, "open:") != 1
+			&& InStr(Call, "notify:") != 1, "a report saves, selects and notifies nothing: " . _THPA_Join(Calls))
+	AssertEqual(2, Calls.Length, _THPA_Join(Calls))
+	AssertTrue(InStr(Calls[1], "copy:") = 1 && InStr(Calls[2], "open_url:") = 1,
+		"the browser must open last, after the clipboard: " . _THPA_Join(Calls))
+}
+Test("Diagnostics page: report saves nothing and opens the browser last (report-focus)", _THPA_ReportSavesNothing)
+
+_THPA_ReportCutsALongReport() {
+	Calls := []
+	Long := "report"
+	Loop 2000
+		Long .= "line of diagnostics é`n"
+	Config := HealthCheck_Config()
+	Templates := Config["templates"]
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", Long, "fields",
+		Map("version", "2.1.0", "driver", "windows")), _THPA_Paths(), Config, _THPA_Effects(Calls))
+	AssertTrue(Outcome["ok"])
+	AssertEqual("copy:" . Long, Calls[1], "the clipboard keeps the whole report")
+	Url := SubStr(Calls[2], StrLen("open_url:") + 1)
+	AssertTrue(StrLen(Url) <= Templates["max_url_bytes"], "the URL fits its budget: " . StrLen(Url))
+	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "the identity fields survive the cut")
+	Prefilled := _THPA_QueryValue(Url, "diagnostics")
+	Marker := IssueLink_PercentEncode(Templates["truncation_marker"])
+	AssertEqual(Marker, SubStr(Prefilled, -StrLen(Marker)), "the cut report ends with the truncation marker")
+	Kept := SubStr(Prefilled, 1, StrLen(Prefilled) - StrLen(Marker))
+	AssertTrue(StrLen(Kept) > 0, "the cut keeps the start of the report")
+	AssertEqual(Kept, SubStr(IssueLink_PercentEncode(Long), 1, StrLen(Kept)),
+		"the prefill is the start of the copied report")
+}
+Test("Diagnostics page: report cuts a long report in the URL, whole in the clipboard (report-bug-flow)",
+	_THPA_ReportCutsALongReport)
 
 _THPA_ReportStopsOnRefusedClipboard() {
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "name",
-		"ergopti-diagnostics-w.md", "fields", Map()), _THPA_Paths(), HealthCheck_Config(),
-		_THPA_Effects(Calls, Map("clipboard", false)))
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "fields", Map()),
+		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls, Map("clipboard", false)))
 	AssertFalse(Outcome["ok"])
 	for Call in Calls
 		AssertTrue(InStr(Call, "open_url:") = 0, "the browser must not open without the report in the clipboard")

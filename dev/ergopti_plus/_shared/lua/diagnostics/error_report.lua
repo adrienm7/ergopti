@@ -5,14 +5,14 @@
 --- DESCRIPTION:
 --- What the error window (_shared/ui/error_dialog/) shows, copies and sends to
 --- GitHub for one logged error, for the macOS and Linux drivers: the Markdown
---- report, the saved file's name and the prefilled fields of the bug form. The
+--- report and the prefilled fields of the bug form. The
 --- AHK port (windows/infra/error_report.ahk) replays the same vectors
 --- (_shared/tests/corpus/diagnostics/error_report_vectors.json).
 ---
 --- FEATURES & RATIONALE:
---- 1. Built from diagnostics.issue_report, the bug report of the diagnostics
----    window: the same identity table, the same file name and the same form
----    summary, so a report opened from an error reads like any other.
+--- 1. Built from diagnostics.issue_report: the same identity table and dump
+---    rules as any other bug report. The report itself fills the form's
+---    report field (ui.healthcheck.report), so no field here repeats it.
 --- 2. The issue's title is the error's module and the first line of its
 ---    message: what a maintainer triages by.
 --- 3. The recent warnings and errors of today's errors file travel with the
@@ -62,8 +62,8 @@ end
 
 --- Builds the report of one error.
 --- @param err table { kind = "error"|"crash", module, message, time, recent = { line, … } }
---- @param identity table { version, commit, os, driver, generated_utc, file_stamp, warn_count, err_count }
---- @return table { name, text, fields = { title, version, os, driver, diagnostics } }
+--- @param identity table { version, commit, os, driver, generated_utc, warn_count, err_count }
+--- @return table { text, fields = { title, version, os, driver } }
 function M.compose(err, identity)
 	checked(err)
 	if type(identity) ~= "table" then error("error_report: the identity must be a table", 2) end
@@ -72,20 +72,13 @@ function M.compose(err, identity)
 	}
 	if #err.recent > 0 then body.recent_issues = err.recent end
 
-	local name = IssueReport.file_name(identity)
-	local summary_info = {}
-	for key, value in pairs(identity) do summary_info[key] = value end
-	summary_info.last_error = "[" .. err.module .. "] " .. err.message
-
 	return {
-		name = name,
 		text = IssueReport.markdown(identity, IssueReport.dump(body)),
 		fields = {
-			title       = err.module .. ": " .. first_line(err.message),
-			version     = identity.version,
-			os          = identity.os,
-			driver      = identity.driver,
-			diagnostics = IssueReport.summary(summary_info, name),
+			title   = err.module .. ": " .. first_line(err.message),
+			version = identity.version,
+			os      = identity.os,
+			driver  = identity.driver,
 		},
 	}
 end

@@ -93,6 +93,27 @@ helpers.describe("Storage exact operations", function()
 		helpers.assert_eq(adapter.delete("owned"), false)
 		helpers.assert_eq(adapter.delete_exact("owned"), false)
 	end)
+
+	-- hs.settings.clear answers false when the key did not exist. The first
+	-- launch of the packaged app deleted an absent reload marker, and logging
+	-- that as an ERROR failed the release launch gate.
+	helpers.it("treats native false on an absent key as a completed delete", function()
+		local errors = {}
+		package.loaded["infra.logger"] = nil
+		local Logger = helpers.load_with_stubs("infra.logger")
+		local original_error = Logger.error
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		local adapter = helpers.load_with_stubs("adapters.storage", {
+			settings = {
+				clear = function() return false end,
+				get = function() return nil end,
+			},
+		})
+		helpers.assert_eq(adapter.delete("reload_in_progress"), true)
+		helpers.assert_eq(adapter.delete_exact("reload_in_progress"), true)
+		Logger.error = original_error
+		helpers.assert_eq(#errors, 0, "deleting an absent key is no error: " .. table.concat(errors, " | "))
+	end)
 end)
 
 

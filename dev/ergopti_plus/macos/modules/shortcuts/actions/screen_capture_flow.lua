@@ -12,19 +12,26 @@
 ---    Recording grant held by another Hammerspoon does not apply. A capture
 ---    without the grant used to show the selection and then leave nothing on
 ---    the clipboard, with only a warning in the log. The permission is now
----    checked before launch; a refusal asks macOS once, tells the user, and
----    opens the exact System Settings pane.
---- 2. Files, not `-c`: every capture writes to a file the caller owns. The
+---    checked before launch. This gate is the one owner of that refusal.
+--- 2. Stale entry reset: the packaged app is signed ad hoc, so each build or
+---    update has a new code identity. System Settings keeps the previous switch
+---    checked while macOS refuses the new binary, and captures failed until the
+---    user deleted the entry by hand. The first refusal of a session resets
+---    this app's own entry with tccutil, then asks macOS for its prompt, opens
+---    the exact pane, and names the entry to turn on. Once per session only:
+---    repeating it would loop over a user who is still deciding, so later
+---    refusals only explain, with a click that opens the pane.
+--- 3. Files, not `-c`: every capture writes to a file the caller owns. The
 ---    clipboard is then filled from that file and read back, so success is
 ---    never claimed without an image on the pasteboard.
---- 3. Held Control: in interactive mode, holding Control sends the capture to
+--- 4. Held Control: in interactive mode, holding Control sends the capture to
 ---    the clipboard instead of the file. Ctrl+H is still held when the selector
 ---    opens, so an advanced pasteboard change count with an image counts as a
 ---    copy rather than as a missing file.
---- 4. Cancel is silent: an interactive capture that exits non-zero with no
+--- 5. Cancel is silent: an interactive capture that exits non-zero with no
 ---    output, no error text and no clipboard change is the user pressing
 ---    Escape. Every other empty result is a visible failure with its exit code.
---- 5. Dependencies are resolved at call time, so a cached instance never keeps
+--- 6. Dependencies are resolved at call time, so a cached instance never keeps
 ---    another caller's adapters.
 --- ==============================================================================
 
@@ -37,8 +44,9 @@ M.OUTCOME_SAVED = "saved"
 M.OUTCOME_CANCELLED = "cancelled"
 M.OUTCOME_FAILED = "failed"
 
--- macOS only shows its Screen Recording prompt the first time an application
--- asks; asking again on every refused shortcut would only add log noise.
+-- One stale-entry reset and prompt per session: macOS only shows its prompt
+-- the first time an application asks, and resetting again while the user is
+-- still deciding would remove the switch they are about to turn on.
 local _permission_prompt_requested = false
 
 
@@ -59,9 +67,10 @@ local function logger() return require("infra.logger") end
 --- @param title string Notification title or message.
 --- @param body string|nil Optional body.
 --- @param kind string Notification kind.
-local function notify(title, body, kind)
+--- @param on_click function|nil What a click on the notification does.
+local function notify(title, body, kind, on_click)
 	local ok, err = pcall(function()
-		return require("infra.notifications").notify(title, body, kind)
+		return require("infra.notifications").notify(title, body, kind, on_click)
 	end)
 	if not ok then
 		logger().error(LOG, "Screen capture notification failed: %s.", tostring(err))
@@ -85,8 +94,63 @@ end
 -- ===================================
 -- ===================================
 
---- Admits a capture only when Screen Recording is granted. A refusal or a
---- failed query asks macOS once, notifies the user, and opens System Settings.
+--- Opens the Screen Recording pane, from the gate or from a clicked notice.
+local function open_settings()
+	local opened, open_err = capture_adapter().open_permission_settings()
+	if not opened then
+		logger().error(LOG, "Screen Recording settings could not be opened: %s.", tostring(open_err))
+	end
+end
+
+--- Explains the refusal; a click on the notice opens the Screen Recording pane.
+--- @param body_key string Locale key of the explanation.
+local function notify_refusal(body_key)
+	notify(text("shortcuts.screen_recording_required_title"), text(body_key), "error", open_settings)
+end
+
+--- Asks macOS for its prompt, opens the pane and names the entry to turn on.
+--- @param Adapter table Screen capture adapter.
+--- @param body_key string Locale key of the explanation.
+local function prompt_user(Adapter, body_key)
+	local requested, request_err = Adapter.request_permission()
+	if not requested then
+		logger().error(LOG, "Screen Recording prompt could not be requested: %s.", tostring(request_err))
+	end
+	notify_refusal(body_key)
+	open_settings()
+end
+
+--- Clears this app's stale entry, then prompts once tccutil has settled. The
+--- notice says the old switch was removed only when the reset succeeded.
+--- @param Adapter table Screen capture adapter.
+local function reset_then_prompt(Adapter)
+	local Logger = logger()
+	local bundle_id, bundle_err = Adapter.bundle_id()
+	if bundle_id == nil then
+		Logger.warn(LOG, "Stale Screen Recording entry not reset: %s.", tostring(bundle_err))
+		prompt_user(Adapter, "shortcuts.screen_recording_required")
+		return
+	end
+	Logger.start(LOG, "Resetting the Screen Recording entry of %s…", bundle_id)
+	local started = Adapter.reset_permission(bundle_id, function(ok, detail)
+		if ok then
+			Logger.success(LOG, "Screen Recording entry of %s reset.", bundle_id)
+			prompt_user(Adapter, "shortcuts.screen_recording_reset")
+			return
+		end
+		Logger.warn(LOG, "Screen Recording entry of %s not reset: %s.", bundle_id, tostring(detail))
+		prompt_user(Adapter, "shortcuts.screen_recording_required")
+	end)
+	if started ~= true then
+		Logger.warn(LOG, "tccutil could not be started; prompting without resetting %s.", bundle_id)
+		prompt_user(Adapter, "shortcuts.screen_recording_required")
+	end
+end
+
+--- Admits a capture only when Screen Recording is granted. The first refusal
+--- of the session resets this app's stale entry, asks macOS for its prompt,
+--- opens System Settings and names the entry to turn on; later refusals only
+--- explain, with a click that opens the pane.
 --- @param context string Diagnostic label of the entry point.
 --- @return boolean admitted
 function M.ensure_permission(context)
@@ -103,21 +167,16 @@ function M.ensure_permission(context)
 			tostring(context))
 	end
 
-	if not _permission_prompt_requested then
-		_permission_prompt_requested = true
-		local requested, request_err = Adapter.request_permission()
-		if not requested then
-			Logger.error(LOG, "Screen Recording prompt could not be requested: %s.",
-				tostring(request_err))
-		end
+	if _permission_prompt_requested then
+		notify_refusal("shortcuts.screen_recording_required")
+		return false
 	end
-
-	notify(text("shortcuts.screen_recording_required_title"),
-		text("shortcuts.screen_recording_required"), "error")
-
-	local opened, open_err = Adapter.open_permission_settings()
-	if not opened then
-		Logger.error(LOG, "Screen Recording settings could not be opened: %s.", tostring(open_err))
+	_permission_prompt_requested = true
+	-- A failed query proves nothing about the entry, so only a refusal resets it.
+	if granted == false then
+		reset_then_prompt(Adapter)
+	else
+		prompt_user(Adapter, "shortcuts.screen_recording_required")
 	end
 	return false
 end

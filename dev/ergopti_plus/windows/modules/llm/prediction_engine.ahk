@@ -357,10 +357,12 @@ _LLM_Engine_RefreshSemanticConfig() {
  *     (a llm_prompt_prediction binding), 0 when it uses the configured one. The
  *     configured count is already part of the base signature; an override is
  *     framed apart so two counts can never share a cache entry or a callback.
+ * @param {Integer} Live - True for a live-mode request, whose minimum word
+ *     count is live.json's instead of the configured one.
  * @returns {string} Request/cache semantic signature.
  */
 _LLM_Engine_RequestSemanticSignature(EffectiveProfileId, EffectiveProfile := unset,
-		NumPredictionsOverride := 0) {
+		NumPredictionsOverride := 0, Live := false) {
 	global _LLM_Engine
 	Base := _LLM_Engine.Get("semantic_config_signature", "")
 	Profile := IsSet(EffectiveProfile)
@@ -373,6 +375,9 @@ _LLM_Engine_RequestSemanticSignature(EffectiveProfileId, EffectiveProfile := uns
 	if (NumPredictionsOverride != 0)
 		Signature .= _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(
 			Map("num_predictions_override", NumPredictionsOverride)))
+	if Live
+		Signature .= _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(
+			Map("live_mode", true)))
 	return Signature
 }
 
@@ -477,8 +482,11 @@ LLM_Engine_Init(opts) {
 LLM_Engine_SetEnabled(state) {
 	global _LLM_Engine
 	_LLM_Engine["enabled"] := state
-	if !state
+	if !state {
 		LLM_Engine_CancelTimer()
+		; Turning the AI off ends live mode too: it is never resumed silently
+		LLM_Engine_LiveStop("the AI was turned off")
+	}
 }
 
 
@@ -486,3 +494,4 @@ LLM_Engine_SetEnabled(state) {
 
 #Include prediction_keylogger.ahk
 #Include prediction_exec.ahk
+#Include prediction_live.ahk

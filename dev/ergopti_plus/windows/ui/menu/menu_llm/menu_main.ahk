@@ -321,6 +321,7 @@ _LLM_MenuLayout_Fallback() {
 		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_num_predictions",     "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
+		Map("id", "llm_live_mode",           "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_generation_settings", "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_display",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_navigation",          "disabled_when_off", true,  "health_dot", false)
@@ -392,6 +393,8 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 		_LLM_Menu_Handle.Add()  ; separator
 	case "llm_trigger":
 		_LLM_Menu_AddRow(t("menu.llm.trigger_menu_title"), LLM_Menu_BuildTriggerMenu(), disabled)
+	case "llm_live_mode":
+		_LLM_Menu_AddRow(t("menu.llm.live_mode_title"), LLM_Menu_BuildLiveModeMenu(), disabled)
 	case "llm_generation_settings":
 		_LLM_Menu_AddRow(t("menu.llm.generation_menu_title"), LLM_Menu_BuildGenerationMenu(), disabled)
 	case "llm_display":

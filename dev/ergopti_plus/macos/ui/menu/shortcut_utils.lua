@@ -287,22 +287,23 @@ end
 -- What picker_parameter_fields reads from the gestures facade.
 local PICKER_EDITOR_FACADE = {
 	"get_action_parameter_spec", "get_action_parameter", "parameter_prompt", "parameter_error", "send_vocabulary",
-	"llm_prompt_choices", "llm_prompt_default_count",
+	"llm_prompt_choices", "llm_prompt_default_count", "llm_vision_choices", "llm_language_choices",
 }
 
 --- Readies picker items for the picker's own parameter editor: each action with
 --- a parameter is marked with its kind and the value `binding` holds for it, so
 --- the page can reopen the current one ("edit the current action"). The page
---- edits a text, a key, a shortcut and a prompt choice itself; for any other
---- kind it confirms without a value and the native prompt asks for it. The
---- returned fields give the page the send-input vocabulary, the prompt profiles,
---- the AI menu's prediction count and the same prompts and refusals as the
---- native prompt.
+--- edits a text, a key, a shortcut, a prompt choice, a vision backend and a
+--- target language itself; for any other kind it confirms without a value and
+--- the native prompt asks for it. The returned fields give the page the
+--- send-input vocabulary, the prompt profiles, the AI menu's prediction count,
+--- the vision backends, the target languages and the same prompts and refusals
+--- as the native prompt.
 --- @param gestures table The gestures facade.
 --- @param items table Picker items, marked in place.
 --- @param binding string|nil The binding the pick is for; nil marks no value.
 --- @return table { send_vocabulary, parameter_strings, prompt_choices, default_count,
----   edit_current_label }, the options ActionPicker.open reads; empty, with an error
+---   vision_choices, language_choices, edit_current_label }, the options ActionPicker.open reads; empty, with an error
 ---   logged, when the facade lacks what the editor needs, and every value is then
 ---   asked by the native prompt.
 function M.picker_parameter_fields(gestures, items, binding)
@@ -318,7 +319,7 @@ function M.picker_parameter_fields(gestures, items, binding)
 		if kind then
 			item.parameter = kind
 			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
-			if SendInput.KINDS[kind] or kind == "llm_prompt" then
+			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" then
 				prompts[kind] = gestures.parameter_prompt(item.id)
 				errors[kind] = gestures.parameter_error(item.id)
 			end
@@ -328,6 +329,8 @@ function M.picker_parameter_fields(gestures, items, binding)
 		send_vocabulary = gestures.send_vocabulary(),
 		prompt_choices = gestures.llm_prompt_choices(),
 		default_count = gestures.llm_prompt_default_count(),
+		vision_choices = gestures.llm_vision_choices(),
+		language_choices = gestures.llm_language_choices(),
 		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {
 			save = i18n.get("button.save"),
@@ -338,6 +341,12 @@ function M.picker_parameter_fields(gestures, items, binding)
 			countLabel = i18n.get("dialog.action_picker.count_label"),
 			-- Raw: the page substitutes {1} with the count it shows
 			countDefault = i18n.get("dialog.action_picker.count_default"),
+			visionProviderLabel = i18n.get("dialog.action_picker.vision_provider_label"),
+			visionModelLabel = i18n.get("dialog.action_picker.vision_model_label"),
+			-- Raw: the page substitutes {1} with the backend's default model
+			visionModelDefault = i18n.get("dialog.action_picker.vision_model_default"),
+			visionModelRequired = i18n.get("dialog.action_picker.vision_model_required"),
+			languageLabel = i18n.get("dialog.action_picker.language_label"),
 			prompts = prompts,
 			errors = errors,
 		},

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Reads and requests the macOS Screen Recording permission, and owns the
 --- pasteboard image boundary used to prove that a screenshot reached the
---- clipboard.
+--- clipboard, and encodes a captured image for a vision request.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Distinct identity: the packaged runtime is its own application
@@ -13,11 +13,14 @@
 ---    stock Hammerspoon does not carry over, and /usr/sbin/screencapture is
 ---    attributed to this runtime, so without the grant a capture fails after
 ---    the selection or silently omits every window.
---- 2. Exact results: a failed native query is reported as nil plus its detail,
+--- 2. Stale grants: every ad hoc signed build has a new code identity, so a
+---    switch left on for a previous build no longer applies. The adapter can
+---    reset this app's own entry before the prompt is requested again.
+--- 3. Exact results: a failed native query is reported as nil plus its detail,
 ---    never as a refusal or a grant, so callers can fail visibly.
---- 3. Verified clipboard: a written image counts only when the pasteboard
+--- 4. Verified clipboard: a written image counts only when the pasteboard
 ---    change count advanced and an image can be read back.
---- 4. No captured `hs` upvalue: the global is read at call time, so a cached
+--- 5. No captured `hs` upvalue: the global is read at call time, so a cached
 ---    adapter never keeps a stale native table.
 --- ==============================================================================
 
@@ -85,6 +88,22 @@ function M.request_permission()
 	local ok, err = pcall(fn, true)
 	if not ok then return false, tostring(err) end
 	return true
+end
+
+--- Returns the bundle identifier macOS files this process's grant under.
+--- @return string|nil bundle_id Nil when the running process has none.
+--- @return string|nil detail Exact reason when bundle_id is nil.
+function M.bundle_id()
+	return require("adapters.tcc_grant").bundle_id()
+end
+
+--- Removes this app's Screen Recording entry so a stale grant from a previous
+--- ad hoc signed build cannot mask a refusal of the running one.
+--- @param bundle_id string Exact bundle identifier whose entry is reset.
+--- @param on_done function fn(ok, detail) once tccutil has exited.
+--- @return boolean started True when tccutil was started.
+function M.reset_permission(bundle_id, on_done)
+	return require("adapters.tcc_grant").reset("ScreenCapture", bundle_id, on_done)
 end
 
 --- Opens System Settings on the Screen Recording privacy pane.
@@ -161,6 +180,31 @@ function M.copy_image_file_to_clipboard(path)
 		return false, present == nil and read_err or "the pasteboard holds no image after the write"
 	end
 	return true
+end
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 4/ Image Encoding ===========
+-- =====================================
+-- =====================================
+
+--- Encodes the bytes of a captured image as base64, the form a vision request
+--- carries the screenshot in.
+--- @param data string Raw image bytes.
+--- @return string|nil encoded Base64 text without line breaks.
+--- @return string|nil detail Exact failure otherwise.
+function M.encode_base64(data)
+	if type(data) ~= "string" or data == "" then return nil, "image data must be a non-empty string" end
+	local encode, missing = native("base64", "encode")
+	if not encode then return nil, missing end
+	local ok, encoded = pcall(encode, data)
+	if not ok then return nil, "base64 encoding raised: " .. tostring(encoded) end
+	if type(encoded) ~= "string" or encoded == "" then return nil, "base64 encoding returned no text" end
+	return (encoded:gsub("%s", ""))
 end
 
 return M

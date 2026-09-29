@@ -242,6 +242,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.tcc_grant",
+		contract = { "bundle_id", "reset" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
 		wired    = true,

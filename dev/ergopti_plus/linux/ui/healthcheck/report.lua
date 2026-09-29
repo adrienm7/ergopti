@@ -5,25 +5,26 @@
 --- DESCRIPTION:
 --- What the diagnostics page's buttons do on this machine once
 --- healthcheck.actions accepted them: copy the report, save it as a Markdown
---- file under the logs folder and open that folder, report it on GitHub (copy,
---- save, open the folder, then open the bug form with a short summary
---- prefilled) and open a folder or a file. Also the Debug menu's "Report a
---- bug", which opens the diagnostics window at its preview, and "Suggest a
---- feature".
+--- file under the logs folder and open that folder, report it on GitHub (copy
+--- it, then open the bug form with the report prefilled) and open a folder or
+--- a file. Also the Debug menu's "Report a bug", which opens the diagnostics
+--- window at its preview, and "Suggest a feature".
 ---
 --- FEATURES & RATIONALE:
 --- 1. Every text that leaves the machine goes through diagnostics.redact
 ---    again here, whatever the page did: the home folder, the account name and
 ---    token-like secrets are removed from the clipboard, the file and the URL.
---- 2. GitHub cannot receive a file through a URL and answers 414 a little
----    above 8 KB, which is why the full report travels through the clipboard
----    and the saved file, and the form gets a summary.
+--- 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
+---    report to its budget; the clipboard holds it whole. A report saves no
+---    file and opens no folder: the file manager would take the focus from
+---    the form.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
 ---    not exist yet (today's errors file before the day's first warning) is
 ---    said to the page, not logged as a failure.
 --- 4. Side effects are one table so a test can observe each of them; the
----    browser opens last, after the clipboard holds what it asks for.
+---    browser opens last, after the clipboard holds what it asks for, and
+---    nothing follows it that could take the focus back.
 --- ==============================================================================
 
 local M = {}
@@ -146,6 +147,28 @@ local function save_and_reveal(effects, paths, name, text)
 	return path
 end
 
+--- Reports on GitHub: copies the full report, then opens the bug form with
+--- that same report prefilled. Nothing is saved and nothing is revealed: the
+--- browser opening is the last side effect, so the form keeps the focus.
+--- @param effects table
+--- @param documents table { templates, repository, redaction }
+--- @param action table { text, fields } The page's text and identity fields.
+--- @param redact function
+--- @return table
+local function report(effects, documents, action, redact)
+	local text = redact(action.text)
+	-- First, and whole: the link may cut the report to fit GitHub's budget
+	if not effects.copy(text) then error("the clipboard refused the report") end
+	local fields = {}
+	for id, value in pairs(action.fields) do fields[id] = redact(value) end
+	local report_field = documents.templates.templates.bug.report_field
+	if type(report_field) ~= "string" then error("the bug template names no report field") end
+	fields[report_field] = text
+	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
+	if not effects.open_url(url) then error("the browser could not be opened") end
+	return {}
+end
+
 --- Performs one action of the diagnostics page, already validated.
 --- @param action table From healthcheck.actions.validate (copy, save, report, open_path).
 --- @param paths table The snapshot's paths section.
@@ -166,15 +189,7 @@ function M.perform(action, paths, documents, context, overrides)
 			if not path then error(err) end
 			return { path = path }
 		elseif action.action == "report" then
-			local text = redact(action.text)
-			if not effects.copy(text) then error("the clipboard refused the report") end
-			local path, err = save_and_reveal(effects, paths, action.name, text)
-			if not path then error(err) end
-			local fields = {}
-			for id, value in pairs(action.fields) do fields[id] = redact(value) end
-			local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
-			if not effects.open_url(url) then error("the browser could not be opened") end
-			return { path = path }
+			return report(effects, documents, action, redact)
 		elseif action.action == "open_path" then
 			local path = paths[action.id]
 			if type(path) ~= "string" or path == "" then error("the path " .. action.id .. " is unknown") end
@@ -214,7 +229,7 @@ end
 -- =============================
 
 --- Opens the diagnostics window at its preview: the user reviews exactly what
---- is shared before the report button copies, saves and opens GitHub.
+--- is shared before the report button copies it and opens GitHub.
 --- @return boolean opened
 function M.report_bug()
 	return require("ui.healthcheck.bridge").open("report")

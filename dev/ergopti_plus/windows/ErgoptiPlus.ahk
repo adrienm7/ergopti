@@ -563,6 +563,15 @@ LLM_Defaults_Load()
 #Include modules/llm/profiles.ahk
 #Include modules/llm/option_validation.ahk
 #Include modules/llm/prompt_action.ahk
+#Include modules/llm/tone.ahk
+#Include modules/llm/tone_action.ahk
+#Include modules/llm/vision.ahk
+#Include modules/llm/vision_action.ahk
+#Include modules/llm/translate.ahk
+#Include modules/llm/translate_action.ahk
+#Include modules/llm/agent.ahk
+#Include modules/llm/agent_connectors.ahk
+#Include modules/llm/agent_action.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk

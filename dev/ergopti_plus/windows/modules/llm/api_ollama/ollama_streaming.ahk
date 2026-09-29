@@ -35,11 +35,14 @@
  * @param {number}   temperature   - Sampling temperature.
  * @param {function} on_success    - Callback receiving the generated text.
  * @param {function} on_fail       - Callback fired on any failure.
+ * @param {string}   payload       - A complete /api/chat body the caller wrote
+ *                                   (LLM_OllamaChat_Async); "" builds it from
+ *                                   the other parameters.
  * @returns {Integer} The request id, for correlating log lines. Aborting is
  *                    always all-or-nothing via LLM_OllamaCancelAllAsync — the
  *                    registry holds at most one in-flight slot by design.
  */
-LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
+LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", payload := "") {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
@@ -54,7 +57,8 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"stop_sequences", stop_sequences,
 		"max_tokens", max_tokens,
 		"is_batch", is_batch,
-		"tail_text", tail_text
+		"tail_text", tail_text,
+		"payload", payload
 	)
 	global _LLM_Ollama_Async
 	if (_LLM_Ollama_Async.Count > 0) {
@@ -79,12 +83,28 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 	return req_id
 }
 
+/**
+ * Non-blocking /api/chat request with a body the caller wrote whole: the
+ * screen reading's image request and its answer requests, whose messages carry
+ * images or must not stop at a line break. Same slot, coalescing, transport and
+ * callbacks as LLM_OllamaGenerate_Async.
+ * @param {string}   payload    - The complete JSON body.
+ * @param {function} on_success - Callback receiving the generated text.
+ * @param {function} on_fail    - Callback fired on any failure.
+ * @returns {Integer} The request id.
+ */
+LLM_OllamaChat_Async(payload, on_success, on_fail) {
+	if !(payload is String) || payload == ""
+		throw ValueError("LLM_OllamaChat_Async needs a JSON body.")
+	return LLM_OllamaGenerate_Async("", "", "", 0, on_success, on_fail, "", "", false, "", payload)
+}
+
 ; Starts one /api/chat request via curl (UTF-8 file body). WinHTTP async ``Send()``
 ; returned HTTP 200 with ``content: ""`` on this driver despite valid JSON payloads.
 _LLM_Ollama_DispatchAsync(job) {
 	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT
 	req_id := job["req_id"]
-	payload := LLM_BuildOllamaPayload(
+	payload := (job.Get("payload", "") != "") ? job["payload"] : LLM_BuildOllamaPayload(
 		job["model"], job["system_prompt"], job["full_text"], job["temperature"],
 		false, job["stop_sequences"], job["max_tokens"], job["is_batch"], job["tail_text"])
 	; Reap any crash-orphaned payload files before writing a new one. The
@@ -113,7 +133,8 @@ _LLM_Ollama_DispatchAsync(job) {
 		"tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
 		"on_success", job["on_success"], "on_fail", job["on_fail"],
 		"cancelled", false, "start_tick", A_TickCount,
-		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "")
+		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "",
+		"redact", job.Get("payload", "") != "")
 	SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
 }
 
@@ -221,7 +242,9 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 		_LLM_Ollama_DrainPending()
 		return
 	}
-	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
+	; A body the caller wrote may carry a screenshot: it is never quoted in a log
+	payload_snip := (job.Get("payload", "") != "") ? ""
+		: (StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload)
 	if _LLM_Ollama_Async.Has(req_id) {
 		_LLM_Ollama_Async[req_id]["payload_snip"] := payload_snip
 	} else
@@ -408,7 +431,10 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		_LLM_InvokeCallback(on_fail, "on_fail", Map("error", true, "message", "empty prediction"))
 		return
 	}
-	snip := StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text
+	; A caller-written body (the screen reading) answers with what is on the
+	; user's screen: its size is logged, never its text
+	Redact := (entry is Map) && entry.Get("redact", false)
+	snip := Redact ? "…" : (StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text)
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
 	try LLM_OllamaNoteInferenceSuccess()
 	_LLM_InvokeCallback(on_success, "on_success", text)

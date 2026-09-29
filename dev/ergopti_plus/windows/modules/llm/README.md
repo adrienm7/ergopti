@@ -27,6 +27,38 @@ accept path applies. `rewrite.ahk` ports `_shared/lua/llm/rewrite.lua` (the
 sentence a rewrite prompt rewrites, its token budget) and `prompt_action.ahk`
 ports `_shared/lua/llm/prompt_action.lua` (the `llm_prompt` value of the
 `llm_prompt_prediction` action), each pinned to its shared corpus.
+`tone.ahk` ports `_shared/lua/llm/tone.lua` (the tone ladder, pinned to
+`tone_vectors.json`) and `tone_action.ahk` runs the `llm_tone_*` actions on it:
+the selection is rewritten one register up or down, typed over itself and
+selected again. `vision.ahk` ports `_shared/lua/llm/vision.lua` (the
+`llm_vision` binding value, the vision model it resolves to, the request body of
+each API dialect and the tagged-answer reader, pinned to `vision_vectors.json`)
+and `vision_action.ahk` runs `llm_screen_region` / `llm_screen_full` /
+`llm_screen_error` on it: a screenshot is transcribed by a vision model, then
+the AI menu's backend drafts the answers offered as tooltip candidates (for
+`llm_screen_error`, the `error_answers` of `vision.json`: the explanation, then
+the fix). `translate.ahk` ports `_shared/lua/llm/translate.lua` (the
+`llm_language` binding value, the target language, the prompt and the answer
+reader, pinned to `translate_vectors.json`) and `translate_action.ahk` runs
+`llm_translate_selection`: the selection is translated by the AI menu's backend
+and offered as one candidate, which replaces the selection when accepted and
+stays selected. `agent.ahk` ports `_shared/lua/llm/agent.lua` (the AI agent's prompts, the
+System 1 triage, the validation of System 2's actions, the iCalendar and
+mailto payloads and the threshold learning, pinned to `agent_vectors.json`);
+`agent_action.ahk` runs `llm_agent_selection`, `llm_agent_command`,
+`llm_agent_auto_toggle` and the automatic mode (`llm.agent_mode = "auto"`: a
+typing pause, System 1, then System 2 above the threshold learned per
+application and intent, kept in the Storage adapter), and offers each proposed
+action as a tooltip candidate whose acceptance runs its connector in
+`agent_connectors.ahk` (Outlook through COM, else an .ics file or a mailto:
+link; the user's tools of `<config dir>/agent_tools/`). The tray's top-level
+AI agent submenu is `ui/menu/menu_llm/menu_agent.ahk`.
+`prediction_live.ahk` owns live mode
+(`llm_live_prompt_toggle` and the AI menu's live mode submenu): while it is on,
+the automatic typing trigger runs its prompt and count through the same
+prompt-override request path, with the debounce and minimum word count of
+`_shared/modules/llm/live.json`, so a rewrite prompt such as `translate_en`
+shows the current sentence translated as it is typed.
 
 ## Public API
 

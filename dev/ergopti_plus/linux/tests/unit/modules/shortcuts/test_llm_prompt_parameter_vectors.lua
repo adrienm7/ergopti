@@ -116,9 +116,9 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 			helpers.assert_eq(fields.default_count, 3, "the AI menu's prediction count")
 			local ids = {}
 			for index, choice in ipairs(fields.prompt_choices) do ids[index] = choice.value end
-			helpers.assert_eq(table.concat(ids, ","), "raw,basic,advanced,batch_advanced,rewrite,user_mine",
+			helpers.assert_eq(table.concat(ids, ","), "raw,basic,advanced,batch_advanced,rewrite,tone_familiar,tone_neutral,tone_formal,tone_very_formal,translate_en,translate_ja,user_mine",
 				"the built-ins in menu order, then the user's own")
-			helpers.assert_eq(fields.prompt_choices[6].label, "Mine", "a user prompt shows its own label")
+			helpers.assert_eq(fields.prompt_choices[12].label, "Mine", "a user prompt shows its own label")
 			helpers.assert_eq(fields.prompt_choices[5].label,
 				require("infra.i18n").get("llm.profile.rewrite.label"), "a built-in shows its menu label")
 			helpers.assert_eq(fields.parameter_strings.prompts.llm_prompt,

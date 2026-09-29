@@ -19,6 +19,8 @@ local ApiCommon      = require("modules.llm.api_common")
 local _infer_client  = require("adapters.http_client").new()
 local _check_client  = require("adapters.http_client").new()
 local _warmup_client = require("adapters.http_client").new()
+-- Screen reading (modules/llm/screen_answer.lua) never shares the prediction owner
+local _vision_client = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -1260,17 +1262,24 @@ end
 --- @param on_success function Callback triggering on successful parse.
 --- @param on_fail function Callback triggering on failure.
 --- @param dedup_stats table Dedup stats metrics.
+--- @param on_raw function|nil Receives the model's answer unparsed instead of on_success
+---        (M.request_raw): a caller that reads its own answer format.
+--- @param force_chat boolean|nil Never line mode: the answer may span several lines.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats)
+                               on_success, on_fail, dedup_stats, on_raw, force_chat)
     _req_counter = _req_counter + 1
     local req_id = _req_counter
 
     local messages, line_mode, user_prompt = build_request_context(
         system_prompt, full_text, tail_text, num_predictions, is_batch)
+    -- A chat request answers over several lines: line mode would stop at the first
+    if force_chat == true then line_mode = false end
 
     local t0_req = TimerScheduler.now()
-    Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) mode_line=%s -> %s", model_name, req_id, #user_prompt, tostring(line_mode), user_prompt:sub(1, 250))
+    -- A chat turn carries what was read on the screen: its size only is logged
+    Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) mode_line=%s -> %s", model_name, req_id, #user_prompt,
+        tostring(line_mode), force_chat == true and "(not logged)" or user_prompt:sub(1, 250))
 
     local payload = {
         model      = tostring(model_name),
@@ -1348,7 +1357,12 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
                 local raw     = Parser.strip_thinking(content)
                 local ms_req  = math.floor((TimerScheduler.now() - t0_req) * 1000)
-                Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
+                Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw,
+                    force_chat == true and "(not logged)" or raw:sub(1, 250))
+                if type(on_raw) == "function" then
+                    ApiCommon.protected_call(on_raw, "on_raw", raw)
+                    return
+                end
                 local results = {}
 
                 if not is_batch then
@@ -1689,6 +1703,91 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 		on_fail,
 		dedup_stats,
 		streaming and on_partial or nil)
+end
+
+--- Sends one non-streaming request and hands back the model's answer unparsed.
+--- For callers that read their own answer format (the tone actions rewrite a
+--- selection, not the typed buffer the prediction parser aligns against).
+--- @param model_name string Name of the targeted local model.
+--- @param system_prompt string The resolved system prompt.
+--- @param full_text string PREFIX (or the context of a non PREFIX/TAIL prompt).
+--- @param tail_text string TAIL.
+--- @param temperature number Sampling temperature.
+--- @param max_tokens number Output token budget.
+--- @param on_raw function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Called on a transport, HTTP or empty-answer failure.
+--- @param options table|nil { chat = true }: a plain chat turn whose answer may
+---        span several lines (the screen-reading answers), never line mode.
+function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail,
+                       options)
+	if type(on_raw) ~= "function" then error("api_ollama.request_raw: on_raw must be a function") end
+	local force_chat = type(options) == "table" and options.chat == true
+	post_and_parse(model_name, system_prompt, full_text, tail_text,
+		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw, force_chat)
+end
+
+--- Posts one prebuilt request body (llm/vision.lua build_request, format
+--- "ollama") to the local server's /api/chat, whatever backend the AI menu uses
+--- for text. The body carries private text or a screenshot: neither it nor the
+--- answer is logged.
+--- @param client table The HTTP client that posts it.
+--- @param label string What is requested, for the log ("Vision", "Agent").
+--- @param body table The request body.
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+local function request_prebuilt(client, label, body, on_text, on_fail)
+	if type(body) ~= "table" or type(on_text) ~= "function" or type(on_fail) ~= "function" then
+		error("api_ollama." .. label .. " request: a body, on_text and on_fail are required")
+	end
+	local encoded, encode_error = JsonCodec.encode(body)
+	if not encoded then
+		Logger.error(LOG, "%s request body encode failed: %s.", label, tostring(encode_error))
+		ApiCommon.protected_call(on_fail, "on_fail", "encode_failed")
+		return
+	end
+	local t0 = TimerScheduler.now()
+	Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, tostring(body.model), #encoded)
+	client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+		function(r)
+			Logger.pcall(LOG, function()
+				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+				if r.status ~= 200 then
+					Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
+						label, ms, tostring(r.status), tostring(r.error or ""))
+					ApiCommon.protected_call(on_fail, "on_fail", "http_" .. tostring(r.status or "unknown"))
+					return
+				end
+				local resp = JsonCodec.decode(r.body)
+				local content = type(resp) == "table" and type(resp.message) == "table"
+					and resp.message.content or nil
+				local text = type(content) == "string" and Parser.strip_thinking(content) or ""
+				if text == "" then
+					Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
+					ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
+					return
+				end
+				Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
+				ApiCommon.protected_call(on_text, "on_text", text)
+			end)
+		end)
+end
+
+--- Posts one prebuilt vision request body (a screenshot and its prompt) to the
+--- local server.
+--- @param body table The request body.
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+function M.request_vision(body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Vision", body, on_text, on_fail)
+end
+
+--- Posts one prebuilt text chat body (no image) to the local server: the AI
+--- agent's System 1 and System 2 requests on the "local" backend.
+--- @param body table The request body.
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+function M.request_chat(body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Agent", body, on_text, on_fail)
 end
 
 --- Dispatches multiple sequential API requests.

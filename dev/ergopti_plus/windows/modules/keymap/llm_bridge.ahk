@@ -891,7 +891,10 @@ LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		return
-	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"] && _LLM_Engine["after_hotstring"])
+	; Live mode waits for the hotstring tooltip to close whatever after_hotstring
+	; says: its tooltip follows every keystroke, so it must come back after it.
+	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"]
+			&& (_LLM_Engine["after_hotstring"] || LLM_Engine_LiveIsActive()))
 		return
 	if !(IsObject(items) && items.Length > 0)
 		return false
@@ -974,6 +977,10 @@ LLM_Bridge_OnChar(ch) {
 		return
 
 	_LLM_Bridge_ApplyBufferEdit(0, ch)
+	; The AI agent's automatic mode waits for a pause in the same typing, and
+	; every keystroke retires its flow in flight, hotstring tooltip or not
+	if IsSet(LLM_Agent_OnTyping)
+		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
@@ -1019,6 +1026,28 @@ LLM_Bridge_OnChar(ch) {
 }
 
 /**
+ * Asks live mode again after a hotstring expansion rewrote the end of the
+ * buffer. The request the trigger's last character armed holds the text the
+ * expansion replaced, and a live tooltip shown for it no longer applies: it is
+ * dismissed, and the request re-issued on the text after the expansion. Does
+ * nothing outside live mode, whose next-word prediction is left as it was.
+ * Called from the hotstring engine's LLM mirror, inside its Critical span.
+ * @returns {Integer} True when a live request was re-armed.
+ */
+LLM_Bridge_ReissueLiveAfterExpansion() {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) || !LLM_Engine_LiveIsActive()
+		return false
+	if LLM_Tooltip_IsVisible()
+		LLM_Bridge_DeferTooltipHide()
+	; Armed even while the consumed preview is still retiring: the live request
+	; waits at fire time for any hotstring tooltip left on screen, whose own
+	; chain (LLM_Bridge_ScheduleAfterHotstring) asks again once it closes.
+	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
+	return true
+}
+
+/**
  * Must be called when Backspace is pressed.
  * Removes the last character from the buffer.
  */
@@ -1028,6 +1057,8 @@ LLM_Bridge_OnBackspace() {
 		return
 
 	_LLM_Bridge_ApplyBufferEdit(1, "")
+	if IsSet(LLM_Agent_OnTyping)
+		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 
 	; Same hotstring-priority guard as OnChar.
 	if TooltipIsVisible()
@@ -1396,6 +1427,15 @@ LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
 		text, AdmissionSeed, RequestId, false, Slots?, ActiveIdx,
 		PresentedRecord, PresentedLifecycle,
 		_LLM_Bridge_AcceptedSlotEdit(text, Slots?, ActiveIdx))
+	; A slot with an accept handler of its own (an AI agent action) runs it
+	; instead of typing anything: the offer is retired like a typed one, then
+	; the handler runs on a fresh thread, off the Tab key's
+	Handler := _LLM_Bridge_AcceptedSlotHandler(Transaction)
+	if HasMethod(Handler, "Call") {
+		_LLM_Bridge_OnInjectComplete(Transaction, true)
+		SetTimer(Handler, -1)
+		return
+	}
 	; The completion callback owns the tooltip and the acceptance claim, so a
 	; refusal goes through it exactly like a sender that rejected the output.
 	if !_LLM_Bridge_RewriteStillApplies(Transaction) {
@@ -1406,6 +1446,40 @@ LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
 	}
 	TextSend(text, _LLM_Bridge_InjectionOptions(Transaction),
 		_LLM_Bridge_OnInjectComplete.Bind(Transaction))
+}
+
+; The accept handler of the accepted slot, when it has one: the AI agent's
+; candidates carry the action they run in place of a text to type.
+; @param {Object} Transaction The acceptance transaction.
+; @returns {Func|String} The handler, "" for an ordinary slot.
+_LLM_Bridge_AcceptedSlotHandler(Transaction) {
+	Slots := Transaction.Slots
+	Index := Transaction.ActiveIdx
+	if !(Slots is Array) || Index < 1 || Index > Slots.Length
+		return ""
+	Slot := Slots[Index]
+	if !IsObject(Slot) || !Slot.HasOwnProp("OnAccept") || !HasMethod(Slot.OnAccept, "Call")
+		return ""
+	return Slot.OnAccept
+}
+
+; Selects the text an accepted slot typed again when the slot asks for it: a
+; translation replaces the selection it was made from (llm_translate_selection)
+; and stays selected, like a tone step, so the next action applies to it.
+; @param {Object} Transaction The completed acceptance transaction.
+; @returns {Boolean} True when the typed text was selected again.
+_LLM_Bridge_SelectAcceptedText(Transaction) {
+	Slots := Transaction.Slots
+	Index := Transaction.ActiveIdx
+	if !(Slots is Array) || Index < 1 || Index > Slots.Length
+		return false
+	Slot := Slots[Index]
+	if !IsObject(Slot) || !Slot.HasOwnProp("SelectAfterAccept") || !Slot.SelectAfterAccept
+		return false
+	if TextSelectBack(LLM_Rewrite_CodepointLength(Transaction.Text))
+		return true
+	try LoggerWarn("LLM", "Accepted text typed over the selection but not selected again.")
+	return false
 }
 
 ; Invoked after TextSender atomically emitted the accepted prediction and
@@ -1430,6 +1504,9 @@ _LLM_Bridge_OnInjectComplete(Transaction, Ok := true, ErrorMessage := "") {
 			Transaction.PresentedRecord)
 		_LLM_Accept_DeferClaimRelease()
 		HideQueued := true
+		; After the teardown is queued: the selection is a courtesy, never a
+		; reason to leave the accepted offer on screen
+		_LLM_Bridge_SelectAcceptedText(Transaction)
 	} finally {
 		; A failed sender callback (or a failure while committing its state) never
 		; reaches the success path that normally releases the acceptance claim.

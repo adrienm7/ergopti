@@ -117,6 +117,10 @@ local KEY_MAP = {
 	llm_pred_indent                      = { sec = "llm", path = "display", key = "pred_indent"   },
 	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = "arrow_nav_enabled" },
 	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = "val_modifiers" },
+	-- The AI agent (modules/llm/agent_runner.lua): System 1 and System 2 backends and the mode
+	llm_agent_system1                    = { sec = "llm", key = "agent_system1"                     },
+	llm_agent_system2                    = { sec = "llm", key = "agent_system2"                     },
+	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
@@ -171,6 +175,7 @@ local NESTED_KEY_MAP = {
 	llm_profile_shortcuts    = { sec = "llm",        key = "profiles.shortcuts"         },
 	llm_user_models          = { sec = "llm",        key = "models.user_models"         },
 	llm_user_profiles        = { sec = "llm",        key = "profiles.user_profiles"     },
+	llm_agent_disabled_apps  = { sec = "llm",        key = "agent_disabled_apps"        },
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
 	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
@@ -284,7 +289,26 @@ local function group_for_disk(flat)
 					end
 				end
 			elseif type(v) == "table" then
-				set_path(grouped[nested.sec], nested.key, v)
+				-- Copy into the section: [shortcuts.script_control] also holds the
+				-- `enabled` scalar. Storing the state table itself let that scalar
+				-- be written INTO the live key-slot table, which then handed a
+				-- boolean to the script-control setter as if it were a key slot.
+				local owned = {}
+				for inner_key, inner_val in pairs(v) do
+					if not _reverse_scalar[nested.sec .. ":" .. nested.key .. "." .. inner_key] then
+						owned[inner_key] = inner_val
+					end
+				end
+				local parts = {}
+				for part in nested.key:gmatch("[^%.]+") do parts[#parts + 1] = part end
+				local target = grouped[nested.sec]
+				for i = 1, #parts - 1 do
+					if type(target[parts[i]]) ~= "table" then target[parts[i]] = {} end
+					target = target[parts[i]]
+				end
+				local leaf = parts[#parts]
+				if type(target[leaf]) ~= "table" then target[leaf] = {} end
+				for inner_key, inner_val in pairs(owned) do target[leaf][inner_key] = inner_val end
 			end
 		elseif scalar then
 			v = scalar_units(scalar, v, false)
@@ -361,7 +385,19 @@ local function flatten_from_disk(grouped, mark)
 					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
-						flat[nested_fk] = disk_val
+						-- A scalar can share the table (shortcuts.script_control.enabled):
+						-- it goes to its own state key, never into the nested map.
+						local owned = {}
+						for inner_key, inner_val in pairs(disk_val) do
+							local scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key .. "." .. inner_key]
+							if scalar_fk then
+								flat[scalar_fk] = inner_val
+								take(sec_name, disk_key, inner_key)
+							else
+								owned[inner_key] = inner_val
+							end
+						end
+						flat[nested_fk] = owned
 						take(sec_name, disk_key)
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
@@ -1025,8 +1061,8 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 			Logger.warn(LOG, "Preferences changed externally; the stale save was refused. "
 				.. "Review the external edit, then repeat the setting change to save it.")
 		else
-			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved.",
-				tostring(prefs_file))
+			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved: %s.",
+				tostring(prefs_file), tostring(write_ok and detail or written))
 		end
 		return false
 	end

@@ -225,6 +225,41 @@ local function model_of(entry, provider)
 	return provider.default_model
 end
 
+--- The address and headers of one request to an entry's provider, per format:
+--- openai (and every OpenAI-compatible provider) base_url/chat/completions with
+--- a Bearer key, anthropic base_url/messages with x-api-key, gemini
+--- base_url/models/{model}:generateContent with the key in the URL. The screen
+--- actions send their image bodies to the same address (vision_request.lua).
+--- @param entry table { provider, base_url?, token }
+--- @param model string The model the request names.
+--- @return table|nil endpoint { url, headers, format }, string|nil reason
+function M.endpoint(entry, model)
+	if type(entry) ~= "table" then return nil, "no API entry" end
+	local provider = M.provider(entry.provider)
+	if not provider then return nil, "unknown provider " .. tostring(entry.provider) end
+	local base_raw = (type(entry.base_url) == "string" and entry.base_url ~= "") and entry.base_url or provider.base_url
+	local base, reason = M.normalize_base_url(base_raw)
+	if not base then return nil, reason end
+	local token = type(entry.token) == "string" and entry.token or ""
+	if token == "" then return nil, "the API key is empty" end
+	if type(model) ~= "string" or model == "" then return nil, "no model is configured" end
+
+	local headers = { ["Content-Type"] = "application/json" }
+	local url
+	if provider.format == "anthropic" then
+		url = base .. "/messages"
+		headers["x-api-key"] = token
+		headers["anthropic-version"] = ANTHROPIC_VERSION
+	elseif provider.format == "gemini" then
+		local name = model:gsub("^models/", "")
+		url = base .. "/models/" .. percent_encode(name) .. ":generateContent?key=" .. percent_encode(token)
+	else
+		url = base .. "/chat/completions"
+		headers["Authorization"] = "Bearer " .. token
+	end
+	return { url = url, headers = headers, format = provider.format }
+end
+
 --- Builds one request for an entry.
 --- @param entry table { provider, base_url?, model?, token }
 --- @param messages table Array of { role, content } (PromptBuilder.build_messages).
@@ -234,13 +269,9 @@ function M.build_request(entry, messages, opts)
 	if type(entry) ~= "table" then return nil, "no API entry" end
 	local provider = M.provider(entry.provider)
 	if not provider then return nil, "unknown provider " .. tostring(entry.provider) end
-	local base_raw = (type(entry.base_url) == "string" and entry.base_url ~= "") and entry.base_url or provider.base_url
-	local base, reason = M.normalize_base_url(base_raw)
-	if not base then return nil, reason end
-	local token = type(entry.token) == "string" and entry.token or ""
-	if token == "" then return nil, "the API key is empty" end
 	local model = model_of(entry, provider)
-	if model == "" then return nil, "no model is configured" end
+	local endpoint, reason = M.endpoint(entry, model)
+	if not endpoint then return nil, reason end
 
 	local system, user = "", ""
 	for _, message in ipairs(type(messages) == "table" and messages or {}) do
@@ -250,26 +281,19 @@ function M.build_request(entry, messages, opts)
 	local temperature = tonumber(options.temperature) or LlmBridge.DEFAULT_TEMPERATURE
 	local max_tokens = tonumber(options.max_tokens) or PromptBuilder.DEFAULT_MAX_TOKENS
 
-	local url, headers, payload = nil, { ["Content-Type"] = "application/json" }, nil
+	local payload = nil
 	if provider.format == "anthropic" then
-		url = base .. "/messages"
-		headers["x-api-key"] = token
-		headers["anthropic-version"] = ANTHROPIC_VERSION
 		payload = {
 			model = model, system = system, max_tokens = max_tokens, temperature = temperature,
 			messages = { { role = "user", content = user } },
 		}
 	elseif provider.format == "gemini" then
-		local name = model:gsub("^models/", "")
-		url = base .. "/models/" .. percent_encode(name) .. ":generateContent?key=" .. percent_encode(token)
 		payload = {
 			systemInstruction = { parts = { { text = system } } },
 			contents = { { role = "user", parts = { { text = user } } } },
 			generationConfig = { temperature = temperature, maxOutputTokens = max_tokens },
 		}
 	else
-		url = base .. "/chat/completions"
-		headers["Authorization"] = "Bearer " .. token
 		local sent = {}
 		if system ~= "" then sent[#sent + 1] = { role = "system", content = system } end
 		sent[#sent + 1] = { role = "user", content = user }
@@ -280,7 +304,7 @@ function M.build_request(entry, messages, opts)
 	end
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then return nil, "request could not be encoded" end
-	return { url = url, headers = headers, body = body, format = provider.format, model = model }
+	return { url = endpoint.url, headers = endpoint.headers, body = body, format = provider.format, model = model }
 end
 
 

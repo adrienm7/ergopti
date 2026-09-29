@@ -64,4 +64,32 @@ helpers.describe("accessibility permission adapter (accessibility-before-eventta
 			helpers.assert_eq(calls[1], true)
 		end)
 	end)
+
+	helpers.it("resets only this app's entry through tccutil (accessibility-wait-resumes)", function()
+		local saved = package.loaded["adapters.shell_runner"]
+		local spawned = nil
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function(executable, args, on_done)
+				spawned = { executable = executable, args = args, on_done = on_done }
+				return { start = function() return true end }
+			end,
+		}
+		local ok, err = pcall(function()
+			with_native(function() return false end, function(adapter)
+				local result = nil
+				helpers.assert_eq(adapter.reset_grant("com.ergoptiplus.app.hammerspoon",
+					function(done, detail) result = { done, detail } end), true)
+				helpers.assert_eq(spawned.executable, "/usr/bin/tccutil")
+				helpers.assert_eq(table.concat(spawned.args, " "),
+					"reset Accessibility com.ergoptiplus.app.hammerspoon")
+				spawned.on_done(1, "", "no such bundle")
+				helpers.assert_eq(result[1], false)
+				helpers.assert_contains(result[2], "no such bundle")
+				local _, refusal = pcall(adapter.reset_grant, "", function() end)
+				helpers.assert_contains(tostring(refusal), "bundle_id must be a non-empty string")
+			end)
+		end)
+		package.loaded["adapters.shell_runner"] = saved
+		if not ok then error(err, 0) end
+	end)
 end)

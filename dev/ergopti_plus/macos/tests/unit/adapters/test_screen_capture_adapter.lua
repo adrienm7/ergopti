@@ -120,6 +120,46 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 			helpers.assert_contains(detail, "false")
 		end)
 	end)
+
+	helpers.it("resets only this app's Screen Recording entry through tccutil (screen-recording-stale-reset)",
+		function()
+			local saved = package.loaded["adapters.shell_runner"]
+			local spawned = nil
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(executable, args, on_done)
+					spawned = { executable = executable, args = args, on_done = on_done }
+					return { start = function() return true end }
+				end,
+			}
+			local ok, err = pcall(function()
+				with_native({ processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon" } }, function(adapter)
+					helpers.assert_eq(adapter.bundle_id(), "com.ergoptiplus.app.hammerspoon")
+					local result = nil
+					helpers.assert_eq(adapter.reset_permission("com.ergoptiplus.app.hammerspoon",
+						function(done, detail) result = { done, detail } end), true)
+					helpers.assert_eq(spawned.executable, "/usr/bin/tccutil")
+					helpers.assert_eq(table.concat(spawned.args, " "),
+						"reset ScreenCapture com.ergoptiplus.app.hammerspoon")
+					spawned.on_done(0, "", "")
+					helpers.assert_eq(result, { true })
+					spawned.on_done(1, "", "no such bundle")
+					helpers.assert_eq(result[1], false)
+					helpers.assert_contains(result[2], "no such bundle")
+					local _, refusal = pcall(adapter.reset_permission, "", function() end)
+					helpers.assert_contains(tostring(refusal), "bundle_id must be a non-empty string")
+					local _, unsupported = pcall(require("adapters.tcc_grant").reset, "All", "com.ergoptiplus.app.hammerspoon",
+						function() end)
+					helpers.assert_contains(tostring(unsupported), "unsupported service")
+				end)
+				with_native({}, function(adapter)
+					local bundle_id, detail = adapter.bundle_id()
+					helpers.assert_nil(bundle_id)
+					helpers.assert_contains(detail, "bundleID")
+				end)
+			end)
+			package.loaded["adapters.shell_runner"] = saved
+			if not ok then error(err, 0) end
+		end)
 end)
 
 helpers.describe("screen capture adapter: verified clipboard image", function()

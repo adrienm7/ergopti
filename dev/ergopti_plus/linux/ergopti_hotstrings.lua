@@ -223,6 +223,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "AI agent files",
+			stop = function()
+				-- The calendar files handed to xdg-open, and the learnt thresholds.
+				require("modules.llm.agent_connectors").cleanup()
+				require("modules.llm.agent_learning").flush()
+			end,
+		},
+		{
 			name = "LLM model download",
 			stop = function()
 				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
@@ -714,6 +722,8 @@ local function main()
 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
 			-- modifier held through the pause is released.
 			TapHold.set_paused(paused)
+			-- A pause turns the AI's live mode off; resuming leaves it off.
+			if prediction_engine then prediction_engine.on_pause_change(paused) end
 			if rebuild_tray_menu then rebuild_tray_menu() end
 		end,
 	})
@@ -1099,6 +1109,51 @@ local function main()
 				local result = injector.inject(candidate.deletes, candidate.to_type, false)
 				return type(result) == "table" and result.ok == true
 			end,
+			-- The tone actions read the selection the way wrap_selection does (a
+			-- copy probe that puts the clipboard back), then type the rewrite over
+			-- it and select it again, through the one uinput channel.
+			read_selection = function()
+				if opts.dry_run then return false, "", "dry run" end
+				return require("adapters.clipboard").read_selection(
+					require("modules.gestures.combo_emitter").press, event_loop.sleep_ms)
+			end,
+			replace_selection = function(text)
+				if opts.dry_run then return false end
+				local result = injector.inject_selected(text, false)
+				if type(result) ~= "table" or result.ok ~= true then return false end
+				-- The caret moved over replaced text: the buffer no longer describes the line.
+				_undoable = nil
+				engine:reset()
+				return true
+			end,
+			-- Read live, not from the 250 ms focus cache: the answer is dropped when
+			-- another window took the focus while it ran.
+			focus_id = window_info and function()
+				local info = window_info.getFocused()
+				return (info.appId or "") .. "\1" .. (info.windowTitle or "")
+			end or nil,
+			-- The AI agent's context: the application and the window title the
+			-- user is in, read live like focus_id.
+			focused_window = window_info and function()
+				local info = window_info.getFocused()
+				return { app = info.appId or "", title = info.windowTitle or "" }
+			end or nil,
+			-- llm_agent_command asks for the command in a zenity entry.
+			ask_text = function(title, prompt)
+				if opts.dry_run then return nil end
+				return require("ui.text_prompt").ask(title, prompt, "")
+			end,
+			-- The screen actions capture to a private file with the screenshot
+			-- actions' tools; the engine reads and deletes it.
+			capture_screen = function(mode, max_edge, on_done)
+				if opts.dry_run then return nil, "dry run" end
+				return require("adapters.screen_capture").capture(mode, max_edge, on_done)
+			end,
+			-- The tray's live submenu checks the live prompt: redrawn when a
+			-- binding turns live mode on or off.
+			on_live_change = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 			on_offer = function(context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keylogger.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))
@@ -1251,6 +1306,8 @@ local function main()
 	local function on_click()
 		secure_focus_guard.invalidate()
 		wrap_on_type.on_pointer_down()
+		-- A click may clear or move the selection a tone step would replace.
+		if prediction_engine then prediction_engine.drop_tone("pointer click") end
 		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
 	end
 

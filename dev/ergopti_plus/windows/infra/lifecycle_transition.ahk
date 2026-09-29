@@ -9,7 +9,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
 		"selection-capture", "space-hold-input-hook",
 		"suppressive-input-hooks", "magic-key-editor-input-hook",
-		"suspend-tooltip", "llm-tooltip", "llm-generation-timer",
+		"suspend-tooltip", "llm-tooltip", "llm-live-mode", "llm-generation-timer",
 		"llm-generation", "ollama-warmup", "llm-pointer-watch",
 		"metrics-focus-refresh", "updater-checks", "updater-self-update",
 		"keylogger-prefetch-typing", "keylogger-prefetch-apps",

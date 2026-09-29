@@ -445,18 +445,27 @@ body {
 	outline: none;
 }
 
-#param-choice {
+#param-choice,
+#param-vision,
+#param-language {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
 }
-#param-choice[hidden] {
+#param-choice[hidden],
+#param-vision[hidden],
+#param-language[hidden] {
 	display: none;
 }
-#param-choice label {
+#param-choice label,
+#param-vision label,
+#param-language label {
 	color: var(--sub);
 }
-#param-choice select {
+#param-vision input,
+#param-choice select,
+#param-vision select,
+#param-language select {
 	background: var(--surface);
 	border: 1px solid var(--border);
 	border-radius: 7px;
@@ -464,6 +473,9 @@ body {
 	font: inherit;
 	padding: 7px 10px;
 }
+#param-vision input:focus,
+#param-vision select:focus,
+#param-language select:focus,
 #param-choice select:focus {
 	border-color: var(--accent);
 	outline: none;
