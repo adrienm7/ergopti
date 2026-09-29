@@ -223,6 +223,21 @@ helpers.describe("workspace switcher: Wayland compositors", function()
 		end)
 	end)
 
+	helpers.it("quotes a sway workspace name that holds a quote and a backslash", function()
+		-- A name reaches sway's own command parser: an unescaped quote would end
+		-- the argument early, and whatever followed would run as a command.
+		local workspaces = '[{"num":1,"name":"1","focused":true,"output":"eDP-1"},'
+			.. '{"num":2,"name":"2 \\"a\\\\b\\"","focused":false,"output":"eDP-1"}]'
+		in_session({
+			kind = "wayland", desktop = "sway", tools = { swaymsg = true },
+			answers = { ["get_workspaces"] = workspaces },
+		}, function(Switcher, commands, _, press)
+			helpers.assert_eq(Switcher.switch("next", false, press), "switched")
+			helpers.assert_eq(switches(commands, "swaymsg --"),
+				{ [[timeout 1 swaymsg -- 'workspace "2 \"a\\b\""' >/dev/null 2>&1]] })
+		end)
+	end)
+
 	helpers.it("drives Hyprland over the active monitor's regular workspaces", function()
 		in_session({
 			kind = "wayland", desktop = "", env = { HYPRLAND_INSTANCE_SIGNATURE = "abc" },

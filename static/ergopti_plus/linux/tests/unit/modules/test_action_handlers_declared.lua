@@ -585,6 +585,24 @@ helpers.describe("linux actions: workspace switch", function()
 		helpers.assert_eq(pressed, {})
 	end)
 
+	helpers.it("gives each of the four ids its own direction and wrap at both edges", function()
+		-- The dispatcher's table is the only place an id gets its direction and
+		-- its wrap flag: every id is run from the first and the last desktop.
+		local FIRST = "0  * DG: x\n1  - DG: x\n2  - DG: x\n"
+		local function to(desktop) return { "timeout 1 wmctrl -s '" .. desktop .. "' >/dev/null 2>&1" } end
+		for _, case in ipairs({
+			{ "desktop_prev", FIRST, {} }, { "desktop_prev", THREE, to(1) },
+			{ "desktop_next", FIRST, to(1) }, { "desktop_next", THREE, {} },
+			{ "desktop_prev_wrap", FIRST, to(2) }, { "desktop_prev_wrap", THREE, to(1) },
+			{ "desktop_next_wrap", FIRST, to(1) }, { "desktop_next_wrap", THREE, to(0) },
+		}) do
+			local switched, pressed = switch(case[1], case[2], true)
+			local edge = case[2] == FIRST and "first" or "last"
+			helpers.assert_eq(switched, case[3], case[1] .. " from the " .. edge .. " desktop")
+			helpers.assert_eq(pressed, {}, case[1] .. " from the " .. edge .. " desktop presses nothing")
+		end
+	end)
+
 	helpers.it("steps inside the row with the plain actions", function()
 		local switched = switch("desktop_prev", THREE, true)
 		helpers.assert_eq(switched, { "timeout 1 wmctrl -s '1' >/dev/null 2>&1" })
