@@ -174,6 +174,12 @@ function M._resolve_word_bounds(ds, get_setting)
 	return min_w, max_w
 end
 
+--- The language a prompt's {language} placeholder names: the interface locale.
+--- @return string language
+function M.prompt_language()
+	return i18n.get_locale() or Manifest.default_for("script.locale")
+end
+
 --- Resolves the appropriate system prompt, injecting live session values.
 --- Delegates the pure prompt-building algorithm to the shared
 --- Selector.resolve_system_prompt() (profile_selector.lua), keeping only
@@ -193,7 +199,7 @@ function M.resolve_system_prompt(profile, n)
 	local min_w, max_w = M._resolve_word_bounds(ds, Storage.get)
 
 	-- Inject the active UI locale so the model replies in the user's language.
-	local locale = i18n.get_locale() or Manifest.default_for("script.locale")
+	local locale = M.prompt_language()
 
 	-- Delegate the pure algorithm to the shared selector
 	-- Convert max_w == 0 to "illimité" (the shared selector substitutes

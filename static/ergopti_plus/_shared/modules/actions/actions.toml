@@ -31,7 +31,10 @@
 #             _shared/tests/corpus/action_parameters/send_input_vectors.json),
 #             or "llm_prompt" (a prompt profile id, optionally followed by
 #             |count; rule pinned by
-#             _shared/tests/corpus/action_parameters/llm_prompt_vectors.json).
+#             _shared/tests/corpus/action_parameters/llm_prompt_vectors.json),
+#             or "llm_vision" (a vision backend, "local" or an API provider,
+#             optionally followed by |model; rule pinned by
+#             _shared/tests/corpus/llm/vision_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
@@ -968,6 +971,21 @@ platform = "all"
 [sg_actions.llm_tone_more_familiar_cycle]
 platform = "all"
 
+[sg_actions.llm_screen_region]
+# Lets the user draw a screen region, has the vision backend stored for the
+# binding transcribe it (llm/vision.lua, _shared/modules/llm/vision.json), then
+# has the AI menu's text backend draft a reply, a translation and an
+# explanation, offered in the prediction tooltip and typed at the caret on
+# acceptance. A cancelled selection does nothing. It refuses like
+# llm_generate_prediction, and when the backend has no vision model.
+platform = "all"
+parameter = "llm_vision"
+
+[sg_actions.llm_screen_full]
+# llm_screen_region on the whole screen the pointer is on, with no selection.
+platform = "all"
+parameter = "llm_vision"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1386,6 +1404,8 @@ items = [
     "llm_tone_more_familiar",
     "llm_tone_more_formal_cycle",
     "llm_tone_more_familiar_cycle",
+    "llm_screen_region",
+    "llm_screen_full",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",

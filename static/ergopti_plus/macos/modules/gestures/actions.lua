@@ -29,6 +29,7 @@ local SendInput     = require("send_input")
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
 local Tone          = require("llm.tone")
+local Vision        = require("llm.vision")
 local JsonCodec     = require("adapters.json_codec")
 local LOG           = "gestures.actions"
 
@@ -1128,6 +1129,30 @@ for _, tone_action in ipairs(TONE_ACTIONS) do
 		return keymap.request_tone_step(spec.direction, spec.cycle, current_action_parent())
 	end)
 end
+-- Screen reading (llm_screen_region / llm_screen_full): the vision backend is
+-- the binding's own parameter, through the keymap bridge like the predictions.
+local SCREEN_ANSWER_ACTIONS = {
+	{ id = "llm_screen_region", mode = "MODE_REGION" },
+	{ id = "llm_screen_full", mode = "MODE_FULL" },
+}
+for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
+	local spec = screen_action
+	sg(spec.id, function(binding)
+		local value = M.get_action_parameter(binding, spec.id)
+		if not Vision.is_valid(value) then
+			Logger.warn(LOG, "%s ignored for binding '%s': no valid vision backend is stored ('%s').",
+				spec.id, tostring(binding), tostring(value))
+			return false
+		end
+		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_screen_answers) ~= "function" then
+			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
+			return false
+		end
+		local mode = require("modules.llm.screen_answer")[spec.mode]
+		return keymap.request_screen_answers(value, mode, current_action_parent())
+	end)
+end
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
@@ -2006,6 +2031,8 @@ function M.validate_action_parameter(action, value)
 	-- Syntax only: whether the profile still exists is checked when the action runs,
 	-- so deleting a custom prompt does not wipe the bindings that name it
 	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
+	-- Syntax only too: whether the provider exists is checked when the action runs
+	if spec == "llm_vision" then return Vision.is_valid(value) end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2041,6 +2068,13 @@ function M.parameter_prompt(action)
 		end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_prompt"), table.concat(lines, "\n"))
 	end
+	if spec == "llm_vision" then
+		local lines = {}
+		for _, choice in ipairs(M.llm_vision_choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
+	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local samples = WrapPair.describe(wrap_pair_list())
@@ -2058,6 +2092,7 @@ function M.parameter_error(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
+	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2098,6 +2133,28 @@ function M.llm_prompt_choices()
 			local label = profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. index)
 			choices[#choices + 1] = { value = profile.id, label = ProfileLabel.format(label, count) }
 		end
+	end
+	return choices
+end
+
+--- The vision backends a llm_vision binding may name: the local server first,
+--- then the API providers in the catalogue's order, each with the vision model
+--- used when the binding names none ("" when the backend needs one).
+--- @return table Array of { value = backend id, label, defaultModel }.
+function M.llm_vision_choices()
+	local Remote = require("modules.llm.api_remote")
+	local defaults = require("modules.llm.screen_answer").config().default_models
+	local choices = { {
+		value = Vision.LOCAL_BACKEND,
+		label = i18n.get("llm.vision.local_backend"),
+		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
+	} }
+	for _, provider_id in ipairs(Remote.PROVIDER_ORDER) do
+		choices[#choices + 1] = {
+			value = provider_id,
+			label = Remote.PROVIDERS[provider_id].label,
+			defaultModel = defaults[provider_id] or "",
+		}
 	end
 	return choices
 end

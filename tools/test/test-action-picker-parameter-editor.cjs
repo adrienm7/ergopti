@@ -33,6 +33,7 @@ const SCRIPT = path.join(SP, '_shared', 'ui', 'action_picker', 'script.js');
 const HTML = path.join(SP, '_shared', 'ui', 'action_picker', 'index.html');
 const CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'send_input_vectors.json');
 const LLM_PROMPT_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'llm_prompt_vectors.json');
+const VISION_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'llm', 'vision_vectors.json');
 const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
 
 /** A DOM element with just what the page script touches. */
@@ -104,7 +105,9 @@ const check = (cond, message) => {
 const html = fs.readFileSync(HTML, 'utf8');
 const IDS = ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 'empty', 'count', 'toc', 'toc-inner',
 	'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back', 'param-save',
-	'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label', 'btn-edit-current'];
+	'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label', 'btn-edit-current',
+	'param-vision', 'param-vision-provider', 'param-vision-provider-label', 'param-vision-model',
+	'param-vision-model-label'];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
 function loadPage(platform, current) {
@@ -139,11 +142,16 @@ function loadPage(platform, current) {
 			promptChoices: [{ value: 'basic', label: 'Basic' }, { value: 'rewrite', label: 'Rewrite' },
 				{ value: 'custom_1_2', label: 'Mine' }],
 			defaultCount: 3,
+			visionChoices: [{ value: 'local', label: 'Local', defaultModel: 'qwen2.5vl:3b' },
+				{ value: 'cerebras', label: 'Cerebras', defaultModel: '' }],
 			parameterStrings: {
 				save: 'Save', back: 'Back', captureKey: 'Press a key', captureShortcut: 'Press a shortcut',
 				promptLabel: 'Prompt', countLabel: 'Count', countDefault: 'Menu ({1})',
+				visionProviderLabel: 'Provider', visionModelLabel: 'Model', visionModelDefault: 'Default: {1}',
+				visionModelRequired: 'Required',
 				prompts: { text: 'Text?', key: 'Key?', shortcut: 'Shortcut?' },
-				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut', llm_prompt: 'Bad prompt' }
+				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut', llm_prompt: 'Bad prompt',
+					llm_vision: 'Bad vision' }
 			},
 			items: [
 				{ type: 'action', id: 'send_text', label: 'Type a text', parameter: 'text', parameterValue: 'salut' },
@@ -152,6 +160,8 @@ function loadPage(platform, current) {
 				{ type: 'action', id: 'open_url', label: 'Open a link', parameter: 'url', parameterValue: 'https://x.y' },
 				{ type: 'action', id: 'llm_prompt_prediction', label: 'Prompt', parameter: 'llm_prompt',
 					parameterValue: 'rewrite|2' },
+				{ type: 'action', id: 'llm_screen_region', label: 'Screen', parameter: 'llm_vision',
+					parameterValue: 'cerebras|llama-4-scout' },
 				{ type: 'action', id: 'enter', label: 'Enter' }
 			]
 		})`,
@@ -372,6 +382,48 @@ function loadPage(platform, current) {
 	url.byId['btn-edit-current'].dispatch('click');
 	check(url.posted.length === 1 && url.posted[0].id === 'open_url' && url.posted[0].parameter === undefined,
 		'the edit button hands a URL back to the host prompt');
+}
+
+// 9. The llm_vision rules are the drivers' rules, and its editor offers the
+//    host's backends with their default model, or requires one.
+{
+	const page = loadPage('ahk');
+	const corpus = JSON.parse(fs.readFileSync(VISION_CORPUS, 'utf8'));
+	for (const vector of corpus.parse_vectors) {
+		page.context.__value = vector.value;
+		const parsed = vm.runInContext('parseLlmVision(__value)', page.context);
+		if (vector.valid === false) {
+			check(parsed === null, `vision ${vector.id}: the page accepts ${JSON.stringify(vector.value)}`);
+		} else {
+			const model = vector.model === undefined ? null : vector.model;
+			check(parsed !== null && parsed.backend === vector.backend && parsed.model === model,
+				`vision ${vector.id}: the page reads ${JSON.stringify(parsed)}`);
+		}
+	}
+
+	vm.runInContext("doConfirm('llm_screen_region')", page.context);
+	check(page.byId['param-vision'].hidden === false && page.byId['param-input'].hidden === true
+		&& page.byId['param-choice'].hidden === true, 'the vision editor replaces the text field');
+	check(page.byId['param-vision-provider'].value === 'cerebras'
+		&& page.byId['param-vision-model'].value === 'llama-4-scout', 'the editor starts from the binding');
+	check(page.byId['param-vision-model'].placeholder === 'Required', 'a backend without a default asks for a model');
+	page.byId['param-vision-model'].value = '';
+	page.byId['param-save'].dispatch('click');
+	check(page.posted.length === 0 && page.byId['param-error'].hidden === false,
+		'a backend without a default is refused without a model');
+	page.byId['param-vision-provider'].value = 'local';
+	page.byId['param-vision-provider'].dispatch('change');
+	check(page.byId['param-vision-model'].placeholder === 'Default: qwen2.5vl:3b', 'the default model is shown');
+	page.byId['param-save'].dispatch('click');
+	check(page.posted.length === 1 && page.posted[0].id === 'llm_screen_region' && page.posted[0].parameter === 'local',
+		'an empty model keeps the backend default');
+
+	const second = loadPage('ahk');
+	vm.runInContext("doConfirm('llm_screen_region')", second.context);
+	second.byId['param-vision-model'].value = '  llama-4-scout  ';
+	second.keydown({ key: 'Enter', code: 'Enter' });
+	check(second.posted.length === 1 && second.posted[0].parameter === 'cerebras|llama-4-scout',
+		'Enter saves the backend and the trimmed model');
 }
 
 if (errors.length > 0) {

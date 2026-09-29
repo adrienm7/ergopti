@@ -249,6 +249,7 @@ local function open_action_picker(title, current, binding, on_confirm)
 		send_vocabulary = editor.send_vocabulary,
 		parameter_strings = editor.parameter_strings,
 		prompt_choices = editor.prompt_choices,
+		vision_choices = editor.vision_choices,
 		default_count = editor.default_count,
 		edit_current_label = editor.edit_current_label,
 	}, function(option, _state, picked) return on_confirm(option, picked) end)

@@ -399,7 +399,30 @@ GestureScreenshotCancelAll(Reason := "canceled") {
 ; ========================================
 ; ========================================
 
-_GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage) {
+; PowerShell statements that shrink the bitmap held by Var (e.g. "$bmp") so its
+; longest edge is at most MaxEdge, with GDI+ (System.Drawing) bicubic
+; resampling. "" when MaxEdge is 0: the capture keeps its size.
+; @param {String} Var The PowerShell variable holding a System.Drawing image.
+; @param {Integer} MaxEdge The longest edge allowed, 0 for no limit.
+; @returns {String}
+_GestureScreenshotDownscaleScript(Var, MaxEdge) {
+	if !(MaxEdge is Integer) || MaxEdge < 0
+		throw ValueError("A screenshot's longest edge must be a non-negative integer.")
+	if (MaxEdge == 0)
+		return ""
+	Longest := "[Math]::Max(" . Var . ".Width, " . Var . ".Height)"
+	return "if (" . Longest . " -gt " . MaxEdge . ") {"
+		. "$dsScale = " . MaxEdge . " / " . Longest . ";"
+		. "$dsW = [Math]::Max(1, [int][Math]::Round(" . Var . ".Width * $dsScale));"
+		. "$dsH = [Math]::Max(1, [int][Math]::Round(" . Var . ".Height * $dsScale));"
+		. "$dsImg = New-Object System.Drawing.Bitmap $dsW,$dsH;"
+		. "$dsG = [System.Drawing.Graphics]::FromImage($dsImg);"
+		. "$dsG.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic;"
+		. "$dsG.DrawImage(" . Var . ", 0, 0, $dsW, $dsH);"
+		. "$dsG.Dispose(); " . Var . ".Dispose(); " . Var . " = $dsImg };"
+}
+
+_GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage, MaxEdge := 0) {
 	global DriverPid
 	EscapedStage := StrReplace(Stage, "'", "''")
 	FormatName := (Mode == "clipboard") ? "Bmp" : "Png"
@@ -407,13 +430,17 @@ _GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage) {
 		. "$bmp = New-Object System.Drawing.Bitmap " . W . "," . H . ";"
 		. "$g = [System.Drawing.Graphics]::FromImage($bmp);"
 		. "$g.CopyFromScreen(" . X . "," . Y . ",0,0,(New-Object System.Drawing.Size " . W . "," . H . "));"
+		. "$g.Dispose();"
+		. _GestureScreenshotDownscaleScript("$bmp", MaxEdge)
 		. "$bmp.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::" . FormatName . ");"
-		. "$g.Dispose(); $bmp.Dispose();"
+		. "$bmp.Dispose();"
 		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
 		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
 }
 
-GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "") {
+; @param {Integer} MaxEdge Longest edge of the saved image, 0 to keep the
+;     captured size (the screen reading shrinks what it sends to a model).
+GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "", MaxEdge := 0) {
 	global _GestureDirectCaptures, _GestureDirectCaptureEpoch, GESTURE_DIRECT_CAPTURE_TIMEOUT_MS
 	global DriverPid
 	Completion := IsObject(OnComplete) ? OnComplete : 0
@@ -432,7 +459,7 @@ GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "") {
 		Epoch := ++_GestureDirectCaptureEpoch
 		Extension := (Mode == "clipboard") ? "bmp" : "png"
 		Stage := A_Temp . "\ergopti_screenshot_direct_" . DriverPid . "_" . Epoch . "." . Extension
-		Script := _GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage)
+		Script := _GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage, MaxEdge)
 		WorkerId := _GestureScreenshotCreateWorker("direct_" . Mode, Epoch, Stage,
 			_GestureScreenshotPowerShellArgs(Script), GestureDirectCaptureWorkerDone.Bind(Epoch))
 		if WorkerId {
@@ -673,10 +700,21 @@ GestureScreenshotFullscreen(Mode) {
 ; =====================================
 ; =====================================
 
-GestureScreenshotRegion(Mode) {
+; @param {String} Mode "clipboard" (Snip & Sketch alone) or "save".
+; @param {Func} OnComplete Save mode only: called with (Ok, Reason) once the
+;     capture ends, instead of the saved-file notification. Reason is "saved"
+;     on success, else why it ended ("selection timeout" when the user
+;     cancelled the selection).
+; @param {String} Path Save mode only: the destination, "" for a new file in
+;     the screenshots folder.
+; @param {Integer} MaxEdge Save mode only: longest edge of the saved image, 0
+;     to keep the selection's size.
+GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0) {
 	global _GestureRegionCapture, _GestureRegionCaptureEpoch
-	if A_IsSuspended
+	if A_IsSuspended {
+		_GestureRegionNotify(OnComplete, false, "suspended")
 		return
+	}
 	GestureScreenshotCancelAll("superseded")
 	if Mode == "clipboard" {
 		LoggerStart("gestures", "Region screenshot to clipboard — opening Snip & Sketch…")
@@ -689,7 +727,8 @@ GestureScreenshotRegion(Mode) {
 		return
 	}
 
-	Path := GestureScreenshotPath()
+	if (Path == "")
+		Path := GestureScreenshotPath()
 	LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
 	PreviousCritical := Critical("On")
 	try Epoch := ++_GestureRegionCaptureEpoch
@@ -722,7 +761,9 @@ GestureScreenshotRegion(Mode) {
 			"save_started_tick", 0,
 			"save_timeout_ms", GESTURE_REGION_CAPTURE_SAVE_TIMEOUT_MS,
 			"save_started", false,
-			"worker_id", 0)
+			"worker_id", 0,
+			"max_edge", MaxEdge,
+			"callback", OnComplete)
 		PreviousCritical := Critical("On")
 		try {
 			_GestureRegionCapture := State
@@ -747,18 +788,21 @@ GestureScreenshotRegion(Mode) {
 				try CB_RestoreOwnedAllEventually(OldClip, CB_GetSequenceNumber(),
 					OwnerToken, "gesture_region_capture_rollback", true, true)
 			}
+			; A published capture reports through its finish; this one never began
+			_GestureRegionNotify(OnComplete, false, "start failure")
 		}
 		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
 	}
 }
 
-_GestureScreenshotRegionSaveScript(Stage) {
+_GestureScreenshotRegionSaveScript(Stage, MaxEdge := 0) {
 	global DriverPid
 	EscapedStage := StrReplace(Stage, "'", "''")
 	return "Add-Type -AssemblyName System.Windows.Forms;"
 		. "Add-Type -AssemblyName System.Drawing;"
 		. "$img = [System.Windows.Forms.Clipboard]::GetImage();"
-		. "if ($img) { $img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png) };"
+		. "if ($img) { " . _GestureScreenshotDownscaleScript("$img", MaxEdge)
+		. "$img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png) };"
 		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
 		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
 }
@@ -787,7 +831,8 @@ GestureRegionCaptureStartSaveWorker(Epoch) {
 		State := _GestureRegionCapture
 		Stage := A_Temp . "\ergopti_screenshot_region_" . DriverPid . "_" . Epoch . ".png"
 		WorkerId := _GestureScreenshotCreateWorker("region_save", Epoch, Stage,
-			_GestureScreenshotPowerShellArgs(_GestureScreenshotRegionSaveScript(Stage), true),
+			_GestureScreenshotPowerShellArgs(
+				_GestureScreenshotRegionSaveScript(Stage, State.Get("max_edge", 0)), true),
 			GestureRegionSaveWorkerDone.Bind(Epoch))
 		if WorkerId {
 			State["worker_id"] := WorkerId
@@ -901,7 +946,10 @@ GestureRegionSaveWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		return
 	}
 	LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", State["path"])
-	TrayTip(t("notify.screenshot_saved"), State["path"], "Iconi Mute")
+	; A capture with its own completion (the screen reading) reads a private
+	; file: the saved-screenshot notification would name it to the user.
+	if !IsObject(State.Get("callback", 0))
+		TrayTip(t("notify.screenshot_saved"), State["path"], "Iconi Mute")
 }
 
 GestureRegionCaptureFinish(Epoch, Reason, CancelWorker := false) {
@@ -926,5 +974,18 @@ GestureRegionCaptureFinish(Epoch, Reason, CancelWorker := false) {
 		LoggerWarn("gestures",
 			"Region screenshot clipboard restore is pending after a transient failure ({1}).",
 			Reason)
+	_GestureRegionNotify(State.Get("callback", 0), Reason == "saved", Reason)
 	return true
+}
+
+; Reports the end of a region capture to its owner, when it has one.
+; @param {Func} Callback The owner's completion, 0 for none.
+; @param {Boolean} Ok Whether the image was saved.
+; @param {String} Reason "saved", or why the capture ended.
+_GestureRegionNotify(Callback, Ok, Reason) {
+	if !IsObject(Callback)
+		return
+	try Callback.Call(Ok ? true : false, Reason)
+	catch as Err
+		LoggerError("gestures", "Region screenshot completion callback failed: {1}.", Err.Message)
 }

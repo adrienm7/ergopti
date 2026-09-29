@@ -50,6 +50,7 @@ graph TD
         LINUX_notifier["Notifier.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
         LINUX_process_runner["ProcessRunner.lua"]
+        LINUX_screen_capture["ScreenCapture.lua"]
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_shell_runner["ShellRunner.lua"]
         LINUX_storage["Storage.lua"]

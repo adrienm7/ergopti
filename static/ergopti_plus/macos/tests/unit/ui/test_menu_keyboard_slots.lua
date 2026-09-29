@@ -351,18 +351,29 @@ local function parameter_ctx()
 	local ctx = make_ctx()
 	local stored = {}
 	ctx.gestures.get_sg_names = function()
-		return { "#header", "lookup", "select_line", "send_key", "wrap_selection", "llm_prompt_prediction" }
+		return { "#header", "lookup", "select_line", "send_key", "wrap_selection", "llm_prompt_prediction",
+			"llm_screen_region" }
 	end
 	ctx.gestures.get_action_parameter_spec = function(id)
-		return ({ wrap_selection = "wrap_pair", send_key = "key", llm_prompt_prediction = "llm_prompt" })[id]
+		return ({
+			wrap_selection = "wrap_pair", send_key = "key", llm_prompt_prediction = "llm_prompt",
+			llm_screen_region = "llm_vision",
+		})[id]
 	end
 	ctx.gestures.get_action_parameter = function(_, action)
-		return ({ wrap_selection = "(", llm_prompt_prediction = "rewrite|2" })[action] or ""
+		return ({
+			wrap_selection = "(", llm_prompt_prediction = "rewrite|2", llm_screen_region = "openai|gpt-4.1-mini",
+		})[action] or ""
 	end
 	ctx.gestures.llm_prompt_choices = function()
 		return { { value = "basic", label = "Basic" }, { value = "rewrite", label = "Rewrite" } }
 	end
 	ctx.gestures.llm_prompt_default_count = function() return 3 end
+	local vision_choices = {
+		{ value = "local", label = "Local", defaultModel = "qwen2.5vl:3b" },
+		{ value = "cerebras", label = "Cerebras", defaultModel = "" },
+	}
+	ctx.gestures.llm_vision_choices = function() return vision_choices end
 	ctx.gestures.validate_action_parameter = function(_, value) return value == "(" or value == "enter" end
 	local vocabulary = { keys = {}, modifiers = {}, text_max_code_points = 500 }
 	ctx.gestures.send_vocabulary = function() return vocabulary end
@@ -453,6 +464,23 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 			helpers.assert_eq(opts.parameter_strings.prompts.llm_prompt, "prompt")
 			helpers.assert_eq(opts.parameter_strings.errors.llm_prompt, "refused")
 			helpers.assert_type(opts.parameter_strings.countDefault, "string")
+			-- The llm_vision editor: the backends with their default model, and its texts
+			helpers.assert_eq(by_id.llm_screen_region and by_id.llm_screen_region.parameter, "llm_vision")
+			helpers.assert_eq(by_id.llm_screen_region and by_id.llm_screen_region.parameterValue,
+				"openai|gpt-4.1-mini")
+			helpers.assert_eq(opts.vision_choices, ctx.gestures.llm_vision_choices(),
+				"the llm_vision editor offers the vision backends")
+			helpers.assert_eq(opts.parameter_strings.prompts.llm_vision, "prompt")
+			helpers.assert_eq(opts.parameter_strings.errors.llm_vision, "refused")
+			local i18n = package.loaded["infra.i18n"]
+			for field, key in pairs({
+				visionProviderLabel = "dialog.action_picker.vision_provider_label",
+				visionModelLabel = "dialog.action_picker.vision_model_label",
+				visionModelDefault = "dialog.action_picker.vision_model_default",
+				visionModelRequired = "dialog.action_picker.vision_model_required",
+			}) do
+				helpers.assert_eq(opts.parameter_strings[field], i18n.get(key), field)
+			end
 			picker.opened[2].confirm("send_key", "enter")
 			helpers.assert_eq(#stored, 1, "the collected value is stored")
 			helpers.assert_eq(stored[1].binding, shortcuts.keyboard_binding_id(slot))

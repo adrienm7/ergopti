@@ -7,7 +7,8 @@
 --- privacy gates, and presents parsed Ollama completions for an explicit user
 --- commit. Model output never reaches the focused application before acceptance,
 --- except for the tone actions, which the user fires on a selection precisely
---- to have it replaced (llm/tone.lua).
+--- to have it replaced (llm/tone.lua). The screen actions (llm/vision.lua) offer
+--- answers to what is on the screen through the same tooltip and acceptance.
 --- ==============================================================================
 
 local M = {}
@@ -20,15 +21,18 @@ local Parser = require("llm.parser")
 local Rewrite = require("llm.rewrite")
 local PromptAction = require("llm.prompt_action")
 local Tone = require("llm.tone")
+local Vision = require("llm.vision")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
+local VisionRequest = require("modules.llm.vision_request")
 local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Inference = require("modules.llm.inference")
 local Monotonic = require("infra.monotonic")
 local i18n = require("infra.i18n")
+local Base64 = require("compat.base64")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -69,6 +73,19 @@ local _tone_generation = 0
 local _tone_memory = nil
 local _tone_timer = nil
 
+-- Injected by init() for the screen actions: how the screen is captured
+-- (adapters/screen_capture.lua in the daemon).
+local _capture_screen = nil
+
+-- The screen actions' state. The generation drops a stale capture or reading:
+-- a newer screen action, typing, Escape or a pause make it obsolete. The flow
+-- holds the capture and the vision request in flight, until the answers are
+-- requested; from then on they are an ordinary offer (_request_epoch).
+local _vision_generation = 0
+local _vision_flow = nil
+-- Whether the session was already told that screenshots go out unscaled
+local _vision_unscaled_logged = false
+
 -- The reasons a manual request is refused, each with the locale key of the
 -- notice that tells the user. manual_refusal checks them in this order: a pause
 -- outranks everything, then the AI switch, then the backend, then the typed
@@ -85,6 +102,12 @@ local MANUAL_REFUSAL_KEYS = {
 -- exists (a deleted custom prompt). Kept apart from MANUAL_REFUSAL_KEYS, which
 -- the three drivers declare identically.
 local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
+
+-- The screen actions, each with the capture mode it runs, and their notices
+local VISION_ACTIONS = { llm_screen_region = "region", llm_screen_full = "full" }
+local VISION_NO_MODEL_KEY = "llm.vision.no_model"
+local VISION_READ_FAILED_KEY = "llm.vision.read_failed"
+local VISION_CAPTURE_FAILED_KEY = "llm.vision.capture_failed"
 
 -- The ready-made prompt actions: one per built-in profile, named after it
 -- (tools/test/test-llm-prompt-actions-single-source.cjs pins the catalogue side).
@@ -261,6 +284,8 @@ function M.init(opts)
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
+	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
+	M.drop_vision("engine initialised")
 	if _tone_timer then _scheduler.cancel(_tone_timer) end
 	_tone_timer = nil
 	_tone_generation = _tone_generation + 1
@@ -294,6 +319,8 @@ function M.on_char(ch, buffer, output_context)
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
 	-- Typing replaced the selection a tone step was about to rewrite.
 	M.drop_tone("typing")
+	-- The user went on typing: the screen answers would be dismissed at once.
+	M.drop_vision("typing")
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	for _, trigger in ipairs(_triggers) do
@@ -658,6 +685,9 @@ function M.action_handlers()
 		local value = PromptAction.format(profile.id)
 		handlers[PRESET_ACTION_PREFIX .. profile.id] = function() return M.trigger_prompt(value) end
 	end
+	for action, mode in pairs(VISION_ACTIONS) do
+		handlers[action] = function(_, parameter) return M.read_screen(mode, parameter) end
+	end
 	for _, step in ipairs(TONE_DIRECTIONS) do
 		for _, cycle in ipairs({ false, true }) do
 			handlers[TONE_ACTION_PREFIX .. step.name .. (cycle and TONE_CYCLE_SUFFIX or "")] = function()
@@ -856,6 +886,347 @@ function M.shift_tone(direction, cycle)
 	return true
 end
 
+--- Deletes a capture's image and its private directory. A file that is still
+--- there afterwards is an error: the screenshot may show private messages.
+--- @param capture table { path, dir }
+local function discard_capture(capture)
+	for _, path in ipairs({ capture.path, capture.dir }) do
+		local removed, err = os.remove(path)
+		if not removed then
+			local left = io.open(path, "rb")
+			if left then
+				left:close()
+				Logger.error(LOG, "A screenshot file could not be deleted: %s", tostring(err))
+			end
+		end
+	end
+end
+
+--- Drops the screen action in flight, if any: its capture is stopped and
+--- deleted and its vision request withdrawn. Answers already requested belong
+--- to the offer and go with dismiss(). Called on every keystroke, so it logs
+--- only when a screen action was actually running.
+--- @param reason string What the log names the cause.
+function M.drop_vision(reason)
+	_vision_generation = _vision_generation + 1
+	local flow = _vision_flow
+	if not flow then return end
+	_vision_flow = nil
+	if flow.capture then
+		local stopped, err = pcall(flow.capture.cancel)
+		if not stopped then Logger.error(LOG, "The screen capture could not be stopped: %s", tostring(err)) end
+		discard_capture(flow.capture)
+	end
+	if flow.reading and VisionRequest.cancel() ~= true then
+		Logger.error(LOG, "The vision request could not be withdrawn.")
+	end
+	if flow.shown then clear_offer() end
+	Logger.info(LOG, "Screen reading dropped (%s).", tostring(reason))
+end
+
+--- Whether a screen flow is still the current one.
+--- @param flow table
+--- @return boolean
+local function vision_current(flow)
+	return _vision_flow == flow and flow.generation == _vision_generation
+end
+
+--- Asks the AI menu's text backend for each answer of vision.json in turn and
+--- offers them as the tooltip's candidates, in that order. Accepting one types
+--- it at the caret; nothing is typed otherwise.
+--- @param spec table The screen action's request (read_screen).
+--- @param screen string The vision model's transcription.
+local function request_screen_answers(spec, screen)
+	local config = spec.config
+	local backend, target, model = M.resolve_backend()
+	if not backend then
+		clear_offer()
+		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+		return
+	end
+	-- The backends serve one request at a time.
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting then M.dismiss() end
+
+	local language = prompt_language()
+	local candidates = {}
+	local index = 0
+	local meta = {
+		model = model,
+		profile = spec.label,
+		loading = true,
+		validation_modifiers = NavigationSettings.get(),
+	}
+	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = spec.action }
+	_offer_notified = false
+	_predicting = true
+	_request_epoch = _request_epoch + 1
+	local epoch = _request_epoch
+	show_candidates({}, meta)
+	Logger.info(LOG, "Requesting %d screen answer(s) (backend=%s, model=%s).", #config.answers, M.get_backend(), model)
+
+	local function publish()
+		local visible = {}
+		for position, candidate in ipairs(candidates) do visible[position] = candidate end
+		meta.loading = _predicting
+		show_candidates(visible, meta)
+	end
+
+	local function settle()
+		_predicting = false
+		_inflight_backend = nil
+		meta.loading = false
+		if #candidates == 0 then
+			clear_offer()
+			Logger.warn(LOG, "Screen reading produced no answer.")
+			show_notice(VISION_READ_FAILED_KEY, "read_failed")
+			return
+		end
+		Logger.info(LOG, "Screen answers on offer: %d of %d.", #candidates, #config.answers)
+		publish()
+	end
+
+	local dispatch
+	dispatch = function()
+		if _scope_owner or epoch ~= _request_epoch then return end
+		local kind = M.get_backend()
+		local now = _clock_ms()
+		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
+		if wait_ms > 0 then
+			_rate_timer = _scheduler.after(wait_ms / 1000, function()
+				if _scope_owner then return end
+				_rate_timer = nil
+				dispatch()
+			end)
+			if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+				_rate_timer = nil
+				Logger.error(LOG, "Screen answers could not be paced: timer unavailable.")
+				settle()
+			end
+			return
+		end
+		_last_request_ms[kind] = now
+		index = index + 1
+		local answer = config.answers[index]
+		local messages = {
+			{ role = "system", content = Vision.fill_language(answer.prompt, language) },
+			{ role = "user", content = Vision.answer_user_text(screen) },
+		}
+		_inflight_backend = backend
+		backend.chat(target, model, messages, {
+			stream = false,
+			temperature = Settings.get("temperature"),
+			max_tokens = config.answer_max_tokens,
+			-- Multi-line answers: the single-line stops would cut them.
+			line_mode = false,
+		}, nil, function(full_text, err)
+			if _scope_owner then return end
+			if epoch ~= _request_epoch then
+				Logger.info(LOG, "Screen answer '%s' ignored: a newer action or an edit superseded it.", answer.id)
+				return
+			end
+			if err then
+				Logger.warn(LOG, "Screen answer '%s' failed: %s", answer.id, tostring(err))
+			else
+				local text = Vision.extract(Parser.strip_thinking(full_text or ""), config.answer_tag)
+				if text then
+					candidates[#candidates + 1] = { deletes = 0, to_type = text }
+				else
+					Logger.warn(LOG, "Screen answer '%s' dropped: no %s block (%d chars).",
+						answer.id, config.answer_tag, #(full_text or ""))
+				end
+			end
+			if index < #config.answers then
+				-- Shown now: the next answer may wait for the backend's interval.
+				if #candidates > 0 then publish() end
+				dispatch()
+				return
+			end
+			settle()
+		end)
+	end
+	dispatch()
+end
+
+--- Reads the vision model's transcription and asks for the answers.
+--- @param flow table The screen flow.
+--- @param spec table The screen action's request.
+--- @param text string|nil The vision model's answer.
+--- @param err string|nil The transport's or the provider's error.
+local function finish_screen_read(flow, spec, text, err)
+	if _scope_owner then return end
+	if not vision_current(flow) then
+		Logger.info(LOG, "Screen transcription ignored: a newer action or an edit superseded it.")
+		return
+	end
+	_vision_flow = nil
+	flow.reading = false
+	if err then
+		Logger.warn(LOG, "Vision request failed: %s", tostring(err))
+		clear_offer()
+		show_notice(VISION_READ_FAILED_KEY, "read_failed")
+		return
+	end
+	if _is_paused() or not _enabled then
+		Logger.info(LOG, "Screen transcription dropped: the AI was paused or switched off while it ran.")
+		clear_offer()
+		return
+	end
+	-- The transcription is what the user's screen shows: only its size is logged.
+	local screen = Vision.extract(Parser.strip_thinking(text or ""), spec.config.screen_tag)
+	if not screen then
+		Logger.warn(LOG, "Vision answer dropped: no %s block (%d chars).", spec.config.screen_tag, #(text or ""))
+		clear_offer()
+		show_notice(VISION_READ_FAILED_KEY, "read_failed")
+		return
+	end
+	Logger.info(LOG, "Screen read (%d byte(s) of transcription).", #screen)
+	request_screen_answers(spec, screen)
+end
+
+--- Sends a finished capture to the vision model, then deletes it.
+--- @param flow table The screen flow.
+--- @param spec table The screen action's request.
+--- @param outcome table screen_capture outcome { status, scaled, reason }.
+local function finish_capture(flow, spec, outcome)
+	local capture = flow.capture
+	if _scope_owner or not vision_current(flow) then
+		discard_capture(capture)
+		Logger.info(LOG, "Screen capture ignored: a newer action or an edit superseded it.")
+		return
+	end
+	flow.capture = nil
+	if type(outcome) ~= "table" or outcome.status ~= "ok" then
+		discard_capture(capture)
+		_vision_flow = nil
+		if type(outcome) == "table" and outcome.status == "cancelled" then
+			Logger.info(LOG, "Screen reading cancelled: no region was captured.")
+			return
+		end
+		Logger.warn(LOG, "Screen capture failed: %s", tostring(type(outcome) == "table" and outcome.reason or outcome))
+		show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+		return
+	end
+	if outcome.scaled ~= true and not _vision_unscaled_logged then
+		_vision_unscaled_logged = true
+		Logger.info(LOG, "Screenshots are sent at their full size: install ImageMagick to downscale them.")
+	end
+	local handle = io.open(capture.path, "rb")
+	local image = handle and handle:read("*a") or nil
+	if handle then handle:close() end
+	discard_capture(capture)
+	if type(image) ~= "string" or image == "" then
+		_vision_flow = nil
+		Logger.error(LOG, "Screen capture reported success but its image is unreadable.")
+		show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+		return
+	end
+	if _is_paused() or not _enabled then
+		_vision_flow = nil
+		Logger.info(LOG, "Screen capture dropped: the AI was paused or switched off meanwhile.")
+		return
+	end
+	local config = spec.config
+	local body = Vision.build_request(spec.target.format, {
+		model = spec.model,
+		system = config.read_prompt,
+		text = Vision.READ_USER_TEXT,
+		image = Base64.encode(image),
+		mime = config.image_mime,
+		max_tokens = config.read_max_tokens,
+	})
+	flow.reading = true
+	-- The tooltip says something is coming: reading a screen takes seconds.
+	flow.shown = true
+	_suggestion_context = nil
+	show_candidates({}, {
+		model = spec.model,
+		profile = spec.label,
+		loading = true,
+		validation_modifiers = NavigationSettings.get(),
+	})
+	Logger.info(LOG, "Screen captured (%d byte(s)); sending it to %s.", #image, spec.backend)
+	VisionRequest.send(spec.target, body, function(text, err) finish_screen_read(flow, spec, text, err) end)
+end
+
+--- Answers what is on the screen: the llm_screen_region and llm_screen_full
+--- actions. A vision model transcribes a private screenshot, then the AI menu's
+--- text backend drafts the answers of vision.json, offered in the tooltip.
+--- A new screen action supersedes the one in flight.
+--- @param mode string "region" (the user draws it) or "full".
+--- @param value string The binding's parameter, "<backend>" or "<backend>|<model>".
+--- @return boolean started True when the capture was started.
+function M.read_screen(mode, value)
+	if _scope_owner then return false end
+	local action = nil
+	for id, action_mode in pairs(VISION_ACTIONS) do
+		if action_mode == mode then action = id end
+	end
+	if not action then error("read_screen: mode must be \"region\" or \"full\"") end
+	-- Every refusal comes before the capture: nothing is captured for nothing.
+	-- The screen is the context, so an empty typing buffer refuses nothing.
+	local reason = manual_refusal()
+	if reason == "empty_context" then reason = nil end
+	if reason then
+		Logger.info(LOG, "Screen reading refused (%s).", reason)
+		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+		return false
+	end
+	local parsed, parse_err = Vision.parse(value)
+	if not parsed then
+		Logger.warn(LOG, "Screen reading refused: invalid parameter '%s' (%s).", tostring(value), parse_err)
+		return false
+	end
+	local config = VisionRequest.config()
+	if not config then return false end
+	local model = Vision.resolve_model(parsed, config)
+	if not model then
+		Logger.info(LOG, "Screen reading refused: '%s' has no default vision model and the binding names none.",
+			parsed.backend)
+		show_notice(VISION_NO_MODEL_KEY, "no_model")
+		return false
+	end
+	local target, target_err = VisionRequest.resolve_target(parsed.backend, model)
+	if not target then
+		Logger.warn(LOG, "Screen reading refused: %s.", tostring(target_err))
+		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+		return false
+	end
+	if not _capture_screen then
+		Logger.error(LOG, "Screen reading refused: no capture surface was injected.")
+		return false
+	end
+	M.drop_vision("superseded")
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+
+	local spec = {
+		action = action,
+		label = i18n.get("sg_actions." .. action),
+		backend = parsed.backend,
+		model = model,
+		target = target,
+		config = config,
+	}
+	local flow = { generation = _vision_generation }
+	_vision_flow = flow
+	Logger.info(LOG, "Screen reading requested (mode=%s, backend=%s, model=%s).", mode, parsed.backend, model)
+	local started, handle, capture_err = pcall(_capture_screen, mode, config.max_image_edge, function(outcome)
+		-- A capture that finished before the handle came back is taken up below.
+		if not flow.capture then flow.early = outcome; return end
+		finish_capture(flow, spec, outcome)
+	end)
+	if not started or type(handle) ~= "table" then
+		if _vision_flow == flow then _vision_flow = nil end
+		Logger.error(LOG, "Screen capture could not start: %s", tostring(started and capture_err or handle))
+		show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+		return false
+	end
+	flow.capture = handle
+	if flow.early then finish_capture(flow, spec, flow.early) end
+	return true
+end
+
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring
 --- buffer alone. For edits the caller has already applied to that buffer:
 --- Backspace and Escape update it precisely, and a reset here undid the edit.
@@ -863,8 +1234,9 @@ function M.withdraw()
 	if _scope_owner then return false end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	-- Backspace, Escape, a desync or a blocked capture: the selection a tone
-	-- step was about to rewrite may be gone.
+	-- step was about to rewrite may be gone, and Escape cancels a screen action.
 	M.drop_tone("withdrawn")
+	M.drop_vision("withdrawn")
 	M.dismiss()
 end
 
@@ -1183,6 +1555,7 @@ function M.quiesce_configuration(owner)
 		_tone_timer = nil
 	end
 	_tone_generation = _tone_generation + 1
+	M.drop_vision("configuration change")
 	-- Backend connectivity probes share these owners, even when the prediction
 	-- engine did not start them. Model downloads have a separate HTTP owner.
 	local backends = { get_ollama(), get_remote() }
@@ -1201,7 +1574,7 @@ end
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
 	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
-		or _inflight_backend then return nil end
+		or _inflight_backend or _vision_flow then return nil end
 	return { enabled = _enabled }
 end
 

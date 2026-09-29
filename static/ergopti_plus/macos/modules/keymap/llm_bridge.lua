@@ -36,6 +36,7 @@ local keylogger        = require("modules.keylogger")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local ToneRewrite      = require("modules.llm.tone_rewrite")
+local ScreenAnswer     = require("modules.llm.screen_answer")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
@@ -1576,7 +1577,9 @@ function M.apply_prediction(idx)
 	-- A rewrite already names the exact span it replaces: an overlap match between
 	-- the buffer tail and the rewritten sentence would shrink its deletions.
 	local resolve_overlap = km_utils.resolve_prediction_overlap
-	if pred.rewrite == true then
+	-- A screen-reading answer is typed verbatim at the caret: it does not
+	-- continue the buffer, so the buffer tail must not trim it either.
+	if pred.rewrite == true or pred.verbatim == true then
 		resolve_overlap = function(_, deletes, text) return deletes, text end
 	end
 	local ok_overlap, res_deletes, res_text = pcall(
@@ -1894,6 +1897,21 @@ function M.request_tone_step(direction, cycle, parent)
 		return false
 	end
 	return ToneRewrite.step(direction, cycle, parent)
+end
+
+--- Reads the screen and offers answers in the prediction tooltip (the
+--- llm_screen_region and llm_screen_full actions). The screen-answer module
+--- logs and shows every refusal.
+--- @param value string The binding's parameter: "<backend>" or "<backend>|<model>".
+--- @param mode string ScreenAnswer.MODE_REGION or ScreenAnswer.MODE_FULL.
+--- @param parent string|nil Stable action parent of the screenshot actions.
+--- @return boolean started True when the screenshot is being taken.
+function M.request_screen_answers(value, mode, parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Screen reading skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return ScreenAnswer.run(value, mode, parent)
 end
 
 --- Re-arms the LLM inactivity timer.

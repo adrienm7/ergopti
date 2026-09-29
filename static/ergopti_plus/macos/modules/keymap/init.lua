@@ -687,6 +687,7 @@ M.trigger_prediction = LLMBridge._perform_llm_check
 M.request_manual_prediction = LLMBridge.request_manual_prediction
 M.request_prompt_prediction = LLMBridge.request_prompt_prediction
 M.request_tone_step = LLMBridge.request_tone_step
+M.request_screen_answers = LLMBridge.request_screen_answers
 M.reset_predictions  = LLMBridge.reset_predictions
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 

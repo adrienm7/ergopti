@@ -294,6 +294,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
 		. '"promptChoices":' . _ActPickWeb_PromptChoicesJson() . ","
+		. '"visionChoices":' . _ActPickWeb_VisionChoicesJson() . ","
 		. '"defaultCount":' . _ActPickWeb_DefaultCount() . ","
 		. _ActPickWeb_Kv("editCurrentLabel", t("dialog.action_picker.edit_current")) . ","
 		. '"items":[' . ItemsJson . "]"
@@ -314,7 +315,8 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 
 ; The editor's localized strings: its buttons, its capture hints, and each
 ; kind's prompt and refusal, the same texts the native prompt shows.
-; countDefault stays raw, with its {1}: the page puts the menu's count in it.
+; countDefault and visionModelDefault stay raw, with their {1}: the page puts
+; the menu's count, or the backend's default model, in it.
 _ActPickWeb_ParameterStringsJson() {
 	Prompts := ""
 	Errors := ""
@@ -324,6 +326,9 @@ _ActPickWeb_ParameterStringsJson() {
 	}
 	Prompts .= "," . _ActPickWeb_Kv("llm_prompt", GestureActionParameterPrompt("llm_prompt_prediction"))
 	Errors .= "," . _ActPickWeb_Kv("llm_prompt", t("dialog.gestures.param_err_llm_prompt"))
+	; Both screen actions share the kind, and so its prompt
+	Prompts .= "," . _ActPickWeb_Kv("llm_vision", GestureActionParameterPrompt("llm_screen_region"))
+	Errors .= "," . _ActPickWeb_Kv("llm_vision", t("dialog.gestures.param_err_llm_vision"))
 	return "{"
 		. _ActPickWeb_Kv("save", t("button.save")) . ","
 		. _ActPickWeb_Kv("back", t("dialog.action_picker.back")) . ","
@@ -332,6 +337,10 @@ _ActPickWeb_ParameterStringsJson() {
 		. _ActPickWeb_Kv("promptLabel", t("dialog.action_picker.prompt_label")) . ","
 		. _ActPickWeb_Kv("countLabel", t("dialog.action_picker.count_label")) . ","
 		. _ActPickWeb_Kv("countDefault", t("dialog.action_picker.count_default")) . ","
+		. _ActPickWeb_Kv("visionProviderLabel", t("dialog.action_picker.vision_provider_label")) . ","
+		. _ActPickWeb_Kv("visionModelLabel", t("dialog.action_picker.vision_model_label")) . ","
+		. _ActPickWeb_Kv("visionModelDefault", t("dialog.action_picker.vision_model_default")) . ","
+		. _ActPickWeb_Kv("visionModelRequired", t("dialog.action_picker.vision_model_required")) . ","
 		. '"prompts":{' . Prompts . '},"errors":{' . Errors . "}}"
 }
 
@@ -343,6 +352,18 @@ _ActPickWeb_PromptChoicesJson() {
 		Json .= (Json = "" ? "" : ",") . "{"
 			. _ActPickWeb_Kv("value", Choice["value"]) . ","
 			. _ActPickWeb_Kv("label", Choice["label"]) . "}"
+	return "[" . Json . "]"
+}
+
+; The vision backends a llm_vision value may name, with the vision model each
+; uses when the value names none ("" when the value must name one).
+_ActPickWeb_VisionChoicesJson() {
+	Json := ""
+	for Choice in LLM_Vision_BackendChoices()
+		Json .= (Json = "" ? "" : ",") . "{"
+			. _ActPickWeb_Kv("value", Choice["value"]) . ","
+			. _ActPickWeb_Kv("label", Choice["label"]) . ","
+			. _ActPickWeb_Kv("defaultModel", Choice["defaultModel"]) . "}"
 	return "[" . Json . "]"
 }
 
