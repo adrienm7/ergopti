@@ -1057,16 +1057,20 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
---- Shows the on-screen banner naming the exact switch to turn on.
---- @return function close Removes the banner.
+--- Opens the native dialog that names the exact switch to turn on. It used to
+--- be a one-line banner along the Dock; the dialog has steps and buttons and
+--- the wait closes it when the grant arrives. Loaded here, not at the top, so a
+--- UI failure can never stop the boot; guide_accessibility itself never raises.
+--- @return function close Closes the dialog.
 local function show_accessibility_guidance()
-	local shown, alert_id = pcall(hs.alert.show, i18n.get("startup.accessibility_waiting"),
-		{ atScreenEdge = 2 }, hs.screen.mainScreen(), AccessibilityWait.DEADLINE_SECONDS)
-	if not shown then
-		Logger.warn(LOG, "Accessibility guidance banner could not be shown: %s.", tostring(alert_id))
+	local ok, close = xpcall(function()
+		return require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Accessibility dialog unavailable: %s.", tostring(close))
 		return function() end
 	end
-	return function() pcall(hs.alert.closeSpecific, alert_id, 0) end
+	return close
 end
 
 -- Pre-start the keyboard input owners so they are active before menu.lua reads

@@ -136,6 +136,7 @@ const MACOS_MODULES = {
 	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
 	error_dialog: 'ui/error_dialog/init.lua',
+	permission_dialog: 'ui/permission_dialog/init.lua',
 	download_window: 'ui/download_window/init.lua',
 	update_check: 'ui/update_check/init.lua'
 };
@@ -262,6 +263,9 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
+	permission_dialog:
+		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
+		'Privacy & Security), which Windows does not have',
 	metrics_apps:
 		'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
 	metrics_typing:
