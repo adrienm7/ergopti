@@ -106,7 +106,10 @@ These are software implementations; final hardware verification remains below.
         confirmation for quarantine/trash; exclude the rejected quit-all-apps action.
 13. [ ] Complete F2: honor the Karabiner integration switch before leases and
         guardians; preserve personal rules; back up and restore Windows touchpad
-        registry values through one owner.
+        registry values through one owner. Remaining: turning the switch off or
+        « Retirer Ergopti de Karabiner » does not unregister a guardian
+        LaunchAgent registered while it was on (needs a headless unregister
+        role in the launcher, verified on a Mac).
 14. [ ] Run final cross-driver, shared, encoding, convention and 21-locale gates;
         record real-device checks still unavailable on this Windows host.
 15. [x] Finish storage cleanup after all useful work is recoverable from GitHub.

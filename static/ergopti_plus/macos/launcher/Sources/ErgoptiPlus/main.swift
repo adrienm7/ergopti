@@ -669,8 +669,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	/// Starts Hammerspoon without registering the remap guardian. The driver
 	/// registers it through the headless `--register-remap-guardian` role, and
-	/// only once it has read « Ergopti uses Karabiner » = on: a user who turned
-	/// the integration off gets no Background Item from ErgoptiPlus.
+	/// only once it has read « Ergopti uses Karabiner » = on: while it is off
+	/// no new Background Item is registered. Turning it off later does not
+	/// unregister one registered earlier.
 	func startManagedHammerspoon(at hsBinary: String) {
 		LauncherLog.write(
 			"launcher stage: remap guardian registration left to the driver's Karabiner switch"
