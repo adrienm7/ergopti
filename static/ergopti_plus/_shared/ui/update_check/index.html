@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="update_check.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+		<script src="../i18n.js"></script>
+		<script src="../_generated/update_channel_registry.js"></script>
+		<script src="../update_channels.js"></script>
+	</head>
+	<body>
+		<main id="panel">
+			<div id="spinner" class="spinner" hidden></div>
+			<p id="line1" class="line1"></p>
+			<p id="line2" class="line2"></p>
+			<p id="logged" class="logged" hidden></p>
+			<button type="button" id="btn-whats-new" class="link" hidden></button>
+			<ul id="others" class="others" hidden></ul>
+			<p id="status" class="status info" role="status" aria-live="polite"></p>
+		</main>
+		<footer class="buttons">
+			<button type="button" id="btn-report" hidden></button>
+			<button type="button" id="btn-open-log" hidden></button>
+			<button type="button" id="btn-close"></button>
+			<button type="button" id="btn-update" class="primary" hidden></button>
+		</footer>
+		<script src="script.js"></script>
+	</body>
+</html>

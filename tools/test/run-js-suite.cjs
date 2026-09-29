@@ -829,6 +829,12 @@ const CHECKS = [
 		repro: 'npm run test:error-dialog-page'
 	},
 	{
+		name: 'update-check page (checking, up to date, new release, no release, failure, other channels, 21 locales, centered)',
+		cmd: 'node',
+		args: ['tools/test/test-update-check-dialog.cjs'],
+		repro: 'npm run test:update-check-dialog'
+	},
+	{
 		name: 'configuration cleanup page (long lists, literal values, session actions, 21 locales)',
 		cmd: 'node',
 		args: ['tools/test/test-config-cleanup-page.cjs'],

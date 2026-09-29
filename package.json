@@ -148,6 +148,7 @@
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:gui-title-audit": "node ./tools/test/test-gui-title-audit.cjs",
 		"test:error-dialog-page": "node ./tools/test/test-error-dialog-page.cjs",
+		"test:update-check-dialog": "node ./tools/test/test-update-check-dialog.cjs",
 		"test:config-cleanup-page": "node ./tools/test/test-config-cleanup-page.cjs",
 		"test:js-suite-failure-diagnostics": "node ./tools/test/test-js-suite-failure-diagnostics.cjs",
 		"verify": "node ./tools/test/verify-change.cjs",
