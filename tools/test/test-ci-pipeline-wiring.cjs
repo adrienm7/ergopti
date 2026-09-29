@@ -92,9 +92,12 @@ const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
 // read such as `gh release view` is not one.
 const SIDE_EFFECT = /\bgh api\b|\bgh release (?:create|edit|upload|delete)\b|\bgit\b[^\n]*\bpush\b/;
 
-// Floors — today: 7 plan outputs, 3 callers, 4 release-only secrets.
+// Floors — today: 7 plan outputs, 3 callers, 6 release-only secrets (the
+// Sparkle private key and the macOS code-signing .p12 and its password, then
+// Windows' certificate, password and subject). Raised from 4 with the macOS
+// certificate, so dropping either of its secrets from the caller fails here.
 const MIN_PLAN_OUTPUTS = 7;
-const MIN_GATED_SECRETS = 4;
+const MIN_GATED_SECRETS = 6;
 
 // The root's checks after its setup, in order, with the one command each runs.
 const VALIDATE_SETUP = 'Prepare plan validation';

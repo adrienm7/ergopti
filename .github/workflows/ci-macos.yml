@@ -31,6 +31,12 @@ on:
       SPARKLE_ED_PRIVATE_KEY:
         description: Sparkle EdDSA private key that signs the release zip; passed on release runs only
         required: false
+      MACOS_SIGNING_CERTIFICATE_BASE64:
+        description: Self-signed code-signing .p12, base64; passed on release runs only
+        required: false
+      MACOS_SIGNING_CERTIFICATE_PASSWORD:
+        description: Password of the code-signing .p12; passed on release runs only
+        required: false
 
 permissions:
   contents: read
@@ -211,6 +217,12 @@ jobs:
       # refuses that fallback first: a throwaway SUPublicEDKey matches no
       # private key, so Sparkle would reject every later update of the
       # installed copies.
+      #
+      # The code-signing certificate reaches this step on a release run only.
+      # With it every build keeps one code identity, so the TCC and Login Items
+      # grants survive an update; without it the build signs ad hoc and every
+      # update costs users each permission. A release still builds without it
+      # until the secrets exist, but says so with a warning on the run.
       - name: Build ErgoptiPlus.app
         shell: bash
         env:
@@ -220,10 +232,15 @@ jobs:
           ERGOPTI_CHANNEL: ${{ inputs.channel }}
           ERGOPTI_RELEASE: ${{ inputs.release }}
           SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+          MACOS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.MACOS_SIGNING_CERTIFICATE_BASE64 }}
+          MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
+          if [ "$ERGOPTI_RELEASE" = true ] && [ -z "$MACOS_SIGNING_CERTIFICATE_BASE64" ]; then
+              echo "::warning title=Ad hoc signature::This release is signed ad hoc: no MACOS_SIGNING_CERTIFICATE_BASE64 secret. macOS will not carry the Accessibility, Screen Recording, Automation and Login Items grants over to it. Create the secrets with tools/build/create_macos_signing_identity.sh."
+          fi
           if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
               if [ "$ERGOPTI_RELEASE" = true ]; then
                   echo "::error::a release build needs the SPARKLE_PUBLIC_KEY secret; a throwaway key would orphan every installed copy from later updates."

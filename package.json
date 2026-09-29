@@ -119,6 +119,7 @@
 		"test:macos-remap-launchagent": "node ./tools/test/test-macos-remap-launchagent.cjs",
 		"test:macos-sparkle-feed": "node ./tools/test/test-macos-sparkle-feed.cjs",
 		"test:macos-sparkle-disarmed-bundles": "node ./tools/test/test-macos-sparkle-disarmed-bundles.cjs",
+		"test:macos-stable-signing-identity": "node ./tools/test/test-macos-stable-signing-identity.cjs",
 		"test:updater-copy-before-consent": "node ./tools/test/test-updater-copy-before-consent.cjs",
 		"test:updater-copy-is-shown": "node ./tools/test/test-updater-copy-is-shown.cjs",
 		"test:ahk-format-placeholders": "node ./tools/test/test-ahk-format-placeholders.cjs",

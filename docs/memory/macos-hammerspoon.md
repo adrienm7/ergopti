@@ -281,6 +281,18 @@ held during an interactive capture sends it to the clipboard; Ctrl+H is still
 held when the selector opens, so an advanced pasteboard change count with an
 image also counts as a copy.
 
+### project-macos-grants-follow-the-designated-requirement
+
+TCC and Login Items store a grant against the signature's designated
+requirement. An ad hoc signature's requirement is the cdhash, new on every
+build, so no grant survives an update whatever `--identifier` says. A stable
+self-signed certificate (`tools/build/create_macos_signing_identity.sh`, secrets
+`MACOS_SIGNING_CERTIFICATE_BASE64` / `_PASSWORD`) makes it identifier +
+certificate hash. Action: sign every object through `sign_code` in
+`build_macos_app.sh`, never replace the certificate casually (each new one
+costs every user one re-grant), and read the requirement the release log
+prints before blaming the driver for a lost grant.
+
 ### project-hs-input-source-single-owner
 
 `hs.keycodes.inputSourceChanged` is a setter, so one broker owns it and

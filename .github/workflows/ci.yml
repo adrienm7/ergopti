@@ -314,6 +314,8 @@ jobs:
     secrets:
       SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
       SPARKLE_ED_PRIVATE_KEY: ${{ needs.validate.outputs.release == 'true' && secrets.SPARKLE_ED_PRIVATE_KEY || '' }}
+      MACOS_SIGNING_CERTIFICATE_BASE64: ${{ needs.validate.outputs.release == 'true' && secrets.MACOS_SIGNING_CERTIFICATE_BASE64 || '' }}
+      MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ needs.validate.outputs.release == 'true' && secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD || '' }}
 
   # ─────────────────────────────────────────────────
   # 2.2) Windows — AHK unit + E2E, release exe

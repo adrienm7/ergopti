@@ -372,6 +372,17 @@ const privateKeyReads = withoutFullLineComments(pipeline.file(MACOS_BOX)).match(
 check(privateKeyReads.length === 1 &&
 	/secrets\.SPARKLE_ED_PRIVATE_KEY\b/.test(pipeline.step(packageJob, 'Sign zip with Sparkle EdDSA key')),
 	`only "Sign zip with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`);
+// The code-signing .p12 and its password reach the one step that signs the
+// bundle: the build. An ad hoc release must say so on the run, because every
+// installed copy then loses its TCC and Login Items grants at the update.
+for (const secret of ['MACOS_SIGNING_CERTIFICATE_BASE64', 'MACOS_SIGNING_CERTIFICATE_PASSWORD']) {
+	const reads = withoutFullLineComments(pipeline.file(MACOS_BOX)).match(new RegExp(`secrets\\.${secret}\\b`, 'g')) ?? [];
+	check(reads.length === 1 && packageBuild.split('\n').includes(`          ${secret}: \${{ secrets.${secret} }}`),
+		`(stable-signing-identity) only "Build ErgoptiPlus.app" may read secrets.${secret} in ${MACOS_BOX}, found ${reads.length} read(s)`);
+}
+check(/if \[ "\$ERGOPTI_RELEASE" = true \] && \[ -z "\$MACOS_SIGNING_CERTIFICATE_BASE64" \]; then\s*echo "::warning[^\n]*\n\s*fi[\s\S]*?build_macos_app\.sh/
+	.test(packageBuild),
+	'(stable-signing-identity) an ad hoc release build must emit a ::warning:: before build_macos_app.sh runs');
 // The judge is the gate itself: it must run the verdict script on the installed
 // app for this leg's scenario, and neither skip nor forgive a red verdict.
 const judge = pipeline.step(launch, 'Launch over the user state and judge it');
