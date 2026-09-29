@@ -224,9 +224,10 @@ local function route_bound_files(packs)
 end
 
 --- Names the root or pack a discovery failure belongs to, for the log.
---- @param where table { root, dir, id } as the scanner reports it.
+--- @param where table { root, dir, id, path } as the scanner reports it.
 --- @return string
 local function describe_failure(where)
+	if where.path then return string.format("file '%s' of pack '%s'", where.path, tostring(where.id)) end
 	if where.id then return string.format("pack '%s' (%s)", where.id, tostring(where.dir)) end
 	if where.root then return string.format("root '%s'", where.root) end
 	return "roots"

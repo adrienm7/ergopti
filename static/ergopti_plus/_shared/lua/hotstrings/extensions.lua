@@ -67,6 +67,13 @@ local FEATURE_SECTION_PATTERN = "^hotstrings%.[a-z][a-z0-9_]*$"
 local MAGIC_KEY_FIELDS = { key = true }
 local KEY_CODE_PATTERN = "^[A-Z][A-Za-z0-9]*$"
 
+-- Characters a pack id or hotstring file stem may not carry: a dot splits the
+-- configuration path (hotstrings.groups.<category>) that addresses the pack's
+-- preference, and a colon splits the ext:<id>:<stem> category key. A pack named
+-- com.acme or a backup words.old.toml would register a group no preference can
+-- name, and the projection that enables groups would refuse the whole catalogue.
+local UNADDRESSABLE_PATTERN = "[%.:]"
+
 
 
 
@@ -201,8 +208,12 @@ end
 --- @param id string Extension id, the directory name.
 --- @param list_files function Injected file listing.
 --- @param read_file function|nil Injected manifest reader.
+--- @param skip_file function|nil Receives (path, err) for a file left out; raises when nil.
 --- @return table Record { id, name, dir, descriptions, toml_files, bound_files, magic_key }.
-local function read_pack(dir, id, list_files, read_file)
+local function read_pack(dir, id, list_files, read_file, skip_file)
+	if id:find(UNADDRESSABLE_PATTERN) then
+		error("Extension id cannot carry a dot or a colon (content withheld)", 0)
+	end
 	local manifest_text = nil
 	if type(read_file) == "function" then
 		manifest_text = read_file(dir .. "/" .. MANIFEST_NAME)
@@ -213,7 +224,12 @@ local function read_pack(dir, id, list_files, read_file)
 	local bound_found = {}
 	for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
 		local stem = path:match("([^/\\]+)%.toml$")
-		if stem and bindings[stem] then
+		if stem and stem:find(UNADDRESSABLE_PATTERN) then
+			-- A backup such as words.old.toml costs that file, not its siblings.
+			local err = "Extension hotstring file stem cannot carry a dot or a colon (content withheld)"
+			if not skip_file then error(err, 0) end
+			skip_file(path, err)
+		elseif stem and bindings[stem] then
 			bound_files[#bound_files + 1] = { path = path, stem = stem, binding = bindings[stem] }
 			bound_found[stem] = true
 		elseif stem then
@@ -255,9 +271,9 @@ end
 --- source of a bundled category, not a namespaced pack, so every consumer that
 --- offers `toml_files` as `ext:` categories leaves it out without knowing why.
 --- Without `on_error` any unreadable root or invalid pack raises. With it, the
---- failure is handed to `on_error({ root, dir, id }, err)` and only that root or
---- pack is left out: a driver that must keep booting reports one broken pack
---- instead of losing every extension, and every bundled feature, to it.
+--- failure is handed to `on_error({ root, dir, id, path }, err)` and only that
+--- root, pack or file is left out: a driver that must keep booting reports one
+--- broken pack instead of losing every extension, and every bundled feature, to it.
 --- @param roots table Array of absolute directory paths, in precedence order.
 --- @param io_fns table { list_dirs, list_files, read_file, on_error? } — injected I/O.
 --- @return table Array of { id, name, dir, descriptions, toml_files, bound_files, magic_key };
@@ -287,7 +303,10 @@ function M.scan(roots, io_fns)
 				if id and id ~= "" then
 					local read, record = true, nil
 					if on_error then
-						read, record = pcall(read_pack, dir, id, list_files, read_file)
+						local function skip_file(path, err)
+							on_error({ root = root, dir = dir, id = id, path = path }, err)
+						end
+						read, record = pcall(read_pack, dir, id, list_files, read_file, skip_file)
 					else
 						record = read_pack(dir, id, list_files, read_file)
 					end

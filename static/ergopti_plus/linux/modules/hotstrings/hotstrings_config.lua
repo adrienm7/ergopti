@@ -804,6 +804,8 @@ end
 -- =========================================
 
 --- The extensions installed on this machine, as the shared scanner reports them.
+--- A root or pack the scanner refuses is logged and left out, so one broken
+--- third-party folder never costs the reload every other hotstring.
 --- @return table Array of extension records (toml_files, bound_files, …).
 function M.discover_extensions()
 	if type(Paths.extension_roots) ~= "function" then return {} end
@@ -811,6 +813,10 @@ function M.discover_extensions()
 		list_dirs  = Loader.list_subdirs,
 		list_files = Loader.find_toml_files,
 		read_file  = Loader.read_file,
+		on_error   = function(where, err)
+			Logger.error(LOG, "Extension %s is left out: %s.",
+				tostring(where.path or (where.id and ("'" .. where.id .. "'")) or where.root), tostring(err))
+		end,
 	})
 end
 
