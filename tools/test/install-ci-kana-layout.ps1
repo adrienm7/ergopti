@@ -237,6 +237,10 @@ try {
 			if ($window -eq $main) { continue }
 			$texts = [KanaInstallerJob]::ChildTexts($window)
 			if ($texts.Count -eq 0) { continue }
+			# The result dialog can be read after its button exists and before its
+			# message is set ("OK | "): that is not a result yet, so poll again.
+			$message = @($texts | Where-Object { $_ -ne '' -and $_ -ne 'OK' })
+			if ($message.Count -eq 0) { continue }
 			$trace.Add(@{ dialog = [KanaInstallerJob]::Text($window); texts = $texts })
 			if (-not ($texts -match '^Layout successfully installed\.?$')) {
 				throw "Unexpected installer result: $($texts -join ' | ')"

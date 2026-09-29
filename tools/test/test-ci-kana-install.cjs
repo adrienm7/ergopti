@@ -23,6 +23,13 @@ const helper = path.resolve(__dirname, 'install-ci-kana-layout.ps1');
 const source = fs.readFileSync(helper, 'utf8');
 const native = source.match(/Add-Type -TypeDefinition @'\r?\n([\s\S]*?)\r?\n'@/);
 assert.ok(native, 'the installer must declare its native job owner');
+// A result dialog read before its message is set shows only "OK": CI once
+// failed with "Unexpected installer result: OK | " on a successful install.
+const resultLoop = source.slice(source.indexOf('$texts = [KanaInstallerJob]::ChildTexts($window)'));
+const waitsForMessage = resultLoop.indexOf("$_ -ne '' -and $_ -ne 'OK'");
+const judges = resultLoop.indexOf('Unexpected installer result');
+assert.ok(waitsForMessage > 0 && waitsForMessage < judges,
+	'the installer must wait for the result message before judging it');
 if (process.platform !== 'win32') {
 	console.log('[SKIP] native Kana installer guard execution requires Windows.');
 	process.exit(0);
