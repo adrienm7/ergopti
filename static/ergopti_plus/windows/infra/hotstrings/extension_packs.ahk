@@ -6,10 +6,28 @@
 ; Discovers bundled, committed layout and user packs in overlay order. Desired
 ; group and section choices stay in the existing feature map; registration uses
 ; a separate plan so disabling the master never rewrites those choices.
+;
+; A manifest may bind one of its files to a historical category
+; ([extension.hotstring_bindings.<stem>]): the file then supplies that bundled
+; category, or some of its sections, and is listed in bound_files instead of
+; toml_files, so it never becomes an ext: category. The Lua scanner
+; (_shared/lua/hotstrings/extensions.lua) applies the same rules; both replay
+; _shared/tests/corpus/layouts/extension_binding_vectors.json.
 ; ==============================================================================
 
 global _HotstringExtensionPacks := []
 global _HotstringExtensionPaths := Map()
+
+; The only fields a binding may carry: it says where a historical section's
+; rules live, never whether they are on, so an `enabled` key is refused.
+global HOTSTRING_BINDING_FIELDS := Map("category", true, "feature_section", true, "sections", true, "source", true)
+; A bound file replaces a bundled source, so it keeps the common priority tier.
+global HOTSTRING_BINDING_SOURCES := Map("common", true)
+global HOTSTRING_BINDING_TABLE := "extension.hotstring_bindings"
+; Identifier shapes shared with the Lua scanner and the layout inventory.
+global HOTSTRING_BINDING_STEM_PATTERN := "^[a-z][a-z0-9_-]*$"
+global HOTSTRING_BINDING_ID_PATTERN := "^[a-z][a-z0-9_]*$"
+global HOTSTRING_BINDING_FEATURE_PATTERN := "^hotstrings\.[a-z][a-z0-9_]*$"
 
 /**
  * Reads the existing roots in bundled, installed, then user precedence order.
@@ -57,7 +75,9 @@ HotstringExtensions_Register(Target, Packs, MasterOn) {
 /**
  * Discovers existing-format hotstring packs; later roots replace earlier packs.
  * @param {Array} Roots - Absolute roots in overlay order.
- * @returns {Array} Packs with canonical category identities and section metadata.
+ * @returns {Array} Packs with canonical category identities and section metadata;
+ *   files bound to a historical category are listed in bound_files, the others
+ *   in toml_files.
  */
 HotstringExtensions_Scan(Roots) {
 	ById := Map()
@@ -70,7 +90,8 @@ HotstringExtensions_Scan(Roots) {
 			Name := Manifest.Has("extension") ? Manifest["extension"].Get("name", Id) : Id
 			if !(Name is String)
 				throw TypeError("Extension name must be a string.")
-			Files := []
+			Bindings := HotstringExtensions_Bindings(Manifest)
+			Files := [], BoundFiles := []
 			for FilePath in FSListDirectoryStrict(PackDir . "\hotstrings") {
 				if !RegExMatch(FilePath, "i)\.toml$")
 					continue
@@ -88,15 +109,144 @@ HotstringExtensions_Scan(Roots) {
 					Sections.Push(Map("name", Section, "description", Description == "" ? Section : Description, "count", Count))
 					Total += Count
 				}
-				Files.Push({ path: FilePath, stem: Stem, category: Category, sections: Sections, count: Total })
+				Record := { path: FilePath, stem: Stem, category: Category, sections: Sections, count: Total }
+				if Bindings.Has(Stem) {
+					Record.binding := Bindings[Stem]
+					BoundFiles.Push(Record)
+					Bindings.Delete(Stem)
+				} else {
+					Files.Push(Record)
+				}
 			}
-			ById[Id] := { id: Id, name: Name, dir: PackDir, toml_files: Files }
+			; A binding names a file the pack must carry: without it a historical
+			; section would read as rules the user lost, not as a broken install.
+			if Bindings.Count
+				throw Error("Bound extension hotstring file is missing.")
+			ById[Id] := { id: Id, name: Name, dir: PackDir, toml_files: Files, bound_files: BoundFiles }
 		}
 	}
 	Packs := []
 	for Id, Pack in ById
 		Packs.Push(Pack)
 	return Packs
+}
+
+/**
+ * Reads and validates the historical source bindings of one manifest.
+ * The per-file table headers, one [extension.hotstring_bindings] table of
+ * inline tables and an inline hotstring_bindings key of [extension] are the
+ * spellings the Lua decoder accepts, so each is read; a stem declared twice is
+ * refused rather than resolved by spelling.
+ * @param {Map} Manifest - ParseTomlFile result, one Map per section header.
+ * @returns {Map} Validated bindings keyed by hotstring file stem.
+ */
+HotstringExtensions_Bindings(Manifest) {
+	global HOTSTRING_BINDING_TABLE
+	Declared := []
+	if Manifest.Has("extension") && Manifest["extension"].Has("hotstring_bindings")
+		Declared.Push(Manifest["extension"]["hotstring_bindings"])
+	if Manifest.Has(HOTSTRING_BINDING_TABLE)
+		Declared.Push(Manifest[HOTSTRING_BINDING_TABLE])
+	Prefix := HOTSTRING_BINDING_TABLE . "."
+	for Header, Values in Manifest {
+		if SubStr(Header, 1, StrLen(Prefix)) == Prefix
+			Declared.Push(Map(SubStr(Header, StrLen(Prefix) + 1), Values))
+	}
+	Bindings := Map()
+	for Table in Declared {
+		if !(Table is Map)
+			throw ValueError("Invalid extension hotstring bindings.")
+		for Stem, Binding in Table {
+			if Bindings.Has(Stem)
+				throw ValueError("An extension hotstring binding is declared twice.")
+			Bindings[Stem] := _HotstringExtensions_ValidBinding(Stem, Binding)
+		}
+	}
+	return Bindings
+}
+
+; One binding, checked field by field against the shapes the Lua scanner uses.
+_HotstringExtensions_ValidBinding(Stem, Binding) {
+	global HOTSTRING_BINDING_FIELDS, HOTSTRING_BINDING_SOURCES, HOTSTRING_BINDING_STEM_PATTERN
+	global HOTSTRING_BINDING_ID_PATTERN, HOTSTRING_BINDING_FEATURE_PATTERN
+	if !(Stem is String) || !RegExMatch(Stem, HOTSTRING_BINDING_STEM_PATTERN) || !(Binding is Map)
+		throw ValueError("Invalid extension hotstring binding.")
+	for Key in Binding {
+		if !HOTSTRING_BINDING_FIELDS.Has(Key)
+			throw ValueError("Unknown extension hotstring binding field.")
+	}
+	Category := Binding.Get("category", 0), Feature := Binding.Get("feature_section", 0)
+	Source := Binding.Get("source", 0)
+	if !(Category is String) || !RegExMatch(Category, HOTSTRING_BINDING_ID_PATTERN)
+		|| !(Feature is String) || !RegExMatch(Feature, HOTSTRING_BINDING_FEATURE_PATTERN)
+		|| !(Source is String) || !HOTSTRING_BINDING_SOURCES.Has(Source)
+		throw ValueError("Invalid historical extension hotstring binding.")
+	Valid := Map("category", Category, "feature_section", Feature, "source", Source)
+	if Binding.Has("sections") {
+		Sections := Binding["sections"]
+		if !(Sections is Array) || Sections.Length == 0
+			throw ValueError("Invalid extension section selection.")
+		Seen := Map()
+		for Section in Sections {
+			if !(Section is String) || !RegExMatch(Section, HOTSTRING_BINDING_ID_PATTERN) || Seen.Has(Section)
+				throw ValueError("Invalid extension section selection.")
+			Seen[Section] := true
+		}
+		Valid["sections"] := Sections.Clone()
+	}
+	return Valid
+}
+
+/**
+ * The discovered file that supplies a category, or one section of it.
+ * A namespaced ext: key names its own file. A historical category keeps its
+ * bundled source unless a pack binds it: a whole-category binding replaces the
+ * file, a section binding only those sections, and the category's general
+ * metadata stays with the bundled file. Two owners are refused: either silent
+ * winner would depend on the order the packs were scanned in.
+ * @param {Array} Packs - Discovered packs.
+ * @param {String} Category - Runtime category, historical or namespaced.
+ * @param {String} Section - Section name, or "" for the category itself.
+ * @returns {String} The bound file path, "" when the bundled source applies.
+ */
+HotstringExtensions_Source(Packs, Category, Section := "") {
+	if !(Packs is Array) || !(Category is String) || Category == "" || !(Section is String)
+		throw ValueError("Extension source resolution needs packs, a category and a section name.")
+	Namespaced := SubStr(Category, 1, 4) == "ext:"
+	Owner := ""
+	for Pack in Packs {
+		for Files in [Pack.toml_files, Pack.HasOwnProp("bound_files") ? Pack.bound_files : []] {
+			for File in Files {
+				if Namespaced {
+					if File.category == Category
+						return File.path
+					continue
+				}
+				Binding := File.HasOwnProp("binding") ? File.binding : 0
+				if !(Binding is Map) || Binding["category"] !== Category
+					|| !_HotstringExtensions_Covers(Binding, Section)
+					continue
+				if Owner != ""
+					throw ValueError("Two extensions bind the same historical hotstring source: "
+						. Category . (Section == "" ? "" : "." . Section))
+				Owner := File.path
+			}
+		}
+	}
+	return Owner
+}
+
+; Whether a binding claims one section ("" = the category's general data).
+_HotstringExtensions_Covers(Binding, Section) {
+	if !Binding.Has("sections")
+		return true
+	if Section == ""
+		return false
+	for Name in Binding["sections"] {
+		if Name == Section
+			return true
+	}
+	return false
 }
 
 /**

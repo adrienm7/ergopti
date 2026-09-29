@@ -26,8 +26,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Json = require("json")
 
 local Extensions = helpers.load_module("hotstrings.extensions")
+
+-- Shared with the macOS suite and the Windows scanner, so the three readers of a
+-- manifest's historical bindings are pinned to one set of decisions.
+local BINDING_VECTORS_PATH = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/extension_binding_vectors.json"
 
 
 --- Builds an injected filesystem from a plain description.
@@ -225,3 +230,20 @@ helpers.describe("extensions: a pack's category is namespaced by its extension",
 	end)
 
 end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 4/ Historical source bindings ============
+-- ==================================================
+-- ==================================================
+
+do
+	local fh = assert(io.open(BINDING_VECTORS_PATH, "r"))
+	local text = fh:read("*a")
+	fh:close()
+	require("test.extension_binding_contract")(helpers, Extensions, Json.decode(text))
+end
