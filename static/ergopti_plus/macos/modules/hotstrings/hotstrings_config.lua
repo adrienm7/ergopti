@@ -831,6 +831,17 @@ function M.resolve(category, section)
 	-- Invalidated by clearing the table in the three writers that can change the
 	-- answer (set_override, clear_override, reload) rather than by a generation
 	-- counter: the cache lives in _state, so M.init() resets it for free.
+	--
+	-- A registered extension pack group (ext:<id>:<stem>) is not a bare category:
+	-- its metadata is its own file, which the resolver names, and its overrides
+	-- belong to the extension's ext.<id> owner, exactly as resolve_ext reads them.
+	local extension_id = Extensions.parse_category_key(category)
+	if extension_id then
+		local ok_path, pack_path = pcall(_state.toml_resolver, category)
+		if ok_path and type(pack_path) == "string" and pack_path ~= "" then
+			return M.resolve_ext(extension_id, pack_path, section)
+		end
+	end
 	local canonical_category = ConfigSchema.normalize_category(category)
 	if not canonical_category or not ConfigSchema.is_section(section) then
 		Logger.error(LOG, "resolve(): category and section must be supported bare identifiers.")
