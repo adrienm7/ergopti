@@ -1118,7 +1118,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-		return _ConfigSparseUpdates(Updates)
+		return _ConfigKeepOutdatedEntries(_ConfigSparseUpdates(Updates))
 }
 
 ; Manifest comparison uses native values; Boolean serialization sentinels belong
@@ -1142,6 +1142,41 @@ _ConfigSparseUpdates(Updates) {
 			Sparse.Push(_ConfigSparseOperation(Update.Section, Update.Key, Update.Value))
 	}
 	return Sparse
+}
+
+; A value the boot load ignored as outdated stays on disk until the user
+; removes it with the configuration cleanup, which backs the file up first, or
+; chooses a new value for that setting. A full save carrying only the neutral
+; value the outdated entry left in memory would erase it silently and leave
+; the cleanup nothing to list, so that update is dropped; any other value is
+; the user's new choice and replaces the outdated one.
+_ConfigKeepOutdatedEntries(Updates) {
+	global _ConfigBootOutdatedEntries
+	if !IsSet(_ConfigBootOutdatedEntries) || _ConfigBootOutdatedEntries.Count == 0
+		return Updates
+	Kept := []
+	for Update in Updates {
+		if _ConfigBootOutdatedEntries.Has(Update.Section . "`n" . Update.Key)
+				&& _ConfigUpdateIsNeutral(Update)
+			continue
+		Kept.Push(Update)
+	}
+	return Kept
+}
+
+; Whether an update only restores its setting's manifest default: a deletion,
+; or a value the sparse writer would turn into one.
+_ConfigUpdateIsNeutral(Update) {
+	if Update.HasOwnProp("Delete")
+		return (Update.Delete is Integer) && Update.Delete == 1
+	try Sparse := _ConfigSparseOperation(Update.Section, Update.Key, Update.Value)
+	catch as Err {
+		; No manifest default to compare with: the value is an explicit choice.
+		try LoggerDebug("ConfigIO", "[{1}].{2} has no manifest default ({3}); its update is kept.",
+			Update.Section, Update.Key, Err.Message)
+		return false
+	}
+	return Sparse.HasOwnProp("Delete") && (Sparse.Delete is Integer) && Sparse.Delete == 1
 }
 
 ; Targeted repairs and explicit reset do not serialize the incomplete boot tree.
@@ -1255,7 +1290,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 								: _ConfigCollectFullSaveUpdates()
 						if !(Updates is Array)
 								throw TypeError("The full configuration collector must return an Array")
-						Updates := _ConfigPrepareTypedUpdates(Updates)
+						Updates := _ConfigPrepareTypedUpdates(_ConfigKeepOutdatedEntries(Updates))
 						; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
 						; atomic write (temp file + rename). A FileDelete here creates a data-loss
 						; window: if a Reload() or thread interrupt fires between the delete and the

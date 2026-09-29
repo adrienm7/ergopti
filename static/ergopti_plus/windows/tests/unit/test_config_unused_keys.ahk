@@ -64,6 +64,16 @@ _CUK_Ids(Keys) {
 	return Ids
 }
 
+_CUK_SortedIds(Keys) {
+	Sorted := Map()
+	for Id in _CUK_Ids(Keys)
+		Sorted[Id] := true
+	Ids := []
+	for Id in Sorted
+		Ids.Push(Id)
+	return Ids
+}
+
 _CUK_Join(Items) {
 	Out := ""
 	for Index, Item in Items
@@ -175,6 +185,49 @@ _CUK_UnknownKeysWarnOnceWithoutErrors() {
 }
 Test("config unused keys: obsolete entries produce one warning and no error (unused-config-warning)",
 	_CUK_UnknownKeysWarnOnceWithoutErrors)
+
+; A known key holding a value this build no longer accepts (a narrowed enum, a
+; boolean spelled "yes", a scalar where a table lives) used to log two ERRORs,
+; latch the boot authority that refuses every later full save, and stay
+; invisible to the cleanup. It is outdated configuration: one WARNING that
+; names it, no rejection, and a cleanup offer (config-outdated-windows).
+_CUK_OutdatedValuesWarnAndAreOffered() {
+	Dir := _CUK_NewDir()
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, "[script]`nlocale = " . '"es"'
+			. "`nlog_level = " . '"VERBOSE"' . "`nalt_gr_is_kana_remap = " . '"yes"' . "`n"
+			. "[layout]`nergopti_base = false`n"))
+		Target := ManifestBuildFeaturesMap()
+		Applied := ApplyConfigToml(Target, Path, &Rejected, , &Outdated)
+		AssertEqual(2, Applied, "the accepted neighbours still apply")
+		AssertEqual(0, Rejected, "an outdated value never blocks full saves")
+		AssertEqual(2, Outdated.Count)
+		AssertEqual("INFO", Target["script"]["log_level"], "the setting keeps its manifest value")
+		Errors := 0, Named := 0
+		for Line in Lines {
+			if InStr(Line, "[ERROR]")
+				Errors += 1
+			if InStr(Line, "[WARNING]") && InStr(Line, "outdated configuration value(s)")
+					&& InStr(Line, "[script].log_level") && InStr(Line, "[script].alt_gr_is_kana_remap")
+				Named += 1
+		}
+		AssertEqual(0, Errors, "an outdated value is never an ERROR")
+		AssertEqual(1, Named, "one warning names every outdated value")
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		AssertEqual("script.alt_gr_is_kana_remap=leaf|script.log_level=leaf",
+			_CUK_Join(_CUK_SortedIds(Scan["keys"])),
+			"the cleanup offers exactly the values boot warned about")
+	} finally {
+		LoggerClearTestSink()
+		DirDelete(Dir, true)
+	}
+}
+Test("config unused keys: an outdated value warns once and is offered (config-outdated-windows)",
+	_CUK_OutdatedValuesWarnAndAreOffered)
 
 _CUK_StartupOffersTheExistingCleanupWithoutWriting() {
 	Dir := _CUK_NewDir()
