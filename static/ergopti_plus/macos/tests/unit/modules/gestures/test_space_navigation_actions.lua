@@ -122,6 +122,25 @@ helpers.describe("gestures.actions: wrapping Space navigation", function()
 		helpers.assert_eq(keys(calls), { "ctrl:" .. RIGHT, "ctrl:" .. LEFT })
 	end)
 
+	it("wraps between two Spaces with the one Ctrl+Arrow that points at the other", function(fresh_actions)
+		-- With two Spaces the wrap from either edge is a single step, but in the
+		-- direction OPPOSITE to the one asked for: pressing the requested arrow
+		-- runs into the edge and macOS stays put.
+		local actions, calls = fresh_actions()
+		local spaces = script_spaces(calls, { ["screen-A"] = { 11, 12 } }, 12, true)
+		helpers.assert_true(actions.execute_single("space_next_wrap"))
+		fire_deferred(calls)
+		helpers.assert_eq(keys(calls), { "ctrl:" .. LEFT }, "from the second of two Spaces, next wraps left")
+		helpers.assert_eq(spaces.jumps, {}, "a neighbour is one keystroke, never Mission Control")
+
+		actions, calls = fresh_actions()
+		spaces = script_spaces(calls, { ["screen-A"] = { 11, 12 } }, 11, true)
+		helpers.assert_true(actions.execute_single("space_prev_wrap"))
+		fire_deferred(calls)
+		helpers.assert_eq(keys(calls), { "ctrl:" .. RIGHT }, "from the first of two Spaces, prev wraps right")
+		helpers.assert_eq(spaces.jumps, {})
+	end)
+
 	it("reads the layout once and the focused Space on every navigation", function(fresh_actions)
 		local actions, calls = fresh_actions()
 		script_spaces(calls, { ["screen-A"] = { 11, 12, 13 } }, 12, true)

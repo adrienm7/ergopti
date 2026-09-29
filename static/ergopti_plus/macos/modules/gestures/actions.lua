@@ -693,7 +693,11 @@ local function wrapping_space_step(direction)
 		Logger.debug(LOG, "The focused screen has a single Space — nothing to wrap to.")
 		return true
 	end
-	if math.abs(steps) == 1 then return space_step(direction) end
+	-- The key follows the sign of the step, not the requested direction: with
+	-- two Spaces the wrap from the last one is a single step LEFT.
+	if math.abs(steps) == 1 then
+		return space_step(steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS)
+	end
 	local target_id = list[target + 1]
 	Logger.debug(LOG, "Wrapping from Space %s to Space %s.", tostring(list[index + 1]), tostring(target_id))
 	return AuxOwner.after(0, "space wrap", function()
