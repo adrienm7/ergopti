@@ -17,9 +17,9 @@
 ---    retried before the next request, never silently dropped.
 --- 3. Consent: AI and metrics consent stay out of « recommended » through the
 ---    manifest's scope exclusions, which each owner applies.
---- 4. Hotstrings Kept: until the hotstrings scope owner exists, the row keeps
----    what it did before the composition: « recommended » reopens every
----    category gate (hotstrings_config.reset_defaults), with an exact inverse.
+--- 4. Hotstrings: their scope owner takes part like every other one, across
+---    config.toml and the override file, with the dynamic and preview runtimes
+---    the daemon hands the menu.
 --- ==============================================================================
 
 local M = {}
@@ -37,47 +37,6 @@ local function composition()
 			participants = function() return _registry end })
 	end
 	return _composition
-end
-
---- The interim hotstrings participant: the category gates this row reopened
---- before the composition existed (« clear » closes them), reverted to the
---- exact disabled set it replaced. The hotstrings scope owner replaces it.
---- @param config table hotstrings_config (bulk gates and their inverse).
---- @param is_paused function Live pause getter.
---- @return table participant See config_scope_composition.
-local function hotstring_gates(config, is_paused)
-	for _, name in ipairs({ "reset_defaults", "disable_all", "capture_disabled", "restore_disabled" }) do
-		assert(type(config[name]) == "function", "hotstrings config lacks " .. name)
-	end
-	local inverse, debt = nil, nil
-	local participant = {}
-	function participant.apply(mode, done)
-		if is_paused() then return done(false, "hotstrings are paused") end
-		local previous = config.capture_disabled()
-		-- Held as debt while the change runs: a raise after the gates were
-		-- persisted leaves this participant pending, so the rollback puts it back.
-		debt = previous
-		local changed
-		if mode == "clear" then changed = config.disable_all() else changed = config.reset_defaults() end
-		-- false means the gates were never persisted: nothing changed.
-		debt = nil
-		if changed == false then return done(false, "hotstring categories could not be persisted") end
-		inverse = previous
-		return done(true)
-	end
-	function participant.revert(done)
-		if inverse == nil then return done(false, "no committed hotstring categories to revert") end
-		if config.restore_disabled(inverse) ~= true then return done(false, "hotstring categories could not be restored") end
-		inverse = nil
-		return done(true)
-	end
-	function participant.release() inverse = nil end
-	function participant.pending() return debt ~= nil end
-	function participant.retry_restore(done)
-		if debt ~= nil and config.restore_disabled(debt) == true then debt = nil end
-		return done(debt == nil)
-	end
-	return participant
 end
 
 --- The participants of the owners a menu context runs, keyed by scope id.
@@ -98,7 +57,10 @@ function M.participants(ctx)
 		and ctx.gestures.scope_available() == true then
 		registry.gestures = ctx.gestures.scope_participant()
 	end
-	if ctx.config then registry.hotstrings = hotstring_gates(ctx.config, is_paused) end
+	if ctx.config then
+		registry.hotstrings = require("infra.hotstrings_scope").participant(is_paused,
+			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
+	end
 	if ctx.llm then registry.llm = require("infra.llm_scope").participant(is_paused) end
 	if ctx.keylogger then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
 	return registry

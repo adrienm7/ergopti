@@ -356,3 +356,44 @@ helpers.describe("hotstrings scope: refusals", function()
 		end)
 	end)
 end)
+
+helpers.describe("hotstrings scope: composition", function()
+	--- What the engine and the category gates say, to compare before and after.
+	local function observed(c)
+		return {
+			autocorrection = c.Config.is_group_enabled("autocorrection"),
+			rolls = c.Config.is_group_enabled("rolls"),
+			caps_fires = fires(c.engine, "cq", "caps-result"),
+			rolls_fires = fires(c.engine, "hq", "rolls-result"),
+		}
+	end
+
+	helpers.it("reverts a committed restore to the exact bytes and runtime it replaced", function()
+		with_scope(function(c)
+			local before = observed(c)
+			local committed, detail = c.scope.apply("recommended")
+			helpers.assert_eq(committed, true, detail)
+			helpers.assert_true(read(c.config_path) ~= CONFIG, "the restore changed config.toml")
+			local reverted, why = c.scope.revert()
+			helpers.assert_eq(reverted, true, why)
+			helpers.assert_eq(read(c.config_path), CONFIG)
+			helpers.assert_eq(read(c.override_path), OVERRIDES)
+			helpers.assert_eq(observed(c), before)
+			helpers.assert_eq(c.scope.pending(), false)
+			helpers.assert_true(c.Config.disable_group("autocorrection"), "ordinary setters are released again")
+		end)
+	end)
+
+	helpers.it("forgets its inverse once the composition commits", function()
+		with_scope(function(c)
+			local committed, detail = c.scope.apply("clear")
+			helpers.assert_eq(committed, true, detail)
+			local cleared = read(c.config_path)
+			c.scope.release()
+			local reverted = c.scope.revert()
+			helpers.assert_eq(reverted, false)
+			helpers.assert_eq(read(c.config_path), cleared)
+			helpers.assert_eq(c.scope.pending(), false)
+		end)
+	end)
+end)

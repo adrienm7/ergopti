@@ -50,7 +50,7 @@ end
 --- @param options table path, backup_suffix, is_paused, and the runtime owners:
 ---   config, preferences, repeat_key, magic_key, dynamic (optional),
 ---   preview_settings with preview (optional), files, remove.
---- @return table owner apply(mode), pending(), retry_restore()
+--- @return table owner apply(mode), revert(), release(), pending(), retry_restore()
 function M.new(options)
 	assert(type(options) == "table" and type(options.path) == "string" and type(options.is_paused) == "function"
 		and type(options.backup_suffix) == "string", "hotstrings scope requires its path and pause owner")
@@ -219,6 +219,28 @@ function M.new(options)
 		return true
 	end
 
+	--- Undoes the last committed operation when a later scope of the same
+	--- composition is refused: the runtime and the override file first, then
+	--- config.toml, each only while it still holds this scope's bytes. A refused
+	--- step stays pending and keeps the owners held until retry_restore().
+	--- @return boolean reverted
+	--- @return string|nil reason
+	function owner.revert()
+		if held then return false, "the hotstrings scope is still held" end
+		if not Config.acquire(owner) then return false, "hotstring configuration is already owned" end
+		if not Preferences.acquire(owner) then
+			Config.release(owner)
+			return false, "hotstring preferences are already owned"
+		end
+		held = true
+		local reverted, detail = transaction.revert()
+		if not transaction.pending() then release() end
+		return reverted == true, detail
+	end
+
+	--- Forgets the last commit's inverse once its composition has committed.
+	function owner.release() transaction.release() end
+
 	return owner
 end
 
@@ -253,6 +275,17 @@ function M.apply(mode, is_paused, ports)
 		Logger.error(LOG, "Hotstrings scope '%s' refused: %s.", mode, tostring(detail))
 	end
 	return committed == true, detail
+end
+
+--- The hotstrings participant of a composed scope, bound to the retained owner.
+--- @param is_paused function Live pause getter.
+--- @param ports table|nil dynamic and preview runtime owners the daemon holds.
+--- @return table participant See config_scope_composition.
+function M.participant(is_paused, ports)
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply(mode, is_paused, ports) end,
+		owner = function() return _owner end,
+	})
 end
 
 return M
