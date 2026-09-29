@@ -78,6 +78,10 @@ local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 local LAYOUT_REFRESH_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local REMAP_GUARDIAN_STATUS_ENV = "ERGOPTI_REMAP_GUARDIAN_STATUS"
 local REMAP_GUARDIAN_READY = "ready"
+-- General > Login Items, where the guardian's Background Items switch lives.
+-- Opened directly for an `unavailable` guardian, which the approval-gated
+-- opener refuses by design.
+local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
 
 local DISABLED_LEGACY_PROBE_STRINGS = {
 	"[ErgoptiPlus managed:",
@@ -5100,12 +5104,19 @@ function M.init(file_system)
 		return false
 	end
 	_ke_variables_recovery_observer = recovery_observer
-	-- Karabiner has no tray row, so the one state that needs the user — its
-	-- helper held until approved in Login Items — reaches them as a notice.
+	-- Karabiner has no tray row, so the states that need the user — its helper
+	-- held until approved in Login Items, or not registered at all — reach them
+	-- as a notice.
 	_guardian_notice = GuardianNotice.new({
 		notify        = Notifications.notify,
 		text          = i18n.get,
 		open_settings = function(on_done) return M.open_guardian_settings(on_done) end,
+		open_login_items = function(on_done)
+			local accepted = require("adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
+				on_done(ok == true, ok == true and "opened" or "open-exited-non-zero")
+			end)
+			return accepted == true
+		end,
 		logger        = Logger,
 		log           = LOG,
 	})

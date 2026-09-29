@@ -85,8 +85,9 @@ local function with_pixel(options, scenario)
 			end,
 		}
 		package.loaded["infra.notifications"] = {
-			notify = function(title, body, kind)
-				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind }
+			notify = function(title, body, kind, on_click)
+				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind,
+					on_click = on_click }
 				return true
 			end,
 		}
@@ -201,7 +202,11 @@ helpers.describe("Ctrl+H interactive screenshot: Screen Recording gate", functio
 			helpers.assert_eq(f.count_prompts(), 1,
 				"the prompt registers the runtime in the list; one request is enough")
 			helpers.assert_eq(#f.notifications, 2, "every refusal is still explained")
-			helpers.assert_eq(#f.opened, 2)
+			helpers.assert_eq(#f.opened, 1,
+				"a later refusal only explains; opening the pane again is left to a click")
+			helpers.assert_type(f.notifications[2].on_click, "function")
+			f.notifications[2].on_click()
+			helpers.assert_eq(f.opened, { SETTINGS_URL, SETTINGS_URL })
 		end)
 	end)
 

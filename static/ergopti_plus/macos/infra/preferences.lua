@@ -1056,8 +1056,8 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 			Logger.warn(LOG, "Preferences changed externally; the stale save was refused. "
 				.. "Review the external edit, then repeat the setting change to save it.")
 		else
-			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved.",
-				tostring(prefs_file))
+			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved: %s.",
+				tostring(prefs_file), tostring(write_ok and detail or written))
 		end
 		return false
 	end

@@ -825,6 +825,77 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(invalidSignatureFallbackCalls, 1)
 	}
 
+	/// A service reported `.notFound` (e.g. after an app update replaced the
+	/// bundle) gets the same single registration attempt as `.notRegistered`,
+	/// including the exact invalid-signature fallback, and nothing more.
+	func testModernGuardianRegistrationRetriesNotFoundOnce() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let registered = ScriptedModernGuardianService(
+			status: .notFound,
+			statusAfterRegister: .enabled
+		)
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: registered,
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				XCTFail("a successful registration must not bootstrap the legacy agent")
+				return false
+			}
+		), .ready)
+		XCTAssertEqual(registered.registerCalls, 1)
+
+		let adHoc = ScriptedModernGuardianService(
+			status: .notFound,
+			registrationError: NSError(
+				domain: kRemapGuardianServiceErrorDomain,
+				code: kSMErrorInvalidSignature
+			)
+		)
+		var legacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: adHoc,
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				legacyCalls += 1
+				return true
+			}
+		), .ready)
+		XCTAssertEqual(adHoc.registerCalls, 1)
+		XCTAssertEqual(legacyCalls, 1,
+			"an ad hoc signed update must reach its exact legacy fallback from notFound")
+
+		let denied = ScriptedModernGuardianService(
+			status: .notFound,
+			registrationError: NSError(
+				domain: kRemapGuardianServiceErrorDomain,
+				code: kSMErrorLaunchDeniedByUser
+			)
+		)
+		var deniedLegacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: denied,
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				deniedLegacyCalls += 1
+				return true
+			}
+		), .requiresApproval)
+		XCTAssertEqual(denied.registerCalls, 1)
+		XCTAssertEqual(deniedLegacyCalls, 0,
+			"a user denial must never bootstrap around Background Items")
+
+		let stillMissing = ScriptedModernGuardianService(
+			status: .notFound,
+			statusAfterRegister: .notFound
+		)
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: stillMissing,
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: { true }
+		), .unavailable)
+		XCTAssertEqual(stillMissing.registerCalls, 1, "registration is attempted once, never looped")
+	}
+
 	/// Runtime observation is read-only and requires both eligibility and health.
 	func testModernGuardianObservationNeverRegistersAndRequiresExactHealth() {
 		guard #available(macOS 13.0, *) else { return }

@@ -2004,6 +2004,16 @@ extension SMAppService: RemapGuardianModernService {}
 
 /// Resolves the complete modern registration state with injectable boundaries.
 /// User denial and approval never reach the legacy launchctl compatibility path.
+///
+/// `.notFound` takes the same single registration attempt as `.notRegistered`.
+/// ServiceManagement can report an agent it holds no usable record for as
+/// `.notFound` rather than `.notRegistered`, notably after the app bundle was
+/// replaced (every update of the ad hoc signed ZIP release has a new code
+/// identity). Returning `.unavailable` there without asking skipped both the
+/// registration and its exact invalid-signature legacy fallback, so remapping
+/// could stay inert after an update with nothing the user could do in-app. The attempt is bounded (one per launch)
+/// and keeps every fail-closed branch: denial and approval still never reach
+/// the legacy path.
 @available(macOS 13.0, *)
 func resolveModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
@@ -2013,7 +2023,7 @@ func resolveModernRemapGuardianRegistration(
 	switch service.status {
 	case .enabled:
 		return guardianHealth() ? .ready : .unavailable
-	case .notRegistered:
+	case .notRegistered, .notFound:
 		do {
 			try service.register()
 			switch service.status {
@@ -2043,8 +2053,6 @@ func resolveModernRemapGuardianRegistration(
 		}
 	case .requiresApproval:
 		return .requiresApproval
-	case .notFound:
-		return .unavailable
 	@unknown default:
 		return .unavailable
 	}

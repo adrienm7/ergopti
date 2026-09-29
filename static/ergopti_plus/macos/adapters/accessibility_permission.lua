@@ -28,7 +28,6 @@ local M = {}
 
 local hs = hs
 
-local TCCUTIL_BIN = "/usr/bin/tccutil"
 local SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 
 --- Reports whether this process is currently trusted for Accessibility.
@@ -59,12 +58,7 @@ end
 --- @return string|nil bundle_id Nil when the running process has none.
 --- @return string|nil detail Exact reason when bundle_id is nil.
 function M.bundle_id()
-	local info = type(hs) == "table" and hs.processInfo or nil
-	local bundle_id = type(info) == "table" and info.bundleID or nil
-	if type(bundle_id) ~= "string" or bundle_id == "" then
-		return nil, "hs.processInfo.bundleID is unavailable"
-	end
-	return bundle_id
+	return require("adapters.tcc_grant").bundle_id()
 end
 
 --- Removes this app's Accessibility entry so a stale grant cannot mask a refusal.
@@ -72,21 +66,7 @@ end
 --- @param on_done function fn(ok, detail) once tccutil has exited.
 --- @return boolean started True when tccutil was started.
 function M.reset_grant(bundle_id, on_done)
-	if type(bundle_id) ~= "string" or bundle_id == "" then
-		error("reset_grant: bundle_id must be a non-empty string", 2)
-	end
-	if type(on_done) ~= "function" then error("reset_grant: on_done must be a function", 2) end
-	local ShellRunner = require("adapters.shell_runner")
-	local handle = ShellRunner.spawn(TCCUTIL_BIN, { "reset", "Accessibility", bundle_id },
-		function(exit_code, stdout, stderr)
-			if exit_code == 0 then
-				on_done(true)
-			else
-				on_done(false, string.format("tccutil exited with %s: %s", tostring(exit_code),
-					tostring(stderr ~= "" and stderr or stdout)))
-			end
-		end)
-	return handle.start() == true
+	return require("adapters.tcc_grant").reset("Accessibility", bundle_id, on_done)
 end
 
 --- Opens System Settings on the Accessibility list, without blocking.
