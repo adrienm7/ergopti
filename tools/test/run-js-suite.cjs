@@ -865,7 +865,7 @@ const CHECKS = [
 		repro: 'node tools/test/test-repo-url-single-source.cjs'
 	},
 	{
-		name: 'UI focus-fix regression (force-focus + no raw blockAlert)',
+		name: 'UI windows are focused, never kept on top (macOS, Windows, Linux) + no raw blockAlert',
 		cmd: 'node',
 		args: ['tools/test/test-ui-focus-fix.cjs'],
 		repro: 'node tools/test/test-ui-focus-fix.cjs'
