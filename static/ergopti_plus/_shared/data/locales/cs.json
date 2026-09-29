@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "Povolte ErgoptiPlus ve Zpřístupnění",
 	"permission_dialog.accessibility.body": "ErgoptiPlus potřebuje toto oprávnění ke čtení klávesnice. Spustí se sám, jakmile je oprávnění zapnuté, bez restartu. Pokud toto okno zavřete, otevřete znovu ErgoptiPlus a tyto kroky se zobrazí znovu.",
 	"permission_dialog.accessibility.step_opened": "Právě se otevřelo Nastavení systému > Soukromí a zabezpečení > Zpřístupnění.",
-	"permission_dialog.accessibility.step_toggle": "V seznamu zapněte „Hammerspoon“: je to jádro ErgoptiPlus. Pokud už vypadá zapnuté, vypněte ho a znovu zapněte.",
+	"permission_dialog.accessibility.step_toggle": "V seznamu zapněte „Hammerspoon“: je to jádro ErgoptiPlus. Pokud jsou v seznamu dva, zapněte ten vypnutý. Pokud jediný už vypadá zapnutý, vypněte ho a znovu zapněte.",
 	"startup.linux_input_access_body": "Ergopti+ zatím nemůže číst klávesnici ani zapisovat do /dev/uinput. Odhlaste se a znovu přihlaste (nebo restartujte), aby se projevily skupiny „input“ a „uinput“ přidané instalátorem. Pokud problém přetrvává, spusťte: {1}",
 	"startup.linux_input_access_title": "Ergopti+ zatím nemůže používat klávesnici",
 	"startup.manifest_missing": "Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.",

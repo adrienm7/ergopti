@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "손쉬운 사용에서 ErgoptiPlus 허용",
 	"permission_dialog.accessibility.body": "ErgoptiPlus가 키보드를 읽으려면 이 권한이 필요합니다. 권한이 켜지면 재시작 없이 자동으로 시작됩니다. 이 창을 닫았다면 ErgoptiPlus를 다시 열어 이 단계를 다시 확인하세요.",
 	"permission_dialog.accessibility.step_opened": "시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용이 방금 열렸습니다.",
-	"permission_dialog.accessibility.step_toggle": "목록에서 “Hammerspoon”을 켜세요. 이것이 ErgoptiPlus 엔진입니다. 이미 켜져 있는 것처럼 보이면 껐다가 다시 켜세요.",
+	"permission_dialog.accessibility.step_toggle": "목록에서 “Hammerspoon”을 켜세요. 이것이 ErgoptiPlus 엔진입니다. 두 개가 있으면 꺼져 있는 항목을 켜세요. 하나뿐인데 이미 켜져 있는 것처럼 보이면 껐다가 다시 켜세요.",
 	"startup.linux_input_access_body": "Ergopti+가 아직 키보드를 읽거나 /dev/uinput에 쓸 수 없습니다. 설치 프로그램이 추가한 “input” 및 “uinput” 그룹이 적용되도록 로그아웃했다가 다시 로그인(또는 재시작)하세요. 문제가 계속되면 다음을 실행하세요: {1}",
 	"startup.linux_input_access_title": "Ergopti+가 아직 키보드를 사용할 수 없습니다",
 	"startup.manifest_missing": "시작 오류: _generated/features_manifest.ahk 파일이 없거나 손상되었습니다.\n\n프로젝트 디렉터리에서 `npm run build:manifest`를 실행한 후 스크립트를 다시 시작하세요.",

@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "Allow ErgoptiPlus in Accessibility",
 	"permission_dialog.accessibility.body": "ErgoptiPlus needs this permission to read the keyboard. It starts by itself as soon as the permission is on, with no restart. If you close this window, open ErgoptiPlus again to see these steps.",
 	"permission_dialog.accessibility.step_opened": "System Settings > Privacy & Security > Accessibility has just opened.",
-	"permission_dialog.accessibility.step_toggle": "Turn on “Hammerspoon” in the list: it is the ErgoptiPlus engine. If it already looks on, turn it off and on again.",
+	"permission_dialog.accessibility.step_toggle": "Turn on “Hammerspoon” in the list: it is the ErgoptiPlus engine. If two are listed, turn on the one that is off. If the only one already looks on, turn it off and on again.",
 	"startup.linux_input_access_body": "Ergopti+ cannot read the keyboard or write to /dev/uinput yet. Log out and back in (or restart) so the “input” and “uinput” groups added by the installer take effect. If it persists, run: {1}",
 	"startup.linux_input_access_title": "Ergopti+ cannot use the keyboard yet",
 	"startup.manifest_missing": "Startup error: the _generated/features_manifest.ahk file is missing or corrupted.\n\nRun `npm run build:manifest` from the project directory, then restart the script.",

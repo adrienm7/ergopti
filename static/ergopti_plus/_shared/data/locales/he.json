@@ -2225,7 +2225,7 @@
 	"permission_dialog.accessibility.title": "אפשרו את ErgoptiPlus בנגישות",
 	"permission_dialog.accessibility.body": "ErgoptiPlus זקוק להרשאה זו כדי לקרוא את המקלדת. הוא יתחיל מעצמו ברגע שההרשאה מופעלת, ללא הפעלה מחדש. אם תסגרו חלון זה, פתחו שוב את ErgoptiPlus כדי לראות את השלבים האלה שוב.",
 	"permission_dialog.accessibility.step_opened": "הגדרות המערכת > פרטיות ואבטחה > נגישות נפתחו זה עתה.",
-	"permission_dialog.accessibility.step_toggle": "הפעילו את „Hammerspoon” ברשימה: זהו המנוע של ErgoptiPlus. אם הוא כבר נראה מופעל, כבו אותו והפעילו אותו מחדש.",
+	"permission_dialog.accessibility.step_toggle": "הפעילו את „Hammerspoon” ברשימה: זהו המנוע של ErgoptiPlus. אם מופיעים שניים, הפעילו את זה שכבוי. אם היחיד ברשימה כבר נראה מופעל, כבו אותו והפעילו אותו מחדש.",
 	"startup.linux_input_access_body": "Ergopti+ עדיין לא יכול לקרוא את המקלדת או לכתוב אל ‎/dev/uinput. התנתקו והתחברו מחדש (או הפעילו מחדש) כדי שהקבוצות „input” ו־„uinput” שהמתקין הוסיף ייכנסו לתוקף. אם הבעיה נמשכת, הריצו: {1}",
 	"startup.linux_input_access_title": "Ergopti+ עדיין לא יכול להשתמש במקלדת",
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
