@@ -116,6 +116,19 @@ helpers.describe("startup: gestures pre-warm does not re-initialise its sub-modu
 	end)
 end)
 
+helpers.describe("startup: configuration consumers follow path initialization", function()
+	helpers.it("initializes managed path parents before loading dependent modules", function()
+		local src = read_code("✅ Hammerspoon boot SUCCESSFUL.")
+		local ready = src:find("local config_paths_ready = config_paths.init(base_dir)", 1, true)
+		helpers.assert_true(ready ~= nil, "the path initialization owner must exist")
+		for _, name in ipairs({ "gestures", "keymap", "shortcuts", "dynamic_hotstrings" }) do
+			local loaded = src:find('require("modules.' .. name .. '")', 1, true)
+			helpers.assert_true(loaded ~= nil and loaded > ready,
+				"configuration-dependent module must follow the path owner: " .. name)
+		end
+	end)
+end)
+
 
 
 
