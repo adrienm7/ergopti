@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "सभी अचुनें",
 	"menu.tapholds.enable": "Tap-holds सक्षम करें",
 	"menu.tapholds.karabiner_off_hint": "अनुपलब्ध: Ergopti, Karabiner का उपयोग नहीं करता (कॉन्फ़िगरेशन देखें)",
+	"menu.tapholds.saved_until_guardian": "💾 Tap-holds सेटिंग्स सहेजी गईं: लॉगिन आइटम में ErgoptiPlus को अनुमति मिलते ही वे लागू होंगी (सेटिंग्स खोलने के लिए क्लिक करें)।",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 मॉडिफायर कुंजियों के लिए tap → combo कॉपी करें",
 	"menu.tapholds.edit_nav_layer": "नेविगेशन परत संपादित करें…",

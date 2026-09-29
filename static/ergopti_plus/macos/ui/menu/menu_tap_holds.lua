@@ -115,6 +115,32 @@ local function commit_menu_setting(karabiner, source, mutate, update_menu)
 	return accepted
 end
 
+--- Tells the user a bulk edit is saved but waits for the remap guardian: the
+--- menu shows the new settings, yet nothing applies them until ErgoptiPlus is
+--- allowed in Login Items. The click opens that pane.
+--- @param karabiner table Remap facade.
+--- @param method_name string Facade method name, for the log.
+--- @param reason string `persisted-guardian-<status>` terminal detail.
+local function announce_saved_until_guardian(karabiner, method_name, reason)
+	Logger.info(LOG, "Karabiner bulk command '%s' saved; its rules deploy once the guardian is ready (%s).",
+		method_name, tostring(reason))
+	local on_click = nil
+	if type(karabiner.open_login_items) == "function" then
+		on_click = function()
+			return karabiner.open_login_items(function(ok, detail)
+				if ok ~= true then
+					Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
+				end
+			end) == true
+		end
+	end
+	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+		i18n.get("menu.tapholds.saved_until_guardian"), nil, "info", on_click)
+	if not ok or sent_or_err ~= true then
+		Logger.error(LOG, "Saved-until-guardian notice was not delivered: %s.", tostring(sent_or_err))
+	end
+end
+
 --- Runs one manifest bulk command and publishes success only after both exact
 --- request acceptance and the transaction's terminal callback are true.
 --- @param karabiner table Remap facade.
@@ -164,6 +190,9 @@ local function run_bulk_menu_command(
 			else
 				Logger.success(LOG, success_message)
 			end
+			if type(reason) == "string" and reason:find("^persisted%-guardian%-") then
+				announce_saved_until_guardian(karabiner, method_name, reason)
+			end
 		else
 			Logger.error(LOG, "Karabiner bulk command '%s' failed: %s.",
 				method_name, tostring(reason))
@@ -185,8 +214,13 @@ local function run_bulk_menu_command(
 	end, debug.traceback)
 	dispatching = false
 	if not call_ok or accepted_or_err ~= true then
+		-- A refusal names its cause (bulk-settings-busy, script-paused...)
+		-- through the terminal it already fired; only a request that fired
+		-- none falls back to the generic detail.
+		local refusal = call_ok and callback_seen and pending_ok ~= true
+			and pending_reason ~= nil and pending_reason or nil
 		callback_seen = false
-		finish(false, call_ok and "request-refused" or accepted_or_err, 0)
+		finish(false, refusal or (call_ok and "request-refused" or accepted_or_err), 0)
 		return false
 	end
 	if callback_seen then

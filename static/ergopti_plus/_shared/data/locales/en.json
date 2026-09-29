@@ -1592,6 +1592,7 @@
 	"menu.shortcuts.keyboard.win_space": "Win + Space: Generate an AI prediction",
 	"menu.tapholds.enable": "Enable tap-holds",
 	"menu.tapholds.karabiner_off_hint": "Unavailable: Ergopti does not use Karabiner (see Configuration)",
+	"menu.tapholds.saved_until_guardian": "💾 Tap-Hold settings saved: they apply once ErgoptiPlus is allowed in Login Items (click to open the settings).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Copy tap → combo for all modifier shortcuts",
 	"menu.tapholds.edit_nav_layer": "Edit the navigation layer…",

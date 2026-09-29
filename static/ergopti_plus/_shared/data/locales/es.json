@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Desmarcar todo",
 	"menu.tapholds.enable": "Activar los tap-holds",
 	"menu.tapholds.karabiner_off_hint": "No disponible: Ergopti no usa Karabiner (ver Configuración)",
+	"menu.tapholds.saved_until_guardian": "💾 Ajustes de tap-holds guardados: se aplicarán en cuanto ErgoptiPlus esté permitido en Ítems de inicio (haz clic para abrir los ajustes).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Copiar tap → combo para teclas modificadoras",
 	"menu.tapholds.edit_nav_layer": "Editar la capa de navegación…",

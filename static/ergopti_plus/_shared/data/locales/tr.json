@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Tümünün işaretini kaldır",
 	"menu.tapholds.enable": "Dokunma-basılı tutmayı etkinleştir",
 	"menu.tapholds.karabiner_off_hint": "Kullanılamıyor: Ergopti, Karabiner'ı kullanmıyor (bkz. Yapılandırma)",
+	"menu.tapholds.saved_until_guardian": "💾 Dokunma-basılı tutma ayarları kaydedildi: ErgoptiPlus'a Giriş Öğeleri'nde izin verildiğinde uygulanacak (ayarları açmak için tıklayın).",
 	"menu.tapholds.title": "⌨️ Dokunma-Basılı Tutma",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Değiştirici tuşlar için tap → combo kopyala",
 	"menu.tapholds.edit_nav_layer": "Gezinme katmanını düzenle…",
