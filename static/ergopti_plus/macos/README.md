@@ -33,10 +33,12 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
   `~/.config/ergopti_plus/` stay. A channel chosen in the About menu is kept in
   `config.toml` and wins over the installed build's channel. The stable cask
   exists once the first stable release is published.
-- **Updates.** Sparkle updates the app in place, as for a manual install. The
-  casks declare `auto_updates true`, so `brew upgrade` leaves the app to
-  Sparkle; `brew upgrade --greedy` reinstalls the cask's own version, which is
-  never older than what the channel published.
+- **Updates.** Two paths update the same app. `brew upgrade` updates it with
+  the other casks: brew quits the app, replaces it and relaunches it if it was
+  running. The app also keeps updating itself (Sparkle): *Check for updates*
+  in its About menu, and automatic checks at the frequency chosen there. After
+  an in-app update, the next `brew upgrade` reinstalls that same version once,
+  since brew only knows the version it installed itself.
 - **Gatekeeper.** The app is not notarised; the cask clears its quarantine
   flag after installing, as the manual `xattr` step does.
 - **Uninstall.** `brew uninstall --cask ergoptiplus` removes the app;

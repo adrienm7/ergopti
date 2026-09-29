@@ -41,7 +41,8 @@ brew install --cask ergoptiplus       # versions stables
 brew install --cask ergoptiplus@dev   # versions de développement</code
 	></pre>
 <p>
-	L'application se met ensuite à jour toute seule, comme une installation manuelle. Pour changer de
+	<code>brew upgrade</code> la met ensuite à jour avec vos autres applications, et elle garde aussi
+	ses propres mises à jour (vérification manuelle ou automatique depuis son menu). Pour changer de
 	canal, désinstaller un cask (<code>brew uninstall --cask ergoptiplus@dev</code>) puis installer
 	l'autre : les réglages sont conservés.
 </p>

@@ -11,9 +11,10 @@
  * 1. Channel from the registry: a dev tag renders ergoptiplus@dev, a semver
  *    tag ergoptiplus, each conflicting with the other, so installing one
  *    channel's cask replaces the other's app instead of adding a second one.
- * 2. Sparkle keeps the updates: every cask says auto_updates true, so brew
- *    upgrade does not fight the app's own updater, and its livecheck reads the
- *    same appcast the app follows.
+ * 2. brew upgrade updates the app with the user's other casks: no cask
+ *    declares auto_updates, brew quits both bundle identifiers before replacing
+ *    the bundle and relaunches the app only when it was running. livecheck
+ *    reads the same appcast the app follows.
  * 3. Names repeated from the build (bundle id, app, asset, minimum macOS) and
  *    from the release workflow (appcast branch, generator call, tap
  *    repository) must match their owners, or the cask downloads or installs
@@ -85,8 +86,20 @@ check('the cask downloads the tagged release asset with its checksum', () => {
 		`url "https://github.com/${Cask.SOURCE_REPOSITORY}/releases/download/v#{version}/${Cask.ASSET_NAME}"`));
 });
 
-check('Sparkle owns the updates and livecheck reads the channel appcast', () => {
-	for (const cask of [dev, stable]) assert.match(cask.text, /^  auto_updates true$/m);
+check('brew upgrade quits, replaces and relaunches the app, and livecheck reads the channel appcast', () => {
+	for (const cask of [dev, stable]) {
+		assert.doesNotMatch(cask.text, /auto_updates/, 'auto_updates would make brew upgrade skip the app');
+		assert.ok(cask.text.includes(`uninstall quit: ["${Cask.BUNDLE_ID}.hammerspoon", "${Cask.BUNDLE_ID}"]`));
+		const marker = `"${Cask.RELAUNCH_MARKER}"`;
+		const preflight = cask.text.slice(cask.text.indexOf('uninstall_preflight do'), cask.text.indexOf('uninstall quit:'));
+		assert.ok(preflight.includes(`FileUtils.touch(${marker})`) && preflight.includes('if running'),
+			'the marker is left only when the app was running');
+		const postflight = cask.text.slice(cask.text.indexOf('postflight do'));
+		assert.ok(postflight.includes(`if File.exist?(${marker})`) && postflight.includes(`FileUtils.rm_f(${marker})`)
+			&& postflight.includes(`"/usr/bin/open", args: ["#{appdir}/${Cask.APP_NAME}"]`),
+			'postflight relaunches only on the marker, and consumes it');
+		assert.ok(Cask.RELAUNCH_MARKER.includes(`/Library/Caches/${Cask.BUNDLE_ID}/`), 'zap must remove the marker');
+	}
 	const base = `https://raw.githubusercontent.com/${Cask.SOURCE_REPOSITORY}/${Cask.APPCAST_BRANCH}/`;
 	assert.ok(dev.text.includes(`url "${base}appcast-dev.xml"`));
 	assert.ok(stable.text.includes(`url "${base}appcast-main.xml"`));

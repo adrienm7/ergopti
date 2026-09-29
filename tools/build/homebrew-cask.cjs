@@ -21,9 +21,13 @@
  * 1. One cask per channel, each conflicting with the others: the cask a user
  *    installs is the build, hence the channel, the app follows until they pick
  *    another channel in its About menu.
- * 2. auto_updates true: Sparkle updates the installed app in place, and
- *    brew upgrade leaves it alone unless run with --greedy, so the two never
- *    fight over the bundle.
+ * 2. Two update paths, one bundle: the app updates itself (Sparkle, the
+ *    About menu, automatic checks), and brew upgrade updates it with the rest
+ *    of the user's casks, so the cask does not declare auto_updates. brew
+ *    quits the app before replacing the bundle (its Lua files load from it)
+ *    and relaunches it when it was running. After a Sparkle update, the next
+ *    brew upgrade reinstalls the same version once, since brew only knows the
+ *    version it installed.
  * 3. livecheck reads the channel's Sparkle appcast, the feed the app itself
  *    follows, so brew livecheck and the app agree on the newest version.
  * 4. The postflight clears the quarantine flag: the app is not notarised, and
@@ -55,6 +59,10 @@ const APP_NAME = 'ErgoptiPlus.app';
 
 // Launcher bundle identifier (tools/build/build_macos_app.sh BUNDLE_ID)
 const BUNDLE_ID = 'com.ergoptiplus.app';
+
+// Left by uninstall_preflight when the app was running, read by postflight
+// to relaunch the upgraded app; zap removes its directory
+const RELAUNCH_MARKER = `#{Dir.home}/Library/Caches/${BUNDLE_ID}/brew-relaunch`;
 
 // Base cask token; channels other than the most stable one add @<id>
 const TOKEN_BASE = 'ergoptiplus';
@@ -126,16 +134,32 @@ function renderCask(tag, sha256) {
 		'    strategy :sparkle, &:short_version',
 		'  end',
 		'',
-		'  auto_updates true',
 		...others.map((other) => `  conflicts_with cask: "${other.token}"`),
 		`  depends_on macos: ">= ${MINIMUM_MACOS}"`,
 		'',
 		`  app "${APP_NAME}"`,
 		'',
+		'  # A running app loads its Lua files from the bundle: it is quit before the',
+		'  # bundle is replaced, and relaunched after an upgrade if it was running.',
+		'  uninstall_preflight do',
+		`    running = system_command("/usr/bin/pgrep", args: ["-f", "/${APP_NAME}/Contents/"],`,
+		'                                               must_succeed: false).success?',
+		'    if running',
+		`      FileUtils.mkdir_p(File.dirname("${RELAUNCH_MARKER}"))`,
+		`      FileUtils.touch("${RELAUNCH_MARKER}")`,
+		'    end',
+		'  end',
+		'',
+		`  uninstall quit: ["${BUNDLE_ID}.hammerspoon", "${BUNDLE_ID}"]`,
+		'',
 		'  # The app is not notarised: without this, Gatekeeper refuses to open it.',
 		'  postflight do',
 		'    system_command "/usr/bin/xattr",',
 		`                   args: ["-dr", "com.apple.quarantine", "#{appdir}/${APP_NAME}"]`,
+		`    if File.exist?("${RELAUNCH_MARKER}")`,
+		`      FileUtils.rm_f("${RELAUNCH_MARKER}")`,
+		`      system_command "/usr/bin/open", args: ["#{appdir}/${APP_NAME}"]`,
+		'    end',
 		'  end',
 		'',
 		'  zap trash: [',
@@ -183,4 +207,5 @@ module.exports = {
 	APP_NAME,
 	BUNDLE_ID,
 	MINIMUM_MACOS,
+	RELAUNCH_MARKER,
 };
