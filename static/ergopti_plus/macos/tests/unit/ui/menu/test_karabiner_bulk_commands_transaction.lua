@@ -521,6 +521,35 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("says once, localized, that the saved notice's Login Items did not open"
+		.. " (login-items-open-failed)", function()
+		local saved_notifications = package.loaded["infra.notifications"]
+		local notices = {}
+		package.loaded["infra.notifications"] = {
+			notify = function(message, _, kind, on_click)
+				notices[#notices + 1] = { message = message, kind = kind, on_click = on_click }
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			local built, observations = build_menu("pending", function(remap)
+				remap.open_login_items = function(on_done)
+					on_done(false, "open-request-rejected")
+					return false
+				end
+			end)
+			helpers.assert_true(row_action(find_item(built, COMMAND_CASES[2].label))())
+			observations.terminals.apply_scope(true, "persisted-guardian-requires_approval", 3)
+			helpers.assert_eq(notices[1].on_click(), false)
+			helpers.assert_eq(#notices, 2)
+			helpers.assert_eq(notices[2].message, "karabiner.guardian_settings_open_failed")
+			helpers.assert_eq(count_logs(observations, "error"), 0,
+				"no raw developer error on top of the localized notice")
+		end)
+		package.loaded["infra.notifications"] = saved_notifications
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("sends no one to Login Items when the helper only failed to answer"
 		.. " (saved-notice-probe-failed)", function()
 		local saved_notifications = package.loaded["infra.notifications"]
@@ -725,19 +754,23 @@ end)
 local function build_guardian_menu(state, options)
 	options = options or {}
 	local opened = { open_guardian_settings = 0, open_login_items = 0 }
-	local built = build_menu("pending", function(remap)
+	local built, observations = build_menu("pending", function(remap)
 		remap.get_enabled = function() return options.enabled ~= false end
 		remap.get_tap_holds_enabled = function() return options.tap_holds_on ~= false end
 		remap.guardian_state = function() return state end
 		for name in pairs(opened) do
 			remap[name] = function(on_done)
 				opened[name] = opened[name] + 1
+				if options.open_fails then
+					on_done(false, "open-request-rejected")
+					return false
+				end
 				on_done(true, "opened")
 				return true
 			end
 		end
 	end)
-	return built, opened
+	return built, opened, observations
 end
 
 helpers.describe("the Tap-Hold submenu says when the remap guardian holds its rules", function()
@@ -770,6 +803,33 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 			helpers.assert_true(english_text(status.title or status.label):find("quit and reopen", 1, true) ~= nil,
 				"the row must name the step that registers the helper again")
 		end)
+
+	helpers.it("says once, localized, that Login Items did not open (login-items-open-failed)", function()
+		local saved_notifications = package.loaded["infra.notifications"]
+		local notices = {}
+		package.loaded["infra.notifications"] = {
+			notify = function(message, _, kind)
+				notices[#notices + 1] = { message = message, kind = kind }
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			for _, case in ipairs(CASES) do
+				local before = #notices
+				local built, _, observations = build_guardian_menu(case.state, { open_fails = true })
+				local action = row_action(find_descendant(built, "menu.tapholds.open_login_items"))
+				helpers.assert_eq(action(), false)
+				helpers.assert_eq(#notices, before + 1, case.state .. " must tell the user once")
+				helpers.assert_eq(notices[#notices].message, "karabiner.guardian_settings_open_failed")
+				helpers.assert_eq(notices[#notices].kind, "error")
+				-- Each error line raises a developer notification; the opener logged it.
+				helpers.assert_eq(count_logs(observations, "error"), 0,
+					"no raw developer error on top of the localized notice")
+			end
+		end)
+		package.loaded["infra.notifications"] = saved_notifications
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("shows no guardian row when nothing waits on it (guardian-status-row)", function()
 		for _, variant in ipairs({
