@@ -153,6 +153,12 @@ function M.with_hotstring_delays(resolve, publish)
 	return Groups.with_hotstring_delays(resolve, publish)
 end
 
+--- Returns every registered TOML group's sections and corpus delay metadata.
+--- @return table|nil inventory Detached copies keyed by group name.
+function M.hotstring_delay_inventory()
+	return Groups.hotstring_delay_inventory()
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.

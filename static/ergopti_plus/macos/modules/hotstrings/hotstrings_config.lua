@@ -103,6 +103,19 @@ local function require_state(func_name)
 	return true
 end
 
+--- Refuses an ordinary override mutation while a scope transaction holds the
+--- file: its retained inverse restores exact bytes, which a newer ordinary
+--- write would make impossible to put back.
+--- @param func_name string Caller name for the diagnostic.
+--- @return boolean admitted
+local function scope_admits(func_name)
+	if _state.scope_owner ~= nil then
+		Logger.error(LOG, "'%s' refused: a hotstrings scope holds the override file.", func_name)
+		return false
+	end
+	return true
+end
+
 
 
 
@@ -128,30 +141,14 @@ end
 --- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
 --- Unknown category keys are ignored. Unowned or unsupported [__global__]
 --- records are preserved byte-for-byte because sibling drivers share the file.
---- @param path string Absolute path to the override file.
+--- @param content string Exact override source bytes.
 --- @return table overrides The parsed overrides.
 --- @return string|nil word_delimiters The optional word-delimiter override.
---- @return string status `committed`, `absent`, or `error`.
---- @return table|nil source_snapshot Exact classified bytes used to build the result.
 --- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
-local function parse_overrides(path)
+local function parse_override_content(content)
 	local result = {}
 	local word_delimiters = nil
 	local global_passthrough = {}
-	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, path)
-	if not read_ok or read_status == "error" then
-		Logger.error(LOG, "Override source read did not commit: %s.",
-			tostring(read_ok and read_detail or content))
-		return result, nil, "error", nil, global_passthrough
-	end
-	if read_status == "absent" then
-		return result, nil, "absent", { status = "absent" }, global_passthrough
-	end
-	if read_status ~= "ok" or type(content) ~= "string" then
-		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
-		return result, nil, "error", nil, global_passthrough
-	end
-
 	local current_cat = nil
 	local current_sec = nil
 	local in_global   = false
@@ -330,6 +327,31 @@ local function parse_overrides(path)
 		::continue::
 	end
 
+	return result, word_delimiters, global_passthrough
+end
+
+--- Reads and parses the user override file.
+--- @param path string Absolute path to the override file.
+--- @return table overrides The parsed overrides.
+--- @return string|nil word_delimiters The optional word-delimiter override.
+--- @return string status `committed`, `absent`, or `error`.
+--- @return table|nil source_snapshot Exact classified bytes used to build the result.
+--- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
+local function parse_overrides(path)
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, path)
+	if not read_ok or read_status == "error" then
+		Logger.error(LOG, "Override source read did not commit: %s.",
+			tostring(read_ok and read_detail or content))
+		return {}, nil, "error", nil, {}
+	end
+	if read_status == "absent" then
+		return {}, nil, "absent", { status = "absent" }, {}
+	end
+	if read_status ~= "ok" or type(content) ~= "string" then
+		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
+		return {}, nil, "error", nil, {}
+	end
+	local result, word_delimiters, global_passthrough = parse_override_content(content)
 	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough
 end
 
@@ -913,7 +935,7 @@ end
 --- @param value number|string The new value. Use M.clear_override to remove.
 --- @return boolean True on success.
 function M.set_override(category, section, field, value)
-	if not require_state("set_override") then return false end
+	if not require_state("set_override") or not scope_admits("set_override") then return false end
 	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
 		Logger.error(LOG, "set_override(): field must be 'delay', 'color', 'show_tooltip', or 'priority', got '%s'.", tostring(field))
 		return false
@@ -961,7 +983,7 @@ end
 --- @param field string|nil "delay", "color", or nil to clear both.
 --- @return boolean True on success.
 function M.clear_override(category, section, field)
-	if not require_state("clear_override") then return false end
+	if not require_state("clear_override") or not scope_admits("clear_override") then return false end
 	if _state.writes_blocked then
 		Logger.error(LOG, "Override clear refused because the source read did not commit.")
 		return false
@@ -1017,7 +1039,7 @@ end
 --- also adopts a newer external version after detecting a lost race.
 --- @return boolean
 function M.reload()
-	if not require_state("reload") then return false end
+	if not require_state("reload") or not scope_admits("reload") then return false end
 	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough =
 		parse_overrides(_state.path)
 	if read_status == "error" then
@@ -1038,6 +1060,85 @@ function M.reload()
 	_state.writes_blocked  = false
 	_state.resolve_cache   = {}
 	Logger.debug(LOG, "Overrides reloaded from disk.")
+	return true
+end
+
+--- Parses override bytes exactly as the running configuration reads them.
+--- @param content string Override source bytes ("" for an absent file).
+--- @return table overrides Category key to override entry.
+function M.parse_override_content(content)
+	assert(type(content) == "string", "override content must be a string")
+	return (parse_override_content(content))
+end
+
+--- The delay resolver of one override tree, as the registry projection runs it.
+--- @param overrides table Reader override tree.
+--- @return function resolve (group, section, corpus metadata) -> seconds.
+function M.delay_projection(overrides)
+	assert(type(overrides) == "table", "delay projection needs an override tree")
+	return delay_projection(overrides)
+end
+
+--- Holds the override file for one scope transaction; ordinary mutations and
+--- reloads are refused until the owner releases it.
+--- @param owner table Transaction identity.
+--- @return boolean acquired
+function M.acquire(owner)
+	if not require_state("acquire") or type(owner) ~= "table" or _state.scope_owner ~= nil then return false end
+	_state.scope_owner = owner
+	return true
+end
+
+--- Releases the override file held by an owner.
+--- @param owner table Transaction identity.
+--- @return boolean released
+function M.release(owner)
+	if not require_state("release") or _state.scope_owner ~= owner then return false end
+	_state.scope_owner = nil
+	return true
+end
+
+--- The committed override state a scope may restore, or nil when the source
+--- read did not commit and nothing may be written.
+--- @return table|nil snapshot { source, overrides } detached from memory.
+function M.scope_snapshot()
+	if not require_state("scope_snapshot") or _state.writes_blocked then return nil end
+	return { source = clone_value(_state.source_snapshot), overrides = clone_value(_state.overrides) }
+end
+
+--- Adopts classified override bytes for the scope that holds the file: their
+--- delays are projected onto the registry in the same transaction that runs
+--- `publish`, and memory follows only once both committed. The same call puts
+--- the previous bytes back, with `publish` restoring them.
+--- @param owner table The holding transaction identity.
+--- @param source table Classified bytes the file holds once `publish` returns true.
+--- @param publish function Exact conditional publication, returning true.
+--- @return boolean adopted
+function M.adopt_scope_source(owner, source, publish)
+	if not require_state("adopt_scope_source") or _state.scope_owner ~= owner or _state.writes_blocked then
+		return false
+	end
+	assert(type(source) == "table" and (source.status == "absent"
+		or (source.status == "ok" and type(source.content) == "string")), "scope override source is not classified")
+	assert(type(publish) == "function", "scope override adoption needs its publication")
+	local overrides, word_delimiters, global_passthrough = parse_override_content(source.content or "")
+	local ok, committed = pcall(function()
+		if _state.delay_transaction then
+			return _state.delay_transaction(delay_projection(overrides), publish)
+		end
+		return publish()
+	end)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "Scope override adoption did not commit: %s.", tostring(committed))
+		return false
+	end
+	_state.overrides          = overrides
+	_state.word_delimiters    = word_delimiters
+	_state.global_passthrough = global_passthrough
+	_state.source_snapshot    = source.status == "ok" and { status = "ok", content = source.content }
+		or { status = "absent" }
+	_state.resolve_cache      = {}
+	Logger.debug(LOG, "Scope override source adopted (%s).", source.status)
 	return true
 end
 
@@ -1161,7 +1262,7 @@ end
 --- @param delimiters string|nil The new delimiter string, or nil to reset.
 --- @return boolean True on success.
 function M.set_word_delimiters(delimiters)
-	if not require_state("set_word_delimiters") then return false end
+	if not require_state("set_word_delimiters") or not scope_admits("set_word_delimiters") then return false end
 
 	local candidate
 	if delimiters == nil or delimiters == DEFAULT_WORD_DELIMITERS then
