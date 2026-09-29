@@ -227,13 +227,14 @@ function M.scan_records(source, options)
 		end
 		local addressable = table_owned and record.key_segments ~= nil
 		record.addressable = addressable
-		-- One quoted key, such as an extension pack's `"ext:pack:stem"`, is
-		-- exposed apart from `addressable` so only the batch writer, which renders
-		-- it back quoted, can edit its line; cleanup and path readers stay unchanged.
-		-- A quoted dot would collide with a dotted key's identity, so none is offered.
+		-- One key that only a quoted spelling can hold, such as an extension
+		-- pack's `"ext:pack:stem"`, is exposed apart from `addressable` so only the
+		-- batch writer, which renders it back quoted, can edit its line; cleanup and
+		-- path readers stay unchanged. A quoted dot would collide with a dotted
+		-- key's identity, and a quoted bare word stays as conservative as before.
 		if table_owned and not addressable and record.key_text then
 			local key = KeyPath.parse(record.key_text)
-			if key and #key == 1 and not key[1]:find(".", 1, true) then
+			if key and #key == 1 and not key[1]:find("^[A-Za-z0-9_%-]*$") and not key[1]:find(".", 1, true) then
 				record.quoted = { section = header.section, key = key[1] }
 			end
 		end
