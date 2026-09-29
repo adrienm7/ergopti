@@ -1422,6 +1422,16 @@ local function language_pack_path(language, stem)
 	return nil
 end
 
+--- Whether a category file is the user's own copy: the configured hotstrings
+--- folder is in use and holds it. An extension binding replaces the bundled
+--- file of a category, never that copy (ExtensionPacks.route).
+--- @param path string|nil
+--- @return boolean
+local function is_user_hotstrings_copy(path)
+	return type(path) == "string" and hotstrings_dir ~= bundled_hotstrings_dir
+		and path:sub(1, #hotstrings_dir) == hotstrings_dir
+end
+
 -- Discover the extension packs once for this boot — the bundled ones, the
 -- committed generations of installed layouts, then the user's folder — before
 -- the override resolver, the loader and the menu read them, so all three
@@ -1444,9 +1454,17 @@ do
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
 			-- A namespaced extension pack names its own discovered file, and a
-			-- category an extension binds whole reads its metadata from it.
+			-- category an extension binds whole reads its metadata from it,
+			-- unless the user's folder holds their own copy, which is what loads.
 			local bound = ExtensionPacks.source(category)
-			if bound then return bound end
+			if bound then
+				local own = hotstrings_dir .. category .. ".toml"
+				local ok_attr, attr = pcall(hs.fs.attributes, own)
+				if is_user_hotstrings_copy(own) and ok_attr and type(attr) == "table" and attr.mode == "file" then
+					return own
+				end
+				return bound
+			end
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
 			end
@@ -1665,7 +1683,8 @@ local _toml_load_t0 = hs.timer.secondsSinceEpoch()
 local carried_categories = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
-	local path, section_sources = ExtensionPacks.route(name, hotstrings_dir .. fname)
+	local own = hotstrings_dir .. fname
+	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
 	keymap.load_toml(name, path, section_sources)
 	table.insert(hotfiles, name)
@@ -1679,7 +1698,8 @@ local language_file_count = 0
 for _, pack in ipairs(language_packs) do
 	for _, stem in ipairs(pack.categories) do
 		local name = HotstringLanguages.group_id(pack.id, stem)
-		local path, section_sources = ExtensionPacks.route(name, language_pack_path(pack.id, stem))
+		local own = language_pack_path(pack.id, stem)
+		local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 		if path then
 			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
 			keymap.load_toml(name, path, section_sources)

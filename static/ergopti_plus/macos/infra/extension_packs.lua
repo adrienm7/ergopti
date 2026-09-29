@@ -294,15 +294,46 @@ function M.routes()
 	return _routes
 end
 
+--- The section sources a user's copy of a category leaves to the extensions:
+--- the bound sections it does not declare itself. An unreadable copy declares
+--- none; the loader then reports that file.
+--- @param section_sources table|nil Array of { path, sections }.
+--- @param path string The user's copy.
+--- @return table|nil
+local function sections_left_by(section_sources, path)
+	if section_sources == nil then return nil end
+	local ok, data, committed = pcall(require("infra.toml.reader").parse, path)
+	local declared = (ok and committed == true and type(data) == "table" and type(data.sections) == "table")
+		and data.sections or {}
+	local left = {}
+	for _, source in ipairs(section_sources) do
+		local sections = {}
+		for _, name in ipairs(source.sections) do
+			if declared[name] == nil then sections[#sections + 1] = name end
+		end
+		if #sections > 0 then left[#left + 1] = { path = source.path, sections = sections } end
+	end
+	return #left > 0 and left or nil
+end
+
 --- Where one bundled category loads from this boot.
+---
+--- An extension binding replaces the driver's own file of a category, never the
+--- user's copy of it: the configured hotstrings folder holds explicit overrides,
+--- which keep the whole category, or each bound section they declare themselves.
 --- @param category string Runtime category.
---- @param bundled_path string|nil The driver's own file for it.
+--- @param bundled_path string|nil The driver's own file for it, or the user's copy.
+--- @param user_copy boolean|nil True when bundled_path is the user's copy.
 --- @return string|nil path The file load_toml reads.
 --- @return table|nil section_sources The { path, sections } records it merges over it.
-function M.route(category, bundled_path)
+function M.route(category, bundled_path, user_copy)
 	local route = M.routes()[category]
 	if route == nil then return bundled_path, nil end
-	return route.path or bundled_path, route.section_sources
+	if user_copy ~= true or bundled_path == nil then return route.path or bundled_path, route.section_sources end
+	if route.path then
+		Logger.info(LOG, "The user's copy of '%s' overrides the file an extension binds.", category)
+	end
+	return bundled_path, sections_left_by(route.section_sources, bundled_path)
 end
 
 --- The bound categories no bundled file carries, in a stable order.
