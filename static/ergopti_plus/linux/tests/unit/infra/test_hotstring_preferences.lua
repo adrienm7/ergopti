@@ -133,8 +133,9 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 
 	helpers.it("refuses paths it does not own and values of the wrong type", function()
 		with_preferences(nil, function(Preferences, path)
-			helpers.assert_eq(pcall(Preferences.get, "hotstrings.groups.rolls"), false)
-			helpers.assert_eq(pcall(Preferences.get, "hotstrings.repeat_key_enabled"), false,
+			helpers.assert_throws(function() Preferences.get("hotstrings.groups.rolls") end,
+				"a catalogue choice has its own owner")
+			helpers.assert_throws(function() Preferences.get("hotstrings.repeat_key_enabled") end,
 				"the repeat key has its own owner")
 			helpers.assert_eq(Preferences.set("hotstrings.preview_star_enabled", "true"), false)
 			helpers.assert_nil(read(path))
