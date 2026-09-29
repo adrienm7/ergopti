@@ -111,6 +111,10 @@ local function with_editor(scenario)
 				return { width = 1100, height = 760 }
 			end,
 			get_centered_frame = function(w, h) return { w = w, h = h } end,
+			force_focus = function(view, is_new, lifecycle)
+				view.fronted = is_new == false and lifecycle.is_current() == true
+				return true
+			end,
 			show_webview = function(options)
 				local view = { scripts = {}, deleted = false, options = options }
 				function view:evaluateJavaScript(js) self.scripts[#self.scripts + 1] = js end
@@ -118,7 +122,7 @@ local function with_editor(scenario)
 					self.deleted = true
 					options.on_close()
 				end
-				function view:bringToFront() self.fronted = true end
+				function view:bringToFront() error("bringToFront pins the editor above other apps") end
 				world.views[#world.views + 1] = view
 				return view
 			end,
@@ -196,7 +200,8 @@ helpers.describe("macOS navigation layer editor host", function()
 			helpers.assert_eq(codes(init), "unavailable_on_os")
 			helpers.assert_eq(editor.open({ karabiner = world.karabiner }), true)
 			helpers.assert_eq(#world.views, 1, "a second open brings the window to the front")
-			helpers.assert_eq(world.views[1].fronted, true)
+			helpers.assert_eq(world.views[1].fronted, true,
+				"the open window is presented by the shared focus helper (ui-focus-not-topmost)")
 		end)
 	end)
 

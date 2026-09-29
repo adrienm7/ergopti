@@ -82,10 +82,11 @@ local function with_editor(scenario)
 					if self.deletes > 0 then error("deleted native view") end
 					return nil
 				end
-				function view:bringToFront()
+				function view:show()
 					if self.deletes > 0 then error("deleted native view") end
 					return self
 				end
+				function view:bringToFront() error("bringToFront pins the editor above other apps") end
 				records.views[#records.views + 1] = view
 				if options.on_webview_created then options.on_webview_created(view) end
 				if records.factory_after_throws then error("injected post-allocation failure") end

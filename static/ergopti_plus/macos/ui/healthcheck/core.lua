@@ -821,7 +821,7 @@ function M.show_window(opts)
 	if not ok_cb then return abandon_open_window("The diagnostics message handler was refused", cb_err) end
 
 	-- The same chrome as every other Ergopti window (title bar, drop shadow,
-	-- floating level), from the one function that defines it.
+	-- normal level), from the one function that defines it.
 	local masks = hs.webview.windowMasks
 	for _, step in ipairs(ui_builder.window_chrome_steps(wv, {
 		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4)
@@ -870,26 +870,11 @@ function M.show_window(opts)
 		return abandon_open_window("wv:show() failed — window will not appear", show_result)
 	end
 
-	local ok_ui, focus_builder = pcall(require, "ui.ui_builder")
-	if ok_ui and focus_builder then
-		focus_builder.force_focus(wv, true, { is_current = function()
-			return _focus_owner == focus_owner and _window == wv and _window_generation == generation
-		end })
-	else
-		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(focus_builder))
-		if not schedule_continuation(0.08, generation, wv, function()
-			if _focus_owner ~= focus_owner then return end
-			pcall(hs.focus)
-			local ok_win, win = pcall(function() return wv:hswindow() end)
-			if ok_win and win and type(win.focus) == "function" then
-				pcall(function() win:focus() end)
-			else
-				pcall(function() wv:bringToFront() end)
-			end
-		end, "Healthcheck fallback focus") then
-			Logger.error(LOG, "Healthcheck fallback focus could not be scheduled.")
-		end
-	end
+	-- Raised and focused once, like every window: never given a level that
+	-- keeps it above the windows the user opens afterwards.
+	ui_builder.force_focus(wv, true, { is_current = function()
+		return _focus_owner == focus_owner and _window == wv and _window_generation == generation
+	end })
 
 	Logger.success(LOG, "Diagnostics window opened.")
 	return true

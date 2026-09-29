@@ -418,7 +418,10 @@ function M.get_centered_frame(w, h)
 	}
 end
 
---- Forces a webview window to the front, teleports it to the current space natively, and gives it focus cleanly.
+--- Presents a webview window: teleports it to the current space, raises it and
+--- gives it focus. This is the driver's one "present window" helper, used when a
+--- window opens and when an open window is requested again. It never changes the
+--- window level: an Ergopti window is focused, never kept above other apps.
 --- @param wv userdata The hs.webview object.
 --- @param is_new boolean When true the window is being shown for the first time — skip hide/show to avoid a
 ---   flicker where the window appears briefly hidden before the HTML finishes loading.
@@ -525,14 +528,17 @@ function M.force_focus(wv, is_new, lifecycle)
 			attempts = attempts + 1
 			return schedule(0.05, try_focus, "webview focus retry")
 		else
-			-- Final fallback: if no window handle after 1s, use the webview-level bringToFront.
-			local brought = pcall(function() wv:bringToFront(true) end)
+			-- Final fallback when no window handle appeared within 1 s: order the
+			-- webview front again (show() makes it key) and activate Hammerspoon.
+			-- Never bringToFront(): it sets a floating or screen-saver LEVEL instead
+			-- of raising the window, which then stays above every other app.
+			local shown = pcall(function() wv:show() end)
 			if not current() then return false end
-			if not brought then return fail("fallback window focus") end
+			if not shown then return fail("fallback window focus") end
 			local activated = pcall(function() hs.focus(true) end)
 			if not current() then return false end
 			if not activated then return fail("fallback application focus") end
-			Logger.warn(LOG, "Window focus applied via bringToFront fallback after %d attempts.", max_attempts)
+			Logger.warn(LOG, "Window focus applied via show fallback after %d attempts.", max_attempts)
 			return current()
 		end
 	end
@@ -570,6 +576,11 @@ end
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	if opts.level ~= nil then
+		-- Refused before the native window exists, so nothing is left to clean up.
+		Logger.error(LOG, "WebView factory refused a window level: windows are focused, never kept on top.")
+		return nil
+	end
 	if _factory_build_owner then
 		Logger.warn(LOG, "WebView factory construction re-entry refused; candidate still in progress.")
 		return nil
@@ -760,16 +771,14 @@ function M.show_webview(opts)
 	end
 
 	-- wv:html() loads content but does not show the window — explicit show() required.
-	-- force_focus is called with is_new=true so it skips the hide/show flicker path
-	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
-	-- UI opened through this factory automatically comes to the foreground and receives
-	-- keyboard focus without each caller having to remember to call it.
-	-- A window opened with focus = false is shown at its chrome level and left
-	-- there. The forced focus activates Hammerspoon and, once its window lookup
-	-- has failed for a second, raises the window to the screen-saver level
-	-- above every app. That lookup goes through Accessibility, so it always
-	-- fails in an untrusted process: a window meant to sit beside another app
-	-- (System Settings) would cover it.
+	-- force_focus is called with is_new=true so it skips the space teleport and
+	-- goes straight to raise + focus. This means every UI opened through this
+	-- factory automatically comes to the foreground and receives keyboard focus
+	-- without each caller having to remember to call it.
+	-- A window opened with focus = false is shown and left where it is, without
+	-- activating Hammerspoon. The forced focus finds the window through
+	-- Accessibility, so it always fails in an untrusted process: a window meant
+	-- to sit beside another app (System Settings) must not be focused.
 	if not apply_required_webview_mutation(function() wv:show() end, "show") then
 		return abandon_required_mutation()
 	end
@@ -790,18 +799,28 @@ end
 
 --- The window chrome every Ergopti webview window gets: a native title bar and
 --- close button, the drop shadow that gives it a visible edge over a white page
---- (Hammerspoon webviews have none by default), and the floating level that keeps
---- it above other apps. Every window applies these steps, in this order, and a
---- window that skips this function is caught by test_window_chrome_everywhere.
+--- (Hammerspoon webviews have none by default), and the normal window level.
+--- An Ergopti window is raised and focused when it opens (force_focus), never
+--- kept above other apps: at the floating level the diagnostics window stayed
+--- over every window the user opened afterwards. The level step runs after the
+--- style because a utility panel mask can make an NSPanel float on its own.
+--- Every window applies these steps, in this order, and a window that skips this
+--- function is caught by test_window_chrome_everywhere.
 --- @param wv table The hs.webview window.
---- @param opts table|nil { style_masks?, level? } overrides for the mask and level.
+--- @param opts table|nil { style_masks? } override for the mask; a level is refused.
 --- @return table Array of { name = string, apply = function } mutation steps.
 function M.window_chrome_steps(wv, opts)
 	opts = opts or {}
+	if opts.level ~= nil then
+		error("window_chrome_steps: windows take no level; they are focused, never kept on top", 2)
+	end
+	local level = hs.drawing.windowLevels.normal
+	if type(level) ~= "number" then
+		error("window_chrome_steps: hs.drawing.windowLevels.normal is unavailable", 2)
+	end
 	local masks = hs.webview.windowMasks
 	local style = opts.style_masks
 		or ((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["utility"] or 16))
-	local level = opts.level or hs.drawing.windowLevels.floating
 	return {
 		{ name = "windowStyle", apply = function() wv:windowStyle(style) end },
 		{ name = "shadow",      apply = function() wv:shadow(true) end },

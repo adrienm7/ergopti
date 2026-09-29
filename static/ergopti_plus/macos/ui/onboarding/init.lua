@@ -693,13 +693,10 @@ function M.run(config_path)
 
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
-		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-		if ok_ui then
-			local view, focus_owner = _webview, _focus_owner
-			ui_builder.force_focus(view, false, { is_current = function()
-				return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
-			end })
-		else pcall(function() _webview:bringToFront() end) end
+		local view, focus_owner = _webview, _focus_owner
+		require("ui.ui_builder").force_focus(view, false, { is_current = function()
+			return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
+		end })
 		return true
 	end
 	if _usercontent and close_webview() ~= true then

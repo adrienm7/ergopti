@@ -232,15 +232,11 @@ function M.open(current_info, save_callback)
 	-- Singleton — focus the existing window instead of opening a second one.
 	if _webview then
 		local owner, view = _owner, _webview
-		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		local ui_builder = require("ui.ui_builder")
 		if not owner_is_current(owner) then return false end
-		if ok_ui and ui_builder then
-			ui_builder.force_focus(view, false, {
-				is_current = function() return owner_is_current(owner) end,
-			})
-		else
-			pcall(function() view:bringToFront() end)
-		end
+		ui_builder.force_focus(view, false, {
+			is_current = function() return owner_is_current(owner) end,
+		})
 		return owner_is_current(owner)
 	end
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPersonalInfo")

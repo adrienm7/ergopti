@@ -743,15 +743,9 @@ function M.show()
 		end
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		if not delivery_is_current(generation, webview) then return false end
-		pcall(function()
-			local win = webview:hswindow()
-			if not delivery_is_current(generation, webview) then return end
-			if win then win:focus()
-			else
-				webview:bringToFront(false)
-				if delivery_is_current(generation, webview) then pcall(hs.focus) end
-			end
-		end)
+		ui_builder.force_focus(webview, false, { is_current = function()
+			return delivery_is_current(generation, webview)
+		end })
 		return submit_javascript(generation, webview, "reopen", "window.apply_date_app_filters();")
 	end
 
