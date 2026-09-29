@@ -5291,8 +5291,10 @@ id = "tapholds_toggle"
 i18n = "menu.tapholds.enable"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
-# macOS switches the feature, not its remap engine (always on): off stops
-# generating the per-key rules while keeping every assignment, like a pause.
+# macOS switches the feature, not its remap engine: off stops generating the
+# per-key rules while keeping every assignment, like a pause. The engine has
+# its own switch, « Ergopti uses Karabiner » (on by default); while it is off
+# the key and chord rows are greyed under the karabiner_off_hint row.
 # Linux takes the engine out of its keyboard hook, keeping every assignment.
 
 [[menu.tap_holds_menu]]

@@ -16,7 +16,8 @@
 
 local helpers = require("tests.helpers")
 
--- The integration is always on, so these toggle-failure notices are gone.
+-- Toggle-failure notices of the retired tray row. The F2 switch logs its
+-- failures and brings neither notice back.
 local RETIRED_KEYS = {
 	"karabiner.disable_failed",
 	"karabiner.enable_failed",
