@@ -437,33 +437,56 @@ Test("system actions: open_terminal_here and new_text_file_here act in the Explo
 ; ======================================
 ; ======================================
 
+; One confirm action through GestureInvokeAction, Cancel then OK. A function
+; of its own, called once per id, rather than a loop body: the recorder closure
+; reads Id, and no closure of the driver reads a for-loop variable of the
+; function that creates it (production binds it through an immediately called
+; arrow). This one did, and on CI it recorded no run: _GestureRunAction
+; contains and logs whatever an action throws, so the OK case saw neither a run
+; nor an error. The log lines of the OK run are part of the failure message.
+; @param Id {String} A catalogue action declaring confirm = true.
+_SysActions_ConfirmGateCase(Id) {
+	global GESTURE_ACTIONS, _LOGGER_INFO_ENABLED
+	Saved := GESTURE_ACTIONS[Id]
+	Ran := []
+	GESTURE_ACTIONS[Id] := { Fn: (*) => Ran.Push(Id) }
+	try {
+		Fake := _SysActionsFake()
+		Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
+		GestureInvokeAction(Id, "", Fake)
+		AssertEqual(0, Ran.Length, Id . " must not run before the answer")
+		AssertEqual(1, Fake.Deferred.Length, Id . ": the question is asked off the hotkey thread")
+		Fake.Deferred[1].Call()
+		AssertEqual(1, _SysActions_CallsNamed(Fake, "Ask").Length, Id . " asks")
+		AssertEqual(0, Ran.Length, Id . ": Cancel runs nothing")
+
+		Fake := _SysActionsFake()
+		Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
+		Fake.Answer := "OK"
+		GestureInvokeAction(Id, "", Fake)
+		Lines := []
+		SavedInfo := _LOGGER_INFO_ENABLED
+		_LOGGER_INFO_ENABLED := true
+		LoggerSetTestSink((Entry) => Lines.Push(Entry))
+		try Fake.Deferred[1].Call()
+		finally {
+			LoggerClearTestSink()
+			_LOGGER_INFO_ENABLED := SavedInfo
+		}
+		Logged := ""
+		for LogLine in Lines
+			Logged .= "`n" . LogLine
+		AssertEqual(1, Ran.Length, Id . ": OK runs it once" . Logged)
+		AssertEqual(0x77, _SysActions_CallsNamed(Fake, "Activate")[1][2], "the window it was asked from gets its focus back")
+	} finally {
+		GESTURE_ACTIONS[Id] := Saved
+	}
+}
+
 _SysActions_ConfirmGate() {
 	global GESTURE_ACTIONS
-	for Id in ["empty_trash", "unblock_file_selection"] {
-		Saved := GESTURE_ACTIONS[Id]
-		Ran := []
-		GESTURE_ACTIONS[Id] := { Fn: (*) => Ran.Push(Id) }
-		try {
-			Fake := _SysActionsFake()
-			Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
-			GestureInvokeAction(Id, "", Fake)
-			AssertEqual(0, Ran.Length, Id . " must not run before the answer")
-			AssertEqual(1, Fake.Deferred.Length, Id . ": the question is asked off the hotkey thread")
-			Fake.Deferred[1].Call()
-			AssertEqual(1, _SysActions_CallsNamed(Fake, "Ask").Length, Id . " asks")
-			AssertEqual(0, Ran.Length, Id . ": Cancel runs nothing")
-
-			Fake := _SysActionsFake()
-			Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
-			Fake.Answer := "OK"
-			GestureInvokeAction(Id, "", Fake)
-			Fake.Deferred[1].Call()
-			AssertEqual(1, Ran.Length, Id . ": OK runs it once")
-			AssertEqual(0x77, _SysActions_CallsNamed(Fake, "Activate")[1][2], "the window it was asked from gets its focus back")
-		} finally {
-			GESTURE_ACTIONS[Id] := Saved
-		}
-	}
+	for Id in ["empty_trash", "unblock_file_selection"]
+		_SysActions_ConfirmGateCase(Id)
 	Saved := GESTURE_ACTIONS["sleep_displays"]
 	Ran := 0
 	GESTURE_ACTIONS["sleep_displays"] := { Fn: (*) => Ran += 1 }
