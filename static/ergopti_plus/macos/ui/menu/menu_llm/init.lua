@@ -45,10 +45,10 @@ local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 local MenuLayout       = require("ui.menu.menu_llm.menu_layout")
 local ManifestMenu     = require("infra.manifest_menu")
 
--- Deps checkers — kicked off on backend switch and on first menu activation
--- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
--- manual user action. Both checkers are idempotent and exit silently when
--- nothing needs doing, so the menu opens instantly in the nominal case.
+-- AI runtimes install only when their backend is selected (a backend row, or
+-- enabling the AI with that backend), through runtime_install_offer — never at
+-- startup, on menu build or after an update. Building the menu only reads
+-- stat-only presence, so it opens instantly whether or not a runtime exists.
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("adapters.shell_runner")
