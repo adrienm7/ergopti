@@ -529,6 +529,20 @@ function buildScriptProblems(source, externals) {
 const manifest = payload.loadManifest(ROOT);
 errors.push(...buildScriptProblems(BUILD, manifest.external));
 
+// The build validated the Karabiner pin on every package run; with the
+// installer gone, the macOS package job must still run that validation, or a
+// bad pin first fails on a new user's onboarding
+const packageJob =
+	(fs
+		.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+		.match(/^ {2}package-macos:\n[\s\S]*?(?=^ {2}[a-z][a-z-]*:\n|(?![\s\S]))/m) || [])[0] || '';
+check(
+	/^ {8}run: python3 -m unittest discover -s tools\/build -p 'karabiner_manifest_test\.py'$/m.test(
+		packageJob
+	),
+	'ci-macos.yml: the package-macos job no longer validates the Karabiner-Elements pin (tools/build/karabiner_manifest_test.py)'
+);
+
 // Self-check: each way of bypassing the manifest must be reported
 const stageLine =
 	'\tnode "$REPO_ROOT/tools/build/macos-bundle-payload.cjs" stage "$REPO_ROOT" "$static_root"\n';
