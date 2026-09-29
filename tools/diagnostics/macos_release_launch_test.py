@@ -3,6 +3,7 @@
 
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location("release_launch", Path(__file__).with_name("macos-release-launch.py"))
@@ -39,6 +40,33 @@ class StartupReadinessTests(unittest.TestCase):
     def test_existing_configuration_accepts_completed_runtime(self):
         marker = "User interface initialized successfully."
         self.assertEqual(observer.require_startup_ready(marker), marker)
+
+
+class FailureEvidenceTests(unittest.TestCase):
+    """A failed launch must explain itself in the job log, not only the artifact."""
+
+    def test_names_the_failure_and_the_error_lines(self):
+        with tempfile.TemporaryDirectory() as folder:
+            logs = Path(folder)
+            (logs / "ErgoptiPlus_boot.log").write_text(
+                "[INFO] booting\n[ERROR] [llm] Profile catalogue failed.\n", encoding="utf-8")
+            (logs / "launcher.log").write_text("FATAL: child exited\n", encoding="utf-8")
+            lines = observer.failure_evidence({"error": "RuntimeError: boom"}, logs)
+        self.assertEqual(lines[0], "release launch failed: RuntimeError: boom")
+        self.assertIn("ErgoptiPlus_boot.log: [ERROR] [llm] Profile catalogue failed.", lines)
+        self.assertIn("launcher.log: FATAL: child exited", lines)
+        self.assertNotIn("ErgoptiPlus_boot.log: [INFO] booting", lines)
+
+    def test_caps_a_noisy_failure(self):
+        with tempfile.TemporaryDirectory() as folder:
+            logs = Path(folder)
+            (logs / "a.log").write_text("[ERROR] x\n" * 500, encoding="utf-8")
+            lines = observer.failure_evidence({"error": "RuntimeError: boom"}, logs)
+        self.assertEqual(len(lines), observer.MAX_EVIDENCE_LINES)
+
+    def test_missing_log_folder_still_names_the_failure(self):
+        lines = observer.failure_evidence({"error": "RuntimeError: boom"}, Path("/nonexistent/ergopti"))
+        self.assertEqual(lines, ["release launch failed: RuntimeError: boom"])
 
 
 if __name__ == "__main__":
