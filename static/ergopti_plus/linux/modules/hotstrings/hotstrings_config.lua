@@ -1584,6 +1584,12 @@ function M.bundled_categories()
 	for _, pack in ipairs(M.language_packs()) do
 		for _, stem in ipairs(pack.categories) do set[Languages.group_id(pack.id, stem)] = true end
 	end
+	-- A category an extension binds (SFB reduction and rolls, moved into the
+	-- shipped Ergopti extension) keeps its historical manifest rows: the scope
+	-- still restores their recommended delays, as for any bundled category.
+	for _, extension in ipairs(M.discover_extensions()) do
+		for _, file in ipairs(extension.bound_files or {}) do set[file.binding.category] = true end
+	end
 	return set
 end
 

@@ -8,16 +8,23 @@ return function(helpers)
 	local Resolver = require("hotstrings.delay_resolver")
 	local Languages = require("hotstrings.languages")
 	local Codec = require("toml_codec")
+	local Extension = require("layouts.extension")
+	local Extensions = require("hotstrings.extensions")
 	local shared = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 		:match("^(.*)/lua/test/[^/]+$")
 	assert(shared, "the shared tree must enclose this contract")
 
-	local function decode(relative)
-		local handle = assert(io.open(shared .. "/modules/hotstrings/" .. relative, "rb"))
+	local function read(path)
+		local handle = io.open(path, "rb")
+		if not handle then return nil end
 		local content = handle:read("*a")
 		handle:close()
-		return assert(Codec.decode(content), relative)
+		return content
 	end
+	local function decode_path(path)
+		return assert(Codec.decode(assert(read(path), path)), path)
+	end
+	local function decode(relative) return decode_path(shared .. "/modules/hotstrings/" .. relative) end
 	local default_delay = assert(tonumber(decode("defaults.toml").delays.default_sec))
 	local index = decode("_index.toml")
 
@@ -33,11 +40,53 @@ return function(helpers)
 				document = decode(pack.id .. "/" .. stem .. ".toml") }
 		end
 	end
+	-- The Ergopti extension every driver ships (SFB reduction, rolls and the
+	-- magic key's repeat corrections moved there), found and scanned by the
+	-- shared resolvers the drivers use. Its files keep their historical
+	-- category: a whole bound file is that category's corpus, and a bound
+	-- section stays a section of its category, whose metadata it inherits.
+	local family = assert(read(shared .. "/modules/layouts/defaults.json"), "layout defaults")
+		:match('"ergopti_family"%s*:%s*"([^"]+)"')
+	local shipped = Extension.shipped_root(shared .. "/../../layouts/registry/", { ergopti_family = family },
+		function(path) return read(path) ~= nil end)
+	local found = Extensions.scan({ assert(shipped, "the Ergopti extension ships with every driver") }, {
+		list_dirs = function() return {} end,
+		list_files = function(dir)
+			local files = {}
+			local listing = assert(io.popen('ls -1 "' .. dir .. '" 2>/dev/null'))
+			for entry in listing:lines() do
+				if entry:match("%.toml$") then files[#files + 1] = dir .. "/" .. entry end
+			end
+			listing:close()
+			return files
+		end,
+		read_file = read,
+	})
+	local bound_sections = {}
+	for _, pack in ipairs(found) do
+		for _, file in ipairs(pack.bound_files) do
+			local binding = file.binding
+			if binding.sections == nil then
+				corpus[#corpus + 1] = { id = binding.category, document = decode_path(file.path) }
+			else
+				bound_sections[binding.category] = bound_sections[binding.category] or {}
+				for _, section in ipairs(binding.sections) do
+					bound_sections[binding.category][section] = true
+				end
+			end
+		end
+	end
 	local metas, groups = {}, {}
 	for _, item in ipairs(corpus) do
 		local meta = item.document._meta
-		local sections = {}
-		for name in pairs(meta.sections or {}) do sections[#sections + 1] = name end
+		local sections, listed = {}, {}
+		for name in pairs(meta.sections or {}) do
+			sections[#sections + 1] = name
+			listed[name] = true
+		end
+		for name in pairs(bound_sections[item.id] or {}) do
+			if not listed[name] then sections[#sections + 1] = name end
+		end
 		table.sort(sections)
 		metas[item.id] = meta
 		groups[#groups + 1] = { id = item.id, override = { item.id }, sections = sections, bundled = true }
