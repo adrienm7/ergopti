@@ -46,9 +46,12 @@ local NavLayer = require("platform.remap.nav_layer")
 
 local LOG = "karabiner"
 
-local MANAGED_TAG_LABEL      = "ErgoptiPlus managed"
-local MANAGED_MODE_NORMAL    = "normal"
-local MANAGED_MODE_PAUSE     = "pause"
+-- The ownership marker is part of the pure lease contract: the integration
+-- switch removes exactly the rules that carry it, so there is one parser.
+local MANAGED_MODE_NORMAL    = LeaseContract.MANAGED_MODE_NORMAL
+local MANAGED_MODE_PAUSE     = LeaseContract.MANAGED_MODE_PAUSE
+local managed_description_prefix = LeaseContract.managed_description_prefix
+local parse_managed_description  = LeaseContract.parse_managed_description
 
 local LEGACY_PARAMETER_TAP = "basic.to_if_alone_timeout_milliseconds"
 local LEGACY_PARAMETER_SIMULTANEOUS = "basic.simultaneous_threshold_milliseconds"
@@ -216,32 +219,6 @@ end
 --- @return string|nil error_message Validation failure.
 function M.revoked_variable_name(token)
 	return LeaseContract.revoked_variable_name(token)
-end
-
---- Builds the exact rule-description prefix owned by ErgoptiPlus.
---- @param token string Canonical generation token.
---- @param mode string Managed mode (`normal` or `pause`).
---- @return string prefix Exact prefix including its trailing space.
-local function managed_description_prefix(token, mode)
-	return string.format("[%s:%s:%s] ", MANAGED_TAG_LABEL, token, mode)
-end
-
---- Parses only canonical ErgoptiPlus ownership markers.
---- Lua patterns have no alternation or fixed-count quantifier, so the broad
---- capture is followed by explicit length, mode, and prefix checks.
---- @param description any Rule description candidate.
---- @return string|nil token Canonical token when the prefix is exact.
---- @return string|nil mode Canonical managed mode when the prefix is exact.
-local function parse_managed_description(description)
-	if type(description) ~= "string" then return nil end
-	local token, mode = description:match(
-		"^%[ErgoptiPlus managed:([0-9a-f]+):([a-z]+)%] "
-	)
-	if not LeaseContract.is_valid_token(token) then return nil end
-	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then return nil end
-	local expected = managed_description_prefix(token, mode)
-	if description:sub(1, #expected) ~= expected then return nil end
-	return token, mode
 end
 
 local VARIABLE_CONDITION_TYPES = {

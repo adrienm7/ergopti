@@ -82,9 +82,11 @@ helpers.describe("Config.build_default_state", function()
 		helpers.assert_eq(type(state.combo_symmetric), "boolean")
 	end)
 
-	helpers.it("starts enabled: the remap integration is always on", function()
+	helpers.it("starts with Ergopti using Karabiner: the switch defaults to on", function()
 		local state = Config.build_default_state({}, {})
 		helpers.assert_eq(state.enabled, true)
+		helpers.assert_eq(Config.INTEGRATION_ENABLED_DEFAULT, true,
+			"the default must be the one named constant the loader also uses")
 	end)
 
 	helpers.it("gives every hold slot an action the hold picker offers (default-holds-are-holdable)", function()
@@ -116,33 +118,83 @@ helpers.describe("Config.build_default_state", function()
 	end)
 end)
 
-helpers.describe("Config: the remap integration is not a user setting", function()
-	helpers.it("ignores a persisted enabled = false written by an earlier version", function()
-		local original_load = Config._load_toml_file
-		Config._load_toml_file = function(_path)
-			return { karabiner = { enabled = false }, tap_holds = { config = {} }, mod_combos = { config = {} } }
-		end
-		local state = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
-		Config._load_toml_file = original_load
-		helpers.assert_true(type(state) == "table", "a readable config must load")
+--- Loads config_karabiner.toml from one decoded document.
+--- @param document table Decoded TOML document.
+--- @return table|nil state
+--- @return string status
+local function load_document(document)
+	local original_load = Config._load_toml_file
+	Config._load_toml_file = function() return document end
+	local ok, state, status = pcall(Config.load_user_config, {}, {}, "/tmp/config_karabiner.toml")
+	Config._load_toml_file = original_load
+	helpers.assert_true(ok, "load_user_config must not raise: " .. tostring(state))
+	return state, status
+end
+
+--- Captures the document save_user_config would encode, without a disk write.
+--- @param state table State to persist.
+--- @return table|nil encoded
+local function encoded_document(state)
+	-- The codec table config.lua captured at load time; stubs installed later
+	-- replace the package entry, not that table.
+	local codec = package.loaded["infra.toml.codec"]
+	local encoded = nil
+	local original_encode = codec.encode
+	codec.encode = function(value)
+		encoded = value
+		error("stop before the disk write")
+	end
+	pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
+	codec.encode = original_encode
+	return encoded
+end
+
+helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
+	helpers.it("reads an absent [karabiner] section as the default: on", function()
+		local state, status = load_document({ tap_holds = { config = {} }, mod_combos = { config = {} } })
+		helpers.assert_eq(status, "ok")
+		helpers.assert_eq(state.enabled, Config.INTEGRATION_ENABLED_DEFAULT)
 		helpers.assert_eq(state.enabled, true)
 	end)
 
-	helpers.it("never writes an enabled flag back", function()
-		-- The codec table config.lua captured at load time; stubs installed later
-		-- replace the package entry, not that table.
-		local codec = package.loaded["infra.toml.codec"]
-		local encoded = nil
-		local original_encode = codec.encode
-		codec.encode = function(value)
-			encoded = value
-			error("stop before the disk write")
+	helpers.it("honours a persisted enabled = false", function()
+		local state, status = load_document({
+			karabiner = { enabled = false }, tap_holds = { config = {} }, mod_combos = { config = {} },
+		})
+		helpers.assert_eq(status, "ok")
+		helpers.assert_eq(state.enabled, false,
+			"an explicit off must survive a restart so no lease or guardian is acquired")
+	end)
+
+	helpers.it("refuses a switch that is not a boolean instead of guessing consent", function()
+		for _, stored in ipairs({ "no", 0, { true } }) do
+			local state, status = load_document({
+				karabiner = { enabled = stored }, tap_holds = { config = {} }, mod_combos = { config = {} },
+			})
+			helpers.assert_nil(state, "an ambiguous switch must not publish a state")
+			helpers.assert_eq(status, "error")
 		end
-		pcall(Config.save_user_config, Config.build_default_state({}, {}), "/tmp/config_karabiner.toml", true)
-		codec.encode = original_encode
-		helpers.assert_true(type(encoded) == "table", "save_user_config must encode the state")
-		helpers.assert_nil(encoded.karabiner, "no [karabiner] section: enabled is not persisted any more")
-		helpers.assert_true(type(encoded.tap_holds) == "table", "the tap-hold settings are still persisted")
+	end)
+
+	helpers.it("persists the switch beside the tap-hold settings", function()
+		for _, value in ipairs({ false, true }) do
+			local state = Config.build_default_state({}, {})
+			state.enabled = value
+			local encoded = encoded_document(state)
+			helpers.assert_true(type(encoded) == "table", "save_user_config must encode the state")
+			helpers.assert_true(type(encoded.karabiner) == "table", "the switch lives in [karabiner]")
+			helpers.assert_eq(encoded.karabiner.enabled, value)
+			helpers.assert_true(type(encoded.tap_holds) == "table", "the tap-hold settings are still persisted")
+		end
+	end)
+
+	helpers.it("leaves the persisted switch alone when a state carries none", function()
+		local state = Config.build_default_state({}, {})
+		state.enabled = nil
+		local encoded = encoded_document(state)
+		helpers.assert_true(type(encoded) == "table")
+		helpers.assert_nil(encoded.karabiner,
+			"a settings-only candidate must never synthesize an integration decision")
 	end)
 end)
 

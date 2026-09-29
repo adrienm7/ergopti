@@ -125,6 +125,11 @@ local function load_remap(options)
 		end,
 		KE_PHYSICAL_KC_LOG = nil,
 	}
+	-- karabiner.json is not part of this scenario: the switch-off cleanup is
+	-- covered by the rule-removal tests.
+	package.loaded["platform.remap.managed_rule_removal"] = {
+		remove_managed_rules = function() return true, "unchanged", 0 end,
+	}
 	package.loaded["platform.remap.ke_lifecycle"] = {
 		open_gui = function() return true end,
 		stop = function()
