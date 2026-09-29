@@ -271,8 +271,8 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 end)
 
 -- The key combinations moved under Shortcuts with a switch of their own. An
--- absent flag must stay absent through a load and a save, so it keeps
--- following the Tap-Holds switch; an explicit one is kept as written.
+-- absent flag must stay absent through a load and a save, so it keeps its
+-- neutral value (on); an explicit one is kept as written.
 helpers.describe("Config: the key-combinations switch", function()
 	helpers.it("persists [mod_combos] enabled when set and leaves it absent otherwise", function()
 		local codec = package.loaded["infra.toml.codec"]
@@ -283,7 +283,7 @@ helpers.describe("Config: the key-combinations switch", function()
 			error("stop before the disk write")
 		end
 		local state = Config.build_default_state({}, {})
-		helpers.assert_nil(state.mod_combos_enabled, "a fresh install follows the Tap-Holds switch")
+		helpers.assert_nil(state.mod_combos_enabled, "a fresh install leaves the switch absent")
 		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
 		helpers.assert_nil(encoded.mod_combos.enabled, "an inherited switch is not written")
 		state.mod_combos_enabled = false

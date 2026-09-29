@@ -4,27 +4,27 @@
 --- MODULE: The Key-Combinations Switch Of The Remap Facade
 --- DESCRIPTION:
 --- The « Combinaisons de touches » first-row checkbox reads and writes the
---- remap facade. While the user never set it, the switch follows Tap-Holds;
---- once set, the choice is persisted in the same exact transaction as every
---- other remap setting and no longer follows.
+--- remap facade. It never follows Tap-Holds (decision of 2026-09-29): while
+--- the user never set it, it is on; once set, the choice is persisted in the
+--- same exact transaction as every other remap setting.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.remap_transaction_fixture")
 
 helpers.describe("the remap facade owns the key-combinations switch", function()
-	helpers.it("follows Tap-Holds until set, then persists its own choice", function()
+	helpers.it("is on until set, whatever Tap-Holds say, then persists its own choice (combos-own-switch)", function()
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap()
 			helpers.assert_true(remap.set_tap_holds_enabled(true))
-			helpers.assert_true(remap.get_mod_combos_enabled(), "an unset switch follows Tap-Holds on")
+			helpers.assert_true(remap.get_mod_combos_enabled(), "an unset switch is on with Tap-Holds on")
 			helpers.assert_true(remap.set_tap_holds_enabled(false))
-			helpers.assert_eq(remap.get_mod_combos_enabled(), false, "an unset switch follows Tap-Holds off")
+			helpers.assert_true(remap.get_mod_combos_enabled(), "an unset switch stays on with Tap-Holds off")
 			helpers.assert_nil(calls.saved_payloads[#calls.saved_payloads].mod_combos_enabled,
-				"following Tap-Holds writes no flag of its own")
+				"switching Tap-Holds writes no flag of its own")
 
 			helpers.assert_true(remap.set_mod_combos_enabled(true))
-			helpers.assert_true(remap.get_mod_combos_enabled(), "the explicit choice wins over Tap-Holds off")
+			helpers.assert_true(remap.get_mod_combos_enabled(), "the explicit choice is on with Tap-Holds off")
 			helpers.assert_eq(calls.saved_payloads[#calls.saved_payloads].mod_combos_enabled, true,
 				"the choice is persisted")
 			helpers.assert_true(remap.set_tap_holds_enabled(true))
@@ -69,7 +69,7 @@ helpers.describe("the remap facade owns the key-combinations switch", function()
 			helpers.assert_true(remap.reset_to_defaults(function() end))
 			helpers.assert_eq(remap.get_combo_combo_action("left_shift+right_shift"), "none",
 				"the global restore still resets the pairs")
-			helpers.assert_true(remap.get_mod_combos_enabled(), "and the switch follows Tap-Holds again")
+			helpers.assert_true(remap.get_mod_combos_enabled(), "and the switch is absent, so on, again")
 		end)
 	end)
 

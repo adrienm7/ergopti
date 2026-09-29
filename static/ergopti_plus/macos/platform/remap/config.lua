@@ -392,7 +392,7 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 		enabled                   = M.INTEGRATION_ENABLED_DEFAULT,
 		tap_holds_enabled         = recommended and Manifest.recommended_for("tap_holds.enabled")
 			or Manifest.default_for("tap_holds.enabled"),
-		-- Absent: the key combinations follow the Tap-Holds switch
+		-- Absent: the key combinations are on whatever the Tap-Holds switch says
 		-- (Generator.key_combinations_enabled), in the preset as on a fresh install.
 		mod_combos_enabled        = nil,
 		tap_hold_config           = tap_hold_config,
@@ -533,12 +533,12 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local tap_holds_enabled = tap_holds.enabled == true
 
 	-- The key-combinations switch stays absent until the user sets it: absent,
-	-- the combinations follow the Tap-Holds switch (Generator.key_combinations_enabled).
+	-- the combinations are on (Generator.key_combinations_enabled).
 	local mod_combos_enabled = nil
 	if type(combos.enabled) == "boolean" then
 		mod_combos_enabled = combos.enabled
 	elseif combos.enabled ~= nil then
-		Logger.error(LOG, "[mod_combos] enabled must be true or false, not %s — it follows Tap-Holds.",
+		Logger.error(LOG, "[mod_combos] enabled must be true or false, not %s — it is read as absent (on).",
 			tostring(combos.enabled))
 	end
 
@@ -649,7 +649,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		assign(tap_holds, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
 		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" })
 		local mod_combos = table_at(document, "mod_combos")
-		-- Written only once set: an absent flag follows the Tap-Holds switch.
+		-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
 		mod_combos.enabled = state.mod_combos_enabled
 		assign(mod_combos, "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
 		assign(mod_combos, "symmetric", state.combo_symmetric, COMBO_SYMMETRIC_DEFAULT)

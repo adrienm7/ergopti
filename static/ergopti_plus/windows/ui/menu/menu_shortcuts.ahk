@@ -62,7 +62,7 @@ _BuildShortcutsSubmenu() {
 }
 
 ; The « Combinaisons de touches » group: its own first-row switch (the
-; KeyCombinations sub-gate of Shortcuts), then one submenu per AltGr / LAlt /
+; KeyCombinations gate, independent of Shortcuts), then one submenu per AltGr / LAlt /
 ; CapsLock combination family, all declared by key_combinations_group.
 _SC_KeyCombinationsSubmenu() {
 	Commands := Map("key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"))

@@ -196,7 +196,7 @@ return function(run)
 				-- by test_generator_combo_gate_split.lua.
 				key_combinations_enabled = function(state)
 					if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
-					return state.tap_holds_enabled ~= false
+					return true
 				end,
 				build_karabiner_json = function(...)
 					calls.build = calls.build + 1
