@@ -207,7 +207,16 @@ function M.minimize_all(parent)
 	return run_script_logged(M.SCRIPTS.minimize_all, "Minimize every window", parent)
 end
 
---- Reads the frontmost application, refusing the driver itself.
+--- The applications that are the desktop shell itself: quitting Finder removes
+--- the desktop until it is relaunched (its own Cmd+Q is disabled), and the
+--- Dock and loginwindow run the session.
+M.SHELL_BUNDLES = {
+	["com.apple.finder"] = true,
+	["com.apple.dock"] = true,
+	["com.apple.loginwindow"] = true,
+}
+
+--- Reads the frontmost application, refusing the driver itself and the shell.
 --- @param label string
 --- @param on_front function fn(pid, bundle_id) for another application.
 --- @param parent string|nil
@@ -230,6 +239,10 @@ local function with_frontmost(label, on_front, parent)
 		local pid, bundle_id = out:match("^(%d+) (%S+)$")
 		if not pid then
 			Logger.error(LOG, "%s: unreadable frontmost application '%s'.", label, out)
+			return
+		end
+		if M.SHELL_BUNDLES[bundle_id] then
+			Logger.warn(LOG, "%s refused: %s is the macOS desktop shell.", label, bundle_id)
 			return
 		end
 		on_front(pid, bundle_id)
