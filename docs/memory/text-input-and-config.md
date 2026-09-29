@@ -75,7 +75,10 @@ manager's committed generations plus the shipped Ergopti `{ pack = dir }` root,
 placed after them so a stale generation cannot hide the bindings. Every install
 shape must therefore carry `static/layouts/registry/` below the driver root: a
 Linux checkout install copies it through `install/layout_registry.sh` and the
-Nix flake copies it too; any new packager needs the same step.
+Nix flake copies it too; any new packager needs the same step. A binding
+replaces only the driver's own file: the user's same-stem copy (Linux user
+folder, macOS configured hotstrings folder) keeps the category, or each bound
+section it declares, so route with the source's origin, never by stem alone.
 
 ### project-hotstrings-self-healing-cache
 
