@@ -622,17 +622,25 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 			end
 		end
 	end
+	-- A key outside the bare and dotted alphabet, such as an extension pack's
+	-- `ext:pack:stem`, is written quoted so it stays one key a reader can parse.
+	local function key_text(key)
+		if key:match("^[A-Za-z0-9_%-%.]+$") then return key end
+		return KeyPath.render({ key })
+	end
 	local applied, replacements, removed = {}, {}, {}
 	for _, record in ipairs(scanned.records) do
-		if record.addressable then
-			local sl, kl = record.section:lower(), record.key:lower()
+		local section, key = record.section, record.key
+		if not record.addressable and record.quoted then section, key = record.quoted.section, record.quoted.key end
+		if record.addressable or record.quoted then
+			local sl, kl = section:lower(), key:lower()
 			local u = lookup[sl] and lookup[sl][kl]
 			if u then
 				if applied[sl .. "\0" .. kl] then return false, "ambiguous batch key identity" end
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
-					replacements[record.first] = u.key .. " = " .. to_toml_value(u.value)
+					replacements[record.first] = key_text(u.key) .. " = " .. to_toml_value(u.value)
 						.. scanned.lines[record.last].eol
 				end
 			end
@@ -677,7 +685,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		if insertions[index] then
 			if line.eol == "" then lines[#lines + 1] = "\n" end
 			for _, u in ipairs(insertions[index]) do
-				lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value) .. "\n"
+				lines[#lines + 1] = key_text(u.key) .. " = " .. to_toml_value(u.value) .. "\n"
 			end
 		end
 	end
@@ -689,7 +697,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value) .. "\n"
+			lines[#lines + 1] = key_text(u.key) .. " = " .. to_toml_value(u.value) .. "\n"
 		end
 	end
 

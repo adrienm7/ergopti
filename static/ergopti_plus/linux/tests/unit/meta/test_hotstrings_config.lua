@@ -290,6 +290,23 @@ helpers.describe("hotstrings_config", function()
       end)
     end)
 
+    -- A bundled toggle writes the [hotstrings.groups] header; the extension pack
+    -- used to be refused under it for good, and enable_all with it.
+    helpers.it("switches an extension pack after a bundled toggle created the groups header", function()
+      with_groups(nil, function(cfg, engine, path)
+        helpers.assert_true(cfg.enable_group("probe"))
+        helpers.assert_true(Choices.read(path):find("[hotstrings.groups]", 1, true) ~= nil, "the header exists")
+        helpers.assert_true(cfg.enable_group("ext:demo:pack"), "the extension pack is switchable under it")
+        helpers.assert_true(cfg.disable_group("ext:demo:pack"))
+        helpers.assert_eq(cfg.enable_all(), 2, "enable_all covers the extension gate and section")
+        helpers.assert_true(fires(engine, "xq", "pack-result"))
+        helpers.assert_true(fires(engine))
+        local decoded = Codec.decode(Choices.read(path))
+        helpers.assert_eq(decoded.hotstrings.groups["ext:demo:pack"], true)
+        helpers.assert_eq(decoded.hotstrings.groups.probe, true)
+      end)
+    end)
+
     helpers.it("persists an extension identity as a quoted key and reads it back", function()
       with_groups(nil, function(cfg, engine, path)
         helpers.assert_true(cfg.set_all_sections("ext:demo:pack", true))

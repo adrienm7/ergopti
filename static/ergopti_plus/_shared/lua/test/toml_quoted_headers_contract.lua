@@ -98,11 +98,18 @@ return function(helpers)
 				helpers.assert_eq(ok, false, source)
 			end
 		end)
-		helpers.it("keeps cleanup conservative and quoted assignment keys unaddressable", function()
+		-- Cleanup never sees a quoted key; only the writer, which renders it back
+		-- quoted, edits its line, so an extension identity stays switchable.
+		helpers.it("keeps cleanup conservative and lets only the writer address one quoted key", function()
 			local source = '[a."x"]\nv = true\n'
 			helpers.assert_eq(Scanner.scan_records(source).records[1].addressable, false)
-			local ok = prepare('[a."x"]\n"v" = true\n', { { section = "a.x", key = "v", delete = true } })
-			helpers.assert_eq(ok, false)
+			helpers.assert_eq(Scanner.scan_records('[a]\n"v" = true\n').records[1].addressable, false)
+			local ok, detail, content = prepare('[a."x"]\n"v" = true\nw = 1\n',
+				{ { section = "a.x", key = "v", delete = true } })
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_eq(content, '[a."x"]\nw = 1\n')
+			-- A quoted dot names a key that a dotted identity could also name.
+			helpers.assert_eq((prepare('[a]\n"v.w" = true\n', { { section = "a", key = "v.w", delete = true } })), false)
 		end)
 	end)
 end
