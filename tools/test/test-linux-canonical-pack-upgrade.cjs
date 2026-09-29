@@ -104,6 +104,14 @@ try {
 	write(path.join(sourceN2, 'fresh.toml'), '[pack]\nadded_in_n2 = true\n');
 	write(path.join(config, 'canonical.toml'), oldCanonical);
 	write(path.join(config, 'customized.toml'), userCustomized);
+	// A pack N shipped that N+1 moved elsewhere (SFB reduction and rolls moved
+	// into the Ergopti layout extension): its intact seed must retire too, or it
+	// would stay an override hiding the pack's new source; an edited one stays.
+	const movedPack = '[pack]\nmoved = "old home"\n';
+	write(path.join(installed, 'moved.toml'), movedPack);
+	write(path.join(config, 'moved.toml'), movedPack);
+	write(path.join(installed, 'movededited.toml'), movedPack);
+	write(path.join(config, 'movededited.toml'), '[pack]\nmoved = "my edit"\n');
 
 	runMigration(sourceN2, installed, config);
 
@@ -125,6 +133,19 @@ try {
 	}
 	if (fs.existsSync(path.join(config, 'fresh.toml')))
 		fail('a fresh install still seeded a canonical user copy');
+	if (fs.existsSync(path.join(config, 'moved.toml')))
+		fail('an intact seed of a pack the new bundle moved still masks its new source');
+	if (
+		fs.readFileSync(
+			path.join(config, '.ergopti-migrations', 'canonical-seeds', 'moved.toml.legacy-seed'),
+			'utf8'
+		) !== movedPack
+	)
+		fail('the retired seed of a moved pack was not retained byte-for-byte');
+	if (
+		fs.readFileSync(path.join(config, 'movededited.toml'), 'utf8') !== '[pack]\nmoved = "my edit"\n'
+	)
+		fail('an edited copy of a moved pack was not preserved as an explicit override');
 
 	copyBundle(sourceN2, installed);
 	const resolvedCanonical = fs.readFileSync(path.join(installed, 'canonical.toml'), 'utf8');

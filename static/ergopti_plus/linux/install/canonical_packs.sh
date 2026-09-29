@@ -29,10 +29,17 @@ migrate_canonical_packs() {
 	fi
 
 	install -d "${config_dir}" "${backup_dir}"
-	for source_pack in "${source_dir}"/*.toml; do
+	# The previously installed packs count as much as the new ones: a pack the
+	# new bundle no longer carries (SFB reduction and rolls moved into the
+	# Ergopti layout extension) must not leave its intact seed behind as an
+	# override that hides the pack's new source.
+	declare -A seen=()
+	for source_pack in "${source_dir}"/*.toml "${installed_dir}"/*.toml; do
 		[ -e "${source_pack}" ] || continue
 		name="$(basename "${source_pack}")"
 		[[ "${name}" == _* ]] && continue
+		[ -z "${seen[${name}]:-}" ] || continue
+		seen["${name}"]=1
 
 		user_pack="${config_dir}/${name}"
 		installed_pack="${installed_dir}/${name}"
