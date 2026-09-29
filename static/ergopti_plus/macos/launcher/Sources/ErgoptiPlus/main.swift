@@ -1082,8 +1082,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// The launcher runs as an accessory app that was never activated after
 		// launch; without this the modal can open behind the frontmost window,
 		// which to the user is indistinguishable from no dialog at all.
+		// Activation alone brings it forward: no level keeps it above other apps.
 		NSApp.activate(ignoringOtherApps: true)
-		alert.window.level = .modalPanel
 		alert.runModal()
 		NSApp.terminate(nil)
 	}
