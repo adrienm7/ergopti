@@ -95,7 +95,7 @@ _HCWWeb_TryOpen() {
 		_HCW_BuildCategoryList()
 		_HCW_BuildGroupList()
 		_HCWWeb_PushState()
-		try WinActivate("ahk_id " . _HCWWeb_Gui.Hwnd)
+		WMPresentWindow(_HCWWeb_Gui)
 		return true
 	}
 	_HCWWeb_SessionEpoch += 1

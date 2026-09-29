@@ -73,7 +73,7 @@ _PathsEdWeb_TryOpen() {
 
 	; Singleton — bring the existing editor to the front.
 	if (_PathsEdWeb_Gui != 0) {
-		try WinActivate("ahk_id " . _PathsEdWeb_Gui.Hwnd)
+		WMPresentWindow(_PathsEdWeb_Gui)
 		return true
 	}
 	_PathsEdWeb_SessionEpoch += 1

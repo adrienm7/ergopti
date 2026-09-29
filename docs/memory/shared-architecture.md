@@ -329,7 +329,8 @@ focused when it opens or is requested again, and never given a level or
 topmost flag. On macOS `hs.webview:bringToFront()` does not raise a window: it
 SETS the level (floating, or screen saver with `true`), so the diagnostics
 window stayed above every app. Present windows with `ui_builder.force_focus`
-(macOS), `Gui.Show`/`WinActivate` without `AlwaysOnTop` (Windows) and
+(macOS), `Gui.Show` for a first open and `WMPresentWindow` for a window
+requested again (Windows; `Gui_Create` refuses a topmost option) and
 `webview_manager._present_gtk_window` (Linux). Only the overlay allowlist in
 `tools/test/test-ui-focus-fix.cjs` (tooltips, previews, WPM widget, spotlight)
 may stay on top; that gate scans all three drivers.

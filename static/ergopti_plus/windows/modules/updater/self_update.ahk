@@ -1205,12 +1205,11 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 	; (updater-download-reentrancy).
 	if IsSet(_Updater_PromptGui) {
 		try LoggerDebug("Updater", "Update prompt already open -- reusing existing window instead of opening a duplicate.")
-		try _Updater_PromptGui.Restore()
 		if !_Updater_RequestMayPublish(Request) {
 			_Updater_CloseGui(_Updater_PromptGui)
 			return
 		}
-		try WinActivate(_Updater_PromptGui.Hwnd)
+		WMPresentWindow(_Updater_PromptGui)
 		if !_Updater_RequestMayPublish(Request)
 			_Updater_CloseGui(_Updater_PromptGui)
 		return

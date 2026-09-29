@@ -138,7 +138,7 @@ _A0720WV_PromptEditorCapturesContextBeforeSingleton() {
 	Assert(Body != "", "_PromptEdWeb_TryOpen must exist in ui/prompt_editor/init.ahk")
 
 	CapturePos := InStr(Body, "_PromptEdWeb_EditId")
-	ActivatePos := InStr(Body, "WinActivate(")
+	ActivatePos := InStr(Body, "WMPresentWindow(_PromptEdWeb_Gui)")
 	Assert(CapturePos > 0 and ActivatePos > 0, "prerequisite: both the context capture and the singleton activate must be present")
 	Assert(CapturePos < ActivatePos,
 		"_PromptEdWeb_TryOpen must capture the open context BEFORE the singleton early-return — otherwise re-opening the editor for a different profile keeps the previous _PromptEdWeb_EditId, the window merely gains focus still bound to the old profile, and saving overwrites the WRONG profile with the new one's edits")

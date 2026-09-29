@@ -224,7 +224,7 @@ class WebViewHost {
 						if WebViewHost._Instances.Has(AppId) {
 								Existing := WebViewHost._Instances[AppId]
 								if (Existing.Gui != 0) {
-										try WinActivate("ahk_id " . Existing.Gui.Hwnd)
+										WMPresentWindow(Existing.Gui)
 										return Existing
 								}
 								; Stale entry — remove and fall through to create a new one

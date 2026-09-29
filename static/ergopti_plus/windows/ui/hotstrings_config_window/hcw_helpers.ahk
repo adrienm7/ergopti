@@ -437,7 +437,7 @@ OpenHotstringsConfigWindow() {
 		_HCW_BuildCategoryList()
 		_HCW_BuildGroupList()
 		_HCW_RefreshExistingControls(Selection)
-		try _HCWGui.Show()
+		WMPresentWindow(_HCWGui)
 		return
 	}
 	_HCW_BuildCategoryList()

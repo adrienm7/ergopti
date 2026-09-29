@@ -48,8 +48,8 @@ _ONBWSG_GuardPresentAndActivatesExisting() {
 
 	Assert(InStr(Body, "_ob_gui != 0") > 0,
 		"_Onboarding_TryWeb must check '_ob_gui != 0' — the singleton guard every sibling WebView2 host (paths_editor, personal_info_editor, prompt_editor, hotstrings_config_window) already has (onbweb-singleton-guard)")
-	Assert(InStr(Body, "WinActivate") > 0,
-		"_Onboarding_TryWeb must WinActivate the existing wizard window when _ob_gui is already set, instead of silently building a second one (onbweb-singleton-guard)")
+	Assert(InStr(Body, "WMPresentWindow(_ob_gui)") > 0,
+		"_Onboarding_TryWeb must present the existing wizard window through WMPresentWindow when _ob_gui is already set, instead of silently building a second one (onbweb-singleton-guard)")
 	Assert(InStr(Body, "return true") > 0,
 		"_Onboarding_TryWeb must return true from the singleton branch so the caller (Onboarding_Run / Onboarding_ShowFromMenu) treats the existing window as the active wizard and does not also fall back to the native pages (onbweb-singleton-guard)")
 }
