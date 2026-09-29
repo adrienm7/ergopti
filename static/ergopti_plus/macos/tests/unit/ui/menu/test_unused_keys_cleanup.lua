@@ -310,6 +310,48 @@ helpers.with_stub_scope(MODULES, function()
 			end)
 		end)
 
+		helpers.it("unused keys: retired actions are never replayed and are offered (config-outdated-actions)", function()
+			-- A retired action id was kept silently in [shortcuts.script_control],
+			-- and warned about at every load but never offered in gesture,
+			-- keyboard and tap-key slots.
+			local source = table.concat({
+				"[gestures]",
+				"tap_3 = \"retired_action_xyz\"",
+				"tap_4 = \"open_url\"",
+				"",
+				"[shortcuts.script_control]",
+				"backspace = \"retired_action_xyz\"",
+				"escape = \"script_quit\"",
+				"",
+				"[shortcuts.keyboard]",
+				"cmd_k = \"retired_action_xyz\"",
+				"",
+				"[shortcuts.tap_keys]",
+				"number_row_left = \"retired_action_xyz\"",
+				"",
+			}, "\n")
+			-- The catalogue itself has its own parity test; here it only has to
+			-- refuse the retired id.
+			local saved = package.loaded["modules.gestures.actions"]
+			package.loaded["modules.gestures.actions"] = {
+				is_assignable = function(action) return action ~= "retired_action_xyz" end,
+			}
+			local ok, err = pcall(function()
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_eq(flat.gesture_actions, { tap_4 = "open_url" })
+				helpers.assert_eq(flat.script_control_shortcuts, { escape = "script_quit" })
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.cmd_k",
+					"shortcuts.script_control.backspace", "shortcuts.tap_keys.number_row_left" })
+			end)
+			package.loaded["modules.gestures.actions"] = saved
+			if not ok then error(err, 0) end
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
