@@ -140,8 +140,11 @@ const ALLOWLIST = [
 	},
 	{
 		file: 'macos/ui/ui_builder.lua',
-		kinds: { 'mac.level': 1 },
-		reason: 'not an overlay: the window chrome applies windowLevels.normal, refusing anything else'
+		kinds: { 'mac.level': 2 },
+		reason:
+			'not an overlay: the window chrome applies windowLevels.normal, refusing anything else, ' +
+			'except PERMISSION_DIALOG_CHROME: the macOS permission dialog floats beside System Settings, ' +
+			'never activates the app (focus is unavailable while untrusted) and closes itself on grant'
 	},
 	{
 		file: 'macos/modules/shortcuts/actions/system_mouse.lua',

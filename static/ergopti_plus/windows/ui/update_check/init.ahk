@@ -91,7 +91,7 @@ UpdateCheck_Begin(Request, Current) {
 	_UC_RequestId := Request.RequestId
 	_UC_Release := 0
 	return _UpdateCheck_Present(Map("state", "checking", "channel", Request.Channel,
-		"current", Current, "latest", "", "others", []))
+		"current", Current, "latest", "", "others", []), true)
 }
 
 ; Shows the answer of one manual check. The answer of another check (superseded
@@ -330,16 +330,19 @@ _UpdateCheck_Install(Release) {
 ; ==============================
 ; ==============================
 
-; Keeps native title construction independently testable.
+; Keeps native title construction independently testable. An ordinary window:
+; it is raised and focused when it opens or a new check re-opens it, never kept
+; above other applications.
 _UpdateCheck_NewWindow() {
-	return Gui_Create("+AlwaysOnTop", t("update_check.window_title"))
+	return Gui_Create("", t("update_check.window_title"))
 }
 
 ; Shows a state in the open window, or opens the window.
 ; @param State {Map}
+; @param Reopen {Boolean} A new manual check: an open window is presented again.
 ; @returns {Boolean} shown
-_UpdateCheck_Present(State) {
-	global _UC_State, _UC_ResetDone, _UC_Native, _UC_WindowEpoch, _UC_PresentFn
+_UpdateCheck_Present(State, Reopen := false) {
+	global _UC_State, _UC_ResetDone, _UC_Native, _UC_WindowEpoch, _UC_PresentFn, _UC_Gui
 	_UC_State := State
 	if HasMethod(_UC_PresentFn, "Call")
 		return _UC_PresentFn.Call(State) ? true : false
@@ -348,6 +351,10 @@ _UpdateCheck_Present(State) {
 			_UpdateCheck_BuildNative()
 		else
 			_UpdateCheck_Send(_UC_WindowEpoch, _UpdateCheck_StateJson(State))
+		; A result updates the window where it is; only the user's new click
+		; brings a covered window back.
+		if Reopen && IsSet(_UC_Gui) && IsObject(_UC_Gui)
+			WMPresentWindow(_UC_Gui)
 		return true
 	}
 	return _UpdateCheck_Open()

@@ -46,6 +46,7 @@ local function with_dialog(body)
 		local fr = french()
 		local h = { windows = {}, urls = {}, fr = fr }
 		package.loaded["ui.ui_builder"] = {
+			PERMISSION_DIALOG_CHROME = "permission_dialog",
 			get_app_geometry = function(id)
 				h.geometry_id = id
 				return { width = 560, height = 400 }
@@ -197,6 +198,8 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_eq(#h.windows, 1, "one window, not a banner")
 			local opts = h.windows[1].opts
 			helpers.assert_eq(h.geometry_id, "permission_dialog")
+			helpers.assert_eq(opts.focus, false, "the dialog never takes focus from System Settings")
+			helpers.assert_eq(opts.chrome, "permission_dialog", "the factory's one floating exception")
 			helpers.assert_eq(opts.title, h.fr["permission_dialog.window_title"],
 				"the brand-less title: ui_builder adds the product prefix once")
 			helpers.assert_true(opts.usercontent ~= nil, "buttons answer through the script bridge")

@@ -156,6 +156,42 @@ helpers.describe("ui-focus-not-topmost: shared factory and focus helper (macOS)"
 			"the refusal leaves the factory usable")
 	end)
 
+	-- The one exception: the permission dialog is shown while ErgoptiPlus is
+	-- not trusted for Accessibility, where focus cannot find a window, and its
+	-- steps are followed in System Settings, which would bury a normal window.
+	helpers.it("floats only the permission dialog, never focused (ui-focus-not-topmost)", function()
+		local view, calls = recording_view(false)
+		local app = { activations = 0 }
+		local Builder = load_builder(view, app)
+		helpers.assert_true(Builder.show_webview({ frame = {}, html_string = "", focus = false,
+			chrome = Builder.PERMISSION_DIALOG_CHROME }) == view)
+		helpers.assert_eq(calls.levels, { LEVELS.floating }, "the permission chrome floats, once")
+		helpers.assert_eq(app.activations, 0, "the dialog never activates the app")
+		helpers.assert_eq(calls.raises + calls.focuses + calls.fronts, 0, "the dialog is never focused")
+	end)
+
+	helpers.it("refuses the floating chrome on a focused window or under another name (ui-focus-not-topmost)",
+		function()
+			local view, calls = recording_view(true)
+			local created = 0
+			local Builder = helpers.load_with_stubs("ui.ui_builder", {
+				webview = {
+					windowMasks = {},
+					new = function() created = created + 1; return view end,
+				},
+				drawing = { windowLevels = LEVELS },
+				focus = function() end,
+			})
+			helpers.assert_nil(Builder.show_webview({ frame = {}, html_string = "",
+				chrome = Builder.PERMISSION_DIALOG_CHROME }), "a focused window may not float")
+			helpers.assert_nil(Builder.show_webview({ frame = {}, html_string = "", focus = false,
+				chrome = "diagnostics" }), "no other window may name a chrome")
+			helpers.assert_eq(created, 0, "a refused window must never exist natively")
+			helpers.assert_eq(#calls.levels, 0)
+			helpers.assert_true(not pcall(Builder.window_chrome_steps, view, { chrome = "diagnostics" }),
+				"the chrome steps refuse an unknown chrome")
+		end)
+
 end)
 
 
