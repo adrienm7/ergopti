@@ -4190,8 +4190,8 @@ id = "start_at_login"
 i18n = "menu.global.start_at_login"
 checked_when = ["start_at_login_enabled"]
 
-# « Ergopti uses Karabiner » (config_karabiner.toml [karabiner] enabled, default
-# on). Off: no lease worker, no guardian registration, and every ErgoptiPlus
+# « Ergopti uses Karabiner » (config_karabiner.toml [karabiner]
+# integration_enabled, default on). Off: no lease worker, no guardian registration, and every ErgoptiPlus
 # rule removed from karabiner.json; Karabiner itself is never quit or
 # reconfigured. The command below turns it off, or only cleans the file when
 # it already is.

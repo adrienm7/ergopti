@@ -369,8 +369,10 @@ Karabiner's shared UI, daemon, grabber, or VirtualHID processes.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 
-`[karabiner] enabled` in `config_karabiner.toml` is read before any token,
-lease worker, or guardian registration, at boot and on toggle. The launcher
+`[karabiner] integration_enabled` in `config_karabiner.toml` is read before
+any token, lease worker, or guardian registration, at boot and on toggle. Never
+read the older `[karabiner] enabled`: builds before 2026-09-22 wrote `false`
+there on first launch without asking. The launcher
 never registers the guardian LaunchAgent; the Lua lease controller's first
 guardian observation of a lifecycle does (`--register-remap-guardian`), so a
 user with the switch off never gets a Login Items entry. Turning it off
