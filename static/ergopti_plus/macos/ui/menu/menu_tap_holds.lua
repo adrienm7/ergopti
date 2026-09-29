@@ -115,28 +115,34 @@ local function commit_menu_setting(karabiner, source, mutate, update_menu)
 	return accepted
 end
 
--- The saved-edit notice for each guardian status. The guardian registers once
--- per launch, so allowing an unregistered helper in Login Items changes
--- nothing until ErgoptiPlus is reopened; only an approval applies at once.
+-- The saved-edit notice for each guardian status Login Items can fix. The
+-- guardian registers once per launch, so allowing an unregistered helper
+-- changes nothing until ErgoptiPlus is reopened; only an approval applies at
+-- once.
 local SAVED_UNTIL_GUARDIAN_KEYS = {
 	requires_approval = "menu.tapholds.saved_until_guardian",
 	unavailable       = "menu.tapholds.saved_until_guardian_restart",
 }
+-- Every other wait (a failed or timed-out probe, a helper that could not be
+-- launched) says nothing of the user's settings: sending them to a Login
+-- Items pane where everything may already be allowed would mislead.
+local SAVED_UNTIL_HELPER_KEY = "menu.tapholds.saved_until_helper"
 
 --- Tells the user a bulk edit is saved but waits for the remap guardian: the
 --- menu shows the new settings, yet nothing applies them until the guardian
---- is ready, and the notice says what makes it ready. The click opens Login
---- Items.
+--- is ready, and the notice says what makes it ready. When Login Items can,
+--- the click opens that pane.
 --- @param karabiner table Remap facade.
 --- @param method_name string Facade method name, for the log.
 --- @param reason string `persisted-guardian-<status>` terminal detail.
 local function announce_saved_until_guardian(karabiner, method_name, reason)
 	Logger.info(LOG, "Karabiner bulk command '%s' saved; its rules deploy once the guardian is ready (%s).",
 		method_name, tostring(reason))
-	local status = reason:match("^persisted%-guardian%-(.+)$")
-	local key = SAVED_UNTIL_GUARDIAN_KEYS[status] or SAVED_UNTIL_GUARDIAN_KEYS.requires_approval
+	local key = SAVED_UNTIL_GUARDIAN_KEYS[reason:match("^persisted%-guardian%-(.+)$")]
 	local on_click = nil
-	if type(karabiner.open_login_items) == "function" then
+	if key == nil then
+		key = SAVED_UNTIL_HELPER_KEY
+	elseif type(karabiner.open_login_items) == "function" then
 		on_click = function()
 			return karabiner.open_login_items(function(ok, detail)
 				if ok ~= true then

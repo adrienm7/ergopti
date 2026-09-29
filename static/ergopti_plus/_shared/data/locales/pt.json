@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Abrir as definições de Elementos de início de sessão…",
 	"menu.tapholds.saved_until_guardian": "💾 Definições do teclado guardadas: aplicam-se assim que o ErgoptiPlus for permitido em Elementos de início de sessão (clique para abrir as definições).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Definições do teclado guardadas: aplicam-se assim que o ErgoptiPlus registar o seu assistente em segundo plano. Verifique que o ErgoptiPlus está permitido em Elementos de início de sessão e depois feche e abra o ErgoptiPlus novamente (clique para abrir as definições).",
+	"menu.tapholds.saved_until_helper": "💾 Definições do teclado guardadas: aplicam-se assim que o assistente em segundo plano do ErgoptiPlus responder.",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Copiar tap → combo para teclas modificadoras",
 	"menu.tapholds.edit_nav_layer": "Editar a camada de navegação…",

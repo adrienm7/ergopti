@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Åpne innstillingene for Påloggingsobjekter…",
 	"menu.tapholds.saved_until_guardian": "💾 Tastaturinnstillinger lagret: de tas i bruk når ErgoptiPlus er tillatt under Påloggingsobjekter (klikk for å åpne innstillingene).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Tastaturinnstillinger lagret: de tas i bruk når ErgoptiPlus har registrert bakgrunnshjelperen sin. Kontroller at ErgoptiPlus er tillatt under Påloggingsobjekter, og avslutt og åpne deretter ErgoptiPlus igjen (klikk for å åpne innstillingene).",
+	"menu.tapholds.saved_until_helper": "💾 Tastaturinnstillinger lagret: de tas i bruk så snart bakgrunnshjelperen til ErgoptiPlus svarer.",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Kopier tap → combo for modifikatortaster",
 	"menu.tapholds.edit_nav_layer": "Rediger navigasjonslaget…",

@@ -521,6 +521,35 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("sends no one to Login Items when the helper only failed to answer"
+		.. " (saved-notice-probe-failed)", function()
+		local saved_notifications = package.loaded["infra.notifications"]
+		local notices = {}
+		package.loaded["infra.notifications"] = {
+			notify = function(message, _, _, on_click)
+				notices[#notices + 1] = { message = message, on_click = on_click }
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			local built, observations = build_menu("pending", function(remap)
+				remap.open_login_items = function() return true end
+			end)
+			for _, status in ipairs({ "probe-failed", "not_requested" }) do
+				helpers.assert_true(row_action(find_item(built, COMMAND_CASES[2].label))())
+				observations.terminals.apply_scope(true, "persisted-guardian-" .. status, 3)
+				local notice = notices[#notices]
+				helpers.assert_eq(notice.message, "menu.tapholds.saved_until_helper",
+					status .. " proves nothing about Login Items")
+				helpers.assert_nil(english_text(notice.message):find("Login Items", 1, true))
+				helpers.assert_nil(notice.on_click, "no Login Items click for " .. status)
+			end
+			helpers.assert_eq(#notices, 2)
+		end)
+		package.loaded["infra.notifications"] = saved_notifications
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("names no single submenu in the saved notice a combo command shows (saved-notice-wording)",
 		function()
 			local saved_notifications = package.loaded["infra.notifications"]

@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Öppna inställningarna för Inloggningsobjekt…",
 	"menu.tapholds.saved_until_guardian": "💾 Tangentbordsinställningar sparade: de börjar gälla när ErgoptiPlus tillåts under Inloggningsobjekt (klicka för att öppna inställningarna).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Tangentbordsinställningar sparade: de börjar gälla när ErgoptiPlus har registrerat sin bakgrundshjälpare. Kontrollera att ErgoptiPlus är tillåtet under Inloggningsobjekt, avsluta sedan ErgoptiPlus och öppna det igen (klicka för att öppna inställningarna).",
+	"menu.tapholds.saved_until_helper": "💾 Tangentbordsinställningar sparade: de börjar gälla så snart ErgoptiPlus bakgrundshjälpare svarar.",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Kopiera tryck → kombination för modifieringstangenter",
 	"menu.tapholds.edit_nav_layer": "Redigera navigeringslagret…",

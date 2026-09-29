@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Einstellungen für Anmeldeobjekte öffnen…",
 	"menu.tapholds.saved_until_guardian": "💾 Tastatureinstellungen gespeichert: Sie gelten, sobald ErgoptiPlus in den Anmeldeobjekten erlaubt ist (klicken, um die Einstellungen zu öffnen).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Tastatureinstellungen gespeichert: Sie gelten, sobald ErgoptiPlus seinen Hintergrundhelfer registriert hat. Prüfe, dass ErgoptiPlus in den Anmeldeobjekten erlaubt ist, beende ErgoptiPlus und öffne es dann erneut (klicken, um die Einstellungen zu öffnen).",
+	"menu.tapholds.saved_until_helper": "💾 Tastatureinstellungen gespeichert: Sie gelten, sobald der Hintergrundhelfer von ErgoptiPlus antwortet.",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Tap → Combo für Modifier-Tasten übertragen",
 	"menu.tapholds.edit_nav_layer": "Navigationsebene bearbeiten…",
