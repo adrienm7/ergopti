@@ -383,6 +383,7 @@ end
 function M.new()
 	-- Tail-char buckets: key = lower-cased last codepoint of trigger.
 	local _buckets = {}
+	local _mapping_state = { generation = 0, mappings = 0, entries = 0, buckets = 0 }
 	-- Rolling buffer stored as an array of UTF-8 codepoint byte-strings.
 	local _buf_cps = {}
 	-- Monotonic timestamps aligned one-for-one with _buf_cps. False marks callers
@@ -448,13 +449,15 @@ function M.new()
 	--- typing adn in ANY casing yields "ADN" — the literal registration is there to
 	--- stop the family generating "Adn" → "Adn". Treating the flag as "compare
 	--- exactly" meant typing "Adn" simply did nothing.
+	--- Builds the replacement before publication, preserving the active catalogue on error.
 	--- @param mappings table Array of mapping tables.
+	--- @return boolean True after publication; false when the input is not a table.
 	function engine:load_mappings(mappings)
 		Logger.start(LOG, "Loading mappings…")
-		_buckets = {}
+		local candidate_buckets = {}
 		if type(mappings) ~= "table" then
 			Logger.error(LOG, "load_mappings(): expected table, got %s.", type(mappings))
-			return
+			return false
 		end
 
 		local registered = 0
@@ -472,8 +475,8 @@ function M.new()
 			-- string.lower because the latter is ASCII-only, so an accented tail typed
 			-- as "Ê" probed a bucket registered under "ê" and never matched.
 			local key    = text_utils.trig_lower(cps[n])
-			local bucket = _buckets[key]
-			if not bucket then bucket = {} ; _buckets[key] = bucket end
+			local bucket = candidate_buckets[key]
+			if not bucket then bucket = {} ; candidate_buckets[key] = bucket end
 			bucket[#bucket + 1] = {
 				trigger      = trigger,
 				-- Canonical side of a "fold" compare, precomputed so the hot path folds
@@ -591,7 +594,7 @@ function M.new()
 		-- registration order. Same key order as the macOS registry and the
 		-- AutoHotkey engine: LENGTH is primary, so a longer trigger beats a
 		-- higher-priority shorter one — priority only arbitrates a genuine tie.
-		for _, bucket in pairs(_buckets) do
+		for _, bucket in pairs(candidate_buckets) do
 			table.sort(bucket, function(a, b)
 				if a.tlen ~= b.tlen then return a.tlen > b.tlen end
 				if a.priority ~= b.priority then return a.priority > b.priority end
@@ -599,9 +602,28 @@ function M.new()
 			end)
 		end
 		local bucket_count = 0
-		for _ in pairs(_buckets) do bucket_count = bucket_count + 1 end
+		for _ in pairs(candidate_buckets) do bucket_count = bucket_count + 1 end
 		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
 			loaded, registered, bucket_count)
+		_buckets = candidate_buckets
+		_mapping_state = {
+			generation = _mapping_state.generation + 1,
+			mappings = loaded,
+			entries = registered,
+			buckets = bucket_count,
+		}
+		return true
+	end
+
+	--- Returns detached metadata for the last successfully published catalogue.
+	--- @return table Generation and mapping, compiled entry, and bucket counts.
+	function engine:mapping_state()
+		return {
+			generation = _mapping_state.generation,
+			mappings = _mapping_state.mappings,
+			entries = _mapping_state.entries,
+			buckets = _mapping_state.buckets,
+		}
 	end
 
 	--- Appends a character to the rolling buffer and checks for a trigger match.
