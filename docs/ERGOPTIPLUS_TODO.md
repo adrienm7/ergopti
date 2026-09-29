@@ -90,6 +90,15 @@ These are software implementations; final hardware verification remains below.
        Recommended delay values must match effective runtime inheritance: deleting
        `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
        0.5 s. Do not assume deletion implements the recommendation.
+       Hotstrings progress (`wip/w1-hotstrings`, unpublished): Linux
+       categories, sections and scalar settings are canonical config.toml
+       leaves, with a one-shot import of legacy storage.json choices; both OSes
+       have a two-file recommended/clear owner whose planner writes explicit
+       delays where inheritance differs; Configuration's Linux « restore
+       recommended » row runs it. Still open: no `scope_restore`/`scope_clear`
+       row is declared in `hotstrings_menu`, the macOS owner
+       (`ui/menu/hotstrings_scope.lua`) is neither constructed nor registered as
+       menu commands, and Linux terminators remain in storage.json.
 6. [ ] Complete L4 extension layout geometry and physical magic-key behavior.
        Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
 7. [ ] Complete W2: seven-page first-run opt-in wizard, per-category recommended
