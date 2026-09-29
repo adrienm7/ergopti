@@ -100,22 +100,25 @@ class VerdictTests(unittest.TestCase):
                          "[t] applicationWillTerminate; stopping embedded Hammerspoon\n",
             boot_log="[SUCCESS] [config_paths] Config paths initialized\n",
             driver_log="", alive_after_window=False, quit_seconds=None))
-        self.assertIn("the refused state produced no FATAL launcher diagnostic", failures)
-        self.assertIn("the fatal abort never reached the fallback boot log", failures)
+        self.assertIn("no driver log appeared under the configured logs folder", failures)
+        self.assertIn("the launcher and embedded Hammerspoon did not both survive the observation window",
+            failures)
 
-    def test_named_configured_refusal_passes(self):
+    def test_configured_boot_waits_for_accessibility(self):
+        waiting = observe(driver_log="[INFO] [accessibility_wait] Waiting for the Accessibility "
+                                     "permission (up to 600 s)…\n")
+        self.assertEqual(gate.evaluate("configured_symlink", waiting), [])
+        self.assertEqual(gate.ready_marker("clean"), gate.READY_MARKER)
+
+    def test_configured_accessibility_exit_is_rejected(self):
+        # The dev.141 shape: a named FATAL exit that sent the user to relaunch.
         failures = gate.evaluate("configured_symlink", observe(
-            launcher_log="[t] embedded Hammerspoon FATAL at boot stage 'accessibility': untrusted\n"
+            launcher_log="[t] embedded Hammerspoon bootstrap logger configured\n"
                          "[t] FATAL: Embedded Hammerspoon stopped at boot stage 'accessibility': untrusted\n",
             boot_log="t [ERROR] [init] FATAL at boot stage 'accessibility': untrusted\n",
-            alive_after_window=False, quit_seconds=None))
-        self.assertEqual(failures, [])
-
-    def test_lua_fatal_line_alone_is_not_the_launcher_verdict(self):
-        failures = gate.evaluate("configured_symlink", observe(
-            launcher_log="[t] embedded Hammerspoon FATAL at boot stage 'accessibility': untrusted\n",
-            boot_log="FATAL at boot stage 'accessibility'\n", alive_after_window=False))
-        self.assertEqual(failures, ["the refused state produced no FATAL launcher diagnostic"])
+            driver_log="", alive_after_window=False, quit_seconds=None))
+        self.assertTrue(any("FATAL" in failure for failure in failures))
+        self.assertTrue(any("survive" in failure for failure in failures))
 
     def test_plain_open_launches_like_a_double_click(self):
         app = Path("/Applications/ErgoptiPlus.app")

@@ -17,7 +17,7 @@ starts, then applies the same machine-checked verdict:
 5. a normal application Quit ends both processes within a bounded time.
 
 Hosted runners cannot grant Accessibility without interactive approval, so a
-state that contains config.toml stops at the first event tap. Every healthy
+state that contains config.toml waits for that grant. Every other healthy
 scenario therefore omits config.toml and completes at the first-run wizard,
 which sits after config-path resolution, the logger handshake, and the
 factory-reset recovery that all of these user states exercise.
@@ -26,10 +26,11 @@ v0.0.0-dev.128 passed every such scenario and still vanished on a real Mac
 with a completed config.toml: the post-onboarding boot died after the logger
 handshake, and the launcher took Hammerspoon's exit status 0 for a Quit. The
 configured_symlink scenario rebuilds that user (completed config.toml in a
-symlinked, Git-versioned folder) and requires the refusal the runner's missing
-Accessibility must now produce: a named launcher FATAL line and the fatal line
-in the fallback boot log, never a silent exit. plain_open launches the way a
-double-click does, without `open -n`.
+symlinked, Git-versioned folder). The runner's missing Accessibility must now
+keep the application running and waiting for the grant, with that wait in the
+driver log, never an exit: a user whose grant went stale with a new build was
+otherwise told to relaunch into the same refusal. plain_open launches the way
+a double-click does, without `open -n`.
 
 `--print-matrix {ci,release}` prints the scenario list of one gate profile as
 the GitHub Actions output line that feeds the workflow matrix. It takes no
@@ -50,6 +51,9 @@ import sys
 import time
 
 READY_MARKER = "Onboarding wizard opened."
+# The configured boot on a runner without Accessibility waits for the grant
+# (infra/accessibility_wait.lua) instead of reaching the wizard.
+ACCESSIBILITY_WAIT_MARKER = "Waiting for the Accessibility permission"
 # The launcher's own fatal line; the Lua runtime writes "... FATAL at boot stage".
 LAUNCHER_FATAL = "FATAL:"
 LUA_FATAL = "FATAL at boot stage"
@@ -110,8 +114,16 @@ PLAIN_OPEN_SCENARIOS = {"plain_open"}
 # names the folder and its reason instead of a bare child exit code.
 EXPECTED_REFUSALS = {
     "dangling_logs": ("gitcfg/ergopti_plus", "symbolic link"),
-    "configured_symlink": ("boot stage 'accessibility'",),
 }
+# The completed-startup marker of a scenario that does not reach the wizard.
+READY_MARKERS = {
+    "configured_symlink": ACCESSIBILITY_WAIT_MARKER,
+}
+
+
+def ready_marker(scenario):
+    """Return the driver-log line that proves this scenario's startup completed."""
+    return READY_MARKERS.get(scenario, READY_MARKER)
 
 
 
@@ -288,7 +300,7 @@ def evaluate(scenario, observation):
     driver_log = observation.get("driver_log", "")
     if not driver_log:
         failures.append("no driver log appeared under the configured logs folder")
-    elif READY_MARKER not in driver_log:
+    elif ready_marker(scenario) not in driver_log:
         failures.append("the driver log has no completed startup marker")
     errors = [line for line in driver_log.splitlines() if "[ERROR]" in line]
     if errors:
@@ -454,7 +466,7 @@ def run(app, output, scenario, seed_tag):
         while time.monotonic() - started < STARTUP_TIMEOUT_SECONDS:
             alive = bool(processes(launcher)) and bool(processes(child))
             report["samples"].append({"seconds": round(time.monotonic() - started, 1), "alive": alive})
-            if ready_at is None and READY_MARKER in driver_logs(state):
+            if ready_at is None and ready_marker(scenario) in driver_logs(state):
                 ready_at = time.monotonic()
             if ready_at is not None and time.monotonic() - ready_at >= ALIVE_WINDOW_SECONDS:
                 break
