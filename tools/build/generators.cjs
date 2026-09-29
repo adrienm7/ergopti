@@ -97,6 +97,13 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/layer_editor/_generated/layer_data.js']
 	},
 	{
+		script: 'codegen/codegen-onboarding-catalogue.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/ui/_generated/onboarding_catalogue.js',
+			'static/ergopti_plus/_shared/ui/_generated/onboarding_catalogue.json'
+		]
+	},
+	{
 		script: 'codegen/codegen-contracts-json.cjs',
 		outputs: ['static/ergopti_plus/_shared/core/ports/contracts.json']
 	},
