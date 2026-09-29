@@ -1288,14 +1288,28 @@ local function start_llm_bootstrap()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
 	-- Each checker owns its retained zero-delay timer, pause admission, exact
 	-- task settlement, and same-epoch replay. A PAUSED caller is rejected and
-	-- does not create a new resume intent.
-	local selected_checker = active_backend == backend_detector.BACKEND_MLX
-		and mlx_deps_checker or ollama_deps_checker
-	local schedule_ok, scheduled = xpcall(
-		selected_checker.schedule_initial_check, debug.traceback)
-	if not schedule_ok or scheduled ~= true then
-		Logger.warn(LOG, "Backend dependency bootstrap was not scheduled: %s",
-			tostring(scheduled))
+	-- does not create a new resume intent. The boot check only reuses an
+	-- installed runtime: it never downloads, and a remote API backend has no
+	-- local runtime to check at all.
+	local selected_checker = nil
+	if active_backend == backend_detector.BACKEND_MLX then
+		selected_checker = mlx_deps_checker
+	elseif active_backend == backend_detector.BACKEND_OLLAMA then
+		selected_checker = ollama_deps_checker
+	end
+	if selected_checker then
+		local notice_ok, notice_err = xpcall(function()
+			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing(active_backend)
+		end, debug.traceback)
+		if not notice_ok then
+			Logger.error(LOG, "Missing AI runtime notice failed: %s", tostring(notice_err))
+		end
+		local schedule_ok, scheduled = xpcall(
+			selected_checker.schedule_initial_check, debug.traceback)
+		if not schedule_ok or scheduled ~= true then
+			Logger.warn(LOG, "Backend dependency bootstrap was not scheduled: %s",
+				tostring(scheduled))
+		end
 	end
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()

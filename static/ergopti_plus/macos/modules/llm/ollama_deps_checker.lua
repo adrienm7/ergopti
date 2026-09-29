@@ -9,8 +9,10 @@
 --- this module owns its install task, marker parsing, and progress UI.
 ---
 --- FEATURES & RATIONALE:
---- 1. Self-bootstrapping: a fresh-out-of-the-box Mac with no Homebrew and
----    no Ollama gets a working server after one Hammerspoon reload.
+--- 1. Consent-gated download: an existing Ollama (resolved by ollama_binary)
+---    is always reused; the pinned release is downloaded only through
+---    install_for_selection(), after the user selected the Ollama backend and
+---    accepted the offer. Any other check settles as "missing" instead.
 --- 2. Silent fast path: when the executable already exists, provisioning exits
 ---    silently and daemon acquisition remains under the Lua owner.
 --- 3. Granular progress UX: the install marker and Lua-owned daemon transition
@@ -37,32 +39,53 @@ local PtyProcessGroup = require("modules.llm.pty_process_group")
 local LOG = "ollama_deps"
 
 local MARKER_INSTALLING = "OLLAMA_INSTALLING"
+local MARKER_VERIFIED   = "OLLAMA_VERIFIED"
 local MARKER_STARTING   = "OLLAMA_STARTING"
 local MARKER_READY      = "OLLAMA_READY"
+-- Followed by an integer percentage; drives the shared window's progress bar.
+local DOWNLOAD_PROGRESS_PATTERN = "^OLLAMA_DOWNLOAD_PROGRESS (%d+)$"
 
 -- Step labels keyed by marker. The "READY" marker also doubles as a
 -- success-final-step we render before auto-hiding.
 local PROGRESS_LABELS = {
 	[MARKER_INSTALLING] = i18n.get("ollama.deps_step_installing"),
+	[MARKER_VERIFIED]   = i18n.get("ollama.deps_step_verified"),
 	[MARKER_STARTING]   = i18n.get("ollama.deps_step_starting"),
 	[MARKER_READY]      = i18n.get("ollama.deps_step_ready"),
 }
 
+-- Failure markers the script prints before exiting, mapped to the localized
+-- explanation the user sees instead of the English script tail.
+local FAILURE_MESSAGES = {
+	OLLAMA_ERROR_NETWORK  = "ollama.error_network",
+	OLLAMA_ERROR_CHECKSUM = "ollama.error_checksum",
+}
+
 local KNOWN_MARKERS = {
 	[MARKER_INSTALLING] = true,
+	[MARKER_VERIFIED]   = true,
 	[MARKER_STARTING]   = true,
 	[MARKER_READY]      = true,
 }
+for marker, _ in pairs(FAILURE_MESSAGES) do KNOWN_MARKERS[marker] = true end
 
 local FAILURE_TAIL_CHARS    = 280
 local SUCCESS_AUTO_HIDE_SEC = 1.5
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
+-- "pending" until the first check, "ready" once an executable is provisioned,
+-- "missing" when none exists and nobody asked for the download, "failed".
 local _bootstrap_state      = "pending"
 local _last_failure_message = nil
 local _daemon_state         = "pending"
 local _last_daemon_failure_message = nil
 local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
+-- Download authority. Only install_for_selection() grants it, after the user
+-- accepted the offer; the next check consumes it, so a boot, an AI enable with
+-- another backend or an update can never start a download.
+local _install_granted      = false
+-- Last failure marker the running script printed, read at its terminal.
+local _observed_failure_marker = nil
 
 -- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
 -- it goes out of scope as soon as the spawning function returns while the
@@ -137,7 +160,13 @@ local function forward_chunk(chunk, is_current, owns_ui)
 	is_current = type(is_current) == "function" and is_current or function() return true end
 	owns_ui = type(owns_ui) == "function" and owns_ui or function() return false end
 	for line in chunk:gmatch("([^\n\r]+)") do
-		if line:match("%S") and not KNOWN_MARKERS[line] then
+		local percent = line:match(DOWNLOAD_PROGRESS_PATTERN)
+		if FAILURE_MESSAGES[line] then
+			_observed_failure_marker = line
+		elseif percent then
+			if not is_current() then return false end
+			if owns_ui() then pcall(llm_progress.set_progress, tonumber(percent)) end
+		elseif line:match("%S") and not KNOWN_MARKERS[line] then
 			if not is_current() then return false end
 			Logger.info(LOG, "[script] %s", line)
 			-- set_detail shows the latest line at a glance; append_log preserves
@@ -164,6 +193,7 @@ local function tail_for_error(s)
 	for marker, _ in pairs(KNOWN_MARKERS) do
 		tail = tail:gsub(marker .. "\n?", "")
 	end
+	tail = tail:gsub("OLLAMA_DOWNLOAD_PROGRESS %d+\n?", "")
 	tail = tail:gsub("[ \t]+\n", "\n"):gsub("\n\n+", "\n")
 	local last = tail:match("([^\n]+)%s*$")
 	return last or tail
@@ -705,14 +735,39 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_preflight_failure("Script ensure-ollama-deps.sh introuvable.")
 	end
 
-	-- The bootstrap installs the executable, but the Lua owner still supplies the
-	-- canonical logging pipeline. This keeps fresh installs on the same rollover
-	-- and quoting contract as both normal daemon launch paths.
-	local resolved_bin, resolve_err, managed_override = OllamaBinary.resolve()
-	if managed_override and not resolved_bin then
-		Logger.error(LOG, "The launcher-owned Ollama executable is unavailable: %s",
-			tostring(resolve_err))
-		return settle_preflight_failure("The bundled Ollama executable is unavailable.")
+	-- Detection belongs to the resolver; the script only publishes a download
+	-- into the folder that same resolver searches.
+	local resolved_bin, resolve_err, resolved_source = OllamaBinary.resolve()
+	local install_dir = nil
+	if resolved_bin then
+		Logger.info(LOG, "Ollama executable found (%s): %s", tostring(resolved_source), resolved_bin)
+	else
+		-- A replayed task was already an accepted download; any other caller
+		-- needs the grant install_for_selection() gives after the user's consent.
+		local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
+			and _resume_intent.kind == "task"
+		local install_allowed = _install_granted == true or replaying_install
+		_install_granted = false
+		if not install_allowed then
+			Logger.warn(LOG, "Ollama is not installed (%s); no download without the user's consent.",
+				tostring(resolve_err))
+			if _pause_controller.is_current(token, authorization) then
+				_bootstrap_state = "missing"
+				_last_failure_message = i18n.get("ollama.runtime_missing_body")
+				_pause_controller.complete(token)
+			elseif not _pause_controller.is_committed(token) then
+				_pause_controller.complete(token)
+			end
+			settle_registered_callbacks()
+			Logger.success(LOG, "Ollama bootstrap settled without a download (not installed).")
+			return true
+		end
+		install_dir = OllamaBinary.managed_install_dir()
+		if not install_dir then
+			Logger.error(LOG, "HOME is unusable; the Ollama install folder cannot be named.")
+			return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+		end
+		Logger.info(LOG, "Ollama download accepted; installing into %s.", install_dir)
 	end
 	if not _pause_controller.is_current(token, authorization) then
 		return settle_stale_intent()
@@ -800,6 +855,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 		end
 
 		if exit_code ~= 0 then
+			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
+			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
 			local tail = tail_for_error(combined)
 			if tail == "" then
 				tail = "Cause inconnue. Consultez " .. Logger.today_log_path() .. "."
@@ -918,9 +975,10 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return consume_stream(table.unpack(args, 1, args.n))
 	end
 
+	_observed_failure_marker = nil
 	task = TaskLifecycle.native("Ollama bootstrap", "/usr/bin/python3",
 		completion_callback, streaming_callback,
-		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "" })
+		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "" })
 
 	if not task then
 		owner.authorized = false
@@ -1059,6 +1117,39 @@ function M.has_daemon_failed() return _daemon_state == "failed" end
 
 --- @return string|nil Last daemon-start failure message.
 function M.get_daemon_failure_message() return _last_daemon_failure_message end
+
+--- @return boolean True when the last check found no Ollama and downloaded nothing.
+function M.is_missing() return _bootstrap_state == "missing" end
+
+--- @return boolean True while a provisioning task (an accepted download or a
+--- found executable's fast path) is running; a new caller joins it.
+function M.is_task_running() return _task_running == true end
+
+--- Reports whether an Ollama executable exists, with stat-only probes.
+--- @return boolean available
+function M.runtime_available()
+	local path = OllamaBinary.resolve()
+	return path ~= nil
+end
+
+--- The only download entry: the user selected the Ollama backend and, when no
+--- executable exists, accepted the offer. A resolvable executable is reused and
+--- the grant is simply consumed without any network access.
+--- @param on_complete function|nil Called once with the terminal result.
+--- @return boolean accepted
+function M.install_for_selection(on_complete)
+	Logger.info(LOG, "Ollama backend selected; download authorized if Ollama is absent.")
+	-- A running task is either an accepted download or a found executable's
+	-- fast path: joining it needs no grant, and a leftover one must not leak.
+	_install_granted = not _task_running
+	if _bootstrap_state == "failed" or _bootstrap_state == "missing" then
+		_bootstrap_state = "pending"
+		_last_failure_message = nil
+	end
+	local accepted = M.check_and_install_deps(on_complete)
+	if accepted ~= true then _install_granted = false end
+	return accepted
+end
 
 --- Resets a definitively-"failed" bootstrap back to "pending" so the tray
 --- menu's "install now" action can retry (F-LOW-10). check_and_install_deps()

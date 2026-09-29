@@ -237,7 +237,8 @@ helpers.describe("Ollama daemon log rollover", function()
 			hide = function() end,
 		}
 		package.loaded["modules.llm.ollama_binary"] = {
-			resolve = function() return nil, "not installed", false end,
+			resolve = function() return nil, "not installed", nil end,
+			managed_install_dir = function() return "/fixture/Ergopti/ollama" end,
 		}
 		package.loaded["modules.llm.api_ollama"] = {
 			ensure_running = function()
@@ -267,11 +268,14 @@ helpers.describe("Ollama daemon log rollover", function()
 			"test must control the real bootstrap path resolver")
 
 		local ok, err = pcall(function()
-			Checker.check_and_install_deps()
+			-- A fresh install only ever follows the user's Ollama selection.
+			Checker.install_for_selection()
 			helpers.assert_true(type(task_args) == "table", "bootstrap task arguments must be captured")
 			helpers.assert_eq(task_args[3], "/bin/bash")
 			helpers.assert_eq(task_args[5], "",
-				"the install script receives only the optional resolved executable")
+				"a fresh install passes no resolved executable")
+			helpers.assert_eq(task_args[6], "/fixture/Ergopti/ollama",
+				"the install script receives only the resolver-named install folder")
 			task_done(0, "", "")
 			helpers.assert_eq(daemon_calls, 1,
 				"the checker must not detach its own unjoinable serve process")
