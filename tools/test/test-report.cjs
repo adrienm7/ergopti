@@ -13,7 +13,7 @@
 'use strict';
 
 const assert = require('assert');
-const { parseResults } = require('./report.cjs');
+const { parseResults, formatCount } = require('./report.cjs');
 
 let checks = 0;
 function check(label, cond) {
@@ -49,5 +49,10 @@ r = parseResults([
 ].join('\n'));
 check('lua fail: counts', r.passed === 1 && r.failed === 1);
 check('lua fail: single deduped failure', r.failures.length === 1 && r.failures[0] === 'beta gamma');
+
+// Counts shown to people group their thousands with a narrow no-break space.
+check('format: small count unchanged', formatCount(0) === '0' && formatCount(999) === '999');
+check('format: thousands grouped', formatCount(7269) === '7\u202F269' && formatCount(11507) === '11\u202F507');
+check('format: millions grouped', formatCount(1234567) === '1\u202F234\u202F567');
 
 console.log(`\x1b[32m[OK] report.cjs parser: ${checks} assertion(s) passed (TAP + Lua formats).\x1b[0m`);
