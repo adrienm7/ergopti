@@ -202,6 +202,32 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 		Packs._reset()
 	end)
 
+	helpers.it("(layout-extension-macos) registers only packs whose groups the preference projection can address", function()
+		Packs._reset()
+		local errors, found = capturing_errors(function()
+			return Packs.discover({ "/ext" }, {
+				list_dirs = function() return { "/ext/com.acme.abbrevs", "/ext/acme" } end,
+				list_files = function(dir)
+					return { dir .. "/words.toml", dir .. "/words.old.toml" }
+				end,
+				read_file = function() return nil end,
+			})
+		end)
+		helpers.assert_eq(#found, 1)
+		helpers.assert_eq(found[1].id, "acme")
+		helpers.assert_eq(#errors, 2, "the dotted pack and the backup file are each reported")
+		-- The projection run before keymap.start asks the manifest for each
+		-- registered group's default; one unknown path aborts the boot there.
+		local Manifest = require("infra.manifest_reader")
+		for _, pack in ipairs(found) do
+			for _, file in ipairs(pack.toml_files) do
+				local key = "hotstrings.groups." .. require("hotstrings.extensions").category_key(pack.id, file.stem)
+				helpers.assert_eq(Manifest.default_for(key), false, key)
+			end
+		end
+		Packs._reset()
+	end)
+
 	helpers.it("(layout-extension-macos) commits an empty catalogue when no root can be resolved", function()
 		Packs._reset()
 		helpers.with_stub_scope({ "infra.paths" }, function()

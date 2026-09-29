@@ -218,6 +218,27 @@ helpers.describe("extensions: scanning finds packs and names them", function()
 			{ failures[1].where, failures[2].where, failures[3].where })
 	end)
 
+	helpers.it("(extension-isolation) refuses a pack id or file stem no preference path can address", function()
+		local io_fns = fake_fs({
+			["/user"] = { "/user/com.acme", "/user/acme" },
+			["/user/com.acme/hotstrings"] = { "/user/com.acme/hotstrings/words.toml" },
+			["/user/acme/hotstrings"] = { "/user/acme/hotstrings/words.toml",
+				"/user/acme/hotstrings/words.old.toml", "/user/acme/hotstrings/a:b.toml" },
+		}, {})
+		helpers.assert_eq(false, (pcall(Extensions.scan, { "/user" }, io_fns)),
+			"a dotted id would register a group the configuration grammar cannot name")
+		local failures = {}
+		io_fns.on_error = function(where) failures[#failures + 1] = where.path or where.id end
+		local found = Extensions.scan({ "/user" }, io_fns)
+		helpers.assert_eq(1, #found)
+		helpers.assert_eq("acme", found[1].id)
+		helpers.assert_eq({ { path = "/user/acme/hotstrings/words.toml", stem = "words" } }, found[1].toml_files,
+			"a backup file costs only itself, not its healthy siblings")
+		table.sort(failures)
+		helpers.assert_eq({ "/user/acme/hotstrings/a:b.toml", "/user/acme/hotstrings/words.old.toml", "com.acme" },
+			failures)
+	end)
+
 end)
 
 
