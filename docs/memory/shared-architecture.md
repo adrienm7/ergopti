@@ -93,6 +93,19 @@ executor's tables, so a new Linux action is a row in one of them, never an
 control, the shortcuts manager's text actions) are injected at init through
 `modules/shortcuts/action_handlers.lua`; the parity test builds the same table.
 
+### project-action-confirm-is-a-dispatcher-gate
+
+A catalogue action with `confirm = true` is asked for by each driver's single
+dispatch choke point, never by the action: macOS `execute_single` (non-blocking
+`modules/gestures/action_confirm.lua`), Windows `GestureInvokeAction` (deferred
+MsgBox), Linux a zenity/kdialog question chained in front of the command of
+`modules/gestures/system_actions.lua`. Linux therefore refuses to load a confirm
+action that is not one of those commands. Action: declare `confirm` in the
+catalogue and add the confirm-gate test case; do not add a second prompt inside
+the handler. Windows native calls of system actions go through
+`adapters/system_control.ahk`: the modules/infra/platform OS-call ratchet has
+almost no headroom left.
+
 ### project-text-case-is-one-rule
 
 Selection case conversion follows one rule, pinned by
