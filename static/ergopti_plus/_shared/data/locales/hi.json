@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 MLX मॉडल डाउनलोड",
 	"download_window.kind_ollama_install": "⚙️ AI इंजन स्थापना (Ollama)",
 	"download_window.kind_ollama_model": "📥 Ollama मॉडल डाउनलोड",
+	"download_window.kind_app_update": "📥 ErgoptiPlus अपडेट डाउनलोड",
 	"download_window.preparing": "तैयार किया जा रहा है…",
 	"download_window.size_label": "📦 आकार: ",
 	"download_window.speed_label": "⚡ गति: ",

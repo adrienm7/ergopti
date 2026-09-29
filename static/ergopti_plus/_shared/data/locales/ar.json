@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 تنزيل نموذج MLX",
 	"download_window.kind_ollama_install": "⚙️ تثبيت محرك الذكاء الاصطناعي (Ollama)",
 	"download_window.kind_ollama_model": "📥 تنزيل نموذج Ollama",
+	"download_window.kind_app_update": "📥 تنزيل تحديث ErgoptiPlus",
 	"download_window.preparing": "جارٍ التحضير…",
 	"download_window.size_label": "📦 الحجم: ",
 	"download_window.speed_label": "⚡ السرعة: ",

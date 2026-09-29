@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 Stahování modelu MLX",
 	"download_window.kind_ollama_install": "⚙️ Instalace AI enginu (Ollama)",
 	"download_window.kind_ollama_model": "📥 Stahování modelu Ollama",
+	"download_window.kind_app_update": "📥 Stahování aktualizace ErgoptiPlus",
 	"download_window.preparing": "Připravuji…",
 	"download_window.size_label": "📦 Velikost: ",
 	"download_window.speed_label": "⚡ Rychlost: ",

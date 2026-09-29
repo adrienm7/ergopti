@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 Завантаження моделі MLX",
 	"download_window.kind_ollama_install": "⚙️ Встановлення двигуна ШІ (Ollama)",
 	"download_window.kind_ollama_model": "📥 Завантаження моделі Ollama",
+	"download_window.kind_app_update": "📥 Завантаження оновлення ErgoptiPlus",
 	"download_window.preparing": "Підготовка…",
 	"download_window.size_label": "📦 Розмір: ",
 	"download_window.speed_label": "⚡ Швидкість: ",

@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 MLX モデルのダウンロード",
 	"download_window.kind_ollama_install": "⚙️ AI エンジンのインストール (Ollama)",
 	"download_window.kind_ollama_model": "📥 Ollama モデルのダウンロード",
+	"download_window.kind_app_update": "📥 ErgoptiPlus アップデートのダウンロード",
 	"download_window.preparing": "準備中…",
 	"download_window.size_label": "📦 サイズ：",
 	"download_window.speed_label": "⚡ 速度：",
