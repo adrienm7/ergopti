@@ -319,6 +319,20 @@ local function scalar_units(spec, value, reading)
 	return result
 end
 
+--- Whether a persisted value can cross its unit boundary (scalar_units asserts
+--- the same rule on every conversion).
+--- @param spec table|nil Scalar ownership declaration.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function persisted_units_fit(spec, value)
+	if not spec or not spec.units_per_state then return true end
+	if type(value) ~= "number" or value ~= value or value < 0 or value >= math.huge then
+		return false, "the value is not a finite non-negative number"
+	end
+	return true
+end
+
 --- Resolves canonical defaults/operations into the units used by their native owner.
 --- @param path string Canonical configuration path.
 --- @param value any Value expressed in persisted units.
@@ -462,6 +476,18 @@ local function flatten_from_disk(grouped, mark)
 	local function take(...)
 		if mark then mark(...) end
 	end
+	--- Takes one owned value, unless it cannot cross its unit boundary: such a
+	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
+	--- the whole file load as corrupt.
+	local function take_value(flat_key, value, ...)
+		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
+		if not fits then
+			ConfigOutdated.report({ ... }, detail)
+			return
+		end
+		flat[flat_key] = value
+		take(...)
+	end
 
 	for sec_name, sec_val in pairs(grouped) do
 		if _known_sections[sec_name] and type(sec_val) == "table" then
@@ -475,8 +501,7 @@ local function flatten_from_disk(grouped, mark)
 					-- the sub-path branch which iterates inner keys and finds nothing.
 					local top_scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key]
 					if top_scalar_fk then
-						flat[top_scalar_fk] = disk_val
-						take(sec_name, disk_key)
+						take_value(top_scalar_fk, disk_val, sec_name, disk_key)
 					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
@@ -486,8 +511,7 @@ local function flatten_from_disk(grouped, mark)
 						for inner_key, inner_val in pairs(disk_val) do
 							local scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key .. "." .. inner_key]
 							if scalar_fk then
-								flat[scalar_fk] = inner_val
-								take(sec_name, disk_key, inner_key)
+								take_value(scalar_fk, inner_val, sec_name, disk_key, inner_key)
 							else
 								owned[inner_key] = inner_val
 							end
@@ -507,8 +531,7 @@ local function flatten_from_disk(grouped, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
 						else
-							flat[nested_fk] = owned
-							take(sec_name, disk_key)
+							take_value(nested_fk, owned, sec_name, disk_key)
 						end
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
@@ -526,8 +549,7 @@ local function flatten_from_disk(grouped, mark)
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup] or _reverse_nested[lookup]
 									if fk then
-										flat[fk] = inner_val
-										take(sec_name, disk_key, inner_key)
+										take_value(fk, inner_val, sec_name, disk_key, inner_key)
 									end
 								else
 									-- Structured scalar (a table value mapped to one flat key)
@@ -535,13 +557,11 @@ local function flatten_from_disk(grouped, mark)
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup]
 									if fk then
-										flat[fk] = inner_val
-										take(sec_name, disk_key, inner_key)
+										take_value(fk, inner_val, sec_name, disk_key, inner_key)
 									else
 										local nfk = _reverse_nested[lookup]
 										if nfk then
-											flat[nfk] = inner_val
-											take(sec_name, disk_key, inner_key)
+											take_value(nfk, inner_val, sec_name, disk_key, inner_key)
 										end
 									end
 								end
@@ -549,8 +569,7 @@ local function flatten_from_disk(grouped, mark)
 								local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 								local fk     = _reverse_scalar[lookup]
 								if fk then
-									flat[fk] = inner_val
-									take(sec_name, disk_key, inner_key)
+									take_value(fk, inner_val, sec_name, disk_key, inner_key)
 								end
 							end
 						end
@@ -565,8 +584,7 @@ local function flatten_from_disk(grouped, mark)
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
 						if fk then
-							flat[fk] = disk_val
-							take(sec_name, disk_key)
+							take_value(fk, disk_val, sec_name, disk_key)
 						elseif Manifest.has_default("gestures." .. disk_key) then
 							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures]
 							if not flat.gesture_actions then flat.gesture_actions = {} end
@@ -577,8 +595,7 @@ local function flatten_from_disk(grouped, mark)
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
 						if fk then
-							flat[fk] = disk_val
-							take(sec_name, disk_key)
+							take_value(fk, disk_val, sec_name, disk_key)
 						elseif _reverse_nested[lookup] then
 							-- A scalar where this build keeps a table of settings
 							-- (an older build's `groups = "…"`): nothing reads it.

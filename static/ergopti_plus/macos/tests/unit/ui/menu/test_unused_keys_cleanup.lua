@@ -273,6 +273,14 @@ helpers.with_stub_scope(MODULES, function()
 				"hotstrings.modules.rolls.hc" })
 		end)
 
+		helpers.it("unused keys: an invalid duration is offered alone, its neighbours kept (config-outdated-units)", function()
+			local source = "[llm.trigger]\ndebounce_ms = \"fast\"\ninstant_on_word_end = true\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
