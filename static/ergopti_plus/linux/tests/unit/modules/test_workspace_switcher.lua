@@ -130,6 +130,17 @@ helpers.describe("workspace switcher: X11 through wmctrl", function()
 		end)
 	end)
 
+	helpers.it("walks to the wrap target with the shortcut when wmctrl refuses the switch", function()
+		-- The listing placed the edge; only the switch failed. One press in the
+		-- requested direction would run into that edge and stay there.
+		local FOUR = WMCTRL_THREE:gsub("2  %*", "2  -") .. "3  * DG: 1920x1080  Four\n"
+		in_session(x11(FOUR, { refuse_switch = true }), function(Switcher, _, pressed, press)
+			helpers.assert_eq(Switcher.switch("next", true, press), "pressed")
+			helpers.assert_eq(pressed, { "ctrl+alt+Left", "ctrl+alt+Left", "ctrl+alt+Left" },
+				"from the fourth workspace back to the first is three steps left")
+		end)
+	end)
+
 	helpers.it("names wmctrl as the missing tool on X11 without it", function()
 		in_session({ kind = "x11", desktop = "xfce", tools = {} }, function(Switcher, commands, pressed, press)
 			local backend, reason = Switcher.detect()

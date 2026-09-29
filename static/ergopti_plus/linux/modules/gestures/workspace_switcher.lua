@@ -29,7 +29,8 @@
 --- 1. One rule: where a step lands comes from _shared/lua/desktop_navigation,
 ---    the rule the macOS and Windows drivers use, pinned by a shared corpus.
 --- 2. A query that fails is reported, never read as "workspace 0": the action
----    then presses the desktop's own shortcut, which is the plain step.
+---    then presses the desktop's own shortcut, which is the plain step. A
+---    switch refused after a good read walks to the target with that shortcut.
 --- 3. Every tool call is bounded by `timeout`: the daemon waits for it while
 ---    it holds the keyboard, so a hung display server must cost a second, not
 ---    the keyboard.
@@ -319,8 +320,16 @@ function M.switch(direction, wrap, press_combo)
 					backend.name, state.index + 1, target + 1, #state.ids)
 				return "switched"
 			end
-			Logger.warn(LOG, "%s refused to switch to workspace %d — pressing %s instead.",
-				backend.name, target + 1, M.COMBO[direction])
+			-- The position is known, so walk to the target as the macOS and
+			-- Windows drivers do: a wrap from an edge is several steps the
+			-- other way, and one press in the requested direction would run
+			-- into the edge.
+			local steps = target - state.index
+			local combo = M.COMBO[steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS]
+			Logger.warn(LOG, "%s refused to switch to workspace %d — pressing %s %d time(s) instead.",
+				backend.name, target + 1, combo, math.abs(steps))
+			for _ = 1, math.abs(steps) do press_combo(combo) end
+			return "pressed"
 		else
 			Logger.warn(LOG, "%s could not list the workspaces (%s) — pressing %s instead.",
 				backend.name, tostring(result), M.COMBO[direction])
