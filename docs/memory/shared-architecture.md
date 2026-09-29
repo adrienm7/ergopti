@@ -210,15 +210,17 @@ engine in the same change.
 ### project-key-combinations-have-their-own-gate
 
 The modifier combinations are the Shortcuts group `key_combinations_group`
-with a switch of their own. macOS persists it as `[mod_combos] enabled` in
-`config_karabiner.toml`; absent, it follows the Tap-Holds switch, and that
-rule lives only in `Generator.key_combinations_enabled`. Windows keeps it as
-the `KeyCombinations` sub-gate of Shortcuts, whose families the master gate
-reads from the group's `feature` rows; its manifest default is on, because
-the sparse writer drops a value equal to the default and an absent key must
-keep the families that existed before the switch. Action: never mark combo
-rules as Tap-Holds feature rules again, add a Windows family as a row of the
-group, not as a gate list, and never make that default off.
+with a switch of their own, the only one they follow on every OS. macOS
+persists it as `[mod_combos] enabled` in `config_karabiner.toml`, read only by
+`Generator.key_combinations_enabled`; Windows as `KeyCombinations`, whose
+families the master gate reads from the group's `feature` rows and the
+Shortcuts master skips. Absent is on on both, because the sparse writer drops
+a value equal to the default and an absent key must keep the families. With
+Tap-Holds off, the generator gives each key 1 of a hold slot a passthrough
+rule that only tracks its held variable, since the hold slots read it.
+Action: never mark combo rules as Tap-Holds feature rules again, add a
+Windows family as a row of the group, not as a gate list, and never make that
+default off.
 
 ### project-two-keys-for-one-row-is-two-menus
 

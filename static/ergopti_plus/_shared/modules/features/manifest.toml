@@ -3687,15 +3687,15 @@ input_altering = true
 type = "boolean"
 description_key = "menu.category_enabled.tap_holds"
 
-# The « Combinaisons de touches » switch under Shortcuts: a sub-gate that turns
-# the AltGr / LAlt / CapsLock combination families off while Shortcuts stays
-# on, each family keeping its own choices. macOS keeps the same switch as
-# [mod_combos] enabled in config_karabiner.toml, beside the rules it gates.
-# Its neutral value is on: the gate can only narrow what Shortcuts and each
-# family already enable, so it activates nothing alone. An absent key must
-# leave the families as the Shortcuts master had them before this switch
-# existed, and the sparse writer deletes a value equal to the default, so a
-# default of off would both disable upgraded configs and never persist.
+# The « Combinaisons de touches » switch under Shortcuts: the only gate of the
+# AltGr / LAlt / CapsLock combination families, which the Shortcuts master no
+# longer reaches (decision of 2026-09-29), each family keeping its own choices.
+# macOS keeps the same switch as [mod_combos] enabled in config_karabiner.toml,
+# beside the rules it gates. Its neutral value is on: the gate can only narrow
+# what each family already enables, so it activates nothing alone. An absent
+# key must leave the families live, and the sparse writer deletes a value
+# equal to the default, so a default of off would both disable upgraded
+# configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
 platforms = ["ahk"]
@@ -4480,10 +4480,9 @@ id = "extensions_shortcuts"
 # through the shared renderer, which is what let the restriction go.
 
 # The « Combinaisons de touches » group under Shortcuts. Its first row is its
-# own switch, retained apart from the Shortcuts one: macOS persists it as
-# [mod_combos] enabled in config_karabiner.toml (absent, it follows the
-# Tap-Holds switch those rules used to belong to), Windows as
-# [category_enabled] key_combinations, a sub-gate of Shortcuts.
+# own switch, the only one the combinations follow on every OS: macOS
+# persists it as [mod_combos] enabled in config_karabiner.toml, Windows as
+# [category_enabled] key_combinations; absent, it is on.
 [[menu.key_combinations_group]]
 type = "toggle"
 id = "key_combinations_toggle"

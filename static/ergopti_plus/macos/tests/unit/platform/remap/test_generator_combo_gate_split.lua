@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- The modifier combinations moved from the Tap-Holds submenu to their own
 --- « Combinaisons de touches » group under Shortcuts, with its own switch,
---- persisted as [mod_combos] enabled. An absent flag inherits the Tap-Holds
---- switch, so a file that never set it behaves as before.
+--- persisted as [mod_combos] enabled, the only switch they follow (decision
+--- of 2026-09-29). An absent flag is on, whatever the Tap-Holds switch says.
 ---
 --- ROOT CAUSE ENCODED:
 --- the generator marked every combo rule as a Tap-Holds feature rule, so the
@@ -62,7 +62,7 @@ local COMBO_LABEL = "Esc + Enter"
 
 --- Builds one state with a key and a combination both assigned.
 --- @param tap_holds_enabled boolean|nil Tap-Holds switch.
---- @param mod_combos_enabled boolean|nil Key-combinations switch; nil inherits.
+--- @param mod_combos_enabled boolean|nil Key-combinations switch; nil is absent.
 --- @return table state
 local function make_state(tap_holds_enabled, mod_combos_enabled)
 	return {
@@ -117,12 +117,13 @@ helpers.describe("key combinations have their own switch in the generated rules"
 		helpers.assert_eq(state.mod_combos_config.esc_ret.combo, "tab", "every stored pair is kept")
 	end)
 
-	helpers.it("lets an absent combinations switch follow Tap-Holds", function()
-		helpers.assert_true(generated(make_state(true, nil)).combos >= 1, "absent follows Tap-Holds on")
-		helpers.assert_eq(generated(make_state(false, nil)).combos, 0, "absent follows Tap-Holds off")
-		helpers.assert_true(Generator.key_combinations_enabled(make_state(nil, nil)),
-			"an absent Tap-Holds switch counts as on, so the combinations follow it")
-		helpers.assert_eq(Generator.key_combinations_enabled(make_state(true, false)), false)
-		helpers.assert_eq(Generator.key_combinations_enabled(make_state(false, true)), true)
+	helpers.it("reads an absent combinations switch as on, whatever Tap-Holds say (combos-own-switch)", function()
+		helpers.assert_true(generated(make_state(true, nil)).combos >= 1, "absent is on with Tap-Holds on")
+		helpers.assert_true(generated(make_state(false, nil)).combos >= 1, "absent is on with Tap-Holds off")
+		for _, tap_holds in ipairs({ true, false }) do
+			helpers.assert_true(Generator.key_combinations_enabled(make_state(tap_holds, nil)))
+			helpers.assert_eq(Generator.key_combinations_enabled(make_state(tap_holds, false)), false)
+			helpers.assert_eq(Generator.key_combinations_enabled(make_state(tap_holds, true)), true)
+		end
 	end)
 end)

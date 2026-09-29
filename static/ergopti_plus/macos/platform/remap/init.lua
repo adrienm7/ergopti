@@ -4402,7 +4402,7 @@ end
 --- Switches the Tap-Holds feature and persists it. Off stops generating every
 --- per-key tap-hold rule except the right-Command one that carries AltGr and
 --- the script-control trigger; every per-key assignment is kept. The
---- modifier-combo rules follow it only while their own switch was never set
+--- modifier-combo rules never follow it: only their own switch governs them
 --- (M.set_mod_combos_enabled).
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
@@ -4421,15 +4421,15 @@ function M.set_tap_holds_enabled(value)
 end
 
 --- Returns whether the key combinations are switched on: the persisted
---- [mod_combos] enabled, or the Tap-Holds switch while it was never set.
+--- [mod_combos] enabled, on while it was never set.
 --- @return boolean enabled
 function M.get_mod_combos_enabled()
 	if not require_state("get_mod_combos_enabled") then return false end
 	return Generator.key_combinations_enabled(_state)
 end
 
---- Switches the key combinations and persists the choice, which from then on
---- no longer follows the Tap-Holds switch. Off stops generating every
+--- Switches the key combinations and persists the choice, independent of the
+--- Tap-Holds switch. Off stops generating every
 --- modifier-combo rule; every pair's assignment is kept. Does NOT regenerate —
 --- call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
@@ -4679,8 +4679,8 @@ function M.apply_scope(request, on_done)
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		if section == "mod_combos" then
-			-- The key-combinations switch returns to absent, following Tap-Holds
-			-- as on a fresh install, like the whole-remap reset.
+			-- The key-combinations switch returns to absent (on) as on a fresh
+			-- install, like the whole-remap reset.
 			candidate.mod_combos_enabled = target.mod_combos_enabled
 			candidate.mod_combos_config = target.mod_combos_config
 			candidate.simultaneous_threshold_ms = target.simultaneous_threshold_ms

@@ -135,8 +135,8 @@ global CategoryEnabled := Map(
 		"Shortcuts", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Shortcuts")),
 		"Hotstrings", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Hotstrings")),
 		"TapHolds", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("TapHolds")),
-		; « Combinaisons de touches », a sub-gate of Shortcuts: off turns only the
-		; AltGr / LAlt / CapsLock combination families off (ApplyMasterGatesToFeatures).
+		; « Combinaisons de touches », the only gate of the AltGr / LAlt / CapsLock
+		; combination families, whatever Shortcuts says (ApplyMasterGatesToFeatures).
 		"KeyCombinations", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("KeyCombinations")),
 		; Per-TOML-file hotstring sub-category gates. Independent of the top
 		; Hotstrings master above: a category file can be switched off while the

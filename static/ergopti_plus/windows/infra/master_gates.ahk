@@ -73,12 +73,15 @@ MasterGateDesiredTapHold(TapHoldSource) {
 
 ; Only declared switches and alpha activation flags are runtime gates. Parameters
 ; retain their types and values, including numbers, strings, and alpha options.
-_MG_DisableFeatureNode(Node, Prefix) {
+; Keys listed in Kept (an Array) are left to another gate.
+_MG_DisableFeatureNode(Node, Prefix, Kept := "") {
 	if InStr(Prefix, ".") && Node.Has("enabled") {
 		Node["enabled"] := false
 		return
 	}
 	for Key, Value in Node {
+		if _MG_ArrayHas(Kept, Key)
+			continue
 		Path := Prefix . "." . Key
 		if Value is Map {
 			_MG_DisableFeatureNode(Value, Path)
@@ -90,6 +93,17 @@ _MG_DisableFeatureNode(Node, Prefix) {
 		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
 			Node[Key] := false
 	}
+}
+
+; Whether Items is an Array holding Value.
+_MG_ArrayHas(Items, Value) {
+	if !(Items is Array)
+		return false
+	for Item in Items {
+		if (Item == Value)
+			return true
+	}
+	return false
 }
 
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
@@ -115,16 +129,16 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Layout master: a disabled category has already turned the selection off.
 		_MG_SupersedeForEmulatedLayout(FeaturesTarget)
 
-		; Shortcuts master
+		; Shortcuts master: every shortcut but the key-combination families, which
+		; only their own switch governs, as on macOS.
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
-				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts")
+				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts", KeyCombinationFamilies)
 		}
 
-		; « Combinaisons de touches » sub-gate, under Shortcuts: with Shortcuts on
-		; and this switch off, only the combination families go off, each keeping
-		; its choices on disk. Skipped when Shortcuts is off (already zeroed).
-		KeyCombinationsOff := CategoryGateFn.Call("Shortcuts") and !CategoryGateFn.Call("KeyCombinations")
-		if KeyCombinationsOff and FeaturesTarget.Has("shortcuts") {
+		; « Combinaisons de touches »: the only gate of the combination families,
+		; whatever the Shortcuts master says. Off, they go off, each keeping its
+		; choices on disk.
+		if !CategoryGateFn.Call("KeyCombinations") and FeaturesTarget.Has("shortcuts") {
 				for Family in KeyCombinationFamilies {
 						if FeaturesTarget["shortcuts"].Has(Family)
 								_MG_DisableFeatureNode(FeaturesTarget["shortcuts"][Family], "shortcuts." . Family)
@@ -303,7 +317,7 @@ _MG_LoadSubCategories(ManifestPath := "", &Root := "") {
 }
 
 ; The Features["shortcuts"] families the « Combinaisons de touches » switch
-; gates: the Windows ``feature`` rows of key_combinations_group, each naming a
+; alone gates: the Windows ``feature`` rows of key_combinations_group, each naming a
 ; feature section (shortcuts.alt_gr_lalt, …). The menu draws the same rows, so
 ; a family shown there is gated the day it is added.
 ; @param Root {Map} The manifest parsed by _MG_LoadSubCategories.

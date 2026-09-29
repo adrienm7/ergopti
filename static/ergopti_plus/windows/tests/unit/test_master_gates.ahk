@@ -119,10 +119,11 @@ TestMasterGates_RequiresCategoryGateCallback() {
 }
 Test("master gates: explicit category-gate callback contract fails fast", TestMasterGates_RequiresCategoryGateCallback)
 
-; « Combinaisons de touches » is a sub-gate of Shortcuts: off, it turns only the
-; AltGr / LAlt / CapsLock families off, each keeping its parameters, while
-; every other shortcut stays live. Its families are the Windows feature rows of
-; key_combinations_group, the rows the menu draws.
+; « Combinaisons de touches » is the only gate of the AltGr / LAlt / CapsLock
+; families: off, it turns only them off, each keeping its parameters, while
+; every other shortcut stays live; the Shortcuts master no longer reaches them
+; (decision of 2026-09-29, as on macOS). Its families are the Windows feature
+; rows of key_combinations_group, the rows the menu draws.
 _MGKC_Families() {
 	return ["alt_gr_lalt", "alt_gr_caps_lock", "lalt_caps_lock"]
 }
@@ -155,7 +156,18 @@ TestMasterGates_KeyCombinationsSubGate() {
 
 	MasterOff := _MGKC_Candidate()
 	ApplyMasterGatesToFeatures(MasterOff, Map(), _MGKC_Gates(false, true))
-	AssertFalse(MasterOff["shortcuts"]["alt_gr_lalt"]["backspace"], "the Shortcuts master still gates the families")
+	for Family in _MGKC_Families() {
+		AssertTrue(MasterOff["shortcuts"][Family]["backspace"], Family . " does not follow the Shortcuts master")
+		AssertFalse(MasterOff["shortcuts"][Family]["tab"], Family . " keeps its own choices")
+	}
+	AssertFalse(MasterOff["shortcuts"]["gpt"]["enabled"], "the Shortcuts master still gates the other shortcuts")
+	AssertEqual("https://example.test", MasterOff["shortcuts"]["gpt"]["link"], "and keeps their parameters")
+
+	BothOff := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(BothOff, Map(), _MGKC_Gates(false, false))
+	for Family in _MGKC_Families()
+		AssertFalse(BothOff["shortcuts"][Family]["backspace"], Family . " goes off with its own switch")
+	AssertFalse(BothOff["shortcuts"]["gpt"]["enabled"])
 }
 Test("master gates: the key-combinations switch gates only its families (key-combinations-gate)",
 	TestMasterGates_KeyCombinationsSubGate)

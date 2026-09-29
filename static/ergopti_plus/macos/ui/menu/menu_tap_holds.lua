@@ -1084,9 +1084,9 @@ end
 --- Builds the « Combinaisons de touches » group of the Shortcuts submenu: the
 --- rows `key_combinations_group` declares, answered by this engine's chords.
 ---
---- It opens with its own switch (persisted [mod_combos] enabled; while the
---- user never set it, it follows the Tap-Holds switch those rules belonged
---- to), then the symmetry check, the chord delay, the tap → chord copy, and
+--- It opens with its own switch (persisted [mod_combos] enabled; on while the
+--- user never set it, whatever the Tap-Holds switch says), then the symmetry
+--- check, the chord delay, the tap → chord copy, and
 --- one row per ordered pair of keys with its three slots.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil The rendered rows of the group's submenu, or nil.

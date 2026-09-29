@@ -125,8 +125,8 @@ _FeatureStateSmokeNeutral() {
 	ReadCategoryEnabled(Map())
 	_FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "empty repeat-key fallback")
 	for Category, Enabled in CategoryEnabled {
-		; The key-combinations sub-gate only narrows the Shortcuts master, which is
-		; off here, so its open neutral value activates nothing.
+		; The key-combinations gate only narrows its families, whose own switches
+		; are off here, so its open neutral value activates nothing.
 		if (Category == "KeyCombinations")
 			continue
 		_FeatureStateSmokeAssert(false, Enabled, "empty master: " . Category)

@@ -874,7 +874,7 @@ _ConfigBuildCategoryIntentPlan(Category, Bool) {
 			if Projected.Has(Root)
 				RuntimePatches.Push({ target: Features, key: Root, value: Projected[Root] })
 		case "KeyCombinations":
-			; A sub-gate of Shortcuts: its families live under Features["shortcuts"].
+			; Its families live under Features["shortcuts"], which it alone gates.
 			if Projected.Has("shortcuts")
 				RuntimePatches.Push({ target: Features, key: "shortcuts", value: Projected["shortcuts"] })
 		case "TapHolds":
