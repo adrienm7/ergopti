@@ -144,9 +144,10 @@ for k, v in pairs(M.DEFAULT_STATE.modes) do CoreState.modes[k] = v end
 for k, v in pairs(M.DEFAULT_STATE.sensitivities) do CoreState.sensitivities[k] = v end
 CoreState.space_wrap = M.DEFAULT_STATE.space_wrap
 
--- Initialize Engine and Actions dependencies
+-- Initialize action dependencies without acquiring input devices.
 Actions.init(CoreState)
-local initial_engine_committed = Engine.init(CoreState, Actions) == true
+-- Acquiring an event tap belongs to explicit startup, after permission and opt-in.
+local initial_engine_committed = false
 
 -- Prevent garbage collection by storing both device objects and watchers globally.
 _G.ERGOPTI_TOUCH_DEVICES = _G.ERGOPTI_TOUCH_DEVICES or {}
