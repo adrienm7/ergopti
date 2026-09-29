@@ -585,11 +585,16 @@ helpers.describe("karabiner bulk settings use one exact reversible transaction",
 				helpers.assert_eq(calls.save, 2)
 				helpers.assert_true(calls.saved_payloads[2].enabled == true)
 
+				-- The click retries the retained inverse first and mutates only once
+				-- that retry has settled every debt; refusing it anyway made the
+				-- user click twice and logged a phase that no longer existed.
 				retry_mode = true
-				helpers.assert_eq(remap.set_tap_action("left_shift", "caps_word"), false,
-					"the click that settles inverse debt must remain a refused sibling: " .. mode)
-				helpers.assert_eq(regeneration_calls, 3)
-				helpers.assert_true(remap.set_tap_action("left_shift", "caps_word"))
+				helpers.assert_true(remap.set_tap_action("left_shift", "caps_word"),
+					"the click whose retry settles the inverse debt must commit: " .. mode)
+				helpers.assert_eq(regeneration_calls, 3,
+					"the click must retry the retained inverse before mutating: " .. mode)
+				helpers.assert_true(remap.settings_pending() == false)
+				helpers.assert_eq(calls.save, 3, "candidate, inverse, then the click's own save")
 				helpers.assert_eq(remap.get_tap_action("left_shift"), "caps_word")
 			end
 		end)

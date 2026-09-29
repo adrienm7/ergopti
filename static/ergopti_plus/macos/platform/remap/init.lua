@@ -3540,6 +3540,17 @@ local function persist_and_publish_settings(candidate, overwrite_corrupt, label,
 	return true
 end
 
+-- Refusals M.regenerate() reports synchronously before it builds or deploys
+-- anything: the deployed rules are still those of the prior settings, so an
+-- inverse only has to persist them again, never to redeploy them.
+local REGENERATION_REFUSED_BEFORE_DEPLOY = {
+	["script-paused"] = true,
+	["lease-transition-in-progress"] = true,
+	["pause-intent-pending"] = true,
+	["token-unavailable"] = true,
+	["layout-refresh-exhausted"] = true,
+}
+
 --- Completes the original bulk caller exactly once.
 --- @param transaction table Active bulk transaction.
 --- @param ok boolean Final operation result.
@@ -3597,7 +3608,8 @@ end
 --- transaction as saved instead: that wait has no deadline.
 --- @param transaction table Active bulk transaction.
 --- @param label string Stable regeneration boundary label.
---- @param on_terminal function Callback fn(ok, reason).
+--- @param on_terminal function Callback fn(ok, reason, refused_before_deploy),
+---   the last true only for a synchronous refusal proven to precede any deploy.
 --- @return boolean accepted True only for a literal-true request result.
 local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 	if _bulk_settings_transaction ~= transaction then
@@ -3643,10 +3655,17 @@ local function dispatch_bulk_regeneration(transaction, label, on_terminal)
 	dispatching = false
 	if not call_ok or accepted_or_err ~= true then
 		_bulk_guardian_waiters[handle_terminal] = nil
+		-- A refusal reports its own reason through the terminal it already
+		-- fired; a request that fired none keeps the generic detail.
+		local refusal = call_ok and callback_seen and saved_status == nil
+			and pending_ok ~= true and type(pending_reason) == "string"
+			and pending_reason or nil
 		callback_seen = true
-		local reason = call_ok and "regeneration-request-refused" or "regeneration-request-raised"
-		Logger.error(LOG, "%s failed: %s.", tostring(label), tostring(accepted_or_err))
-		on_terminal(false, reason)
+		local reason = refusal
+			or (call_ok and "regeneration-request-refused" or "regeneration-request-raised")
+		Logger.error(LOG, "%s failed: %s.", tostring(label),
+			tostring(refusal or accepted_or_err))
+		on_terminal(false, reason, REGENERATION_REFUSED_BEFORE_DEPLOY[refusal] == true)
 		return false
 	end
 	if saved_status ~= nil then
@@ -3695,6 +3714,20 @@ local function request_bulk_inverse_regeneration(transaction)
 	)
 end
 
+--- Settles an inverse whose candidate was refused before any deploy: the
+--- deployed rules are still the prior settings' own, so persisting those
+--- settings again completes the recovery. Redeploying them could only be
+--- refused for the same reason, which pinned the transaction for as long as
+--- that reason lasted (a paused script, a lease transition...).
+--- @param transaction table Active bulk transaction whose inverse persisted.
+local function settle_bulk_inverse_without_redeploy(transaction)
+	if _bulk_settings_transaction ~= transaction then return end
+	_bulk_settings_transaction = nil
+	Logger.info(LOG, "%s restored the prior settings; its refused candidate never deployed (%s).",
+		transaction.label, tostring(transaction.failure_reason))
+	finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+end
+
 --- Retries the exact inverse before any sibling settings mutation is admitted.
 --- @return boolean settled True only when no recovery debt remains.
 retry_bulk_settings_recovery = function()
@@ -3708,6 +3741,10 @@ retry_bulk_settings_recovery = function()
 			transaction.label .. " inverse"
 		) then
 			return false
+		end
+		if transaction.inverse_redeploy_required == false then
+			settle_bulk_inverse_without_redeploy(transaction)
+			return _bulk_settings_transaction == nil
 		end
 		transaction.phase = "rollback-regeneration"
 	end
@@ -3743,9 +3780,12 @@ end
 --- Rejects a failed candidate and retains every unsettled inverse boundary.
 --- @param transaction table Active bulk transaction.
 --- @param reason string Candidate failure detail.
-local function reject_bulk_settings_candidate(transaction, reason)
+--- @param refused_before_deploy boolean|nil True when the candidate's
+---   regeneration was refused synchronously before any build or deploy.
+local function reject_bulk_settings_candidate(transaction, reason, refused_before_deploy)
 	if _bulk_settings_transaction ~= transaction then return end
 	transaction.failure_reason = reason or "candidate-regeneration-failed"
+	transaction.inverse_redeploy_required = refused_before_deploy ~= true
 	transaction.phase = "rollback-persistence"
 	Logger.error(LOG, "%s failed after settings commit; restoring the exact prior configuration.",
 		transaction.label)
@@ -3756,6 +3796,10 @@ local function reject_bulk_settings_candidate(transaction, reason)
 	) then
 		Logger.error(LOG, "%s inverse persistence remains pending.", transaction.label)
 		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+		return
+	end
+	if not transaction.inverse_redeploy_required then
+		settle_bulk_inverse_without_redeploy(transaction)
 		return
 	end
 	transaction.phase = "rollback-regeneration"
@@ -3817,10 +3861,16 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 			retry_bulk_settings_recovery()
 		end
-		Logger.error(LOG, "%s refused while another bulk settings transaction is '%s'.",
+		-- The retry can settle the retained recovery synchronously; refusing
+		-- then would report a phase that no longer exists.
+		if _bulk_settings_transaction then
+			Logger.error(LOG, "%s refused while another bulk settings transaction is '%s'.",
+				label, tostring(_bulk_settings_transaction.phase))
+			invoke_public_callback(label, on_done, false, "bulk-settings-busy", 0)
+			return false
+		end
+		Logger.info(LOG, "%s continues: the retained '%s' recovery settled on retry.",
 			label, tostring(phase))
-		invoke_public_callback(label, on_done, false, "bulk-settings-busy", 0)
-		return false
 	end
 	if type(mutate) ~= "function" then
 		Logger.error(LOG, "%s refused an invalid settings mutator.", label)
@@ -3881,15 +3931,16 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 	end
 
 	transaction.phase = "candidate-regeneration-pending"
-	return dispatch_bulk_regeneration(transaction, label .. " regeneration", function(ok, reason)
-		if _bulk_settings_transaction ~= transaction then return end
-		if ok == true then
-			_bulk_settings_transaction = nil
-			finish_bulk_settings_callback(transaction, true, reason or "ready")
-			return
-		end
-		reject_bulk_settings_candidate(transaction, reason)
-	end)
+	return dispatch_bulk_regeneration(transaction, label .. " regeneration",
+		function(ok, reason, refused_before_deploy)
+			if _bulk_settings_transaction ~= transaction then return end
+			if ok == true then
+				_bulk_settings_transaction = nil
+				finish_bulk_settings_callback(transaction, true, reason or "ready")
+				return
+			end
+			reject_bulk_settings_candidate(transaction, reason, refused_before_deploy)
+		end)
 end
 
 --- Persists a prospective state and publishes one live mutation only after the
@@ -3917,9 +3968,14 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 			retry_bulk_settings_recovery()
 		end
-		Logger.error(LOG, "Karabiner setting mutation refused during bulk phase '%s'.",
+		if _bulk_settings_transaction then
+			Logger.error(LOG, "Karabiner setting mutation refused during bulk phase '%s'.",
+				tostring(_bulk_settings_transaction.phase))
+			return false
+		end
+		Logger.info(LOG,
+			"Karabiner setting mutation continues: the retained '%s' recovery settled on retry.",
 			tostring(phase))
-		return false
 	end
 	local candidate = clone_settings_state(_state)
 	local mutate_ok, mutate_err = xpcall(function() mutate(candidate) end, debug.traceback)
