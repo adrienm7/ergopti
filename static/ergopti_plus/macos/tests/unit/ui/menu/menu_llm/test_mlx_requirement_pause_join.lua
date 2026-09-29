@@ -1326,3 +1326,45 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 		end
 	end)
 end)
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 6/ One Owner For The MLX Interpreter Path =======
+-- =========================================================
+-- =========================================================
+
+helpers.describe("MLX interpreter comes from the runtime owner (mlx-venv-single-owner)", function()
+	-- Neither location is one the manager could derive on its own, so only a
+	-- manager that asks mlx_deps_checker.venv_dir() probes them. The owner's
+	-- own launcher/checkout rule is covered in test_ai_runtime_selection_install.
+	for _, venv in ipairs({ "/fixture/owner/mlx-venv", "/fixture/other owner/.venv" }) do
+		helpers.it("probes the venv mlx_deps_checker names (" .. venv .. ")", function()
+			with_fixture(function(native)
+				install_subject_stubs(native)
+				package.loaded["modules.llm.mlx_deps_checker"] = {
+					venv_dir = function() return venv end,
+				}
+
+				local script_control = start_script_control()
+				local manager = build_manager(script_control)
+				local capability = manager.create_requirement_owner("activation")
+				helpers.assert_true(manager.check_requirements("fixture-model",
+					function() return true end, function() return true end, {
+						requirement_owner = capability,
+						is_current = function() return true end,
+					}))
+				helpers.assert_eq(#native.tasks, 1)
+				local command = native.tasks[1].args[#native.tasks[1].args]
+				local expected = "\"" .. venv .. "/bin/python\" -c "
+				helpers.assert_eq(command:sub(1, #expected), expected,
+					"the probed interpreter must live in the venv the installed verdict reads")
+				native.tasks[1].on_done(0, "", "")
+				helpers.assert_true(script_control.stop())
+			end)
+		end)
+	end
+end)
