@@ -215,6 +215,32 @@ end
 -- Exported for the pure-Lua lifecycle regression harness.
 M._release_app_ownership = _release_app_ownership
 
+--- Builds the HTML a window loads for a shared UI app, with the page's
+--- strings: active locale over English over French, so a key the active
+--- locale lacks reads as English, not as a key. show() and the WebKitGTK
+--- page-error harness (tests/hardware/run_page_errors.lua) both build
+--- through here: that harness is the only place a real engine parses these
+--- pages, and its own copy of this build had lost the seeded strings.
+--- @param app_name string The shared UI app directory name.
+--- @param active_locale string Locale code the page boots with.
+--- @return string html Complete HTML, or an error page from the builder.
+function M.build_page_html(app_name, active_locale)
+	if type(app_name) ~= "string" or app_name == "" then
+		error("build_page_html(): app_name must be a nonempty string", 2)
+	end
+	if type(active_locale) ~= "string" or active_locale == "" then
+		error("build_page_html(): active_locale must be a nonempty string", 2)
+	end
+	local root = _driver_root()
+	local ok_catalogue, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	if not ok_catalogue or type(catalogue) ~= "table" or next(catalogue) == nil then
+		Logger.error(LOG, "build_page_html(): '%s' opens without its strings: the locale catalogue is unavailable (%s).",
+			app_name, tostring(catalogue))
+		catalogue = nil
+	end
+	return webkit_host.build_app_html(root, app_name, active_locale, catalogue)
+end
+
 --- Opens a webview window for the given shared UI app.
 --- If the window already exists, brings it to front instead of creating a new one.
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
@@ -242,16 +268,7 @@ function M.show(app_name, active_locale)
 		return true
 	end
 
-	-- Build the HTML, with the page's strings: active locale over English over
-	-- French, so a key the active locale lacks reads as English, not as a key.
-	local root = _driver_root()
-	local ok_catalogue, catalogue = pcall(function() return require("infra.locale").catalogue() end)
-	if not ok_catalogue or type(catalogue) ~= "table" or next(catalogue) == nil then
-		Logger.error(LOG, "show(): '%s' opens without its strings: the locale catalogue is unavailable (%s).",
-			app_name, tostring(catalogue))
-		catalogue = nil
-	end
-	local html = webkit_host.build_app_html(root, app_name, active_locale, catalogue)
+	local html = M.build_page_html(app_name, active_locale)
 	if not html or html == "" then
 		Logger.error(LOG, "show(): failed to build HTML for '%s'.", app_name)
 		return false
