@@ -352,6 +352,15 @@ helpers.with_stub_scope(MODULES, function()
 			if not ok then error(err, 0) end
 		end)
 
+		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
+			-- The setup wizard marks shortcuts.keys.layer_scroll; the owner's report
+			-- must still win, or the warned entry could never be removed.
+			local source = "[shortcuts.keys]\nlayer_scroll = \"yes\"\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "layer_scroll" })
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
