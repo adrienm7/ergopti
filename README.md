@@ -117,13 +117,28 @@ install.
 
 A self-contained app bundling Hammerspoon and Karabiner-Elements.
 
+With [Homebrew](https://brew.sh), pick the stable or the dev channel:
+
+```bash
+brew tap adrienm7/ergopti
+brew install --cask ergoptiplus        # stable releases
+brew install --cask ergoptiplus@dev   # every dev prerelease
+```
+
+The app keeps updating itself in place (Sparkle), exactly as a manual install
+does; see [Homebrew](static/ergopti_plus/macos/README.md#install-with-homebrew)
+for switching channels and uninstalling.
+
+Or by hand:
+
 1. Download `ErgoptiPlus.app.zip`, unzip, move the app to `/Applications`.
 2. Remove the quarantine flag (the app is not Apple-notarised yet):
    ```bash
-   xattr -dr com.apple.quarantine /Applications/Ergopti.app
+   xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
    ```
-3. Launch it. On first run, Karabiner-Elements asks for a System Extension
-   approval — required for key remapping.
+
+Then launch it. On first run, Karabiner-Elements asks for a System Extension
+approval — required for key remapping.
 
 **Linux — alpha**
 

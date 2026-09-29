@@ -665,6 +665,51 @@ jobs:
           cmp --silent "$feed" "$RUNNER_TEMP/published-appcast.xml"
           echo "Published and verified $published"
 
+      # The tap's cask names one exact release and its checksum (Homebrew has no
+      # install-time URL and GitHub no stable URL for the newest prerelease),
+      # so it is rendered here, once the release exists. Left alone with the feed:
+      # an older release must not replace the cask of a newer one either. The
+      # checksum is taken from the published asset, which a resumed attempt's
+      # rebuilt artifact would no longer match. The step itself always runs,
+      # like every step the preflight does not skip, and reads skip_feed.
+      - name: Publish Homebrew cask
+        shell: bash
+        env:
+          SKIP_FEED: ${{ steps.preflight.outputs.skip_feed }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAP_REPOSITORY: ${{ github.repository_owner }}/homebrew-ergopti
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "$SKIP_FEED" in
+              true) echo "::notice::A newer release of this channel owns the Homebrew cask; $TAG leaves it."; exit 0 ;;
+              false) ;;
+              *) echo "::error::preflight's skip_feed output is '$SKIP_FEED', expected true or false."; exit 1 ;;
+          esac
+          if [ -z "$TAP_TOKEN" ]; then
+              echo "::warning title=Homebrew tap::No HOMEBREW_TAP_TOKEN secret: $TAP_REPOSITORY keeps its previous cask for this channel. Create a token with Contents read and write on that repository (static/ergopti_plus/macos/README.md, Homebrew)."
+              exit 0
+          fi
+          download="$RUNNER_TEMP/homebrew-asset"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern ErgoptiPlus.app.zip --dir "$download" --clobber
+          sha=$(sha256sum "$download/ErgoptiPlus.app.zip" | cut -d ' ' -f 1)
+
+          tap="$RUNNER_TEMP/homebrew-tap"
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPOSITORY}.git" "$tap"
+          cask=$(node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap")
+          git -C "$tap" config user.name "github-actions[bot]"
+          git -C "$tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$tap" add -- "$cask"
+          if git -C "$tap" diff --cached --quiet; then
+              echo "$cask already names $TAG."
+          else
+              git -C "$tap" commit -m "chore(release): $cask for $TAG"
+              git -C "$tap" push origin HEAD
+              echo "Published $cask for $TAG to $TAP_REPOSITORY."
+          fi
+
       - name: Build changelog section
         shell: bash
         env:
@@ -692,9 +737,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.validate.outputs.tag }}
           VERSION: ${{ needs.validate.outputs.version }}
+          CHANNEL: ${{ needs.validate.outputs.channel }}
         run: |
           set -euo pipefail
           body_file="$(mktemp)"
+          cask="$(node tools/build/homebrew-cask.cjs --token "$CHANNEL")"
           # The downloads come first and the changelog last, folded. A "skip to
           # downloads" link could not work: the releases list page truncates long
           # notes (the anchor after the changelog was not there), and from the
@@ -751,7 +798,14 @@ jobs:
           |---|---|
           | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
 
-          **Installation — app:**
+          **Installation with [Homebrew](https://brew.sh):**
+          \`\`\`bash
+          brew tap ${GITHUB_REPOSITORY_OWNER}/ergopti
+          brew install --cask ${cask}
+          \`\`\`
+          \`ergoptiplus\` installs the stable releases and \`ergoptiplus@dev\` the dev prereleases; this release is in \`${cask}\`. The app then keeps updating itself, and \`brew upgrade\` leaves it to its own updater.
+
+          **Installation — app, by hand:**
           1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
           2. Remove the quarantine flag (the app is not yet Apple-notarised):
           \`\`\`bash

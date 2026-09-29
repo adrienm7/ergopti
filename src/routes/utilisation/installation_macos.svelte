@@ -30,6 +30,24 @@
 
 <tiny-space></tiny-space>
 
+<p>
+	Le driver <a href="ergopti-plus" class="link"><ErgoptiPlus /></a> s'installe aussi avec
+	<a href="https://brew.sh" class="link" target="_blank" rel="noopener">Homebrew</a>, en choisissant
+	son canal de mises à jour :
+</p>
+<pre><code
+		>brew tap adrienm7/ergopti
+brew install --cask ergoptiplus       # versions stables
+brew install --cask ergoptiplus@dev   # versions de développement</code
+	></pre>
+<p>
+	L'application se met ensuite à jour toute seule, comme une installation manuelle. Pour changer de
+	canal, désinstaller un cask (<code>brew uninstall --cask ergoptiplus@dev</code>) puis installer
+	l'autre : les réglages sont conservés.
+</p>
+
+<tiny-space></tiny-space>
+
 <p>Ce bundle doit être dézippé puis placé dans le dossier des extensions de clavier de macOS :</p>
 <code>/Library/Keyboard Layouts/</code>
 

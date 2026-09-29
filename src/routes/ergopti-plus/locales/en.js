@@ -183,6 +183,7 @@ export default {
 	// ── Final CTA ────────────────────────────────────────────────────────────
 	'Vos doigts vous diront merci.': 'Your fingers will thank you.',
 	'★ {n} sur GitHub': '★ {n} on GitHub',
+	'Sur macOS, aussi avec Homebrew :': 'On macOS, also with Homebrew:',
 	'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →':
 		'Already typing in Ergopti? Install the layout for the full combo →'
 };

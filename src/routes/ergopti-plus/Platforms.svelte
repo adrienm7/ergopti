@@ -223,6 +223,10 @@ FEATURES & RATIONALE:
 					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>
 				</a>
 			</div>
+			<p class="cta-brew">
+				{t('Sur macOS, aussi avec Homebrew :')}
+				<code>brew install --cask adrienm7/ergopti/ergoptiplus</code>
+			</p>
 			<p class="cta-meta">
 				{#if ui.release}<span class="cta-version">{ui.release.tag}</span>{/if}
 				{#if ui.repo}
@@ -645,6 +649,15 @@ FEATURES & RATIONALE:
 	.cta-buttons small {
 		font-weight: 500;
 		opacity: 0.75;
+	}
+
+	.cta-brew {
+		color: var(--ink-faint);
+		font-size: 0.85rem;
+		margin: 14px 0 0;
+		overflow-wrap: anywhere;
+		position: relative;
+		text-align: center;
 	}
 
 	.cta-foot {
