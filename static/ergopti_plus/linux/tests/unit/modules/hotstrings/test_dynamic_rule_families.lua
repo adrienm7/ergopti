@@ -31,24 +31,47 @@
 
 local helpers = require("tests.helpers")
 
-local Fakes = helpers.load_module("tests.fakes")
+local Manifest = require("infra.manifest_reader")
+local previous_preferences = package.loaded["infra.hotstring_preferences"]
 
---- Installs a fake storage adapter and returns it.
+--- Installs an in-memory canonical preference owner and returns it.
 ---
---- The manager re-requires the adapter on every call rather than caching it, so
---- swapping `package.loaded` is enough and no re-init is needed.
---- @param initial table|nil Pre-existing stored values.
---- @param writes_fail boolean|nil Whether mutations fail.
+--- The manager is loaded fresh after the swap, so it binds this owner. It keeps
+--- the real owner's contract: canonical paths and sparse writes against the
+--- manifest's neutral defaults. The real owner's file behaviour has its own test.
+--- @param initial table|nil Pre-existing explicit values by canonical path.
+--- @param writes_fail boolean|nil Whether writes are refused.
 --- @return table
 local function with_storage(initial, writes_fail)
-	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	package.loaded["adapters.storage"] = storage
+	local storage = { values = {} }
+	for path, value in pairs(initial or {}) do storage.values[path] = value end
+	function storage.get(path)
+		local value = storage.values[path]
+		if value == nil then return Manifest.default_for(path) end
+		return value
+	end
+	function storage.is_explicit(path) return storage.values[path] ~= nil end
+	function storage.has(path) return storage.values[path] ~= nil end
+	--- The family leaves only: the fixture switches the master on first.
+	function storage.family_keys()
+		local keys = {}
+		for path in pairs(storage.values) do
+			if path ~= "hotstrings.dynamic.enabled" then keys[#keys + 1] = path end
+		end
+		return keys
+	end
+	function storage.set(path, value)
+		if writes_fail then return false end
+		if value == Manifest.default_for(path) then storage.values[path] = nil else storage.values[path] = value end
+		return true
+	end
+	package.loaded["infra.hotstring_preferences"] = storage
 	return storage
 end
 
---- Drops the fake, so nothing leaks into the tests that follow.
+--- Restores the owner, so nothing leaks into the tests that follow.
 local function drop_storage()
-	package.loaded["adapters.storage"] = nil
+	package.loaded["infra.hotstring_preferences"] = previous_preferences
 end
 
 --- A manager initialised with the date rules registered.
@@ -131,7 +154,7 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 	end)
 
 	helpers.it("brings a family back when it is switched on again", function()
-		with_storage({ ["hotstrings.dynamic.datelongfr"] = false })
+		with_storage({ ["hotstrings.dynamic.date_long_fr.enabled"] = false })
 		local dh = manager()
 		helpers.assert_nil(dh.preview("date\\"), "off is read back from storage on boot")
 
@@ -157,28 +180,27 @@ helpers.describe("dynamic rule families: persistence", function()
 		local storage = with_storage()
 		local dh = manager()
 		dh.rule_families()
-		helpers.assert_eq(#storage.keys(), 0,
+		helpers.assert_eq(#storage.family_keys(), 0,
 			"writing the default would freeze today's default for anyone who had "
 				.. "already run the driver once, so neutral absence stays absent")
 		drop_storage()
 	end)
 
-	helpers.it("uses the same preference path macOS uses", function()
+	helpers.it("uses the family's canonical manifest leaf", function()
 		local storage = with_storage()
 		local dh = manager()
 		dh.set_rule_enabled("datefr", true)
-		helpers.assert_eq(storage.get("hotstrings.dynamic.datefr"), true,
-			"macos/infra/preferences.lua maps dynamichotstrings_datefr to "
-				.. "hotstrings.dynamic.datefr; a driver-local spelling would make the "
-				.. "same user's choice mean nothing on the other platform")
+		helpers.assert_eq(storage.values["hotstrings.dynamic.date_fr.enabled"], true,
+			"the manifest row hotstrings.dynamic.date_fr declares the leaf, so the "
+				.. "cleanup and the scopes own the same key the switch writes")
 		drop_storage()
 	end)
 
 	helpers.it("clears the key rather than storing the neutral false", function()
-		local storage = with_storage({ ["hotstrings.dynamic.date"] = true })
+		local storage = with_storage({ ["hotstrings.dynamic.date.enabled"] = true })
 		local dh = manager()
 		dh.set_rule_enabled("date", false)
-		helpers.assert_true(not storage.has("hotstrings.dynamic.date"),
+		helpers.assert_true(not storage.has("hotstrings.dynamic.date.enabled"),
 			"back to the default means back to no entry")
 		drop_storage()
 	end)
@@ -188,12 +210,13 @@ helpers.describe("dynamic rule families: persistence", function()
 		local dh = manager()
 		helpers.assert_true(dh.set_rule_enabled("datefrr", false) == false,
 			"a typo must be reported, not silently written")
-		helpers.assert_eq(#storage.keys(), 0, "and must write nothing")
+		helpers.assert_eq(#storage.family_keys(), 0, "and must write nothing")
 		drop_storage()
 	end)
 
 	helpers.it("reports failed writes and keeps the durable family state", function()
-		local storage = with_storage({ ["hotstrings.dynamic.date"] = false, ["hotstrings.dynamic.datefr"] = true }, true)
+		local storage = with_storage({ ["hotstrings.dynamic.date.enabled"] = false,
+			["hotstrings.dynamic.date_fr.enabled"] = true }, true)
 		local dh = manager()
 		helpers.assert_eq(dh.set_rule_enabled("date", true), false)
 		helpers.assert_eq(dh.is_rule_enabled(nil, "date"), false,
@@ -201,20 +224,7 @@ helpers.describe("dynamic rule families: persistence", function()
 		helpers.assert_eq(dh.set_rule_enabled("datefr", false), false)
 		helpers.assert_eq(dh.is_rule_enabled(nil, "datefr"), true,
 			"a failed delete must not make the family appear disabled")
-		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), false)
-		drop_storage()
-	end)
-
-	helpers.it("does not turn a failed delete into a write of the opposite state", function()
-		local storage = with_storage({ ["hotstrings.dynamic.date"] = true })
-		local writes = 0
-		storage.delete = function() return false end
-		storage.set = function() writes = writes + 1 ; return true end
-		local dh = manager()
-		helpers.assert_eq(dh.set_rule_enabled("date", false), false)
-		helpers.assert_eq(writes, 0,
-			"Lua's and/or idiom must not fall through from a failed delete into the false-state writer")
-		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), true)
+		helpers.assert_eq(storage.values["hotstrings.dynamic.date.enabled"], false)
 		drop_storage()
 	end)
 
@@ -273,8 +283,9 @@ end
 helpers.describe("dynamic rule families: the rows", function()
 
 	helpers.it("offers one row per family, ticked from storage", function()
-		with_storage({ ["hotstrings.dynamic.datefr"] = false, ["hotstrings.dynamic.date"] = true,
-			["hotstrings.dynamic.datelongfr"] = true, ["hotstrings.dynamic.personal_info"] = true })
+		with_storage({ ["hotstrings.dynamic.date_fr.enabled"] = false, ["hotstrings.dynamic.date.enabled"] = true,
+			["hotstrings.dynamic.date_long_fr.enabled"] = true,
+			["hotstrings.dynamic.text_expansion_personal_information.enabled"] = true })
 		local dh = manager()
 		local sub = dynamic_submenu(dh)
 		helpers.assert_not_nil(sub, "the dynamic category has a submenu")
@@ -310,7 +321,7 @@ helpers.describe("dynamic rule families: the rows", function()
 			if row.title == label then row.fn() end
 		end
 
-		helpers.assert_eq(storage.get("hotstrings.dynamic.datelongfr"), true,
+		helpers.assert_eq(storage.values["hotstrings.dynamic.date_long_fr.enabled"], true,
 			"a row bound to the wrong section is invisible in the tray and only "
 				.. "shows up as the wrong expansion disappearing")
 		drop_storage()
