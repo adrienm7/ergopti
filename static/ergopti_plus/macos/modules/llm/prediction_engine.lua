@@ -30,6 +30,8 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
+local Rewrite          = require("llm.rewrite")
+local PromptAction     = require("llm.prompt_action")
 local Logger           = require("infra.logger")
 local Timings          = require("infra.timings")
 local TimerScheduler   = require("adapters.timer_scheduler")
@@ -1450,6 +1452,25 @@ end
 -- ============================================
 
 
+--- Turns continuation request parameters into rewrite parameters, in place.
+--- The tail becomes the current sentence, an exact suffix of the context sent,
+--- so the parser can erase exactly what it replaces. A sentence longer than the
+--- capped context extends the context to hold all of it.
+--- @param params table PromptBuilder.build result (context_buffer, tail, max_tokens).
+--- @param buffer string The full tracked buffer the context was cut from.
+--- @return string|nil skip_reason Why nothing can be rewritten, or nil when params are ready.
+function M._apply_rewrite_params(params, buffer)
+	local context = params.context_buffer
+	local sentence = Rewrite.sentence_span(buffer)
+	if #sentence > #context then context = sentence end
+	local span = Rewrite.sentence_span(context)
+	if span == "" then return "no sentence to rewrite" end
+	params.context_buffer = context
+	params.tail = span
+	params.max_tokens = Rewrite.max_tokens(span)
+	return nil
+end
+
 --- Runs the full LLM prediction pipeline against the current buffer state.
 ---
 --- Execution flow:
@@ -1464,9 +1485,21 @@ end
 --- @param force_trigger boolean If true, bypasses the freshness and word-count guards.
 --- @param profile_name string|nil Optional profile label override shown in the info bar.
 --- @param continuation_guard function|nil Internal exact-owner predicate for timer delivery.
-function M.perform_check(force_trigger, profile_name, continuation_guard)
+--- @param request table|nil One-request overrides from a prompt action:
+---        { profile = table, num_predictions = number|nil }. The global active
+---        profile and prediction count stay untouched. Requires force_trigger.
+function M.perform_check(force_trigger, profile_name, continuation_guard, request)
 	if not runtime_available() then return end
 	if not require_state("perform_check") then return end
+	-- The rate-limit deferral re-arms the shared timer with the label only, so an
+	-- unforced override would lose its profile there.
+	if request ~= nil and (force_trigger ~= true or type(request) ~= "table"
+		or type(request.profile) ~= "table") then
+		Logger.error(LOG, "perform_check: a request override must be a forced { profile } table.")
+		return
+	end
+	local request_profile = request and request.profile or nil
+	local request_count   = request and request.num_predictions or num_predictions
 	local entry_request_counter = llm_request_counter
 	local entry_fetch_counter = fetch_request_counter
 
@@ -1565,7 +1598,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 		temperature             = temperature,
 		max_words               = max_words,
 		min_words               = min_words,
-		num_predictions         = num_predictions,
+		num_predictions         = request_count,
 		auto_raise_temperature  = auto_raise_temperature,
 		context_window_chars    = context_window_chars,
 	}, last_buffer_signature, force_trigger)
@@ -1580,6 +1613,28 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	if not params then
 		Logger.debug(LOG, "%s — LLM request skipped.", skip_reason or "unknown reason")
 		return
+	end
+
+	-- A rewrite profile replaces the current sentence instead of continuing it,
+	-- whatever triggered the request, so its tail and budget are the sentence's
+	local profile_ok, request_profile_now = xpcall(function()
+		return request_profile or core_llm.get_active_profile()
+	end, debug.traceback)
+	if not profile_ok then
+		Logger.error(LOG, "Active profile lookup raised — request aborted: %s", tostring(request_profile_now))
+		return
+	end
+	if not predispatch_is_current() then return end
+	if Rewrite.is_rewrite_profile(request_profile_now) then
+		local rewrite_ok, rewrite_skip = pcall(M._apply_rewrite_params, params, buffer)
+		if not rewrite_ok then
+			Logger.error(LOG, "Rewrite request parameters raised — request aborted: %s", tostring(rewrite_skip))
+			return
+		end
+		if rewrite_skip then
+			Logger.debug(LOG, "%s — rewrite request skipped.", rewrite_skip)
+			return
+		end
 	end
 
 	-- Backend-aware request floor — re-arm the debounce timer for the
@@ -1617,8 +1672,9 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	end
 
 	-- Pre-build the info bar for streaming frames; on_success replaces it with the latency-aware version
-	local active_profile_now   = core_llm.get_active_profile()
-	local display_profile_now  = profile_name or (active_profile_now and active_profile_now.label)
+	-- The info bar names the profile that actually runs: an override's label wins
+	if profile_name == nil and request_profile then profile_name = request_profile.label end
+	local display_profile_now  = profile_name or (request_profile_now and request_profile_now.label)
 	local streaming_info_bar   = show_info_bar
 		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
 		or nil
@@ -1697,7 +1753,12 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	end
 
 	-- Shared noise gate — must be consistent between partial and final paths
-	local function is_noise_pred(to_type)
+	local function is_noise_pred(to_type, pred)
+		-- A rewrite legitimately starts with a capital and may hold a colon: it
+		-- replaces the sentence instead of continuing the buffer
+		if type(pred) == "table" and pred.rewrite == true then
+			return (tonumber(pred.deletes) or 0) == 0 and (to_type == nil or to_type == "")
+		end
 		if not to_type or to_type:gsub("[%s%.…]", "") == "" then return true end
 		local text_lower = to_type:lower()
 		-- Anchor to the end of the buffer ((%S)%s*$) instead of a greedy .*
@@ -1833,6 +1894,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	_request_log_id = my_fetch_id
 	Logger.start(LOG, "LLM request — request=%d | model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		my_fetch_id, tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
+	if request_profile then
+		Logger.debug(LOG, "Request %d runs profile '%s' for this request only.",
+			my_fetch_id, tostring(request_profile.id))
+	end
 	if not is_current_fetch() then return end
 
 	local fetch_ok, fetch_err = xpcall(function()
@@ -1842,7 +1907,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 			on_success,
 			on_fail,
 			sequential_mode, force_trigger, function() return fetch_request_counter end,
-			on_partial
+			on_partial, request_profile
 		)
 	end, debug.traceback)
 	if not fetch_ok then
@@ -1892,6 +1957,35 @@ local function manual_refusal()
 	return nil, buffer
 end
 
+-- The notice of a prompt action whose stored prompt no longer exists
+local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
+
+--- Shows the notice explaining why a request the user made did nothing.
+--- @param reason string Short reason, for the log.
+--- @param key string Locale key of the notice.
+local function show_refusal_notice(reason, key)
+	local ok_show, shown = pcall(tooltip.show, i18n.get(key), true, true)
+	if not ok_show or shown ~= true then
+		Logger.warn(LOG, "Manual prediction notice '%s' was not shown: %s.", reason, tostring(shown))
+	end
+end
+
+--- Refuses a request whose profile is a rewrite profile when the buffer holds
+--- no sentence to rewrite (only spacing).
+--- @param profile table|nil The profile the request would run.
+--- @param context string The typed context.
+--- @return string|nil reason "empty_context", or nil when the request may run.
+local function rewrite_refusal(profile, context)
+	if not Rewrite.is_rewrite_profile(profile) then return nil end
+	local ok, span = pcall(Rewrite.sentence_span, context)
+	if not ok then
+		Logger.error(LOG, "The typed context has no readable sentence: %s.", tostring(span))
+		return "empty_context"
+	end
+	if span == "" then return "empty_context" end
+	return nil
+end
+
 --- Runs a prediction now, on the user's request: the llm_generate_prediction
 --- action. perform_check's own refusals are debug lines meant for the
 --- per-keystroke path; a chord pressed on purpose that did nothing would read as
@@ -1900,16 +1994,66 @@ end
 function M.request_manual_prediction()
 	if not require_state("request_manual_prediction") then return false end
 	local reason, context = manual_refusal()
+	if not reason then
+		local profile_ok, profile = xpcall(core_llm.get_active_profile, debug.traceback)
+		if not profile_ok then
+			Logger.error(LOG, "Active profile lookup raised: %s.", tostring(profile))
+			return false
+		end
+		reason = rewrite_refusal(profile, context)
+	end
 	if reason then
 		Logger.info(LOG, "Manual prediction refused (%s).", reason)
-		local ok_show, shown = pcall(tooltip.show, i18n.get(MANUAL_REFUSAL_KEYS[reason]), true, true)
-		if not ok_show or shown ~= true then
-			Logger.warn(LOG, "Manual prediction notice '%s' was not shown: %s.", reason, tostring(shown))
-		end
+		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
 		return false
 	end
 	Logger.info(LOG, "Manual prediction requested (%d context byte(s)).", #context)
 	M.perform_check(true)
+	return true
+end
+
+--- Runs a prediction now with a chosen prompt profile and prediction count: the
+--- llm_prompt_prediction action and its per-profile presets. The global active
+--- profile and the menu's count are left untouched. Refuses like
+--- request_manual_prediction, and also when the stored profile no longer exists:
+--- running another prompt in its place would be a silent substitution.
+--- @param value string The binding's parameter: "<profile_id>" or "<profile_id>|<count>".
+--- @return boolean requested True when a request was sent to perform_check.
+function M.request_prompt_prediction(value)
+	if not require_state("request_prompt_prediction") then return false end
+	local parsed, parse_err = PromptAction.parse(value)
+	if not parsed then
+		Logger.warn(LOG, "Prompt prediction refused: invalid prompt parameter '%s' (%s).",
+			tostring(value), tostring(parse_err))
+		show_refusal_notice("unknown_prompt", UNKNOWN_PROMPT_KEY)
+		return false
+	end
+	local reason, context = manual_refusal()
+	if reason then
+		Logger.info(LOG, "Prompt prediction refused (%s).", reason)
+		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
+		return false
+	end
+	local lookup_ok, profile = xpcall(core_llm.find_profile, debug.traceback, parsed.profile_id)
+	if not lookup_ok then
+		Logger.error(LOG, "Prompt profile lookup raised: %s.", tostring(profile))
+		return false
+	end
+	if type(profile) ~= "table" then
+		Logger.warn(LOG, "Prompt prediction refused: the prompt '%s' no longer exists.", parsed.profile_id)
+		show_refusal_notice("unknown_prompt", UNKNOWN_PROMPT_KEY)
+		return false
+	end
+	reason = rewrite_refusal(profile, context)
+	if reason then
+		Logger.info(LOG, "Prompt prediction refused (%s).", reason)
+		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
+		return false
+	end
+	local count = parsed.num_predictions or num_predictions
+	Logger.info(LOG, "Prompt prediction requested with '%s' (%d prediction(s), %d context byte(s)).",
+		parsed.profile_id, count, #context)
+	M.perform_check(true, nil, nil, { profile = profile, num_predictions = count })
 	return true
 end
 

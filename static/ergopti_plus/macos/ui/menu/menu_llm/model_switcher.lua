@@ -46,6 +46,8 @@ local PROFILE_POWER_LEVELS = {
 	basic         = PROFILE_POWER_BASIC,
 	advanced      = PROFILE_POWER_ADVANCED,
 	batch_advanced = PROFILE_POWER_BATCH_ADVANCED,
+	-- Rewriting a sentence takes the instruction-following of the advanced profile
+	rewrite       = PROFILE_POWER_ADVANCED,
 	batch         = PROFILE_POWER_ADVANCED,
 	parallel      = PROFILE_POWER_BASIC,
 }
@@ -350,6 +352,7 @@ function M.new(ctx)
 		if profile_id == "basic" then return "basic" end
 		if profile_id == "advanced" then return "advanced" end
 		if profile_id == "batch_advanced" then return "batch_advanced" end
+		if profile_id == "rewrite" then return "rewrite" end
 		if profile_id:match("^batch_") or profile_id == "batch" then return "batch" end
 		if profile_id:match("^parallel_") or profile_id == "parallel" then return "parallel" end
 		return "basic"

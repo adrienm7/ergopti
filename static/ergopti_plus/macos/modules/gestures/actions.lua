@@ -26,6 +26,8 @@ local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local WrapPair      = require("wrap_pair")
 local SendInput     = require("send_input")
+local PromptAction  = require("llm.prompt_action")
+local ProfileSelector = require("llm.profile_selector")
 local JsonCodec     = require("adapters.json_codec")
 local LOG           = "gestures.actions"
 
@@ -1067,6 +1069,45 @@ sg("llm_generate_prediction", function()
 	end
 	return keymap.request_manual_prediction()
 end)
+
+--- Runs a prediction now with a chosen prompt profile, through the keymap
+--- bridge that owns the prediction engine (loaded after this registry). The
+--- engine checks the profile still exists and shows every refusal.
+--- @param action string The action id, for the log.
+--- @param value string "<profile_id>" or "<profile_id>|<count>".
+--- @return boolean True when the request was sent.
+local function request_prompt_prediction(action, value)
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table"
+		or type(keymap.request_prompt_prediction) ~= "function" then
+		Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", action, tostring(keymap))
+		return false
+	end
+	return keymap.request_prompt_prediction(value)
+end
+-- The prompt and the count are the binding's own parameter, as for wrap_selection.
+sg("llm_prompt_prediction", function(binding)
+	local value = M.get_action_parameter(binding, "llm_prompt_prediction")
+	if not PromptAction.is_valid(value) then
+		Logger.warn(LOG, "llm_prompt_prediction ignored for binding '%s': no valid prompt is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	return request_prompt_prediction("llm_prompt_prediction", value)
+end)
+-- One ready-made action per built-in profile (llm_predict_<id>), with the AI
+-- menu's count. Derived from profiles.json, like the catalogue, so a new
+-- built-in profile gets its action without a hand-written registration here.
+local BUILTIN_PROMPT_PROFILES = ProfileSelector.load_built_in_profiles()
+if #BUILTIN_PROMPT_PROFILES == 0 then
+	error("gestures/actions: _shared/modules/llm/profiles.json holds no built-in profile — "
+		.. "the llm_predict_* actions cannot be registered.")
+end
+for _, profile in ipairs(BUILTIN_PROMPT_PROFILES) do
+	local profile_id = profile.id
+	local action = "llm_predict_" .. profile_id
+	sg(action, function() return request_prompt_prediction(action, PromptAction.format(profile_id)) end)
+end
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
@@ -1942,6 +1983,9 @@ function M.validate_action_parameter(action, value)
 	local spec = M.get_action_parameter_spec(action)
 	if not spec then return true end
 	if spec == "wrap_pair" then return (M.wrap_pair_for(value)) ~= nil end
+	-- Syntax only: whether the profile still exists is checked when the action runs,
+	-- so deleting a custom prompt does not wipe the bindings that name it
+	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -1970,6 +2014,13 @@ function M.parameter_prompt(action)
 		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec),
 			SendInput.describe_keys(M.send_vocabulary()))
 	end
+	if spec == "llm_prompt" then
+		local lines = {}
+		for _, choice in ipairs(M.llm_prompt_choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_prompt"), table.concat(lines, "\n"))
+	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local samples = WrapPair.describe(wrap_pair_list())
@@ -1986,6 +2037,7 @@ end
 function M.parameter_error(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -1995,6 +2047,39 @@ function M.parameter_error(action)
 			.. i18n.get("dialog.gestures.param_err_many_placeholders")
 	end
 	return i18n.get("dialog.gestures.param_err_url")
+end
+
+--- The AI menu's current prediction count: what a prompt binding without a
+--- count of its own requests.
+--- @return number count
+function M.llm_prompt_default_count()
+	local Engine = require("modules.llm.prediction_engine")
+	local found, count = Engine.get_llm_runtime_setting("llm_num_predictions")
+	if found ~= true or type(count) ~= "number" then
+		error("gestures/actions: the prediction engine has no prediction count.")
+	end
+	return count
+end
+
+--- The prompts a llm_prompt binding may name, as the AI menu lists them:
+--- built-in profiles in menu order, then the user's custom profiles.
+--- @return table Array of { value = profile id, label = menu label }.
+function M.llm_prompt_choices()
+	local Llm = require("modules.llm")
+	local ProfileLabel = require("ui.menu.menu_llm.profile_label")
+	local count = M.llm_prompt_default_count()
+	local choices = {}
+	for _, profile in ipairs(Llm.BUILTIN_PROFILES) do
+		choices[#choices + 1] = { value = profile.id, label = ProfileLabel.format(profile.label, count) }
+	end
+	for index, profile in ipairs(Llm.get_user_profiles()) do
+		if type(profile) == "table" and type(profile.id) == "string" then
+			-- The custom-profile fallback name mirrors the AI menu's own row
+			local label = profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. index)
+			choices[#choices + 1] = { value = profile.id, label = ProfileLabel.format(label, count) }
+		end
+	end
+	return choices
 end
 
 function M.get_action_parameter(binding, action)

@@ -1572,8 +1572,14 @@ function M.apply_prediction(idx)
 	-- Also enforces correct spacing at the join point as a safety net for cases the
 	-- parser may not have handled (e.g. raw-mode output with no leading space).
 	-- This call was accidentally dropped during the 183effff refactor.
+	-- A rewrite already names the exact span it replaces: an overlap match between
+	-- the buffer tail and the rewritten sentence would shrink its deletions.
+	local resolve_overlap = km_utils.resolve_prediction_overlap
+	if pred.rewrite == true then
+		resolve_overlap = function(_, deletes, text) return deletes, text end
+	end
 	local ok_overlap, res_deletes, res_text = pcall(
-		km_utils.resolve_prediction_overlap, _state.buffer, delete_count, text_to_type)
+		resolve_overlap, _state.buffer, delete_count, text_to_type)
 	if not ok_overlap or res_deletes == nil or res_text == nil then
 		Logger.error(LOG, "Prediction overlap resolution failed; output rejected before injection: %s",
 			tostring(ok_overlap and "invalid nil result" or res_deletes))
@@ -1860,6 +1866,19 @@ function M.request_manual_prediction()
 		return false
 	end
 	return engine.request_manual_prediction()
+end
+
+--- Runs a prediction now with a chosen prompt profile and count (the
+--- llm_prompt_prediction action and its presets). The engine logs and shows
+--- every refusal, an unknown prompt included.
+--- @param value string The binding's parameter: "<profile_id>" or "<profile_id>|<count>".
+--- @return boolean requested True when the engine accepted the request.
+function M.request_prompt_prediction(value)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Prompt prediction skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return engine.request_prompt_prediction(value)
 end
 
 --- Re-arms the LLM inactivity timer.
