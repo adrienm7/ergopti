@@ -46,7 +46,10 @@ local function build(opts)
 		report = function(result) ctx.reports[#ctx.reports + 1] = result; return true end,
 		open_log = function() ctx.opened = ctx.opened + 1; return false, true end,
 		close = function() ctx.closes = ctx.closes + 1 end,
-		log_path = function() return "/logs/ErgoptiPlus_2026-09-29.log" end,
+		log_path = function()
+			if opts.log_path_throws then error("no log sink") end
+			return "/logs/ErgoptiPlus_2026-09-29.log"
+		end,
 		log = function(level, message, ...) ctx.logs[#ctx.logs + 1] = { level = level, text = string.format(message, ...) } end,
 	})
 	return ctx
@@ -155,6 +158,20 @@ helpers.describe("updater.check_session: the update-check window's session", fun
 		ctx.session.on_message({ action = "open_log" })
 		helpers.assert_eq(ctx.opened, 1)
 		helpers.assert_eq(last(ctx), { type = "action", action = "open_log", ok = false, missing = true })
+	end)
+
+	helpers.it("logs why a failure shows no log path", function()
+		local ctx = build({ log_path_throws = true })
+		ctx.session.start()
+		ctx.checks[1].answer({ state = "error", channel = "dev", current = "v0.0.0-dev.144", others = {},
+			reason_key = "updater.no_connection", detail = "timed out" })
+		helpers.assert_eq(last(ctx).state, "error", "the failure is still shown")
+		helpers.assert_eq(last(ctx).log_path, "", "the page hides the log it cannot name")
+		local logged = false
+		for _, entry in ipairs(ctx.logs) do
+			if entry.level == "error" and entry.text:find("log path is unavailable", 1, true) then logged = true end
+		end
+		helpers.assert_true(logged, "the log says why the log line is missing")
 	end)
 
 	helpers.it("turns a refused or raising check into a visible failure", function()
