@@ -125,6 +125,9 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "llm_screen_full" })
 	Items.Push({ Kind: "action", Id: "llm_screen_error" })
 	Items.Push({ Kind: "action", Id: "llm_translate_selection" })
+	Items.Push({ Kind: "action", Id: "llm_agent_selection" })
+	Items.Push({ Kind: "action", Id: "llm_agent_command" })
+	Items.Push({ Kind: "action", Id: "llm_agent_auto_toggle" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.modifier_chords" })
 	Items.Push({ Kind: "modifier_chords", Level: 2, GroupKey: "sg_actions.sg_order.header.modifier_chord_group" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_media" })
@@ -234,6 +237,9 @@ GestureActionCatalogueData() {
 	Actions["line_end"] := { Family: "sg", LabelKey: "sg_actions.line_end", Parameter: "", Confirm: false }
 	Actions["line_start"] := { Family: "sg", LabelKey: "sg_actions.line_start", Parameter: "", Confirm: false }
 	Actions["line_up"] := { Family: "sg", LabelKey: "sg_actions.line_up", Parameter: "", Confirm: false }
+	Actions["llm_agent_auto_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_auto_toggle", Parameter: "", Confirm: false }
+	Actions["llm_agent_command"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_command", Parameter: "", Confirm: false }
+	Actions["llm_agent_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_selection", Parameter: "", Confirm: false }
 	Actions["llm_generate_prediction"] := { Family: "sg", LabelKey: "sg_actions.llm_generate_prediction", Parameter: "", Confirm: false }
 	Actions["llm_live_prompt_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_live_prompt_toggle", Parameter: "llm_prompt", Confirm: false }
 	Actions["llm_predict_advanced"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_advanced", Parameter: "", Confirm: false }

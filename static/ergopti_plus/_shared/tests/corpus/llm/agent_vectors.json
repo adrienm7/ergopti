@@ -205,6 +205,45 @@
 			"triage": {
 				"absent": true
 			}
+		},
+		{
+			"id": "no_choice_most_probable",
+			"response": {
+				"answers": {
+					"intent": {
+						"type": "choice",
+						"probabilities": {
+							"none": 0.2,
+							"calendar": 0.1,
+							"reminder": 0.05,
+							"mail": 0.64,
+							"shortcut": 0.01
+						},
+						"confidence": 0.6
+					}
+				}
+			},
+			"triage": {
+				"intent": "mail",
+				"probability": 0.64
+			}
+		},
+		{
+			"id": "wrong_type",
+			"response": {
+				"answers": {
+					"intent": {
+						"type": "noul",
+						"noul": 0.9,
+						"probabilities": {
+							"mail": 0.9
+						}
+					}
+				}
+			},
+			"triage": {
+				"absent": true
+			}
 		}
 	],
 	"should_act": [
@@ -522,7 +561,20 @@
 			}
 		},
 		{
-			"id": "mail",
+			"id": "shortcut",
+			"action": {
+				"type": "shortcut",
+				"name": "Mode focus"
+			},
+			"expected": {
+				"args": [
+					"Mode focus"
+				],
+				"key": "llm.agent.label.shortcut"
+			}
+		},
+		{
+			"id": "mail_to",
 			"action": {
 				"type": "mail",
 				"to": [
@@ -534,37 +586,36 @@
 			},
 			"expected": {
 				"args": [
-					"a@b.fr, c@d.fr",
-					"Devis"
+					"Devis",
+					"a@b.fr, c@d.fr"
 				],
-				"key": "llm.agent.label.mail"
+				"key": "llm.agent.label.mail_to"
 			}
 		},
 		{
-			"id": "mail_no_to",
+			"id": "mail_body_topic",
 			"action": {
 				"type": "mail",
-				"body": "x"
+				"body": "Bonjour Paul,\nVoici le devis."
 			},
 			"expected": {
 				"args": [
-					"",
-					""
+					"Bonjour Paul,"
 				],
 				"key": "llm.agent.label.mail"
 			}
 		},
 		{
-			"id": "shortcut",
+			"id": "mail_long_topic",
 			"action": {
-				"type": "shortcut",
-				"name": "Mode focus"
+				"type": "mail",
+				"body": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 			},
 			"expected": {
 				"args": [
-					"Mode focus"
+					"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé…"
 				],
-				"key": "llm.agent.label.shortcut"
+				"key": "llm.agent.label.mail"
 			}
 		}
 	],
@@ -679,6 +730,69 @@
 			"threshold": 0.93,
 			"accepted": false,
 			"threshold_after": 0.95
+		}
+	],
+	"resolve_model": [
+		{
+			"id": "provider_default",
+			"value": "cerebras",
+			"expected": {
+				"model": "qwen-3.8-27b"
+			}
+		},
+		{
+			"id": "named_model",
+			"value": "cerebras|llama-3.3-70b",
+			"expected": {
+				"model": "llama-3.3-70b"
+			}
+		},
+		{
+			"id": "local_default",
+			"value": "local",
+			"expected": {
+				"model": "qwen2.5:7b"
+			}
+		},
+		{
+			"id": "local_named",
+			"value": "local|qwen3:14b",
+			"expected": {
+				"model": "qwen3:14b"
+			}
+		},
+		{
+			"id": "compat_needs_model",
+			"value": "openai_compat",
+			"expected": {}
+		},
+		{
+			"id": "unknown_provider",
+			"value": "nope",
+			"expected": {}
+		},
+		{
+			"id": "off",
+			"value": "",
+			"expected": {}
+		}
+	],
+	"jev_questions": [
+		{
+			"id": "triage",
+			"questions": {
+				"intent": {
+					"criteria": {
+						"calendar": "A meeting or an event at a given time",
+						"mail": "An email to write or to send",
+						"none": "Plain conversation or anything that needs no action",
+						"reminder": "Something to remember or to do later",
+						"shortcut": "Running one of the user's named shortcuts"
+					},
+					"instructions": "Which action does the user's text ask for, or clearly imply?",
+					"type": "choice"
+				}
+			}
 		}
 	]
 }

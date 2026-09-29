@@ -38,6 +38,7 @@ local engine           = require("modules.llm.prediction_engine")
 local ToneRewrite      = require("modules.llm.tone_rewrite")
 local ScreenAnswer     = require("modules.llm.screen_answer")
 local SelectionTranslation = require("modules.llm.selection_translation")
+local AgentRunner      = require("modules.llm.agent_runner")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
@@ -596,6 +597,10 @@ function M.set_llm_max_words(w)             return engine.set_llm_max_words(w)  
 function M.set_llm_debounce(seconds)        return engine.set_llm_debounce(seconds)        end
 function M.set_llm_streaming(v)             return engine.set_llm_streaming(v)             end
 function M.set_llm_streaming_multi(v)       return engine.set_llm_streaming_multi(v)       end
+function M.set_llm_agent_system1(v)         return AgentRunner.set_system1(v)              end
+function M.set_llm_agent_system2(v)         return AgentRunner.set_system2(v)              end
+function M.set_llm_agent_mode(v)            return AgentRunner.set_mode(v)                 end
+function M.set_llm_agent_disabled_apps(apps) return AgentRunner.set_disabled_apps(apps)    end
 
 --- Sets the "chain LLM after hotstring" flag, owned here because
 --- update_preview() consumes it directly.
@@ -620,7 +625,9 @@ end
 function M.get_llm_runtime_setting(key)
 	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
 	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
-	return engine.get_llm_runtime_setting(key)
+	local found, value = engine.get_llm_runtime_setting(key)
+	if found then return found, value end
+	return AgentRunner.get_runtime_setting(key)
 end
 
 
@@ -698,6 +705,10 @@ function M.update_preview(buf)
 	-- revoke cursor-relative actions without defeating the user's keep-context
 	-- preference.
 	_state.llm_buffer = buf
+	-- The agent's automatic mode waits for a pause in the typing: every
+	-- keystroke drops what it had in flight and re-arms its own timer
+	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, buf)
+	if not agent_ok then Logger.error(LOG, "Agent typing observer raised: %s.", tostring(agent_error)) end
 
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
 	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
@@ -1499,6 +1510,7 @@ end
 function M.reset_predictions_for_pause()
 	-- A pause ends live mode: resuming must not redraw a translation unannounced
 	engine.stop_live_prompt("pause", true)
+	AgentRunner.cancel_typing("pause")
 	local deferred_settled = settle_prediction_deferred_handles()
 	local reset_committed = reset_predictions_impl(true, true, true)
 	return deferred_settled and reset_committed
@@ -1991,6 +2003,36 @@ function M.request_selection_translation(value, parent)
 		return false
 	end
 	return SelectionTranslation.run(value, parent)
+end
+
+--- Offers the actions the selection implies (the llm_agent_selection action).
+--- The agent logs and shows every refusal.
+--- @param parent string|nil Stable action parent of the text actions.
+--- @return boolean started True when the selection is being read.
+function M.request_agent_selection(parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Agent on the selection skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return AgentRunner.run_selection(parent)
+end
+
+--- Asks for a command and offers the actions it implies (the llm_agent_command
+--- action). The agent logs and shows every refusal.
+--- @return boolean started True when the command dialog is about to open.
+function M.request_agent_command()
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Agent command skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return AgentRunner.run_command()
+end
+
+--- Switches the agent between its automatic mode and "on action" (the
+--- llm_agent_auto_toggle action).
+--- @return boolean changed True when the mode changed.
+function M.toggle_agent_auto()
+	return AgentRunner.toggle_auto()
 end
 
 --- Re-arms the LLM inactivity timer.

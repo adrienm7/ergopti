@@ -67,7 +67,7 @@ _LLM_Menu_CoerceIniArray(raw) {
 }
 
 _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
-	global _LLM_Menu, Features
+	global _LLM_Menu, Features, LLM_AGENT_SETTING_KEYS
 	if !(MenuState is Map) {
 		if !IsSet(_LLM_Menu)
 			return false
@@ -97,6 +97,18 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	}
 	Validated["streaming"] := LLM_EffectiveStreaming(
 		Validated["backend"], Validated["streaming"])
+	; The AI agent's settings ride along once the menu state carries them
+	AgentValues := Map()
+	for Key in LLM_AGENT_SETTING_KEYS {
+		if !MenuState.Has(Key)
+			continue
+		if !LLM_Option_TryNormalize(Key, MenuState[Key], &Normalized) {
+			try LoggerError("LLM",
+				"Refusing to sync invalid option '{1}' into Features.", Key)
+			return false
+		}
+		AgentValues[Key] := Normalized
+	}
 	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated["val_modifiers"])
 	if !(ValModifiers is Array) {
 		try LoggerError("LLM",
@@ -127,6 +139,8 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["trigger"]["url_bar_filter_enabled"]  := Validated["disable_url_bars"]
 	llm["trigger"]["secure_filter_enabled"]   := Validated["disable_password_fields"]
 	llm["navigation"]["val_modifiers"]          := ValModifiers
+	for Key, Value in AgentValues
+		llm[Key] := Value
 	return true
 }
 
@@ -229,7 +243,7 @@ _LLM_Menu_LoadAppProfileOverridesFromCache(SavedOpts, Cache) {
 }
 
 LLM_Menu_BuildSavedOpts(Cache := unset) {
-	global Features
+	global Features, LLM_AGENT_SETTING_KEYS
 	opts := Map()
 	if !IsSet(Features) or !Features.Has("llm")
 		return opts
@@ -265,6 +279,10 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			Format("{:.2f}", TemperatureRaw + 0), "llm.generation.temperature")
 	else
 		_LLM_Menu_LogInvalidPersistedOption("llm.generation.temperature")
+	for Key in LLM_AGENT_SETTING_KEYS {
+		if llm.Has(Key)
+			_LLM_Menu_PutValidatedPersistedOption(opts, Key, llm[Key], "llm." . Key)
+	}
 	val_raw := llm["navigation"]["val_modifiers"]
 	ValModifiers := (val_raw is Array)
 		? _LLM_Menu_ModifiersArrayToString(val_raw)

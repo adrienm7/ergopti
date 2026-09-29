@@ -348,6 +348,19 @@ FSListDirectoryStrict(Path, Directories := false) {
 	return Entries
 }
 
+; Creates a directory, and its missing parents, when it does not exist.
+; @param Path {String} Absolute directory path.
+; @return {Boolean} True when it was created, false when it already existed.
+; @throws {Error} When it cannot be created.
+FSEnsureDirectoryStrict(Path) {
+	if !(Path is String) || Path == ""
+		throw ValueError("A directory creation requires a non-empty path.")
+	if DirExist(Path)
+		return false
+	DirCreate(Path)
+	return true
+}
+
 ; Deletes a file. Returns true if deleted or already absent, false on error.
 ; @param Path {String} Absolute path to the file to delete.
 ; @return {Boolean} True on success, false on error.

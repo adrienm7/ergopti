@@ -14,6 +14,10 @@
 --- Live mode (llm_live_prompt_toggle) redirects the automatic typing trigger to
 --- a chosen prompt, so a rewrite prompt shows the sentence translated or
 --- rewritten as it is typed; Tab accepts it. It owns no second pipeline.
+--- The AI agent (llm/agent.lua) offers actions as candidates of the same
+--- tooltip: System 2 reads the selection, a typed command or, in the automatic
+--- mode, the sentence System 1 flagged after a typing pause. Accepting one runs
+--- its connector (modules/llm/agent_connectors.lua); nothing is typed.
 --- ==============================================================================
 
 local M = {}
@@ -28,12 +32,16 @@ local PromptAction = require("llm.prompt_action")
 local Tone = require("llm.tone")
 local Vision = require("llm.vision")
 local Translate = require("llm.translate")
+local Agent = require("llm.agent")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
 local VisionRequest = require("modules.llm.vision_request")
 local Translation = require("modules.llm.translation")
+local AgentSettings = require("modules.llm.agent_settings")
+local AgentConnectors = require("modules.llm.agent_connectors")
+local AgentLearning = require("modules.llm.agent_learning")
 local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Inference = require("modules.llm.inference")
@@ -105,6 +113,28 @@ local _live_config = nil
 -- its live submenu's check marks.
 local _on_live_change = nil
 
+-- Injected by init() for the AI agent: the focused window's application and
+-- title (the request's context), a native text dialog (llm_agent_command), the
+-- clock and the system time zone.
+local _focused_window = nil
+local _ask_text = nil
+local function SYSTEM_CLOCK() return os.time() end
+local _now = SYSTEM_CLOCK
+local _timezone = AgentSettings.timezone
+-- The automatic mode's state. The pause timer runs after every keystroke; the
+-- generation, bumped by every keystroke, drops a stale triage; the triage in
+-- flight is withdrawn by the next keystroke. The sentences already triaged are
+-- never triaged again (a ring of the last AGENT_TRIAGED_MEMORY).
+local _agent_timer = nil
+local _agent_generation = 0
+local _agent_triage = nil
+local _agent_triaged = {}
+-- The application the user last typed in, for the menu's exclusion row
+local _agent_last_app = nil
+-- Arms the automatic mode's pause timer; defined in the agent section below,
+-- declared here so on_char, above it, binds this local and not a nil global.
+local arm_agent
+
 -- The reasons a manual request is refused, each with the locale key of the
 -- notice that tells the user. manual_refusal checks them in this order: a pause
 -- outranks everything, then the AI switch, then the backend, then the typed
@@ -137,6 +167,32 @@ local VISION_CAPTURE_FAILED_KEY = "llm.vision.capture_failed"
 local TRANSLATE_ACTION = "llm_translate_selection"
 local TRANSLATE_NO_SELECTION_KEY = "llm.translate.no_selection"
 local TRANSLATE_FAILED_KEY = "llm.translate.failed"
+
+-- The agent's actions, their notices, and the notice of each connector's success
+local AGENT_SELECTION_ACTION = "llm_agent_selection"
+local AGENT_COMMAND_ACTION = "llm_agent_command"
+local AGENT_AUTO_ACTION = "llm_agent_auto_toggle"
+local AGENT_KEYS = {
+	off = "llm.agent.off_notice",
+	no_system1 = "llm.agent.no_system1",
+	no_system2 = "llm.agent.no_system2",
+	no_selection = "llm.agent.no_selection",
+	no_action = "llm.agent.no_action",
+	failed = "llm.agent.failed",
+	connector_failed = "llm.agent.connector_failed",
+	auto_on = "llm.agent.auto_on",
+	auto_off = "llm.agent.auto_off",
+}
+local AGENT_DONE_KEYS = {
+	calendar = "llm.agent.done_calendar",
+	reminder = "llm.agent.done_reminder",
+	mail = "llm.agent.done_mail",
+	shortcut = "llm.agent.done_shortcut",
+}
+-- How many triaged sentences the automatic mode remembers
+local AGENT_TRIAGED_MEMORY = 32
+-- What the request's context names a time zone the system does not give
+local UNKNOWN_TIMEZONE = "unknown"
 
 -- The live mode's action, its notices and its shipped timing
 local LIVE_ACTION = "llm_live_prompt_toggle"
@@ -384,6 +440,10 @@ function M.init(opts)
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
 	_on_live_change = type(options.on_live_change) == "function" and options.on_live_change or nil
+	_focused_window = type(options.focused_window) == "function" and options.focused_window or nil
+	_ask_text = type(options.ask_text) == "function" and options.ask_text or nil
+	_now = type(options.now) == "function" and options.now or SYSTEM_CLOCK
+	_timezone = type(options.timezone) == "function" and options.timezone or AgentSettings.timezone
 	-- Live mode is a session state: every start begins with it off.
 	_live = nil
 	M.drop_vision("engine initialised")
@@ -394,6 +454,9 @@ function M.init(opts)
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
+	M.drop_agent_triage("engine initialised")
+	_agent_triaged = {}
+	_agent_last_app = nil
 	_scheduler = type(options.scheduler) == "table" and options.scheduler or TimerScheduler
 	-- The pacing clock must be the scheduler's: a test's virtual timers would
 	-- otherwise be measured against real time.
@@ -422,8 +485,11 @@ function M.on_char(ch, buffer, output_context)
 	M.drop_tone("typing")
 	-- The user went on typing: the screen answers would be dismissed at once.
 	M.drop_vision("typing")
+	-- A keystroke withdraws the agent's triage in flight and restarts its pause.
+	M.drop_agent_triage("typing")
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	arm_agent(buffer, output_context)
 	for _, trigger in ipairs(_triggers) do
 		if buffer:sub(-#trigger) == trigger then
 			local delay_ms = TriggerSettings.get("debounce_ms")
@@ -458,6 +524,8 @@ end
 function M.on_hotstring_expired(context, output_context)
 	if _scope_owner then return false end
 	if not _enabled then return false end
+	-- The automatic agent held its pause back while the preview was shown (on_char).
+	arm_agent(context, output_context)
 	-- Live mode held its request back while the preview was shown (on_char).
 	if not _live and TriggerSettings.get("after_hotstring") ~= true then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
@@ -923,6 +991,9 @@ function M.action_handlers()
 		handlers[action] = function(_, parameter) return M.read_screen(action, parameter) end
 	end
 	handlers[TRANSLATE_ACTION] = function(_, parameter) return M.translate_selection(parameter) end
+	handlers[AGENT_SELECTION_ACTION] = function() return M.agent_selection() end
+	handlers[AGENT_COMMAND_ACTION] = function() return M.agent_command() end
+	handlers[AGENT_AUTO_ACTION] = function() return M.toggle_agent_auto() end
 	for _, step in ipairs(TONE_DIRECTIONS) do
 		for _, cycle in ipairs({ false, true }) do
 			handlers[TONE_ACTION_PREFIX .. step.name .. (cycle and TONE_CYCLE_SUFFIX or "")] = function()
@@ -1202,16 +1273,18 @@ end
 --- @param what string What the log names the request.
 --- @param send function Called when the request may go.
 --- @param on_unpaced function Called when the pacing timer could not be armed.
-local function send_paced(epoch, what, send, on_unpaced)
+--- @param kind string|nil The backend kind ("ollama" or "api") the request goes
+---   to; nil for the AI menu's.
+local function send_paced(epoch, what, send, on_unpaced, kind)
 	if _scope_owner or epoch ~= _request_epoch then return end
-	local kind = M.get_backend()
+	kind = kind or M.get_backend()
 	local now = _clock_ms()
 	local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
 	if wait_ms > 0 then
 		_rate_timer = _scheduler.after(wait_ms / 1000, function()
 			if _scope_owner then return end
 			_rate_timer = nil
-			send_paced(epoch, what, send, on_unpaced)
+			send_paced(epoch, what, send, on_unpaced, kind)
 		end)
 		if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
 			_rate_timer = nil
@@ -1617,6 +1690,483 @@ function M.translate_selection(value)
 	return true
 end
 
+--- Fills the {1}, {2}… of a translated template with plain values: a value is
+--- data, never a pattern replacement.
+--- @param template string
+--- @param args table Array of values.
+--- @return string
+local function fill_args(template, args)
+	return (template:gsub("{(%d+)}", function(index)
+		local value = args[tonumber(index)]
+		if value == nil then return nil end
+		return tostring(value)
+	end))
+end
+
+--- The focused window's application name and title, "" when unknown. Both are
+--- private: sent in the agent's prompt, never logged.
+--- @return table { app, title }
+local function focused_window()
+	if not _focused_window then return { app = "", title = "" } end
+	local ok, info = pcall(_focused_window)
+	if not ok or type(info) ~= "table" then return { app = "", title = "" } end
+	return {
+		app = type(info.app) == "string" and info.app or "",
+		title = type(info.title) == "string" and info.title or "",
+	}
+end
+
+--- Counts the code points of a UTF-8 text.
+--- @param text string
+--- @return integer
+local function code_points(text)
+	local _, count = text:gsub("[%z\1-\127\194-\244][\128-\191]*", "")
+	return count
+end
+
+--- The System 1 transport: triages one sentence on a chat backend. A new
+--- backend kind (a triage API rather than a chat model) plugs in here and
+--- nowhere else. on_done(triage, err) is called once, unless the request is
+--- withdrawn (drop_agent_triage).
+--- @param chat table AgentSettings.chat_target() output.
+--- @param config table Decoded agent.json.
+--- @param sentence string The sentence being typed.
+--- @param ctx table { app, tools }
+--- @param on_done function
+local function system1_transport(chat, config, sentence, ctx, on_done)
+	local messages = {
+		{ role = "system", content = Agent.system1_prompt(config, ctx) },
+		{ role = "user", content = sentence },
+	}
+	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens), nil,
+		function(full_text, err)
+			if err then on_done(nil, err) return end
+			on_done(Agent.parse_system1(config, Parser.strip_thinking(full_text or "")), nil)
+		end)
+end
+
+--- The System 2 transport: sends one request for actions. A new backend kind
+--- plugs in here and nowhere else. on_done(raw, err) is called once, unless the
+--- offer's backend is cancelled (dismiss).
+--- @param chat table AgentSettings.chat_target() output.
+--- @param payload table { system, user, max_tokens }
+--- @param on_done function
+local function system2_transport(chat, payload, on_done)
+	_inflight_backend = chat.module
+	chat.module.chat(chat.target, chat.model, {
+		{ role = "system", content = payload.system },
+		{ role = "user", content = payload.user },
+	}, offer_request_opts(payload.max_tokens), nil, on_done)
+end
+
+--- Tells the user why an agent action cannot run, if it cannot: the pause,
+--- the AI switch, then the agent's mode. The agent does not use the AI menu's
+--- backend, so the menu's model refuses nothing here.
+--- @param what string What the log names the action.
+--- @return boolean refused
+local function agent_refused(what)
+	local reason = nil
+	if _is_paused() then reason = "paused" elseif not _enabled then reason = "disabled" end
+	if reason then
+		Logger.info(LOG, "%s refused (%s).", what, reason)
+		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+		return true
+	end
+	if AgentSettings.get_mode() == "off" then
+		Logger.info(LOG, "%s refused: the agent is off.", what)
+		show_notice(AGENT_KEYS.off, "agent_off")
+		return true
+	end
+	return false
+end
+
+--- System 2's chat target and agent.json, or nil after telling the user why.
+--- @param what string What the log names the action.
+--- @return table|nil chat, table|nil config
+local function system2_chat(what)
+	local config = AgentSettings.config()
+	if not config then return nil end
+	local chat, reason = AgentSettings.chat_target("system2")
+	if chat then return chat, config end
+	if reason == "off" or reason == "no_model" then
+		Logger.info(LOG, "%s refused: no System 2 is configured (%s).", what, reason)
+		show_notice(AGENT_KEYS.no_system2, "no_system2")
+	else
+		Logger.warn(LOG, "%s refused: System 2 cannot answer (%s).", what, tostring(reason))
+		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+	end
+	return nil
+end
+
+--- Carries out an accepted action and tells the user how it went.
+--- @param config table Decoded agent.json.
+--- @param action table A validated action.
+--- @return boolean accepted Always true: the connector owns the outcome.
+local function run_connector(config, action)
+	Logger.info(LOG, "Agent action accepted: %s.", action.type)
+	AgentConnectors.run(config, action, function(ok, reason)
+		if ok then
+			Logger.info(LOG, "Agent %s action done.", action.type)
+			local arg = action.type == "shortcut" and action.name or action.title
+			announce(fill_args(i18n.get(AGENT_DONE_KEYS[action.type]), { arg }), "agent " .. action.type .. " done")
+			return
+		end
+		Logger.error(LOG, "Agent %s action failed: %s", action.type, tostring(reason))
+		show_notice(AGENT_KEYS.connector_failed, "connector_failed")
+	end)
+	return true
+end
+
+--- Offers the actions of a System 2 answer, or tells the user why none is
+--- offered. The automatic mode stays silent: the user asked for nothing.
+--- @param epoch integer The offer's _request_epoch.
+--- @param meta table The tooltip's metadata.
+--- @param config table Decoded agent.json.
+--- @param tools table The tool names the request offered.
+--- @param quiet boolean The automatic mode's request.
+--- @param full_text string|nil The model's answer.
+--- @param err string|nil The backend's error.
+local function finish_agent(epoch, meta, config, tools, quiet, full_text, err)
+	if _scope_owner then return end
+	if epoch ~= _request_epoch then
+		Logger.info(LOG, "Agent answer ignored: a newer action or an edit superseded it.")
+		return
+	end
+	_predicting = false
+	_inflight_backend = nil
+	meta.loading = false
+	local function fail(key, reason)
+		clear_offer()
+		if not quiet then show_notice(key, reason) end
+	end
+	if _is_paused() or not _enabled then
+		Logger.info(LOG, "Agent answer dropped: the AI was paused or switched off while it ran.")
+		clear_offer()
+		return
+	end
+	if err then
+		Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+		return fail(AGENT_KEYS.failed, "failed")
+	end
+	local actions, rejected = Agent.parse_actions(config, Parser.strip_thinking(full_text or ""), Json.decode,
+		{ tools = tools, is_null = Json.is_null })
+	-- The reasons name fields and rules, never the user's text.
+	for _, reason in ipairs(rejected) do Logger.info(LOG, "Agent action refused: %s.", tostring(reason)) end
+	if not actions then
+		Logger.warn(LOG, "Agent answer dropped: no readable %s block (%d chars).", config.system2.tag, #(full_text or ""))
+		return fail(AGENT_KEYS.failed, "failed")
+	end
+	if #actions == 0 then
+		Logger.info(LOG, "Agent answer holds no action.")
+		return fail(AGENT_KEYS.no_action, "no_action")
+	end
+	local candidates = {}
+	for index, action in ipairs(actions) do
+		local key, args = Agent.label(action)
+		candidates[index] = {
+			deletes = 0,
+			to_type = fill_args(i18n.get(key), args),
+			-- Accepting runs the connector; nothing is typed.
+			on_accept = function() return run_connector(config, action) end,
+		}
+	end
+	Logger.info(LOG, "Agent actions on offer: %d (%d refused).", #candidates, #rejected)
+	show_candidates(candidates, meta)
+end
+
+--- Asks System 2 for the actions a text implies and offers them in the
+--- tooltip, each accepted on its own. A newer action, typing or Escape
+--- supersede it; a stale answer is dropped.
+--- @param source string "selection", "command" or "typing".
+--- @param text string The source text.
+--- @param opts table { chat, config, window?, auto? } auto = { app, intent } for
+---   the automatic mode, whose acceptance and dismissal are learnt.
+--- @return boolean requested
+local function run_agent(source, text, opts)
+	local config, chat = opts.config, opts.chat
+	local window = opts.window or focused_window()
+	local tools = AgentConnectors.tools(config)
+	local time = AgentSettings.time_context(_now())
+	local ok_zone, zone = pcall(_timezone)
+	local ctx = {
+		source = source, app = window.app, window = window.title, now = time.now, weekday = time.weekday,
+		timezone = (ok_zone and type(zone) == "string" and zone ~= "") and zone or UNKNOWN_TIMEZONE,
+		language = prompt_language(), tools = tools,
+	}
+	local action = source == "selection" and AGENT_SELECTION_ACTION
+		or source == "command" and AGENT_COMMAND_ACTION or AGENT_AUTO_ACTION
+	-- One offer at a time: a screen reading or a tone step in flight would
+	-- replace or rewrite what the actions are made from.
+	M.drop_vision("superseded")
+	M.drop_tone("superseded")
+	local label = source == "typing" and i18n.get("menu.agent.title") or i18n.get("sg_actions." .. action)
+	local epoch, meta = open_offer(action, label, chat.model, current_focus())
+	_suggestion_context.app_id = opts.auto and opts.auto.app or nil
+	_suggestion_context.agent = { source = source, auto = opts.auto, config = config }
+	local payload = {
+		system = Agent.system2_prompt(config, ctx),
+		user = Agent.system2_user_text(config, text),
+		max_tokens = config.system2.max_tokens,
+	}
+	-- The text, the window and the answer are the user's: only sizes are logged.
+	Logger.info(LOG, "Sending agent request (source=%s, backend=%s, model=%s, %d byte(s), %d tool(s)).",
+		source, chat.backend, chat.model, #text, #tools)
+	send_paced(epoch, "Agent request", function()
+		system2_transport(chat, payload, function(full_text, err)
+			finish_agent(epoch, meta, config, tools, source == "typing", full_text, err)
+		end)
+	end, function()
+		_predicting = false
+		clear_offer()
+		if source ~= "typing" then show_notice(AGENT_KEYS.failed, "failed") end
+	end, chat.kind)
+	return true
+end
+
+--- "What can I do with this?": the llm_agent_selection action. System 2 reads
+--- the selection and its actions are offered in the tooltip.
+--- @return boolean requested True when the request was started.
+function M.agent_selection()
+	if _scope_owner then return false end
+	if not _read_selection then
+		Logger.error(LOG, "Agent selection refused: no selection surface was injected.")
+		return false
+	end
+	-- Checked before the selection is read: a refused request sends no copy chord.
+	if agent_refused("Agent selection") then return false end
+	local chat, config = system2_chat("Agent selection")
+	if not chat then return false end
+	if _is_secure_context() then
+		Logger.debug(LOG, "Agent selection suppressed: secure field or excluded context.")
+		return false
+	end
+	local window = focused_window()
+	local read_ok, selection, read_err = _read_selection()
+	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
+		if read_ok or read_err == "no_selection" then
+			Logger.info(LOG, "Agent selection refused: nothing is selected.")
+			show_notice(AGENT_KEYS.no_selection, "no_selection")
+		else
+			Logger.warn(LOG, "Agent selection ignored: the selection could not be read (%s).", tostring(read_err))
+		end
+		return false
+	end
+	return run_agent("selection", selection, { chat = chat, config = config, window = window })
+end
+
+--- The llm_agent_command action: System 2 reads a command the user types in a
+--- dialog. Cancelling it, or confirming nothing, does nothing.
+--- @return boolean requested True when the request was started.
+function M.agent_command()
+	if _scope_owner then return false end
+	if not _ask_text then
+		Logger.error(LOG, "Agent command refused: no text dialog was injected.")
+		return false
+	end
+	if agent_refused("Agent command") then return false end
+	local chat, config = system2_chat("Agent command")
+	if not chat then return false end
+	if _is_secure_context() then
+		Logger.debug(LOG, "Agent command suppressed: secure field or excluded context.")
+		return false
+	end
+	-- Read before the dialog takes the focus: the context is where the user was.
+	local window = focused_window()
+	local ok, text = pcall(_ask_text, i18n.get("dialog.agent.command_title"), i18n.get("dialog.agent.command_prompt"))
+	if not ok then
+		Logger.error(LOG, "Agent command dialog failed: %s", tostring(text))
+		return false
+	end
+	if type(text) ~= "string" or not text:find("%S") then
+		Logger.info(LOG, "Agent command cancelled: nothing was typed.")
+		return false
+	end
+	return run_agent("command", text, { chat = chat, config = config, window = window })
+end
+
+--- Changes the agent's mode, from the menu or the toggle action. The automatic
+--- mode needs System 1 and System 2: without them it is refused with a notice
+--- and the mode stays as it was.
+--- @param mode string "off", "action" or "auto"
+--- @return boolean applied
+function M.set_agent_mode(mode)
+	if _scope_owner then return false end
+	if mode == "auto" then
+		if not AgentSettings.resolve("system1") then
+			Logger.info(LOG, "Automatic agent refused: no System 1 is configured.")
+			show_notice(AGENT_KEYS.no_system1, "no_system1")
+			return false
+		end
+		if not AgentSettings.resolve("system2") then
+			Logger.info(LOG, "Automatic agent refused: no System 2 is configured.")
+			show_notice(AGENT_KEYS.no_system2, "no_system2")
+			return false
+		end
+	end
+	local previous = AgentSettings.get_mode()
+	if previous == mode then return true end
+	if not AgentSettings.set_mode(mode) then return false end
+	if mode ~= "auto" then M.drop_agent_triage("automatic mode off") end
+	if mode == "auto" then
+		announce(i18n.get(AGENT_KEYS.auto_on), "agent auto on")
+	elseif previous == "auto" then
+		announce(i18n.get(AGENT_KEYS.auto_off), "agent auto off")
+	end
+	return true
+end
+
+--- The llm_agent_auto_toggle action: the automatic mode on or off ("auto" <->
+--- "action"; from "off" it turns the automatic mode on).
+--- @return boolean changed
+function M.toggle_agent_auto()
+	if _scope_owner then return false end
+	return M.set_agent_mode(AgentSettings.get_mode() == "auto" and "action" or "auto")
+end
+
+--- The application the user last typed in, for the menu's exclusion row.
+--- @return string|nil
+function M.get_agent_last_app()
+	return _agent_last_app
+end
+
+--- Withdraws the automatic mode's pause and its triage in flight, if any, and
+--- makes any answer to come stale. Called on every keystroke, so it logs only
+--- when a triage was actually in flight.
+--- @param reason string What the log names the cause.
+function M.drop_agent_triage(reason)
+	_agent_generation = _agent_generation + 1
+	if _agent_timer then
+		_scheduler.cancel(_agent_timer)
+		_agent_timer = nil
+	end
+	local triage = _agent_triage
+	if not triage then return end
+	_agent_triage = nil
+	if triage.chat.module.cancel() ~= true then Logger.error(LOG, "The agent's triage could not be withdrawn.") end
+	Logger.info(LOG, "Agent triage withdrawn (%s).", tostring(reason))
+end
+
+--- Reports whether another tooltip or AI request has the screen: the
+--- automatic agent never covers one.
+--- @return boolean
+local function agent_blocked()
+	return _live ~= nil or _predicting or #_suggestions > 0 or _vision_flow ~= nil or _tone_timer ~= nil
+		or _is_paused() or not _enabled or AgentSettings.get_mode() ~= "auto"
+end
+
+--- Remembers a triaged sentence, forgetting the oldest beyond the memory.
+--- @param sentence string
+local function remember_triaged(sentence)
+	_agent_triaged[#_agent_triaged + 1] = sentence
+	if #_agent_triaged > AGENT_TRIAGED_MEMORY then table.remove(_agent_triaged, 1) end
+end
+
+--- Reports whether a sentence was already triaged.
+--- @param sentence string
+--- @return boolean
+local function already_triaged(sentence)
+	for _, seen in ipairs(_agent_triaged) do if seen == sentence then return true end end
+	return false
+end
+
+--- The automatic mode's pause elapsed: triages the current sentence with
+--- System 1 and, above the learnt threshold of its intent in this application,
+--- asks System 2 for the actions.
+--- @param generation integer The keystroke generation the pause belongs to.
+--- @param buffer string The typing buffer.
+--- @param app string|nil The application typed in.
+local function agent_pause_elapsed(generation, buffer, app)
+	if _scope_owner or generation ~= _agent_generation or agent_blocked() then return end
+	if AgentSettings.is_app_disabled(app) then
+		Logger.debug(LOG, "Agent triage skipped: the application is excluded.")
+		return
+	end
+	local config = AgentSettings.config()
+	if not config then return end
+	-- Trimmed: a space typed after the sentence does not make it a new one.
+	local sentence = Rewrite.sentence_span(buffer):match("^%s*(.-)%s*$")
+	if code_points(sentence) < config.system1.min_chars or already_triaged(sentence) then return end
+	if _is_secure_context() then
+		Logger.debug(LOG, "Agent triage suppressed: secure field or excluded context.")
+		return
+	end
+	local system1, reason1 = AgentSettings.chat_target("system1")
+	local system2, reason2 = AgentSettings.chat_target("system2")
+	if not system1 or not system2 then
+		Logger.debug(LOG, "Agent triage skipped: System 1 (%s) or System 2 (%s) cannot answer.",
+			tostring(reason1 or "ready"), tostring(reason2 or "ready"))
+		return
+	end
+	-- The backends serve one request at a time: a triage never waits for one.
+	local wait_ms = (_last_request_ms[system1.kind] or -math.huge) + Inference.min_interval_ms(system1.kind)
+		- _clock_ms()
+	if wait_ms > 0 then
+		Logger.debug(LOG, "Agent triage skipped: the backend's minimum interval has not passed.")
+		return
+	end
+	_last_request_ms[system1.kind] = _clock_ms()
+	remember_triaged(sentence)
+	local window = focused_window()
+	local tools = AgentConnectors.tools(config)
+	local triage_state = { chat = system1 }
+	_agent_triage = triage_state
+	Logger.info(LOG, "Agent triage sent (backend=%s, model=%s, %d char(s)).", system1.backend, system1.model,
+		code_points(sentence))
+	system1_transport(system1, config, sentence, { app = window.app, tools = tools }, function(triage, err)
+		if _scope_owner then return end
+		if _agent_triage ~= triage_state or generation ~= _agent_generation then
+			Logger.info(LOG, "Agent triage ignored: typing superseded it.")
+			return
+		end
+		_agent_triage = nil
+		if err then
+			Logger.warn(LOG, "Agent triage failed: %s", tostring(err))
+			return
+		end
+		if not triage then
+			Logger.info(LOG, "Agent triage unreadable.")
+			return
+		end
+		local threshold = AgentLearning.threshold(config, app, triage.intent)
+		if not Agent.should_act(triage, threshold) then
+			Logger.info(LOG, "Agent triage: %s at %.2f, below %.2f.", triage.intent, triage.probability, threshold)
+			return
+		end
+		if agent_blocked() then
+			Logger.info(LOG, "Agent triage not followed: another tooltip or request has the screen.")
+			return
+		end
+		Logger.info(LOG, "Agent triage: %s at %.2f (threshold %.2f); asking System 2.", triage.intent,
+			triage.probability, threshold)
+		run_agent("typing", sentence, { chat = system2, config = config, window = window,
+			auto = { app = app, intent = triage.intent } })
+	end)
+end
+
+--- Arms the automatic mode's pause after a keystroke. Nothing while live mode
+--- runs or a hotstring preview is on screen: on_hotstring_expired re-arms it.
+--- @param buffer string The typing buffer.
+--- @param output_context table|nil { app_id, hotstring_preview_visible }
+arm_agent = function(buffer, output_context)
+	local app = type(output_context) == "table" and output_context.app_id or nil
+	if type(app) == "string" and app ~= "" then _agent_last_app = app end
+	if _live or type(buffer) ~= "string" or buffer == "" then return end
+	if type(output_context) == "table" and output_context.hotstring_preview_visible == true then return end
+	if AgentSettings.get_mode() ~= "auto" then return end
+	local config = AgentSettings.config()
+	if not config then return end
+	if _agent_timer then _scheduler.cancel(_agent_timer) end
+	local generation = _agent_generation
+	_agent_timer = _scheduler.after(config.system1.pause_ms / 1000, function()
+		_agent_timer = nil
+		agent_pause_elapsed(generation, buffer, app)
+	end)
+	if type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+		_agent_timer = nil
+		Logger.error(LOG, "The agent's typing pause could not be armed: timer unavailable.")
+	end
+end
+
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring
 --- buffer alone. For edits the caller has already applied to that buffer:
 --- Backspace and Escape update it precisely, and a reset here undid the edit.
@@ -1627,6 +2177,7 @@ function M.withdraw()
 	-- step was about to rewrite may be gone, and Escape cancels a screen action.
 	M.drop_tone("withdrawn")
 	M.drop_vision("withdrawn")
+	M.drop_agent_triage("withdrawn")
 	M.dismiss()
 end
 
@@ -1640,6 +2191,12 @@ end
 --- Dismisses in-flight and visible suggestions without changing the buffer.
 function M.dismiss()
 	if _scope_owner then return false end
+	-- An automatic suggestion on screen that goes without acceptance (Escape,
+	-- typing over it) raises its intent's threshold in that application.
+	local agent = _suggestion_context and _suggestion_context.agent or nil
+	if agent and agent.auto and #_suggestions > 0 then
+		AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, false)
+	end
 	_request_epoch = _request_epoch + 1
 	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
 	if _predicting and _inflight_backend then _inflight_backend.cancel() end
@@ -1656,7 +2213,16 @@ function M.accept(index)
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
 	local ok, committed
-	if candidate.replaces_selection then
+	if candidate.on_accept then
+		-- An agent action: its connector runs, nothing is typed.
+		ok, committed = pcall(candidate.on_accept)
+		if ok and committed == true then
+			local agent = _suggestion_context and _suggestion_context.agent or nil
+			if agent and agent.auto then AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, true) end
+			clear_offer()
+			return true
+		end
+	elseif candidate.replaces_selection then
 		-- A translation replaces the selection it was made from, left selected as
 		-- a tone step leaves it. Compared like a tone step's focus: in another
 		-- window the text would land where nothing was selected.
@@ -1715,15 +2281,26 @@ end
 function M.handle_shortcut(detail)
 	if _scope_owner then return false end
 	if type(detail) ~= "table" or not offer_visible() then return false end
-	-- Tab accepts live mode's rewrite, and only while its tooltip is on screen:
-	-- another offer, a modified Tab or no offer leave Tab to the application.
-	if detail.code == EvdevCodes.KEY_TAB then
-		if not (_suggestion_context and _suggestion_context.live) then return false end
+	-- Tab accepts live mode's rewrite or runs the selected agent action, and
+	-- only while that tooltip is on screen: another offer, a modified key or no
+	-- offer leave Tab to the application. Up and Down move the agent's selection.
+	local agent_offer = _suggestion_context ~= nil and _suggestion_context.agent ~= nil
+	local navigation = detail.code == EvdevCodes.KEY_UP and -1 or detail.code == EvdevCodes.KEY_DOWN and 1 or nil
+	if detail.code == EvdevCodes.KEY_TAB or (navigation and agent_offer) then
+		if not (_suggestion_context and (_suggestion_context.live or agent_offer)) then return false end
 		for _, held in pairs(type(detail.mods) == "table" and detail.mods or {}) do
 			if held then return false end
 		end
-		if not M.accept(1) then
-			Logger.warn(LOG, "Live rewrite could not be inserted — Tab is swallowed, nothing typed.")
+		if navigation then
+			if _overlay and type(_overlay.move) == "function" then _overlay.move(navigation) end
+			return true
+		end
+		local index = 1
+		if agent_offer and _overlay and type(_overlay.active_index) == "function" then
+			index = tonumber(_overlay.active_index()) or 1
+		end
+		if not M.accept(index) then
+			Logger.warn(LOG, "The offer could not be accepted — Tab is swallowed, nothing typed.")
 		end
 		return true
 	end
@@ -1976,6 +2553,7 @@ function M.quiesce_configuration(owner)
 	end
 	_tone_generation = _tone_generation + 1
 	M.drop_vision("configuration change")
+	M.drop_agent_triage("configuration change")
 	-- Backend connectivity probes share these owners, even when the prediction
 	-- engine did not start them. Model downloads have a separate HTTP owner.
 	local backends = { get_ollama(), get_remote() }
@@ -1994,7 +2572,7 @@ end
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
 	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
-		or _inflight_backend or _vision_flow then return nil end
+		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage then return nil end
 	return { enabled = _enabled }
 end
 

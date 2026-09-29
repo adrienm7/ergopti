@@ -389,7 +389,7 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // changing this list, in the same commit and on purpose.
 const APPROVED_TOP_LEVEL = [
 	'tap_holds', 'shortcuts', 'gestures', SEPARATOR,
-	'keyboard_layout', 'hotstrings', 'llm', SEPARATOR,
+	'keyboard_layout', 'hotstrings', 'llm', 'agent', SEPARATOR,
 	'metrics', 'apps', SEPARATOR,
 	'configuration', 'language', 'about', SEPARATOR,
 	'suspend', 'reload', 'quit', 'debug'

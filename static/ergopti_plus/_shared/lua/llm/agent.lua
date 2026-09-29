@@ -77,6 +77,24 @@ function M.system2_prompt(config, ctx)
 	})
 end
 
+--- Returns the model a parsed backend setting runs: the model it names, else
+--- the local default of agent.json for the local backend, else the provider's
+--- default_model in api_providers.json.
+--- @param parsed table|nil { backend, model } from llm.vision parse().
+--- @param config table Decoded agent.json.
+--- @param providers table Decoded api_providers.json.
+--- @return string|nil model Nil when the setting is off, unknown or has no model.
+function M.resolve_model(parsed, config, providers)
+	if type(parsed) ~= "table" then return nil end
+	if parsed.model then return parsed.model end
+	if parsed.backend == "local" then return config.default_models["local"] end
+	local provider = providers.providers[parsed.backend]
+	if type(provider) ~= "table" or type(provider.default_model) ~= "string" or provider.default_model == "" then
+		return nil
+	end
+	return provider.default_model
+end
+
 --- Returns the user turn of a System 2 request.
 --- @param config table Decoded agent.json.
 --- @param text string The source text.
@@ -111,33 +129,50 @@ function M.parse_system1(config, raw)
 	return { intent = intent, probability = probability }
 end
 
---- Returns the Jev choice question of the triage.
+--- Returns the Jev choice question of the triage, in the TypeSafe decisions
+--- shape: { [id] = { type = "choice", instructions, criteria = { label = description } } }.
 --- @param config table Decoded agent.json.
---- @return table questions { [question_id] = { type, instructions, options } }
+--- @return table questions
 function M.jev_questions(config)
-	local options = {}
-	for i, id in ipairs(config.intents) do options[i] = id end
-	return {
-		[config.system1.jev.question_id] = {
-			type = "choice", instructions = config.system1.jev.instructions, options = options,
-		},
-	}
+	local jev = config.system1.jev
+	local criteria = {}
+	for _, id in ipairs(config.intents) do criteria[id] = jev.criteria[id] end
+	return { [jev.question_id] = { type = "choice", instructions = jev.instructions, criteria = criteria } }
 end
 
---- Reads the triage out of a decoded Jev answer.
+--- Reads the triage out of the decoded answers of a Jev decision. The chosen
+--- label is the answer's `choice` when present, else the most probable one
+--- (ties go to the earlier intent).
+--- @param config table Decoded agent.json.
+--- @param answers table|nil The `answers` object of the decision.
+--- @return table|nil triage { intent, probability }, nil when unreadable.
+function M.parse_jev_answers(config, answers)
+	local answer = type(answers) == "table" and answers[config.system1.jev.question_id] or nil
+	if type(answer) ~= "table" or (answer.type ~= nil and answer.type ~= "choice") then return nil end
+	local probabilities = answer.probabilities
+	if type(probabilities) ~= "table" then return nil end
+	local choice = answer.choice
+	if choice == nil then
+		local best = -1
+		for _, id in ipairs(config.intents) do
+			local p = probabilities[id]
+			if type(p) == "number" and p > best then choice, best = id, p end
+		end
+	end
+	local known = false
+	for _, id in ipairs(config.intents) do if id == choice then known = true end end
+	if not known then return nil end
+	local probability = probabilities[choice]
+	if type(probability) ~= "number" or probability < 0 or probability > 1 then return nil end
+	return { intent = choice, probability = probability }
+end
+
+--- Reads the triage out of a decoded Jev decision response.
 --- @param config table Decoded agent.json.
 --- @param response table The decoded response body.
 --- @return table|nil triage { intent, probability }, nil when unreadable.
 function M.parse_jev(config, response)
-	local answers = type(response) == "table" and response.answers or nil
-	local answer = type(answers) == "table" and answers[config.system1.jev.question_id] or nil
-	if type(answer) ~= "table" or type(answer.choice) ~= "string" then return nil end
-	local known = false
-	for _, id in ipairs(config.intents) do if id == answer.choice then known = true end end
-	if not known then return nil end
-	local probability = type(answer.probabilities) == "table" and answer.probabilities[answer.choice] or nil
-	if type(probability) ~= "number" or probability < 0 or probability > 1 then return nil end
-	return { intent = answer.choice, probability = probability }
+	return M.parse_jev_answers(config, type(response) == "table" and response.answers or nil)
 end
 
 --- Reports whether a triage should wake System 2.
@@ -346,6 +381,9 @@ function M.parse_actions(config, raw, decode, opts)
 	return actions, rejected
 end
 
+-- Longest topic, in code points, a mail label shows before an ellipsis
+local LABEL_TOPIC_MAX = 60
+
 --- Returns the locale key and arguments of an action's tooltip label.
 --- @param action table A validated action.
 --- @return string key, table args
@@ -357,7 +395,15 @@ function M.label(action)
 		if action.due then return "llm.agent.label.reminder_due", { action.title, when(action.due) } end
 		return "llm.agent.label.reminder", { action.title }
 	elseif action.type == "mail" then
-		return "llm.agent.label.mail", { action.to and table.concat(action.to, ", ") or "", action.subject or "" }
+		-- A draft without a subject is named by the start of its body
+		local topic = action.subject or action.body:match("^[^\r\n]*")
+		if utf8_length(topic) > LABEL_TOPIC_MAX then
+			topic = topic:match("^" .. ("[%z\1-\127\194-\244][\128-\191]*"):rep(LABEL_TOPIC_MAX)) .. "…"
+		end
+		if action.to and #action.to > 0 then
+			return "llm.agent.label.mail_to", { topic, table.concat(action.to, ", ") }
+		end
+		return "llm.agent.label.mail", { topic }
 	end
 	return "llm.agent.label.shortcut", { action.name }
 end

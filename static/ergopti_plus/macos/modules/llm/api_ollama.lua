@@ -1726,31 +1726,34 @@ function M.request_raw(model_name, system_prompt, full_text, tail_text, temperat
 		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw, force_chat)
 end
 
---- Posts one prebuilt vision request body (llm/vision.lua build_request, format
+--- Posts one prebuilt request body (llm/vision.lua build_request, format
 --- "ollama") to the local server's /api/chat, whatever backend the AI menu uses
---- for text. The body carries a screenshot: neither it nor the answer is logged.
+--- for text. The body carries private text or a screenshot: neither it nor the
+--- answer is logged.
+--- @param client table The HTTP client that posts it.
+--- @param label string What is requested, for the log ("Vision", "Agent").
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
-function M.request_vision(body, on_text, on_fail)
+local function request_prebuilt(client, label, body, on_text, on_fail)
 	if type(body) ~= "table" or type(on_text) ~= "function" or type(on_fail) ~= "function" then
-		error("api_ollama.request_vision: a body, on_text and on_fail are required")
+		error("api_ollama." .. label .. " request: a body, on_text and on_fail are required")
 	end
 	local encoded, encode_error = JsonCodec.encode(body)
 	if not encoded then
-		Logger.error(LOG, "Vision request body encode failed: %s.", tostring(encode_error))
+		Logger.error(LOG, "%s request body encode failed: %s.", label, tostring(encode_error))
 		ApiCommon.protected_call(on_fail, "on_fail", "encode_failed")
 		return
 	end
 	local t0 = TimerScheduler.now()
-	Logger.info(LOG, "Vision request to the local server (model %s, %d byte(s)).", tostring(body.model), #encoded)
-	_vision_client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+	Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, tostring(body.model), #encoded)
+	client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 				if r.status ~= 200 then
-					Logger.error(LOG, "Vision request to the local server failed in %dms: HTTP %s (%s).",
-						ms, tostring(r.status), tostring(r.error or ""))
+					Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
+						label, ms, tostring(r.status), tostring(r.error or ""))
 					ApiCommon.protected_call(on_fail, "on_fail", "http_" .. tostring(r.status or "unknown"))
 					return
 				end
@@ -1759,14 +1762,32 @@ function M.request_vision(body, on_text, on_fail)
 					and resp.message.content or nil
 				local text = type(content) == "string" and Parser.strip_thinking(content) or ""
 				if text == "" then
-					Logger.warn(LOG, "Vision answer of the local server holds no text (%dms).", ms)
+					Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
 					ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
 					return
 				end
-				Logger.info(LOG, "Vision answer of the local server received in %dms (%d char(s)).", ms, #text)
+				Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
 				ApiCommon.protected_call(on_text, "on_text", text)
 			end)
 		end)
+end
+
+--- Posts one prebuilt vision request body (a screenshot and its prompt) to the
+--- local server.
+--- @param body table The request body.
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+function M.request_vision(body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Vision", body, on_text, on_fail)
+end
+
+--- Posts one prebuilt text chat body (no image) to the local server: the AI
+--- agent's System 1 and System 2 requests on the "local" backend.
+--- @param body table The request body.
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+function M.request_chat(body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Agent", body, on_text, on_fail)
 end
 
 --- Dispatches multiple sequential API requests.

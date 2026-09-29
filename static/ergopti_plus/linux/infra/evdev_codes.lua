@@ -97,11 +97,14 @@ M.MODIFIER_OF = {
 --- Codes named individually because something synthesises them rather than only
 --- recognising them. The injector emits Backspace to erase a trigger, so it
 --- needs the number, and a second literal 14 in that file is the duplication
---- this module exists to prevent.
+--- this module exists to prevent. Up and Down are named for the prediction
+--- engine, which moves the agent tooltip's selection with them.
 M.KEY_BACKSPACE = 14
 M.KEY_TAB       = 15
 M.KEY_ENTER     = 28
 M.KEY_ESC       = 1
+M.KEY_UP        = 103
+M.KEY_DOWN      = 108
 
 --- Codes the domain wants by name. A key absent from this table and absent from
 --- the layout produces nothing, which is correct: it is a key this driver has no
@@ -112,8 +115,8 @@ M.CONTROL_NAME_OF = {
 	[M.KEY_ENTER]     = "enter",
 	[96]  = "enter",       -- keypad Enter, same meaning to the domain
 	[M.KEY_ESC]       = "escape",
-	[103] = "up",
-	[108] = "down",
+	[M.KEY_UP]        = "up",
+	[M.KEY_DOWN]      = "down",
 	[105] = "left",
 	[106] = "right",
 	[102] = "home",

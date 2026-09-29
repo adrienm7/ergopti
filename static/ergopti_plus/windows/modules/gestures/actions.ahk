@@ -248,6 +248,18 @@ global GESTURE_ACTIONS := Map(
 		"llm_translate_selection", {
 				Fn: (BindingId := "") => GestureTranslateSelection(BindingId),
 		},
+		; The AI agent: actions proposed for the selection or for a typed
+		; command, and its automatic mode switched on or back to "on action".
+		; Each shows its own refusals.
+		"llm_agent_selection", {
+				Fn: (*) => LLM_Agent_TriggerSelection(),
+		},
+		"llm_agent_command", {
+				Fn: (*) => LLM_Agent_TriggerCommand(),
+		},
+		"llm_agent_auto_toggle", {
+				Fn: (*) => LLM_Agent_ToggleAuto(),
+		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
 		; when the action is triggered via a gesture slot instead.

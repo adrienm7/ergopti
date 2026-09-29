@@ -38,6 +38,13 @@
  *    replays the shared translate corpus, the llm_language kind is validated,
  *    prompted and sent to the picker, and an accepted translation is selected
  *    again by the bridge's completion.
+ * 9. The AI agent's port (modules/llm/agent.ahk), its connectors and its
+ *    actions are included after the translation and before the gesture actions
+ *    registered from them, its test replays the shared agent corpus, the
+ *    bridge feeds the typing to its automatic mode and runs an accepted
+ *    candidate's own handler instead of typing, the tray builds its top-level
+ *    submenu, its settings ride the AI menu's persistence, every COM and
+ *    process call goes through the adapters and a mail is never sent.
  *
  * ROOT CAUSE ENCODED:
  * A module that no runner includes, or a list restated by hand, fails silently
@@ -130,7 +137,19 @@ for (const [label, list, prefix] of [
 		translate > visionAction && translateAction > translate && gestures > translateAction,
 		`${label} must include translate.ahk, then translate_action.ahk, after vision_action.ahk and before the gesture actions`
 	);
+	const agent = position(list, `${prefix}modules/llm/agent.ahk`);
+	const agentConnectors = position(list, `${prefix}modules/llm/agent_connectors.ahk`);
+	const agentAction = position(list, `${prefix}modules/llm/agent_action.ahk`);
+	check(
+		agent > translateAction && agentConnectors > agent && agentAction > agentConnectors && gestures > agentAction,
+		`${label} must include agent.ahk, agent_connectors.ahk, then agent_action.ahk after the translation and before the gesture actions`
+	);
 }
+check(
+	includesOf(read('ui/menu/menu_llm/_index.ahk')).includes('menu_agent.ahk') &&
+		runAll.includes('../ui/menu/menu_llm/menu_agent.ahk'),
+	'the AI agent submenu must be included by the AI menu index and by the AHK suite'
+);
 check(
 	position(bench, '../modules/llm/rewrite.ahk') >= 0 &&
 		position(bench, '../modules/llm/rewrite.ahk') < position(bench, '../modules/llm/parser.ahk'),
@@ -145,6 +164,7 @@ const TESTS = {
 	'unit/test_llm_tone.ahk': 'tone_vectors.json',
 	'unit/test_llm_vision.ahk': 'vision_vectors.json',
 	'unit/test_llm_translate.ahk': 'translate_vectors.json',
+	'unit/test_llm_agent.ahk': 'agent_vectors.json',
 	'unit/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
@@ -425,6 +445,79 @@ check(
 	picker.includes('_ActPickWeb_Kv("llm_language"') &&
 		bodyOf(picker, '_ActPickWeb_LanguageChoicesJson').includes('LLM_Translate_ShippedChoices()'),
 	'the picker host must send the llm_language prompt, refusal and the shipped choices'
+);
+
+// 9. The AI agent.
+for (const id of ['llm_agent_selection', 'llm_agent_command', 'llm_agent_auto_toggle']) {
+	check(actions.includes(`"${id}", {`), `${id} must be a registered gesture action`);
+}
+const agentPort = read('modules/llm/agent.ahk');
+const agentAction = read('modules/llm/agent_action.ahk');
+const agentConnectors = read('modules/llm/agent_connectors.ahk');
+const agentMenu = read('ui/menu/menu_llm/menu_agent.ahk');
+for (const name of [
+	'LLM_Agent_System1Prompt', 'LLM_Agent_System2Prompt', 'LLM_Agent_ResolveModel', 'LLM_Agent_ParseSystem1',
+	'LLM_Agent_ParseJev', 'LLM_Agent_JevQuestions', 'LLM_Agent_ParseActions', 'LLM_Agent_Label',
+	'LLM_Agent_Ics', 'LLM_Agent_Mailto', 'LLM_Agent_Learn'
+]) {
+	check(bodyOf(agentPort, name) !== '', `agent.ahk must port ${name}`);
+}
+check(
+	['LLM_Bridge_OnChar', 'LLM_Bridge_OnBackspace'].every((name) =>
+		bodyOf(bridge, name).includes('LLM_Agent_OnTyping(_LLM_Bridge_Buffer)')),
+	'every typed character and Backspace must reach the agent\'s automatic mode'
+);
+check(
+	bridge.includes('Handler := _LLM_Bridge_AcceptedSlotHandler(Transaction)') &&
+		bodyOf(bridge, '_LLM_Bridge_AcceptedSlotHandler').includes('"OnAccept"'),
+	'an accepted candidate with its own handler must run it instead of typing'
+);
+check(
+	bodyOf(agentAction, '_LLM_Agent_Show').includes('OnAccept: _LLM_Agent_Accept.Bind(Flow, Action)'),
+	'each agent candidate must carry its own accept handler'
+);
+check(
+	bodyOf(agentAction, '_LLM_Agent_ManualRefusal').includes('LLM_Menu_ManualPredictionRefusal(') &&
+		bodyOf(agentAction, 'LLM_Agent_TriggerSelection').includes('LLM_SelectionReader()'),
+	'the agent must apply the manual-prediction refusals and read the selection like the tone ladder'
+);
+check(
+	(agentAction.match(/_LLM_Agent_Chat\(/g) || []).length === 3 &&
+		bodyOf(agentAction, 'LLM_Agent_System1Request').includes('_LLM_Agent_Chat(') &&
+		bodyOf(agentAction, 'LLM_Agent_System2Request').includes('_LLM_Agent_Chat('),
+	'System 1 and System 2 must each have one transport function, the only callers of the agent\'s chat sender'
+);
+check(
+	bodyOf(agentAction, '_LLM_Agent_OnPause').includes('_LLM_Agent_Auto["triaged"].Has(Sentence)') &&
+		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('LLM_Engine_LiveIsActive()') &&
+		bodyOf(agentAction, '_LLM_Agent_OnPause').includes('SFD_IsSecureField()'),
+	'the automatic mode must skip a triaged sentence, live mode and secure fields'
+);
+check(
+	bodyOf(agentAction, '_LLM_Agent_LearningState').includes('ST_Get') &&
+		bodyOf(agentAction, '_LLM_Agent_SaveLearning').includes('ST_Set'),
+	'the learned thresholds must live in the local state store, not config.toml'
+);
+for (const [source, label] of [[agentAction, 'agent_action.ahk'], [agentConnectors, 'agent_connectors.ahk'],
+	[agentMenu, 'menu_agent.ahk']]) {
+	check(
+		!/\bComObject\(|\bRun\(|\bRunWait\(|\bFileOpen\(|\bFileAppend\(|\bFileDelete\(|\bDllCall\(/.test(source),
+		`${label} must reach COM, processes and files through windows/adapters`
+	);
+}
+check(
+	!/\.Send\(/.test(agentConnectors) && bodyOf(agentConnectors, '_LLM_AgentConnector_Mail').includes('Item.Display()'),
+	'a mail must only ever be displayed as a draft, never sent'
+);
+check(
+	read('ui/menu/menu_init.ahk').includes('"agent",           _MI_StageAgent') &&
+		bodyOf(agentMenu, 'LLM_Agent_MenuBuild').includes('MenuRenderer_Build("agent_menu"'),
+	'the tray must build the top-level agent row from the manifest agent_menu'
+);
+check(
+	bodyOf(read('ui/menu/menu_llm/persist.ahk'), '_LLM_Menu_SyncToFeatures').includes('LLM_AGENT_SETTING_KEYS') &&
+		bodyOf(read('ui/menu/menu_llm/persist.ahk'), 'LLM_Menu_BuildSavedOpts').includes('LLM_AGENT_SETTING_KEYS'),
+	'the agent settings must ride the AI menu persistence both ways'
 );
 
 if (errors.length > 0) {

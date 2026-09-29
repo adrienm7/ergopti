@@ -223,6 +223,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "AI agent files",
+			stop = function()
+				-- The calendar files handed to xdg-open, and the learnt thresholds.
+				require("modules.llm.agent_connectors").cleanup()
+				require("modules.llm.agent_learning").flush()
+			end,
+		},
+		{
 			name = "LLM model download",
 			stop = function()
 				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
@@ -1124,6 +1132,17 @@ local function main()
 				local info = window_info.getFocused()
 				return (info.appId or "") .. "\1" .. (info.windowTitle or "")
 			end or nil,
+			-- The AI agent's context: the application and the window title the
+			-- user is in, read live like focus_id.
+			focused_window = window_info and function()
+				local info = window_info.getFocused()
+				return { app = info.appId or "", title = info.windowTitle or "" }
+			end or nil,
+			-- llm_agent_command asks for the command in a zenity entry.
+			ask_text = function(title, prompt)
+				if opts.dry_run then return nil end
+				return require("ui.text_prompt").ask(title, prompt, "")
+			end,
 			-- The screen actions capture to a private file with the screenshot
 			-- actions' tools; the engine reads and deletes it.
 			capture_screen = function(mode, max_edge, on_done)

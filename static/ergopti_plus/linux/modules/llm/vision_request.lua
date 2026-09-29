@@ -94,12 +94,17 @@ function M.config()
 	return _config
 end
 
---- The vision backends a binding may name, for the binding editors: the local
---- server first, then the API providers in catalogue order.
+--- The backends a binding or a setting may name, for the editors: the local
+--- server first, then the API providers in catalogue order. The screen actions
+--- use vision.json's default models; the agent passes agent.json's.
+--- @param default_models table|nil backend -> default model; nil for vision.json's.
 --- @return table Array of { value, label, defaultModel } ("" when the backend has no default).
-function M.backend_choices()
-	local config = M.config()
-	local defaults = config and config.default_models or {}
+function M.backend_choices(default_models)
+	local defaults = default_models
+	if defaults == nil then
+		local config = M.config()
+		defaults = config and config.default_models or {}
+	end
 	local choices = { {
 		value = Vision.LOCAL_BACKEND,
 		label = require("infra.i18n").get("llm.vision.local_backend"),
@@ -121,10 +126,11 @@ end
 -- =========================================
 
 --- The API entry holding the user's key for a provider: the active entry when
---- it is that provider's, else the first one added.
+--- it is that provider's, else the first one added. The agent's backends are
+--- reached with the same key.
 --- @param provider_id string
 --- @return table|nil entry
-local function entry_for(provider_id)
+function M.entry_for(provider_id)
 	local Entries = require("modules.llm.api_entries")
 	local active = Entries.active()
 	if type(active) == "table" and active.provider == provider_id then return active end
@@ -149,7 +155,7 @@ function M.resolve_target(backend, model)
 	end
 	local Remote = require("modules.llm.api_remote")
 	if not Remote.provider(backend) then return nil, "unknown provider " .. backend end
-	local entry = entry_for(backend)
+	local entry = M.entry_for(backend)
 	if not entry then return nil, "no API key is stored for " .. backend end
 	return Remote.endpoint(entry, model)
 end

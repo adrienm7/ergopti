@@ -93,6 +93,7 @@ graph TD
         MACOS_system_info["SystemInfo.lua"]
         MACOS_task_environment["TaskEnvironment.lua"]
         MACOS_task_lifecycle["TaskLifecycle.lua"]
+        MACOS_tcc_grant["TccGrant.lua"]
         MACOS_text_sender["TextSender.lua"]
         MACOS_timer_scheduler["TimerScheduler.lua"]
         MACOS_toml_cache["TomlCache.lua"]

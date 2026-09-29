@@ -1883,18 +1883,23 @@ function M.provider_format(provider_id)
 	return provider and provider.format or nil
 end
 
---- Posts one prebuilt vision request body to a provider with its stored API
---- key, through the same URL, header and answer rules as a prediction. The
---- body carries a screenshot: neither it nor the answer is ever logged.
+--- Posts one prebuilt request body to a provider with its stored API key,
+--- through the same URL, header and answer rules as a prediction. The body
+--- carries private text or a screenshot: neither it nor the answer is ever
+--- logged.
+--- @param client table The HTTP client that posts it.
+--- @param label string What is requested, for the log ("Vision", "Agent").
 --- @param provider_id string Provider id of api_providers.json.
---- @param model string The vision model (Gemini puts it in the URL).
+--- @param model string The model (Gemini puts it in the URL).
 --- @param body table The request body (llm/vision.lua build_request).
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
+--- @param with_extras boolean|nil Merge the model's model_extras of
+---        api_providers.json into an OpenAI-shape body, as a prediction does.
 --- @return boolean sent True when the key resolution started.
-function M.request_vision(provider_id, model, body, on_text, on_fail)
+local function request_prebuilt(client, label, provider_id, model, body, on_text, on_fail, with_extras)
 	if type(on_text) ~= "function" or type(on_fail) ~= "function" then
-		error("api_remote.request_vision: on_text and on_fail must be functions")
+		error("api_remote." .. label .. " request: on_text and on_fail must be functions")
 	end
 	local function fail(reason)
 		ApiCommon.protected_call(on_fail, "on_fail", reason)
@@ -1902,64 +1907,99 @@ function M.request_vision(provider_id, model, body, on_text, on_fail)
 	end
 	local ready, reason = M.vision_provider_status(provider_id)
 	if not ready then
-		Logger.error(LOG, "Vision request refused for provider '%s': %s.", tostring(provider_id), tostring(reason))
+		Logger.error(LOG, "%s request refused for provider '%s': %s.", label, tostring(provider_id), tostring(reason))
 		return fail(reason)
 	end
 	if type(model) ~= "string" or model == "" or type(body) ~= "table" then
-		error("api_remote.request_vision: a model and a body are required")
+		error("api_remote." .. label .. " request: a model and a body are required")
 	end
 	local provider = M.PROVIDERS[provider_id]
 	local entry = find_provider_entry(provider_id)
+	local extras = with_extras and provider.format == "openai" and provider.model_extras
+		and provider.model_extras[model] or nil
+	if extras then
+		-- A reasoning model left at its default effort spends a small budget
+		-- thinking and answers nothing; the body's own fields win
+		for field, value in pairs(extras) do
+			if body[field] == nil then body[field] = value end
+		end
+	end
 	TokenCrypto.decrypt_async(entry.token, function(decrypted, token, token_reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
-			Logger.error(LOG, "Vision request for provider '%s' has no usable key (entry '%s'): %s.",
-				provider_id, tostring(entry.id), tostring(token_reason))
+			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
+				label, provider_id, tostring(entry.id), tostring(token_reason))
 			fail("missing_token")
 			return
 		end
 		local base, base_error = resolve_base_url(entry, provider)
 		if not base then
-			log_endpoint_refusal("vision", entry, base_error)
+			log_endpoint_refusal(label:lower(), entry, base_error)
 			fail("invalid_endpoint")
 			return
 		end
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then
-			log_endpoint_refusal("vision", entry, url_error)
+			log_endpoint_refusal(label:lower(), entry, url_error)
 			fail("invalid_endpoint")
 			return
 		end
 		local encoded, encode_error = JsonCodec.encode(body)
 		if not encoded then
-			Logger.error(LOG, "Vision request body encode failed: %s.", tostring(encode_error))
+			Logger.error(LOG, "%s request body encode failed: %s.", label, tostring(encode_error))
 			fail("encode_failed")
 			return
 		end
 		local t0 = TimerScheduler.now()
-		Logger.info(LOG, "Vision request to provider '%s' (model %s, %d byte(s)) -> %s.",
-			provider_id, model, #encoded, redact_url(url))
-		_vision_client.post(url, build_headers(provider.format, token), encoded, function(r)
+		Logger.info(LOG, "%s request to provider '%s' (model %s, %d byte(s)) -> %s.",
+			label, provider_id, model, #encoded, redact_url(url))
+		client.post(url, build_headers(provider.format, token), encoded, function(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 				if not r.ok then
-					Logger.error(LOG, "Vision request to provider '%s' failed in %dms: HTTP %s (%s).",
-						provider_id, ms, tostring(r.status), tostring(extract_server_message(r.body) or r.error or ""))
+					Logger.error(LOG, "%s request to provider '%s' failed in %dms: HTTP %s (%s).",
+						label, provider_id, ms, tostring(r.status), tostring(extract_server_message(r.body) or r.error or ""))
 					fail("http_" .. tostring(r.status or "unknown"))
 					return
 				end
 				local text = Parser.strip_thinking(ResponseClassifier.classify(provider.format, r.body).text)
 				if type(text) ~= "string" or text == "" then
-					Logger.warn(LOG, "Vision answer of provider '%s' holds no text (%dms).", provider_id, ms)
+					Logger.warn(LOG, "%s answer of provider '%s' holds no text (%dms).", label, provider_id, ms)
 					fail("empty_answer")
 					return
 				end
-				Logger.info(LOG, "Vision answer of provider '%s' received in %dms (%d char(s)).",
-					provider_id, ms, #text)
+				Logger.info(LOG, "%s answer of provider '%s' received in %dms (%d char(s)).",
+					label, provider_id, ms, #text)
 				ApiCommon.protected_call(on_text, "on_text", text)
 			end)
 		end)
 	end)
 	return true
+end
+
+--- Posts one prebuilt vision request body (a screenshot and its prompt) to a
+--- provider with its stored API key.
+--- @param provider_id string Provider id of api_providers.json.
+--- @param model string The vision model.
+--- @param body table The request body (llm/vision.lua build_request).
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+--- @return boolean sent True when the key resolution started.
+function M.request_vision(provider_id, model, body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Vision", provider_id, model, body, on_text, on_fail)
+end
+
+--- Posts one prebuilt text chat body (llm/vision.lua build_request without an
+--- image) to a provider with its stored API key: the AI agent's System 1 and
+--- System 2 requests, which name their own backend whatever the AI menu uses.
+--- The model's model_extras apply, as they do to a prediction.
+--- @param provider_id string Provider id of api_providers.json.
+--- @param model string The model.
+--- @param body table The request body.
+--- @param on_text function Receives the answer text, thinking blocks stripped.
+--- @param on_fail function Receives a short reason when no answer came back.
+--- @return boolean sent True when the key resolution started.
+function M.request_chat(provider_id, model, body, on_text, on_fail)
+	return request_prebuilt(_vision_client, "Agent", provider_id, model, body, on_text, on_fail, true)
 end
 
 --- Sends the shared minimal probe (api_providers.json test_request, verbatim)

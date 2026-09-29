@@ -329,22 +329,24 @@ _LLM_Vision_OnCaptured(Flow, Ok, Reason := "") {
 ; ===========================
 ; ===========================
 
-; Resolves where the vision request goes.
-; @param {String} Backend The binding's backend id.
-; @param {String} Model The vision model.
+; Resolves where a request to a named backend goes: the screen reading's vision
+; request, and the AI agent's System 1 and System 2 requests.
+; @param {String} Backend The backend id: "local" or an API provider.
+; @param {String} Model The model the request runs.
+; @param {String} Caller The feature asking, for the log.
 ; @returns {Map|String} Map("format"[, "resolved", "url"]), "" when the backend
 ;     is an unknown provider or has no API entry with a key.
-_LLM_Vision_ResolveTarget(Backend, Model) {
+_LLM_Vision_ResolveTarget(Backend, Model, Caller := "Screen reading") {
 	global LLM_VISION_LOCAL_BACKEND, LLM_API_PROVIDERS
 	if (Backend == LLM_VISION_LOCAL_BACKEND)
 		return Map("format", "ollama")
 	if !LLM_API_PROVIDERS.Has(Backend) {
-		LoggerWarn("LLM", "Screen reading refused: '{1}' is not an API provider.", Backend)
+		LoggerWarn("LLM", "{1} refused: '{2}' is not an API provider.", Caller, Backend)
 		return ""
 	}
 	Entry := _LLM_Vision_ProviderEntry(Backend)
 	if !IsObject(Entry) {
-		LoggerWarn("LLM", "Screen reading refused: no API entry is configured for '{1}'.", Backend)
+		LoggerWarn("LLM", "{1} refused: no API entry is configured for '{2}'.", Caller, Backend)
 		return ""
 	}
 	; The entry lends its address and key; the model is the vision one
@@ -353,8 +355,8 @@ _LLM_Vision_ResolveTarget(Backend, Model) {
 		Candidate[Field] := _LLMRemoteEntryGet(Entry, Field, "")
 	Resolved := _LLMRemoteResolveEntry(Candidate)
 	if !(Resolved is Map) {
-		LoggerWarn("LLM", "Screen reading refused: the API entry for '{1}' has no usable key or address.",
-			Backend)
+		LoggerWarn("LLM", "{1} refused: the API entry for '{2}' has no usable key or address.",
+			Caller, Backend)
 		return ""
 	}
 	return Map(
@@ -385,17 +387,22 @@ _LLM_Vision_ProviderEntry(ProviderId) {
 	return First
 }
 
-; Sends a caller-written body to a vision target: the local server or a provider.
+; Sends a caller-written body to a target: the local server or a provider.
 ; @param {Map} Target _LLM_Vision_ResolveTarget's record.
 ; @param {String} Body The JSON body.
 ; @param {Func} OnSuccess Called with the answer text.
 ; @param {Func} OnFail Called on failure.
-_LLM_Vision_Send(Target, Body, OnSuccess, OnFail) {
+; @param {Boolean} CancelEngine Whether a pending or in-flight prediction gives
+;     way: every request the user asked for; the AI agent's automatic triage,
+;     which the user did not ask for, leaves the prediction running.
+_LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine := true) {
 	global _LLM_Engine, _LLM_Vision_RemoteTransport, _LLM_Vision_OllamaTransport
 	; A pending or in-flight prediction would hold the backend's slot
-	LLM_Engine_CancelTimer()
-	LLM_Engine_CancelInflight()
-	_LLM_Engine["last_request_tick"] := A_TickCount
+	if CancelEngine {
+		LLM_Engine_CancelTimer()
+		LLM_Engine_CancelInflight()
+		_LLM_Engine["last_request_tick"] := A_TickCount
+	}
 	if Target.Has("resolved") {
 		Transport := HasMethod(_LLM_Vision_RemoteTransport, "Call")
 			? _LLM_Vision_RemoteTransport : LLM_RemotePostBody_Async

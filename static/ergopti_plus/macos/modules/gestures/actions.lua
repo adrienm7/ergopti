@@ -1184,6 +1184,27 @@ sg("llm_translate_selection", function(binding)
 	end
 	return keymap.request_selection_translation(value, current_action_parent())
 end)
+-- The AI agent (llm_agent_selection / llm_agent_command / llm_agent_auto_toggle):
+-- its settings are the AI agent menu's, so the bindings carry no parameter; the
+-- keymap bridge hands them to modules/llm/agent_runner.lua, which logs and shows
+-- every refusal.
+local AGENT_ACTIONS = {
+	{ id = "llm_agent_selection", bridge = "request_agent_selection", parent = true },
+	{ id = "llm_agent_command", bridge = "request_agent_command" },
+	{ id = "llm_agent_auto_toggle", bridge = "toggle_agent_auto" },
+}
+for _, agent_action in ipairs(AGENT_ACTIONS) do
+	local spec = agent_action
+	sg(spec.id, function()
+		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		if not ok_keymap or type(keymap) ~= "table" or type(keymap[spec.bridge]) ~= "function" then
+			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
+			return false
+		end
+		if spec.parent then return keymap[spec.bridge](current_action_parent()) end
+		return keymap[spec.bridge]()
+	end)
+end
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then

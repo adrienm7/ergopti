@@ -42,7 +42,18 @@ the fix). `translate.ahk` ports `_shared/lua/llm/translate.lua` (the
 reader, pinned to `translate_vectors.json`) and `translate_action.ahk` runs
 `llm_translate_selection`: the selection is translated by the AI menu's backend
 and offered as one candidate, which replaces the selection when accepted and
-stays selected. `prediction_live.ahk` owns live mode
+stays selected. `agent.ahk` ports `_shared/lua/llm/agent.lua` (the AI agent's prompts, the
+System 1 triage, the validation of System 2's actions, the iCalendar and
+mailto payloads and the threshold learning, pinned to `agent_vectors.json`);
+`agent_action.ahk` runs `llm_agent_selection`, `llm_agent_command`,
+`llm_agent_auto_toggle` and the automatic mode (`llm.agent_mode = "auto"`: a
+typing pause, System 1, then System 2 above the threshold learned per
+application and intent, kept in the Storage adapter), and offers each proposed
+action as a tooltip candidate whose acceptance runs its connector in
+`agent_connectors.ahk` (Outlook through COM, else an .ics file or a mailto:
+link; the user's tools of `<config dir>/agent_tools/`). The tray's top-level
+AI agent submenu is `ui/menu/menu_llm/menu_agent.ahk`.
+`prediction_live.ahk` owns live mode
 (`llm_live_prompt_toggle` and the AI menu's live mode submenu): while it is on,
 the automatic typing trigger runs its prompt and count through the same
 prompt-override request path, with the debounce and minimum word count of

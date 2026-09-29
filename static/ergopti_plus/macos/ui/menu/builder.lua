@@ -568,6 +568,20 @@ function M.generate(ctx, menu_mods, actions)
 			Logger.debug(LOG, "AI component added successfully.")
 			return llm_item and { llm_item } or {}
 		end,
+		["agent"]           = function()
+			-- The AI agent's settings share the AI menu's transaction owner, so
+			-- its handler builds this row too.
+			if type(ctx.llm_handler) ~= "table" or type(ctx.llm_handler.build_agent_item) ~= "function" then
+				Logger.warn(LOG, "LLM handler missing or incomplete — AI agent component ignored.")
+				return {}
+			end
+			local ok_b, agent_item = pcall(ctx.llm_handler.build_agent_item)
+			if not ok_b then
+				Logger.error(LOG, string.format("Error building the AI agent component: %s.", tostring(agent_item)))
+				return {}
+			end
+			return agent_item and { agent_item } or {}
+		end,
 		["metrics"]         = function() return module_rows("keylogger") end,
 		-- The shortcuts submodule surfaces the edit-shortcuts callback, so it gets
 		-- the actions on top of the context.
