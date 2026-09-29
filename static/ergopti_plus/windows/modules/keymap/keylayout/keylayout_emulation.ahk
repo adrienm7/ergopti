@@ -156,14 +156,17 @@ _KLE_BaseCriterion(Sc, Shift, *) {
 	return KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift)
 }
 
-; The magic key is a general feature, never part of the emulated layout: once
-; the user turned a key into it, that key's unshifted level belongs to the
-; magic-key remap (modules/keymap/layout.ahk) whatever layout is emulated, as
-; the independent digit row belongs to its own override. Shift, AltGr and the
-; shortcut chords keep the emulated layout's characters.
+; The magic key is an Ergopti feature tied to the layout that declares it: when
+; the active layout declares its key (the built-in Ergopti emulation) or the
+; user chose one, that key's unshifted level belongs to the magic-key remap
+; (modules/keymap/layout.ahk), as the independent digit row belongs to its own
+; override. An emulated layout that declares none, such as Ergo-L, keeps its
+; own character there. Shift, AltGr and the shortcut chords always keep the
+; emulated layout's characters.
 _KLE_MagicKeyOwnsKey(Sc) {
 	global Features, ScriptInformation
-	return Sc == ScriptInformation["MagicKeySourceScan"]
+	return ScriptInformation["MagicKeySourceOverridesEmulation"]
+		&& Sc == ScriptInformation["MagicKeySourceScan"]
 		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"]
 }
 

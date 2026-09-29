@@ -35,6 +35,10 @@ global ScriptInformation := Map(
 		; Whether the boot took the source key from the OS layout, so a switch of
 		; OS layout can move it (LayoutRemapSignature); decided at boot.
 		"MagicKeySourceFollowsOsLayout", false,
+		; Whether an emulated layout yields the magic key's unshifted level to it:
+		; only for a key the user chose or the active layout declares, so an
+		; emulated layout declaring none keeps its own character; decided at boot.
+		"MagicKeySourceOverridesEmulation", false,
 		; Manual override for the AltGr-as-Kana / custom-remap detection. Default
 		; false here is overwritten by HotstringEngineInit() which auto-detects via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when

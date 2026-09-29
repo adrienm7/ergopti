@@ -468,14 +468,17 @@ _KLT_MagicKeySourceOrderCase() {
 	AssertEqual("SC031", Chosen["scan"], "the user's key wins over the layout's declaration")
 	AssertEqual("user", Chosen["origin"])
 	AssertFalse(Chosen["follows_os_layout"])
+	AssertTrue(Chosen["overrides_emulation"], "a chosen key is the magic key on any layout")
 	AssertEqual(0, Probe.Calls, "a configured key is never replaced by a detection")
 	Declared := Resolve(Map("declared", "Semicolon", "emulated", true))
 	AssertEqual("SC027", Declared["scan"], "the declared KeyboardEvent.code reaches its scan code")
 	AssertEqual("layout", Declared["origin"])
+	AssertTrue(Declared["overrides_emulation"], "the declaring layout yields its key to the magic key")
 	AssertEqual(0, Probe.Calls)
 	Emulated := Resolve(Map("emulated", true))
 	AssertEqual("SC02E", Emulated["scan"], "an emulated layout without declaration keeps the default key")
 	AssertFalse(Emulated["follows_os_layout"], "and never follows the OS layout it replaces")
+	AssertFalse(Emulated["overrides_emulation"], "a layout declaring no magic key keeps its own character")
 	AssertEqual(0, Probe.Calls, "the OS layout an emulation replaces is never probed")
 	Detected := Resolve(Map())
 	AssertEqual("SC024", Detected["scan"], "the user's own layout is probed for the source character")
@@ -518,14 +521,14 @@ _KLT_MagicKeyDeclarationCase() {
 		"a damaged record is logged and declares nothing")
 }
 
-Test("magic key: an emulated layout leaves the magic key's unshifted level to the remap (layout-magic-key)",
+Test("magic key: only a declared or chosen key takes an emulated layout's unshifted level (layout-magic-key)",
 	() => _KLT_WithEmulation(_KLT_MagicKeyYieldCase))
 
 _KLT_MagicKeyYieldCase() {
 	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, ScriptInformation
 	State := MasterGateState()
 	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
-		ScriptInformation["MagicKeySourceScan"]]
+		ScriptInformation["MagicKeySourceScan"], ScriptInformation["MagicKeySourceOverridesEmulation"]]
 	try {
 		Replace := Map("enabled", true)
 		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
@@ -542,7 +545,10 @@ _KLT_MagicKeyYieldCase() {
 			(Name, *) => Capture.Rows[Name] := Capture.Criterion,
 			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
 		ScriptInformation["MagicKeySourceScan"] := "SC02E"
-		AssertFalse(Capture.Rows["SC02E"].Call(), "the magic key's unshifted level is the remap's")
+		ScriptInformation["MagicKeySourceOverridesEmulation"] := false
+		AssertTrue(Capture.Rows["SC02E"].Call(), "Ergo-L declares no magic key: its '-' stays on that key")
+		ScriptInformation["MagicKeySourceOverridesEmulation"] := true
+		AssertFalse(Capture.Rows["SC02E"].Call(), "a declared or chosen key's unshifted level is the remap's")
 		AssertTrue(Capture.Rows["+SC02E"].Call(), "Shift keeps the emulated layout's character")
 		AssertTrue(Capture.Rows["SC138 & SC02E"].Call(), "AltGr keeps the emulated layout's character")
 		AssertTrue(Capture.Rows["SC010"].Call(), "every other key stays with the emulation")
@@ -563,6 +569,7 @@ _KLT_MagicKeyYieldCase() {
 		for Key, Value in Saved[5]
 			State[Key] := Value
 		ScriptInformation["MagicKeySourceScan"] := Saved[6]
+		ScriptInformation["MagicKeySourceOverridesEmulation"] := Saved[7]
 	}
 }
 
