@@ -43,10 +43,10 @@ function M.new(options)
 		files = options.files or require("adapters.file_system"), manifest = Manifest,
 		capture = capture,
 		apply = function(config, updates)
-			local values, state = Preferences.resolve(config), capture()
-			if not state then return false end
 			local touched = {}
 			for _, operation in ipairs(updates) do touched[operation.section .. "." .. operation.key] = true end
+			local values, state = Preferences.resolve(config, nil, touched), capture()
+			if not state then return false end
 			for key in pairs(state.collector) do
 				local path = "metrics." .. key
 				if touched[path] then state.collector[key] = values[path] end

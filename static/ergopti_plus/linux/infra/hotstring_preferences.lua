@@ -28,6 +28,7 @@ local LeafRows = require("toml_codec.leaf_rows")
 local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 
 local LOG = "infra.hotstring_preferences"
 
@@ -82,29 +83,46 @@ local function segments(path)
 	return parts
 end
 
---- Reads one owned leaf, refusing a path that crosses a scalar.
+--- Reads one owned leaf without judging it.
 --- @param document table
 --- @param path string
---- @return any
-local function lookup(document, path)
-	local value = document
+--- @return any value The stored value, nil when absent or unusable.
+--- @return string|nil outdated Path of the unusable entry: the leaf itself
+---   (wrong type) or the scalar its path crosses (`[hotstrings] dynamic = true`).
+--- @return string|nil detail Why that entry is outdated.
+local function inspect(document, path)
+	local value, walked = document, {}
 	for _, key in ipairs(segments(path)) do
 		if value == nil then return nil end
-		assert(type(value) == "table", "hotstring preference path crosses a scalar: " .. path)
+		if type(value) ~= "table" then
+			return nil, table.concat(walked, "."), "a table of settings is expected here"
+		end
+		walked[#walked + 1] = key
 		value = value[key]
+	end
+	if value ~= nil and type(value) ~= _owned[path] then
+		return nil, path, "the value is not a " .. _owned[path]
 	end
 	return value
 end
 
---- Validates every owned leaf of a decoded document.
+--- Reads one owned leaf. An unusable entry an older build or a hand edit left
+--- is outdated configuration for that leaf alone: warned once and read as
+--- absent (its neutral default), while every other leaf keeps its value.
+--- @param document table
+--- @param path string
+--- @return any value
+local function lookup(document, path)
+	local value, outdated, detail = inspect(document, path)
+	if outdated then ConfigOutdated.report(outdated, detail, Logger) end
+	return value
+end
+
+--- Checks the shape of a decoded document; owned leaves are judged one by one.
 --- @param document table
 --- @return table document
 local function validate(document)
 	assert(type(document) == "table", "hotstring preferences are malformed")
-	for path, kind in pairs(_owned) do
-		local value = lookup(document, path)
-		assert(value == nil or type(value) == kind, "hotstring preference has the wrong type: " .. path)
-	end
 	return document
 end
 
@@ -184,7 +202,9 @@ function M.paths()
 	return copy
 end
 
---- Marks the owned leaves a document sets, through the same validation as the reader.
+--- Marks the owned leaves a document sets, through the same reading as the
+--- reader: an outdated leaf is reported and left unmarked, so the cleanup
+--- offers it.
 --- @param document table Decoded config.toml.
 --- @param mark function mark(...segments).
 function M.mark_config_reads(document, mark)
@@ -292,7 +312,18 @@ end
 --- @return boolean adopted
 function M.adopt(owner, document)
 	if _scope_owner ~= owner then return false end
-	local ok, validated = pcall(validate, document)
+	local ok, validated = pcall(function()
+		validate(document)
+		-- The scope wrote every owned leaf: one of the wrong type is its own
+		-- output, a real failure. An unusable parent it does not own (an
+		-- older build's `dynamic = true`) stays outdated configuration.
+		for path in pairs(_owned) do
+			local _, outdated, detail = inspect(document, path)
+			assert(outdated ~= path, "hotstring preference has the wrong type: " .. path)
+			if outdated then ConfigOutdated.report(outdated, detail, Logger) end
+		end
+		return document
+	end)
 	if not ok then
 		Logger.error(LOG, "Candidate hotstring preferences were refused: %s.", tostring(validated))
 		return false
