@@ -14,9 +14,8 @@
 		{
 			"source": "static/img",
 			"target": "img",
-			"reason": "Only the images the driver opens: the menu bar and notification logos (ui/menu/init.lua, infra/notifications.lua) and the onboarding layout preview (ui/onboarding/init.lua). The other images belong to the website and the Windows onboarding flags.",
+			"reason": "Only the images the driver opens: the menu bar and notification logos (ui/menu/init.lua, infra/notifications.lua). The other images belong to the website and the Windows onboarding flags.",
 			"only": [
-				"ergopti.jpg",
 				"logo/logo_black.png",
 				"logo/logo_simple.png",
 				"logo/logo_simple_disabled.png",
