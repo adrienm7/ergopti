@@ -407,8 +407,9 @@ local function open_window(record)
 		close(session)
 		return false
 	end
-	-- show() without a focus request: the window floats above the user's work
-	-- and waits; the keyboard stays where the user was typing
+	-- show() without a focus request: the window is ordered front at the normal
+	-- level and waits; the keyboard stays where the user was typing, and the
+	-- next window the user opens covers it
 	local ok_show, show_err = xpcall(function() return webview:show() end, debug.traceback)
 	if not ok_show or show_err == nil or show_err == false then
 		Logger.error(LOG, "The error window could not be shown: %s.", tostring(show_err))

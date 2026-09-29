@@ -82,17 +82,22 @@ check(
 );
 
 check(
-	'UI Builder: default level is floating',
+	'UI Builder: every window chrome applies the normal level',
 	'static/ergopti_plus/macos/ui/ui_builder.lua',
-	// The level is one of the shared window chrome steps every window applies.
-	/local level = opts\.level or hs\.drawing\.windowLevels\.floating[\s\S]*wv:level\(level\)/
+	// Windows are focused when they open, never kept above other apps.
+	/local level = hs\.drawing\.windowLevels\.normal[\s\S]*wv:level\(level\)/
 );
 
-// Check Changelog Fix
-check(
-	'Changelog: explicitly set level to floating',
+checkNegative(
+	'UI Builder: no bringToFront, which sets a floating or screen-saver level',
+	'static/ergopti_plus/macos/ui/ui_builder.lua',
+	/:bringToFront\(/
+);
+
+checkNegative(
+	'Changelog: sets no window level',
 	'static/ergopti_plus/macos/ui/changelog/init.lua',
-	/level\s*=\s*hs\.drawing\.windowLevels\.floating/
+	/windowLevels\.floating/
 );
 
 // Check Dialog Util Fix

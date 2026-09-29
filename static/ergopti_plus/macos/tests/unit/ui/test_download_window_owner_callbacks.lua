@@ -61,13 +61,14 @@ helpers.describe("download window exact native owners", function()
 			helpers.assert_true(window.show({ kind = "mlx_install" }))
 			local native = records.windows[1]
 			local focused = 0
-			function native:bringToFront() return self end
+			function native:bringToFront() error("bringToFront pins the window above other apps") end
+			function native:show() return self end
 			function native:hswindow()
 				return { focus = function() focused = focused + 1 end }
 			end
 			helpers.assert_true(window.focus())
 			helpers.assert_eq(focused, 1)
-			function native:bringToFront()
+			function native:show()
 				helpers.assert_true(window.show({ kind = "ollama_install" }))
 				return self
 			end
@@ -84,6 +85,7 @@ helpers.describe("download window exact native owners", function()
 			native.opts.on_navigation("didFinishNavigation")
 			local focus_calls = 0
 			function native:bringToFront() focus_calls = focus_calls + 1 end
+			function native:show() focus_calls = focus_calls + 1 end
 			function native:hswindow() focus_calls = focus_calls + 1 end
 			records.delete_throws = true
 			helpers.assert_eq(window.hide(), false)

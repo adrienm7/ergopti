@@ -9,7 +9,9 @@
 local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
-local boundaries = { "show", "bringToFront", "application", "hswindow", "raise", "focus" }
+-- bringToFront is absent on purpose: it sets a floating or screen-saver level
+-- instead of raising the window (ui-focus-not-topmost).
+local boundaries = { "show", "application", "hswindow", "raise", "focus" }
 
 helpers.describe("metrics native presentation", function()
 	for _, refused in ipairs({ false, true }) do
@@ -101,9 +103,9 @@ helpers.describe("metrics native presentation", function()
 					for _, name in ipairs({ "raise", "focus" }) do
 						win[name] = function(self) invoke(name); return self end
 					end
-					for _, name in ipairs({ "show", "bringToFront" }) do
-						state.view[name] = function(self) invoke(name); return self end
-					end
+					state.view.show = function(self) invoke("show"); return self end
+					state.view.bringToFront = function() error("bringToFront pins a window level") end
+					state.view.level = function() error("a window level must never change on presentation") end
 					state.view.hswindow = function() invoke("hswindow"); return win end
 					hs.focus = function() invoke("application") end
 					pending[1]()

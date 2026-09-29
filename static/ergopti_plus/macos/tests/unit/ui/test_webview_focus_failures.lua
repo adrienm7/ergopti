@@ -65,10 +65,12 @@ local function with_focus(mode, scenario)
 				if mode:find("schedule", 1, true) or mode == "fallback" or mode == "async" then return nil end
 				return window
 			end,
-			bringToFront = function(self)
+			show = function(self)
 				if mode == "fallback" or mode == "async" then error("private native error") end
 				return self
 			end,
+			bringToFront = function() error("bringToFront sets a window level") end,
+			level = function() error("presentation must never change the window level") end,
 		}
 		package.loaded["ui.ui_builder"] = nil
 		local lifecycle = { is_current = function()

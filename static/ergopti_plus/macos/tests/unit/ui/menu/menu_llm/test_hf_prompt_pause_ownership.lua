@@ -235,7 +235,7 @@ local function with_fixture(options, callback)
 					return { frame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end }
 				end,
 			},
-			drawing = { windowLevels = { floating = 1 } },
+			drawing = { windowLevels = { normal = 0, floating = 1 } },
 		}
 
 		local Mixin = helpers.load_with_stubs(

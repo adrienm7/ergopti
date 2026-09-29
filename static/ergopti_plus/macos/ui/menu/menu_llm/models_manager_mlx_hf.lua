@@ -829,7 +829,6 @@ function M.install(ctx)
 				frame             = frame,
 				title             = i18n.get("mlx.hf_login_title"),
 				style_masks       = { "titled", "closable", "nonactivating" },
-				level             = hs.drawing.windowLevels.floating,
 				allow_text_entry  = true,
 				allow_new_windows = false,
 				usercontent       = ucc,

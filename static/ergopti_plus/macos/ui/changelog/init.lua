@@ -507,7 +507,6 @@ local function build_window(channel, opening_generation, focus_owner)
 		frame             = frame,
 		title             = title,
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
-		level             = hs.drawing.windowLevels.floating,
 		allow_text_entry  = false,
 		allow_new_windows = false,
 		usercontent       = _ucc,

@@ -43,12 +43,10 @@ local MANIFEST_RETRY_DELAY_SEC = 0.15
 local MANIFEST_RETRY_LIMIT = 60
 local PREFILL_RETRY_DELAY_SEC = 0.10
 local PREFILL_RETRY_LIMIT = 50
-local STARTUP_FOCUS_STEPS = {
-	{ delay = 0.05, above_everything = true },
-	{ delay = 0.15, above_everything = true },
-	{ delay = 0.35, above_everything = true },
-	{ delay = 0.70, above_everything = false },
-}
+-- The new dashboard is raised and focused again while WebKit materializes its
+-- window. Each step only presents it: none sets a level, so any window the user
+-- opens afterwards covers the dashboard as it would cover any other app.
+local STARTUP_FOCUS_DELAYS_SEC = { 0.05, 0.15, 0.35, 0.70 }
 
 M._wv             = nil
 M._startup_webview = nil
@@ -802,7 +800,12 @@ local function with_live_active_app_duration(manifest)
 	return projected
 end
 
-local function raise_now(generation, wv, above_everything)
+--- Presents the dashboard: shows it, activates Hammerspoon, then raises and
+--- focuses its window. It never sets a window level.
+--- @param generation integer Window generation.
+--- @param wv table Exact webview owner.
+--- @return boolean presented
+local function raise_now(generation, wv)
 	local function invoke(category, callback)
 		if not is_current_window(generation, wv) then return false end
 		local ok, result = pcall(callback)
@@ -813,7 +816,6 @@ local function raise_now(generation, wv, above_everything)
 		return is_current_window(generation, wv), result
 	end
 	if not invoke("show", function() wv:show() end) then return false end
-	if not invoke("bring to front", function() wv:bringToFront(above_everything) end) then return false end
 	if not invoke("application focus", hs.focus) then return false end
 	local ok, win = invoke("window lookup", function() return wv:hswindow() end)
 	if not ok then return false end
@@ -1082,10 +1084,10 @@ function M.show()
 				or ("webview acquisition: " .. tostring(webview_or_err)))
 	end
 
-	for index, step in ipairs(STARTUP_FOCUS_STEPS) do
-		if not schedule_continuation(step.delay, generation, webview,
+	for index, delay in ipairs(STARTUP_FOCUS_DELAYS_SEC) do
+		if not schedule_continuation(delay, generation, webview,
 			function()
-				if _focus_owner == focus_owner then raise_now(generation, webview, step.above_everything) end
+				if _focus_owner == focus_owner then raise_now(generation, webview) end
 			end,
 			string.format("Apps dashboard focus step %d", index))
 		then
@@ -1111,7 +1113,7 @@ function M.show()
 	end
 
 	M._wv = webview
-	if not raise_now(generation, webview, true) then
+	if not raise_now(generation, webview) then
 		if not is_current_window(generation, webview) then return false end
 		close_window_generation(generation, webview, true, "native presentation failure")
 		return false
