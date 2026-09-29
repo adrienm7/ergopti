@@ -66,6 +66,22 @@ run in CI, so logger readiness, refusals and even child death went unobserved
 (run 35661113100: the keyless package red, the keyed one green). Every package
 the gate judges must embed the public key.
 
+### project-macos-bundle-payload-is-declared
+
+`Contents/Resources/static` holds only what
+`tools/build/macos-bundle-manifest.json` declares, staged from tracked files by
+`tools/build/macos-bundle-payload.cjs`; `test-macos-bundle-payload.cjs` scans
+the staged Lua, shell, JavaScript and HTML for every path they read. A file
+whose name is joined at run time (the logos, the onboarding preview, the MLX
+`pyproject.toml`/`uv.lock`) is invisible to that scan: add its reader to
+`CURATED_READS`, never a `cp` into the static root. Karabiner-Elements is not
+vendored: `platform/remap/onboarding.lua` downloads the pinned DMG, and the
+49 MB installer the app carried until v0.0.0-dev.146 had no reader. Do not
+strip `docs.json`/`lua.json` from the embedded Hammerspoon: `_coresetup.lua`
+requires `hs.doc` at startup, which registers both files. Dropping the bundled
+Ollama (29 MB) needs the launcher to stop exporting `ERGOPTI_OLLAMA_BIN` and
+the resolver to find the `~/.local/bin` copy `ensure-ollama-deps.sh` installs.
+
 ## Native HID element qualification
 
 ### project-hs-hid-and-host-clock-units
