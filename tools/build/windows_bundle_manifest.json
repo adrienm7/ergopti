@@ -28,11 +28,6 @@
 			"why": "Language flags of the language menu and the onboarding wizard."
 		},
 		{
-			"source": "static/img/ergopti.jpg",
-			"dest": "static/img/ergopti.jpg",
-			"why": "Layout preview of the onboarding wizard's keyboard step."
-		},
-		{
 			"source": "static/ergopti_plus/windows/vendor",
 			"dest": "vendor",
 			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall and crash-report workers."
