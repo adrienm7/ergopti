@@ -95,12 +95,6 @@ const CURATED_READS = [
 		why: 'notifications carry the logo'
 	},
 	{
-		reader: 'ergopti_plus/macos/ui/onboarding/init.lua',
-		needles: ['ASSETS_DIR .. "../../../../img/ergopti.jpg"'],
-		targets: ['img/ergopti.jpg'],
-		why: 'the onboarding wizard previews the layout from the shared UI folder'
-	},
-	{
 		reader: 'ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh',
 		needles: [
 			'HS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"',
@@ -735,7 +729,7 @@ try {
 		['ergopti_plus/macos/modules/llm/network-retry.sh', 'a file a bootstrap script sources'],
 		['ergopti_plus/_shared/ui/host_bridge.js', 'a script a WebView page loads'],
 		['ergopti_plus/_shared/modules/hotstrings/defaults.toml', 'a shared data file'],
-		['img/ergopti.jpg', 'a curated image read'],
+		['img/logo/logo_white.png', 'a curated image read'],
 		['ergopti_plus/macos/uv.lock', 'the committed MLX lock file'],
 		['ergopti_plus/_shared/ui/vendor/LICENSES.md', 'the vendored code license notice']
 	];
