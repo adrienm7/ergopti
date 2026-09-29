@@ -1655,6 +1655,8 @@
 	"mlx.deps_task_start_failed": "Impossible de démarrer la tâche hs.task.",
 	"mlx.runtime_missing_title": "Le moteur MLX n’est pas installé",
 	"mlx.runtime_missing_body": "L’IA reste désactivée tant qu’il n’est pas installé. Sélectionnez le backend MLX dans le menu IA pour l’installer.",
+	"mlx.runtime_broken_title": "Le moteur MLX doit être réinstallé",
+	"mlx.runtime_broken_body": "Ses paquets Python sont incomplets ou obsolètes. Sélectionnez le backend MLX dans le menu IA pour le réinstaller.",
 	"mlx.download_cancelled": "Annulé",
 	"mlx.download_cancelled_body": "Téléchargement de %s interrompu.",
 	"mlx.download_failed": "Échec MLX",

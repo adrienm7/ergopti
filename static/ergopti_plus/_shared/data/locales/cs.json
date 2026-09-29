@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "Nelze spustit úlohu hs.task.",
 	"mlx.runtime_missing_title": "Běhové prostředí MLX není nainstalováno",
 	"mlx.runtime_missing_body": "AI zůstane vypnutá, dokud nebude nainstalováno. Vyberte backend MLX v nabídce AI a nainstalujte ho.",
+	"mlx.runtime_broken_title": "Běhové prostředí MLX je třeba přeinstalovat",
+	"mlx.runtime_broken_body": "Jeho balíčky Pythonu jsou neúplné nebo zastaralé. Vyberte backend MLX v nabídce AI a přeinstalujte ho.",
 	"mlx.download_cancelled": "Zrušeno",
 	"mlx.download_cancelled_body": "Stahování %s přerušeno.",
 	"mlx.download_failed": "Selhání MLX",

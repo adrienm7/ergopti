@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "hs.task를 시작할 수 없습니다.",
 	"mlx.runtime_missing_title": "MLX 런타임이 설치되어 있지 않습니다",
 	"mlx.runtime_missing_body": "설치될 때까지 AI는 꺼진 상태로 유지됩니다. AI 메뉴에서 MLX 백엔드를 선택해 설치하세요.",
+	"mlx.runtime_broken_title": "MLX 런타임을 다시 설치해야 합니다",
+	"mlx.runtime_broken_body": "Python 패키지가 불완전하거나 오래되었습니다. AI 메뉴에서 MLX 백엔드를 선택해 다시 설치하세요.",
 	"mlx.download_cancelled": "취소되었습니다",
 	"mlx.download_cancelled_body": "%s 다운로드가 중단되었습니다.",
 	"mlx.download_failed": "MLX 오류",

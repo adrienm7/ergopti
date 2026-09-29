@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "hs.task शुरू करने में विफल।",
 	"mlx.runtime_missing_title": "MLX रनटाइम इंस्टॉल नहीं है",
 	"mlx.runtime_missing_body": "इंस्टॉल होने तक AI बंद रहता है। इसे इंस्टॉल करने के लिए AI मेनू में MLX बैकएंड चुनें।",
+	"mlx.runtime_broken_title": "MLX रनटाइम को फिर से इंस्टॉल करना होगा",
+	"mlx.runtime_broken_body": "इसके Python पैकेज अधूरे या पुराने हैं। इसे फिर से इंस्टॉल करने के लिए AI मेनू में MLX बैकएंड चुनें।",
 	"mlx.download_cancelled": "रद्द किया गया",
 	"mlx.download_cancelled_body": "%s का डाउनलोड बाधित किया गया।",
 	"mlx.download_failed": "MLX विफल",
