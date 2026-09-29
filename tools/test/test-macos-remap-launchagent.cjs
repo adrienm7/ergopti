@@ -4,8 +4,9 @@
  * ==============================================================================
  * MODULE: macOS Remap LaunchAgent Crash Guard
  * DESCRIPTION:
- * Proves that ErgoptiPlus ships and registers an independent user LaunchAgent
- * before embedded Hammerspoon starts, and that the native lease worker cannot
+ * Proves that ErgoptiPlus ships an independent user LaunchAgent that only the
+ * driver registers, and only while « Ergopti uses Karabiner » is on (the GUI
+ * launcher never registers it), and that the native lease worker cannot
  * activate a Karabiner generation before the guardian durably arms that exact
  * token.
  *
@@ -382,22 +383,38 @@ check(
 	'DRAINING must linearize after every previously authorized shared transport'
 );
 
+// The switch lives in the driver's config, so only the driver can read it
+// before a registration: the GUI launcher must never register the guardian.
 const appDelegate = SWIFT.indexOf('final class AppDelegate');
-const ensureAgent = indexAfter(
-	SWIFT,
-	'beginRemapGuardianRegistration(executablePath:',
-	appDelegate,
-	'the GUI launcher must begin the independent guardian registration'
+const appDelegateEnd = appDelegate >= 0 ? SWIFT.indexOf('\n}\n', appDelegate) : -1;
+const appDelegateSource =
+	appDelegateEnd > appDelegate ? SWIFT.slice(appDelegate, appDelegateEnd) : '';
+check(appDelegateSource.length > 1000, 'the GUI launcher delegate must remain locatable');
+for (const registration of [
+	'guardianRegistrar',
+	'remapGuardianRegistrationStatus',
+	'ensureLegacyRemapGuardianRegistered(',
+	'ensureRemapGuardianRegistered(',
+	'.register()'
+]) {
+	check(
+		!appDelegateSource.includes(registration),
+		`the GUI launcher must not register the guardian (${registration}); ` +
+			'the driver does, only while Ergopti uses Karabiner'
+	);
+}
+check(
+	appDelegateSource.includes('launchHammerspoon(at: hsBinary, remapGuardianStatus: .notRequested)'),
+	'the GUI launcher must tell the driver that guardian registration is left to it'
 );
-const launchHS = indexAfter(
-	SWIFT,
-	'launchHammerspoon(at:',
-	appDelegate,
-	'the embedded Hammerspoon launch must remain locatable'
+const LEASE_CONTROLLER = fs.readFileSync(
+	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'platform', 'remap', 'lease_controller.lua'),
+	'utf8'
 );
 check(
-	appDelegate >= 0 && ensureAgent >= 0 && launchHS >= 0 && ensureAgent < launchHS,
-	'the independent guardian must be registered before embedded Hammerspoon starts'
+	LEASE_CONTROLLER.includes('local GUARDIAN_REGISTER_FLAG = "--register-remap-guardian"') &&
+		LEASE_CONTROLLER.includes('function M.register_guardian(on_done)'),
+	'the driver must own guardian registration through the headless registration role'
 );
 check(
 	!SWIFT.includes('handleEmbeddedHammerspoonExit(status: 0)'),
@@ -473,10 +490,8 @@ check(
 	'XCTest must prove modern registration errors cannot bypass a disabled background item'
 );
 check(
-	/test\w*Managed\w*Hammerspoon\w*Waits\w*For\w*Guardian\w*Registration\w*Result\w*Before\w*Child\w*Start/i.test(
-		XCTEST
-	),
-	'XCTest must behaviorally prove composed startup waits for guardian registration'
+	/test\w*Managed\w*Hammerspoon\w*Starts\w*Without\w*Registering\w*The\w*Guardian/i.test(XCTEST),
+	'XCTest must behaviorally prove composed startup leaves guardian registration to the driver'
 );
 check(
 	/test\w*Guardian\w*Fences\w*Externally\w*Unlinked\w*Live\w*Record/i.test(XCTEST),

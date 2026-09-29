@@ -50,6 +50,9 @@ local TOKEN_LEDGER_KEY = "karabiner.used_tokens.v1"
 local WORKER_FLAG = "--karabiner-lease-worker"
 local REVOKE_FLAG = "--karabiner-lease-revoke"
 local GUARDIAN_STATUS_FLAG = "--remap-guardian-status"
+-- The launcher never registers the guardian itself: the driver does, only
+-- after reading « Ergopti uses Karabiner », through this headless role.
+local GUARDIAN_REGISTER_FLAG = "--register-remap-guardian"
 local GUARDIAN_SETTINGS_FLAG = "--open-remap-guardian-settings"
 local GUARDIAN_STATUS_OUTPUT_MAX_BYTES = 32
 local GUARDIAN_SETTINGS_OUTPUT_MAX_BYTES = 32
@@ -1340,15 +1343,18 @@ function M.is_initialized()
 	return _state ~= nil
 end
 
---- Observes current ServiceManagement authorization plus exact guardian health
---- through the bundle-owned launcher. No registration or shell is involved.
+--- Starts one native guardian observation through the bundle-owned launcher.
+--- Status probes and registrations answer the same OS question, so both share
+--- one ordering ticket and the same canonical one-line output contract.
+--- @param flag string Exact headless role flag.
+--- @param label string Callback label and failure prefix.
 --- @param on_done function Callback fn(status, reason); status is canonical or nil.
+--- @param on_canonical function|nil Runs before on_done for a canonical answer.
 --- @return table|nil handle Started cancellation wrapper, or nil on rejection.
 --- @return string|nil error_message Stable launch failure detail.
-function M.probe_guardian_status(on_done)
-	if not require_state("probe_guardian_status") then return nil, "uninitialized" end
+local function start_guardian_observation(flag, label, on_done, on_canonical)
 	if type(on_done) ~= "function" then
-		Logger.error(LOG, "probe_guardian_status requires a completion callback.")
+		Logger.error(LOG, "%s requires a completion callback.", label)
 		return nil, "invalid-callback"
 	end
 	local observation_serial = next_guardian_observation()
@@ -1358,7 +1364,7 @@ function M.probe_guardian_status(on_done)
 		termination_complete = false,
 	}
 	local raw_handle, helper_error = spawn_current_helper(
-		{ GUARDIAN_STATUS_FLAG },
+		{ flag },
 		function(exit_code, stdout, stderr)
 			if request.cancelled or request.settled then return end
 			request.settled = true
@@ -1373,14 +1379,15 @@ function M.probe_guardian_status(on_done)
 			end
 			if status then
 				_state.guardian_status = status
-				invoke_callback("lease.probe_guardian_status", on_done, status, nil)
+				if on_canonical then on_canonical(status) end
+				invoke_callback(label, on_done, status, nil)
 				return
 			end
-			local reason = string.format("guardian status probe failed (exit %s): %s",
-				tostring(exit_code), tostring(stderr))
+			local reason = string.format("%s failed (exit %s): %s",
+				label, tostring(exit_code), tostring(stderr))
 			-- The retained polling owner rate-limits this routine external fault.
 			-- Logging here as well emitted one warning every three seconds.
-			invoke_callback("lease.probe_guardian_status", on_done, nil, reason)
+			invoke_callback(label, on_done, nil, reason)
 		end
 	)
 	if not raw_handle then
@@ -1414,6 +1421,40 @@ function M.probe_guardian_status(on_done)
 			or "helper-start-raised: " .. tostring(started)
 	end
 	return handle, nil
+end
+
+--- Observes current ServiceManagement authorization plus exact guardian health
+--- through the bundle-owned launcher. No registration or shell is involved.
+--- @param on_done function Callback fn(status, reason); status is canonical or nil.
+--- @return table|nil handle Started cancellation wrapper, or nil on rejection.
+--- @return string|nil error_message Stable launch failure detail.
+function M.probe_guardian_status(on_done)
+	if not require_state("probe_guardian_status") then return nil, "uninitialized" end
+	return start_guardian_observation(GUARDIAN_STATUS_FLAG, "guardian status probe", on_done, nil)
+end
+
+--- Registers this bundle's own guardian LaunchAgent and reports its status.
+--- The launcher no longer does it at startup, so a registration only ever
+--- follows the remap owner's reading of « Ergopti uses Karabiner » = on. One
+--- canonical answer settles the duty for this controller lifecycle; a failed
+--- attempt leaves it due. No Karabiner process is involved.
+--- @param on_done function Callback fn(status, reason); status is canonical or nil.
+--- @return table|nil handle Started cancellation wrapper, or nil on rejection.
+--- @return string|nil error_message Stable launch failure detail.
+function M.register_guardian(on_done)
+	if not require_state("register_guardian") then return nil, "uninitialized" end
+	Logger.info(LOG, "Registering the remap guardian for this Ergopti lifecycle.")
+	return start_guardian_observation(GUARDIAN_REGISTER_FLAG, "guardian registration", on_done,
+		function(status)
+			_state.guardian_registration_settled = true
+			Logger.info(LOG, "Remap guardian registration answered '%s'.", status)
+		end)
+end
+
+--- Reports whether the next guardian observation must register the guardian.
+--- @return boolean required True until one registration of this lifecycle answered.
+function M.guardian_registration_required()
+	return _state ~= nil and _state.guardian_registration_settled ~= true
 end
 
 --- Opens the exact Login Items settings pane after a native current-status
@@ -1514,6 +1555,7 @@ function M.init(phase_listener)
 		token_ledger_ready = token_ledger_ready,
 		token_ledger_error = token_ledger_error,
 		guardian_status = initial_guardian_status(),
+		guardian_registration_settled = false,
 		guardian_observation_serial = 0,
 		guardian_settings_request = nil,
 		helper_path = helper_path,

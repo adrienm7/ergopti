@@ -156,6 +156,8 @@ local function with_remap(options, body)
 			options.guardian_probe_termination_failures or 0,
 		guardian_probes = {},
 		guardian_probe_statuses = {},
+		guardian_registrations = 0,
+		guardian_registration_due = options.guardian_registration_due == true,
 		guardian_cached_status = options.guardian_cached_status or options.guardian_status,
 		guardian_settings_opens = 0,
 		onboarding_stop_attempts = 0,
@@ -310,6 +312,62 @@ local function with_remap(options, body)
 		end,
 	}
 
+	--- One native guardian observation double shared by probe and registration.
+	--- @param on_done function Completion callback.
+	--- @param kind string `probe` or `register`.
+	--- @return table|nil probe
+	--- @return string|nil error_message
+	function calls.observe_guardian(on_done, kind)
+		calls.guardian_probe_count = calls.guardian_probe_count + 1
+		local probe = {
+			callback = on_done,
+			deliveries = 0,
+			invalidated = false,
+			terminated = false,
+			kind = kind,
+		}
+		probe.terminate = function()
+			probe.invalidated = true
+			if probe.terminated then return true end
+			calls.guardian_probe_termination_attempts =
+				calls.guardian_probe_termination_attempts + 1
+			if calls.guardian_probe_termination_failures_remaining > 0 then
+				calls.guardian_probe_termination_failures_remaining =
+					calls.guardian_probe_termination_failures_remaining - 1
+				return false
+			end
+			probe.terminated = true
+			calls.guardian_probe_terminations = calls.guardian_probe_terminations + 1
+			return true
+		end
+		calls.guardian_probes[#calls.guardian_probes + 1] = probe
+
+		if (options.guardian_probe_start_failures or 0) >= calls.guardian_probe_count then
+			return nil, "synthetic-guardian-probe-start-failure"
+		end
+
+		local outcome = table.remove(calls.guardian_probe_statuses, 1)
+		if outcome == nil then outcome = options.guardian_probe_default_status or "ready" end
+		local deferred = options.guardian_probe_deferred == true
+		if type(outcome) == "table" and outcome.deferred ~= nil then
+			deferred = outcome.deferred == true
+		end
+		probe.outcome = outcome
+		if not deferred then
+			probe.deliveries = probe.deliveries + 1
+			if type(outcome) == "table" then
+				if type(outcome.status) == "string" then
+					calls.guardian_cached_status = outcome.status
+				end
+				on_done(outcome.status, outcome.error)
+			else
+				calls.guardian_cached_status = outcome
+				on_done(outcome, nil)
+			end
+		end
+		return probe
+	end
+
 	package.loaded["platform.remap.lease_controller"] = {
 		init = function(listener)
 			calls.phase_listener = listener
@@ -416,54 +474,16 @@ local function with_remap(options, body)
 			return true
 		end,
 		refresh_liveness = function() return true end,
+		guardian_registration_required = function() return calls.guardian_registration_due end,
+		register_guardian = function(on_done)
+			calls.guardian_registrations = calls.guardian_registrations + 1
+			return calls.observe_guardian(function(status, err)
+				if type(status) == "string" then calls.guardian_registration_due = false end
+				on_done(status, err)
+			end, "register")
+		end,
 		probe_guardian_status = function(on_done)
-			calls.guardian_probe_count = calls.guardian_probe_count + 1
-			local probe = {
-				callback = on_done,
-				deliveries = 0,
-				invalidated = false,
-				terminated = false,
-			}
-			probe.terminate = function()
-				probe.invalidated = true
-				if probe.terminated then return true end
-				calls.guardian_probe_termination_attempts =
-					calls.guardian_probe_termination_attempts + 1
-				if calls.guardian_probe_termination_failures_remaining > 0 then
-					calls.guardian_probe_termination_failures_remaining =
-						calls.guardian_probe_termination_failures_remaining - 1
-					return false
-				end
-				probe.terminated = true
-				calls.guardian_probe_terminations = calls.guardian_probe_terminations + 1
-				return true
-			end
-			calls.guardian_probes[#calls.guardian_probes + 1] = probe
-
-			if (options.guardian_probe_start_failures or 0) >= calls.guardian_probe_count then
-				return nil, "synthetic-guardian-probe-start-failure"
-			end
-
-			local outcome = table.remove(calls.guardian_probe_statuses, 1)
-			if outcome == nil then outcome = options.guardian_probe_default_status or "ready" end
-			local deferred = options.guardian_probe_deferred == true
-			if type(outcome) == "table" and outcome.deferred ~= nil then
-				deferred = outcome.deferred == true
-			end
-			probe.outcome = outcome
-			if not deferred then
-				probe.deliveries = probe.deliveries + 1
-				if type(outcome) == "table" then
-					if type(outcome.status) == "string" then
-						calls.guardian_cached_status = outcome.status
-					end
-					on_done(outcome.status, outcome.error)
-				else
-					calls.guardian_cached_status = outcome
-					on_done(outcome, nil)
-				end
-			end
-			return probe
+			return calls.observe_guardian(on_done, "probe")
 		end,
 		open_guardian_settings = function(on_done)
 			calls.guardian_settings_opens = calls.guardian_settings_opens + 1

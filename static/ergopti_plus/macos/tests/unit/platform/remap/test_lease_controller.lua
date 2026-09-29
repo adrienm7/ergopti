@@ -60,6 +60,51 @@ helpers.describe("karabiner lease controller: activation identity", function()
 		end)
 	end)
 
+	helpers.it("registers the guardian through the exact headless role, once per lifecycle", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			helpers.assert_true(controller.guardian_registration_required() == false,
+				"an uninitialized controller owns no registration duty")
+			controller.init()
+			helpers.assert_true(controller.guardian_registration_required(),
+				"the launcher no longer registers: the first observation must")
+			helpers.assert_eq(#ctx.spawns, 0, "initialization must not register anything")
+
+			local observed = {}
+			local handle, reason = controller.register_guardian(function(status)
+				observed[#observed + 1] = status or false
+			end)
+			helpers.assert_type(handle, "table")
+			helpers.assert_nil(reason)
+			helpers.assert_true(helpers.deep_equal(ctx.spawns[1].args, { "--register-remap-guardian" }))
+			ctx.complete(1, 0, "requires_approval\n")
+			helpers.assert_eq(observed[1], "requires_approval")
+			helpers.assert_true(controller.guardian_registration_required() == false,
+				"a canonical registration answer settles the duty")
+			local _, snapshot = controller.status()
+			helpers.assert_eq(snapshot.guardian_status, "requires_approval")
+		end)
+	end)
+
+	helpers.it("keeps registration due after a failed attempt or a mere status probe", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			local observed = {}
+			controller.register_guardian(function(status) observed[#observed + 1] = status or false end)
+			ctx.complete(1, 9, "ready\n")
+			helpers.assert_eq(observed[1], false)
+			helpers.assert_true(controller.guardian_registration_required(),
+				"a failed registration must be retried")
+
+			controller.probe_guardian_status(function() end)
+			helpers.assert_true(helpers.deep_equal(ctx.spawns[2].args, { "--remap-guardian-status" }))
+			ctx.complete(2, 0, "ready\n")
+			helpers.assert_true(controller.guardian_registration_required(),
+				"observing a guardian registered by another session is not this session's registration")
+		end)
+	end)
+
 	helpers.it("rejects a guardian probe whose exact helper cannot start", function()
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()

@@ -333,6 +333,8 @@ local function with_remap(options, body)
 				callback("ready")
 				return { terminate = function() return true end }
 			end,
+			-- The guardian is already registered in these scenarios.
+			guardian_registration_required = function() return false end,
 		}
 
 		local function make_handle(kind)
