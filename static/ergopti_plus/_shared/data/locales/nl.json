@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Alles uitvinken",
 	"menu.tapholds.enable": "Tik-vasthouden inschakelen",
 	"menu.tapholds.karabiner_off_hint": "Niet beschikbaar: Ergopti gebruikt Karabiner niet (zie Configuratie)",
+	"menu.tapholds.saved_until_guardian": "💾 Instellingen voor tik-vasthouden bewaard: ze gelden zodra ErgoptiPlus is toegestaan bij Inloggen (klik om de instellingen te openen).",
 	"menu.tapholds.title": "⌨️ Tik-vasthouden",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Tap → combo kopiëren voor modifieertoetsen",
 	"menu.tapholds.edit_nav_layer": "Navigatielaag bewerken…",

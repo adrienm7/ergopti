@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Зняти всі позначки",
 	"menu.tapholds.enable": "Увімкнути натискання-утримання",
 	"menu.tapholds.karabiner_off_hint": "Недоступно: Ergopti не використовує Karabiner (див. «Конфігурація»)",
+	"menu.tapholds.saved_until_guardian": "💾 Налаштування натискання-утримання збережено: вони застосуються, щойно ErgoptiPlus буде дозволено в «Об’єктах входу» (натисніть, щоб відкрити параметри).",
 	"menu.tapholds.title": "⌨️ Натискання-Утримання",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Скопіювати натискання → комбо для клавіш-модифікаторів",
 	"menu.tapholds.edit_nav_layer": "Редагувати шар навігації…",

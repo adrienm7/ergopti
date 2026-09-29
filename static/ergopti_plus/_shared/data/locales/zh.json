@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "全部取消选中",
 	"menu.tapholds.enable": "启用点按/长按",
 	"menu.tapholds.karabiner_off_hint": "不可用：Ergopti 未使用 Karabiner（参见“配置”）",
+	"menu.tapholds.saved_until_guardian": "💾 已保存点按/长按设置：在登录项中允许 ErgoptiPlus 后即会生效（点击打开设置）。",
 	"menu.tapholds.title": "⌨️ 点按/长按",
 	"menu.tapholds.copy_tap_to_combo": "🔁 将点击 → 组合键复制到所有修饰键快捷键",
 	"menu.tapholds.edit_nav_layer": "编辑导航层…",

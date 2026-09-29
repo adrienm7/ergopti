@@ -2950,6 +2950,31 @@ end
 --- Opens the Karabiner-Elements GUI for the user on explicit request.
 function M.open_gui() KeLifecycle.open_gui() end
 
+--- Opens System Settings at Login Items, whatever the guardian status: the
+--- approval opener refuses every status but `requires_approval`, while an
+--- `unavailable` helper is fixed from that same pane.
+--- @param on_done function|nil Callback fn(ok, reason).
+--- @return boolean accepted
+function M.open_login_items(on_done)
+	-- The opener reports its own refusals through the callback too.
+	local settled = false
+	local call_ok, accepted_or_err = pcall(function()
+		return require("adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
+			if settled then return end
+			settled = true
+			invoke_public_callback("open Login Items", on_done, ok == true,
+				ok == true and "opened" or "open-exited-non-zero")
+		end)
+	end)
+	if call_ok and accepted_or_err == true then return true end
+	Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(accepted_or_err))
+	if not settled then
+		settled = true
+		invoke_public_callback("open Login Items", on_done, false, "open-request-rejected")
+	end
+	return false
+end
+
 --- Opens Login Items only for an enabled integration whose last exact native
 --- observation still requires approval. The child rechecks ServiceManagement
 --- immediately before opening, so a stale menu can never cause the side effect.
@@ -5490,12 +5515,7 @@ function M.init(file_system)
 		notify        = Notifications.notify,
 		text          = i18n.get,
 		open_settings = function(on_done) return M.open_guardian_settings(on_done) end,
-		open_login_items = function(on_done)
-			local accepted = require("adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
-				on_done(ok == true, ok == true and "opened" or "open-exited-non-zero")
-			end)
-			return accepted == true
-		end,
+		open_login_items = function(on_done) return M.open_login_items(on_done) end,
 		logger        = Logger,
 		log           = LOG,
 	})

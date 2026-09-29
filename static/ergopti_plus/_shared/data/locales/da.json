@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Fravælg alle",
 	"menu.tapholds.enable": "Aktivér tap-holds",
 	"menu.tapholds.karabiner_off_hint": "Utilgængelig: Ergopti bruger ikke Karabiner (se Konfiguration)",
+	"menu.tapholds.saved_until_guardian": "💾 Tap-hold-indstillinger gemt: de træder i kraft, når ErgoptiPlus er tilladt under Login-emner (klik for at åbne indstillingerne).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Kopier tap → combo for modifikatortaster",
 	"menu.tapholds.edit_nav_layer": "Redigér navigationslaget…",

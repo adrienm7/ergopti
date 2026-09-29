@@ -1575,6 +1575,7 @@
 	"menu.shortcuts.wrap_symbols_uncheck_all": "すべてチェック解除",
 	"menu.tapholds.enable": "タップホールドを有効にする",
 	"menu.tapholds.karabiner_off_hint": "利用不可：Ergopti は Karabiner を使用していません（設定を参照）",
+	"menu.tapholds.saved_until_guardian": "💾 タップホールドの設定を保存しました：ログイン項目で ErgoptiPlus が許可されると適用されます（クリックして設定を開く）。",
 	"menu.tapholds.title": "⌨️ タップホールド",
 	"menu.tapholds.copy_tap_to_combo": "🔁 修飾キーにタップ→コンボをコピー",
 	"menu.tapholds.edit_nav_layer": "ナビゲーションレイヤーを編集…",

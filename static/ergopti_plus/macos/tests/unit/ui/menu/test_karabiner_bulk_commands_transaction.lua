@@ -260,6 +260,10 @@ local function make_remap(observations, mode)
 			observations.terminals[method_name] = on_done
 			if mode == "throw" then error("synthetic bulk request failure") end
 			if mode == "false" then return false end
+			if mode == "sync-busy-false" then
+				on_done(false, "bulk-settings-busy", 0)
+				return false
+			end
 			if mode == "nil" then return nil end
 			if mode == "sync-true-false" or mode == "sync-true-nil"
 				or mode == "sync-true-throw" then
@@ -417,6 +421,59 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 			helpers.assert_true(count_logs(observations, "error") >= 1)
 			helpers.assert_eq(observations.refreshes, 1)
 		end
+	end)
+
+	helpers.it("reports the refusal reason the remap engine gave (bulk-refusal-reason)", function()
+		for _, case in ipairs(COMMAND_CASES) do
+			local built, observations = build_menu("sync-busy-false")
+			helpers.assert_eq(row_action(find_item(built, case.label))(), false)
+			local reported = nil
+			for _, record in ipairs(observations.logs) do
+				if record.level == "error" and record.message:find("Karabiner bulk command", 1, true) then
+					reported = record.message
+				end
+			end
+			helpers.assert_eq(reported, "Karabiner bulk command '" .. case.method
+				.. "' failed: bulk-settings-busy.",
+				case.id .. " must not overwrite the engine's reason with request-refused")
+		end
+	end)
+
+	helpers.it("announces a bulk edit saved until the guardian is ready (guardian-bulk-settle)", function()
+		local saved_notifications = package.loaded["infra.notifications"]
+		local notices = {}
+		package.loaded["infra.notifications"] = {
+			notify = function(message, detail, kind, on_click)
+				notices[#notices + 1] = { message = message, detail = detail, kind = kind, on_click = on_click }
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			local opened = 0
+			local built, observations = build_menu("pending", function(remap)
+				remap.open_login_items = function(on_done)
+					opened = opened + 1
+					on_done(true, "opened")
+					return true
+				end
+			end)
+			helpers.assert_true(row_action(find_item(built, COMMAND_CASES[2].label))())
+			observations.terminals.apply_scope(true, "persisted-guardian-requires_approval", 3)
+			helpers.assert_eq(count_logs(observations, "success"), 1,
+				"a saved edit is a success for the user")
+			helpers.assert_eq(#notices, 1, "the user learns why nothing applies yet")
+			helpers.assert_eq(notices[1].message, "menu.tapholds.saved_until_guardian")
+			helpers.assert_type(notices[1].on_click, "function")
+			helpers.assert_true(notices[1].on_click())
+			helpers.assert_eq(opened, 1, "the notice opens Login Items")
+
+			helpers.assert_true(row_action(find_item(built, COMMAND_CASES[2].label))())
+			observations.terminals.apply_scope(true, "ready", 3)
+			helpers.assert_eq(count_logs(observations, "success"), 2)
+			helpers.assert_eq(#notices, 1, "an exact deploy needs no notice")
+		end)
+		package.loaded["infra.notifications"] = saved_notifications
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("HS-019 rejects synchronous true callbacks followed by false, nil, or throw", function()
