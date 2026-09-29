@@ -281,6 +281,16 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
 		end)
 
+		helpers.it("unused keys: plain keyboard and tap_keys values are offered (config-outdated-shortcut-shape)", function()
+			local source = "[shortcuts]\nkeyboard = \"x\"\ntap_keys = \"y\"\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			local offered = {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "shortcuts.keyboard", "shortcuts.tap_keys" })
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
