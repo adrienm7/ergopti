@@ -28,7 +28,10 @@ const LOCALES = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'lo
 const APPROVED = {
 	// The errors file holds today's WARNING and ERROR lines; the gesture and
 	// shortcut action that opens it reads like the Debug row.
-	'sg_actions.open_error_log': { fr: '📄 Fichier des erreurs du jour', en: "📄 Today's errors file" },
+	'sg_actions.open_error_log': {
+		fr: '📄 Fichier des erreurs du jour',
+		en: "📄 Today's errors file"
+	},
 	// « Versions » names the list of releases the row opens, and the window it
 	// opens carries the same name.
 	'menu.about.changelog': { fr: 'Versions', en: 'Releases' },
@@ -47,7 +50,10 @@ const errors = [];
 const files = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'));
 if (files.length !== 21) errors.push(`read ${files.length} locale file(s), expected 21.`);
 const tables = Object.fromEntries(
-	files.map((f) => [f.replace(/\.json$/, ''), JSON.parse(fs.readFileSync(path.join(LOCALES, f), 'utf8'))])
+	files.map((f) => [
+		f.replace(/\.json$/, ''),
+		JSON.parse(fs.readFileSync(path.join(LOCALES, f), 'utf8'))
+	])
 );
 if (!tables.en || !tables.fr) errors.push('en.json and fr.json must both be present.');
 
@@ -68,7 +74,8 @@ for (const [key, spec] of Object.entries(APPROVED)) {
 		}
 	}
 }
-if (checked < Object.keys(APPROVED).length * 21) errors.push(`checked ${checked} value(s) — the scan is incomplete.`);
+if (checked < Object.keys(APPROVED).length * 21)
+	errors.push(`checked ${checked} value(s) — the scan is incomplete.`);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] Approved menu labels:\x1b[0m');

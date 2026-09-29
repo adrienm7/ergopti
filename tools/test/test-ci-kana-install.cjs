@@ -28,8 +28,10 @@ assert.ok(native, 'the installer must declare its native job owner');
 const resultLoop = source.slice(source.indexOf('$texts = [KanaInstallerJob]::ChildTexts($window)'));
 const waitsForMessage = resultLoop.indexOf("$_ -ne '' -and $_ -ne 'OK'");
 const judges = resultLoop.indexOf('Unexpected installer result');
-assert.ok(waitsForMessage > 0 && waitsForMessage < judges,
-	'the installer must wait for the result message before judging it');
+assert.ok(
+	waitsForMessage > 0 && waitsForMessage < judges,
+	'the installer must wait for the result message before judging it'
+);
 if (process.platform !== 'win32') {
 	console.log('[SKIP] native Kana installer guard execution requires Windows.');
 	process.exit(0);
@@ -38,7 +40,9 @@ if (process.platform !== 'win32') {
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-kana-guard-'));
 try {
 	const script = path.join(scratch, 'guard.ps1');
-	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'
+	fs.writeFileSync(
+		script,
+		`$ErrorActionPreference = 'Stop'
 function Add-Type { throw 'UNSAFE_NATIVE_BOUNDARY' }
 try {
 	& '${helper.replace(/'/g, "''")}'
@@ -46,20 +50,32 @@ try {
 } catch {
 	if ($_.Exception.Message -cne 'Kana installation is restricted to an ephemeral GitHub Actions runner.') { throw }
 }
-`);
+`
+	);
 	for (const missing of ['GITHUB_ACTIONS', 'RUNNER_TEMP', 'GITHUB_ENV', 'wrong-case']) {
-		const env = { ...process.env, GITHUB_ACTIONS: 'true', RUNNER_TEMP: scratch, GITHUB_ENV: path.join(scratch, 'env') };
+		const env = {
+			...process.env,
+			GITHUB_ACTIONS: 'true',
+			RUNNER_TEMP: scratch,
+			GITHUB_ENV: path.join(scratch, 'env')
+		};
 		if (missing === 'wrong-case') env.GITHUB_ACTIONS = 'True';
 		else delete env[missing];
 		const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
-			env, encoding: 'utf8', timeout: 30000,
+			env,
+			encoding: 'utf8',
+			timeout: 30000
 		});
 		assert.equal(result.error, undefined, `${missing}: ${result.error}`);
 		assert.equal(result.status, 0, `${missing}: ${result.stdout}\n${result.stderr}`);
 	}
-	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${native[1]}\n'@\n`);
+	fs.writeFileSync(
+		script,
+		`$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${native[1]}\n'@\n`
+	);
 	const compiled = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
-		encoding: 'utf8', timeout: 30000,
+		encoding: 'utf8',
+		timeout: 30000
 	});
 	assert.equal(compiled.error, undefined, String(compiled.error));
 	assert.equal(compiled.status, 0, `${compiled.stdout}\n${compiled.stderr}`);
@@ -99,25 +115,45 @@ public static class KanaButtonFixture {
     }
 }
 `;
-	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${native[1]}\n${controls}\n'@\n[KanaButtonFixture]::Run()\n`);
+	fs.writeFileSync(
+		script,
+		`$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${native[1]}\n${controls}\n'@\n[KanaButtonFixture]::Run()\n`
+	);
 	const buttons = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
-		encoding: 'utf8', timeout: 30000,
+		encoding: 'utf8',
+		timeout: 30000
 	});
 	assert.equal(buttons.error, undefined, String(buttons.error));
 	assert.equal(buttons.status, 0, `${buttons.stdout}\n${buttons.stderr}`);
 	// Replay the old predicate against the same destroyed HWND. This must fail
 	// for the reported defect, not for a compilation or fixture setup error.
-	const stalePredicate = native[1].replace('return IsWindow(main) && !IsWindowEnabled(main);',
-		'return !IsWindowEnabled(main);');
-	assert.notEqual(stalePredicate, native[1], 'the old-predicate mutation must change the native helper');
-	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${stalePredicate}\n${controls}\n'@\n[KanaButtonFixture]::Run()\n`);
-	const staleWindow = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
-		encoding: 'utf8', timeout: 30000,
-	});
+	const stalePredicate = native[1].replace(
+		'return IsWindow(main) && !IsWindowEnabled(main);',
+		'return !IsWindowEnabled(main);'
+	);
+	assert.notEqual(
+		stalePredicate,
+		native[1],
+		'the old-predicate mutation must change the native helper'
+	);
+	fs.writeFileSync(
+		script,
+		`$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${stalePredicate}\n${controls}\n'@\n[KanaButtonFixture]::Run()\n`
+	);
+	const staleWindow = spawnSync(
+		'powershell.exe',
+		['-NoProfile', '-NonInteractive', '-File', script],
+		{
+			encoding: 'utf8',
+			timeout: 30000
+		}
+	);
 	assert.equal(staleWindow.error, undefined, String(staleWindow.error));
 	assert.equal(staleWindow.status, 1, `${staleWindow.stdout}\n${staleWindow.stderr}`);
 	assert.match(staleWindow.stderr, /Closed installer was mistaken for a pending result/);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
-console.log('[OK] Kana installation refuses every missing CI prerequisite; native ownership code compiles.');
+console.log(
+	'[OK] Kana installation refuses every missing CI prerequisite; native ownership code compiles.'
+);

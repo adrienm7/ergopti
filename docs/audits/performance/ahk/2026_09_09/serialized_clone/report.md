@@ -47,10 +47,10 @@ Disk-cache state is uncontrolled, and no full-dashboard latency was measured.
 The final reverse-order pair retained the process handle before waiting, and
 both native exit codes were captured as zero:
 
-| Mode | Clone samples (ms) | Peak working set (bytes) | Peak commit (bytes) |
-| --- | --- | --- | --- |
-| Serialized candidate | 1105.841, 1117.541, 1111.381 | 720322560 | 709640192 |
-| Production backup | 1639.999, 1752.203, 1599.140 | 822886400 | 849563648 |
+| Mode                 | Clone samples (ms)           | Peak working set (bytes) | Peak commit (bytes) |
+| -------------------- | ---------------------------- | ------------------------ | ------------------- |
+| Serialized candidate | 1105.841, 1117.541, 1111.381 | 720322560                | 709640192           |
+| Production backup    | 1639.999, 1752.203, 1599.140 | 822886400                | 849563648           |
 
 Receipts: `metrics-serialized-clone-candidate-03.out/.exit` and
 `metrics-serialized-clone-backup-02.out/.exit`.
@@ -124,10 +124,10 @@ native page-size and max-page-count values instead of adding a 1 GiB limit.
 
 Initial sequential native samples from `metrics-buffered-backup-bench.ahk`:
 
-| Mode | Clone samples (ms) | Peak working set (bytes) | Peak commit (bytes) |
-| --- | --- | --- | --- |
-| Original memory-pager backup | 1518.241, 1467.494, 1321.208 | 821940224 | 849334272 |
-| Buffered-backup prototype | 1044.463, 1006.533, 1188.086 | 722558976 | 711864320 |
+| Mode                         | Clone samples (ms)           | Peak working set (bytes) | Peak commit (bytes) |
+| ---------------------------- | ---------------------------- | ------------------------ | ------------------- |
+| Original memory-pager backup | 1518.241, 1467.494, 1321.208 | 821940224                | 849334272           |
+| Buffered-backup prototype    | 1044.463, 1006.533, 1188.086 | 722558976                | 711864320           |
 
 Both processes exited zero. Receipts are `metrics-buffered-backup-legacy-01`
 and `metrics-buffered-backup-buffered-01`, with `.out/.err/.exit` extensions.

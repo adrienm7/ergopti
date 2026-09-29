@@ -18,12 +18,19 @@ class HelperArtifactTests(unittest.TestCase):
             root = Path(directory)
             archive = root / "ErgoptiPlus.app.zip"
             archive.write_bytes(b"verified helper archive")
-            identity = {"archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-                        "archive_bytes": archive.stat().st_size, "sources": {"source.swift": "current"}}
+            identity = {
+                "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                "archive_bytes": archive.stat().st_size,
+                "sources": {"source.swift": "current"},
+            }
             receipt = root / "native-helper.json"
             receipt.write_text(json.dumps(identity), encoding="utf-8")
-            with patch.object(probe, "selection", return_value={"identity": identity}), \
-                    patch.object(probe, "source_identity", return_value=copy.deepcopy(identity["sources"])) as sources:
+            with (
+                patch.object(probe, "selection", return_value={"identity": identity}),
+                patch.object(
+                    probe, "source_identity", return_value=copy.deepcopy(identity["sources"])
+                ) as sources,
+            ):
                 self.assertEqual(probe.authenticate(root), archive)
                 archive.write_bytes(b"unverified replacement")
                 with self.assertRaisesRegex(ValueError, "integrity"):

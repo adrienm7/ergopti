@@ -6,7 +6,13 @@
 		{ "id": "ctrl", "aliases": ["control"], "ahk": "Ctrl", "hs": "ctrl", "linux": 29 },
 		{ "id": "alt", "aliases": ["option", "opt"], "ahk": "Alt", "hs": "alt", "linux": 56 },
 		{ "id": "shift", "aliases": [], "ahk": "Shift", "hs": "shift", "linux": 42 },
-		{ "id": "super", "aliases": ["win", "cmd", "command", "meta"], "ahk": "Win", "hs": "cmd", "linux": 125 }
+		{
+			"id": "super",
+			"aliases": ["win", "cmd", "command", "meta"],
+			"ahk": "Win",
+			"hs": "cmd",
+			"linux": 125
+		}
 	],
 	"keys": [
 		{ "id": "enter", "aliases": ["return"], "ahk": "Enter", "hs": "return", "linux": 28 },
@@ -23,7 +29,13 @@
 		{ "id": "home", "aliases": [], "ahk": "Home", "hs": "home", "linux": 102 },
 		{ "id": "end", "aliases": [], "ahk": "End", "hs": "end", "linux": 107 },
 		{ "id": "page_up", "aliases": ["pageup", "pgup"], "ahk": "PgUp", "hs": "pageup", "linux": 104 },
-		{ "id": "page_down", "aliases": ["pagedown", "pgdn"], "ahk": "PgDn", "hs": "pagedown", "linux": 109 },
+		{
+			"id": "page_down",
+			"aliases": ["pagedown", "pgdn"],
+			"ahk": "PgDn",
+			"hs": "pagedown",
+			"linux": 109
+		},
 		{ "id": "f1", "aliases": [], "ahk": "F1", "hs": "f1", "linux": 59 },
 		{ "id": "f2", "aliases": [], "ahk": "F2", "hs": "f2", "linux": 60 },
 		{ "id": "f3", "aliases": [], "ahk": "F3", "hs": "f3", "linux": 61 },

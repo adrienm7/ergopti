@@ -60,9 +60,9 @@ class RealCompilationTests(unittest.TestCase):
                     os.environ[name] = value
 
     def test_every_variant_compiles_through_its_staged_package(self):
-        data_types = (
-            LAYOUT_DIR / "xkb_generation" / "data" / "xkb_types.txt"
-        ).read_text(encoding="utf-8")
+        data_types = (LAYOUT_DIR / "xkb_generation" / "data" / "xkb_types.txt").read_text(
+            encoding="utf-8"
+        )
         for version_dir in sorted(LAYOUT_DIR.glob("v*")):
             for symbols_path in sorted(version_dir.glob("*.xkb")):
                 if variant_for_filename(symbols_path.name) is None:
@@ -93,9 +93,7 @@ def tempfile_staging(symbols_path: Path, types_content: str):
             "<xkbConfigRegistry version='1.1'><layoutList/></xkbConfigRegistry>",
             encoding="utf-8",
         )
-        (package / "rules" / "evdev.post").write_text(
-            build_evdev_post("ergopti"), encoding="utf-8"
-        )
+        (package / "rules" / "evdev.post").write_text(build_evdev_post("ergopti"), encoding="utf-8")
         yield staging_root
 
 

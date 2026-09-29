@@ -16,24 +16,36 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 
-const source = fs.readFileSync(path.resolve(__dirname,
-	'../../static/ergopti_plus/_shared/ui/download_window/script.js'), 'utf8');
-const hostBridge = fs.readFileSync(path.resolve(__dirname,
-	'../../static/ergopti_plus/_shared/ui/host_bridge.js'), 'utf8');
+const source = fs.readFileSync(
+	path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/download_window/script.js'),
+	'utf8'
+);
+const hostBridge = fs.readFileSync(
+	path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/host_bridge.js'),
+	'utf8'
+);
 const elements = new Map();
 const messages = [];
 const context = vm.createContext({
 	console,
-	window: { webkit: { messageHandlers: { dl_bridge: {
-		postMessage: message => messages.push(JSON.parse(JSON.stringify(message)))
-	} } } },
+	window: {
+		webkit: {
+			messageHandlers: {
+				dl_bridge: {
+					postMessage: (message) => messages.push(JSON.parse(JSON.stringify(message)))
+				}
+			}
+		}
+	},
 	document: {
 		readyState: 'complete',
 		body: { classList: { add() {}, remove() {} } },
 		getElementById(id) {
-			if (!elements.has(id)) elements.set(id, {
-				style: {}, classList: { add() {}, remove() {} }
-			});
+			if (!elements.has(id))
+				elements.set(id, {
+					style: {},
+					classList: { add() {}, remove() {} }
+				});
 			return elements.get(id);
 		}
 	}
@@ -43,30 +55,62 @@ vm.runInContext(source, context);
 assert.deepEqual(messages.splice(0), ['ready']);
 
 function actions() {
-	vm.runInContext("doCancel(); doTerm(); doRetry(); done(false, 'gated', 'gated'); doRetry(); showLog()", context);
+	vm.runInContext(
+		"doCancel(); doTerm(); doRetry(); done(false, 'gated', 'gated'); doRetry(); showLog()",
+		context
+	);
 	return messages.splice(0);
 }
 
 const names = ['cancel', 'terminal', 'retry', 'resolve', 'expand'];
 vm.runInContext("setKind('mlx_model', 'A', '', 1)", context);
 const oldMessages = actions();
-assert.deepEqual(oldMessages, names.map(action => ({ action, session: 1 })),
-	'HS-266: every action must retain the operation that emitted it');
+assert.deepEqual(
+	oldMessages,
+	names.map((action) => ({ action, session: 1 })),
+	'HS-266: every action must retain the operation that emitted it'
+);
 vm.runInContext("setKind('mlx_model', 'B', '', 2); done(false, '', '')", context);
-assert.deepEqual(actions(), names.map(action => ({ action, session: 2 })));
-assert.equal(oldMessages[0].session, 1, 'already posted messages must not acquire the successor session');
+assert.deepEqual(
+	actions(),
+	names.map((action) => ({ action, session: 2 }))
+);
+assert.equal(
+	oldMessages[0].session,
+	1,
+	'already posted messages must not acquire the successor session'
+);
 
-for (const invalid of ['null', 'undefined', '0', '-1', '1.5', 'NaN', 'Infinity', "'42'", '{}', '9007199254740992']) {
-	assert.throws(() => vm.runInContext(`setKind('mlx_model', 'invalid', '', ${invalid})`, context),
-		/session/, `explicit invalid session ${invalid} must fail fast`);
-	assert.equal(elements.get('title').textContent, 'B', 'invalid initialization must not mutate the page');
+for (const invalid of [
+	'null',
+	'undefined',
+	'0',
+	'-1',
+	'1.5',
+	'NaN',
+	'Infinity',
+	"'42'",
+	'{}',
+	'9007199254740992'
+]) {
+	assert.throws(
+		() => vm.runInContext(`setKind('mlx_model', 'invalid', '', ${invalid})`, context),
+		/session/,
+		`explicit invalid session ${invalid} must fail fast`
+	);
+	assert.equal(
+		elements.get('title').textContent,
+		'B',
+		'invalid initialization must not mutate the page'
+	);
 }
 vm.runInContext('doTerm()', context);
 assert.deepEqual(messages.splice(0), [{ action: 'terminal', session: 2 }]);
 
 // Feed the actual frontend payloads into the real Lua host after native reuse.
-const luaMessages = oldMessages.map(({ action, session }) =>
-	`{ action = ${JSON.stringify(action)}, session = ${session} }`).join(',');
+const luaMessages = oldMessages
+	.map(({ action, session }) => `{ action = ${JSON.stringify(action)}, session = ${session} }`)
+	.join(',');
 const lua = spawnSync('lua', ['-'], {
 	cwd: path.resolve(__dirname, '../../static/ergopti_plus/macos'),
 	encoding: 'utf8',
@@ -122,9 +166,13 @@ assert.equal(lua.status, 0, lua.stdout + lua.stderr);
 
 vm.runInContext("setKind('mlx_model', 'legacy', ''); done(false, '', '')", context);
 assert.deepEqual(actions(), names, 'three-argument Windows/Linux callers retain string messages');
-context.window.chrome = { webview: {
-	postMessage: message => messages.push(message)
-} };
+context.window.chrome = {
+	webview: {
+		postMessage: (message) => messages.push(message)
+	}
+};
 vm.runInContext("setKind('mlx_model', 'Windows', ''); done(false, '', '')", context);
 assert.deepEqual(actions(), names, 'real WebView2 bridge must preserve legacy string messages');
-console.log('Download session bridge: tagged actions, stale snapshots, validation and legacy hosts passed.');
+console.log(
+	'Download session bridge: tagged actions, stale snapshots, validation and legacy hosts passed.'
+);

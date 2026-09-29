@@ -22,25 +22,57 @@ function fixture(host = 'macos') {
 	let nextTimer = 0;
 	const requests = [];
 	const renders = [];
-	const elements = { date_start: { value: '2026-09-01' }, date_end: { value: '2026-09-01' },
-		metrics_table_body: { innerHTML: 'last-good' }, btn_case_sensitive: { classList: { contains: () => true } } };
-	const state = { loading_data: false, range_request_sequence: 0, active_range_request_id: 0,
-		range_request_watchdog: null, available_apps: ['Editor', 'Browser'], selected_apps: new Set(['Editor']),
-		app_selection_mode: 'subset' };
-	const context = vm.createContext({ app_state: state,
-		APP_SELECTION_MODE: { ALL: 'all', NONE: 'none', SUBSET: 'subset', UNINITIALIZED: 'uninitialized' },
-		document: { getElementById: (id) => elements[id] || null }, console,
-		setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
-		clearTimeout(id) { timers.delete(id); } });
+	const elements = {
+		date_start: { value: '2026-09-01' },
+		date_end: { value: '2026-09-01' },
+		metrics_table_body: { innerHTML: 'last-good' },
+		btn_case_sensitive: { classList: { contains: () => true } }
+	};
+	const state = {
+		loading_data: false,
+		range_request_sequence: 0,
+		active_range_request_id: 0,
+		range_request_watchdog: null,
+		available_apps: ['Editor', 'Browser'],
+		selected_apps: new Set(['Editor']),
+		app_selection_mode: 'subset'
+	};
+	const context = vm.createContext({
+		app_state: state,
+		APP_SELECTION_MODE: {
+			ALL: 'all',
+			NONE: 'none',
+			SUBSET: 'subset',
+			UNINITIALIZED: 'uninitialized'
+		},
+		document: { getElementById: (id) => elements[id] || null },
+		console,
+		setTimeout(fn, delay) {
+			const id = ++nextTimer;
+			timers.set(id, { fn, delay });
+			return id;
+		},
+		clearTimeout(id) {
+			timers.delete(id);
+		}
+	});
 	context.window = context;
-	if (host === 'windows') context.chrome = { webview: { postMessage: (raw) => requests.push(JSON.parse(raw)) } };
+	if (host === 'windows')
+		context.chrome = { webview: { postMessage: (raw) => requests.push(JSON.parse(raw)) } };
 	if (host === 'linux') {
 		context.__ergopti_host = 'linux';
-		context.webkit = { messageHandlers: { metrics_typing_bridge: { postMessage: (req) => requests.push(req) } } };
+		context.webkit = {
+			messageHandlers: { metrics_typing_bridge: { postMessage: (req) => requests.push(req) } }
+		};
 	}
-	context.RANGE_REQUEST_WATCHDOG_MS = Number(fs.readFileSync(path.join(root, 'state.js'), 'utf8')
-		.match(/const RANGE_REQUEST_WATCHDOG_MS = ([\d_]+);/)[1].replaceAll('_', ''));
-	for (const name of ['data.js', 'filters.js']) vm.runInContext(fs.readFileSync(path.join(root, name), 'utf8'), context);
+	context.RANGE_REQUEST_WATCHDOG_MS = Number(
+		fs
+			.readFileSync(path.join(root, 'state.js'), 'utf8')
+			.match(/const RANGE_REQUEST_WATCHDOG_MS = ([\d_]+);/)[1]
+			.replaceAll('_', '')
+	);
+	for (const name of ['data.js', 'filters.js'])
+		vm.runInContext(fs.readFileSync(path.join(root, name), 'utf8'), context);
 	context.compute_manifest_metrics = () => {};
 	context.get_source_mode_flags = () => ({ show_manual: true, show_hs: false, show_llm: false });
 	context.get_local_date_string = () => '2026-09-07';
@@ -50,7 +82,10 @@ function fixture(host = 'macos') {
 	context.render_current_tab = () => renders.push(Object.keys(state.data.c));
 	function dispatch() {
 		for (const [id, timer] of Array.from(timers)) {
-			if (timer.delay === 50) { timers.delete(id); timer.fn(); }
+			if (timer.delay === 50) {
+				timers.delete(id);
+				timer.fn();
+			}
 		}
 		if (host === 'macos' && context._lua_request) {
 			requests.push(JSON.parse(context._lua_request));
@@ -66,8 +101,14 @@ function fixture(host = 'macos') {
 }
 
 function test(name, callback) {
-	try { callback(); passed++; console.log(`ok ${name}`); }
-	catch (error) { failed++; console.error(`FAIL ${name}: ${error.message}`); }
+	try {
+		callback();
+		passed++;
+		console.log(`ok ${name}`);
+	} catch (error) {
+		failed++;
+		console.error(`FAIL ${name}: ${error.message}`);
+	}
 }
 
 const payload = (key) => ({ historical: { c: { [key]: { c: 9 } } }, today: {} });
@@ -75,9 +116,11 @@ const payload = (key) => ({ historical: { c: { [key]: { c: 9 } } }, today: {} })
 for (const host of ['macos', 'windows', 'linux']) {
 	test(`${host}: changed filters revoke pending response (filter-request-ownership)`, () => {
 		const f = fixture(host);
-		f.context.apply_date_app_filters(); f.dispatch();
+		f.context.apply_date_app_filters();
+		f.dispatch();
 		const old = f.requests[0];
-		f.select('Browser'); f.dispatch();
+		f.select('Browser');
+		f.dispatch();
 		assert.equal(f.requests.length, 2);
 		const latest = f.requests[1];
 		assert.ok(latest.request_id > old.request_id);
@@ -95,7 +138,8 @@ for (const host of ['macos', 'windows', 'linux']) {
 		const f = fixture(host);
 		f.context.request_range_data();
 		const oldWatchdog = f.timers.get(f.state.range_request_watchdog).fn;
-		f.select('Browser'); f.select('Editor', '2026-09-03');
+		f.select('Browser');
+		f.select('Editor', '2026-09-03');
 		const current = f.state.active_range_request_id;
 		assert.equal(current, 3);
 		oldWatchdog();
@@ -154,11 +198,16 @@ test('completed identical query can refresh again', () => {
 for (const host of ['windows', 'linux']) {
 	test(`${host}: replacement transport failure restores last-good view`, () => {
 		const f = fixture(host);
-		f.context.request_range_data(); f.dispatch();
+		f.context.request_range_data();
+		f.dispatch();
 		f.select('Browser');
-		const bridge = host === 'windows' ? f.context.chrome.webview
-			: f.context.webkit.messageHandlers.metrics_typing_bridge;
-		bridge.postMessage = () => { throw new Error('native transport unavailable'); };
+		const bridge =
+			host === 'windows'
+				? f.context.chrome.webview
+				: f.context.webkit.messageHandlers.metrics_typing_bridge;
+		bridge.postMessage = () => {
+			throw new Error('native transport unavailable');
+		};
 		f.dispatch();
 		assert.equal(f.state.loading_data, false);
 		assert.equal(f.elements.metrics_table_body.innerHTML, 'last-good');
@@ -183,7 +232,8 @@ test('none selection is distinct from all available apps', () => {
 	f.state.app_selection_mode = 'all';
 	f.context.request_range_data();
 	f.state.app_selection_mode = 'none';
-	f.context.request_range_data(); f.dispatch();
+	f.context.request_range_data();
+	f.dispatch();
 	assert.equal(f.requests.length, 1);
 	assert.equal(f.requests[0].request_id, 2);
 	assert.deepEqual(Array.from(f.requests[0].apps), []);

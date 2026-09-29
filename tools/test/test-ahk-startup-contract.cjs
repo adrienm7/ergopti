@@ -34,13 +34,15 @@ const includeNeedle = '#Include infra/config_io.ahk';
 const useNeedle = '_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)';
 
 if (entry.indexOf(includeNeedle) < 0 || entry.indexOf(includeNeedle) > entry.indexOf(useNeedle)) {
-	errors.push('config_io.ahk must execute before the boot full-save API or any of its module globals are read');
+	errors.push(
+		'config_io.ahk must execute before the boot full-save API or any of its module globals are read'
+	);
 }
 
 for (const name of [
 	'CONFIG_FULL_SAVE_RETRY_DELAY_MS',
 	'CONFIG_FULL_SAVE_FAILURE_RETRY_DELAY_MS',
-	'CONFIG_FULL_SAVE_BOOT_DELAY_MS',
+	'CONFIG_FULL_SAVE_BOOT_DELAY_MS'
 ]) {
 	const assignment = new RegExp(`^global ${name}\\s*:=`, 'gm');
 	const owned = (configIo.match(assignment) || []).length;
@@ -48,23 +50,31 @@ for (const name of [
 }
 
 if (!errorNet.includes('Exc.HasProp("Stack") ? " | " . Exc.Stack : ""')) {
-	errors.push('fatal startup logs must retain the exception stack (file and line), not only the generic message');
+	errors.push(
+		'fatal startup logs must retain the exception stack (file and line), not only the generic message'
+	);
 }
 if (!entry.includes('ERGOPTI_STARTUP_SMOKE_DIR') || !entry.includes('_DriverStartupSmokeDir')) {
 	errors.push('the real entry point must expose the isolated startup-smoke seam');
 }
 if (!entry.includes('EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],')) {
-	errors.push('the startup smoke must continue after first-run personal-shortcuts creation instead of escaping through Reload');
+	errors.push(
+		'the startup smoke must continue after first-run personal-shortcuts creation instead of escaping through Reload'
+	);
 }
 const smokeReady = entry.indexOf('_DriverBootPhase := "ready"');
 const smokeMenuBuild = entry.indexOf('BuildTrayMenuDeferred()', smokeReady);
 const smokeExit = entry.indexOf('DllCall("ExitProcess", "UInt", 0)', smokeMenuBuild);
 if (smokeReady < 0 || smokeMenuBuild < 0 || smokeExit < 0 || smokeMenuBuild > smokeExit) {
-	errors.push('the startup smoke must consume the deferred tray-menu build before reporting a clean boot');
+	errors.push(
+		'the startup smoke must consume the deferred tray-menu build before reporting a clean boot'
+	);
 }
-if (!lifecycle.includes('BuildTrayMenuDeferred()')
-		|| !lifecycle.includes('return false')
-		|| !lifecycle.includes('return true')) {
+if (
+	!lifecycle.includes('BuildTrayMenuDeferred()') ||
+	!lifecycle.includes('return false') ||
+	!lifecycle.includes('return true')
+) {
 	errors.push('the deferred tray-menu builder must expose a status the startup smoke can consume');
 }
 
@@ -87,4 +97,6 @@ if (errors.length) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] AHK startup contract: early globals, fatal diagnostics, and smoke seam are wired.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] AHK startup contract: early globals, fatal diagnostics, and smoke seam are wired.\x1b[0m'
+);

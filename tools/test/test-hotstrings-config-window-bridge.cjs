@@ -144,12 +144,25 @@ for (const action of [...actions].sort()) {
 
 // 4. State-shape parity — the Windows host emits every field key the page reads.
 const FIELD_KEYS = [
-	'categories', 'groups', 'presets', 'global_default_delay_ms',
-	'name', 'group', 'title', 'sections',
-	'delay_ms', 'delay_default_ms', 'delay_overridden',
-	'color', 'color_default', 'color_overridden',
-	'show_tooltip', 'show_tooltip_overridden',
-	'priority', 'priority_default', 'priority_overridden'
+	'categories',
+	'groups',
+	'presets',
+	'global_default_delay_ms',
+	'name',
+	'group',
+	'title',
+	'sections',
+	'delay_ms',
+	'delay_default_ms',
+	'delay_overridden',
+	'color',
+	'color_default',
+	'color_overridden',
+	'show_tooltip',
+	'show_tooltip_overridden',
+	'priority',
+	'priority_default',
+	'priority_overridden'
 ];
 for (const key of FIELD_KEYS) {
 	check(

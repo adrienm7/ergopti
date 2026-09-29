@@ -23,7 +23,10 @@ PRODUCTS = (
     ("apps/AppIconSwitcher", "Karabiner-AppIconSwitcher.app"),
     ("apps/EventViewer", "Karabiner-EventViewer.app"),
     ("apps/MultitouchExtension", "Karabiner-MultitouchExtension.app"),
-    ("apps/ServiceManager-Non-Privileged-Agents", "Karabiner-Elements Non-Privileged Agents v2.app"),
+    (
+        "apps/ServiceManager-Non-Privileged-Agents",
+        "Karabiner-Elements Non-Privileged Agents v2.app",
+    ),
     ("apps/ServiceManager-Privileged-Daemons", "Karabiner-Elements Privileged Daemons v2.app"),
     ("apps/SettingsWindow", "Karabiner-Elements.app"),
     ("apps/Updater", "Karabiner-Updater.app"),
@@ -31,13 +34,25 @@ PRODUCTS = (
     ("apps/ConsoleUserServer", "Karabiner-Console-User-Server.app"),
     ("apps/CoreService", "Karabiner-Core-Service.app"),
 )
-BUILD_STEP = 'echo "make build"\nruby scripts/reduce-logs.rb \'make build\' || exit 99'
+BUILD_STEP = "echo \"make build\"\nruby scripts/reduce-logs.rb 'make build' || exit 99"
 SIGN_STEP = 'bash scripts/codesign.sh "pkgroot"'
 
 LAUNCHD_RESOURCES = (
-    ("src/apps/ServiceManager-Non-Privileged-Agents/LaunchAgents", "apps/ServiceManager-Non-Privileged-Agents", "LaunchAgents"),
-    ("src/apps/ServiceManager-Privileged-Daemons/LaunchDaemons", "apps/ServiceManager-Privileged-Daemons", "LaunchDaemons"),
-    ("vendor/Karabiner-DriverKit-VirtualHIDDevice/files/LaunchDaemons", "apps/ServiceManager-Privileged-Daemons", "LaunchDaemons"),
+    (
+        "src/apps/ServiceManager-Non-Privileged-Agents/LaunchAgents",
+        "apps/ServiceManager-Non-Privileged-Agents",
+        "LaunchAgents",
+    ),
+    (
+        "src/apps/ServiceManager-Privileged-Daemons/LaunchDaemons",
+        "apps/ServiceManager-Privileged-Daemons",
+        "LaunchDaemons",
+    ),
+    (
+        "vendor/Karabiner-DriverKit-VirtualHIDDevice/files/LaunchDaemons",
+        "apps/ServiceManager-Privileged-Daemons",
+        "LaunchDaemons",
+    ),
 )
 
 
@@ -46,7 +61,9 @@ def pinned_root(root):
     if sys.platform != "darwin":
         raise RuntimeError("Candidate packaging requires native macOS tools")
     root = Path(root).resolve()
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    revision = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
     if revision != REVISION:
         raise ValueError("Candidate requires the inspected Karabiner revision")
     return root
@@ -62,19 +79,33 @@ def build(root):
             raise ValueError("Refusing modified upstream build commands")
     with tempfile.TemporaryDirectory(prefix="ergopti-build-tools-") as directory:
         wrapper = Path(directory) / "xcodebuild"
-        wrapper.write_text('#!/bin/sh\nexec /usr/bin/xcodebuild -jobs 2 "$@"\n', encoding="utf-8", newline="\n")
+        wrapper.write_text(
+            '#!/bin/sh\nexec /usr/bin/xcodebuild -jobs 2 "$@"\n', encoding="utf-8", newline="\n"
+        )
         wrapper.chmod(0o755)
         environment = os.environ.copy()
         environment["PATH"] = directory + os.pathsep + environment["PATH"]
-        subprocess.run(["/usr/bin/make", "-C", str(root / "src"), "all"], env=environment, check=True)
+        subprocess.run(
+            ["/usr/bin/make", "-C", str(root / "src"), "all"], env=environment, check=True
+        )
     # The service-manager recipes copy launchd plists after Xcode signing.
     # Seal the complete candidate only after those upstream mutations finish.
     for component, name in PRODUCTS:
         product = root / "src" / component / "build/Release" / name
         if not product.exists() or product.resolve() != product:
             raise ValueError("Missing or redirected product before candidate signing")
-        subprocess.run(["/usr/bin/codesign", "--force", "--deep",
-                        "--preserve-metadata=identifier,entitlements,flags", "--sign", "-", str(product)], check=True)
+        subprocess.run(
+            [
+                "/usr/bin/codesign",
+                "--force",
+                "--deep",
+                "--preserve-metadata=identifier,entitlements,flags",
+                "--sign",
+                "-",
+                str(product),
+            ],
+            check=True,
+        )
 
 
 def verify_launchd_resources(root):
@@ -85,10 +116,22 @@ def verify_launchd_resources(root):
         resources = sorted((root / source).glob("*.plist"))
         if not resources:
             raise ValueError("Missing upstream launchd resources")
-        target = root / "src" / component / "build/Release" / names[component] / "Contents/Library" / folder
+        target = (
+            root
+            / "src"
+            / component
+            / "build/Release"
+            / names[component]
+            / "Contents/Library"
+            / folder
+        )
         for resource in resources:
             destination = target / resource.name
-            if destination in copied or resource.resolve() != resource or destination.resolve() != destination:
+            if (
+                destination in copied
+                or resource.resolve() != resource
+                or destination.resolve() != destination
+            ):
                 raise ValueError("Conflicting or redirected launchd resources")
             if not destination.is_file() or destination.read_bytes() != resource.read_bytes():
                 raise ValueError("Missing or changed launchd resource in candidate")
@@ -116,8 +159,13 @@ def inspect_product(product, verify=native):
             raise ValueError("Missing or redirected product metadata")
         metadata = plistlib.loads(info.read_bytes())
         name = metadata.get("CFBundleExecutable")
-        if (not isinstance(name, str) or not name or name in (".", "..")
-                or "/" in name or "\\" in name):
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in (".", "..")
+            or "/" in name
+            or "\\" in name
+        ):
             raise ValueError("Invalid product executable name")
         executable = product / "Contents/MacOS" / name
     if not executable.is_file() or executable.resolve() != executable:
@@ -131,8 +179,12 @@ def inspect_product(product, verify=native):
     architectures = verify(["/usr/bin/lipo", "-archs", str(executable)]).split()
     if sorted(architectures) != ["arm64", "x86_64"]:
         raise ValueError("Karabiner candidate must contain both supported architectures")
-    return {"executable": executable, "sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
-            "architectures": sorted(architectures), "team_identifier": team}
+    return {
+        "executable": executable,
+        "sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+        "architectures": sorted(architectures),
+        "team_identifier": team,
+    }
 
 
 def inspect_products(root, verify=native):
@@ -155,10 +207,17 @@ def packaging_script(source, receipt):
     """Reuse the pinned upstream assembly after the complete build was verified."""
     if source.count(BUILD_STEP) != 1 or source.count(SIGN_STEP) != 1:
         raise ValueError("Pinned Karabiner packaging script changed")
-    source = source.replace(BUILD_STEP, '# All components were built and verified by the caller.', 1)
-    target = 'pkgroot/Library/Application Support/org.pqrs/Karabiner-Elements/ergopti-candidate.json'
-    return source.replace(SIGN_STEP, 'cp ' + shlex.quote(str(receipt)) + ' ' + shlex.quote(target)
-                          + "\n" + SIGN_STEP, 1)
+    source = source.replace(
+        BUILD_STEP, "# All components were built and verified by the caller.", 1
+    )
+    target = (
+        "pkgroot/Library/Application Support/org.pqrs/Karabiner-Elements/ergopti-candidate.json"
+    )
+    return source.replace(
+        SIGN_STEP,
+        "cp " + shlex.quote(str(receipt)) + " " + shlex.quote(target) + "\n" + SIGN_STEP,
+        1,
+    )
 
 
 def assemble(root, output):
@@ -167,7 +226,9 @@ def assemble(root, output):
     output = Path(output).resolve()
     # Upstream assembly owns these paths in its disposable build checkout.
     version = (root / "version").read_text(encoding="utf-8").strip()
-    pinned_version = subprocess.check_output(["git", "-C", str(root), "show", "HEAD:version"], text=True).strip()
+    pinned_version = subprocess.check_output(
+        ["git", "-C", str(root), "show", "HEAD:version"], text=True
+    ).strip()
     if version != pinned_version or not version or any(c not in "0123456789." for c in version):
         raise ValueError("Unexpected upstream package version")
     archive = root / ("Karabiner-Elements-" + version + ".dmg")
@@ -178,11 +239,17 @@ def assemble(root, output):
         raise ValueError("Candidate output must be new")
     products = inspect_products(root)
     source = (root / "make-package.sh").read_text(encoding="utf-8")
-    pinned_source = subprocess.check_output(["git", "-C", str(root), "show", "HEAD:make-package.sh"]).decode("utf-8")
+    pinned_source = subprocess.check_output(
+        ["git", "-C", str(root), "show", "HEAD:make-package.sh"]
+    ).decode("utf-8")
     if source != pinned_source:
         raise ValueError("Refusing modified upstream packaging commands")
-    receipt = {"kind": "ergopti-karabiner-candidate", "coverage": "fixture_only",
-               "upstream_revision": REVISION, "products": products}
+    receipt = {
+        "kind": "ergopti-karabiner-candidate",
+        "coverage": "fixture_only",
+        "upstream_revision": REVISION,
+        "products": products,
+    }
     with tempfile.TemporaryDirectory(prefix="ergopti-candidate-") as temporary:
         temporary = Path(temporary)
         identity = temporary / "identity.json"
@@ -199,8 +266,9 @@ def assemble(root, output):
         with destination.open("rb") as image:
             digest = hashlib.file_digest(image, "sha256").hexdigest()
         receipt["package"] = {"file_name": destination.name, "sha256": digest}
-        (output / "identity.json").write_text(json.dumps(receipt, indent=2) + "\n",
-                                             encoding="utf-8", newline="\n")
+        (output / "identity.json").write_text(
+            json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n"
+        )
 
 
 if __name__ == "__main__":

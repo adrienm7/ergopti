@@ -143,7 +143,8 @@ const namespaced = entries.filter((e) =>
 );
 
 const fellThrough = entries.filter(
-	(e) => !candidateKeys(e.key, e.path).some((c) => catalogue[c] !== undefined && catalogue[c] !== '')
+	(e) =>
+		!candidateKeys(e.key, e.path).some((c) => catalogue[c] !== undefined && catalogue[c] !== '')
 );
 
 if (process.argv.includes('--measure')) {
@@ -173,7 +174,7 @@ if (fellThrough.length > FALLTHROUGH_BASELINE) {
 		`\x1b[31m[ERROR] Manifest entries with no translated label rose to ${fellThrough.length} (baseline ${FALLTHROUGH_BASELINE}).\x1b[0m`
 	);
 	console.error(
-		'  The candidate chain ends by returning the path\'s last segment, so this never\n' +
+		"  The candidate chain ends by returning the path's last segment, so this never\n" +
 			'  fails at runtime — it shows an English identifier inside a translated menu.\n' +
 			'  Add the key to the locale catalogues. Do NOT raise the baseline.'
 	);

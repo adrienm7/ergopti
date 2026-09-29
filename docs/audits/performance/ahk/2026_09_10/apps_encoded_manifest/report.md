@@ -34,10 +34,10 @@ but desktop load was uncontrolled and absolute times varied substantially.
 Receipt: `apps-encoded-manifest-production-01.log`, process exit 0.
 
 | Sample | Ordinary Apps build and encode (ms) | Encoded Apps build and encode (ms) |
-| --- | --- | --- |
-| 1 | 3000.698 | 2589.435 |
-| 2 | 4202.340 | 3753.600 |
-| 3 | 4804.111 | 4135.169 |
+| ------ | ----------------------------------- | ---------------------------------- |
+| 1      | 3000.698                            | 2589.435                           |
+| 2      | 4202.340                            | 3753.600                           |
+| 3      | 4804.111                            | 4135.169                           |
 
 Reduction: 411.263–668.942 ms, approximately 10.7–13.9 percent. Maximum candidate
 sample: 4135.169 ms. This is a small sample with fixed ordering, not a latency

@@ -44,5 +44,10 @@ if [ -n "$STAGED_LUA_TESTS" ]; then
     fi
 fi
 
+# Formatting — Prettier and Ruff rewrite the staged files they own and
+# re-stage them, so every commit carries formatted bytes; CI's check then
+# never finds a diff. A staged file with unstaged changes is refused.
+node tools/lint/format.cjs --staged
+
 # Lint coding conventions — blocks commit on any violation.
 node tools/lint/lint-conventions.js --fail-on-violations

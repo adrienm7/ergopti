@@ -41,7 +41,7 @@ const RUN_ALL = path.join(WINDOWS_TESTS, 'run_all.ahk');
 const AHK_CANDIDATES = [
 	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe',
 	'C:\\Program Files\\AutoHotkey\\AutoHotkey64.exe',
-	'C:\\Program Files (x86)\\AutoHotkey\\v2\\AutoHotkey64.exe',
+	'C:\\Program Files (x86)\\AutoHotkey\\v2\\AutoHotkey64.exe'
 ];
 
 // ==================================================
@@ -64,7 +64,11 @@ function changedFiles(range, repoRoot = REPO_ROOT) {
 	const args = range
 		? ['diff', '--name-only', '--no-renames', '-z', '--end-of-options', range, '--']
 		: ['status', '--porcelain=v1', '-z', '--untracked-files=all'];
-	const out = execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+	const out = execFileSync('git', args, {
+		cwd: repoRoot,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe']
+	});
 	return parseChangedPaths(out, !range);
 }
 
@@ -76,7 +80,8 @@ function changedFiles(range, repoRoot = REPO_ROOT) {
  */
 function parseChangedPaths(output, status) {
 	if (output === '') return [];
-	if (!output.endsWith('\0')) throw new Error('Git changed-path stream is missing its terminal NUL');
+	if (!output.endsWith('\0'))
+		throw new Error('Git changed-path stream is missing its terminal NUL');
 	const records = output.slice(0, -1).split('\0');
 	const files = [];
 	for (let index = 0; index < records.length; index += 1) {
@@ -86,7 +91,8 @@ function parseChangedPaths(output, status) {
 			files.push(record);
 			continue;
 		}
-		if (record.length <= 3 || !/^[ MADRCU?!T]{2} /.test(record)) throw new Error('Git status record is missing its status or path');
+		if (record.length <= 3 || !/^[ MADRCU?!T]{2} /.test(record))
+			throw new Error('Git status record is missing its status or path');
 		files.push(record.slice(3));
 		if (/[RC]/.test(record.slice(0, 2))) {
 			const original = records[++index];
@@ -122,7 +128,7 @@ function checkTestsAreRegistered(files, repoRoot = REPO_ROOT) {
 		if (!fs.existsSync(absolute)) continue;
 		if (!reachable.has(absolute.toLowerCase())) {
 			problems.push(
-				`${f} is not #Include'd by tests/run_all.ahk — it will never run, and the suite will pass without it`,
+				`${f} is not #Include'd by tests/run_all.ahk — it will never run, and the suite will pass without it`
 			);
 		}
 	}
@@ -258,8 +264,10 @@ function hasAhkFunctionDefinition(source, name) {
  * @returns {string[]} Human-readable problems.
  */
 function checkScannedSymbolsExist(files) {
-	const testFiles = files.filter((f) =>
-		/static\/ergopti_plus\/windows\/tests\/.*\.ahk$/.test(f) && fs.existsSync(path.join(REPO_ROOT, f)),
+	const testFiles = files.filter(
+		(f) =>
+			/static\/ergopti_plus\/windows\/tests\/.*\.ahk$/.test(f) &&
+			fs.existsSync(path.join(REPO_ROOT, f))
 	);
 	if (testFiles.length === 0) return [];
 
@@ -269,7 +277,8 @@ function checkScannedSymbolsExist(files) {
 		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 			const p = path.join(dir, entry.name);
 			const posix = p.replace(/\\/g, '/');
-			if (posix.includes('/tests/') || posix.includes('/vendor/') || posix.includes('/_generated/')) continue;
+			if (posix.includes('/tests/') || posix.includes('/vendor/') || posix.includes('/_generated/'))
+				continue;
 			if (entry.isDirectory()) walk(p);
 			else if (entry.name.endsWith('.ahk')) driverSource += '\n' + fs.readFileSync(p, 'utf8');
 		}
@@ -286,7 +295,7 @@ function checkScannedSymbolsExist(files) {
 			const defined = hasAhkFunctionDefinition(driverSource, name);
 			if (!defined) {
 				problems.push(
-					`${f} scans _DriverFuncBody("${name}") but no such function is defined in the driver — the body comes back empty and every absence assertion on it passes vacuously`,
+					`${f} scans _DriverFuncBody("${name}") but no such function is defined in the driver — the body comes back empty and every absence assertion on it passes vacuously`
 				);
 			}
 		}
@@ -352,13 +361,14 @@ const RULES = [
 	{
 		gate: 'ahk-encoding',
 		why: 'every .ahk must stay UTF-8 BOM + LF; a stray CRLF or a lost BOM breaks the parser in ways that are hard to read',
-		match: (f) => f.endsWith('.ahk'),
+		match: (f) => f.endsWith('.ahk')
 	},
 	{
 		gate: 'ahk-suite',
 		why: 'the AHK unit + meta suite covers the Windows driver — and replays the shared corpora and port contracts',
 		match: (f) =>
-			(f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) || isCrossDriverContract(f),
+			(f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) ||
+			isCrossDriverContract(f)
 	},
 	{
 		gate: 'ahk-parse',
@@ -369,39 +379,37 @@ const RULES = [
 		// nothing at all catches the rest.
 		why: 'a compile parses the WHOLE #Include graph, including the files run_all.ahk cannot include',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk') && !f.includes('/tests/'),
+			f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk') && !f.includes('/tests/')
 	},
 	{
 		gate: 'ahk-e2e',
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/windows/') &&
-			f.endsWith('.ahk') &&
-			!f.includes('/tests/'),
+			f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk') && !f.includes('/tests/')
 	},
 	{
 		gate: 'report-style',
 		why: 'historical performance reports require conventions; driver-doc path guards do not inspect this archive',
-		match: isPerformanceReport,
+		match: isPerformanceReport
 	},
 	{
 		gate: 'js',
 		why: 'port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only',
 		match: (f) =>
-			!isPerformanceReport(f) && (
-			f.includes('/adapters/') ||
-			f.includes('_shared/') ||
-			f.startsWith('static/ergopti_plus/macos/launcher/') ||
-			// A .keylayout edit alone changes the registry checksums the drivers verify.
-			f.startsWith('static/layouts/registry/') ||
-			f.startsWith('tools/') ||
-			f.includes('/locales/') ||
-			f.endsWith('.json') ||
-			f.endsWith('.toml') ||
-			f.endsWith('.js') ||
-			f.endsWith('.cjs') ||
-			f.endsWith('.svelte') ||
-			f.endsWith('.md')),
+			!isPerformanceReport(f) &&
+			(f.includes('/adapters/') ||
+				f.includes('_shared/') ||
+				f.startsWith('static/ergopti_plus/macos/launcher/') ||
+				// A .keylayout edit alone changes the registry checksums the drivers verify.
+				f.startsWith('static/layouts/registry/') ||
+				f.startsWith('tools/') ||
+				f.includes('/locales/') ||
+				f.endsWith('.json') ||
+				f.endsWith('.toml') ||
+				f.endsWith('.js') ||
+				f.endsWith('.cjs') ||
+				f.endsWith('.svelte') ||
+				f.endsWith('.md'))
 	},
 	{
 		gate: 'xkb-python',
@@ -411,12 +419,12 @@ const RULES = [
 		match: (f) =>
 			f.startsWith('static/ergopti/linux/') ||
 			f.startsWith('static/layouts/registry/') ||
-			f.startsWith('static/ergopti_plus/_shared/modules/layouts/'),
+			f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
 	},
 	{
 		gate: 'swift-launcher',
 		why: 'native launcher code must compile and its process-level XCTest must run on macOS; other hosts report the CI deferral explicitly',
-		match: (f) => f.startsWith('static/ergopti_plus/macos/launcher/'),
+		match: (f) => f.startsWith('static/ergopti_plus/macos/launcher/')
 	},
 	{
 		gate: 'hs-e2e',
@@ -427,11 +435,8 @@ const RULES = [
 		// itself does not need a behaviour re-run.
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
-			isSharedLuaSource(f) || (
-				f.startsWith('static/ergopti_plus/macos/') &&
-				f.endsWith('.lua') &&
-				!f.includes('/tests/')
-			),
+			isSharedLuaSource(f) ||
+			(f.startsWith('static/ergopti_plus/macos/') && f.endsWith('.lua') && !f.includes('/tests/'))
 	},
 	{
 		gate: 'hs',
@@ -441,7 +446,8 @@ const RULES = [
 		// ignore the tool's answer.
 		match: (f) =>
 			(f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md')) ||
-			isCrossDriverContract(f) || isSharedLuaSource(f),
+			isCrossDriverContract(f) ||
+			isSharedLuaSource(f)
 	},
 	{
 		gate: 'linux-e2e',
@@ -451,19 +457,17 @@ const RULES = [
 		// what surfaced it.
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
-			isSharedLuaSource(f) || (
-				f.startsWith('static/ergopti_plus/linux/') &&
-				f.endsWith('.lua') &&
-				!f.includes('/tests/')
-			),
+			isSharedLuaSource(f) ||
+			(f.startsWith('static/ergopti_plus/linux/') && f.endsWith('.lua') && !f.includes('/tests/'))
 	},
 	{
 		gate: 'linux',
 		why: 'the Linux driver, its shared Lua runtime, or a shared corpus/port contract changed',
 		match: (f) =>
 			(f.startsWith('static/ergopti_plus/linux/') && !f.endsWith('.md')) ||
-			isCrossDriverContract(f) || isSharedLuaSource(f),
-	},
+			isCrossDriverContract(f) ||
+			isSharedLuaSource(f)
+	}
 ];
 
 function selectGates(files) {
@@ -526,7 +530,7 @@ const GATE_COMMANDS = {
 	'linux-e2e': { npm: 'test:linux:e2e' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
-	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' },
+	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }
 };
 
 function runGate(gate) {
@@ -542,13 +546,15 @@ function runGate(gate) {
 	// native gates noninteractive and route that failure to the inherited receipt.
 	const args = ['/ErrorStdOut', spec.ahk];
 	const options = { cwd: WINDOWS_TESTS, stdio: 'inherit', windowsHide: true };
-	if (spec.ahk !== 'run_all.ahk')
-		return spawnSync(ahk, args, options);
+	if (spec.ahk !== 'run_all.ahk') return spawnSync(ahk, args, options);
 
-	const resultsFile = path.join(os.tmpdir(), `ergopti_ahk_manifest_${process.pid}_${Date.now()}.tap`);
+	const resultsFile = path.join(
+		os.tmpdir(),
+		`ergopti_ahk_manifest_${process.pid}_${Date.now()}.tap`
+	);
 	const result = spawnSync(ahk, args, {
 		...options,
-		env: { ...process.env, ERGOPTI_AHK_RESULTS_FILE: resultsFile },
+		env: { ...process.env, ERGOPTI_AHK_RESULTS_FILE: resultsFile }
 	});
 	let manifest;
 	try {
@@ -556,13 +562,21 @@ function runGate(gate) {
 	} catch (error) {
 		manifest = { complete: false, planned: 0, executed_count: 0, errors: [error.message] };
 	} finally {
-		try { fs.rmSync(resultsFile, { force: true }); } catch { /* best-effort temp cleanup */ }
+		try {
+			fs.rmSync(resultsFile, { force: true });
+		} catch {
+			/* best-effort temp cleanup */
+		}
 	}
 	if (manifest.complete) {
-		console.log(`verify-change: AHK execution manifest complete (${manifest.executed_count}/${manifest.planned}).`);
+		console.log(
+			`verify-change: AHK execution manifest complete (${manifest.executed_count}/${manifest.planned}).`
+		);
 		return result;
 	}
-	console.error(`verify-change: AHK execution manifest incomplete (${manifest.executed_count}/${manifest.planned}).`);
+	console.error(
+		`verify-change: AHK execution manifest incomplete (${manifest.executed_count}/${manifest.planned}).`
+	);
 	for (const error of manifest.errors.slice(0, 20)) console.error(`  - ${error}`);
 	return result.status === 0 ? { ...result, status: 1 } : result;
 }
@@ -585,7 +599,7 @@ function classifyGateResult(gate, result, selectedByChange) {
 		return {
 			kind: 'environment-failure',
 			blockingInDiagnosis: selectedByChange,
-			detail: result.error ? result.error.message : `${gate} process did not start`,
+			detail: result.error ? result.error.message : `${gate} process did not start`
 		};
 	}
 	if (result.status === 0) return { kind: 'pass', blockingInDiagnosis: false, detail: '' };
@@ -593,13 +607,15 @@ function classifyGateResult(gate, result, selectedByChange) {
 		return {
 			kind: 'candidate-regression',
 			blockingInDiagnosis: true,
-			detail: 'this gate covers the current diff; inspect the exact assertion before attributing causality',
+			detail:
+				'this gate covers the current diff; inspect the exact assertion before attributing causality'
 		};
 	}
 	return {
 		kind: 'baseline-or-history',
 		blockingInDiagnosis: false,
-		detail: 'this full-audit gate is not selected by the current diff; reproduce it against the baseline before blocking a scoped change',
+		detail:
+			'this full-audit gate is not selected by the current diff; reproduce it against the baseline before blocking a scoped change'
 	};
 }
 
@@ -630,7 +646,9 @@ function main() {
 		console.log(`verify-change: ${files.length} changed file(s).`);
 		const problems = [...checkTestsAreRegistered(files), ...checkScannedSymbolsExist(files)];
 		if (problems.length > 0) {
-			console.error('\n  SILENT-FAILURE PRE-CHECKS FAILED — these would not have shown up as a red suite:\n');
+			console.error(
+				'\n  SILENT-FAILURE PRE-CHECKS FAILED — these would not have shown up as a red suite:\n'
+			);
 			for (const p of problems) console.error(`   - ${p}`);
 			console.error('');
 			return 1;
@@ -664,11 +682,13 @@ function main() {
 		const res = runGate(gate);
 		// A full audit may run a selected standalone check through its parent
 		// suite. Its failure still covers this change and cannot be exonerated.
-		const coversChange = changeGates.has(gate) || [...changeGates.keys()].some(
-			(changedGate) => GATE_COMMANDS[changedGate]?.coveredBy === gate);
+		const coversChange =
+			changeGates.has(gate) ||
+			[...changeGates.keys()].some((changedGate) => GATE_COMMANDS[changedGate]?.coveredBy === gate);
 		const classification = classifyGateResult(gate, res, coversChange);
 		classifications.push({ gate, ...classification });
-		if (classification.kind === 'environment-deferral') console.log(`  skipped: ${classification.detail}`);
+		if (classification.kind === 'environment-deferral')
+			console.log(`  skipped: ${classification.detail}`);
 		else if (classification.kind !== 'pass') {
 			failed += 1;
 			if (classification.blockingInDiagnosis) diagnosticBlockers += 1;
@@ -682,13 +702,19 @@ function main() {
 		console.log('verify-change diagnosis:');
 		if (nonPassing.length === 0) console.log('  every full-audit gate passed.');
 		for (const item of nonPassing) {
-			console.log(`  - ${item.gate}: ${item.kind}${item.blockingInDiagnosis ? ' (blocks this scoped change)' : ' (reported, non-blocking for this scoped change)'}`);
+			console.log(
+				`  - ${item.gate}: ${item.kind}${item.blockingInDiagnosis ? ' (blocks this scoped change)' : ' (reported, non-blocking for this scoped change)'}`
+			);
 		}
 		if (diagnosticBlockers === 0) {
-			console.log('verify-change: gates required by the current diff passed or were explicitly deferred; unrelated historical reds were not promoted to regressions.');
+			console.log(
+				'verify-change: gates required by the current diff passed or were explicitly deferred; unrelated historical reds were not promoted to regressions.'
+			);
 			return 0;
 		}
-		console.error(`verify-change: ${diagnosticBlockers} current-diff gate(s) still require diagnosis.`);
+		console.error(
+			`verify-change: ${diagnosticBlockers} current-diff gate(s) still require diagnosis.`
+		);
 		return 1;
 	}
 	if (failed > 0) {
@@ -703,7 +729,16 @@ function main() {
 // every selectable gate resolves to a real command, without spawning any suite.
 // The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
 // exactly as before.
-module.exports = { RULES, GATE_COMMANDS, changedFiles, parseChangedPaths, classifyGateResult, selectGates, hasAhkFunctionDefinition, checkTestsAreRegistered };
+module.exports = {
+	RULES,
+	GATE_COMMANDS,
+	changedFiles,
+	parseChangedPaths,
+	classifyGateResult,
+	selectGates,
+	hasAhkFunctionDefinition,
+	checkTestsAreRegistered
+};
 
 if (require.main === module) {
 	process.exit(main());

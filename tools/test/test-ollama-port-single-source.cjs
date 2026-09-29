@@ -89,7 +89,9 @@ if (violations.length > 0 || missingRef.length > 0) {
 		`\x1b[31m[ERROR] The Ollama port default must come from the single shared source (defaults.json llm_ollama_port = ${ssot}).\x1b[0m`
 	);
 	if (violations.length > 0) {
-		console.error(`  Hardcoded ${ssot} literal found (route it through LLM_Defaults / _LLM_DefaultFor("${SHARED_KEY}")):`);
+		console.error(
+			`  Hardcoded ${ssot} literal found (route it through LLM_Defaults / _LLM_DefaultFor("${SHARED_KEY}")):`
+		);
 		for (const v of violations) console.error('    ' + v);
 	}
 	if (missingRef.length > 0) {

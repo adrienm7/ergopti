@@ -40,7 +40,9 @@ if (!archDeclaration) {
 } else {
 	const declared = archDeclaration[1].trim().split(/\s+/).sort();
 	if (JSON.stringify(declared) !== JSON.stringify([...REQUIRED_ARCHS].sort())) {
-		errors.push(`build_macos_app.sh: LAUNCHER_ARCHS must be exactly ${REQUIRED_ARCHS.join(' ')}, got ${declared.join(' ')}.`);
+		errors.push(
+			`build_macos_app.sh: LAUNCHER_ARCHS must be exactly ${REQUIRED_ARCHS.join(' ')}, got ${declared.join(' ')}.`
+		);
 	}
 }
 
@@ -51,11 +53,15 @@ if (!buildFunction) {
 	const body = buildFunction[0];
 	const swiftCalls = body.split(/\r?\n/).filter((line) => /\bswift build\b/.test(line));
 	if (swiftCalls.length !== 2) {
-		errors.push(`build_launcher(): expected the build and --show-bin-path swift calls, found ${swiftCalls.length}.`);
+		errors.push(
+			`build_launcher(): expected the build and --show-bin-path swift calls, found ${swiftCalls.length}.`
+		);
 	}
 	for (const call of swiftCalls) {
 		if (!call.includes('"${LAUNCHER_ARCH_FLAGS[@]}"')) {
-			errors.push(`build_launcher(): swift call does not pass every launcher architecture: ${call.trim()}`);
+			errors.push(
+				`build_launcher(): swift call does not pass every launcher architecture: ${call.trim()}`
+			);
 		}
 	}
 	if (!/lipo -archs "\$built_bin"/.test(body)) {
@@ -63,7 +69,11 @@ if (!buildFunction) {
 	}
 }
 
-if (!/for arch in "\$\{LAUNCHER_ARCHS\[@\]\}"; do\s*\n\s*LAUNCHER_ARCH_FLAGS\+=\(--arch "\$arch"\)/.test(build)) {
+if (
+	!/for arch in "\$\{LAUNCHER_ARCHS\[@\]\}"; do\s*\n\s*LAUNCHER_ARCH_FLAGS\+=\(--arch "\$arch"\)/.test(
+		build
+	)
+) {
 	errors.push('build_macos_app.sh: LAUNCHER_ARCH_FLAGS must be derived from LAUNCHER_ARCHS.');
 }
 
@@ -77,7 +87,12 @@ if (buildFunction && archStart >= 0 && archEnd > archStart) {
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-archs-'));
 	try {
 		fs.writeFileSync(path.join(tmp, 'ErgoptiPlus'), 'product');
-		const replay = (lipoOutput) => spawnSync(bashExecutable(), ['-c', `
+		const replay = (lipoOutput) =>
+			spawnSync(
+				bashExecutable(),
+				[
+					'-c',
+					`
 set -e
 LAUNCHER_DIR="$1"
 log() { :; }
@@ -90,15 +105,25 @@ lipo() { printf '%s\\n' "$LIPO_OUTPUT"; }
 ${archBlock}
 ${buildFunction[0]}
 build_launcher
-`, 'fixture', tmp.replaceAll('\\', '/')], { encoding: 'utf8', timeout: 10000, env: { ...process.env, LIPO_OUTPUT: lipoOutput } });
+`,
+					'fixture',
+					tmp.replaceAll('\\', '/')
+				],
+				{ encoding: 'utf8', timeout: 10000, env: { ...process.env, LIPO_OUTPUT: lipoOutput } }
+			);
 
 		const universal = replay('x86_64 arm64');
 		if (universal.error || universal.status !== 0) {
 			errors.push(`build_launcher() rejected a universal binary: ${universal.stderr.trim()}`);
 		}
 		const swiftLines = universal.stderr.split(/\r?\n/).filter((line) => line.startsWith('SWIFT:'));
-		if (swiftLines.length !== 2 || !swiftLines.every((line) => line.includes('--arch arm64 --arch x86_64'))) {
-			errors.push(`build_launcher() did not pass both architectures to every swift call: ${swiftLines.join(' | ')}`);
+		if (
+			swiftLines.length !== 2 ||
+			!swiftLines.every((line) => line.includes('--arch arm64 --arch x86_64'))
+		) {
+			errors.push(
+				`build_launcher() did not pass both architectures to every swift call: ${swiftLines.join(' | ')}`
+			);
 		}
 		const thin = replay('arm64');
 		if (thin.error || thin.status === 0 || !thin.stderr.includes('lacks the x86_64 slice')) {
@@ -110,8 +135,12 @@ build_launcher
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] macOS launcher is not built as a verified universal binary:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] macOS launcher is not built as a verified universal binary:\x1b[0m'
+	);
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }
-console.log('\x1b[32m[OK] macOS launcher builds for arm64 and x86_64 and verifies both slices.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] macOS launcher builds for arm64 and x86_64 and verifies both slices.\x1b[0m'
+);

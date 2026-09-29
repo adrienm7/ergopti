@@ -3,7 +3,13 @@ name: Native synthetic metrics reader evidence
 on:
   push:
     branches: ['fix/metrics-convergence-2026-09-08', 'fix/linux-metrics-aggregation-2026-09-09']
-    paths: ['tools/bench/**', 'tools/test/*linux-metrics-aggregation-native*', 'static/ergopti_plus/linux/modules/keylogger/sqlite_reader.lua', '.github/workflows/metrics-reader-bench.yml']
+    paths:
+      [
+        'tools/bench/**',
+        'tools/test/*linux-metrics-aggregation-native*',
+        'static/ergopti_plus/linux/modules/keylogger/sqlite_reader.lua',
+        '.github/workflows/metrics-reader-bench.yml'
+      ]
   workflow_dispatch:
     inputs:
       days:

@@ -301,9 +301,7 @@
 				"\r",
 				"</details>\r"
 			],
-			"changelog": [
-				"- **Ci: Normalise line endings**"
-			]
+			"changelog": ["- **Ci: Normalise line endings**"]
 		},
 		{
 			"id": "unknown-body-is-its-own-changelog",
@@ -316,12 +314,7 @@
 				"- Second point",
 				""
 			],
-			"changelog": [
-				"Hand-written notes for this release.",
-				"",
-				"- First point",
-				"- Second point"
-			]
+			"changelog": ["Hand-written notes for this release.", "", "- First point", "- Second point"]
 		}
 	]
 }

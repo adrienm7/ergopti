@@ -6,19 +6,19 @@ Defines the full physical key remapping for the Ergopti layout: base layer, Shif
 
 ## Ports used (`_shared/core/ports/`)
 
-| Port             | Usage                                                          |
-| ---------------- | -------------------------------------------------------------- |
-| `KeyboardHook`   | `#HotIf`-gated hotkeys for every remapped key                   |
-| `TimerScheduler` | HKL poll timer (`LAYOUT_POLL_INTERVAL_MS`)                     |
-| `WindowInfo`     | `ImmGetDefaultIMEWnd` to detect IME-active windows             |
+| Port             | Usage                                              |
+| ---------------- | -------------------------------------------------- |
+| `KeyboardHook`   | `#HotIf`-gated hotkeys for every remapped key      |
+| `TimerScheduler` | HKL poll timer (`LAYOUT_POLL_INTERVAL_MS`)         |
+| `WindowInfo`     | `ImmGetDefaultIMEWnd` to detect IME-active windows |
 
 ## Public API
 
-| File                    | Description                                                         |
-| ----------------------- | ------------------------------------------------------------------- |
-| `layout.ahk`            | All `#HotIf`-gated remap hotkeys; `DeadKey()` dispatcher           |
-| `layout/`               | Sub-folder with per-dead-key resolution tables (`circumflex.ahk`, …) |
-| `layout_poll_helper.ahk`| `LayoutPoll_GetHKL()` and `LayoutPoll_Changed()` HKL detection      |
+| File                     | Description                                                          |
+| ------------------------ | -------------------------------------------------------------------- |
+| `layout.ahk`             | All `#HotIf`-gated remap hotkeys; `DeadKey()` dispatcher             |
+| `layout/`                | Sub-folder with per-dead-key resolution tables (`circumflex.ahk`, …) |
+| `layout_poll_helper.ahk` | `LayoutPoll_GetHKL()` and `LayoutPoll_Changed()` HKL detection       |
 
 ## Init pattern
 

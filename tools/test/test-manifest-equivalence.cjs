@@ -600,10 +600,7 @@ if (!ahkExists || !luaExists || !fixtureExists) {
 const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
 const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
 const fixtureSrc = fs.readFileSync(FIXTURE_CONFIG, 'utf8');
-const manifestSrc = fs.readFileSync(
-	shared('modules/features/manifest.toml'),
-	'utf8'
-);
+const manifestSrc = fs.readFileSync(shared('modules/features/manifest.toml'), 'utf8');
 
 // Build the set of feature paths that use default_per_platform — their defaults
 // are intentionally different between drivers and must not be compared.

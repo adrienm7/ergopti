@@ -53,8 +53,23 @@ const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui'];
 // Lua/AHK scanner should reach them. Their dedicated build gates remain
 // responsible for their source.
 const NON_SOURCE = new Set([
-	'tests', 'data', '_generated', 'vendor', 'build', 'docs', 'extensions', 'old', 'scripts',
-	'apps', 'launcher', 'bin', 'install', 'native', '__pycache__', '.pytest_cache', '.venv',
+	'tests',
+	'data',
+	'_generated',
+	'vendor',
+	'build',
+	'docs',
+	'extensions',
+	'old',
+	'scripts',
+	'apps',
+	'launcher',
+	'bin',
+	'install',
+	'native',
+	'__pycache__',
+	'.pytest_cache',
+	'.venv'
 ]);
 
 // A list literal naming two or more canonical trees, in any of the three
@@ -70,11 +85,10 @@ function treesIn(literal) {
 	return CANONICAL_TREES.filter((t) => new RegExp(`["']${t}/?["']`).test(literal));
 }
 
-const trackedPaths = execFileSync(
-	'git',
-	['ls-files', '--cached', '-z'],
-	{ cwd: ROOT, encoding: 'utf8' }
-)
+const trackedPaths = execFileSync('git', ['ls-files', '--cached', '-z'], {
+	cwd: ROOT,
+	encoding: 'utf8'
+})
 	.split('\0')
 	.filter(Boolean)
 	.map((rel) => rel.split(path.sep).join('/'));
@@ -115,13 +129,15 @@ for (const rel of tracked) {
 }
 
 // Every driver's real top-level folders must be known.
-const DRIVERS = [...new Set(
-	trackedPaths
-		.filter((rel) => rel.startsWith(DRIVER_PREFIX))
-		.map((rel) => rel.slice(DRIVER_PREFIX.length).split('/'))
-		.filter((parts) => parts.length >= 3 && parts[1] === 'adapters')
-		.map((parts) => parts[0])
-)].sort();
+const DRIVERS = [
+	...new Set(
+		trackedPaths
+			.filter((rel) => rel.startsWith(DRIVER_PREFIX))
+			.map((rel) => rel.slice(DRIVER_PREFIX.length).split('/'))
+			.filter((parts) => parts.length >= 3 && parts[1] === 'adapters')
+			.map((parts) => parts[0])
+	)
+].sort();
 
 const driverTrees = new Map(DRIVERS.map((driver) => [driver, new Set()]));
 for (const rel of trackedPaths) {
@@ -143,7 +159,8 @@ if (process.argv.includes('--measure')) {
 	console.log(`drivers: ${DRIVERS.join(', ')}`);
 	console.log(`canonical trees: ${CANONICAL_TREES.join(', ')}`);
 	console.log(`\nlists missing a canonical tree: ${incomplete.length}`);
-	for (const i of incomplete) console.log(`  ${i.rel}\n     missing ${i.absent.join(', ')} — ${i.line}`);
+	for (const i of incomplete)
+		console.log(`  ${i.rel}\n     missing ${i.absent.join(', ')} — ${i.line}`);
 	console.log(`\nunknown top-level driver folders: ${unknown.length}`);
 	for (const u of unknown) console.log('  ' + u);
 	process.exit(0);
@@ -186,7 +203,9 @@ if (unknown.length > 0) {
 	);
 }
 if (failed) {
-	console.error('  Run `node tools/test/test-source-trees-are-scanned.cjs --measure` for the full list.');
+	console.error(
+		'  Run `node tools/test/test-source-trees-are-scanned.cjs --measure` for the full list.'
+	);
 	process.exit(1);
 }
 

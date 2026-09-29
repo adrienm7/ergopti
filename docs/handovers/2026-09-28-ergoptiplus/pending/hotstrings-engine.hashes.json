@@ -1,12 +1,12 @@
 [
-  {
-    "path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
-    "before": "c2476902e27df03e22c71829401f7a4e29afa75bb9f93891b4bc52d9e6d8326b",
-    "after": "0945661471732954c714e9aa7dd1dc3b04b363d9f55c7a0a48d8c2485edd52b3"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/meta/test_shared_hotstring_engine.lua",
-    "before": "be4af6687b2e0a8081be4d10a00e6841f8d7af97fa6b4bdb932bc270ba0f955a",
-    "after": "69e64100da390d43e6d543e7c13959ea91c055e8ec1e34acfe52dea4ab83bc81"
-  }
+	{
+		"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+		"before": "c2476902e27df03e22c71829401f7a4e29afa75bb9f93891b4bc52d9e6d8326b",
+		"after": "0945661471732954c714e9aa7dd1dc3b04b363d9f55c7a0a48d8c2485edd52b3"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/meta/test_shared_hotstring_engine.lua",
+		"before": "be4af6687b2e0a8081be4d10a00e6841f8d7af97fa6b4bdb932bc270ba0f955a",
+		"after": "69e64100da390d43e6d543e7c13959ea91c055e8ec1e34acfe52dea4ab83bc81"
+	}
 ]

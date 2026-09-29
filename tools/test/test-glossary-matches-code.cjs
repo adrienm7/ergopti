@@ -41,7 +41,7 @@ const GLOSSARIES = ['docs/glossary.md', 'static/ergopti_plus/docs/glossary.md'];
 // ever a mistake. Kept explicit so the failure names the replacement.
 const RETIRED_DIRS = new Map([
 	['autohotkey/', 'windows/'],
-	['hammerspoon/', 'macos/'],
+	['hammerspoon/', 'macos/']
 ]);
 
 const NUMBER_WORDS = {
@@ -58,7 +58,7 @@ const NUMBER_WORDS = {
 	nineteen: 19,
 	twenty: 20,
 	'twenty-one': 21,
-	'twenty-two': 22,
+	'twenty-two': 22
 };
 
 const failures = [];
@@ -79,7 +79,10 @@ const ports = fs
 	.map((f) => f.replace('.spec.js', ''))
 	.sort();
 
-check(ports.length > 0, 'no *.spec.js found in _shared/core/ports — the walk is broken, not the glossary');
+check(
+	ports.length > 0,
+	'no *.spec.js found in _shared/core/ports — the walk is broken, not the glossary'
+);
 
 // ==========================================
 // ==========================================
@@ -90,7 +93,9 @@ check(ports.length > 0, 'no *.spec.js found in _shared/core/ports — the walk i
 for (const rel of GLOSSARIES) {
 	const abs = path.join(ROOT, rel);
 	if (!fs.existsSync(abs)) {
-		failures.push(`${rel} does not exist — update GLOSSARIES here rather than leaving a check that scans nothing`);
+		failures.push(
+			`${rel} does not exist — update GLOSSARIES here rather than leaving a check that scans nothing`
+		);
 		continue;
 	}
 	const text = fs.readFileSync(abs, 'utf8');
@@ -119,10 +124,7 @@ for (const rel of GLOSSARIES) {
 	// lists a subset while announcing a total is worse than one that lists none.
 	if (/\bports are:/.test(text)) {
 		const missing = ports.filter((p) => !new RegExp(`\`${p}\``).test(text));
-		check(
-			missing.length === 0,
-			`${rel} enumerates the ports but omits: ${missing.join(', ')}`
-		);
+		check(missing.length === 0, `${rel} enumerates the ports but omits: ${missing.join(', ')}`);
 	}
 }
 

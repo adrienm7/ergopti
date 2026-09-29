@@ -56,7 +56,9 @@ const MAGIC = declared ? declared[1] : null;
 // gets no entry at all and has no choice but to hardcode. That is exactly how
 // the Linux backslash survived.
 if (MAGIC) {
-	const section = /\[sections\.hotstrings\][\s\S]{0,300}?platforms\s*=\s*\[([^\]]*)\]/.exec(manifestSrc);
+	const section = /\[sections\.hotstrings\][\s\S]{0,300}?platforms\s*=\s*\[([^\]]*)\]/.exec(
+		manifestSrc
+	);
 	const platforms = section ? section[1] : '';
 	for (const p of ['ahk', 'hs', 'linux']) {
 		if (!platforms.includes(`"${p}"`)) {
@@ -81,7 +83,10 @@ function driverSources(driver) {
 			if (e.isDirectory()) {
 				if (e.name !== 'tests' && e.name !== '_generated' && e.name !== 'vendor') walk(p);
 			} else if (/\.(lua|ahk)$/.test(e.name)) {
-				out.push({ rel: path.relative(ROOT, p).split(path.sep).join('/'), src: fs.readFileSync(p, 'utf8') });
+				out.push({
+					rel: path.relative(ROOT, p).split(path.sep).join('/'),
+					src: fs.readFileSync(p, 'utf8')
+				});
 			}
 		}
 	})(root);
@@ -98,7 +103,7 @@ const ALLOWED = new Set([
 	// The canonical character itself, as the shared engine's exported constant and
 	// as the onboarding page's option list — those ARE the declaration's twins and
 	// are locked to it by the value check below rather than by absence.
-	'static/ergopti_plus/_shared/lua/hotstring_engine/init.lua',
+	'static/ergopti_plus/_shared/lua/hotstring_engine/init.lua'
 ]);
 
 let scanned = 0;

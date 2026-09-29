@@ -13,7 +13,9 @@ def runtime_paths():
         if not root.is_absolute():
             raise RuntimeError("Development runtime requires an absolute artifact root")
         core = root / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app"
-        console = root / "src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app"
+        console = (
+            root / "src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app"
+        )
         cli = root / "src/bin/cli/build/Release/karabiner_cli"
     else:
         root = Path("/Library/Application Support/org.pqrs/Karabiner-Elements")

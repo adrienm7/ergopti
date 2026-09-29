@@ -9,8 +9,8 @@
 
 name: Bug report
 description: Something in ErgoptiPlus does not work as expected. / Quelque chose ne fonctionne pas comme prévu.
-title: "[Bug] "
-labels: ["bug"]
+title: '[Bug] '
+labels: ['bug']
 body:
   - type: markdown
     attributes:

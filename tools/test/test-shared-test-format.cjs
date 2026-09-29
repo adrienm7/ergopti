@@ -130,7 +130,10 @@ if (!formatSrc.includes('fail_msg_for')) {
 // ── 4. Ratchet: both assert_eq implementations must use inspect, not tostring ─
 // The old assert_eq used tostring() which produces opaque pointers like
 // "table: 0x1a2b3c". The new one uses M.inspect() for readable values.
-for (const [driver, f] of [['linux', 'tests/helpers.lua'], ['macos', 'tests/helpers/init.lua']]) {
+for (const [driver, f] of [
+	['linux', 'tests/helpers.lua'],
+	['macos', 'tests/helpers/init.lua']
+]) {
 	const base = driver === 'linux' ? LINUX : MACOS;
 	const code = read(f, base);
 	// assert_eq must call M.inspect for debug output, not raw tostring
@@ -163,7 +166,9 @@ for (const [driver, f] of [['linux', 'tests/helpers.lua'], ['macos', 'tests/help
 		const rightEq = m[4].length;
 		const loc = `_shared/lua/test/format.lua:${i + 1}`;
 		if (leftEq !== rightEq) {
-			errors.push(`${loc}: banner "${title}" is unbalanced (${leftEq} left vs ${rightEq} right) — both sides must be 7`);
+			errors.push(
+				`${loc}: banner "${title}" is unbalanced (${leftEq} left vs ${rightEq} right) — both sides must be 7`
+			);
 			return;
 		}
 		const expectedLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
@@ -172,14 +177,18 @@ for (const [driver, f] of [['linux', 'tests/helpers.lua'], ['macos', 'tests/help
 			const bm = bannerLines[adj].match(BORDER_RE);
 			if (!bm || bm[1] !== marker) continue;
 			if (bannerLines[adj].length !== expectedLen) {
-				errors.push(`${loc}: border row (line ${adj + 1}) length ${bannerLines[adj].length} != title-line length ${expectedLen} for "${title}"`);
+				errors.push(
+					`${loc}: border row (line ${adj + 1}) length ${bannerLines[adj].length} != title-line length ${expectedLen} for "${title}"`
+				);
 			}
 		}
 	});
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] test.format is not single-sourced in _shared/lua/test/format.lua:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] test.format is not single-sourced in _shared/lua/test/format.lua:\x1b[0m'
+	);
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }

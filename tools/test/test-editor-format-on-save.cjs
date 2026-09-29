@@ -69,6 +69,24 @@ assert.ok(
 	extensions.recommendations.includes('esbenp.prettier-vscode'),
 	'the Prettier VS Code extension must be recommended'
 );
+assert.deepStrictEqual(
+	vscode['[python]'],
+	{
+		'editor.defaultFormatter': 'charliermarsh.ruff',
+		'editor.formatOnSave': true,
+		'editor.formatOnSaveMode': 'file'
+	},
+	'VS Code Python files must use Ruff on save'
+);
+assert.ok(
+	extensions.recommendations.includes('charliermarsh.ruff'),
+	'the Ruff VS Code extension must be recommended'
+);
+assert.deepStrictEqual(
+	zed.languages.Python?.formatter,
+	{ language_server: { name: 'ruff' } },
+	'Zed Python files must use Ruff on save'
+);
 assert.ok(
 	extensions.recommendations.includes('svelte.svelte-vscode'),
 	'the Svelte language extension must be recommended'
@@ -128,6 +146,7 @@ assert.ok(
 	'Prettier 3 must not receive the removed pluginSearchDirs option'
 );
 assert.strictEqual(pkg.scripts.lint, 'prettier --check . && eslint .');
-assert.strictEqual(pkg.scripts.format, 'prettier --write .');
+assert.strictEqual(pkg.scripts.format, 'node ./tools/lint/format.cjs --write');
+assert.strictEqual(pkg.scripts['format:check'], 'node ./tools/lint/format.cjs --check');
 
 console.log('OK: VS Code and Zed use the repository Prettier only for supported formats');

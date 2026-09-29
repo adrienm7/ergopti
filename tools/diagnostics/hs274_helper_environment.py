@@ -34,7 +34,10 @@ def authenticate(directory):
         raise ValueError("Redirected native helper artifact")
     if json.loads(receipt.read_text(encoding="utf-8")) != expected:
         raise ValueError("Helper artifact differs from the accepted native receipt")
-    if digest(archive) != expected["archive_sha256"] or archive.stat().st_size != expected["archive_bytes"]:
+    if (
+        digest(archive) != expected["archive_sha256"]
+        or archive.stat().st_size != expected["archive_bytes"]
+    ):
         raise ValueError("Helper archive integrity failed")
     if source_identity() != expected["sources"]:
         raise ValueError("Current native sources differ from the retained helper")
@@ -53,7 +56,9 @@ def observe(directory, hammerspoon, output):
     subprocess.run(["/usr/bin/ditto", "-x", "-k", str(archive), str(native_root)], check=True)
     helper_app = native_root / "ErgoptiPlus.app"
     helper = helper_app / "Contents/MacOS/ErgoptiPlus"
-    subprocess.run(["/usr/bin/codesign", "--verify", "--strict", "--deep", str(helper_app)], check=True)
+    subprocess.run(
+        ["/usr/bin/codesign", "--verify", "--strict", "--deep", str(helper_app)], check=True
+    )
     if digest(helper) != selection()["identity"]["executable_sha256"]:
         raise ValueError("Extracted native helper executable changed")
     copied = native_root / "Hammerspoon.app"
@@ -66,19 +71,32 @@ def observe(directory, hammerspoon, output):
     executable = copied / "Contents/MacOS/Hammerspoon"
     result = output / "result.json"
     identity = helper.stat()
-    config = {"repo": str(here.parents[1]), "helper": str(helper), "result": str(result),
-              "wrong_inode": str(identity.st_ino + 1), "environment": {
-                  "ERGOPTI_LAUNCHER_EXECUTABLE": str(helper), "ERGOPTI_LAUNCHER_DEVICE": str(identity.st_dev),
-                  "ERGOPTI_LAUNCHER_INODE": str(identity.st_ino)}}
-    (native_root / "helper-environment-config.json").write_text(json.dumps(config), encoding="utf-8", newline="\n")
+    config = {
+        "repo": str(here.parents[1]),
+        "helper": str(helper),
+        "result": str(result),
+        "wrong_inode": str(identity.st_ino + 1),
+        "environment": {
+            "ERGOPTI_LAUNCHER_EXECUTABLE": str(helper),
+            "ERGOPTI_LAUNCHER_DEVICE": str(identity.st_dev),
+            "ERGOPTI_LAUNCHER_INODE": str(identity.st_ino),
+        },
+    }
+    (native_root / "helper-environment-config.json").write_text(
+        json.dumps(config), encoding="utf-8", newline="\n"
+    )
     environment = os.environ.copy()
     for name in config["environment"]:
         environment.pop(name, None)
     lifecycle = native_lifecycle()
     native = lifecycle.NativeProcesses()
     with (output / "launch.log").open("xb") as log:
-        launcher = subprocess.Popen(["/usr/bin/open", "-n", "-g", "-W", str(copied), "--args", "-MJConfigFile", str(init)],
-                                    env=environment, stdout=log, stderr=subprocess.STDOUT)
+        launcher = subprocess.Popen(
+            ["/usr/bin/open", "-n", "-g", "-W", str(copied), "--args", "-MJConfigFile", str(init)],
+            env=environment,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
         try:
             deadline = time.monotonic() + 20
             while not result.exists():
@@ -86,15 +104,22 @@ def observe(directory, hammerspoon, output):
                     raise RuntimeError("Native Hammerspoon environment probe did not settle")
                 time.sleep(0.05)
             receipt = json.loads(result.read_text(encoding="utf-8"))
-            if (receipt.get("error") or receipt.get("good_exit") != 0 or receipt.get("wrong_identity_exit") != 64
-                    or receipt.get("parent_identity_absent") is not True or receipt.get("forbidden_started") is not False
-                    or len(native.matching(executable)) != 1):
+            if (
+                receipt.get("error")
+                or receipt.get("good_exit") != 0
+                or receipt.get("wrong_identity_exit") != 64
+                or receipt.get("parent_identity_absent") is not True
+                or receipt.get("forbidden_started") is not False
+                or len(native.matching(executable)) != 1
+            ):
                 raise RuntimeError("Native task environment acceptance failed: " + repr(receipt))
             report["result"] = receipt
         finally:
             lifecycle.cleanup(native, executable, launcher)
             report["application_cleanup"] = "confirmed"
-            (output / "receipt.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
+            (output / "receipt.json").write_text(
+                json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n"
+            )
 
 
 if __name__ == "__main__":
@@ -105,4 +130,6 @@ if __name__ == "__main__":
     elif len(sys.argv) == 4:
         observe(*sys.argv[1:])
     else:
-        raise SystemExit("Expected selection, or artifact directory, Hammerspoon app, and new output directory")
+        raise SystemExit(
+            "Expected selection, or artifact directory, Hammerspoon app, and new output directory"
+        )

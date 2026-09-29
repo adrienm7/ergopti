@@ -205,10 +205,20 @@ function runPage(globals = {}, page = 'changelog') {
 	for (const src of pageScripts(page)) {
 		const file = path.resolve(SHARED_UI, page, src);
 		if (STUBBED_SCRIPTS.has(path.basename(file))) continue;
-		if (!file.startsWith(SHARED_UI + path.sep)) throw new Error(`page script ${src} escapes the shared UI root`);
+		if (!file.startsWith(SHARED_UI + path.sep))
+			throw new Error(`page script ${src} escapes the shared UI root`);
 		vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: src });
 	}
 	return { sandbox, document, posted };
 }
 
-module.exports = { FakeNode, makeText, elements, textNodes, byTag, textOutside, pageScripts, runPage };
+module.exports = {
+	FakeNode,
+	makeText,
+	elements,
+	textNodes,
+	byTag,
+	textOutside,
+	pageScripts,
+	runPage
+};

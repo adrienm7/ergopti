@@ -169,7 +169,8 @@ function resolveDefault(feature, platform) {
 
 function resolveRecommended(feature, platform) {
 	const value = feature.recommended_per_platform?.[platform] ?? feature.recommended;
-	if (value === undefined) throw new Error(`feature ${feature.path} has no recommended value for ${platform}`);
+	if (value === undefined)
+		throw new Error(`feature ${feature.path} has no recommended value for ${platform}`);
 	return value;
 }
 
@@ -193,9 +194,13 @@ function validate(features) {
 		seen.set(key, f);
 	}
 	for (const f of features) {
-		if ((f.recommended !== undefined) === (f.recommended_per_platform !== undefined)
-			|| typeof f.input_altering !== 'boolean') {
-			throw new Error(`feature ${f.path} needs one recommended source and an input_altering classification`);
+		if (
+			(f.recommended !== undefined) === (f.recommended_per_platform !== undefined) ||
+			typeof f.input_altering !== 'boolean'
+		) {
+			throw new Error(
+				`feature ${f.path} needs one recommended source and an input_altering classification`
+			);
 		}
 		const hasDefault = f.default !== undefined;
 		const hasDefaultPerPlatform = f.default_per_platform !== undefined;
@@ -224,7 +229,10 @@ function validate(features) {
 		// (the Ergopti emulation, the digit-row swap). Only the Windows driver
 		// emulates layouts, and its master gate can only turn a boolean off.
 		if (f.superseded_reason_key !== undefined) {
-			if (typeof f.superseded_reason_key !== 'string' || !/^[a-z][a-z0-9_.]*$/.test(f.superseded_reason_key)) {
+			if (
+				typeof f.superseded_reason_key !== 'string' ||
+				!/^[a-z][a-z0-9_.]*$/.test(f.superseded_reason_key)
+			) {
 				throw new Error(`feature ${f.path} has an invalid superseded_reason_key`);
 			}
 			if (f.type !== 'boolean' || !Array.isArray(f.platforms) || f.platforms.join(',') !== 'ahk') {
@@ -399,7 +407,7 @@ function renderLuaManifest(manifest, sections, features, platform) {
 	lines.push('--- parity with the AHK twin (features_manifest.ahk) and because');
 	lines.push('--- test-manifest-parity.cjs cross-checks it between the two generated');
 	lines.push('--- files — but no Lua module on macOS reads entry.description_key today');
-	lines.push('--- (confirmed via a repo-wide grep; infra/manifest_reader.lua\'s own');
+	lines.push("--- (confirmed via a repo-wide grep; infra/manifest_reader.lua's own");
 	lines.push('--- docstring documents it as exposing only what macOS modules actually');
 	lines.push('--- consume). The AHK driver genuinely resolves every description_key via');
 	lines.push('--- its menu builder. Removing the field from this side alone would break');
@@ -581,9 +589,7 @@ function ensureDir(p) {
 function writeOutput(absPath, content) {
 	ensureDir(dirname(absPath));
 	// AHK source retains UTF-8 BOM and follows the repository-wide LF convention.
-	const payload = absPath.endsWith('.ahk')
-		? '﻿' + content.replace(/\r\n?/g, '\n')
-		: content;
+	const payload = absPath.endsWith('.ahk') ? '﻿' + content.replace(/\r\n?/g, '\n') : content;
 	writeFileSync(absPath, payload, 'utf8');
 	console.log(`Wrote ${absPath} (${content.length} chars)`);
 }

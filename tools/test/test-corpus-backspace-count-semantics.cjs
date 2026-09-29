@@ -47,10 +47,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CORPUS = path.join(
-	ROOT,
-	'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json'
-);
+const CORPUS = path.join(ROOT, 'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json');
 
 const errors = [];
 const corpus = JSON.parse(fs.readFileSync(CORPUS, 'utf8'));
@@ -116,7 +113,10 @@ if (physical_differs === 0) {
 // The measurement above is what makes the claim true; this is what stops the
 // next person having to redo it.
 const doc = JSON.stringify(corpus.field_semantics || {});
-if (!/logical/i.test(doc) || !/backspace_count/.test(JSON.stringify(Object.keys(corpus.field_semantics || {})))) {
+if (
+	!/logical/i.test(doc) ||
+	!/backspace_count/.test(JSON.stringify(Object.keys(corpus.field_semantics || {})))
+) {
 	errors.push(
 		'the corpus has no field_semantics.backspace_count entry explaining that the count is logical ' +
 			'(codepoints replaced) rather than physical (keystrokes emitted). The field name alone reads ' +

@@ -187,8 +187,8 @@ if (count > BASELINE) {
 	);
 	console.error(
 		'  A new test reads a driver source file by a hardcoded path. Use a move-resilient\n' +
-		'  helper instead — _DriverFuncBody("Fn") or _DriverSourceConcat() — so a file move\n' +
-		'  does not break it, or assert behaviour directly. Do NOT raise the baseline.'
+			'  helper instead — _DriverFuncBody("Fn") or _DriverSourceConcat() — so a file move\n' +
+			'  does not break it, or assert behaviour directly. Do NOT raise the baseline.'
 	);
 }
 if (reads > READ_BASELINE) {
@@ -198,8 +198,8 @@ if (reads > READ_BASELINE) {
 	);
 	console.error(
 		'  A file that already reads sources by hardcoded path gained another one — that used\n' +
-		'  to be free, because only files were counted, and a single helper call exempted the\n' +
-		'  whole file. Do NOT raise the baseline.'
+			'  to be free, because only files were counted, and a single helper call exempted the\n' +
+			'  whole file. Do NOT raise the baseline.'
 	);
 }
 if (failed) {

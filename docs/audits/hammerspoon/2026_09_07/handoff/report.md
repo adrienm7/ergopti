@@ -50,17 +50,17 @@ rows are fixture limitations, not additional production findings.
 
 ## Coverage register
 
-| Surface | Evidence in this pass | Boundary |
-| --- | --- | --- |
-| Extension section counts and detail rendering | Canonical reader, registry and actual menu builder probes | Specific valid inputs; not exhaustive TOML grammar |
-| Extension names | Canonical string parsing versus counter output | Shared discovery has the same escape weakness; do not use it as the sole oracle |
-| Application picker ownership | Real controller with reversed native completions | Headless callback ordering, not native visual testing |
-| Application discovery cache | Real controller with failed process receipt and partial stdout | Optional-root handling must be designed before fixing |
-| Metadata candidate | Six red-before/green-after cases, selected full gates | Candidate is not part of audited HEAD or committed delivery |
-| LLM activation tests | 44 executed cases; responsibility and fixture review | No new false-green or redundant case proven |
-| Large test inventory | 1,043 tracked Lua test/support files; 28 over 1,000 split-on-newline lines | Static call-site counts are not executed case counts |
-| Other input/clipboard flows | Brief search_web reading only | No completion claim, no new finding |
-| Native latency, CPU, memory, real keyboard hosts | No new native measurement | G4 remains unmeasured |
+| Surface                                          | Evidence in this pass                                                      | Boundary                                                                        |
+| ------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Extension section counts and detail rendering    | Canonical reader, registry and actual menu builder probes                  | Specific valid inputs; not exhaustive TOML grammar                              |
+| Extension names                                  | Canonical string parsing versus counter output                             | Shared discovery has the same escape weakness; do not use it as the sole oracle |
+| Application picker ownership                     | Real controller with reversed native completions                           | Headless callback ordering, not native visual testing                           |
+| Application discovery cache                      | Real controller with failed process receipt and partial stdout             | Optional-root handling must be designed before fixing                           |
+| Metadata candidate                               | Six red-before/green-after cases, selected full gates                      | Candidate is not part of audited HEAD or committed delivery                     |
+| LLM activation tests                             | 44 executed cases; responsibility and fixture review                       | No new false-green or redundant case proven                                     |
+| Large test inventory                             | 1,043 tracked Lua test/support files; 28 over 1,000 split-on-newline lines | Static call-site counts are not executed case counts                            |
+| Other input/clipboard flows                      | Brief search_web reading only                                              | No completion claim, no new finding                                             |
+| Native latency, CPU, memory, real keyboard hosts | No new native measurement                                                  | G4 remains unmeasured                                                           |
 
 ## Refutations and non-findings
 

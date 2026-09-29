@@ -27,7 +27,7 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCES = {
 	windows: path.join(SP, 'windows', 'ui', 'menu', 'menu_llm', 'menu_settings.ahk'),
 	macos: path.join(SP, 'macos', 'modules', 'llm', 'prediction_engine.lua'),
-	linux: path.join(SP, 'linux', 'modules', 'llm', 'prediction_engine.lua'),
+	linux: path.join(SP, 'linux', 'modules', 'llm', 'prediction_engine.lua')
 };
 const EN = path.join(SP, '_shared', 'data', 'locales', 'en.json');
 const EXPECTED_REASONS = ['paused', 'disabled', 'backend_not_ready', 'empty_context'];
@@ -51,23 +51,35 @@ const pairsOf = (block, pair) => [...block.matchAll(pair)].map((m) => [m[1], m[2
 
 const tables = {};
 const windows = read(SOURCES.windows);
-const winBlock = (windows.match(/global LLM_MANUAL_PREDICTION_REFUSALS := Map\(([\s\S]*?)\n\)/) || [])[1];
-check(typeof winBlock === 'string', 'windows: LLM_MANUAL_PREDICTION_REFUSALS not found in menu_settings.ahk');
+const winBlock = (windows.match(/global LLM_MANUAL_PREDICTION_REFUSALS := Map\(([\s\S]*?)\n\)/) ||
+	[])[1];
+check(
+	typeof winBlock === 'string',
+	'windows: LLM_MANUAL_PREDICTION_REFUSALS not found in menu_settings.ahk'
+);
 tables.windows = pairsOf(winBlock || '', /"(\w+)",\s*"([\w.]+)"/g);
 
 for (const driver of ['macos', 'linux']) {
 	const source = read(SOURCES[driver]);
 	const block = (source.match(/local MANUAL_REFUSAL_KEYS = \{([\s\S]*?)\n\}/) || [])[1];
-	check(typeof block === 'string', `${driver}: MANUAL_REFUSAL_KEYS not found in modules/llm/prediction_engine.lua`);
+	check(
+		typeof block === 'string',
+		`${driver}: MANUAL_REFUSAL_KEYS not found in modules/llm/prediction_engine.lua`
+	);
 	tables[driver] = pairsOf(block || '', /(\w+)\s*=\s*"([\w.]+)"/g);
 }
 
 const en = JSON.parse(read(EN));
 for (const [driver, pairs] of Object.entries(tables)) {
-	check(JSON.stringify(pairs.map(([reason]) => reason)) === JSON.stringify(EXPECTED_REASONS),
-		`${driver}: refusal reasons ${JSON.stringify(pairs.map(([r]) => r))} must be ${JSON.stringify(EXPECTED_REASONS)} in that order`);
+	check(
+		JSON.stringify(pairs.map(([reason]) => reason)) === JSON.stringify(EXPECTED_REASONS),
+		`${driver}: refusal reasons ${JSON.stringify(pairs.map(([r]) => r))} must be ${JSON.stringify(EXPECTED_REASONS)} in that order`
+	);
 	for (const [reason, key] of pairs) {
-		check(key === `llm.manual_prediction.${reason}`, `${driver}: '${reason}' must show llm.manual_prediction.${reason}, not ${key}`);
+		check(
+			key === `llm.manual_prediction.${reason}`,
+			`${driver}: '${reason}' must show llm.manual_prediction.${reason}, not ${key}`
+		);
 		check(typeof en[key] === 'string' && en[key] !== '', `${driver}: en.json lacks ${key}`);
 	}
 }
@@ -75,9 +87,12 @@ for (const [driver, pairs] of Object.entries(tables)) {
 // Each decision function must return the reasons its table declares, so a
 // renamed reason cannot survive in the table and vanish from the decision.
 const decisions = {
-	windows: (windows.match(/LLM_Menu_ManualPredictionRefusal\([^)]*\) \{([\s\S]*?)\n\}/) || [])[1] || '',
-	macos: (read(SOURCES.macos).match(/local function manual_refusal\(\)([\s\S]*?)\nend/) || [])[1] || '',
-	linux: (read(SOURCES.linux).match(/local function manual_refusal\(\)([\s\S]*?)\nend/) || [])[1] || '',
+	windows:
+		(windows.match(/LLM_Menu_ManualPredictionRefusal\([^)]*\) \{([\s\S]*?)\n\}/) || [])[1] || '',
+	macos:
+		(read(SOURCES.macos).match(/local function manual_refusal\(\)([\s\S]*?)\nend/) || [])[1] || '',
+	linux:
+		(read(SOURCES.linux).match(/local function manual_refusal\(\)([\s\S]*?)\nend/) || [])[1] || ''
 };
 for (const [driver, body] of Object.entries(decisions)) {
 	check(body !== '', `${driver}: the refusal decision function was not found`);
@@ -92,4 +107,6 @@ if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
 }
-console.log(`\x1b[32m[OK] manual prediction refusals single source: ${checks} check(s) passed.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] manual prediction refusals single source: ${checks} check(s) passed.\x1b[0m`
+);

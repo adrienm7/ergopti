@@ -33,9 +33,7 @@
 				"at_file_start": true,
 				"max_entries": 50
 			},
-			"expected": [
-				"2026-09-23 10:00:00:001 [WARNING] [Layout] after the byte order mark"
-			]
+			"expected": ["2026-09-23 10:00:00:001 [WARNING] [Layout] after the byte order mark"]
 		},
 		{
 			"id": "cut_inside_first_line",
@@ -44,9 +42,7 @@
 				"at_file_start": false,
 				"max_entries": 50
 			},
-			"expected": [
-				"2026-09-23 10:00:01:002 [ERROR] [Probe] a whole line"
-			]
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] a whole line"]
 		},
 		{
 			"id": "cut_inside_utf8_sequence",
@@ -56,9 +52,7 @@
 				"at_file_start": false,
 				"max_entries": 50
 			},
-			"expected": [
-				"2026-09-23 10:00:01:002 [ERROR] [Probe] résumé café 😀"
-			]
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] résumé café 😀"]
 		},
 		{
 			"id": "cut_exactly_on_a_line_start",
@@ -67,9 +61,7 @@
 				"at_file_start": false,
 				"max_entries": 50
 			},
-			"expected": [
-				"2026-09-23 10:00:01:002 [ERROR] [Probe] kept"
-			]
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] kept"]
 		},
 		{
 			"id": "partial_last_line_is_kept",
@@ -102,9 +94,7 @@
 				"at_file_start": false,
 				"max_entries": 50
 			},
-			"expected": [
-				"2026-09-23 10:00:02:003 [WARNING] [Layout] first whole entry"
-			]
+			"expected": ["2026-09-23 10:00:02:003 [WARNING] [Layout] first whole entry"]
 		},
 		{
 			"id": "dedup_summary_is_an_entry",
@@ -125,9 +115,7 @@
 				"at_file_start": true,
 				"max_entries": 50
 			},
-			"expected": [
-				"2026-09-23 10:00:01:002 [ERROR] [Probe] an issue"
-			]
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] an issue"]
 		},
 		{
 			"id": "blank_lines_are_skipped",

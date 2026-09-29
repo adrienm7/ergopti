@@ -218,13 +218,9 @@ def rebuild_toml_from_structure(structure: dict) -> str:
         # - 2 more blanks for h3 (total 3)
         if not is_first:
             if is_subsection:
-                lines.extend(
-                    ["", ""]
-                )  # 2 blanks before h3 (total 3 with the one after)
+                lines.extend(["", ""])  # 2 blanks before h3 (total 3 with the one after)
             else:
-                lines.extend(
-                    ["", "", "", ""]
-                )  # 4 blanks before h2 (total 5 with the one after)
+                lines.extend(["", "", "", ""])  # 4 blanks before h2 (total 5 with the one after)
 
         display_name = section_display_name(section_key)
         header_lines = create_section_header(display_name, is_subsection)
@@ -297,13 +293,9 @@ def dict_to_toml(data: dict) -> str:
         # - 2 more blanks for h3 (total 3)
         if not is_first:
             if is_subsection:
-                lines.extend(
-                    ["", ""]
-                )  # 2 blanks before h3 (total 3 with the one after)
+                lines.extend(["", ""])  # 2 blanks before h3 (total 3 with the one after)
             else:
-                lines.extend(
-                    ["", "", "", ""]
-                )  # 4 blanks before h2 (total 5 with the one after)
+                lines.extend(["", "", "", ""])  # 4 blanks before h2 (total 5 with the one after)
 
         display_name = section_display_name(section_key)
         header_lines = create_section_header(display_name, is_subsection)
@@ -385,10 +377,7 @@ def _hs_parse(content: str) -> dict:
                 # blank lines that _hs_rebuild injected before the first [[.
                 # These must not end up in meta_lines or the second pass will
                 # produce a longer meta block than the first (non-idempotent).
-                while meta_lines and (
-                    meta_lines[-1] == ""
-                    or meta_lines[-1].startswith("# =")
-                ):
+                while meta_lines and (meta_lines[-1] == "" or meta_lines[-1].startswith("# =")):
                     meta_lines.pop()
             else:
                 meta_lines.append(stripped)
@@ -497,9 +486,7 @@ def print_usage():
     print("- Sorts sections and keys alphabetically")
     print("- Use --preview to show output without modifying the file")
     print("\nGenerate TOML from JSON (for Hammerspoon/AHK integration):")
-    print(
-        "- Read JSON from stdin: cat data.json | format_toml.py --generate output.toml"
-    )
+    print("- Read JSON from stdin: cat data.json | format_toml.py --generate output.toml")
     print("- Or pass inline: format_toml.py --generate output.toml --data '{...}'")
 
 

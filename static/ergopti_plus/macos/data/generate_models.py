@@ -108,9 +108,7 @@ def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
     # If 'total' is missing, sum the individual parameter counts
     if not isinstance(total_p_count, int):
         params_dict = safetensors.get("parameters", {})
-        total_p_count = sum(
-            v for v in params_dict.values() if isinstance(v, int)
-        )
+        total_p_count = sum(v for v in params_dict.values() if isinstance(v, int))
 
     if total_p_count and total_p_count > 0:
         billions = total_p_count / 1e9
@@ -169,9 +167,7 @@ def get_hf_repo_size_gb(repo_url: Optional[str]) -> Optional[float]:
         if response.status_code != 200:
             return None
         files = response.json()
-        total_bytes = sum(
-            f.get("size", 0) for f in files if isinstance(f, dict)
-        )
+        total_bytes = sum(f.get("size", 0) for f in files if isinstance(f, dict))
         return round(total_bytes / (1024**3), 2)
     except requests.RequestException:
         return None
@@ -194,9 +190,7 @@ def get_ollama_size_gb(ollama_url: Optional[str]) -> Optional[float]:
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        response = requests.get(
-            ollama_url, headers=headers, timeout=REQUEST_TIMEOUT
-        )
+        response = requests.get(ollama_url, headers=headers, timeout=REQUEST_TIMEOUT)
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Look into standard text containers for an exact size match
@@ -232,9 +226,7 @@ def get_ollama_size_gb(ollama_url: Optional[str]) -> Optional[float]:
 # ==================================
 
 
-def extract_active_params(
-    model_name: str, readme_text: str, total_params: str
-) -> str:
+def extract_active_params(model_name: str, readme_text: str, total_params: str) -> str:
     """Extracts active parameters for Mixture of Experts (MoE) or Effective parameter models.
 
     Prioritizes the model name to avoid conflicts when multiple models share a README.
@@ -256,9 +248,7 @@ def extract_active_params(
         return f"{match_e_name.group(1)}B"
 
     if readme_text:
-        match_active = re.search(
-            r"(?i)(\d+(?:\.\d+)?B)[ -]*active", readme_text
-        )
+        match_active = re.search(r"(?i)(\d+(?:\.\d+)?B)[ -]*active", readme_text)
         if match_active:
             return match_active.group(1).upper()
 
@@ -424,9 +414,7 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
 
                 # Smart fallback: Parse model name if HuggingFace API lacks the parameter count
                 if total_p in ("N/A", "0.0B", "0B"):
-                    match_b = re.search(
-                        r"(?i)(\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?)?)B", model_name
-                    )
+                    match_b = re.search(r"(?i)(\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?)?)B", model_name)
                     if match_b:
                         total_p = f"{match_b.group(1).upper()}B"
                     else:
@@ -435,9 +423,7 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
                             mb = float(match_m.group(1))
                             total_p = f"{round(mb / 1000, 2):g}B"
 
-                active_p = extract_active_params(
-                    model_name, hf_meta["readme"], total_p
-                )
+                active_p = extract_active_params(model_name, hf_meta["readme"], total_p)
 
                 if active_p in ("N/A", "0.0B", "0B"):
                     active_p = total_p
@@ -448,17 +434,11 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
 
                 mlx_url = urls.get("mlx")
                 mlx_dl = get_hf_repo_size_gb(mlx_url) if mlx_url else None
-                hardware["mlx"] = calculate_hardware_requirements(
-                    mlx_dl, total_p
-                )
+                hardware["mlx"] = calculate_hardware_requirements(mlx_dl, total_p)
 
                 ollama_url = urls.get("ollama")
-                ollama_dl = (
-                    get_ollama_size_gb(ollama_url) if ollama_url else None
-                )
-                hardware["ollama"] = calculate_hardware_requirements(
-                    ollama_dl, total_p
-                )
+                ollama_dl = get_ollama_size_gb(ollama_url) if ollama_url else None
+                hardware["ollama"] = calculate_hardware_requirements(ollama_dl, total_p)
 
                 new_family["models"].append(
                     {
@@ -469,9 +449,7 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
                         "capabilities": {
                             "speed_tok_s": speed_data["speed_tok_s"],
                             "speed_tier": speed_data["speed_tier"],
-                            "tags": hf_meta["tags"]
-                            if hf_meta["tags"]
-                            else ["dense", "text"],
+                            "tags": hf_meta["tags"] if hf_meta["tags"] else ["dense", "text"],
                         },
                         "hardware_requirements": hardware,
                         "urls": urls,

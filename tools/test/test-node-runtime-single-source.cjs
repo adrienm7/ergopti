@@ -26,7 +26,8 @@ if (!/^\d+\.\d+\.\d+$/.test(pinnedVersion)) {
 	errors.push(`.node-version must contain one exact semantic version, got '${pinnedVersion}'`);
 }
 
-const workflowFiles = fs.readdirSync(WORKFLOWS)
+const workflowFiles = fs
+	.readdirSync(WORKFLOWS)
 	.filter((name) => /\.ya?ml$/.test(name))
 	.map((name) => path.join(WORKFLOWS, name));
 let setupCount = 0;
@@ -48,7 +49,7 @@ if (setupCount < 6) {
 if (filePinCount !== setupCount || inlineVersionCount !== 0) {
 	errors.push(
 		`all ${setupCount} setup-node steps must read .node-version; found ${filePinCount} file pins and ` +
-		`${inlineVersionCount} inline versions`
+			`${inlineVersionCount} inline versions`
 	);
 }
 
@@ -59,12 +60,14 @@ if (!expectedUnicode) {
 	errors.push('the Unicode case generator no longer declares its reviewed Unicode version');
 }
 if (process.version !== `v${pinnedVersion}`) {
-	errors.push(`the active Node ${process.version} does not match the repository pin v${pinnedVersion}`);
+	errors.push(
+		`the active Node ${process.version} does not match the repository pin v${pinnedVersion}`
+	);
 }
 if (expectedUnicode && process.versions.unicode !== expectedUnicode) {
 	errors.push(
 		`pinned Node ${pinnedVersion} exposes Unicode ${process.versions.unicode}, but the generator requires ` +
-		`${expectedUnicode}`
+			`${expectedUnicode}`
 	);
 }
 

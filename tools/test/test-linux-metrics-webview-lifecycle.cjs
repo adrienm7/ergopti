@@ -1,13 +1,13 @@
 // tools/test/test-linux-metrics-webview-lifecycle.cjs
 
 /**
-* ==============================================================================
-* MODULE: Linux Metrics WebView Lifecycle Regression Test
-* DESCRIPTION:
-* Proves that Linux metrics polling stops while its document is hidden, owns at
-* most one interval after resume, and is wired into both shared dashboards.
-* ==============================================================================
-*/
+ * ==============================================================================
+ * MODULE: Linux Metrics WebView Lifecycle Regression Test
+ * DESCRIPTION:
+ * Proves that Linux metrics polling stops while its document is hidden, owns at
+ * most one interval after resume, and is wired into both shared dashboards.
+ * ==============================================================================
+ */
 
 'use strict';
 
@@ -30,7 +30,7 @@ const document = {
 	visibilityState: 'visible',
 	addEventListener(type, listener) {
 		listeners.document.set(type, listener);
-	},
+	}
 };
 const window = {
 	addEventListener(type, listener) {
@@ -46,7 +46,7 @@ const window = {
 	},
 	refresh() {
 		refreshes += 1;
-	},
+	}
 };
 const context = vm.createContext({ console, document, window });
 vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });

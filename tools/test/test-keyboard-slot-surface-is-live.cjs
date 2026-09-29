@@ -65,16 +65,15 @@ const sources = walk(MAC).map((f) => ({
 }));
 
 if (sources.length < 100) {
-	errors.push(`walked only ${sources.length} macOS source file(s) — the scan is broken, and every check below would pass over nothing`);
+	errors.push(
+		`walked only ${sources.length} macOS source file(s) — the scan is broken, and every check below would pass over nothing`
+	);
 }
 
 const moduleSrc = (sources.find((s) => s.rel === MODULE_REL) || {}).src;
 if (!moduleSrc) {
 	errors.push(`${MODULE_REL} is missing — it moved, and this gate no longer describes anything`);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -118,7 +117,9 @@ for (const reader of FACADE_READERS) {
 		// exact state this feature was in before the UI existed.
 		const writesReal = callers.some((rel) => {
 			const src = sources.find((s) => s.rel === rel).src;
-			return [...src.matchAll(/set_keyboard_action[(\s]+([^)\n]*)/g)].some((m) => !/["']none["']/.test(m[1]));
+			return [...src.matchAll(/set_keyboard_action[(\s]+([^)\n]*)/g)].some(
+				(m) => !/["']none["']/.test(m[1])
+			);
 		});
 		if (!writesReal) {
 			errors.push(
@@ -129,9 +130,6 @@ for (const reader of FACADE_READERS) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ The Menu Entry Still Exists ===========
@@ -141,7 +139,9 @@ for (const reader of FACADE_READERS) {
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const shortcutsMenu = manifest.shortcuts_menu;
 if (!Array.isArray(shortcutsMenu) || shortcutsMenu.length === 0) {
-	errors.push('menu_manifest.json has no shortcuts_menu array — the parse is wrong or the menu is gone');
+	errors.push(
+		'menu_manifest.json has no shortcuts_menu array — the parse is wrong or the menu is gone'
+	);
 } else {
 	const entry = shortcutsMenu.find((e) => e && e.id === MENU_ENTRY_ID);
 	if (!entry) {
@@ -170,9 +170,6 @@ if (!Array.isArray(shortcutsMenu) || shortcutsMenu.length === 0) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 3/ Groups Resolve To Real Chords =========
@@ -183,15 +180,21 @@ if (moduleSrc) {
 	// Anchored to the line start: each SLOT_MODS row is `{ "prefix", {mods} }`, so
 	// an unanchored match would also collect the modifier names from the inner
 	// table and report every one of them as a prefix no group offers.
-	const slotMods = [...(moduleSrc.match(/local\s+SLOT_MODS\s*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(/^\s*\{\s*"([^"]+)"/gm)].map(
-		(m) => m[1]
-	);
-	const groups = [...(moduleSrc.match(/M\.SLOT_GROUPS\s*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(/prefix\s*=\s*"([^"]+)"/g)].map(
-		(m) => m[1]
-	);
+	const slotMods = [
+		...(moduleSrc.match(/local\s+SLOT_MODS\s*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(
+			/^\s*\{\s*"([^"]+)"/gm
+		)
+	].map((m) => m[1]);
+	const groups = [
+		...(moduleSrc.match(/M\.SLOT_GROUPS\s*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(
+			/prefix\s*=\s*"([^"]+)"/g
+		)
+	].map((m) => m[1]);
 
-	if (slotMods.length === 0) errors.push('SLOT_MODS parsed empty — the prefix check below would pass over nothing');
-	if (groups.length === 0) errors.push('M.SLOT_GROUPS parsed empty — the menu would render no groups at all');
+	if (slotMods.length === 0)
+		errors.push('SLOT_MODS parsed empty — the prefix check below would pass over nothing');
+	if (groups.length === 0)
+		errors.push('M.SLOT_GROUPS parsed empty — the menu would render no groups at all');
 
 	for (const prefix of groups) {
 		if (!slotMods.includes(prefix)) {
@@ -213,9 +216,6 @@ if (moduleSrc) {
 		}
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================

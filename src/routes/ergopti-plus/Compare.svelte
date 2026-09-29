@@ -83,7 +83,9 @@ whole experience — free, local, unified across OSes — with no scripting."
 			</table>
 		</div>
 		<p class="cmp-note" use:reveal>
-			{t('Comparatif indicatif des offres par défaut, dressé de bonne foi — chaque outil a ses forces.')}
+			{t(
+				'Comparatif indicatif des offres par défaut, dressé de bonne foi — chaque outil a ses forces.'
+			)}
 		</p>
 	</div>
 </section>

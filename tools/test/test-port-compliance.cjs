@@ -55,9 +55,6 @@ function fail(msg, detail) {
 	totalFail++;
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Freshness Gate ========================
@@ -90,9 +87,6 @@ if (committed === null) {
 // file is stale).
 const contracts = JSON.parse(regenerated).ports;
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Port → ADAPTER_ Name Mapping ==========
@@ -118,9 +112,6 @@ const snakeToPort = {};
 for (const portName of Object.keys(contracts)) {
 	snakeToPort[pascalToUpperSnake(portName)] = portName;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -171,7 +162,7 @@ for (const file of ahkFiles) {
 			continue;
 		}
 		coveredPorts.add(portName);
-			const contractMethods = Object.keys(contracts[portName].methods);
+		const contractMethods = Object.keys(contracts[portName].methods);
 		const requiredMethods = contractMethods.filter(
 			(mth) => contracts[portName].methods[mth].required
 		);
@@ -199,7 +190,9 @@ for (const file of ahkFiles) {
 }
 
 if (adapterMapCount === 0) {
-	fail('AHK ADAPTER_* maps found', ['no ADAPTER_* Map() definitions parsed — parser or layout drift']);
+	fail('AHK ADAPTER_* maps found', [
+		'no ADAPTER_* Map() definitions parsed — parser or layout drift'
+	]);
 }
 
 // Completeness gate: every port whose adapter file exists in adapters/ must
@@ -211,7 +204,10 @@ const failBeforeCompleteness = totalFail;
 const portsImplementedElsewhere = [];
 for (const portName of Object.keys(contracts)) {
 	if (coveredPorts.has(portName)) continue;
-	const adapterFile = path.join(AHK_ADAPTERS_DIR, pascalToUpperSnake(portName).toLowerCase() + '.ahk');
+	const adapterFile = path.join(
+		AHK_ADAPTERS_DIR,
+		pascalToUpperSnake(portName).toLowerCase() + '.ahk'
+	);
 	if (fs.existsSync(adapterFile)) {
 		fail(`${portName}: adapter file declares an ADAPTER_ map`, [
 			`${path.basename(adapterFile)} exists but has no global ADAPTER_${pascalToUpperSnake(portName)} := Map(…) — a missing dispatch map silently weakens the contract gate`
@@ -224,11 +220,10 @@ if (totalFail === failBeforeCompleteness) {
 	const elsewhere = portsImplementedElsewhere.length
 		? ` (${portsImplementedElsewhere.length} outside adapters/: ${portsImplementedElsewhere.join(', ')})`
 		: '';
-	pass(`completeness: every adapter file declares its ADAPTER_ map — ${coveredPorts.size}/${Object.keys(contracts).length} ports covered${elsewhere}`);
+	pass(
+		`completeness: every adapter file declares its ADAPTER_ map — ${coveredPorts.size}/${Object.keys(contracts).length} ports covered${elsewhere}`
+	);
 }
-
-
-
 
 // ==================================================
 // ==================================================

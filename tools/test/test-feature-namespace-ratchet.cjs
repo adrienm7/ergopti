@@ -34,7 +34,15 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MANIFEST = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml');
+const MANIFEST = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'features',
+	'manifest.toml'
+);
 
 // Floor on the total table count: a parse that stops matching would report zero
 // driver-namespaced tables and pass while reading nothing.

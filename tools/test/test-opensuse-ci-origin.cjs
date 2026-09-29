@@ -19,16 +19,17 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // read through the loader, which throws when its distro job is missing.
 const sources = [
 	['.github/workflows/ci-linux.yml (job install-linux)', pipeline.job('install-linux')],
-	['.github/workflows/linux-layout.yml', fs.readFileSync(path.join(ROOT, '.github/workflows/linux-layout.yml'), 'utf8')],
+	[
+		'.github/workflows/linux-layout.yml',
+		fs.readFileSync(path.join(ROOT, '.github/workflows/linux-layout.yml'), 'utf8')
+	]
 ];
 const originRewrite =
 	"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' " +
 	'/etc/zypp/repos.d/*.repo && zypper --non-interactive install';
 
 for (const [workflow, source] of sources) {
-	const tumbleweed = source.match(
-		/image: opensuse\/tumbleweed:latest\r?\n\s+prep: ([^\r\n]+)/
-	);
+	const tumbleweed = source.match(/image: opensuse\/tumbleweed:latest\r?\n\s+prep: ([^\r\n]+)/);
 	assert(tumbleweed, `${workflow} must retain its openSUSE Tumbleweed matrix entry`);
 	assert(
 		tumbleweed[1].startsWith(originRewrite),

@@ -24,12 +24,12 @@ One pair warmed both paths, then four measured pairs alternated order.
 Fixture creation and canonical JSON comparison were outside timing.
 All ten outputs were canonically equal and each contained 465,380 UTF-8 bytes.
 
-| Pair | Order | Baseline ms | Candidate ms |
-| --- | --- | ---: | ---: |
-| 1 | Candidate, baseline | 771.186 | 69.567 |
-| 2 | Baseline, candidate | 752.545 | 71.675 |
-| 3 | Candidate, baseline | 723.933 | 74.903 |
-| 4 | Baseline, candidate | 715.408 | 71.584 |
+| Pair | Order               | Baseline ms | Candidate ms |
+| ---- | ------------------- | ----------: | -----------: |
+| 1    | Candidate, baseline |     771.186 |       69.567 |
+| 2    | Baseline, candidate |     752.545 |       71.675 |
+| 3    | Candidate, baseline |     723.933 |       74.903 |
+| 4    | Baseline, candidate |     715.408 |       71.584 |
 
 Median: 738.239 ms baseline versus 71.630 ms candidate, about 90.3% lower.
 Maximum: 771.186 versus 74.903 ms. This is one workload, not a general p99.

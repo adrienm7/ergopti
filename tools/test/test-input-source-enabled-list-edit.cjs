@@ -21,7 +21,15 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const INPUT_SOURCES = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'keymap', 'input_sources.lua');
+const INPUT_SOURCES = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'modules',
+	'keymap',
+	'input_sources.lua'
+);
 
 let failures = 0;
 let passes = 0;
@@ -128,15 +136,31 @@ if (!python) {
 	process.exit(1);
 }
 
-const FRENCH = { InputSourceKind: 'Keyboard Layout', 'KeyboardLayout ID': 1, 'KeyboardLayout Name': 'French' };
-const ERGOL = { InputSourceKind: 'Keyboard Layout', 'KeyboardLayout ID': 0, 'KeyboardLayout Name': 'French (Ergo-L)' };
-const LEGACY = { InputSourceKind: 'Keyboard Layout', 'Bundle ID': 'com.apple.keyboardlayout.ergopti', 'KeyboardLayout Name': 'X' };
+const FRENCH = {
+	InputSourceKind: 'Keyboard Layout',
+	'KeyboardLayout ID': 1,
+	'KeyboardLayout Name': 'French'
+};
+const ERGOL = {
+	InputSourceKind: 'Keyboard Layout',
+	'KeyboardLayout ID': 0,
+	'KeyboardLayout Name': 'French (Ergo-L)'
+};
+const LEGACY = {
+	InputSourceKind: 'Keyboard Layout',
+	'Bundle ID': 'com.apple.keyboardlayout.ergopti',
+	'KeyboardLayout Name': 'X'
+};
 
 console.log('Enabled input-source list edit');
 
 const keylayoutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-keylayout-'));
 const keylayout = path.join(keylayoutDir, 'ergol.keylayout');
-fs.writeFileSync(keylayout, '<?xml version="1.1"?>\n<keyboard group="0" id="0" name="French (Ergo-L)" maxout="1">\n', 'utf8');
+fs.writeFileSync(
+	keylayout,
+	'<?xml version="1.1"?>\n<keyboard group="0" id="0" name="French (Ergo-L)" maxout="1">\n',
+	'utf8'
+);
 const nameless = path.join(keylayoutDir, 'nameless.keylayout');
 fs.writeFileSync(nameless, '<keyboard group="0" id="7">\n', 'utf8');
 
@@ -149,10 +173,15 @@ try {
 			throw new Error(`unexpected list ${JSON.stringify(result.written)}`);
 		}
 		const added = result.written[1];
-		if (added['KeyboardLayout ID'] !== 0 || added.InputSourceKind !== 'Keyboard Layout' || 'Bundle ID' in added) {
+		if (
+			added['KeyboardLayout ID'] !== 0 ||
+			added.InputSourceKind !== 'Keyboard Layout' ||
+			'Bundle ID' in added
+		) {
 			throw new Error(`the entry must mirror a built-in layout: ${JSON.stringify(added)}`);
 		}
-		if (result.printed[result.printed.length - 1] !== 'OK') throw new Error(JSON.stringify(result.printed));
+		if (result.printed[result.printed.length - 1] !== 'OK')
+			throw new Error(JSON.stringify(result.printed));
 	});
 
 	check('disable removes only the named layout', () => {
@@ -172,7 +201,11 @@ try {
 
 	check('a layout file without a name, or an unknown mode, is refused before any write', () => {
 		const unnamed = run(python, 'enable', nameless, [FRENCH]);
-		if (unnamed.exit !== 1 || unnamed.written !== null || !unnamed.printed[0].startsWith('PARSE_ERR')) {
+		if (
+			unnamed.exit !== 1 ||
+			unnamed.written !== null ||
+			!unnamed.printed[0].startsWith('PARSE_ERR')
+		) {
 			throw new Error(JSON.stringify(unnamed));
 		}
 		const unknown = run(python, 'rename', 'French', [FRENCH]);

@@ -49,7 +49,7 @@ const HEADER = {
 		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
 		"'group' = named submenu, 'section_header' = disabled label, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
-		"the A-Z chooser. The last two were in use and undocumented here, which matters " +
+		'the A-Z chooser. The last two were in use and undocumented here, which matters ' +
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
 		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
 		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
@@ -70,7 +70,10 @@ const HEADER = {
  */
 function projectChoices(menu, raw) {
 	const flattened = parseToml(
-		raw.replace(/^\[\[features\.([^\]]+)\]\]\r?$/gm, (_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`)
+		raw.replace(
+			/^\[\[features\.([^\]]+)\]\]\r?$/gm,
+			(_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
+		)
 	);
 	const enums = new Map();
 	for (const entry of flattened.entries || []) {
@@ -83,9 +86,12 @@ function projectChoices(menu, raw) {
 			const where = `menu.${key} choice "${row.id}"`;
 			const feature = enums.get(row.path);
 			if (!feature) throw new Error(`${where} names "${row.path}", which is no enum feature`);
-			if (row.choices !== undefined) throw new Error(`${where} lists its choices by hand; they come from the feature`);
-			if (typeof row.i18n !== 'string' || row.i18n === '') throw new Error(`${where} has no i18n key`);
-			if (!Array.isArray(feature.platforms)) throw new Error(`"${row.path}" must declare its platforms to back a choice row`);
+			if (row.choices !== undefined)
+				throw new Error(`${where} lists its choices by hand; they come from the feature`);
+			if (typeof row.i18n !== 'string' || row.i18n === '')
+				throw new Error(`${where} has no i18n key`);
+			if (!Array.isArray(feature.platforms))
+				throw new Error(`"${row.path}" must declare its platforms to back a choice row`);
 			// A row with no `platforms` is shown by every driver.
 			for (const platform of row.platforms || ['ahk', 'hs', 'linux']) {
 				if (!feature.platforms.includes(platform)) {
@@ -108,7 +114,9 @@ function build() {
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');
-	console.log(`build-menu-manifest: wrote ${OUT_PATH} (${Object.keys(parsed.menu).length} top-level keys).`);
+	console.log(
+		`build-menu-manifest: wrote ${OUT_PATH} (${Object.keys(parsed.menu).length} top-level keys).`
+	);
 }
 
 build();

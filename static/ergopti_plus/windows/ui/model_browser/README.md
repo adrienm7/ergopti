@@ -6,9 +6,9 @@ Sortable ListView window showing the curated LLM model catalogue with rich per-m
 
 ## Key files
 
-| File      | Description                                                                 |
-| --------- | --------------------------------------------------------------------------- |
-| `init.ahk`| `ModelBrowser_Show()` — singleton; reads `models.json`, populates ListView  |
+| File       | Description                                                                |
+| ---------- | -------------------------------------------------------------------------- |
+| `init.ahk` | `ModelBrowser_Show()` — singleton; reads `models.json`, populates ListView |
 
 ## Shared data
 

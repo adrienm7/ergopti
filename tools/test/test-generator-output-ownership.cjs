@@ -20,10 +20,15 @@ for (const generator of GENERATORS) {
 	scripts.add(generator.script);
 	assert.ok(generator.outputs.length > 0, `${generator.script}: declare its outputs`);
 	for (const output of generator.outputs) {
-		if (owners.has(output)) duplicates.push(`${output}: ${owners.get(output)} + ${generator.script}`);
+		if (owners.has(output))
+			duplicates.push(`${output}: ${owners.get(output)} + ${generator.script}`);
 		owners.set(output, generator.script);
 	}
 }
 assert.deepEqual(duplicates, [], 'each output must be generated once per registry traversal');
-assert.deepEqual([...owners.keys()].sort(), allOutputs(), 'execution and snapshot inventories must agree');
+assert.deepEqual(
+	[...owners.keys()].sort(),
+	allOutputs(),
+	'execution and snapshot inventories must agree'
+);
 console.log(`[OK] ${owners.size} generated outputs have exactly one execution owner.`);

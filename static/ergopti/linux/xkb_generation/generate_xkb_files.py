@@ -38,7 +38,9 @@ import keylayout_to_xkb  # noqa: E402
 LINUX_DIR = SCRIPT_DIR.parent
 BUNDLES_DIR = LINUX_DIR.parent / "macos" / "bundles"
 STATIC_DIR = LINUX_DIR.parent.parent
-KEYCODES_PATH = STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
+KEYCODES_PATH = (
+    STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
+)
 REGISTRY_INDEX_PATH = STATIC_DIR / "layouts" / "registry" / "index.json"
 
 # Registry entry whose keysym choices every Ergopti file uses.
@@ -109,7 +111,10 @@ def main(argv: List[str]) -> int:
             if args.check and not out_dir.is_dir():
                 continue
             if args.check:
-                for suffix, content in ((".xkb", result.symbols_text), (".XCompose", result.compose_text)):
+                for suffix, content in (
+                    (".xkb", result.symbols_text),
+                    (".XCompose", result.compose_text),
+                ):
                     path = out_dir / (layout_id + suffix)
                     if not path.is_file() or path.read_text(encoding="utf-8") != content:
                         differences.append(path)

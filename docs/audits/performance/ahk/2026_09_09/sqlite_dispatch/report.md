@@ -36,10 +36,10 @@ source-row multiplicity. All 5,653 returned rows were encoded and compared for
 exact equality in memory. An additional run checked integer extremes, floats,
 NULL, UTF-8, existing BLOB text conversion, and empty results.
 
-| ABBA run | Original (ms) | Candidate (ms) | Candidate (ms) | Original (ms) |
-| --- | ---: | ---: | ---: | ---: |
-| First | 1261.668 | 214.601 | 202.304 | 1093.419 |
-| Additional type vectors | 1215.572 | 186.295 | 196.044 | 1157.488 |
+| ABBA run                | Original (ms) | Candidate (ms) | Candidate (ms) | Original (ms) |
+| ----------------------- | ------------: | -------------: | -------------: | ------------: |
+| First                   |      1261.668 |        214.601 |        202.304 |      1093.419 |
+| Additional type vectors |      1215.572 |        186.295 |        196.044 |      1157.488 |
 
 Receipts: `sqlite-dispatch-1`, `sqlite-query-candidate-1`, and
 `sqlite-query-candidate-2`; all exited zero. The isolated candidate did not

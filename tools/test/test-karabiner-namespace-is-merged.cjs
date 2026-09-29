@@ -63,9 +63,6 @@ const KNOWN_SAME_KEYSTROKE = {
 
 const errors = [];
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Read both namespaces ==================
@@ -91,9 +88,6 @@ if (Object.keys(rows).length < MIN_CATALOGUE_ROWS) {
 			'parse is broken'
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -128,9 +122,6 @@ if (heldButDeclared.length > 0) {
 	);
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 3/ Every alias is honest =================
@@ -151,7 +142,9 @@ for (const [alias, target] of Object.entries(aliases)) {
 		);
 	}
 	if (order.includes(alias)) {
-		errors.push(`"${alias}" is an alias but appears in sg_order — the picker would list an id with no row`);
+		errors.push(
+			`"${alias}" is an alias but appears in sg_order — the picker would list an id with no row`
+		);
 	}
 }
 
@@ -162,9 +155,6 @@ if (Object.keys(aliases).length === 0) {
 			'picker entries) or the section was dropped (four raw identifiers in the remap menu).'
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -210,9 +200,6 @@ for (const label of Object.keys(KNOWN_SAME_KEYSTROKE)) {
 		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================

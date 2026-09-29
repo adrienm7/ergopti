@@ -49,11 +49,10 @@ const MIN_FILES = 800;
 const offenders = [];
 let checked = 0;
 
-const tracked = execFileSync(
-	'git',
-	['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'],
-	{ cwd: ROOT, encoding: 'utf8' }
-)
+const tracked = execFileSync('git', ['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'], {
+	cwd: ROOT,
+	encoding: 'utf8'
+})
 	.split('\0')
 	.filter(Boolean)
 	.map((rel) => rel.split(path.sep).join('/'))
@@ -105,4 +104,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] all ${checked} .lua/.toml/.json file(s) under ergopti_plus use LF.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] all ${checked} .lua/.toml/.json file(s) under ergopti_plus use LF.\x1b[0m`
+);

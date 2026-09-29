@@ -39,14 +39,21 @@ def main():
             length = int(self.headers.get("Content-Length", "0"))
             body = self.rfile.read(length).decode("utf-8", "replace")
             with open(args.log, "a", encoding="utf-8") as log:
-                log.write(json.dumps({
-                    "path": self.path,
-                    "authorization": self.headers.get("Authorization"),
-                    "body": body,
-                }) + "\n")
+                log.write(
+                    json.dumps(
+                        {
+                            "path": self.path,
+                            "authorization": self.headers.get("Authorization"),
+                            "body": body,
+                        }
+                    )
+                    + "\n"
+                )
             # ensure_ascii, as Python servers answer by default: the daemon must
             # decode \u escapes to get the accented text back.
-            reply = json.dumps({"choices": [{"message": {"role": "assistant", "content": reply_for(body)}}]})
+            reply = json.dumps(
+                {"choices": [{"message": {"role": "assistant", "content": reply_for(body)}}]}
+            )
             payload = reply.encode("ascii")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

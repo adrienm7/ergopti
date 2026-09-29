@@ -119,8 +119,20 @@ function stripAhkStringsAndComment(line) {
 // file using it as a loop variable blocked the entire suite at load, silently.
 const RESERVED_LOWER = new Set(
 	[
-		'Case', 'Loop', 'Until', 'Catch', 'Finally', 'Switch', 'Break', 'Continue',
-		'Return', 'Throw', 'Goto', 'Global', 'Static', 'Local'
+		'Case',
+		'Loop',
+		'Until',
+		'Catch',
+		'Finally',
+		'Switch',
+		'Break',
+		'Continue',
+		'Return',
+		'Throw',
+		'Goto',
+		'Global',
+		'Static',
+		'Local'
 	].map((w) => w.toLowerCase())
 );
 
@@ -158,9 +170,13 @@ function bracketErrors(codeLines) {
 		const opening = sectionOpening(line);
 		if (opening) {
 			if (!opening.valid) {
-				found.push({ line: i + 1, message: 'a line starting with "(" and no ")" opens a ' +
-					'continuation section, and its text is not section options (`Invalid option` at load). ' +
-					'Keep the "(" on the previous line or compute the value first.' });
+				found.push({
+					line: i + 1,
+					message:
+						'a line starting with "(" and no ")" opens a ' +
+						'continuation section, and its text is not section options (`Invalid option` at load). ' +
+						'Keep the "(" on the previous line or compute the value first.'
+				});
 			} else {
 				inSection = true;
 			}
@@ -171,26 +187,34 @@ function bracketErrors(codeLines) {
 			else if (char === ')' || char === ']') {
 				depth -= 1;
 				if (depth < 0) {
-					found.push({ line: i + 1, message: 'a closing bracket with no opening one ' +
-						'(`Unexpected ")"` at load).' });
+					found.push({
+						line: i + 1,
+						message: 'a closing bracket with no opening one ' + '(`Unexpected ")"` at load).'
+					});
 					depth = 0;
 				}
 			}
 		}
 	});
-	if (depth !== 0) found.push({ line: codeLines.length, message: `${depth} bracket(s) never closed.` });
+	if (depth !== 0)
+		found.push({ line: codeLines.length, message: `${depth} bracket(s) never closed.` });
 	return found;
 }
 
 // The two lines that shipped: the gate must see both before it may pass a tree.
 const SELF_TEST = [
 	['\t\tExpected := JsonParse(Build("openai", Map(', '\t\t\t"image", "QUJD", "max_tokens", 1))))'],
-	['\t\tResult := InputBox(Prompt, Title,', '\t\t\t(Spec = "wrap_pair" || Spec = "llm_prompt"',
-		'\t\t\t\t|| Spec = "llm_vision") ? "w680 h300" : "w680 h160", Existing)'],
+	[
+		'\t\tResult := InputBox(Prompt, Title,',
+		'\t\t\t(Spec = "wrap_pair" || Spec = "llm_prompt"',
+		'\t\t\t\t|| Spec = "llm_vision") ? "w680 h300" : "w680 h160", Existing)'
+	]
 ];
 for (const sample of SELF_TEST) {
 	if (bracketErrors(sample).length === 0) {
-		console.error('The bracket check no longer detects a line that aborted the AHK suite:\n' + sample.join('\n'));
+		console.error(
+			'The bracket check no longer detects a line that aborted the AHK suite:\n' + sample.join('\n')
+		);
 		process.exit(1);
 	}
 }
@@ -225,7 +249,7 @@ for (const file of files) {
 		if (/(?<!!)===(?!=)/.test(executable)) {
 			errors.push(
 				`${rel}:${i + 1}: JavaScript-style strict equality (===) — AHK v2 uses == ` +
-				'for case-sensitive equality; === aborts parsing with `Missing operand`.'
+					'for case-sensitive equality; === aborts parsing with `Missing operand`.'
 			);
 		}
 	});
@@ -266,7 +290,10 @@ for (const file of files) {
 		const decl = stripped.match(/^\s*(\w+)\s*\(([^)]*)\)\s*\{?\s*$/);
 		if (decl) {
 			for (const param of decl[2].split(',')) {
-				const name = param.trim().replace(/^&/, '').split(/[\s:=*]/)[0];
+				const name = param
+					.trim()
+					.replace(/^&/, '')
+					.split(/[\s:=*]/)[0];
 				if (RESERVED_LOWER.has(name.toLowerCase())) {
 					errors.push(
 						`${rel}:${i + 1}: "${name}" is an AHK v2 reserved word used as a parameter of ` +
@@ -288,7 +315,8 @@ for (const file of files) {
 		}
 	});
 
-	for (const problem of bracketErrors(codeLines)) errors.push(`${rel}:${problem.line}: ${problem.message}`);
+	for (const problem of bracketErrors(codeLines))
+		errors.push(`${rel}:${problem.line}: ${problem.message}`);
 
 	const joined = codeLines.join('\n');
 	let m;
@@ -302,9 +330,13 @@ for (const file of files) {
 }
 
 if (errors.length > 0) {
-	console.error('AHK v2.0 parse-breaking antipatterns found (these abort the whole suite at load):');
+	console.error(
+		'AHK v2.0 parse-breaking antipatterns found (these abort the whole suite at load):'
+	);
 	for (const e of errors) console.error('  ' + e);
-	console.error(`\n${errors.length} issue(s) — exactly the class of parse error that silently disables the AHK suite.`);
+	console.error(
+		`\n${errors.length} issue(s) — exactly the class of parse error that silently disables the AHK suite.`
+	);
 	process.exit(1);
 }
 

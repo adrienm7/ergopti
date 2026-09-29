@@ -138,7 +138,9 @@ if (offenders.length > PATH_BASELINE) {
 }
 if (missing.length > 0) {
 	failed = true;
-	console.error('\x1b[31m[ERROR] Convention P: platform/ is not symmetrical across the drivers.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Convention P: platform/ is not symmetrical across the drivers.\x1b[0m'
+	);
 	for (const m of missing) console.error('  missing: ' + m);
 	console.error(
 		'\n  Every driver ships every platform/ sub-folder; one with nothing to put there\n' +
@@ -147,7 +149,9 @@ if (missing.length > 0) {
 	);
 }
 if (failed) {
-	console.error('  Run `node tools/test/test-convention-p-platform-only.cjs --measure` to list them.');
+	console.error(
+		'  Run `node tools/test/test-convention-p-platform-only.cjs --measure` to list them.'
+	);
 	process.exit(1);
 }
 

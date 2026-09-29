@@ -19,13 +19,13 @@ Each process selected four tests. Values below are the runner's QPC callback
 duration for the second test, the real transitive HotIf guard. They exclude
 process startup and are not whole-suite, CPU, RAM or driver latency measures.
 
-| Sample | Baseline ms | Borrowed source ms |
-| --- | ---: | ---: |
-| 1 | 2128.490 | 1630.734 |
-| 2 | 2229.384 | 1627.515 |
-| 3 | 2010.614 | 1597.779 |
-| Median | 2128.490 | 1627.515 |
-| Maximum | 2229.384 | 1630.734 |
+| Sample  | Baseline ms | Borrowed source ms |
+| ------- | ----------: | -----------------: |
+| 1       |    2128.490 |           1630.734 |
+| 2       |    2229.384 |           1627.515 |
+| 3       |    2010.614 |           1597.779 |
+| Median  |    2128.490 |           1627.515 |
+| Maximum |    2229.384 |           1630.734 |
 
 The observed median reduction is 500.975 ms (23.5%). Three observations do not
 establish a latency distribution or a long-term tail guarantee.

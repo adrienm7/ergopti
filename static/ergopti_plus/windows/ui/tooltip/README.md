@@ -9,11 +9,11 @@ Floating, frameless overlay for in-context previews. Two distinct tooltip surfac
 
 ## Key files
 
-| File                  | Description                                              |
-| --------------------- | -------------------------------------------------------- |
-| `init.ahk`            | Unified `Tooltip_Show` / `Tooltip_Hide` façade           |
-| `tooltip_hotstring.ahk`| Hotstring preview tooltip implementation                 |
-| `tooltip_llm.ahk`     | LLM streaming prediction tooltip implementation          |
+| File                    | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `init.ahk`              | Unified `Tooltip_Show` / `Tooltip_Hide` façade  |
+| `tooltip_hotstring.ahk` | Hotstring preview tooltip implementation        |
+| `tooltip_llm.ahk`       | LLM streaming prediction tooltip implementation |
 
 ## Shared constants
 

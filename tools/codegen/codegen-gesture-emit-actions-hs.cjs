@@ -62,7 +62,9 @@ for (const [id, entry] of Object.entries(sg)) {
 }
 
 if (rows.length === 0) {
-	console.error('[ERROR] the catalogue declares no emit_hs rows — refusing to generate an empty table.');
+	console.error(
+		'[ERROR] the catalogue declares no emit_hs rows — refusing to generate an empty table.'
+	);
 	process.exit(1);
 }
 rows.sort((a, b) => a.id.localeCompare(b.id));

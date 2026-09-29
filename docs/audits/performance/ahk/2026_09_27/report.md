@@ -46,20 +46,20 @@ Preparation excludes content construction and disposal. Values are elapsed
 QPC milliseconds, not CPU time or end-to-end keystroke latency. Percentiles use
 nearest rank; the median below averages the two middle values.
 
-| Variant/run | Workload | Median | p95 | p99 | Maximum |
-| --- | --- | ---: | ---: | ---: | ---: |
-| measure/1 | border | 0.490 | 0.902 | 1.196 | 1.286 |
-| measure/1 | preparation | 1.645 | 6.891 | 27.293 | 30.226 |
-| measure/2 | border | 0.803 | 1.620 | 4.017 | 5.091 |
-| measure/2 | preparation | 3.438 | 50.394 | 52.367 | 68.482 |
-| measure/3 | border | 0.486 | 0.873 | 1.206 | 2.056 |
-| measure/3 | preparation | 1.460 | 31.726 | 48.554 | 150.131 |
-| hidden-fixed/1 | border | 1.056 | 1.980 | 2.487 | 2.494 |
-| hidden-fixed/1 | preparation | 1.068 | 2.267 | 3.252 | 5.134 |
-| hidden-fixed/2 | border | 0.989 | 1.654 | 2.099 | 2.223 |
-| hidden-fixed/2 | preparation | 1.306 | 4.231 | 9.428 | 10.801 |
-| hidden-fixed/3 | border | 0.672 | 1.162 | 1.934 | 12.218 |
-| hidden-fixed/3 | preparation | 1.047 | 7.277 | 10.363 | 11.072 |
+| Variant/run    | Workload    | Median |    p95 |    p99 | Maximum |
+| -------------- | ----------- | -----: | -----: | -----: | ------: |
+| measure/1      | border      |  0.490 |  0.902 |  1.196 |   1.286 |
+| measure/1      | preparation |  1.645 |  6.891 | 27.293 |  30.226 |
+| measure/2      | border      |  0.803 |  1.620 |  4.017 |   5.091 |
+| measure/2      | preparation |  3.438 | 50.394 | 52.367 |  68.482 |
+| measure/3      | border      |  0.486 |  0.873 |  1.206 |   2.056 |
+| measure/3      | preparation |  1.460 | 31.726 | 48.554 | 150.131 |
+| hidden-fixed/1 | border      |  1.056 |  1.980 |  2.487 |   2.494 |
+| hidden-fixed/1 | preparation |  1.068 |  2.267 |  3.252 |   5.134 |
+| hidden-fixed/2 | border      |  0.989 |  1.654 |  2.099 |   2.223 |
+| hidden-fixed/2 | preparation |  1.306 |  4.231 |  9.428 |  10.801 |
+| hidden-fixed/3 | border      |  0.672 |  1.162 |  1.934 |  12.218 |
+| hidden-fixed/3 | preparation |  1.047 |  7.277 | 10.363 |  11.072 |
 
 ## Budget decision and limits
 

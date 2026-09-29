@@ -99,6 +99,7 @@ export function restoreLang() {
 		i18n.lang = stored;
 		return;
 	}
-	const code = typeof navigator !== 'undefined' ? (navigator.language || '').slice(0, 2).toLowerCase() : '';
+	const code =
+		typeof navigator !== 'undefined' ? (navigator.language || '').slice(0, 2).toLowerCase() : '';
 	i18n.lang = AVAILABLE_LANGS.some((l) => l.code === code) ? code : 'fr';
 }

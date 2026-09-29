@@ -93,7 +93,7 @@ if (!fs.existsSync(CORPUS)) {
 	if (vectorCount < 15) {
 		errors.push(
 			`_shared/${CORPUS_REL} declares ${vectorCount} vector(s) — it carried 16 when this ` +
-			'guard was written, and a shrinking corpus is coverage being removed rather than a driver being fixed.'
+				'guard was written, and a shrinking corpus is coverage being removed rather than a driver being fixed.'
 		);
 	}
 	// Both arms have to be represented or the corpus proves half the decision.
@@ -113,7 +113,9 @@ for (const driver of DRIVERS) {
 	const dir = path.join(ROOT, driver.testsRel.split('/').join(path.sep));
 	const files = walk(dir, driver.exts);
 	if (files.length === 0) {
-		errors.push(`${driver.label}: found no test files under ${driver.testsRel} — this scan is broken, not the tree.`);
+		errors.push(
+			`${driver.label}: found no test files under ${driver.testsRel} — this scan is broken, not the tree.`
+		);
 		continue;
 	}
 	const consumer = files.find((f) => fs.readFileSync(f, 'utf8').includes(CORPUS_MARKER));
@@ -136,7 +138,7 @@ for (const driver of DRIVERS) {
 //
 // U+21E5 RIGHTWARDS ARROW TO BAR, with one space either side. Spelled as a
 // codepoint rather than pasted so the check cannot pass on a look-alike.
-const SEPARATOR = ' ' + String.fromCodePoint(0x21E5) + ' ';
+const SEPARATOR = ' ' + String.fromCodePoint(0x21e5) + ' ';
 const SEPARATOR_PRODUCERS = [
 	{ label: 'linux', rel: 'static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua' },
 	{ label: 'linux-bubble', rel: 'static/ergopti_plus/linux/ui/tooltip/preview.lua' },
@@ -147,20 +149,21 @@ const SEPARATOR_PRODUCERS = [
 for (const producer of SEPARATOR_PRODUCERS) {
 	const file = path.join(ROOT, producer.rel.split('/').join(path.sep));
 	if (!fs.existsSync(file)) {
-		errors.push(`${producer.label}: ${producer.rel} is missing — this check cannot answer, which is not the same as passing.`);
+		errors.push(
+			`${producer.label}: ${producer.rel} is missing — this check cannot answer, which is not the same as passing.`
+		);
 		continue;
 	}
 	const body = fs.readFileSync(file, 'utf8');
 	// Either the literal glyph, or the escape each language spells it with:
 	// Lua writes the UTF-8 bytes, AutoHotkey uses Chr(0x21E5).
-	const hasGlyph = body.includes(SEPARATOR)
-		|| body.includes('\\226\\135\\165')
-		|| body.includes('Chr(0x21E5)');
+	const hasGlyph =
+		body.includes(SEPARATOR) || body.includes('\\226\\135\\165') || body.includes('Chr(0x21E5)');
 	if (!hasGlyph) {
 		errors.push(
 			`${producer.label} (${producer.rel}) no longer writes the U+21E5 field separator. ` +
-			'A multi-field preview row has to read the same on all three drivers — without the ' +
-			'glyph a user cannot tell two concatenated fields from one value containing a space.'
+				'A multi-field preview row has to read the same on all three drivers — without the ' +
+				'glyph a user cannot tell two concatenated fields from one value containing a space.'
 		);
 	}
 }
@@ -171,8 +174,8 @@ for (const label of unwired) {
 	if (!NOT_YET_WIRED.includes(label)) {
 		errors.push(
 			`${label} no longer renders the preview bubble from _shared/${CORPUS_REL}. ` +
-			'It did when this guard was written, so this is a regression: the three ' +
-			'drivers can now show a user different things for the same value.'
+				'It did when this guard was written, so this is a regression: the three ' +
+				'drivers can now show a user different things for the same value.'
 		);
 	}
 }
@@ -180,7 +183,7 @@ for (const label of NOT_YET_WIRED) {
 	if (wired.includes(label)) {
 		errors.push(
 			`${label} now consumes _shared/${CORPUS_REL} — remove it from NOT_YET_WIRED. ` +
-			'A baseline that outlives the gap it recorded starts excusing the next one.'
+				'A baseline that outlives the gap it recorded starts excusing the next one.'
 		);
 	}
 }
@@ -193,6 +196,6 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] ${wired.length}/${DRIVERS.length} driver(s) render the preview bubble from the shared corpus ` +
-	`(${wired.join(', ')}); ${unwired.length} still to carry it across (${unwired.join(', ') || 'none'}).\x1b[0m`
+		`(${wired.join(', ')}); ${unwired.length} still to carry it across (${unwired.join(', ') || 'none'}).\x1b[0m`
 );
 for (const n of notes) console.log('     ' + n);

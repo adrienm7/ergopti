@@ -91,7 +91,9 @@ FEATURES & RATIONALE:
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Expansions en temps réel</p>
-			<h2><span use:countup={total}>{fmt(total)}</span> corrections et expansions, prêtes à l’emploi.</h2>
+			<h2>
+				<span use:countup={total}>{fmt(total)}</span> corrections et expansions, prêtes à l’emploi.
+			</h2>
 			<p class="lead">
 				Cinq familles livrées avec le driver, chacune avec sa couleur de tooltip et son délai
 				réglable. Ce compteur est <strong>mesuré automatiquement</strong> depuis les fichiers du driver

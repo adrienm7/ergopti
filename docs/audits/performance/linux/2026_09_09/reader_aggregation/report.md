@@ -39,13 +39,13 @@ These are separate hosted machines, not a paired same-host experiment. The
 workload and SQLite version match; OS page-cache state was uncontrolled. There
 are two range samples per run, insufficient to estimate p99.
 
-| Phase | Baseline (ms) | Candidate (ms) |
-| --- | ---: | ---: |
-| Range, first | 81599.835 | 8268.570 |
-| Range, second | 82035.672 | 8296.066 |
-| Composed ready, first | 82025.333 | 8647.766 |
-| Composed ready, second | 82926.774 | 8688.705 |
-| One-app filtered range | 20209.297 | 3777.418 |
+| Phase                  | Baseline (ms) | Candidate (ms) |
+| ---------------------- | ------------: | -------------: |
+| Range, first           |     81599.835 |       8268.570 |
+| Range, second          |     82035.672 |       8296.066 |
+| Composed ready, first  |     82025.333 |       8647.766 |
+| Composed ready, second |     82926.774 |       8688.705 |
+| One-app filtered range |     20209.297 |       3777.418 |
 
 Native child peak RSS: 751,648 KiB before, 75,940 KiB after. Both probes issued
 108 SQLite CLI calls. The reduction comes from less row transport and Lua work,

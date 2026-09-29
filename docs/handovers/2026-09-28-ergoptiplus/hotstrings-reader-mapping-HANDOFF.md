@@ -9,16 +9,16 @@ status proves an owner; missing inventory and missing native readers are explici
 
 ## Classification
 
-| Count | Existing owner |
-| --- | --- |
-| 8 | Exact Preferences scalar reader and runtime state |
-| 1 | Dormant dynamic master scalar; actual runtime uses the registered group |
-| 57 | Actual registered section leaf, including six programmatic dynamic sections |
-| 33 | Delay resolver in a separate file; engine section override hookup is incomplete |
-| 4 | Manifest section absent from the bundled registered corpus |
-| 1 | Personal-info scalar with a real runtime owner |
-| 1 | Personal-info pattern limit with no macOS native reader |
-| 10 | Personal sections whose ownership depends on the actual user catalogue |
+| Count | Existing owner                                                                  |
+| ----- | ------------------------------------------------------------------------------- |
+| 8     | Exact Preferences scalar reader and runtime state                               |
+| 1     | Dormant dynamic master scalar; actual runtime uses the registered group         |
+| 57    | Actual registered section leaf, including six programmatic dynamic sections     |
+| 33    | Delay resolver in a separate file; engine section override hookup is incomplete |
+| 4     | Manifest section absent from the bundled registered corpus                      |
+| 1     | Personal-info scalar with a real runtime owner                                  |
+| 1     | Personal-info pattern limit with no macOS native reader                         |
+| 10    | Personal sections whose ownership depends on the actual user catalogue          |
 
 ## Groups and sections
 
@@ -30,17 +30,17 @@ sections in declared order (`modules/keymap/registry_groups.lua:385`).
 
 The current corpus-derived category mapping is:
 
-| Conceptual manifest category | Actual group |
-| --- | --- |
-| autocorrection | autocorrection |
-| distances_reduction | distancesreduction |
-| sfbs_reduction | sfbsreduction |
-| rolls | rolls |
-| magic_key | magickey |
-| french_distancesreduction | french_distancesreduction |
-| french_autocorrection | french_autocorrection |
-| french_magickey | french_magickey |
-| personal | personal, only when the real descriptor exists |
+| Conceptual manifest category | Actual group                                   |
+| ---------------------------- | ---------------------------------------------- |
+| autocorrection               | autocorrection                                 |
+| distances_reduction          | distancesreduction                             |
+| sfbs_reduction               | sfbsreduction                                  |
+| rolls                        | rolls                                          |
+| magic_key                    | magickey                                       |
+| french_distancesreduction    | french_distancesreduction                      |
+| french_autocorrection        | french_autocorrection                          |
+| french_magickey              | french_magickey                                |
+| personal                     | personal, only when the real descriptor exists |
 
 This is an inventory description, not a proposed runtime alias map. The shared
 `hotstrings.languages.section_default` already normalizes category spellings for
@@ -62,16 +62,16 @@ come from `list_groups/get_sections`, not directory-name guesses.
 The actual runtime checks group `dynamichotstrings` and the section guard
 (`modules/dynamic_hotstrings/rules_engine.lua:220`, `:227`, `:567`):
 
-| Conceptual feature | Consumed persisted leaf |
-| --- | --- |
-| dynamic.enabled | hotstrings.groups.dynamichotstrings |
-| dynamic.date.enabled | hotstrings.modules.dynamichotstrings.date |
-| dynamic.date_fr.enabled | hotstrings.modules.dynamichotstrings.datefr |
-| dynamic.date_long_fr.enabled | hotstrings.modules.dynamichotstrings.datelongfr |
-| dynamic.iban_prefixes.enabled | hotstrings.modules.dynamichotstrings.ibanprefixes |
-| dynamic.phone_prefixes.enabled | hotstrings.modules.dynamichotstrings.phoneprefixes |
-| dynamic.ssn_prefixes.enabled | hotstrings.modules.dynamichotstrings.ssnprefixes |
-| dynamic.text_expansion_personal_information.enabled | hotstrings.modules.personal_info |
+| Conceptual feature                                  | Consumed persisted leaf                            |
+| --------------------------------------------------- | -------------------------------------------------- |
+| dynamic.enabled                                     | hotstrings.groups.dynamichotstrings                |
+| dynamic.date.enabled                                | hotstrings.modules.dynamichotstrings.date          |
+| dynamic.date_fr.enabled                             | hotstrings.modules.dynamichotstrings.datefr        |
+| dynamic.date_long_fr.enabled                        | hotstrings.modules.dynamichotstrings.datelongfr    |
+| dynamic.iban_prefixes.enabled                       | hotstrings.modules.dynamichotstrings.ibanprefixes  |
+| dynamic.phone_prefixes.enabled                      | hotstrings.modules.dynamichotstrings.phoneprefixes |
+| dynamic.ssn_prefixes.enabled                        | hotstrings.modules.dynamichotstrings.ssnprefixes   |
+| dynamic.text_expansion_personal_information.enabled | hotstrings.modules.personal_info                   |
 
 Preferences also contains older scalar mappings `hotstrings.dynamic.datefr`,
 `date`, `datelongfr`, `ibanprefixes`, `phoneprefixes`, `ssnprefixes`, and `enabled`.

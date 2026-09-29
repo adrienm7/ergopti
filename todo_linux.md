@@ -3,7 +3,7 @@
 # Plan & TODO — Driver Linux (moteur de hotstrings X11 + Wayland)
 
 > **But de ce document.** Amener le driver Linux d'ergopti+ à un moteur de
-> hotstrings *réellement fonctionnel sur du vrai matériel*, identique sous X11
+> hotstrings _réellement fonctionnel sur du vrai matériel_, identique sous X11
 > et sous Wayland, avec **une seule** implémentation qui détecte le serveur
 > d'affichage à l'exécution — un utilisateur peut se déconnecter d'X11, se
 > reconnecter sous Wayland, sans rien toucher. Livrable minimal visé : une icône
@@ -28,7 +28,7 @@
 
 Le driver Linux garde **une seule voie** pour capturer et injecter les frappes :
 **lire les événements evdev bruts depuis `/dev/input/eventN` et écrire dans
-`/dev/uinput`**, tout en LuaJIT via FFI. Cette voie est la *seule* mécanique qui
+`/dev/uinput`**, tout en LuaJIT via FFI. Cette voie est la _seule_ mécanique qui
 couvre 100 % des serveurs d'affichage et compositeurs en 2026 (X11, Mutter/GNOME,
 KWin/KDE, wlroots : sway/Hyprland/river/niri, COSMIC, Weston, TTY) parce qu'elle
 opère **sous** le serveur d'affichage : ni X11 ni le compositeur ne savent que le
@@ -41,10 +41,10 @@ détection partagée. Le sous-menu tray passe par **StatusNotifierItem** (D-Bus)
 lui aussi agnostique au serveur d'affichage.
 
 **Corollaire fort :** notre différenciateur par rapport à espanso est le
-*driver unique*. Espanso a un split X11/Wayland **à la compilation**
+_driver unique_. Espanso a un split X11/Wayland **à la compilation**
 (`is_wayland()` = `cfg!(feature = "wayland")`, deux binaires mutuellement
 exclusifs, issue #2137 toujours ouverte). Notre objectif de driver unique évite
-exactement cette verrue — et le code d'espanso *prouve* que la voie evdev marche
+exactement cette verrue — et le code d'espanso _prouve_ que la voie evdev marche
 aussi sous X11 (`USE_EVDEV=true` force le backend evdev sur leur build X11).
 
 ```
@@ -59,15 +59,15 @@ Physique ──► daemon Ergopti+ (grab + tap-holds + hotstrings) ──► pé
 
 ## 1. Contraintes et objectifs de succès
 
-| # | Contrainte | Critère de validation |
-| --- | --- | --- |
-| C1 | **Un seul driver.** Pas de binaire X11 vs Wayland séparé. | Le même exécutable démarre et fonctionne sous les deux, sans variable d'environnement de sélection. |
-| C2 | **Détection dynamique.** Bascule X11 ⇄ Wayland sans réinstallation ni reconfiguration. | Après un logout X11 → login Wayland, le daemon (via systemd `--user`, lié à `graphical-session.target`) redémarre et re-sonde le serveur à chaud. |
-| C3 | **Toutes distros.** Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE, **et** Alpine/musl, Void, Gentoo, NixOS, distros immuables (Silverblue, SteamOS). | Un chemin d'installation documenté et testé par distro-famille ; aucune ne « hard-abort » silencieusement. |
-| C4 | **Correction du texte.** Une expansion ne doit jamais corrompre le texte de l'utilisateur (bug de course actuel `"abcd"→"acd"`). | Test de course sur vrai matériel : frappe rapide pendant l'expansion, sortie déterministe. |
-| C5 | **Multilingue.** Les remplacements contiennent massivement des accents français (é, è, à, ç…) et des symboles (★, ➜, ≠). | Une expansion `NT’ ➜ N’T` ou une phrase accentuée s'insère correctement, quelle que soit la disposition active. |
-| C6 | **Icône tray + sous-menu Hotstrings.** Au minimum : charger toutes les hotstrings TOML et les présenter. | Le sous-menu liste les catégories réelles (5 packs partagés + perso), avec toggles fonctionnels et persistants. |
-| C7 | **Parité de discipline.** Chaque bug corrigé embarque un test de régression (règle §5.9) ; tout texte visible passe par l'i18n (21 locales). | `node ./tools/test/verify-change.cjs` vert sur ce qu'on touche ; pas de littéral français hors i18n. |
+| #   | Contrainte                                                                                                                                        | Critère de validation                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | **Un seul driver.** Pas de binaire X11 vs Wayland séparé.                                                                                         | Le même exécutable démarre et fonctionne sous les deux, sans variable d'environnement de sélection.                                               |
+| C2  | **Détection dynamique.** Bascule X11 ⇄ Wayland sans réinstallation ni reconfiguration.                                                            | Après un logout X11 → login Wayland, le daemon (via systemd `--user`, lié à `graphical-session.target`) redémarre et re-sonde le serveur à chaud. |
+| C3  | **Toutes distros.** Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE, **et** Alpine/musl, Void, Gentoo, NixOS, distros immuables (Silverblue, SteamOS). | Un chemin d'installation documenté et testé par distro-famille ; aucune ne « hard-abort » silencieusement.                                        |
+| C4  | **Correction du texte.** Une expansion ne doit jamais corrompre le texte de l'utilisateur (bug de course actuel `"abcd"→"acd"`).                  | Test de course sur vrai matériel : frappe rapide pendant l'expansion, sortie déterministe.                                                        |
+| C5  | **Multilingue.** Les remplacements contiennent massivement des accents français (é, è, à, ç…) et des symboles (★, ➜, ≠).                          | Une expansion `NT’ ➜ N’T` ou une phrase accentuée s'insère correctement, quelle que soit la disposition active.                                   |
+| C6  | **Icône tray + sous-menu Hotstrings.** Au minimum : charger toutes les hotstrings TOML et les présenter.                                          | Le sous-menu liste les catégories réelles (5 packs partagés + perso), avec toggles fonctionnels et persistants.                                   |
+| C7  | **Parité de discipline.** Chaque bug corrigé embarque un test de régression (règle §5.9) ; tout texte visible passe par l'i18n (21 locales).      | `node ./tools/test/verify-change.cjs` vert sur ce qu'on touche ; pas de littéral français hors i18n.                                              |
 
 ---
 
@@ -85,7 +85,7 @@ Physique ──► daemon Ergopti+ (grab + tap-holds + hotstrings) ──► pé
 
 ### 3.2 Le grab (EVIOCGRAB) est ce qui corrige la corruption à la racine
 
-Les observateurs sans grab (espanso) *documentent notre bug* : désync de
+Les observateurs sans grab (espanso) _documentent notre bug_ : désync de
 modificateurs et intercalage sur frappe rapide (espanso issues #588, #914,
 #1507, #1575). Les daemons qui **grab + ré-émettent** (keyd, kanata, kmonad,
 xremap) possèdent l'ordre des événements et peuvent **mettre en file** les
@@ -110,7 +110,7 @@ disposition XKB de l'utilisateur **par-dessus, de façon identique sous X11 et
 Wayland** — XKB est l'unique étage de mapping, XInput2 ne re-mappe pas au-dessus.
 Injecter du **texte** exige donc le mapping inverse
 `caractère → (keycode, groupe, niveau, masque de modificateurs)` sous la
-disposition **active**. C'est *exactement* le problème de `xdotool type`, et il
+disposition **active**. C'est _exactement_ le problème de `xdotool type`, et il
 est **uniforme** sur les deux serveurs : donc il ne pousse **pas** vers un backend
 X11 séparé, c'est une propriété de la voie uinput partagée. keyd/kanata
 l'esquivent en ne faisant que du keycode→keycode ; un injecteur de texte ne le
@@ -147,21 +147,22 @@ documenter, non corrigeable de notre côté).
 **Décision clé : ne PAS hand-roll le dbusmenu en `gdbus` one-shot** (c'est
 exactement pourquoi le tray actuel est une façade cassée : `RequestName` transient
 qui relâche le nom, XML jamais servi). Il faut un **processus persistant** qui
-reste sur le bus et *sert* `GetLayout`/`GetGroupProperties`/`Event`/`AboutToShow`
-— ce que `gdbus` en ligne de commande ne fait pas (il *appelle*/*émet*, il n'*héberge*
+reste sur le bus et _sert_ `GetLayout`/`GetGroupProperties`/`Event`/`AboutToShow`
+— ce que `gdbus` en ligne de commande ne fait pas (il _appelle_/_émet_, il n'_héberge_
 pas un objet). Options réalistes, de la meilleure à la moins bonne :
+
 1. **FFI LuaJIT → `libayatana-appindicator`** (dbusmenu géré pour nous) ou
 2. **Petit sidecar** contre une implémentation prête : crate Rust **`ksni`** (SNI +
 3. `yad --notification` **uniquement** en fallback X11-XEmbed (invisible sur GNOME
-Pour les WM sans hôte SNI (dwm/i3/vieux XFCE) : proxy **`snixembed`** (SNI→XEmbed).
-espanso **n'a aucun tray Linux** à copier (son search-bar est indisponible sous
-Linux) ; ksni est ce qu'utilisent les daemons Rust/Go qui affichent un tray.
+   Pour les WM sans hôte SNI (dwm/i3/vieux XFCE) : proxy **`snixembed`** (SNI→XEmbed).
+   espanso **n'a aucun tray Linux** à copier (son search-bar est indisponible sous
+   Linux) ; ksni est ce qu'utilisent les daemons Rust/Go qui affichent un tray.
 
 ### 3.7 Permissions et universalité distro
 
 - **Accès `/dev/input` (lecture)** : groupe `input` (défaut des distros), mais
 - **Accès `/dev/uinput` (écriture)** : règle udev
-- **Piège LuaJIT statique-musl** *(mesuré, classe de bug documentée)* : le JIT
+- **Piège LuaJIT statique-musl** _(mesuré, classe de bug documentée)_ : le JIT
 - **glibc version skew** : un binaire lié dynamiquement contre une glibc récente
 - **Non-systemd** : pas de réponse portable unique — systemd `--user` en primaire
 - **NixOS** : un script qui hardcode `/usr`/`#!/bin/bash` ne tourne pas. Livrer un
@@ -182,12 +183,12 @@ l'occasion de faire mieux. « Le menu est partagé » n'est vrai qu'à moitié :
 la faire pour les trois. L'architecture cible (= invariant **I3** + Lot 5 de
 `TODO.md`) en **4 couches** :
 
-| Couche | Rôle | Où | Partagé ? |
-| --- | --- | --- | --- |
-| **1. Manifeste** (donnée) | *Ce que* l'utilisateur voit : chaque rangée déclarée, y compris celles codées en dur aujourd'hui (sous-menus par catégorie, toggles par section via un `provider`, compteurs via `count`+`count_policy`, coches `checked_when`, labels à valeur `label.format`+`args`, `platforms`, `visible_when`/`disabled_when`) | `_shared/modules/menu/menu_manifest.json` | **100 %** |
-| **2. Renderer** (code) | Parcourt le manifeste, résout l'i18n, appelle les getters/providers du driver, émet un **arbre de menu neutre** `{label, kind, checked, enabled, submenu, action_id}` | `_shared/lua/menu/render.lua` | **macOS + Linux** (les deux en Lua) — AHK garde son `MenuRenderer_Build`, tenu identique par la gate |
-| **3. Host OS** (code, petit) | Dessine l'arbre neutre avec la toolkit OS : `hs.menubar` (macOS), SNI/dbusmenu (Linux), `Menu` AHK (Windows) | `<driver>/infra/menu_host.*` | par-OS (mince) |
-| **4. Le driver ne fournit QUE** | un **registre d'actions** (id → callback), des **getters d'état** (`is_enabled`, char trigger courant, délai courant) et des **providers** (catégories, sections, compteurs) | `<driver>/…` | logique dans `_shared/lua/*` quand c'est du Lua pur |
+| Couche                          | Rôle                                                                                                                                                                                                                                                                                                                | Où                                        | Partagé ?                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **1. Manifeste** (donnée)       | _Ce que_ l'utilisateur voit : chaque rangée déclarée, y compris celles codées en dur aujourd'hui (sous-menus par catégorie, toggles par section via un `provider`, compteurs via `count`+`count_policy`, coches `checked_when`, labels à valeur `label.format`+`args`, `platforms`, `visible_when`/`disabled_when`) | `_shared/modules/menu/menu_manifest.json` | **100 %**                                                                                            |
+| **2. Renderer** (code)          | Parcourt le manifeste, résout l'i18n, appelle les getters/providers du driver, émet un **arbre de menu neutre** `{label, kind, checked, enabled, submenu, action_id}`                                                                                                                                               | `_shared/lua/menu/render.lua`             | **macOS + Linux** (les deux en Lua) — AHK garde son `MenuRenderer_Build`, tenu identique par la gate |
+| **3. Host OS** (code, petit)    | Dessine l'arbre neutre avec la toolkit OS : `hs.menubar` (macOS), SNI/dbusmenu (Linux), `Menu` AHK (Windows)                                                                                                                                                                                                        | `<driver>/infra/menu_host.*`              | par-OS (mince)                                                                                       |
+| **4. Le driver ne fournit QUE** | un **registre d'actions** (id → callback), des **getters d'état** (`is_enabled`, char trigger courant, délai courant) et des **providers** (catégories, sections, compteurs)                                                                                                                                        | `<driver>/…`                              | logique dans `_shared/lua/*` quand c'est du Lua pur                                                  |
 
 **Le « modulo OS » devient de la donnée, pas du code divergent** : un
 `platforms:["windows","macos","linux"]` par entrée + prédicats
@@ -195,15 +196,16 @@ la faire pour les trois. L'architecture cible (= invariant **I3** + Lot 5 de
 plateforme (rangée grisée avec tooltip = Convention S « stub avec raison »). La
 différence est **auditable** parce qu'elle est déclarée.
 
-**La certification — le cœur de ta demande** : une gate qui *rend* le manifeste
-pour les 3 plateformes et *diffe* les arbres de labels, en assertant qu'ils sont
+**La certification — le cœur de ta demande** : une gate qui _rend_ le manifeste
+pour les 3 plateformes et _diffe_ les arbres de labels, en assertant qu'ils sont
 identiques **sauf** là où `platforms`/`visible_when` diffèrent explicitement :
+
 - `test-menu-parity.cjs` (I3) — rend les 3, diffe les arbres.
 - ratchet **« aucune rangée de menu créée hors du renderer »** (baseliné aux sites
 - bijection `action_id ↔ handler` dans les deux sens (toute action du manifeste
 - « toute clé-tableau du manifeste a un lecteur ».
-Ainsi « le menu est identique sur chaque OS » devient un **invariant vérifié par
-la CI**, pas une discipline.
+  Ainsi « le menu est identique sur chaque OS » devient un **invariant vérifié par
+  la CI**, pas une discipline.
 
 **La frontière honnête (AHK)** : Windows est en AHK — il partage la **donnée**
 (manifeste, i18n, registre d'actions, `defaults.toml`, catalogue Terminators, la
@@ -231,16 +233,16 @@ driver Linux, et des deux autres, s'en trouvent durablement allégées.
 
 ## 4. Alternatives rejetées (à ne PAS re-proposer)
 
-| Idée | Pourquoi rejetée |
-| --- | --- |
-| **Adopter espanso comme moteur** | Déjà rejeté (`README.md:22-40`) : besoin de log par frappe pour les métriques, terminateurs par entrée, touche magique, état in-process partagé avec le keymap. On en tire des **leçons**, on ne l'adopte pas. |
-| **Split binaire X11 vs Wayland (compile-time)** | C'est exactement la verrue d'espanso (issue #2137). Viole C1. La détection runtime + evdev/uinput l'évite. |
-| **Protocoles Wayland « propres » (virtual-keyboard-v1, input-method-v2)** | Absents de GNOME **et** KDE (les deux plus gros desktops). Ne peuvent pas être la voie unique. Utilisables au mieux en *fast-path opportuniste* sur wlroots. |
-| **Portails + libei comme capture** | `InputCapture` est réactif par conception, inutilisable pour un trigger toujours actif. Injection possible sur GNOME/KDE seulement. Optionnel en 2ᵉ backend d'injection, jamais l'unique. |
-| **`kanata` defseq/zippychord pour les hotstrings** | Mauvais modèle de déclenchement (leader/accords simultanés), pas de terminateurs ni de casse, unicode Wayland cassé. |
-| **Rester en observe-mode (libinput/evtest scraping)** | Masquage des keycodes = daemon inerte ; lecture bloquante = daemon affamé ; pas de grab = corruption C4. La voie FFI evdev résout les trois. |
-| **`ydotool` comme injecteur principal** | Suppose US (charabia accentué), pas de `--clearmodifiers`, dépend de `ydotoold` root, un fork par événement en pass-through. Gardé **au mieux** en fallback ASCII. |
-| **Garder `M.new` (décodeur) en double du chemin scraping** | Divergence garantie. Soit on en fait la voie de prod (FFI), soit on le supprime — pas de copie morte parallèle. |
+| Idée                                                                      | Pourquoi rejetée                                                                                                                                                                                               |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Adopter espanso comme moteur**                                          | Déjà rejeté (`README.md:22-40`) : besoin de log par frappe pour les métriques, terminateurs par entrée, touche magique, état in-process partagé avec le keymap. On en tire des **leçons**, on ne l'adopte pas. |
+| **Split binaire X11 vs Wayland (compile-time)**                           | C'est exactement la verrue d'espanso (issue #2137). Viole C1. La détection runtime + evdev/uinput l'évite.                                                                                                     |
+| **Protocoles Wayland « propres » (virtual-keyboard-v1, input-method-v2)** | Absents de GNOME **et** KDE (les deux plus gros desktops). Ne peuvent pas être la voie unique. Utilisables au mieux en _fast-path opportuniste_ sur wlroots.                                                   |
+| **Portails + libei comme capture**                                        | `InputCapture` est réactif par conception, inutilisable pour un trigger toujours actif. Injection possible sur GNOME/KDE seulement. Optionnel en 2ᵉ backend d'injection, jamais l'unique.                      |
+| **`kanata` defseq/zippychord pour les hotstrings**                        | Mauvais modèle de déclenchement (leader/accords simultanés), pas de terminateurs ni de casse, unicode Wayland cassé.                                                                                           |
+| **Rester en observe-mode (libinput/evtest scraping)**                     | Masquage des keycodes = daemon inerte ; lecture bloquante = daemon affamé ; pas de grab = corruption C4. La voie FFI evdev résout les trois.                                                                   |
+| **`ydotool` comme injecteur principal**                                   | Suppose US (charabia accentué), pas de `--clearmodifiers`, dépend de `ydotoold` root, un fork par événement en pass-through. Gardé **au mieux** en fallback ASCII.                                             |
+| **Garder `M.new` (décodeur) en double du chemin scraping**                | Divergence garantie. Soit on en fait la voie de prod (FFI), soit on le supprime — pas de copie morte parallèle.                                                                                                |
 
 ---
 
@@ -250,7 +252,6 @@ Ordre de dépendance : **coordination d'abord, moteur ensuite, layout/tray/
 packaging après.** Chaque tâche note le test de régression qu'elle embarque
 (règle §5.9). Chaque tâche runtime porte la mention **[MATÉRIEL]** = à valider sur
 une vraie machine avant merge (le CI ne le couvre pas).
-
 
 ### M3 — Fondation du menu partagé + transport tray
 
@@ -272,76 +273,75 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
       partagé. Contrainte d'ordre ci-dessus : deux ratchets désignent ce fichier
       par son nom et doivent être repointés dans le même changement.
       → **Mesuré le 2026-08-05** (`--measure`) : le fichier contient **134 sites de
-        rangée**. Les supprimer signifie migrer 134 rangées en entrées manifeste de
-        type `list`/`action`/`group` avec leurs fournisseurs — et l en-tête du
-        ratchet le dit : router par `ManifestMenu.build` ne fait **pas** baisser le
-        compte, seule une migration `list` l a jamais fait.
+      rangée**. Les supprimer signifie migrer 134 rangées en entrées manifeste de
+      type `list`/`action`/`group` avec leurs fournisseurs — et l en-tête du
+      ratchet le dit : router par `ManifestMenu.build` ne fait **pas** baisser le
+      compte, seule une migration `list` l a jamais fait.
       → **Cet item demande à Linux d aller plus loin que les deux autres pilotes.**
-        macOS a 301 rangées hors renderer, Windows 220 ; ni l un ni l autre n a
-        fait cette migration, et le ratchet existe précisément parce que
-        « l interdire aujourd hui voudrait dire réécrire deux couches de menu d un
-        coup ». Formulé comme « supprimer le fichier », M3.3 vise un état qu aucun
-        pilote de référence n a atteint.
+      macOS a 301 rangées hors renderer, Windows 220 ; ni l un ni l autre n a
+      fait cette migration, et le ratchet existe précisément parce que
+      « l interdire aujourd hui voudrait dire réécrire deux couches de menu d un
+      coup ». Formulé comme « supprimer le fichier », M3.3 vise un état qu aucun
+      pilote de référence n a atteint.
       → **Décision prise le 2026-08-05 : repointer.** Le ratchet ne traite plus
-        `menu_builder.lua` comme « le renderer Linux » — c en est un **appelant**,
-        exactement comme `menu_shortcuts.lua` sur macOS, que ce même fichier a
-        toujours compté dehors. Linux est le seul pilote dont le renderer est
-        entièrement partagé. L ancienne définition rendait la mesure vide : 2/2
-        quoi qu il arrive.
+      `menu_builder.lua` comme « le renderer Linux » — c en est un **appelant**,
+      exactement comme `menu_shortcuts.lua` sur macOS, que ce même fichier a
+      toujours compté dehors. Linux est le seul pilote dont le renderer est
+      entièrement partagé. L ancienne définition rendait la mesure vide : 2/2
+      quoi qu il arrive.
       → **État : 120 rangées dehors, 4 fournisseurs `list`.** Trois blocs migrés —
-        `kanata_menu`, `updates_menu`, et les deux lignes de gestes Linux-only
-        (`gesture_slots_linux` compte à lui seul une trentaine de rangées avec un
-        sélecteur d action imbriqué chacune). Gelé sur le mesuré, pas sur le chiffre
-        d avant migration : figer à 136 aurait silencieusement rendu les seize
-        rangées que ces blocs ont coûté à déplacer. C est la seule forme qui déplace quoi que ce soit — router un menu par
-        `ManifestMenu.build` en laissant ses handlers ajouter les rangées ne bouge
-        rien, et quatre menus de ce pilote le faisaient déjà sans qu une seule
-        rangée soit sortie.
+      `kanata_menu`, `updates_menu`, et les deux lignes de gestes Linux-only
+      (`gesture_slots_linux` compte à lui seul une trentaine de rangées avec un
+      sélecteur d action imbriqué chacune). Gelé sur le mesuré, pas sur le chiffre
+      d avant migration : figer à 136 aurait silencieusement rendu les seize
+      rangées que ces blocs ont coûté à déplacer. C est la seule forme qui déplace quoi que ce soit — router un menu par
+      `ManifestMenu.build` en laissant ses handlers ajouter les rangées ne bouge
+      rien, et quatre menus de ce pilote le faisaient déjà sans qu une seule
+      rangée soit sortie.
       → **Un cadran qui n attend personne** a été ajouté au ratchet : le nombre de
-        fournisseurs `list` que le pilote Linux enregistre et dont le manifeste
-        déclare l id pour `linux`. Il ne fait que monter, donc il n exige aucun
-        arbitrage. Première version comptait les clés du pilote, et renommer l une
-        d elles laissait le nombre intact pendant que le sous-menu se vidait — il
-        compte contre le manifeste désormais.
+      fournisseurs `list` que le pilote Linux enregistre et dont le manifeste
+      déclare l id pour `linux`. Il ne fait que monter, donc il n exige aucun
+      arbitrage. Première version comptait les clés du pilote, et renommer l une
+      d elles laissait le nombre intact pendant que le sous-menu se vidait — il
+      compte contre le manifeste désormais.
       → **Bloc suivant à ne PAS migrer tel quel : `apps_menu`.** Tenté puis annulé
-        le 2026-08-05. `top_level/apps` est déclaré `["hs", "linux"]`, et macOS a
-        bien le même sous-menu par application — mais il le construit lui-même
-        (`ui/menu/menu_apps.lua`) sans lire de clé de manifeste. Déclarer
-        `apps_menu` en Linux-only fait donc que macOS ouvre une entrée de premier
-        niveau sur un menu qui ne projette aucune rangée pour lui, ce que la porte
-        de parité signale — à juste titre. Le décrire honnêtement des deux côtés
-        demande d abord du travail côté macOS ; ce n est pas une migration Linux.
+      le 2026-08-05. `top_level/apps` est déclaré `["hs", "linux"]`, et macOS a
+      bien le même sous-menu par application — mais il le construit lui-même
+      (`ui/menu/menu_apps.lua`) sans lire de clé de manifeste. Déclarer
+      `apps_menu` en Linux-only fait donc que macOS ouvre une entrée de premier
+      niveau sur un menu qui ne projette aucune rangée pour lui, ce que la porte
+      de parité signale — à juste titre. Le décrire honnêtement des deux côtés
+      demande d abord du travail côté macOS ; ce n est pas une migration Linux.
       → **Le menu Débogage est bloqué de la même façon** : ses rangées de manifeste
-        n ont **aucun `type`**, donc le renderer les journaliserait en « Unknown
-        item type » et les sauterait. Les typer touche les trois pilotes, et
-        Windows les charge par son propre `MenuManifest_LoadDebugMenu`.
+      n ont **aucun `type`**, donc le renderer les journaliserait en « Unknown
+      item type » et les sauterait. Les typer touche les trois pilotes, et
+      Windows les charge par son propre `MenuManifest_LoadDebugMenu`.
 - [x] **M3.4 — fait** le 2026-08-05. `_build_shortcuts` passe par
       `ManifestMenu.build("shortcuts_menu", …)` et `extensions_shortcuts` a perdu
       sa restriction `["ahk"]`. Détails dans l item de §11.3.
 - [x] **M3.6 — certifié** le 2026-08-05 pour Linux, au **runtime**.
       → Les portes de `tools/test` lisent le manifeste et la **source**. Elles
-        attrapent une ligne promise qu aucun handler ne répond, et un pilote qui
-        construit des lignes qu aucun manifeste ne décrit. Aucune ne voit le
-        troisième cas : un handler qui existe, est enregistré, est atteint — et
-        n ajoute rien, parce qu une garde au-dessus est sortie tôt ou qu une clé de
-        contexte était mal orthographiée. Cette ligne est déclarée, gérée,
-        invisible, et tout reste vert. C est arrivé deux fois (les onze lignes de
-        gestes, la catégorie dynamique grisée).
+      attrapent une ligne promise qu aucun handler ne répond, et un pilote qui
+      construit des lignes qu aucun manifeste ne décrit. Aucune ne voit le
+      troisième cas : un handler qui existe, est enregistré, est atteint — et
+      n ajoute rien, parce qu une garde au-dessus est sortie tôt ou qu une clé de
+      contexte était mal orthographiée. Cette ligne est déclarée, gérée,
+      invisible, et tout reste vert. C est arrivé deux fois (les onze lignes de
+      gestes, la catégorie dynamique grisée).
       → `linux/tests/unit/meta/test_menu_matches_manifest.lua` construit le plateau
-        entier avec le builder du démon et vérifie chaque `action`, `group` et
-        `section_header` que le manifeste promet à `linux`. Il tourne dans la suite
-        du pilote, donc sur un vrai Linux en CI et sur le LuaJIT de chaque distro.
-        Vérifié rouge : neutraliser le rendu manifeste des hotstrings nomme les six
-        lignes disparues.
+      entier avec le builder du démon et vérifie chaque `action`, `group` et
+      `section_header` que le manifeste promet à `linux`. Il tourne dans la suite
+      du pilote, donc sur un vrai Linux en CI et sur le LuaJIT de chaque distro.
+      Vérifié rouge : neutraliser le rendu manifeste des hotstrings nomme les six
+      lignes disparues.
       → Il couvre aussi « aucun sous-menu vide » : un sous-menu qui s ouvre sur rien
-        est pire qu absent, l utilisateur ne peut pas le distinguer d une
-        fonctionnalité qui a échoué à charger.
+      est pire qu absent, l utilisateur ne peut pas le distinguer d une
+      fonctionnalité qui a échoué à charger.
       → **Hors périmètre, assumé** : les lignes `dynamic`, `feature` et `toggle`,
-        dont le libellé appartient au handler ou à l appelant — le ratchet de
-        bijection pose sur elles la question plus étroite « un handler est-il
-        enregistré ». Et les 39 lignes cachées sans `reason_key` : ce compteur est
-        une dette gelée par son propre ratchet, pas une certification.
-
+      dont le libellé appartient au handler ou à l appelant — le ratchet de
+      bijection pose sur elles la question plus étroite « un handler est-il
+      enregistré ». Et les 39 lignes cachées sans `reason_key` : ce compteur est
+      une dette gelée par son propre ratchet, pas une certification.
 
 ---
 
@@ -400,7 +400,7 @@ pas les rouvrir sans raison nouvelle.
 
 > **Procédure écrite** : `static/ergopti_plus/linux/HARDWARE.md` — chaque point
 > ci-dessous y a sa commande et la réponse attendue, dans un ordre où un échec
-> précoce rend les suivants ininterprétables. Une chose *est* désormais couverte
+> précoce rend les suivants ininterprétables. Une chose _est_ désormais couverte
 > par le CI : `tests/hardware/run_uinput_roundtrip.lua` crée un vrai clavier
 > virtuel, le grab, écrit et relit — ce qui épingle les numéros d'ioctl, la
 > disposition du struct et les bits de capacité. Il tourne sans écran, donc il ne
@@ -411,14 +411,14 @@ pas les rouvrir sans raison nouvelle.
 > machine Linux avec un serveur d'affichage, un panneau et une vraie disposition
 > clavier ; ce checkout est sous Windows. Les cocher serait mentir.
 >
-> Ce qui *était* livrable d'ici l'est, et il y en avait plus que « une checklist
+> Ce qui _était_ livrable d'ici l'est, et il y en avait plus que « une checklist
 > en prose ». Deux de ces sept points avaient un **cœur mécanisable qui n'avait
 > jamais été écrit** :
 >
 > - **`tests/hardware/run_grab_race.lua`** — la propriété qui donne son nom au
 >   jalon (`"abcd"` → `"acd"`, §4 de HARDWARE.md) n'était vérifiée **que par
 >   lecture**. Un backend enregistré peut affirmer l'ordre que notre code
->   *entend*, et il est structurellement incapable d'affirmer que le noyau est
+>   _entend_, et il est structurellement incapable d'affirmer que le noyau est
 >   d'accord ; un grab en particulier est invisible pour un mock — un `ioctl` qui
 >   retourne 0 à un enregistreur ne dit rien de si le bureau voit encore le
 >   périphérique. Ce harnais crée un vrai clavier, prend le grab, écrit une rafale
@@ -430,7 +430,7 @@ pas les rouvrir sans raison nouvelle.
 >   vraies dispositions système (`fr`, `es`, `us`, `de`) et vérifie que chacune
 >   tape ses propres accents **et refuse ceux des autres, en entier**. Et il ne
 >   demande **aucun serveur d'affichage** : `xkbcli compile-keymap` produit le
->   même texte qu'un dump de session — la session décide *quelle* disposition est
+>   même texte qu'un dump de session — la session décide _quelle_ disposition est
 >   active, pas ce qu'une disposition contient. C'est ce qui le rend exécutable en
 >   CI, et c'est le cas « pack espagnol sur clavier français » vérifié pour de bon.
 >
@@ -463,7 +463,7 @@ pas les rouvrir sans raison nouvelle.
 >   au jalon — est prouvée : rafale entrelacée (effacements synthétiques + frappe
 >   utilisateur au milieu), tout revient entier et dans l'ordre.
 > - `run_layout_resolution` : `fr` rend **169 caractères typables**, tape `é è à ç
->   ù` en frappe native, n'a **aucune touche** pour `ñ`, et refuse `señor` **en
+ù` en frappe native, n'a **aucune touche** pour `ñ`, et refuse `señor` **en
 >   entier** en nommant `ñ` comme bloqueur. `us` 104 caractères, refuse `é ñ ç`.
 >   `de` tape `ä ö ü ß`. Réponse mesurée à la question « pack espagnol » : sur
 >   clavier espagnol `ñ` se tape et `á` se colle — les voyelles accentuées y sont
@@ -482,32 +482,30 @@ pas les rouvrir sans raison nouvelle.
 > La moitié mécanisable de chacune est faite et tourne en CI — voir la note sous
 > chaque ligne pour savoir laquelle exactement, et ce qui reste.
 
-
 - 👁 Frappe normale capturée sous X11 **et** sous Wayland (post-grab du daemon).
-      *(le cœur — capture, grab, ré-émission — est vérifié ; reste la partie
-      « le texte apparaît bien dans une vraie fenêtre », sur les deux serveurs)*
+  _(le cœur — capture, grab, ré-émission — est vérifié ; reste la partie
+  « le texte apparaît bien dans une vraie fenêtre », sur les deux serveurs)_
 - 👁 Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
-      *(la résolution de disposition est vérifiée sur de vraies keymaps ; reste
-      la frappe réelle dans une application)*
+  _(la résolution de disposition est vérifiée sur de vraies keymaps ; reste
+  la frappe réelle dans une application)_
 - 👁 Frappe rapide pendant expansion → pas de corruption (C4).
-      *(l'ordre des événements est prouvé sur un vrai noyau ; reste la
-      confirmation visuelle dans un éditeur)*
+  _(l'ordre des événements est prouvé sur un vrai noyau ; reste la
+  confirmation visuelle dans un éditeur)_
 - 👁 Bascule logout-X11 → login-Wayland sans reconfiguration (C2).
-      *(la moitié mécanisable est vérifiée : `run_display_server.lua` tourne sous
-      **Xvfb** puis sous **sway headless**, même binaire, zéro configuration entre
-      les deux, et le cas piège — DISPLAY laissé positionné comme le fait XWayland
-      sur toute session Wayland — est celui qui est testé. Reste que la session
-      redémarre bien l'unité, ce qui exige une vraie ouverture de session)*
+  _(la moitié mécanisable est vérifiée : `run_display_server.lua` tourne sous
+  **Xvfb** puis sous **sway headless**, même binaire, zéro configuration entre
+  les deux, et le cas piège — DISPLAY laissé positionné comme le fait XWayland
+  sur toute session Wayland — est celui qui est testé. Reste que la session
+  redémarre bien l'unité, ce qui exige une vraie ouverture de session)_
 - 👁 Icône tray + sous-menu Hotstrings fonctionnels (KDE, GNOME+extension, sway).
-      *(la moitié qui échoue **en silence** est vérifiée à chaque CI :
-      `run_tray_symbols.lua` charge les trois sonames et résout les quinze
-      symboles contre de vraies libayatana et GTK3 — 15/15. Un soname faux ou un
-      symbole déplacé ne donne ni erreur ni crash, juste pas d'icône, et aucun
-      test unitaire ne peut l'attraper puisqu'il doit stubber, et qu'un stub
-      répond à n'importe quel nom. Reste que l'icône soit **visible**, ce qui
-      exige un panneau qui héberge un StatusNotifierWatcher)*
+  _(la moitié qui échoue **en silence** est vérifiée à chaque CI :
+  `run_tray_symbols.lua` charge les trois sonames et résout les quinze
+  symboles contre de vraies libayatana et GTK3 — 15/15. Un soname faux ou un
+  symbole déplacé ne donne ni erreur ni crash, juste pas d'icône, et aucun
+  test unitaire ne peut l'attraper puisqu'il doit stubber, et qu'un stub
+  répond à n'importe quel nom. Reste que l'icône soit **visible**, ce qui
+  exige un panneau qui héberge un StatusNotifierWatcher)_
 - 👁 Trigger `★` changeable ; délais réglables ; tooltip au bon style.
-
 
 ## 11. Parité hotstrings Linux ↔ macOS/Windows (audit du 2026-08-05)
 
@@ -531,36 +529,36 @@ pas les rouvrir sans raison nouvelle.
 
 - [x] **La fenêtre de réglages n exécutait pas son script dans WebKit** — corrigé.
       La cause n était dans aucune des sept hypothèses ci-dessous : `load_html(html,
-      nil)` donne à la page une origine opaque `about:blank`, où les assignations
+nil)` donne à la page une origine opaque `about:blank`, où les assignations
       `window.X` ne survivent pas. Le second argument est une URI de base, et il
       vaut `"file:///"` désormais (`ui/webview_manager.lua`). Le harnais de pièges
       d erreurs avait servi à établir que la page était saine, ce qui a déplacé
       l attention de la page vers la façon dont elle était chargée.
       → Journal d enquête conservé : sept hypothèses éliminées, dont aucune n était
-        la bonne, ce qui est précisément ce qui rend le journal utile.
+      la bonne, ce qui est précisément ce qui rend le journal utile.
 
   **Journal d enquête (conservé).** Trouvé par
-      `tests/hardware/run_webview_push.lua`, reproductible : `window.setData` est
-      `undefined`, donc l hôte — qui garde `if(window.setData)` — jette chaque push.
-      L éditeur, lui, est **vert et stable** (5/5, payload de 146 octets reçu), ce qui
-      établit que le mécanisme de push et le harnais fonctionnent.
-      → **Éliminé localement** : le script EST inliné (aucune balise externe ne
-        survit dans l une ou l autre page) ; la balise est au niveau `body`, après
-        les `<template>`, pas dedans ; les trois blocs assemblés **parsent** (page
-        réassemblée et chaque bloc compilé) ; `makeHostBridge` répond `function`,
-        donc les blocs 1 et 2 s exécutent bien.
-      → **Éliminé en CI** : ce n est pas une interférence entre fenêtres — depuis que
-        chaque page tourne dans son propre processus, l éditeur est vert et celle-ci
-        échoue seule.
-      → Une assignation explicite `window.setData = setData` en fin de fichier n y a
-        rien changé, ce qui **exclut** la simple non-globalisation d une déclaration :
-        si le script s exécutait jusqu au bout, cette ligne suffirait. L hypothèse
-        restante est que le troisième bloc ne s exécute pas du tout, ou lève avant sa
-        fin — à instrumenter avec un `window.onerror` posé AVANT les scripts de la
-        page, ce que le harnais ne fait pas encore.
-      → **Pas une troncature** non plus : la taille du bloc assemblé et celle du
-        fichier sur disque se réconcilient exactement (l écart correspondait à un
-        ajout fait après la mesure).
+  `tests/hardware/run_webview_push.lua`, reproductible : `window.setData` est
+  `undefined`, donc l hôte — qui garde `if(window.setData)` — jette chaque push.
+  L éditeur, lui, est **vert et stable** (5/5, payload de 146 octets reçu), ce qui
+  établit que le mécanisme de push et le harnais fonctionnent.
+  → **Éliminé localement** : le script EST inliné (aucune balise externe ne
+  survit dans l une ou l autre page) ; la balise est au niveau `body`, après
+  les `<template>`, pas dedans ; les trois blocs assemblés **parsent** (page
+  réassemblée et chaque bloc compilé) ; `makeHostBridge` répond `function`,
+  donc les blocs 1 et 2 s exécutent bien.
+  → **Éliminé en CI** : ce n est pas une interférence entre fenêtres — depuis que
+  chaque page tourne dans son propre processus, l éditeur est vert et celle-ci
+  échoue seule.
+  → Une assignation explicite `window.setData = setData` en fin de fichier n y a
+  rien changé, ce qui **exclut** la simple non-globalisation d une déclaration :
+  si le script s exécutait jusqu au bout, cette ligne suffirait. L hypothèse
+  restante est que le troisième bloc ne s exécute pas du tout, ou lève avant sa
+  fin — à instrumenter avec un `window.onerror` posé AVANT les scripts de la
+  page, ce que le harnais ne fait pas encore.
+  → **Pas une troncature** non plus : la taille du bloc assemblé et celle du
+  fichier sur disque se réconcilient exactement (l écart correspondait à un
+  ajout fait après la mesure).
 
 - [x] **Bascules par famille de règle dynamique** — fait le 2026-08-05 pour les
       4 familles que ce pilote enregistre (date, date_fr, date_long_fr,
@@ -568,17 +566,17 @@ pas les rouvrir sans raison nouvelle.
       deux autres pilotes, date du jour substituée, plus les deux lignes « tout
       activer / tout désactiver ».
       → **Le bloquant consigné ici était faux.** Il disait que
-        `register_date_rules` enregistrait les trois règles de date « en lot, sans
-        identifiant ». La lecture tranche : `add_rule(suffix, section, resolver)`
-        porte une section depuis toujours, `register_date_rules` passe
-        `date`/`datefr`/`datelongfr`, et `match_buffer(buffer, group, prédicat)`
-        filtre dessus. Rien n était bloqué — ce pilote passait `nil` en prédicat
-        aux **deux** sites d appel, `match_buffer` et `preview`. Le travail était
-        dans le pilote, pas dans le moteur.
+      `register_date_rules` enregistrait les trois règles de date « en lot, sans
+      identifiant ». La lecture tranche : `add_rule(suffix, section, resolver)`
+      porte une section depuis toujours, `register_date_rules` passe
+      `date`/`datefr`/`datelongfr`, et `match_buffer(buffer, group, prédicat)`
+      filtre dessus. Rien n était bloqué — ce pilote passait `nil` en prédicat
+      aux **deux** sites d appel, `match_buffer` et `preview`. Le travail était
+      dans le pilote, pas dans le moteur.
       → Le défaut visé est « une bascule qui écrit un booléen que rien ne relit » :
-        sans le prédicat, la préférence se serait persistée, la coche affichée, et
-        le pilote aurait continué de taper. Les trois assertions de fond du test
-        de régression sont rouges quand on remet `nil`.
+      sans le prédicat, la préférence se serait persistée, la coche affichée, et
+      le pilote aurait continué de taper. Les trois assertions de fond du test
+      de régression sont rouges quand on remet `nil`.
 
 - [x] **Les trois familles de préfixes (iban, phone, ssn)** — faites le
       2026-08-05. Le manifeste les déclarait depuis toujours, Windows et macOS les
@@ -586,24 +584,24 @@ pas les rouvrir sans raison nouvelle.
       fonctionnalité était trois lignes dans un fichier que personne ne lisait, sur
       un pilote sur trois.
       → Ce ne sont **pas** des règles dynamiques. Un préfixe n a pas de touche de
-        validation — taper `0750` EST le déclencheur — donc ce sont des mappings
-        auto-expansifs ordinaires (`prefix_rules.lua`), remis au moteur habituel
-        via un fournisseur injecté dans `hotstrings_config`. C est aussi pourquoi
-        leur bascule ne peut pas être lue au moment du match : elle doit retirer
-        les mappings, donc déclencher un rechargement.
+      validation — taper `0750` EST le déclencheur — donc ce sont des mappings
+      auto-expansifs ordinaires (`prefix_rules.lua`), remis au moteur habituel
+      via un fournisseur injecté dans `hotstrings_config`. C est aussi pourquoi
+      leur bascule ne peut pas être lue au moment du match : elle doit retirer
+      les mappings, donc déclencher un rechargement.
       → Les seuils viennent du moteur partagé (`compute_prefix_counts`,
-        `spaced_prefix`), pas d une deuxième implémentation.
+      `spaced_prefix`), pas d une deuxième implémentation.
       → **Prérequis livré séparément** : chaque mapping est `is_private`, et rien
-        sur Linux n honorait ce drapeau. Sans lui, porter les préfixes aurait écrit
-        l IBAN en clair dans `events_hotstring`, dans le `events_json` que l export
-        multi-machines réplique, et dans le journal de 14 jours.
+      sur Linux n honorait ce drapeau. Sans lui, porter les préfixes aurait écrit
+      l IBAN en clair dans `events_hotstring`, dans le `events_json` que l export
+      multi-machines réplique, et dans le journal de 14 jours.
       → **Deux défauts trouvés en chemin**, tous deux corrigés avec leur test :
-        `load_all()` sortait avant d ajouter les mappings du fournisseur quand
-        aucun TOML n était trouvé (deux fichiers sans rapport, l un punissant
-        l autre) ; et la garde d arguments de `inject()` imprimait
-        `tostring(backspace_count)`, donc un appelant qui inversait ses deux
-        arguments journalisait la charge depuis la position censée ne jamais en
-        contenir.
+      `load_all()` sortait avant d ajouter les mappings du fournisseur quand
+      aucun TOML n était trouvé (deux fichiers sans rapport, l un punissant
+      l autre) ; et la garde d arguments de `inject()` imprimait
+      `tostring(backspace_count)`, donc un appelant qui inversait ses deux
+      arguments journalisait la charge depuis la position censée ne jamais en
+      contenir.
 
 ### 11.3 — Majeurs et mineurs restants
 
@@ -614,12 +612,13 @@ pas les rouvrir sans raison nouvelle.
       correction parce qu un menu qui ne dispatche rien **par id** ne peut pas se
       voir promettre une ligne par id — le ratchet de bijection l aurait signalé.
       → Ce que le changement rend en échange : `keyboard_slots` était déclaré pour
-        toutes les plateformes et Linux ne peut pas y répondre (aucune capture
-        d accord, aucun stockage d assignation dans `modules/shortcuts/manager.lua`),
-        donc le renderer aurait journalisé un avertissement « pas de fournisseur »
-        à chaque construction. Restreint à `ahk`+`hs`, avec sa clé de raison dans
-        les 21 locales — cela consigne un écart qui existait déjà, ce menu ne lisant
-        aucun manifeste avant.
+      toutes les plateformes et Linux ne peut pas y répondre (aucune capture
+      d accord, aucun stockage d assignation dans `modules/shortcuts/manager.lua`),
+      donc le renderer aurait journalisé un avertissement « pas de fournisseur »
+      à chaque construction. Restreint à `ahk`+`hs`, avec sa clé de raison dans
+      les 21 locales — cela consigne un écart qui existait déjà, ce menu ne lisant
+      aucun manifeste avant.
+
 ## 12. Gestes 3/4/5 doigts sur Linux (audit du 2026-08-05)
 
 > **Demande :** « fais un audit de comment faire sur Linux pour mapper les gestes
@@ -643,8 +642,8 @@ doigts ni aucun tap au-delà », les taps sortant comme
 `BTN_LEFT/RIGHT/MIDDLE` et jamais comme gestes.
 
 > Deux agents de recherche se sont **contredits** sur ce point. Celui qui affirmait
-> « il n'y a pas de plafond à 4 » citait le code de *comptage* des contacts et le
-> prenait pour la *grille* des gestes. La contradiction a été tranchée en allant
+> « il n'y a pas de plafond à 4 » citait le code de _comptage_ des contacts et le
+> prenait pour la _grille_ des gestes. La contradiction a été tranchée en allant
 > lire le corps complet de la fonction, pas en arbitrant entre deux résumés.
 
 Conséquence chiffrée : sur les 36 slots simples déclarés dans
@@ -687,6 +686,7 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       Wayland.** Une action « aller à l'espace 3 » ne peut s'exprimer que comme une
       combinaison de touches que le compositeur lie déjà — et Hyprland, sway, i3,
       niri et river ne livrent aucune liaison par défaut.
+
 ### 12.5 — Les étapes
 
 - [x] Slot `TOUCHPAD` ajouté, **sans grab** — grabber le pavé prendrait le pointeur
@@ -695,26 +695,26 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 - [x] `process_frame` retiré, avec ses 508 lignes de tests et la logique qu il
       était seul à utiliser (`_slot_for_dir`, `_compute_dir`, seuils, état de suivi).
       → **Une régression évitée de justesse** : un de ces tests épinglait qu un
-        maintien immobile de 2 s n est PAS un tap. Mon décodeur classait par
-        distance seule — poser les doigts aurait déclenché l action liée. Le
-        plafond de temps est porté dans `mt_decoder`, horloge injectable (le bug
-        d origine était `os.clock()`, dont le temps CPU n avance presque pas dans
-        un démon I/O-bound).
+      maintien immobile de 2 s n est PAS un tap. Mon décodeur classait par
+      distance seule — poser les doigts aurait déclenché l action liée. Le
+      plafond de temps est porté dans `mt_decoder`, horloge injectable (le bug
+      d origine était `os.clock()`, dont le temps CPU n avance presque pas dans
+      un démon I/O-bound).
       → Et une duplication de moins : `_slot_for_dir` orthographiait les mêmes
-        noms de slots que `_slot_for_gesture`. Deux orthographes d une règle,
-        c est exactement ce qui a produit `up_right` contre `right_up`.
+      noms de slots que `_slot_for_gesture`. Deux orthographes d une règle,
+      c est exactement ce qui a produit `up_right` contre `right_up`.
 - [x] `start_reading()` lit réellement : `touchpad_finder.find()` →
       `evdev_reader.open(path, TOUCHPAD)` → `mt_decoder` → `dispatch_gesture`,
       avec `pump()` branché sur le tick du démon.
       → Il **refuse et le dit** sans pavé, au lieu de prétendre lire. La ligne de
-        menu « lecteur actif » basculait un talon et annonçait le contraire dans
-        21 langues ; elle dit vrai maintenant.
+      menu « lecteur actif » basculait un talon et annonçait le contraire dans
+      21 langues ; elle dit vrai maintenant.
 - [x] Émission par **uinput**. `xdotool` est X11 seulement : sous Wayland la
       commande réussit, le shell sort zéro, et le geste ne fait rien — aucune
       erreur à trouver, et ça ressemble exactement à un slot non lié.
       → Table de 18 noms (ce que le catalogue utilise réellement), **bornée par un
-        test** qui parcourt chaque combo généré : ajouter une action avec un nom
-        absent fait échouer la suite au lieu de produire un geste muet.
+      test** qui parcourt chaque combo généré : ajouter une action avec un nom
+      absent fait échouer la suite au lieu de produire un geste muet.
       → Repli xdotool conservé quand le périphérique ne s’ouvre pas.
 - [x] Capacité matérielle remontée au menu : les slots que le matériel ne peut pas
       servir sont **grisés avec une raison traduite** (21 locales), pas livrés
@@ -727,7 +727,8 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       — un modificateur relâché avant sa touche donne une frappe nue, et aucun test
       de parsing ne peut le voir.
       → Ajouté depuis : `test_gesture_under_load.lua` couvre la borne de drain et
-        `SYN_DROPPED`, les deux risques que l audit avait laissés « non testables ».
+      `SYN_DROPPED`, les deux risques que l audit avait laissés « non testables ».
+
 ### 12.6 — Risques identifiés avant d'écrire une ligne
 
 - [ ] **La trace d’événements du décodeur est une reconstruction, pas une capture.**
@@ -736,7 +737,7 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       **bitmaps** publiés par le noyau, ce qui est une autre question que
       l’entrelacement des événements dans une trame.
       → Capturer un vrai pavé (`evtest` ou `libinput record`) et rebâtir les
-        fixtures dessus. Demande votre machine.
+      fixtures dessus. Demande votre machine.
 - [x] **`MAX_EVENTS_PER_DRAIN = 256` vérifié** le 2026-08-05. « Ne reproduit que
       sous charge » avait été lu comme « n est testable que sous charge », ce qui
       était faux : la charge ne fait que changer l arithmétique, et l arithmétique
@@ -799,9 +800,9 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 - [x] **Le bouton de remise à zéro des tableaux de bord ne fait rien**, et
       `metrics_apps` appelle une fonction qui n existe pas.
 - [ ] **La couche navigation laisse la molette transparente** (`volu`/`vold` sur
-      `mwu`/`mwd`, au-dessus du marqueur GENERATED BLOCK). *Constat fait sur
+      `mwu`/`mwd`, au-dessus du marqueur GENERATED BLOCK). _Constat fait sur
       l'ancien `kanata.kbd` ; la couche tourne depuis le 2026-09-24 dans
-      `platform/remap/tap_hold_engine.lua`, à revérifier là.*
+      `platform/remap/tap_hold_engine.lua`, à revérifier là._
 - [x] **« Démarrer kanata » peut lancer une seconde instance** à côté de celle que
       systemd gère : `is_running()` ne teste que le processus qu il a lancé lui-même.
 - [x] **Un `tap_hold.toml` utilisateur remplace les défauts partagés en bloc** au
@@ -812,7 +813,7 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 - [ ] **Aucune surface de notification** : le port `Notifier` n a pas d adaptateur
       Linux. Les chaînes existent déjà dans les 21 locales.
 - [x] **La fenêtre de diagnostic s ouvre vide** : `_shared/lua/healthcheck/snapshot
-      .lua` n est lié que par macOS.
+.lua` n est lié que par macOS.
 - [ ] **Activer `[sections.llm]` pour `linux`** dans le manifeste partagé, puis
       écrire les lecteurs et setters. Débloque le sous-menu LLM à 8 lignes.
 
@@ -835,19 +836,18 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 > que rien ne surveille encore ; `agg_system_day` est un sous-système entier
 > (wifi, batterie, verrouillage, veille).
 
-
 - [x] **Lier `_shared/lua/keylogger/aggregator_helpers.lua`.** Ce module existe,
       se déclare « ZERO driver dependencies », nomme déjà les neuf tables n-grammes
       manquantes et les finaliseurs de rafale et de session — et n est requis que
       par macOS. Linux écrit 8 tables sur 25.
       → **Ce qui en dépend** : les neuf familles de n-grammes (bigrammes à
-        heptagrammes, mots, bigrammes de mots), les douze tables `agg_app_day_*` et
-        `agg_system_day`. Donc l analyse SFB, l analyse d erreurs, les panneaux de
-        rafale et de session, les frises horaires, les catégories et titres de
-        fenêtre du tableau de bord applications — tout cela est vide par
-        construction, pas par accident.
+      heptagrammes, mots, bigrammes de mots), les douze tables `agg_app_day_*` et
+      `agg_system_day`. Donc l analyse SFB, l analyse d erreurs, les panneaux de
+      rafale et de session, les frises horaires, les catégories et titres de
+      fenêtre du tableau de bord applications — tout cela est vide par
+      construction, pas par accident.
       → Taille : **large**. C est le seul item de l audit qui ne se fait pas en une
-        soirée, et il débloque plus que tous les autres réunis.
+      soirée, et il débloque plus que tous les autres réunis.
 
 ### 13.5 — Parité livrée le 2026-08-06 (suite)
 

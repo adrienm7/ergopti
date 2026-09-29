@@ -70,8 +70,10 @@ FEATURES & RATIONALE:
 			<h2>Windows et macOS à parité. Linux en alpha.</h2>
 			<p class="lead">
 				Le même fichier de hotstrings, les mêmes raccourcis, le même tooltip, le même menu — sur
-				AutoHotkey v2 (Windows) et Hammerspoon (macOS). Le driver Linux (un daemon Lua qui gère aussi les tap-holds) est
-				complet sur le papier mais <strong>cherche encore ses premiers testeurs</strong>.
+				AutoHotkey v2 (Windows) et Hammerspoon (macOS). Le driver Linux (un daemon Lua qui gère
+				aussi les tap-holds) est complet sur le papier mais <strong
+					>cherche encore ses premiers testeurs</strong
+				>.
 			</p>
 		</header>
 
@@ -163,7 +165,8 @@ FEATURES & RATIONALE:
 				{#each macosApps as app, i (app.id)}
 					<article class="ep-card app-card" use:reveal={{ delay: (i % 3) * 70 }}>
 						<div class="app-icon" aria-hidden="true">
-							{#if app.icon}{@html app.icon}{:else}<span class="app-monogram">{app.name.charAt(0)}</span
+							{#if app.icon}{@html app.icon}{:else}<span class="app-monogram"
+									>{app.name.charAt(0)}</span
 								>{/if}
 						</div>
 						<div class="app-text">
@@ -181,8 +184,8 @@ FEATURES & RATIONALE:
 		<aside class="linux-callout ep-card" use:reveal>
 			<h3>🐧 Vous utilisez Linux ? On vous cherche.</h3>
 			<p>
-				Le driver Linux existe : 16 000 lignes de Lua, tap-holds gérés par le daemon lui-même, hotstrings via le
-				moteur partagé, IA Ollama, métriques SQLite. Mais <strong
+				Le driver Linux existe : 16 000 lignes de Lua, tap-holds gérés par le daemon lui-même,
+				hotstrings via le moteur partagé, IA Ollama, métriques SQLite. Mais <strong
 					>personne ne l’a encore fait tourner en conditions réelles</strong
 				>
 				— il lui faut des testeurs avant d’être recommandable. Si vous voulez essuyer les plâtres,
@@ -240,7 +243,9 @@ FEATURES & RATIONALE:
 			</p>
 			<p class="cta-foot">
 				<a href="utilisation" class="cta-link"
-					>{@html t('Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →')}</a
+					>{@html t(
+						'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →'
+					)}</a
 				>
 			</p>
 		</div>

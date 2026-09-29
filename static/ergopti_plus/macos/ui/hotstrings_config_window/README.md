@@ -6,9 +6,9 @@ WKWebView-based editor for per-group and per-section hotstring expansion delay a
 
 ## Key files
 
-| File      | Description                                                              |
-| --------- | ------------------------------------------------------------------------ |
-| `init.lua`| `M.show()` — singleton host; bridge handler for JS↔Lua config I/O        |
+| File       | Description                                                        |
+| ---------- | ------------------------------------------------------------------ |
+| `init.lua` | `M.show()` — singleton host; bridge handler for JS↔Lua config I/O |
 
 ## Shared frontend
 

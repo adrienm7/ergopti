@@ -9,15 +9,27 @@ from hs274_inventory import MARKER, read_inventories
 
 
 def receipt(**changes):
-    row = {"version": 2, "device": "41", "coverage": "fixture_only", "capacity": 300, "enumerated": True,
-           "exhausted": False, "readable": True, "elements": [{"usage": 44}]}
+    row = {
+        "version": 2,
+        "device": "41",
+        "coverage": "fixture_only",
+        "capacity": 300,
+        "enumerated": True,
+        "exhausted": False,
+        "readable": True,
+        "elements": [{"usage": 44}],
+    }
     row.update(changes)
     return MARKER + json.dumps(row) + "\n"
 
 
 class InventoryTests(unittest.TestCase):
     def test_retained_native_scenarios_preserve_all_observations(self):
-        evidence = json.loads((Path(__file__).parent / "fixtures" / "hs274-native-inventories.json").read_text(encoding="utf-8"))
+        evidence = json.loads(
+            (Path(__file__).parent / "fixtures" / "hs274-native-inventories.json").read_text(
+                encoding="utf-8"
+            )
+        )
         self.assertEqual(len(evidence["scenarios"]), 2)
         for scenario in evidence["scenarios"]:
             with self.subTest(run=scenario["run"]):
@@ -32,12 +44,23 @@ class InventoryTests(unittest.TestCase):
         self.assertFalse(records[1]["readable"])
 
     def test_missing_failed_and_malformed_evidence_cannot_admit_fixture(self):
-        for output in ("", receipt(device="42"), receipt(readable=False), receipt().rstrip(),
-                       receipt() + receipt(readable=False), receipt(elements=[]), receipt(exhausted=True),
-                       receipt(enumerated=False), receipt(version=True), receipt(readable=1),
-                       receipt(capacity=0), receipt(capacity=True), receipt(version=1),
-                       receipt(capacity=2, elements=[{}] * 3),
-                       receipt().replace('"version": 2', '"version": 2, "version": 1')):
+        for output in (
+            "",
+            receipt(device="42"),
+            receipt(readable=False),
+            receipt().rstrip(),
+            receipt() + receipt(readable=False),
+            receipt(elements=[]),
+            receipt(exhausted=True),
+            receipt(enumerated=False),
+            receipt(version=True),
+            receipt(readable=1),
+            receipt(capacity=0),
+            receipt(capacity=True),
+            receipt(version=1),
+            receipt(capacity=2, elements=[{}] * 3),
+            receipt().replace('"version": 2', '"version": 2, "version": 1'),
+        ):
             with self.subTest(output=output), self.assertRaises(ValueError):
                 read_inventories(output, 41)
 

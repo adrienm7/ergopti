@@ -19,8 +19,15 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const INPUT_SOURCES = path.join(ROOT, 'static', 'ergopti_plus', 'macos',
-	'modules', 'keymap', 'input_sources.lua');
+const INPUT_SOURCES = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'modules',
+	'keymap',
+	'input_sources.lua'
+);
 const PY_CANDIDATES = ['python3', 'python'];
 
 let passed = 0;
@@ -158,7 +165,7 @@ function runMode(python, supervisor, fixtureDir, mode) {
 	fs.writeFileSync(harnessPath, buildHarness(supervisor), 'utf8');
 	const run = spawnSync(python, [harnessPath, mode, path.join(fixtureDir, 'Ergopti.keylayout')], {
 		cwd: ROOT,
-		encoding: 'utf8',
+		encoding: 'utf8'
 	});
 	if (run.error || run.status !== 0) {
 		throw new Error(`harness ${mode} failed: status=${run.status}\n${run.stdout}${run.stderr}`);
@@ -180,24 +187,23 @@ function replaceExactly(source, before, after) {
 
 function budgetContract(payload) {
 	const timeouts = eventsOf(payload, 'communicate').map((event) => event[2]);
-	return payload.exit === 0
-		&& JSON.stringify(timeouts) === JSON.stringify([8, 5, 1]);
+	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5, 1]);
 }
 
 function timeoutKillContract(payload) {
-	return payload.exit === 1
-		&& eventsOf(payload, 'killpg').some((event) => event[1] === 1001);
+	return payload.exit === 1 && eventsOf(payload, 'killpg').some((event) => event[1] === 1001);
 }
 
 function timeoutWaitContract(payload) {
-	return eventsOf(payload, 'wait')
-		.some((event) => event[1] === 1001 && event[2] === 1);
+	return eventsOf(payload, 'wait').some((event) => event[1] === 1001 && event[2] === 1);
 }
 
 function signalRaceContract(payload) {
-	return payload.exit === 124
-		&& eventsOf(payload, 'killpg').some((event) => event[1] === 1001)
-		&& eventsOf(payload, 'wait').some((event) => event[1] === 1001);
+	return (
+		payload.exit === 124 &&
+		eventsOf(payload, 'killpg').some((event) => event[1] === 1001) &&
+		eventsOf(payload, 'wait').some((event) => event[1] === 1001)
+	);
 }
 
 function report() {
@@ -222,54 +228,83 @@ const supervisor = extractSupervisor(source);
 const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-input-source-'));
 
 try {
-	fs.writeFileSync(path.join(fixtureDir, 'Ergopti.keylayout'),
-		'<keyboard id="42" name="Ergopti"></keyboard>\n', 'utf8');
+	fs.writeFileSync(
+		path.join(fixtureDir, 'Ergopti.keylayout'),
+		'<keyboard id="42" name="Ergopti"></keyboard>\n',
+		'utf8'
+	);
 
 	const budget = runMode(python, supervisor, fixtureDir, 'budget');
-	test('all nested children consume the one decreasing monotonic budget',
+	test(
+		'all nested children consume the one decreasing monotonic budget',
 		budgetContract(budget),
-		JSON.stringify(budget));
-	test('every nested child starts in its own process group',
-		eventsOf(budget, 'spawn').length === 3
-			&& eventsOf(budget, 'spawn').every((event) => event[2] === true),
-		JSON.stringify(budget));
+		JSON.stringify(budget)
+	);
+	test(
+		'every nested child starts in its own process group',
+		eventsOf(budget, 'spawn').length === 3 &&
+			eventsOf(budget, 'spawn').every((event) => event[2] === true),
+		JSON.stringify(budget)
+	);
 
 	const timeout = runMode(python, supervisor, fixtureDir, 'timeout');
-	test('a nested timeout kills the exact process group',
+	test(
+		'a nested timeout kills the exact process group',
 		timeoutKillContract(timeout),
-		JSON.stringify(timeout));
-	test('a nested timeout waits for the exact killed child',
+		JSON.stringify(timeout)
+	);
+	test(
+		'a nested timeout waits for the exact killed child',
 		timeoutWaitContract(timeout),
-		JSON.stringify(timeout));
+		JSON.stringify(timeout)
+	);
 
 	const race = runMode(python, supervisor, fixtureDir, 'race');
-	test('SIGTERM during spawn cannot escape before child ownership publishes',
+	test(
+		'SIGTERM during spawn cannot escape before child ownership publishes',
 		signalRaceContract(race),
-		JSON.stringify(race));
+		JSON.stringify(race)
+	);
 
-	const resetBudget = replaceExactly(supervisor,
+	const resetBudget = replaceExactly(
+		supervisor,
 		'    remaining = DEADLINE - time.monotonic()',
-		'    remaining = CHILD_TIMEOUT  # mutation: resets the global budget');
-	test('mutation guard rejects a per-child budget reset',
-		!budgetContract(runMode(python, resetBudget, fixtureDir, 'budget')));
+		'    remaining = CHILD_TIMEOUT  # mutation: resets the global budget'
+	);
+	test(
+		'mutation guard rejects a per-child budget reset',
+		!budgetContract(runMode(python, resetBudget, fixtureDir, 'budget'))
+	);
 
-	const communicateBudget = replaceExactly(supervisor,
+	const communicateBudget = replaceExactly(
+		supervisor,
 		'        stdout, _stderr = child.communicate(timeout=remaining)',
-		'        stdout, _stderr = child.communicate(timeout=CHILD_TIMEOUT)');
-	test('mutation guard rejects a non-decreasing communicate timeout',
-		!budgetContract(runMode(python, communicateBudget, fixtureDir, 'budget')));
+		'        stdout, _stderr = child.communicate(timeout=CHILD_TIMEOUT)'
+	);
+	test(
+		'mutation guard rejects a non-decreasing communicate timeout',
+		!budgetContract(runMode(python, communicateBudget, fixtureDir, 'budget'))
+	);
 
-	const noKill = replaceExactly(supervisor,
+	const noKill = replaceExactly(
+		supervisor,
 		'        os.killpg(child.pid, signal.SIGKILL)',
-		'        pass  # mutation: child process group survives');
-	test('mutation guard rejects missing process-group kill',
-		!timeoutKillContract(runMode(python, noKill, fixtureDir, 'timeout')));
+		'        pass  # mutation: child process group survives'
+	);
+	test(
+		'mutation guard rejects missing process-group kill',
+		!timeoutKillContract(runMode(python, noKill, fixtureDir, 'timeout'))
+	);
 
-	const noWait = replaceExactly(supervisor,
+	const noWait = replaceExactly(
+		supervisor,
 		'        child.wait(timeout=1)',
-		'        pass  # mutation: exact child is never reaped');
-	test('mutation guard rejects missing exact-child wait',
-		!timeoutWaitContract(runMode(python, noWait, fixtureDir, 'timeout')));
+		'        pass  # mutation: exact child is never reaped'
+	);
+	test(
+		'mutation guard rejects missing exact-child wait',
+		!timeoutWaitContract(runMode(python, noWait, fixtureDir, 'timeout'))
+	);
 
 	const maskedSpawn = `    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
     try:
@@ -284,8 +319,10 @@ try {
         start_new_session=True)
     ACTIVE_CHILD = child`;
 	const raceWindow = replaceExactly(supervisor, maskedSpawn, unmaskedSpawn);
-	test('mutation guard rejects the SIGTERM ownership publication window',
-		!signalRaceContract(runMode(python, raceWindow, fixtureDir, 'race')));
+	test(
+		'mutation guard rejects the SIGTERM ownership publication window',
+		!signalRaceContract(runMode(python, raceWindow, fixtureDir, 'race'))
+	);
 } finally {
 	fs.rmSync(fixtureDir, { recursive: true, force: true });
 }

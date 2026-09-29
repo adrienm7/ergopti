@@ -1,5 +1,6 @@
 # tools/diagnostics/hs274_accessibility.py
 """Use the runner's ordinary settings UI to approve its owned Hammerspoon app."""
+
 import subprocess
 import time
 
@@ -8,7 +9,7 @@ from hs274_accessibility_picker import select_application
 from hs274_accessibility_diagnostics import retain_failure
 
 
-PREPARE_SCRIPT = '''
+PREPARE_SCRIPT = """
 log "HS274 settings preparation started"
 tell application "System Events"
     if not UI elements enabled then error "Runner UI automation is unavailable"
@@ -44,10 +45,10 @@ tell application "System Events"
         error "Owned provider panel did not close"
     end tell
 end tell
-'''
+"""
 
 
-SCRIPT = '''
+SCRIPT = """
 log "HS274 accessibility UI started"
 tell application "System Events"
     if not UI elements enabled then error "Runner UI automation is unavailable"
@@ -108,10 +109,10 @@ tell application "System Events"
         return "Hammerspoon checkbox did not become enabled" & linefeed & observations
     end tell
 end tell
-'''
+"""
 
 
-ADD_SCRIPT = '''
+ADD_SCRIPT = """
 tell application "System Events"
     tell process "System Settings"
         if name of window 1 is not "Accessibility" then error "Accessibility page changed before addition"
@@ -141,7 +142,7 @@ tell application "System Events"
         return "addition_sheet_observed"
     end tell
 end tell
-'''
+"""
 
 
 def approve_accessibility(report, app):
@@ -149,25 +150,50 @@ def approve_accessibility(report, app):
     state = report.setdefault("hammerspoon_accessibility", {})
     state["stage"] = "prepare_settings"
     try:
-        preparation = subprocess.run(["/usr/bin/osascript", "-e", PREPARE_SCRIPT],
-                                     capture_output=True, text=True, timeout=10)
+        preparation = subprocess.run(
+            ["/usr/bin/osascript", "-e", PREPARE_SCRIPT], capture_output=True, text=True, timeout=10
+        )
         report["hammerspoon_settings_preparation"] = {
-            "exit": preparation.returncode, "stdout": preparation.stdout, "stderr": preparation.stderr}
-        if preparation.returncode != 0 or preparation.stdout.strip() not in ("no_sheet", "dismissed"):
+            "exit": preparation.returncode,
+            "stdout": preparation.stdout,
+            "stderr": preparation.stderr,
+        }
+        if preparation.returncode != 0 or preparation.stdout.strip() not in (
+            "no_sheet",
+            "dismissed",
+        ):
             raise RuntimeError("Owned settings preparation was not confirmed")
         state["stage"] = "open_settings"
-        subprocess.run(["/usr/bin/open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"],
-                       check=True, capture_output=True, text=True, timeout=5)
+        subprocess.run(
+            [
+                "/usr/bin/open",
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         state["stage"] = "approval"
-        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            ["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15
+        )
         if result.returncode == 0 and result.stdout.strip() == "missing_application":
             report["hammerspoon_accessibility_listing"] = {
-                "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+                "exit": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
             state["stage"] = "add_application"
-            result = subprocess.run(["/usr/bin/osascript", "-e", ADD_SCRIPT], capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                ["/usr/bin/osascript", "-e", ADD_SCRIPT], capture_output=True, text=True, timeout=10
+            )
             if result.returncode == 0 and result.stdout.strip() == "addition_sheet_observed":
                 report["hammerspoon_accessibility_addition"] = {
-                    "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+                    "exit": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                }
                 state["stage"] = "authenticate"
                 with authenticate_accessibility(report):
                     state["stage"] = "select_application"
@@ -175,24 +201,45 @@ def approve_accessibility(report, app):
                     state["stage"] = "verify_permission"
                     observations = report.setdefault("hammerspoon_accessibility_admission", [])
                     for attempt in range(3):
-                        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
-                        observations.append({"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
+                        result = subprocess.run(
+                            ["/usr/bin/osascript", "-e", SCRIPT],
+                            capture_output=True,
+                            text=True,
+                            timeout=15,
+                        )
+                        observations.append(
+                            {
+                                "exit": result.returncode,
+                                "stdout": result.stdout,
+                                "stderr": result.stderr,
+                            }
+                        )
                         if result.returncode != 0 or result.stdout.strip() != "missing_application":
                             break
                         if attempt < 2:
                             time.sleep(0.1)
         if result.returncode == 0 and result.stdout.strip() == "permission_requested":
             report["hammerspoon_accessibility_request"] = {
-                "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+                "exit": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
             state["stage"] = "authenticate_existing"
             with authenticate_accessibility(report):
                 state["stage"] = "verify_permission"
-                result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
+                result = subprocess.run(
+                    ["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15
+                )
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
-        state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
+        state.update(
+            exit=getattr(error, "returncode", None),
+            timed_out=isinstance(error, subprocess.TimeoutExpired),
+        )
         for name in ("stdout", "stderr"):
             value = getattr(error, name, None)
-            state[name] = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
+            state[name] = (
+                value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
+            )
         raise
     state.update(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)
     if result.returncode != 0 or result.stdout.strip() != "enabled":

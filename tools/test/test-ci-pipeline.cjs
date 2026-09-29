@@ -59,7 +59,7 @@ const ENTRY_TEXT = [
 	'  box:',
 	'    needs: [plan]',
 	'    uses: ./.github/workflows/ci-box.yml',
-	'',
+	''
 ].join('\n');
 
 const BOX_TEXT = [
@@ -87,7 +87,7 @@ const BOX_TEXT = [
 	'    steps:',
 	'      - name: Judge',
 	'        run: echo judge',
-	'',
+	''
 ].join('\n');
 
 const roots = [];
@@ -139,16 +139,18 @@ function reindentJob(text, id, extra) {
 	const at = lines.indexOf(`  ${id}:`);
 	assert.ok(at >= 0, `no job ${id} to re-indent`);
 	let end = at + 1;
-	while (end < lines.length && !/^ {2}[A-Za-z0-9_-]+:\s*$/.test(lines[end]) && !/^ {0,2}#/.test(lines[end])) end++;
+	while (
+		end < lines.length &&
+		!/^ {2}[A-Za-z0-9_-]+:\s*$/.test(lines[end]) &&
+		!/^ {0,2}#/.test(lines[end])
+	)
+		end++;
 	for (let index = at + 1; index < end; index++) {
 		if (lines[index].trim() !== '') lines[index] = `  ${lines[index]}`;
 	}
 	lines.splice(at + 1, 0, ...extra);
 	return lines.join('\n');
 }
-
-
-
 
 // ==========================================
 // ==========================================
@@ -160,27 +162,43 @@ check('a workflow a box calls is loaded too, depth first', () => {
 	const inner = '.github/workflows/ci-inner.yml';
 	const ci = fixture({
 		[BOX]: `${BOX_TEXT}  nested:\n    needs: [gate]\n    uses: ./.github/workflows/ci-inner.yml\n`,
-		[inner]: 'name: Inner\non:\n  workflow_call:\njobs:\n  deep:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Deep\n        run: echo deep\n',
+		[inner]:
+			'name: Inner\non:\n  workflow_call:\njobs:\n  deep:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Deep\n        run: echo deep\n'
 	});
-	assert.deepEqual(ci.files().map((entry) => entry.rel), [ENTRY, BOX, inner]);
+	assert.deepEqual(
+		ci.files().map((entry) => entry.rel),
+		[ENTRY, BOX, inner]
+	);
 	assert.equal(ci.locate('deep').file, inner);
 	assert.equal(ci.findStep('Deep').job, 'deep');
 	assert.deepEqual(ci.calls(BOX), [{ id: 'nested', uses: './.github/workflows/ci-inner.yml' }]);
 });
 
 check('a job key after the steps list ends the steps, and field() still reads it', () => {
-	const ci = fixture({ [BOX]: edit(BOX_TEXT, '        run: echo judge\n', '        run: echo judge\n    timeout-minutes: 5\n') });
+	const ci = fixture({
+		[BOX]: edit(
+			BOX_TEXT,
+			'        run: echo judge\n',
+			'        run: echo judge\n    timeout-minutes: 5\n'
+		)
+	});
 	const gate = ci.job('gate');
 	assert.equal(pipeline.field(gate, 'timeout-minutes'), '5');
 	const found = pipeline.steps(gate);
-	assert.deepEqual(found.map((candidate) => candidate.name), ['Judge']);
+	assert.deepEqual(
+		found.map((candidate) => candidate.name),
+		['Judge']
+	);
 	assert.ok(!found[0].body.includes('timeout-minutes'), 'the job key leaked into the last step');
 });
 
 check('a quoted step name is found by its text', () => {
 	const ci = fixture({
-		[BOX]: edit(edit(BOX_TEXT, '      - name: Judge\n', "      - name: 'Judge it'\n"),
-			'      - name: Run tests\n', '      - name: "Run the tests"\n'),
+		[BOX]: edit(
+			edit(BOX_TEXT, '      - name: Judge\n', "      - name: 'Judge it'\n"),
+			'      - name: Run tests\n',
+			'      - name: "Run the tests"\n'
+		)
 	});
 	assert.equal(pipeline.stepField(pipeline.step(ci.job('gate'), 'Judge it'), 'run'), 'echo judge');
 	assert.equal(ci.findStep('Run the tests').job, 'test');
@@ -189,7 +207,10 @@ check('a quoted step name is found by its text', () => {
 check('a step script is read line by line, and a failure branch by its last statement', () => {
 	const ci = fixture();
 	const test = ci.job('test');
-	assert.deepEqual(pipeline.runOf(pipeline.step(test, 'Run tests')), ['# a shell comment inside the script', 'echo test']);
+	assert.deepEqual(pipeline.runOf(pipeline.step(test, 'Run tests')), [
+		'# a shell comment inside the script',
+		'echo test'
+	]);
 	assert.deepEqual(pipeline.runOf(pipeline.step(ci.job('gate'), 'Judge')), ['echo judge']);
 	assert.equal(pipeline.runOf(pipeline.steps(test)[0].body), null);
 	const script = [
@@ -203,21 +224,30 @@ check('a step script is read line by line, and a failure branch by its last stat
 		'    Write-Warning "only a warning"',
 		'}',
 		'if ($open) {',
-		'    exit 1',
+		'    exit 1'
 	];
 	assert.ok(pipeline.blockExits(pipeline.scriptBlock(script, 'if (-not $ahk) {'), '2'));
 	assert.ok(!pipeline.blockExits(pipeline.scriptBlock(script, 'if (-not $ahk) {'), '1'));
 	assert.deepEqual(pipeline.scriptBlock(script, 'if ($warnings) {'), script.slice(1, 6));
 	assert.ok(pipeline.blockExits(pipeline.scriptBlock(script, 'if ($warnings) {'), '1'));
 	assert.ok(!pipeline.blockExits(pipeline.scriptBlock(script, 'if ($other) {'), '1'));
-	refuses(() => pipeline.scriptBlock(script, 'if ($missing) {'), /expected one script line starting with 'if \(\$missing\) \{', found 0/);
-	refuses(() => pipeline.scriptBlock([...script, 'if ($other) { exit 1 }'], 'if ($other) {'), /found 2/);
+	refuses(
+		() => pipeline.scriptBlock(script, 'if ($missing) {'),
+		/expected one script line starting with 'if \(\$missing\) \{', found 0/
+	);
+	refuses(
+		() => pipeline.scriptBlock([...script, 'if ($other) { exit 1 }'], 'if ($other) {'),
+		/found 2/
+	);
 	refuses(() => pipeline.scriptBlock(script, 'if ($open) {'), /never closes at its own column/);
 });
 
 check('a well-formed pipeline is loaded in call order and sliced', () => {
 	const ci = fixture();
-	assert.deepEqual(ci.files().map((entry) => entry.rel), [ENTRY, BOX]);
+	assert.deepEqual(
+		ci.files().map((entry) => entry.rel),
+		[ENTRY, BOX]
+	);
 	assert.equal(ci.locate('test').file, BOX);
 	assert.equal(ci.locate('plan').line, 4);
 	assert.deepEqual(pipeline.needsOf(ci.job('gate')), ['test']);
@@ -229,14 +259,14 @@ check('a well-formed pipeline is loaded in call order and sliced', () => {
 	assert.equal(pipeline.stepField(run, 'run'), '# a shell comment inside the script echo test');
 	assert.equal(pipeline.stepField(run, 'continue-on-error'), null);
 	assert.equal(pipeline.steps(ci.job('test'))[0].name, '');
-	assert.equal(pipeline.stepField(pipeline.steps(ci.job('test'))[0].body, 'uses'), 'actions/checkout@v4');
+	assert.equal(
+		pipeline.stepField(pipeline.steps(ci.job('test'))[0].body, 'uses'),
+		'actions/checkout@v4'
+	);
 	assert.equal(ci.findStep('Judge').job, 'gate');
 	assert.deepEqual(ci.calls(), [{ id: 'box', uses: './.github/workflows/ci-box.yml' }]);
 	assert.ok(!ci.textWithout('test').includes('echo test'));
 });
-
-
-
 
 // ==========================================
 // ==========================================
@@ -263,28 +293,51 @@ check('a missing step throws, in a job and across the pipeline', () => {
 
 check('a step name used twice throws, in a job and across the pipeline', () => {
 	const twiceInJob = fixture({
-		[BOX]: edit(BOX_TEXT, '      - name: Judge\n', '      - name: Judge\n        run: echo one\n      - name: Judge\n'),
+		[BOX]: edit(
+			BOX_TEXT,
+			'      - name: Judge\n',
+			'      - name: Judge\n        run: echo one\n      - name: Judge\n'
+		)
 	});
-	refuses(() => pipeline.step(twiceInJob.job('gate'), 'Judge'), /step 'Judge' appears 2 times in one job/);
-	const twiceInPipeline = fixture({ [BOX]: edit(BOX_TEXT, '      - name: Run tests', '      - name: Judge') });
+	refuses(
+		() => pipeline.step(twiceInJob.job('gate'), 'Judge'),
+		/step 'Judge' appears 2 times in one job/
+	);
+	const twiceInPipeline = fixture({
+		[BOX]: edit(BOX_TEXT, '      - name: Run tests', '      - name: Judge')
+	});
 	refuses(() => twiceInPipeline.findStep('Judge'), /step 'Judge' appears 2 times/);
 });
 
 check('a job key set twice throws', () => {
-	const ci = fixture({ [BOX]: edit(BOX_TEXT, '    if: always()\n', '    if: always()\n    if: false\n') });
+	const ci = fixture({
+		[BOX]: edit(BOX_TEXT, '    if: always()\n', '    if: always()\n    if: false\n')
+	});
 	refuses(() => pipeline.field(ci.job('gate'), 'if'), /job key 'if' in one job appears 2 times/);
 });
 
 check('a missing, empty or job-less called workflow throws', () => {
-	refuses(() => fixture({ [BOX]: null }).files(), /ci-box\.yml \(called from \.github\/workflows\/ci\.yml\) does not exist/);
+	refuses(
+		() => fixture({ [BOX]: null }).files(),
+		/ci-box\.yml \(called from \.github\/workflows\/ci\.yml\) does not exist/
+	);
 	refuses(() => fixture({ [BOX]: '\n' }).files(), /ci-box\.yml \(called from .*\) is empty/);
-	refuses(() => fixture({ [BOX]: 'name: Box\n' }).files(), /ci-box\.yml has no top-level jobs: block/);
-	refuses(() => fixture({ [ENTRY]: edit(ENTRY_TEXT, '    uses: ./.github/workflows/ci-box.yml\n', '    runs-on: ubuntu-latest\n') }).files(),
-		/calls no reusable workflow/);
+	refuses(
+		() => fixture({ [BOX]: 'name: Box\n' }).files(),
+		/ci-box\.yml has no top-level jobs: block/
+	);
+	refuses(
+		() =>
+			fixture({
+				[ENTRY]: edit(
+					ENTRY_TEXT,
+					'    uses: ./.github/workflows/ci-box.yml\n',
+					'    runs-on: ubuntu-latest\n'
+				)
+			}).files(),
+		/calls no reusable workflow/
+	);
 });
-
-
-
 
 // ===============================================
 // ===============================================
@@ -294,7 +347,10 @@ check('a missing, empty or job-less called workflow throws', () => {
 
 check('a job whose keys sit at six spaces throws, even with a hidden continue-on-error', () => {
 	const ci = fixture({ [BOX]: reindentJob(BOX_TEXT, 'test', ['      continue-on-error: true']) });
-	refuses(() => ci.jobs(BOX), /job 'test' starts its keys at 6 spaces; job keys must sit at exactly 4/);
+	refuses(
+		() => ci.jobs(BOX),
+		/job 'test' starts its keys at 6 spaces; job keys must sit at exactly 4/
+	);
 	refuses(() => ci.locate('gate'), /job 'test' starts its keys at 6 spaces/);
 });
 
@@ -304,10 +360,20 @@ check('a job key at an odd column throws', () => {
 });
 
 check('a quoted or listed job-level key throws', () => {
-	const quoted = fixture({ [BOX]: edit(BOX_TEXT, '    if: always()\n', "    if: always()\n    'continue-on-error': true\n") });
-	refuses(() => quoted.jobs(BOX), /job 'gate' has a job-level line the checks cannot read: ''continue-on-error': true'/);
-	const listed = fixture({ [BOX]: edit(BOX_TEXT, '    needs:\n      - test\n', '    needs:\n    - test\n') });
-	refuses(() => listed.jobs(BOX), /job 'gate' has a job-level line the checks cannot read: '- test'/);
+	const quoted = fixture({
+		[BOX]: edit(BOX_TEXT, '    if: always()\n', "    if: always()\n    'continue-on-error': true\n")
+	});
+	refuses(
+		() => quoted.jobs(BOX),
+		/job 'gate' has a job-level line the checks cannot read: ''continue-on-error': true'/
+	);
+	const listed = fixture({
+		[BOX]: edit(BOX_TEXT, '    needs:\n      - test\n', '    needs:\n    - test\n')
+	});
+	refuses(
+		() => listed.jobs(BOX),
+		/job 'gate' has a job-level line the checks cannot read: '- test'/
+	);
 });
 
 check('a job with no keys throws', () => {
@@ -317,28 +383,60 @@ check('a job with no keys throws', () => {
 
 check('a step whose keys sit at another column throws', () => {
 	const wide = fixture({
-		[BOX]: edit(BOX_TEXT, '      - name: Run tests\n        if: ${{ !cancelled() }}\n        run: |\n          # a shell comment inside the script\n          echo test\n',
-			'      -   name: Run tests\n          if: false\n          run: echo test\n'),
+		[BOX]: edit(
+			BOX_TEXT,
+			'      - name: Run tests\n        if: ${{ !cancelled() }}\n        run: |\n          # a shell comment inside the script\n          echo test\n',
+			'      -   name: Run tests\n          if: false\n          run: echo test\n'
+		)
 	});
-	refuses(() => pipeline.steps(wide.job('test')), /a step must start as '- key:' at six spaces, got '-   name: Run tests'/);
-	const bare = fixture({ [BOX]: edit(BOX_TEXT, '      - name: Judge\n        run: echo judge\n', '      -\n        name: Judge\n        run: echo judge\n') });
-	refuses(() => pipeline.steps(bare.job('gate')), /a step must start as '- key:' at six spaces, got '-'/);
-	const shallow = fixture({ [BOX]: edit(BOX_TEXT, '        run: echo judge\n', '       run: echo judge\n') });
+	refuses(
+		() => pipeline.steps(wide.job('test')),
+		/a step must start as '- key:' at six spaces, got '-   name: Run tests'/
+	);
+	const bare = fixture({
+		[BOX]: edit(
+			BOX_TEXT,
+			'      - name: Judge\n        run: echo judge\n',
+			'      -\n        name: Judge\n        run: echo judge\n'
+		)
+	});
+	refuses(
+		() => pipeline.steps(bare.job('gate')),
+		/a step must start as '- key:' at six spaces, got '-'/
+	);
+	const shallow = fixture({
+		[BOX]: edit(BOX_TEXT, '        run: echo judge\n', '       run: echo judge\n')
+	});
 	refuses(() => pipeline.steps(shallow.job('gate')), /a steps line at 7 spaces/);
 });
 
 check('a quoted step key throws', () => {
-	const ci = fixture({ [BOX]: edit(BOX_TEXT, '        run: echo judge\n', "        run: echo judge\n        'continue-on-error': true\n") });
-	refuses(() => pipeline.steps(ci.job('gate')), /a step line the checks cannot read: ''continue-on-error': true'/);
+	const ci = fixture({
+		[BOX]: edit(
+			BOX_TEXT,
+			'        run: echo judge\n',
+			"        run: echo judge\n        'continue-on-error': true\n"
+		)
+	});
+	refuses(
+		() => pipeline.steps(ci.job('gate')),
+		/a step line the checks cannot read: ''continue-on-error': true'/
+	);
 });
 
 check('a step key set twice throws', () => {
-	const ci = fixture({ [BOX]: edit(BOX_TEXT, '        run: echo judge\n', '        run: echo judge\n        if: false\n        if: true\n') });
-	refuses(() => pipeline.stepField(pipeline.step(ci.job('gate'), 'Judge'), 'if'), /step key 'if' in one step appears 2 times/);
+	const ci = fixture({
+		[BOX]: edit(
+			BOX_TEXT,
+			'        run: echo judge\n',
+			'        run: echo judge\n        if: false\n        if: true\n'
+		)
+	});
+	refuses(
+		() => pipeline.stepField(pipeline.step(ci.job('gate'), 'Judge'), 'if'),
+		/step key 'if' in one step appears 2 times/
+	);
 });
-
-
-
 
 // ========================================
 // ========================================
@@ -356,7 +454,10 @@ check('the real pipeline parses under the enforced layout', () => {
 		}
 	}
 	assert.ok(jobCount >= MIN_REAL_JOBS, `parsed only ${jobCount} job(s) (floor ${MIN_REAL_JOBS})`);
-	assert.ok(stepCount >= MIN_REAL_STEPS, `parsed only ${stepCount} step(s) (floor ${MIN_REAL_STEPS})`);
+	assert.ok(
+		stepCount >= MIN_REAL_STEPS,
+		`parsed only ${stepCount} step(s) (floor ${MIN_REAL_STEPS})`
+	);
 });
 
 check('the review mutation of the real macOS box is refused', () => {

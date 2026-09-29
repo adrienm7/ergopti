@@ -68,7 +68,8 @@ const LOADERS = [
 		// actually hands the path to the tap-hold manager.
 		file: 'linux/ergopti_hotstrings.lua',
 		needle: 'shared("tap_hold/defaults.toml")',
-		lifecycle: 'passes the shared defaults to the tap-hold manager at boot; the loader merges the user file on top per key'
+		lifecycle:
+			'passes the shared defaults to the tap-hold manager at boot; the loader merges the user file on top per key'
 	},
 	{
 		file: 'macos/platform/remap/defaults.lua',
@@ -98,10 +99,7 @@ for (const l of LOADERS) {
 // becomes legal again the day it becomes true.
 const loadersStillRead = errors.length === 0;
 
-const DOCS = [
-	'_shared/core/config_schema/SCHEMA.md',
-	'_shared/tap_hold/defaults.toml'
-];
+const DOCS = ['_shared/core/config_schema/SCHEMA.md', '_shared/tap_hold/defaults.toml'];
 
 const FALSE_CLAIMS = [
 	/no runtime merge/i,
@@ -126,7 +124,8 @@ if (loadersStillRead) {
 				// matched line would force the correction to be written awkwardly to
 				// satisfy the gate, and a gate that dictates line breaks gets ignored.
 				const context = lines.slice(Math.max(0, i - 3), i + 4).join(' ');
-				if (/used to say|was wrong|despite|opposite|previously|no longer true/i.test(context)) return;
+				if (/used to say|was wrong|despite|opposite|previously|no longer true/i.test(context))
+					return;
 				errors.push(
 					`${rel}:${i + 1}: claims the shared tap-hold defaults are not read at runtime — ` +
 						`"${line.trim().slice(0, 90)}". All three drivers read the file on every boot.`

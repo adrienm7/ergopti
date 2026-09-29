@@ -701,7 +701,11 @@ function selectRelease(idx) {
  * @param {Object} markdownOptions - Link policy for renderMarkdownInto().
  */
 function _renderReleaseSections(bodyEl, parts, markdownOptions) {
-	var changelog = _makeReleaseSection('release-section-changelog', 'changelog_window.section_changelog', true);
+	var changelog = _makeReleaseSection(
+		'release-section-changelog',
+		'changelog_window.section_changelog',
+		true
+	);
 	if (parts.changelog !== '') renderMarkdownInto(changelog.body, parts.changelog, markdownOptions);
 	else changelog.body.appendChild(_emptyNotes());
 	bodyEl.appendChild(changelog.details);
@@ -712,7 +716,11 @@ function _renderReleaseSections(bodyEl, parts, markdownOptions) {
 		})
 		.join('\n\n');
 	if (downloadsSource !== '') {
-		var downloads = _makeReleaseSection('release-section-downloads', 'changelog_window.section_downloads', false);
+		var downloads = _makeReleaseSection(
+			'release-section-downloads',
+			'changelog_window.section_downloads',
+			false
+		);
 		renderMarkdownInto(downloads.body, downloadsSource, markdownOptions);
 		bodyEl.appendChild(downloads.details);
 	}

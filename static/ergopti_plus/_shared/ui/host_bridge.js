@@ -51,8 +51,14 @@
 function makeHostBridge(name) {
 	return function post(payload) {
 		try {
-			if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-				window.chrome.webview.postMessage(typeof payload === 'string' ? payload : JSON.stringify(payload));
+			if (
+				window.chrome &&
+				window.chrome.webview &&
+				typeof window.chrome.webview.postMessage === 'function'
+			) {
+				window.chrome.webview.postMessage(
+					typeof payload === 'string' ? payload : JSON.stringify(payload)
+				);
 				return;
 			}
 			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[name]) {
@@ -77,7 +83,7 @@ function decodeHostBridgeResponse(isBase64, payload) {
 			: decodeURIComponent(payload);
 		return JSON.parse(serialized);
 	} catch (error) {
-		console.error("[host bridge] failed to decode native response:", error);
+		console.error('[host bridge] failed to decode native response:', error);
 		return null;
 	}
 }

@@ -25,7 +25,12 @@
 const fs = require('fs');
 const path = require('path');
 const { shared } = require('../lib/paths.cjs');
-const { loadContext, loadLayers, formatResolution, errorSignature } = require('../lib/keymap-layers.cjs');
+const {
+	loadContext,
+	loadLayers,
+	formatResolution,
+	errorSignature
+} = require('../lib/keymap-layers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const CORPUS_PATH = shared('tests', 'corpus', 'keymap_layers', 'vectors.json');
@@ -49,13 +54,21 @@ const ERROR_CODES = [
 	'invalid_keystroke',
 	'unavailable_on_os'
 ];
-const RESOLUTION_FORMS = [/^keystroke:.*@repeat$/, /^keystroke:[^@]*$/, /^call:/, /^repeat_count:\d+$/, /^none$/];
+const RESOLUTION_FORMS = [
+	/^keystroke:.*@repeat$/,
+	/^keystroke:[^@]*$/,
+	/^call:/,
+	/^repeat_count:\d+$/,
+	/^none$/
+];
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
 
 if (!fs.existsSync(CORPUS_PATH)) {
-	console.error(`\x1b[31m[FAIL] ${path.relative(ROOT, CORPUS_PATH)} is missing — the layer-file schema has no cross-driver contract.\x1b[0m`);
+	console.error(
+		`\x1b[31m[FAIL] ${path.relative(ROOT, CORPUS_PATH)} is missing — the layer-file schema has no cross-driver contract.\x1b[0m`
+	);
 	process.exit(1);
 }
 
@@ -93,36 +106,49 @@ for (const v of vectors) {
 	const expectedErrors = [...v.expected.errors].sort();
 	for (const sig of expectedErrors) seenCodes.add(sig.split('|')[0]);
 	if (JSON.stringify(actualErrors) !== JSON.stringify(expectedErrors))
-		fail(`${where}: errors ${JSON.stringify(actualErrors)}, expected ${JSON.stringify(expectedErrors)}`);
-	if (result.ok !== (actualErrors.length === 0)) fail(`${where}: ok is ${result.ok} with ${actualErrors.length} error(s)`);
+		fail(
+			`${where}: errors ${JSON.stringify(actualErrors)}, expected ${JSON.stringify(expectedErrors)}`
+		);
+	if (result.ok !== (actualErrors.length === 0))
+		fail(`${where}: ok is ${result.ok} with ${actualErrors.length} error(s)`);
 	const actualLayers = {};
 	for (const [layerId, bindings] of Object.entries(result.layers)) {
 		actualLayers[layerId] = {};
-		for (const [code, r] of Object.entries(bindings)) actualLayers[layerId][code] = formatResolution(r);
+		for (const [code, r] of Object.entries(bindings))
+			actualLayers[layerId][code] = formatResolution(r);
 	}
 	const expectedLayers = v.expected.layers;
 	for (const layerId of new Set([...Object.keys(actualLayers), ...Object.keys(expectedLayers)])) {
 		const a = actualLayers[layerId];
 		const e = expectedLayers[layerId];
 		if (!a || !e) {
-			fail(`${where}: layer "${layerId}" is ${a ? 'loaded but not expected' : 'expected but not loaded'}`);
+			fail(
+				`${where}: layer "${layerId}" is ${a ? 'loaded but not expected' : 'expected but not loaded'}`
+			);
 			continue;
 		}
 		for (const code of new Set([...Object.keys(a), ...Object.keys(e)])) {
-			if (a[code] !== e[code]) fail(`${where}: ${layerId}.${code} resolves to ${a[code] || '(nothing)'}, expected ${e[code] || '(nothing)'}`);
-			for (let i = 0; i < RESOLUTION_FORMS.length; i++) if (e[code] && RESOLUTION_FORMS[i].test(e[code])) seenForms.add(i);
+			if (a[code] !== e[code])
+				fail(
+					`${where}: ${layerId}.${code} resolves to ${a[code] || '(nothing)'}, expected ${e[code] || '(nothing)'}`
+				);
+			for (let i = 0; i < RESOLUTION_FORMS.length; i++)
+				if (e[code] && RESOLUTION_FORMS[i].test(e[code])) seenForms.add(i);
 		}
 	}
 }
 
-for (const code of ERROR_CODES) if (!seenCodes.has(code)) fail(`no vector expects the error code "${code}"`);
+for (const code of ERROR_CODES)
+	if (!seenCodes.has(code)) fail(`no vector expects the error code "${code}"`);
 for (const os of ctx.platforms) if (!seenOses.has(os)) fail(`no vector resolves for ${os}`);
 RESOLUTION_FORMS.forEach((form, i) => {
 	if (!seenForms.has(i)) fail(`no vector expects a resolution matching ${form}`);
 });
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the JS layer loader disagrees with the cross-driver layer-file corpus:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the JS layer loader disagrees with the cross-driver layer-file corpus:\x1b[0m'
+	);
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }

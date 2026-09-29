@@ -17,7 +17,9 @@ def account_command(command, password):
         raise RuntimeError("Temporary approval account command timed out") from None
     if result.returncode:
         detail = (result.stderr + result.stdout).replace(password, "<redacted>")[-1200:]
-        raise RuntimeError(f"Temporary approval account command failed ({result.returncode}): {detail}")
+        raise RuntimeError(
+            f"Temporary approval account command failed ({result.returncode}): {detail}"
+        )
     return result.stdout
 
 
@@ -28,7 +30,9 @@ def approval_account(output, report):
         raise RuntimeError("Temporary approval accounts require a disposable macOS Actions runner")
     root = Path(os.environ["RUNNER_TEMP"]).resolve()
     if output.resolve() != root:
-        raise RuntimeError("Approval account home must belong to the current runner temporary directory")
+        raise RuntimeError(
+            "Approval account home must belong to the current runner temporary directory"
+        )
     name = "hs274_" + secrets.token_hex(6)
     password = "Hs274!" + secrets.token_urlsafe(24)
     home = root / ("hs274-approval-home-" + name)
@@ -49,15 +53,29 @@ def approval_account(output, report):
     report["approval_account_verified"] = False
     report["approval_account_removed"] = False
     try:
-        account_command([
-            "sudo", "-n", "sysadminctl", "-addUser", name,
-            "-fullName", "HS274 CI Approval", "-password", password,
-            "-home", str(home), "-admin",
-        ], password)
+        account_command(
+            [
+                "sudo",
+                "-n",
+                "sysadminctl",
+                "-addUser",
+                name,
+                "-fullName",
+                "HS274 CI Approval",
+                "-password",
+                password,
+                "-home",
+                str(home),
+                "-admin",
+            ],
+            password,
+        )
         if name not in users():
             raise RuntimeError("Temporary approval account was not created")
         verify_home()
-        membership = account_command(["dseditgroup", "-o", "checkmember", "-m", name, "admin"], password)
+        membership = account_command(
+            ["dseditgroup", "-o", "checkmember", "-m", name, "admin"], password
+        )
         if not membership.startswith("yes "):
             raise RuntimeError("Temporary approval account is not an administrator")
         account_command(["dscl", ".", "-authonly", name, password], password)
@@ -66,7 +84,9 @@ def approval_account(output, report):
     finally:
         if name in users():
             verify_home()
-            account_command(["sudo", "-n", "sysadminctl", "-deleteUser", name, "-keepHome"], password)
+            account_command(
+                ["sudo", "-n", "sysadminctl", "-deleteUser", name, "-keepHome"], password
+            )
         if name in users():
             raise RuntimeError("Temporary approval account cleanup did not complete")
         report["approval_account_removed"] = True

@@ -14,7 +14,14 @@ import unittest
 from unittest.mock import patch
 
 from karabiner_candidate import PRODUCTS, inspect_products
-from karabiner_candidate_install import MARKER, configuration_snapshot, reference, verify_configuration, verify_download, verify_installed
+from karabiner_candidate_install import (
+    MARKER,
+    configuration_snapshot,
+    reference,
+    verify_configuration,
+    verify_download,
+    verify_installed,
+)
 from karabiner_test_fixture import bash_executable, make_products, signature_verifier
 
 
@@ -55,8 +62,14 @@ class InstalledCandidateTests(unittest.TestCase):
             base, applications, identity = installed_fixture(directory)
             actual = verify_installed(base, applications, identity, signature_verifier([]))
             self.assertEqual(len(actual), 10)
-            self.assertEqual({row["sha256"] for row in actual}, {row["sha256"] for row in identity["products"]})
-            self.assertTrue(any(row["product"] == str(applications / "Karabiner-Elements.app") for row in actual))
+            self.assertEqual(
+                {row["sha256"] for row in actual}, {row["sha256"] for row in identity["products"]}
+            )
+            self.assertTrue(
+                any(
+                    row["product"] == str(applications / "Karabiner-Elements.app") for row in actual
+                )
+            )
 
     def test_valid_marker_does_not_hide_an_official_cli_left_installed(self):
         with TemporaryDirectory() as directory:
@@ -114,10 +127,12 @@ class InstalledCandidateTests(unittest.TestCase):
             protected = root / "assets"
             protected.mkdir()
             original = os.scandir
+
             def denied(path):
                 if Path(path) == protected:
                     raise PermissionError("fixture configuration is unreadable")
                 return original(path)
+
             with patch("os.scandir", side_effect=denied):
                 with self.assertRaisesRegex(PermissionError, "unreadable"):
                     configuration_snapshot(root)
@@ -125,7 +140,9 @@ class InstalledCandidateTests(unittest.TestCase):
     def test_existing_profile_and_rules_survive_while_new_backups_are_allowed(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "karabiner.json").write_text('{"profiles":[{"name":"personal"}]}', encoding="utf-8")
+            (root / "karabiner.json").write_text(
+                '{"profiles":[{"name":"personal"}]}', encoding="utf-8"
+            )
             rules = root / "assets/rules.json"
             rules.parent.mkdir()
             rules.write_text('{"personal_rule":true}', encoding="utf-8")
@@ -145,15 +162,25 @@ class InstalledCandidateTests(unittest.TestCase):
 class InstallerMountTests(unittest.TestCase):
     def test_native_mount_is_released_after_success_and_installer_failure(self):
         for installer_status, detach_status, expected in ((0, 0, 0), (42, 0, 42), (0, 1, 1)):
-            with self.subTest(installer=installer_status, detach=detach_status), TemporaryDirectory() as directory:
+            with (
+                self.subTest(installer=installer_status, detach=detach_status),
+                TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 image = root / "candidate image.dmg"
                 image.write_bytes(b"fixture image")
                 trace = root / "calls.log"
                 environment = os.environ.copy()
-                environment.update({"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
-                                    "RUNNER_TEMP": root.as_posix(), "INSTALL_STATUS": str(installer_status),
-                                    "DETACH_STATUS": str(detach_status), "TASK_TRACE": trace.as_posix()})
+                environment.update(
+                    {
+                        "GITHUB_ACTIONS": "true",
+                        "RUNNER_ENVIRONMENT": "github-hosted",
+                        "RUNNER_TEMP": root.as_posix(),
+                        "INSTALL_STATUS": str(installer_status),
+                        "DETACH_STATUS": str(detach_status),
+                        "TASK_TRACE": trace.as_posix(),
+                    }
+                )
                 script = r"""
 uname() { printf 'Darwin\n'; }
 hdiutil() {
@@ -175,11 +202,24 @@ export -f uname hdiutil sudo
 bash "$1" "$2"
 """
                 helper = Path(__file__).with_name("karabiner_install_image.sh").resolve()
-                result = subprocess.run([bash_executable(), "-c", script, "fixture",
-                                         helper.as_posix(), image.as_posix()], env=environment,
-                                        capture_output=True, text=True, timeout=10)
+                result = subprocess.run(
+                    [
+                        bash_executable(),
+                        "-c",
+                        script,
+                        "fixture",
+                        helper.as_posix(),
+                        image.as_posix(),
+                    ],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
                 self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
-                self.assertEqual(trace.read_text(encoding="utf-8").splitlines(), ["installer", "detach"])
+                self.assertEqual(
+                    trace.read_text(encoding="utf-8").splitlines(), ["installer", "detach"]
+                )
                 if detach_status == 0:
                     self.assertEqual(list(root.glob("hs274-install.*")), [])
 

@@ -11,12 +11,27 @@ from hs274_capture import MARKER, validate_capture
 
 def fixture():
     """Use unequal and backwards timestamps so the verdict cannot normalize them."""
-    return {"coverage": "fixture_only", "seen": 4, "overflow": 0, "contention": 0,
-            "records": [{"device": 123, "timestamp": timestamp, "value": value,
-                         "has_page": True, "has_usage": True, "page": 7,
-                         "usage": usage, "sequence": index}
-                        for index, (timestamp, usage, value) in enumerate(
-                            ((100, 41, 1), (90, 41, 0), (0, 44, 1), (110, 44, 0)), 1)]}
+    return {
+        "coverage": "fixture_only",
+        "seen": 4,
+        "overflow": 0,
+        "contention": 0,
+        "records": [
+            {
+                "device": 123,
+                "timestamp": timestamp,
+                "value": value,
+                "has_page": True,
+                "has_usage": True,
+                "page": 7,
+                "usage": usage,
+                "sequence": index,
+            }
+            for index, (timestamp, usage, value) in enumerate(
+                ((100, 41, 1), (90, 41, 0), (0, 44, 1), (110, 44, 0)), 1
+            )
+        ],
+    }
 
 
 def encode(capture):
@@ -36,9 +51,15 @@ class CaptureVerdictTests(unittest.TestCase):
             candidate = fixture()
             candidate["records"][0].update(has_cookie=True, cookie=cookie)
             self.assertEqual(validate_capture(encode(candidate), 123), candidate)
-        for fields in ({"cookie": 24}, {"has_cookie": True}, {"has_cookie": 1, "cookie": 24},
-                       {"has_cookie": True, "cookie": True}, {"has_cookie": True, "cookie": -1},
-                       {"has_cookie": True, "cookie": 1 << 32}, {"has_cookie": False, "cookie": 24}):
+        for fields in (
+            {"cookie": 24},
+            {"has_cookie": True},
+            {"has_cookie": 1, "cookie": 24},
+            {"has_cookie": True, "cookie": True},
+            {"has_cookie": True, "cookie": -1},
+            {"has_cookie": True, "cookie": 1 << 32},
+            {"has_cookie": False, "cookie": 24},
+        ):
             candidate = fixture()
             candidate["records"][0].update(fields)
             with self.subTest(fields=fields), self.assertRaises(ValueError):
@@ -62,31 +83,61 @@ class CaptureVerdictTests(unittest.TestCase):
     def test_missing_duplicate_truncated_and_invalid_receipts_fail(self):
         valid = encode(fixture())
         duplicate_field = valid.replace('"seen": 4', '"seen": 5, "seen": 4')
-        for output in ("", "startup log\n", valid + valid, valid.rstrip("\n"), MARKER + "{\n", duplicate_field):
+        for output in (
+            "",
+            "startup log\n",
+            valid + valid,
+            valid.rstrip("\n"),
+            MARKER + "{\n",
+            duplicate_field,
+        ):
             with self.subTest(output=output), self.assertRaises(ValueError):
                 validate_capture(output, 123)
 
     def test_retains_supplementary_signed_and_absent_usage_metadata(self):
         expected = fixture()
         for page, usage, present in ((-1, -2, True), (0, 0, False)):
-            expected["records"].append({"device": 123, "timestamp": 0, "value": 0,
-                                        "has_page": present, "has_usage": present,
-                                        "page": page, "usage": usage, "sequence": len(expected["records"]) + 1})
+            expected["records"].append(
+                {
+                    "device": 123,
+                    "timestamp": 0,
+                    "value": 0,
+                    "has_page": present,
+                    "has_usage": present,
+                    "page": page,
+                    "usage": usage,
+                    "sequence": len(expected["records"]) + 1,
+                }
+            )
         expected["seen"] = len(expected["records"])
         self.assertEqual(validate_capture(encode(expected), 123), expected)
 
     def test_empty_losses_and_wrong_coverage_fail(self):
-        for key, value in (("records", []), ("seen", 5), ("seen", True),
-                           ("overflow", 1), ("contention", 1), ("coverage", "all_devices")):
+        for key, value in (
+            ("records", []),
+            ("seen", 5),
+            ("seen", True),
+            ("overflow", 1),
+            ("contention", 1),
+            ("coverage", "all_devices"),
+        ):
             candidate = fixture()
             candidate[key] = value
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 validate_capture(encode(candidate), 123)
 
     def test_corrupted_record_identity_and_types_fail(self):
-        for key, value in (("device", 124), ("sequence", 2), ("timestamp", True),
-                           ("timestamp", -1), ("value", 0.0), ("has_page", 1),
-                           ("has_usage", False), ("page", 1 << 31), ("usage", -(1 << 31) - 1)):
+        for key, value in (
+            ("device", 124),
+            ("sequence", 2),
+            ("timestamp", True),
+            ("timestamp", -1),
+            ("value", 0.0),
+            ("has_page", 1),
+            ("has_usage", False),
+            ("page", 1 << 31),
+            ("usage", -(1 << 31) - 1),
+        ):
             candidate = fixture()
             candidate["records"][0][key] = value
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
@@ -94,8 +145,11 @@ class CaptureVerdictTests(unittest.TestCase):
 
     def test_missing_duplicate_reordered_and_remapped_physical_keys_fail(self):
         original = fixture()
-        variants = [original["records"][:-1], original["records"] + [original["records"][-1]],
-                    list(reversed(original["records"]))]
+        variants = [
+            original["records"][:-1],
+            original["records"] + [original["records"][-1]],
+            list(reversed(original["records"])),
+        ]
         remapped = copy.deepcopy(original["records"])
         remapped[0]["usage"] = remapped[1]["usage"] = 44
         variants.append(remapped)

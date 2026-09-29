@@ -37,24 +37,24 @@ SHARED_DIR: Path = REPO_ROOT / SHARED_REL
 
 
 def shared(*parts: str) -> Path:
-	"""Resolves an absolute path inside the _shared/ tree.
+    """Resolves an absolute path inside the _shared/ tree.
 
-	Args:
-		*parts: Path segments under _shared/, e.g. "data", "db", "schema.sql".
+    Args:
+            *parts: Path segments under _shared/, e.g. "data", "db", "schema.sql".
 
-	Returns:
-		Absolute filesystem path.
-	"""
-	return SHARED_DIR.joinpath(*parts)
+    Returns:
+            Absolute filesystem path.
+    """
+    return SHARED_DIR.joinpath(*parts)
 
 
 def shared_rel(*parts: str) -> str:
-	"""Resolves a repo-relative (forward-slash) path inside the _shared/ tree.
+    """Resolves a repo-relative (forward-slash) path inside the _shared/ tree.
 
-	Args:
-		*parts: Path segments under _shared/.
+    Args:
+            *parts: Path segments under _shared/.
 
-	Returns:
-		Repo-relative path string, e.g. "static/ergopti_plus/_shared/data/locales".
-	"""
-	return "/".join((SHARED_REL, *parts))
+    Returns:
+            Repo-relative path string, e.g. "static/ergopti_plus/_shared/data/locales".
+    """
+    return "/".join((SHARED_REL, *parts))

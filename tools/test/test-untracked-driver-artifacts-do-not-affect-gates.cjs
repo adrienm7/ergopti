@@ -50,9 +50,13 @@ try {
 }
 
 if (failures.length > 0) {
-	console.error('\x1b[31m[ERROR] untracked driver artifacts contaminated commit-candidate gates:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] untracked driver artifacts contaminated commit-candidate gates:\x1b[0m'
+	);
 	for (const failure of failures) console.error(failure);
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] all ${GATES.length} commit-candidate gates ignore untracked driver artifacts.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] all ${GATES.length} commit-candidate gates ignore untracked driver artifacts.\x1b[0m`
+);

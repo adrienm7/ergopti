@@ -11,10 +11,10 @@ intermittent latency defect is resolved. No threshold or assertion was removed.
 The preceding full gate completed 5700 cases with 5699 passing. Complete
 preparation failed its 5 ms p95 budget. Its newly correlated diagnostic reported:
 
-| Observation | Total ms | Clamp | Show | Corners | Border |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| p95, sample 29 | 5.301 | 0.061 | 4.045 | 0.017 | 1.178 |
-| maximum, sample 49 | 6.738 | 0.196 | 6.272 | 0.019 | 0.251 |
+| Observation        | Total ms | Clamp |  Show | Corners | Border |
+| ------------------ | -------: | ----: | ----: | ------: | -----: |
+| p95, sample 29     |    5.301 | 0.061 | 4.045 |   0.017 |  1.178 |
+| maximum, sample 49 |    6.738 | 0.196 | 6.272 |   0.019 |  0.251 |
 
 Receipt: TEMP `ergopti-shutdown-verify.log`; the exact values are also retained
 in the source commit's message. This is one failing run, not a latency distribution
@@ -54,10 +54,10 @@ Both runs completed normally. Each yielded 100 aligned observations in
 outer/inner sums within 0.0003 ms, allowing four-decimal CSV rounding.
 Percentiles use nearest rank, matching the production test helper.
 
-| Run | Test result | p95 total ms | p95 sample | Maximum ms | Maximum sample | Samples >= 5 ms |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Isolated complete preparation | 1/1 | 3.9914 | 83 | 5.6375 | 1 | 1 |
-| Original registry prefix | 359/359 | 2.9911 | 73 | 6.2904 | 1 | 1 |
+| Run                           | Test result | p95 total ms | p95 sample | Maximum ms | Maximum sample | Samples >= 5 ms |
+| ----------------------------- | ----------- | -----------: | ---------: | ---------: | -------------: | --------------: |
+| Isolated complete preparation | 1/1         |       3.9914 |         83 |     5.6375 |              1 |               1 |
+| Original registry prefix      | 359/359     |       2.9911 |         73 |     6.2904 |              1 |               1 |
 
 At the isolated p95 row, show was 3.6838 ms, including 3.6504 ms in the
 movement interval. At the prefix p95 row, show was 2.7642 ms, including
@@ -90,7 +90,7 @@ justify GUI caching, priority changes or omitting native positioning.
   only in the temporary archive, not in the repository's test runner.
 - An initial prefix launch failed to parse a probe-local reserved variable name
   before executing tests. The attached patch fixes it; that launch supplies no
-timing evidence.
+  timing evidence.
 
 Review found that the added QPC could overwrite the failed native call's last
 error. The replay patch now captures that error immediately before QPC and uses

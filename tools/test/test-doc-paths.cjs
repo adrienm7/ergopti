@@ -33,11 +33,7 @@ const DOCS_ROOT = path.join(ROOT, 'static', 'ergopti_plus');
 // Dead pre-reorg driver roots (slash form). The matcher below checks each one in
 // BOTH slash and backslash form, so a regression in either a bash or a PowerShell
 // block is caught from this single list.
-const DEAD_PATHS = [
-	'drivers/hammerspoon',
-	'drivers/autohotkey',
-	'drivers/linux',
-];
+const DEAD_PATHS = ['drivers/hammerspoon', 'drivers/autohotkey', 'drivers/linux'];
 
 /**
  * Recursively collects every Markdown file under a directory.
@@ -63,9 +59,14 @@ for (const file of collectMarkdown(DOCS_ROOT, [])) {
 	const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
 	lines.forEach((line, i) => {
 		for (const dead of DEAD_PATHS) {
-			if (line.includes('static/' + dead) || line.includes('static\\' + dead.replace(/\//g, '\\'))) {
+			if (
+				line.includes('static/' + dead) ||
+				line.includes('static\\' + dead.replace(/\//g, '\\'))
+			) {
 				const rel = path.relative(ROOT, file).replace(/\\/g, '/');
-				errors.push(`${rel}:${i + 1} references dead pre-reorg path "static/${dead}" — use static/ergopti_plus/<driver>.`);
+				errors.push(
+					`${rel}:${i + 1} references dead pre-reorg path "static/${dead}" — use static/ergopti_plus/<driver>.`
+				);
 			}
 		}
 	});

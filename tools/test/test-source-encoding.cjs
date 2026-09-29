@@ -42,7 +42,16 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SCAN_DIRS = ['static/ergopti_plus', 'tools', 'src'];
 const EXTENSIONS = ['.lua', '.ahk', '.js', '.cjs', '.mjs', '.json', '.toml', '.py', '.md'];
-const SKIP_DIRS = new Set(['node_modules', '.venv', '.git', 'vendor', '.svelte-kit', 'build', '__pycache__', '.pytest_cache']);
+const SKIP_DIRS = new Set([
+	'node_modules',
+	'.venv',
+	'.git',
+	'vendor',
+	'.svelte-kit',
+	'build',
+	'__pycache__',
+	'.pytest_cache'
+]);
 
 // The CP1252 re-encoding of a UTF-8 lead byte. Any of these appearing in a UTF-8
 // file means the file was decoded with the wrong codepage and written back.
@@ -51,12 +60,15 @@ const SKIP_DIRS = new Set(['node_modules', '.venv', '.git', 'vendor', '.svelte-k
 // words. Spelling them as string literals would embed the corruption in this
 // file, and the guard would flag itself — which it did, on the first run.
 const MOJIBAKE_SIGNATURES = [
-	{ bytes: Buffer.from([0xc3, 0xa2, 0xe2, 0x82, 0xac]), label: 'UTF-8 punctuation read as CP1252 (em dash, ellipsis, curly quote, arrow)' },
+	{
+		bytes: Buffer.from([0xc3, 0xa2, 0xe2, 0x82, 0xac]),
+		label: 'UTF-8 punctuation read as CP1252 (em dash, ellipsis, curly quote, arrow)'
+	},
 	{ bytes: Buffer.from([0xc3, 0x83, 0xc2, 0xa9]), label: 'e-acute double-encoded' },
 	{ bytes: Buffer.from([0xc3, 0x83, 0xc2, 0xa8]), label: 'e-grave double-encoded' },
 	{ bytes: Buffer.from([0xc3, 0x83, 0xc2, 0xa0]), label: 'a-grave double-encoded' },
 	{ bytes: Buffer.from([0xc3, 0x82, 0xc2, 0xab]), label: 'left guillemet double-encoded' },
-	{ bytes: Buffer.from([0xc3, 0x82, 0xc2, 0xbb]), label: 'right guillemet double-encoded' },
+	{ bytes: Buffer.from([0xc3, 0x82, 0xc2, 0xbb]), label: 'right guillemet double-encoded' }
 ];
 
 const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
@@ -110,7 +122,9 @@ for (const file of files) {
 
 	// A second BOM. One is legal (AHK requires it); two is a tool that ran twice.
 	if (buf.length >= 6 && buf.subarray(0, 3).equals(BOM) && buf.subarray(3, 6).equals(BOM)) {
-		problems.push(`${rel}:1 — repeated UTF-8 BOM (a strict parser rejects it even after stripping one)`);
+		problems.push(
+			`${rel}:1 — repeated UTF-8 BOM (a strict parser rejects it even after stripping one)`
+		);
 	}
 
 	for (const sig of MOJIBAKE_SIGNATURES) {

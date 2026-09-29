@@ -75,9 +75,6 @@ for (const bin of LUA_CANDIDATES) {
 	}
 }
 
-
-
-
 // ==========================================
 // ==========================================
 // ======= 1/ Collecting the requests =======
@@ -108,7 +105,9 @@ const targets = new Map(); // shared-relative path -> [call sites]
 const luaFiles = walkLua(DRIVERS);
 
 if (luaFiles.length < 200) {
-	errors.push(`walked only ${luaFiles.length} .lua file(s) — the scan is broken and would report nothing`);
+	errors.push(
+		`walked only ${luaFiles.length} .lua file(s) — the scan is broken and would report nothing`
+	);
 }
 
 for (const abs of luaFiles) {
@@ -137,9 +136,6 @@ if (targets.size < MIN_TARGETS) {
 }
 
 const targetList = [...targets.keys()].sort();
-
-
-
 
 // ==========================================
 // ==========================================
@@ -234,7 +230,9 @@ if (!LUA) {
 		const driverRoot = path.join(DRIVERS, drv.name).split(path.sep).join('/');
 		const resolver = path.join(DRIVERS, drv.name, 'infra', 'paths.lua');
 		if (!fs.existsSync(resolver)) {
-			errors.push(`${drv.name}/infra/paths.lua is missing — the driver has no shared-tree resolver`);
+			errors.push(
+				`${drv.name}/infra/paths.lua is missing — the driver has no shared-tree resolver`
+			);
 			continue;
 		}
 
@@ -295,7 +293,8 @@ if (!LUA) {
 
 		for (const { target, resolved } of res.paths) {
 			const sites = targets.get(target) || [];
-			const where = sites.slice(0, 2).join(', ') + (sites.length > 2 ? `, +${sites.length - 2} more` : '');
+			const where =
+				sites.slice(0, 2).join(', ') + (sites.length > 2 ? `, +${sites.length - 2} more` : '');
 			if (!resolved || resolved === 'nil') {
 				errors.push(`${drv.name}: Paths.shared("${target}") returned nil — requested at ${where}`);
 				continue;
@@ -316,9 +315,6 @@ if (!LUA) {
 		);
 	}
 }
-
-
-
 
 // ==============================================
 // ==============================================
@@ -404,7 +400,9 @@ if (LUA && !fs.existsSync(CONFIG_PATHS)) {
 			continue;
 		}
 		if (!res.ended) {
-			errors.push(`config_paths [${c.label}]: the probe did not complete — its output proves nothing`);
+			errors.push(
+				`config_paths [${c.label}]: the probe did not complete — its output proves nothing`
+			);
 			continue;
 		}
 		homeCasesRun++;
@@ -454,9 +452,6 @@ if (LUA && !fs.existsSync(CONFIG_PATHS)) {
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
-
-
-
 
 // ==========================
 // ==========================

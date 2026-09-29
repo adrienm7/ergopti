@@ -38,7 +38,9 @@ const PACKAGED_DIR = 'linux/xkb_generation';
 const INSTALLER_DIR = 'static/ergopti/linux/xkb_installation';
 const INSTALLER = `${INSTALLER_DIR}/user_layout_installer.py`;
 const PACKAGED_INSTALLER_DIR = 'linux/xkb_installation';
-const LAYOUT_DEFAULTS = JSON.parse(read('static/ergopti_plus/_shared/modules/layouts/defaults.json'));
+const LAYOUT_DEFAULTS = JSON.parse(
+	read('static/ergopti_plus/_shared/modules/layouts/defaults.json')
+);
 
 let failures = 0;
 function check(name, fn) {
@@ -70,7 +72,10 @@ const build = read(BUILD);
 const required = requiredFiles(build);
 
 check('the build copies the converter tree into the driver', () => {
-	const copy = /copy_tree\s+"\$\{REPO_ROOT\}\/static\/ergopti\/linux\/xkb_generation\/"\s+"\$\{BUILD_DIR\}\/linux\/xkb_generation\/"([^\n]*)/.exec(build);
+	const copy =
+		/copy_tree\s+"\$\{REPO_ROOT\}\/static\/ergopti\/linux\/xkb_generation\/"\s+"\$\{BUILD_DIR\}\/linux\/xkb_generation\/"([^\n]*)/.exec(
+			build
+		);
 	assert.ok(copy, `${BUILD} must copy ${CONVERTER_DIR}/ into \${BUILD_DIR}/${PACKAGED_DIR}/`);
 	assert.ok(!/--exclude\s+data\b/.test(copy[1]), 'the converter data must not be excluded');
 });
@@ -79,10 +84,15 @@ check('the integrity check requires the converter and every data file it reads',
 	const data = converterDataFiles();
 	assert.ok(data.length >= 3, `found only ${data.length} DATA_DIR file(s) in the converter`);
 	for (const name of data) {
-		assert.ok(fs.existsSync(path.join(ROOT, CONVERTER_DIR, 'data', name)), `data/${name} is not in the repository`);
+		assert.ok(
+			fs.existsSync(path.join(ROOT, CONVERTER_DIR, 'data', name)),
+			`data/${name} is not in the repository`
+		);
 	}
-	const missing = [`${PACKAGED_DIR}/keylayout_to_xkb.py`, ...data.map((name) => `${PACKAGED_DIR}/data/${name}`)]
-		.filter((file) => !required.includes(file));
+	const missing = [
+		`${PACKAGED_DIR}/keylayout_to_xkb.py`,
+		...data.map((name) => `${PACKAGED_DIR}/data/${name}`)
+	].filter((file) => !required.includes(file));
 	assert.deepStrictEqual(missing, [], 'REQUIRED_FILES lacks these converter files');
 });
 
@@ -104,11 +114,22 @@ check('the Lua module looks where the package and the source tree put the conver
 	const block = /CONVERTER_CANDIDATES\s*=\s*\{([\s\S]*?)\}/.exec(source);
 	assert.ok(block, `${LUA_MODULE} declares no CONVERTER_CANDIDATES`);
 	const candidates = [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-	assert.strictEqual(candidates.length, 2, 'a packaged and a source-checkout candidate are expected');
-	assert.strictEqual(`linux/${candidates[0]}`, `${PACKAGED_DIR}/keylayout_to_xkb.py`,
-		'the first candidate must be where the build puts the converter');
+	assert.strictEqual(
+		candidates.length,
+		2,
+		'a packaged and a source-checkout candidate are expected'
+	);
+	assert.strictEqual(
+		`linux/${candidates[0]}`,
+		`${PACKAGED_DIR}/keylayout_to_xkb.py`,
+		'the first candidate must be where the build puts the converter'
+	);
 	const fromDriver = path.resolve(ROOT, 'static/ergopti_plus/linux', candidates[1]);
-	assert.strictEqual(fromDriver, path.join(ROOT, CONVERTER), 'the source candidate must resolve to the real converter');
+	assert.strictEqual(
+		fromDriver,
+		path.join(ROOT, CONVERTER),
+		'the source candidate must resolve to the real converter'
+	);
 });
 
 /** The installer and every module of its folder it imports, transitively. */
@@ -131,10 +152,14 @@ check('the build ships the user XKB installer with every module it imports', () 
 	const modules = installerModules();
 	assert.ok(modules.length >= 3, `found only ${modules.length} installer module(s)`);
 	for (const name of modules) {
-		assert.ok(new RegExp(`/static/ergopti/linux/xkb_installation/${name}\\.py"`).test(build),
-			`${BUILD} must copy ${name}.py into \${BUILD_DIR}/${PACKAGED_INSTALLER_DIR}/`);
+		assert.ok(
+			new RegExp(`/static/ergopti/linux/xkb_installation/${name}\\.py"`).test(build),
+			`${BUILD} must copy ${name}.py into \${BUILD_DIR}/${PACKAGED_INSTALLER_DIR}/`
+		);
 	}
-	const missing = modules.map((name) => `${PACKAGED_INSTALLER_DIR}/${name}.py`).filter((f) => !required.includes(f));
+	const missing = modules
+		.map((name) => `${PACKAGED_INSTALLER_DIR}/${name}.py`)
+		.filter((f) => !required.includes(f));
 	assert.deepStrictEqual(missing, [], 'REQUIRED_FILES lacks these installer files');
 });
 
@@ -143,21 +168,44 @@ check('the Lua module looks where the package and the source tree put the instal
 	const block = /INSTALLER_CANDIDATES\s*=\s*\{([\s\S]*?)\}/.exec(source);
 	assert.ok(block, `${LUA_MODULE} declares no INSTALLER_CANDIDATES`);
 	const candidates = [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-	assert.strictEqual(candidates.length, 2, 'a packaged and a source-checkout candidate are expected');
-	assert.strictEqual(`linux/${candidates[0]}`, `${PACKAGED_INSTALLER_DIR}/user_layout_installer.py`);
+	assert.strictEqual(
+		candidates.length,
+		2,
+		'a packaged and a source-checkout candidate are expected'
+	);
+	assert.strictEqual(
+		`linux/${candidates[0]}`,
+		`${PACKAGED_INSTALLER_DIR}/user_layout_installer.py`
+	);
 	const fromDriver = path.resolve(ROOT, 'static/ergopti_plus/linux', candidates[1]);
-	assert.strictEqual(fromDriver, path.join(ROOT, INSTALLER), 'the source candidate must resolve to the real installer');
+	assert.strictEqual(
+		fromDriver,
+		path.join(ROOT, INSTALLER),
+		'the source candidate must resolve to the real installer'
+	);
 });
 
 check('the build ships the registry folder where the Lua module looks for it', () => {
 	const folder = LAYOUT_DEFAULTS.registry.folder;
-	assert.ok(new RegExp(`copy_tree\\s+"\\$\\{REPO_ROOT\\}/${folder}/"\\s+"\\$\\{BUILD_DIR\\}/linux/${folder}/"`).test(build),
-		`${BUILD} must copy ${folder}/ into \${BUILD_DIR}/linux/${folder}/`);
-	assert.ok(required.includes(`linux/${folder}/${LAYOUT_DEFAULTS.registry.index_file}`),
-		'REQUIRED_FILES must require the shipped registry index');
+	assert.ok(
+		new RegExp(
+			`copy_tree\\s+"\\$\\{REPO_ROOT\\}/${folder}/"\\s+"\\$\\{BUILD_DIR\\}/linux/${folder}/"`
+		).test(build),
+		`${BUILD} must copy ${folder}/ into \${BUILD_DIR}/linux/${folder}/`
+	);
+	assert.ok(
+		required.includes(`linux/${folder}/${LAYOUT_DEFAULTS.registry.index_file}`),
+		'REQUIRED_FILES must require the shipped registry index'
+	);
 	const source = read(LUA_MODULE);
-	assert.ok(source.includes('driver_root .. "/" .. settings.folder'), 'the packaged candidate is <driver>/<folder>');
-	assert.ok(source.includes('driver_root .. "/../../../" .. settings.folder'), 'the checkout candidate is the repository folder');
+	assert.ok(
+		source.includes('driver_root .. "/" .. settings.folder'),
+		'the packaged candidate is <driver>/<folder>'
+	);
+	assert.ok(
+		source.includes('driver_root .. "/../../../" .. settings.folder'),
+		'the checkout candidate is the repository folder'
+	);
 });
 
 if (failures > 0) process.exit(1);

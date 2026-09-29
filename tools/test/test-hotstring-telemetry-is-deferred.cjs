@@ -78,8 +78,9 @@ for (const file of files) {
 		return line.replace(/--.*$/, '');
 	});
 	const code = lines.join('\n');
-	helperDefinitions += (code.match(new RegExp(`local\\s+function\\s+${DEFER_HELPER}\\s*\\(`, 'g')) || [])
-		.length;
+	helperDefinitions += (
+		code.match(new RegExp(`local\\s+function\\s+${DEFER_HELPER}\\s*\\(`, 'g')) || []
+	).length;
 	if (CENTRAL_DEFERRAL.test(code)) centralDeferrals += 1;
 
 	lines.forEach((line, i) => {

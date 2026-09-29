@@ -47,67 +47,65 @@ OUT_DIR = Path(__file__).resolve().parents[1] / "static" / "img" / "flags"
 # specification when one exists; otherwise from Wikipedia's reference SVGs.
 COLORS = {
     # Pan-European
-    "white":        (255, 255, 255),
-    "black":        (  0,   0,   0),
+    "white": (255, 255, 255),
+    "black": (0, 0, 0),
     # Nordic blues / yellows / reds
-    "sv_blue":      (  0, 106, 167),
-    "sv_yellow":    (254, 204,   0),
-    "no_red":       (239,  43,  45),
-    "no_blue":      (  0,  35, 149),
-    "da_red":       (198,  12,  48),
+    "sv_blue": (0, 106, 167),
+    "sv_yellow": (254, 204, 0),
+    "no_red": (239, 43, 45),
+    "no_blue": (0, 35, 149),
+    "da_red": (198, 12, 48),
     # France
-    "fr_blue":      (  0,  35, 149),
-    "fr_red":       (239,  65,  53),
+    "fr_blue": (0, 35, 149),
+    "fr_red": (239, 65, 53),
     # Germany
-    "de_red":       (221,   0,   0),
-    "de_gold":      (255, 206,   0),
+    "de_red": (221, 0, 0),
+    "de_gold": (255, 206, 0),
     # Italy
-    "it_green":     (  0, 140,  69),
-    "it_red":       (205,  33,  42),
+    "it_green": (0, 140, 69),
+    "it_red": (205, 33, 42),
     # Netherlands
-    "nl_red":       (174,  28,  40),
-    "nl_blue":      ( 33,  70, 139),
+    "nl_red": (174, 28, 40),
+    "nl_blue": (33, 70, 139),
     # Spain
-    "es_red":       (198,  11,  30),
-    "es_yellow":    (255, 196,   0),
+    "es_red": (198, 11, 30),
+    "es_yellow": (255, 196, 0),
     # Russia / similar tricolors
-    "ru_blue":      (  0,  57, 166),
-    "ru_red":       (213,  43,  30),
+    "ru_blue": (0, 57, 166),
+    "ru_red": (213, 43, 30),
     # Poland
-    "pl_red":       (220,  20,  60),
+    "pl_red": (220, 20, 60),
     # Portugal
-    "pt_green":     (  0, 102,  53),
-    "pt_red":       (218,  41,  28),
+    "pt_green": (0, 102, 53),
+    "pt_red": (218, 41, 28),
     # Czech
-    "cs_blue":      ( 17,  69, 126),
-    "cs_red":       (215,  20,  26),
+    "cs_blue": (17, 69, 126),
+    "cs_red": (215, 20, 26),
     # Ukraine
-    "uk_blue":      (  0,  87, 183),
-    "uk_yellow":    (255, 215,   0),
+    "uk_blue": (0, 87, 183),
+    "uk_yellow": (255, 215, 0),
     # Turkey
-    "tr_red":       (227,  10,  23),
+    "tr_red": (227, 10, 23),
     # China
-    "zh_red":       (238,  28,  37),
-    "zh_yellow":    (255, 222,   0),
+    "zh_red": (238, 28, 37),
+    "zh_yellow": (255, 222, 0),
     # Japan
-    "ja_red":       (188,   0,  45),
+    "ja_red": (188, 0, 45),
     # Korea
-    "ko_red":       (205,  46,  58),
-    "ko_blue":      (  0,  71, 160),
+    "ko_red": (205, 46, 58),
+    "ko_blue": (0, 71, 160),
     # India
-    "in_saffron":   (255, 153,  51),
-    "in_green":     ( 19, 136,   8),
-    "in_navy":      (  0,   0, 128),
+    "in_saffron": (255, 153, 51),
+    "in_green": (19, 136, 8),
+    "in_navy": (0, 0, 128),
     # Israel
-    "il_blue":      (  0,  56, 184),
+    "il_blue": (0, 56, 184),
     # Arabic — Saudi green (most recognisable single-flag stand-in for "ar")
-    "ar_green":     (  0, 109,  41),
+    "ar_green": (0, 109, 41),
     # UK (English language pick)
-    "uk_navy":      (  1,  33,  105),
-    "uk_red":       (200,  16,  46),
+    "uk_navy": (1, 33, 105),
+    "uk_red": (200, 16, 46),
 }
-
-
 
 
 # ==========================================
@@ -115,6 +113,7 @@ COLORS = {
 # ======= 2/ Drawing primitives =======
 # ==========================================
 # ==========================================
+
 
 def _new_canvas(color=(0, 0, 0)):
     """Return a fresh (image, draw) pair filled with `color`."""
@@ -160,13 +159,12 @@ def _nordic_cross(bg, fg, *, vx=10, vw=4, hy=10, hh=4):
     return img
 
 
-
-
 # =====================================================
 # =====================================================
 # ======= 3/ Per-flag builders =======
 # =====================================================
 # =====================================================
+
 
 def flag_sv():
     # Sweden: yellow Nordic cross on royal blue.
@@ -209,8 +207,7 @@ def flag_nl():
 
 def flag_es():
     # 1 : 2 : 1 horizontal stripes — red, yellow, red.
-    return _hstripes(COLORS["es_red"], COLORS["es_yellow"], COLORS["es_red"],
-                     weights=[1, 2, 1])
+    return _hstripes(COLORS["es_red"], COLORS["es_yellow"], COLORS["es_red"], weights=[1, 2, 1])
 
 
 def flag_ru():
@@ -241,8 +238,7 @@ def flag_cs():
     img, d = _new_canvas()
     d.rectangle([0, 0, WIDTH - 1, HEIGHT // 2 - 1], fill=COLORS["white"])
     d.rectangle([0, HEIGHT // 2, WIDTH - 1, HEIGHT - 1], fill=COLORS["cs_red"])
-    d.polygon([(0, 0), (0, HEIGHT - 1), (WIDTH // 2 - 1, HEIGHT // 2 - 1)],
-              fill=COLORS["cs_blue"])
+    d.polygon([(0, 0), (0, HEIGHT - 1), (WIDTH // 2 - 1, HEIGHT // 2 - 1)], fill=COLORS["cs_blue"])
     return img
 
 
@@ -283,9 +279,9 @@ def flag_zh():
     # the upper-left quadrant. At 32x24 we approximate with simple discs;
     # full 5-point star drawing at this size is illegible.
     img, d = _new_canvas(COLORS["zh_red"])
-    d.ellipse([4, 4, 10, 10], fill=COLORS["zh_yellow"])           # big star
-    d.ellipse([12, 3, 14, 5],  fill=COLORS["zh_yellow"])
-    d.ellipse([14, 6, 16, 8],  fill=COLORS["zh_yellow"])
+    d.ellipse([4, 4, 10, 10], fill=COLORS["zh_yellow"])  # big star
+    d.ellipse([12, 3, 14, 5], fill=COLORS["zh_yellow"])
+    d.ellipse([14, 6, 16, 8], fill=COLORS["zh_yellow"])
     d.ellipse([14, 10, 16, 12], fill=COLORS["zh_yellow"])
     d.ellipse([12, 13, 14, 15], fill=COLORS["zh_yellow"])
     return img
@@ -298,11 +294,11 @@ def flag_ko():
     cx, cy, r = WIDTH // 2, HEIGHT // 2, 6
     # Disc split: top half red, bottom half blue (schematic of the taegeuk).
     d.pieslice([cx - r, cy - r, cx + r, cy + r], 180, 360, fill=COLORS["ko_red"])
-    d.pieslice([cx - r, cy - r, cx + r, cy + r],   0, 180, fill=COLORS["ko_blue"])
+    d.pieslice([cx - r, cy - r, cx + r, cy + r], 0, 180, fill=COLORS["ko_blue"])
     # The S-curve of a real taegeuk would need more pixels than we have;
     # we leave the simple split, which still reads as "Korean flag" at 32x24.
     # Trigrams — three short bars in each corner.
-    for (x, y) in [(2, 2), (WIDTH - 8, 2), (2, HEIGHT - 5), (WIDTH - 8, HEIGHT - 5)]:
+    for x, y in [(2, 2), (WIDTH - 8, 2), (2, HEIGHT - 5), (WIDTH - 8, HEIGHT - 5)]:
         for i in range(3):
             d.rectangle([x, y + i * 2, x + 5, y + i * 2], fill=COLORS["black"])
     return img
@@ -330,10 +326,8 @@ def flag_he():
     d.rectangle([0, HEIGHT - 6, WIDTH - 1, HEIGHT - 4], fill=COLORS["il_blue"])
     # Star of David — two overlapping triangles, schematic at 32x24.
     cx, cy = WIDTH // 2, HEIGHT // 2
-    d.polygon([(cx, cy - 4), (cx - 4, cy + 2), (cx + 4, cy + 2)],
-              outline=COLORS["il_blue"])
-    d.polygon([(cx, cy + 4), (cx - 4, cy - 2), (cx + 4, cy - 2)],
-              outline=COLORS["il_blue"])
+    d.polygon([(cx, cy - 4), (cx - 4, cy + 2), (cx + 4, cy + 2)], outline=COLORS["il_blue"])
+    d.polygon([(cx, cy + 4), (cx - 4, cy - 2), (cx + 4, cy - 2)], outline=COLORS["il_blue"])
     return img
 
 
@@ -360,8 +354,6 @@ def flag_ar():
     d.ellipse([10, 6, 22, 18], fill=COLORS["white"])
     d.ellipse([13, 7, 23, 17], fill=COLORS["ar_green"])
     return img
-
-
 
 
 # ===================================
@@ -401,8 +393,7 @@ def main():
         img = builder()
         out_path = OUT_DIR / f"{locale}.png"
         img.save(out_path, "PNG", optimize=True)
-        print(f"  wrote {out_path.relative_to(OUT_DIR.parents[2])} "
-              f"({img.size[0]}x{img.size[1]})")
+        print(f"  wrote {out_path.relative_to(OUT_DIR.parents[2])} ({img.size[0]}x{img.size[1]})")
     print(f"\n{len(REGISTRY)} flag(s) regenerated under {OUT_DIR}.")
 
 

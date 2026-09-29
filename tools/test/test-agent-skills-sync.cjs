@@ -27,21 +27,39 @@ function write(relative, content) {
 
 function run(command) {
 	return spawnSync(process.execPath, [SCRIPT, command, '--root', temporaryRoot], {
-		encoding: 'utf8',
+		encoding: 'utf8'
 	});
 }
 
 try {
-	const repositoryMirror = compareTrees(path.join(ROOT, '.agents', 'skills'), path.join(ROOT, '.claude', 'skills'));
-	assert.equal(repositoryMirror.sourceFiles.length > 0, true, 'the canonical repository skill tree must not be empty');
-	assert.deepEqual(repositoryMirror.missing, [], 'the repository Claude mirror is missing canonical skill files');
+	const repositoryMirror = compareTrees(
+		path.join(ROOT, '.agents', 'skills'),
+		path.join(ROOT, '.claude', 'skills')
+	);
+	assert.equal(
+		repositoryMirror.sourceFiles.length > 0,
+		true,
+		'the canonical repository skill tree must not be empty'
+	);
+	assert.deepEqual(
+		repositoryMirror.missing,
+		[],
+		'the repository Claude mirror is missing canonical skill files'
+	);
 	assert.deepEqual(repositoryMirror.stale, [], 'the repository Claude mirror contains stale files');
-	assert.deepEqual(repositoryMirror.changed, [], 'the repository Claude mirror contains hand-edited copies');
+	assert.deepEqual(
+		repositoryMirror.changed,
+		[],
+		'the repository Claude mirror contains hand-edited copies'
+	);
 
 	write('.claude/skills/example/SKILL.md', 'legacy\n');
 	let result = run('bootstrap-from-claude');
 	assert.equal(result.status, 0, result.stderr);
-	assert.equal(fs.readFileSync(path.join(temporaryRoot, '.agents/skills/example/SKILL.md'), 'utf8'), 'legacy\n');
+	assert.equal(
+		fs.readFileSync(path.join(temporaryRoot, '.agents/skills/example/SKILL.md'), 'utf8'),
+		'legacy\n'
+	);
 
 	write('.agents/skills/example/SKILL.md', 'canonical\n');
 	write('.agents/skills/example/references/detail.md', 'detail\n');
@@ -52,8 +70,17 @@ try {
 	result = run('write');
 	assert.equal(result.status, 0, result.stderr);
 	assert.equal(fs.existsSync(path.join(temporaryRoot, '.claude/skills/stale/SKILL.md')), false);
-	assert.equal(fs.readFileSync(path.join(temporaryRoot, '.claude/skills/example/SKILL.md'), 'utf8'), 'canonical\n');
-	assert.equal(fs.readFileSync(path.join(temporaryRoot, '.claude/skills/example/references/detail.md'), 'utf8'), 'detail\n');
+	assert.equal(
+		fs.readFileSync(path.join(temporaryRoot, '.claude/skills/example/SKILL.md'), 'utf8'),
+		'canonical\n'
+	);
+	assert.equal(
+		fs.readFileSync(
+			path.join(temporaryRoot, '.claude/skills/example/references/detail.md'),
+			'utf8'
+		),
+		'detail\n'
+	);
 
 	result = run('check');
 	assert.equal(result.status, 0, result.stderr);

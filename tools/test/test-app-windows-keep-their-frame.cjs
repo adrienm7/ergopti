@@ -35,12 +35,12 @@ const FRAMELESS_BY_DESIGN = {
 	windows: {
 		'ui/tooltip/helpers.ahk': 'typing tooltip and its border overlay',
 		'ui/tooltip/llm.ahk': 'LLM suggestion tooltip',
-		'ui/wpm/wpm_widget.ahk': 'floating WPM widget and graph',
+		'ui/wpm/wpm_widget.ahk': 'floating WPM widget and graph'
 	},
 	linux: {
 		'adapters/graphics_renderer.lua': 'preview tooltip',
-		'adapters/wpm_surface.lua': 'floating WPM widget and graph',
-	},
+		'adapters/wpm_surface.lua': 'floating WPM widget and graph'
+	}
 };
 
 // Floors: a walk returning fewer files means the enumeration broke.
@@ -98,7 +98,9 @@ function checkDriver(driver, ext, marker, isOffending) {
 	const dir = path.join(DRIVERS, driver);
 	const files = listSources(dir, ext);
 	if (files.length < MIN_FILES[driver]) {
-		errors.push(`${driver}: only ${files.length} source file(s) found (floor ${MIN_FILES[driver]}); the walk is broken`);
+		errors.push(
+			`${driver}: only ${files.length} source file(s) found (floor ${MIN_FILES[driver]}); the walk is broken`
+		);
 		return;
 	}
 	const allowed = FRAMELESS_BY_DESIGN[driver] || {};
@@ -110,21 +112,27 @@ function checkDriver(driver, ext, marker, isOffending) {
 	}
 	for (const rel of Object.keys(allowed)) {
 		if (!files.includes(rel)) {
-			errors.push(`${driver}: allow-listed file ${rel} no longer exists; drop it from FRAMELESS_BY_DESIGN`);
+			errors.push(
+				`${driver}: allow-listed file ${rel} no longer exists; drop it from FRAMELESS_BY_DESIGN`
+			);
 		}
 	}
 }
 
-checkDriver('macos', '.lua', '--',
-	(src) => src.includes('hs.webview.new') && !src.includes('window_chrome_steps('));
-checkDriver('windows', '.ahk', ';',
-	(src) => /\bGui\(\s*"[^"]*-Caption\b/.test(src));
-checkDriver('linux', '.lua', '--',
-	(src) => /set_decorated\(\s*false\s*\)/.test(src));
+checkDriver(
+	'macos',
+	'.lua',
+	'--',
+	(src) => src.includes('hs.webview.new') && !src.includes('window_chrome_steps(')
+);
+checkDriver('windows', '.ahk', ';', (src) => /\bGui\(\s*"[^"]*-Caption\b/.test(src));
+checkDriver('linux', '.lua', '--', (src) => /set_decorated\(\s*false\s*\)/.test(src));
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] app windows must keep their frame:\x1b[0m');
 	for (const error of errors) console.error(`  - ${error}`);
 	process.exit(1);
 }
-console.log('\x1b[32m[OK] every app window on macOS, Windows and Linux keeps the shared frame.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] every app window on macOS, Windows and Linux keeps the shared frame.\x1b[0m'
+);

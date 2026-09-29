@@ -163,9 +163,7 @@ FEATURES & RATIONALE:
 			<div class="ep-topbar">
 				<LangToggle />
 				<p class="legacy-link">
-					<a href="ergopti-plus-old"
-						>{t('Ancienne version de cette page →')}</a
-					>
+					<a href="ergopti-plus-old">{t('Ancienne version de cette page →')}</a>
 				</p>
 			</div>
 

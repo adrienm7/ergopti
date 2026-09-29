@@ -11,22 +11,28 @@
 	var post = makeHostBridge('config_cleanup_bridge');
 	var state = null;
 	var busy = false;
-	var el = function (id) { return document.getElementById(id); };
+	var el = function (id) {
+		return document.getElementById(id);
+	};
 
 	/** Formats the existing numbered locale placeholders without interpreting values. */
 	function t(key) {
 		var args = Array.prototype.slice.call(arguments, 1);
 		var value = (window._i18n_strings || {})[key];
-		return typeof value === 'string' ? value.replace(/\{(\d+)\}/g, function (_, index) {
-			return String(args[Number(index) - 1]);
-		}) : key;
+		return typeof value === 'string'
+			? value.replace(/\{(\d+)\}/g, function (_, index) {
+					return String(args[Number(index) - 1]);
+				})
+			: key;
 	}
 
 	/** Renders host state without parsing configuration text as HTML. */
 	function render() {
 		el('btn-clean').disabled = busy || !state || state.status !== 'ready' || !state.keys.length;
 		el('btn-refresh').disabled = busy || !state;
-		el('count').textContent = state ? t('config_cleanup.count', state.keys.length) : t('common.loading');
+		el('count').textContent = state
+			? t('config_cleanup.count', state.keys.length)
+			: t('common.loading');
 		if (!state) return;
 		el('path').textContent = state.path;
 		el('keys').textContent = '';
@@ -45,7 +51,8 @@
 		var status = '';
 		if (state.status === 'empty') status = t('dialog.unused_keys.none', state.path);
 		if (state.status === 'changed') status = t('config_cleanup.changed');
-		if (state.status === 'removed') status = t('dialog.unused_keys.done', state.removed, state.backup);
+		if (state.status === 'removed')
+			status = t('dialog.unused_keys.done', state.removed, state.backup);
 		if (state.status === 'failed') status = t('dialog.unused_keys.failed', t(state.reason_key));
 		el('status').textContent = status;
 		el('status').className = state.status;
@@ -60,12 +67,16 @@
 		render();
 	};
 	window.__hostBridgeResponse = function (bridge, base64, payload) {
-		if (bridge === 'config_cleanup_bridge') window.receiveConfigCleanup(decodeHostBridgeResponse(base64, payload));
+		if (bridge === 'config_cleanup_bridge')
+			window.receiveConfigCleanup(decodeHostBridgeResponse(base64, payload));
 	};
 	['refresh', 'clean', 'close'].forEach(function (action) {
 		el('btn-' + action).addEventListener('click', function () {
 			if (el('btn-' + action).disabled) return;
-			if (action !== 'close') { busy = true; render(); }
+			if (action !== 'close') {
+				busy = true;
+				render();
+			}
 			post({ action: action, session: state ? state.session : '' });
 		});
 	});

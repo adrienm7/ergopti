@@ -47,16 +47,16 @@ menu a une SSoT dans `manifest.toml` → codegen `menu_manifest.json` (FEAT B).
 Toute proposition doit préciser comment elle serait vérifiée. Les portes
 existantes :
 
-| Couche | Commande | Sens |
-|---|---|---|
+| Couche             | Commande                                                                                                                                                                                           | Sens                                                                                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Parse/validate AHK | `& "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ErgoptiPlus.ahk /out "$env:TEMP\probe.exe"` (depuis `windows/`, **PowerShell uniquement** — Git Bash réécrit `/in` et `/out` en chemins) | exit 0 = tout parse, exit 17 = erreur de syntaxe. **Jamais `/validate`** : le flag est ignoré et le script s'EXÉCUTE (`feedback_ahk_ui_syntax_validation`) |
-| Suite AHK | `AutoHotkey64.exe tests\run_all.ahk` (TAP dans `%TEMP%\ergopti_test_results.txt`) | unitaires + meta |
-| Suite JS/CI | `npm run test:js` | drift gates, lint, parité, headers… |
-| Encodage AHK | `npm run test:ahk-encoding` | UTF-8 BOM + LF |
-| Lint conventions | `npm run lint:conventions:strict` | bannières/sections/espacement |
-| Headers de fichier | `node tools/lint/audit-file-headers.cjs` | 1re ligne = chemin |
-| Suite macOS | `cd static/ergopti_plus/macos && lua tests/run.lua` | unitaires Lua |
-| Pipeline domaine | `npm run build:domain` | régénère `_generated` + drift-check |
+| Suite AHK          | `AutoHotkey64.exe tests\run_all.ahk` (TAP dans `%TEMP%\ergopti_test_results.txt`)                                                                                                                  | unitaires + meta                                                                                                                                           |
+| Suite JS/CI        | `npm run test:js`                                                                                                                                                                                  | drift gates, lint, parité, headers…                                                                                                                        |
+| Encodage AHK       | `npm run test:ahk-encoding`                                                                                                                                                                        | UTF-8 BOM + LF                                                                                                                                             |
+| Lint conventions   | `npm run lint:conventions:strict`                                                                                                                                                                  | bannières/sections/espacement                                                                                                                              |
+| Headers de fichier | `node tools/lint/audit-file-headers.cjs`                                                                                                                                                           | 1re ligne = chemin                                                                                                                                         |
+| Suite macOS        | `cd static/ergopti_plus/macos && lua tests/run.lua`                                                                                                                                                | unitaires Lua                                                                                                                                              |
+| Pipeline domaine   | `npm run build:domain`                                                                                                                                                                             | régénère `_generated` + drift-check                                                                                                                        |
 
 Règle d'or : **aucun changement de comportement** ; chaque fix embarque son test
 de régression ; ne jamais affaiblir un test pour faire passer un changement.
@@ -77,12 +77,12 @@ Analyse exhaustivement, avec preuves :
    - **devrait** devenir une webview partagée (toute UI non triviale),
    - peut **rester native** car « petite » (un seul `OK`/`Annuler`, un seul
      sélecteur, un seul `InputBox`) — justifie le « petit ».
-   Cible explicitement les natifs restants : p.ex. `windows/ui/editors.ahk`
-   (modales clé magique / touche de répétition / lien GPT / infos perso),
-   `tooltip`, `healthcheck`, `spotlight`, `wpm`, et tout équivalent macOS. Pour
-   chaque candidate à convertir : frontend à créer/partager, host à cloner
-   (pattern `model_browser`/`paths_editor`), contrat de pont, fallback natif,
-   risque, et **ce qui n'est vérifiable qu'au reload**.
+     Cible explicitement les natifs restants : p.ex. `windows/ui/editors.ahk`
+     (modales clé magique / touche de répétition / lien GPT / infos perso),
+     `tooltip`, `healthcheck`, `spotlight`, `wpm`, et tout équivalent macOS. Pour
+     chaque candidate à convertir : frontend à créer/partager, host à cloner
+     (pattern `model_browser`/`paths_editor`), contrat de pont, fallback natif,
+     risque, et **ce qui n'est vérifiable qu'au reload**.
 
 2. **Menu.** Le menu est-il **entièrement** piloté par la SSoT partagée
    (`manifest.toml` → `_shared/modules/menu/menu_manifest.json`) sur les DEUX
@@ -124,16 +124,16 @@ réduction, pas l'ajout.
      `expander.ahk`, `terminators.ahk`, `prompt_builder.ahk`,
      `config_template.toml`, `paths.toml`, `personal_shortcuts.ahk`.
    - `macos/_generated/` : `features_manifest.lua` (~58 Ko), `config_template.toml`.
-   Pour CHACUN : (a) est-il encore **lu au runtime** (grep des `#Include` /
-   `require` / lectures) ? (b) quel codegen le produit (`tools/codegen/**`,
-   `tools/build/**`, `npm run build:*`) et est-il branché en CI/drift-gate ? (c)
-   pourrait-il être **supprimé** (orphelin), **réduit** (gros fichier qui pourrait
-   être lu à la volée depuis `_shared` au lieu d'être pré-généré et committé),
-   ou **remplacé** par une lecture directe de la source partagée ? Évalue le
-   compromis taille-committée / coût-boot / risque (certains `_generated` ont été
-   créés pour sortir ~1 Mo de tables du chemin de boot — vérifie si c'est encore
-   le cas et si une alternative plus simple existe). **Ne propose aucune
-   suppression sans grep prouvant l'absence de consommateur** (cf. P0/P5).
+     Pour CHACUN : (a) est-il encore **lu au runtime** (grep des `#Include` /
+     `require` / lectures) ? (b) quel codegen le produit (`tools/codegen/**`,
+     `tools/build/**`, `npm run build:*`) et est-il branché en CI/drift-gate ? (c)
+     pourrait-il être **supprimé** (orphelin), **réduit** (gros fichier qui pourrait
+     être lu à la volée depuis `_shared` au lieu d'être pré-généré et committé),
+     ou **remplacé** par une lecture directe de la source partagée ? Évalue le
+     compromis taille-committée / coût-boot / risque (certains `_generated` ont été
+     créés pour sortir ~1 Mo de tables du chemin de boot — vérifie si c'est encore
+     le cas et si une alternative plus simple existe). **Ne propose aucune
+     suppression sans grep prouvant l'absence de consommateur** (cf. P0/P5).
 
 2. **Simplifier `_shared/`.** `core/`, `lua/`, `modules/`, `tap_hold/`,
    `tests/`, `data/`, `ui/` : y a-t-il des sous-arbres redondants, mal nommés,
@@ -165,12 +165,12 @@ Produis un **rapport Markdown unique**, structuré et priorisé :
    tête, chacune en une ligne.
 2. **Axe 1 (mise en commun)** puis **Axe 2 (simplification)** — sections
    détaillées, chaque item au format `constat → preuve → proposition → gain →
-   risque → effort → vérif`.
+risque → effort → vérif`.
 3. **Plan d'exécution incrémental** — ordonné du moins au plus risqué, chaque
    incrément étant un commit conventionnel autonome, vérifié par les portes
    ci-dessus, avec mention explicite de ce qui n'est validable qu'au reload
    (Windows GUI / boot Hammerspoon).
-4. **Pistes écartées** — ce qui *paraît* mutualisable/simplifiable mais ne l'est
+4. **Pistes écartées** — ce qui _paraît_ mutualisable/simplifiable mais ne l'est
    pas (avec la raison : net négatif, spécifique plateforme, risque
    disproportionné), pour éviter d'y revenir.
 

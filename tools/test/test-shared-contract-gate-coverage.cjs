@@ -101,11 +101,17 @@ const SHARED_FILES = ['data/keycodes/physical_keys.json'];
 const samples = [];
 for (const tree of SHARED_TREES) {
 	const sample = findRealFile(tree);
-	check(sample !== null, `_shared/${tree}/ holds no file — the sample walk found nothing, so nothing below was verified`);
+	check(
+		sample !== null,
+		`_shared/${tree}/ holds no file — the sample walk found nothing, so nothing below was verified`
+	);
 	if (sample !== null) samples.push(sample);
 }
 for (const rel of SHARED_FILES) {
-	check(fs.existsSync(path.join(SHARED, rel)), `_shared/${rel} does not exist — the assertion below would check a fiction`);
+	check(
+		fs.existsSync(path.join(SHARED, rel)),
+		`_shared/${rel} does not exist — the assertion below would check a fiction`
+	);
 	samples.push(path.relative(ROOT, path.join(SHARED, rel)).replace(/\\/g, '/'));
 }
 
@@ -132,4 +138,6 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log(`[OK] shared-contract gate coverage (${samples.length} shared samples x ${DRIVER_UNIT_GATES.length} driver suites).`);
+console.log(
+	`[OK] shared-contract gate coverage (${samples.length} shared samples x ${DRIVER_UNIT_GATES.length} driver suites).`
+);

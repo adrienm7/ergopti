@@ -13,7 +13,10 @@
 const fs = require('node:fs');
 
 function validateAhkSuiteManifest(source) {
-	const lines = String(source).replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line !== '');
+	const lines = String(source)
+		.replace(/^\uFEFF/, '')
+		.split(/\r?\n/)
+		.filter((line) => line !== '');
 	const plans = [];
 	const footers = [];
 	const running = new Map();
@@ -51,7 +54,8 @@ function validateAhkSuiteManifest(source) {
 			}
 			const index = Number(match[1]);
 			if (durations.has(index)) errors.push(`duplicate duration ordinal ${index}`);
-			if (!results.has(index)) errors.push(`duration ordinal ${index} precedes its terminal result`);
+			if (!results.has(index))
+				errors.push(`duration ordinal ${index} precedes its terminal result`);
 			durations.set(index, Number(match[2]));
 			continue;
 		}
@@ -65,26 +69,35 @@ function validateAhkSuiteManifest(source) {
 	for (let index = 1; index <= planned; index += 1) {
 		const started = running.get(index);
 		if (!started) errors.push(`planned test ${index}/${planned} never started`);
-		else if (started.total !== planned) errors.push(`RUNNING ${index} declared total ${started.total}, expected ${planned}`);
+		else if (started.total !== planned)
+			errors.push(`RUNNING ${index} declared total ${started.total}, expected ${planned}`);
 		if (!results.has(index)) errors.push(`planned test ${index}/${planned} has no terminal result`);
 		else if (started) {
 			const result = results.get(index);
 			// Failure diagnostics follow the full name. Splitting on the delimiter
 			// would truncate legitimate names that contain the same punctuation.
-			const matchesName = result.detail === started.name
-				|| (result.status === 'not ok' && result.detail.startsWith(`${started.name} — `));
-			if (!matchesName) errors.push(`result ordinal ${index} does not match RUNNING name ${JSON.stringify(started.name)}`);
+			const matchesName =
+				result.detail === started.name ||
+				(result.status === 'not ok' && result.detail.startsWith(`${started.name} — `));
+			if (!matchesName)
+				errors.push(
+					`result ordinal ${index} does not match RUNNING name ${JSON.stringify(started.name)}`
+				);
 		}
-		if (hasTiming && !durations.has(index)) errors.push(`planned test ${index}/${planned} has no duration`);
+		if (hasTiming && !durations.has(index))
+			errors.push(`planned test ${index}/${planned} has no duration`);
 	}
 	for (const index of running.keys()) {
-		if (index < 1 || index > planned) errors.push(`RUNNING ordinal ${index} is outside plan 1..${planned}`);
+		if (index < 1 || index > planned)
+			errors.push(`RUNNING ordinal ${index} is outside plan 1..${planned}`);
 	}
 	for (const index of results.keys()) {
-		if (index < 1 || index > planned) errors.push(`result ordinal ${index} is outside plan 1..${planned}`);
+		if (index < 1 || index > planned)
+			errors.push(`result ordinal ${index} is outside plan 1..${planned}`);
 	}
 	for (const index of durations.keys()) {
-		if (index < 1 || index > planned) errors.push(`duration ordinal ${index} is outside plan 1..${planned}`);
+		if (index < 1 || index > planned)
+			errors.push(`duration ordinal ${index} is outside plan 1..${planned}`);
 	}
 
 	const observedPassed = [...results.values()].filter((entry) => entry.status === 'ok').length;
@@ -92,28 +105,42 @@ function validateAhkSuiteManifest(source) {
 	if (footers.length === 1) {
 		const footer = footers[0];
 		if (footer.passed !== observedPassed || footer.failed !== observedFailed) {
-			errors.push(`footer ${footer.passed}/${footer.failed} disagrees with results ${observedPassed}/${observedFailed}`);
+			errors.push(
+				`footer ${footer.passed}/${footer.failed} disagrees with results ${observedPassed}/${observedFailed}`
+			);
 		}
 		if (footer.passed + footer.failed !== planned) {
 			errors.push(`footer covers ${footer.passed + footer.failed} tests, expected ${planned}`);
 		}
 	}
 
-	const executed = [...results.entries()].sort((a, b) => a[0] - b[0]).map(([index, result]) => ({
-		index,
-		name: running.has(index) ? running.get(index).name : '',
-		status: result.status,
-		duration_ms: durations.has(index) ? durations.get(index) : null,
-	}));
-	return { complete: errors.length === 0, planned, executed_count: results.size, timed_count: durations.size,
-		passed: observedPassed, failed: observedFailed, executed, errors };
+	const executed = [...results.entries()]
+		.sort((a, b) => a[0] - b[0])
+		.map(([index, result]) => ({
+			index,
+			name: running.has(index) ? running.get(index).name : '',
+			status: result.status,
+			duration_ms: durations.has(index) ? durations.get(index) : null
+		}));
+	return {
+		complete: errors.length === 0,
+		planned,
+		executed_count: results.size,
+		timed_count: durations.size,
+		passed: observedPassed,
+		failed: observedFailed,
+		executed,
+		errors
+	};
 }
 
 function main(argv) {
 	const inputIndex = argv.indexOf('--input');
 	const jsonIndex = argv.indexOf('--json');
 	if (inputIndex < 0 || !argv[inputIndex + 1]) {
-		console.error('Usage: node validate-ahk-suite-manifest.cjs --input <tap-file> [--json <manifest-file>]');
+		console.error(
+			'Usage: node validate-ahk-suite-manifest.cjs --input <tap-file> [--json <manifest-file>]'
+		);
 		return 2;
 	}
 	const input = argv[inputIndex + 1];
@@ -129,11 +156,15 @@ function main(argv) {
 		fs.writeFileSync(argv[jsonIndex + 1], `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 	}
 	if (!manifest.complete) {
-		console.error(`AHK execution manifest incomplete (${manifest.executed_count}/${manifest.planned}).`);
+		console.error(
+			`AHK execution manifest incomplete (${manifest.executed_count}/${manifest.planned}).`
+		);
 		for (const error of manifest.errors.slice(0, 20)) console.error(`  - ${error}`);
 		return 1;
 	}
-	console.log(`AHK execution manifest complete: ${manifest.executed_count}/${manifest.planned} terminal results.`);
+	console.log(
+		`AHK execution manifest complete: ${manifest.executed_count}/${manifest.planned} terminal results.`
+	);
 	return 0;
 }
 

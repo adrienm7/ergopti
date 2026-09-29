@@ -98,7 +98,9 @@ const trees = new Map(DRIVERS.map((d) => [d, treeOf(d)]));
 const errors = [];
 for (const [d, t] of trees) {
 	if (t.size === 0) {
-		errors.push(`${d}/ produced no directories — the walk is broken, and a ratchet over nothing passes forever`);
+		errors.push(
+			`${d}/ produced no directories — the walk is broken, and a ratchet over nothing passes forever`
+		);
 	}
 }
 

@@ -154,7 +154,7 @@ for (const [driver, spec] of Object.entries(DRIVERS)) {
 		errors.push(
 			`${driver}: ${readers.length} file(s) read ${MANIFEST_FILE} (baseline ${BASELINE[driver]}):\n` +
 				readers.map((r) => '        ' + r).join('\n') +
-				'\n      Route the extra one through the driver\'s existing manifest accessor. A second ' +
+				"\n      Route the extra one through the driver's existing manifest accessor. A second " +
 				'reader is almost never added deliberately — it arrives as a fallback beside the first, ' +
 				'which is exactly how macOS ended up with three.'
 		);

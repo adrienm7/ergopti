@@ -52,7 +52,7 @@ const RETIRED = [
 	'menu.hotstrings.category_off',
 	'menu.hotstrings.enable_all"',
 	"menu.hotstrings.enable_all'",
-	'menu.hotstrings.disable_all',
+	'menu.hotstrings.disable_all'
 ];
 
 // The key fragments a driver could build a retired key from at run time, the
@@ -62,7 +62,7 @@ const RETIRED_FRAGMENTS = [
 	'key = "enable_all"',
 	'key = "disable_all"',
 	'"hotstrings_enable_all"',
-	'"hotstrings_disable_all"',
+	'"hotstrings_disable_all"'
 ];
 
 // Each driver: the one helper that draws the « all sections » checkbox (it must
@@ -73,36 +73,40 @@ const DRIVERS = [
 		helper: {
 			file: 'windows/ui/menu/menu_hotstring_switches.ahk',
 			from: '_HS_AllSectionsRow(AllOn, Apply) {',
-			to: '\n}',
+			to: '\n}'
 		},
 		call: '_HS_AllSectionsRow(',
 		files: [
 			'windows/ui/menu/menu_hotstring_switches.ahk',
 			'windows/ui/menu/menu_submenus.ahk',
 			'windows/ui/menu/menu_hotstrings.ahk',
-			'windows/ui/menu/menu_init.ahk',
-		],
+			'windows/ui/menu/menu_init.ahk'
+		]
 	},
 	{
 		driver: 'macos',
 		helper: {
 			file: 'macos/ui/menu/menu_hotstrings_custom.lua',
 			from: 'function M.all_sections_row(',
-			to: '\nend',
+			to: '\nend'
 		},
 		call: 'all_sections_row(',
 		files: [
 			'macos/ui/menu/menu_hotstrings.lua',
 			'macos/ui/menu/menu_hotstrings_custom.lua',
-			'macos/ui/menu/builder.lua',
-		],
+			'macos/ui/menu/builder.lua'
+		]
 	},
 	{
 		driver: 'linux',
-		helper: { file: 'linux/ui/menu/menu_builder.lua', from: 'local function all_sections_row(ids)', to: '\n\tend' },
+		helper: {
+			file: 'linux/ui/menu/menu_builder.lua',
+			from: 'local function all_sections_row(ids)',
+			to: '\n\tend'
+		},
 		call: 'all_sections_row(',
-		files: ['linux/ui/menu/menu_builder.lua'],
-	},
+		files: ['linux/ui/menu/menu_builder.lua']
+	}
 ];
 
 // Each driver's category-submenu builder, delimited by two literals unique to it.
@@ -111,20 +115,20 @@ const CATEGORY_REGIONS = [
 		driver: 'windows',
 		file: 'windows/ui/menu/menu_hotstring_switches.ahk',
 		from: '_HS_CategoryHeadRows(V1Cat, V2Section, TomlPath) {',
-		to: '\treturn Rows\n}',
+		to: '\treturn Rows\n}'
 	},
 	{
 		driver: 'macos',
 		file: 'macos/ui/menu/menu_hotstrings.lua',
 		from: 'local sec_menu = {}',
-		to: 'item.items = sec_menu',
+		to: 'item.items = sec_menu'
 	},
 	{
 		driver: 'linux',
 		file: 'linux/ui/menu/menu_builder.lua',
 		from: 'local function category_submenu(id)',
-		to: 'items    = sub,',
-	},
+		to: 'items    = sub,'
+	}
 ];
 
 // Each driver's language-submenu builder: one « toutes les sections » checkbox
@@ -137,20 +141,20 @@ const LANGUAGE_REGIONS = [
 		to: 'Rows.Push(Map(\n\t\t\t"label", HotstringsLanguageName',
 		// The language checkbox has a builder of its own here, which the unit
 		// harness can reach; it draws the row through _HS_AllSectionsRow.
-		call: '_HS_LanguageSwitchRow(',
+		call: '_HS_LanguageSwitchRow('
 	},
 	{
 		driver: 'macos',
 		file: 'macos/ui/menu/menu_hotstrings.lua',
 		from: 'function M.build_language_bulk_actions(',
-		to: 'local _mgmt = require',
+		to: 'local _mgmt = require'
 	},
 	{
 		driver: 'linux',
 		file: 'linux/ui/menu/menu_builder.lua',
 		from: 'local function language_rows()',
-		to: 'label = string.format("%s (%d)", language_label(pack.locale), total)',
-	},
+		to: 'label = string.format("%s (%d)", language_label(pack.locale), total)'
+	}
 ];
 
 const errors = [];
@@ -164,7 +168,9 @@ const errors = [];
 function read(driver, file) {
 	const full = path.join(SP, file);
 	if (!fs.existsSync(full)) {
-		errors.push(`${driver}: ${file} is gone — this gate compares nothing until the anchor is updated`);
+		errors.push(
+			`${driver}: ${file} is gone — this gate compares nothing until the anchor is updated`
+		);
 		return null;
 	}
 	return fs.readFileSync(full, 'utf8');
@@ -236,7 +242,10 @@ for (const region of CATEGORY_REGIONS) {
 			);
 		}
 	}
-	const actual = [...seen].sort((a, b) => a.at - b.at).map((s) => s.token).join(' → ');
+	const actual = [...seen]
+		.sort((a, b) => a.at - b.at)
+		.map((s) => s.token)
+		.join(' → ');
 	const wanted = seen.map((s) => s.token).join(' → ');
 	if (actual !== wanted) {
 		errors.push(
@@ -252,14 +261,20 @@ for (const region of LANGUAGE_REGIONS) {
 	if (text === null) continue;
 	regions += 1;
 	if (!text.includes(region.call || byDriver.get(region.driver).call)) {
-		errors.push(`${region.driver}: the language submenu never opens with the « all sections » checkbox`);
+		errors.push(
+			`${region.driver}: the language submenu never opens with the « all sections » checkbox`
+		);
 	}
 }
 
 const expected =
-	DRIVERS.reduce((n, d) => n + 1 + d.files.length, 0) + CATEGORY_REGIONS.length + LANGUAGE_REGIONS.length;
+	DRIVERS.reduce((n, d) => n + 1 + d.files.length, 0) +
+	CATEGORY_REGIONS.length +
+	LANGUAGE_REGIONS.length;
 if (regions < expected && errors.length === 0) {
-	errors.push(`only ${regions} of ${expected} region(s) were read — the gate compared less than it claims`);
+	errors.push(
+		`only ${regions} of ${expected} region(s) were read — the gate compared less than it claims`
+	);
 }
 
 if (errors.length > 0) {

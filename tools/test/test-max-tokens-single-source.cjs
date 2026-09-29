@@ -34,7 +34,15 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 
 // The single source of truth for the default output-token budget.
-const SSOT_FILE = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'core', 'domain', 'PromptBuilder.js');
+const SSOT_FILE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'domain',
+	'PromptBuilder.js'
+);
 
 // Backend adapters that must defer to the shared constant for their default.
 const ADAPTERS = [
@@ -57,9 +65,18 @@ const SHARED_REF_RE = /PB_DEFAULT_MAX_TOKENS|SharedPromptBuilder\.DEFAULT_MAX_TO
 //   AHK body fallback:    ... ? Integer(max_tokens) : 150
 //   Lua fallback:         tonumber(opts.max_tokens) or 50
 const FORBIDDEN = [
-	{ re: /max_tokens\s*:=\s*\d+/g, why: 'AHK param default literal (use the "" sentinel + PB_DEFAULT_MAX_TOKENS)' },
-	{ re: /Integer\(\s*max_tokens\s*\)\s*:\s*\d+/g, why: 'AHK body fallback literal (use : PB_DEFAULT_MAX_TOKENS)' },
-	{ re: /tonumber\([^)\n]*max_tokens[^)\n]*\)\s*or\s*\d+/g, why: 'Lua fallback literal (use or SharedPromptBuilder.DEFAULT_MAX_TOKENS)' }
+	{
+		re: /max_tokens\s*:=\s*\d+/g,
+		why: 'AHK param default literal (use the "" sentinel + PB_DEFAULT_MAX_TOKENS)'
+	},
+	{
+		re: /Integer\(\s*max_tokens\s*\)\s*:\s*\d+/g,
+		why: 'AHK body fallback literal (use : PB_DEFAULT_MAX_TOKENS)'
+	},
+	{
+		re: /tonumber\([^)\n]*max_tokens[^)\n]*\)\s*or\s*\d+/g,
+		why: 'Lua fallback literal (use or SharedPromptBuilder.DEFAULT_MAX_TOKENS)'
+	}
 ];
 
 /**
@@ -75,7 +92,9 @@ function readSsotDefault() {
 
 const ssot = readSsotDefault();
 if (ssot === null) {
-	console.error('\x1b[31m[ERROR] Could not read DEFAULT_MAX_TOKENS from the domain SSoT (PromptBuilder.js).\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Could not read DEFAULT_MAX_TOKENS from the domain SSoT (PromptBuilder.js).\x1b[0m'
+	);
 	process.exit(1);
 }
 
@@ -101,16 +120,22 @@ for (const rel of ADAPTERS) {
 }
 
 if (violations.length > 0 || missingRef.length > 0) {
-	console.error(`\x1b[31m[ERROR] max_tokens default must come from the single shared source (DEFAULT_MAX_TOKENS = ${ssot}).\x1b[0m`);
+	console.error(
+		`\x1b[31m[ERROR] max_tokens default must come from the single shared source (DEFAULT_MAX_TOKENS = ${ssot}).\x1b[0m`
+	);
 	if (violations.length > 0) {
 		console.error('  Literal max_tokens default/fallback found in a backend adapter:');
 		for (const v of violations) console.error('    ' + v);
 	}
 	if (missingRef.length > 0) {
-		console.error('  Adapter no longer references the shared constant (default resolution deleted?):');
+		console.error(
+			'  Adapter no longer references the shared constant (default resolution deleted?):'
+		);
 		for (const f of missingRef) console.error('    ' + f);
 	}
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] No literal max_tokens defaults — all ${ADAPTERS.length} backend adapters defer to the shared DEFAULT_MAX_TOKENS (${ssot}).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] No literal max_tokens defaults — all ${ADAPTERS.length} backend adapters defer to the shared DEFAULT_MAX_TOKENS (${ssot}).\x1b[0m`
+);

@@ -57,7 +57,13 @@ for (const g of GENERATORS) {
 	} catch (err) {
 		console.error(`  \x1b[31mFAILED\x1b[0m  ${g.script}`);
 		const out = (err.stdout && err.stdout.toString()) + (err.stderr && err.stderr.toString());
-		console.error(out.trim().split('\n').map((l) => '      ' + l).join('\n'));
+		console.error(
+			out
+				.trim()
+				.split('\n')
+				.map((l) => '      ' + l)
+				.join('\n')
+		);
 		failed++;
 	}
 }

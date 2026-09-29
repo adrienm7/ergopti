@@ -74,8 +74,8 @@ for (const abs of collectAhk(WIN, [])) {
 if (!(modelHits.length === 1 && modelHits[0] === MODEL_SSOT)) {
 	errors.push(
 		`The LLM model literal "${MODEL_LITERAL}" must appear in exactly one production file ` +
-		`(${MODEL_SSOT}); found in: ${modelHits.join(', ') || '(none — SSoT deleted?)'}. ` +
-		`Route fallbacks through _LLM_LOCAL_DEFAULTS["llm_model"].`
+			`(${MODEL_SSOT}); found in: ${modelHits.join(', ') || '(none — SSoT deleted?)'}. ` +
+			`Route fallbacks through _LLM_LOCAL_DEFAULTS["llm_model"].`
 	);
 }
 
@@ -84,7 +84,7 @@ const gptSrc = stripComments(fs.readFileSync(path.join(WIN, GPT_FILE), 'utf8'));
 if (gptSrc.includes(GPT_LITERAL)) {
 	errors.push(
 		`The GPT link literal "${GPT_LITERAL}" must not be hardcoded in ${GPT_FILE}; ` +
-		`read it from the manifest-backed Features["shortcuts"]["gpt"]["link"].`
+			`read it from the manifest-backed Features["shortcuts"]["gpt"]["link"].`
 	);
 }
 

@@ -46,7 +46,9 @@ function walk(dir, acc = []) {
 	return acc;
 }
 
-const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' })
+	.split('\n')
+	.filter(Boolean);
 // `git ls-files` reports the INDEX, so a file deleted on disk but not yet staged
 // is listed and unreadable. Reading it unguarded made this gate die with ENOENT
 // halfway through deleting a superseded test — a crash where a finding belongs,
@@ -54,14 +56,16 @@ const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' }).split(
 // reference a runner, so skipping it is also the right answer.
 const runners = walk(TESTS);
 if (runners.length === 0) {
-	console.error('\x1b[31m[ERROR] no run_*/bench_* file found under windows/tests — the walk is broken, not the tree.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] no run_*/bench_* file found under windows/tests — the walk is broken, not the tree.\x1b[0m'
+	);
 	process.exit(1);
 }
 
 const subjects = runners.map((abs) => ({
 	base: path.basename(abs),
 	rel: path.relative(ROOT, abs).replace(/\\/g, '/'),
-	referenced: false,
+	referenced: false
 }));
 // Retain only runner metadata, not every tracked text in the repository. Keep
 // reading after all references are found so unreadable inputs still fail fast.
@@ -78,7 +82,9 @@ for (const file of tracked) {
 const orphans = subjects.filter((subject) => !subject.referenced).map((subject) => subject.rel);
 
 if (orphans.length > 0) {
-	console.error(`\x1b[31m[ERROR] ${orphans.length} AHK runner(s) are referenced by nothing — nothing invokes them.\x1b[0m`);
+	console.error(
+		`\x1b[31m[ERROR] ${orphans.length} AHK runner(s) are referenced by nothing — nothing invokes them.\x1b[0m`
+	);
 	console.error(
 		'  A runner nobody runs holds tests that never execute and drifts out of the code it\n' +
 			'  stubs, silently. Reference it from CI, from an npm script, or from a doc that says\n' +
@@ -88,4 +94,6 @@ if (orphans.length > 0) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] All ${runners.length} AHK runner(s) under windows/tests are referenced.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] All ${runners.length} AHK runner(s) under windows/tests are referenced.\x1b[0m`
+);

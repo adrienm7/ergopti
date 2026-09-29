@@ -43,7 +43,10 @@ const {
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = fs.readFileSync(path.join(SP, '_shared', 'modules', 'actions', 'actions.toml'), 'utf8');
+const SOURCE = fs.readFileSync(
+	path.join(SP, '_shared', 'modules', 'actions', 'actions.toml'),
+	'utf8'
+);
 const LOCALES = path.join(SP, '_shared', 'data', 'locales');
 
 const errors = [];
@@ -72,7 +75,10 @@ function rejects(label, source, pattern) {
 	} catch (err) {
 		message = err.message;
 	}
-	check(message !== null, `${label}: the generator accepted it — a field nothing reads would be dropped silently`);
+	check(
+		message !== null,
+		`${label}: the generator accepted it — a field nothing reads would be dropped silently`
+	);
 	if (message !== null) check(pattern.test(message), `${label}: wrong refusal "${message}"`);
 }
 
@@ -88,30 +94,89 @@ function mutate(from, to) {
 }
 
 // 1. Strictness.
-rejects('unknown field', mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "hs"\nrequire_hs = ["x"]'), /unknown field "require_hs"/);
-rejects('unknown platform', mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "mac"'), /unknown platform "mac"/);
-rejects('unknown parameter kind', mutate('parameter = "url"', 'parameter = "uri"'), /unknown parameter kind/);
-rejects('requirement token no driver probes', mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "hs"\nrequires_hs = ["tool:osascript"]'), /no hs probe/);
-rejects('requirement for an unclaimed platform', mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "hs"\nrequires_linux = ["session:x11"]'), /does not claim linux/);
-rejects('ordered id without a table', mutate('    "lookup",\n', '    "lookup",\n    "ghost_action",\n'), /"ghost_action" has no table/);
-rejects('declared id never ordered', mutate('    "lookup",\n', ''), /"lookup" is declared but never ordered/);
-rejects('confirm must be boolean', mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "hs"\nconfirm = "yes"'), /confirm must be a boolean/);
+rejects(
+	'unknown field',
+	mutate(
+		'[sg_actions.lookup]\nplatform = "hs"',
+		'[sg_actions.lookup]\nplatform = "hs"\nrequire_hs = ["x"]'
+	),
+	/unknown field "require_hs"/
+);
+rejects(
+	'unknown platform',
+	mutate('[sg_actions.lookup]\nplatform = "hs"', '[sg_actions.lookup]\nplatform = "mac"'),
+	/unknown platform "mac"/
+);
+rejects(
+	'unknown parameter kind',
+	mutate('parameter = "url"', 'parameter = "uri"'),
+	/unknown parameter kind/
+);
+rejects(
+	'requirement token no driver probes',
+	mutate(
+		'[sg_actions.lookup]\nplatform = "hs"',
+		'[sg_actions.lookup]\nplatform = "hs"\nrequires_hs = ["tool:osascript"]'
+	),
+	/no hs probe/
+);
+rejects(
+	'requirement for an unclaimed platform',
+	mutate(
+		'[sg_actions.lookup]\nplatform = "hs"',
+		'[sg_actions.lookup]\nplatform = "hs"\nrequires_linux = ["session:x11"]'
+	),
+	/does not claim linux/
+);
+rejects(
+	'ordered id without a table',
+	mutate('    "lookup",\n', '    "lookup",\n    "ghost_action",\n'),
+	/"ghost_action" has no table/
+);
+rejects(
+	'declared id never ordered',
+	mutate('    "lookup",\n', ''),
+	/"lookup" is declared but never ordered/
+);
+rejects(
+	'confirm must be boolean',
+	mutate(
+		'[sg_actions.lookup]\nplatform = "hs"',
+		'[sg_actions.lookup]\nplatform = "hs"\nconfirm = "yes"'
+	),
+	/confirm must be a boolean/
+);
 
 // 2. The committed files are exactly what the generator produces.
 const generated = generate(SOURCE);
 for (const [platform, out] of Object.entries(generated)) {
 	const onDisk = fs.readFileSync(path.join(ROOT, OUTPUTS[platform]), 'utf8');
-	check(onDisk === out.text, `${OUTPUTS[platform]} is stale — run npm run codegen:action-catalogue`);
+	check(
+		onDisk === out.text,
+		`${OUTPUTS[platform]} is stale — run npm run codegen:action-catalogue`
+	);
 }
 
 // 3. Filtering, empty-heading pruning and metadata.
 const models = Object.fromEntries(Object.entries(generated).map(([k, v]) => [k, v.model]));
 const ids = (m) => m.sgItems.filter((i) => i.kind === 'action').map((i) => i.id);
-check(ids(models.ahk).length >= 90, `ahk lists only ${ids(models.ahk).length} action(s) — the walk collapsed`);
-check(ids(models.hs).length >= 90, `hs lists only ${ids(models.hs).length} action(s) — the walk collapsed`);
-check(ids(models.linux).length >= 60, `linux lists only ${ids(models.linux).length} action(s) — the walk collapsed`);
+check(
+	ids(models.ahk).length >= 90,
+	`ahk lists only ${ids(models.ahk).length} action(s) — the walk collapsed`
+);
+check(
+	ids(models.hs).length >= 90,
+	`hs lists only ${ids(models.hs).length} action(s) — the walk collapsed`
+);
+check(
+	ids(models.linux).length >= 60,
+	`linux lists only ${ids(models.linux).length} action(s) — the walk collapsed`
+);
 check(ids(models.ahk).includes('copy') && !ids(models.hs).includes('copy'), 'copy is Windows-only');
-check(ids(models.hs).includes('lookup') && !ids(models.linux).includes('lookup'), 'lookup is macOS-only');
+check(
+	ids(models.hs).includes('lookup') && !ids(models.linux).includes('lookup'),
+	'lookup is macOS-only'
+);
 const navKey = HEADER_KEY_PREFIX + 'navigation';
 const hasHeading = (m, key) => m.sgItems.some((i) => i.kind === 'heading' && i.key === key);
 check(hasHeading(models.ahk, navKey), 'Windows keeps the Navigation heading over its two rows');
@@ -122,24 +187,47 @@ for (const [platform, m] of Object.entries(models)) {
 		const item = m.sgItems[i];
 		if (item.kind !== 'heading') continue;
 		const next = m.sgItems[i + 1];
-		check(next !== undefined && !(next.kind === 'heading' && next.level <= item.level),
-			`${platform}: heading ${item.key} has nothing under it`);
+		check(
+			next !== undefined && !(next.kind === 'heading' && next.level <= item.level),
+			`${platform}: heading ${item.key} has nothing under it`
+		);
 	}
 	const chords = m.sgItems.filter((i) => i.kind === 'modifier_chords');
-	check(chords.length === 1 && chords[0].groupKey === CHORD_GROUP_KEY && chords[0].level === 2,
-		`${platform}: exactly one level-2 modifier-chord block keyed on ${CHORD_GROUP_KEY}`);
-	check(m.actions.open_url && m.actions.open_url.parameter === 'url', `${platform}: open_url keeps its url parameter`);
-	check(m.actions.search_web && m.actions.search_web.parameter === 'search_url',
-		`${platform}: search_web keeps its search_url parameter`);
-	for (const id of ids(m)) check(Boolean(m.actions[id]), `${platform}: listed "${id}" has no metadata`);
+	check(
+		chords.length === 1 && chords[0].groupKey === CHORD_GROUP_KEY && chords[0].level === 2,
+		`${platform}: exactly one level-2 modifier-chord block keyed on ${CHORD_GROUP_KEY}`
+	);
+	check(
+		m.actions.open_url && m.actions.open_url.parameter === 'url',
+		`${platform}: open_url keeps its url parameter`
+	);
+	check(
+		m.actions.search_web && m.actions.search_web.parameter === 'search_url',
+		`${platform}: search_web keeps its search_url parameter`
+	);
+	for (const id of ids(m))
+		check(Boolean(m.actions[id]), `${platform}: listed "${id}" has no metadata`);
 }
-check(models.hs.axItems.length >= 10 && models.ahk.axItems.length === 0 && models.linux.axItems.length === 0,
-	'only macOS dispatches an axis, so only its catalogue may list one');
-check(JSON.stringify(models.linux.actions.left_click_toggle.requires) === JSON.stringify(['session:x11', 'tool:xdotool']),
-	'Linux left_click_toggle carries its requirements');
+check(
+	models.hs.axItems.length >= 10 &&
+		models.ahk.axItems.length === 0 &&
+		models.linux.axItems.length === 0,
+	'only macOS dispatches an axis, so only its catalogue may list one'
+);
+check(
+	JSON.stringify(models.linux.actions.left_click_toggle.requires) ===
+		JSON.stringify(['session:x11', 'tool:xdotool']),
+	'Linux left_click_toggle carries its requirements'
+);
 check(!models.ahk.actions.left_click_toggle.requires, 'requirements stay per-OS');
-check(models.hs.karabinerAliases && models.hs.karabinerAliases.return === 'enter', 'macOS keeps the Karabiner aliases');
-check(models.linux.slots && models.linux.slots.single.includes('tap_3'), 'Linux carries the gesture slot-space');
+check(
+	models.hs.karabinerAliases && models.hs.karabinerAliases.return === 'enter',
+	'macOS keeps the Karabiner aliases'
+);
+check(
+	models.linux.slots && models.linux.slots.single.includes('tap_3'),
+	'Linux carries the gesture slot-space'
+);
 
 // 4. Every heading and label key resolves in every locale, and none is French
 //    outside fr.json.
@@ -156,13 +244,18 @@ for (const f of localeFiles) {
 	const strings = JSON.parse(fs.readFileSync(path.join(LOCALES, f), 'utf8'));
 	for (const key of keys) {
 		const value = strings[key];
-		check(typeof value === 'string' && value.replace(/^#+/, '').trim() !== '', `${code}: "${key}" has no value`);
+		check(
+			typeof value === 'string' && value.replace(/^#+/, '').trim() !== '',
+			`${code}: "${key}" has no value`
+		);
 		if (typeof value === 'string' && code !== 'fr' && key.startsWith(HEADER_KEY_PREFIX)) {
 			check(!/Raccourcis/.test(value), `${code}: heading "${key}" is French ("${value}")`);
 		}
 	}
-	check(typeof strings[CHORD_GROUP_KEY] === 'string' && strings[CHORD_GROUP_KEY].includes('{1}'),
-		`${code}: ${CHORD_GROUP_KEY} must place the modifier label with {1}`);
+	check(
+		typeof strings[CHORD_GROUP_KEY] === 'string' && strings[CHORD_GROUP_KEY].includes('{1}'),
+		`${code}: ${CHORD_GROUP_KEY} must place the modifier label with {1}`
+	);
 }
 check(!/"#+Raccourcis/.test(SOURCE), 'actions.toml must not carry a literal French heading');
 
@@ -176,18 +269,31 @@ const PARITY_TESTS = [
 ];
 for (const rel of PARITY_TESTS) {
 	const abs = path.join(SP, rel);
-	check(fs.existsSync(abs) && fs.readFileSync(abs, 'utf8').includes(PARITY_SLUG),
-		`${rel} must carry the runtime catalogue parity test ${PARITY_SLUG}`);
+	check(
+		fs.existsSync(abs) && fs.readFileSync(abs, 'utf8').includes(PARITY_SLUG),
+		`${rel} must carry the runtime catalogue parity test ${PARITY_SLUG}`
+	);
 }
 const runAll = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
-check(/^#Include unit\/test_gestures\.ahk$/m.test(runAll), 'run_all.ahk must include unit/test_gestures.ahk');
+check(
+	/^#Include unit\/test_gestures\.ahk$/m.test(runAll),
+	'run_all.ahk must include unit/test_gestures.ahk'
+);
 
 // 6. The website reads the same canonical registry.
-const SITE_LOADER = fs.readFileSync(path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'), 'utf8');
-check(/ACTIONS_ROOT[\s\S]*?modules[/\\]actions/.test(SITE_LOADER)
-	&& /resolve\(ACTIONS_ROOT,\s*'actions\.toml'\)/.test(SITE_LOADER),
-	'the Ergopti+ site must read the canonical modules/actions/actions.toml registry');
-check(!/modules[/\\]gestures/.test(SITE_LOADER), 'the Ergopti+ site still reads the retired shared modules/gestures path');
+const SITE_LOADER = fs.readFileSync(
+	path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'),
+	'utf8'
+);
+check(
+	/ACTIONS_ROOT[\s\S]*?modules[/\\]actions/.test(SITE_LOADER) &&
+		/resolve\(ACTIONS_ROOT,\s*'actions\.toml'\)/.test(SITE_LOADER),
+	'the Ergopti+ site must read the canonical modules/actions/actions.toml registry'
+);
+check(
+	!/modules[/\\]gestures/.test(SITE_LOADER),
+	'the Ergopti+ site still reads the retired shared modules/gestures path'
+);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] action catalogue codegen:\x1b[0m');

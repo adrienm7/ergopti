@@ -24,41 +24,41 @@ let total_pass = 0;
 let total_fail = 0;
 
 function check(label, file, pattern) {
-    const filePath = path.join(REPO_ROOT, file);
-    try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        if (pattern.test(content)) {
-            total_pass++;
-            console.log(`  ${PASS_SYMBOL}  ${label}`);
-        } else {
-            total_fail++;
-            console.log(`  ${FAIL_SYMBOL}  ${label}`);
-            console.log(`       Violation: Pattern not found in ${file}`);
-        }
-    } catch (err) {
-        total_fail++;
-        console.log(`  ${FAIL_SYMBOL}  ${label}`);
-        console.log(`       Error: ${err.message}`);
-    }
+	const filePath = path.join(REPO_ROOT, file);
+	try {
+		const content = fs.readFileSync(filePath, 'utf8');
+		if (pattern.test(content)) {
+			total_pass++;
+			console.log(`  ${PASS_SYMBOL}  ${label}`);
+		} else {
+			total_fail++;
+			console.log(`  ${FAIL_SYMBOL}  ${label}`);
+			console.log(`       Violation: Pattern not found in ${file}`);
+		}
+	} catch (err) {
+		total_fail++;
+		console.log(`  ${FAIL_SYMBOL}  ${label}`);
+		console.log(`       Error: ${err.message}`);
+	}
 }
 
 function checkNegative(label, file, pattern) {
-    const filePath = path.join(REPO_ROOT, file);
-    try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        if (!pattern.test(content)) {
-            total_pass++;
-            console.log(`  ${PASS_SYMBOL}  ${label}`);
-        } else {
-            total_fail++;
-            console.log(`  ${FAIL_SYMBOL}  ${label}`);
-            console.log(`       Violation: Forbidden pattern FOUND in ${file}`);
-        }
-    } catch (err) {
-        total_fail++;
-        console.log(`  ${FAIL_SYMBOL}  ${label}`);
-        console.log(`       Error: ${err.message}`);
-    }
+	const filePath = path.join(REPO_ROOT, file);
+	try {
+		const content = fs.readFileSync(filePath, 'utf8');
+		if (!pattern.test(content)) {
+			total_pass++;
+			console.log(`  ${PASS_SYMBOL}  ${label}`);
+		} else {
+			total_fail++;
+			console.log(`  ${FAIL_SYMBOL}  ${label}`);
+			console.log(`       Violation: Forbidden pattern FOUND in ${file}`);
+		}
+	} catch (err) {
+		total_fail++;
+		console.log(`  ${FAIL_SYMBOL}  ${label}`);
+		console.log(`       Error: ${err.message}`);
+	}
 }
 
 console.log('\n=== Hammerspoon Code Integrity Validation ===');
@@ -68,40 +68,36 @@ console.log('\n=== Hammerspoon Code Integrity Validation ===');
 // read — the drag-protect guard it claimed to provide was never wired). It was
 // removed entirely, so it must NOT reappear in any form (local OR global leak).
 checkNegative(
-    'Gestures Actions: dead gestureInProgress flag stays removed',
-    'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
-    /gestureInProgress/
+	'Gestures Actions: dead gestureInProgress flag stays removed',
+	'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
+	/gestureInProgress/
 );
 
 // --- Initialization Audit ---
 check(
-    'Init: locale trigger provider is wired',
-    'static/ergopti_plus/macos/init.lua',
-    /locale_mod\.set_trigger_provider/
+	'Init: locale trigger provider is wired',
+	'static/ergopti_plus/macos/init.lua',
+	/locale_mod\.set_trigger_provider/
 );
 
 check(
-    'Keymap: exposes get_trigger_char',
-    'static/ergopti_plus/macos/modules/keymap/init.lua',
-    /function M\.get_trigger_char\(\)/
+	'Keymap: exposes get_trigger_char',
+	'static/ergopti_plus/macos/modules/keymap/init.lua',
+	/function M\.get_trigger_char\(\)/
 );
 
 // --- Resource Management Audit (M.stop) ---
 const modulesWithStop = [
-    'static/ergopti_plus/macos/modules/gestures/init.lua',
-    'static/ergopti_plus/macos/modules/keymap/init.lua',
-    'static/ergopti_plus/macos/modules/shortcuts/init.lua',
-    'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua',
-    'static/ergopti_plus/macos/modules/shortcuts/script_control.lua',
-    'static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua',
+	'static/ergopti_plus/macos/modules/gestures/init.lua',
+	'static/ergopti_plus/macos/modules/keymap/init.lua',
+	'static/ergopti_plus/macos/modules/shortcuts/init.lua',
+	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua',
+	'static/ergopti_plus/macos/modules/shortcuts/script_control.lua',
+	'static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua'
 ];
 
-modulesWithStop.forEach(f => {
-    check(
-        `Lifecycle: ${f} exposes M.stop(...)`,
-        f,
-        /function M\.stop\([^)]*\)/
-    );
+modulesWithStop.forEach((f) => {
+	check(`Lifecycle: ${f} exposes M.stop(...)`, f, /function M\.stop\([^)]*\)/);
 });
 
 // --- Controlled teardown / native shutdown audit ---
@@ -111,38 +107,38 @@ modulesWithStop.forEach(f => {
 // armed; requiring direct stop calls from that callback would reintroduce the
 // missing-output window guarded by the Lua lifecycle tests.
 check(
-    'Controlled teardown: calls keymap, gestures, and shortcuts stop in order',
-    'static/ergopti_plus/macos/init.lua',
-    /return keymap\.stop\(true\)[\s\S]*return gestures\.stop\(\)[\s\S]*return shortcuts\.stop\(\)/
+	'Controlled teardown: calls keymap, gestures, and shortcuts stop in order',
+	'static/ergopti_plus/macos/init.lua',
+	/return keymap\.stop\(true\)[\s\S]*return gestures\.stop\(\)[\s\S]*return shortcuts\.stop\(\)/
 );
 
 check(
-    'Controlled teardown: drains owners before scheduler/logger finalization',
-    'static/ergopti_plus/macos/init.lua',
-    /local function teardown_all_resources\([^)]*\)[\s\S]*TeardownTransaction\.run\(_local_teardown_state, steps\)[\s\S]*local function finalize_teardown_resources\([^)]*\)[\s\S]*TimerScheduler\.cancelAll\(\)[\s\S]*Logger\.stop_async_sink\(\)[\s\S]*begin_drain\s*=\s*Logger\.begin_async_sink_shutdown[\s\S]*finalize_teardown\s*=\s*finalize_teardown_resources/
+	'Controlled teardown: drains owners before scheduler/logger finalization',
+	'static/ergopti_plus/macos/init.lua',
+	/local function teardown_all_resources\([^)]*\)[\s\S]*TeardownTransaction\.run\(_local_teardown_state, steps\)[\s\S]*local function finalize_teardown_resources\([^)]*\)[\s\S]*TimerScheduler\.cancelAll\(\)[\s\S]*Logger\.stop_async_sink\(\)[\s\S]*begin_drain\s*=\s*Logger\.begin_async_sink_shutdown[\s\S]*finalize_teardown\s*=\s*finalize_teardown_resources/
 );
 
 check(
-    'Termination coordinator: owns the controlled teardown callback',
-    'static/ergopti_plus/macos/init.lua',
-    /TerminationCoordinator\.init\([\s\S]*teardown\s*=\s*teardown_all_resources/
+	'Termination coordinator: owns the controlled teardown callback',
+	'static/ergopti_plus/macos/init.lua',
+	/TerminationCoordinator\.init\([\s\S]*teardown\s*=\s*teardown_all_resources/
 );
 
 check(
-    'Native shutdown: exact-lease handoff remains armed',
-    'static/ergopti_plus/macos/init.lua',
-    /hs\.shutdownCallback\s*=\s*shutdown_all_resources/
+	'Native shutdown: exact-lease handoff remains armed',
+	'static/ergopti_plus/macos/init.lua',
+	/hs\.shutdownCallback\s*=\s*shutdown_all_resources/
 );
 
 // --- Code Quality Audit ---
 check(
-    'Gestures: uses Logger.pcall for frame processing',
-    'static/ergopti_plus/macos/modules/gestures/init.lua',
-    /Logger\.pcall\(LOG, Engine\.process_frame/
+	'Gestures: uses Logger.pcall for frame processing',
+	'static/ergopti_plus/macos/modules/gestures/init.lua',
+	/Logger\.pcall\(LOG, Engine\.process_frame/
 );
 
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);
 
 if (total_fail > 0) {
-    process.exit(1);
+	process.exit(1);
 }

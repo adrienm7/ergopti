@@ -18,8 +18,15 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const PTY_PROCESS_GROUP = path.join(ROOT, 'static', 'ergopti_plus', 'macos',
-	'modules', 'llm', 'pty_process_group.lua');
+const PTY_PROCESS_GROUP = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'modules',
+	'llm',
+	'pty_process_group.lua'
+);
 const PY_CANDIDATES = ['python3', 'python'];
 
 let passed = 0;
@@ -41,8 +48,7 @@ function resolvePython() {
 }
 
 function extractWrapper(source) {
-	const match = source.match(
-		/local WRAPPER_SOURCE = \[\[([\s\S]*?)\n\]\]\n\n--- Removes/);
+	const match = source.match(/local WRAPPER_SOURCE = \[\[([\s\S]*?)\n\]\]\n\n--- Removes/);
 	if (!match) throw new Error('PTY process-group Python wrapper block not found');
 	return match[1];
 }
@@ -157,14 +163,14 @@ finally:
 function runWrapper(python, wrapper, mode = 'term-resistant') {
 	const run = spawnSync(python, ['-c', buildHarness(wrapper, mode)], {
 		cwd: ROOT,
-		encoding: 'utf8',
+		encoding: 'utf8'
 	});
 	if (run.error || run.status !== 0) {
 		throw new Error(`wrapper harness failed: status=${run.status}\n${run.stdout}${run.stderr}`);
 	}
 	return {
 		payload: JSON.parse(run.stdout.trim()),
-		stderr: run.stderr,
+		stderr: run.stderr
 	};
 }
 
@@ -174,24 +180,28 @@ function eventsOf(run, kind) {
 
 function escalationContract(run) {
 	const signals = eventsOf(run, 'killpg').map((event) => event[2]);
-	return run.payload.exit !== 250
-		&& run.payload.alive === false
-		&& run.payload.select_calls <= 40
-		&& JSON.stringify(signals) === JSON.stringify([15, 9])
-		&& eventsOf(run, 'wait').length === 1
-		&& eventsOf(run, 'close').some((event) => event[1] === 10)
-		&& run.stderr.includes('SIGKILL');
+	return (
+		run.payload.exit !== 250 &&
+		run.payload.alive === false &&
+		run.payload.select_calls <= 40 &&
+		JSON.stringify(signals) === JSON.stringify([15, 9]) &&
+		eventsOf(run, 'wait').length === 1 &&
+		eventsOf(run, 'close').some((event) => event[1] === 10) &&
+		run.stderr.includes('SIGKILL')
+	);
 }
 
 function boundedDrainContract(run) {
 	const signals = eventsOf(run, 'killpg').map((event) => event[2]);
-	return run.payload.exit === 124
-		&& run.payload.alive === true
-		&& run.payload.select_calls <= 40
-		&& JSON.stringify(signals) === JSON.stringify([15, 9])
-		&& eventsOf(run, 'wait').length === 0
-		&& eventsOf(run, 'close').some((event) => event[1] === 10)
-		&& run.stderr.includes('drain deadline');
+	return (
+		run.payload.exit === 124 &&
+		run.payload.alive === true &&
+		run.payload.select_calls <= 40 &&
+		JSON.stringify(signals) === JSON.stringify([15, 9]) &&
+		eventsOf(run, 'wait').length === 0 &&
+		eventsOf(run, 'close').some((event) => event[1] === 10) &&
+		run.stderr.includes('drain deadline')
+	);
 }
 
 function replaceExactly(source, before, after) {
@@ -223,29 +233,47 @@ const source = fs.readFileSync(PTY_PROCESS_GROUP, 'utf8');
 const wrapper = extractWrapper(source);
 const run = runWrapper(python, wrapper);
 
-test('a TERM-resistant descendant receives KILL and the wrapper settles',
-	escalationContract(run), JSON.stringify(run));
+test(
+	'a TERM-resistant descendant receives KILL and the wrapper settles',
+	escalationContract(run),
+	JSON.stringify(run)
+);
 
 const stubborn = runWrapper(python, wrapper, 'stubborn-after-kill');
-test('the post-KILL drain has an absolute terminal deadline',
-	boundedDrainContract(stubborn), JSON.stringify(stubborn));
+test(
+	'the post-KILL drain has an absolute terminal deadline',
+	boundedDrainContract(stubborn),
+	JSON.stringify(stubborn)
+);
 
-const noKill = replaceExactly(wrapper,
+const noKill = replaceExactly(
+	wrapper,
 	'        try: os.killpg(proc.pid, signal.SIGKILL)',
-	'        pass  # mutation: TERM-resistant descendants survive');
-test('mutation guard rejects a missing process-group KILL',
-	!escalationContract(runWrapper(python, noKill)));
+	'        pass  # mutation: TERM-resistant descendants survive'
+);
+test(
+	'mutation guard rejects a missing process-group KILL',
+	!escalationContract(runWrapper(python, noKill))
+);
 
-const noHardDeadline = replaceExactly(wrapper,
+const noHardDeadline = replaceExactly(
+	wrapper,
 	'    if kill_sent and kill_deadline is not None and now >= kill_deadline:',
-	'    if False:  # mutation: post-KILL drain is unbounded');
-test('mutation guard rejects a missing post-KILL deadline',
-	!boundedDrainContract(runWrapper(python, noHardDeadline, 'stubborn-after-kill')));
+	'    if False:  # mutation: post-KILL drain is unbounded'
+);
+test(
+	'mutation guard rejects a missing post-KILL deadline',
+	!boundedDrainContract(runWrapper(python, noHardDeadline, 'stubborn-after-kill'))
+);
 
-const noWait = replaceExactly(wrapper,
+const noWait = replaceExactly(
+	wrapper,
 	'    proc.wait()',
-	'    pass  # mutation: the exact group leader is never reaped');
-test('mutation guard rejects a missing exact-leader wait',
-	!escalationContract(runWrapper(python, noWait)));
+	'    pass  # mutation: the exact group leader is never reaped'
+);
+test(
+	'mutation guard rejects a missing exact-leader wait',
+	!escalationContract(runWrapper(python, noWait))
+);
 
 report();

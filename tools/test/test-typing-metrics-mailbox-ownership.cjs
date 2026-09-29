@@ -20,19 +20,46 @@ let failed = 0;
 
 function frontend() {
 	const timers = [];
-	const state = { loading_data: false, range_request_sequence: 0, active_range_request_id: 0,
-		cache_reset_sequence: 0, active_cache_reset_id: 0, cache_reset_watchdog: null, cache_reset_pending_range: null,
-		available_apps: ['Editor'], selected_apps: new Set(['Editor']), app_selection_mode: 'all' };
+	const state = {
+		loading_data: false,
+		range_request_sequence: 0,
+		active_range_request_id: 0,
+		cache_reset_sequence: 0,
+		active_cache_reset_id: 0,
+		cache_reset_watchdog: null,
+		cache_reset_pending_range: null,
+		available_apps: ['Editor'],
+		selected_apps: new Set(['Editor']),
+		app_selection_mode: 'all'
+	};
 	const element = { value: '2026-09-01', innerHTML: '', classList: { add() {}, toggle() {} } };
-	const context = vm.createContext({ app_state: state,
-		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized' }, RANGE_REQUEST_WATCHDOG_MS: 30000,
-		document: { getElementById() { return element; } },
-		setTimeout(fn, delay) { timers.push({ fn, delay }); return timers.length; }, clearTimeout() {}, console });
+	const context = vm.createContext({
+		app_state: state,
+		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized' },
+		RANGE_REQUEST_WATCHDOG_MS: 30000,
+		document: {
+			getElementById() {
+				return element;
+			}
+		},
+		setTimeout(fn, delay) {
+			timers.push({ fn, delay });
+			return timers.length;
+		},
+		clearTimeout() {},
+		console
+	});
 	context.window = context;
 	for (const file of ['data.js', 'filters.js']) {
-		vm.runInContext(fs.readFileSync(path.join(root, '_shared/ui/metrics_typing', file), 'utf8'), context);
+		vm.runInContext(
+			fs.readFileSync(path.join(root, '_shared/ui/metrics_typing', file), 'utf8'),
+			context
+		);
 	}
-	vm.runInContext('compute_manifest_metrics=function(){};apply_default_date_range=function(){};update_app_btn_text=function(){};', context);
+	vm.runInContext(
+		'compute_manifest_metrics=function(){};apply_default_date_range=function(){};update_app_btn_text=function(){};',
+		context
+	);
 	context.request_range_data(false);
 	timers.find((timer) => timer.delay === 50).fn();
 	assert.equal(JSON.parse(context.window._lua_request).request_id, 1);
@@ -40,7 +67,10 @@ function frontend() {
 }
 
 function controller(request, outcomes = [], admission = 'accepted') {
-	const lua = spawnSync('lua', ['-'], { cwd: path.join(root, 'macos'), encoding: 'utf8', input: `
+	const lua = spawnSync('lua', ['-'], {
+		cwd: path.join(root, 'macos'),
+		encoding: 'utf8',
+		input: `
 package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
 local json=require('json')
 local poll
@@ -84,7 +114,8 @@ for index,outcome in ipairs(outcomes) do
  end
 end
 print('RESULT='..json.encode({codes=codes,completions=completions,before=before,reads=reads,errors=errors,removes=removes}))
-` });
+`
+	});
 	assert.equal(lua.status, 0, lua.stderr + lua.stdout);
 	const line = lua.stdout.split(/\r?\n/).find((value) => value.startsWith('RESULT='));
 	assert.ok(line, lua.stdout);
@@ -92,8 +123,14 @@ print('RESULT='..json.encode({codes=codes,completions=completions,before=before,
 }
 
 function test(name, callback) {
-	try { callback(); passed++; console.log(`ok ${name}`); }
-	catch (error) { failed++; console.error(`FAIL ${name}: ${error.message}`); }
+	try {
+		callback();
+		passed++;
+		console.log(`ok ${name}`);
+	} catch (error) {
+		failed++;
+		console.error(`FAIL ${name}: ${error.message}`);
+	}
 }
 
 test('Reset posted after a poll read survives the old acknowledgement', () => {
@@ -132,12 +169,18 @@ test('a retained Reset executes once after its own successful acknowledgement', 
 	assert.equal(completed.removes, 1);
 	assert.equal(completed.reads, 0);
 	assert.equal(completed.errors, 0);
-	assert.equal(context.app_state.active_cache_reset_id, 1,
-		'mailbox consumption must not pretend that native purge has completed');
+	assert.equal(
+		context.app_state.active_cache_reset_id,
+		1,
+		'mailbox consumption must not pretend that native purge has completed'
+	);
 	assert.equal(completed.completions.length, 1);
 	assert.equal(vm.runInContext(completed.completions[0], context), true);
-	assert.equal(context.app_state.active_cache_reset_id, 0,
-		'only the exact native purge completion may release the reset owner');
+	assert.equal(
+		context.app_state.active_cache_reset_id,
+		0,
+		'only the exact native purge completion may release the reset owner'
+	);
 });
 
 for (const outcome of [false, 'nil', 'invalid', 'error']) {

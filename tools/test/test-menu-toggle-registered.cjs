@@ -47,13 +47,13 @@ const FEATURE_MENUS = [
 	'metrics_menu',
 	'shortcuts_menu',
 	'tap_holds_menu',
-	'gestures_menu',
+	'gestures_menu'
 ];
 
 const DRIVERS = [
 	{ platform: 'ahk', dir: 'windows', ext: '.ahk' },
 	{ platform: 'hs', dir: 'macos', ext: '.lua' },
-	{ platform: 'linux', dir: 'linux', ext: '.lua' },
+	{ platform: 'linux', dir: 'linux', ext: '.lua' }
 ];
 
 /**
@@ -88,21 +88,39 @@ function registers(source, ext, id) {
 	const tokens = Array.isArray(source) ? source : scriptTokens(source, ext);
 	const calls = [];
 	for (let i = 0; i < tokens.length; i += 1) {
-		const token = tokens[i], value = token.value;
+		const token = tokens[i],
+			value = token.value;
 		if (token.kind === 'symbol') {
-			if (['(', '[', '{'].includes(value)) calls.push({ open: value, name: tokens[i - 1]?.value, commas: 0 });
+			if (['(', '[', '{'].includes(value))
+				calls.push({ open: value, name: tokens[i - 1]?.value, commas: 0 });
 			if ([')', ']', '}'].includes(value)) calls.pop();
 			if (value === ',' && calls.at(-1)?.open === '(') calls.at(-1).commas += 1;
 		}
 		if (value !== id) continue;
 		const before = tokens[i - 1]?.value;
-		if (token.kind === 'string' && before === '[' && tokens[i + 1]?.value === ']'
-			&& tokens[i + 2]?.value === (ext === '.ahk' ? ':=' : '=')) return true;
-		if (ext === '.ahk' && token.kind === 'string' && calls.at(-1)?.name === 'Map'
-			&& calls.at(-1).commas % 2 === 0
-			&& ['(', ','].includes(before) && tokens[i + 1]?.value === ',') return true;
-		if (ext !== '.ahk' && token.kind === 'identifier' && ['{', ','].includes(before)
-			&& tokens[i + 1]?.value === '=') return true;
+		if (
+			token.kind === 'string' &&
+			before === '[' &&
+			tokens[i + 1]?.value === ']' &&
+			tokens[i + 2]?.value === (ext === '.ahk' ? ':=' : '=')
+		)
+			return true;
+		if (
+			ext === '.ahk' &&
+			token.kind === 'string' &&
+			calls.at(-1)?.name === 'Map' &&
+			calls.at(-1).commas % 2 === 0 &&
+			['(', ','].includes(before) &&
+			tokens[i + 1]?.value === ','
+		)
+			return true;
+		if (
+			ext !== '.ahk' &&
+			token.kind === 'identifier' &&
+			['{', ','].includes(before) &&
+			tokens[i + 1]?.value === '='
+		)
+			return true;
 	}
 	return false;
 }
@@ -114,22 +132,25 @@ for (const [ext, source] of [
 	['.ahk', 'Commands["switch"] := Handler'],
 	['.lua', 'commands = { ["switch"] = handler }'],
 	['.lua', 'commands = { switch = handler }'],
-	['.ahk', '; menu/*.ahk are hoisted\nCommands := Map("switch", Handler)\n/** later prose */'],
-]) assert.equal(registers(source, ext, 'switch'), true, source);
+	['.ahk', '; menu/*.ahk are hoisted\nCommands := Map("switch", Handler)\n/** later prose */']
+])
+	assert.equal(registers(source, ext, 'switch'), true, source);
 for (const [ext, source] of [
 	['.ahk', '; Commands := Map("switch", Handler)'],
 	['.ahk', '/* Commands["switch"] := Handler */'],
-	['.ahk', "description := 'Commands[\"switch\"] := Handler'"],
+	['.ahk', 'description := \'Commands["switch"] := Handler\''],
 	['.ahk', 'Run("switch", Handler)'],
 	['.ahk', 'Map("label", "switch", "other", Handler)'],
 	['.lua', '-- commands = { switch = handler }'],
 	['.lua', '--[=[ commands = { switch = handler } ]=]'],
 	['.lua', 'description = [[commands = { switch = handler }]]'],
 	['.lua', 'local switch = handler'],
-	['.lua', 'commands = { switch_other = handler }'],
-]) assert.equal(registers(source, ext, 'switch'), false, source);
+	['.lua', 'commands = { switch_other = handler }']
+])
+	assert.equal(registers(source, ext, 'switch'), false, source);
 
-const visible = (row, platform) => !Array.isArray(row.platforms) || row.platforms.includes(platform);
+const visible = (row, platform) =>
+	!Array.isArray(row.platforms) || row.platforms.includes(platform);
 const errors = [];
 
 for (const key of FEATURE_MENUS) {

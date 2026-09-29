@@ -27,10 +27,10 @@ only `SQLite_CloneMemory`. Validate row count, total payload length and ID sum
 after each timed clone, then close it before starting another.
 
 | Page size (bytes) | File size (bytes) | Clone median (ms) | Clone max (ms) |
-| ---: | ---: | ---: | ---: |
-| 4096 | 44855296 | 107.613 | 121.798 |
-| 16384 | 35864576 | 59.783 | 65.868 |
-| 65536 | 34275328 | 50.462 | 55.588 |
+| ----------------: | ----------------: | ----------------: | -------------: |
+|              4096 |          44855296 |           107.613 |        121.798 |
+|             16384 |          35864576 |            59.783 |         65.868 |
+|             65536 |          34275328 |            50.462 |         55.588 |
 
 Samples in milliseconds:
 
@@ -92,12 +92,12 @@ under this agent's ownership. Unlike the earlier synthetic probe, this timing
 phase checks clone success but does not reread every cloned row; the exhaustive
 logical comparison above covers the source variants.
 
-| Source | File size (bytes) | Clone median (ms) | Clone max (ms) |
-| --- | ---: | ---: | ---: |
-| Original geometry backup | 702390272 | 1684.988 | 1785.124 |
-| Vacuumed 4096 | 658853888 | 1684.428 | 4362.445 |
-| Vacuumed 16384 | 652525568 | 1101.040 | 2801.071 |
-| Vacuumed 65536 | 657260544 | 893.294 | 966.054 |
+| Source                   | File size (bytes) | Clone median (ms) | Clone max (ms) |
+| ------------------------ | ----------------: | ----------------: | -------------: |
+| Original geometry backup |         702390272 |          1684.988 |       1785.124 |
+| Vacuumed 4096            |         658853888 |          1684.428 |       4362.445 |
+| Vacuumed 16384           |         652525568 |          1101.040 |       2801.071 |
+| Vacuumed 65536           |         657260544 |           893.294 |        966.054 |
 
 Six samples per source, in milliseconds:
 
@@ -150,16 +150,16 @@ No projection diagnostic occurred. This measurement uses the current production
 implementation; output size differs from historical manifest experiments, and
 no equivalence to an older implementation is claimed here.
 
-| Route | Source | Manifest median (ms) | Manifest max (ms) | Combined median (ms) | Combined max (ms) |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Readonly | Baseline | 1316.183 | 1428.214 | 1316.192 | 1428.223 |
-| Readonly | Vacuumed 4096 | 1318.880 | 1443.220 | 1318.891 | 1443.231 |
-| Readonly | Vacuumed 16384 | 1421.440 | 1502.288 | 1421.454 | 1502.300 |
-| Readonly | Vacuumed 65536 | 1400.131 | 1531.311 | 1400.141 | 1531.323 |
-| Memory clone | Baseline | 1518.413 | 1569.837 | 2875.121 | 2958.532 |
-| Memory clone | Vacuumed 4096 | 1490.329 | 1567.278 | 2775.749 | 3004.192 |
-| Memory clone | Vacuumed 16384 | 1383.651 | 1487.924 | 2261.781 | 2760.758 |
-| Memory clone | Vacuumed 65536 | 1480.900 | 1542.378 | 2236.381 | 2361.146 |
+| Route        | Source         | Manifest median (ms) | Manifest max (ms) | Combined median (ms) | Combined max (ms) |
+| ------------ | -------------- | -------------------: | ----------------: | -------------------: | ----------------: |
+| Readonly     | Baseline       |             1316.183 |          1428.214 |             1316.192 |          1428.223 |
+| Readonly     | Vacuumed 4096  |             1318.880 |          1443.220 |             1318.891 |          1443.231 |
+| Readonly     | Vacuumed 16384 |             1421.440 |          1502.288 |             1421.454 |          1502.300 |
+| Readonly     | Vacuumed 65536 |             1400.131 |          1531.311 |             1400.141 |          1531.323 |
+| Memory clone | Baseline       |             1518.413 |          1569.837 |             2875.121 |          2958.532 |
+| Memory clone | Vacuumed 4096  |             1490.329 |          1567.278 |             2775.749 |          3004.192 |
+| Memory clone | Vacuumed 16384 |             1383.651 |          1487.924 |             2261.781 |          2760.758 |
+| Memory clone | Vacuumed 65536 |             1480.900 |          1542.378 |             2236.381 |          2361.146 |
 
 The combined median improves by about 22% for 65536 versus baseline in this
 series, while direct-read manifest generation is about 84 ms (6%) slower.
@@ -195,11 +195,11 @@ before the next observation. Warm one write per geometry, then repeat
 baseline/16384/65536/65536/16384/baseline three times for six samples each.
 The 4096 compacted control is not repeated in this write-only follow-up.
 
-| Source | Backup median (ms) | Backup max (ms) |
-| --- | ---: | ---: |
-| Baseline | 3353.792 | 4025.339 |
-| Vacuumed 16384 | 2705.041 | 4164.763 |
-| Vacuumed 65536 | 2665.687 | 3555.048 |
+| Source         | Backup median (ms) | Backup max (ms) |
+| -------------- | -----------------: | --------------: |
+| Baseline       |           3353.792 |        4025.339 |
+| Vacuumed 16384 |           2705.041 |        4164.763 |
+| Vacuumed 65536 |           2665.687 |        3555.048 |
 
 All six backup durations per source, in milliseconds:
 

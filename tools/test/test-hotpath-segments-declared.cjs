@@ -35,29 +35,42 @@ const WIN = path.join(ROOT, 'static/ergopti_plus/windows');
 // Segment → why it exists. Order is the keystroke path first, then render, then
 // idle, because that is the order a latency investigation walks them in.
 const INVENTORY = {
-	'Hook.KeyDown': 'the first stage of every keystroke: two tap-hold trackers plus the whole EVT_KB_DOWN fan-out, inside the hook callback',
+	'Hook.KeyDown':
+		'the first stage of every keystroke: two tap-hold trackers plus the whole EVT_KB_DOWN fan-out, inside the hook callback',
 	'Hook.KeyUp': 'the release half of the same path — a slow release is a stuck-feeling key',
 	RemapEmit: 'the layout remap that turns a physical key into the emitted one',
 	OnChar: 'the character event both the hotstring engine and the LLM bridge consume',
 	'HSE.FeedChar': 'the hotstring engine consuming one character',
 	'HSE.Dispatch': 'the hotstring engine deciding and firing an expansion',
-	'LLM.OnChar': 'the other consumer of every character — the profiler showed slow OnChar events with no matching slow HSE.FeedChar, and this was the only unattributed candidate',
+	'LLM.OnChar':
+		'the other consumer of every character — the profiler showed slow OnChar events with no matching slow HSE.FeedChar, and this was the only unattributed candidate',
 	'KL.Ingest': 'the keylogger ingest, which closes the per-keystroke budget with the hook fan-out',
-	'KL.RoiPrune': 'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',
-	'KLR.CandidateClone': 'the O(database-size) SQLite backup paid before an incremental metrics projection can publish atomically',
+	'KL.RoiPrune':
+		'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',
+	'KLR.CandidateClone':
+		'the O(database-size) SQLite backup paid before an incremental metrics projection can publish atomically',
 	'Tooltip.Build': 'building the tooltip GUI rows',
 	'Tooltip.ResolvePos': 'resolving where the tooltip goes, including the UIA path',
-	'Tooltip.Present': 'the composite present: clamp, prepare, corners, border, reveal (sub-attributed by HotPath_BreakdownMark)',
-	'Tooltip.DequeuePresent': 'the same present from the destack rebuild, so a slow row expiry is not mistaken for a slow render',
+	'Tooltip.Present':
+		'the composite present: clamp, prepare, corners, border, reveal (sub-attributed by HotPath_BreakdownMark)',
+	'Tooltip.DequeuePresent':
+		'the same present from the destack rebuild, so a slow row expiry is not mistaken for a slow render',
 	'Tooltip.LlmPresent': 'presenting an LLM prediction preview',
-	'Tooltip.BorderPixelLoop': 'the per-pixel border draw, the one step that scales with tooltip size',
-	'Gesture.Invoke': 'the single choke point all three dispatchers share (gesture, shortcut slot, tap-hold), so one segment covers every user-triggered action',
-	'Config.TomlWrite': 'a config save: full read-modify-write plus canonicalisation, run from menu callbacks, so a slow one blocks the tray menu while the user watches',
-	'Config.TomlBuild': 'the detached TOML candidate build before a transactional config publication, including exact-subtree reconstruction and stage verification',
-	'Updater.Poll': 'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
-	'Webview.Eval': 'the host-to-page half of the webview bridge — ExecuteScriptAsync is named async but the COM marshalling is not free, and this is what pushes the init payload',
+	'Tooltip.BorderPixelLoop':
+		'the per-pixel border draw, the one step that scales with tooltip size',
+	'Gesture.Invoke':
+		'the single choke point all three dispatchers share (gesture, shortcut slot, tap-hold), so one segment covers every user-triggered action',
+	'Config.TomlWrite':
+		'a config save: full read-modify-write plus canonicalisation, run from menu callbacks, so a slow one blocks the tray menu while the user watches',
+	'Config.TomlBuild':
+		'the detached TOML candidate build before a transactional config publication, including exact-subtree reconstruction and stage verification',
+	'Updater.Poll':
+		'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
+	'Webview.Eval':
+		'the host-to-page half of the webview bridge — ExecuteScriptAsync is named async but the COM marshalling is not free, and this is what pushes the init payload',
 	'UIA.SelectionPoll': 'the idle UI-Automation selection poll',
-	'Metrics.FocusRefresh': 'the canonical 20 Hz focus snapshot — WM_GETTEXT has a 5 ms SendMessageTimeoutW deadline and every partial identity fails privacy closed'
+	'Metrics.FocusRefresh':
+		'the canonical 20 Hz focus snapshot — WM_GETTEXT has a 5 ms SendMessageTimeoutW deadline and every partial identity fails privacy closed'
 };
 
 const errors = [];
@@ -107,10 +120,6 @@ for (const [name, where] of declared) {
 	}
 }
 
-
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Pre-Logger Boot Stamps ================
@@ -148,12 +157,11 @@ for (const name of BOOT_STAMPS) {
 }
 for (const name of stamped) {
 	if (!BOOT_STAMPS.includes(name)) {
-		errors.push(`ErgoptiPlus.ahk takes a boot stamp "${name}" that is not in the inventory — add it`);
+		errors.push(
+			`ErgoptiPlus.ahk takes a boot stamp "${name}" that is not in the inventory — add it`
+		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================

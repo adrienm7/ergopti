@@ -42,13 +42,25 @@ const domain = gen.readSpecNames(gen.DOMAIN_DIR);
 const driverData = gen.collectDriverData();
 
 // (a) The reorg-drift regression: a stale path resolves to 0 entries.
-check('generator resolves the ports/ spec dir (>=18, not 0)', ports.length >= 18, `found ${ports.length} at ${gen.PORTS_DIR}`);
-check('generator resolves the domain/ spec dir (>=4)', domain.length >= 4, `found ${domain.length} at ${gen.DOMAIN_DIR}`);
+check(
+	'generator resolves the ports/ spec dir (>=18, not 0)',
+	ports.length >= 18,
+	`found ${ports.length} at ${gen.PORTS_DIR}`
+);
+check(
+	'generator resolves the domain/ spec dir (>=4)',
+	domain.length >= 4,
+	`found ${domain.length} at ${gen.DOMAIN_DIR}`
+);
 
 // (a2) Every driver, not two of them. The diagram used to hardcode windows and
 // macos, so linux/adapters/ — a full set of them — appeared nowhere in a
 // document titled "the three-layer hexagonal architecture".
-check('generator discovers all three drivers', gen.DRIVERS.length >= 3, `found ${gen.DRIVERS.map((d) => d.name).join(', ')}`);
+check(
+	'generator discovers all three drivers',
+	gen.DRIVERS.length >= 3,
+	`found ${gen.DRIVERS.map((d) => d.name).join(', ')}`
+);
 // The floor guards the SCAN, not parity between drivers. It used to be >=18,
 // which encoded "every driver implements ~20 adapters" — the reading of ADR-001
 // that produced nine Linux adapters with no caller, all of them deleted under
@@ -75,12 +87,20 @@ check(
 
 // Every port spec must appear as a node in the rendered diagram.
 const missing = ports.filter((p) => !mermaid.includes(`["${p}"]`));
-check('every port spec appears as a diagram node', missing.length === 0, `missing: ${missing.join(', ')}`);
+check(
+	'every port spec appears as a diagram node',
+	missing.length === 0,
+	`missing: ${missing.join(', ')}`
+);
 
 // And every driver must have its own subgraph. Naming the driver in the diagram
 // text is the check that would have failed on the original two-driver version.
 const noSubgraph = gen.DRIVERS.filter((d) => !mermaid.includes(`${d.name}/adapters/`));
-check('every driver has an adapters subgraph', noSubgraph.length === 0, `missing: ${noSubgraph.map((d) => d.name).join(', ')}`);
+check(
+	'every driver has an adapters subgraph',
+	noSubgraph.length === 0,
+	`missing: ${noSubgraph.map((d) => d.name).join(', ')}`
+);
 
 console.log(`\nTotal: ${pass + fail} — ${pass} passed, ${fail} failed.`);
 process.exit(fail > 0 ? 1 : 0);

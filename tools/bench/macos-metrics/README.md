@@ -33,7 +33,7 @@ Use an isolated copy of Hammerspoon (the existing macOS build currently pins
 and create `bench-config.json` beside it with absolute JSON-escaped paths:
 
 ```json
-{"repo_root":"/absolute/checkout","output_dir":"/absolute/fresh/output"}
+{ "repo_root": "/absolute/checkout", "output_dir": "/absolute/fresh/output" }
 ```
 
 Create the output directory first. It must not contain `synthetic.sqlite`.

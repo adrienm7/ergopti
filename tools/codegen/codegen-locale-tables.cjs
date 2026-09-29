@@ -111,7 +111,9 @@ function emitMacos() {
 // ── Linux: code → name (its menu resolves the flag separately) ──────────────
 
 function emitLinux() {
-	const rows = order.map((c) => `\t{ code = "${c}", flag = "${names[c].flag}", name = "${names[c].name}" },`);
+	const rows = order.map(
+		(c) => `\t{ code = "${c}", flag = "${names[c].flag}", name = "${names[c].name}" },`
+	);
 	return (
 		'--- _generated/locale_table.lua\n' +
 		'--- AUTO-GENERATED from _shared/data/locale_order.json + locale_names.json.\n' +
@@ -136,7 +138,8 @@ function emitLinux() {
 
 function emitWindows() {
 	const rows = order.map(
-		(c) => `\t\t{ Code: "${c}", Tag: "[${c.toUpperCase()}]", Name: ${padToken('"' + names[c].name + '"', 14)} },`
+		(c) =>
+			`\t\t{ Code: "${c}", Tag: "[${c.toUpperCase()}]", Name: ${padToken('"' + names[c].name + '"', 14)} },`
 	);
 	return (
 		'﻿; _generated/locale_table.ahk\n' +

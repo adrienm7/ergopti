@@ -25,7 +25,15 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SCRIPT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'action_picker', 'script.js');
+const SCRIPT = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'ui',
+	'action_picker',
+	'script.js'
+);
 
 /** A DOM element with just what the page script touches. */
 class FakeElement {
@@ -80,11 +88,37 @@ class FakeElement {
 }
 
 const byId = {};
-for (const id of ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 'empty', 'count', 'toc',
-	'toc-inner', 'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back',
-	'param-save', 'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label',
-	'btn-edit-current', 'param-vision', 'param-vision-provider',
-	'param-vision-provider-label', 'param-vision-model', 'param-vision-model-label']) {
+for (const id of [
+	'title',
+	'subtitle',
+	'search',
+	'search-bar',
+	'btn-cancel',
+	'list',
+	'empty',
+	'count',
+	'toc',
+	'toc-inner',
+	'param',
+	'param-title',
+	'param-prompt',
+	'param-hint',
+	'param-input',
+	'param-error',
+	'param-back',
+	'param-save',
+	'param-choice',
+	'param-profile',
+	'param-profile-label',
+	'param-count',
+	'param-count-label',
+	'btn-edit-current',
+	'param-vision',
+	'param-vision-provider',
+	'param-vision-provider-label',
+	'param-vision-model',
+	'param-vision-model-label'
+]) {
 	byId[id] = new FakeElement('div', id);
 }
 const docListeners = {};
@@ -128,8 +162,14 @@ const greyed = rows.find((r) => r.dataset.id === 'left_click_toggle');
 const live = rows.find((r) => r.dataset.id === 'enter');
 check(rows.length === 3, `expected the none row plus two actions, rendered ${rows.length}`);
 check(greyed !== undefined, 'a disabled action must stay visible — a vanished row reads as a bug');
-check(greyed && greyed.classList.contains('disabled'), 'the disabled row must carry the disabled class');
-check(greyed && greyed.text().includes('X11 session only'), 'the disabled row must show its reason');
+check(
+	greyed && greyed.classList.contains('disabled'),
+	'the disabled row must carry the disabled class'
+);
+check(
+	greyed && greyed.text().includes('X11 session only'),
+	'the disabled row must show its reason'
+);
 check(live && !live.classList.contains('disabled'), 'an ordinary row stays enabled');
 
 // Click, arrows and Enter must never confirm the greyed row.
@@ -138,11 +178,15 @@ check(posted.length === 0, 'clicking a disabled row must not confirm it');
 vm.runInContext("doConfirm('left_click_toggle')", context);
 check(posted.length === 0, 'a disabled id must be refused even when confirmed directly');
 const visibleIds = vm.runInContext('visible.map(function (v) { return v.id; })', context);
-check(JSON.stringify(visibleIds) === JSON.stringify(['none', 'enter']),
-	`arrow keys walk only the pickable rows, got ${JSON.stringify(visibleIds)}`);
+check(
+	JSON.stringify(visibleIds) === JSON.stringify(['none', 'enter']),
+	`arrow keys walk only the pickable rows, got ${JSON.stringify(visibleIds)}`
+);
 if (live) live.dispatch('click');
-check(posted.length === 1 && posted[0].action === 'confirm' && posted[0].id === 'enter',
-	'an enabled row still confirms');
+check(
+	posted.length === 1 && posted[0].action === 'confirm' && posted[0].id === 'enter',
+	'an enabled row still confirms'
+);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] action picker disabled rows:\x1b[0m');

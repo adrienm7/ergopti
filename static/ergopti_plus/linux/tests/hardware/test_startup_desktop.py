@@ -24,10 +24,17 @@ def main():
         result = folder / "result"
         executable.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$ERGOPTI_DESKTOP_RESULT"\n')
         executable.chmod(0o700)
-        encoded = subprocess.check_output([
-            "/bin/bash", "-c", 'source "$1"; ergopti_desktop_exec "$2"',
-            "desktop-test", str(helper), str(executable),
-        ], text=True)
+        encoded = subprocess.check_output(
+            [
+                "/bin/bash",
+                "-c",
+                'source "$1"; ergopti_desktop_exec "$2"',
+                "desktop-test",
+                str(helper),
+                str(executable),
+            ],
+            text=True,
+        )
         desktop = folder / "ergopti.desktop"
         desktop.write_text("[Desktop Entry]\nType=Application\nName=Fixture\n" + encoded)
         app = Gio.DesktopAppInfo.new_from_filename(str(desktop))

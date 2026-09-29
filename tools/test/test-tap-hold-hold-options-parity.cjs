@@ -62,7 +62,9 @@ if (!modifiers || modifiers.length === 0) {
 	);
 }
 if (!layers) {
-	errors.push('[tap_hold.hold_picker] declares no `layers` array — the nav-layer hold would vanish from every picker.');
+	errors.push(
+		'[tap_hold.hold_picker] declares no `layers` array — the nav-layer hold would vanish from every picker.'
+	);
 }
 
 // The expected sequence, walked here rather than taken from either driver.
@@ -116,7 +118,10 @@ if (modifiers && modifiers.length > 0) {
 	}
 
 	// The Linux menu must actually offer the picker — the point of the exercise.
-	const linuxMenu = fs.readFileSync(path.join(SP, 'linux', 'ui', 'menu', 'menu_builder.lua'), 'utf8');
+	const linuxMenu = fs.readFileSync(
+		path.join(SP, 'linux', 'ui', 'menu', 'menu_builder.lua'),
+		'utf8'
+	);
 	if (!/tap_hold\.hold_options/.test(linuxMenu)) {
 		errors.push(
 			'linux/ui/menu/menu_builder.lua no longer builds its hold picker from the shared catalogue. ' +
@@ -154,12 +159,16 @@ const aliases = {};
 for (const field of aliasTables) {
 	const table = readInlineTable(field);
 	if (!table || Object.keys(table).length === 0) {
-		errors.push(`[tap_hold.hold_picker] declares no \`${field}\` table — the other spellings of a hold have no home.`);
+		errors.push(
+			`[tap_hold.hold_picker] declares no \`${field}\` table — the other spellings of a hold have no home.`
+		);
 		continue;
 	}
 	for (const [alias, id] of Object.entries(table)) {
 		if (!(modifiers || []).includes(id)) {
-			errors.push(`[tap_hold.hold_picker] ${field}: '${alias}' means '${id}', which is no modifier of the picker.`);
+			errors.push(
+				`[tap_hold.hold_picker] ${field}: '${alias}' means '${id}', which is no modifier of the picker.`
+			);
 		}
 		aliases[alias] = id;
 	}
@@ -168,19 +177,27 @@ if (Object.keys(aliases).length > 0) {
 	const lua = fs.readFileSync(SHARED_LUA, 'utf8');
 	const ahkLoader = fs.readFileSync(AHK_LOADER, 'utf8');
 	const resolveStart = ahkLoader.indexOf('ResolveHoldModifierKey(ModifierValue, FieldLabel) {');
-	const resolveBody = resolveStart >= 0 ? ahkLoader.slice(resolveStart, ahkLoader.indexOf('\n}', resolveStart)) : '';
-	if (resolveBody === '') errors.push('windows/platform/remap/tap_hold_loader.ahk has no ResolveHoldModifierKey.');
+	const resolveBody =
+		resolveStart >= 0 ? ahkLoader.slice(resolveStart, ahkLoader.indexOf('\n}', resolveStart)) : '';
+	if (resolveBody === '')
+		errors.push('windows/platform/remap/tap_hold_loader.ahk has no ResolveHoldModifierKey.');
 	for (const field of aliasTables) {
 		if (!lua.includes(field)) {
-			errors.push(`_shared/lua/tap_hold/hold_options.lua does not read \`${field}\` from the hold picker.`);
+			errors.push(
+				`_shared/lua/tap_hold/hold_options.lua does not read \`${field}\` from the hold picker.`
+			);
 		}
 		if (!ahkLoader.includes('"' + field + '"')) {
-			errors.push(`windows/platform/remap/tap_hold_loader.ahk does not read \`${field}\` from the hold picker.`);
+			errors.push(
+				`windows/platform/remap/tap_hold_loader.ahk does not read \`${field}\` from the hold picker.`
+			);
 		}
 	}
 	for (const alias of Object.keys(aliases)) {
 		if (new RegExp(`\\b${alias}\\s*=\\s*"`).test(lua)) {
-			errors.push(`_shared/lua/tap_hold/hold_options.lua spells the alias '${alias}' itself again.`);
+			errors.push(
+				`_shared/lua/tap_hold/hold_options.lua spells the alias '${alias}' itself again.`
+			);
 		}
 		if (new RegExp(`case[^\\n]*"${alias}"`).test(resolveBody)) {
 			errors.push(`ResolveHoldModifierKey spells the alias '${alias}' in a case label again.`);

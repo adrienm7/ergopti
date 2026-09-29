@@ -11,11 +11,11 @@ for AHK, and SQL quoting, preparation, execution and returned-text conversion
 for SQLite. Input construction and result validation are excluded. Every output
 was parsed afterward and required the original historical row count.
 
-| Rows | UTF-8 bytes | AHK round-trip samples (ms) | SQLite samples (ms) |
-| --- | --- | --- | --- |
-| 1,000 | 64,961 | 170.882 / 170.010 / 164.815 | 1.710 / 1.518 / 1.596 |
-| 10,000 | 658,962 | 1614.210 / 1693.451 / 1697.600 | 13.975 / 13.248 / 15.746 |
-| 50,000 | 3,338,962 | 8776.844 / 9008.234 / 9124.138 | 70.012 / 63.287 / 70.519 |
+| Rows   | UTF-8 bytes | AHK round-trip samples (ms)    | SQLite samples (ms)      |
+| ------ | ----------- | ------------------------------ | ------------------------ |
+| 1,000  | 64,961      | 170.882 / 170.010 / 164.815    | 1.710 / 1.518 / 1.596    |
+| 10,000 | 658,962     | 1614.210 / 1693.451 / 1697.600 | 13.975 / 13.248 / 15.746 |
+| 50,000 | 3,338,962   | 8776.844 / 9008.234 / 9124.138 | 70.012 / 63.287 / 70.519 |
 
 The operation replaces `_prefetch_data.today` while retaining historical data.
 AHK uses `JsonParse`, map replacement and `KL_JsonEncode`; SQLite uses
@@ -53,10 +53,10 @@ same scratch directory compares both paths and parses/canonically compares their
 results outside the timed sections. Three sequential samples were taken per
 workload; desktop load and filesystem cache state were not controlled.
 
-| Workload | Output bytes | Legacy samples (ms) | SQL samples (ms) |
-| --- | --- | --- | --- |
-| Synthetic 50,000 words | 2,800,110 | 3198.459 / 3231.982 / 3251.421 | 142.131 / 138.579 / 138.588 |
-| Real derived image, history through yesterday | 15,138,180 | 26166.980 / 27687.056 / 45410.472 | 2243.351 / 2313.867 / 2388.312 |
+| Workload                                      | Output bytes | Legacy samples (ms)               | SQL samples (ms)               |
+| --------------------------------------------- | ------------ | --------------------------------- | ------------------------------ |
+| Synthetic 50,000 words                        | 2,800,110    | 3198.459 / 3231.982 / 3251.421    | 142.131 / 138.579 / 138.588    |
+| Real derived image, history through yesterday | 15,138,180   | 26166.980 / 27687.056 / 45410.472 | 2243.351 / 2313.867 / 2388.312 |
 
 The real-data invocation adds `--real` and opens the existing derived
 `metrics/cache/reader.sqlite` with `SQLiteConst.OPEN_RO`. The image was

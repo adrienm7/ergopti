@@ -41,15 +41,15 @@ LuaJIT instead of Rust.
 
 ## Stack
 
-| Layer                    | Technology                     | Rationale                                                                            |
-| ------------------------ | ------------------------------ | ------------------------------------------------------------------------------------ |
-| Runtime                  | **LuaJIT 2.x**                 | Same language as the Hammerspoon driver; reuses all `_shared/lua/` modules directly. |
-| Keyboard input           | **/dev/input/eventN** (evdev)  | Raw 24-byte `input_event` structs; works on X11, Wayland, and TTY identically.       |
-| Text injection           | **ydotool** (uinput backend)   | Works on both X11 and Wayland; no display-server coupling.                           |
+| Layer                    | Technology                      | Rationale                                                                              |
+| ------------------------ | ------------------------------- | -------------------------------------------------------------------------------------- |
+| Runtime                  | **LuaJIT 2.x**                  | Same language as the Hammerspoon driver; reuses all `_shared/lua/` modules directly.   |
+| Keyboard input           | **/dev/input/eventN** (evdev)   | Raw 24-byte `input_event` structs; works on X11, Wayland, and TTY identically.         |
+| Text injection           | **ydotool** (uinput backend)    | Works on both X11 and Wayland; no display-server coupling.                             |
 | Key remapping + tap-hold | **platform/remap/** (in-daemon) | Tap-hold engine in the keyboard hook; same evdev grab and `uinput` output as the rest. |
-| Notifications            | **notify-send**                | D-Bus `org.freedesktop.Notifications` — works on GNOME, KDE, XFCE, wlroots.          |
-| Tray icon                | **StatusNotifierItem** (D-Bus) | De-facto Linux standard; KDE/Plasma, GNOME (with AppIndicator ext), wlroots.         |
-| HTTP                     | **curl** via io.popen          | Zero extra dependencies; async path via lua-http planned.                            |
+| Notifications            | **notify-send**                 | D-Bus `org.freedesktop.Notifications` — works on GNOME, KDE, XFCE, wlroots.            |
+| Tray icon                | **StatusNotifierItem** (D-Bus)  | De-facto Linux standard; KDE/Plasma, GNOME (with AppIndicator ext), wlroots.           |
+| HTTP                     | **curl** via io.popen           | Zero extra dependencies; async path via lua-http planned.                              |
 
 ## Directory structure
 
@@ -81,7 +81,7 @@ linux/
 > calls them, so there is currently no tooltip surface, no notification, no clipboard
 > action and no window management on Linux. The `secure_field_detector` case is
 > **deliberate** — see the comment at `modules/keylogger/keylogger.lua:90-98`:
-> delegating to it would *narrow* password-app coverage and leak keystrokes.
+> delegating to it would _narrow_ password-app coverage and leak keystrokes.
 
 ## Running the daemon
 
@@ -169,16 +169,16 @@ keyboard layout. Reinstalling the application can reuse the retained settings.
 
 ## Known limitations by feature
 
-| Feature                  | X11                  | Wayland                | Notes                                               |
-| ------------------------ | -------------------- | ---------------------- | --------------------------------------------------- |
-| Key remapping + tap-hold | ✅ in-daemon         | ✅ in-daemon           | Bypasses display server via `/dev/input` + `uinput` |
-| Hotstrings + metrics     | ✅                   | ✅                     | evdev read works on both; injection via ydotool     |
-| Text injection           | ✅ ydotool           | ✅ ydotool             | Requires `ydotoold` daemon + uinput permissions     |
-| Window info (active app) | ✅ xdotool           | ⚠️ compositor-specific | No universal Wayland protocol                       |
-| Tray icon                | ✅ SNI               | ⚠️ partial             | Every packaged systemd unit passes `--tray` (pinned by `test:linux-package-layout`); a manual launch without it runs headless and says so in the log. GNOME Wayland also needs the AppIndicator extension |
-| Tooltip overlay          | ✅ GTK               | ✅ GTK                 | Hotstring previews and selectable LLM suggestions share the focus-free tooltip renderer |
-| Secure field detection   | ✅ AT-SPI             | ✅ AT-SPI               | Secure applications, private windows and focused password fields suppress capture and prediction; an inconclusive focus probe fails closed |
-| Config UI                | ✅ WebKitGTK          | ✅ WebKitGTK            | Shared configuration, diagnostics, onboarding, metrics and editor pages are routed through page-scoped bridges |
+| Feature                  | X11          | Wayland                | Notes                                                                                                                                                                                                     |
+| ------------------------ | ------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key remapping + tap-hold | ✅ in-daemon | ✅ in-daemon           | Bypasses display server via `/dev/input` + `uinput`                                                                                                                                                       |
+| Hotstrings + metrics     | ✅           | ✅                     | evdev read works on both; injection via ydotool                                                                                                                                                           |
+| Text injection           | ✅ ydotool   | ✅ ydotool             | Requires `ydotoold` daemon + uinput permissions                                                                                                                                                           |
+| Window info (active app) | ✅ xdotool   | ⚠️ compositor-specific | No universal Wayland protocol                                                                                                                                                                             |
+| Tray icon                | ✅ SNI       | ⚠️ partial             | Every packaged systemd unit passes `--tray` (pinned by `test:linux-package-layout`); a manual launch without it runs headless and says so in the log. GNOME Wayland also needs the AppIndicator extension |
+| Tooltip overlay          | ✅ GTK       | ✅ GTK                 | Hotstring previews and selectable LLM suggestions share the focus-free tooltip renderer                                                                                                                   |
+| Secure field detection   | ✅ AT-SPI    | ✅ AT-SPI              | Secure applications, private windows and focused password fields suppress capture and prediction; an inconclusive focus probe fails closed                                                                |
+| Config UI                | ✅ WebKitGTK | ✅ WebKitGTK           | Shared configuration, diagnostics, onboarding, metrics and editor pages are routed through page-scoped bridges                                                                                            |
 
 ## Distribution support
 

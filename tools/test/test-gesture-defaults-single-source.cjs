@@ -42,9 +42,6 @@ const WINDOWS_SLOTS_FILE = 'windows/modules/gestures/constants.ahk';
 
 const errors = [];
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ The manifest ==========================
@@ -66,7 +63,10 @@ function manifestDefaults(platform) {
 		if (entry.path_prefix !== 'gestures' || entry.type !== 'action') continue;
 		if (Array.isArray(entry.platforms) && !entry.platforms.includes(platform)) continue;
 		const perPlatform = entry.recommended_per_platform || {};
-		out.set(entry.id, perPlatform[platform] !== undefined ? perPlatform[platform] : entry.recommended);
+		out.set(
+			entry.id,
+			perPlatform[platform] !== undefined ? perPlatform[platform] : entry.recommended
+		);
 	}
 	return out;
 }
@@ -80,9 +80,6 @@ function quoted(body) {
 	return [...body.matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]);
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ macOS =================================
@@ -92,22 +89,39 @@ function quoted(body) {
 {
 	const src = read(MACOS_FILE);
 	const hs = manifestDefaults('hs');
-	if (hs.size < 30) errors.push(`the manifest declares ${hs.size} macOS gesture slot(s) — the manifest scan is broken.`);
+	if (hs.size < 30)
+		errors.push(
+			`the manifest declares ${hs.size} macOS gesture slot(s) — the manifest scan is broken.`
+		);
 
 	const literal = src.match(/M\.DEFAULT_GESTURES\s*=\s*\{([\s\S]*?)\n\}/);
 	const pairs = literal ? [...literal[1].matchAll(/^\s*([a-z0-9_]+)\s*=\s*"([a-z0-9_]+)"/gm)] : [];
 	if (pairs.length > 0) {
-		const drift = pairs.filter(([, slot, action]) => hs.get(slot) !== action).map(([, slot, action]) =>
-			`${slot} (macOS "${action}", manifest "${hs.get(slot)}")`);
-		errors.push(`${MACOS_FILE} spells ${pairs.length} recommended action(s) by hand in DEFAULT_GESTURES` +
-			(drift.length ? `, ${drift.length} of them drifted: ${drift.join(', ')}` : '') + '.');
+		const drift = pairs
+			.filter(([, slot, action]) => hs.get(slot) !== action)
+			.map(([, slot, action]) => `${slot} (macOS "${action}", manifest "${hs.get(slot)}")`);
+		errors.push(
+			`${MACOS_FILE} spells ${pairs.length} recommended action(s) by hand in DEFAULT_GESTURES` +
+				(drift.length ? `, ${drift.length} of them drifted: ${drift.join(', ')}` : '') +
+				'.'
+		);
 	}
-	if (!/M\.DEFAULT_GESTURES\[slot\]\s*=\s*Manifest\.default_for\("gestures\."\s*\.\.\s*slot\)/.test(src)) {
-		errors.push(`${MACOS_FILE} must build DEFAULT_GESTURES from Manifest.default_for("gestures." .. slot).`);
+	if (
+		!/M\.DEFAULT_GESTURES\[slot\]\s*=\s*Manifest\.default_for\("gestures\."\s*\.\.\s*slot\)/.test(
+			src
+		)
+	) {
+		errors.push(
+			`${MACOS_FILE} must build DEFAULT_GESTURES from Manifest.default_for("gestures." .. slot).`
+		);
 	}
 
-	if (!src.includes('M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)')) {
-		errors.push(`${MACOS_FILE} must project explicit recommendations separately from neutral defaults.`);
+	if (
+		!src.includes('M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)')
+	) {
+		errors.push(
+			`${MACOS_FILE} must project explicit recommendations separately from neutral defaults.`
+		);
 	}
 
 	const slots = [];
@@ -116,14 +130,13 @@ function quoted(body) {
 		if (!m) errors.push(`${MACOS_FILE} declares no M.${name}.`);
 		else slots.push(...quoted(m[1]));
 	}
-	if (slots.length < 30) errors.push(`${MACOS_FILE} lists ${slots.length} slot(s) — the slot scan is broken.`);
+	if (slots.length < 30)
+		errors.push(`${MACOS_FILE} lists ${slots.length} slot(s) — the slot scan is broken.`);
 	for (const slot of slots) {
-		if (typeof hs.get(slot) !== 'string') errors.push(`the manifest has no macOS default for gestures.${slot}.`);
+		if (typeof hs.get(slot) !== 'string')
+			errors.push(`the manifest has no macOS default for gestures.${slot}.`);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -134,40 +147,54 @@ function quoted(body) {
 {
 	const src = read(WINDOWS_FILE);
 	const ahk = manifestDefaults('ahk');
-	if (ahk.size < 10) errors.push(`the manifest declares ${ahk.size} Windows gesture slot(s) — the manifest scan is broken.`);
+	if (ahk.size < 10)
+		errors.push(
+			`the manifest declares ${ahk.size} Windows gesture slot(s) — the manifest scan is broken.`
+		);
 
 	const literal = src.match(/GESTURE_FACTORY_DEFAULTS\s*:=\s*Map\(([\s\S]*?)\n\)/);
 	if (literal) {
 		const values = quoted(literal[1]);
 		const drift = [];
 		for (let i = 0; i + 1 < values.length; i += 2) {
-			if (ahk.get(values[i]) !== values[i + 1]) drift.push(`${values[i]} (Windows "${values[i + 1]}", manifest "${ahk.get(values[i])}")`);
+			if (ahk.get(values[i]) !== values[i + 1])
+				drift.push(`${values[i]} (Windows "${values[i + 1]}", manifest "${ahk.get(values[i])}")`);
 		}
-		errors.push(`${WINDOWS_FILE} spells ${values.length / 2} recommended action(s) by hand in GESTURE_FACTORY_DEFAULTS` +
-			(drift.length ? `, ${drift.length} of them drifted: ${drift.join(', ')}` : '') + '.');
+		errors.push(
+			`${WINDOWS_FILE} spells ${values.length / 2} recommended action(s) by hand in GESTURE_FACTORY_DEFAULTS` +
+				(drift.length ? `, ${drift.length} of them drifted: ${drift.join(', ')}` : '') +
+				'.'
+		);
 	}
 	if (!/global GESTURE_FACTORY_DEFAULTS\s*:=\s*GestureRecommendedActions\(\)/.test(src)) {
-		errors.push(`${WINDOWS_FILE} must take GESTURE_FACTORY_DEFAULTS from GestureRecommendedActions().`);
+		errors.push(
+			`${WINDOWS_FILE} must take GESTURE_FACTORY_DEFAULTS from GestureRecommendedActions().`
+		);
 	}
 
-	if (!src.includes('GestureAssignments[_GestureAssignmentSlot] := ManifestDefaultFor("gestures." . _GestureAssignmentSlot)')) {
+	if (
+		!src.includes(
+			'GestureAssignments[_GestureAssignmentSlot] := ManifestDefaultFor("gestures." . _GestureAssignmentSlot)'
+		)
+	) {
 		errors.push(`${WINDOWS_FILE} must initialize assignments with neutral defaults.`);
 	}
 
 	const constants = read(WINDOWS_SLOTS_FILE);
 	if (!/ManifestRecommendedFor\("gestures\."\s*\.\s*Slot\)/.test(constants)) {
-		errors.push(`${WINDOWS_SLOTS_FILE} must read each recommended action with ManifestRecommendedFor("gestures." . Slot).`);
+		errors.push(
+			`${WINDOWS_SLOTS_FILE} must read each recommended action with ManifestRecommendedFor("gestures." . Slot).`
+		);
 	}
 	const slotList = constants.match(/GestureSlotIds\(\)\s*\{[\s\S]*?static Slots := \[([\s\S]*?)\]/);
 	const slots = slotList ? quoted(slotList[1]) : [];
-	if (slots.length < 10) errors.push(`${WINDOWS_SLOTS_FILE} lists ${slots.length} slot(s) — the slot scan is broken.`);
+	if (slots.length < 10)
+		errors.push(`${WINDOWS_SLOTS_FILE} lists ${slots.length} slot(s) — the slot scan is broken.`);
 	for (const slot of slots) {
-		if (typeof ahk.get(slot) !== 'string') errors.push(`the manifest has no Windows default for gestures.${slot}.`);
+		if (typeof ahk.get(slot) !== 'string')
+			errors.push(`the manifest has no Windows default for gestures.${slot}.`);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -176,12 +203,19 @@ function quoted(body) {
 // ==================================================
 
 const linuxSource = read('linux/modules/gestures/manager.lua');
-if (!linuxSource.includes('M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)')
-	|| !/function M\.reset_defaults\(\)[\s\S]*?pairs\(M\.RECOMMENDED_GESTURES\)/.test(linuxSource)) {
-	errors.push('Linux must project and restore explicit gesture recommendations separately from initialization.');
+if (
+	!linuxSource.includes(
+		'M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)'
+	) ||
+	!/function M\.reset_defaults\(\)[\s\S]*?pairs\(M\.RECOMMENDED_GESTURES\)/.test(linuxSource)
+) {
+	errors.push(
+		'Linux must project and restore explicit gesture recommendations separately from initialization.'
+	);
 }
 for (const [slot, action] of manifestDefaults('linux')) {
-	if (action !== 'none') errors.push(`Linux gesture recommendation gestures.${slot} must remain opt-in (none).`);
+	if (action !== 'none')
+		errors.push(`Linux gesture recommendation gestures.${slot} must remain opt-in (none).`);
 }
 
 if (errors.length > 0) {
@@ -190,4 +224,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] macOS and Windows build their recommended gesture actions from the manifest.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] macOS and Windows build their recommended gesture actions from the manifest.\x1b[0m'
+);

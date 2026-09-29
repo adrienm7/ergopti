@@ -80,19 +80,24 @@ const POSIX_SHIM = fs.readFileSync(
 );
 
 function readSwiftTree(directory) {
-	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-		const entryPath = path.join(directory, entry.name);
-		if (entry.isDirectory()) return readSwiftTree(entryPath);
-		return entry.isFile() && entry.name.endsWith('.swift')
-			? [fs.readFileSync(entryPath, 'utf8')]
-			: [];
-	}).join('\n');
+	return fs
+		.readdirSync(directory, { withFileTypes: true })
+		.flatMap((entry) => {
+			const entryPath = path.join(directory, entry.name);
+			if (entry.isDirectory()) return readSwiftTree(entryPath);
+			return entry.isFile() && entry.name.endsWith('.swift')
+				? [fs.readFileSync(entryPath, 'utf8')]
+				: [];
+		})
+		.join('\n');
 }
 
 const SWIFT_SOURCES = readSwiftTree(SWIFT_ROOT);
 
-const sparklePackagePin = /\.package\(\s*url:\s*"https:\/\/github\.com\/sparkle-project\/Sparkle",\s*exact:\s*"([^"]+)"\s*\)/
-	.exec(PACKAGE);
+const sparklePackagePin =
+	/\.package\(\s*url:\s*"https:\/\/github\.com\/sparkle-project\/Sparkle",\s*exact:\s*"([^"]+)"\s*\)/.exec(
+		PACKAGE
+	);
 const sparkleSigningToolPin = /^\s*SPARKLE_VERSION:\s*'([^']+)'\s*$/m.exec(PIPELINE);
 
 const failures = [];
@@ -109,22 +114,35 @@ function withoutFullLineComments(source) {
 	return source.replace(/^\s*#.*$/gm, '');
 }
 
-check(PIPELINE.length > 10000, 'the CI pipeline is missing or truncated; refusing to inspect an empty workflow');
+check(
+	PIPELINE.length > 10000,
+	'the CI pipeline is missing or truncated; refusing to inspect an empty workflow'
+);
 // locate() throws unless exactly one `package-macos` job exists.
-check(pipeline.locate('package-macos').file === MACOS_BOX,
-	`the \`package-macos\` job, which builds and tests the launcher, must live in the macOS lane, ${MACOS_BOX}`);
-check(!/^ {2}test-swift-launcher:/m.test(pipeline.file(MACOS_BOX)),
-	'the launcher build and XCTest live in package-macos; a second macOS job for them would add a second lane entry');
+check(
+	pipeline.locate('package-macos').file === MACOS_BOX,
+	`the \`package-macos\` job, which builds and tests the launcher, must live in the macOS lane, ${MACOS_BOX}`
+);
+check(
+	!/^ {2}test-swift-launcher:/m.test(pipeline.file(MACOS_BOX)),
+	'the launcher build and XCTest live in package-macos; a second macOS job for them would add a second lane entry'
+);
 
 const swiftJob = withoutFullLineComments(pipeline.job('package-macos'));
 check(swiftJob.length > 100, '`package-macos` is absent or empty');
-check(/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
-	'`package-macos` must run the launcher build and XCTest on a real macOS runner');
-check(!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
-	'`package-macos` must be gating, not continue-on-error');
+check(
+	/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
+	'`package-macos` must run the launcher build and XCTest on a real macOS runner'
+);
+check(
+	!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
+	'`package-macos` must be gating, not continue-on-error'
+);
 // Fail fast: a red Hammerspoon suite spends no macOS minutes.
-check(JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
-	`package-macos must need e2e-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`);
+check(
+	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
+	`package-macos must need e2e-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
+);
 
 // The launcher build and XCTest precede the app build. LauncherLogTests append
 // to the real ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke
@@ -134,19 +152,31 @@ const PACKAGE_ORDER = [
 	'Run Swift launcher tests',
 	'Remove the launcher log the Swift tests wrote',
 	'Build ErgoptiPlus.app',
-	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
+	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)'
 ];
-const packageStepNames = pipeline.steps(pipeline.job('package-macos')).map((candidate) => candidate.name);
+const packageStepNames = pipeline
+	.steps(pipeline.job('package-macos'))
+	.map((candidate) => candidate.name);
 const packageOrder = PACKAGE_ORDER.map((name) => packageStepNames.indexOf(name));
-check(!packageOrder.some((at, index) => at < 0 || (index > 0 && at <= packageOrder[index - 1])),
-	`package-macos must run ${PACKAGE_ORDER.join(' < ')}; got: ${packageStepNames.join(' | ')}`);
-const logCleanup = pipeline.step(pipeline.job('package-macos'), 'Remove the launcher log the Swift tests wrote');
-check(pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ergopti_plus"'
-	&& pipeline.stepField(logCleanup, 'if') === null,
-	'package-macos must always remove ~/Library/Logs/ergopti_plus, the log the launcher tests write, before the app build');
-check(/if launcher_log\.exists\(\):\s*\n\s*raise RuntimeError\("Release launch requires a fresh launcher log"\)/
-	.test(fs.readFileSync(path.join(ROOT, 'tools', 'diagnostics', 'macos-release-launch.py'), 'utf8')),
-	'the release smoke no longer refuses a stale launcher log; re-derive why package-macos removes it');
+check(
+	!packageOrder.some((at, index) => at < 0 || (index > 0 && at <= packageOrder[index - 1])),
+	`package-macos must run ${PACKAGE_ORDER.join(' < ')}; got: ${packageStepNames.join(' | ')}`
+);
+const logCleanup = pipeline.step(
+	pipeline.job('package-macos'),
+	'Remove the launcher log the Swift tests wrote'
+);
+check(
+	pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ergopti_plus"' &&
+		pipeline.stepField(logCleanup, 'if') === null,
+	'package-macos must always remove ~/Library/Logs/ergopti_plus, the log the launcher tests write, before the app build'
+);
+check(
+	/if launcher_log\.exists\(\):\s*\n\s*raise RuntimeError\("Release launch requires a fresh launcher log"\)/.test(
+		fs.readFileSync(path.join(ROOT, 'tools', 'diagnostics', 'macos-release-launch.py'), 'utf8')
+	),
+	'the release smoke no longer refuses a stale launcher log; re-derive why package-macos removes it'
+);
 
 // The tests build in a scratch path of their own, the only SwiftPM tree the
 // cache restores, so the app build resolves its dependencies into a clean
@@ -156,103 +186,171 @@ const swiftCache = pipeline.step(pipeline.job('package-macos'), 'Cache SwiftPM d
 const cacheLines = swiftCache.split('\n');
 const pathAt = cacheLines.indexOf('          path: |');
 const pathEnd = cacheLines.findIndex((line, index) => index > pathAt && !/^ {12}\S/.test(line));
-const cachedPaths = pathAt < 0 ? [] : cacheLines.slice(pathAt + 1, pathEnd < 0 ? undefined : pathEnd).map((line) => line.trim());
-check(cachedPaths.length === 3 && cachedPaths.every((line) =>
-	/^\$\{\{ runner\.temp \}\}\/swift-launcher-ci\/(?:artifacts|checkouts|repositories)$/.test(line)),
-	`the SwiftPM cache must restore only the launcher tests' scratch path, got: ${cachedPaths.join(', ')}`);
+const cachedPaths =
+	pathAt < 0
+		? []
+		: cacheLines.slice(pathAt + 1, pathEnd < 0 ? undefined : pathEnd).map((line) => line.trim());
+check(
+	cachedPaths.length === 3 &&
+		cachedPaths.every((line) =>
+			/^\$\{\{ runner\.temp \}\}\/swift-launcher-ci\/(?:artifacts|checkouts|repositories)$/.test(
+				line
+			)
+		),
+	`the SwiftPM cache must restore only the launcher tests' scratch path, got: ${cachedPaths.join(', ')}`
+);
 
-const plistLintLine = swiftJob.split(/\r?\n/).find((line) =>
-	/\brun:\s*plutil\s+-lint\b/.test(line)) || '';
-check(plistLintLine.includes(
-	'static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist'
-), 'the macOS job must plutil-lint the exact bundled guardian LaunchAgent');
-check(!plistLintLine.includes('|| true'),
-	'the guardian plist lint step must not swallow malformed XML');
+const plistLintLine =
+	swiftJob.split(/\r?\n/).find((line) => /\brun:\s*plutil\s+-lint\b/.test(line)) || '';
+check(
+	plistLintLine.includes('static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist'),
+	'the macOS job must plutil-lint the exact bundled guardian LaunchAgent'
+);
+check(
+	!plistLintLine.includes('|| true'),
+	'the guardian plist lint step must not swallow malformed XML'
+);
 
 const buildLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift build\b/.test(line)) || '';
-check(buildLine.includes('--package-path static/ergopti_plus/macos/launcher'),
-	'the Swift build step must compile the packaged launcher directory');
-check(buildLine.endsWith(SWIFT_SCRATCH),
-	`the Swift build step must build in the tests' own scratch path, ${SWIFT_SCRATCH}`);
-check(/(?:^|\s)(?:-c|--configuration)\s+release(?:\s|$)/.test(buildLine),
-	'the Swift build step must compile the release configuration that ships');
-check(/(?:^|\s)--product\s+ErgoptiPlus(?:\s|$)/.test(buildLine),
-	'the Swift build step must compile the ErgoptiPlus executable product');
+check(
+	buildLine.includes('--package-path static/ergopti_plus/macos/launcher'),
+	'the Swift build step must compile the packaged launcher directory'
+);
+check(
+	buildLine.endsWith(SWIFT_SCRATCH),
+	`the Swift build step must build in the tests' own scratch path, ${SWIFT_SCRATCH}`
+);
+check(
+	/(?:^|\s)(?:-c|--configuration)\s+release(?:\s|$)/.test(buildLine),
+	'the Swift build step must compile the release configuration that ships'
+);
+check(
+	/(?:^|\s)--product\s+ErgoptiPlus(?:\s|$)/.test(buildLine),
+	'the Swift build step must compile the ErgoptiPlus executable product'
+);
 check(!buildLine.includes('|| true'), 'the Swift build step must not swallow compilation failure');
 
 const testStep = pipeline.step(swiftJob, 'Run Swift launcher tests');
-check(testStep.length > 100,
-	'`Run Swift launcher tests` is absent or too small to enforce a trustworthy XCTest verdict');
-check(/script -q \/dev\/null swift test\b/.test(testStep),
-	'the Swift test step must use a pseudo-terminal so the last completed XCTest is visible');
-check(testStep.includes('--package-path static/ergopti_plus/macos/launcher'),
-	'the Swift test step must execute the packaged launcher test target');
-check(testStep.includes(`swift test --package-path static/ergopti_plus/macos/launcher ${SWIFT_SCRATCH} `),
-	`the Swift test step must build in the tests' own scratch path, ${SWIFT_SCRATCH}`);
-check(!testStep.includes('|| true'), 'the Swift test step must not swallow XCTest failure');
-check(/set -euo pipefail/.test(testStep),
-	'the Swift test step must propagate failures through its log-capture pipeline');
-const logVariable = /\b([A-Za-z_][A-Za-z0-9_]*)=["']?\$\(mktemp\)["']?/.exec(testStep)?.[1] || '';
-check(logVariable.length > 0,
-	'the Swift test step must allocate one transcript file with mktemp');
 check(
-	logVariable.length > 0 && new RegExp(`\\btee\\s+["']?\\$${escapeRegExp(logVariable)}\\b`).test(testStep),
+	testStep.length > 100,
+	'`Run Swift launcher tests` is absent or too small to enforce a trustworthy XCTest verdict'
+);
+check(
+	/script -q \/dev\/null swift test\b/.test(testStep),
+	'the Swift test step must use a pseudo-terminal so the last completed XCTest is visible'
+);
+check(
+	testStep.includes('--package-path static/ergopti_plus/macos/launcher'),
+	'the Swift test step must execute the packaged launcher test target'
+);
+check(
+	testStep.includes(
+		`swift test --package-path static/ergopti_plus/macos/launcher ${SWIFT_SCRATCH} `
+	),
+	`the Swift test step must build in the tests' own scratch path, ${SWIFT_SCRATCH}`
+);
+check(!testStep.includes('|| true'), 'the Swift test step must not swallow XCTest failure');
+check(
+	/set -euo pipefail/.test(testStep),
+	'the Swift test step must propagate failures through its log-capture pipeline'
+);
+const logVariable = /\b([A-Za-z_][A-Za-z0-9_]*)=["']?\$\(mktemp\)["']?/.exec(testStep)?.[1] || '';
+check(logVariable.length > 0, 'the Swift test step must allocate one transcript file with mktemp');
+check(
+	logVariable.length > 0 &&
+		new RegExp(`\\btee\\s+["']?\\$${escapeRegExp(logVariable)}\\b`).test(testStep),
 	'the Swift test step must capture the complete pseudo-terminal transcript'
 );
 check(
-	logVariable.length > 0 && new RegExp(
-		`grep\\s+-Fq\\s+["']Test Suite 'All tests' passed["']\\s+["']?\\$${escapeRegExp(logVariable)}\\b`
-	).test(testStep),
+	logVariable.length > 0 &&
+		new RegExp(
+			`grep\\s+-Fq\\s+["']Test Suite 'All tests' passed["']\\s+["']?\\$${escapeRegExp(logVariable)}\\b`
+		).test(testStep),
 	'(macos-xctest-summary-required-2026-08-27) the Swift test step must require the successful summary from that transcript'
 );
-check(/::error::[^\n]*XCTest[^\n]*summary/.test(testStep) && /\bexit 1\b/.test(testStep),
-	'(macos-xctest-summary-required-2026-08-27) a missing XCTest summary must fail the job explicitly');
+check(
+	/::error::[^\n]*XCTest[^\n]*summary/.test(testStep) && /\bexit 1\b/.test(testStep),
+	'(macos-xctest-summary-required-2026-08-27) a missing XCTest summary must fail the job explicitly'
+);
 check(
 	/\.testTarget\s*\(\s*name:\s*"ErgoptiPlusTests"/s.test(PACKAGE),
 	'Package.swift must register the ErgoptiPlusTests target that CI claims to run'
 );
-check(!/\bDarwin\.flock\s*\(/.test(SWIFT_SOURCES),
-	'Swift 6.3 resolves `Darwin.flock(...)` as the struct; use ergoptiFlock instead');
-check(!/\b_NSGetEnviron\s*\(/.test(SWIFT_SOURCES),
-	'the current macOS SDK does not expose `_NSGetEnviron`; use duplicateProcessEnvironment');
-check(!/\bDarwin\.fork\s*\(/.test(SWIFT_SOURCES),
-	'Swift 6.3 marks `Darwin.fork()` unavailable; use the posix_spawn test helper');
-check(/ergopti_flock_compat\s*\(/.test(SWIFT_SOURCES),
-	'the Swift launcher must retain its C ABI flock compatibility shim');
-check(/return flock\s*\(descriptor, operation\)/.test(POSIX_SHIM),
-	'the C compatibility target must call the real BSD flock function');
-check(/"CPOSIXCompatibility"/.test(PACKAGE),
-	'Package.swift must link the explicit C POSIX compatibility target');
-check(sparklePackagePin !== null,
-	'Package.swift must pin Sparkle with `exact:` so clean builds cannot float to a new release');
 check(
-	sparklePackagePin !== null
-		&& sparkleSigningToolPin !== null
-		&& sparklePackagePin[1] === sparkleSigningToolPin[1],
+	!/\bDarwin\.flock\s*\(/.test(SWIFT_SOURCES),
+	'Swift 6.3 resolves `Darwin.flock(...)` as the struct; use ergoptiFlock instead'
+);
+check(
+	!/\b_NSGetEnviron\s*\(/.test(SWIFT_SOURCES),
+	'the current macOS SDK does not expose `_NSGetEnviron`; use duplicateProcessEnvironment'
+);
+check(
+	!/\bDarwin\.fork\s*\(/.test(SWIFT_SOURCES),
+	'Swift 6.3 marks `Darwin.fork()` unavailable; use the posix_spawn test helper'
+);
+check(
+	/ergopti_flock_compat\s*\(/.test(SWIFT_SOURCES),
+	'the Swift launcher must retain its C ABI flock compatibility shim'
+);
+check(
+	/return flock\s*\(descriptor, operation\)/.test(POSIX_SHIM),
+	'the C compatibility target must call the real BSD flock function'
+);
+check(
+	/"CPOSIXCompatibility"/.test(PACKAGE),
+	'Package.swift must link the explicit C POSIX compatibility target'
+);
+check(
+	sparklePackagePin !== null,
+	'Package.swift must pin Sparkle with `exact:` so clean builds cannot float to a new release'
+);
+check(
+	sparklePackagePin !== null &&
+		sparkleSigningToolPin !== null &&
+		sparklePackagePin[1] === sparkleSigningToolPin[1],
 	'the launcher and release signing tool must use the same exact Sparkle version'
 );
-check(!/hashFiles\([^\r\n)]*Package\.resolved/.test(PIPELINE),
-	'the SwiftPM cache key must not pretend an ignored Package.resolved is tracked input');
-check(/SWIFT_BACKTRACE:\s*enable=yes/.test(testStep),
-	'the Swift XCTest step must emit an actionable backtrace after a native crash');
-check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
-	'the Swift launcher must retain its owned posix_spawn environment builder');
-check(/let kPOSIXTestHelperFlag\s*=\s*"--posix-test-helper"/.test(SWIFT_SOURCES),
-	'the cross-process POSIX tests must retain their debug-only helper role');
-check(/func runPOSIXTestHelper\s*\(/.test(SWIFT_SOURCES),
-	'the real launcher must implement the cross-process POSIX test helper');
-check(!/^let k[A-Za-z0-9_]*\s*(?::[^=]+)?=/m.test(MAIN_SWIFT),
-	'shared constants must not live in executable main.swift globals');
 check(
-	!/terminateProcess:\s*@escaping\s*\(Int32\)\s*->\s*Void\s*=\s*\{\s*Darwin\.exit/s.test(SWIFT_SOURCES),
+	!/hashFiles\([^\r\n)]*Package\.resolved/.test(PIPELINE),
+	'the SwiftPM cache key must not pretend an ignored Package.resolved is tracked input'
+);
+check(
+	/SWIFT_BACKTRACE:\s*enable=yes/.test(testStep),
+	'the Swift XCTest step must emit an actionable backtrace after a native crash'
+);
+check(
+	/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
+	'the Swift launcher must retain its owned posix_spawn environment builder'
+);
+check(
+	/let kPOSIXTestHelperFlag\s*=\s*"--posix-test-helper"/.test(SWIFT_SOURCES),
+	'the cross-process POSIX tests must retain their debug-only helper role'
+);
+check(
+	/func runPOSIXTestHelper\s*\(/.test(SWIFT_SOURCES),
+	'the real launcher must implement the cross-process POSIX test helper'
+);
+check(
+	!/^let k[A-Za-z0-9_]*\s*(?::[^=]+)?=/m.test(MAIN_SWIFT),
+	'shared constants must not live in executable main.swift globals'
+);
+check(
+	!/terminateProcess:\s*@escaping\s*\(Int32\)\s*->\s*Void\s*=\s*\{\s*Darwin\.exit/s.test(
+		SWIFT_SOURCES
+	),
 	'(macos-xctest-explicit-termination-2026-08-27) guardian runtimes must choose process termination explicitly'
 );
-const guardianRuntimeTestCalls = (LEASE_WORKER_TESTS.match(/RemapLeaseGuardianRuntime\s*\(/g) || []).length;
+const guardianRuntimeTestCalls = (LEASE_WORKER_TESTS.match(/RemapLeaseGuardianRuntime\s*\(/g) || [])
+	.length;
 const explicitTestTerminations = (LEASE_WORKER_TESTS.match(/terminateProcess\s*:/g) || []).length;
-check(guardianRuntimeTestCalls >= 25,
-	'the guardian-runtime termination guard must cover the complete XCTest call-site class');
-check(explicitTestTerminations === guardianRuntimeTestCalls,
-	'(macos-xctest-explicit-termination-2026-08-27) every XCTest guardian runtime must replace process exit');
+check(
+	guardianRuntimeTestCalls >= 25,
+	'the guardian-runtime termination guard must cover the complete XCTest call-site class'
+);
+check(
+	explicitTestTerminations === guardianRuntimeTestCalls,
+	'(macos-xctest-explicit-termination-2026-08-27) every XCTest guardian runtime must replace process exit'
+);
 
 // The lane result is the aggregate gate. A job-level `if:` or `continue-on-error`
 // is how a job becomes skipped or ignored while its lane still reports success,
@@ -263,22 +361,34 @@ check(explicitTestTerminations === guardianRuntimeTestCalls,
 const BOX_FILES = {
 	macos: MACOS_BOX,
 	windows: '.github/workflows/ci-windows.yml',
-	linux: '.github/workflows/ci-linux.yml',
+	linux: '.github/workflows/ci-linux.yml'
 };
-const ALLOWED_JOB_IFS = { 'windows-ok': 'always()', 'macos-ok': 'always()', 'linux-ok': 'always()' };
+const ALLOWED_JOB_IFS = {
+	'windows-ok': 'always()',
+	'macos-ok': 'always()',
+	'linux-ok': 'always()'
+};
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
 		const condition = pipeline.field(boxJob.body, 'if');
-		check(condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition,
+		check(
+			condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition,
 			`${rel}: job \`${boxJob.id}\` has job-level \`if: ${condition}\`; only ` +
-				`${Object.entries(ALLOWED_JOB_IFS).map(([id, value]) => `${id} (${value})`).join(' and ')} may`);
-		check(pipeline.field(boxJob.body, 'continue-on-error') === null,
-			`${rel}: job \`${boxJob.id}\` must not set continue-on-error; its failure must fail the box`);
+				`${Object.entries(ALLOWED_JOB_IFS)
+					.map(([id, value]) => `${id} (${value})`)
+					.join(' and ')} may`
+		);
+		check(
+			pipeline.field(boxJob.body, 'continue-on-error') === null,
+			`${rel}: job \`${boxJob.id}\` must not set continue-on-error; its failure must fail the box`
+		);
 	}
 }
 for (const [id, condition] of Object.entries(ALLOWED_JOB_IFS)) {
-	check(pipeline.field(pipeline.job(id), 'if') === condition,
-		`the allow-listed job \`${id}\` must keep exactly \`if: ${condition}\``);
+	check(
+		pipeline.field(pipeline.job(id), 'if') === condition,
+		`the allow-listed job \`${id}\` must keep exactly \`if: ${condition}\``
+	);
 }
 // The same holds one level down: a gating step with continue-on-error turns its
 // own failure green, and its job then gates nothing. Only the report-only AHK
@@ -288,41 +398,58 @@ for (const entry of pipeline.files()) {
 	for (const pipelineJob of pipeline.jobs(entry.rel)) {
 		for (const pipelineStep of pipeline.steps(pipelineJob.body)) {
 			const value = pipeline.stepField(pipelineStep.body, 'continue-on-error');
-			check(value === null || ALLOWED_STEP_CONTINUE_ON_ERROR[pipelineStep.name] === value,
+			check(
+				value === null || ALLOWED_STEP_CONTINUE_ON_ERROR[pipelineStep.name] === value,
 				`${entry.rel}: step "${pipelineStep.name}" of job \`${pipelineJob.id}\` sets continue-on-error: ${value}; ` +
-					'only the report-only "Annotate AHK results" may');
+					'only the report-only "Annotate AHK results" may'
+			);
 		}
 	}
 }
 for (const [name, value] of Object.entries(ALLOWED_STEP_CONTINUE_ON_ERROR)) {
-	check(pipeline.stepField(pipeline.findStep(name).body, 'continue-on-error') === value,
-		`the allow-listed step "${name}" must keep exactly continue-on-error: ${value}`);
+	check(
+		pipeline.stepField(pipeline.findStep(name).body, 'continue-on-error') === value,
+		`the allow-listed step "${name}" must keep exactly continue-on-error: ${value}`
+	);
 }
 
 // ci.yml calls each lane by its file, and release waits on all three and on
 // the root, where it reads the plan.
 const callers = pipeline.calls();
 check(
-	JSON.stringify(callers.map((call) => [call.id, call.uses]).sort()) === JSON.stringify(
-		Object.entries(BOX_FILES).map(([id, rel]) => [id, `./${rel}`]).sort()),
+	JSON.stringify(callers.map((call) => [call.id, call.uses]).sort()) ===
+		JSON.stringify(
+			Object.entries(BOX_FILES)
+				.map(([id, rel]) => [id, `./${rel}`])
+				.sort()
+		),
 	`ci.yml must call exactly the three OS lanes, got ${JSON.stringify(callers)}`
 );
 const release = pipeline.job('release');
 const releaseNeeds = pipeline.needsOf(release);
 for (const needed of ['validate', ...Object.keys(BOX_FILES)]) {
-	check(releaseNeeds.includes(needed), `release must need \`${needed}\`, got [${releaseNeeds.join(', ')}]`);
+	check(
+		releaseNeeds.includes(needed),
+		`release must need \`${needed}\`, got [${releaseNeeds.join(', ')}]`
+	);
 	// locate() throws when the needed job no longer exists under that id.
-	check(pipeline.locate(needed).file === pipeline.ENTRY_REL,
-		`release's need \`${needed}\` must be a job of ${pipeline.ENTRY_REL}`);
+	check(
+		pipeline.locate(needed).file === pipeline.ENTRY_REL,
+		`release's need \`${needed}\` must be a job of ${pipeline.ENTRY_REL}`
+	);
 }
 // No status function: the implicit success() over needs is the "all three OS
 // are green" gate. The event test keeps a regression in the plan script alone
 // from publishing a pull request or a dispatch run, where PAT_ERGOPTI is read.
 const releaseIf = pipeline.field(release, 'if');
-check(!/\b(?:always|success|failure|cancelled)\s*\(/.test(releaseIf || ''),
-	`release.if must hold no status function, got: ${releaseIf}`);
-check(releaseIf === "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
-	`release.if must be exactly github.event_name == 'push' && needs.validate.outputs.release == 'true', got: ${releaseIf}`);
+check(
+	!/\b(?:always|success|failure|cancelled)\s*\(/.test(releaseIf || ''),
+	`release.if must hold no status function, got: ${releaseIf}`
+);
+check(
+	releaseIf === "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+	`release.if must be exactly github.event_name == 'push' && needs.validate.outputs.release == 'true', got: ${releaseIf}`
+);
 
 // Forks receive no secrets: without a stand-in key their package opens a
 // Sparkle error and the launch gate fails every outside contribution. A
@@ -330,70 +457,120 @@ check(releaseIf === "github.event_name == 'push' && needs.validate.outputs.relea
 // matches no private key, so installed copies could never update again.
 const packageJob = pipeline.job('package-macos');
 const packageBuild = withoutFullLineComments(pipeline.step(packageJob, 'Build ErgoptiPlus.app'));
-check(/^\s+ERGOPTI_RELEASE:\s*\$\{\{\s*inputs\.release\s*\}\}\s*$/m.test(packageBuild),
-	'(fork-sparkle-key) the package build must know whether it builds the release');
-check(/if \[ -z "\$SPARKLE_PUBLIC_KEY" \]; then[\s\S]*?\/dev\/urandom[\s\S]*?fi[\s\S]*?build_macos_app\.sh/.test(packageBuild),
-	'(fork-sparkle-key) the unreleased package must substitute a throwaway Sparkle key when the secret is absent');
 check(
-	/if \[ -z "\$SPARKLE_PUBLIC_KEY" \]; then\s*if \[ "\$ERGOPTI_RELEASE" = true \]; then[^\n]*\n\s*echo "::error::[^\n]*\n\s*exit 1\s*\n\s*fi[\s\S]*?\/dev\/urandom/
-		.test(packageBuild),
+	/^\s+ERGOPTI_RELEASE:\s*\$\{\{\s*inputs\.release\s*\}\}\s*$/m.test(packageBuild),
+	'(fork-sparkle-key) the package build must know whether it builds the release'
+);
+check(
+	/if \[ -z "\$SPARKLE_PUBLIC_KEY" \]; then[\s\S]*?\/dev\/urandom[\s\S]*?fi[\s\S]*?build_macos_app\.sh/.test(
+		packageBuild
+	),
+	'(fork-sparkle-key) the unreleased package must substitute a throwaway Sparkle key when the secret is absent'
+);
+check(
+	/if \[ -z "\$SPARKLE_PUBLIC_KEY" \]; then\s*if \[ "\$ERGOPTI_RELEASE" = true \]; then[^\n]*\n\s*echo "::error::[^\n]*\n\s*exit 1\s*\n\s*fi[\s\S]*?\/dev\/urandom/.test(
+		packageBuild
+	),
 	'(fork-sparkle-key) a release build must fail with ::error:: before the throwaway Sparkle key is generated'
 );
-check(!/\/dev\/urandom/.test(pipeline.textWithout('package-macos')),
-	'(fork-sparkle-key) only the package-macos build may generate a throwaway Sparkle key');
+check(
+	!/\/dev\/urandom/.test(pipeline.textWithout('package-macos')),
+	'(fork-sparkle-key) only the package-macos build may generate a throwaway Sparkle key'
+);
 
 // Every push/PR launches the packaged app over user states; a release run
 // launches the release archive itself on Apple silicon and Intel.
 const launch = withoutFullLineComments(pipeline.job('launch'));
 check(pipeline.locate('launch').file === MACOS_BOX, `the launch gate must live in ${MACOS_BOX}`);
-check(pipeline.needsOf(launch).includes('package-macos'),
-	'(symlinked-config-dir) the launch gate must wait for the package it launches');
-check(/^\s+name:\s*assets-macos\s*$/m.test(pipeline.step(launch, 'Download the package built by this run')),
-	'(symlinked-config-dir) the launch gate must install the assets-macos archive that release publishes');
-check(/^\s+scenario:\s*\$\{\{\s*fromJSON\(needs\.package-macos\.outputs\.scenarios\)\s*\}\}\s*$/m.test(launch),
-	'(symlinked-config-dir) the launch scenarios must come from the profile package-macos resolved');
+check(
+	pipeline.needsOf(launch).includes('package-macos'),
+	'(symlinked-config-dir) the launch gate must wait for the package it launches'
+);
+check(
+	/^\s+name:\s*assets-macos\s*$/m.test(
+		pipeline.step(launch, 'Download the package built by this run')
+	),
+	'(symlinked-config-dir) the launch gate must install the assets-macos archive that release publishes'
+);
+check(
+	/^\s+scenario:\s*\$\{\{\s*fromJSON\(needs\.package-macos\.outputs\.scenarios\)\s*\}\}\s*$/m.test(
+		launch
+	),
+	'(symlinked-config-dir) the launch scenarios must come from the profile package-macos resolved'
+);
 // Exact, not a shape: a release run launching on Intel only, or a CI run
 // launching nowhere, kept a looser pattern green.
-check(launch.split('\n').includes(
-	"        runner: ${{ fromJSON(inputs.release && '[\"macos-15\",\"macos-15-intel\"]' || '[\"macos-15\"]') }}"),
-	'(symlinked-config-dir) a release run must launch on macos-15 and macos-15-intel, any other run on macos-15');
+check(
+	launch
+		.split('\n')
+		.includes(
+			'        runner: ${{ fromJSON(inputs.release && \'["macos-15","macos-15-intel"]\' || \'["macos-15"]\') }}'
+		),
+	'(symlinked-config-dir) a release run must launch on macos-15 and macos-15-intel, any other run on macos-15'
+);
 // The release profile adds the release-only scenarios (source_logs,
 // symlink_config_documents); a profile stuck on ci drops them from every
 // release without a failure.
 const profileStep = pipeline.step(packageJob, 'Resolve the launch-gate scenario profile');
-check(profileStep.split('\n').includes("          PROFILE: ${{ inputs.release && 'release' || 'ci' }}"),
-	'(symlinked-config-dir) a release run must resolve the release scenario profile, any other run the ci one');
-check(pipeline.stepField(profileStep, 'run') ===
-	'python3 tools/diagnostics/macos_launch_gate.py --print-matrix "$PROFILE" >> "$GITHUB_OUTPUT"',
-	'(symlinked-config-dir) the scenario profile must come from macos_launch_gate.py, the one scenario list');
+check(
+	profileStep.split('\n').includes("          PROFILE: ${{ inputs.release && 'release' || 'ci' }}"),
+	'(symlinked-config-dir) a release run must resolve the release scenario profile, any other run the ci one'
+);
+check(
+	pipeline.stepField(profileStep, 'run') ===
+		'python3 tools/diagnostics/macos_launch_gate.py --print-matrix "$PROFILE" >> "$GITHUB_OUTPUT"',
+	'(symlinked-config-dir) the scenario profile must come from macos_launch_gate.py, the one scenario list'
+);
 // The private Sparkle key reaches one step: the one that signs. Anywhere else,
 // a build script or a job-level env could read or log it.
-const privateKeyReads = withoutFullLineComments(pipeline.file(MACOS_BOX)).match(/secrets\.SPARKLE_ED_PRIVATE_KEY\b/g) ?? [];
-check(privateKeyReads.length === 1 &&
-	/secrets\.SPARKLE_ED_PRIVATE_KEY\b/.test(pipeline.step(packageJob, 'Sign zip with Sparkle EdDSA key')),
-	`only "Sign zip with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`);
+const privateKeyReads =
+	withoutFullLineComments(pipeline.file(MACOS_BOX)).match(/secrets\.SPARKLE_ED_PRIVATE_KEY\b/g) ??
+	[];
+check(
+	privateKeyReads.length === 1 &&
+		/secrets\.SPARKLE_ED_PRIVATE_KEY\b/.test(
+			pipeline.step(packageJob, 'Sign zip with Sparkle EdDSA key')
+		),
+	`only "Sign zip with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`
+);
 // The code-signing .p12 and its password reach the one step that signs the
 // bundle: the build. An ad hoc release must say so on the run, because every
 // installed copy then loses its TCC and Login Items grants at the update.
 for (const secret of ['MACOS_SIGNING_CERTIFICATE_BASE64', 'MACOS_SIGNING_CERTIFICATE_PASSWORD']) {
-	const reads = withoutFullLineComments(pipeline.file(MACOS_BOX)).match(new RegExp(`secrets\\.${secret}\\b`, 'g')) ?? [];
-	check(reads.length === 1 && packageBuild.split('\n').includes(`          ${secret}: \${{ secrets.${secret} }}`),
-		`(stable-signing-identity) only "Build ErgoptiPlus.app" may read secrets.${secret} in ${MACOS_BOX}, found ${reads.length} read(s)`);
+	const reads =
+		withoutFullLineComments(pipeline.file(MACOS_BOX)).match(
+			new RegExp(`secrets\\.${secret}\\b`, 'g')
+		) ?? [];
+	check(
+		reads.length === 1 &&
+			packageBuild.split('\n').includes(`          ${secret}: \${{ secrets.${secret} }}`),
+		`(stable-signing-identity) only "Build ErgoptiPlus.app" may read secrets.${secret} in ${MACOS_BOX}, found ${reads.length} read(s)`
+	);
 }
-check(/if \[ "\$ERGOPTI_RELEASE" = true \] && \[ -z "\$MACOS_SIGNING_CERTIFICATE_BASE64" \]; then\s*echo "::warning[^\n]*\n\s*fi[\s\S]*?build_macos_app\.sh/
-	.test(packageBuild),
-	'(stable-signing-identity) an ad hoc release build must emit a ::warning:: before build_macos_app.sh runs');
+check(
+	/if \[ "\$ERGOPTI_RELEASE" = true \] && \[ -z "\$MACOS_SIGNING_CERTIFICATE_BASE64" \]; then\s*echo "::warning[^\n]*\n\s*fi[\s\S]*?build_macos_app\.sh/.test(
+		packageBuild
+	),
+	'(stable-signing-identity) an ad hoc release build must emit a ::warning:: before build_macos_app.sh runs'
+);
 // The judge is the gate itself: it must run the verdict script on the installed
 // app for this leg's scenario, and neither skip nor forgive a red verdict.
 const judge = pipeline.step(launch, 'Launch over the user state and judge it');
-check(pipeline.stepField(judge, 'if') === null && pipeline.stepField(judge, 'continue-on-error') === null,
-	'(symlinked-config-dir) the launch verdict step must set neither if nor continue-on-error');
+check(
+	pipeline.stepField(judge, 'if') === null &&
+		pipeline.stepField(judge, 'continue-on-error') === null,
+	'(symlinked-config-dir) the launch verdict step must set neither if nor continue-on-error'
+);
 const JUDGE_RUN =
 	/^python3 tools\/diagnostics\/macos_launch_gate\.py \/Applications\/ErgoptiPlus\.app "\$RUNNER_TEMP\/launch-gate" "\$\{\{ matrix\.scenario \}\}"(?:\s|$)/;
-check(JUDGE_RUN.test(pipeline.stepField(judge, 'run') ?? ''),
-	'(symlinked-config-dir) the launch verdict step must run macos_launch_gate.py on the installed app for the matrix scenario');
-check(!fs.existsSync(path.join(ROOT, '.github', 'workflows', 'macos-launch-gate.yml')),
-	'macos-launch-gate.yml was inlined as the launch job; a second copy of the gate must not come back');
+check(
+	JUDGE_RUN.test(pipeline.stepField(judge, 'run') ?? ''),
+	'(symlinked-config-dir) the launch verdict step must run macos_launch_gate.py on the installed app for the matrix scenario'
+);
+check(
+	!fs.existsSync(path.join(ROOT, '.github', 'workflows', 'macos-launch-gate.yml')),
+	'macos-launch-gate.yml was inlined as the launch job; a second copy of the gate must not come back'
+);
 
 if (failures.length > 0) {
 	console.error('[FAIL] macOS Swift launcher CI coverage:');
@@ -401,4 +578,6 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log('[OK] macOS CI requires a completed XCTest summary before the app build, and every OS lane gates the release success-only.');
+console.log(
+	'[OK] macOS CI requires a completed XCTest summary before the app build, and every OS lane gates the release success-only.'
+);

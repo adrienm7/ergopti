@@ -21,11 +21,14 @@ function fail(message) {
 function parseArgs(argv) {
 	const command = argv[0];
 	if (!['check', 'write', 'bootstrap-from-claude'].includes(command)) {
-		fail('usage: node tools/agents/sync-skills.cjs <check|write|bootstrap-from-claude> [--root <repo>]');
+		fail(
+			'usage: node tools/agents/sync-skills.cjs <check|write|bootstrap-from-claude> [--root <repo>]'
+		);
 	}
 	let root = DEFAULT_ROOT;
 	for (let index = 1; index < argv.length; index += 1) {
-		if (argv[index] !== '--root' || !argv[index + 1]) fail(`unknown or incomplete argument: ${argv[index]}`);
+		if (argv[index] !== '--root' || !argv[index + 1])
+			fail(`unknown or incomplete argument: ${argv[index]}`);
 		root = path.resolve(argv[index + 1]);
 		index += 1;
 	}
@@ -63,8 +66,10 @@ function compareTrees(source, target) {
 	const targetSet = new Set(targetFiles);
 	const missing = sourceFiles.filter((file) => !targetSet.has(file));
 	const stale = targetFiles.filter((file) => !sourceSet.has(file));
-	const changed = sourceFiles.filter((file) =>
-		targetSet.has(file) && !fs.readFileSync(path.join(source, file)).equals(fs.readFileSync(path.join(target, file))),
+	const changed = sourceFiles.filter(
+		(file) =>
+			targetSet.has(file) &&
+			!fs.readFileSync(path.join(source, file)).equals(fs.readFileSync(path.join(target, file)))
 	);
 	return { sourceFiles, missing, stale, changed };
 }
@@ -102,7 +107,8 @@ function run(argv) {
 	assertSafeDirectory(root, mirror, 'Claude mirror directory');
 
 	if (command === 'bootstrap-from-claude') {
-		if (listFiles(canonical).length > 0) fail('bootstrap refused: .agents/skills is already non-empty');
+		if (listFiles(canonical).length > 0)
+			fail('bootstrap refused: .agents/skills is already non-empty');
 		const copied = syncTrees(mirror, canonical);
 		return { command, canonical, mirror, copied };
 	}
@@ -114,7 +120,9 @@ function run(argv) {
 	const comparison = compareTrees(canonical, mirror);
 	if (comparison.sourceFiles.length === 0) fail('canonical skill tree is empty');
 	if (comparison.missing.length || comparison.stale.length || comparison.changed.length) {
-		fail(`skill mirror drift: ${comparison.missing.length} missing, ${comparison.stale.length} stale, ${comparison.changed.length} changed`);
+		fail(
+			`skill mirror drift: ${comparison.missing.length} missing, ${comparison.stale.length} stale, ${comparison.changed.length} changed`
+		);
 	}
 	return { command, canonical, mirror, files: comparison.sourceFiles.length };
 }

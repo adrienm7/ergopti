@@ -103,7 +103,9 @@ if (!fs.existsSync(p.join(ROOT, CANONICAL))) {
 // ── 2. Nobody else may define them ──────────────────────────────────────────
 const files = walk(SP);
 if (files.length < 500) {
-	errors.push(`walk found only ${files.length} source file(s) — the scan is broken, and this gate would pass over nothing`);
+	errors.push(
+		`walk found only ${files.length} source file(s) — the scan is broken, and this gate would pass over nothing`
+	);
 }
 
 const found = {}; // rel → [formatter, …]
@@ -140,7 +142,9 @@ for (const [rel, fns] of Object.entries(found)) {
 for (const [rel, fns] of Object.entries(DUPLICATES)) {
 	for (const fn of fns) {
 		if (!(found[rel] || []).includes(fn)) {
-			errors.push(`DUPLICATES lists ${rel} → "${fn}", but no such definition exists any more. Delete the entry.`);
+			errors.push(
+				`DUPLICATES lists ${rel} → "${fn}", but no such definition exists any more. Delete the entry.`
+			);
 		}
 	}
 }

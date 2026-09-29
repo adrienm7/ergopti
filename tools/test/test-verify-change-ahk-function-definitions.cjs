@@ -32,19 +32,19 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true,
 assert.equal(
 	hasAhkFunctionDefinition(multiline, '_Updater_CancelSelfUpdateTransaction'),
 	true,
-	'a real multiline signature must satisfy the silent-failure pre-check',
+	'a real multiline signature must satisfy the silent-failure pre-check'
 );
 
 const nestedDefaults = [
 	'Resolve(Config := Map("predicate", IsReady("value)")), /* signature comment */',
 	'\tMessage := "escaped backtick: `` and quote: `"") {',
 	'\treturn Config',
-	'}',
+	'}'
 ].join('\n');
 assert.equal(
 	hasAhkFunctionDefinition(nestedDefaults, 'Resolve'),
 	true,
-	'nested defaults, quoted parentheses and comments must not truncate a signature',
+	'nested defaults, quoted parentheses and comments must not truncate a signature'
 );
 
 const callOnly = String.raw`
@@ -58,7 +58,7 @@ Sibling() {
 assert.equal(
 	hasAhkFunctionDefinition(callOnly, '_Updater_CancelSelfUpdateTransaction'),
 	false,
-	'a column-zero call site must not masquerade as a function definition',
+	'a column-zero call site must not masquerade as a function definition'
 );
 
 const blockCommentOnly = String.raw`
@@ -71,24 +71,24 @@ Ghost() {
 assert.equal(
 	hasAhkFunctionDefinition(blockCommentOnly, 'Ghost'),
 	false,
-	'a pseudo-definition inside a block comment must not prove that a scanned symbol exists',
+	'a pseudo-definition inside a block comment must not prove that a scanned symbol exists'
 );
 
 const singleQuotedNoise = [
 	"Pattern := 'an embedded \" and Ghost() { stay string data }'",
 	'Real() {',
 	'\treturn true',
-	'}',
+	'}'
 ].join('\n');
 assert.equal(
 	hasAhkFunctionDefinition(singleQuotedNoise, 'Ghost'),
 	false,
-	'a pseudo-definition inside an AHK single-quoted string must not satisfy the pre-check',
+	'a pseudo-definition inside an AHK single-quoted string must not satisfy the pre-check'
 );
 assert.equal(
 	hasAhkFunctionDefinition(singleQuotedNoise, 'Real'),
 	true,
-	'a real definition after a single-quoted string must remain reachable',
+	'a real definition after a single-quoted string must remain reachable'
 );
 
 console.log('verify-change AHK function-definition scanner: OK');

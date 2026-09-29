@@ -6,9 +6,9 @@ Generated tray-menu manifest consumed by both drivers' menu renderers. `menu_man
 
 ## Key files
 
-| File                | Description                                                               |
-| ------------------- | ------------------------------------------------------------------------- |
-| `menu_manifest.json`| Machine-generated full menu tree; never hand-edited                       |
+| File                 | Description                                         |
+| -------------------- | --------------------------------------------------- |
+| `menu_manifest.json` | Machine-generated full menu tree; never hand-edited |
 
 ## Editing rules
 

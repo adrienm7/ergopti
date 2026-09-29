@@ -29,7 +29,10 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const TOML = fs.readFileSync(path.join(SP, '_shared', 'modules', 'tooltip', 'constants.toml'), 'utf8');
+const TOML = fs.readFileSync(
+	path.join(SP, '_shared', 'modules', 'tooltip', 'constants.toml'),
+	'utf8'
+);
 const AHK = fs.readFileSync(path.join(SP, 'windows', 'infra', 'ui_style.ahk'), 'utf8');
 const LUA = fs.readFileSync(path.join(SP, 'macos', 'ui', 'tooltip', 'config.lua'), 'utf8');
 
@@ -99,7 +102,8 @@ const PAIRED = [
 
 const ahkReads = (section, key) =>
 	new RegExp(`_UiStyleRequire(?:Hex)?\\(c,\\s*"${section}",\\s*"${key}"\\)`).test(AHK);
-const luaReads = (section, key) => new RegExp(`require_key\\("${section}",\\s*"${key}"\\)`).test(LUA);
+const luaReads = (section, key) =>
+	new RegExp(`require_key\\("${section}",\\s*"${key}"\\)`).test(LUA);
 
 function declared(section, key) {
 	if (!toml[section] || !(key in toml[section])) {
@@ -111,8 +115,10 @@ function declared(section, key) {
 
 for (const [section, key] of SHARED) {
 	if (!declared(section, key)) continue;
-	if (!ahkReads(section, key)) errors.push(`Windows does not read [${section}].${key} through _UiStyleRequire`);
-	if (!luaReads(section, key)) errors.push(`macOS does not read [${section}].${key} through require_key`);
+	if (!ahkReads(section, key))
+		errors.push(`Windows does not read [${section}].${key} through _UiStyleRequire`);
+	if (!luaReads(section, key))
+		errors.push(`macOS does not read [${section}].${key} through require_key`);
 }
 
 /** RGB triple in 0..255 from a TOML value: "#RRGGBB", a number (white), or an inline table. */
@@ -130,8 +136,10 @@ function rgb(raw) {
 
 for (const [section, ahkKey, hsKey] of PAIRED) {
 	if (!declared(section, ahkKey) || !declared(section, hsKey)) continue;
-	if (!ahkReads(section, ahkKey)) errors.push(`Windows does not read [${section}].${ahkKey} through _UiStyleRequire`);
-	if (!luaReads(section, hsKey)) errors.push(`macOS does not read [${section}].${hsKey} through require_key`);
+	if (!ahkReads(section, ahkKey))
+		errors.push(`Windows does not read [${section}].${ahkKey} through _UiStyleRequire`);
+	if (!luaReads(section, hsKey))
+		errors.push(`macOS does not read [${section}].${hsKey} through require_key`);
 	if (!ahkKey.endsWith('_hex')) continue;
 	const a = rgb(toml[section][ahkKey]);
 	const b = rgb(toml[section][hsKey]);
@@ -146,12 +154,32 @@ for (const [section, ahkKey, hsKey] of PAIRED) {
 // Style globals must start empty: a literal is a second source that silently
 // wins whenever the loader is skipped (the old UI_OFFSET_RIGHT := 15).
 const STYLE_GLOBALS = [
-	'UI_FONT_NAME', 'UI_FONT_SIZE_MAIN', 'UI_FONT_SIZE_HINT', 'UI_FONT_SIZE_INFO', 'UI_PAD_X', 'UI_PAD_Y',
-	'UI_LINE_SPACING', 'UI_HINT_SPACING', 'UI_CORNER_RADIUS', 'UI_BG_HEX', 'UI_HINT_COLOR_HEX',
-	'UI_INFO_COLOR_HEX', 'UI_LOADING_TEXT_HEX', 'UI_OFFSET_BELOW', 'UI_OFFSET_RIGHT', 'UI_WINDOW_OFFSET_Y',
-	'UI_SCREEN_MARGIN', 'UI_MAX_CARET_HEIGHT_PX', 'UI_LLM_CORR_SEL_HEX', 'UI_LLM_NW_SEL_HEX',
-	'UI_LLM_UNSEL_GRAY_HEX', 'UI_LLM_LOADING_HEX', 'UI_LLM_CURSOR_HEX', 'UI_LLM_CMD_SEL_HEX',
-	'UI_LLM_CMD_DIM_HEX', 'UI_AI_LOADING_HEX'
+	'UI_FONT_NAME',
+	'UI_FONT_SIZE_MAIN',
+	'UI_FONT_SIZE_HINT',
+	'UI_FONT_SIZE_INFO',
+	'UI_PAD_X',
+	'UI_PAD_Y',
+	'UI_LINE_SPACING',
+	'UI_HINT_SPACING',
+	'UI_CORNER_RADIUS',
+	'UI_BG_HEX',
+	'UI_HINT_COLOR_HEX',
+	'UI_INFO_COLOR_HEX',
+	'UI_LOADING_TEXT_HEX',
+	'UI_OFFSET_BELOW',
+	'UI_OFFSET_RIGHT',
+	'UI_WINDOW_OFFSET_Y',
+	'UI_SCREEN_MARGIN',
+	'UI_MAX_CARET_HEIGHT_PX',
+	'UI_LLM_CORR_SEL_HEX',
+	'UI_LLM_NW_SEL_HEX',
+	'UI_LLM_UNSEL_GRAY_HEX',
+	'UI_LLM_LOADING_HEX',
+	'UI_LLM_CURSOR_HEX',
+	'UI_LLM_CMD_SEL_HEX',
+	'UI_LLM_CMD_DIM_HEX',
+	'UI_AI_LOADING_HEX'
 ];
 for (const name of STYLE_GLOBALS) {
 	const init = new RegExp(`^global ${name}\\s*:=\\s*(\\S+)`, 'm').exec(AHK);
@@ -160,7 +188,9 @@ for (const name of STYLE_GLOBALS) {
 		continue;
 	}
 	if (init[1] !== '0' && init[1] !== '""') {
-		errors.push(`ui_style.ahk initialises ${name} to ${init[1]} — style globals start as 0 / "" sentinels`);
+		errors.push(
+			`ui_style.ahk initialises ${name} to ${init[1]} — style globals start as 0 / "" sentinels`
+		);
 	}
 }
 
@@ -171,10 +201,12 @@ if (/static\s+MARGIN\s*:=/.test(HELPERS)) {
 	errors.push('ui/tooltip/helpers.ahk declares its own MARGIN; read [layout].screen_margin');
 }
 const rendererStart = LLM.indexOf('_LLM_TooltipFooterTexts() {');
-if (rendererStart === -1) errors.push('ui/tooltip/llm.ahk no longer defines _LLM_TooltipFooterTexts; re-anchor this scan');
+if (rendererStart === -1)
+	errors.push('ui/tooltip/llm.ahk no longer defines _LLM_TooltipFooterTexts; re-anchor this scan');
 const llmRenderer = rendererStart === -1 ? '' : LLM.slice(rendererStart);
 const literal = /"[^"\n]*\bc[0-9A-Fa-f]{6}\b[^"\n]*"/.exec(llmRenderer);
-if (literal) errors.push(`the LLM renderer hardcodes a colour (${literal[0]}); read it from constants.toml`);
+if (literal)
+	errors.push(`the LLM renderer hardcodes a colour (${literal[0]}); read it from constants.toml`);
 
 if (errors.length) {
 	console.error('\x1b[31m[ERROR] tooltip style single source:\x1b[0m');

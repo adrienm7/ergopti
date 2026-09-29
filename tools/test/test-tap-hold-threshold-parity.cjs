@@ -41,7 +41,9 @@ const DEFAULTS = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'tap_hold'
 const errors = [];
 
 if (!fs.existsSync(DEFAULTS)) {
-	console.error(`\x1b[31m[ERROR] ${DEFAULTS} is missing — the shared tap-hold defaults moved.\x1b[0m`);
+	console.error(
+		`\x1b[31m[ERROR] ${DEFAULTS} is missing — the shared tap-hold defaults moved.\x1b[0m`
+	);
 	process.exit(1);
 }
 const src = fs.readFileSync(DEFAULTS, 'utf8');

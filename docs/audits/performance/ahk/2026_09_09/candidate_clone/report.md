@@ -6,10 +6,10 @@ opened with `SQLiteConst.OPEN_RO`, into a private memory database. No ledger
 was opened or modified, and no token, application name or payload was exported.
 
 | Sequential sample | Clone time (ms) |
-| --- | --- |
-| 1 | 1402.475 |
-| 2 | 1371.335 |
-| 3 | 1293.045 |
+| ----------------- | --------------- |
+| 1                 | 1402.475        |
+| 2                 | 1371.335        |
+| 3                 | 1293.045        |
 
 The image contained 171,482 pages and occupied 702,390,272 bytes. QPC timing
 covered the clone call only. Each clone was closed before the next sample;
@@ -48,10 +48,10 @@ worker premise was explicit: `KLHook.prev_app` was empty, so no resident live
 foreground interval was added. No other local benchmark or suite ran concurrently.
 
 | Sequential sample | Manifest construction (ms) | JSON encoding (ms) |
-| --- | --- | --- |
-| 1 | 1315.012 | 871.378 |
-| 2 | 1317.078 | 915.471 |
-| 3 | 1387.135 | 925.163 |
+| ----------------- | -------------------------- | ------------------ |
+| 1                 | 1315.012                   | 871.378            |
+| 2                 | 1317.078                   | 915.471            |
+| 3                 | 1387.135                   | 925.163            |
 
 Each result contained 87 dates, 717 date/application cells and 1,910,238 UTF-8
 bytes. Parsing and checking date/cell counts happened outside the timed regions.
@@ -59,20 +59,20 @@ These totals exclude the n-gram payload and all GUI rendering.
 
 One subsequent diagnostic pass measured individual manifest helpers:
 
-| Helper | Time (ms) |
-| --- | --- |
-| App/day | 51.127 |
-| Time buckets | 115.572 |
-| Bursts | 53.137 |
-| Sessions | 29.977 |
-| Character classes | 20.095 |
-| Errors | 16.686 |
-| Ergonomics | 11.359 |
-| Layouts | 0.536 |
-| Key hold | 0.475 |
-| Window titles | 169.532 |
-| Hourly series | 277.632 |
-| Five-minute series | 737.356 |
+| Helper             | Time (ms) |
+| ------------------ | --------- |
+| App/day            | 51.127    |
+| Time buckets       | 115.572   |
+| Bursts             | 53.137    |
+| Sessions           | 29.977    |
+| Character classes  | 20.095    |
+| Errors             | 16.686    |
+| Ergonomics         | 11.359    |
+| Layouts            | 0.536     |
+| Key hold           | 0.475     |
+| Window titles      | 169.532   |
+| Hourly series      | 277.632   |
+| Five-minute series | 737.356   |
 
 That diagnostic pass reassembled exactly the same encoded manifest as the
 production entry point. Its individual timings are one sample each and must
@@ -96,10 +96,10 @@ calls but introduced another AHK JSON decode. The candidate and baseline produce
 identical canonical encoded projections in all three samples.
 
 | Sample | Existing two helpers (ms) | Grouped-JSON candidate (ms) |
-| --- | --- | --- |
-| 1 | 924.143 | 1821.228 |
-| 2 | 933.599 | 1823.990 |
-| 3 | 938.161 | 1855.483 |
+| ------ | ------------------------- | --------------------------- |
+| 1      | 924.143                   | 1821.228                    |
+| 2      | 933.599                   | 1823.990                    |
+| 3      | 938.161                   | 1855.483                    |
 
 Both paths used the same read-only real image and returned Maps for 81 dates
 with time-series data. Validation/encoding was outside the timed sections.
@@ -119,14 +119,14 @@ each bin's scalar JSON; AHK merges only nonempty error histograms using the
 existing helper, then appends that owned property structurally. It returns
 encoded series per date/application, not Maps requiring another encoding pass.
 
-| Sample | Series | Existing build + encode (ms) | Encoded candidate (ms) |
-| --- | --- | --- | --- |
-| 1 | Hourly | 395.835 | 299.377 |
-| 1 | Five-minute | 933.892 | 713.850 |
-| 2 | Hourly | 364.114 | 278.876 |
-| 2 | Five-minute | 918.504 | 698.891 |
-| 3 | Hourly | 383.356 | 286.707 |
-| 3 | Five-minute | 935.134 | 724.584 |
+| Sample | Series      | Existing build + encode (ms) | Encoded candidate (ms) |
+| ------ | ----------- | ---------------------------- | ---------------------- |
+| 1      | Hourly      | 395.835                      | 299.377                |
+| 1      | Five-minute | 933.892                      | 713.850                |
+| 2      | Hourly      | 364.114                      | 278.876                |
+| 2      | Five-minute | 918.504                      | 698.891                |
+| 3      | Hourly      | 383.356                      | 286.707                |
+| 3      | Five-minute | 935.134                      | 724.584                |
 
 The baseline includes encoding those series, unlike the preceding two-helper
 comparison. Every date/application series was parsed and canonically compared
@@ -152,10 +152,10 @@ owned cell-object boundaries. It clones each metadata cell before removing the
 two series fields, so the original cell is not modified.
 
 | Sample | Existing complete build + encode (ms) | Complete candidate (ms) |
-| --- | --- | --- |
-| 1 | 2279.791 | 2011.864 |
-| 2 | 2295.398 | 2013.161 |
-| 3 | 2300.626 | 1997.755 |
+| ------ | ------------------------------------- | ----------------------- |
+| 1      | 2279.791                              | 2011.864                |
+| 2      | 2295.398                              | 2013.161                |
+| 3      | 2300.626                              | 1997.755                |
 
 All outputs contained 1,910,238 UTF-8 bytes and were canonically equal after
 parsing outside the timed sections. Savings were 267.927–302.871 ms, roughly
@@ -208,10 +208,10 @@ image was opened read-only, no suite ran concurrently, and canonical comparison
 remained outside timed sections. Each result contained 1,910,238 UTF-8 bytes.
 
 | Sample | Existing complete build + encode (ms) | Production candidate (ms) |
-| --- | --- | --- |
-| 1 | 2468.517 | 2103.043 |
-| 2 | 2454.369 | 2128.686 |
-| 3 | 2431.850 | 2143.713 |
+| ------ | ------------------------------------- | ------------------------- |
+| 1      | 2468.517                              | 2103.043                  |
+| 2      | 2454.369                              | 2128.686                  |
+| 3      | 2431.850                              | 2143.713                  |
 
 The measured reduction is 288.137–365.474 ms (11.8–14.8 percent); the maximum
 candidate sample is 2143.713 ms. This is neither a cold-filesystem measurement

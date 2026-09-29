@@ -34,7 +34,9 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
 const driversRoot = path.join(root, 'static', 'ergopti_plus');
-const en = JSON.parse(fs.readFileSync(path.join(driversRoot, '_shared', 'data', 'locales', 'en.json'), 'utf8'));
+const en = JSON.parse(
+	fs.readFileSync(path.join(driversRoot, '_shared', 'data', 'locales', 'en.json'), 'utf8')
+);
 const FAMILY = /^(?:updater|menu\.about|menu\.updates)\./;
 const SKIPPED_DIRS = new Set(['tests', 'Tests', 'locales', '.build', 'node_modules']);
 const errors = [];
@@ -49,8 +51,14 @@ const SYNTAX_BY_EXTENSION = {
 	'.swift': C_LIKE,
 	'.js': C_LIKE,
 	'.cjs': C_LIKE,
-	'.html': { ...C_LIKE, block: [['/*', '*/'], ['<!--', '-->']] },
-	'.json': { line: [], block: [], quotes: ['"'], escape: '\\' },
+	'.html': {
+		...C_LIKE,
+		block: [
+			['/*', '*/'],
+			['<!--', '-->']
+		]
+	},
+	'.json': { line: [], block: [], quotes: ['"'], escape: '\\' }
 };
 
 /**
@@ -85,8 +93,9 @@ function stripComments(source, syntax) {
 				continue;
 			}
 		}
-		const block = syntax.block.find(([opening]) => source.startsWith(opening, i)
-			&& (!syntax.ahk || lineStart));
+		const block = syntax.block.find(
+			([opening]) => source.startsWith(opening, i) && (!syntax.ahk || lineStart)
+		);
 		if (block) {
 			const close = source.indexOf(block[1], i + block[0].length);
 			const skipped = source.slice(i, close < 0 ? source.length : close + block[1].length);
@@ -94,8 +103,10 @@ function stripComments(source, syntax) {
 			i += skipped.length;
 			continue;
 		}
-		const line = syntax.line.find((opening) => source.startsWith(opening, i)
-			&& (!syntax.ahk || lineStart || /\s/.test(source[i - 1])));
+		const line = syntax.line.find(
+			(opening) =>
+				source.startsWith(opening, i) && (!syntax.ahk || lineStart || /\s/.test(source[i - 1]))
+		);
 		if (line) {
 			const end = source.indexOf('\n', i);
 			i = end < 0 ? source.length : end;
@@ -148,8 +159,11 @@ function isRead(key, sources) {
 	const prefix = `${segments.slice(0, -1).join('.')}.`;
 	const suffix = segments[segments.length - 1];
 	const composed = new RegExp(`["']${escape(prefix)}["']\\s*(?:\\.\\.?|\\+)`);
-	return sources.some(({ driver, code }) => composed.test(code)
-		&& sources.some((other) => other.driver === driver && quoted(other.code, suffix)));
+	return sources.some(
+		({ driver, code }) =>
+			composed.test(code) &&
+			sources.some((other) => other.driver === driver && quoted(other.code, suffix))
+	);
 }
 
 // The guard itself: a key named only in a comment, or below a prefix that
@@ -158,46 +172,86 @@ const lua = SYNTAX_BY_EXTENSION['.lua'];
 const ahk = SYNTAX_BY_EXTENSION['.ahk'];
 const js = SYNTAX_BY_EXTENSION['.js'];
 const SELF_TEST = [
-	{ key: 'updater.gone', read: false, sources: [{ driver: 'macos', code: stripComments('-- t("updater.gone")\nlocal a = 1', lua) }] },
-	{ key: 'updater.gone', read: false, sources: [{ driver: 'macos', code: stripComments('--[[ "updater.gone" ]] x()', lua) }] },
-	{ key: 'updater.gone', read: false, sources: [{ driver: 'windows', code: stripComments('x := 1 ; t("updater.gone")', ahk) }] },
-	{ key: 'updater.gone', read: false, sources: [{ driver: 'windows', code: stripComments('/*\nt("updater.gone")\n*/', ahk) }] },
-	{ key: 'updater.gone', read: false, sources: [{ driver: 'linux', code: stripComments('f(); // "updater.gone"', js) }] },
-	{ key: 'updater.kept', read: true, sources: [{ driver: 'windows', code: stripComments('t("updater.kept") ; note', ahk) }] },
-	{ key: 'updater.kept', read: true, sources: [{ driver: 'macos', code: stripComments('get("updater.kept") -- note', lua) }] },
-	{ key: 'updater.kept', read: true, sources: [{ driver: 'windows', code: stripComments('s := "a;b" . t("updater.kept")', ahk) }] },
+	{
+		key: 'updater.gone',
+		read: false,
+		sources: [{ driver: 'macos', code: stripComments('-- t("updater.gone")\nlocal a = 1', lua) }]
+	},
+	{
+		key: 'updater.gone',
+		read: false,
+		sources: [{ driver: 'macos', code: stripComments('--[[ "updater.gone" ]] x()', lua) }]
+	},
+	{
+		key: 'updater.gone',
+		read: false,
+		sources: [{ driver: 'windows', code: stripComments('x := 1 ; t("updater.gone")', ahk) }]
+	},
+	{
+		key: 'updater.gone',
+		read: false,
+		sources: [{ driver: 'windows', code: stripComments('/*\nt("updater.gone")\n*/', ahk) }]
+	},
+	{
+		key: 'updater.gone',
+		read: false,
+		sources: [{ driver: 'linux', code: stripComments('f(); // "updater.gone"', js) }]
+	},
+	{
+		key: 'updater.kept',
+		read: true,
+		sources: [{ driver: 'windows', code: stripComments('t("updater.kept") ; note', ahk) }]
+	},
+	{
+		key: 'updater.kept',
+		read: true,
+		sources: [{ driver: 'macos', code: stripComments('get("updater.kept") -- note', lua) }]
+	},
+	{
+		key: 'updater.kept',
+		read: true,
+		sources: [{ driver: 'windows', code: stripComments('s := "a;b" . t("updater.kept")', ahk) }]
+	},
 	{
 		key: 'menu.about.update.install_error',
 		read: false,
-		sources: [{ driver: 'macos', code: stripComments('get("menu.about." .. name) local n = "install_error"', lua) }],
+		sources: [
+			{
+				driver: 'macos',
+				code: stripComments('get("menu.about." .. name) local n = "install_error"', lua)
+			}
+		]
 	},
 	{
 		key: 'menu.about.frequency.12h',
 		read: true,
 		sources: [
 			{ driver: 'windows', code: stripComments('t("menu.about.frequency." . Preset.Code)', ahk) },
-			{ driver: 'windows', code: stripComments('P := [{ Code: "12h" }]', ahk) },
-		],
+			{ driver: 'windows', code: stripComments('P := [{ Code: "12h" }]', ahk) }
+		]
 	},
 	{
 		key: 'menu.about.frequency.12h',
 		read: false,
 		sources: [
 			{ driver: 'windows', code: stripComments('t("menu.about.frequency." . Preset.Code)', ahk) },
-			{ driver: 'linux', code: stripComments('local p = { code = "12h" }', lua) },
-		],
-	},
+			{ driver: 'linux', code: stripComments('local p = { code = "12h" }', lua) }
+		]
+	}
 ];
 for (const { key, read, sources } of SELF_TEST) {
 	if (isRead(key, sources) !== read) {
-		errors.push(`guard self-test: ${key} must count as ${read ? 'read' : 'unread'} in ${JSON.stringify(sources)}`);
+		errors.push(
+			`guard self-test: ${key} must count as ${read ? 'read' : 'unread'} in ${JSON.stringify(sources)}`
+		);
 	}
 }
 
 const sources = driverSources(driversRoot);
 const family = Object.keys(en).filter((key) => FAMILY.test(key));
 // Floor: a family pattern that stopped matching would pass over nothing.
-if (family.length < 40) errors.push(`expected the updater catalogue family, found only ${family.length} key(s)`);
+if (family.length < 40)
+	errors.push(`expected the updater catalogue family, found only ${family.length} key(s)`);
 for (const key of family) {
 	if (!isRead(key, sources)) {
 		errors.push(`${key} is in the catalogue but no driver shows it: remove it from all 21 locales`);
@@ -209,4 +263,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log(`[OK] all ${family.length} updater, About-menu and Updates-menu strings are shown by a driver.`);
+console.log(
+	`[OK] all ${family.length} updater, About-menu and Updates-menu strings are shown by a driver.`
+);

@@ -26,10 +26,10 @@ cache port; candidate used the new default. Both used the same source and timing
 wrapper. Values below are total first-pass guard wall time in milliseconds.
 
 | Pair | HotIf baseline | HotIf candidate | Tooltip baseline | Tooltip candidate |
-| --- | ---: | ---: | ---: | ---: |
-| 1 | 2893.169 | 2181.814 | 2605.841 | 1309.373 |
-| 2 | 2867.419 | 2159.218 | 2743.109 | 1271.607 |
-| 3 | 2937.909 | 2178.646 | 2708.799 | 1293.750 |
+| ---- | -------------: | --------------: | ---------------: | ----------------: |
+| 1    |       2893.169 |        2181.814 |         2605.841 |          1309.373 |
+| 2    |       2867.419 |        2159.218 |         2743.109 |          1271.607 |
+| 3    |       2937.909 |        2178.646 |         2708.799 |          1293.750 |
 
 HotIf saved 708-759 ms (about 25-26%); tooltip expiry saved 1296-1472 ms
 (about 50-54%). Candidate maxima were 2181.814 and 1309.373 ms respectively.

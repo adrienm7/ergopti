@@ -6,7 +6,11 @@
 		{ "id": "lowercase_input", "input": "ctrl+shift+s", "expect": "Ctrl+Shift+S" },
 		{ "id": "uppercase_input", "input": "CTRL+SHIFT+S", "expect": "Ctrl+Shift+S" },
 		{ "id": "modifier_order_normalised", "input": "shift+ctrl+s", "expect": "Ctrl+Shift+S" },
-		{ "id": "full_modifier_order", "input": "fn+shift+alt+ctrl+cmd+k", "expect": "Cmd+Ctrl+Alt+Shift+Fn+K" },
+		{
+			"id": "full_modifier_order",
+			"input": "fn+shift+alt+ctrl+cmd+k",
+			"expect": "Cmd+Ctrl+Alt+Shift+Fn+K"
+		},
 		{ "id": "alias_command", "input": "command+c", "expect": "Cmd+C" },
 		{ "id": "alias_win", "input": "win+e", "expect": "Cmd+E" },
 		{ "id": "alias_super", "input": "super+e", "expect": "Cmd+E" },

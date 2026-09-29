@@ -62,7 +62,12 @@ const NON_FEATURE_FALLTHROUGH_BASELINE = 82;
 // key. Verified empirically before exempting them — across nine days of real
 // driver logs, not one `hotstrings.personal.*` candidate key ever reached `t()`,
 // so these rows never touch the cascade this test models.
-const NO_LOCALE_KEY_BY_DESIGN = [{ prefix: 'hotstrings.personal.', why: "user-authored sections; label comes from the TOML section description" }];
+const NO_LOCALE_KEY_BY_DESIGN = [
+	{
+		prefix: 'hotstrings.personal.',
+		why: 'user-authored sections; label comes from the TOML section description'
+	}
+];
 
 function isExemptByDesign(entryPath) {
 	return NO_LOCALE_KEY_BY_DESIGN.some((e) => entryPath.startsWith(e.prefix));
@@ -145,7 +150,8 @@ function candidateKeys(descKey, entryPath) {
 	const dyn = combined.indexOf('.dynamic.');
 	if (dyn >= 0) {
 		const section = combined.slice(dyn + 9);
-		if (section !== '') out.push(`dynamichotstrings.${section}`, `dynamichotstrings.${strip(section)}`);
+		if (section !== '')
+			out.push(`dynamichotstrings.${section}`, `dynamichotstrings.${strip(section)}`);
 	}
 	return out;
 }
@@ -240,7 +246,9 @@ check(
 	featureBad.length
 		? `these rows render their RAW ID in the tray menu: ${featureBad
 				.map((r) => `${r.path} -> "${fallbackLabel(r.key, r.path)}"`)
-				.join(', ')}. Add the folded locale key (underscores stripped) to en.json and every sibling locale.`
+				.join(
+					', '
+				)}. Add the folded locale key (underscores stripped) to en.json and every sibling locale.`
 		: ''
 );
 
@@ -249,7 +257,9 @@ check(
 	otherBad.length <= NON_FEATURE_FALLTHROUGH_BASELINE,
 	`${otherBad.length} entries do not resolve, baseline is ${NON_FEATURE_FALLTHROUGH_BASELINE}. New offenders: ${otherBad
 		.map((r) => r.path)
-		.join(', ')}. Never raise the baseline to make a change pass — add the folded locale key instead.`
+		.join(
+			', '
+		)}. Never raise the baseline to make a change pass — add the folded locale key instead.`
 );
 
 if (otherBad.length < NON_FEATURE_FALLTHROUGH_BASELINE) {

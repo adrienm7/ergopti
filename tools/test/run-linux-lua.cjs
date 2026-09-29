@@ -61,7 +61,9 @@ function findRuntime(spawn = spawnSync) {
  */
 function run(argv) {
 	if (argv.length === 0) {
-		console.error('usage: node tools/test/run-linux-lua.cjs <entry.lua relative to static/ergopti_plus/linux> [args...]');
+		console.error(
+			'usage: node tools/test/run-linux-lua.cjs <entry.lua relative to static/ergopti_plus/linux> [args...]'
+		);
 		return 2;
 	}
 	const runtime = findRuntime();
@@ -69,7 +71,9 @@ function run(argv) {
 		console.error(`No Lua runtime found (${RUNTIMES.join(', ')}).`);
 		return 1;
 	}
-	console.error(`[run-linux-lua] ${runtime} ${argv.join(' ')} (in ${path.relative(ROOT, LINUX_ROOT)})`);
+	console.error(
+		`[run-linux-lua] ${runtime} ${argv.join(' ')} (in ${path.relative(ROOT, LINUX_ROOT)})`
+	);
 	const result = spawnSync(runtime, argv, { cwd: LINUX_ROOT, stdio: 'inherit' });
 	if (result.error) {
 		console.error(`[run-linux-lua] ${runtime} could not start: ${result.error.message}`);

@@ -58,11 +58,11 @@ implementation and checks exact payload equality in addition to cardinality.
 `typing-date-queue-production-01` exited 0 with all equivalence and cleanup
 checks passing. Milliseconds, baseline/candidate in paired order:
 
-| Workload | Pair 1 | Pair 2 | Pair 3 |
-| --- | --- | --- | --- |
-| Dense day | 10940.852 / 7215.125 | 16622.595 / 7830.279 | 14832.977 / 8144.009 |
-| Sparse day | 377.284 / 381.844 | 391.071 / 366.442 | 406.319 / 373.663 |
-| Two distant days | 996.646 / 821.390 | 799.693 / 772.328 | 811.294 / 764.066 |
+| Workload         | Pair 1               | Pair 2               | Pair 3               |
+| ---------------- | -------------------- | -------------------- | -------------------- |
+| Dense day        | 10940.852 / 7215.125 | 16622.595 / 7830.279 | 14832.977 / 8144.009 |
+| Sparse day       | 377.284 / 381.844    | 391.071 / 366.442    | 406.319 / 373.663    |
+| Two distant days | 996.646 / 821.390    | 799.693 / 772.328    | 811.294 / 764.066    |
 
 Maximum dense latency was 16622.595 ms baseline and 8144.009 ms candidate.
 However, the other agent started a verifier at local 00:20:30 during this

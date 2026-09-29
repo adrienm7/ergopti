@@ -43,7 +43,7 @@ const PRE_CONSENT_KEYS = [
 	'updater.update_dialog_title',
 	'updater.update_dialog_header',
 	'updater.update_dialog_install',
-	'menu.about.update_now',
+	'menu.about.update_now'
 ];
 
 // Copy shown only once a consented download is staged; it defines each
@@ -84,7 +84,7 @@ const READY_BY_LOCALE = {
 	sv: WORD('(?:klar|redo)'),
 	tr: /hazır/iu,
 	uk: /готов/iu,
-	zh: /就绪|准备好/u,
+	zh: /就绪|准备好/u
 };
 
 // English also states the download itself; anything but "downloaded only"
@@ -93,14 +93,22 @@ const EN_DOWNLOADED = /\b(?:has been|was|already|is) downloaded\b(?!\s+only)/i;
 const QUOTES = /["«»„“”「」『』]/u;
 const PLACEHOLDER = /\{[A-Za-z0-9_]+\}/g;
 
-const locales = fs.readdirSync(localesDir).filter((name) => name.endsWith('.json'))
-	.map((name) => name.slice(0, -'.json'.length)).sort();
+const locales = fs
+	.readdirSync(localesDir)
+	.filter((name) => name.endsWith('.json'))
+	.map((name) => name.slice(0, -'.json'.length))
+	.sort();
 if (locales.length !== 21) errors.push(`expected 21 locale catalogues, found ${locales.length}`);
 const missingPatterns = locales.filter((code) => !(code in READY_BY_LOCALE));
-if (missingPatterns.length > 0) errors.push(`no "ready" pattern for locale(s) ${missingPatterns.join(', ')}`);
+if (missingPatterns.length > 0)
+	errors.push(`no "ready" pattern for locale(s) ${missingPatterns.join(', ')}`);
 
-const catalogs = Object.fromEntries(locales.map((code) =>
-	[code, JSON.parse(fs.readFileSync(path.join(localesDir, `${code}.json`), 'utf8'))]));
+const catalogs = Object.fromEntries(
+	locales.map((code) => [
+		code,
+		JSON.parse(fs.readFileSync(path.join(localesDir, `${code}.json`), 'utf8'))
+	])
+);
 const placeholders = (text) => (text.match(PLACEHOLDER) ?? []).sort().join(' ');
 
 // The list must track copy a driver really shows, or it guards nothing.
@@ -116,10 +124,12 @@ function collectSources(dir) {
 		}
 	}
 }
-for (const driver of ['windows', 'macos', 'linux']) collectSources(path.join(root, 'static', 'ergopti_plus', driver));
+for (const driver of ['windows', 'macos', 'linux'])
+	collectSources(path.join(root, 'static', 'ergopti_plus', driver));
 const driverText = driverSources.join('\n');
 for (const key of PRE_CONSENT_KEYS) {
-	if (!driverText.includes(`"${key}"`)) errors.push(`${key} is no longer shown by any driver: update PRE_CONSENT_KEYS`);
+	if (!driverText.includes(`"${key}"`))
+		errors.push(`${key} is no longer shown by any driver: update PRE_CONSENT_KEYS`);
 }
 
 for (const code of locales) {
@@ -128,7 +138,9 @@ for (const code of locales) {
 	if (!ready) continue;
 	const staged = catalog[POST_DOWNLOAD_KEY];
 	if (typeof staged !== 'string' || !ready.test(staged)) {
-		errors.push(`${code}: the "ready" pattern ${ready} does not match ${POST_DOWNLOAD_KEY}, so it guards nothing`);
+		errors.push(
+			`${code}: the "ready" pattern ${ready} does not match ${POST_DOWNLOAD_KEY}, so it guards nothing`
+		);
 	}
 	for (const key of PRE_CONSENT_KEYS) {
 		const text = catalog[key];
@@ -137,16 +149,22 @@ for (const code of locales) {
 			continue;
 		}
 		if (ready.test(text)) {
-			errors.push(`${code}: ${key} calls the update ready before the user chose to install it: ${text}`);
+			errors.push(
+				`${code}: ${key} calls the update ready before the user chose to install it: ${text}`
+			);
 		}
 		if (code === 'en' && EN_DOWNLOADED.test(text)) {
 			errors.push(`en: ${key} claims a download before consent: ${text}`);
 		}
 		if (placeholders(text) !== placeholders(catalogs.en[key])) {
-			errors.push(`${code}: ${key} must keep the placeholders of en (${placeholders(catalogs.en[key])}): ${text}`);
+			errors.push(
+				`${code}: ${key} must keep the placeholders of en (${placeholders(catalogs.en[key])}): ${text}`
+			);
 		}
 		if (NOTIFICATION_KEYS.includes(key) && QUOTES.test(text)) {
-			errors.push(`${code}: ${key} quotes a menu label, but each tray names its update row differently: ${text}`);
+			errors.push(
+				`${code}: ${key} quotes a menu label, but each tray names its update row differently: ${text}`
+			);
 		}
 	}
 	const prompt = catalog[PROMPT_KEY];
@@ -156,8 +174,10 @@ for (const code of locales) {
 	if (consent === '' || consent === prompt) {
 		errors.push(`${code}: ${PROMPT_KEY} has no consent sentence after its first one: ${prompt}`);
 	} else if (toast.replace(FIRST_SENTENCE, '') !== consent) {
-		errors.push(`${code}: ${TOAST_KEY} must follow its first sentence with the consent of ${PROMPT_KEY} ("${consent}"), `
-			+ `not send the user to one place to install from: ${toast}`);
+		errors.push(
+			`${code}: ${TOAST_KEY} must follow its first sentence with the consent of ${PROMPT_KEY} ("${consent}"), ` +
+				`not send the user to one place to install from: ${toast}`
+		);
 	}
 }
 
@@ -166,4 +186,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log(`[OK] ${PRE_CONSENT_KEYS.length} pre-consent updater strings claim no download in ${locales.length} locales.`);
+console.log(
+	`[OK] ${PRE_CONSENT_KEYS.length} pre-consent updater strings claim no download in ${locales.length} locales.`
+);

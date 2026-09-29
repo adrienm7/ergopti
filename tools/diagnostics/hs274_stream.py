@@ -12,7 +12,7 @@ from hs274_baseline_frames import BaselineFrames
 def read_stream(output, partial=False):
     """During observation, inspect only complete lines; final reads reject truncation."""
     if partial:
-        output = output[:output.rfind("\n") + 1]
+        output = output[: output.rfind("\n") + 1]
         if not output:
             return None
     if not output or not output.endswith("\n"):
@@ -20,10 +20,20 @@ def read_stream(output, partial=False):
     frames = [json.loads(line, object_pairs_hook=unique_object) for line in output.splitlines()]
     opened = frames[0]
     fields = {"version", "kind", "coverage", "incarnation", "lease"}
-    expected_open = fields | ({"baseline"} if isinstance(opened, dict) and "baseline" in opened else set())
-    if not isinstance(opened, dict) or set(opened) != expected_open or opened.get("kind") != "opened":
+    expected_open = fields | (
+        {"baseline"} if isinstance(opened, dict) and "baseline" in opened else set()
+    )
+    if (
+        not isinstance(opened, dict)
+        or set(opened) != expected_open
+        or opened.get("kind") != "opened"
+    ):
         raise ValueError("Missing stream handshake")
-    if type(opened["version"]) is not int or opened["version"] != 1 or opened["coverage"] != "fixture_only":
+    if (
+        type(opened["version"]) is not int
+        or opened["version"] != 1
+        or opened["coverage"] != "fixture_only"
+    ):
         raise ValueError("Unexpected stream protocol or coverage")
     incarnation = opened["incarnation"]
     if not isinstance(incarnation, str):
@@ -37,7 +47,11 @@ def read_stream(output, partial=False):
     baseline = BaselineFrames(opened["baseline"]) if "baseline" in opened else None
     records = []
     for frame in frames[1:]:
-        if not isinstance(frame, dict) or not fields <= set(frame) or not isinstance(frame.get("kind"), str):
+        if (
+            not isinstance(frame, dict)
+            or not fields <= set(frame)
+            or not isinstance(frame.get("kind"), str)
+        ):
             raise ValueError("Invalid stream frame")
         for field in fields - {"kind"}:
             if type(frame[field]) is not type(opened[field]) or frame[field] != opened[field]:
@@ -54,8 +68,18 @@ def read_stream(output, partial=False):
         if not isinstance(frame["records"], list) or not frame["records"]:
             raise ValueError("Empty or invalid published batch")
         for row in frame["records"]:
-            expected = {"sequence", "device", "timestamp", "value", "has_page", "has_usage", "page", "usage",
-                        "has_cookie", "cookie"}
+            expected = {
+                "sequence",
+                "device",
+                "timestamp",
+                "value",
+                "has_page",
+                "has_usage",
+                "page",
+                "usage",
+                "has_cookie",
+                "cookie",
+            }
             if not isinstance(row, dict) or set(row) != expected:
                 raise ValueError("Invalid stream record fields")
             decoded = dict(row)
@@ -115,11 +139,19 @@ def validate_stream(output, capture):
 def fixture_drain(device, *, held=False):
     """Require the complete recorded fixture shape, including trailing auxiliaries."""
     filename = "hs274-native-cookie-held.json" if held else "hs274-native-capture.json"
-    reference = json.loads((Path(__file__).with_name("fixtures") / filename).read_text(encoding="utf-8"))
+    reference = json.loads(
+        (Path(__file__).with_name("fixtures") / filename).read_text(encoding="utf-8")
+    )
     if held:
         reference = reference["capture"]
-    expected = [{key: value for key, value in row.items() if key not in ("timestamp", "device", "has_cookie", "cookie")}
-                for row in reference["records"]]
+    expected = [
+        {
+            key: value
+            for key, value in row.items()
+            if key not in ("timestamp", "device", "has_cookie", "cookie")
+        }
+        for row in reference["records"]
+    ]
     if not expected:
         raise ValueError("Missing native fixture drain reference")
 
@@ -130,8 +162,11 @@ def fixture_drain(device, *, held=False):
         for index, row in enumerate(rows):
             # Drain checks event shape; validate_stream separately compares every
             # cookie with the independent receipt from this exact native run.
-            actual = {key: value for key, value in row.items()
-                      if key not in ("timestamp", "device", "has_cookie", "cookie")}
+            actual = {
+                key: value
+                for key, value in row.items()
+                if key not in ("timestamp", "device", "has_cookie", "cookie")
+            }
             if row["device"] != device or actual != expected[index]:
                 raise ValueError("Native fixture stream differs from its drain reference")
         return len(rows) == len(expected)
@@ -153,7 +188,13 @@ def validate_interruption(output, expected_opened):
     terminal = json.loads(lines[-1], object_pairs_hook=unique_object)
     expected = dict(opened, kind="lost", reason="interrupted")
     expected.pop("baseline", None)
-    if not isinstance(terminal, dict) or set(terminal) != set(expected) or any(
-            type(terminal[key]) is not type(value) or terminal[key] != value for key, value in expected.items()):
+    if (
+        not isinstance(terminal, dict)
+        or set(terminal) != set(expected)
+        or any(
+            type(terminal[key]) is not type(value) or terminal[key] != value
+            for key, value in expected.items()
+        )
+    ):
         raise ValueError("Capture did not report the expected monitor interruption")
     return {"opened": opened, "terminal": terminal}

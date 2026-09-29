@@ -48,10 +48,17 @@ const errors = [];
 // `version=` entry tools/build/write_build_stamp.sh writes in release builds.
 const versionSrc = stripLua(read('infra/version.lua'));
 if (/M\.VERSION\s*=\s*"/.test(versionSrc)) {
-	errors.push('infra/version.lua: M.VERSION must be resolved from the build stamp, not typed as a literal');
+	errors.push(
+		'infra/version.lua: M.VERSION must be resolved from the build stamp, not typed as a literal'
+	);
 }
-if (!/Snapshot\.build_version\(/.test(versionSrc) || !/M\.VERSION\s*,\s*M\.SOURCE\s*=\s*M\.resolve\(\)/.test(versionSrc)) {
-	errors.push('infra/version.lua: must resolve M.VERSION through Snapshot.build_version (the build stamp)');
+if (
+	!/Snapshot\.build_version\(/.test(versionSrc) ||
+	!/M\.VERSION\s*,\s*M\.SOURCE\s*=\s*M\.resolve\(\)/.test(versionSrc)
+) {
+	errors.push(
+		'infra/version.lua: must resolve M.VERSION through Snapshot.build_version (the build stamp)'
+	);
 }
 // The updater validates a staged release against the same stamp entry.
 const installerSrc = stripLua(read('modules/updater/installer.lua'));
@@ -86,7 +93,9 @@ for (const rel of CONSUMERS) {
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] Linux driver version is not single-sourced from infra/version.lua:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Linux driver version is not single-sourced from infra/version.lua:\x1b[0m'
+	);
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }

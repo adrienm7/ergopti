@@ -28,11 +28,11 @@
 
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const p = require('path');
 
 const ROOT = p.resolve(__dirname, '..', '..');
-const SP   = p.join(ROOT, 'static/ergopti_plus');
+const SP = p.join(ROOT, 'static/ergopti_plus');
 
 const errors = [];
 
@@ -52,13 +52,17 @@ if (!fileExistsSP('_shared/lua/locale/core.lua')) {
 }
 
 // ── 2. macOS must consume it ───────────────────────────────────────────────
-const macLocale = fileExistsSP('macos/infra/locale.lua') ? read('static/ergopti_plus/macos/infra/locale.lua') : '';
+const macLocale = fileExistsSP('macos/infra/locale.lua')
+	? read('static/ergopti_plus/macos/infra/locale.lua')
+	: '';
 if (!macLocale.includes('require("locale.core")')) {
 	errors.push('macos/infra/locale.lua: must require("locale.core") — not a hand-rolled copy');
 }
 
 // ── 3. Linux must consume it ───────────────────────────────────────────────
-const lnxLocale = fileExistsSP('linux/infra/locale.lua') ? read('static/ergopti_plus/linux/infra/locale.lua') : '';
+const lnxLocale = fileExistsSP('linux/infra/locale.lua')
+	? read('static/ergopti_plus/linux/infra/locale.lua')
+	: '';
 if (!lnxLocale.includes('require("locale.core")')) {
 	errors.push('linux/infra/locale.lua: must require("locale.core") — not a hand-rolled copy');
 }
@@ -66,13 +70,15 @@ if (!lnxLocale.includes('require("locale.core")')) {
 // ── 4. Neither driver may re-implement the cascade inline ───────────────────
 for (const [relPath, name] of [
 	['static/ergopti_plus/macos/infra/locale.lua', 'macos'],
-	['static/ergopti_plus/linux/infra/locale.lua', 'linux'],
+	['static/ergopti_plus/linux/infra/locale.lua', 'linux']
 ]) {
 	const src = fileExists(relPath) ? fs.readFileSync(p.join(ROOT, relPath), 'utf8') : '';
 	// These functions should live in locale.core, not re-declared here
 	for (const forbidden of ['local function ensure_loaded', 'local function load_locale']) {
 		if (src.includes(forbidden)) {
-			errors.push(`${name}/infra/locale.lua: re-declares "${forbidden}" — must delegate to locale.core`);
+			errors.push(
+				`${name}/infra/locale.lua: re-declares "${forbidden}" — must delegate to locale.core`
+			);
 		}
 	}
 }
@@ -90,12 +96,16 @@ if (!fileExistsSP(corpusPath)) {
 
 // ── 6. macOS must have a corpus consumer test ──────────────────────────────
 if (!fileExistsSP('macos/tests/unit/meta/test_corpus_locale_resolution.lua')) {
-	errors.push('macos/tests/unit/meta/test_corpus_locale_resolution.lua: missing — must replay locale corpus');
+	errors.push(
+		'macos/tests/unit/meta/test_corpus_locale_resolution.lua: missing — must replay locale corpus'
+	);
 }
 
 // ── 7. AHK must have a corpus consumer test included in run_all.ahk ────────
 if (!fileExistsSP('windows/tests/meta/test_corpus_locale_resolution.ahk')) {
-	errors.push('windows/tests/meta/test_corpus_locale_resolution.ahk: missing — must replay locale corpus');
+	errors.push(
+		'windows/tests/meta/test_corpus_locale_resolution.ahk: missing — must replay locale corpus'
+	);
 } else {
 	const runAll = fileExistsSP('windows/tests/run_all.ahk')
 		? read('static/ergopti_plus/windows/tests/run_all.ahk')
@@ -119,4 +129,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] Locale resolution single-sourced — locale.core consumed by macOS + Linux; corpus exists and is consumed by macOS + AHK tests.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] Locale resolution single-sourced — locale.core consumed by macOS + Linux; corpus exists and is consumed by macOS + AHK tests.\x1b[0m'
+);

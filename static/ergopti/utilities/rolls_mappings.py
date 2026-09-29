@@ -77,9 +77,7 @@ def _load_toml_files(config_files: list[Path]) -> dict:
 
                 logger.info("Loaded hotstrings from: %s", config_file.name)
         except OSError as e:
-            raise OSError(
-                f"Error reading hotstrings file {config_file}: {e}"
-            ) from e
+            raise OSError(f"Error reading hotstrings file {config_file}: {e}") from e
 
     return merged_data
 
@@ -148,9 +146,7 @@ def load_plus_mappings_config() -> dict:
 # Load hotstrings from TOML files
 try:
     PLUS_MAPPINGS_CONFIG = load_plus_mappings_config()
-    logger.info(
-        "Loaded Ergopti+ mappings hotstrings from rolls.toml and suffixes.toml files"
-    )
+    logger.info("Loaded Ergopti+ mappings hotstrings from rolls.toml and suffixes.toml files")
 except (ImportError, FileNotFoundError, OSError) as e:
     logger.error("Error loading TOML hotstrings: %s", e)
     logger.info("Falling back to empty hotstrings")
@@ -163,9 +159,7 @@ plus_mappings = escape_symbols_in_mappings(plus_mappings)
 
 
 # Sort mappings by trigger key in simple alphabetical order
-plus_mappings = OrderedDict(
-    sorted(plus_mappings.items(), key=lambda item: item[0])
-)
+plus_mappings = OrderedDict(sorted(plus_mappings.items(), key=lambda item: item[0]))
 
 
 def check_duplicate_triggers(mappings_to_check: dict):

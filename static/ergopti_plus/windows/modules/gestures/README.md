@@ -6,13 +6,13 @@ Maps user-configurable gesture slots (3-finger tap, 4-finger tap, left/right/up/
 
 ## Ports used (`_shared/core/ports/`)
 
-| Port              | Usage                                                                    |
-| ----------------- | ------------------------------------------------------------------------ |
-| `KeyboardHook`    | `#HotIf`-gated hotkeys that fire on gesture-synthesised key sequences    |
-| `ClipboardAccess` | Read clipboard on paste-plain; write screenshot data path                |
-| `FileSystem`      | Temp file for screenshot capture via Snipping Tool / GDI+                |
-| `TimerScheduler`  | Debounce timer for window-cycle focus events                              |
-| `WindowInfo`      | `WinGetList` / `WinActivate` for the window-cycle action                  |
+| Port              | Usage                                                                 |
+| ----------------- | --------------------------------------------------------------------- |
+| `KeyboardHook`    | `#HotIf`-gated hotkeys that fire on gesture-synthesised key sequences |
+| `ClipboardAccess` | Read clipboard on paste-plain; write screenshot data path             |
+| `FileSystem`      | Temp file for screenshot capture via Snipping Tool / GDI+             |
+| `TimerScheduler`  | Debounce timer for window-cycle focus events                          |
+| `WindowInfo`      | `WinGetList` / `WinActivate` for the window-cycle action              |
 
 ## Shared data (`_shared/modules/actions/`)
 
@@ -20,13 +20,13 @@ Maps user-configurable gesture slots (3-finger tap, 4-finger tap, left/right/up/
 
 ## Public API
 
-| File              | Description                                              |
-| ----------------- | -------------------------------------------------------- |
-| `init.ahk`        | Module entry: reads slot assignments, registers hotkeys  |
-| `config.ahk`      | `GestureGetAction(slot)` accessor; slot-name constants   |
-| `click.ahk`       | Left-button click-lock (long-press drag simulation)       |
-| `screenshots.ahk` | GDI+ region capture and clipboard copy                   |
-| `window_cycle.ahk`| Alt-Tab-style window cycle guarded by HWND fence          |
+| File               | Description                                             |
+| ------------------ | ------------------------------------------------------- |
+| `init.ahk`         | Module entry: reads slot assignments, registers hotkeys |
+| `config.ahk`       | `GestureGetAction(slot)` accessor; slot-name constants  |
+| `click.ahk`        | Left-button click-lock (long-press drag simulation)     |
+| `screenshots.ahk`  | GDI+ region capture and clipboard copy                  |
+| `window_cycle.ahk` | Alt-Tab-style window cycle guarded by HWND fence        |
 
 ## Init pattern
 

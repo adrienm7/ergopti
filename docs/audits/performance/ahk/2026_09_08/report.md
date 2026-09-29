@@ -56,22 +56,22 @@ ten times in one process, with the original teardown after every case. Run 14
 replayed all 357 original registered cases through the complete preparation
 test, in their original order; that prefix passed 357/357.
 
-| Run | Context | Median ms | p95 ms | Maximum ms | Thread CPU ms | Loop wall ms |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | isolated | 0.5649 | 1.0732 | 1.8262 | 62.5 | 62.4569 |
-| 2 | isolated | 0.5802 | 1.6318 | 3.1400 | 78.125 | 78.2646 |
-| 3 | isolated | 0.4599 | 0.8655 | 1.2401 | 46.875 | 50.5296 |
-| 4 | same-process repeat | 0.6433 | 1.4485 | 2.4022 | 46.875 | 78.0578 |
-| 5 | same-process repeat | 0.5054 | 0.7644 | 1.8948 | 46.875 | 56.0542 |
-| 6 | same-process repeat | 0.4907 | 0.8083 | 3.4649 | 46.875 | 57.2937 |
-| 7 | same-process repeat | 0.5035 | 0.8922 | 1.4209 | 46.875 | 57.2605 |
-| 8 | same-process repeat | 0.5155 | 0.9991 | 1.3158 | 62.5 | 59.3717 |
-| 9 | same-process repeat | 0.4450 | 0.6077 | 1.5359 | 46.875 | 49.0078 |
-| 10 | same-process repeat | 0.6727 | 1.1216 | 3.2612 | 46.875 | 73.0202 |
-| 11 | same-process repeat | 0.5843 | 1.0714 | 2.0693 | 46.875 | 66.1654 |
-| 12 | same-process repeat | 0.4794 | 0.6452 | 1.6438 | 46.875 | 52.7047 |
-| 13 | same-process repeat | 0.5041 | 0.9515 | 3.1070 | 46.875 | 64.7677 |
-| 14 | 357-case prefix | 0.4930 | 0.7877 | 1.2809 | 62.5 | 53.1092 |
+| Run | Context             | Median ms | p95 ms | Maximum ms | Thread CPU ms | Loop wall ms |
+| --- | ------------------- | --------- | ------ | ---------- | ------------- | ------------ |
+| 1   | isolated            | 0.5649    | 1.0732 | 1.8262     | 62.5          | 62.4569      |
+| 2   | isolated            | 0.5802    | 1.6318 | 3.1400     | 78.125        | 78.2646      |
+| 3   | isolated            | 0.4599    | 0.8655 | 1.2401     | 46.875        | 50.5296      |
+| 4   | same-process repeat | 0.6433    | 1.4485 | 2.4022     | 46.875        | 78.0578      |
+| 5   | same-process repeat | 0.5054    | 0.7644 | 1.8948     | 46.875        | 56.0542      |
+| 6   | same-process repeat | 0.4907    | 0.8083 | 3.4649     | 46.875        | 57.2937      |
+| 7   | same-process repeat | 0.5035    | 0.8922 | 1.4209     | 46.875        | 57.2605      |
+| 8   | same-process repeat | 0.5155    | 0.9991 | 1.3158     | 62.5          | 59.3717      |
+| 9   | same-process repeat | 0.4450    | 0.6077 | 1.5359     | 46.875        | 49.0078      |
+| 10  | same-process repeat | 0.6727    | 1.1216 | 3.2612     | 46.875        | 73.0202      |
+| 11  | same-process repeat | 0.5843    | 1.0714 | 2.0693     | 46.875        | 66.1654      |
+| 12  | same-process repeat | 0.4794    | 0.6452 | 1.6438     | 46.875        | 52.7047      |
+| 13  | same-process repeat | 0.5041    | 0.9515 | 3.1070     | 46.875        | 64.7677      |
+| 14  | 357-case prefix     | 0.4930    | 0.7877 | 1.2809     | 62.5          | 53.1092      |
 
 The percentile uses nearest rank, exactly as the existing test: sorted index
 `ceil(100 * 0.95)`. Median here is the lower middle observation (rank 50).
@@ -84,18 +84,18 @@ The timer still encloses build, handle-identity assertion, recycle, and its
 success assertion. Timestamp storage and sample-array bookkeeping are performed
 as shown in the patch; no telemetry file or logger write occurs inside the loop.
 
-| CSV segment | Inclusive region |
-| --- | --- |
-| prelude | Start timestamp storage through build preparation and pool entry |
-| pool | Pool lookup/removal and Critical restoration |
-| validation | HWND extraction and IsWindow through the next timestamp |
-| move | SetWindowPos region, including any synchronous processing it triggers |
-| build_return | Reuse counter, returns and build cleanup after movement |
-| assert_hwnd | Exact HWND assertion |
-| recycle_prelude | Recycle validation through the hide boundary |
-| hide | GR_Hide, HWND access and its wrapper |
-| recycle_return | Pool insertion/eviction bookkeeping and return |
-| assert_recycled | Recycle acknowledgement assertion |
+| CSV segment     | Inclusive region                                                      |
+| --------------- | --------------------------------------------------------------------- |
+| prelude         | Start timestamp storage through build preparation and pool entry      |
+| pool            | Pool lookup/removal and Critical restoration                          |
+| validation      | HWND extraction and IsWindow through the next timestamp               |
+| move            | SetWindowPos region, including any synchronous processing it triggers |
+| build_return    | Reuse counter, returns and build cleanup after movement               |
+| assert_hwnd     | Exact HWND assertion                                                  |
+| recycle_prelude | Recycle validation through the hide boundary                          |
+| hide            | GR_Hide, HWND access and its wrapper                                  |
+| recycle_return  | Pool insertion/eviction bookkeeping and return                        |
+| assert_recycled | Recycle acknowledgement assertion                                     |
 
 These are elapsed regions, **not native CPU attribution**. Restoring Critical can
 permit a timer to run; synchronous native calls can wait or dispatch messages.

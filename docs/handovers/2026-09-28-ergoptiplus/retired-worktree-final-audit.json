@@ -1,1118 +1,1118 @@
 {
-  "created_utc": "2026-09-28T21:05:03.716Z",
-  "dev": "2d065e7c808fb3006fa23dfa3e2584e1747d3b9e",
-  "worktrees": [
-    {
-      "name": "actions-D4",
-      "cwd": "C:/ewtb/actions-D4",
-      "head": "8ee9bd665b175308d4866c15eb63e34361bf77c8",
-      "gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/actions-D4",
-      "bundle": "D:/ewt/_archive/git/actions-D4/history.bundle",
-      "bundleBytes": 483526,
-      "commits": [
-        {
-          "sign": "+",
-          "sha": "eaf946da24de92f1841f93c7cf17eada3e63a55f",
-          "subject": "feat(actions): generate one action catalogue per driver",
-          "subject_matched_counterpart": "c1c95ba22a77c958093b5f72a80d22807c6ad0c8",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "322a8d27c8624be6782fdb0c55fcfeee9efde75e",
-          "subject": "refactor(windows): build the action picker from the generated catalogue",
-          "subject_matched_counterpart": "2a193b7ab710bc289535f6a75bc207c882549465",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "748868d25ea2389d302cf4d980067252f531b9ea",
-          "subject": "refactor(macos): read the generated action catalogue, refuse unknown ids",
-          "subject_matched_counterpart": "841a21cc2aeead11398e90146cc86bffaa1bf38a",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "be189a32d947f8d4aec36e985f3a1a3c7442e310",
-          "subject": "feat(picker): grey a host-disabled action row with its reason",
-          "subject_matched_counterpart": "bb2dad392486348802db8e794a1c277a66b81888",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "52af7dd446686b0141b0c92377f4ce874a603aea",
-          "subject": "feat(linux): follow the generated action catalogue in picker and tray",
-          "subject_matched_counterpart": "d266d40d42bc5961b3584e006c1bde633bfbf0ee",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "4385b8834c473147cfdf701424521f2767354bc4",
-          "subject": "test(actions): replace the literal-scan gates with driver parity",
-          "subject_matched_counterpart": "6e8d9af541f49158d9dffdd15bfacb5f41ffbdbe",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "f72c115e0f3326be9493569017c48a95450ffdc0",
-          "subject": "docs(actions): stop describing the retired runtime catalogue reads",
-          "subject_matched_counterpart": "a038895108d30421a956c1001216a5eafffa4ba7",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "62487b31cf5b8528daffe3b29a1e5e6ee05f3fea",
-          "subject": "fix(linux): leave an unknown stored keyboard-slot action unbound",
-          "subject_matched_counterpart": "4954e55dcac9009241995d26dd7390836ea9bd6c",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "b3a432d62f001ad884e1b5ae39150196ff8b5316",
-          "subject": "test(linux): pin that the gesture loader ignores an unknown action",
-          "subject_matched_counterpart": "db9530cb62c69c4e321e5341986da46b4bf41201",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "cde2661e61a09f383d6f93ae845ec12ef4010f57",
-          "subject": "fix(macos): leave an unknown stored keyboard-slot action unbound",
-          "subject_matched_counterpart": "c6d414f0164ac2b1c0ae77cbe31f121d04d3f5a3",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "1573794dd11627f3af462a7d30ce754b2996cf64",
-          "subject": "feat(actions): Unicode-correct case actions on all three drivers",
-          "subject_matched_counterpart": "02c3c1517890046fbda69d6a37dd2cdbc5608527",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "206bc4d6ec1780a20135c71b15478c30342b1dd4",
-          "subject": "feat(actions): plain paste and word selection on every driver",
-          "subject_matched_counterpart": "6ea463ee19659a244e77f742e82018cdc157569e",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "84020438c7c176ec8547c94c9009619a064e9ec2",
-          "subject": "feat(actions): wrap the selection with a chosen pair on every driver",
-          "subject_matched_counterpart": "2d7879af243431d30564b80b7cb19c46ced18114",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "7cae08a4e635940cda984ac176f4f8beeece6f71",
-          "subject": "feat(actions): bind the line wrap, emoji picker, mirroring, keep-awake",
-          "subject_matched_counterpart": "2952687ad2ba3161849dfb08f528477bdd2b44d4",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "a52c7bf62eefd505835f0b52d2a6c5669b5e9944",
-          "subject": "refactor(macos): scope the app-navigation owner by action parent",
-          "subject_matched_counterpart": "5e9f7260bd8e452d0f52c3717db947d7ef15350e",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "04f18931c9878f455210550ae74fda4afc187047",
-          "subject": "refactor(macos): scope the pixel owner by action parent",
-          "subject_matched_counterpart": "996969129a0b1ab45f87da83ec08305c39da7d13",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "665894f332d98945c731618815d28d70dfc90eca",
-          "subject": "feat(actions): bind Downloads, file manager, settings, path, colour",
-          "subject_matched_counterpart": "415bf0a3a7bfcabf0025d9dcc7b8fa60d4b61c6e",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "36e72df290012296f602bec190aa784bb3cb5f8d",
-          "subject": "fix(macos): ask for a keyboard slot's action parameter before binding",
-          "subject_matched_counterpart": "528d3e0bd293663eeb85015a1b34ccfe03d64db9",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "38ad6f18aab73f50e3bc90bc6856bcc2795da341",
-          "subject": "docs(actions): say Linux copy path and colour pick are not implemented",
-          "subject_matched_counterpart": "d76c70db69dda0616cfa86926ec6d4ea2e808fc9",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "16a69528082438ede3219158b74783a4e32b0fec",
-          "subject": "docs(actions): say which platform exclusions are missing work",
-          "subject_matched_counterpart": "dd247dc3a443e6dfbb5dfbdc278222276c4644c7",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "b8f561190656b1e5f008eea1151f2ebf7e703d27",
-          "subject": "feat(actions): open the system capture tool on every driver",
-          "subject_matched_counterpart": "ac272a78d81330eb30ea65077b0e35014ee8f71f",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "9d4d179a39532909305aeb7d9db11f812afdeeab",
-          "subject": "feat(actions): type a text or press a key or shortcut from any binding",
-          "subject_matched_counterpart": "60eaa3e2c95b04e33363fa2473dc9d3e0e91a569",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "7470a1133011a287cdd9bd2e741b9226e4b3f8cf",
-          "subject": "feat(shortcuts): three number-row tap keys with live labels",
-          "subject_matched_counterpart": "20a30aea8ec5f3dfce3591f0ed03b05c32c3a563",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "9bf9544c9589e19e663ad66dd80484e188547af4",
-          "subject": "feat(actions): edit send_* values in the action picker itself",
-          "subject_matched_counterpart": "cb6a0b3302f453ae4d9757f9470931a296b4a972",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "5939552a02793c4ebc08e45397f23f4ce668584d",
-          "subject": "fix(windows): say why a manual prediction request does nothing",
-          "subject_matched_counterpart": "4e0f08d6fe475b99f67715d87bd179261913a14a",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "7bc1a9fcf22bca602dbc6785aa8cc7907ca9bd7b",
-          "subject": "feat(actions): generate an AI prediction from any binding",
-          "subject_matched_counterpart": "9ca946451942b12a9d1110c26316287eec8f7236",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "768d6d5c95e585c7f932a1688fefeae91208c98e",
-          "subject": "fix(linux): swallow a bound keyboard-slot chord under the grab",
-          "subject_matched_counterpart": "32aebcafcf31c2881c3d46387ec10c73aef26d47",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "8ee9bd665b175308d4866c15eb63e34361bf77c8",
-          "subject": "feat(shortcuts): bind Ctrl/Win/Super+Space to generate a prediction",
-          "subject_matched_counterpart": "32df631490e06c4b487a1724f0c8e023e9339cb7",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        }
-      ],
-      "plus": 15,
-      "minus": 13,
-      "patches": [
-        {
-          "file": "actions-D4-staged.patch",
-          "source": "D:/ewt/_archive/git/actions-D4/staged.patch",
-          "size_bytes": 30572,
-          "sha256": "2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937",
-          "kind": "archived uncommitted delta; inspect, do not apply blindly",
-          "files": [
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/ar.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/cs.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/da.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/de.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/en.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/es.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/fr.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/he.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/hi.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/it.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/ja.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/ko.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/nl.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/no.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/pl.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/pt.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/ru.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/sv.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/tr.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/uk.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/_shared/data/locales/zh.json",
-              "added_lines": 1,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review",
-              "semantic_current": false,
-              "semantic_committed": false
-            },
-            {
-              "path": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_health_probe_generation.lua",
-              "added_lines": 5,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
-              "added_lines": 7,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "different or missing; preserve for review"
-            }
-          ]
-        }
-      ],
-      "untracked": []
-    },
-    {
-      "name": "diag-integration",
-      "cwd": "C:/ewtb/diag-integration",
-      "head": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
-      "gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/diag-integration",
-      "bundle": "D:/ewt/_archive/git/diag-integration/history.bundle",
-      "bundleBytes": 422932,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "10e337f1c7f39a9c5ed903cae1990139331a3171",
-          "subject": "feat(layouts): add the keyboard-layout registry folder and its index",
-          "subject_matched_counterpart": "554ad23204b6a8f640fec50f53c65ac7305be66e",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "31d284aebf80a9f4f9a4cc851873807e99734f61",
-          "subject": "feat(linux): convert any registry .keylayout to XKB with one converter",
-          "subject_matched_counterpart": "41d035e32d1bb9a34e0acc8a9bc74115c6ac0e70",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "0cd338dd996e757a46d44d357fe8f50f8262849c",
-          "subject": "feat(windows): emulate a registry layout by reading its .keylayout",
-          "subject_matched_counterpart": "c3b32c0149e12efb6318bea47769869fb40a018c",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "7872ee8cf466ab3046c6c1468d90725cece6d19b",
-          "subject": "feat(macos): install a registry layout's .keylayout as it is",
-          "subject_matched_counterpart": "87d594ece3623a3e1fad8fde5a9d700f2060f838",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "ce472c562587b6c2c19885da2c319ae66dafa7e7",
-          "subject": "feat(linux): convert a registry layout to XKB on the device",
-          "subject_matched_counterpart": "6bc07b5b037e52b33faf7f6f9e225bd19434a671",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "26fb89a8a56514d0d7f565cb5eb4ab4b7dfff010",
-          "subject": "fix(layouts): name the defaults file a Lua driver cannot decode",
-          "subject_matched_counterpart": "5441b61ae7fec702f93793e4ca61e99f8bbf4512",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "287851bbe895e41f3ff3618fd04a416807bed198",
-          "subject": "fix(linux): report registry Compose outputs that no key can reach",
-          "subject_matched_counterpart": "30239a2944b3df27e17d6da6171e264a8aafbf56",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "d2d0dd58172f20329417f24b05a7dc41eb099200",
-          "subject": "fix(layouts): pin every registry id rule to the index builder's",
-          "subject_matched_counterpart": "c95be828814f14402559bd46478d66ac155d03c2",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "db8a7745d1abafb29df7039bc44d36b66b61018f",
-          "subject": "feat(windows): read the Ergopti emulation tables from its .keylayout",
-          "subject_matched_counterpart": "0233a6a93b2348b0c43823c0de5434a8eca54092",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "61dfc0a37f83867d4de81bbc3e87fac05e3eb762",
-          "subject": "feat(layouts): declare what an emulated layout supersedes, and why",
-          "subject_matched_counterpart": "c17c0107817910d9f76835a4b9f5e17fd6403857",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "c256a697db787ee14368b78762dc0cd26582bc45",
-          "subject": "fix(layouts): declare superseded_reason_key in the manifest schema",
-          "subject_matched_counterpart": "872cdfc04f8254052a53d3fc34d3df23ac1c5970",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "269853d2340c0813dca52e4d49c62da5e7f76fe3",
-          "subject": "test(windows): pin why the Ergopti table loaders refuse bad input",
-          "subject_matched_counterpart": "ee917a1cc2e57113c48485d76c604b7b3fde7923",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "7d9b798f68ba1c6a074c0db707e8b6992e548895",
-          "subject": "docs(windows): point the typography note at the Ergopti .keylayout",
-          "subject_matched_counterpart": "b3431100dbe2a10f5bf4fc749fa702801c8c576c",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "8b028807f8526a7a5afc474ecd389bd24771328d",
-          "subject": "test(windows): replay the Ergopti golden through the registry emulation",
-          "subject_matched_counterpart": "d91f11b225685a696e59c17788d10d471dff84e7",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "c6e59c0c25733bf58b0594090821b33861a2abe1",
-          "subject": "feat(layouts): declare each registry layout's family",
-          "subject_matched_counterpart": "7bfb46d93fea7cedfbd9a523e96ea9ad52697eec",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "aa2fd65dd72c288dec12754f0bcbfea5e6918525",
-          "subject": "feat(layouts): publish each layout's keyboard name in the index",
-          "subject_matched_counterpart": "83b170eb98bc18f89561a34f23a4b31f4191d9d9",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "a487caf2beb4956fb2bb0b57bc3b2a65dbc9ea1d",
-          "subject": "feat(layouts): add the shared layout catalogue decisions",
-          "subject_matched_counterpart": "a59ab058d9722276f2c4fa1c9d82a1d27b24abfa",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "b68e4341b6ce7b725bbe1509b438a292d92f1088",
-          "subject": "refactor(macos): read a bundle's layouts from its Info.plist",
-          "subject_matched_counterpart": "6008d163c1e1dbefc124283439854c66ef4782f0",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "893df3cb98c5a8078eada01aff1829750d72ff19",
-          "subject": "feat(macos): install, update and uninstall registry layouts",
-          "subject_matched_counterpart": "cc825bb024d4df7dbf1ce852a9e306ed20c2ff26",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "174f86a786c46ca83f5afcbb208704bd3c43bda0",
-          "subject": "feat(linux): install registry layouts in the user XKB tree",
-          "subject_matched_counterpart": "58df3c733c4c040a455a9ae27dbf9d779b8fad6d",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "2fda635fd7c30f13c2a68250f5a98100e4195c9a",
-          "subject": "feat(windows): install, update and uninstall registry layouts",
-          "subject_matched_counterpart": "88480fc8b984107f9382d5cbd73945b5976bf38b",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "ecacf79938b74817e48ddf9915902b32de8ca1fe",
-          "subject": "feat(layouts): add the shared layout manager window on three drivers",
-          "subject_matched_counterpart": "dcfbe6051f3b0e33a2ff36030e7575b3cb5367f1",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
-          "subject": "refactor(macos): host the layout manager window in ui/layout_manager",
-          "subject_matched_counterpart": "9da35250472e7a12d34cf86eb1515502f307e071",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "fa9798907c19cc89923d86e8baf80d0de299cb7a",
-          "subject": "feat(menu): make the Ergopti section the custom layout section",
-          "subject_matched_counterpart": "11123eca0efb8c3f33eb3d849ac231ed983fb63e",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "cf5828429689cedbfe0b61129195c2daad5e8612",
-          "subject": "feat(windows): turn Ergopti-only hotstrings off under another layout",
-          "subject_matched_counterpart": "da27668b6457491c4c68742976aa32a6a44fe0ae",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "9f314bf8ed7293f21c45b185f2f24be2c9655f25",
-          "subject": "fix(layouts): read the installed record before writing a layout",
-          "subject_matched_counterpart": "ba29c25a7c59cb2b32d8885f4a9a45a4a9bf8183",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "b6b3b1836778818415525ef067591a8cdd1908ea",
-          "subject": "fix(layouts): name the shipped catalogue before the first refresh",
-          "subject_matched_counterpart": "6ff43ac92bcae846f050007c70887d0223de0951",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "e94fe6674fbd5842628038e21c63535fa6125500",
-          "subject": "fix(layouts): report a cached index the catalogue sets aside",
-          "subject_matched_counterpart": "50b07bf78b824676cac61e634a86dc441ea5cc81",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "73b2b56e4727e8ea152e59128527fe03e87ed029",
-          "subject": "refactor(layouts): drop the registry download the catalogue replaced",
-          "subject_matched_counterpart": "4b5db4349347dd57a56c40f2fb9ff2c8455917ca",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "0f81fcc182fbd2249b2d1b9e80dc800b21b6b812",
-          "subject": "refactor(layouts): declare the registry user agent once",
-          "subject_matched_counterpart": "41f680b75a904cf3dffa69c4ba4196638250e193",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "a3f67d96a9701d66bdef83d23c51db62ef7fc58d",
-          "subject": "fix(linux): leave the user XKB tree unchanged after a failed install",
-          "subject_matched_counterpart": "e4f49b1497647a9134b6cf8943d1771bff7ba37e",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "be0b73524eac608e81eaa1b5f454dc91842884f0",
-          "subject": "test(windows): pin that a refused update keeps the installed layout",
-          "subject_matched_counterpart": "32029aa182e1c137e44572f1e85e6a3188b8c589",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "2a2516176a8d3da59044ac5288adfce2c40629ea",
-          "subject": "test(layouts): resolve Git Bash for the packaging fixture",
-          "subject_matched_counterpart": "a36c939e361f267971bae4ef86c9728450b8d381",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "54a31ea4cab61cd716c536aa462a9663f3e23380",
-          "subject": "fix(layouts): preserve opt-in geometry hotstrings on every layout",
-          "subject_matched_counterpart": "95318893107f4f37f53c077224a229fd49bab9bb",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "c25a00ffed43e6cb7a50effdae2fc738f1f19c36",
-          "subject": "feat(layouts): inventory existing extension content in the registry",
-          "subject_matched_counterpart": "2c6964dfe62e6eb0ff04146cf164d646aa966b27",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "f77494627af86efc87bf8df5191a20a1dfb43b85",
-          "subject": "feat(layouts): publish verified extension generations atomically",
-          "subject_matched_counterpart": "129e02f61498a6545c8cca12ea8fcfbd95396f18",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "4c56825375440364326484945dee9b50773ce949",
-          "subject": "feat(layouts): show optional extension content in the manager",
-          "subject_matched_counterpart": "61a519571924da9676c14b24e5ff8687f82dfce1",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "703d10c88ae4f98be283357afc2116be636efb29",
-          "subject": "feat(layouts): discover committed extension packs on Linux",
-          "subject_matched_counterpart": "50dff8281d6daf8256d3363922bd7c3323bccaf5",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "-",
-          "sha": "fa92fdc66aaa719c2ff23d37991505e9debb875b",
-          "subject": "fix(config): preserve quoted extension paths on Windows reload",
-          "subject_matched_counterpart": "f36a16870a84b302f7d8047e040a5ae0b4083513",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "f35930ec2fedd889c4ffc4fff7dfbd1101626783",
-          "subject": "feat(layouts): discover committed extension packs on macOS",
-          "subject_matched_counterpart": null,
-          "evidence": "unknown preserve original"
-        },
-        {
-          "sign": "+",
-          "sha": "e58cadf956fac2bf18adf652cd3031f4198278b6",
-          "subject": "feat(layouts): declare historical hotstring source bindings",
-          "subject_matched_counterpart": null,
-          "evidence": "unknown preserve original"
-        },
-        {
-          "sign": "-",
-          "sha": "e4076604dbd06ea350bafda535dad52e8fc2eaa3",
-          "subject": "fix(hotstrings): recognize canonical extension source categories",
-          "subject_matched_counterpart": "6704852a473a3d26dbd804476768a96f4b7f3f42",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "-",
-          "sha": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
-          "subject": "feat(layouts): discover Windows packs and plan effective sections",
-          "subject_matched_counterpart": "e81ddf6702f833af46c2c9f85960c7a84f433238",
-          "evidence": "patch-equivalent"
-        }
-      ],
-      "plus": 6,
-      "minus": 37,
-      "patches": [
-        {
-          "file": "diag-integration-unstaged.patch",
-          "source": "D:/ewt/_archive/git/diag-integration/unstaged.patch",
-          "size_bytes": 3457,
-          "sha256": "03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f",
-          "kind": "archived uncommitted delta; inspect, do not apply blindly",
-          "files": [
-            {
-              "path": "static/ergopti_plus/macos/init.lua",
-              "added_lines": 14,
-              "added_lines_found_current": 3,
-              "added_lines_found_committed": 3,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk",
-              "added_lines": 15,
-              "added_lines_found_current": 1,
-              "added_lines_found_committed": 1,
-              "status": "different or missing; preserve for review"
-            }
-          ]
-        }
-      ],
-      "untracked": []
-    },
-    {
-      "name": "shortcut-refusals",
-      "cwd": "C:/ewtb/shortcut-refusals",
-      "head": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-      "gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/shortcut-refusals",
-      "bundle": "D:/ewt/_archive/git/shortcut-refusals/history.bundle",
-      "bundleBytes": 170906,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "aed8fba358ec12168aed35d9a03f398f7e6747ae",
-          "subject": "feat(config): preserve unknown fields in sparse TOML transactions",
-          "subject_matched_counterpart": "bdaf487442e5c0fd82f89131d9478fbbc695f072",
-          "evidence": "patch-equivalent"
-        },
-        {
-          "sign": "+",
-          "sha": "8ad07a053c904c69869172f343ebe8fd4877dcf5",
-          "subject": "feat(config): start neutral and persist only explicit overrides",
-          "subject_matched_counterpart": "ae047500fe4a6cef4f0497cde3840cfa17b06444",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        },
-        {
-          "sign": "+",
-          "sha": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-          "subject": "feat(config): retain rollback debt for scoped transactions",
-          "subject_matched_counterpart": "dc4f2618159deb0574da7b896a6ab5e1c645f022",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        }
-      ],
-      "plus": 2,
-      "minus": 1,
-      "patches": [],
-      "untracked": []
-    },
-    {
-      "name": "windows-master-state",
-      "cwd": "C:/ewtb/windows-master-state",
-      "head": "335e06aa1f2b868e225da798269b03edcdf7dcae",
-      "gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/windows-master-state",
-      "bundle": "D:/ewt/_archive/git/windows-master-state/history.bundle",
-      "bundleBytes": 24066,
-      "commits": [
-        {
-          "sign": "+",
-          "sha": "335e06aa1f2b868e225da798269b03edcdf7dcae",
-          "subject": "fix(windows): preserve desired features behind category masters",
-          "subject_matched_counterpart": "8549080ada96a5df1958e1a09eddb388c51a2445",
-          "evidence": "matching subject; adapted integration, not exact equivalence"
-        }
-      ],
-      "plus": 1,
-      "minus": 0,
-      "patches": [
-        {
-          "file": "windows-master-state-unstaged.patch",
-          "source": "D:/ewt/_archive/git/windows-master-state/unstaged.patch",
-          "size_bytes": 511775,
-          "sha256": "693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6",
-          "kind": "archived uncommitted delta; inspect, do not apply blindly",
-          "files": [
-            {
-              "path": "static/ergopti_plus/_shared/modules/features/manifest.schema.json",
-              "added_lines": 44,
-              "added_lines_found_current": 42,
-              "added_lines_found_committed": 42,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
-              "added_lines": 1133,
-              "added_lines_found_current": 1125,
-              "added_lines_found_committed": 1125,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/linux/_generated/config_template.toml",
-              "added_lines": 35,
-              "added_lines_found_current": 35,
-              "added_lines_found_committed": 35,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/linux/_generated/features_manifest.lua",
-              "added_lines": 288,
-              "added_lines_found_current": 283,
-              "added_lines_found_committed": 283,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/macos/_generated/config_template.toml",
-              "added_lines": 81,
-              "added_lines_found_current": 80,
-              "added_lines_found_committed": 80,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/macos/_generated/features_manifest.lua",
-              "added_lines": 360,
-              "added_lines_found_current": 351,
-              "added_lines_found_committed": 351,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/windows/_generated/config_template.toml",
-              "added_lines": 81,
-              "added_lines_found_current": 80,
-              "added_lines_found_committed": 80,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/windows/_generated/features_manifest.ahk",
-              "added_lines": 266,
-              "added_lines_found_current": 251,
-              "added_lines_found_committed": 251,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/windows/infra/feature_state.ahk",
-              "added_lines": 31,
-              "added_lines_found_current": 31,
-              "added_lines_found_committed": 31,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/infra/first_boot.ahk",
-              "added_lines": 20,
-              "added_lines_found_current": 20,
-              "added_lines_found_committed": 20,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/infra/manifest_reader.ahk",
-              "added_lines": 146,
-              "added_lines_found_current": 139,
-              "added_lines_found_committed": 139,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "static/ergopti_plus/windows/infra/toml/toml_config_loader.ahk",
-              "added_lines": 7,
-              "added_lines_found_current": 7,
-              "added_lines_found_committed": 7,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
-              "added_lines": 1,
-              "added_lines_found_current": 1,
-              "added_lines_found_committed": 1,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/meta/test_master_gate_drifted_subgate_skip.ahk",
-              "added_lines": 5,
-              "added_lines_found_current": 5,
-              "added_lines_found_committed": 5,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/run_all.ahk",
-              "added_lines": 1,
-              "added_lines_found_current": 1,
-              "added_lines_found_committed": 1,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk",
-              "added_lines": 0,
-              "added_lines_found_current": 0,
-              "added_lines_found_committed": 0,
-              "status": "deletion present"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk",
-              "added_lines": 3,
-              "added_lines_found_current": 3,
-              "added_lines_found_committed": 3,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk",
-              "added_lines": 12,
-              "added_lines_found_current": 12,
-              "added_lines_found_committed": 12,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/unit/test_gestures.ahk",
-              "added_lines": 4,
-              "added_lines_found_current": 4,
-              "added_lines_found_committed": 4,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
-              "added_lines": 3,
-              "added_lines_found_current": 3,
-              "added_lines_found_committed": 3,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "static/ergopti_plus/windows/tests/unit/test_tap_hold_loader.ahk",
-              "added_lines": 15,
-              "added_lines_found_current": 14,
-              "added_lines_found_committed": 14,
-              "status": "different or missing; preserve for review"
-            },
-            {
-              "path": "tools/build/build-features-manifest.js",
-              "added_lines": 17,
-              "added_lines_found_current": 17,
-              "added_lines_found_committed": 17,
-              "status": "all added lines present; not semantic proof"
-            },
-            {
-              "path": "tools/test/test-feature-state-boot-smoke.cjs",
-              "added_lines": 2,
-              "added_lines_found_current": 2,
-              "added_lines_found_committed": 2,
-              "status": "all added lines present; not semantic proof"
-            }
-          ]
-        }
-      ],
-      "untracked": [
-        "static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk"
-      ]
-    }
-  ],
-  "exported": [
-    {
-      "file": "actions-D4-staged.patch",
-      "source": "D:/ewt/_archive/git/actions-D4/staged.patch",
-      "size_bytes": 30572,
-      "sha256": "2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937",
-      "kind": "archived uncommitted delta; inspect, do not apply blindly"
-    },
-    {
-      "file": "diag-integration-unstaged.patch",
-      "source": "D:/ewt/_archive/git/diag-integration/unstaged.patch",
-      "size_bytes": 3457,
-      "sha256": "03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f",
-      "kind": "archived uncommitted delta; inspect, do not apply blindly"
-    },
-    {
-      "file": "windows-master-state-unstaged.patch",
-      "source": "D:/ewt/_archive/git/windows-master-state/unstaged.patch",
-      "size_bytes": 511775,
-      "sha256": "693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6",
-      "kind": "archived uncommitted delta; inspect, do not apply blindly"
-    },
-    {
-      "file": "actions-D4-history.bundle",
-      "source": "D:/ewt/_archive/git/actions-D4/history.bundle",
-      "size_bytes": 483526,
-      "sha256": "917cd6218564fb48e398384e32844707b9d0bbd384eb3b7945250c07121a6a79",
-      "kind": "exact original detached history, 483526 bytes; prerequisite history required"
-    },
-    {
-      "file": "windows-master-state-test_neutral_config_manifest.ahk",
-      "size_bytes": 4552,
-      "sha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
-      "source": "ewtb-20260928.objects.zip object 32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
-      "kind": "archived untracked original test; current test supersedes it with 39 added lines and one updated navigation-owner assertion; do not overwrite current"
-    }
-  ],
-  "untracked": [
-    {
-      "path": "windows-master-state/static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
-      "size": 9495,
-      "sha256": "38fc7be43eeb415acc6da5af09f1b355bb4b125f16a88705bcb8f7a984423efe",
-      "mtime_ns": "1790586305678977900",
-      "worktree": "windows-master-state",
-      "repo_path": "static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
-      "current_sha256": "38fc7be43eeb415acc6da5af09f1b355bb4b125f16a88705bcb8f7a984423efe",
-      "exact_current": true,
-      "needs_original_export": false
-    },
-    {
-      "path": "windows-master-state/static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
-      "size": 4552,
-      "sha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
-      "mtime_ns": "1790586305678977900",
-      "worktree": "windows-master-state",
-      "repo_path": "static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
-      "current_sha256": "e65f29dc561993f420728dfdb3485b02071e02d977f956433aa0017cc35de5cc",
-      "exact_current": false,
-      "needs_original_export": true
-    }
-  ],
-  "limits": [
-    "Added-line presence is a bounded screening heuristic, not proof of semantic equivalence. No tests run.",
-    "D4 original history has adapted counterparts; exact 483526-byte bundle retained instead of claiming patch equality.",
-    "Windows original delta is mainly W1 prereqs already integrated in adapted form, but full semantic equivalence not proven in this bounded audit; preserve original.",
-    "No git refs/index/source mutations. No full archive copy."
-  ],
-  "findings": [
-    {
-      "priority": "preserve pending work",
-      "artifact": "actions-D4-staged.patch",
-      "finding": "Confirmed absent in both committed dev and current files: 21 locales retain active_model_label and old model_label wording; Mac formatter and five test lookups still use active_model_label. This 23-path staged delta is not integrated. Rebase and test before application."
-    },
-    {
-      "priority": "preserve pending work",
-      "artifact": "diag-integration-unstaged.patch",
-      "finding": "Mac extension scan/load boot hooks and Windows historical-fragment routing test are missing in current source. Requires the unintegrated f35930ec2 and e58cadf95 foundations already exported in branch-original-patches. Boot snippet is stale against subsequent initialization changes; do not apply blindly."
-    },
-    {
-      "priority": "original provenance",
-      "artifact": "actions-D4-history.bundle",
-      "finding": "Original detached 28-commit history: 13 patch-equivalent commits and 15 plus commits all have same-subject adapted counterparts in dev. Same-subject mapping is not a proof of full semantic equivalence. Exact bundle retained, git bundle verify passed; requires f4d0bfd633ab7af50044199917e1e3db4241d8be, confirmed ancestor of dev."
-    },
-    {
-      "priority": "conservative preservation",
-      "artifact": "windows-master-state-unstaged.patch",
-      "finding": "23 tracked paths, mainly excluded W1 manifest/defaults/loader/test prerequisite delta. Much is present or superseded in dev, but full semantic equivalence is not proven within this bounded audit. Preserve original for review, never wholesale apply stale generated output."
-    },
-    {
-      "priority": "no missing tracked changes",
-      "artifact": "shortcut-refusals",
-      "finding": "Archived staged/unstaged/untracked state empty. Original non-equivalent commits already preserved by branch-original-patches."
-    },
-    {
-      "priority": "no lost untracked fixture",
-      "artifact": "windows-master-state",
-      "finding": "Archived feature_state_boot_smoke support file is byte-identical current. Archived neutral_config_manifest test is superseded by current additional assertions and navigation-owner correction; exact old 4552-byte test retained for provenance."
-    }
-  ],
-  "ignored_zip_review": {
-    "archives": [
-      {
-        "name": "wf_f8423464-54e-1-ignored.zip",
-        "entries": 768
-      },
-      {
-        "name": "wf_f8423464-54e-2-ignored.zip",
-        "entries": 763
-      }
-    ],
-    "method": "Listed all entries without extracting archive. Reviewed the four previously differing non-reconstructible records as text; hashed additional local settings/test config/empty lock against current root.",
-    "findings": [
-      "Generated build output, locale/hotstring TSV and Python bytecode are reconstructible.",
-      "Both personal_shortcuts.ahk files are generated forwarding stubs pointing only at Temp/ergopti-full-startup-*/suspend-marker/config/autohotkey/personal_shortcuts.ahk. No user shortcut bodies.",
-      "today.log is a 68-byte synthetic typing record containing text x and a test UUID; test_results.txt is an old 5/5 E2E receipt.",
-      "The only other entries outside generated/fixture classifications are .claude/settings.local.json, tests/test_config.ini, and one zero-byte fixture write lock; all byte-identical current root.",
-      "No missing implementation or user-authored config found; do not include these ignored ZIPs in GitHub handoff. Local machine settings were not exported."
-    ]
-  },
-  "security_review": "Exports consist of original code/test/localization diffs and original committed history. No working user configuration, credential file, ignored ZIP or full object archive copied."
+	"created_utc": "2026-09-28T21:05:03.716Z",
+	"dev": "2d065e7c808fb3006fa23dfa3e2584e1747d3b9e",
+	"worktrees": [
+		{
+			"name": "actions-D4",
+			"cwd": "C:/ewtb/actions-D4",
+			"head": "8ee9bd665b175308d4866c15eb63e34361bf77c8",
+			"gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/actions-D4",
+			"bundle": "D:/ewt/_archive/git/actions-D4/history.bundle",
+			"bundleBytes": 483526,
+			"commits": [
+				{
+					"sign": "+",
+					"sha": "eaf946da24de92f1841f93c7cf17eada3e63a55f",
+					"subject": "feat(actions): generate one action catalogue per driver",
+					"subject_matched_counterpart": "c1c95ba22a77c958093b5f72a80d22807c6ad0c8",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "322a8d27c8624be6782fdb0c55fcfeee9efde75e",
+					"subject": "refactor(windows): build the action picker from the generated catalogue",
+					"subject_matched_counterpart": "2a193b7ab710bc289535f6a75bc207c882549465",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "748868d25ea2389d302cf4d980067252f531b9ea",
+					"subject": "refactor(macos): read the generated action catalogue, refuse unknown ids",
+					"subject_matched_counterpart": "841a21cc2aeead11398e90146cc86bffaa1bf38a",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "be189a32d947f8d4aec36e985f3a1a3c7442e310",
+					"subject": "feat(picker): grey a host-disabled action row with its reason",
+					"subject_matched_counterpart": "bb2dad392486348802db8e794a1c277a66b81888",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "52af7dd446686b0141b0c92377f4ce874a603aea",
+					"subject": "feat(linux): follow the generated action catalogue in picker and tray",
+					"subject_matched_counterpart": "d266d40d42bc5961b3584e006c1bde633bfbf0ee",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "4385b8834c473147cfdf701424521f2767354bc4",
+					"subject": "test(actions): replace the literal-scan gates with driver parity",
+					"subject_matched_counterpart": "6e8d9af541f49158d9dffdd15bfacb5f41ffbdbe",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "f72c115e0f3326be9493569017c48a95450ffdc0",
+					"subject": "docs(actions): stop describing the retired runtime catalogue reads",
+					"subject_matched_counterpart": "a038895108d30421a956c1001216a5eafffa4ba7",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "62487b31cf5b8528daffe3b29a1e5e6ee05f3fea",
+					"subject": "fix(linux): leave an unknown stored keyboard-slot action unbound",
+					"subject_matched_counterpart": "4954e55dcac9009241995d26dd7390836ea9bd6c",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "b3a432d62f001ad884e1b5ae39150196ff8b5316",
+					"subject": "test(linux): pin that the gesture loader ignores an unknown action",
+					"subject_matched_counterpart": "db9530cb62c69c4e321e5341986da46b4bf41201",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "cde2661e61a09f383d6f93ae845ec12ef4010f57",
+					"subject": "fix(macos): leave an unknown stored keyboard-slot action unbound",
+					"subject_matched_counterpart": "c6d414f0164ac2b1c0ae77cbe31f121d04d3f5a3",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "1573794dd11627f3af462a7d30ce754b2996cf64",
+					"subject": "feat(actions): Unicode-correct case actions on all three drivers",
+					"subject_matched_counterpart": "02c3c1517890046fbda69d6a37dd2cdbc5608527",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "206bc4d6ec1780a20135c71b15478c30342b1dd4",
+					"subject": "feat(actions): plain paste and word selection on every driver",
+					"subject_matched_counterpart": "6ea463ee19659a244e77f742e82018cdc157569e",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "84020438c7c176ec8547c94c9009619a064e9ec2",
+					"subject": "feat(actions): wrap the selection with a chosen pair on every driver",
+					"subject_matched_counterpart": "2d7879af243431d30564b80b7cb19c46ced18114",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "7cae08a4e635940cda984ac176f4f8beeece6f71",
+					"subject": "feat(actions): bind the line wrap, emoji picker, mirroring, keep-awake",
+					"subject_matched_counterpart": "2952687ad2ba3161849dfb08f528477bdd2b44d4",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "a52c7bf62eefd505835f0b52d2a6c5669b5e9944",
+					"subject": "refactor(macos): scope the app-navigation owner by action parent",
+					"subject_matched_counterpart": "5e9f7260bd8e452d0f52c3717db947d7ef15350e",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "04f18931c9878f455210550ae74fda4afc187047",
+					"subject": "refactor(macos): scope the pixel owner by action parent",
+					"subject_matched_counterpart": "996969129a0b1ab45f87da83ec08305c39da7d13",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "665894f332d98945c731618815d28d70dfc90eca",
+					"subject": "feat(actions): bind Downloads, file manager, settings, path, colour",
+					"subject_matched_counterpart": "415bf0a3a7bfcabf0025d9dcc7b8fa60d4b61c6e",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "36e72df290012296f602bec190aa784bb3cb5f8d",
+					"subject": "fix(macos): ask for a keyboard slot's action parameter before binding",
+					"subject_matched_counterpart": "528d3e0bd293663eeb85015a1b34ccfe03d64db9",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "38ad6f18aab73f50e3bc90bc6856bcc2795da341",
+					"subject": "docs(actions): say Linux copy path and colour pick are not implemented",
+					"subject_matched_counterpart": "d76c70db69dda0616cfa86926ec6d4ea2e808fc9",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "16a69528082438ede3219158b74783a4e32b0fec",
+					"subject": "docs(actions): say which platform exclusions are missing work",
+					"subject_matched_counterpart": "dd247dc3a443e6dfbb5dfbdc278222276c4644c7",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "b8f561190656b1e5f008eea1151f2ebf7e703d27",
+					"subject": "feat(actions): open the system capture tool on every driver",
+					"subject_matched_counterpart": "ac272a78d81330eb30ea65077b0e35014ee8f71f",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "9d4d179a39532909305aeb7d9db11f812afdeeab",
+					"subject": "feat(actions): type a text or press a key or shortcut from any binding",
+					"subject_matched_counterpart": "60eaa3e2c95b04e33363fa2473dc9d3e0e91a569",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "7470a1133011a287cdd9bd2e741b9226e4b3f8cf",
+					"subject": "feat(shortcuts): three number-row tap keys with live labels",
+					"subject_matched_counterpart": "20a30aea8ec5f3dfce3591f0ed03b05c32c3a563",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "9bf9544c9589e19e663ad66dd80484e188547af4",
+					"subject": "feat(actions): edit send_* values in the action picker itself",
+					"subject_matched_counterpart": "cb6a0b3302f453ae4d9757f9470931a296b4a972",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "5939552a02793c4ebc08e45397f23f4ce668584d",
+					"subject": "fix(windows): say why a manual prediction request does nothing",
+					"subject_matched_counterpart": "4e0f08d6fe475b99f67715d87bd179261913a14a",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "7bc1a9fcf22bca602dbc6785aa8cc7907ca9bd7b",
+					"subject": "feat(actions): generate an AI prediction from any binding",
+					"subject_matched_counterpart": "9ca946451942b12a9d1110c26316287eec8f7236",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "768d6d5c95e585c7f932a1688fefeae91208c98e",
+					"subject": "fix(linux): swallow a bound keyboard-slot chord under the grab",
+					"subject_matched_counterpart": "32aebcafcf31c2881c3d46387ec10c73aef26d47",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "8ee9bd665b175308d4866c15eb63e34361bf77c8",
+					"subject": "feat(shortcuts): bind Ctrl/Win/Super+Space to generate a prediction",
+					"subject_matched_counterpart": "32df631490e06c4b487a1724f0c8e023e9339cb7",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				}
+			],
+			"plus": 15,
+			"minus": 13,
+			"patches": [
+				{
+					"file": "actions-D4-staged.patch",
+					"source": "D:/ewt/_archive/git/actions-D4/staged.patch",
+					"size_bytes": 30572,
+					"sha256": "2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937",
+					"kind": "archived uncommitted delta; inspect, do not apply blindly",
+					"files": [
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/da.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/de.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/en.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/es.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/he.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/it.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/no.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+							"added_lines": 1,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review",
+							"semantic_current": false,
+							"semantic_committed": false
+						},
+						{
+							"path": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_health_probe_generation.lua",
+							"added_lines": 5,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
+							"added_lines": 7,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "different or missing; preserve for review"
+						}
+					]
+				}
+			],
+			"untracked": []
+		},
+		{
+			"name": "diag-integration",
+			"cwd": "C:/ewtb/diag-integration",
+			"head": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
+			"gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/diag-integration",
+			"bundle": "D:/ewt/_archive/git/diag-integration/history.bundle",
+			"bundleBytes": 422932,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "10e337f1c7f39a9c5ed903cae1990139331a3171",
+					"subject": "feat(layouts): add the keyboard-layout registry folder and its index",
+					"subject_matched_counterpart": "554ad23204b6a8f640fec50f53c65ac7305be66e",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "31d284aebf80a9f4f9a4cc851873807e99734f61",
+					"subject": "feat(linux): convert any registry .keylayout to XKB with one converter",
+					"subject_matched_counterpart": "41d035e32d1bb9a34e0acc8a9bc74115c6ac0e70",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "0cd338dd996e757a46d44d357fe8f50f8262849c",
+					"subject": "feat(windows): emulate a registry layout by reading its .keylayout",
+					"subject_matched_counterpart": "c3b32c0149e12efb6318bea47769869fb40a018c",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "7872ee8cf466ab3046c6c1468d90725cece6d19b",
+					"subject": "feat(macos): install a registry layout's .keylayout as it is",
+					"subject_matched_counterpart": "87d594ece3623a3e1fad8fde5a9d700f2060f838",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "ce472c562587b6c2c19885da2c319ae66dafa7e7",
+					"subject": "feat(linux): convert a registry layout to XKB on the device",
+					"subject_matched_counterpart": "6bc07b5b037e52b33faf7f6f9e225bd19434a671",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "26fb89a8a56514d0d7f565cb5eb4ab4b7dfff010",
+					"subject": "fix(layouts): name the defaults file a Lua driver cannot decode",
+					"subject_matched_counterpart": "5441b61ae7fec702f93793e4ca61e99f8bbf4512",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "287851bbe895e41f3ff3618fd04a416807bed198",
+					"subject": "fix(linux): report registry Compose outputs that no key can reach",
+					"subject_matched_counterpart": "30239a2944b3df27e17d6da6171e264a8aafbf56",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "d2d0dd58172f20329417f24b05a7dc41eb099200",
+					"subject": "fix(layouts): pin every registry id rule to the index builder's",
+					"subject_matched_counterpart": "c95be828814f14402559bd46478d66ac155d03c2",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "db8a7745d1abafb29df7039bc44d36b66b61018f",
+					"subject": "feat(windows): read the Ergopti emulation tables from its .keylayout",
+					"subject_matched_counterpart": "0233a6a93b2348b0c43823c0de5434a8eca54092",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "61dfc0a37f83867d4de81bbc3e87fac05e3eb762",
+					"subject": "feat(layouts): declare what an emulated layout supersedes, and why",
+					"subject_matched_counterpart": "c17c0107817910d9f76835a4b9f5e17fd6403857",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "c256a697db787ee14368b78762dc0cd26582bc45",
+					"subject": "fix(layouts): declare superseded_reason_key in the manifest schema",
+					"subject_matched_counterpart": "872cdfc04f8254052a53d3fc34d3df23ac1c5970",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "269853d2340c0813dca52e4d49c62da5e7f76fe3",
+					"subject": "test(windows): pin why the Ergopti table loaders refuse bad input",
+					"subject_matched_counterpart": "ee917a1cc2e57113c48485d76c604b7b3fde7923",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "7d9b798f68ba1c6a074c0db707e8b6992e548895",
+					"subject": "docs(windows): point the typography note at the Ergopti .keylayout",
+					"subject_matched_counterpart": "b3431100dbe2a10f5bf4fc749fa702801c8c576c",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "8b028807f8526a7a5afc474ecd389bd24771328d",
+					"subject": "test(windows): replay the Ergopti golden through the registry emulation",
+					"subject_matched_counterpart": "d91f11b225685a696e59c17788d10d471dff84e7",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "c6e59c0c25733bf58b0594090821b33861a2abe1",
+					"subject": "feat(layouts): declare each registry layout's family",
+					"subject_matched_counterpart": "7bfb46d93fea7cedfbd9a523e96ea9ad52697eec",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "aa2fd65dd72c288dec12754f0bcbfea5e6918525",
+					"subject": "feat(layouts): publish each layout's keyboard name in the index",
+					"subject_matched_counterpart": "83b170eb98bc18f89561a34f23a4b31f4191d9d9",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "a487caf2beb4956fb2bb0b57bc3b2a65dbc9ea1d",
+					"subject": "feat(layouts): add the shared layout catalogue decisions",
+					"subject_matched_counterpart": "a59ab058d9722276f2c4fa1c9d82a1d27b24abfa",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "b68e4341b6ce7b725bbe1509b438a292d92f1088",
+					"subject": "refactor(macos): read a bundle's layouts from its Info.plist",
+					"subject_matched_counterpart": "6008d163c1e1dbefc124283439854c66ef4782f0",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "893df3cb98c5a8078eada01aff1829750d72ff19",
+					"subject": "feat(macos): install, update and uninstall registry layouts",
+					"subject_matched_counterpart": "cc825bb024d4df7dbf1ce852a9e306ed20c2ff26",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "174f86a786c46ca83f5afcbb208704bd3c43bda0",
+					"subject": "feat(linux): install registry layouts in the user XKB tree",
+					"subject_matched_counterpart": "58df3c733c4c040a455a9ae27dbf9d779b8fad6d",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "2fda635fd7c30f13c2a68250f5a98100e4195c9a",
+					"subject": "feat(windows): install, update and uninstall registry layouts",
+					"subject_matched_counterpart": "88480fc8b984107f9382d5cbd73945b5976bf38b",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "ecacf79938b74817e48ddf9915902b32de8ca1fe",
+					"subject": "feat(layouts): add the shared layout manager window on three drivers",
+					"subject_matched_counterpart": "dcfbe6051f3b0e33a2ff36030e7575b3cb5367f1",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
+					"subject": "refactor(macos): host the layout manager window in ui/layout_manager",
+					"subject_matched_counterpart": "9da35250472e7a12d34cf86eb1515502f307e071",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "fa9798907c19cc89923d86e8baf80d0de299cb7a",
+					"subject": "feat(menu): make the Ergopti section the custom layout section",
+					"subject_matched_counterpart": "11123eca0efb8c3f33eb3d849ac231ed983fb63e",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "cf5828429689cedbfe0b61129195c2daad5e8612",
+					"subject": "feat(windows): turn Ergopti-only hotstrings off under another layout",
+					"subject_matched_counterpart": "da27668b6457491c4c68742976aa32a6a44fe0ae",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "9f314bf8ed7293f21c45b185f2f24be2c9655f25",
+					"subject": "fix(layouts): read the installed record before writing a layout",
+					"subject_matched_counterpart": "ba29c25a7c59cb2b32d8885f4a9a45a4a9bf8183",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "b6b3b1836778818415525ef067591a8cdd1908ea",
+					"subject": "fix(layouts): name the shipped catalogue before the first refresh",
+					"subject_matched_counterpart": "6ff43ac92bcae846f050007c70887d0223de0951",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "e94fe6674fbd5842628038e21c63535fa6125500",
+					"subject": "fix(layouts): report a cached index the catalogue sets aside",
+					"subject_matched_counterpart": "50b07bf78b824676cac61e634a86dc441ea5cc81",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "73b2b56e4727e8ea152e59128527fe03e87ed029",
+					"subject": "refactor(layouts): drop the registry download the catalogue replaced",
+					"subject_matched_counterpart": "4b5db4349347dd57a56c40f2fb9ff2c8455917ca",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "0f81fcc182fbd2249b2d1b9e80dc800b21b6b812",
+					"subject": "refactor(layouts): declare the registry user agent once",
+					"subject_matched_counterpart": "41f680b75a904cf3dffa69c4ba4196638250e193",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "a3f67d96a9701d66bdef83d23c51db62ef7fc58d",
+					"subject": "fix(linux): leave the user XKB tree unchanged after a failed install",
+					"subject_matched_counterpart": "e4f49b1497647a9134b6cf8943d1771bff7ba37e",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "be0b73524eac608e81eaa1b5f454dc91842884f0",
+					"subject": "test(windows): pin that a refused update keeps the installed layout",
+					"subject_matched_counterpart": "32029aa182e1c137e44572f1e85e6a3188b8c589",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "2a2516176a8d3da59044ac5288adfce2c40629ea",
+					"subject": "test(layouts): resolve Git Bash for the packaging fixture",
+					"subject_matched_counterpart": "a36c939e361f267971bae4ef86c9728450b8d381",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "54a31ea4cab61cd716c536aa462a9663f3e23380",
+					"subject": "fix(layouts): preserve opt-in geometry hotstrings on every layout",
+					"subject_matched_counterpart": "95318893107f4f37f53c077224a229fd49bab9bb",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "c25a00ffed43e6cb7a50effdae2fc738f1f19c36",
+					"subject": "feat(layouts): inventory existing extension content in the registry",
+					"subject_matched_counterpart": "2c6964dfe62e6eb0ff04146cf164d646aa966b27",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "f77494627af86efc87bf8df5191a20a1dfb43b85",
+					"subject": "feat(layouts): publish verified extension generations atomically",
+					"subject_matched_counterpart": "129e02f61498a6545c8cca12ea8fcfbd95396f18",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "4c56825375440364326484945dee9b50773ce949",
+					"subject": "feat(layouts): show optional extension content in the manager",
+					"subject_matched_counterpart": "61a519571924da9676c14b24e5ff8687f82dfce1",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "703d10c88ae4f98be283357afc2116be636efb29",
+					"subject": "feat(layouts): discover committed extension packs on Linux",
+					"subject_matched_counterpart": "50dff8281d6daf8256d3363922bd7c3323bccaf5",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "-",
+					"sha": "fa92fdc66aaa719c2ff23d37991505e9debb875b",
+					"subject": "fix(config): preserve quoted extension paths on Windows reload",
+					"subject_matched_counterpart": "f36a16870a84b302f7d8047e040a5ae0b4083513",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "f35930ec2fedd889c4ffc4fff7dfbd1101626783",
+					"subject": "feat(layouts): discover committed extension packs on macOS",
+					"subject_matched_counterpart": null,
+					"evidence": "unknown preserve original"
+				},
+				{
+					"sign": "+",
+					"sha": "e58cadf956fac2bf18adf652cd3031f4198278b6",
+					"subject": "feat(layouts): declare historical hotstring source bindings",
+					"subject_matched_counterpart": null,
+					"evidence": "unknown preserve original"
+				},
+				{
+					"sign": "-",
+					"sha": "e4076604dbd06ea350bafda535dad52e8fc2eaa3",
+					"subject": "fix(hotstrings): recognize canonical extension source categories",
+					"subject_matched_counterpart": "6704852a473a3d26dbd804476768a96f4b7f3f42",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "-",
+					"sha": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
+					"subject": "feat(layouts): discover Windows packs and plan effective sections",
+					"subject_matched_counterpart": "e81ddf6702f833af46c2c9f85960c7a84f433238",
+					"evidence": "patch-equivalent"
+				}
+			],
+			"plus": 6,
+			"minus": 37,
+			"patches": [
+				{
+					"file": "diag-integration-unstaged.patch",
+					"source": "D:/ewt/_archive/git/diag-integration/unstaged.patch",
+					"size_bytes": 3457,
+					"sha256": "03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f",
+					"kind": "archived uncommitted delta; inspect, do not apply blindly",
+					"files": [
+						{
+							"path": "static/ergopti_plus/macos/init.lua",
+							"added_lines": 14,
+							"added_lines_found_current": 3,
+							"added_lines_found_committed": 3,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk",
+							"added_lines": 15,
+							"added_lines_found_current": 1,
+							"added_lines_found_committed": 1,
+							"status": "different or missing; preserve for review"
+						}
+					]
+				}
+			],
+			"untracked": []
+		},
+		{
+			"name": "shortcut-refusals",
+			"cwd": "C:/ewtb/shortcut-refusals",
+			"head": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+			"gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/shortcut-refusals",
+			"bundle": "D:/ewt/_archive/git/shortcut-refusals/history.bundle",
+			"bundleBytes": 170906,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "aed8fba358ec12168aed35d9a03f398f7e6747ae",
+					"subject": "feat(config): preserve unknown fields in sparse TOML transactions",
+					"subject_matched_counterpart": "bdaf487442e5c0fd82f89131d9478fbbc695f072",
+					"evidence": "patch-equivalent"
+				},
+				{
+					"sign": "+",
+					"sha": "8ad07a053c904c69869172f343ebe8fd4877dcf5",
+					"subject": "feat(config): start neutral and persist only explicit overrides",
+					"subject_matched_counterpart": "ae047500fe4a6cef4f0497cde3840cfa17b06444",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				},
+				{
+					"sign": "+",
+					"sha": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+					"subject": "feat(config): retain rollback debt for scoped transactions",
+					"subject_matched_counterpart": "dc4f2618159deb0574da7b896a6ab5e1c645f022",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				}
+			],
+			"plus": 2,
+			"minus": 1,
+			"patches": [],
+			"untracked": []
+		},
+		{
+			"name": "windows-master-state",
+			"cwd": "C:/ewtb/windows-master-state",
+			"head": "335e06aa1f2b868e225da798269b03edcdf7dcae",
+			"gitdir": "D:/Documents/GitHub/ergopti/.git/worktrees/windows-master-state",
+			"bundle": "D:/ewt/_archive/git/windows-master-state/history.bundle",
+			"bundleBytes": 24066,
+			"commits": [
+				{
+					"sign": "+",
+					"sha": "335e06aa1f2b868e225da798269b03edcdf7dcae",
+					"subject": "fix(windows): preserve desired features behind category masters",
+					"subject_matched_counterpart": "8549080ada96a5df1958e1a09eddb388c51a2445",
+					"evidence": "matching subject; adapted integration, not exact equivalence"
+				}
+			],
+			"plus": 1,
+			"minus": 0,
+			"patches": [
+				{
+					"file": "windows-master-state-unstaged.patch",
+					"source": "D:/ewt/_archive/git/windows-master-state/unstaged.patch",
+					"size_bytes": 511775,
+					"sha256": "693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6",
+					"kind": "archived uncommitted delta; inspect, do not apply blindly",
+					"files": [
+						{
+							"path": "static/ergopti_plus/_shared/modules/features/manifest.schema.json",
+							"added_lines": 44,
+							"added_lines_found_current": 42,
+							"added_lines_found_committed": 42,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+							"added_lines": 1133,
+							"added_lines_found_current": 1125,
+							"added_lines_found_committed": 1125,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/linux/_generated/config_template.toml",
+							"added_lines": 35,
+							"added_lines_found_current": 35,
+							"added_lines_found_committed": 35,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/linux/_generated/features_manifest.lua",
+							"added_lines": 288,
+							"added_lines_found_current": 283,
+							"added_lines_found_committed": 283,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/macos/_generated/config_template.toml",
+							"added_lines": 81,
+							"added_lines_found_current": 80,
+							"added_lines_found_committed": 80,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/macos/_generated/features_manifest.lua",
+							"added_lines": 360,
+							"added_lines_found_current": 351,
+							"added_lines_found_committed": 351,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/windows/_generated/config_template.toml",
+							"added_lines": 81,
+							"added_lines_found_current": 80,
+							"added_lines_found_committed": 80,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/windows/_generated/features_manifest.ahk",
+							"added_lines": 266,
+							"added_lines_found_current": 251,
+							"added_lines_found_committed": 251,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/windows/infra/feature_state.ahk",
+							"added_lines": 31,
+							"added_lines_found_current": 31,
+							"added_lines_found_committed": 31,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/infra/first_boot.ahk",
+							"added_lines": 20,
+							"added_lines_found_current": 20,
+							"added_lines_found_committed": 20,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/infra/manifest_reader.ahk",
+							"added_lines": 146,
+							"added_lines_found_current": 139,
+							"added_lines_found_committed": 139,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "static/ergopti_plus/windows/infra/toml/toml_config_loader.ahk",
+							"added_lines": 7,
+							"added_lines_found_current": 7,
+							"added_lines_found_committed": 7,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+							"added_lines": 1,
+							"added_lines_found_current": 1,
+							"added_lines_found_committed": 1,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/meta/test_master_gate_drifted_subgate_skip.ahk",
+							"added_lines": 5,
+							"added_lines_found_current": 5,
+							"added_lines_found_committed": 5,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/run_all.ahk",
+							"added_lines": 1,
+							"added_lines_found_current": 1,
+							"added_lines_found_committed": 1,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk",
+							"added_lines": 0,
+							"added_lines_found_current": 0,
+							"added_lines_found_committed": 0,
+							"status": "deletion present"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk",
+							"added_lines": 3,
+							"added_lines_found_current": 3,
+							"added_lines_found_committed": 3,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk",
+							"added_lines": 12,
+							"added_lines_found_current": 12,
+							"added_lines_found_committed": 12,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/unit/test_gestures.ahk",
+							"added_lines": 4,
+							"added_lines_found_current": 4,
+							"added_lines_found_committed": 4,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+							"added_lines": 3,
+							"added_lines_found_current": 3,
+							"added_lines_found_committed": 3,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "static/ergopti_plus/windows/tests/unit/test_tap_hold_loader.ahk",
+							"added_lines": 15,
+							"added_lines_found_current": 14,
+							"added_lines_found_committed": 14,
+							"status": "different or missing; preserve for review"
+						},
+						{
+							"path": "tools/build/build-features-manifest.js",
+							"added_lines": 17,
+							"added_lines_found_current": 17,
+							"added_lines_found_committed": 17,
+							"status": "all added lines present; not semantic proof"
+						},
+						{
+							"path": "tools/test/test-feature-state-boot-smoke.cjs",
+							"added_lines": 2,
+							"added_lines_found_current": 2,
+							"added_lines_found_committed": 2,
+							"status": "all added lines present; not semantic proof"
+						}
+					]
+				}
+			],
+			"untracked": [
+				"static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk"
+			]
+		}
+	],
+	"exported": [
+		{
+			"file": "actions-D4-staged.patch",
+			"source": "D:/ewt/_archive/git/actions-D4/staged.patch",
+			"size_bytes": 30572,
+			"sha256": "2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937",
+			"kind": "archived uncommitted delta; inspect, do not apply blindly"
+		},
+		{
+			"file": "diag-integration-unstaged.patch",
+			"source": "D:/ewt/_archive/git/diag-integration/unstaged.patch",
+			"size_bytes": 3457,
+			"sha256": "03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f",
+			"kind": "archived uncommitted delta; inspect, do not apply blindly"
+		},
+		{
+			"file": "windows-master-state-unstaged.patch",
+			"source": "D:/ewt/_archive/git/windows-master-state/unstaged.patch",
+			"size_bytes": 511775,
+			"sha256": "693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6",
+			"kind": "archived uncommitted delta; inspect, do not apply blindly"
+		},
+		{
+			"file": "actions-D4-history.bundle",
+			"source": "D:/ewt/_archive/git/actions-D4/history.bundle",
+			"size_bytes": 483526,
+			"sha256": "917cd6218564fb48e398384e32844707b9d0bbd384eb3b7945250c07121a6a79",
+			"kind": "exact original detached history, 483526 bytes; prerequisite history required"
+		},
+		{
+			"file": "windows-master-state-test_neutral_config_manifest.ahk",
+			"size_bytes": 4552,
+			"sha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
+			"source": "ewtb-20260928.objects.zip object 32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
+			"kind": "archived untracked original test; current test supersedes it with 39 added lines and one updated navigation-owner assertion; do not overwrite current"
+		}
+	],
+	"untracked": [
+		{
+			"path": "windows-master-state/static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
+			"size": 9495,
+			"sha256": "38fc7be43eeb415acc6da5af09f1b355bb4b125f16a88705bcb8f7a984423efe",
+			"mtime_ns": "1790586305678977900",
+			"worktree": "windows-master-state",
+			"repo_path": "static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
+			"current_sha256": "38fc7be43eeb415acc6da5af09f1b355bb4b125f16a88705bcb8f7a984423efe",
+			"exact_current": true,
+			"needs_original_export": false
+		},
+		{
+			"path": "windows-master-state/static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
+			"size": 4552,
+			"sha256": "32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba",
+			"mtime_ns": "1790586305678977900",
+			"worktree": "windows-master-state",
+			"repo_path": "static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
+			"current_sha256": "e65f29dc561993f420728dfdb3485b02071e02d977f956433aa0017cc35de5cc",
+			"exact_current": false,
+			"needs_original_export": true
+		}
+	],
+	"limits": [
+		"Added-line presence is a bounded screening heuristic, not proof of semantic equivalence. No tests run.",
+		"D4 original history has adapted counterparts; exact 483526-byte bundle retained instead of claiming patch equality.",
+		"Windows original delta is mainly W1 prereqs already integrated in adapted form, but full semantic equivalence not proven in this bounded audit; preserve original.",
+		"No git refs/index/source mutations. No full archive copy."
+	],
+	"findings": [
+		{
+			"priority": "preserve pending work",
+			"artifact": "actions-D4-staged.patch",
+			"finding": "Confirmed absent in both committed dev and current files: 21 locales retain active_model_label and old model_label wording; Mac formatter and five test lookups still use active_model_label. This 23-path staged delta is not integrated. Rebase and test before application."
+		},
+		{
+			"priority": "preserve pending work",
+			"artifact": "diag-integration-unstaged.patch",
+			"finding": "Mac extension scan/load boot hooks and Windows historical-fragment routing test are missing in current source. Requires the unintegrated f35930ec2 and e58cadf95 foundations already exported in branch-original-patches. Boot snippet is stale against subsequent initialization changes; do not apply blindly."
+		},
+		{
+			"priority": "original provenance",
+			"artifact": "actions-D4-history.bundle",
+			"finding": "Original detached 28-commit history: 13 patch-equivalent commits and 15 plus commits all have same-subject adapted counterparts in dev. Same-subject mapping is not a proof of full semantic equivalence. Exact bundle retained, git bundle verify passed; requires f4d0bfd633ab7af50044199917e1e3db4241d8be, confirmed ancestor of dev."
+		},
+		{
+			"priority": "conservative preservation",
+			"artifact": "windows-master-state-unstaged.patch",
+			"finding": "23 tracked paths, mainly excluded W1 manifest/defaults/loader/test prerequisite delta. Much is present or superseded in dev, but full semantic equivalence is not proven within this bounded audit. Preserve original for review, never wholesale apply stale generated output."
+		},
+		{
+			"priority": "no missing tracked changes",
+			"artifact": "shortcut-refusals",
+			"finding": "Archived staged/unstaged/untracked state empty. Original non-equivalent commits already preserved by branch-original-patches."
+		},
+		{
+			"priority": "no lost untracked fixture",
+			"artifact": "windows-master-state",
+			"finding": "Archived feature_state_boot_smoke support file is byte-identical current. Archived neutral_config_manifest test is superseded by current additional assertions and navigation-owner correction; exact old 4552-byte test retained for provenance."
+		}
+	],
+	"ignored_zip_review": {
+		"archives": [
+			{
+				"name": "wf_f8423464-54e-1-ignored.zip",
+				"entries": 768
+			},
+			{
+				"name": "wf_f8423464-54e-2-ignored.zip",
+				"entries": 763
+			}
+		],
+		"method": "Listed all entries without extracting archive. Reviewed the four previously differing non-reconstructible records as text; hashed additional local settings/test config/empty lock against current root.",
+		"findings": [
+			"Generated build output, locale/hotstring TSV and Python bytecode are reconstructible.",
+			"Both personal_shortcuts.ahk files are generated forwarding stubs pointing only at Temp/ergopti-full-startup-*/suspend-marker/config/autohotkey/personal_shortcuts.ahk. No user shortcut bodies.",
+			"today.log is a 68-byte synthetic typing record containing text x and a test UUID; test_results.txt is an old 5/5 E2E receipt.",
+			"The only other entries outside generated/fixture classifications are .claude/settings.local.json, tests/test_config.ini, and one zero-byte fixture write lock; all byte-identical current root.",
+			"No missing implementation or user-authored config found; do not include these ignored ZIPs in GitHub handoff. Local machine settings were not exported."
+		]
+	},
+	"security_review": "Exports consist of original code/test/localization diffs and original committed history. No working user configuration, credential file, ignored ZIP or full object archive copied."
 }

@@ -20,8 +20,17 @@ const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SOURCE_SCRIPT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'apps',
-	'App Cloner.app', 'Contents', 'Resources', 'make_shortcut.sh');
+const SOURCE_SCRIPT = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'apps',
+	'App Cloner.app',
+	'Contents',
+	'Resources',
+	'make_shortcut.sh'
+);
 
 const results = [];
 
@@ -62,7 +71,9 @@ const launcher = path.join(desktop, 'Shortcut.app', 'Contents', 'MacOS', 'open_t
 
 try {
 	fs.mkdirSync(fakeBin, { recursive: true });
-	writeExecutable(path.join(fakeBin, 'qlmanage'), `#!/usr/bin/env bash
+	writeExecutable(
+		path.join(fakeBin, 'qlmanage'),
+		`#!/usr/bin/env bash
 set -eu
 out=''
 while [ "$#" -gt 0 ]; do
@@ -71,8 +82,11 @@ while [ "$#" -gt 0 ]; do
 done
 mkdir -p "$out"
 printf 'png' > "$out/preview.png"
-`);
-	writeExecutable(path.join(fakeBin, 'sips'), `#!/usr/bin/env bash
+`
+	);
+	writeExecutable(
+		path.join(fakeBin, 'sips'),
+		`#!/usr/bin/env bash
 set -eu
 out=''
 while [ "$#" -gt 0 ]; do
@@ -81,8 +95,11 @@ while [ "$#" -gt 0 ]; do
 done
 mkdir -p "$(dirname "$out")"
 printf 'png' > "$out"
-`);
-	writeExecutable(path.join(fakeBin, 'iconutil'), `#!/usr/bin/env bash
+`
+	);
+	writeExecutable(
+		path.join(fakeBin, 'iconutil'),
+		`#!/usr/bin/env bash
 set -eu
 out=''
 while [ "$#" -gt 0 ]; do
@@ -90,45 +107,64 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 printf 'icns' > "$out"
-`);
+`
+	);
 
-	const run = spawnSync(bash, [
-		toBashPath(SOURCE_SCRIPT),
-		'Shortcut',
-		'/tmp/project',
-		'/Applications/Visual Studio Code.app',
-		'#123456',
-		'S',
-	], {
-		cwd: fixtureRoot,
-		encoding: 'utf8',
-		maxBuffer: 4 * 1024 * 1024,
-		env: {
-			...process.env,
-			HOME: toBashPath(fixtureRoot),
-			PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`,
-		},
+	const run = spawnSync(
+		bash,
+		[
+			toBashPath(SOURCE_SCRIPT),
+			'Shortcut',
+			'/tmp/project',
+			'/Applications/Visual Studio Code.app',
+			'#123456',
+			'S'
+		],
+		{
+			cwd: fixtureRoot,
+			encoding: 'utf8',
+			maxBuffer: 4 * 1024 * 1024,
+			env: {
+				...process.env,
+				HOME: toBashPath(fixtureRoot),
+				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+			}
+		}
+	);
+	const detail = JSON.stringify({
+		status: run.status,
+		error: run.error && run.error.message,
+		stdout: run.stdout,
+		stderr: run.stderr
 	});
-	const detail = JSON.stringify({ status: run.status, error: run.error && run.error.message,
-		stdout: run.stdout, stderr: run.stderr });
-	test('production generator writes a shortcut launcher',
-		run.status === 0 && fs.existsSync(launcher), detail);
+	test(
+		'production generator writes a shortcut launcher',
+		run.status === 0 && fs.existsSync(launcher),
+		detail
+	);
 
 	const generated = fs.existsSync(launcher) ? fs.readFileSync(launcher, 'utf8') : '';
-	test('generated AppleScript receives the resolved application name as argv',
-		generated.includes('osascript "$ASFILE" "$APP_NAME"')
-			&& generated.includes('on run argv')
-			&& generated.includes('set appName to item 1 of argv'), generated);
-	test('generated AppleScript addresses the argv value, never a literal shell token',
-		generated.includes('process appName')
-			&& !generated.includes('process "$APP_NAME"'), generated);
+	test(
+		'generated AppleScript receives the resolved application name as argv',
+		generated.includes('osascript "$ASFILE" "$APP_NAME"') &&
+			generated.includes('on run argv') &&
+			generated.includes('set appName to item 1 of argv'),
+		generated
+	);
+	test(
+		'generated AppleScript addresses the argv value, never a literal shell token',
+		generated.includes('process appName') && !generated.includes('process "$APP_NAME"'),
+		generated
+	);
 	const appAssignment = generated.match(/^APP_PATH=.*$/m);
 	const appRoundtrip = appAssignment
 		? spawnSync(bash, ['-c', `${appAssignment[0]}\nprintf '%s' "$APP_PATH"`], { encoding: 'utf8' })
 		: { status: null, stdout: '' };
-	test('generated launcher retains the chosen application path',
-		appRoundtrip.status === 0
-			&& appRoundtrip.stdout === '/Applications/Visual Studio Code.app', generated);
+	test(
+		'generated launcher retains the chosen application path',
+		appRoundtrip.status === 0 && appRoundtrip.stdout === '/Applications/Visual Studio Code.app',
+		generated
+	);
 } finally {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 	report();

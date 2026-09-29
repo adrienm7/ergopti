@@ -28,7 +28,10 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAIRS = [
 	['static/ergopti_plus/_shared/assets/ergopti_tray.png', 'static/img/logo/logo_simple.png'],
-	['static/ergopti_plus/_shared/assets/ergopti_tray_paused.png', 'static/img/logo/logo_simple_disabled.png'],
+	[
+		'static/ergopti_plus/_shared/assets/ergopti_tray_paused.png',
+		'static/img/logo/logo_simple_disabled.png'
+	]
 ];
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -58,7 +61,9 @@ try {
 	fs.writeFileSync(path.join(sandbox, '_shared', 'assets', 'ergopti_tray.png'), logo);
 	for (const format of ['deb', 'rpm', 'appimage']) {
 		const source = fs.readFileSync(path.join(ROOT, `tools/build/build-linux-${format}.sh`), 'utf8');
-		const section = source.match(/^# (?:\d+\. )?(?:Placeholder|Application) icon\n(?:# -+\n)?([\s\S]*?)(?=\n# -{10,})/m);
+		const section = source.match(
+			/^# (?:\d+\. )?(?:Placeholder|Application) icon\n(?:# -+\n)?([\s\S]*?)(?=\n# -{10,})/m
+		);
 		if (!section) throw new Error(`Missing ${format} icon packaging section`);
 		const stage = path.join(sandbox, format);
 		for (const size of ['128x128', '512x512']) {
@@ -67,13 +72,21 @@ try {
 		const script = path.join(sandbox, `${format}.sh`);
 		fs.writeFileSync(script, section[1]);
 		const result = spawnSync(bashExecutable(), ['-eu', script.replaceAll('\\', '/')], {
-			encoding: 'utf8', env: { ...process.env, BUILD_DIR: sandbox.replaceAll('\\', '/'),
-				DEB_ROOT: stage.replaceAll('\\', '/'), INSTALL_ROOT: stage.replaceAll('\\', '/'),
-				APPDIR: stage.replaceAll('\\', '/') },
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				BUILD_DIR: sandbox.replaceAll('\\', '/'),
+				DEB_ROOT: stage.replaceAll('\\', '/'),
+				INSTALL_ROOT: stage.replaceAll('\\', '/'),
+				APPDIR: stage.replaceAll('\\', '/')
+			}
 		});
-		if (result.status !== 0) throw new Error(`${format} icon staging failed: ${result.error || result.stderr}`);
-		const icon = format === 'appimage' ? path.join(stage, 'ergopti.png')
-			: path.join(stage, 'usr/share/icons/hicolor/512x512/apps/ergopti.png');
+		if (result.status !== 0)
+			throw new Error(`${format} icon staging failed: ${result.error || result.stderr}`);
+		const icon =
+			format === 'appimage'
+				? path.join(stage, 'ergopti.png')
+				: path.join(stage, 'usr/share/icons/hicolor/512x512/apps/ergopti.png');
 		if (!fs.existsSync(icon) || !fs.readFileSync(icon).equals(logo)) {
 			failures.push(`${format} launcher must ship the real 512x512 Ergopti logo`);
 		}

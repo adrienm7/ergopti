@@ -19,22 +19,18 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs = require("fs");
-const path = require("path");
-const { spawnSync } = require("child_process");
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
 
-const ROOT = path.resolve(__dirname, "..", "..");
-const SHARED_UI_ROOT = path.join(ROOT, "static", "ergopti_plus", "_shared", "ui");
+const ROOT = path.resolve(__dirname, '..', '..');
+const SHARED_UI_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui');
 
 let passCount = 0;
 let failCount = 0;
 const results = [];
-
-
-
-
 
 // =====================================================
 // =====================================================
@@ -53,7 +49,7 @@ function collectJavascriptFiles(directory) {
 		const entryPath = path.join(directory, entry.name);
 		if (entry.isDirectory()) {
 			files.push(...collectJavascriptFiles(entryPath));
-		} else if (entry.isFile() && entry.name.endsWith(".js")) {
+		} else if (entry.isFile() && entry.name.endsWith('.js')) {
 			files.push(entryPath);
 		}
 	}
@@ -80,12 +76,12 @@ function record(name, ok, detail) {
  * @param {string} filePath - Absolute JavaScript asset path.
  */
 function checkSyntax(filePath) {
-	const result = spawnSync(process.execPath, ["--check", filePath], {
+	const result = spawnSync(process.execPath, ['--check', filePath], {
 		cwd: ROOT,
-		encoding: "utf8"
+		encoding: 'utf8'
 	});
-	const relativePath = path.relative(ROOT, filePath).replaceAll(path.sep, "/");
-	const parserOutput = `${result.stdout || ""}${result.stderr || ""}`.trim();
+	const relativePath = path.relative(ROOT, filePath).replaceAll(path.sep, '/');
+	const parserOutput = `${result.stdout || ''}${result.stderr || ''}`.trim();
 	record(
 		`${relativePath} parses as JavaScript`,
 		result.status === 0,
@@ -98,12 +94,12 @@ function checkSyntax(filePath) {
  */
 function report() {
 	const total = passCount + failCount;
-	console.log("TAP version 14");
+	console.log('TAP version 14');
 	console.log(`1..${total}`);
 	results.forEach((result, index) => {
-		console.log(`${result.ok ? "ok" : "not ok"} ${index + 1} - ${result.name}`);
+		console.log(`${result.ok ? 'ok' : 'not ok'} ${index + 1} - ${result.name}`);
 		if (!result.ok && result.detail) {
-			console.log(`  # ${result.detail.replaceAll("\n", "\n  # ")}`);
+			console.log(`  # ${result.detail.replaceAll('\n', '\n  # ')}`);
 		}
 	});
 	console.log(`# passed: ${passCount}/${total}`);
@@ -114,6 +110,6 @@ function report() {
 }
 
 const javascriptFiles = collectJavascriptFiles(SHARED_UI_ROOT);
-record("shared UI contains JavaScript browser assets", javascriptFiles.length > 0);
+record('shared UI contains JavaScript browser assets', javascriptFiles.length > 0);
 javascriptFiles.forEach(checkSyntax);
 report();

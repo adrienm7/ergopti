@@ -35,14 +35,17 @@ const IssueLink = (() => {
 	const file = path.join(SHARED, 'ui', 'issue_link.js');
 	const sandbox = { window: {} };
 	vm.runInNewContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
-	if (!sandbox.window.ErgoptiIssueLink) throw new Error('issue_link.js did not define window.ErgoptiIssueLink');
+	if (!sandbox.window.ErgoptiIssueLink)
+		throw new Error('issue_link.js did not define window.ErgoptiIssueLink');
 	return sandbox.window.ErgoptiIssueLink;
 })();
 
 const registry = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'issue_templates.json'), 'utf8')
 );
-const defaults = JSON.parse(fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8'));
+const defaults = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8')
+);
 const repository = defaults.github;
 
 // The labels the repository has (`gh label list`, GitHub's default set). A form
@@ -66,12 +69,18 @@ let labelsChecked = 0;
 
 // ── Registry shape ────────────────────────────────────────────────────────
 const templateIds = Object.keys(registry.templates || {});
-if (templateIds.length < 2) failures.push('the registry declares fewer than the bug and feature templates');
-if (!/\{owner\}/.test(registry.issue_new_url || '') || !/\{repo\}/.test(registry.issue_new_url || '')) {
+if (templateIds.length < 2)
+	failures.push('the registry declares fewer than the bug and feature templates');
+if (
+	!/\{owner\}/.test(registry.issue_new_url || '') ||
+	!/\{repo\}/.test(registry.issue_new_url || '')
+) {
 	failures.push('issue_new_url must take the repository from {owner} and {repo}');
 }
 if (!(registry.max_url_bytes > 0 && registry.max_url_bytes <= 8000)) {
-	failures.push(`max_url_bytes ${registry.max_url_bytes} must be positive and under GitHub's ~8 KB limit`);
+	failures.push(
+		`max_url_bytes ${registry.max_url_bytes} must be positive and under GitHub's ~8 KB limit`
+	);
 }
 
 // ── Every template against its form ───────────────────────────────────────
@@ -79,7 +88,9 @@ for (const id of templateIds) {
 	const template = registry.templates[id];
 	const formPath = path.join(FORMS_DIR, template.file);
 	if (!fs.existsSync(formPath)) {
-		failures.push(`template "${id}" names ${template.file}, which is not in .github/ISSUE_TEMPLATE`);
+		failures.push(
+			`template "${id}" names ${template.file}, which is not in .github/ISSUE_TEMPLATE`
+		);
 		continue;
 	}
 	let form;
@@ -92,9 +103,11 @@ for (const id of templateIds) {
 	const body = Array.isArray(form.body) ? form.body : [];
 	const formIds = body.filter((item) => item && item.id).map((item) => item.id);
 	if (formIds.length < 3) failures.push(`${template.file}: fewer than 3 fields with an id`);
-	if (new Set(formIds).size !== formIds.length) failures.push(`${template.file}: duplicate field ids`);
+	if (new Set(formIds).size !== formIds.length)
+		failures.push(`${template.file}: duplicate field ids`);
 	for (const fieldId of formIds) {
-		if (!/^[A-Za-z0-9_-]+$/.test(fieldId)) failures.push(`${template.file}: invalid field id "${fieldId}"`);
+		if (!/^[A-Za-z0-9_-]+$/.test(fieldId))
+			failures.push(`${template.file}: invalid field id "${fieldId}"`);
 	}
 	if (!Array.isArray(form.labels) || form.labels.length === 0) {
 		failures.push(`${template.file}: labels must be declared in the form`);
@@ -102,11 +115,15 @@ for (const id of templateIds) {
 	for (const label of Array.isArray(form.labels) ? form.labels : []) {
 		labelsChecked++;
 		if (!REPOSITORY_LABELS.has(label)) {
-			failures.push(`${template.file}: label "${label}" does not exist in the repository, so GitHub drops it`);
+			failures.push(
+				`${template.file}: label "${label}" does not exist in the repository, so GitHub drops it`
+			);
 		}
 	}
 	if (form.title !== template.title_prefix) {
-		failures.push(`${template.file}: title "${form.title}" differs from the registry prefix "${template.title_prefix}"`);
+		failures.push(
+			`${template.file}: title "${form.title}" differs from the registry prefix "${template.title_prefix}"`
+		);
 	}
 	if (!Array.isArray(template.fields) || template.fields.length === 0) {
 		failures.push(`template "${id}" prefills no field`);
@@ -115,9 +132,13 @@ for (const id of templateIds) {
 		fieldsChecked++;
 		const field = body.find((item) => item && item.id === fieldId);
 		if (!field) {
-			failures.push(`template "${id}" prefills "${fieldId}", which ${template.file} does not declare`);
+			failures.push(
+				`template "${id}" prefills "${fieldId}", which ${template.file} does not declare`
+			);
 		} else if (field.type !== 'input' && field.type !== 'textarea') {
-			failures.push(`${template.file}: "${fieldId}" is a ${field.type}, which a URL cannot prefill`);
+			failures.push(
+				`${template.file}: "${fieldId}" is a ${field.type}, which a URL cannot prefill`
+			);
 		}
 	}
 	// The host fills report_field with the full report: the budget cuts the
@@ -125,7 +146,9 @@ for (const id of templateIds) {
 	if (template.report_field !== undefined) {
 		const fields = template.fields || [];
 		if (fields[fields.length - 1] !== template.report_field) {
-			failures.push(`template "${id}": report_field "${template.report_field}" must be its last field`);
+			failures.push(
+				`template "${id}": report_field "${template.report_field}" must be its last field`
+			);
 		}
 	}
 }
@@ -133,12 +156,14 @@ if (!registry.templates.bug || registry.templates.bug.report_field === undefined
 	failures.push('the bug template names no report_field for the full report');
 }
 if (fieldsChecked < 4) failures.push(`only ${fieldsChecked} prefilled field(s) checked`);
-if (labelsChecked < templateIds.length) failures.push(`only ${labelsChecked} form label(s) checked`);
+if (labelsChecked < templateIds.length)
+	failures.push(`only ${labelsChecked} form label(s) checked`);
 
 // ── config.yml ────────────────────────────────────────────────────────────
 try {
 	const config = parseIssueFormYaml(fs.readFileSync(path.join(FORMS_DIR, 'config.yml'), 'utf8'));
-	if (config.blank_issues_enabled !== false) failures.push('config.yml must set blank_issues_enabled: false');
+	if (config.blank_issues_enabled !== false)
+		failures.push('config.yml must set blank_issues_enabled: false');
 } catch (error) {
 	failures.push(`config.yml: ${error.message}`);
 }
@@ -155,13 +180,15 @@ if (!repository || !repository.owner || !repository.repo) {
 		version: '2.1.0-dev.130',
 		os: 'Windows 11 Famille 26100.9457 — édition française',
 		driver: 'windows',
-		diagnostics: long,
+		diagnostics: long
 	};
 	const url = IssueLink.buildIssueUrl(registry, repository, 'bug', values);
 	const expectedStart = `https://github.com/${repository.owner}/${repository.repo}/issues/new?template=bug_report.yml`;
 	if (!url.startsWith(expectedStart)) failures.push(`the URL does not start with ${expectedStart}`);
 	if (url.length > registry.max_url_bytes) {
-		failures.push(`a worst-case prefill is ${url.length} bytes, over the ${registry.max_url_bytes}-byte budget`);
+		failures.push(
+			`a worst-case prefill is ${url.length} bytes, over the ${registry.max_url_bytes}-byte budget`
+		);
 	}
 	if (!/[?&]version=/.test(url)) failures.push('the worst-case prefill lost the version field');
 }
@@ -171,4 +198,6 @@ if (failures.length > 0) {
 	for (const failure of failures) console.error(`  - ${failure}`);
 	process.exit(1);
 }
-console.log(`[OK] issue templates: ${templateIds.length} form(s), ${fieldsChecked} prefilled field(s) declared by their forms.`);
+console.log(
+	`[OK] issue templates: ${templateIds.length} form(s), ${fieldsChecked} prefilled field(s) declared by their forms.`
+);

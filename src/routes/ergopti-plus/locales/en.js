@@ -187,4 +187,3 @@ export default {
 	'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →':
 		'Already typing in Ergopti? Install the layout for the full combo →'
 };
-

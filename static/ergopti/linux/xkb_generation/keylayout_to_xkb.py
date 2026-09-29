@@ -72,17 +72,43 @@ MODIFIER_TOKENS = {
 # after one of them (Kalamine names its states "acute", "greek", ...).
 KNOWN_DEAD_KEYSYMS = frozenset(
     {
-        "dead_grave", "dead_acute", "dead_circumflex", "dead_tilde",
-        "dead_perispomeni", "dead_macron", "dead_breve", "dead_abovedot",
-        "dead_diaeresis", "dead_abovering", "dead_doubleacute", "dead_caron",
-        "dead_cedilla", "dead_ogonek", "dead_iota", "dead_belowdot",
-        "dead_hook", "dead_horn", "dead_stroke", "dead_abovecomma",
-        "dead_abovereversedcomma", "dead_doublegrave", "dead_belowring",
-        "dead_belowmacron", "dead_belowcircumflex", "dead_belowtilde",
-        "dead_belowbreve", "dead_belowdiaeresis", "dead_invertedbreve",
-        "dead_belowcomma", "dead_currency", "dead_lowline",
-        "dead_aboveverticalline", "dead_belowverticalline",
-        "dead_longsolidusoverlay", "dead_greek", "dead_hamza",
+        "dead_grave",
+        "dead_acute",
+        "dead_circumflex",
+        "dead_tilde",
+        "dead_perispomeni",
+        "dead_macron",
+        "dead_breve",
+        "dead_abovedot",
+        "dead_diaeresis",
+        "dead_abovering",
+        "dead_doubleacute",
+        "dead_caron",
+        "dead_cedilla",
+        "dead_ogonek",
+        "dead_iota",
+        "dead_belowdot",
+        "dead_hook",
+        "dead_horn",
+        "dead_stroke",
+        "dead_abovecomma",
+        "dead_abovereversedcomma",
+        "dead_doublegrave",
+        "dead_belowring",
+        "dead_belowmacron",
+        "dead_belowcircumflex",
+        "dead_belowtilde",
+        "dead_belowbreve",
+        "dead_belowdiaeresis",
+        "dead_invertedbreve",
+        "dead_belowcomma",
+        "dead_currency",
+        "dead_lowline",
+        "dead_aboveverticalline",
+        "dead_belowverticalline",
+        "dead_longsolidusoverlay",
+        "dead_greek",
+        "dead_hamza",
     }
 )
 
@@ -112,9 +138,18 @@ DEAD_KEYSYMS_BY_TERMINATOR = {
 # turns each back into its text. Taken in sorted order; a keysym the layout
 # already types is skipped.
 BORROWED_KEYSYMS = (
-    "fiveeighths", "fivesixths", "fourfifths", "oneeighth", "onefifth",
-    "onesixth", "onethird", "seveneighths", "threeeighths", "threefifths",
-    "twofifths", "twothirds",
+    "fiveeighths",
+    "fivesixths",
+    "fourfifths",
+    "oneeighth",
+    "onefifth",
+    "onesixth",
+    "onethird",
+    "seveneighths",
+    "threeeighths",
+    "threefifths",
+    "twofifths",
+    "twothirds",
 )
 # Once those are used up, Unicode private-use keysyms take over: they are
 # never on a keyboard and render nothing recognisable if Compose is off.
@@ -132,7 +167,9 @@ class KeylayoutError(ValueError):
 # ---------------------------------------------------------------------------
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-_TAG_RE = re.compile(r"<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*\"[^\"]*\")*)\s*(/?)>")
+_TAG_RE = re.compile(
+    r"<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*\"[^\"]*\")*)\s*(/?)>"
+)
 _ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*\"([^\"]*)\"")
 _ENTITY_RE = re.compile(r"&(#x[0-9A-Fa-f]+|#[0-9]+|lt|gt|amp|quot|apos);")
 _NAMED_ENTITIES = {"lt": "<", "gt": ">", "amp": "&", "quot": '"', "apos": "'"}
@@ -200,7 +237,9 @@ class Keylayout:
         """The <key> of ``code`` in keyMap ``index``, following baseMapSet."""
         return self._key_entry(self.map_set_id, index, code, 0)
 
-    def _key_entry(self, map_set: str, index: int, code: int, depth: int) -> Optional[Tuple[str, str]]:
+    def _key_entry(
+        self, map_set: str, index: int, code: int, depth: int
+    ) -> Optional[Tuple[str, str]]:
         if depth > 8:
             raise KeylayoutError("keyMap base chain is too deep (cycle?)")
         maps = self.key_map_sets.get(map_set)
@@ -383,7 +422,9 @@ def resolve(layout: Keylayout, index: int, code: int) -> Resolved:
         raise KeylayoutError("key %d uses undefined action %r" % (code, value))
     output, next_state = action.whens.get("none", (None, None))
     if next_state:
-        return Resolved("dead", layout.terminators.get(next_state, "") or action.id, next_state, action.id)
+        return Resolved(
+            "dead", layout.terminators.get(next_state, "") or action.id, next_state, action.id
+        )
     if output and is_printable(output):
         return Resolved("text", output, action=action.id)
     return Resolved("none")
@@ -461,7 +502,11 @@ class _Converter:
         }
         for cells in self.grid.values():
             for cell in cells[1:]:
-                if cell.kind == "text" and cell.text in hints.base_level_only and len(cell.action) == 1:
+                if (
+                    cell.kind == "text"
+                    and cell.text in hints.base_level_only
+                    and len(cell.action) == 1
+                ):
                     cell.text = cell.action
         self.typed_keysyms = self._plain_keysyms()
         self.taken = set(self.typed_keysyms) | set(self.borrowed.values())
@@ -666,7 +711,9 @@ class _Converter:
                     lines.append("")
                 first = False
                 head = " ".join("<%s>" % keysym for keysym in prefix)
-                lines.append("%s\t: %s" % (head, compose_string(self.layout.terminators.get(state, ""))))
+                lines.append(
+                    "%s\t: %s" % (head, compose_string(self.layout.terminators.get(state, "")))
+                )
                 for action_id, output in sorted(outputs[state]):
                     sequence = "%s <%s>" % (head, self.base_keysym(action_id))
                     if sequence in emitted:
@@ -712,7 +759,9 @@ def convert(
     template = (DATA_DIR / "xkb_symbols.txt").read_text(encoding="utf-8")
     # Dead triggers first, in state order, so borrowed keysyms do not depend
     # on the order keys happen to be listed in.
-    for state in sorted({cell.state for cells in converter.grid.values() for cell in cells if cell.kind == "dead"}):
+    for state in sorted(
+        {cell.state for cells in converter.grid.values() for cell in cells if cell.kind == "dead"}
+    ):
         converter.dead_trigger(state)
     result = converter.result
     result.symbols_text = converter.symbols(template, layout_id, display_name)
@@ -757,8 +806,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--layout-id", required=True)
     parser.add_argument("--display-name", required=True)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--index", type=Path, help="registry index.json carrying the layout's XKB hints")
-    parser.add_argument("--registry-id", help="registry id to read from --index (default: --layout-id)")
+    parser.add_argument(
+        "--index", type=Path, help="registry index.json carrying the layout's XKB hints"
+    )
+    parser.add_argument(
+        "--registry-id", help="registry id to read from --index (default: --layout-id)"
+    )
     args = parser.parse_args(argv)
     try:
         registry_id = args.registry_id or args.layout_id

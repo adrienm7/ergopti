@@ -46,19 +46,19 @@ Those controls establish basic structure and private mutation, not full output
 equivalence under faults or worker concurrency.
 
 | Process | Sample | Mapped bytes | Clone ms |
-| --- | --- | --- | --- |
-| 1 | 1 | 0 | 1217.353 |
-| 1 | 2 | 1073741824 | 742.700 |
-| 1 | 3 | 1073741824 | 816.527 |
-| 1 | 4 | 0 | 1661.072 |
-| 1 | 5 | 0 | 1517.904 |
-| 1 | 6 | 1073741824 | 980.919 |
-| 2 | 1 | 1073741824 | 737.565 |
-| 2 | 2 | 0 | 1140.557 |
-| 2 | 3 | 0 | 1162.784 |
-| 2 | 4 | 1073741824 | 724.898 |
-| 2 | 5 | 1073741824 | 717.661 |
-| 2 | 6 | 0 | 1127.970 |
+| ------- | ------ | ------------ | -------- |
+| 1       | 1      | 0            | 1217.353 |
+| 1       | 2      | 1073741824   | 742.700  |
+| 1       | 3      | 1073741824   | 816.527  |
+| 1       | 4      | 0            | 1661.072 |
+| 1       | 5      | 0            | 1517.904 |
+| 1       | 6      | 1073741824   | 980.919  |
+| 2       | 1      | 1073741824   | 737.565  |
+| 2       | 2      | 0            | 1140.557 |
+| 2       | 3      | 0            | 1162.784 |
+| 2       | 4      | 1073741824   | 724.898  |
+| 2       | 5      | 1073741824   | 717.661  |
+| 2       | 6      | 0            | 1127.970 |
 
 Six samples per mode: medians 1190.069 ms without mapping and 740.133 ms with
 mapping, a difference of 449.936 ms (37.8%). Maxima were 1661.072 ms and
@@ -71,10 +71,10 @@ An independent synthetic SQLite file contains one 32,768-byte zero BLOB.
 An exclusive `LockFileEx` lock covers its last page while each read-only source
 is cloned. No real image or journal is locked. Both runs observed:
 
-| Source mode | Clone during lock | Payload length |
-| --- | --- | --- |
-| ordinary reads | refused (zero handle) | unavailable |
-| mapped reads | succeeded | 32768 |
+| Source mode    | Clone during lock     | Payload length |
+| -------------- | --------------------- | -------------- |
+| ordinary reads | refused (zero handle) | unavailable    |
+| mapped reads   | succeeded             | 32768          |
 
 Unlocked controls subsequently succeeded. Mapping bypassed this read-refusal
 mechanism; the observed mapped output was correct, so this is not evidence of

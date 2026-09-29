@@ -78,8 +78,8 @@ function runBootstrap(bash, scriptPath, fixtureRoot) {
 		env: {
 			...process.env,
 			HOME: toBashPath(fixtureRoot),
-			ERGOPTI_CONFIG_DIR: '',
-		},
+			ERGOPTI_CONFIG_DIR: ''
+		}
 	});
 }
 
@@ -88,7 +88,7 @@ function runDetail(run) {
 		status: run.status,
 		error: run.error && run.error.message,
 		stdout: run.stdout,
-		stderr: run.stderr,
+		stderr: run.stderr
 	});
 }
 
@@ -178,37 +178,48 @@ try {
 	const originalLock = fs.readFileSync(lockPath);
 
 	const cold = runBootstrap(bash, scriptPath, fixtureRoot);
-	test('cold bootstrap executes exactly one dependency sync',
+	test(
+		'cold bootstrap executes exactly one dependency sync',
 		cold.status === 0 && cold.stdout.includes(SYNC_MARKER) && syncCount(countPath) === 1,
-		runDetail(cold));
-	test('development sync is allowed to update only uv.lock',
-		fs.readFileSync(pyprojectPath).equals(originalPyproject)
-			&& !fs.readFileSync(lockPath).equals(originalLock));
-	test('cold bootstrap stores the post-sync combined fingerprint',
-		fs.existsSync(markerPath)
-			&& fs.readFileSync(markerPath, 'utf8') === combinedFingerprint(pyprojectPath, lockPath),
-		fs.existsSync(markerPath) ? fs.readFileSync(markerPath, 'utf8') : 'marker missing');
+		runDetail(cold)
+	);
+	test(
+		'development sync is allowed to update only uv.lock',
+		fs.readFileSync(pyprojectPath).equals(originalPyproject) &&
+			!fs.readFileSync(lockPath).equals(originalLock)
+	);
+	test(
+		'cold bootstrap stores the post-sync combined fingerprint',
+		fs.existsSync(markerPath) &&
+			fs.readFileSync(markerPath, 'utf8') === combinedFingerprint(pyprojectPath, lockPath),
+		fs.existsSync(markerPath) ? fs.readFileSync(markerPath, 'utf8') : 'marker missing'
+	);
 
 	const unchanged = runBootstrap(bash, scriptPath, fixtureRoot);
-	test('unchanged dependency sources take the silent fast path',
-		unchanged.status === 0 && !unchanged.stdout.includes(SYNC_MARKER)
-			&& syncCount(countPath) === 1,
-		runDetail(unchanged));
+	test(
+		'unchanged dependency sources take the silent fast path',
+		unchanged.status === 0 && !unchanged.stdout.includes(SYNC_MARKER) && syncCount(countPath) === 1,
+		runDetail(unchanged)
+	);
 
 	fs.appendFileSync(lockPath, '\n# external lock-only update\n', 'utf8');
 	const lockOnly = runBootstrap(bash, scriptPath, fixtureRoot);
-	test('a lock-only update forces a second dependency sync',
-		lockOnly.status === 0 && lockOnly.stdout.includes(SYNC_MARKER)
-			&& syncCount(countPath) === 2,
-		runDetail(lockOnly));
-	test('lock-only invalidation does not require a pyproject edit',
-		fs.readFileSync(pyprojectPath).equals(originalPyproject));
+	test(
+		'a lock-only update forces a second dependency sync',
+		lockOnly.status === 0 && lockOnly.stdout.includes(SYNC_MARKER) && syncCount(countPath) === 2,
+		runDetail(lockOnly)
+	);
+	test(
+		'lock-only invalidation does not require a pyproject edit',
+		fs.readFileSync(pyprojectPath).equals(originalPyproject)
+	);
 
 	const settled = runBootstrap(bash, scriptPath, fixtureRoot);
-	test('the updated lock fingerprint restores the silent fast path',
-		settled.status === 0 && !settled.stdout.includes(SYNC_MARKER)
-			&& syncCount(countPath) === 2,
-		runDetail(settled));
+	test(
+		'the updated lock fingerprint restores the silent fast path',
+		settled.status === 0 && !settled.stdout.includes(SYNC_MARKER) && syncCount(countPath) === 2,
+		runDetail(settled)
+	);
 } finally {
 	const tempRoot = path.resolve(os.tmpdir()) + path.sep;
 	if (path.resolve(fixtureRoot).startsWith(tempRoot)) {

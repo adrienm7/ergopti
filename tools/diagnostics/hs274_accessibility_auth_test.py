@@ -1,5 +1,6 @@
 # tools/diagnostics/hs274_accessibility_auth_test.py
 """Exercise authentication error handling without native credentials or UI."""
+
 from contextlib import contextmanager
 from types import SimpleNamespace
 import subprocess
@@ -21,19 +22,25 @@ class AuthenticationTests(unittest.TestCase):
             finally:
                 lifecycle.append("removed")
 
-        with patch.dict("os.environ", {"RUNNER_TEMP": "fixture-output"}), \
-                patch("hs274_accessibility_auth.approval_account", account), \
-                patch("hs274_accessibility_auth.subprocess.run", side_effect=[response]) as run:
+        with (
+            patch.dict("os.environ", {"RUNNER_TEMP": "fixture-output"}),
+            patch("hs274_accessibility_auth.approval_account", account),
+            patch("hs274_accessibility_auth.subprocess.run", side_effect=[response]) as run,
+        ):
             with self.assertRaises(RuntimeError) as failure:
                 with authenticate_accessibility(report):
                     self.fail("Rejected authentication cannot admit the caller")
         self.assertEqual(lifecycle, ["created", "removed"])
-        self.assertNotIn("fixture-secret", str(report) + str(failure.exception) + str(run.call_args.args))
+        self.assertNotIn(
+            "fixture-secret", str(report) + str(failure.exception) + str(run.call_args.args)
+        )
         self.assertEqual(run.call_args.kwargs["env"]["HS274_APPROVAL_PASSWORD"], "fixture-secret")
         return report["hammerspoon_accessibility_authentication"]
 
     def test_rejection_redacts_receipt_and_retires_account(self):
-        state = self.exercise(SimpleNamespace(returncode=1, stdout="fixture-secret", stderr="denied fixture-secret"))
+        state = self.exercise(
+            SimpleNamespace(returncode=1, stdout="fixture-secret", stderr="denied fixture-secret")
+        )
         self.assertEqual(state, {"exit": 1, "stdout": "<redacted>", "stderr": "denied <redacted>"})
 
     def test_timeout_retires_account_without_exposing_partial_credentials(self):

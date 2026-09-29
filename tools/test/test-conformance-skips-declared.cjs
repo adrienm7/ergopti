@@ -81,7 +81,9 @@ const byId = new Map();
 for (const e of entries) {
 	for (const f of REQUIRED_FIELDS) {
 		if (typeof e[f] !== 'string' || e[f].trim() === '') {
-			errors.push(`ledger entry ${e.id || '(no id)'}: "${f}" is missing or empty — the row is prose again`);
+			errors.push(
+				`ledger entry ${e.id || '(no id)'}: "${f}" is missing or empty — the row is prose again`
+			);
 		}
 	}
 	if (e.status && !VALID_STATUS.has(e.status)) {

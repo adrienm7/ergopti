@@ -124,9 +124,6 @@ if (MENU_KEYS.length < 10) {
 	);
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Projecting the manifest ===============
@@ -203,9 +200,6 @@ function actionable(menuKey, platform) {
 	return project(menuKey, platform).filter((row) => !isSeparator(row));
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ The submenu graph =====================
@@ -269,9 +263,6 @@ for (const menuKey of MENU_KEYS) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 3/ No heading without a section ==========
@@ -303,9 +294,6 @@ for (const menuKey of MENU_KEYS) {
 		});
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -355,9 +343,6 @@ for (const menuKey of MENU_KEYS) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 5/ Every label resolves ==================
@@ -380,7 +365,9 @@ for (const menuKey of MENU_KEYS) {
 
 const localeFiles = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'));
 if (localeFiles.length < 15) {
-	errors.push(`read ${localeFiles.length} locale file(s) — the scan is broken, so nothing below is checked`);
+	errors.push(
+		`read ${localeFiles.length} locale file(s) — the scan is broken, so nothing below is checked`
+	);
 }
 
 for (const file of localeFiles) {
@@ -393,9 +380,6 @@ for (const file of localeFiles) {
 		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -469,9 +453,6 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 			'lower the baseline in this file to lock the improvement in.'
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -620,9 +601,6 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 8/ Report ================================
@@ -633,7 +611,9 @@ if (process.argv.includes('--measure')) {
 	console.log(`menus: ${MENU_KEYS.length}`);
 	for (const menuKey of MENU_KEYS) {
 		const counts = PLATFORMS.map((p) => `${p}=${project(menuKey, p).length}`).join(' ');
-		console.log(`  ${menuKey.padEnd(24)} ${counts}   reachable on: ${(reachableOn[menuKey] || []).join(',')}`);
+		console.log(
+			`  ${menuKey.padEnd(24)} ${counts}   reachable on: ${(reachableOn[menuKey] || []).join(',')}`
+		);
 	}
 	console.log(`unreasoned hidden rows: ${unreasoned.length}`);
 	console.log(`rendered through the shared renderer: ${JSON.stringify(renderedCounts)}`);
@@ -641,7 +621,9 @@ if (process.argv.includes('--measure')) {
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the three menus differ in ways the manifest does not declare:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the three menus differ in ways the manifest does not declare:\x1b[0m'
+	);
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);
 }

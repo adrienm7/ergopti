@@ -15,22 +15,32 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 
-const source = fs.readFileSync(path.resolve(__dirname,
-	'../../static/ergopti_plus/_shared/ui/metrics_apps/script.js'), 'utf8');
+const source = fs.readFileSync(
+	path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/metrics_apps/script.js'),
+	'utf8'
+);
 let passed = 0;
 let failed = 0;
 
 function fixture() {
 	const context = vm.createContext({ window: {}, document: { addEventListener() {} }, console });
-	vm.runInContext(fs.readFileSync(path.resolve(__dirname,
-		'../../static/ergopti_plus/_shared/ui/host_bridge.js'), 'utf8'), context);
+	vm.runInContext(
+		fs.readFileSync(
+			path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/host_bridge.js'),
+			'utf8'
+		),
+		context
+	);
 	vm.runInContext(source, context);
 	vm.runInContext('initDashboard = function() {}; renderDashboard = function() {};', context);
 	return {
 		context,
 		bootstrap: context.window.publishMetricsAppsData,
 		categories: context.window.publishMetricsAppsCategories,
-		state: () => JSON.parse(vm.runInContext('JSON.stringify([manifestData, userCategories, appIcons])', context))
+		state: () =>
+			JSON.parse(
+				vm.runInContext('JSON.stringify([manifestData, userCategories, appIcons])', context)
+			)
 	};
 }
 
@@ -45,7 +55,10 @@ function test(name, callback) {
 	}
 }
 
-const revision = (manifest, categories) => ({ manifest_revision: manifest, categories_revision: categories });
+const revision = (manifest, categories) => ({
+	manifest_revision: manifest,
+	categories_revision: categories
+});
 
 test('cache can paint a fresh page and page watermarks are isolated', () => {
 	const first = fixture();
@@ -100,12 +113,23 @@ for (const value of [undefined, null, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER
 	});
 }
 
-for (const metadata of [undefined, null, {}, revision(-1, 0), revision(1, NaN), revision(1, Infinity),
-	revision(Number.MAX_SAFE_INTEGER + 1, 1), revision(1, 1.5)]) {
+for (const metadata of [
+	undefined,
+	null,
+	{},
+	revision(-1, 0),
+	revision(1, NaN),
+	revision(1, Infinity),
+	revision(Number.MAX_SAFE_INTEGER + 1, 1),
+	revision(1, 1.5)
+]) {
 	test(`invalid metadata refuses every component: ${JSON.stringify(metadata)}`, () => {
 		const f = fixture();
 		f.context.window.bootstrapMetricsAppsData({ valid: 1 }, { valid: 1 }, { valid: 1 });
-		assert.throws(() => f.bootstrap({ invalid: 1 }, { invalid: 1 }, { invalid: 1 }, metadata), /revision/i);
+		assert.throws(
+			() => f.bootstrap({ invalid: 1 }, { invalid: 1 }, { invalid: 1 }, metadata),
+			/revision/i
+		);
 		assert.deepEqual(f.state(), [{ valid: 1 }, { valid: 1 }, { valid: 1 }]);
 		f.bootstrap({ accepted: 1 }, { accepted: 1 }, { accepted: 1 }, revision(0, 0));
 		assert.deepEqual(f.state(), [{ accepted: 1 }, { accepted: 1 }, { accepted: 1 }]);
@@ -114,9 +138,14 @@ for (const metadata of [undefined, null, {}, revision(-1, 0), revision(1, NaN), 
 
 test('render failure cannot undo an already applied revision', () => {
 	const f = fixture();
-	vm.runInContext('initDashboard = function() { throw new Error("synthetic render refusal"); };', f.context);
-	assert.throws(() => f.bootstrap({ fresh: 1 }, { fresh: 1 }, { fresh: 1 }, revision(2, 2)),
-		/synthetic render refusal/);
+	vm.runInContext(
+		'initDashboard = function() { throw new Error("synthetic render refusal"); };',
+		f.context
+	);
+	assert.throws(
+		() => f.bootstrap({ fresh: 1 }, { fresh: 1 }, { fresh: 1 }, revision(2, 2)),
+		/synthetic render refusal/
+	);
 	assert.deepEqual(f.state(), [{ fresh: 1 }, { fresh: 1 }, { fresh: 1 }]);
 	vm.runInContext('initDashboard = function() {};', f.context);
 	f.bootstrap({ stale: 1 }, { stale: 1 }, { stale: 1 }, revision(1, 1));
@@ -126,7 +155,10 @@ test('render failure cannot undo an already applied revision', () => {
 test('a reentrant render applies a newer category without later rollback', () => {
 	const f = fixture();
 	f.context.newerCategory = () => f.categories({ newest: 1 }, 3);
-	vm.runInContext('renderDashboard = function() { renderDashboard = function() {}; newerCategory(); };', f.context);
+	vm.runInContext(
+		'renderDashboard = function() { renderDashboard = function() {}; newerCategory(); };',
+		f.context
+	);
 	f.categories({ first: 1 }, 1);
 	f.categories({ older: 1 }, 2);
 	assert.deepEqual(f.state()[1], { newest: 1 });
@@ -194,7 +226,10 @@ end)
 	assert.deepEqual(f.state()[0], { '2026-01-01': { Editor: { app_time_ms: 10 } } });
 	const completed = spawnSync('lua', ['-'], {
 		...options,
-		env: { ...process.env, ERGOPTI_METRICS_TEST_RESULTS: JSON.stringify([freshResult, cacheResult]) }
+		env: {
+			...process.env,
+			ERGOPTI_METRICS_TEST_RESULTS: JSON.stringify([freshResult, cacheResult])
+		}
 	});
 	assert.equal(completed.status, 0, completed.stderr + completed.stdout);
 	assert.ok(completed.stdout.includes('COMPLETIONS=verified'));

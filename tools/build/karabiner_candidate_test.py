@@ -10,7 +10,15 @@ import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
-from karabiner_candidate import BUILD_STEP, LAUNCHD_RESOURCES, PRODUCTS, SIGN_STEP, inspect_products, native, packaging_script
+from karabiner_candidate import (
+    BUILD_STEP,
+    LAUNCHD_RESOURCES,
+    PRODUCTS,
+    SIGN_STEP,
+    inspect_products,
+    native,
+    packaging_script,
+)
 from karabiner_test_fixture import bash_executable, make_products, signature_verifier
 
 
@@ -19,7 +27,13 @@ class CandidateTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stderr(output):
             with self.assertRaises(subprocess.CalledProcessError) as raised:
-                native([sys.executable, "-c", "import sys; print('invalid resource seal', file=sys.stderr); sys.exit(7)"])
+                native(
+                    [
+                        sys.executable,
+                        "-c",
+                        "import sys; print('invalid resource seal', file=sys.stderr); sys.exit(7)",
+                    ]
+                )
         self.assertEqual(raised.exception.returncode, 7)
         self.assertIn("invalid resource seal", output.getvalue())
 
@@ -28,8 +42,18 @@ class CandidateTests(unittest.TestCase):
             root = make_products(directory)
             calls = []
             receipt = inspect_products(root, signature_verifier(calls))
-            expected = {"AppIconSwitcher", "EventViewer", "MultitouchExtension", "ServiceManager-Non-Privileged-Agents",
-                        "ServiceManager-Privileged-Daemons", "SettingsWindow", "Updater", "cli", "ConsoleUserServer", "CoreService"}
+            expected = {
+                "AppIconSwitcher",
+                "EventViewer",
+                "MultitouchExtension",
+                "ServiceManager-Non-Privileged-Agents",
+                "ServiceManager-Privileged-Daemons",
+                "SettingsWindow",
+                "Updater",
+                "cli",
+                "ConsoleUserServer",
+                "CoreService",
+            }
             self.assertEqual({row["product"].split("/")[2] for row in receipt}, expected)
             self.assertEqual(len(calls), 30)
             self.assertEqual(len({row["sha256"] for row in receipt}), 10)
@@ -38,7 +62,10 @@ class CandidateTests(unittest.TestCase):
     def test_missing_core_service_cannot_be_packaged_as_a_complete_fork(self):
         with TemporaryDirectory() as directory:
             root = make_products(directory)
-            (root / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/native-peer").unlink()
+            (
+                root
+                / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/native-peer"
+            ).unlink()
             with self.assertRaisesRegex(ValueError, "Missing or redirected product executable"):
                 inspect_products(root, signature_verifier([]))
 
@@ -48,15 +75,22 @@ class CandidateTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 inspect_products(root, signature_verifier([], "Karabiner-Console-User-Server.app"))
             with self.assertRaisesRegex(ValueError, "both supported architectures"):
-                inspect_products(root, lambda command: "arm64" if command[0].endswith("lipo") else signature_verifier([])(command))
+                inspect_products(
+                    root,
+                    lambda command: (
+                        "arm64" if command[0].endswith("lipo") else signature_verifier([])(command)
+                    ),
+                )
 
     def test_valid_official_client_cannot_mix_with_adhoc_fork_peers(self):
         with TemporaryDirectory() as directory:
             root = make_products(directory)
+
             def mixed(command):
                 if "--display" in command and "Karabiner-Console-User-Server.app" in command[-1]:
                     return "TeamIdentifier=official-team\n"
                 return signature_verifier([])(command)
+
             with self.assertRaisesRegex(ValueError, "different signing teams"):
                 inspect_products(root, mixed)
 
@@ -70,7 +104,16 @@ class CandidateTests(unittest.TestCase):
         for index, (_, component, folder) in enumerate(LAUNCHD_RESOURCES):
             with self.subTest(component=component, index=index), TemporaryDirectory() as directory:
                 root = make_products(directory)
-                copied = root / "src" / component / "build/Release" / dict(PRODUCTS)[component] / "Contents/Library" / folder / (str(index) + ".plist")
+                copied = (
+                    root
+                    / "src"
+                    / component
+                    / "build/Release"
+                    / dict(PRODUCTS)[component]
+                    / "Contents/Library"
+                    / folder
+                    / (str(index) + ".plist")
+                )
                 copied.write_bytes(b"changed launchd configuration")
                 with self.assertRaisesRegex(ValueError, "changed launchd"):
                     inspect_products(root, signature_verifier([]))
@@ -81,13 +124,22 @@ class CandidateTests(unittest.TestCase):
     def test_product_metadata_cannot_redirect_the_executable(self):
         with TemporaryDirectory() as directory:
             root = make_products(directory)
-            info = root / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/Info.plist"
+            info = (
+                root
+                / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/Info.plist"
+            )
             info.write_bytes(plistlib.dumps({"CFBundleExecutable": "../../foreign"}))
             with self.assertRaisesRegex(ValueError, "Invalid product executable name"):
                 inspect_products(root, signature_verifier([]))
 
     def test_assembly_reuses_upstream_without_rebuilding_or_losing_identity(self):
-        source = "#!/bin/bash\n" + BUILD_STEP + "\n# copy complete package\n" + SIGN_STEP + "\npkgbuild owned\n"
+        source = (
+            "#!/bin/bash\n"
+            + BUILD_STEP
+            + "\n# copy complete package\n"
+            + SIGN_STEP
+            + "\npkgbuild owned\n"
+        )
         result = packaging_script(source, Path("candidate identity.json"))
         self.assertNotIn(BUILD_STEP, result)
         self.assertEqual(result.count(SIGN_STEP), 1)
@@ -104,13 +156,20 @@ class CandidateTests(unittest.TestCase):
             target = "pkgroot/Library/Application Support/org.pqrs/Karabiner-Elements/ergopti-candidate.json"
             (root / target).parent.mkdir(parents=True)
             (root / "scripts").mkdir()
-            (root / "scripts/codesign.sh").write_text('test -f "' + target + '"\n', encoding="utf-8")
+            (root / "scripts/codesign.sh").write_text(
+                'test -f "' + target + '"\n', encoding="utf-8"
+            )
             identity = root / "candidate identity '$value.json"
             identity.write_bytes(b"exact candidate identity")
             source = "set -eu\nruby() { exit 98; }\n" + BUILD_STEP + "\n" + SIGN_STEP + "\n"
             script = packaging_script(source, identity.as_posix())
-            result = subprocess.run([bash_executable(), "-c", script], cwd=root,
-                                    text=True, capture_output=True, timeout=10)
+            result = subprocess.run(
+                [bash_executable(), "-c", script],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                timeout=10,
+            )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual((root / target).read_bytes(), identity.read_bytes())
 

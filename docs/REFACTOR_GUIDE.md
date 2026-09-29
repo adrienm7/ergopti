@@ -16,22 +16,22 @@ re-confirmer. **Deux sur trois ont changé de sens depuis leur mesure**, et
 l'ignorer aurait produit un guide qui attaque des problèmes résolus tout en
 manquant celui qui a doublé.
 
-| Douleur                    | Chiffre du prompt   | Mesuré 2026-08-04             | Verdict                    |
-| -------------------------- | ------------------- | ----------------------------- | -------------------------- |
-| Tests fragiles (source)    | ~206 / 411 (50 %)   | **755 / 841 (90 %)**          | **nettement pire**         |
-| Gros fichiers fourre-tout  | 6 fichiers nommés   | **5 sur 6 fondus ou disparus** | **largement résolu**       |
-| Defaults éparpillés        | « 2+ endroits »     | 34 `DEFAULT_STATE` / 26 gates  | **encadré, pas résolu**    |
+| Douleur                   | Chiffre du prompt | Mesuré 2026-08-04              | Verdict                 |
+| ------------------------- | ----------------- | ------------------------------ | ----------------------- |
+| Tests fragiles (source)   | ~206 / 411 (50 %) | **755 / 841 (90 %)**           | **nettement pire**      |
+| Gros fichiers fourre-tout | 6 fichiers nommés | **5 sur 6 fondus ou disparus** | **largement résolu**    |
+| Defaults éparpillés       | « 2+ endroits »   | 34 `DEFAULT_STATE` / 26 gates  | **encadré, pas résolu** |
 
 ### 0.1 Les gros fichiers ont fondu
 
-| Fichier nommé par le prompt                     | Alors   | Aujourd'hui | Δ         |
-| ----------------------------------------------- | ------- | ----------- | --------- |
-| `windows/modules/gestures.ahk`                  | ~2 076  | **absent**  | supprimé  |
-| `macos/ui/menu/menu_llm/models_manager_mlx.lua` | ~1 790  | 346         | −1 444    |
-| `macos/modules/llm/api_mlx.lua`                 | ~1 799  | 829         | −970      |
-| `macos/ui/menu/menu_keyboard_layout.lua`        | ~1 647  | 721         | −926      |
-| `windows/modules/keylogger/keylogger.ahk`       | ~1 867  | 1 494       | −373      |
-| `macos/modules/keylogger/init.lua`              | ~1 583  | **1 674**   | **+91**   |
+| Fichier nommé par le prompt                     | Alors  | Aujourd'hui | Δ        |
+| ----------------------------------------------- | ------ | ----------- | -------- |
+| `windows/modules/gestures.ahk`                  | ~2 076 | **absent**  | supprimé |
+| `macos/ui/menu/menu_llm/models_manager_mlx.lua` | ~1 790 | 346         | −1 444   |
+| `macos/modules/llm/api_mlx.lua`                 | ~1 799 | 829         | −970     |
+| `macos/ui/menu/menu_keyboard_layout.lua`        | ~1 647 | 721         | −926     |
+| `windows/modules/keylogger/keylogger.ahk`       | ~1 867 | 1 494       | −373     |
+| `macos/modules/keylogger/init.lua`              | ~1 583 | **1 674**   | **+91**  |
 
 Cinq des six ont fondu ou disparu. **Un seul a grossi**, et c'est le seul qui
 reste à traiter au titre de cette douleur.
@@ -49,7 +49,7 @@ grep -rl "_DriverSourceConcat"    … --include="test_*.ahk" | wc -l         #  
 
 **Ces deux faits ne sont pas indépendants — c'est le cœur de ce guide.**
 
-Les gros fichiers ont pu être découpés *parce que* quelqu'un a payé le prix de
+Les gros fichiers ont pu être découpés _parce que_ quelqu'un a payé le prix de
 recâbler les tests d'introspection à chaque fois. Et la proportion de tests
 d'introspection a monté précisément parce que découper un fichier crée de
 nouveaux tests « la fonction X vit bien dans le fichier Y » pour verrouiller le
@@ -59,8 +59,8 @@ découpage. **La solution d'hier est la dette d'aujourd'hui.**
 
 ## 1. Le problème n°1, formulé correctement
 
-Le prompt le dit : « quand un test casse, le dev sait en < 5 min *quel
-comportement* a régressé ». Avec 576 fichiers utilisant `_DriverFuncBody`, un
+Le prompt le dit : « quand un test casse, le dev sait en < 5 min _quel
+comportement_ a régressé ». Avec 576 fichiers utilisant `_DriverFuncBody`, un
 échec typique dit :
 
 > `AltTabMonitor must wrap the per-window enumeration body in a try`
@@ -86,7 +86,7 @@ Deux exemples réels, du même jour, pour calibrer :
   reproduit pas dans un test unitaire : il faut une vraie course. La source est
   la seule surface disponible.
 - **De la dette** — `try_auto_expand` doit contenir `M.would_fire` dans ses
-  1 200 premiers caractères. C'est un test de *mise en page*. Il est tombé le
+  1 200 premiers caractères. C'est un test de _mise en page_. Il est tombé le
   2026-08-03 parce qu'un commentaire de 16 lignes avait repoussé l'appel hors de
   la fenêtre, alors que la délégation était intacte.
 

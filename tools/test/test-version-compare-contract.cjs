@@ -30,7 +30,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const versionUrl = pathToFileURL(
 	path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater/version.js')
 ).href;
-const vectorsPath = path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater/version_vectors.json');
+const vectorsPath = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/modules/updater/version_vectors.json'
+);
 
 // version.js is an ESM module (the repo is type:module); load it via dynamic
 // import so this CommonJS runner can read its compareVersions export.
@@ -55,9 +58,13 @@ const vectorsPath = path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater
 	}
 
 	if (failures.length > 0) {
-		console.error('\x1b[31m[ERROR] JS compareVersions disagrees with the shared parity vectors:\x1b[0m');
+		console.error(
+			'\x1b[31m[ERROR] JS compareVersions disagrees with the shared parity vectors:\x1b[0m'
+		);
 		for (const f of failures) console.error('  - ' + f);
-		console.error('  Non-semver pairs must be fail-closed (expect 0). Fix version.js to match the table.');
+		console.error(
+			'  Non-semver pairs must be fail-closed (expect 0). Fix version.js to match the table.'
+		);
 		process.exit(1);
 	}
 

@@ -64,9 +64,12 @@ const CREATE_TAG = 'Create git tag';
 const CREATE_RELEASE = 'Create release and upload all assets atomically';
 const PUBLISH_FEED = 'Publish channel feed for Sparkle';
 const REPOSITORY = 'owner/ergopti';
-const LINUX_BUNDLE = JSON.parse(fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'updater', 'defaults.json'), 'utf8'
-)).release_assets.linux_bundle;
+const LINUX_BUNDLE = JSON.parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'updater', 'defaults.json'),
+		'utf8'
+	)
+).release_assets.linux_bundle;
 
 const failures = [];
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-release-reruns-'));
@@ -96,9 +99,6 @@ function bashPath(value) {
 	return normalized.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
 }
 
-
-
-
 // ======================================
 // ======================================
 // ======= 1/ Harness ===================
@@ -123,16 +123,24 @@ function scriptOf(stepBody, what) {
 	const first = block.find((line) => line.trim() !== '');
 	if (!first) throw new Error(`"${what}" has an empty script`);
 	const indent = indentOf(first);
-	const script = `${block.map((line) => line.slice(indent)).join('\n').trimEnd()}\n`;
+	const script = `${block
+		.map((line) => line.slice(indent))
+		.join('\n')
+		.trimEnd()}\n`;
 	if (script.includes('${{')) {
-		throw new Error(`"${what}" reads a workflow expression in its script; pass it through env: so it can be tested`);
+		throw new Error(
+			`"${what}" reads a workflow expression in its script; pass it through env: so it can be tested`
+		);
 	}
 	return script;
 }
 
 const BASH = bashExecutable();
 const gitVersion = spawnSync('git', ['--version'], { encoding: 'utf8' });
-if (gitVersion.status !== 0) throw new Error(`git is required to run the release scripts: ${gitVersion.error ?? gitVersion.stderr}`);
+if (gitVersion.status !== 0)
+	throw new Error(
+		`git is required to run the release scripts: ${gitVersion.error ?? gitVersion.stderr}`
+	);
 
 // Every git call, the harness's and the scripts', ignores the user's and the
 // system's configuration.
@@ -146,13 +154,14 @@ const GIT_ENV = {
 	GIT_AUTHOR_EMAIL: 'ci@example.invalid',
 	GIT_COMMITTER_NAME: 'CI Test',
 	GIT_COMMITTER_EMAIL: 'ci@example.invalid',
-	GIT_TERMINAL_PROMPT: '0',
+	GIT_TERMINAL_PROMPT: '0'
 };
 
 /** Runs git in `cwd` and returns its trimmed stdout, or throws. */
 function git(cwd, ...args) {
 	const result = spawnSync('git', args, { cwd, env: GIT_ENV, encoding: 'utf8' });
-	if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.error}`);
+	if (result.status !== 0)
+		throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.error}`);
 	return result.stdout.trim();
 }
 
@@ -173,7 +182,7 @@ function repository(name, branch) {
 	for (const relative of [
 		'tools/build/release-channel.cjs',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
-		'static/ergopti_plus/_shared/ui/update_channels.js',
+		'static/ergopti_plus/_shared/ui/update_channels.js'
 	]) {
 		const target = path.join(work, relative);
 		fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -207,58 +216,69 @@ function runScript(script, cwd, env, prologue = '') {
 		cwd,
 		env: { ...GIT_ENV, ...env, GITHUB_OUTPUT: bashPath(output) },
 		encoding: 'utf8',
-		timeout: 60000,
+		timeout: 60000
 	});
 	if (result.error) throw result.error;
-	return { status: result.status, stdout: result.stdout, stderr: result.stderr, outputs: outputsOf(output) };
+	return {
+		status: result.status,
+		stdout: result.stdout,
+		stderr: result.stderr,
+		outputs: outputsOf(output)
+	};
 }
 
 // gh and curl answer only the exact calls the release scripts make; anything
 // else exits 99, so a changed call fails a case instead of being answered.
 const stubs = path.join(scratch, 'stubs');
 fs.mkdirSync(stubs);
-fs.writeFileSync(path.join(stubs, 'gh'), [
-	'#!/usr/bin/env bash',
-	'printf \'%s\\n\' "$*" >> "$GH_STUB_LOG"',
-	'if [ -z "${GH_TOKEN:-}" ]; then echo "gh stub: GH_TOKEN is not set" >&2; exit 98; fi',
-	'case "$1 $2" in',
-	'    "release view")',
-	'        if [ "$*" != "release view $GH_STUB_TAG --repo $GH_STUB_REPO --json isDraft --jq .isDraft" ]; then',
-	'            echo "gh stub: unexpected call: $*" >&2; exit 99',
-	'        fi',
-	'        case "$GH_STUB_MODE" in',
-	'            missing) echo "release not found" >&2; exit 1 ;;',
-	'            published) echo false ;;',
-	'            draft) echo true ;;',
-	'            empty) echo "" ;;',
-	'            error) echo "HTTP 502: Bad Gateway" >&2; exit 1 ;;',
-	'            not-found) echo "HTTP 404: Not Found (https://api.github.com/repos/$GH_STUB_REPO/releases)" >&2; exit 1 ;;',
-	'            *) echo "gh stub: no mode" >&2; exit 97 ;;',
-	'        esac ;;',
-	'    "release create")',
-	'        printf \'%s\\n\' "${@:3}" > "$GH_STUB_ARGS" ;;',
-	'    "release download")',
-	'        feed="appcast-$GH_STUB_CHANNEL.xml"',
-	'        if [ "$*" != "release download $GH_STUB_TAG --repo $GH_STUB_REPO --pattern $feed --output release-assets/$feed --clobber" ]; then',
-	'            echo "gh stub: unexpected call: $*" >&2; exit 99',
-	'        fi',
-	'        printf \'%s\\n\' "$GH_STUB_PUBLISHED_FEED" > "release-assets/$feed" ;;',
-	'    *) echo "gh stub: unexpected call: $*" >&2; exit 99 ;;',
-	'esac',
-	'',
-].join('\n'));
-fs.writeFileSync(path.join(stubs, 'curl'), [
-	'#!/usr/bin/env bash',
-	'url="${*: -1}"',
-	'printf \'%s\\n\' "$url" >> "$CURL_STUB_LOG"',
-	'if [ "$url" != "$CURL_STUB_URL" ]; then echo "curl stub: unexpected URL $url" >&2; exit 99; fi',
-	'case "$CURL_STUB_MODE" in',
-	'    origin) git --git-dir "$CURL_STUB_ORIGIN" show "sparkle-appcasts:appcast-$CURL_STUB_CHANNEL.xml" ;;',
-	'    stale) echo "<appcast>a stale edge copy</appcast>" ;;',
-	'    *) echo "curl stub: no mode" >&2; exit 97 ;;',
-	'esac',
-	'',
-].join('\n'));
+fs.writeFileSync(
+	path.join(stubs, 'gh'),
+	[
+		'#!/usr/bin/env bash',
+		'printf \'%s\\n\' "$*" >> "$GH_STUB_LOG"',
+		'if [ -z "${GH_TOKEN:-}" ]; then echo "gh stub: GH_TOKEN is not set" >&2; exit 98; fi',
+		'case "$1 $2" in',
+		'    "release view")',
+		'        if [ "$*" != "release view $GH_STUB_TAG --repo $GH_STUB_REPO --json isDraft --jq .isDraft" ]; then',
+		'            echo "gh stub: unexpected call: $*" >&2; exit 99',
+		'        fi',
+		'        case "$GH_STUB_MODE" in',
+		'            missing) echo "release not found" >&2; exit 1 ;;',
+		'            published) echo false ;;',
+		'            draft) echo true ;;',
+		'            empty) echo "" ;;',
+		'            error) echo "HTTP 502: Bad Gateway" >&2; exit 1 ;;',
+		'            not-found) echo "HTTP 404: Not Found (https://api.github.com/repos/$GH_STUB_REPO/releases)" >&2; exit 1 ;;',
+		'            *) echo "gh stub: no mode" >&2; exit 97 ;;',
+		'        esac ;;',
+		'    "release create")',
+		'        printf \'%s\\n\' "${@:3}" > "$GH_STUB_ARGS" ;;',
+		'    "release download")',
+		'        feed="appcast-$GH_STUB_CHANNEL.xml"',
+		'        if [ "$*" != "release download $GH_STUB_TAG --repo $GH_STUB_REPO --pattern $feed --output release-assets/$feed --clobber" ]; then',
+		'            echo "gh stub: unexpected call: $*" >&2; exit 99',
+		'        fi',
+		'        printf \'%s\\n\' "$GH_STUB_PUBLISHED_FEED" > "release-assets/$feed" ;;',
+		'    *) echo "gh stub: unexpected call: $*" >&2; exit 99 ;;',
+		'esac',
+		''
+	].join('\n')
+);
+fs.writeFileSync(
+	path.join(stubs, 'curl'),
+	[
+		'#!/usr/bin/env bash',
+		'url="${*: -1}"',
+		'printf \'%s\\n\' "$url" >> "$CURL_STUB_LOG"',
+		'if [ "$url" != "$CURL_STUB_URL" ]; then echo "curl stub: unexpected URL $url" >&2; exit 99; fi',
+		'case "$CURL_STUB_MODE" in',
+		'    origin) git --git-dir "$CURL_STUB_ORIGIN" show "sparkle-appcasts:appcast-$CURL_STUB_CHANNEL.xml" ;;',
+		'    stale) echo "<appcast>a stale edge copy</appcast>" ;;',
+		'    *) echo "curl stub: no mode" >&2; exit 97 ;;',
+		'esac',
+		''
+	].join('\n')
+);
 fs.chmodSync(path.join(stubs, 'gh'), 0o755);
 fs.chmodSync(path.join(stubs, 'curl'), 0o755);
 const STUB_PATH = `export PATH="${bashPath(stubs)}:$PATH"\n`;
@@ -275,16 +295,16 @@ function linesOf(file) {
 	return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
 }
 
-
-
-
 // ======================================
 // ======================================
 // ======= 2/ Plan Never Republishes ====
 // ======================================
 // ======================================
 
-const planScript = scriptOf(pipeline.step(pipeline.job('validate'), 'Compute tag and version'), 'Compute tag and version');
+const planScript = scriptOf(
+	pipeline.step(pipeline.job('validate'), 'Compute tag and version'),
+	'Compute tag and version'
+);
 
 /** Runs plan's script for a push of `ref`, with HEAD at `sha`. */
 function plan(repo, sha, ref, event = 'push') {
@@ -292,7 +312,7 @@ function plan(repo, sha, ref, event = 'push') {
 	return runScript(planScript, repo, {
 		GITHUB_EVENT_NAME: event,
 		GITHUB_REF: ref,
-		GITHUB_REF_NAME: ref.replace(/^refs\/heads\//, ''),
+		GITHUB_REF_NAME: ref.replace(/^refs\/heads\//, '')
 	});
 }
 
@@ -319,18 +339,33 @@ git(dev, 'tag', '-a', '-m', 'dev 2', 'v0.0.0-dev.2', d3);
 git(dev, 'push', '--quiet', 'origin', 'dev', '--tags');
 
 check('dev: an ancestor of the last dev tag is not published again', () => {
-	noRelease(plan(dev, d2, 'refs/heads/dev'), /::notice::This commit is already part of v0\.0\.0-dev\.2, which an earlier run published/);
+	noRelease(
+		plan(dev, d2, 'refs/heads/dev'),
+		/::notice::This commit is already part of v0\.0\.0-dev\.2, which an earlier run published/
+	);
 });
 
-check('dev: the last dev tag\'s own commit is not published again', () => {
-	noRelease(plan(dev, d3, 'refs/heads/dev'), /::notice::This commit is already part of v0\.0\.0-dev\.2, /);
+check("dev: the last dev tag's own commit is not published again", () => {
+	noRelease(
+		plan(dev, d3, 'refs/heads/dev'),
+		/::notice::This commit is already part of v0\.0\.0-dev\.2, /
+	);
 });
 
 check('dev: the notice says how to finish a half-published release without a dead end', () => {
 	const result = plan(dev, d1, 'refs/heads/dev');
-	noRelease(result, /::notice::This commit is already part of v0\.0\.0-dev\.1 and 1 later tag\(s\)/);
-	assert.match(result.stdout, /'Re-run failed jobs' on the run that created that tag, before any 'Re-run all jobs' there/);
-	assert.match(result.stdout, /delete an orphan tag, or write a published release's notes with gh release edit/);
+	noRelease(
+		result,
+		/::notice::This commit is already part of v0\.0\.0-dev\.1 and 1 later tag\(s\)/
+	);
+	assert.match(
+		result.stdout,
+		/'Re-run failed jobs' on the run that created that tag, before any 'Re-run all jobs' there/
+	);
+	assert.match(
+		result.stdout,
+		/delete an orphan tag, or write a published release's notes with gh release edit/
+	);
 });
 
 check('dev: a new commit publishes under the next dev tag', () => {
@@ -339,8 +374,12 @@ check('dev: a new commit publishes under the next dev tag', () => {
 	const result = plan(dev, d4, 'refs/heads/dev');
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(result.outputs, {
-		release: 'true', tag: 'v0.0.0-dev.3', version: '0.0.0-dev.3',
-		title: 'Ergopti v0.0.0-dev.3', prerelease: 'true', channel: 'dev',
+		release: 'true',
+		tag: 'v0.0.0-dev.3',
+		version: '0.0.0-dev.3',
+		title: 'Ergopti v0.0.0-dev.3',
+		prerelease: 'true',
+		channel: 'dev'
 	});
 });
 
@@ -359,8 +398,14 @@ check('dev: after a force push, a commit that an older tag contains is not publi
 	const b1 = commit(forced, 'chore: b1 after the force push');
 	git(forced, 'tag', 'v0.0.0-dev.3', b1);
 	git(forced, 'push', '--quiet', 'origin', '--tags');
-	noRelease(plan(forced, a1, 'refs/heads/dev'), /::notice::This commit is already part of v0\.0\.0-dev\.1 and 1 later tag\(s\)/);
-	noRelease(plan(forced, a2, 'refs/heads/dev'), /::notice::This commit is already part of v0\.0\.0-dev\.2, /);
+	noRelease(
+		plan(forced, a1, 'refs/heads/dev'),
+		/::notice::This commit is already part of v0\.0\.0-dev\.1 and 1 later tag\(s\)/
+	);
+	noRelease(
+		plan(forced, a2, 'refs/heads/dev'),
+		/::notice::This commit is already part of v0\.0\.0-dev\.2, /
+	);
 	git(forced, 'checkout', '--quiet', '--detach', b1);
 	releases(plan(forced, commit(forced, 'chore: b2'), 'refs/heads/dev'), 'v0.0.0-dev.4');
 });
@@ -373,9 +418,15 @@ check('dev: a failing git tag fails plan instead of reading as "never released"'
 	git(broken, 'checkout', '--quiet', '--detach', b1);
 	fs.appendFileSync(path.join(broken, '.git', 'packed-refs'), 'not a ref line\n');
 	const result = runScript(planScript, broken, {
-		GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/dev', GITHUB_REF_NAME: 'dev',
+		GITHUB_EVENT_NAME: 'push',
+		GITHUB_REF: 'refs/heads/dev',
+		GITHUB_REF_NAME: 'dev'
 	});
-	assert.notEqual(result.status, 0, 'plan must fail when git cannot list the tags that contain HEAD');
+	assert.notEqual(
+		result.status,
+		0,
+		'plan must fail when git cannot list the tags that contain HEAD'
+	);
 	assert.match(result.stderr, /packed-refs/);
 	assert.equal(result.outputs.release, undefined, 'a failed plan must not emit release');
 });
@@ -391,12 +442,18 @@ const m2 = commit(main, 'fix: a bug');
 git(main, 'tag', 'v1.2.3', m2);
 git(main, 'push', '--quiet', 'origin', 'main', '--tags');
 
-check('main: the last stable tag\'s own commit is not published again', () => {
-	noRelease(plan(main, m2, 'refs/heads/main'), /::notice::This commit is already part of v1\.2\.3, /);
+check("main: the last stable tag's own commit is not published again", () => {
+	noRelease(
+		plan(main, m2, 'refs/heads/main'),
+		/::notice::This commit is already part of v1\.2\.3, /
+	);
 });
 
 check('main: an ancestor of the last stable tag is not published again', () => {
-	noRelease(plan(main, m1, 'refs/heads/main'), /::notice::This commit is already part of v1\.2\.3, /);
+	noRelease(
+		plan(main, m1, 'refs/heads/main'),
+		/::notice::This commit is already part of v1\.2\.3, /
+	);
 });
 
 check('main: a new commit publishes the next stable version', () => {
@@ -405,8 +462,12 @@ check('main: a new commit publishes the next stable version', () => {
 	const result = plan(main, m3, 'refs/heads/main');
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(result.outputs, {
-		release: 'true', tag: 'v1.2.4', version: '1.2.4',
-		title: 'Ergopti v1.2.4', prerelease: 'false', channel: 'main',
+		release: 'true',
+		tag: 'v1.2.4',
+		version: '1.2.4',
+		title: 'Ergopti v1.2.4',
+		prerelease: 'false',
+		channel: 'main'
 	});
 });
 
@@ -434,11 +495,17 @@ check('main: a feat as the oldest commit, before a fix, bumps the minor version'
 });
 
 check('main: a `!:` breaking change as the oldest commit bumps the major version', () => {
-	releases(mainBump('bang-oldest', ['refactor(api)!: drop the old API', 'fix: a later fix']), 'v2.0.0');
+	releases(
+		mainBump('bang-oldest', ['refactor(api)!: drop the old API', 'fix: a later fix']),
+		'v2.0.0'
+	);
 });
 
 check('main: a BREAKING: subject bumps the major version', () => {
-	releases(mainBump('breaking', ['fix: a bug', 'BREAKING: drop the old config', 'feat: a feature']), 'v2.0.0');
+	releases(
+		mainBump('breaking', ['fix: a bug', 'BREAKING: drop the old config', 'feat: a feature']),
+		'v2.0.0'
+	);
 });
 
 check('main: fixes and chores only bump the patch version', () => {
@@ -461,9 +528,6 @@ check('a tag outside the series, even one the glob matches, does not count as pu
 	releases(plan(hotfix, h2, 'refs/heads/dev'), 'v0.0.0-dev.2');
 });
 
-
-
-
 // ===============================================
 // ===============================================
 // ======= 3/ The Preflight Resumes Or Stops =====
@@ -478,13 +542,18 @@ const assetLoop = /^for asset in ([^\n;]*(?:\\\n[^\n;]*)*); do$/m.exec(preflight
 if (!assetLoop) throw new Error(`"${PREFLIGHT}" no longer loops over its required assets`);
 /** Lists the files the preflight requires for `channel`. */
 function requiredAssets(channel) {
-	return assetLoop[1].split(/\s+/)
+	return assetLoop[1]
+		.split(/\s+/)
 		.filter((token) => token !== '' && token !== '\\')
-		.map((token) => token.replace(/^"(.*)"$/, '$1')
-			.replace('${CHANNEL}', channel)
-			.replace('$LINUX_BUNDLE_ASSET', LINUX_BUNDLE));
+		.map((token) =>
+			token
+				.replace(/^"(.*)"$/, '$1')
+				.replace('${CHANNEL}', channel)
+				.replace('$LINUX_BUNDLE_ASSET', LINUX_BUNDLE)
+		);
 }
-if (requiredAssets('dev').length < 10) throw new Error(`parsed only ${requiredAssets('dev').length} required asset(s)`);
+if (requiredAssets('dev').length < 10)
+	throw new Error(`parsed only ${requiredAssets('dev').length} required asset(s)`);
 
 const runner = repository('runner', 'dev');
 const other = commit(runner, 'chore: an older commit');
@@ -527,17 +596,29 @@ function uploadedLayout(channel) {
 				const listed = uploadPaths(candidate.body);
 				const dirs = listed.map((listedPath) => listedPath.split('/').slice(0, -1));
 				const common = [];
-				for (let depth = 0; dirs.every((dir) => depth < dir.length && dir[depth] === dirs[0][depth]); depth++) {
+				for (
+					let depth = 0;
+					dirs.every((dir) => depth < dir.length && dir[depth] === dirs[0][depth]);
+					depth++
+				) {
 					common.push(dirs[0][depth]);
 				}
 				for (const listedPath of listed) {
 					const below = listedPath.split('/').slice(common.length);
-					const leaf = below[below.length - 1].replace(/\$\{\{\s*([^}]*?)\s*\}\}/g, (whole, expression) => {
-						if (expression === 'inputs.linux_bundle' || expression === 'env.LINUX_BUNDLE_ASSET') return LINUX_BUNDLE;
-						if (expression === 'inputs.channel') return channel;
-						throw new Error(`an assets-* upload path uses ${whole}, which this test cannot resolve`);
-					});
-					const pattern = new RegExp(`^${leaf.replace(/[.+?^$(){}|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`);
+					const leaf = below[below.length - 1].replace(
+						/\$\{\{\s*([^}]*?)\s*\}\}/g,
+						(whole, expression) => {
+							if (expression === 'inputs.linux_bundle' || expression === 'env.LINUX_BUNDLE_ASSET')
+								return LINUX_BUNDLE;
+							if (expression === 'inputs.channel') return channel;
+							throw new Error(
+								`an assets-* upload path uses ${whole}, which this test cannot resolve`
+							);
+						}
+					);
+					const pattern = new RegExp(
+						`^${leaf.replace(/[.+?^$(){}|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`
+					);
 					for (const name of requiredAssets(channel)) {
 						if (!pattern.test(name)) continue;
 						if (layout.has(name)) throw new Error(`two assets-* upload paths match ${name}`);
@@ -556,7 +637,17 @@ function uploadedLayout(channel) {
  * the way the real upload steps store them and the release job's flattening
  * step runs first.
  */
-function preflight(tag, { ghMode = 'none', missingAsset = null, cwd = runner, channel = 'dev', sha = head, uploaded = false } = {}) {
+function preflight(
+	tag,
+	{
+		ghMode = 'none',
+		missingAsset = null,
+		cwd = runner,
+		channel = 'dev',
+		sha = head,
+		uploaded = false
+	} = {}
+) {
 	const assets = path.join(cwd, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
@@ -572,19 +663,24 @@ function preflight(tag, { ghMode = 'none', missingAsset = null, cwd = runner, ch
 		if (flattened.status !== 0) return { ...flattened, ghCalls: [] };
 	}
 	const ghLog = stubLog('gh');
-	const result = runScript(preflightScript, cwd, {
-		TAG: tag,
-		CHANNEL: channel,
-		LINUX_BUNDLE_ASSET: LINUX_BUNDLE,
-		GITHUB_SHA: sha,
-		GITHUB_REPOSITORY: REPOSITORY,
-		RUNNER_TEMP: bashPath(scratch),
-		GH_TOKEN: 'stub-token',
-		GH_STUB_LOG: bashPath(ghLog),
-		GH_STUB_TAG: tag,
-		GH_STUB_REPO: REPOSITORY,
-		GH_STUB_MODE: ghMode,
-	}, STUB_PATH);
+	const result = runScript(
+		preflightScript,
+		cwd,
+		{
+			TAG: tag,
+			CHANNEL: channel,
+			LINUX_BUNDLE_ASSET: LINUX_BUNDLE,
+			GITHUB_SHA: sha,
+			GITHUB_REPOSITORY: REPOSITORY,
+			RUNNER_TEMP: bashPath(scratch),
+			GH_TOKEN: 'stub-token',
+			GH_STUB_LOG: bashPath(ghLog),
+			GH_STUB_TAG: tag,
+			GH_STUB_REPO: REPOSITORY,
+			GH_STUB_MODE: ghMode
+		},
+		STUB_PATH
+	);
 	return { ...result, ghCalls: linesOf(ghLog) };
 }
 
@@ -598,26 +694,42 @@ function pushTag(tag, sha, { annotated = false, repo = runner } = {}) {
 check('a free tag publishes from the start', () => {
 	const result = preflight('v0.0.0-dev.10');
 	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.deepEqual(result.outputs, { create_tag: 'true', create_release: 'true', skip_feed: 'false' });
+	assert.deepEqual(result.outputs, {
+		create_tag: 'true',
+		create_release: 'true',
+		skip_feed: 'false'
+	});
 	assert.deepEqual(result.ghCalls, [], 'a free tag needs no release lookup');
 });
 
-check('assets stored below a common directory by upload-artifact still publish (release-assets-layout-2026-09-27)', () => {
-	const layout = uploadedLayout('dev');
-	for (const name of requiredAssets('dev')) {
-		assert.ok(layout.has(name), `no assets-* upload step lists ${name}`);
+check(
+	'assets stored below a common directory by upload-artifact still publish (release-assets-layout-2026-09-27)',
+	() => {
+		const layout = uploadedLayout('dev');
+		for (const name of requiredAssets('dev')) {
+			assert.ok(layout.has(name), `no assets-* upload step lists ${name}`);
+		}
+		// The layout that failed the first release of the grouped pipeline: the
+		// Windows exes and the XKB zip arrived in subdirectories.
+		assert.ok(
+			[...layout.values()].some((placed) => placed.includes('/')),
+			'no asset lands in a subdirectory, so this case no longer exercises the flattening'
+		);
+		const result = preflight('v0.0.0-dev.10', { uploaded: true });
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.deepEqual(result.outputs, {
+			create_tag: 'true',
+			create_release: 'true',
+			skip_feed: 'false'
+		});
+		const top = fs.readdirSync(path.join(runner, 'release-assets'), { withFileTypes: true });
+		assert.deepEqual(
+			top.filter((dirent) => !dirent.isFile()).map((dirent) => dirent.name),
+			[],
+			'release-assets must hold files only once flattened'
+		);
 	}
-	// The layout that failed the first release of the grouped pipeline: the
-	// Windows exes and the XKB zip arrived in subdirectories.
-	assert.ok([...layout.values()].some((placed) => placed.includes('/')),
-		'no asset lands in a subdirectory, so this case no longer exercises the flattening');
-	const result = preflight('v0.0.0-dev.10', { uploaded: true });
-	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.deepEqual(result.outputs, { create_tag: 'true', create_release: 'true', skip_feed: 'false' });
-	const top = fs.readdirSync(path.join(runner, 'release-assets'), { withFileTypes: true });
-	assert.deepEqual(top.filter((dirent) => !dirent.isFile()).map((dirent) => dirent.name), [],
-		'release-assets must hold files only once flattened');
-});
+);
 
 check('two downloaded assets with one name stop the release', () => {
 	const assets = path.join(runner, 'release-assets');
@@ -637,52 +749,82 @@ check('a missing asset stops the release before anything is created', () => {
 	assert.deepEqual(result.outputs, {});
 });
 
-check('a tag on a newer commit means this run was superseded: nothing to publish, no re-run', () => {
-	pushTag('v0.0.0-dev.11', newer);
-	const result = preflight('v0.0.0-dev.11');
-	assert.equal(result.status, 1);
-	assert.match(result.stdout, new RegExp(`::error::v0\\.0\\.0-dev\\.11 already exists on ${newer}, not on ${head}: ` +
-		'a newer run superseded this one'));
-	assert.match(result.stdout, /There is nothing to publish; do not re-run this run\./);
-	assert.doesNotMatch(result.stdout, /Re-run all jobs/);
-	assert.deepEqual(result.ghCalls, []);
-	assert.deepEqual(result.outputs, {});
-});
+check(
+	'a tag on a newer commit means this run was superseded: nothing to publish, no re-run',
+	() => {
+		pushTag('v0.0.0-dev.11', newer);
+		const result = preflight('v0.0.0-dev.11');
+		assert.equal(result.status, 1);
+		assert.match(
+			result.stdout,
+			new RegExp(
+				`::error::v0\\.0\\.0-dev\\.11 already exists on ${newer}, not on ${head}: ` +
+					'a newer run superseded this one'
+			)
+		);
+		assert.match(result.stdout, /There is nothing to publish; do not re-run this run\./);
+		assert.doesNotMatch(result.stdout, /Re-run all jobs/);
+		assert.deepEqual(result.ghCalls, []);
+		assert.deepEqual(result.outputs, {});
+	}
+);
 
-check('a tag on an older commit means another run took the number: "Re-run all jobs" publishes this one', () => {
-	pushTag('v0.0.0-dev.12', other);
-	const result = preflight('v0.0.0-dev.12');
-	assert.equal(result.status, 1);
-	assert.match(result.stdout, new RegExp(`::error::v0\\.0\\.0-dev\\.12 already exists on ${other}, an older commit ` +
-		`than this run's ${head}: another run took the number this run planned\\.`));
-	assert.match(result.stdout, /'Re-run all jobs' publishes this commit under the next number/);
-	assert.doesNotMatch(result.stdout, /newer run superseded/);
-	assert.deepEqual(result.outputs, {});
-});
+check(
+	'a tag on an older commit means another run took the number: "Re-run all jobs" publishes this one',
+	() => {
+		pushTag('v0.0.0-dev.12', other);
+		const result = preflight('v0.0.0-dev.12');
+		assert.equal(result.status, 1);
+		assert.match(
+			result.stdout,
+			new RegExp(
+				`::error::v0\\.0\\.0-dev\\.12 already exists on ${other}, an older commit ` +
+					`than this run's ${head}: another run took the number this run planned\\.`
+			)
+		);
+		assert.match(result.stdout, /'Re-run all jobs' publishes this commit under the next number/);
+		assert.doesNotMatch(result.stdout, /newer run superseded/);
+		assert.deepEqual(result.outputs, {});
+	}
+);
 
-check('this commit\'s tag without a release resumes at the release', () => {
+check("this commit's tag without a release resumes at the release", () => {
 	pushTag('v0.0.0-dev.13', head);
 	const result = preflight('v0.0.0-dev.13', { ghMode: 'missing' });
 	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.deepEqual(result.outputs, { create_tag: 'false', create_release: 'true', skip_feed: 'false' });
+	assert.deepEqual(result.outputs, {
+		create_tag: 'false',
+		create_release: 'true',
+		skip_feed: 'false'
+	});
 	assert.equal(result.ghCalls.length, 1);
-	assert.match(result.stdout, /::notice::v0\.0\.0-dev\.13 already points at this commit and has no release/);
+	assert.match(
+		result.stdout,
+		/::notice::v0\.0\.0-dev\.13 already points at this commit and has no release/
+	);
 });
 
-check('this commit\'s published release resumes at the feed and the notes', () => {
+check("this commit's published release resumes at the feed and the notes", () => {
 	// Annotated: the tag object differs from the commit, so the peeled line decides.
 	pushTag('v0.0.0-dev.14', head, { annotated: true });
 	const result = preflight('v0.0.0-dev.14', { ghMode: 'published' });
 	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.deepEqual(result.outputs, { create_tag: 'false', create_release: 'false', skip_feed: 'false' });
+	assert.deepEqual(result.outputs, {
+		create_tag: 'false',
+		create_release: 'false',
+		skip_feed: 'false'
+	});
 	assert.match(result.stdout, /::notice::v0\.0\.0-dev\.14 is already released from this commit/);
 });
 
-check('this commit\'s draft release stops the run with the manual fix', () => {
+check("this commit's draft release stops the run with the manual fix", () => {
 	pushTag('v0.0.0-dev.15', head);
 	const result = preflight('v0.0.0-dev.15', { ghMode: 'draft' });
 	assert.equal(result.status, 1);
-	assert.match(result.stdout, /::error::v0\.0\.0-dev\.15 has a draft release[^\n]*Delete that draft \(keep the tag\), then use 'Re-run failed jobs'/);
+	assert.match(
+		result.stdout,
+		/::error::v0\.0\.0-dev\.15 has a draft release[^\n]*Delete that draft \(keep the tag\), then use 'Re-run failed jobs'/
+	);
 	assert.deepEqual(result.outputs, {});
 });
 
@@ -690,17 +832,26 @@ check('an empty draft flag is refused, never read as "published"', () => {
 	pushTag('v0.0.0-dev.16', head);
 	const result = preflight('v0.0.0-dev.16', { ghMode: 'empty' });
 	assert.equal(result.status, 1);
-	assert.match(result.stdout, /::error::gh reported isDraft='' for v0\.0\.0-dev\.16; expected true or false\./);
+	assert.match(
+		result.stdout,
+		/::error::gh reported isDraft='' for v0\.0\.0-dev\.16; expected true or false\./
+	);
 	assert.deepEqual(result.outputs, {});
 });
 
 check('a failed release lookup fails the preflight instead of being read as "no release"', () => {
 	pushTag('v0.0.0-dev.17', head);
-	for (const [mode, message] of [['error', /HTTP 502: Bad Gateway/], ['not-found', /HTTP 404: Not Found/]]) {
+	for (const [mode, message] of [
+		['error', /HTTP 502: Bad Gateway/],
+		['not-found', /HTTP 404: Not Found/]
+	]) {
 		const result = preflight('v0.0.0-dev.17', { ghMode: mode });
 		assert.equal(result.status, 1, `gh mode ${mode}`);
 		assert.match(result.stderr, message);
-		assert.match(result.stdout, /::error::could not read the release of v0\.0\.0-dev\.17 \(gh exit 1\)/);
+		assert.match(
+			result.stdout,
+			/::error::could not read the release of v0\.0\.0-dev\.17 \(gh exit 1\)/
+		);
 		assert.deepEqual(result.outputs, {});
 	}
 });
@@ -727,24 +878,40 @@ pushTag('v1.3.0', seriesNewer, { repo: series });
 pushTag('v9.9.9-rc.1', seriesNewer, { repo: series });
 const inSeries = { cwd: series, sha: seriesHead };
 
-check('a newer release of the channel: a published older release finishes its notes but skips its feed', () => {
-	const result = preflight('v0.0.0-dev.20', { ...inSeries, ghMode: 'published' });
-	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.deepEqual(result.outputs, { create_tag: 'false', create_release: 'false', skip_feed: 'true' });
-	assert.match(result.stdout, /::notice::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.20\. Finishing the changelog and the notes/);
-});
+check(
+	'a newer release of the channel: a published older release finishes its notes but skips its feed',
+	() => {
+		const result = preflight('v0.0.0-dev.20', { ...inSeries, ghMode: 'published' });
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.deepEqual(result.outputs, {
+			create_tag: 'false',
+			create_release: 'false',
+			skip_feed: 'true'
+		});
+		assert.match(
+			result.stdout,
+			/::notice::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.20\. Finishing the changelog and the notes/
+		);
+	}
+);
 
 check('a newer release of the channel: an orphan older tag is not released', () => {
 	const result = preflight('v0.0.0-dev.20', { ...inSeries, ghMode: 'missing' });
 	assert.equal(result.status, 1);
-	assert.match(result.stdout, /::error::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.20: publishing v0\.0\.0-dev\.20 now would put older code after it/);
+	assert.match(
+		result.stdout,
+		/::error::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.20: publishing v0\.0\.0-dev\.20 now would put older code after it/
+	);
 	assert.deepEqual(result.outputs, {});
 });
 
 check('a newer release of the channel: a free older tag is not created', () => {
 	const result = preflight('v0.0.0-dev.19', inSeries);
 	assert.equal(result.status, 1);
-	assert.match(result.stdout, /::error::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.19/);
+	assert.match(
+		result.stdout,
+		/::error::v0\.0\.0-dev\.21 was published after this run planned v0\.0\.0-dev\.19/
+	);
 	assert.deepEqual(result.ghCalls, []);
 	assert.deepEqual(result.outputs, {});
 });
@@ -756,11 +923,12 @@ check('the stable channel compares stable tags only', () => {
 	// v9.9.9-rc.1 and the dev tags sort higher but are not stable releases.
 	const next = preflight('v1.4.0', { ...inSeries, channel: 'main' });
 	assert.equal(next.status, 0, next.stdout + next.stderr);
-	assert.deepEqual(next.outputs, { create_tag: 'true', create_release: 'true', skip_feed: 'false' });
+	assert.deepEqual(next.outputs, {
+		create_tag: 'true',
+		create_release: 'true',
+		skip_feed: 'false'
+	});
 });
-
-
-
 
 // ==========================================
 // ==========================================
@@ -777,15 +945,20 @@ function createRelease(prerelease) {
 	fs.mkdirSync(assets);
 	for (const name of requiredAssets('dev')) fs.writeFileSync(path.join(assets, name), `${name}\n`);
 	const ghArgs = stubLog('gh-args');
-	const result = runScript(createScript, runner, {
-		TAG: 'v0.0.0-dev.30',
-		PRERELEASE: prerelease,
-		TITLE: 'Ergopti v0.0.0-dev.30',
-		GITHUB_SHA: head,
-		GH_TOKEN: 'stub-token',
-		GH_STUB_LOG: bashPath(stubLog('gh')),
-		GH_STUB_ARGS: bashPath(ghArgs),
-	}, STUB_PATH);
+	const result = runScript(
+		createScript,
+		runner,
+		{
+			TAG: 'v0.0.0-dev.30',
+			PRERELEASE: prerelease,
+			TITLE: 'Ergopti v0.0.0-dev.30',
+			GITHUB_SHA: head,
+			GH_TOKEN: 'stub-token',
+			GH_STUB_LOG: bashPath(stubLog('gh')),
+			GH_STUB_ARGS: bashPath(ghArgs)
+		},
+		STUB_PATH
+	);
 	return { ...result, args: linesOf(ghArgs) };
 }
 
@@ -801,19 +974,34 @@ function parseCreate(args) {
 	return { tag: args[0], options, files: files.sort() };
 }
 
-check('a dev release is created as a prerelease, on this commit, with every downloaded file', () => {
-	const result = createRelease('true');
-	assert.equal(result.status, 0, result.stdout + result.stderr);
-	const created = parseCreate(result.args);
-	assert.equal(created.tag, 'v0.0.0-dev.30');
-	assert.deepEqual(created.options, { target: head, title: 'Ergopti v0.0.0-dev.30', prerelease: true });
-	assert.deepEqual(created.files, requiredAssets('dev').map((name) => `release-assets/${name}`).sort());
-});
+check(
+	'a dev release is created as a prerelease, on this commit, with every downloaded file',
+	() => {
+		const result = createRelease('true');
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		const created = parseCreate(result.args);
+		assert.equal(created.tag, 'v0.0.0-dev.30');
+		assert.deepEqual(created.options, {
+			target: head,
+			title: 'Ergopti v0.0.0-dev.30',
+			prerelease: true
+		});
+		assert.deepEqual(
+			created.files,
+			requiredAssets('dev')
+				.map((name) => `release-assets/${name}`)
+				.sort()
+		);
+	}
+);
 
 check('a stable release is not a prerelease', () => {
 	const result = createRelease('false');
 	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.deepEqual(parseCreate(result.args).options, { target: head, title: 'Ergopti v0.0.0-dev.30' });
+	assert.deepEqual(parseCreate(result.args).options, {
+		target: head,
+		title: 'Ergopti v0.0.0-dev.30'
+	});
 });
 
 check('an unreadable prerelease flag creates nothing', () => {
@@ -840,28 +1028,41 @@ function publishFeed(artifact, { resumed = false, served = 'origin', published =
 	const curlLog = stubLog('curl');
 	const ghLog = stubLog('gh');
 	const url = `https://raw.githubusercontent.com/${REPOSITORY}/sparkle-appcasts/appcast-dev.xml?release=${head}`;
-	const result = runScript(feedScript, runner, {
-		ERGOPTI_CHANNEL: 'dev',
-		TAG: 'v0.0.0-dev.14',
-		RESUMED: resumed ? 'true' : 'false',
-		GITHUB_SHA: head,
-		GITHUB_REPOSITORY: REPOSITORY,
-		RUNNER_TEMP: bashPath(temp),
-		GH_TOKEN: 'stub-token',
-		GH_STUB_LOG: bashPath(ghLog),
-		GH_STUB_TAG: 'v0.0.0-dev.14',
-		GH_STUB_REPO: REPOSITORY,
-		GH_STUB_CHANNEL: 'dev',
-		GH_STUB_PUBLISHED_FEED: published,
-		CURL_STUB_LOG: bashPath(curlLog),
-		CURL_STUB_URL: url,
-		CURL_STUB_MODE: served,
-		CURL_STUB_ORIGIN: bashPath(feedOrigin),
-		CURL_STUB_CHANNEL: 'dev',
-	}, STUB_PATH);
-	const onOrigin = spawnSync('git', ['--git-dir', feedOrigin, 'show', 'sparkle-appcasts:appcast-dev.xml'],
-		{ env: GIT_ENV, encoding: 'utf8' });
-	return { ...result, onOrigin: onOrigin.status === 0 ? onOrigin.stdout.trim() : null, curlCalls: linesOf(curlLog), ghCalls: linesOf(ghLog) };
+	const result = runScript(
+		feedScript,
+		runner,
+		{
+			ERGOPTI_CHANNEL: 'dev',
+			TAG: 'v0.0.0-dev.14',
+			RESUMED: resumed ? 'true' : 'false',
+			GITHUB_SHA: head,
+			GITHUB_REPOSITORY: REPOSITORY,
+			RUNNER_TEMP: bashPath(temp),
+			GH_TOKEN: 'stub-token',
+			GH_STUB_LOG: bashPath(ghLog),
+			GH_STUB_TAG: 'v0.0.0-dev.14',
+			GH_STUB_REPO: REPOSITORY,
+			GH_STUB_CHANNEL: 'dev',
+			GH_STUB_PUBLISHED_FEED: published,
+			CURL_STUB_LOG: bashPath(curlLog),
+			CURL_STUB_URL: url,
+			CURL_STUB_MODE: served,
+			CURL_STUB_ORIGIN: bashPath(feedOrigin),
+			CURL_STUB_CHANNEL: 'dev'
+		},
+		STUB_PATH
+	);
+	const onOrigin = spawnSync(
+		'git',
+		['--git-dir', feedOrigin, 'show', 'sparkle-appcasts:appcast-dev.xml'],
+		{ env: GIT_ENV, encoding: 'utf8' }
+	);
+	return {
+		...result,
+		onOrigin: onOrigin.status === 0 ? onOrigin.stdout.trim() : null,
+		curlCalls: linesOf(curlLog),
+		ghCalls: linesOf(ghLog)
+	};
 }
 
 check('a first release pushes its appcast to the feed branch and reads it back', () => {
@@ -877,15 +1078,18 @@ check('a feed that does not read back as pushed fails the step', () => {
 	assert.notEqual(result.status, 0, 'a published copy that differs must fail the verification');
 });
 
-check('a resumed release publishes the appcast attached to the release, not this attempt\'s artifact', () => {
-	const result = publishFeed('<appcast>a rebuilt package</appcast>', { resumed: true, published: '<appcast>the published zip</appcast>' });
-	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.equal(result.onOrigin, '<appcast>the published zip</appcast>');
-	assert.equal(result.ghCalls.length, 1);
-});
-
-
-
+check(
+	"a resumed release publishes the appcast attached to the release, not this attempt's artifact",
+	() => {
+		const result = publishFeed('<appcast>a rebuilt package</appcast>', {
+			resumed: true,
+			published: '<appcast>the published zip</appcast>'
+		});
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.equal(result.onOrigin, '<appcast>the published zip</appcast>');
+		assert.equal(result.ghCalls.length, 1);
+	}
+);
 
 // ==========================================
 // ==========================================
@@ -898,47 +1102,73 @@ check('the release job skips only the three steps the preflight decides on', () 
 	const indexOf = (name) => releaseSteps.findIndex((candidate) => candidate.name === name);
 	const preflightStep = pipeline.step(releaseJob, PREFLIGHT);
 	assert.equal(pipeline.stepField(preflightStep, 'id'), 'preflight');
-	assert.match(preflightStep, /^ {10}GH_TOKEN: \$\{\{ github\.token \}\}$/m, 'the preflight reads the release with the job token');
+	assert.match(
+		preflightStep,
+		/^ {10}GH_TOKEN: \$\{\{ github\.token \}\}$/m,
+		'the preflight reads the release with the job token'
+	);
 	const conditional = {
 		[CREATE_TAG]: "steps.preflight.outputs.create_tag == 'true'",
 		[CREATE_RELEASE]: "steps.preflight.outputs.create_release == 'true'",
-		[PUBLISH_FEED]: "steps.preflight.outputs.skip_feed != 'true'",
+		[PUBLISH_FEED]: "steps.preflight.outputs.skip_feed != 'true'"
 	};
 	for (const candidate of releaseSteps) {
-		assert.equal(pipeline.stepField(candidate.body, 'if'), conditional[candidate.name] ?? null,
-			`release step "${candidate.name}" must ${conditional[candidate.name] ? `run if ${conditional[candidate.name]}` : 'always run'}`);
+		assert.equal(
+			pipeline.stepField(candidate.body, 'if'),
+			conditional[candidate.name] ?? null,
+			`release step "${candidate.name}" must ${conditional[candidate.name] ? `run if ${conditional[candidate.name]}` : 'always run'}`
+		);
 	}
-	assert.ok(indexOf(PREFLIGHT) < indexOf(CREATE_TAG) && indexOf(CREATE_TAG) < indexOf(CREATE_RELEASE) &&
-		indexOf(CREATE_RELEASE) < indexOf(PUBLISH_FEED), 'the preflight, the tag, the release and the feed run in that order');
+	assert.ok(
+		indexOf(PREFLIGHT) < indexOf(CREATE_TAG) &&
+			indexOf(CREATE_TAG) < indexOf(CREATE_RELEASE) &&
+			indexOf(CREATE_RELEASE) < indexOf(PUBLISH_FEED),
+		'the preflight, the tag, the release and the feed run in that order'
+	);
 	// A resumed attempt must still finish the feed, the changelog and the notes.
-	assert.ok(releaseSteps.length - indexOf(CREATE_RELEASE) - 1 >= 3,
-		`only ${releaseSteps.length - indexOf(CREATE_RELEASE) - 1} step(s) follow the release creation`);
+	assert.ok(
+		releaseSteps.length - indexOf(CREATE_RELEASE) - 1 >= 3,
+		`only ${releaseSteps.length - indexOf(CREATE_RELEASE) - 1} step(s) follow the release creation`
+	);
 });
 
-check('each script\'s env carries the plan output or preflight decision it reads', () => {
+check("each script's env carries the plan output or preflight decision it reads", () => {
 	const envOf = (name) => pipeline.step(releaseJob, name).split('\n');
 	for (const [name, lines] of [
-		[CREATE_RELEASE, [
-			'          TAG: ${{ needs.validate.outputs.tag }}',
-			'          PRERELEASE: ${{ needs.validate.outputs.prerelease }}',
-			'          TITLE: ${{ needs.validate.outputs.title }}',
-			'          GH_TOKEN: ${{ github.token }}',
-		]],
-		[PUBLISH_FEED, [
-			'          ERGOPTI_CHANNEL: ${{ needs.validate.outputs.channel }}',
-			'          TAG: ${{ needs.validate.outputs.tag }}',
-			"          RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}",
-			'          GH_TOKEN: ${{ github.token }}',
-		]],
-		[PREFLIGHT, [
-			'          TAG: ${{ needs.validate.outputs.tag }}',
-			'          CHANNEL: ${{ needs.validate.outputs.channel }}',
-		]],
+		[
+			CREATE_RELEASE,
+			[
+				'          TAG: ${{ needs.validate.outputs.tag }}',
+				'          PRERELEASE: ${{ needs.validate.outputs.prerelease }}',
+				'          TITLE: ${{ needs.validate.outputs.title }}',
+				'          GH_TOKEN: ${{ github.token }}'
+			]
+		],
+		[
+			PUBLISH_FEED,
+			[
+				'          ERGOPTI_CHANNEL: ${{ needs.validate.outputs.channel }}',
+				'          TAG: ${{ needs.validate.outputs.tag }}',
+				"          RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}",
+				'          GH_TOKEN: ${{ github.token }}'
+			]
+		],
+		[
+			PREFLIGHT,
+			[
+				'          TAG: ${{ needs.validate.outputs.tag }}',
+				'          CHANNEL: ${{ needs.validate.outputs.channel }}'
+			]
+		]
 	]) {
-		for (const line of lines) assert.ok(envOf(name).includes(line), `"${name}" must set ${line.trim()}`);
+		for (const line of lines)
+			assert.ok(envOf(name).includes(line), `"${name}" must set ${line.trim()}`);
 	}
-	assert.match(pipeline.job('release'), /^ {6}LINUX_BUNDLE_ASSET: \$\{\{ needs\.validate\.outputs\.linux_bundle \}\}$/m,
-		'the release job must give the preflight and the notes the bundle name plan resolved');
+	assert.match(
+		pipeline.job('release'),
+		/^ {6}LINUX_BUNDLE_ASSET: \$\{\{ needs\.validate\.outputs\.linux_bundle \}\}$/m,
+		'the release job must give the preflight and the notes the bundle name plan resolved'
+	);
 });
 
 if (failures.length > 0) {
@@ -947,5 +1177,7 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log('[OK] plan never republishes a tagged commit and bumps from every subject; the release preflight ' +
-	'resumes or stops on every tag state, and the release and its feed publish what was gated.');
+console.log(
+	'[OK] plan never republishes a tagged commit and bumps from every subject; the release preflight ' +
+		'resumes or stops on every tag state, and the release and its feed publish what was gated.'
+);

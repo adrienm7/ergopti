@@ -5,20 +5,20 @@
 This document separates whole-suite runs, corrected replays and environment
 limitations. CI for the published commit remains the final release verdict.
 
-| Check | Latest verified result |
-| --- | --- |
-| Windows unit/meta | 7,239/7,239 |
-| Windows E2E | 5/5 |
-| Windows production compile | Complete include graph compiled with Ahk2Exe; live driver preserved |
-| Linux unit/meta on the native Windows compatibility launcher | 3,576/3,576 in a fresh full run |
-| Linux E2E | 115/115 |
-| macOS stubbed E2E | 67/67; one driver-specific vector skipped |
-| macOS full Lua 5.4 suite under WSL | 11412 passed, one old boot-oracle failure; corrected module 15/15, giving 11426 distinct passing cases in the composite |
-| macOS mandatory boot-boundary guard | 15/15 after repairing a stale count-based oracle; Lua 5.4 and LuaJIT proofs |
-| macOS hotstring delay regression cohort | 99/99 after strengthening the boot-result assertion |
-| JavaScript registry | 298/303 in the initial complete run; all five failures subsequently resolved below |
-| Strict conventions | Zero violations |
-| Pending artifact integrity | 47 preserved artifacts inventoried with SHA-256 |
+| Check                                                        | Latest verified result                                                                                                  |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Windows unit/meta                                            | 7,239/7,239                                                                                                             |
+| Windows E2E                                                  | 5/5                                                                                                                     |
+| Windows production compile                                   | Complete include graph compiled with Ahk2Exe; live driver preserved                                                     |
+| Linux unit/meta on the native Windows compatibility launcher | 3,576/3,576 in a fresh full run                                                                                         |
+| Linux E2E                                                    | 115/115                                                                                                                 |
+| macOS stubbed E2E                                            | 67/67; one driver-specific vector skipped                                                                               |
+| macOS full Lua 5.4 suite under WSL                           | 11412 passed, one old boot-oracle failure; corrected module 15/15, giving 11426 distinct passing cases in the composite |
+| macOS mandatory boot-boundary guard                          | 15/15 after repairing a stale count-based oracle; Lua 5.4 and LuaJIT proofs                                             |
+| macOS hotstring delay regression cohort                      | 99/99 after strengthening the boot-result assertion                                                                     |
+| JavaScript registry                                          | 298/303 in the initial complete run; all five failures subsequently resolved below                                      |
+| Strict conventions                                           | Zero violations                                                                                                         |
+| Pending artifact integrity                                   | 47 preserved artifacts inventoried with SHA-256                                                                         |
 
 ## First published CI
 

@@ -27,11 +27,11 @@ outside the measured window. The recorded total covers clamping, positioning,
 corners and border work, not end-to-end tooltip creation or keystroke latency.
 
 | Run | CPU capture | Median ms | p95 ms | Maximum ms | Samples >= 5 ms | Prefix result |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| 1 | Disabled | 2.2334 | 4.8046 | 11.4384 | 5 | 359/359 |
-| 2 | Enabled | 2.6486 | 6.5400 | 13.5328 | 14 | 357/359 |
-| 3 | Enabled | 2.5113 | 5.5948 | 10.0180 | 7 | 357/359 |
-| 4 | Disabled | 2.6206 | 5.6584 | 10.9517 | 11 | 358/359 |
+| --- | ----------- | --------: | -----: | ---------: | --------------: | ------------- |
+| 1   | Disabled    |    2.2334 | 4.8046 |    11.4384 |               5 | 359/359       |
+| 2   | Enabled     |    2.6486 | 6.5400 |    13.5328 |              14 | 357/359       |
+| 3   | Enabled     |    2.5113 | 5.5948 |    10.0180 |               7 | 357/359       |
+| 4   | Disabled    |    2.6206 | 5.6584 |    10.9517 |              11 | 358/359       |
 
 All 400 observations are in [samples.csv](samples.csv). The extraction checked
 100 ordered samples per run, mode labels, nonnegative finite values and segment
@@ -83,12 +83,12 @@ resident PID 11412 and six existing UIA workers were present. None was stopped,
 restarted or reprioritized. The resident was launched before the recent fixes;
 this protocol does not test its loaded code or establish a current UIA leak.
 
-| Run | Test PID | Completion UTC |
-| --- | ---: | --- |
-| 1 | 16740 | 2026-09-08T17:18:56.8725249Z |
-| 2 | 17196 | 2026-09-08T17:19:30.3375161Z |
-| 3 | 17340 | 2026-09-08T17:20:03.0489824Z |
-| 4 | 3300 | 2026-09-08T17:20:44.0839754Z |
+| Run | Test PID | Completion UTC               |
+| --- | -------: | ---------------------------- |
+| 1   |    16740 | 2026-09-08T17:18:56.8725249Z |
+| 2   |    17196 | 2026-09-08T17:19:30.3375161Z |
+| 3   |    17340 | 2026-09-08T17:20:03.0489824Z |
+| 4   |     3300 | 2026-09-08T17:20:44.0839754Z |
 
 Archive `static/ergopti_plus/windows` and `static/ergopti_plus/_shared` from
 `427e44588` into a new private directory, then apply the replay patch there.

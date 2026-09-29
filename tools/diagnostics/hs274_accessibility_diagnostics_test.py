@@ -1,5 +1,6 @@
 # tools/diagnostics/hs274_accessibility_diagnostics_test.py
 """Exercise diagnostic ownership, bounded receipts and independent failures."""
+
 from pathlib import Path
 import plistlib
 from tempfile import TemporaryDirectory
@@ -13,7 +14,10 @@ from hs274_accessibility_diagnostics import OUTPUT_LIMIT, retain_failure
 
 class DiagnosticTests(unittest.TestCase):
     def test_invalid_bundle_does_not_query_native_services(self):
-        with TemporaryDirectory() as root, patch("hs274_accessibility_diagnostics.subprocess.run") as run:
+        with (
+            TemporaryDirectory() as root,
+            patch("hs274_accessibility_diagnostics.subprocess.run") as run,
+        ):
             report = {}
             retain_failure(report, root)
             self.assertIn("bundle_error", report["hammerspoon_admission_diagnostics"])
@@ -25,15 +29,24 @@ class DiagnosticTests(unittest.TestCase):
             executable = app / "Contents/MacOS/Hammerspoon"
             executable.parent.mkdir(parents=True)
             executable.write_bytes(b"fixture")
-            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "fixture.identity"}))
-            responses = [SimpleNamespace(returncode=1, stdout="", stderr="invalid signature"),
-                         subprocess.TimeoutExpired("codesign", 5,
-                                                   output=b"x" * OUTPUT_LIMIT + b"partial identity",
-                                                   stderr=b"native refusal\xff"),
-                         SimpleNamespace(returncode=0, stdout="x" * OUTPUT_LIMIT + "refusal", stderr=""),
-                         SimpleNamespace(returncode=0, stdout="msgID=124.2 denied", stderr="")]
+            (app / "Contents/Info.plist").write_bytes(
+                plistlib.dumps({"CFBundleIdentifier": "fixture.identity"})
+            )
+            responses = [
+                SimpleNamespace(returncode=1, stdout="", stderr="invalid signature"),
+                subprocess.TimeoutExpired(
+                    "codesign",
+                    5,
+                    output=b"x" * OUTPUT_LIMIT + b"partial identity",
+                    stderr=b"native refusal\xff",
+                ),
+                SimpleNamespace(returncode=0, stdout="x" * OUTPUT_LIMIT + "refusal", stderr=""),
+                SimpleNamespace(returncode=0, stdout="msgID=124.2 denied", stderr=""),
+            ]
             report = {"primary_error": "approval refused"}
-            with patch("hs274_accessibility_diagnostics.subprocess.run", side_effect=responses) as run:
+            with patch(
+                "hs274_accessibility_diagnostics.subprocess.run", side_effect=responses
+            ) as run:
                 retain_failure(report, app, [124])
             evidence = report["hammerspoon_admission_diagnostics"]
             self.assertEqual(evidence["bundle"]["CFBundleIdentifier"], "fixture.identity")

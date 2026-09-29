@@ -188,10 +188,11 @@ FEATURES & RATIONALE:
 			<h2>Sept touches à double vie.</h2>
 			<p class="lead">
 				Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. La même
-				logique sur les deux OS : <strong>les mêmes doigts</strong> déclenchent les mêmes gestes, avec
-				le modificateur natif de chaque plateforme — <kbd>Ctrl</kbd> sur Windows, <kbd>⌘</kbd> sur
-				macOS. L’objectif : <strong>une expérience unifiée</strong>, quel que soit l’ordinateur devant
-				vous. Ce sont les défauts livrés ; chaque touche, action et délai se change depuis le menu.
+				logique sur les deux OS : <strong>les mêmes doigts</strong> déclenchent les mêmes gestes,
+				avec le modificateur natif de chaque plateforme — <kbd>Ctrl</kbd> sur Windows, <kbd>⌘</kbd>
+				sur macOS. L’objectif : <strong>une expérience unifiée</strong>, quel que soit l’ordinateur
+				devant vous. Ce sont les défauts livrés ; chaque touche, action et délai se change depuis le
+				menu.
 			</p>
 		</header>
 

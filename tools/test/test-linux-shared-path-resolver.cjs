@@ -55,7 +55,9 @@ function walk(dir, acc = []) {
 const errors = [];
 
 if (!fs.existsSync(RESOLVER)) {
-	errors.push('linux/infra/paths.lua is missing — every module would go back to counting ".." itself');
+	errors.push(
+		'linux/infra/paths.lua is missing — every module would go back to counting ".." itself'
+	);
 }
 
 // The resolver is allowed to know where the tree is; that is its job. Two more
@@ -68,12 +70,14 @@ const EXEMPT = new Set([
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.
 	'ergopti_hotstrings.lua',
-	'modules/hotstrings/engine.lua',
+	'modules/hotstrings/engine.lua'
 ]);
 
 const files = walk(DRIVER);
 if (files.length < 40) {
-	errors.push(`walked only ${files.length} Linux .lua file(s) — the scan is broken and would report nothing`);
+	errors.push(
+		`walked only ${files.length} Linux .lua file(s) — the scan is broken and would report nothing`
+	);
 }
 
 // A hardcoded hop to the shared tree comes in TWO spellings, and this guard
@@ -92,7 +96,7 @@ if (files.length < 40) {
 // levels up is /usr, and the daemon died on its first timing lookup.
 const HARDCODED = [
 	{ re: /\.\.[/\\](?:\.\.[/\\])*_shared/, why: 'counting ".." steps' },
-	{ re: /["'][/\\]_shared[/\\]/,          why: 'appending "/_shared/…" to a derived root' }
+	{ re: /["'][/\\]_shared[/\\]/, why: 'appending "/_shared/…" to a derived root' }
 ];
 
 for (const abs of files) {
@@ -119,7 +123,7 @@ for (const abs of files) {
 // pattern had already reached.
 const BOOTSTRAPS = [
 	{ file: 'ergopti_hotstrings.lua', note: 'SCRIPT_DIR is the driver root' },
-	{ file: 'modules/hotstrings/engine.lua', note: '_linux_root is the driver root' },
+	{ file: 'modules/hotstrings/engine.lua', note: '_linux_root is the driver root' }
 ];
 for (const b of BOOTSTRAPS) {
 	const abs = path.join(DRIVER, b.file);

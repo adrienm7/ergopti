@@ -51,8 +51,10 @@ const errors = [];
 const order = JSON.parse(fs.readFileSync(path.join(DATA, 'locale_order.json'), 'utf8')).order;
 const names = JSON.parse(fs.readFileSync(path.join(DATA, 'locale_names.json'), 'utf8')).locales;
 
-if (!/LOCALE_NAMES_PATH[\s\S]*?locale_names\.json/.test(SITE_LOADER)
-	|| !/readJson\(LOCALE_NAMES_PATH\)\.locales/.test(SITE_LOADER)) {
+if (
+	!/LOCALE_NAMES_PATH[\s\S]*?locale_names\.json/.test(SITE_LOADER) ||
+	!/readJson\(LOCALE_NAMES_PATH\)\.locales/.test(SITE_LOADER)
+) {
 	errors.push('the Ergopti+ site must read locale names from canonical locale_names.json');
 }
 if (/macos[/\\]lib[/\\]i18n\.lua/.test(SITE_LOADER)) {
@@ -96,7 +98,9 @@ const shipped = fs
 	.sort();
 
 if (shipped.length < 15) {
-	errors.push(`found only ${shipped.length} locale file(s) — the scan is broken and proves nothing`);
+	errors.push(
+		`found only ${shipped.length} locale file(s) — the scan is broken and proves nothing`
+	);
 }
 for (const code of shipped) {
 	if (!order.includes(code)) {

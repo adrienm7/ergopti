@@ -43,9 +43,7 @@ def ensure_action_block_exists(body: str, action_id: str) -> str:
     return body
 
 
-def assign_layer_to_action_block_none(
-    body: str, trigger_key: str, layer_name: str
-) -> str:
+def assign_layer_to_action_block_none(body: str, trigger_key: str, layer_name: str) -> str:
     """
     Assigns a next state (layer) to a single <action id="..."> in the body.
     Modifies the default <when state="none"/> line to include a 'next' state.
@@ -89,9 +87,7 @@ def add_terminator_state(body: str, output: str, layer_name: int) -> str:
         header, body, footer = match.groups()
         # Check if layer already exists
         if re.search(rf'<when state="{re.escape(layer_name)}"', body):
-            raise ValueError(
-                f"Layer {layer_name} already exists in <terminators> block."
-            )
+            raise ValueError(f"Layer {layer_name} already exists in <terminators> block.")
         new_line = f'\t<when state="{layer_name}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t{footer}"
 
@@ -101,9 +97,7 @@ def add_terminator_state(body: str, output: str, layer_name: int) -> str:
     return body
 
 
-def ensure_key_uses_action_and_not_output(
-    body: str, action_id: str, extra_keys: list[int]
-) -> str:
+def ensure_key_uses_action_and_not_output(body: str, action_id: str, extra_keys: list[int]) -> str:
     """
     Ensure that in <keyMap index="0|1|2|3|5|6|7|8"> blocks,
     any <key ... output="action_id" or action="action_id"> becomes
@@ -128,13 +122,9 @@ def ensure_key_uses_action_and_not_output(
                 if re.search(rf'(output|action)="{re.escape(action_id)}"', tag):
                     new_tag = re.sub(r'\s+(output|action)="[^"]*"', "", tag)
                     if code in extra_keys:
-                        new_tag = (
-                            new_tag[:-2].rstrip() + f' output="{action_id}"/>'
-                        )
+                        new_tag = new_tag[:-2].rstrip() + f' output="{action_id}"/>'
                     else:
-                        new_tag = (
-                            new_tag[:-2].rstrip() + f' action="{action_id}"/>'
-                        )
+                        new_tag = new_tag[:-2].rstrip() + f' action="{action_id}"/>'
                     return new_tag
                 return tag
 
@@ -145,9 +135,7 @@ def ensure_key_uses_action_and_not_output(
     return body
 
 
-def add_action_when_state(
-    body: str, trigger: str, layer: int, output: str
-) -> str:
+def add_action_when_state(body: str, trigger: str, layer: int, output: str) -> str:
     """
     Insert a new <when state="sX" output="..."/> line inside the <action id="..."> block.
     Raises a ValueError if a <when> with the same state already exists.
@@ -164,9 +152,7 @@ def add_action_when_state(
         header, body, footer = match.groups()
         # Check if the state already exists
         if re.search(rf'state="{re.escape(layer)}"', body):
-            raise ValueError(
-                f'Action "{trigger}" already has state {layer} defined.'
-            )
+            raise ValueError(f'Action "{trigger}" already has state {layer} defined.')
         new_line = f'\t<when state="{layer}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t\t{footer}"
 

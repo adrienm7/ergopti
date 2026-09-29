@@ -35,7 +35,9 @@ const toml = require('smol-toml');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
-const registry = toml.parse(fs.readFileSync(path.join(SP, '_shared/modules/paths/app_dirs.toml'), 'utf8'));
+const registry = toml.parse(
+	fs.readFileSync(path.join(SP, '_shared/modules/paths/app_dirs.toml'), 'utf8')
+);
 const FILES = registry.logs.files;
 const UNIFIED = FILES.unified_prefix;
 const ERRORS = FILES.errors_prefix;
@@ -60,7 +62,15 @@ const SCANNED_ROOTS = [
 ];
 
 const EXTENSIONS = new Set(['.lua', '.ahk', '.swift', '.js', '.cjs', '.mjs']);
-const SKIPPED_DIRS = new Set(['tests', 'Tests', 'vendor', 'node_modules', '_generated', '.build', 'corpus']);
+const SKIPPED_DIRS = new Set([
+	'tests',
+	'Tests',
+	'vendor',
+	'node_modules',
+	'_generated',
+	'.build',
+	'corpus'
+]);
 
 /** Lists every scanned source file below `dir`. */
 function walk(dir, out) {
@@ -86,7 +96,13 @@ function literals(src, ext) {
 	const isLua = ext === '.lua';
 	const isAhk = ext === '.ahk';
 	const escape = isAhk ? '`' : '\\';
-	const quotes = isAhk ? ['"', "'"] : ext === '.swift' ? ['"'] : isLua ? ['"', "'"] : ['"', "'", '`'];
+	const quotes = isAhk
+		? ['"', "'"]
+		: ext === '.swift'
+			? ['"']
+			: isLua
+				? ['"', "'"]
+				: ['"', "'", '`'];
 	const found = [];
 	let line = 1;
 	let i = 0;
@@ -181,11 +197,19 @@ for (const owner of GENERATED_OWNERS) {
 	}
 }
 // The detector itself must recognise the spellings it exists to forbid.
-for (const sample of [ERRORS, UNIFIED, `${UNIFIED}\\(date)`, `^${UNIFIED}(%d)`, `${UNIFIED}*${FILES.extension}`, `${UNIFIED}boot${FILES.extension}`]) {
+for (const sample of [
+	ERRORS,
+	UNIFIED,
+	`${UNIFIED}\\(date)`,
+	`^${UNIFIED}(%d)`,
+	`${UNIFIED}*${FILES.extension}`,
+	`${UNIFIED}boot${FILES.extension}`
+]) {
 	if (!spellsLogName(sample)) floors.push(`the detector misses ${JSON.stringify(sample)}`);
 }
 for (const sample of [`${UNIFIED}new.exe`, `${UNIFIED}Configuration.ini`]) {
-	if (spellsLogName(sample)) floors.push(`the detector flags the non-log name ${JSON.stringify(sample)}`);
+	if (spellsLogName(sample))
+		floors.push(`the detector flags the non-log name ${JSON.stringify(sample)}`);
 }
 
 if (floors.length || violations.length) {

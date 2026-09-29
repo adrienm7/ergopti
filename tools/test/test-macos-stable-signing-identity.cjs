@@ -53,9 +53,6 @@ const check = (condition, message) => {
 	if (!condition) errors.push(message);
 };
 
-
-
-
 // ==========================================
 // ==========================================
 // ======= 1/ Build script replay ===========
@@ -176,20 +173,37 @@ disarm_bundle_sparkle() { :; }
 zip_app() { record zip; }
 ${options.entry === 'main' ? 'main' : 'build_native_helper'}
 `;
-		const result = spawnSync(bashExecutable(), ['-c', script, 'replay', posix,
-			options.base64, options.password, options.dr ?? '', options.failOn ?? ''],
-		{ encoding: 'utf8', timeout: 20000 });
+		const result = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				script,
+				'replay',
+				posix,
+				options.base64,
+				options.password,
+				options.dr ?? '',
+				options.failOn ?? ''
+			],
+			{ encoding: 'utf8', timeout: 20000 }
+		);
 		const logPath = path.join(tmp, 'calls.log');
 		const calls = fs.existsSync(logPath)
-			? fs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map((line) => line.split('\x1f'))
+			? fs
+					.readFileSync(logPath, 'utf8')
+					.split('\n')
+					.filter(Boolean)
+					.map((line) => line.split('\x1f'))
 			: [];
 		const importedPath = path.join(tmp, 'imported.p12');
 		return {
 			status: result.error ? null : result.status,
 			stderr: `${result.stderr ?? ''}${result.error ? String(result.error) : ''}`,
 			calls,
-			leftovers: fs.existsSync(path.join(tmp, 'tmp')) ? fs.readdirSync(path.join(tmp, 'tmp')) : ['<no TMPDIR>'],
-			imported: fs.existsSync(importedPath) ? fs.readFileSync(importedPath) : null,
+			leftovers: fs.existsSync(path.join(tmp, 'tmp'))
+				? fs.readdirSync(path.join(tmp, 'tmp'))
+				: ['<no TMPDIR>'],
+			imported: fs.existsSync(importedPath) ? fs.readFileSync(importedPath) : null
 		};
 	} finally {
 		fs.rmSync(tmp, { recursive: true, force: true });
@@ -201,7 +215,8 @@ const ADHOC_DR = 'designated => cdhash H"feedfacefeedfacefeedfacefeedfacefeedfac
 const B64 = P12_BYTES.toString('base64');
 
 /** @returns {string[][]} The codesign calls that write a signature. */
-const signatures = (run) => run.calls.filter((call) => call[0] === 'codesign' && call.includes('--sign'));
+const signatures = (run) =>
+	run.calls.filter((call) => call[0] === 'codesign' && call.includes('--sign'));
 const signedBy = (call) => call[call.indexOf('--sign') + 1];
 const target = (call) => call[call.length - 1];
 
@@ -213,11 +228,14 @@ const target = (call) => call[call.length - 1];
  */
 function certificateProblems(run, expected) {
 	const problems = [];
-	if (run.status !== 0) problems.push(`the build failed: ${run.stderr.trim().split('\n').slice(-3).join(' | ')}`);
+	if (run.status !== 0)
+		problems.push(`the build failed: ${run.stderr.trim().split('\n').slice(-3).join(' | ')}`);
 	const signed = signatures(run);
 	const adHoc = signed.filter((call) => signedBy(call) !== HASH);
 	if (adHoc.length > 0) {
-		problems.push(`signed ${adHoc.map(target).join(', ')} with ${adHoc.map(signedBy).join(', ')} instead of the certificate ${HASH}`);
+		problems.push(
+			`signed ${adHoc.map(target).join(', ')} with ${adHoc.map(signedBy).join(', ')} instead of the certificate ${HASH}`
+		);
 	}
 	for (const call of signed) {
 		const keychain = call[call.indexOf('--keychain') + 1] ?? '';
@@ -226,9 +244,13 @@ function certificateProblems(run, expected) {
 		}
 	}
 	const order = signed.map(target);
-	const missing = expected.filter((suffix) => !order.some((signedPath) => signedPath.endsWith(suffix)));
+	const missing = expected.filter(
+		(suffix) => !order.some((signedPath) => signedPath.endsWith(suffix))
+	);
 	if (missing.length > 0) problems.push(`never signed: ${missing.join(', ')}`);
-	const positions = expected.map((suffix) => order.findIndex((signedPath) => signedPath.endsWith(suffix)));
+	const positions = expected.map((suffix) =>
+		order.findIndex((signedPath) => signedPath.endsWith(suffix))
+	);
 	if (positions.some((at, index) => index > 0 && at <= positions[index - 1])) {
 		problems.push(`signing order must be ${expected.join(' < ')}, got ${order.join(' < ')}`);
 	}
@@ -244,30 +266,62 @@ function checkKeychain(run, label) {
 	const security = run.calls.filter((call) => call[0] === 'security').map((call) => call.slice(1));
 	const created = security.find((call) => call[0] === 'create-keychain');
 	const keychain = created ? created[created.length - 1] : '';
-	check(created !== undefined && keychain.endsWith('.keychain-db'), `${label}: a temporary keychain must be created`);
+	check(
+		created !== undefined && keychain.endsWith('.keychain-db'),
+		`${label}: a temporary keychain must be created`
+	);
 	const verbs = security.map((call) => call[0]);
-	for (const verb of ['unlock-keychain', 'import', 'set-key-partition-list', 'find-identity', 'delete-keychain']) {
+	for (const verb of [
+		'unlock-keychain',
+		'import',
+		'set-key-partition-list',
+		'find-identity',
+		'delete-keychain'
+	]) {
 		check(verbs.includes(verb), `${label}: security ${verb} is missing`);
 	}
-	check(verbs.indexOf('import') < verbs.indexOf('set-key-partition-list'),
-		`${label}: the partition list must be set after the import`);
+	check(
+		verbs.indexOf('import') < verbs.indexOf('set-key-partition-list'),
+		`${label}: the partition list must be set after the import`
+	);
 	const partition = security.find((call) => call[0] === 'set-key-partition-list') ?? [];
-	check(partition.join(' ') === `set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${partition[5]} ${keychain}`
-		&& /^[0-9a-f]{48}$/.test(partition[5] ?? ''),
-	`${label}: the partition list must open the key to codesign with the random keychain password, got ${partition.join(' ')}`);
+	check(
+		partition.join(' ') ===
+			`set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${partition[5]} ${keychain}` &&
+			/^[0-9a-f]{48}$/.test(partition[5] ?? ''),
+		`${label}: the partition list must open the key to codesign with the random keychain password, got ${partition.join(' ')}`
+	);
 	const search = security.find((call) => call[0] === 'list-keychains' && call.includes('-s')) ?? [];
-	check(search[3] === '-s' && search[4] === keychain && search[5] === '/Library/Keychains/ci.keychain-db',
-		`${label}: the keychain must be added in front of the existing search list, got ${search.join(' ')}`);
+	check(
+		search[3] === '-s' &&
+			search[4] === keychain &&
+			search[5] === '/Library/Keychains/ci.keychain-db',
+		`${label}: the keychain must be added in front of the existing search list, got ${search.join(' ')}`
+	);
 	const imported = security.find((call) => call[0] === 'import') ?? [];
-	check(imported.includes('-P') && imported[imported.indexOf('-P') + 1] === P12_PASSWORD
-		&& imported.includes('-T') && imported[imported.indexOf('-T') + 1] === '/usr/bin/codesign',
-	`${label}: the .p12 must be imported with its password and codesign allowed, got ${imported.join(' ')}`);
-	check(run.imported !== null && run.imported.equals(P12_BYTES), `${label}: the imported .p12 must be the decoded secret`);
-	const deleted = security.findIndex((call) => call[0] === 'delete-keychain' && call[1] === keychain);
+	check(
+		imported.includes('-P') &&
+			imported[imported.indexOf('-P') + 1] === P12_PASSWORD &&
+			imported.includes('-T') &&
+			imported[imported.indexOf('-T') + 1] === '/usr/bin/codesign',
+		`${label}: the .p12 must be imported with its password and codesign allowed, got ${imported.join(' ')}`
+	);
+	check(
+		run.imported !== null && run.imported.equals(P12_BYTES),
+		`${label}: the imported .p12 must be the decoded secret`
+	);
+	const deleted = security.findIndex(
+		(call) => call[0] === 'delete-keychain' && call[1] === keychain
+	);
 	check(deleted === security.length - 1, `${label}: the keychain must be deleted last, at exit`);
-	check(run.leftovers.length === 0, `${label}: the signing work directory must be removed, left ${run.leftovers.join(', ')}`);
-	check(!run.stderr.includes(P12_PASSWORD) && !run.stderr.includes(B64),
-		`${label}: the build log must not print the .p12 or its password`);
+	check(
+		run.leftovers.length === 0,
+		`${label}: the signing work directory must be removed, left ${run.leftovers.join(', ')}`
+	);
+	check(
+		!run.stderr.includes(P12_PASSWORD) && !run.stderr.includes(B64),
+		`${label}: the build log must not print the .p12 or its password`
+	);
 }
 
 const FULL_ORDER = [
@@ -276,72 +330,131 @@ const FULL_ORDER = [
 	'/Karabiner/Karabiner-Elements.app',
 	'/Contents/Frameworks/Sparkle.framework',
 	'/Contents/MacOS/ErgoptiPlus',
-	'/ErgoptiPlus.app',
+	'/ErgoptiPlus.app'
 ];
 const HELPER_ORDER = FULL_ORDER.slice(3);
 
 const full = replay(BUILD, { entry: 'main', base64: B64, password: P12_PASSWORD, dr: CERT_DR });
-errors.push(...certificateProblems(full, FULL_ORDER).map((problem) => `certificate build: ${problem}`));
+errors.push(
+	...certificateProblems(full, FULL_ORDER).map((problem) => `certificate build: ${problem}`)
+);
 checkKeychain(full, 'certificate build');
 const verified = full.calls.filter((call) => call[0] === 'codesign' && call.includes('--verify'));
-check(verified.some((call) => ['--strict', '--deep'].every((flag) => call.includes(flag)) && target(call).endsWith('/ErgoptiPlus.app')),
-	'certificate build: the app must pass codesign --verify --strict --deep');
-check(full.calls.some((call) => call[0] === 'codesign' && call.join(' ').includes('-d -r-')),
-	'certificate build: the designated requirement must be printed to the log');
-check(full.stderr.includes(`certificate leaf = H"${HASH.toLowerCase()}"`),
-	'certificate build: the log must show the certificate requirement');
+check(
+	verified.some(
+		(call) =>
+			['--strict', '--deep'].every((flag) => call.includes(flag)) &&
+			target(call).endsWith('/ErgoptiPlus.app')
+	),
+	'certificate build: the app must pass codesign --verify --strict --deep'
+);
+check(
+	full.calls.some((call) => call[0] === 'codesign' && call.join(' ').includes('-d -r-')),
+	'certificate build: the designated requirement must be printed to the log'
+);
+check(
+	full.stderr.includes(`certificate leaf = H"${HASH.toLowerCase()}"`),
+	'certificate build: the log must show the certificate requirement'
+);
 const lastSignature = full.calls.lastIndexOf(signatures(full).at(-1));
-check(full.calls.findIndex((call) => call[0] === 'zip') > lastSignature,
-	'certificate build: the zip must be made after the last signature');
+check(
+	full.calls.findIndex((call) => call[0] === 'zip') > lastSignature,
+	'certificate build: the zip must be made after the last signature'
+);
 
 const helper = replay(BUILD, { entry: 'helper', base64: B64, password: P12_PASSWORD, dr: CERT_DR });
-errors.push(...certificateProblems(helper, HELPER_ORDER).map((problem) => `native helper: ${problem}`));
+errors.push(
+	...certificateProblems(helper, HELPER_ORDER).map((problem) => `native helper: ${problem}`)
+);
 checkKeychain(helper, 'native helper');
 
 // A requirement that still reads as ad hoc means the certificate did not
 // take; the build must stop rather than ship it.
-const mismatch = replay(BUILD, { entry: 'main', base64: B64, password: P12_PASSWORD, dr: ADHOC_DR });
-check(mismatch.status !== 0 && /does not name the certificate/.test(mismatch.stderr),
-	'a certificate build whose requirement does not name the certificate must fail');
-check(mismatch.calls.some((call) => call[0] === 'security' && call[1] === 'delete-keychain'),
-	'a failed certificate build must still delete its keychain');
+const mismatch = replay(BUILD, {
+	entry: 'main',
+	base64: B64,
+	password: P12_PASSWORD,
+	dr: ADHOC_DR
+});
+check(
+	mismatch.status !== 0 && /does not name the certificate/.test(mismatch.stderr),
+	'a certificate build whose requirement does not name the certificate must fail'
+);
+check(
+	mismatch.calls.some((call) => call[0] === 'security' && call[1] === 'delete-keychain'),
+	'a failed certificate build must still delete its keychain'
+);
 
-const failed = replay(BUILD, { entry: 'main', base64: B64, password: P12_PASSWORD, dr: CERT_DR, failOn: 'Hammerspoon.app' });
+const failed = replay(BUILD, {
+	entry: 'main',
+	base64: B64,
+	password: P12_PASSWORD,
+	dr: CERT_DR,
+	failOn: 'Hammerspoon.app'
+});
 check(failed.status !== 0, 'a failed signature must fail the build');
-check(failed.calls.some((call) => call[0] === 'security' && call[1] === 'delete-keychain') && failed.leftovers.length === 0,
-	'a build that fails while signing must still delete its keychain and work directory');
+check(
+	failed.calls.some((call) => call[0] === 'security' && call[1] === 'delete-keychain') &&
+		failed.leftovers.length === 0,
+	'a build that fails while signing must still delete its keychain and work directory'
+);
 
 const adHoc = replay(BUILD, { entry: 'main', base64: '', password: '', dr: ADHOC_DR });
-check(adHoc.status === 0, `the ad hoc build must still succeed: ${adHoc.stderr.trim().split('\n').slice(-2).join(' | ')}`);
-check(signatures(adHoc).length >= FULL_ORDER.length && signatures(adHoc).every((call) => signedBy(call) === '-'),
-	'without the certificate every object must be signed ad hoc');
-check(!adHoc.calls.some((call) => call[0] === 'security'), 'the ad hoc build must not touch any keychain');
-check(/WARNING: No MACOS_SIGNING_CERTIFICATE_BASE64[\s\S]*Accessibility, Screen Recording, Automation/.test(adHoc.stderr),
-	'the ad hoc build must say loudly that TCC grants will not survive the update');
+check(
+	adHoc.status === 0,
+	`the ad hoc build must still succeed: ${adHoc.stderr.trim().split('\n').slice(-2).join(' | ')}`
+);
+check(
+	signatures(adHoc).length >= FULL_ORDER.length &&
+		signatures(adHoc).every((call) => signedBy(call) === '-'),
+	'without the certificate every object must be signed ad hoc'
+);
+check(
+	!adHoc.calls.some((call) => call[0] === 'security'),
+	'the ad hoc build must not touch any keychain'
+);
+check(
+	/WARNING: No MACOS_SIGNING_CERTIFICATE_BASE64[\s\S]*Accessibility, Screen Recording, Automation/.test(
+		adHoc.stderr
+	),
+	'the ad hoc build must say loudly that TCC grants will not survive the update'
+);
 
-for (const [label, base64, password] of [['password alone', '', P12_PASSWORD], ['certificate alone', B64, '']]) {
+for (const [label, base64, password] of [
+	['password alone', '', P12_PASSWORD],
+	['certificate alone', B64, '']
+]) {
 	const partial = replay(BUILD, { entry: 'main', base64, password, dr: CERT_DR });
-	check(partial.status !== 0 && /set both or neither/.test(partial.stderr),
-		`${label}: half a signing configuration must fail the build`);
-	check(!partial.calls.some((call) => call[0] === 'download' || call[0] === 'codesign'),
-		`${label}: half a signing configuration must fail before any download or signature`);
+	check(
+		partial.status !== 0 && /set both or neither/.test(partial.stderr),
+		`${label}: half a signing configuration must fail the build`
+	);
+	check(
+		!partial.calls.some((call) => call[0] === 'download' || call[0] === 'codesign'),
+		`${label}: half a signing configuration must fail before any download or signature`
+	);
 }
 
 // Self-check: the original bug, a build that signs ad hoc whatever the
 // variables say, must be rejected by the checks above.
 const adHocOnly = BUILD.replace(
 	'codesign --force --sign "$SIGN_IDENTITY" --keychain "$SIGNING_KEYCHAIN" --timestamp=none "$@"',
-	'codesign --force --sign - "$@"');
+	'codesign --force --sign - "$@"'
+);
 if (adHocOnly === BUILD) {
 	errors.push('self-check: the certificate codesign call drifted; re-derive the ad hoc mutation');
 } else {
-	const mutated = replay(adHocOnly, { entry: 'main', base64: B64, password: P12_PASSWORD, dr: CERT_DR });
-	check(certificateProblems(mutated, FULL_ORDER).length > 0,
-		'self-check: a build that signs ad hoc with the certificate variables set went unnoticed');
+	const mutated = replay(adHocOnly, {
+		entry: 'main',
+		base64: B64,
+		password: P12_PASSWORD,
+		dr: CERT_DR
+	});
+	check(
+		certificateProblems(mutated, FULL_ORDER).length > 0,
+		'self-check: a build that signs ad hoc with the certificate variables set went unnoticed'
+	);
 }
-
-
-
 
 // ==========================================
 // ==========================================
@@ -353,11 +466,11 @@ if (adHocOnly === BUILD) {
 // diagnostic that is never distributed; that is the only other ad hoc site.
 for (const rel of ['.github/workflows/ci-macos.yml', '.github/workflows/ci.yml']) {
 	const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-	check(!/codesign[^\n]*--sign -/.test(text), `${rel} must not sign ad hoc; build_macos_app.sh owns the signature`);
+	check(
+		!/codesign[^\n]*--sign -/.test(text),
+		`${rel} must not sign ad hoc; build_macos_app.sh owns the signature`
+	);
 }
-
-
-
 
 // ==========================================
 // ==========================================
@@ -371,45 +484,92 @@ try {
 	const env = { ...process.env };
 	delete env.CI;
 	delete env.GITHUB_ACTIONS;
-	const run = (target, extraEnv = {}) => spawnSync(bashExecutable(), [CREATE.replaceAll('\\', '/'), target.replaceAll('\\', '/')],
-		{ encoding: 'utf8', timeout: 60000, env: { ...env, ...extraEnv } });
+	const run = (target, extraEnv = {}) =>
+		spawnSync(bashExecutable(), [CREATE.replaceAll('\\', '/'), target.replaceAll('\\', '/')], {
+			encoding: 'utf8',
+			timeout: 60000,
+			env: { ...env, ...extraEnv }
+		});
 	const first = run(out);
-	check(!first.error && first.status === 0, `create_macos_signing_identity.sh failed: ${first.stderr || first.error}`);
+	check(
+		!first.error && first.status === 0,
+		`create_macos_signing_identity.sh failed: ${first.stderr || first.error}`
+	);
 	const printed = `${first.stdout}${first.stderr}`;
 	check(!/PRIVATE KEY/.test(printed), 'the creation script must never print a private key');
-	const password = /==== MACOS_SIGNING_CERTIFICATE_PASSWORD ====\n([^\n]+)\n/.exec(first.stdout)?.[1] ?? '';
-	const base64 = /==== MACOS_SIGNING_CERTIFICATE_BASE64[^\n]*\n([^\n]+)\n==== end ====/.exec(first.stdout)?.[1] ?? '';
-	check(/^[0-9a-f]{32}$/.test(password), 'the creation script must print a random password for MACOS_SIGNING_CERTIFICATE_PASSWORD');
+	const password =
+		/==== MACOS_SIGNING_CERTIFICATE_PASSWORD ====\n([^\n]+)\n/.exec(first.stdout)?.[1] ?? '';
+	const base64 =
+		/==== MACOS_SIGNING_CERTIFICATE_BASE64[^\n]*\n([^\n]+)\n==== end ====/.exec(
+			first.stdout
+		)?.[1] ?? '';
+	check(
+		/^[0-9a-f]{32}$/.test(password),
+		'the creation script must print a random password for MACOS_SIGNING_CERTIFICATE_PASSWORD'
+	);
 	const p12Path = path.join(out, 'ErgoptiPlus-signing.p12');
 	const certPath = path.join(out, 'ErgoptiPlus-signing.cer.pem');
-	check(fs.existsSync(p12Path) && Buffer.from(base64, 'base64').equals(fs.readFileSync(p12Path)),
-		'the printed MACOS_SIGNING_CERTIFICATE_BASE64 must be the written .p12');
+	check(
+		fs.existsSync(p12Path) && Buffer.from(base64, 'base64').equals(fs.readFileSync(p12Path)),
+		'the printed MACOS_SIGNING_CERTIFICATE_BASE64 must be the written .p12'
+	);
 	for (const file of fs.existsSync(out) ? fs.readdirSync(out) : []) {
-		check(!/PRIVATE KEY/.test(fs.readFileSync(path.join(out, file), 'latin1')), `${file} must not hold a key in clear`);
+		check(
+			!/PRIVATE KEY/.test(fs.readFileSync(path.join(out, file), 'latin1')),
+			`${file} must not hold a key in clear`
+		);
 	}
 	if (fs.existsSync(certPath)) {
 		const cert = new crypto.X509Certificate(fs.readFileSync(certPath));
-		check(cert.subject === 'CN=ErgoptiPlus Self-Signed', `unexpected certificate subject ${cert.subject}`);
+		check(
+			cert.subject === 'CN=ErgoptiPlus Self-Signed',
+			`unexpected certificate subject ${cert.subject}`
+		);
 		check(cert.ca === false, 'the certificate must be CA:false');
-		check((cert.keyUsage ?? []).includes('1.3.6.1.5.5.7.3.3'), 'the certificate must carry extendedKeyUsage codeSigning');
-		const years = (Date.parse(cert.validTo) - Date.parse(cert.validFrom)) / (365 * 24 * 3600 * 1000);
+		check(
+			(cert.keyUsage ?? []).includes('1.3.6.1.5.5.7.3.3'),
+			'the certificate must carry extendedKeyUsage codeSigning'
+		);
+		const years =
+			(Date.parse(cert.validTo) - Date.parse(cert.validFrom)) / (365 * 24 * 3600 * 1000);
 		check(years >= 9.9, `the certificate must be valid about ten years, got ${years.toFixed(1)}`);
-		const text = spawnSync('openssl', ['x509', '-in', certPath, '-noout', '-text'], { encoding: 'utf8' });
-		check(text.status === 0 && /Key Usage: critical\s+Digital Signature\s*\n/.test(text.stdout),
-			'the certificate key usage must be digitalSignature alone');
-		const info = spawnSync('openssl', ['pkcs12', '-in', p12Path, '-info', '-noout', '-passin', `pass:${password}`],
-			{ encoding: 'utf8' });
+		const text = spawnSync('openssl', ['x509', '-in', certPath, '-noout', '-text'], {
+			encoding: 'utf8'
+		});
+		check(
+			text.status === 0 && /Key Usage: critical\s+Digital Signature\s*\n/.test(text.stdout),
+			'the certificate key usage must be digitalSignature alone'
+		);
+		const info = spawnSync(
+			'openssl',
+			['pkcs12', '-in', p12Path, '-info', '-noout', '-passin', `pass:${password}`],
+			{ encoding: 'utf8' }
+		);
 		const pkcs12 = `${info.stdout}${info.stderr}`;
-		check(info.status === 0 && /MAC: sha1/.test(pkcs12) && /Shrouded Keybag: pbeWithSHA1And3-KeyTripleDES-CBC/.test(pkcs12),
-			`the .p12 must open with the printed password and use 3DES + SHA-1 for security import: ${pkcs12.trim()}`);
+		check(
+			info.status === 0 &&
+				/MAC: sha1/.test(pkcs12) &&
+				/Shrouded Keybag: pbeWithSHA1And3-KeyTripleDES-CBC/.test(pkcs12),
+			`the .p12 must open with the printed password and use 3DES + SHA-1 for security import: ${pkcs12.trim()}`
+		);
 	}
 	const before = fs.existsSync(p12Path) ? fs.readFileSync(p12Path) : Buffer.alloc(0);
 	const second = run(out);
-	check(second.status !== 0 && /Refusing to overwrite/.test(second.stderr), 'a second run must refuse to overwrite the identity');
-	check(fs.existsSync(p12Path) && fs.readFileSync(p12Path).equals(before), 'a refused run must leave the .p12 untouched');
+	check(
+		second.status !== 0 && /Refusing to overwrite/.test(second.stderr),
+		'a second run must refuse to overwrite the identity'
+	);
+	check(
+		fs.existsSync(p12Path) && fs.readFileSync(p12Path).equals(before),
+		'a refused run must leave the .p12 untouched'
+	);
 	const inCi = run(path.join(createTmp, 'ci'), { GITHUB_ACTIONS: 'true' });
-	check(inCi.status !== 0 && /Refusing to run in CI/.test(inCi.stderr) && !fs.existsSync(path.join(createTmp, 'ci')),
-		'the creation script must refuse to run in CI');
+	check(
+		inCi.status !== 0 &&
+			/Refusing to run in CI/.test(inCi.stderr) &&
+			!fs.existsSync(path.join(createTmp, 'ci')),
+		'the creation script must refuse to run in CI'
+	);
 } finally {
 	fs.rmSync(createTmp, { recursive: true, force: true });
 }
@@ -420,4 +580,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('[OK] macOS builds sign every object with the imported certificate when it is set, ad hoc (loudly) otherwise, and the identity is created once, never overwritten.');
+console.log(
+	'[OK] macOS builds sign every object with the imported certificate when it is set, ad hoc (loudly) otherwise, and the identity is created once, never overwritten.'
+);

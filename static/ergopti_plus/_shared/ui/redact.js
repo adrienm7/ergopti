@@ -199,7 +199,8 @@
 	function redactKeyValues(text, rules) {
 		rules.secret_keys.forEach(function (key) {
 			text = replaceOccurrences(text, key, true, function (source, first, last) {
-				if (charIs(source, first - 1, WORD_CHAR) || charIs(source, last + 1, WORD_CHAR)) return null;
+				if (charIs(source, first - 1, WORD_CHAR) || charIs(source, last + 1, WORD_CHAR))
+					return null;
 				var i = last + 1;
 				if (charIs(source, i, QUOTE)) i++;
 				i = runEnd(source, i, BLANK) + 1;
@@ -209,7 +210,8 @@
 				var stop = i;
 				while (stop < source.length && !charIs(source, stop, VALUE_STOP)) stop++;
 				stop--;
-				if (codePointCount(source.substring(i, stop + 1)) < rules.secret_value_min_length) return null;
+				if (codePointCount(source.substring(i, stop + 1)) < rules.secret_value_min_length)
+					return null;
 				return { text: source.substring(first, i) + rules.secret_placeholder, last: stop };
 			});
 		});
@@ -229,9 +231,11 @@
 		var trimmed = home.replace(/[\/\\]+$/, '');
 		if (trimmed === '') return text;
 		var spellings = [];
-		[trimmed, trimmed.replace(/\\/g, '/'), trimmed.replace(/\//g, '\\')].forEach(function (spelling) {
-			if (spellings.indexOf(spelling) < 0) spellings.push(spelling);
-		});
+		[trimmed, trimmed.replace(/\\/g, '/'), trimmed.replace(/\//g, '\\')].forEach(
+			function (spelling) {
+				if (spellings.indexOf(spelling) < 0) spellings.push(spelling);
+			}
+		);
 		spellings.forEach(function (spelling) {
 			text = replaceOccurrences(text, spelling, caseInsensitive, function (source, first, last) {
 				if (charIs(source, last + 1, PATH_CHAR)) return null;
@@ -250,7 +254,8 @@
 	 * @returns {string}
 	 */
 	function redactAccount(text, rules, user, caseInsensitive) {
-		if (typeof user !== 'string' || codePointCount(user) < rules.min_account_name_length) return text;
+		if (typeof user !== 'string' || codePointCount(user) < rules.min_account_name_length)
+			return text;
 		return replaceOccurrences(text, user, caseInsensitive, function (source, first, last) {
 			if (charIs(source, first - 1, WORD_CHAR) || charIs(source, last + 1, WORD_CHAR)) return null;
 			return { text: rules.account_placeholder, last: last };
@@ -275,7 +280,8 @@
 	 */
 	function apply(text, rules, context) {
 		if (typeof text !== 'string') throw new Error('redact: text must be a string');
-		if (!rules || typeof rules !== 'object') throw new Error('redact: rules must be the decoded redaction.json');
+		if (!rules || typeof rules !== 'object')
+			throw new Error('redact: rules must be the decoded redaction.json');
 		context = context && typeof context === 'object' ? context : {};
 		var folded = context.case_insensitive === true;
 		text = redactTokens(text, rules);

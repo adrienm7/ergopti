@@ -17,9 +17,7 @@
 					{
 						"id": "kernel",
 						"type": "text",
-						"platforms": [
-							"linux"
-						]
+						"platforms": ["linux"]
 					},
 					{
 						"id": "disk_free",
@@ -48,14 +46,8 @@
 			{
 				"id": "permissions",
 				"kind": "items",
-				"columns": [
-					"id",
-					"state"
-				],
-				"platforms": [
-					"macos",
-					"linux"
-				]
+				"columns": ["id", "state"],
+				"platforms": ["macos", "linux"]
 			}
 		]
 	},
@@ -188,10 +180,7 @@
 					}
 				}
 			},
-			"expected_undeclared": [
-				"permissions",
-				"system.kernel"
-			],
+			"expected_undeclared": ["permissions", "system.kernel"],
 			"expected_missing": []
 		},
 		{
@@ -211,9 +200,7 @@
 				}
 			},
 			"expected_undeclared": [],
-			"expected_missing": [
-				"system.kernel"
-			]
+			"expected_missing": ["system.kernel"]
 		},
 		{
 			"id": "check_fields_probe_and_opt_in_fields_may_be_absent",
@@ -245,10 +232,7 @@
 				}
 			},
 			"expected_undeclared": [],
-			"expected_missing": [
-				"network",
-				"permissions"
-			]
+			"expected_missing": ["network", "permissions"]
 		},
 		{
 			"id": "check_fields_unknown_section_and_field",
@@ -269,10 +253,7 @@
 					"sys": {}
 				}
 			},
-			"expected_undeclared": [
-				"sys",
-				"system.wifi_ssid"
-			],
+			"expected_undeclared": ["sys", "system.wifi_ssid"],
 			"expected_missing": []
 		}
 	]

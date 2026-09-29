@@ -17,3 +17,17 @@ dev = [
     "beautifulsoup4>=4.14.3",
     "requests>=2.33.1",
 ]
+
+[tool.ruff]
+# Same width as .prettierrc, so every language wraps at the same column.
+line-length = 100
+target-version = "py313"
+extend-exclude = ["**/vendor/**", "**/_generated/**", ".claude/**"]
+
+[tool.ruff.lint.per-file-ignores]
+# Puts its sibling packages on sys.path before importing them.
+"static/ergopti/macos/generate_keylayouts.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "lf"

@@ -99,11 +99,7 @@ const AQ = '"';
  * @returns {string} The escaped text (without surrounding quotes).
  */
 function escapeAhkString(text) {
-	return text
-		.replace(/`/g, '``')
-		.replace(/"/g, '`"')
-		.replace(/\n/g, '`n')
-		.replace(/\r/g, '');
+	return text.replace(/`/g, '``').replace(/"/g, '`"').replace(/\n/g, '`n').replace(/\r/g, '');
 }
 
 /**
@@ -149,7 +145,9 @@ function buildAhkSource(legacyIds, basicPrompt) {
 	const legacyEntries = Object.entries(legacyIds);
 	legacyEntries.forEach(([oldId, newId], i) => {
 		const comma = i < legacyEntries.length - 1 ? ',' : '';
-		lines.push(`\t${AQ}${escapeAhkString(oldId)}${AQ}, ${AQ}${escapeAhkString(newId)}${AQ}${comma}`);
+		lines.push(
+			`\t${AQ}${escapeAhkString(oldId)}${AQ}, ${AQ}${escapeAhkString(newId)}${AQ}${comma}`
+		);
 	});
 	lines.push(')');
 	lines.push('');
@@ -205,7 +203,7 @@ function main() {
 	const legacyIds = loadLegacyIds();
 	const basicPrompt = loadBasicPrompt();
 	const source = buildAhkSource(legacyIds, basicPrompt);
-    writeWithBomLf(OUT_PATH, source);
+	writeWithBomLf(OUT_PATH, source);
 
 	const relOut = path.relative(ROOT, OUT_PATH);
 	console.log(`  Written: ${relOut}`);

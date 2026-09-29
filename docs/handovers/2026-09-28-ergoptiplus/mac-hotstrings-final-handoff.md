@@ -4,7 +4,7 @@ Stopped at the user's clean-handoff request. No repository source was changed by
 
 ## Unintegrated material: design fragments, NOT an applicable patch
 
-All paths below are under D:/ewt/_scratch/:
+All paths below are under D:/ewt/\_scratch/:
 
 - mac-hotstrings-terminal-plan.md (2281 bytes): proposed composition through existing ScopedPreferences and config_scope_transaction. Its assumption that all recommended delays can be deleted is NOT proven and has a concrete counterexample below.
 - hotstrings-scope-delay-participant.lua (4112 bytes): incomplete HotstringsConfig participant sketch, exact-source capture, verified backup, conditional publication and retained inverse. Not inserted into production; no tests run. Currently DELETE-only, so it cannot implement recommended timing where inherited corpus differs.
@@ -16,13 +16,14 @@ There is NO completed terminal Hotstrings patch, no terminal causal RED/GREEN re
 
 ## Critical delay-contract finding at handoff
 
-TASK_SPECS.md W1 line 112 says recommended scope writes recommended values after backup, while persistence stays sparse against the actual neutral default. The current conceptual manifest declares autocorrection.caps time_activation_seconds default=recommended=0.5 (manifest.toml lines 468-470). The actual autocorrection corpus _meta.delay is 1.0 (autocorrection.toml line 10), its caps metadata is a description, and no section delay override exists there. The integrated runtime resolver therefore inherits 1.0 after removing the override. DELETE does NOT prove restoration to the manifest recommendation 0.5.
+TASK_SPECS.md W1 line 112 says recommended scope writes recommended values after backup, while persistence stays sparse against the actual neutral default. The current conceptual manifest declares autocorrection.caps time_activation_seconds default=recommended=0.5 (manifest.toml lines 468-470). The actual autocorrection corpus \_meta.delay is 1.0 (autocorrection.toml line 10), its caps metadata is a description, and no section delay override exists there. The integrated runtime resolver therefore inherits 1.0 after removing the override. DELETE does NOT prove restoration to the manifest recommendation 0.5.
 
 This is a confirmed source-contract mismatch, not yet a new behavior test. The full timing census and choice of canonical recommendation authority remain unfinished. Do not retain the draft's blanket claim that all 38 conceptual timing DELETE operations imply correct runtime recommendations. Absence of the secondary file is not an acceptable reason to refuse the required feature: if Restore must create it, its actual file owner must provide a conditional inverse for newly created files (or canonical metadata/defaults must first be aligned with an explicitly justified single owner). Root asked for per-case comparison, not a generic DELETE inference. Compare actual resolver metadata for bundled and personal/extension sections before implementing.
 
 ## Known fragment defects and missing dependencies
 
 Planner:
+
 - Several Lua `mode == "clear" and false_default or recommended` expressions select recommended when default is false. Replace with explicit branching. Same false-value loss in `row.delete and Manifest.default_for(path) or row.value`.
 - Languages.section_entry and keymap.get_group_source are proposed but do not exist yet. section_entry should reuse the existing shared Languages.section_default matcher, not a second spelling map.
 - Dynamic section descriptors need reader-owned feature_path metadata for six actual sections; this is not written.
@@ -30,12 +31,14 @@ Planner:
 - Existing dormant dynamic scalar preferences must be retired/aligned coherently with canonical group/module readers, not accepted as aliases.
 
 Delay participant:
+
 - `entry and (section and entry.sections[section] or entry)` falls back to the category when a requested section is absent; fix explicit branching before any test.
 - prepare_override_content currently has no preserve-delimiters third argument; the fragment assumes that missing option.
 - Public set/clear/reload/delimiter mutations need scope_pending admission while the participant retains compensation debt.
 - Current removal-only handling cannot create and conditionally remove an absent file on rollback. Resolve the recommendation contract first.
 
 Native snapshot/cohort:
+
 - LLMBridge.hotstrings_configuration_snapshot does not exist. Actual preview AI owner lacks a paired getter and its setter drops reset refusal; strict acknowledgement needs real-owner regression coverage.
 - Dynamic trigger readback is missing; use existing dynamic trigger transaction plus a real getter, not menu-state success.
 - Legacy state.delays can override canonical HotstringsConfig. Handle only exact actual owned keys and preserve unknowns; do not sweep the table.

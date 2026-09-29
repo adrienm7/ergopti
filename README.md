@@ -76,14 +76,14 @@ with no account and no telemetry**.
 
 ![Base layer +](static/img/ergopti_plus.jpg)
 
-| Feature                  |                                                                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Hotstrings**           | ~3 000 ready-made corrections and expansions, plus your own — with the magic <kbd>★</kbd> key (`pex★` → `par exemple`, `el★e` → `elle`)      |
-| **Local AI predictions** | Sentence completion and correction via Ollama or MLX (Apple Silicon), 110-model curated catalogue; optional remote APIs with encrypted keys   |
-| **Tap-holds**            | 7 default dual-role keys (tap = action, hold = modifier) + a home-row navigation layer                                                        |
-| **Trackpad gestures**    | 36 gesture slots + 3 continuous axes on macOS (10 slots on Windows)                                                                           |
-| **Typing metrics**       | Local SQLite dashboards (WPM over time, delegated keystrokes, n-grams, heatmaps) + a floating live WPM widget                                 |
-| **Fully configurable**   | 335 settings, 21 interface languages, every feature optional and toggleable from the menu                                                     |
+| Feature                  |                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hotstrings**           | ~3 000 ready-made corrections and expansions, plus your own — with the magic <kbd>★</kbd> key (`pex★` → `par exemple`, `el★e` → `elle`)     |
+| **Local AI predictions** | Sentence completion and correction via Ollama or MLX (Apple Silicon), 110-model curated catalogue; optional remote APIs with encrypted keys |
+| **Tap-holds**            | 7 default dual-role keys (tap = action, hold = modifier) + a home-row navigation layer                                                      |
+| **Trackpad gestures**    | 36 gesture slots + 3 continuous axes on macOS (10 slots on Windows)                                                                         |
+| **Typing metrics**       | Local SQLite dashboards (WPM over time, delegated keystrokes, n-grams, heatmaps) + a floating live WPM widget                               |
+| **Fully configurable**   | 335 settings, 21 interface languages, every feature optional and toggleable from the menu                                                   |
 
 The three drivers share a single source of truth (`static/ergopti_plus/_shared/`)
 for hotstrings, the LLM catalogue, locales, menus and webview UIs — so Windows,
@@ -241,16 +241,16 @@ bash static/ergopti_plus/linux/install.sh             # deps, files, permissions
 bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the package installs
 ```
 
-| Package                            | Without it                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------ |
-| `luajit`                           | the launcher refuses to start                                                  |
-| `libnotify` (`notify-send`)        | the launcher refuses to start                                                  |
-| `libxkbcommon-tools` (`xkbcli`)    | no keymap source on Wayland without XWayland, so the keyboard is refused; before libxkbcommon 1.8 (Ubuntu 24.04, Debian 12) the keymap is read from XWayland (`xkbcomp`) or compiled from the session's layout names (GNOME, Plasma, `XKB_DEFAULT_*`, `localectl`) |
-| `libayatana-appindicator3`         | `--tray` has nothing to host the icon in                                       |
-| `lua-luv`                          | no inotify — the loop falls back to an FFI sleep and file watching to `stat()` polling |
-| `lua-posix`                        | no `SIGTERM`/`SIGHUP` handlers, and no `stat()` polling to fall back on        |
-| `lua-lgi`                          | no typing-speed pill and no WebKit2GTK windows                                 |
-| `lua-filesystem`                   | existence checks fall back from `stat()` to opening the path                   |
+| Package                         | Without it                                                                                                                                                                                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `luajit`                        | the launcher refuses to start                                                                                                                                                                                                                                      |
+| `libnotify` (`notify-send`)     | the launcher refuses to start                                                                                                                                                                                                                                      |
+| `libxkbcommon-tools` (`xkbcli`) | no keymap source on Wayland without XWayland, so the keyboard is refused; before libxkbcommon 1.8 (Ubuntu 24.04, Debian 12) the keymap is read from XWayland (`xkbcomp`) or compiled from the session's layout names (GNOME, Plasma, `XKB_DEFAULT_*`, `localectl`) |
+| `libayatana-appindicator3`      | `--tray` has nothing to host the icon in                                                                                                                                                                                                                           |
+| `lua-luv`                       | no inotify — the loop falls back to an FFI sleep and file watching to `stat()` polling                                                                                                                                                                             |
+| `lua-posix`                     | no `SIGTERM`/`SIGHUP` handlers, and no `stat()` polling to fall back on                                                                                                                                                                                            |
+| `lua-lgi`                       | no typing-speed pill and no WebKit2GTK windows                                                                                                                                                                                                                     |
+| `lua-filesystem`                | existence checks fall back from `stat()` to opening the path                                                                                                                                                                                                       |
 
 `install.sh` installs every row, plus the WebKit2GTK typelib the tray's windows
 are drawn with, and on GNOME the AppIndicator shell extension — GNOME shows no
@@ -302,17 +302,17 @@ an installed tree if `/usr/lib/ergopti` exists — call the entry file directly
 when iterating on a checkout. With no `~/.config/ergopti/hotstrings/`, the daemon
 falls back to the TOML definitions bundled in `_shared/modules/hotstrings/`.
 
-| Flag                       | Effect                                                                     |
-| -------------------------- | -------------------------------------------------------------------------- |
-| `--config <path>`          | TOML file or directory (default `~/.config/ergopti/hotstrings/`)           |
-| `--device <path>`          | evdev device to listen on; auto-detected when omitted                      |
-| `--layout qwerty\|azerty`  | INPUT layout, keycode → character (default: `$XKBLAYOUT`)                  |
-| `--keymap <path>`          | OUTPUT keymap dump, for a session whose layout cannot be probed            |
-| `--tray`                   | system tray icon                                                           |
-| `--no-grab`                | observe instead of grabbing — physical keys then interleave with an expansion and can scramble it |
-| `--dry-run`                | log matches without injecting                                              |
-| `--verbose`, `-v`          | log at debug level for that run                                            |
-| `--help`, `-h`             | usage                                                                      |
+| Flag                      | Effect                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `--config <path>`         | TOML file or directory (default `~/.config/ergopti/hotstrings/`)                                  |
+| `--device <path>`         | evdev device to listen on; auto-detected when omitted                                             |
+| `--layout qwerty\|azerty` | INPUT layout, keycode → character (default: `$XKBLAYOUT`)                                         |
+| `--keymap <path>`         | OUTPUT keymap dump, for a session whose layout cannot be probed                                   |
+| `--tray`                  | system tray icon                                                                                  |
+| `--no-grab`               | observe instead of grabbing — physical keys then interleave with an expansion and can scramble it |
+| `--dry-run`               | log matches without injecting                                                                     |
+| `--verbose`, `-v`         | log at debug level for that run                                                                   |
+| `--help`, `-h`            | usage                                                                                             |
 
 **4. Before trusting it on your own keyboard**
 
@@ -327,12 +327,12 @@ bash static/ergopti_plus/linux/tests/hardware/validate.sh
 
 ### Tests and quality gates
 
-| Suite                       | Command                                                             |
-| --------------------------- | ------------------------------------------------------------------- |
-| Site + cross-driver gates   | `npm run test:js`                                                   |
-| macOS driver (Lua)          | `cd static/ergopti_plus/macos && lua tests/run.lua`                 |
-| Windows driver (AHK)        | run `static/ergopti_plus/windows/tests/run_all.ahk` with AHK v2     |
-| Linux driver                | `npm run test:linux`                                                |
+| Suite                     | Command                                                         |
+| ------------------------- | --------------------------------------------------------------- |
+| Site + cross-driver gates | `npm run test:js`                                               |
+| macOS driver (Lua)        | `cd static/ergopti_plus/macos && lua tests/run.lua`             |
+| Windows driver (AHK)      | run `static/ergopti_plus/windows/tests/run_all.ahk` with AHK v2 |
+| Linux driver              | `npm run test:linux`                                            |
 
 House rules: every bug fix ships with a regression test, and the shared
 constants between drivers are pinned by single-source parity tests — see
@@ -406,10 +406,10 @@ stable tag):
 [`deploy-site.yml`](.github/workflows/deploy-site.yml) publishes the site to
 GitHub Pages (branch mode, `gh-pages`) whenever site-relevant paths change:
 
-| Branch | URL                                              |
-| ------ | ------------------------------------------------ |
-| `main` | [ergopti.fr](https://ergopti.fr)                 |
-| `dev`  | [ergopti.fr/dev/](https://ergopti.fr/dev/)       |
+| Branch | URL                                        |
+| ------ | ------------------------------------------ |
+| `main` | [ergopti.fr](https://ergopti.fr)           |
+| `dev`  | [ergopti.fr/dev/](https://ergopti.fr/dev/) |
 
 Each push rebuilds only the pushed branch's subdirectory, so the two stay
 independent.

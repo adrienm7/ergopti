@@ -14,9 +14,7 @@ def test_case_variants():
     print("Testing case variants generation...")
 
     # Test simple word
-    variants = generate_case_variants_for_trigger_replacement(
-        "hello", "bonjour"
-    )
+    variants = generate_case_variants_for_trigger_replacement("hello", "bonjour")
     print(f"'hello' -> 'bonjour': {variants}")
 
     # Test single character
@@ -24,9 +22,7 @@ def test_case_variants():
     print(f"'a' -> 'à': {variants}")
 
     # Test with symbol
-    variants = generate_case_variants_for_trigger_replacement(
-        "citroen", "citroën"
-    )
+    variants = generate_case_variants_for_trigger_replacement("citroen", "citroën")
     print(f"'citroen' -> 'citroën': {variants}")
 
     # Test special characters

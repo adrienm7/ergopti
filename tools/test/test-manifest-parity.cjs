@@ -328,7 +328,11 @@ test(
 	`Expected ${AHK_MANIFEST} — run npm run build:manifest`
 );
 test('HS manifest file exists', luaExists, `Expected ${HS_MANIFEST} — run npm run build:manifest`);
-test('Linux manifest file exists', linuxExists, `Expected ${LINUX_MANIFEST} — run npm run build:manifest`);
+test(
+	'Linux manifest file exists',
+	linuxExists,
+	`Expected ${LINUX_MANIFEST} — run npm run build:manifest`
+);
 
 if (!ahkExists || !luaExists || !linuxExists) {
 	// Cannot proceed without all three files.
@@ -365,7 +369,11 @@ test(
 	ahkVersion === luaVersion && ahkVersion !== '',
 	`AHK="${ahkVersion}" HS="${luaVersion}"`
 );
-test('Linux manifest version is parseable', linuxVersion !== '', `Could not extract version from ${LINUX_MANIFEST}`);
+test(
+	'Linux manifest version is parseable',
+	linuxVersion !== '',
+	`Could not extract version from ${LINUX_MANIFEST}`
+);
 test(
 	`Version matches Linux: "${ahkVersion}" (AHK) == "${linuxVersion}" (Linux)`,
 	ahkVersion === linuxVersion && ahkVersion !== '',
@@ -397,7 +405,11 @@ test(
 	ahkOrder.length === luaOrder.length,
 	`AHK=[${ahkOrder}] HS=[${luaOrder}]`
 );
-test('Linux section_order is parseable', linuxOrder.length > 0, 'Extracted 0 items from Linux section_order');
+test(
+	'Linux section_order is parseable',
+	linuxOrder.length > 0,
+	'Extracted 0 items from Linux section_order'
+);
 test(
 	`section_order length matches Linux: ${ahkOrder.length} (AHK) == ${linuxOrder.length} (Linux)`,
 	ahkOrder.length === linuxOrder.length,
@@ -424,7 +436,11 @@ const linuxSections = parseLuaSections(linuxSrc);
 
 test('AHK sections parseable', ahkSections.size > 0, `Extracted 0 sections from AHK manifest`);
 test('HS sections parseable', luaSections.size > 0, `Extracted 0 sections from HS manifest`);
-test('Linux sections parseable', linuxSections.size > 0, 'Extracted 0 sections from Linux manifest');
+test(
+	'Linux sections parseable',
+	linuxSections.size > 0,
+	'Extracted 0 sections from Linux manifest'
+);
 
 // Collect cross-platform sections (present in both drivers)
 const crossPlatformSections = new Set();
@@ -469,7 +485,11 @@ for (const sectionKey of crossPlatformSections) {
 for (const [sectionKey, ahkInfo] of ahkSections) {
 	if (!ahkInfo.platforms.includes('linux')) continue;
 	const linuxInfo = linuxSections.get(sectionKey);
-	test(`Linux section "${sectionKey}" exists`, linuxInfo !== undefined, `Missing from Linux manifest`);
+	test(
+		`Linux section "${sectionKey}" exists`,
+		linuxInfo !== undefined,
+		`Missing from Linux manifest`
+	);
 	if (!linuxInfo) continue;
 	test(
 		`Linux section "${sectionKey}" metadata matches`,
@@ -491,7 +511,11 @@ const linuxFeatures = parseLuaFeatures(linuxSrc);
 
 test('AHK features parseable', ahkFeatures.length > 0, `Extracted 0 features from AHK manifest`);
 test('HS features parseable', luaFeatures.length > 0, `Extracted 0 features from HS manifest`);
-test('Linux features parseable', linuxFeatures.length > 0, 'Extracted 0 features from Linux manifest');
+test(
+	'Linux features parseable',
+	linuxFeatures.length > 0,
+	'Extracted 0 features from Linux manifest'
+);
 
 // Cross-platform features: present in both ahk and hs
 const ahkCrossFeatures = ahkFeatures.filter(
@@ -546,11 +570,16 @@ test(
 );
 for (const feature of ahkLinuxFeatures) {
 	const linuxFeature = linuxFeatureMap.get(feature.path);
-	test(`Linux feature "${feature.path}" exists`, linuxFeature !== undefined, 'Missing from Linux manifest');
+	test(
+		`Linux feature "${feature.path}" exists`,
+		linuxFeature !== undefined,
+		'Missing from Linux manifest'
+	);
 	if (!linuxFeature) continue;
 	test(
 		`Linux feature "${feature.path}" metadata matches`,
-		feature.id === linuxFeature.id && feature.type === linuxFeature.type &&
+		feature.id === linuxFeature.id &&
+			feature.type === linuxFeature.type &&
 			feature.desc_key === linuxFeature.desc_key,
 		`AHK=${JSON.stringify(feature)} Linux=${JSON.stringify(linuxFeature)}`
 	);
@@ -566,47 +595,90 @@ test(
 );
 for (const feature of linuxHsFeatures) {
 	const hsFeature = hsFeatureMap.get(feature.path);
-	test(`Linux feature "${feature.path}" exists in HS`, hsFeature !== undefined, 'Missing from HS manifest');
+	test(
+		`Linux feature "${feature.path}" exists in HS`,
+		hsFeature !== undefined,
+		'Missing from HS manifest'
+	);
 	if (!hsFeature) continue;
 	test(
 		`Linux/HS feature "${feature.path}" metadata matches`,
-		feature.id === hsFeature.id && feature.type === hsFeature.type &&
+		feature.id === hsFeature.id &&
+			feature.type === hsFeature.type &&
 			feature.desc_key === hsFeature.desc_key,
 		`HS=${JSON.stringify(hsFeature)} Linux=${JSON.stringify(feature)}`
 	);
 }
 
 const { normalizeScopes } = require('../lib/configuration-scopes.cjs');
-const scopeFixture = { probe: { prefixes: [], restore_exclude: [], dynamic_defaults: [
-	{ prefix: 'enabled', depth: 1, default: false, recommended: true },
-	{ prefix: 'delay', depth: 1, default: 0, recommended: 0 },
-	{ prefix: 'fraction', depth: 1, default: 0, recommended: 0.5 },
-	{ prefix: 'name', depth: 1, default: '', recommended: 'chosen' },
-	{ prefix: 'mods', depth: 1, default: [], recommended: ['ctrl'] }
-] } };
+const scopeFixture = {
+	probe: {
+		prefixes: [],
+		restore_exclude: [],
+		dynamic_defaults: [
+			{ prefix: 'enabled', depth: 1, default: false, recommended: true },
+			{ prefix: 'delay', depth: 1, default: 0, recommended: 0 },
+			{ prefix: 'fraction', depth: 1, default: 0, recommended: 0.5 },
+			{ prefix: 'name', depth: 1, default: '', recommended: 'chosen' },
+			{ prefix: 'mods', depth: 1, default: [], recommended: ['ctrl'] }
+		]
+	}
+};
 const typed = normalizeScopes(scopeFixture).probe.dynamic_defaults;
-test('dynamic scope types preserve booleans, integers, floats and strings',
-	JSON.stringify(typed.map(row => row.type)) === JSON.stringify(['boolean', 'integer', 'number', 'string', 'array']));
-test('scope normalization does not mutate canonical input', scopeFixture.probe.dynamic_defaults[0].type === undefined);
+test(
+	'dynamic scope types preserve booleans, integers, floats and strings',
+	JSON.stringify(typed.map((row) => row.type)) ===
+		JSON.stringify(['boolean', 'integer', 'number', 'string', 'array'])
+);
+test(
+	'scope normalization does not mutate canonical input',
+	scopeFixture.probe.dynamic_defaults[0].type === undefined
+);
 for (const patch of [{ recommended: 0 }, { type: 'integer' }, { default: {} }, { default: NaN }]) {
 	let refused = false;
-	try { normalizeScopes({ probe: { dynamic_defaults: [{ ...scopeFixture.probe.dynamic_defaults[0], ...patch }] } }); }
-	catch { refused = true; }
+	try {
+		normalizeScopes({
+			probe: { dynamic_defaults: [{ ...scopeFixture.probe.dynamic_defaults[0], ...patch }] }
+		});
+	} catch {
+		refused = true;
+	}
 	test('inconsistent dynamic default metadata is refused: ' + JSON.stringify(patch), refused);
 }
-for (const values of [[[], false], [[{}], []], [[], [["nested"]]], [[Infinity], []]]) {
+for (const values of [
+	[[], false],
+	[[{}], []],
+	[[], [['nested']]],
+	[[Infinity], []]
+]) {
 	let refused = false;
-	try { normalizeScopes({ probe: { dynamic_defaults: [{ prefix: 'mods', depth: 1,
-		default: values[0], recommended: values[1] }] } }); }
-	catch { refused = true; }
+	try {
+		normalizeScopes({
+			probe: {
+				dynamic_defaults: [{ prefix: 'mods', depth: 1, default: values[0], recommended: values[1] }]
+			}
+		});
+	} catch {
+		refused = true;
+	}
 	test('invalid dynamic arrays are refused: ' + JSON.stringify(values), refused);
 }
-for (const parameters of [{ domains: ['gesture'], restore: 'keep' },
-	{ domains: ['unknown'], restore: 'remove' }, { domains: ['gesture', 'gesture'], restore: 'remove' },
-	{ domains: [], restore: 'remove' }, { domains: ['gesture'], restore: 'remove', default: '' }]) {
+for (const parameters of [
+	{ domains: ['gesture'], restore: 'keep' },
+	{ domains: ['unknown'], restore: 'remove' },
+	{ domains: ['gesture', 'gesture'], restore: 'remove' },
+	{ domains: [], restore: 'remove' },
+	{ domains: ['gesture'], restore: 'remove', default: '' }
+]) {
 	let refused = false;
-	try { normalizeScopes({ probe: { action_parameters: parameters } }); }
-	catch { refused = true; }
-	test('invalid action parameter scope metadata is refused: ' + JSON.stringify(parameters), refused);
+	try {
+		normalizeScopes({ probe: { action_parameters: parameters } });
+	} catch {
+		refused = true;
+	}
+	test(
+		'invalid action parameter scope metadata is refused: ' + JSON.stringify(parameters),
+		refused
+	);
 }
 report();

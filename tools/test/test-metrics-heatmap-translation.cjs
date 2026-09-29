@@ -111,7 +111,7 @@ if (!fs.existsSync(ABS)) {
 	);
 
 	// ── 5. macOS payloads must fall through untouched ───────────────────────
-	const mac = { 'Safari': { kc: { 0: { c: 4 } } } };
+	const mac = { Safari: { kc: { 0: { c: 4 } } } };
 	const macOut = api.translate_win_today(mac);
 	check(
 		macOut['Safari'].kc['0'].c === 4,

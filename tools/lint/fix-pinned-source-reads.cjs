@@ -84,7 +84,7 @@ const SHAPE_B = new RegExp(
 // Group indices differ between the two shapes; name them once.
 const SHAPES = [
 	{ name: 'var-then-open', re: SHAPE_A, indent: 1, quoted: 3, srcVar: 5 },
-	{ name: 'inline-open', re: SHAPE_B, indent: 1, quoted: 3, srcVar: 4 },
+	{ name: 'inline-open', re: SHAPE_B, indent: 1, quoted: 3, srcVar: 4 }
 ];
 
 /** Production sources, cached — every selector is checked against this set. */
@@ -125,7 +125,7 @@ function selectorCandidates(body) {
 		// Trailing `= …` deliberately dropped: the alignment spaces around it are
 		// reformatting fodder, and a selector that a formatter can break is a
 		// path pin with extra steps.
-		[...body.matchAll(/^local ([A-Z][A-Z0-9_]{4,})\s*=/gm)].map((m) => `local ${m[1]}`),
+		[...body.matchAll(/^local ([A-Z][A-Z0-9_]{4,})\s*=/gm)].map((m) => `local ${m[1]}`)
 	];
 
 	// Long string literals — i18n keys and log markers, for the five menu modules
@@ -238,7 +238,8 @@ function convertHelperPass(get, set, convertedNames, blocked) {
 	// The path is always the FIRST parameter; later ones (a marker to look for, a
 	// baseline) ride along untouched. Restricting this to single-parameter
 	// helpers left assert_gc_pinned and check_file behind for no reason.
-	const defRe = /^([ \t]*)local function (\w+)\((\w+)((?:\s*,\s*\w+)*)\)[ \t]*\r?\n([\s\S]*?)\r?\n\1end[ \t]*$/gm;
+	const defRe =
+		/^([ \t]*)local function (\w+)\((\w+)((?:\s*,\s*\w+)*)\)[ \t]*\r?\n([\s\S]*?)\r?\n\1end[ \t]*$/gm;
 
 	for (const def of [...src.matchAll(defRe)]) {
 		const [whole, indent, name, param, moreParams, body] = def;
@@ -299,7 +300,10 @@ function convertHelperPass(get, set, convertedNames, blocked) {
 		// and a message built from it ("cannot open " .. rel) would otherwise print
 		// a selector while calling it a path.
 		let newBody = hit
-			? body.replace(hit[0], `${blockIndent}local ${srcVar} = helpers.read_driver_source(selector)\n`)
+			? body.replace(
+					hit[0],
+					`${blockIndent}local ${srcVar} = helpers.read_driver_source(selector)\n`
+				)
 			: body;
 		newBody = newBody.replace(new RegExp(`\\b${P}\\b`, 'g'), 'selector');
 		const newDef =
@@ -399,7 +403,7 @@ if (all) {
 	try {
 		staged = execSync('git diff --cached --name-only --diff-filter=ACM', {
 			cwd: ROOT,
-			encoding: 'utf8',
+			encoding: 'utf8'
 		});
 	} catch {
 		staged = '';
@@ -427,7 +431,9 @@ for (const file of targets) {
 // --all is a survey of the tolerated legacy population, so it reports without
 // failing. Staged mode is the gate: a NEW pinned read must not land.
 if (all) {
-	console.log(`\nsurvey: ${totalConverted} ${apply ? 'converted' : 'auto-convertible'}, ${offenders.length} need a human`);
+	console.log(
+		`\nsurvey: ${totalConverted} ${apply ? 'converted' : 'auto-convertible'}, ${offenders.length} need a human`
+	);
 	for (const o of offenders) console.log('  ' + o);
 	process.exit(0);
 }

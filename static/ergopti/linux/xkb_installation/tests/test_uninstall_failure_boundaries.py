@@ -11,13 +11,18 @@ import unittest
 from pathlib import Path
 
 
-@unittest.skipUnless(sys.platform.startswith("linux") and shutil.which("bash"), "requires Linux and bash")
+@unittest.skipUnless(
+    sys.platform.startswith("linux") and shutil.which("bash"), "requires Linux and bash"
+)
 class UninstallFailureBoundaryTests(unittest.TestCase):
     def test_desktop_refusal_prevents_privileged_uninstall_for_both_methods(self):
         installer = Path(__file__).resolve().parents[1] / "install.sh"
         for method in ("clean", "legacy"):
             for refusal in (False, True):
-                with self.subTest(method=method, refusal=refusal), tempfile.TemporaryDirectory() as temporary:
+                with (
+                    self.subTest(method=method, refusal=refusal),
+                    tempfile.TemporaryDirectory() as temporary,
+                ):
                     root = Path(temporary)
                     binaries = root / "bin"
                     binaries.mkdir()
@@ -53,14 +58,27 @@ class UninstallFailureBoundaryTests(unittest.TestCase):
                         "ERGOPTI_XKB_USER_HOME": str(root / "home"),
                     }
                     result = subprocess.run(
-                        ["bash", str(installer), "--uninstall", "--yes", "--installation-method", method],
-                        env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                        text=True, timeout=30, check=False,
+                        [
+                            "bash",
+                            str(installer),
+                            "--uninstall",
+                            "--yes",
+                            "--installation-method",
+                            method,
+                        ],
+                        env=environment,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        timeout=30,
+                        check=False,
                     )
                     self.assertIn("desktop cleanup fixture result", result.stdout)
                     if refusal:
                         self.assertNotEqual(result.returncode, 0, result.stdout)
-                        self.assertFalse(marker.exists(), "desktop refusal must fence privileged file removal")
+                        self.assertFalse(
+                            marker.exists(), "desktop refusal must fence privileged file removal"
+                        )
                     else:
                         self.assertEqual(result.returncode, 0, result.stdout)
                         self.assertEqual(marker.read_text(encoding="utf-8"), "called")

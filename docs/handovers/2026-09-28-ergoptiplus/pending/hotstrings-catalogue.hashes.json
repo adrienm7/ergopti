@@ -1,37 +1,37 @@
 [
-  {
-    "path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
-    "before": "dedbd4d7189f847cbc4178d432b656c5bcf55028410497f79dce3fcf8f13bbde",
-    "after": "a3508ab4c6c6ae70bd1959f48de951c03bdd99d535ccd537222d4145d7d4d4a9"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua",
-    "before": "536f892215728412bf6bcd02fbfd1b48cf35249e3684fb70b6dc8296c1d0b210",
-    "after": "310775ec26c6fc14b896f68aa3cb9e34712f7fe2604b389c568a477a706f32ca"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua",
-    "before": "d760d6e2601dc2b6f68d82d895a98c79d91f5a606291f8eaa1e1a96c3ef944c9",
-    "after": "82a42aeaedeb69bb8945073b53b33bd5a6b05e35fcc6f79f098649f08668308b"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_catalogue_last_known_good.lua",
-    "before": "6fc12836c37833797afe5021ab1090fff92ec4dec96a4915f8af785037bb7aa9",
-    "after": "55a8c75c7ff8b48430017681192a99c48771a68aedc4e25a6c27dfe0c5d705c8"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua",
-    "before": "fec0afcbbf1bb2f836cc29afc5cc038cf46ddacaad269cb3b6096a558542f5d4",
-    "after": "f7cbe2a4fd13f2acb3a0b5d461e71f2dfd1082850d0d615bd40a18decbe32f08"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
-    "before": "2c80edf2f896b503c6d4bd2ecc83126c9c116e51684afa443295af325ee092f7",
-    "after": "e39430541e7395a09f758ae7d48f0b8aa3fa68e3b63fef8fc368ab8e20b4847a"
-  },
-  {
-    "path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua",
-    "before": "9502e5f09084923a3873af9303d1d304fd2165860cd68e410fc6bb171ee86b96",
-    "after": "00bcc9e15a94cf8d6b264e4c4dfbe844733e3077c3c498a812fe83d5a03341b4"
-  }
+	{
+		"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+		"before": "dedbd4d7189f847cbc4178d432b656c5bcf55028410497f79dce3fcf8f13bbde",
+		"after": "a3508ab4c6c6ae70bd1959f48de951c03bdd99d535ccd537222d4145d7d4d4a9"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua",
+		"before": "536f892215728412bf6bcd02fbfd1b48cf35249e3684fb70b6dc8296c1d0b210",
+		"after": "310775ec26c6fc14b896f68aa3cb9e34712f7fe2604b389c568a477a706f32ca"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua",
+		"before": "d760d6e2601dc2b6f68d82d895a98c79d91f5a606291f8eaa1e1a96c3ef944c9",
+		"after": "82a42aeaedeb69bb8945073b53b33bd5a6b05e35fcc6f79f098649f08668308b"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_catalogue_last_known_good.lua",
+		"before": "6fc12836c37833797afe5021ab1090fff92ec4dec96a4915f8af785037bb7aa9",
+		"after": "55a8c75c7ff8b48430017681192a99c48771a68aedc4e25a6c27dfe0c5d705c8"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua",
+		"before": "fec0afcbbf1bb2f836cc29afc5cc038cf46ddacaad269cb3b6096a558542f5d4",
+		"after": "f7cbe2a4fd13f2acb3a0b5d461e71f2dfd1082850d0d615bd40a18decbe32f08"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
+		"before": "2c80edf2f896b503c6d4bd2ecc83126c9c116e51684afa443295af325ee092f7",
+		"after": "e39430541e7395a09f758ae7d48f0b8aa3fa68e3b63fef8fc368ab8e20b4847a"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua",
+		"before": "9502e5f09084923a3873af9303d1d304fd2165860cd68e410fc6bb171ee86b96",
+		"after": "00bcc9e15a94cf8d6b264e4c4dfbe844733e3077c3c498a812fe83d5a03341b4"
+	}
 ]

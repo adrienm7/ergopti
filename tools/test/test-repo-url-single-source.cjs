@@ -30,7 +30,17 @@ const DEFAULTS = 'static/ergopti_plus/_shared/modules/updater/defaults.json';
 const { owner, repo } = JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS), 'utf8')).github;
 
 // Source files whose URLs are executable logic rather than documentation
-const CODE_EXTENSIONS = new Set(['.lua', '.ahk', '.js', '.cjs', '.mjs', '.swift', '.ps1', '.sh', '.py']);
+const CODE_EXTENSIONS = new Set([
+	'.lua',
+	'.ahk',
+	'.js',
+	'.cjs',
+	'.mjs',
+	'.swift',
+	'.ps1',
+	'.sh',
+	'.py'
+]);
 
 // Paths allowed to spell the canonical URL: fixtures, tests and the example
 // extension users copy as a self-contained file
@@ -57,7 +67,10 @@ const files = execFileSync('git', ['ls-files', '-z', '--', 'static/ergopti_plus'
 const failures = [];
 let scanned = 0;
 for (const file of files) {
-	if (/\.(png|jpe?g|gif|ico|icns|woff2?|ttf|otf|dll|exe|zip|gz|sqlite|db|bin|dylib|so)$/i.test(file)) continue;
+	if (
+		/\.(png|jpe?g|gif|ico|icns|woff2?|ttf|otf|dll|exe|zip|gz|sqlite|db|bin|dylib|so)$/i.test(file)
+	)
+		continue;
 	let text;
 	try {
 		text = fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -72,7 +85,10 @@ for (const file of files) {
 	const lines = text.split('\n');
 	lines.forEach((line, index) => {
 		for (const match of isFixture ? [] : line.matchAll(ERGOPTI_REPO)) {
-			if (match[1].toLowerCase() !== owner.toLowerCase() || match[2].toLowerCase() !== repo.toLowerCase()) {
+			if (
+				match[1].toLowerCase() !== owner.toLowerCase() ||
+				match[2].toLowerCase() !== repo.toLowerCase()
+			) {
 				failures.push(`${file}:${index + 1}: ${match[0]} is not the repository ${owner}/${repo}`);
 			}
 		}
@@ -82,11 +98,14 @@ for (const file of files) {
 	});
 }
 
-if (scanned < 500) failures.push(`only ${scanned} file(s) scanned — the tracked-file listing is broken`);
+if (scanned < 500)
+	failures.push(`only ${scanned} file(s) scanned — the tracked-file listing is broken`);
 
 if (failures.length > 0) {
 	console.error(`[FAIL] repository URL single source: ${failures.length} violation(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);
 	process.exit(1);
 }
-console.log(`[OK] repository URL single source: ${scanned} tracked file(s), every link derives from ${DEFAULTS}.`);
+console.log(
+	`[OK] repository URL single source: ${scanned} tracked file(s), every link derives from ${DEFAULTS}.`
+);

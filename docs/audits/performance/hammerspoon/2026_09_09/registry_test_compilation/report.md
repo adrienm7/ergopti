@@ -21,11 +21,11 @@ compilation scope. No generator, predicate, run count or assertion is removed.
 
 ## Observations
 
-| Matched run | Baseline seconds | Cached seconds | Reduction |
-| --- | ---: | ---: | ---: |
-| Initial integrated scope | 38.077 | 20.196 | 47.0% |
-| With payload observation | 35.766 | 19.263 | 46.1% |
-| Tracked benchmark replay | 47.505 | 24.672 | 48.1% |
+| Matched run              | Baseline seconds | Cached seconds | Reduction |
+| ------------------------ | ---------------: | -------------: | --------: |
+| Initial integrated scope |           38.077 |         20.196 |     47.0% |
+| With payload observation |           35.766 |         19.263 |     46.1% |
+| Tracked benchmark replay |           47.505 |         24.672 |     48.1% |
 
 These are whole-workload observations, not per-keystroke percentiles or a
 statistical latency budget. The maximum observed baseline/candidate durations

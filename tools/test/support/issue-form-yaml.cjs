@@ -23,7 +23,8 @@
  */
 function tokenize(text) {
 	const out = [];
-	text.replace(/\r\n?/g, '\n')
+	text
+		.replace(/\r\n?/g, '\n')
 		.split('\n')
 		.forEach((raw, index) => {
 			if (/^\s*(#.*)?$/.test(raw)) {
@@ -97,7 +98,8 @@ function parseBlock(lines, start, indent) {
 			continue;
 		}
 		const match = current.text.match(/^([A-Za-z0-9_-]+):(?:\s+(.*))?$/);
-		if (!match) throw new Error(`line ${current.line}: expected "key: value", got "${current.text}"`);
+		if (!match)
+			throw new Error(`line ${current.line}: expected "key: value", got "${current.text}"`);
 		const key = match[1];
 		const rest = match[2] === undefined ? '' : match[2];
 		if (rest === '|' || rest === '|-') {
@@ -148,7 +150,8 @@ function parseIssueFormYaml(text) {
 	const lines = tokenize(text);
 	const result = parseBlock(lines, 0, 0);
 	for (let i = result.next; i < lines.length; i++) {
-		if (lines[i].indent !== -1) throw new Error(`line ${lines[i].line}: content after the document`);
+		if (lines[i].indent !== -1)
+			throw new Error(`line ${lines[i].line}: content after the document`);
 	}
 	return result.value;
 }

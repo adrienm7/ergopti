@@ -399,8 +399,7 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 	const report = loadReport(rootCandidate, reportOption, scopeOption);
 	const normalizedId = String(id).toUpperCase();
 	const finding = report.manifest.findings.find((candidate) => candidate.id === normalizedId);
-	if (!finding)
-		fail(`finding is not in the manifest: ${normalizedId}`);
+	if (!finding) fail(`finding is not in the manifest: ${normalizedId}`);
 	const worktreeState = preflight(report.root, report.scope);
 	if (worktreeState.state !== 'ready')
 		fail(`canonical worktree is not ready: ${worktreeState.reason || worktreeState.state}`);
@@ -439,16 +438,19 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 	// The audit record must explicitly name test/CI infrastructure as its root
 	// cause, and the commit must contain a real runner/tooling implementation file;
 	// generic tools changes still cannot claim an ordinary driver finding.
-	const testInfrastructureFinding = /(?:^|[\s(])(?:tests\/|tools\/test\/|\.github\/workflows\/)/i
-		.test(finding.root_cause);
+	const testInfrastructureFinding =
+		/(?:^|[\s(])(?:tests\/|tools\/test\/|\.github\/workflows\/)/i.test(finding.root_cause);
 	if (production.length === 0 && testInfrastructureFinding) {
-		production.push(...files.filter((file) =>
-			file === 'package.json' ||
-			file.startsWith('.github/workflows/') ||
-			file === `${driverPrefix}tests/run_all.ahk` ||
-			file === `${driverPrefix}tests/test_framework.ahk` ||
-			(/^tools\/test\/(?!test-).+\.c?js$/.test(file))
-		));
+		production.push(
+			...files.filter(
+				(file) =>
+					file === 'package.json' ||
+					file.startsWith('.github/workflows/') ||
+					file === `${driverPrefix}tests/run_all.ahk` ||
+					file === `${driverPrefix}tests/test_framework.ahk` ||
+					/^tools\/test\/(?!test-).+\.c?js$/.test(file)
+			)
+		);
 	}
 	const tests = files.filter(
 		(file) =>

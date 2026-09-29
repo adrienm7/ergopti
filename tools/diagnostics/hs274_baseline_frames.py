@@ -43,7 +43,11 @@ class BaselineFrames:
             raise ValueError("Baseline row count changed")
         next_cursor = integer(frame["next"], "baseline next", self.cursor + 1, self.total)
         rows = frame["rows"]
-        if not isinstance(rows, list) or not 1 <= len(rows) <= 64 or len(rows) != next_cursor - self.cursor:
+        if (
+            not isinstance(rows, list)
+            or not 1 <= len(rows) <= 64
+            or len(rows) != next_cursor - self.cursor
+        ):
             raise ValueError("Invalid baseline page size")
         if type(frame["complete"]) is not bool or frame["complete"] != (next_cursor == self.total):
             raise ValueError("Invalid baseline page completion")
@@ -53,12 +57,19 @@ class BaselineFrames:
             device = decimal(row.get("device"), minimum=1)
             if row.get("kind") == "device":
                 self._device_complete()
-                if set(row) != {"kind", "device", "keyboard", "elements"} or type(row["keyboard"]) is not bool:
+                if (
+                    set(row) != {"kind", "device", "keyboard", "elements"}
+                    or type(row["keyboard"]) is not bool
+                ):
                     raise ValueError("Invalid baseline device marker")
                 if device in self.devices or len(self.devices) == 64:
                     raise ValueError("Duplicated or excessive baseline devices")
-                count = integer(row["elements"], "baseline elements", 1 if row["keyboard"] else 0,
-                                1024 if row["keyboard"] else 0)
+                count = integer(
+                    row["elements"],
+                    "baseline elements",
+                    1 if row["keyboard"] else 0,
+                    1024 if row["keyboard"] else 0,
+                )
                 self.current = {"keyboard": row["keyboard"], "elements": count, "keys": {}}
                 self.devices[device] = self.current
             elif row.get("kind") == "key":
@@ -81,5 +92,9 @@ class BaselineFrames:
 
     def result(self):
         """Retain partial receipt evidence without claiming completed admission."""
-        return {"boundary": self.boundary, "complete": self.complete,
-                "received_rows": self.cursor, "devices": self.devices}
+        return {
+            "boundary": self.boundary,
+            "complete": self.complete,
+            "received_rows": self.cursor,
+            "devices": self.devices,
+        }

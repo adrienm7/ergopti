@@ -219,7 +219,9 @@ function loadHotstringCategories() {
 		let count = countEntries(doc);
 		for (const lang of languages) {
 			if (!(index.languages[lang]?.categories_order ?? []).includes(id)) continue;
-			count += countEntries(parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, lang, `${id}.toml`), 'utf-8')));
+			count += countEntries(
+				parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, lang, `${id}.toml`), 'utf-8'))
+			);
 		}
 		const meta = doc._meta ?? {};
 		return {

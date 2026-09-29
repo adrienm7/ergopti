@@ -21,18 +21,24 @@ const { execFileSync } = require('node:child_process');
 /** Checks mandatory job results and the exact set of successful launch records. */
 function verify({ platform, needs, evidence, sha, scenarios, release }) {
 	assert.ok(['windows', 'macos'].includes(platform), 'Unknown desktop platform');
-	const jobs = platform === 'windows'
-		? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
-		: ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
+	const jobs =
+		platform === 'windows'
+			? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
+			: ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
 	assert.deepEqual(Object.keys(needs).sort(), jobs.sort(), 'Mandatory jobs differ');
 	for (const job of jobs) assert.equal(needs[job].result, 'success', `${job} did not succeed`);
 	assert.match(sha, /^[a-f0-9]{40}$/, 'Invalid commit');
 	const runners = release ? ['macos-15', 'macos-15-intel'] : ['macos-15'];
-	const expected = platform === 'windows' ? ['windows-latest/startup']
-		: runners.flatMap((runner) => scenarios.map((scenario) => `${runner}/${scenario}`));
+	const expected =
+		platform === 'windows'
+			? ['windows-latest/startup']
+			: runners.flatMap((runner) => scenarios.map((scenario) => `${runner}/${scenario}`));
 	assert.ok(expected.length > 0, 'No expected launch scenarios');
-	assert.deepEqual(evidence.map((record) => `${record.runner}/${record.scenario}`).sort(),
-		expected.sort(), 'Missing, duplicate or unexpected launch evidence');
+	assert.deepEqual(
+		evidence.map((record) => `${record.runner}/${record.scenario}`).sort(),
+		expected.sort(),
+		'Missing, duplicate or unexpected launch evidence'
+	);
 	const hashes = new Set();
 	for (const record of evidence) {
 		assert.equal(record.schema_version, 1, 'Unknown evidence schema');
@@ -63,12 +69,18 @@ function recordMac(resultFile, archive, output) {
 	const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
 	assert.deepEqual(result.failures, [], 'Launch reported failures');
 	assert.equal(typeof result.scenario, 'string', 'Missing scenario');
-	fs.writeFileSync(output, JSON.stringify({
-		schema_version: 1, platform: 'macos', sha: process.env.GITHUB_SHA,
-		runner: process.env.MATRIX_RUNNER, scenario: result.scenario,
-		package_sha256: crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
-		failures: result.failures,
-	}) + '\n');
+	fs.writeFileSync(
+		output,
+		JSON.stringify({
+			schema_version: 1,
+			platform: 'macos',
+			sha: process.env.GITHUB_SHA,
+			runner: process.env.MATRIX_RUNNER,
+			scenario: result.scenario,
+			package_sha256: crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
+			failures: result.failures
+		}) + '\n'
+	);
 }
 
 if (require.main === module) {
@@ -82,11 +94,30 @@ if (require.main === module) {
 		assert.equal(args.length, 2);
 		assert.ok(['true', 'false'].includes(process.env.RELEASE), 'Invalid release profile');
 		const release = process.env.RELEASE === 'true';
-		const scenarios = platform === 'macos' ? JSON.parse(execFileSync('python3',
-			['tools/diagnostics/macos_launch_gate.py', '--print-matrix', release ? 'release' : 'ci'],
-			{ encoding: 'utf8' }).trim().replace(/^scenarios=/, '')) : [];
-		verify({ platform, needs: JSON.parse(process.env.NEEDS), evidence: readEvidence(directory),
-			sha: process.env.GITHUB_SHA, scenarios, release });
+		const scenarios =
+			platform === 'macos'
+				? JSON.parse(
+						execFileSync(
+							'python3',
+							[
+								'tools/diagnostics/macos_launch_gate.py',
+								'--print-matrix',
+								release ? 'release' : 'ci'
+							],
+							{ encoding: 'utf8' }
+						)
+							.trim()
+							.replace(/^scenarios=/, '')
+					)
+				: [];
+		verify({
+			platform,
+			needs: JSON.parse(process.env.NEEDS),
+			evidence: readEvidence(directory),
+			sha: process.env.GITHUB_SHA,
+			scenarios,
+			release
+		});
 		console.log(`${platform}: all mandatory jobs and packaged launch scenarios passed.`);
 	}
 }

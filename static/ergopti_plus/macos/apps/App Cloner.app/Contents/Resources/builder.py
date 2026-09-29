@@ -4,9 +4,7 @@
 
 
 def main():
-    print(
-        "This Python/Tk builder is kept for reference and is not used by default."
-    )
+    print("This Python/Tk builder is kept for reference and is not used by default.")
 
 
 if __name__ == "__main__":

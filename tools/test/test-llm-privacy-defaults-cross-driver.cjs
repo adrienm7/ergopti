@@ -123,7 +123,10 @@ if (macEngine) {
 			);
 		}
 	}
-	for (const ref of ['LLM_DEFAULTS.llm_disable_url_bars', 'LLM_DEFAULTS.llm_disable_password_fields']) {
+	for (const ref of [
+		'LLM_DEFAULTS.llm_disable_url_bars',
+		'LLM_DEFAULTS.llm_disable_password_fields'
+	]) {
 		if (!stripped.includes(ref)) {
 			errors.push(`macos/modules/llm/prediction_engine.lua: must read ${ref}.`);
 		}
@@ -182,7 +185,9 @@ if (linuxEngine) {
 // ── Report ───────────────────────────────────────────────────────────────────
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] LLM privacy defaults are not single-sourced across drivers:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] LLM privacy defaults are not single-sourced across drivers:\x1b[0m'
+	);
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }

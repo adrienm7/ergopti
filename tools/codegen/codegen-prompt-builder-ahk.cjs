@@ -270,18 +270,10 @@ function buildAhkSource() {
 	lines.push('\t;');
 	lines.push('\t; Param buffer     - The full context buffer.');
 	lines.push('\t; Param maxWords   - Max predicted words (0 = unlimited).');
-	lines.push(
-		'\t; Param ctxChars   - User-configured hard char cap (0 = no override). When'
-	);
-	lines.push(
-		'\t;                    positive this is AUTHORITATIVE and wins over maxWords,'
-	);
-	lines.push(
-		"\t;                    mirroring the shared Lua cap_context(). Omitting it is why"
-	);
-	lines.push(
-		'\t;                    llm_context_length had no effect on the automatic path.'
-	);
+	lines.push('\t; Param ctxChars   - User-configured hard char cap (0 = no override). When');
+	lines.push('\t;                    positive this is AUTHORITATIVE and wins over maxWords,');
+	lines.push('\t;                    mirroring the shared Lua cap_context(). Omitting it is why');
+	lines.push('\t;                    llm_context_length had no effect on the automatic path.');
 	lines.push('\t; Returns string   - The possibly truncated context.');
 	lines.push('\t_CapContext(buffer, maxWords, ctxChars := 0) {');
 	lines.push('\t\tif (ctxChars && ctxChars > 0) {');
@@ -403,7 +395,7 @@ function main() {
 	console.log('codegen:prompt-builder:ahk — generating PromptBuilder AHK adapter…');
 
 	const source = buildAhkSource();
-    writeWithBomLf(OUT_PATH, source);
+	writeWithBomLf(OUT_PATH, source);
 
 	const relOut = path.relative(ROOT, OUT_PATH);
 	console.log(`  Written: ${relOut}`);

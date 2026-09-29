@@ -25,14 +25,14 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const ROOT = path.resolve(__dirname, "..", "..");
-const WIN = path.join(ROOT, "static", "ergopti_plus", "windows");
-const MAC = path.join(ROOT, "static", "ergopti_plus", "macos");
+const ROOT = path.resolve(__dirname, '..', '..');
+const WIN = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
+const MAC = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 
 let failures = 0;
 
@@ -45,11 +45,8 @@ function check(label, condition, detail) {
 }
 
 function exists(rel) {
-	return fs.existsSync(path.join(ROOT, "static", "ergopti_plus", rel));
+	return fs.existsSync(path.join(ROOT, 'static', 'ergopti_plus', rel));
 }
-
-
-
 
 // =====================================================================
 // =====================================================================
@@ -58,23 +55,22 @@ function exists(rel) {
 // =====================================================================
 
 check(
-	"windows/infra/text_utils.ahk exists",
-	exists("windows/infra/text_utils.ahk"),
-	"Rename windows/infra/string_utils.ahk -> text_utils.ahk may have been reverted."
+	'windows/infra/text_utils.ahk exists',
+	exists('windows/infra/text_utils.ahk'),
+	'Rename windows/infra/string_utils.ahk -> text_utils.ahk may have been reverted.'
 );
 
 check(
-	"macos/infra/text_utils.lua exists",
-	exists("macos/infra/text_utils.lua"),
-	"macos/infra/text_utils.lua is the macOS peer — must not be renamed or removed."
+	'macos/infra/text_utils.lua exists',
+	exists('macos/infra/text_utils.lua'),
+	'macos/infra/text_utils.lua is the macOS peer — must not be renamed or removed.'
 );
 
 check(
-	"windows/infra/string_utils.ahk is absent (old name, §5.6)",
-	!exists("windows/infra/string_utils.ahk"),
-	"Old name re-introduced — remove it and ensure infra/text_utils.ahk is the only copy."
+	'windows/infra/string_utils.ahk is absent (old name, §5.6)',
+	!exists('windows/infra/string_utils.ahk'),
+	'Old name re-introduced — remove it and ensure infra/text_utils.ahk is the only copy.'
 );
-
 
 // =====================================================================
 // =====================================================================
@@ -83,23 +79,22 @@ check(
 // =====================================================================
 
 check(
-	"windows/ui/action_picker/init.ahk exists",
-	exists("windows/ui/action_picker/init.ahk"),
-	"Move windows/ui/action_picker.ahk -> ui/action_picker/init.ahk may have been reverted."
+	'windows/ui/action_picker/init.ahk exists',
+	exists('windows/ui/action_picker/init.ahk'),
+	'Move windows/ui/action_picker.ahk -> ui/action_picker/init.ahk may have been reverted.'
 );
 
 check(
-	"macos/ui/action_picker/init.lua exists",
-	exists("macos/ui/action_picker/init.lua"),
-	"macos/ui/action_picker/init.lua is the macOS peer — must not be renamed or removed."
+	'macos/ui/action_picker/init.lua exists',
+	exists('macos/ui/action_picker/init.lua'),
+	'macos/ui/action_picker/init.lua is the macOS peer — must not be renamed or removed.'
 );
 
 check(
-	"windows/ui/action_picker.ahk is absent (old flat path, §5.6)",
-	!exists("windows/ui/action_picker.ahk"),
-	"Old flat file re-introduced — remove it and ensure ui/action_picker/init.ahk is the only copy."
+	'windows/ui/action_picker.ahk is absent (old flat path, §5.6)',
+	!exists('windows/ui/action_picker.ahk'),
+	'Old flat file re-introduced — remove it and ensure ui/action_picker/init.ahk is the only copy.'
 );
-
 
 // =====================================================================
 // =====================================================================
@@ -108,17 +103,16 @@ check(
 // =====================================================================
 
 check(
-	"windows/infra/manifest_menu.ahk exists (renderer, peer of manifest_menu.lua)",
-	exists("windows/infra/manifest_menu.ahk"),
-	"windows/infra/manifest_menu.ahk (the menu renderer) must not be renamed or removed."
+	'windows/infra/manifest_menu.ahk exists (renderer, peer of manifest_menu.lua)',
+	exists('windows/infra/manifest_menu.ahk'),
+	'windows/infra/manifest_menu.ahk (the menu renderer) must not be renamed or removed.'
 );
 
 check(
-	"macos/infra/manifest_menu.lua exists",
-	exists("macos/infra/manifest_menu.lua"),
-	"macos/infra/manifest_menu.lua is the macOS renderer peer — must not be renamed or removed."
+	'macos/infra/manifest_menu.lua exists',
+	exists('macos/infra/manifest_menu.lua'),
+	'macos/infra/manifest_menu.lua is the macOS renderer peer — must not be renamed or removed.'
 );
-
 
 // =====================================================================
 // =====================================================================

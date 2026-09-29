@@ -6,9 +6,9 @@ WKWebView dashboard showing detailed typing metrics (WPM distribution, hotstring
 
 ## Key files
 
-| File      | Description                                                               |
-| --------- | ------------------------------------------------------------------------- |
-| `init.lua`| `M.show()` — singleton host; poll timer for JS request/response bridge    |
+| File       | Description                                                            |
+| ---------- | ---------------------------------------------------------------------- |
+| `init.lua` | `M.show()` — singleton host; poll timer for JS request/response bridge |
 
 ## Data path
 

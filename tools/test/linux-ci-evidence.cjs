@@ -103,13 +103,17 @@ function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
 	for (const [job, contract] of Object.entries(manifest.jobs)) {
 		const dependency = needs[job];
 		if (!dependency) {
-			if (contract.classification === 'mandatory') fail(`mandatory job ${job} is missing from needs`);
+			if (contract.classification === 'mandatory')
+				fail(`mandatory job ${job} is missing from needs`);
 			continue;
 		}
 		if (contract.classification === 'mandatory' && dependency.result !== 'success') {
 			fail(`mandatory job ${job} concluded ${dependency.result || 'without a result'}`);
 		}
-		if (contract.classification === 'optional' && ['failure', 'cancelled'].includes(dependency.result)) {
+		if (
+			contract.classification === 'optional' &&
+			['failure', 'cancelled'].includes(dependency.result)
+		) {
 			fail(`optional job ${job} concluded ${dependency.result}`);
 		}
 		if (dependency.result !== 'success') continue;
@@ -117,7 +121,8 @@ function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
 			const key = `${job}/${subject}`;
 			const assertions = indexedEvidence.get(key);
 			if (!assertions) fail(`successful job ${job} has no evidence for ${subject}`);
-			if (assertions < floor) fail(`${key} recorded ${assertions} assertion(s), expected at least ${floor}`);
+			if (assertions < floor)
+				fail(`${key} recorded ${assertions} assertion(s), expected at least ${floor}`);
 		}
 	}
 
@@ -127,7 +132,15 @@ function verifyAggregate({ manifest, needs, evidence, expectedSha }) {
 }
 
 function record(options) {
-	for (const field of ['job', 'output', 'sha', 'architecture', 'distro', 'session', 'interpreter']) {
+	for (const field of [
+		'job',
+		'output',
+		'sha',
+		'architecture',
+		'distro',
+		'session',
+		'interpreter'
+	]) {
 		if (!options[field]) fail(`record requires --${field.replace(/_/g, '-')}`);
 	}
 	const subjects = {};
@@ -146,7 +159,7 @@ function record(options) {
 		distro: options.distro,
 		session: options.session,
 		interpreter: options.interpreter,
-		subjects,
+		subjects
 	};
 	fs.mkdirSync(path.dirname(options.output), { recursive: true });
 	fs.writeFileSync(options.output, `${JSON.stringify(document, null, 2)}\n`);
@@ -154,7 +167,8 @@ function record(options) {
 
 function loadEvidence(directory) {
 	if (!fs.existsSync(directory)) fail(`evidence directory does not exist: ${directory}`);
-	return fs.readdirSync(directory, { recursive: true })
+	return fs
+		.readdirSync(directory, { recursive: true })
 		.filter((entry) => entry.endsWith('.json'))
 		.map((entry) => readJson(path.join(directory, entry), `evidence ${entry}`));
 }
@@ -174,7 +188,7 @@ function main(argv) {
 			manifest: readJson(options.manifest, 'manifest'),
 			needs: JSON.parse(options.needs),
 			evidence: loadEvidence(options.evidence_dir),
-			expectedSha: options.sha,
+			expectedSha: options.sha
 		});
 		return;
 	}

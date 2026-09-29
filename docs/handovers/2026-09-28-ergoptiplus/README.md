@@ -42,12 +42,12 @@ hash with its `before` value and inspect the patch before applying it. Use
 `git apply --check <patch>` and exact-path staging; never use a reset or stash
 to force an old proposal onto a changed source.
 
-| Proposal | Status and prerequisite | Recorded targeted verification |
-| --- | --- | --- |
-| `hotstrings-repeat.patch` | Linux sparse repeat preference; independent | 41/41; old code fails 11 cases |
-| `hotstrings-engine.patch` | Shared engine detached catalogue publication | 59/59 on LuaJIT and Lua 5.4; five new cases fail before fix |
-| `hotstrings-catalogue.patch` | Linux catalogue publication; apply after engine | 53/53 on both runtimes; five causal failures |
-| `mac-remap-sparse.patch` | macOS neutral remap persistence; after integrated owned-field preservation | 8/8 targeted, 47/47 broader; four causal failures |
+| Proposal                     | Status and prerequisite                                                    | Recorded targeted verification                              |
+| ---------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `hotstrings-repeat.patch`    | Linux sparse repeat preference; independent                                | 41/41; old code fails 11 cases                              |
+| `hotstrings-engine.patch`    | Shared engine detached catalogue publication                               | 59/59 on LuaJIT and Lua 5.4; five new cases fail before fix |
+| `hotstrings-catalogue.patch` | Linux catalogue publication; apply after engine                            | 53/53 on both runtimes; five causal failures                |
+| `mac-remap-sparse.patch`     | macOS neutral remap persistence; after integrated owned-field preservation | 8/8 targeted, 47/47 broader; four causal failures           |
 
 The standalone CI repair changes `test_hotstrings_config.lua` after the
 `hotstrings-catalogue.patch` proposal was captured. Rebase that proposal over

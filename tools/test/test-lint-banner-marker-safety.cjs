@@ -56,8 +56,7 @@ function buildAlignedBanner(title) {
 }
 
 const TITLE = '1/ Lint Banner Marker Safety Fixture';
-const FIXTURE_CONTENT =
-	'local M = {}\n\n\n\n\n' + buildAlignedBanner(TITLE) + '\n\nreturn M\n';
+const FIXTURE_CONTENT = 'local M = {}\n\n\n\n\n' + buildAlignedBanner(TITLE) + '\n\nreturn M\n';
 
 let _pass = 0;
 let _fail = 0;
@@ -88,7 +87,7 @@ function report() {
 function runLint(extraArgs) {
 	return spawnSync('node', [LINT_SCRIPT, '--warn-only', ...extraArgs], {
 		cwd: REPO_ROOT,
-		encoding: 'utf8',
+		encoding: 'utf8'
 	});
 }
 
@@ -97,9 +96,7 @@ try {
 
 	// 1) The checker must not flag an already-aligned "--"-marker banner.
 	const checkResult = runLint([]);
-	const fixtureRel = path
-		.relative(REPO_ROOT, FIXTURE_PATH)
-		.replace(/\\/g, '/');
+	const fixtureRel = path.relative(REPO_ROOT, FIXTURE_PATH).replace(/\\/g, '/');
 	const flaggedThisFixture = checkResult.stdout
 		.split('\n')
 		.some((line) => line.includes(fixtureRel) && line.includes('Banner'));
@@ -120,9 +117,7 @@ try {
 	test(
 		'fix-banners leaves an aligned "--"-marker banner byte-identical',
 		afterFix === FIXTURE_CONTENT,
-		afterFix !== FIXTURE_CONTENT
-			? `expected unchanged content, got:\n${afterFix}`
-			: undefined
+		afterFix !== FIXTURE_CONTENT ? `expected unchanged content, got:\n${afterFix}` : undefined
 	);
 
 	// 3) Root-cause guard: every fill line touching the title must share its
@@ -139,7 +134,9 @@ try {
 	test(
 		'every fill line shares the title line\'s "--" marker (no "---" corruption)',
 		markersConsistent,
-		markersConsistent ? undefined : `banner block:\n${lines.slice(titleIdx - 2, titleIdx + 3).join('\n')}`
+		markersConsistent
+			? undefined
+			: `banner block:\n${lines.slice(titleIdx - 2, titleIdx + 3).join('\n')}`
 	);
 } finally {
 	fs.rmSync(FIXTURE_PATH, { force: true });

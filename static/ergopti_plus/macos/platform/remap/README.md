@@ -65,11 +65,11 @@ personal edit made concurrently between its read and rename.
 
 ## Ports used
 
-| Port | Usage |
-| --- | --- |
-| `FileSystem` | Read/write `config_karabiner.toml`, inspect and atomically deploy `karabiner.json` |
-| `Storage` | Persist ErgoptiPlus preferences between sessions |
-| `ShellRunner` | Retain the signed native lease worker and its detached exact-revocation fallback |
+| Port          | Usage                                                                              |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `FileSystem`  | Read/write `config_karabiner.toml`, inspect and atomically deploy `karabiner.json` |
+| `Storage`     | Persist ErgoptiPlus preferences between sessions                                   |
+| `ShellRunner` | Retain the signed native lease worker and its detached exact-revocation fallback   |
 
 ## Canonical data
 
@@ -89,14 +89,14 @@ The module optionally supplies its live managed output keycodes to `modules.keyl
 
 ## Lifecycle API
 
-| Function | Description |
-| --- | --- |
-| `M.init(file_system)` | Load preferences and data, migrate proven legacy rules, and start an enabled lease |
-| `M.regenerate()` | Build and merge a fresh token-scoped rule set, then start its lease |
-| `M.pause()` / `M.resume()` | Request an acknowledged pause transition for the active generation |
-| `M.set_enabled(value)` | Enable or disable only ErgoptiPlus remapping |
-| `M.stop()` | Stop ErgoptiPlus resources and revoke its exact lease |
-| `M.shutdown(reason)` | Revoke the exact lease for quit or reload without touching shared Karabiner processes |
-| `M.open_gui()` | Open the stock Karabiner-Elements UI on an explicit user request |
+| Function                   | Description                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `M.init(file_system)`      | Load preferences and data, migrate proven legacy rules, and start an enabled lease    |
+| `M.regenerate()`           | Build and merge a fresh token-scoped rule set, then start its lease                   |
+| `M.pause()` / `M.resume()` | Request an acknowledged pause transition for the active generation                    |
+| `M.set_enabled(value)`     | Enable or disable only ErgoptiPlus remapping                                          |
+| `M.stop()`                 | Stop ErgoptiPlus resources and revoke its exact lease                                 |
+| `M.shutdown(reason)`       | Revoke the exact lease for quit or reload without touching shared Karabiner processes |
+| `M.open_gui()`             | Open the stock Karabiner-Elements UI on an explicit user request                      |
 
 Menu setters update the in-memory ErgoptiPlus configuration and call `M.regenerate()`; they never take ownership of the Karabiner application or services.

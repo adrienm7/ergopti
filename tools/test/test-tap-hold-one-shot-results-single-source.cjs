@@ -37,7 +37,9 @@ const data = JSON.parse(fs.readFileSync(DATA, 'utf8'));
 const results = Array.isArray(data.results) ? data.results : [];
 
 if (results.length < 7) {
-	errors.push(`one_shot_shift.json declares ${results.length} result(s); the one-shot Shift has at least 7.`);
+	errors.push(
+		`one_shot_shift.json declares ${results.length} result(s); the one-shot Shift has at least 7.`
+	);
 }
 for (const entry of results) {
 	if (typeof entry.char !== 'string' || [...entry.char].length !== 1) {
@@ -56,24 +58,34 @@ const start = oneShot.indexOf('OneShotShift() {');
 const body = start >= 0 ? oneShot.slice(start, oneShot.indexOf('\n}', start)) : '';
 if (body === '') errors.push('windows/platform/remap/one_shot_shift.ahk has no OneShotShift().');
 if (/SpecialCharacter\s*:=\s*("[^"]|Chr\()/.test(body)) {
-	errors.push('OneShotShift() spells a one-shot result itself again instead of reading the shared table.');
+	errors.push(
+		'OneShotShift() spells a one-shot result itself again instead of reading the shared table.'
+	);
 }
 if (!body.includes('TapHoldOneShotResult(') || !body.includes('TapHoldOneShotEndKeys(')) {
-	errors.push('OneShotShift() must take its results and its end keys from TapHoldOneShotResult/TapHoldOneShotEndKeys.');
+	errors.push(
+		'OneShotShift() must take its results and its end keys from TapHoldOneShotResult/TapHoldOneShotEndKeys.'
+	);
 }
 if (!fs.readFileSync(AHK_LOADER, 'utf8').includes('one_shot_shift.json')) {
-	errors.push('windows/platform/remap/tap_hold_loader.ahk does not read _shared/tap_hold/one_shot_shift.json.');
+	errors.push(
+		'windows/platform/remap/tap_hold_loader.ahk does not read _shared/tap_hold/one_shot_shift.json.'
+	);
 }
 
 if (!fs.readFileSync(LINUX_MANAGER, 'utf8').includes('tap_hold/one_shot_shift.json')) {
-	errors.push('linux/platform/remap/tap_hold_manager.lua does not read _shared/tap_hold/one_shot_shift.json.');
+	errors.push(
+		'linux/platform/remap/tap_hold_manager.lua does not read _shared/tap_hold/one_shot_shift.json.'
+	);
 }
 if (!fs.readFileSync(MACOS_ADAPTER, 'utf8').includes('tap_hold/one_shot_shift.json')) {
 	errors.push('macOS must load the same one-shot result table.');
 }
 for (const file of [LINUX_ENGINE, MACOS_OWNER]) {
 	if (!fs.readFileSync(file, 'utf8').includes('require("tap_hold.one_shot_shift")')) {
-		errors.push(`${path.relative(SP, file)} must consume the shared one-shot key and Unicode policy.`);
+		errors.push(
+			`${path.relative(SP, file)} must consume the shared one-shot key and Unicode policy.`
+		);
 	}
 }
 // Code only: the engine's comments may quote a result to explain it.
@@ -84,11 +96,19 @@ const engine = fs
 	.join('\n');
 
 for (const file of [LINUX_ENGINE, MACOS_ADAPTER, MACOS_OWNER]) {
-	const source = file === LINUX_ENGINE ? engine : fs.readFileSync(file, 'utf8')
-		.split('\n').map((line) => line.replace(/--.*$/, '')).join('\n');
+	const source =
+		file === LINUX_ENGINE
+			? engine
+			: fs
+					.readFileSync(file, 'utf8')
+					.split('\n')
+					.map((line) => line.replace(/--.*$/, ''))
+					.join('\n');
 	for (const entry of results) {
 		if (source.includes(JSON.stringify(entry.result))) {
-			errors.push(`${path.relative(SP, file)} spells the result ${JSON.stringify(entry.result)} itself.`);
+			errors.push(
+				`${path.relative(SP, file)} spells the result ${JSON.stringify(entry.result)} itself.`
+			);
 		}
 	}
 }

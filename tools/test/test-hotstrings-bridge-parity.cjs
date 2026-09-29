@@ -70,9 +70,6 @@ const ALLOWED_UNHANDLED = {};
 
 const errors = [];
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ What the shared UI sends ==============
@@ -113,9 +110,6 @@ for (const name of Object.keys(WINDOWS)) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ What each bridge answers ==============
@@ -147,7 +141,7 @@ for (const [name, drivers] of Object.entries(WINDOWS)) {
 			continue;
 		}
 		const src = fs.readFileSync(file, 'utf8');
-		const allowed = new Set((ALLOWED_UNHANDLED[`${driver}/${name}`] || []));
+		const allowed = new Set(ALLOWED_UNHANDLED[`${driver}/${name}`] || []);
 
 		const unhandled = vocabulary.filter((a) => !handles(src, a) && !allowed.has(a));
 		if (unhandled.length > 0) {
@@ -176,9 +170,6 @@ for (const [name, drivers] of Object.entries(WINDOWS)) {
 		}
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -220,9 +211,6 @@ for (const [name, keys] of Object.entries(REQUIRED_PAYLOAD_KEYS)) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 4/ Report ================================
@@ -235,14 +223,18 @@ if (process.argv.includes('--measure')) {
 		for (const [driver, relative] of Object.entries(WINDOWS[name])) {
 			const src = fs.readFileSync(path.join(SP, relative), 'utf8');
 			const missing = vocabulary.filter((a) => !handles(src, a));
-			console.log(`  ${driver.padEnd(6)} ${missing.length ? 'missing: ' + missing.join(', ') : 'complete'}`);
+			console.log(
+				`  ${driver.padEnd(6)} ${missing.length ? 'missing: ' + missing.join(', ') : 'complete'}`
+			);
 		}
 	}
 	process.exit(0);
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the hotstrings windows are shared, and the bridges behind them are not:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the hotstrings windows are shared, and the bridges behind them are not:\x1b[0m'
+	);
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);
 }

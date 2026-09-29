@@ -1,11 +1,12 @@
 # tools/diagnostics/hs274_accessibility_picker.py
 """Select the exact owned app through the native Accessibility file picker."""
+
 from pathlib import Path
 import os
 import subprocess
 
 
-SCRIPT = '''
+SCRIPT = """
 on run argv
     set appPath to item 1 of argv
     set screenshotPath to item 2 of argv
@@ -67,7 +68,7 @@ on run argv
         end tell
     end tell
 end run
-'''
+"""
 
 
 def select_application(app, report):
@@ -79,8 +80,12 @@ def select_application(app, report):
     screenshot = Path(os.environ["RUNNER_TEMP"]) / "hs274-picker-before-open.png"
     after_screenshot = screenshot.with_name("hs274-picker-after-open.png")
     try:
-        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT, str(app), str(screenshot), str(after_screenshot)],
-                                capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            ["/usr/bin/osascript", "-e", SCRIPT, str(app), str(screenshot), str(after_screenshot)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
     except subprocess.TimeoutExpired as error:
         state.update(timed_out=True, stdout=error.stdout, stderr=error.stderr)
         for key in ("stdout", "stderr"):

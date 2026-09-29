@@ -22,23 +22,23 @@ TAP printing and framework error formatting. These are wall times, not CPU
 times. The statistics below describe different tests within one run, not
 repeated samples of a single operation.
 
-| Statistic | Callback duration |
-| --- | --- |
-| Sum over all tests | 155,483.562 ms |
-| Median across tests | 0.584 ms |
-| 95th percentile across tests | 99.934 ms |
-| Maximum | 4,902.502 ms |
+| Statistic                    | Callback duration |
+| ---------------------------- | ----------------- |
+| Sum over all tests           | 155,483.562 ms    |
+| Median across tests          | 0.584 ms          |
+| 95th percentile across tests | 99.934 ms         |
+| Maximum                      | 4,902.502 ms      |
 
-| Largest measured cases | Duration |
-| --- | --- |
-| Updater native-child failure diagnosis | 4,902.502 ms |
-| Updater missing replacement rollback | 3,811.829 ms |
-| Updater interrupted backup recovery | 3,796.179 ms |
-| Updater successful replacement | 3,777.136 ms |
+| Largest measured cases                    | Duration     |
+| ----------------------------------------- | ------------ |
+| Updater native-child failure diagnosis    | 4,902.502 ms |
+| Updater missing replacement rollback      | 3,811.829 ms |
+| Updater interrupted backup recovery       | 3,796.179 ms |
+| Updater successful replacement            | 3,777.136 ms |
 | Updater parent crash before authorization | 2,565.240 ms |
-| Crash worker responsiveness under delay | 2,476.104 ms |
-| Crash worker large snapshot transport | 2,265.004 ms |
-| Parse-time HotIf helper safety audit | 2,050.814 ms |
+| Crash worker responsiveness under delay   | 2,476.104 ms |
+| Crash worker large snapshot transport     | 2,265.004 ms |
+| Parse-time HotIf helper safety audit      | 2,050.814 ms |
 
 ## Priorities and limits
 

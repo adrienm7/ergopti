@@ -68,7 +68,7 @@ function findPinnedPaths(src, driverRoot) {
 			literal,
 			rel,
 			line: src.slice(0, m.index).split('\n').length,
-			resolves: fs.existsSync(abs),
+			resolves: fs.existsSync(abs)
 		});
 	}
 	return out;

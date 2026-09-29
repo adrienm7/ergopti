@@ -12,11 +12,11 @@ It exists because the same four fields — IBAN, BIC, credit card, social-securi
 number — were already hand-repeated at four unrelated sites, with no gate
 between them:
 
-| Driver  | Site                                                       |
-| ------- | ---------------------------------------------------------- |
-| macOS   | `modules/dynamic_hotstrings/rules_engine.lua`              |
-| Linux   | `modules/dynamic_hotstrings/prefix_rules.lua`              |
-| Windows | `modules/dynamic_hotstrings/dynamic_hotstrings.ahk`        |
+| Driver  | Site                                                        |
+| ------- | ----------------------------------------------------------- |
+| macOS   | `modules/dynamic_hotstrings/rules_engine.lua`               |
+| Linux   | `modules/dynamic_hotstrings/prefix_rules.lua`               |
+| Windows | `modules/dynamic_hotstrings/dynamic_hotstrings.ahk`         |
 | shared  | `lua/dynamic_hotstrings/init.lua` (`compute_prefix_counts`) |
 
 Four hand-written lists is four chances for one to drift, and the failure is
@@ -34,7 +34,7 @@ full value, and a test at each driver's injection seam pins that.
 **It is not the `is_private` flag.** `is_private` answers "may this be
 persisted", and its answer is always no for anything built from
 `personal_info.toml`. This file answers a different question — "may this be
-*shown*" — and the two disagree deliberately: the phone number is private
+_shown_" — and the two disagree deliberately: the phone number is private
 (never logged) and unmasked (shown in full), because a log is read later by
 whoever has the file and a bubble is read now by the person who typed it.
 
@@ -57,17 +57,17 @@ detectable state rather than a default.
 
 ## The reveal policy
 
-| Key                    | Meaning                                                     |
-| ---------------------- | ----------------------------------------------------------- |
-| `mask_char`            | The glyph a hidden position is drawn as (U+2022).            |
-| `reveal_head`          | Characters kept visible at the start.                        |
-| `reveal_tail`          | Characters kept visible at the end.                          |
-| `min_length_to_reveal` | Below this length, nothing is revealed.                      |
-| `preserve_separators`  | Spaces stay as spaces instead of becoming mask characters.   |
+| Key                    | Meaning                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| `mask_char`            | The glyph a hidden position is drawn as (U+2022).          |
+| `reveal_head`          | Characters kept visible at the start.                      |
+| `reveal_tail`          | Characters kept visible at the end.                        |
+| `min_length_to_reveal` | Below this length, nothing is revealed.                    |
+| `preserve_separators`  | Spaces stay as spaces instead of becoming mask characters. |
 
 The tail is the larger of the two because the tail is what a user **checks**:
 the last four digits are how a bank, a card issuer and a phone company all ask
-you to identify an account, and the bubble exists to confirm *which* of your
+you to identify an account, and the bubble exists to confirm _which_ of your
 values is about to be typed. The head exists so the row still reads as an IBAN
 rather than as a row of dots.
 
@@ -97,6 +97,6 @@ The fields this file classifies are not in the Windows preview index at all:
 `@iban★`, `@cb★` and `@ss★` are registered by direct `CreateHotstring` calls in
 AutoHotkey code, while the index is built exclusively from the TOML categories
 listed in `_PREFIX_WATCHER_CATEGORIES`. There is nothing on screen there for a
-mask to attach to, so making the requirement *observable* on Windows is its own
+mask to attach to, so making the requirement _observable_ on Windows is its own
 piece of work and is tracked separately. This file is written for three drivers
 because the answer must not differ between them once the third arrives.

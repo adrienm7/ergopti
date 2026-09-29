@@ -87,7 +87,10 @@ for (const d of ['tools', 'src']) {
 				// guard treat its own source as a consumer — and pass with an
 				// unreachable module sitting right there. Found by probing it.
 				if (path.resolve(p) === path.resolve(__filename)) continue;
-				consumers.push({ rel: path.relative(ROOT, p).split(path.sep).join('/'), src: fs.readFileSync(p, 'utf8') });
+				consumers.push({
+					rel: path.relative(ROOT, p).split(path.sep).join('/'),
+					src: fs.readFileSync(p, 'utf8')
+				});
 			}
 		}
 	})(base);
@@ -115,9 +118,10 @@ for (const abs of walk(SHARED)) {
 	// The one real directory sweep in the repo: codegen-contracts-json.cjs reads
 	// every *.spec.js in core/ports. Recognised by name rather than inferred from
 	// loose token matching, which is what let this guard match its own source.
-	const swept = dirRel === 'core/ports'
-		&& base.endsWith('.spec.js')
-		&& consumers.some((c) => c.rel.endsWith('codegen-contracts-json.cjs'));
+	const swept =
+		dirRel === 'core/ports' &&
+		base.endsWith('.spec.js') &&
+		consumers.some((c) => c.rel.endsWith('codegen-contracts-json.cjs'));
 
 	if (named || swept) continue;
 	if (rel in SPEC_ONLY) continue;

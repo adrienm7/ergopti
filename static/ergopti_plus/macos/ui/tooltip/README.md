@@ -9,11 +9,11 @@ Central tooltip façade exposing a unified API for all overlay previews. Delegat
 
 ## Key files
 
-| File                   | Description                                                        |
-| ---------------------- | ------------------------------------------------------------------ |
-| `init.lua`             | `M.show(kind, data)` / `M.hide()` unified façade                    |
-| `tooltip_hotstring.lua`| Per-group tinted hotstring preview (hs.canvas)                      |
-| `tooltip_llm.lua`      | LLM streaming prediction overlay (hs.canvas, multi-slot)            |
+| File                    | Description                                              |
+| ----------------------- | -------------------------------------------------------- |
+| `init.lua`              | `M.show(kind, data)` / `M.hide()` unified façade         |
+| `tooltip_hotstring.lua` | Per-group tinted hotstring preview (hs.canvas)           |
+| `tooltip_llm.lua`       | LLM streaming prediction overlay (hs.canvas, multi-slot) |
 
 ## Shared constants
 

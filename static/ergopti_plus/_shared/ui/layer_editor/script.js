@@ -81,7 +81,8 @@ function el(id) {
 function _t(key) {
 	var strings = window._i18n_strings || {};
 	var text = typeof strings[key] === 'string' ? strings[key] : key;
-	for (var i = 1; i < arguments.length; i++) text = text.split('{' + i + '}').join(String(arguments[i]));
+	for (var i = 1; i < arguments.length; i++)
+		text = text.split('{' + i + '}').join(String(arguments[i]));
 	return text;
 }
 
@@ -109,10 +110,6 @@ function storeForm(form) {
 		// means the next window opens on the default form.
 	}
 }
-
-
-
-
 
 // =================================
 // ======= 2/ Host -> page =========
@@ -177,10 +174,6 @@ function describeError(e) {
 	return (where.length ? where.join('.') + ' — ' : '') + (e.detail || e.code || '');
 }
 
-
-
-
-
 // ================================
 // ======= 3/ Edits ===============
 // ================================
@@ -194,7 +187,8 @@ function markDirty() {
 /** Binds the selected input to a value, or gives it its normal behaviour back (null). */
 function pick(value) {
 	if (!state.selected || state.os === null) return;
-	if (value === null) LayerModel.makeNative(state.doc, DATA.layer, state.os, state.selected, DATA.platforms);
+	if (value === null)
+		LayerModel.makeNative(state.doc, DATA.layer, state.os, state.selected, DATA.platforms);
 	else {
 		if (!LayerModel.bindingAvailability(value, state.os, DATA).ok) return;
 		LayerModel.setBinding(state.doc, DATA.layer, state.os, state.selected, value);
@@ -237,10 +231,6 @@ function select(code) {
 	state.search = '';
 	render();
 }
-
-
-
-
 
 // ================================
 // ======= 4/ Rendering ===========
@@ -293,13 +283,26 @@ function inputState(code, current, recommended) {
 	var value = entry ? entry.value : undefined;
 	var recValue = rec ? rec.value : undefined;
 	var source = LayerModel.inputAvailability(code, state.os, DATA);
-	if (!source.ok) return { value: value, recommended: recValue, className: 'unavailable', reason: source.reason_key ? _t(source.reason_key) : null };
+	if (!source.ok)
+		return {
+			value: value,
+			recommended: recValue,
+			className: 'unavailable',
+			reason: source.reason_key ? _t(source.reason_key) : null
+		};
 	if (value !== undefined && !LayerModel.bindingAvailability(value, state.os, DATA).ok) {
 		var why = LayerModel.bindingAvailability(value, state.os, DATA).reason_key;
-		return { value: value, recommended: recValue, className: 'invalid', reason: why ? _t(why) : null };
+		return {
+			value: value,
+			recommended: recValue,
+			className: 'invalid',
+			reason: why ? _t(why) : null
+		};
 	}
-	if (value !== undefined && value === recValue) return { value: value, recommended: recValue, className: 'recommended', reason: null };
-	if (value !== undefined || recValue !== undefined) return { value: value, recommended: recValue, className: 'custom', reason: null };
+	if (value !== undefined && value === recValue)
+		return { value: value, recommended: recValue, className: 'recommended', reason: null };
+	if (value !== undefined || recValue !== undefined)
+		return { value: value, recommended: recValue, className: 'custom', reason: null };
 	return { value: value, recommended: recValue, className: '', reason: null };
 }
 
@@ -313,7 +316,13 @@ function bindingShort(value) {
 
 /** One clickable input, placed by the caller. */
 function buildInput(code, info, text, extraClass) {
-	var node = make('div', ['key', info.className, extraClass || '', state.selected === code ? 'selected' : ''].join(' ').replace(/\s+/g, ' ').trim());
+	var node = make(
+		'div',
+		['key', info.className, extraClass || '', state.selected === code ? 'selected' : '']
+			.join(' ')
+			.replace(/\s+/g, ' ')
+			.trim()
+	);
 	node.dataset.code = code;
 	node.title = info.reason || '';
 	// The slot fills the key's place on the board; the cap inside it is drawn a
@@ -342,7 +351,12 @@ function boardColumns() {
 	var max = 0;
 	DATA.keys.forEach(function (k) {
 		var g = k.geometry && k.geometry[state.form];
-		if (g) max = Math.max(max, g.col + g.width, g.bottom_col !== undefined ? g.bottom_col + g.bottom_width : 0);
+		if (g)
+			max = Math.max(
+				max,
+				g.col + g.width,
+				g.bottom_col !== undefined ? g.bottom_col + g.bottom_width : 0
+			);
 	});
 	return max;
 }
@@ -379,7 +393,9 @@ function renderMouse(current, recommended) {
 	pane.innerHTML = '';
 	DATA.keys.forEach(function (k) {
 		if (k.kind !== 'mouse_button' && k.kind !== 'wheel') return;
-		pane.appendChild(buildInput(k.code, inputState(k.code, current, recommended), inputLabel(k.code), 'pointer'));
+		pane.appendChild(
+			buildInput(k.code, inputState(k.code, current, recommended), inputLabel(k.code), 'pointer')
+		);
 	});
 }
 
@@ -441,7 +457,9 @@ function renderPickerList(list, info) {
 			list.appendChild(make('div', 'heading', pendingHeading.text));
 			pendingHeading = null;
 		}
-		list.appendChild(pickerRow(item.label, item.id, info.value === item.id, item.available, item.reason));
+		list.appendChild(
+			pickerRow(item.label, item.id, info.value === item.id, item.available, item.reason)
+		);
 		shown += 1;
 	});
 	if (shown === 0) list.appendChild(make('div', 'empty', _t('dialog.action_picker.no_results')));
@@ -457,7 +475,9 @@ function renderRepeat(panel, info) {
 	input.min = String(DATA.repeat_count.min);
 	input.max = String(DATA.repeat_count.max);
 	var parsed = info.value !== undefined ? LayerModel.parseBinding(info.value, DATA) : null;
-	input.value = String(parsed && parsed.type === 'repeat_count' ? parsed.count : DATA.repeat_count.min);
+	input.value = String(
+		parsed && parsed.type === 'repeat_count' ? parsed.count : DATA.repeat_count.min
+	);
 	var apply = make('button', '', _t('layer_editor.repeat.apply'));
 	apply.type = 'button';
 	apply.id = 'repeat-apply';
@@ -481,7 +501,8 @@ function renderKeystroke(panel, info) {
 	var box = make('div', 'param');
 	box.appendChild(make('h3', '', _t('layer_editor.keystroke.heading')));
 	var parsed = info.value !== undefined ? LayerModel.parseBinding(info.value, DATA) : null;
-	var chord = parsed && parsed.type === 'keystroke' && parsed.chords.length === 1 ? parsed.chords[0] : null;
+	var chord =
+		parsed && parsed.type === 'keystroke' && parsed.chords.length === 1 ? parsed.chords[0] : null;
 	var boxes = {};
 	var mods = make('div', 'mods');
 	var primary = make('label', 'mod primary');
@@ -539,17 +560,33 @@ function renderPanel(current, recommended) {
 		return;
 	}
 	var info = inputState(state.selected, current, recommended);
-	panel.appendChild(make('h2', 'panel-title', inputLabel(state.selected) + '  ·  ' + state.selected));
+	panel.appendChild(
+		make('h2', 'panel-title', inputLabel(state.selected) + '  ·  ' + state.selected)
+	);
 	if (info.className === 'unavailable') {
 		panel.appendChild(make('p', 'reason', info.reason || _t('layer_editor.legend.unavailable')));
 		return;
 	}
-	var now = make('p', 'current-value', _t('layer_editor.current', bindingShort(info.value) || _t('layer_editor.value.native')));
+	var now = make(
+		'p',
+		'current-value',
+		_t('layer_editor.current', bindingShort(info.value) || _t('layer_editor.value.native'))
+	);
 	now.id = 'current-value';
 	panel.appendChild(now);
-	if (info.className === 'invalid' && info.reason) panel.appendChild(make('p', 'reason', info.reason));
+	if (info.className === 'invalid' && info.reason)
+		panel.appendChild(make('p', 'reason', info.reason));
 	var recLine = make('div', 'recommended-line');
-	recLine.appendChild(make('span', '', _t('layer_editor.recommended', bindingShort(info.recommended) || _t('layer_editor.value.native'))));
+	recLine.appendChild(
+		make(
+			'span',
+			'',
+			_t(
+				'layer_editor.recommended',
+				bindingShort(info.recommended) || _t('layer_editor.value.native')
+			)
+		)
+	);
 	var useRec = make('button', '', _t('layer_editor.use_recommended'));
 	useRec.type = 'button';
 	useRec.id = 'use-recommended';
@@ -578,10 +615,6 @@ function render() {
 	el('status').textContent = state.status;
 	el('btn-save').disabled = state.saving;
 }
-
-
-
-
 
 // ================================
 // ======= 5/ Events ==============

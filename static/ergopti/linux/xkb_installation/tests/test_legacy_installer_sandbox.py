@@ -172,23 +172,33 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         compose = self.sandbox / "Ergopti.XCompose"
         compose.write_text('<Multi_key> <e> : "ergopti"\n', encoding="utf-8")
 
-        result = self.run_installer("--skip-activation", "--xcompose", str(compose), "--force-xcompose")
+        result = self.run_installer(
+            "--skip-activation", "--xcompose", str(compose), "--force-xcompose"
+        )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-        self.assertIn("Desktop activation identifier: fr+Ergopti_v2_2_1", result.stderr + result.stdout)
+        self.assertIn(
+            "Desktop activation identifier: fr+Ergopti_v2_2_1", result.stderr + result.stdout
+        )
         self.assert_type_inside_section()
         symbols = self.paths.symbols_fr.read_text(encoding="utf-8")
         self.assertEqual(symbols.count('xkb_symbols "Ergopti_v2_2_1"'), 1)
         self.assertIn('xkb_symbols "oss"', symbols)
         lst = self.paths.evdev_lst.read_text(encoding="utf-8")
         self.assertRegex(lst, r"! variant\n  Ergopti_v2_2_1 +fr: ")
-        self.assertIn("<name>Ergopti_v2_2_1</name>", self.paths.evdev_xml.read_text(encoding="utf-8"))
+        self.assertIn(
+            "<name>Ergopti_v2_2_1</name>", self.paths.evdev_xml.read_text(encoding="utf-8")
+        )
         for path, original in self.originals.items():
             backup = path.with_name(f"{path.name}.1")
             self.assertEqual(backup.read_bytes(), original, f"{backup} is not the pristine copy")
-        self.assertEqual((self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <e> : "ergopti"\n')
+        self.assertEqual(
+            (self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <e> : "ergopti"\n'
+        )
         self.assertEqual((self.home / ".XCompose.1").read_text(encoding="utf-8"), "user compose\n")
 
-        result = self.run_installer("--skip-activation", "--xcompose", str(compose), "--force-xcompose")
+        result = self.run_installer(
+            "--skip-activation", "--xcompose", str(compose), "--force-xcompose"
+        )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assert_type_inside_section()
         symbols = self.paths.symbols_fr.read_text(encoding="utf-8")
@@ -218,7 +228,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         file the installer wrote must go instead of staying forever."""
         compose = self.sandbox / "Ergopti.XCompose"
         compose.write_text('include "%L"\n<Multi_key> <e> : "ergopti"\n', encoding="utf-8")
-        result = self.run_installer("--skip-activation", "--xcompose", str(compose), "--force-xcompose")
+        result = self.run_installer(
+            "--skip-activation", "--xcompose", str(compose), "--force-xcompose"
+        )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual((self.home / ".XCompose").read_bytes(), compose.read_bytes())
         self.assertEqual(
@@ -231,8 +243,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
 
     def test_a_tree_that_does_not_compile_is_rolled_back(self):
         roots = self.roots()
-        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
-            legacy, "compile_check", return_value=False
+        with (
+            mock.patch.dict(os.environ, self.env, clear=False),
+            mock.patch.object(legacy, "compile_check", return_value=False),
         ):
             with self.assertRaises(legacy.LegacyInstallError):
                 legacy.perform_install(
@@ -243,13 +256,17 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                 )
         for path, original in self.originals.items():
             self.assertEqual(path.read_bytes(), original, f"{path} was left modified")
-            self.assertFalse(path.with_name(f"{path.name}.1").exists(), "a fresh backup must not linger")
+            self.assertFalse(
+                path.with_name(f"{path.name}.1").exists(), "a fresh backup must not linger"
+            )
 
     def test_an_unverified_tree_is_kept_with_a_warning(self):
         roots = self.roots()
-        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
-            legacy, "compile_check", return_value=None
-        ), self.assertLogs(level="WARNING") as logs:
+        with (
+            mock.patch.dict(os.environ, self.env, clear=False),
+            mock.patch.object(legacy, "compile_check", return_value=None),
+            self.assertLogs(level="WARNING") as logs,
+        ):
             spec = legacy.perform_install(
                 roots,
                 LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
@@ -264,7 +281,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         for target_index in range(4):
             for existing_history in (False, True):
                 for interruption in (False, True):
-                    with self.subTest(target=target_index, history=existing_history, interruption=interruption):
+                    with self.subTest(
+                        target=target_index, history=existing_history, interruption=interruption
+                    ):
                         fixture = LegacyInstallerSandboxTests()
                         fixture.setUp()
                         try:
@@ -272,10 +291,13 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                             target = targets[target_index]
                             if existing_history:
                                 for path in targets:
-                                    path.with_name(path.name + ".1").write_bytes(b"older installation backup\n")
+                                    path.with_name(path.name + ".1").write_bytes(
+                                        b"older installation backup\n"
+                                    )
                             previous_backups = {
                                 backup: backup.read_bytes()
-                                for path in targets for backup in legacy.find_backups(path)
+                                for path in targets
+                                for backup in legacy.find_backups(path)
                             }
                             original_write = Path.write_text
                             original_xml_write = legacy.ET.ElementTree.write
@@ -283,8 +305,12 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                             def fail_write():
                                 original_write(target, "", encoding="utf-8")
                                 if interruption:
-                                    raise KeyboardInterrupt("injected interruption after truncation")
-                                raise OSError(errno.ENOSPC, "injected full filesystem after truncation")
+                                    raise KeyboardInterrupt(
+                                        "injected interruption after truncation"
+                                    )
+                                raise OSError(
+                                    errno.ENOSPC, "injected full filesystem after truncation"
+                                )
 
                             def write_text(path, content, *args, **kwargs):
                                 if path == target:
@@ -296,23 +322,33 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                                     fail_write()
                                 return original_xml_write(tree, file, *args, **kwargs)
 
-                            expected_error = KeyboardInterrupt if interruption else legacy.LegacyInstallError
-                            with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
-                                Path, "write_text", write_text
-                            ), mock.patch.object(legacy.ET.ElementTree, "write", write_xml), mock.patch.object(
-                                legacy, "compile_check"
-                            ) as compiler:
+                            expected_error = (
+                                KeyboardInterrupt if interruption else legacy.LegacyInstallError
+                            )
+                            with (
+                                mock.patch.dict(os.environ, fixture.env),
+                                mock.patch.object(Path, "write_text", write_text),
+                                mock.patch.object(legacy.ET.ElementTree, "write", write_xml),
+                                mock.patch.object(legacy, "compile_check") as compiler,
+                            ):
                                 with self.assertRaises(expected_error):
                                     legacy.perform_install(
-                                        fixture.roots(), LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
-                                        None, LAYOUT_VERSION_DIR / "xkb_types.txt",
+                                        fixture.roots(),
+                                        LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
+                                        None,
+                                        LAYOUT_VERSION_DIR / "xkb_types.txt",
                                     )
                                 compiler.assert_not_called()
                             for path, original in fixture.originals.items():
-                                self.assertEqual(path.read_bytes(), original, f"{path.name}: partial write survived rollback")
+                                self.assertEqual(
+                                    path.read_bytes(),
+                                    original,
+                                    f"{path.name}: partial write survived rollback",
+                                )
                             remaining_backups = {
                                 backup: backup.read_bytes()
-                                for path in targets for backup in legacy.find_backups(path)
+                                for path in targets
+                                for backup in legacy.find_backups(path)
                             }
                             self.assertEqual(remaining_backups, previous_backups)
                         finally:
@@ -331,7 +367,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                 legacy.backup_file(target, journal)
         self.assertEqual(target.read_bytes(), self.originals[target])
         self.assertEqual(journal, [])
-        self.assertEqual(legacy.find_backups(target), [], "a partial .1 must never become the pristine backup")
+        self.assertEqual(
+            legacy.find_backups(target), [], "a partial .1 must never become the pristine backup"
+        )
         self.assertEqual(list(target.parent.glob(".*.ergopti-backup-*")), [])
 
     def test_backup_publication_preserves_a_concurrently_claimed_number(self):
@@ -356,7 +394,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         self.assertEqual(list(target.parent.glob(".*.ergopti-backup-*")), [])
 
     def test_the_types_edit_alone_places_the_block_inside_the_section(self):
-        backup = legacy.update_xkb_types_file(LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra)
+        backup = legacy.update_xkb_types_file(
+            LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra
+        )
         self.assertIsNotNone(backup)
         self.assert_type_inside_section()
 
@@ -365,8 +405,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         desktop user's home, which the sandbox override stands in for."""
         (self.home / ".XCompose").write_text("ergopti compose\n", encoding="utf-8")
         (self.home / ".XCompose.1").write_text("user compose\n", encoding="utf-8")
-        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
-            legacy, "purge_cache"
+        with (
+            mock.patch.dict(os.environ, self.env, clear=False),
+            mock.patch.object(legacy, "purge_cache"),
         ):
             self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual((self.home / ".XCompose").read_text(encoding="utf-8"), "user compose\n")
@@ -376,12 +417,15 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         with its own pristine copy; restoring the older ``.1`` backup over it
         would downgrade the file. Only the stale backups may go."""
         pristine = self.paths.types_extra.read_bytes()
-        backup = legacy.update_xkb_types_file(LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra)
+        backup = legacy.update_xkb_types_file(
+            LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra
+        )
         self.assertIsNotNone(backup)
         upgraded = pristine + b"\n// upgraded by the package manager\n"
         self.paths.types_extra.write_bytes(upgraded)
-        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
-            legacy, "purge_cache"
+        with (
+            mock.patch.dict(os.environ, self.env, clear=False),
+            mock.patch.object(legacy, "purge_cache"),
         ):
             self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual(self.paths.types_extra.read_bytes(), upgraded)
@@ -419,8 +463,11 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
 
     @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
     def test_uninstall_refusal_reaches_the_cli_exit_code(self):
-        with mock.patch.dict(os.environ, self.env), mock.patch.object(
-            legacy, "deactivate_desktop_entries", return_value=legacy.CleanupStatus.FAILED
+        with (
+            mock.patch.dict(os.environ, self.env),
+            mock.patch.object(
+                legacy, "deactivate_desktop_entries", return_value=legacy.CleanupStatus.FAILED
+            ),
         ):
             self.assertNotEqual(legacy.main(["--uninstall"]), legacy.EXIT_OK)
         for path, original in self.originals.items():
@@ -438,11 +485,15 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                 raise OSError(errno.EACCES, "injected restore refusal")
             return original_copy(source, destination)
 
-        with mock.patch.dict(os.environ, self.env), mock.patch.object(
-            legacy.shutil, "copy", fail_one_restore
+        with (
+            mock.patch.dict(os.environ, self.env),
+            mock.patch.object(legacy.shutil, "copy", fail_one_restore),
         ):
             self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
-        self.assertEqual(failed_target.with_name(failed_target.name + ".1").read_bytes(), self.originals[failed_target])
+        self.assertEqual(
+            failed_target.with_name(failed_target.name + ".1").read_bytes(),
+            self.originals[failed_target],
+        )
         self.assertIn(b"Ergopti", failed_target.read_bytes())
         with mock.patch.dict(os.environ, self.env):
             self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
@@ -460,7 +511,10 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                 raise OSError(errno.EACCES, "injected unreadable system file")
             return original_read(path, *args, **kwargs)
 
-        with mock.patch.dict(os.environ, self.env), mock.patch.object(Path, "read_text", refuse_target_read):
+        with (
+            mock.patch.dict(os.environ, self.env),
+            mock.patch.object(Path, "read_text", refuse_target_read),
+        ):
             self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual(backup.read_bytes(), self.originals[target])
         with mock.patch.dict(os.environ, self.env):
@@ -482,14 +536,22 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                         fixture.paths.symbols_fr.unlink()
                     elif failure == "malformed-registry":
                         fixture.paths.evdev_xml.write_text("<invalid", encoding="utf-8")
-                    before = {path: path.read_bytes() for path in fixture.paths.touched() if path.exists()}
+                    before = {
+                        path: path.read_bytes() for path in fixture.paths.touched() if path.exists()
+                    }
                     arguments = [
-                        "--xkb", str(LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb"),
-                        "--types", str(LAYOUT_VERSION_DIR / "xkb_types.txt"), "--skip-activation",
+                        "--xkb",
+                        str(LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb"),
+                        "--types",
+                        str(LAYOUT_VERSION_DIR / "xkb_types.txt"),
+                        "--skip-activation",
                     ]
-                    with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
-                        legacy, "compile_check", return_value=failure != "compiler-rejection"
-                    ) as compiler:
+                    with (
+                        mock.patch.dict(os.environ, fixture.env),
+                        mock.patch.object(
+                            legacy, "compile_check", return_value=failure != "compiler-rejection"
+                        ) as compiler,
+                    ):
                         code = legacy.main(arguments)
                     if failure is None:
                         self.assertEqual(code, 0)
@@ -498,7 +560,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                         fixture.assert_type_inside_section()
                     else:
                         self.assertNotEqual(code, 0)
-                        self.assertTrue(previous.exists(), "failed migration removed the prior clean package")
+                        self.assertTrue(
+                            previous.exists(), "failed migration removed the prior clean package"
+                        )
                         self.assertEqual(previous.read_bytes(), b"previous clean package\n")
                         for path, content in before.items():
                             self.assertEqual(path.read_bytes(), content)

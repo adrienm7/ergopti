@@ -532,7 +532,11 @@ const DRIVER_SPEC = {
 		// RegisterMenuItem(...) and the MenuAdd* helpers are the sanctioned row
 		// calls; `<something>Menu.Add(` / `Sub*.Add(` is a row added straight to a
 		// Menu object. Restricting the receiver keeps Array.Add and Map.Add out.
-		patterns: [/\bRegisterMenuItem\s*\(/, /\bMenuAdd[A-Za-z]*\s*\(/, /\b(?:[A-Za-z_]*Menu|Sub[A-Za-z_]*|M)\.Add\s*\(/],
+		patterns: [
+			/\bRegisterMenuItem\s*\(/,
+			/\bMenuAdd[A-Za-z]*\s*\(/,
+			/\b(?:[A-Za-z_]*Menu|Sub[A-Za-z_]*|M)\.Add\s*\(/
+		],
 		// ui/menu/menu_engine.ahk joined the set on 2026-08-07, and this is a
 		// correction of DOUBLE COUNTING rather than a migration. Its three
 		// MenuAdd* helpers are this driver's row materialisation — the manifest
@@ -610,7 +614,12 @@ function countRows(driver, spec) {
 		for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
 			const p = path.join(dir, e.name);
 			if (e.isDirectory()) {
-				if (e.name !== 'tests' && e.name !== 'vendor' && e.name !== '_generated' && e.name !== 'node_modules') {
+				if (
+					e.name !== 'tests' &&
+					e.name !== 'vendor' &&
+					e.name !== '_generated' &&
+					e.name !== 'node_modules'
+				) {
 					walk(p);
 				}
 				continue;
@@ -625,7 +634,9 @@ function countRows(driver, spec) {
 				if (t.startsWith('--') || t.startsWith(';') || t.startsWith('//')) return;
 				if (!spec.patterns.some((rx) => rx.test(line))) return;
 				if (spec.context) {
-					const window = lines.slice(Math.max(0, i - CONTEXT_LINES), i + CONTEXT_LINES + 1).join('\n');
+					const window = lines
+						.slice(Math.max(0, i - CONTEXT_LINES), i + CONTEXT_LINES + 1)
+						.join('\n');
 					if (!spec.context.test(window)) return;
 				}
 				n++;
@@ -671,7 +682,9 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 	// because nothing could re-derive them, which is how a comment stops being
 	// evidence and becomes folklore.
 	if (MEASURE) {
-		console.log(`${driver}: ${total} row site(s), ${inRenderer} in the renderer, ${outside} outside`);
+		console.log(
+			`${driver}: ${total} row site(s), ${inRenderer} in the renderer, ${outside} outside`
+		);
 		for (const [file, n] of [...offenders].sort((a, b) => b[1] - a[1]).slice(0, 8)) {
 			console.log(`    ${String(n).padStart(3)}  ${file}`);
 		}

@@ -44,7 +44,15 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const REGISTRY = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'actions', 'actions.toml');
+const REGISTRY = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'actions',
+	'actions.toml'
+);
 
 // The one modifier vocabulary. "super" is stored neutrally and each driver maps
 // it to its own physical key, which is why "win" and "meta" are not spellings
@@ -179,7 +187,9 @@ for (const t of tables) {
 		const parts = lin.split('+');
 		const key = parts[parts.length - 1];
 		if (lin.trim() === '' || key === '') {
-			errors.push(`${id}: emit_linux "${lin}" has no key — a chord that is only modifiers sends nothing`);
+			errors.push(
+				`${id}: emit_linux "${lin}" has no key — a chord that is only modifiers sends nothing`
+			);
 		}
 		for (const mod of parts.slice(0, -1)) {
 			if (!MODIFIERS.has(mod)) {

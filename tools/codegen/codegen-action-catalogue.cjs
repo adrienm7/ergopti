@@ -60,7 +60,17 @@ const CHORD_PLACEHOLDER = '_modifier_chords_placeholder';
 
 // Every driver validates and prompts for each kind; adding one means adding it
 // to the three gesture modules (validator, prompt, error text) in the same change.
-const PARAMETER_KINDS = new Set(['url', 'search_url', 'wrap_pair', 'text', 'key', 'shortcut', 'llm_prompt', 'llm_vision', 'llm_language']);
+const PARAMETER_KINDS = new Set([
+	'url',
+	'search_url',
+	'wrap_pair',
+	'text',
+	'key',
+	'shortcut',
+	'llm_prompt',
+	'llm_vision',
+	'llm_language'
+]);
 
 const SG_FIELDS = new Set([
 	'platform',
@@ -109,10 +119,14 @@ function parseRegistry(source) {
 	validateOrder(data.ax_order.items, data.ax_actions, 'ax_order', false);
 	for (const [alias, target] of Object.entries(data.karabiner_aliases || {})) {
 		if (!data.sg_actions[target]) {
-			throw new Error(`karabiner_aliases.${alias} targets "${target}", which is not an sg_actions row`);
+			throw new Error(
+				`karabiner_aliases.${alias} targets "${target}", which is not an sg_actions row`
+			);
 		}
 		if (data.sg_actions[alias]) {
-			throw new Error(`karabiner_aliases.${alias} is also an sg_actions row — one name, two meanings`);
+			throw new Error(
+				`karabiner_aliases.${alias} is also an sg_actions row — one name, two meanings`
+			);
 		}
 	}
 	return data;
@@ -132,7 +146,9 @@ function platformsOf(value, where) {
 	const keys = value.split(',').map((s) => s.trim());
 	for (const key of keys) {
 		if (!PLATFORMS.includes(key)) {
-			throw new Error(`${where}: unknown platform "${key}" (expected all, ${PLATFORMS.join(', ')})`);
+			throw new Error(
+				`${where}: unknown platform "${key}" (expected all, ${PLATFORMS.join(', ')})`
+			);
 		}
 	}
 	return keys;
@@ -193,18 +209,21 @@ function validateFamily(family, allowed, name) {
  *   placeholder may appear.
  */
 function validateOrder(items, family, name, allowStructure) {
-	if (!Array.isArray(items) || items.length === 0) throw new Error(`[${name}].items must be a non-empty array`);
+	if (!Array.isArray(items) || items.length === 0)
+		throw new Error(`[${name}].items must be a non-empty array`);
 	const seen = new Set();
 	for (const item of items) {
 		if (typeof item !== 'string') throw new Error(`[${name}].items: non-string entry`);
 		if (allowStructure && (item === '--' || /^#{1,2}[a-z_][a-z0-9_]*$/.test(item))) continue;
-		if (allowStructure && item.startsWith('#')) throw new Error(`[${name}].items: malformed heading "${item}"`);
+		if (allowStructure && item.startsWith('#'))
+			throw new Error(`[${name}].items: malformed heading "${item}"`);
 		if (!family[item]) throw new Error(`[${name}].items: "${item}" has no table`);
 		if (seen.has(item)) throw new Error(`[${name}].items: "${item}" is listed twice`);
 		seen.add(item);
 	}
 	for (const id of Object.keys(family)) {
-		if (!seen.has(id)) throw new Error(`${name}: "${id}" is declared but never ordered — the picker would hide it`);
+		if (!seen.has(id))
+			throw new Error(`${name}: "${id}" is declared but never ordered — the picker would hide it`);
 	}
 }
 
@@ -218,7 +237,10 @@ function buildModel(data, platform) {
 	const actions = {};
 	const claims = (row, where) => platformsOf(row.platform, where).includes(platform);
 
-	for (const [family, rows] of [['sg', data.sg_actions], ['ax', data.ax_actions]]) {
+	for (const [family, rows] of [
+		['sg', data.sg_actions],
+		['ax', data.ax_actions]
+	]) {
 		for (const [id, row] of Object.entries(rows)) {
 			if (row.is_header) continue;
 			if (!claims(row, `${family}_actions.${id}`)) continue;
@@ -273,7 +295,8 @@ function buildModel(data, platform) {
 	const axItems = data.ax_order.items.filter((id) => actions[id] && actions[id].family === 'ax');
 	const model = { platform, sgItems, axItems, actions };
 	if (platform === 'hs') model.karabinerAliases = { ...(data.karabiner_aliases || {}) };
-	if (platform === 'linux') model.slots = { single: [...data.slots.single], axis: [...data.slots.axis] };
+	if (platform === 'linux')
+		model.slots = { single: [...data.slots.single], axis: [...data.slots.axis] };
 	return model;
 }
 
@@ -320,7 +343,11 @@ function renderLua(model, refresh) {
 		}
 	}
 	out.push('\t},');
-	out.push(model.axItems.length ? `\tax_items = { ${model.axItems.map(luaQ).join(', ')} },` : '\tax_items = {},');
+	out.push(
+		model.axItems.length
+			? `\tax_items = { ${model.axItems.map(luaQ).join(', ')} },`
+			: '\tax_items = {},'
+	);
 	out.push('\tactions = {');
 	for (const id of Object.keys(model.actions).sort()) {
 		const a = model.actions[id];
@@ -375,7 +402,9 @@ function renderAhk(model, refresh) {
 	out.push('; ==============================================================================');
 	out.push('');
 	out.push('GestureActionCatalogueData() {');
-	out.push(`\tCatalogue := { Platform: ${ahkQ(model.platform)}, SgItems: [], AxItems: [], Actions: Map() }`);
+	out.push(
+		`\tCatalogue := { Platform: ${ahkQ(model.platform)}, SgItems: [], AxItems: [], Actions: Map() }`
+	);
 	out.push('\tItems := Catalogue.SgItems');
 	for (const item of model.sgItems) {
 		if (item.kind === 'action') out.push(`\tItems.Push({ Kind: "action", Id: ${ahkQ(item.id)} })`);
@@ -422,7 +451,14 @@ function generate(source) {
 	return result;
 }
 
-module.exports = { generate, parseRegistry, buildModel, OUTPUTS, CHORD_GROUP_KEY, HEADER_KEY_PREFIX };
+module.exports = {
+	generate,
+	parseRegistry,
+	buildModel,
+	OUTPUTS,
+	CHORD_GROUP_KEY,
+	HEADER_KEY_PREFIX
+};
 
 if (require.main === module) {
 	let generated;

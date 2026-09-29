@@ -295,6 +295,7 @@ FEATURES & RATIONALE:
 	/* Shimmer placeholder shown until the embedded window finishes loading —
 	 * a calmer first paint than a bare dark rectangle. */
 	.frame-skeleton {
+		animation: frame-shimmer 1.4s ease-in-out infinite;
 		background:
 			linear-gradient(
 				100deg,
@@ -308,7 +309,6 @@ FEATURES & RATIONALE:
 		inset: 0;
 		position: absolute;
 		z-index: 2;
-		animation: frame-shimmer 1.4s ease-in-out infinite;
 	}
 
 	@keyframes frame-shimmer {

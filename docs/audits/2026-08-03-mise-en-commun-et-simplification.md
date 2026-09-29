@@ -28,13 +28,13 @@ failure mode the prompt warns about in its own "pistes écartées" section.
 Ordered by value/risk. Only the first three are new findings; the rest confirm or
 correct entries that already exist.
 
-| # | Opportunity | Value | Risk | New? |
-| --- | --- | --- | --- | --- |
-| 1 | **Three gates ran nowhere** — port compliance, priority parity, manifest parity: alias present, suite entry absent | high | none | ✅ new |
-| 2 | A stalled-download notification had a translated title and a hardcoded French body — fixed, 2 keys × 21 locales | small, user-visible | none | ✅ new |
-| 3 | `_generated/` is **not** reducible — every one of the 21 artefacts has a runtime reader and a generator wired into the drift guard | closes a question | none | ✅ new |
-| 4 | 33 production files over 900 lines (35 873 lines) — the split candidates are known and mostly listed in `TODO.md` | large | medium | partly |
-| 5 | The remaining cross-driver duplication is the four items already in `TODO.md` Lot 8 | large | high | no |
+| #   | Opportunity                                                                                                                        | Value               | Risk   | New?   |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------ | ------ |
+| 1   | **Three gates ran nowhere** — port compliance, priority parity, manifest parity: alias present, suite entry absent                 | high                | none   | ✅ new |
+| 2   | A stalled-download notification had a translated title and a hardcoded French body — fixed, 2 keys × 21 locales                    | small, user-visible | none   | ✅ new |
+| 3   | `_generated/` is **not** reducible — every one of the 21 artefacts has a runtime reader and a generator wired into the drift guard | closes a question   | none   | ✅ new |
+| 4   | 33 production files over 900 lines (35 873 lines) — the split candidates are known and mostly listed in `TODO.md`                  | large               | medium | partly |
+| 5   | The remaining cross-driver duplication is the four items already in `TODO.md` Lot 8                                                | large               | high   | no     |
 
 ---
 
@@ -122,13 +122,13 @@ double-quoted literal containing an accented character, on a line that does not
 route through `i18n`/`t()`/a logger, returns **156 hits in 32 files**. Opening
 them shows the heuristic cannot tell UI text from four other things:
 
-| What it actually is | Example | Count |
-| --- | --- | --- |
-| French hotstring corpora | `windows/modules/hotstrings/hotstrings_distances.ahk` | 31 |
-| Layout character tables | `windows/modules/keymap/layout.ahk` | 25 |
-| Content of a *generated shell script* | `f:write("echo 'Démarrage…'")` | 3 |
-| Matching an external tool's French output | `out:find("Terminé !")` | 2 |
-| A key character, not a word | `return "ù"` | 4 |
+| What it actually is                       | Example                                               | Count |
+| ----------------------------------------- | ----------------------------------------------------- | ----- |
+| French hotstring corpora                  | `windows/modules/hotstrings/hotstrings_distances.ahk` | 31    |
+| Layout character tables                   | `windows/modules/keymap/layout.ahk`                   | 25    |
+| Content of a _generated shell script_     | `f:write("echo 'Démarrage…'")`                        | 3     |
+| Matching an external tool's French output | `out:find("Terminé !")`                               | 2     |
+| A key character, not a word               | `return "ù"`                                          | 4     |
 
 The genuine finding is one notification in
 `macos/ui/menu/menu_llm/models_manager_mlx_download.lua`: its **title** went
@@ -142,7 +142,7 @@ translated heading — on a failure screen, where a user least wants to guess.
 confirms 2345 keys × 21 with no blanks.
 
 **Piste écartée.** Turning this scan into a gate. It has a 98 % false-positive
-rate against a codebase whose *data* is legitimately French, and a gate that
+rate against a codebase whose _data_ is legitimately French, and a gate that
 cries wolf 154 times out of 156 is one people learn to skip. The lesson is the
 one `TODO.md` states in its own header: a finding is a lead, not a work order.
 
@@ -198,14 +198,14 @@ by a corpus — that is I5 working as designed, not a defect.
 
 **Preuve.** Top of the list:
 
-| Lines | File |
-| --- | --- |
-| 1 675 | `macos/modules/keylogger/init.lua` |
-| 1 495 | `windows/modules/keylogger/keylogger.ahk` |
+| Lines | File                                               |
+| ----- | -------------------------------------------------- |
+| 1 675 | `macos/modules/keylogger/init.lua`                 |
+| 1 495 | `windows/modules/keylogger/keylogger.ahk`          |
 | 1 447 | `windows/infra/hotstrings/hotstring_inputhook.ahk` |
-| 1 385 | `macos/modules/keymap/init.lua` |
-| 1 324 | `windows/modules/keymap/layout.ahk` |
-| 1 293 | `macos/modules/keylogger/log_manager.lua` |
+| 1 385 | `macos/modules/keymap/init.lua`                    |
+| 1 324 | `windows/modules/keymap/layout.ahk`                |
+| 1 293 | `macos/modules/keylogger/log_manager.lua`          |
 
 **Proposition.** Do not split on size. Three of the top six are the two keylogger
 walkers plus their log manager, and `TODO.md` Lot 8(3) already names the right

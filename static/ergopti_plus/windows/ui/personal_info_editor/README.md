@@ -6,9 +6,9 @@ WebView2 host for the personal-information form (name, phone, IBAN, SSN, address
 
 ## Key files
 
-| File      | Description                                                                    |
-| --------- | ------------------------------------------------------------------------------ |
-| `init.ahk`| Singleton host: `PersonalInfoEditor_Show()` — opens / focuses the window        |
+| File       | Description                                                              |
+| ---------- | ------------------------------------------------------------------------ |
+| `init.ahk` | Singleton host: `PersonalInfoEditor_Show()` — opens / focuses the window |
 
 ## Shared frontend
 

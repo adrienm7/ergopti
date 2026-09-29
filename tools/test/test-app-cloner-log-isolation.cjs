@@ -107,7 +107,7 @@ print(json.dumps(events))
 const behavior = spawnSync(python, ['-c', harness, LAUNCHER_PATH], {
 	cwd: ROOT,
 	encoding: 'utf8',
-	maxBuffer: 4 * 1024 * 1024,
+	maxBuffer: 4 * 1024 * 1024
 });
 let events = [];
 try {
@@ -115,43 +115,68 @@ try {
 } catch {
 	// The assertions below report the full child result.
 }
-const behaviorDetail = JSON.stringify({ status: behavior.status,
-	error: behavior.error && behavior.error.message, stdout: behavior.stdout, stderr: behavior.stderr });
-test('an unwritable diagnostic log cannot prevent osascript launch',
-	behavior.status === 0 && events.some((argv) => argv[0] === 'osascript'), behaviorDetail);
+const behaviorDetail = JSON.stringify({
+	status: behavior.status,
+	error: behavior.error && behavior.error.message,
+	stdout: behavior.stdout,
+	stderr: behavior.stderr
+});
+test(
+	'an unwritable diagnostic log cannot prevent osascript launch',
+	behavior.status === 0 && events.some((argv) => argv[0] === 'osascript'),
+	behaviorDetail
+);
 
 const launcher = fs.readFileSync(LAUNCHER_PATH, 'utf8');
 const clone = fs.readFileSync(CLONE_PATH, 'utf8');
 const builder = fs.readFileSync(BUILDER_PATH, 'utf8');
 const combined = `${launcher}\n${clone}\n${builder}`;
 
-test('the fixed cross-user /tmp App Cloner log is absent from every surface',
-	!combined.includes('/tmp/appcloner.log'));
-test('the failure dialog opens only the exact private log exported by the launcher',
-	!combined.includes('/tmp/clone_diag.log')
-		&& builder.includes('"Le diagnostic complet est dans " & appLogPath')
-		&& builder.includes('quoted form of appLogPath')
-		&& builder.includes('if appLogPath is not "" then')
-		&& launcher.includes('env["ERGOPTI_APPCLONER_LOG"] = log_path or ""'));
-test('the bundle launcher creates a private per-run log with mode-077 defaults',
-	launcher.includes('os.umask(0o077)')
-		&& launcher.includes('tempfile.mkdtemp(prefix="ergopti-appcloner-")')
-		&& launcher.includes('env["ERGOPTI_APPCLONER_LOG"] = log_path or ""'));
-test('clone generation accepts only its owned regular log or falls back safely',
-	clone.includes('DIAG="${8:-/dev/null}"')
-		&& clone.includes('! -L "$DIAG"')
-		&& clone.includes('DIAG=/dev/null'));
-test('each generated PWA launch owns a private mode-077 diagnostic path',
-	clone.includes('PWA_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-pwa.XXXXXXXX")"')
-		&& (clone.match(/umask 077/g) || []).length >= 2
-		&& clone.includes('ERGOPTI_PWA_LOG="$PWA_LOG_DIR/pwa.log"'));
-test('generated PWA diagnostics never persist the authenticated URL',
-	!clone.split('\n').some((line) => line.includes('_log(')
-		&& (line.includes('{OPEN_ARG') || line.includes('+ OPEN_ARG'))));
+test(
+	'the fixed cross-user /tmp App Cloner log is absent from every surface',
+	!combined.includes('/tmp/appcloner.log')
+);
+test(
+	'the failure dialog opens only the exact private log exported by the launcher',
+	!combined.includes('/tmp/clone_diag.log') &&
+		builder.includes('"Le diagnostic complet est dans " & appLogPath') &&
+		builder.includes('quoted form of appLogPath') &&
+		builder.includes('if appLogPath is not "" then') &&
+		launcher.includes('env["ERGOPTI_APPCLONER_LOG"] = log_path or ""')
+);
+test(
+	'the bundle launcher creates a private per-run log with mode-077 defaults',
+	launcher.includes('os.umask(0o077)') &&
+		launcher.includes('tempfile.mkdtemp(prefix="ergopti-appcloner-")') &&
+		launcher.includes('env["ERGOPTI_APPCLONER_LOG"] = log_path or ""')
+);
+test(
+	'clone generation accepts only its owned regular log or falls back safely',
+	clone.includes('DIAG="${8:-/dev/null}"') &&
+		clone.includes('! -L "$DIAG"') &&
+		clone.includes('DIAG=/dev/null')
+);
+test(
+	'each generated PWA launch owns a private mode-077 diagnostic path',
+	clone.includes('PWA_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-pwa.XXXXXXXX")"') &&
+		(clone.match(/umask 077/g) || []).length >= 2 &&
+		clone.includes('ERGOPTI_PWA_LOG="$PWA_LOG_DIR/pwa.log"')
+);
+test(
+	'generated PWA diagnostics never persist the authenticated URL',
+	!clone
+		.split('\n')
+		.some(
+			(line) =>
+				line.includes('_log(') && (line.includes('{OPEN_ARG') || line.includes('+ OPEN_ARG'))
+		)
+);
 
 const literalMutant = `${launcher}\n${clone}\n${builder}\n_LOG_PATH = "/tmp/appcloner.log"`;
-test('the source contract rejects reintroducing the fixed shared log literal',
-	literalMutant.includes('/tmp/appcloner.log') && !combined.includes('/tmp/appcloner.log'));
+test(
+	'the source contract rejects reintroducing the fixed shared log literal',
+	literalMutant.includes('/tmp/appcloner.log') && !combined.includes('/tmp/appcloner.log')
+);
 
 console.log('TAP version 14');
 console.log(`1..${results.length}`);

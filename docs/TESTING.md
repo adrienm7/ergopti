@@ -7,12 +7,12 @@ the one command — the local output is byte-identical to CI.
 The test suite spans four independent layers. CI runs them as separate jobs; you
 only need the layer whose check failed.
 
-| Layer                       | One command                   | CI job                    | Needs         |
-| --------------------------- | ----------------------------- | ------------------------- | ------------- |
-| **JS / domain / codegen**   | `npm run test:js`             | `Core / js`               | Node 22       |
-| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests`    | AutoHotkey v2 |
-| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests (stubbed)` | Lua 5.4 |
-| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests`      | LuaJIT        |
+| Layer                       | One command                   | CI job                         | Needs         |
+| --------------------------- | ----------------------------- | ------------------------------ | ------------- |
+| **JS / domain / codegen**   | `npm run test:js`             | `Core / js`                    | Node 22       |
+| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests`         | AutoHotkey v2 |
+| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests (stubbed)` | Lua 5.4       |
+| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests`           | LuaJIT        |
 
 `Validate and plan` is the root job of [`ci.yml`](../.github/workflows/ci.yml):
 it validates the release inputs and resolves the plan. The `Core` matrix then

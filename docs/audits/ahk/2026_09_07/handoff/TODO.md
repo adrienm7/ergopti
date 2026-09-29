@@ -321,23 +321,23 @@ existing modules. Three levels are useful only where real ownership warrants it.
 Line counts below were measured as physical lines at the audited SHA. They are
 triage signals, NOT defects by themselves and NOT a size ceiling.
 
-| Current file under tests/ | Lines | Proposed responsibility boundaries |
-| --- | ---: | --- |
-| unit/test_updater.ahk | 4403 | network outcome; staging ownership; config admission; tray publication; cancellation/teardown |
-| unit/test_llm_hotkey_cross_owner_collision.ahk | 2071 | cross-owner reservation; navigation policy; stale callback/retirement |
-| unit/test_personal_toml_io.ahk | 1786 | section loading; atomic writes; metadata round trips; metadata patch transactions |
-| run_all.ahk | 1621 | inspect bootstrap versus explicit registry; do not blindly split include order |
-| unit/test_llm_trigger_shortcut_transactions.ahk | 1574 | admission; trigger dispatch; recovery; watchdog and retry caps |
-| unit/test_llm_prediction_engine.ahk | 1461 | scheduling; response ownership; cancellation; rendering eligibility |
-| unit/test_hotstring_engine_main.ahk | 1420 | candidate selection; expansion; pause/context; retirement |
-| unit/test_logger.ahk | 1359 | formatting/filtering; pending queue; fan-out; initialization/exit |
-| unit/test_llm_api_remote.ahk | 1235 | request contract; streaming chunks; error/terminal outcomes |
-| unit/test_config_persistence_transactions.ahk | 1207 | admission; durable writes; publication; rollback/recovery |
-| unit/test_hotstrings_config.ahk | 1199 | validation; precedence; reload; publication |
-| unit/test_llm_api_ollama.ahk | 1166 | provider request; stream protocol; cancellation; terminal result |
-| unit/test_adapter_contract_vectors.ahk | 1145 | contract families; preserve one registration per actual vector |
-| unit/test_hotstrings_full.ahk | 1142 | inspect overlaps with engine tests before deciding boundaries |
-| unit/test_features_manifest.ahk | 1134 | loader contract; resolution; generated manifest invariants |
+| Current file under tests/                       | Lines | Proposed responsibility boundaries                                                            |
+| ----------------------------------------------- | ----: | --------------------------------------------------------------------------------------------- |
+| unit/test_updater.ahk                           |  4403 | network outcome; staging ownership; config admission; tray publication; cancellation/teardown |
+| unit/test_llm_hotkey_cross_owner_collision.ahk  |  2071 | cross-owner reservation; navigation policy; stale callback/retirement                         |
+| unit/test_personal_toml_io.ahk                  |  1786 | section loading; atomic writes; metadata round trips; metadata patch transactions             |
+| run_all.ahk                                     |  1621 | inspect bootstrap versus explicit registry; do not blindly split include order                |
+| unit/test_llm_trigger_shortcut_transactions.ahk |  1574 | admission; trigger dispatch; recovery; watchdog and retry caps                                |
+| unit/test_llm_prediction_engine.ahk             |  1461 | scheduling; response ownership; cancellation; rendering eligibility                           |
+| unit/test_hotstring_engine_main.ahk             |  1420 | candidate selection; expansion; pause/context; retirement                                     |
+| unit/test_logger.ahk                            |  1359 | formatting/filtering; pending queue; fan-out; initialization/exit                             |
+| unit/test_llm_api_remote.ahk                    |  1235 | request contract; streaming chunks; error/terminal outcomes                                   |
+| unit/test_config_persistence_transactions.ahk   |  1207 | admission; durable writes; publication; rollback/recovery                                     |
+| unit/test_hotstrings_config.ahk                 |  1199 | validation; precedence; reload; publication                                                   |
+| unit/test_llm_api_ollama.ahk                    |  1166 | provider request; stream protocol; cancellation; terminal result                              |
+| unit/test_adapter_contract_vectors.ahk          |  1145 | contract families; preserve one registration per actual vector                                |
+| unit/test_hotstrings_full.ahk                   |  1142 | inspect overlaps with engine tests before deciding boundaries                                 |
+| unit/test_features_manifest.ahk                 |  1134 | loader contract; resolution; generated manifest invariants                                    |
 
 For EACH row:
 
@@ -981,12 +981,12 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
   This is a paired helper benchmark, not a controlled whole-machine or
   whole-suite latency claim.
 
-  | Path | Samples | Total ms | Median ms | p95 ms | Maximum ms |
-  | --- | ---: | ---: | ---: | ---: | ---: |
-  | Uncached first reads | 7 | 423.478 | 62.4917 | 89.2457 | 89.2457 |
-  | Cache fill | 7 | 503.911 | 74.4094 | 92.1067 | 92.1067 |
-  | Uncached repeated reads | 350 | 21787.784 | 61.8720 | 93.5987 | 123.8321 |
-  | Cached repeated reads | 350 | 11.718 | 0.0314 | 0.0567 | 0.3311 |
+  | Path                    | Samples |  Total ms | Median ms |  p95 ms | Maximum ms |
+  | ----------------------- | ------: | --------: | --------: | ------: | ---------: |
+  | Uncached first reads    |       7 |   423.478 |   62.4917 | 89.2457 |    89.2457 |
+  | Cache fill              |       7 |   503.911 |   74.4094 | 92.1067 |    92.1067 |
+  | Uncached repeated reads |     350 | 21787.784 |   61.8720 | 93.5987 |   123.8321 |
+  | Cached repeated reads   |     350 |    11.718 |    0.0314 |  0.0567 |     0.3311 |
 
   First-use performance is not claimed to improve. Receipt:
   `ergopti_body_cache_bench_paired_loader.out`. The temporary framework used

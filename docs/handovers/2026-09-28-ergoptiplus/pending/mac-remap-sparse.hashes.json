@@ -1,12 +1,12 @@
 [
-  {
-    "path": "static/ergopti_plus/macos/platform/remap/config.lua",
-    "before": "784945a739b4208d600c4a1e7651e1ed452fb1e41b96bf285d6e2979b1f91922",
-    "after": "60f978f09c96f85faa3baf76fbab2cda7a46dca87751aafee467288d841b263d"
-  },
-  {
-    "path": "static/ergopti_plus/macos/tests/unit/platform/remap/test_config_owned_fields.lua",
-    "before": "210acf2e74f84c944b56068954602703ee1418c287a62080577ad5db1122e3a0",
-    "after": "1c2db1441af4e5614c7dbca9d882b23d4b855a3d01b2062f71194955d24016df"
-  }
+	{
+		"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+		"before": "784945a739b4208d600c4a1e7651e1ed452fb1e41b96bf285d6e2979b1f91922",
+		"after": "60f978f09c96f85faa3baf76fbab2cda7a46dca87751aafee467288d841b263d"
+	},
+	{
+		"path": "static/ergopti_plus/macos/tests/unit/platform/remap/test_config_owned_fields.lua",
+		"before": "210acf2e74f84c944b56068954602703ee1418c287a62080577ad5db1122e3a0",
+		"after": "1c2db1441af4e5614c7dbca9d882b23d4b855a3d01b2062f71194955d24016df"
+	}
 ]

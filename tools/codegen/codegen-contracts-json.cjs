@@ -33,9 +33,6 @@ const { loadCjsModule } = require('../lib/load-cjs-module.cjs');
 const PORTS_DIR = shared('core/ports');
 const OUTPUT_PATH = path.join(PORTS_DIR, 'contracts.json');
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Spec Discovery & Projection ===========
@@ -105,9 +102,6 @@ function buildContracts() {
 	}
 	return { ports: sortedPorts };
 }
-
-
-
 
 // ==================================================
 // ==================================================

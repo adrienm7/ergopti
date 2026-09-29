@@ -37,7 +37,9 @@ def main():
     """Retain both direct and sudo outcomes from the existing ownership helper."""
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true" or os.geteuid() == 0:
         raise RuntimeError("Shutdown probe requires the disposable macOS console user")
-    spec = importlib.util.spec_from_file_location("hs274_remap", Path(__file__).with_name("hs274-remap.py"))
+    spec = importlib.util.spec_from_file_location(
+        "hs274_remap", Path(__file__).with_name("hs274-remap.py")
+    )
     remap = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(remap)
     report = {"cases": []}
@@ -62,8 +64,11 @@ def main():
                 except Exception as error:
                     case["error"] = f"{type(error).__name__}: {error}"
                 case["lines"] = log.read_text(encoding="utf-8").splitlines()
-                case["passed"] = ("error" not in case and case["lines"] == ["ready", "first-signal", "complete"]
-                                  and case["processes"][name].get("exit") == 0)
+                case["passed"] = (
+                    "error" not in case
+                    and case["lines"] == ["ready", "first-signal", "complete"]
+                    and case["processes"][name].get("exit") == 0
+                )
     print(json.dumps(report, indent=2), flush=True)
     return 0 if all(case["passed"] for case in report["cases"]) else 1
 

@@ -37,12 +37,26 @@ const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
-const { loadContext, loadLayers, parseResolution, VOCABULARY_PATH, RECOMMENDED_PATH } = require('../lib/keymap-layers.cjs');
+const {
+	loadContext,
+	loadLayers,
+	parseResolution,
+	VOCABULARY_PATH,
+	RECOMMENDED_PATH
+} = require('../lib/keymap-layers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const CATALOGUE_PATH = shared('modules', 'actions', 'actions.toml');
 const LOCALES_DIR = shared('data', 'locales');
-const COMBO_EMITTER = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'modules', 'gestures', 'combo_emitter.lua');
+const COMBO_EMITTER = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'linux',
+	'modules',
+	'gestures',
+	'combo_emitter.lua'
+);
 
 // Floors: a vocabulary or a catalogue that stopped being read would otherwise
 // pass with nothing compared.
@@ -55,7 +69,9 @@ const errors = [];
 const fail = (msg) => errors.push(msg);
 
 if (!fs.existsSync(VOCABULARY_PATH)) {
-	console.error(`\x1b[31m[FAIL] ${path.relative(ROOT, VOCABULARY_PATH)} is missing — layer bindings have no vocabulary.\x1b[0m`);
+	console.error(
+		`\x1b[31m[FAIL] ${path.relative(ROOT, VOCABULARY_PATH)} is missing — layer bindings have no vocabulary.\x1b[0m`
+	);
 	process.exit(1);
 }
 
@@ -65,10 +81,6 @@ const keys = ctx.registry.keys;
 const OSES = ['windows', 'macos', 'linux'];
 const reasonKeys = new Set();
 
-
-
-
-
 // ===================================
 // ===================================
 // ======= 1/ Vocabulary shape =======
@@ -76,23 +88,36 @@ const reasonKeys = new Set();
 // ===================================
 
 const meta = vocabulary._meta || {};
-if (JSON.stringify(meta.platforms) !== JSON.stringify(OSES)) fail(`[_meta].platforms must be ${JSON.stringify(OSES)}, found ${JSON.stringify(meta.platforms)}`);
-if (!Number.isInteger(meta.layers_schema_version) || meta.layers_schema_version < 1) fail('[_meta].layers_schema_version must be a positive integer');
-if (meta.user_file !== 'layers.toml') fail(`[_meta].user_file must name the user's layers.toml, found ${JSON.stringify(meta.user_file)}`);
+if (JSON.stringify(meta.platforms) !== JSON.stringify(OSES))
+	fail(
+		`[_meta].platforms must be ${JSON.stringify(OSES)}, found ${JSON.stringify(meta.platforms)}`
+	);
+if (!Number.isInteger(meta.layers_schema_version) || meta.layers_schema_version < 1)
+	fail('[_meta].layers_schema_version must be a positive integer');
+if (meta.user_file !== 'layers.toml')
+	fail(
+		`[_meta].user_file must name the user's layers.toml, found ${JSON.stringify(meta.user_file)}`
+	);
 const modifierOrder = meta.modifier_order || [];
-if (!Array.isArray(modifierOrder) || modifierOrder.length < 4) fail('[_meta].modifier_order must list the modifiers');
+if (!Array.isArray(modifierOrder) || modifierOrder.length < 4)
+	fail('[_meta].modifier_order must list the modifiers');
 
 for (const os of OSES) {
 	const primary = (vocabulary.primary_modifier || {})[os];
-	if (!modifierOrder.includes(primary)) fail(`[primary_modifier].${os} = ${JSON.stringify(primary)} is not a modifier`);
-	if (!Array.isArray((vocabulary.call_handlers || {})[os])) fail(`[call_handlers].${os} must be a list`);
+	if (!modifierOrder.includes(primary))
+		fail(`[primary_modifier].${os} = ${JSON.stringify(primary)} is not a modifier`);
+	if (!Array.isArray((vocabulary.call_handlers || {})[os]))
+		fail(`[call_handlers].${os} must be a list`);
 }
 
 for (const [mod, rule] of Object.entries(vocabulary.modifiers || {})) {
-	if (!modifierOrder.includes(mod)) fail(`[modifiers.${mod}] restricts a modifier that is not in modifier_order`);
-	if (!Array.isArray(rule.platforms) || rule.platforms.some((p) => !OSES.includes(p))) fail(`[modifiers.${mod}].platforms must list OSes`);
+	if (!modifierOrder.includes(mod))
+		fail(`[modifiers.${mod}] restricts a modifier that is not in modifier_order`);
+	if (!Array.isArray(rule.platforms) || rule.platforms.some((p) => !OSES.includes(p)))
+		fail(`[modifiers.${mod}].platforms must list OSes`);
 	if (rule.platforms.length < OSES.length) {
-		if (typeof rule.reason_key !== 'string') fail(`[modifiers.${mod}] leaves an OS out without a reason_key`);
+		if (typeof rule.reason_key !== 'string')
+			fail(`[modifiers.${mod}] leaves an OS out without a reason_key`);
 		else reasonKeys.add(rule.reason_key);
 	}
 }
@@ -101,27 +126,37 @@ for (const [mod, rule] of Object.entries(vocabulary.modifiers || {})) {
 // guards nothing; and the OS it leaves out must be told why.
 const registryKinds = new Set(Object.values(keys).map((k) => k.kind));
 for (const [kind, rule] of Object.entries(vocabulary.source_kinds || {})) {
-	if (!registryKinds.has(kind)) fail(`[source_kinds.${kind}] restricts a kind no physical key has (${[...registryKinds].join(', ')})`);
-	if (!Array.isArray(rule.platforms) || rule.platforms.some((p) => !OSES.includes(p))) fail(`[source_kinds.${kind}].platforms must list OSes`);
-	else if (rule.platforms.length === OSES.length) fail(`[source_kinds.${kind}] restricts nothing: every OS is listed`);
-	else if (typeof rule.reason_key !== 'string') fail(`[source_kinds.${kind}] leaves an OS out without a reason_key`);
+	if (!registryKinds.has(kind))
+		fail(
+			`[source_kinds.${kind}] restricts a kind no physical key has (${[...registryKinds].join(', ')})`
+		);
+	if (!Array.isArray(rule.platforms) || rule.platforms.some((p) => !OSES.includes(p)))
+		fail(`[source_kinds.${kind}].platforms must list OSes`);
+	else if (rule.platforms.length === OSES.length)
+		fail(`[source_kinds.${kind}] restricts nothing: every OS is listed`);
+	else if (typeof rule.reason_key !== 'string')
+		fail(`[source_kinds.${kind}] leaves an OS out without a reason_key`);
 	else reasonKeys.add(rule.reason_key);
 }
 
 const repeatCount = (vocabulary.parameters || {}).repeat_count;
-if (!repeatCount || !Number.isInteger(repeatCount.min) || !Number.isInteger(repeatCount.max) || repeatCount.min < 1 || repeatCount.max < repeatCount.min)
+if (
+	!repeatCount ||
+	!Number.isInteger(repeatCount.min) ||
+	!Number.isInteger(repeatCount.max) ||
+	repeatCount.min < 1 ||
+	repeatCount.max < repeatCount.min
+)
 	fail('[parameters.repeat_count] needs integer min >= 1 and max >= min');
 for (const [name, param] of Object.entries(vocabulary.parameters || {})) {
-	if (!Array.isArray(param.platforms) || param.platforms.some((p) => !OSES.includes(p))) fail(`[parameters.${name}].platforms must list OSes`);
+	if (!Array.isArray(param.platforms) || param.platforms.some((p) => !OSES.includes(p)))
+		fail(`[parameters.${name}].platforms must list OSes`);
 	else if (param.platforms.length < OSES.length) {
-		if (typeof param.reason_key !== 'string') fail(`[parameters.${name}] leaves an OS out without a reason_key`);
+		if (typeof param.reason_key !== 'string')
+			fail(`[parameters.${name}] leaves an OS out without a reason_key`);
 		else reasonKeys.add(param.reason_key);
 	}
 }
-
-
-
-
 
 // ===================================
 // ===================================
@@ -129,7 +164,15 @@ for (const [name, param] of Object.entries(vocabulary.parameters || {})) {
 // ===================================
 // ===================================
 
-const ACTION_FIELDS = new Set(['catalogue', 'catalogue_divergence', 'repeatable', 'reason_key', 'group', 'all', ...OSES]);
+const ACTION_FIELDS = new Set([
+	'catalogue',
+	'catalogue_divergence',
+	'repeatable',
+	'reason_key',
+	'group',
+	'all',
+	...OSES
+]);
 const actions = vocabulary.actions || {};
 const usedHandlers = new Set();
 // action id -> os -> canonical chord text ("alt+shift+ArrowUp"), for section 3
@@ -142,14 +185,18 @@ function resolutionFor(action, os) {
 
 /** Canonical form of one resolved chord: modifiers in modifier_order, then the key. */
 function chordText(chord, os) {
-	const mods = new Set(chord.mods.map((m) => (m === 'primary' ? vocabulary.primary_modifier[os] : m)));
+	const mods = new Set(
+		chord.mods.map((m) => (m === 'primary' ? vocabulary.primary_modifier[os] : m))
+	);
 	return [...modifierOrder.filter((m) => mods.has(m)), chord.key].join('+');
 }
 
 for (const [id, action] of Object.entries(actions)) {
 	if (!/^[a-z][a-z0-9_]*$/.test(id)) fail(`action id "${id}" is not snake_case`);
-	for (const field of Object.keys(action)) if (!ACTION_FIELDS.has(field)) fail(`[actions.${id}].${field} is not a field`);
-	if (typeof action.repeatable !== 'boolean') fail(`[actions.${id}].repeatable must be true or false`);
+	for (const field of Object.keys(action))
+		if (!ACTION_FIELDS.has(field)) fail(`[actions.${id}].${field} is not a field`);
+	if (typeof action.repeatable !== 'boolean')
+		fail(`[actions.${id}].repeatable must be true or false`);
 	resolved[id] = {};
 	let missing = 0;
 	for (const os of OSES) {
@@ -171,14 +218,17 @@ for (const [id, action] of Object.entries(actions)) {
 			for (const raw of chord.mods) {
 				const mod = raw === 'primary' ? vocabulary.primary_modifier[os] : raw;
 				const rule = (vocabulary.modifiers || {})[mod];
-				if (rule && !rule.platforms.includes(os)) fail(`[actions.${id}] on ${os} sends modifier "${mod}", which does not exist on ${os}`);
+				if (rule && !rule.platforms.includes(os))
+					fail(`[actions.${id}] on ${os} sends modifier "${mod}", which does not exist on ${os}`);
 			}
 		}
 		if (res.chords.length === 1) resolved[id][os] = chordText(res.chords[0], os);
-		if (action.repeatable === true && res.kind === 'none') fail(`[actions.${id}] is repeatable but does nothing on ${os}`);
+		if (action.repeatable === true && res.kind === 'none')
+			fail(`[actions.${id}] is repeatable but does nothing on ${os}`);
 	}
 	if (missing > 0) {
-		if (typeof action.reason_key !== 'string') fail(`[actions.${id}] has no resolution on ${missing} OS(es) and no reason_key`);
+		if (typeof action.reason_key !== 'string')
+			fail(`[actions.${id}] has no resolution on ${missing} OS(es) and no reason_key`);
 		else reasonKeys.add(action.reason_key);
 	} else if (action.reason_key !== undefined) {
 		fail(`[actions.${id}] resolves everywhere but declares a reason_key nothing can display`);
@@ -187,15 +237,13 @@ for (const [id, action] of Object.entries(actions)) {
 
 for (const os of OSES) {
 	for (const handler of vocabulary.call_handlers[os] || []) {
-		if (!usedHandlers.has(`${os}:${handler}`)) fail(`[call_handlers].${os} declares "${handler}" and no action calls it`);
+		if (!usedHandlers.has(`${os}:${handler}`))
+			fail(`[call_handlers].${os} declares "${handler}" and no action calls it`);
 	}
 }
 
-if (Object.keys(actions).length < MIN_ACTIONS) fail(`only ${Object.keys(actions).length} actions read (floor ${MIN_ACTIONS})`);
-
-
-
-
+if (Object.keys(actions).length < MIN_ACTIONS)
+	fail(`only ${Object.keys(actions).length} actions read (floor ${MIN_ACTIONS})`);
 
 // ============================================
 // ============================================
@@ -223,14 +271,29 @@ const HS_NAME_TO_KEYCODE = {
 	tab: 48,
 	space: 49
 };
-const MOD_ALIASES = { ctrl: 'ctrl', control: 'ctrl', shift: 'shift', alt: 'alt', option: 'alt', super: 'meta', win: 'meta', cmd: 'meta', meta: 'meta' };
+const MOD_ALIASES = {
+	ctrl: 'ctrl',
+	control: 'ctrl',
+	shift: 'shift',
+	alt: 'alt',
+	option: 'alt',
+	super: 'meta',
+	win: 'meta',
+	cmd: 'meta',
+	meta: 'meta'
+};
 
 const emitterSource = fs.readFileSync(COMBO_EMITTER, 'utf8');
 const keysymBlock = /local KEYSYM_TO_CODE = \{([\s\S]*?)\n\}/.exec(emitterSource);
 const KEYSYM_TO_EVDEV = {};
 if (!keysymBlock) fail('linux/modules/gestures/combo_emitter.lua: KEYSYM_TO_CODE table not found');
-else for (const m of keysymBlock[1].matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+),/gm)) KEYSYM_TO_EVDEV[m[1]] = Number(m[2]);
-if (Object.keys(KEYSYM_TO_EVDEV).length < 15) fail(`only ${Object.keys(KEYSYM_TO_EVDEV).length} keysyms read from combo_emitter.lua (floor 15)`);
+else
+	for (const m of keysymBlock[1].matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+),/gm))
+		KEYSYM_TO_EVDEV[m[1]] = Number(m[2]);
+if (Object.keys(KEYSYM_TO_EVDEV).length < 15)
+	fail(
+		`only ${Object.keys(KEYSYM_TO_EVDEV).length} keysyms read from combo_emitter.lua (floor 15)`
+	);
 
 // The helpers below report through `onProblem`: section 3 fails on every name
 // it cannot resolve, while the scan in section 5 skips catalogue entries this
@@ -260,16 +323,27 @@ function canonical(mods, code, what, onProblem = fail) {
 function catalogueChord(entry, os, id, onProblem = fail) {
 	const what = `[sg_actions.${id}] on ${os}`;
 	if (os === 'windows' && entry.emit_ahk_key !== undefined) {
-		const code = uniqueCode((k) => k.ahk_send && k.ahk_send.toLowerCase() === entry.emit_ahk_key.toLowerCase(), `${what}: AHK key "${entry.emit_ahk_key}"`, onProblem);
+		const code = uniqueCode(
+			(k) => k.ahk_send && k.ahk_send.toLowerCase() === entry.emit_ahk_key.toLowerCase(),
+			`${what}: AHK key "${entry.emit_ahk_key}"`,
+			onProblem
+		);
 		return canonical(entry.emit_ahk_mods || [], code, what, onProblem);
 	}
 	if (os === 'macos' && entry.emit_hs_key !== undefined) {
 		const keycode = HS_NAME_TO_KEYCODE[entry.emit_hs_key];
 		if (keycode === undefined) {
-			onProblem(`${what}: Hammerspoon key "${entry.emit_hs_key}" is not in this gate's name table — add its hs.keycodes.map code`);
+			onProblem(
+				`${what}: Hammerspoon key "${entry.emit_hs_key}" is not in this gate's name table — add its hs.keycodes.map code`
+			);
 			return null;
 		}
-		return canonical(entry.emit_hs_mods || [], uniqueCode((k) => k.hs === keycode, `${what}: macOS keycode ${keycode}`, onProblem), what, onProblem);
+		return canonical(
+			entry.emit_hs_mods || [],
+			uniqueCode((k) => k.hs === keycode, `${what}: macOS keycode ${keycode}`, onProblem),
+			what,
+			onProblem
+		);
 	}
 	if (os === 'linux' && entry.emit_linux !== undefined) {
 		const parts = entry.emit_linux.split('+');
@@ -279,7 +353,12 @@ function catalogueChord(entry, os, id, onProblem = fail) {
 			onProblem(`${what}: keysym "${name}" is not in combo_emitter.lua's table`);
 			return null;
 		}
-		return canonical(parts, uniqueCode((k) => k.evdev === evdev, `${what}: evdev ${evdev}`, onProblem), what, onProblem);
+		return canonical(
+			parts,
+			uniqueCode((k) => k.evdev === evdev, `${what}: evdev ${evdev}`, onProblem),
+			what,
+			onProblem
+		);
 	}
 	return undefined;
 }
@@ -287,33 +366,46 @@ function catalogueChord(entry, os, id, onProblem = fail) {
 let pins = 0;
 for (const [id, action] of Object.entries(actions)) {
 	const entry = catalogue[id];
-	if (action.catalogue === true && !entry) fail(`[actions.${id}] says catalogue = true but [sg_actions.${id}] does not exist`);
-	if (action.catalogue !== true && entry) fail(`[actions.${id}] reuses the catalogue id "${id}" without catalogue = true — it must send what the catalogue sends`);
-	if (action.catalogue_divergence !== undefined && action.catalogue !== true) fail(`[actions.${id}] declares a catalogue_divergence but is not a catalogue action`);
+	if (action.catalogue === true && !entry)
+		fail(`[actions.${id}] says catalogue = true but [sg_actions.${id}] does not exist`);
+	if (action.catalogue !== true && entry)
+		fail(
+			`[actions.${id}] reuses the catalogue id "${id}" without catalogue = true — it must send what the catalogue sends`
+		);
+	if (action.catalogue_divergence !== undefined && action.catalogue !== true)
+		fail(`[actions.${id}] declares a catalogue_divergence but is not a catalogue action`);
 	if (!entry) continue;
 	const divergent = new Set(action.catalogue_divergence || []);
-	for (const os of divergent) if (!OSES.includes(os)) fail(`[actions.${id}].catalogue_divergence names "${os}", which is not an OS`);
+	for (const os of divergent)
+		if (!OSES.includes(os))
+			fail(`[actions.${id}].catalogue_divergence names "${os}", which is not an OS`);
 	for (const os of OSES) {
 		const expected = catalogueChord(entry, os, id);
 		if (expected === undefined) {
-			if (divergent.has(os)) fail(`[actions.${id}] declares a divergence on ${os}, where the catalogue emits nothing to diverge from`);
+			if (divergent.has(os))
+				fail(
+					`[actions.${id}] declares a divergence on ${os}, where the catalogue emits nothing to diverge from`
+				);
 			continue;
 		}
 		if (expected === null) continue;
 		const actual = resolved[id][os];
 		if (divergent.has(os)) {
-			if (actual === expected) fail(`[actions.${id}] declares a divergence on ${os} but sends exactly the catalogue's ${expected}: remove the stale declaration`);
+			if (actual === expected)
+				fail(
+					`[actions.${id}] declares a divergence on ${os} but sends exactly the catalogue's ${expected}: remove the stale declaration`
+				);
 			continue;
 		}
 		pins += 1;
-		if (actual !== expected) fail(`[actions.${id}] on ${os} sends ${actual === undefined ? 'no single keystroke' : actual}; the catalogue sends ${expected}`);
+		if (actual !== expected)
+			fail(
+				`[actions.${id}] on ${os} sends ${actual === undefined ? 'no single keystroke' : actual}; the catalogue sends ${expected}`
+			);
 	}
 }
-if (pins < MIN_CATALOGUE_PINS) fail(`only ${pins} catalogue keystrokes compared (floor ${MIN_CATALOGUE_PINS})`);
-
-
-
-
+if (pins < MIN_CATALOGUE_PINS)
+	fail(`only ${pins} catalogue keystrokes compared (floor ${MIN_CATALOGUE_PINS})`);
 
 // =====================================
 // =====================================
@@ -322,20 +414,22 @@ if (pins < MIN_CATALOGUE_PINS) fail(`only ${pins} catalogue keystrokes compared 
 // =====================================
 
 const localeFiles = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
-if (localeFiles.length < MIN_LOCALES) fail(`only ${localeFiles.length} locale files found (floor ${MIN_LOCALES})`);
-if (reasonKeys.size === 0) fail('the vocabulary declares no reason_key: the OS restrictions it documents would be unexplained');
+if (localeFiles.length < MIN_LOCALES)
+	fail(`only ${localeFiles.length} locale files found (floor ${MIN_LOCALES})`);
+if (reasonKeys.size === 0)
+	fail(
+		'the vocabulary declares no reason_key: the OS restrictions it documents would be unexplained'
+	);
 for (const file of localeFiles) {
 	const catalogueText = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
 	for (const key of reasonKeys) {
-		if (!key.startsWith('platform_reason.')) fail(`reason_key "${key}" is not under platform_reason.`);
+		if (!key.startsWith('platform_reason.'))
+			fail(`reason_key "${key}" is not under platform_reason.`);
 		const value = catalogueText[key];
-		if (typeof value !== 'string' || value.trim() === '') fail(`${file}: reason_key "${key}" is missing or blank`);
+		if (typeof value !== 'string' || value.trim() === '')
+			fail(`${file}: reason_key "${key}" is missing or blank`);
 	}
 }
-
-
-
-
 
 // =====================================================
 // =====================================================
@@ -357,7 +451,8 @@ for (const [id, entry] of Object.entries(catalogue)) {
 		catalogueByChord[os].get(chord).push(id);
 	}
 }
-if (scanned < MIN_CATALOGUE_CHORDS_SCANNED) fail(`only ${scanned} catalogue keystrokes scanned (floor ${MIN_CATALOGUE_CHORDS_SCANNED})`);
+if (scanned < MIN_CATALOGUE_CHORDS_SCANNED)
+	fail(`only ${scanned} catalogue keystrokes scanned (floor ${MIN_CATALOGUE_CHORDS_SCANNED})`);
 
 const presetText = fs.readFileSync(RECOMMENDED_PATH, 'utf8');
 let rawKeystrokes = 0;
@@ -368,15 +463,15 @@ for (const os of OSES) {
 			rawKeystrokes += 1;
 			const chord = res.chords.map((c) => [...c.mods, c.key].join('+')).join(',');
 			const ids = catalogueByChord[os].get(chord);
-			if (ids) fail(`layers.recommended.toml: ${layerId}.${code} spells out ${chord} on ${os}, which the catalogue action ${ids.join(' / ')} sends — bind the action by name`);
+			if (ids)
+				fail(
+					`layers.recommended.toml: ${layerId}.${code} spells out ${chord} on ${os}, which the catalogue action ${ids.join(' / ')} sends — bind the action by name`
+				);
 		}
 	}
 }
-if (rawKeystrokes === 0) fail('the recommended layer yielded no raw keystroke on any OS: the preset was not read');
-
-
-
-
+if (rawKeystrokes === 0)
+	fail('the recommended layer yielded no raw keystroke on any OS: the preset was not read');
 
 // ================================================
 // ================================================
@@ -390,22 +485,28 @@ if (rawKeystrokes === 0) fail('the recommended layer yielded no raw keystroke on
 // action would be an empty heading.
 const editorGroups = (vocabulary.editor || {}).groups;
 const groupSizes = new Map();
-if (!Array.isArray(editorGroups) || editorGroups.length === 0) fail('[editor].groups must list the picker groups in order');
+if (!Array.isArray(editorGroups) || editorGroups.length === 0)
+	fail('[editor].groups must list the picker groups in order');
 else {
 	for (const group of editorGroups) {
-		if (typeof group !== 'string' || !/^[a-z][a-z0-9_]*$/.test(group)) fail(`[editor].groups entry ${JSON.stringify(group)} is not a snake_case id`);
+		if (typeof group !== 'string' || !/^[a-z][a-z0-9_]*$/.test(group))
+			fail(`[editor].groups entry ${JSON.stringify(group)} is not a snake_case id`);
 		else if (groupSizes.has(group)) fail(`[editor].groups lists "${group}" twice`);
 		else groupSizes.set(group, 0);
 	}
 	for (const [id, action] of Object.entries(actions)) {
-		if (!groupSizes.has(action.group)) fail(`[actions.${id}].group = ${JSON.stringify(action.group)} is not one of [editor].groups`);
+		if (!groupSizes.has(action.group))
+			fail(`[actions.${id}].group = ${JSON.stringify(action.group)} is not one of [editor].groups`);
 		else groupSizes.set(action.group, groupSizes.get(action.group) + 1);
 	}
-	for (const [group, size] of groupSizes) if (size === 0) fail(`[editor].groups lists "${group}" and no action belongs to it`);
+	for (const [group, size] of groupSizes)
+		if (size === 0) fail(`[editor].groups lists "${group}" and no action belongs to it`);
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the layer-action vocabulary is incomplete or disagrees with the action catalogue:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the layer-action vocabulary is incomplete or disagrees with the action catalogue:\x1b[0m'
+	);
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }

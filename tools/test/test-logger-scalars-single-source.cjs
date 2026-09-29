@@ -63,7 +63,9 @@ const registry = toml.parse(
 const errors = [];
 
 if (!registry.logger) {
-	console.error('\x1b[31m[ERROR] _shared/modules/timings/constants.toml has no [logger] section.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] _shared/modules/timings/constants.toml has no [logger] section.\x1b[0m'
+	);
 	process.exit(1);
 }
 
@@ -92,7 +94,8 @@ function check(file, name, pattern, expected, note) {
 		if (value !== expected) {
 			const line = src.slice(0, m.index).split('\n').length;
 			errors.push(
-				`${file}:${line}: ${name} is ${value}, registry says ${expected}` + (note ? ` (${note})` : '')
+				`${file}:${line}: ${name} is ${value}, registry says ${expected}` +
+					(note ? ` (${note})` : '')
 			);
 		}
 	}
@@ -153,7 +156,10 @@ check(
 	// travels through pcall, so `Timings.count("logger", "retention_days")` and
 	// `pcall(Timings.count, "logger", "retention_days")` are both correct and only
 	// one of them has the parentheses.
-	if (!/Timings\.count/.test(sink) || !/["']logger["'][\s\S]{0,24}["']retention_days["']/.test(sink)) {
+	if (
+		!/Timings\.count/.test(sink) ||
+		!/["']logger["'][\s\S]{0,24}["']retention_days["']/.test(sink)
+	) {
 		errors.push(
 			'linux/infra/logger_sink.lua: the retention window is not read ' +
 				'from the shared registry — either it purges on a number of its own, which is ' +
@@ -219,9 +225,15 @@ check(
 // it had no dedup at all, so adopting it would have removed flood suppression
 // from a driver that had it.
 {
-	const ms = Number((read('windows/infra/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) || [])[1]);
-	const sec = Number((read('macos/infra/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]);
-	const coreSec = Number((read('_shared/lua/logger/init.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]);
+	const ms = Number(
+		(read('windows/infra/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) || [])[1]
+	);
+	const sec = Number(
+		(read('macos/infra/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
+	);
+	const coreSec = Number(
+		(read('_shared/lua/logger/init.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
+	);
 	if (Number.isFinite(ms) && Number.isFinite(sec) && ms !== sec * 1000) {
 		errors.push(
 			`the two dedup windows are different durations: AHK ${ms} ms vs HS ${sec} s (= ${sec * 1000} ms). ` +
@@ -366,7 +378,12 @@ check(
 	/\bkLoggerSlowBatchThresholdMilliseconds\s*=\s*(\d+)/g,
 	registry.logger.native_slow_batch_ms
 );
-if (!(registry.logger.native_slow_batch_ms > 0 && registry.logger.native_slow_batch_ms <= registry.logger.ack_retry_ms)) {
+if (
+	!(
+		registry.logger.native_slow_batch_ms > 0 &&
+		registry.logger.native_slow_batch_ms <= registry.logger.ack_retry_ms
+	)
+) {
 	errors.push(
 		`[logger] native_slow_batch_ms (${registry.logger.native_slow_batch_ms}) must be positive and no longer ` +
 			`than ack_retry_ms (${registry.logger.ack_retry_ms}): a slower reply has already cost a resend.`
@@ -397,7 +414,9 @@ mustNotDeclare(
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] logger scalars have drifted from the shared registry:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
-	console.error('    Registry: static/ergopti_plus/_shared/modules/timings/constants.toml [logger]');
+	console.error(
+		'    Registry: static/ergopti_plus/_shared/modules/timings/constants.toml [logger]'
+	);
 	process.exit(1);
 }
 

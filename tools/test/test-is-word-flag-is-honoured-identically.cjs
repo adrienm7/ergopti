@@ -55,7 +55,14 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const HOTSTRINGS_DIR = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'hotstrings');
+const HOTSTRINGS_DIR = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'hotstrings'
+);
 
 // A TOML entry line: "TRIGGER" = { output = "…", is_word = …, … }
 const ENTRY_RE = /^\s*"((?:[^"\\]|\\.)*)"\s*=\s*\{(.*)$/;
@@ -86,7 +93,10 @@ const CLEARED_ON_PURPOSE = [
 	{ trigger: ' = _', why: 'a leading space already is the boundary; the flag only blocked it' },
 	{ trigger: ' -> ★', why: 'a leading space already is the boundary; the flag only blocked it' },
 	{ trigger: ' = /=>★', why: 'a leading space already is the boundary; the flag only blocked it' },
-	{ trigger: '°C★', why: 'typed glued to a digit ("25°C★"); the flag made it unreachable everywhere but macOS, and there only by a byte-class accident' },
+	{
+		trigger: '°C★',
+		why: 'typed glued to a digit ("25°C★"); the flag made it unreachable everywhere but macOS, and there only by a byte-class accident'
+	}
 ];
 
 /**

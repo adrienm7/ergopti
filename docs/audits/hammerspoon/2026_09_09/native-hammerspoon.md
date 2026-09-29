@@ -9,11 +9,11 @@ own the earlier acquisition experiments and rejected approaches.
 
 ## What the tests actually establish
 
-| Layer | Evidence | Limit |
-| --- | --- | --- |
-| Windows Lua/Python tests | Real delivery, transport, accounting and context modules with explicit native doubles | Cannot prove Hammerspoon APIs, Accessibility permission or HID acquisition |
-| GitHub Actions macOS | Actual Hammerspoon, Quartz, IOKit and the owned Karabiner runtime | Input comes from a controlled virtual HID fixture, not physical keyboard hardware |
-| Production driver | Existing keylogger remains the ordinary counting path | Complete physical stream startup and exclusive accounting are not integrated |
+| Layer                    | Evidence                                                                              | Limit                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Windows Lua/Python tests | Real delivery, transport, accounting and context modules with explicit native doubles | Cannot prove Hammerspoon APIs, Accessibility permission or HID acquisition        |
+| GitHub Actions macOS     | Actual Hammerspoon, Quartz, IOKit and the owned Karabiner runtime                     | Input comes from a controlled virtual HID fixture, not physical keyboard hardware |
+| Production driver        | Existing keylogger remains the ordinary counting path                                 | Complete physical stream startup and exclusive accounting are not integrated      |
 
 The expression `condition and nil or keycode` always retains `keycode`. Replacing
 it with global suppression loses real Space when remapped Escape also emits
@@ -165,8 +165,7 @@ determine whether a fresh process changes the observed trust result.
 
 [Run 34755533559](https://github.com/adrienm7/ergopti/actions/runs/34755533559),
 job `103719145066`, tested the restart at
-`6e9cf688ff3db3a73df3ea80599ddbfbeaed0137`. The exact previous owner (PID
-11587) settled, UI state was enabled, but the replacement still failed the
+`6e9cf688ff3db3a73df3ea80599ddbfbeaed0137`. The exact previous owner (PID 11587) settled, UI state was enabled, but the replacement still failed the
 native trust check. Restarting alone did not resolve this failure.
 The supervisor now retains TCC evidence before cleanup on consumer failure too,
 not only on rejected UI admission. An additional bounded query follows the
@@ -550,11 +549,9 @@ The remap report has no observation error and SHA-256
 `01b364ca19c9390e9d193b8aa577dda3f1fc9fba867b719cb596a8c101d7bc65`.
 
 Lease 2 completed 496 baseline rows at boundary 8977339854. Device 4294968821
-had 263 elements, with exactly Space usage 44/cookie 109 held, timestamp
-8217178168. The other 231-element device had no held key. The fixture requested
+had 263 elements, with exactly Space usage 44/cookie 109 held, timestamp 8217178168. The other 231-element device had no held key. The fixture requested
 release at 8982573430, after the transferred baseline. Its retained cookie 109
-then delivered release at 8982618555, fresh press at 8984808892 and release at
-8987086379. All 15 stream records match the independent raw capture.
+then delivered release at 8982618555, fresh press at 8984808892 and release at 8987086379. All 15 stream records match the independent raw capture.
 
 Native Hammerspoon credited only keycode 49 once, with zero errors, trusted AX
 focus, verified privacy transitions and settled consumer/context ownership.
@@ -577,8 +574,7 @@ remain separate requirements; the producer still declares `fixture_only`.
 ## Eight native modifier sides
 
 Run [34816149265](https://github.com/adrienm7/ergopti/actions/runs/34816149265)
-used consumer `f1d2491eaf12bdfed39235bfcdded7b4124fff1c` and unchanged producer
-34783474637. Native fixture compilation and actual input passed; separate
+used consumer `f1d2491eaf12bdfed39235bfcdded7b4124fff1c` and unchanged producer 34783474637. Native fixture compilation and actual input passed; separate
 capability probes left the overall workflow red. The remap report has no
 observation error and SHA-256
 `b32f44a191b9a93e9813cd4f6b0f48197e4fb4828af7825e39dc157b9169a5eb`.
@@ -606,8 +602,7 @@ keyboards and production integration still require their own evidence.
 ## Overlapping Shift and repeated HID reports
 
 Run [34869741330](https://github.com/adrienm7/ergopti/actions/runs/34869741330)
-used consumer `f9186f27f55f5e916fafef4d530343f845393188` and unchanged producer
-34783474637. The actual remapping step passed without an observation error;
+used consumer `f9186f27f55f5e916fafef4d530343f845393188` and unchanged producer 34783474637. The actual remapping step passed without an observation error;
 independent capability probes still leave the overall workflow red. Report SHA-256:
 `0a2ffdee6107d5c41e500ecc47c336b5110d7cf9c9add090d735fbd86244db9e`.
 
@@ -637,6 +632,7 @@ The shared modifier replay validates both native fixtures and every incomplete
 stream prefix. This proves repeated HID report handling, not OS autorepeat;
 keyboard combinations, multiple active keyboards, full mapping and production
 integration still require validation.
+
 ## Shifted remapped and physical keys accepted on native macOS
 
 Run [34877932993](https://github.com/adrienm7/ergopti/actions/runs/34877932993)

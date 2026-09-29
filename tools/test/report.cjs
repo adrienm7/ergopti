@@ -26,9 +26,6 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 
-
-
-
 // =====================================
 // ======= 1/ Argument parsing =========
 // =====================================
@@ -38,15 +35,14 @@ function parseArgs(argv) {
 	let i = 0;
 	for (; i < argv.length; i++) {
 		const a = argv[i];
-		if (a === '--') { opts.cmd = argv.slice(i + 1); break; }
-		else if (a === '--name') opts.name = argv[++i];
+		if (a === '--') {
+			opts.cmd = argv.slice(i + 1);
+			break;
+		} else if (a === '--name') opts.name = argv[++i];
 		else if (a === '--json') opts.json = argv[++i];
 	}
 	return opts;
 }
-
-
-
 
 // =====================================
 // ======= 2/ Result extraction ========
@@ -60,24 +56,43 @@ function parseArgs(argv) {
 function parseResults(out) {
 	const lines = out.split(/\r?\n/);
 	const failures = [];
-	let passed = 0, failed = 0, format = 'unknown';
+	let passed = 0,
+		failed = 0,
+		format = 'unknown';
 
 	for (const line of lines) {
 		// TAP: "not ok 12 - some test - diag"
 		const tap = line.match(/^not ok\s+\d+\s+-\s+(.+)$/);
-		if (tap) { failures.push(tap[1].trim()); format = 'tap'; continue; }
+		if (tap) {
+			failures.push(tap[1].trim());
+			format = 'tap';
+			continue;
+		}
 		// Lua: "  FAIL some test — error"  (em-dash or hyphen separator)
 		const lua = line.match(/^\s*FAIL\s+(.+?)(?:\s+[—-]\s+.*)?$/);
-		if (lua && /^\s*FAIL\s/.test(line)) { failures.push(lua[1].trim()); format = 'lua'; continue; }
+		if (lua && /^\s*FAIL\s/.test(line)) {
+			failures.push(lua[1].trim());
+			format = 'lua';
+			continue;
+		}
 	}
 
 	// Counts: prefer the authoritative footers.
 	const tapPlan = out.match(/#\s*(\d+)\s+passed,\s+(\d+)\s+failed/);
-	if (tapPlan) { passed = Number(tapPlan[1]); failed = Number(tapPlan[2]); format = 'tap'; }
+	if (tapPlan) {
+		passed = Number(tapPlan[1]);
+		failed = Number(tapPlan[2]);
+		format = 'tap';
+	}
 	const luaPassed = out.match(/Passed tests:\s+(\d+)/);
 	const luaFailed = out.match(/Failed tests:\s+(\d+)/);
-	if (luaPassed) { passed = Number(luaPassed[1]); format = format === 'tap' ? 'tap' : 'lua'; }
-	if (luaFailed) { failed = Number(luaFailed[1]); }
+	if (luaPassed) {
+		passed = Number(luaPassed[1]);
+		format = format === 'tap' ? 'tap' : 'lua';
+	}
+	if (luaFailed) {
+		failed = Number(luaFailed[1]);
+	}
 
 	// De-duplicate failure names (the lua runner lists each failure twice:
 	// inline FAIL + DETAILED FAILURES). Keep first occurrence order.
@@ -86,9 +101,6 @@ function parseResults(out) {
 
 	return { failures: uniqueFailures, passed, failed, format };
 }
-
-
-
 
 // =====================================
 // ======= 3/ Emission =================
@@ -120,23 +132,40 @@ function emit(opts, res, code) {
 		const summary = `${opts.name}: ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {
-			const md = `### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n`
-				+ (res.failures.length ? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n` : '');
-			try { fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md); } catch { /* best-effort */ }
+			const md =
+				`### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n` +
+				(res.failures.length
+					? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n`
+					: '');
+			try {
+				fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+			} catch {
+				/* best-effort */
+			}
 		}
 	}
 
 	if (opts.json) {
-		const payload = { name: opts.name, format: res.format, passed: res.passed, failed: res.failed, exit_code: code, failures: res.failures };
-		try { fs.writeFileSync(opts.json, JSON.stringify(payload, null, 2)); } catch { /* best-effort */ }
+		const payload = {
+			name: opts.name,
+			format: res.format,
+			passed: res.passed,
+			failed: res.failed,
+			exit_code: code,
+			failures: res.failures
+		};
+		try {
+			fs.writeFileSync(opts.json, JSON.stringify(payload, null, 2));
+		} catch {
+			/* best-effort */
+		}
 	}
 
 	const tag = res.failed > 0 || code !== 0 ? '\x1b[31mFAIL\x1b[0m' : '\x1b[32mPASS\x1b[0m';
-	process.stdout.write(`\n[report:${opts.name}] ${tag} — ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed (exit ${code}, format ${res.format}).\n`);
+	process.stdout.write(
+		`\n[report:${opts.name}] ${tag} — ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed (exit ${code}, format ${res.format}).\n`
+	);
 }
-
-
-
 
 // =====================================
 // ======= 4/ Main =====================
@@ -145,7 +174,9 @@ function emit(opts, res, code) {
 function main() {
 	const opts = parseArgs(process.argv.slice(2));
 	if (opts.cmd.length === 0) {
-		process.stderr.write('Usage: node tools/test/report.cjs --name <label> [--json out.json] -- <cmd> [args…]\n');
+		process.stderr.write(
+			'Usage: node tools/test/report.cjs --name <label> [--json out.json] -- <cmd> [args…]\n'
+		);
 		process.exit(2);
 	}
 
@@ -160,8 +191,14 @@ function main() {
 
 	const child = spawn(opts.cmd[0], opts.cmd.slice(1), { shell: false });
 	let buf = '';
-	child.stdout.on('data', (d) => { buf += d; process.stdout.write(d); });
-	child.stderr.on('data', (d) => { buf += d; process.stderr.write(d); });
+	child.stdout.on('data', (d) => {
+		buf += d;
+		process.stdout.write(d);
+	});
+	child.stderr.on('data', (d) => {
+		buf += d;
+		process.stderr.write(d);
+	});
 	child.on('close', (code) => {
 		const res = parseResults(buf);
 		emit(opts, res, code ?? 0);

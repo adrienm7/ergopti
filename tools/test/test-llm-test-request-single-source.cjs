@@ -25,30 +25,38 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SSOT_FILE = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'llm', 'api_providers.json');
+const SSOT_FILE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'llm',
+	'api_providers.json'
+);
 
 // Files that must read the shared probe instead of restating it.
 const CONSUMERS = [
 	{
 		rel: 'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
-		refs: ['test_request'],
+		refs: ['test_request']
 	},
 	{
 		rel: 'static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk',
-		refs: ['test_request'],
+		refs: ['test_request']
 	},
 	{
 		rel: 'static/ergopti_plus/macos/modules/llm/api_remote.lua',
-		refs: ['TEST_REQUEST', 'test_request'],
+		refs: ['TEST_REQUEST', 'test_request']
 	},
 	{
 		rel: 'static/ergopti_plus/macos/ui/menu/menu_llm/api_panel.lua',
-		refs: ['test_request'],
+		refs: ['test_request']
 	},
 	{
 		rel: 'static/ergopti_plus/linux/modules/llm/api_remote.lua',
-		refs: ['test_request'],
-	},
+		refs: ['test_request']
+	}
 ];
 
 let failed = false;
@@ -113,4 +121,6 @@ if (spec && typeof spec.system_prompt === 'string' && spec.system_prompt !== '')
 }
 
 if (failed) process.exit(1);
-console.log('\x1b[32m[OK] API test-request probe is single-sourced (api_providers.json test_request).\x1b[0m');
+console.log(
+	'\x1b[32m[OK] API test-request probe is single-sourced (api_providers.json test_request).\x1b[0m'
+);

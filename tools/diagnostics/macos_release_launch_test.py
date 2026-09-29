@@ -6,7 +6,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-spec = importlib.util.spec_from_file_location("release_launch", Path(__file__).with_name("macos-release-launch.py"))
+spec = importlib.util.spec_from_file_location(
+    "release_launch", Path(__file__).with_name("macos-release-launch.py")
+)
 observer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(observer)
 
@@ -49,7 +51,8 @@ class FailureEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             logs = Path(folder)
             (logs / "ErgoptiPlus_boot.log").write_text(
-                "[INFO] booting\n[ERROR] [llm] Profile catalogue failed.\n", encoding="utf-8")
+                "[INFO] booting\n[ERROR] [llm] Profile catalogue failed.\n", encoding="utf-8"
+            )
             (logs / "launcher.log").write_text("FATAL: child exited\n", encoding="utf-8")
             lines = observer.failure_evidence({"error": "RuntimeError: boom"}, logs)
         self.assertEqual(lines[0], "release launch failed: RuntimeError: boom")
@@ -65,7 +68,9 @@ class FailureEvidenceTests(unittest.TestCase):
         self.assertEqual(len(lines), observer.MAX_EVIDENCE_LINES)
 
     def test_missing_log_folder_still_names_the_failure(self):
-        lines = observer.failure_evidence({"error": "RuntimeError: boom"}, Path("/nonexistent/ergopti"))
+        lines = observer.failure_evidence(
+            {"error": "RuntimeError: boom"}, Path("/nonexistent/ergopti")
+        )
         self.assertEqual(lines, ["release launch failed: RuntimeError: boom"])
 
 

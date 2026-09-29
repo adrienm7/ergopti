@@ -93,7 +93,10 @@ for (const base of readerRoots) {
 			// are consumers whose names say nothing about a corpus.
 			else if (/\.(lua|ahk|cjs|js)$/.test(e.name)) {
 				if (path.resolve(p) === path.resolve(__filename)) continue;
-				readerFiles.push({ rel: path.relative(SP, p).split(path.sep).join('/'), src: fs.readFileSync(p, 'utf8') });
+				readerFiles.push({
+					rel: path.relative(SP, p).split(path.sep).join('/'),
+					src: fs.readFileSync(p, 'utf8')
+				});
 			}
 		}
 	})(base);

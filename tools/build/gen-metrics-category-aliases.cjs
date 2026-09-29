@@ -35,7 +35,14 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const LOCALES_DIR = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
-const OUT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'metrics_general_category_aliases.json');
+const OUT = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'data',
+	'metrics_general_category_aliases.json'
+);
 
 const KEY = 'metrics_apps.general_category';
 
@@ -79,9 +86,11 @@ if (require.main === module) {
 			'these must resolve to the same category or their overrides are orphaned.',
 		key: KEY,
 		by_locale: byLocale,
-		aliases,
+		aliases
 	};
 	fs.mkdirSync(path.dirname(OUT), { recursive: true });
 	fs.writeFileSync(OUT, JSON.stringify(doc, null, '\t') + '\n', 'utf8');
-	console.log(`[gen] ${aliases.length} distinct spelling(s) across ${Object.keys(byLocale).length} locale(s) → ${path.relative(ROOT, OUT)}`);
+	console.log(
+		`[gen] ${aliases.length} distinct spelling(s) across ${Object.keys(byLocale).length} locale(s) → ${path.relative(ROOT, OUT)}`
+	);
 }

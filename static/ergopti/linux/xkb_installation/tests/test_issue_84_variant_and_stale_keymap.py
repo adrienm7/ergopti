@@ -77,7 +77,7 @@ class VariantAliasTests(unittest.TestCase):
         preceding = aliased[:alias_at].rsplit("\n", 2)[-2]
         self.assertEqual(preceding, "partial alphanumeric_keys")
         self.assertNotIn(
-            "default partial alphanumeric_keys\nxkb_symbols \"ergopti_plus\"",
+            'default partial alphanumeric_keys\nxkb_symbols "ergopti_plus"',
             aliased,
             "a second default section would make the resolved layout ambiguous",
         )
@@ -134,9 +134,7 @@ class ParseLocalectlTests(unittest.TestCase):
         self.assertEqual(spec, LayoutSpec("fr", "Ergopti_v2_2_1"))
 
     def test_reads_a_layout_with_no_variant(self):
-        self.assertEqual(
-            parse_localectl_x11("X11 Layout: us\n"), LayoutSpec("us", "")
-        )
+        self.assertEqual(parse_localectl_x11("X11 Layout: us\n"), LayoutSpec("us", ""))
 
     def test_returns_none_without_an_x11_layout(self):
         self.assertIsNone(parse_localectl_x11("System Locale: LANG=C\n"))
@@ -145,9 +143,7 @@ class ParseLocalectlTests(unittest.TestCase):
 
     def test_rejects_values_that_could_escape_a_rules_slot(self):
         self.assertIsNone(parse_localectl_x11("X11 Layout: ../../etc\n"))
-        self.assertIsNone(
-            parse_localectl_x11("X11 Layout: fr\nX11 Variant: ../escape\n")
-        )
+        self.assertIsNone(parse_localectl_x11("X11 Layout: fr\nX11 Variant: ../escape\n"))
 
     def test_ignores_the_console_keymap(self):
         # VC Keymap is the console, not X11; confusing the two would report a
@@ -176,20 +172,24 @@ class StaleSystemKeymapTests(unittest.TestCase):
     def test_issue_84_accepts_the_current_french_variant(self):
         for variant in ("ergopti", "ergopti_plus"):
             with self.subTest(variant=variant):
-                self.assertIsNone(stale_x11_keymap(
-                    f"X11 Layout: fr\nX11 Variant: {variant}\n",
-                    LayoutSpec("ergopti", variant),
-                ))
+                self.assertIsNone(
+                    stale_x11_keymap(
+                        f"X11 Layout: fr\nX11 Variant: {variant}\n",
+                        LayoutSpec("ergopti", variant),
+                    )
+                )
 
     def test_issue_84_still_reports_a_different_installed_variant(self):
-        self.assertEqual(stale_x11_keymap(
-            "X11 Layout: fr\nX11 Variant: ergopti_plus\n", self.installed,
-        ), LayoutSpec("fr", "ergopti_plus"))
+        self.assertEqual(
+            stale_x11_keymap(
+                "X11 Layout: fr\nX11 Variant: ergopti_plus\n",
+                self.installed,
+            ),
+            LayoutSpec("fr", "ergopti_plus"),
+        )
 
     def test_stays_quiet_for_a_keymap_that_is_none_of_our_business(self):
-        self.assertIsNone(
-            stale_x11_keymap("X11 Layout: fr\nX11 Variant: bepo\n", self.installed)
-        )
+        self.assertIsNone(stale_x11_keymap("X11 Layout: fr\nX11 Variant: bepo\n", self.installed))
         self.assertIsNone(stale_x11_keymap("X11 Layout: us\n", self.installed))
 
     def test_stays_quiet_when_localectl_is_absent(self):
@@ -216,8 +216,13 @@ class InstallerWarningTests(unittest.TestCase):
     def test_warns_and_names_the_exact_fix_command(self):
         clean = self._installer()
         printed: list[str] = []
-        with mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL), \
-                mock.patch("builtins.print", side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a))):
+        with (
+            mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL),
+            mock.patch(
+                "builtins.print",
+                side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a)),
+            ),
+        ):
             clean.warn_stale_system_keymap("ergopti_plus")
         joined = "\n".join(printed)
         self.assertIn("fr + Ergopti_v2_2_1", joined)
@@ -226,8 +231,13 @@ class InstallerWarningTests(unittest.TestCase):
     def test_says_nothing_when_there_is_no_leftover(self):
         clean = self._installer()
         printed: list[str] = []
-        with mock.patch.object(clean, "run_capture", return_value="X11 Layout: us\n"), \
-                mock.patch("builtins.print", side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a))):
+        with (
+            mock.patch.object(clean, "run_capture", return_value="X11 Layout: us\n"),
+            mock.patch(
+                "builtins.print",
+                side_effect=lambda *a, **k: printed.append(" ".join(str(x) for x in a)),
+            ),
+        ):
             clean.warn_stale_system_keymap("ergopti_plus")
         self.assertEqual(printed, [])
 
@@ -236,8 +246,10 @@ class InstallerWarningTests(unittest.TestCase):
         # display manager. Reporting it is this installer's job; repointing it
         # silently is not.
         clean = self._installer()
-        with mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL) as capture, \
-                mock.patch("builtins.print"):
+        with (
+            mock.patch.object(clean, "run_capture", return_value=REPORTER_LOCALECTL) as capture,
+            mock.patch("builtins.print"),
+        ):
             clean.warn_stale_system_keymap("ergopti_plus")
         for call in capture.call_args_list:
             command = call.args[0]
@@ -312,11 +324,10 @@ class RetireLegacyInstallationTests(unittest.TestCase):
     def test_leaves_no_backup_that_would_look_like_a_live_install(self):
         self.build_reporter_tree()
         retire_legacy_installation(self.system_root)
-        leftovers = [
-            path.name
-            for path in self.system_root.rglob("*.1")
-        ]
-        self.assertEqual(leftovers, [], "stale snapshots make a later run think Ergopti is installed")
+        leftovers = [path.name for path in self.system_root.rglob("*.1")]
+        self.assertEqual(
+            leftovers, [], "stale snapshots make a later run think Ergopti is installed"
+        )
 
     def test_never_touches_a_file_it_did_not_back_up(self):
         # No .1 snapshot means the legacy installer never edited this file, so
@@ -324,13 +335,17 @@ class RetireLegacyInstallationTests(unittest.TestCase):
         untouched = self.write(("symbols", "fr"), "ergopti mentioned by someone else\n")
         retired = retire_legacy_installation(self.system_root)
         self.assertEqual(retired, [])
-        self.assertEqual(untouched.read_text(encoding="utf-8"), "ergopti mentioned by someone else\n")
+        self.assertEqual(
+            untouched.read_text(encoding="utf-8"), "ergopti mentioned by someone else\n"
+        )
 
     def test_drops_stale_snapshots_beside_an_already_clean_file(self):
         # A distribution upgrade replaced the file with its own pristine copy.
         # Restoring an older snapshot over it would downgrade it; only the
         # snapshots go, so a later run does not believe an install is present.
-        target = self.write(("symbols", "fr"), "// replaced by the distribution\n", backup="// older\n")
+        target = self.write(
+            ("symbols", "fr"), "// replaced by the distribution\n", backup="// older\n"
+        )
         retired = retire_legacy_installation(self.system_root)
         self.assertEqual(retired, [])
         self.assertEqual(target.read_text(encoding="utf-8"), "// replaced by the distribution\n")
@@ -368,12 +383,14 @@ class CleanInstallRetiresTheLegacyTreeTests(unittest.TestCase):
     def test_cleanup_calls_the_retirement(self):
         import xkb_files_installer_clean as clean
 
-        with mock.patch.object(clean, "remove_generation_two_links", return_value=0), \
-                mock.patch.object(clean, "strip_legacy_evdev_patch", return_value=0), \
-                mock.patch.object(
-                    clean, "retire_legacy_installation", return_value=["symbols/fr"]
-                ) as retire, \
-                mock.patch("builtins.print") as printed:
+        with (
+            mock.patch.object(clean, "remove_generation_two_links", return_value=0),
+            mock.patch.object(clean, "strip_legacy_evdev_patch", return_value=0),
+            mock.patch.object(
+                clean, "retire_legacy_installation", return_value=["symbols/fr"]
+            ) as retire,
+            mock.patch("builtins.print") as printed,
+        ):
             roots = mock.Mock(system_root=Path("/usr/share/X11/xkb"))
             clean.cleanup_previous_installations(roots)
         retire.assert_called_once_with(Path("/usr/share/X11/xkb"))
@@ -397,20 +414,30 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
             seen.append(spec)
             return True
 
-        with mock.patch.object(clean, "verify_keymap", side_effect=record), \
-                mock.patch("builtins.print"):
+        with (
+            mock.patch.object(clean, "verify_keymap", side_effect=record),
+            mock.patch("builtins.print"),
+        ):
             self.assertTrue(
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
             )
         self.assertEqual(
-            seen, [LayoutSpec("ergopti", ""), LayoutSpec("ergopti", "ergopti_plus"),
-                   LayoutSpec("fr", "ergopti_plus")]
+            seen,
+            [
+                LayoutSpec("ergopti", ""),
+                LayoutSpec("ergopti", "ergopti_plus"),
+                LayoutSpec("fr", "ergopti_plus"),
+            ],
         )
 
     def test_issue_84_french_variant_failure_aborts_the_install(self):
         clean = self._installer()
-        with mock.patch.object(clean, "verify_keymap", side_effect=lambda spec, *a, **k: spec.layout != "fr"), \
-                mock.patch("builtins.print"):
+        with (
+            mock.patch.object(
+                clean, "verify_keymap", side_effect=lambda spec, *a, **k: spec.layout != "fr"
+            ),
+            mock.patch("builtins.print"),
+        ):
             self.assertFalse(clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti"))
 
     def test_a_variant_that_fails_the_fence_aborts_the_install(self):
@@ -419,16 +446,20 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
         def reject_the_variant(spec, *args, **kwargs):
             return spec.variant == ""
 
-        with mock.patch.object(clean, "verify_keymap", side_effect=reject_the_variant), \
-                mock.patch("builtins.print"):
+        with (
+            mock.patch.object(clean, "verify_keymap", side_effect=reject_the_variant),
+            mock.patch("builtins.print"),
+        ):
             self.assertFalse(
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
             )
 
     def test_a_host_with_no_compiler_still_installs(self):
         clean = self._installer()
-        with mock.patch.object(clean, "verify_keymap", return_value=None), \
-                mock.patch("builtins.print"):
+        with (
+            mock.patch.object(clean, "verify_keymap", return_value=None),
+            mock.patch("builtins.print"),
+        ):
             self.assertTrue(
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
             )
@@ -436,9 +467,12 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
     def test_the_layout_alone_is_still_checked_without_a_variant(self):
         clean = self._installer()
         seen: list[LayoutSpec] = []
-        with mock.patch.object(
-            clean, "verify_keymap", side_effect=lambda spec, *a, **k: seen.append(spec) or True
-        ), mock.patch("builtins.print"):
+        with (
+            mock.patch.object(
+                clean, "verify_keymap", side_effect=lambda spec, *a, **k: seen.append(spec) or True
+            ),
+            mock.patch("builtins.print"),
+        ):
             self.assertTrue(clean.compile_validation(Path("/tmp/staging"), "ergopti"))
         self.assertEqual(seen, [LayoutSpec("ergopti", "")])
 
