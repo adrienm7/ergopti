@@ -45,11 +45,16 @@ local quote = ShellRunner.quote
 --- The shell command that signals the process owning the active X11 window.
 --- `$PPID` is the daemon (the shell that runs this is its child): its own
 --- windows are refused, as are pid 0 and 1, so the action can neither kill the
---- driver nor init.
+--- driver nor init. The desktop and the panels (EWMH DESKTOP and DOCK windows)
+--- are refused too: they belong to the desktop shell (plasmashell,
+--- xfdesktop…), which a clean SIGTERM exit leaves gone for the session.
 --- @param signal string "TERM" or "KILL".
 --- @return string
 local function active_window_signal(signal)
-	return "pid=$(xdotool getactivewindow getwindowpid 2>/dev/null)"
+	return "win=$(xdotool getactivewindow 2>/dev/null)"
+		.. ' && kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
+		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
+		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -' .. signal .. ' "$pid"'
 end
 

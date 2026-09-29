@@ -165,6 +165,23 @@ helpers.describe("macOS system actions start their exact native command", functi
 		end)
 	end)
 
+	-- With the desktop clicked, Finder is frontmost: quitting it removed the
+	-- desktop until it was relaunched, which Cmd+Q deliberately cannot do.
+	helpers.it("quit and force quit refuse the desktop shell", function()
+		with_system(function(System, record)
+			local runs = 0
+			for _, front in ipairs({ "301 com.apple.finder", "302 com.apple.dock", "303 com.apple.loginwindow" }) do
+				System.quit_frontmost_app(PARENT)
+				runs = runs + 1
+				complete(record.runs[runs], true, front)
+				System.force_quit_frontmost(PARENT)
+				runs = runs + 1
+				complete(record.runs[runs], true, front)
+				helpers.assert_eq(#record.runs, runs, front .. " is neither quit nor killed")
+			end
+		end)
+	end)
+
 	helpers.it("force_quit_frontmost sends SIGKILL to the frontmost process", function()
 		with_system(function(System, record)
 			System.force_quit_frontmost(PARENT)

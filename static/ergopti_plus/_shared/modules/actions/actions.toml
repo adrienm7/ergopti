@@ -789,14 +789,19 @@ parameter = "app"
 [sg_actions.quit_frontmost_app]
 # Asks the active application to quit (macOS its Quit command, Windows WM_CLOSE
 # to each of its windows, Linux SIGTERM to the active window's process, X11).
-# The driver itself is refused: script_quit owns its teardown.
+# The driver itself is refused: script_quit owns its teardown. The desktop
+# shell is refused too, as quitting it removes the desktop or the taskbar:
+# Finder, the Dock and loginwindow on macOS; the desktop, the taskbar and the
+# rest of the shell's explorer.exe on Windows (only the active folder window is
+# closed); the EWMH desktop and dock windows on Linux (read with xprop).
 platform = "all"
-requires_linux = ["session:x11", "tool:xdotool"]
+requires_linux = ["session:x11", "tool:xdotool", "tool:xprop"]
 
 [sg_actions.force_quit_frontmost]
-# Kills the active application at once (SIGKILL, TerminateProcess).
+# Kills the active application at once (SIGKILL, TerminateProcess), with the
+# same refusals as quit_frontmost_app.
 platform = "all"
-requires_linux = ["session:x11", "tool:xdotool"]
+requires_linux = ["session:x11", "tool:xdotool", "tool:xprop"]
 
 [sg_actions.empty_trash]
 platform = "all"

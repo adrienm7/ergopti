@@ -69,9 +69,17 @@ local EXPECTED = {
 		.. " *prefer-dark*) gsettings set org.gnome.desktop.interface color-scheme default;;"
 		.. " *) gsettings set org.gnome.desktop.interface color-scheme prefer-dark;; esac; }",
 	mic_mute_toggle = "{ pactl set-source-mute @DEFAULT_SOURCE@ toggle; }",
-	quit_frontmost_app = "{ pid=$(xdotool getactivewindow getwindowpid 2>/dev/null)"
+	-- The desktop and the panels belong to the desktop shell: signalling their
+	-- process removed the desktop and the panels for the session.
+	quit_frontmost_app = "{ win=$(xdotool getactivewindow 2>/dev/null)"
+		.. ' && kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
+		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
+		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -TERM "$pid"; }',
-	force_quit_frontmost = "{ pid=$(xdotool getactivewindow getwindowpid 2>/dev/null)"
+	force_quit_frontmost = "{ win=$(xdotool getactivewindow 2>/dev/null)"
+		.. ' && kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
+		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
+		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -KILL "$pid"; }',
 	clear_notifications = "{ dunstctl close-all 2>/dev/null || makoctl dismiss --all 2>/dev/null"
 		.. " || swaync-client --close-all 2>/dev/null; }",
