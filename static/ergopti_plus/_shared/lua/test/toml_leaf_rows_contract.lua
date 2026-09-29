@@ -80,6 +80,23 @@ return function(helpers)
 			end, "a present quoted key under a header cannot be removed by line")
 		end)
 
+		helpers.it("deletes nothing where the source holds a scalar instead of the leaf's table", function()
+			local inline = '[hotstrings]\ndynamic = { date = false, keep = 1 }\n'
+			helpers.assert_eq(#LeafRows.prepare(inline, {
+				{ path = { "hotstrings", "dynamic", "date", "enabled" }, delete = true } }), 0,
+				"an inline scalar is left as the file holds it")
+			local header = "[hotstrings.dynamic]\ndate = false\n"
+			local decoded, bytes = apply(header, {
+				{ path = { "hotstrings", "dynamic", "date", "enabled" }, delete = true },
+				{ path = { "hotstrings", "dynamic", "enabled" }, delete = true },
+			})
+			helpers.assert_eq(decoded.hotstrings.dynamic.date, false)
+			helpers.assert_eq(bytes, header)
+			helpers.assert_throws(function()
+				LeafRows.prepare(inline, { { path = { "hotstrings", "dynamic", "date", "enabled" }, value = true } })
+			end, "a write across a scalar is still refused")
+		end)
+
 		helpers.it("refuses malformed operations", function()
 			for _, operation in ipairs({ { path = { "a" }, value = true }, { path = { "a", "" }, value = true },
 				{ path = { "a", "b" } }, { path = { "a", "b" }, value = true, delete = true } }) do

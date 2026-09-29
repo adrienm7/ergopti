@@ -143,8 +143,14 @@ function M.prepare(content, operations)
 		for index = #anchor_path + 1, #operation.path do rest[#rest + 1] = operation.path[index] end
 		apply_inside(candidates[key].value, rest, operation)
 	end
-	for _, operation in ipairs(operations) do
+	--- Plans one operation as a folded inline change or a writer row.
+	--- @param operation table Validated leaf operation.
+	local function plan(operation)
 		local path, anchor = operation.path, nil
+		-- A leaf the source does not hold has nothing to remove, including one
+		-- whose parent is a scalar another reader keeps at that name. No row is
+		-- planned, so the file keeps those bytes exactly as they are.
+		if operation.delete and lookup(decoded, path) == nil then return end
 		for depth = 1, #path - 1 do
 			if inline[identity(path, depth)] or created[identity(path, depth)] then anchor = depth; break end
 		end
@@ -154,12 +160,12 @@ function M.prepare(content, operations)
 			rows[#rows + 1] = { section = KeyPath.render(prefix(path, #path - 1)), key = path[#path],
 				value = clone(operation.value), delete = operation.delete }
 		else
-			-- Only a deletion reaches here: an absent quoted key needs no row, and a
-			-- present one under a header cannot be addressed without misparsing it.
-			assert(lookup(decoded, path) == nil, "TOML key cannot be removed under a table header: "
-				.. KeyPath.render(path))
+			-- Only a deletion of a present quoted key reaches here, and under a
+			-- table header it cannot be addressed by line without misparsing it.
+			error("TOML key cannot be removed under a table header: " .. KeyPath.render(path))
 		end
 	end
+	for _, operation in ipairs(operations) do plan(operation) end
 	for _, key in ipairs(order) do
 		local candidate = candidates[key]
 		local parent, name = prefix(candidate.path, #candidate.path - 1), candidate.path[#candidate.path]
