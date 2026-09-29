@@ -69,6 +69,9 @@ local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
+-- The launcher's registration role runs at most five bounded launchctl steps
+-- (3 s each plus a 0.25 s termination grace) and one 3 s guardian health wait.
+local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 20.0
 local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
 local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
@@ -1625,6 +1628,28 @@ local function guardian_status_probe_required()
 	return true
 end
 
+--- Starts the next native guardian observation for a retained regeneration or
+--- recovery. The launcher never registers the guardian, so the first
+--- observation of a lifecycle registers it; both callers are reached only with
+--- « Ergopti uses Karabiner » on, which makes the switch the registration gate.
+--- @param on_done function Callback fn(status, reason).
+--- @return table|nil handle Cancellation wrapper, or nil on rejection.
+--- @return string|nil error_message Stable launch failure detail.
+--- @return number timeout_sec Bound for this observation.
+local function start_guardian_observation(on_done)
+	local required_ok, required = pcall(LeaseController.guardian_registration_required)
+	if not required_ok or type(required) ~= "boolean" then
+		return nil, "guardian-registration-state-unavailable: " .. tostring(required),
+			LEASE_GUARDIAN_PROBE_TIMEOUT_SEC
+	end
+	if required then
+		local handle, err = LeaseController.register_guardian(on_done)
+		return handle, err, LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC
+	end
+	local handle, err = LeaseController.probe_guardian_status(on_done)
+	return handle, err, LEASE_GUARDIAN_PROBE_TIMEOUT_SEC
+end
+
 local schedule_guardian_regeneration_poll
 local start_guardian_regeneration_probe
 
@@ -1880,8 +1905,11 @@ start_guardian_regeneration_probe = function(wait, reason)
 		release_lease_less_resume_waiters(wait, wait_status)
 	end
 
+	local observation_timeout_sec = LEASE_GUARDIAN_PROBE_TIMEOUT_SEC
 	local call_ok, handle_or_err, launch_error = xpcall(function()
-		return LeaseController.probe_guardian_status(settle_probe)
+		local handle, err, timeout_sec = start_guardian_observation(settle_probe)
+		observation_timeout_sec = timeout_sec
+		return handle, err
 	end, debug.traceback)
 	if not call_ok then
 		settle_probe(nil, "guardian-status-probe-raised: " .. tostring(handle_or_err))
@@ -1899,7 +1927,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 	local fired_before_arm = false
 	local timer_ok, timeout_or_err, timeout_committed = pcall(
 		TimerScheduler.after,
-		LEASE_GUARDIAN_PROBE_TIMEOUT_SEC,
+		observation_timeout_sec,
 		function()
 			if not armed then
 				fired_before_arm = true
@@ -2074,8 +2102,11 @@ probe_guardian_for_recovery = function(recovery, continuation, refund_attempt, r
 		schedule_guardian_status_poll(recovery, status or probe_error or reason)
 	end
 
+	local observation_timeout_sec = LEASE_GUARDIAN_PROBE_TIMEOUT_SEC
 	local call_ok, handle_or_err, launch_error = xpcall(function()
-		return LeaseController.probe_guardian_status(settle_probe)
+		local handle, err, timeout_sec = start_guardian_observation(settle_probe)
+		observation_timeout_sec = timeout_sec
+		return handle, err
 	end, debug.traceback)
 	if not call_ok then
 		settle_probe(nil, "guardian-status-probe-raised: " .. tostring(handle_or_err))
@@ -2093,7 +2124,7 @@ probe_guardian_for_recovery = function(recovery, continuation, refund_attempt, r
 	local fired_before_arm = false
 	local timer_ok, timer_or_err, timer_committed = pcall(
 		TimerScheduler.after,
-		LEASE_GUARDIAN_PROBE_TIMEOUT_SEC,
+		observation_timeout_sec,
 		function()
 			if not armed then
 				fired_before_arm = true

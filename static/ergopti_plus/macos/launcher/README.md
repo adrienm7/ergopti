@@ -52,6 +52,13 @@ publishes only that token's OFF+tombstone variables if every private process is
 Force Quit. Pipe EOF, outer loss, inner loss, guardian restart and bounded CLI
 timeouts therefore converge on the same token-scoped fence.
 
+The GUI launcher never registers this LaunchAgent: it starts Hammerspoon at
+once and exports `ERGOPTI_REMAP_GUARDIAN_STATUS=not_requested`. Only the driver
+reads « Ergopti uses Karabiner », so the driver registers the guardian through
+the headless `--register-remap-guardian` role, on the first guardian
+observation of a lifecycle, which it reaches only while that switch is on. A
+user who turns the integration off gets no Background Item from ErgoptiPlus.
+
 This is deliberately not a Karabiner process watchdog. Karabiner's UI, menubar,
 root Core Service, console user server, user/session agents, observers,
 extensions, watchers, `Karabiner-VirtualHIDDevice-Daemon` and its DriverKit

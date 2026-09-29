@@ -532,15 +532,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	) -> Void
 	private let fatalReporter: ((String) -> Void)?
 	private let applicationTerminator: (Any?) -> Void
-	private let guardianRegistrar: (String) -> RemapGuardianRegistrationStatus
 	private let loggerWorkerFactory: () -> LoggerDatagramServing?
 	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
 	private let fatalReportStore: EmbeddedFatalReportStore
 	private let childActivity: EmbeddedChildActivity
-	private let guardianRegistrationQueue = DispatchQueue(
-		label: "com.ergoptiplus.remap-guardian.registration",
-		qos: .userInitiated
-	)
 	private var applicationIsTerminating = false
 	// Monotonic origin of this launcher's startup trail.
 	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
@@ -556,7 +551,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - applicationLauncher: Starts embedded Hammerspoon through Launch Services.
 	///   - fatalReporter: Test-only observer replacing the modal fatal UI.
 	///   - applicationTerminator: Ends AppKit after a clean child shutdown.
-	///   - guardianRegistrar: Resolves the independent service off the AppKit thread.
 	///   - loggerWorkerFactory: Binds the native loopback logger before child start.
 	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
 	///   - fatalReportStore: Per-launch report the Lua runtime writes before a fatal exit.
@@ -577,8 +571,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		},
 		fatalReporter: ((String) -> Void)? = nil,
 		applicationTerminator: @escaping (Any?) -> Void = { NSApp.terminate($0) },
-		guardianRegistrar: @escaping (String) -> RemapGuardianRegistrationStatus =
-			remapGuardianRegistrationStatus,
 		loggerWorkerFactory: @escaping () -> LoggerDatagramServing? = {
 			LoggerDatagramWorker()
 		},
@@ -592,7 +584,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.applicationLauncher = applicationLauncher
 		self.fatalReporter = fatalReporter
 		self.applicationTerminator = applicationTerminator
-		self.guardianRegistrar = guardianRegistrar
 		self.loggerWorkerFactory = loggerWorkerFactory
 		self.processExitMonitorFactory = processExitMonitorFactory
 		self.fatalReportStore = fatalReportStore
@@ -666,15 +657,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
-
-		// Service registration can execute bounded launchctl children on macOS
-		// 11/12. Keep that work off AppKit's main thread, but do not launch
-		// Hammerspoon until its result is known: remapping remains fail-closed.
-		guard let launcherPath = Bundle.main.executablePath else {
-			fail("Running launcher executable path is unavailable.")
-			return
-		}
-		startManagedHammerspoon(at: hsBinary, launcherPath: launcherPath)
+		startManagedHammerspoon(at: hsBinary)
 	}
 
 	/// Routes the private menu commands to the retained Sparkle controller.
@@ -684,34 +667,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 	}
 
-	/// Starts Hammerspoon only after the independent guardian result is known.
-	func startManagedHammerspoon(at hsBinary: String, launcherPath: String) {
-		LauncherLog.write("launcher stage: remap guardian registration started")
-		beginRemapGuardianRegistration(executablePath: launcherPath) { [weak self] status in
-			guard let self, !self.applicationIsTerminating else { return }
-			LauncherLog.write(
-				"launcher stage: remap guardian registration finished: \(status.rawValue) "
-					+ "(+\(self.elapsedMilliseconds()) ms)"
-			)
-			if status != .ready {
-				LauncherLog.write(
-					"remap guardian \(status.rawValue); ErgoptiPlus rules remain inert"
-				)
-			}
-			self.launchHammerspoon(at: hsBinary, remapGuardianStatus: status)
-		}
-	}
-
-	/// Resolves bounded service work away from AppKit and returns on the main queue.
-	func beginRemapGuardianRegistration(
-		executablePath: String,
-		completion: @escaping (RemapGuardianRegistrationStatus) -> Void
-	) {
-		let registrar = guardianRegistrar
-		guardianRegistrationQueue.async {
-			let status = registrar(executablePath)
-			DispatchQueue.main.async { completion(status) }
-		}
+	/// Starts Hammerspoon without registering the remap guardian. The driver
+	/// registers it through the headless `--register-remap-guardian` role, and
+	/// only once it has read « Ergopti uses Karabiner » = on: a user who turned
+	/// the integration off gets no Background Item from ErgoptiPlus.
+	func startManagedHammerspoon(at hsBinary: String) {
+		LauncherLog.write(
+			"launcher stage: remap guardian registration left to the driver's Karabiner switch"
+		)
+		launchHammerspoon(at: hsBinary, remapGuardianStatus: .notRequested)
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {
@@ -821,7 +785,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// while the returned NSRunningApplication preserves the fused lifecycle.
 	func launchHammerspoon(
 		at binaryPath: String,
-		remapGuardianStatus: RemapGuardianRegistrationStatus = .ready
+		remapGuardianStatus: RemapGuardianRegistrationStatus = .notRequested
 	) {
 		guard let launcherPath = Bundle.main.executablePath,
 			!launcherPath.isEmpty,
@@ -1089,6 +1053,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return "The independent remap guardian requires user approval; ErgoptiPlus rules remain inert."
 		case .unavailable:
 			return "The independent remap guardian is unavailable; ErgoptiPlus rules remain inert."
+		case .notRequested:
+			return "The remap guardian is registered by the driver only while Ergopti uses Karabiner."
 		}
 	}
 
