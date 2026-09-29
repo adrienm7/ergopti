@@ -19,6 +19,8 @@
 ---    first-row switch is the persisted [mod_combos] enabled.
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
+--- 5. Restore recommended / clear run the remap engine's tap_holds scope: a
+---    default-No confirmation, a verified backup, then the exact terminal.
 --- ==============================================================================
 
 local M = {}
@@ -192,6 +194,36 @@ local function run_bulk_menu_command(
 		finish(pending_ok, pending_reason, pending_count)
 	end
 	return true
+end
+
+-- Makes each scope backup path unique within the session.
+local _scope_generation = 0
+
+--- Asks, then applies one tap_holds scope mode through the remap transaction.
+--- The chords belong to the shortcuts scope and are not part of this request.
+--- @param karabiner table Remap facade.
+--- @param mode string "recommended" or "clear".
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean accepted
+local function run_scope(karabiner, mode, update_menu)
+	local label = i18n.get(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+	local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+	if require("infra.dialog_util").block_alert(i18n.get("menu.tapholds.title"), label, no, yes, "warning") ~= yes then
+		Logger.info(LOG, "Tap-hold scope %s declined.", mode)
+		return false
+	end
+	_scope_generation = _scope_generation + 1
+	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. ".tap_holds-"
+		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
+	return run_bulk_menu_command(
+		karabiner,
+		"apply_scope",
+		"Applying the tap-hold scope (" .. mode .. ")…",
+		"Tap-hold scope " .. mode .. " applied.",
+		false,
+		update_menu,
+		{ scope = "tap_holds", mode = mode, backup_path = backup_path }
+	)
 end
 
 --- Builds an index of action id → action definition for fast lookup.
@@ -893,26 +925,8 @@ function M.build(ctx)
 		["tapholds_toggle"] = function()
 			return M.set_feature_enabled(karabiner, not tap_holds_on, update_menu)
 		end,
-		["disable_all"] = function()
-			return run_bulk_menu_command(
-				karabiner,
-				"clear_tap_hold_bindings",
-				"Clearing every tap/hold slot…",
-				"Cleared %d changed entry/entries — all tap/hold slots are now 'none'.",
-				true,
-				update_menu
-			)
-		end,
-		["reset_defaults"] = function()
-			return run_bulk_menu_command(
-				karabiner,
-				"reset_tap_holds_to_defaults",
-				"Restoring every tap-hold setting to defaults…",
-				"All tap-hold settings restored to defaults.",
-				false,
-				update_menu
-			)
-		end,
+		["disable_all"] = function() return run_scope(karabiner, "clear", update_menu) end,
+		["reset_defaults"] = function() return run_scope(karabiner, "recommended", update_menu) end,
 		-- Required on the click: the editor loads the layer data and its window
 		-- stack, which a menu build has no use for.
 		["edit_nav_layer"] = function()

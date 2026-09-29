@@ -15,12 +15,14 @@ local COMMAND_CASES = {
 	{
 		id = "disable_all",
 		label = "common.clear_to_system",
-		method = "clear_tap_hold_bindings",
+		method = "apply_scope",
+		request = { scope = "tap_holds", mode = "clear" },
 	},
 	{
 		id = "reset_defaults",
 		label = "common.restore_recommended",
-		method = "reset_tap_holds_to_defaults",
+		method = "apply_scope",
+		request = { scope = "tap_holds", mode = "recommended" },
 	},
 	{
 		id = "copy_tap_to_combo",
@@ -70,6 +72,24 @@ local SPECIAL_PICKER_ACTION = { label = "None", id = "none" }
 local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 
 -- Transaction test harness
+
+-- The two scope rows ask first and name a backup under the remap file; both
+-- boundaries are doubles for the whole module, restored at its end.
+local SAVED_DIALOGS = package.loaded["infra.dialog_util"]
+local SAVED_PATHS = package.loaded["infra.config_paths"]
+local CONFIRMATION = { answer = "yes", asked = 0 }
+package.loaded["infra.dialog_util"] = {
+	block_alert = function(_, _, no, yes)
+		CONFIRMATION.asked = CONFIRMATION.asked + 1
+		return CONFIRMATION.answer == "yes" and yes or no
+	end,
+}
+package.loaded["infra.config_paths"] = {
+	get = function(key)
+		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/config_karabiner.toml"
+	end,
+}
 
 --- Finds a rendered row without coupling the test to one menu-table dialect.
 --- @param item table Built top-level item.
@@ -232,7 +252,10 @@ local function make_remap(observations, mode)
 		stop_lease = function() return true end,
 	}
 	local function bulk_method(method_name)
-		return function(on_done)
+		return function(...)
+			local arguments = { ... }
+			local on_done = arguments[#arguments]
+			if #arguments > 1 then observations.arguments[method_name] = arguments[1] end
 			observations.calls[method_name] = observations.calls[method_name] + 1
 			observations.terminals[method_name] = on_done
 			if mode == "throw" then error("synthetic bulk request failure") end
@@ -278,8 +301,7 @@ end
 local function build_menu(mode, configure)
 	local observations = {
 		calls = {
-			clear_tap_hold_bindings = 0,
-			reset_tap_holds_to_defaults = 0,
+			apply_scope = 0,
 			copy_tap_actions_to_combos = 0,
 			clear_tap_hold_binding = 0,
 			clear_combo_binding = 0,
@@ -336,6 +358,13 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 
 			helpers.assert_true(row_action(row)())
 			helpers.assert_eq(observations.calls[case.method], 1)
+			if case.request then
+				local sent = observations.arguments[case.method]
+				helpers.assert_eq(sent.scope, case.request.scope)
+				helpers.assert_eq(sent.mode, case.request.mode)
+				helpers.assert_true(sent.backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+					"the backup sits beside the remap file: " .. tostring(sent.backup_path))
+			end
 			helpers.assert_eq(count_logs(observations, "success"), 0,
 				case.id .. " request acceptance must not claim terminal success")
 			helpers.assert_eq(observations.refreshes, 0,
@@ -344,6 +373,25 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 			observations.terminals[case.method](true, "ready", 3)
 			helpers.assert_eq(count_logs(observations, "success"), 1)
 			helpers.assert_eq(observations.refreshes, 1)
+		end
+	end)
+
+	helpers.it("W1 asks before either scope row and a declined question sends nothing", function()
+		for _, case in ipairs({ COMMAND_CASES[1], COMMAND_CASES[2] }) do
+			local built, observations = build_menu("pending")
+			local asked = CONFIRMATION.asked
+			CONFIRMATION.answer = "no"
+			local ok, result = pcall(row_action(find_item(built, case.label)))
+			CONFIRMATION.answer = "yes"
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(CONFIRMATION.asked, asked + 1)
+			helpers.assert_eq(observations.calls.apply_scope, 0, case.id .. " must not run after No")
+			helpers.assert_true(row_action(find_item(built, case.label))())
+			local first = observations.arguments.apply_scope.backup_path
+			helpers.assert_true(row_action(find_item(built, case.label))())
+			helpers.assert_true(observations.arguments.apply_scope.backup_path ~= first,
+				"each request names a new backup")
 		end
 	end)
 
@@ -509,3 +557,6 @@ helpers.describe("karabiner local clear rows use one bulk transaction", function
 		end
 	end)
 end)
+
+package.loaded["infra.dialog_util"] = SAVED_DIALOGS
+package.loaded["infra.config_paths"] = SAVED_PATHS

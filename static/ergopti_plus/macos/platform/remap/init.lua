@@ -44,6 +44,8 @@ local Registrar   = require("adapters.hotkey_registrar")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Timings     = require("infra.timings")
 local FileSystem  = require("adapters.file_system")
+local Manifest    = require("infra.manifest_reader")
+local TomlWriter  = require("toml_codec.writer")
 
 -- The managed-output classifier is a lease prerequisite even when the
 -- keylogger feature is disabled. A load failure must keep generated rules
@@ -3466,8 +3468,9 @@ end
 --- @param candidate table Detached settings candidate.
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
 --- @param label string Stable operation label for diagnostics.
+--- @param expected_source table|nil Exact bytes a scope backed up before this save.
 --- @return boolean committed
-local function persist_and_publish_settings(candidate, overwrite_corrupt, label)
+local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
 	local payload = clone_settings_state(candidate)
 	-- Settings compensation must never roll back a separately owned preference
 	payload.enabled = _state.enabled == true
@@ -3475,7 +3478,8 @@ local function persist_and_publish_settings(candidate, overwrite_corrupt, label)
 		Config.save_user_config,
 		payload,
 		resolve_user_config(),
-		overwrite_corrupt
+		overwrite_corrupt,
+		expected_source
 	)
 	if not call_ok or saved ~= true then
 		Logger.error(LOG, "%s did not persist; live Karabiner settings were preserved: %s.",
@@ -3649,6 +3653,23 @@ local function reject_bulk_settings_candidate(transaction, reason)
 	request_bulk_inverse_regeneration(transaction)
 end
 
+--- Reads the remap file and writes one verified backup of its exact bytes, so a
+--- scope's candidate can only replace the bytes that backup holds.
+--- @param backup_path string Unique backup destination that must not exist.
+--- @return table|nil source `{ status, content }` precondition for the save.
+--- @return string|nil detail Refusal reason.
+local function back_up_settings_source(backup_path)
+	local path = resolve_user_config()
+	local content, status = FileSystem.read_with_status(path)
+	if status == "absent" then return { status = "absent" } end
+	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
+	local backed, detail = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
+	if backed ~= true then return nil, "backup refused: " .. tostring(detail) end
+	local observed, observed_status = FileSystem.read_with_status(backup_path)
+	if observed_status ~= "ok" or observed ~= content then return nil, "backup verification failed" end
+	return { status = "ok", content = content }
+end
+
 --- Applies one multi-setting candidate, deploys it, and compensates exactly on
 --- any non-true terminal. All sibling setters remain gated until candidate
 --- success or the retained inverse has persisted and regenerated successfully.
@@ -3656,9 +3677,11 @@ end
 --- @param mutate function Receives a detached candidate and returns a count.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @param backup_path string|nil A scope's unique backup: the candidate then
+---        replaces only the exact bytes that verified backup holds.
 --- @return boolean accepted True when candidate regeneration was accepted, or
 ---   when the candidate persisted while « Ergopti uses Karabiner » is off.
-local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt)
+local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path)
 	if not require_state(label) then
 		invoke_public_callback(label, on_done, false, "not-initialized", 0)
 		return false
@@ -3718,7 +3741,18 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		callback_settled = false,
 	}
 	_bulk_settings_transaction = transaction
-	if not persist_and_publish_settings(candidate, overwrite_corrupt, label) then
+	local expected_source
+	if backup_path ~= nil then
+		local backup_detail
+		expected_source, backup_detail = back_up_settings_source(backup_path)
+		if not expected_source then
+			Logger.error(LOG, "%s refused before any write: %s.", label, tostring(backup_detail))
+			_bulk_settings_transaction = nil
+			finish_bulk_settings_callback(transaction, false, "backup-refused")
+			return false
+		end
+	end
+	if not persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source) then
 		_bulk_settings_transaction = nil
 		finish_bulk_settings_callback(transaction, false, "candidate-persistence-failed")
 		return false
@@ -4304,6 +4338,66 @@ function M.clear_all_bindings(on_done, scope)
 		end
 		return changed
 	end, on_done)
+end
+
+--- The remap file's top-level tables, each owned by the manifest scope whose
+--- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
+local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos" }
+
+--- Applies the remap part of a manifest scope as one exact transaction: a
+--- verified backup of config_karabiner.toml, a save that only replaces those
+--- backed-up bytes, and the Karabiner terminal before success. « recommended »
+--- writes the shipped preset, « clear » the neutral none/none; the timings are
+--- parameters whose default is the recommendation. The master comes from the
+--- manifest rows; every other table of the file is left untouched.
+--- @param request table `{ scope = "tap_holds"|"shortcuts",
+---   mode = "recommended"|"clear", backup_path = string }`.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.apply_scope(request, on_done)
+	local label = "Remap scope"
+	local section = type(request) == "table" and REMAP_SCOPE_SECTIONS[request.scope] or nil
+	local declared = false
+	if section then
+		local scope = Manifest.scopes()[request.scope]
+		for _, prefix in ipairs(type(scope) == "table" and scope.prefixes or {}) do
+			declared = declared or prefix == section
+		end
+	end
+	if not declared or (request.mode ~= "recommended" and request.mode ~= "clear")
+		or type(request.backup_path) ~= "string" or request.backup_path == "" then
+		Logger.error(LOG, "%s refused an invalid request.", label)
+		invoke_public_callback(label, on_done, false, "invalid-scope-request", 0)
+		return false
+	end
+	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
+	return apply_bulk_settings_transaction(label, function(candidate)
+		local target = request.mode == "recommended"
+			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
+			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
+		if section == "mod_combos" then
+			-- The key-combinations switch returns to absent, following Tap-Holds
+			-- as on a fresh install, like the whole-remap reset.
+			candidate.mod_combos_enabled = target.mod_combos_enabled
+			candidate.mod_combos_config = target.mod_combos_config
+			candidate.simultaneous_threshold_ms = target.simultaneous_threshold_ms
+			candidate.combo_symmetric = target.combo_symmetric
+			return #M.MOD_COMBOS
+		end
+		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
+			local path = row.section .. "." .. row.key
+			assert(path == "tap_holds.enabled", "tap-hold scope row has no remap owner: " .. path)
+			if row.delete then
+				candidate.tap_holds_enabled = Manifest.default_for(path)
+			else
+				candidate.tap_holds_enabled = row.value
+			end
+		end
+		candidate.tap_hold_config = target.tap_hold_config
+		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
+		candidate.sticky_timeout_ms = target.sticky_timeout_ms
+		return #M.TAP_HOLD_KEYS
+	end, on_done, nil, request.backup_path)
 end
 
 --- Restores the settings to defaults as one exact transaction: every setting,
