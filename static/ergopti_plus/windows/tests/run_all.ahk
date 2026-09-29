@@ -352,6 +352,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_border_pool.ahk
+#Include unit/test_tooltip_border_zorder.ahk
 #Include unit/test_tooltip_latency_diagnostics.ahk
 #Include unit/test_tooltip_border_gdi_ownership.ahk
 #Include unit/test_tooltip_measure_gdi_ownership.ahk
@@ -1926,6 +1927,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_taphold_hold_gate_arms_without_tap.ahk
 #Include meta/test_tooltip_debounce_is_load_bearing.ahk
 #Include meta/test_tooltip_present_subsegmented.ahk
+#Include meta/test_tooltip_reveal_zorder.ahk
 #Include meta/test_tooltip_render_accounting.ahk
 #Include meta/test_tray_suspend_checkmark_survives_rebuild.ahk
 #Include meta/test_uia_clamp_every_probe_site.ahk
