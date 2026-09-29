@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Неактивно: дозвольте ErgoptiPlus в «Об’єктах входу»",
 	"menu.tapholds.guardian_unavailable": "🔴 Неактивно: фоновий помічник ErgoptiPlus не зареєстровано",
 	"menu.tapholds.open_login_items": "Відкрити параметри «Об’єктів входу»…",
-	"menu.tapholds.saved_until_guardian": "💾 Налаштування натискання-утримання збережено: вони застосуються, щойно ErgoptiPlus буде дозволено в «Об’єктах входу» (натисніть, щоб відкрити параметри).",
+	"menu.tapholds.saved_until_guardian": "💾 Налаштування клавіатури збережено: вони застосуються, щойно ErgoptiPlus буде дозволено в «Об’єктах входу» (натисніть, щоб відкрити параметри).",
 	"menu.tapholds.title": "⌨️ Натискання-Утримання",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Скопіювати натискання → комбо для клавіш-модифікаторів",
 	"menu.tapholds.edit_nav_layer": "Редагувати шар навігації…",

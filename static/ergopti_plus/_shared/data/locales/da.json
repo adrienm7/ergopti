@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inaktive: tillad ErgoptiPlus under Login-emner",
 	"menu.tapholds.guardian_unavailable": "🔴 Inaktive: ErgoptiPlus’ baggrundshjælper er ikke registreret",
 	"menu.tapholds.open_login_items": "Åbn indstillinger for Login-emner…",
-	"menu.tapholds.saved_until_guardian": "💾 Tap-hold-indstillinger gemt: de træder i kraft, når ErgoptiPlus er tilladt under Login-emner (klik for at åbne indstillingerne).",
+	"menu.tapholds.saved_until_guardian": "💾 Tastaturindstillinger gemt: de træder i kraft, når ErgoptiPlus er tilladt under Login-emner (klik for at åbne indstillingerne).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Kopier tap → combo for modifikatortaster",
 	"menu.tapholds.edit_nav_layer": "Redigér navigationslaget…",

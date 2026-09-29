@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 未生效：请在登录项中允许 ErgoptiPlus",
 	"menu.tapholds.guardian_unavailable": "🔴 未生效：ErgoptiPlus 后台辅助程序未注册",
 	"menu.tapholds.open_login_items": "打开登录项设置…",
-	"menu.tapholds.saved_until_guardian": "💾 已保存点按/长按设置：在登录项中允许 ErgoptiPlus 后即会生效（点击打开设置）。",
+	"menu.tapholds.saved_until_guardian": "💾 已保存键盘设置：在登录项中允许 ErgoptiPlus 后即会生效（点击打开设置）。",
 	"menu.tapholds.title": "⌨️ 点按/长按",
 	"menu.tapholds.copy_tap_to_combo": "🔁 将点击 → 组合键复制到所有修饰键快捷键",
 	"menu.tapholds.edit_nav_layer": "编辑导航层…",

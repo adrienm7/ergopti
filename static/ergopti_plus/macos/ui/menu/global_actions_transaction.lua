@@ -522,6 +522,9 @@ function M.create(deps)
 	end
 
 	--- Handles the exact candidate Karabiner terminal and final reload boundary.
+	--- A `persisted-…` terminal commits as well: the reset is saved and deploys
+	--- later, and the reload that follows re-observes the remap guardian, whose
+	--- own notice tells the user when that deploy waits on it.
 	--- @param transaction table Active transaction.
 	--- @param committed boolean Exact terminal state.
 	--- @param detail any Terminal detail.

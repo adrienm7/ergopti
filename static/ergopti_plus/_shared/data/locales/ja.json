@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 無効：ログイン項目で ErgoptiPlus を許可してください",
 	"menu.tapholds.guardian_unavailable": "🔴 無効：ErgoptiPlus のバックグラウンドヘルパーが登録されていません",
 	"menu.tapholds.open_login_items": "ログイン項目の設定を開く…",
-	"menu.tapholds.saved_until_guardian": "💾 タップホールドの設定を保存しました：ログイン項目で ErgoptiPlus が許可されると適用されます（クリックして設定を開く）。",
+	"menu.tapholds.saved_until_guardian": "💾 キーボード設定を保存しました：ログイン項目で ErgoptiPlus が許可されると適用されます（クリックして設定を開く）。",
 	"menu.tapholds.title": "⌨️ タップホールド",
 	"menu.tapholds.copy_tap_to_combo": "🔁 修飾キーにタップ→コンボをコピー",
 	"menu.tapholds.edit_nav_layer": "ナビゲーションレイヤーを編集…",

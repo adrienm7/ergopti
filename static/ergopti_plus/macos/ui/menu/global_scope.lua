@@ -31,7 +31,11 @@ local LOG = "menu.global_scope"
 --- inverse is the settings snapshot the engine restores through the same gate.
 --- The next category never runs on the Karabiner terminal's own stack: the
 --- continuation is deferred, so a second regeneration is not requested from
---- inside the callback that settles the first.
+--- inside the callback that settles the first. A `persisted-guardian-…`
+--- terminal commits too: the settings are saved and deploy once the remap
+--- guardian is ready. This flow shows no notice of its own for it; the
+--- guardian's notice already told the user why the rules wait, and the
+--- Tap-Hold submenu keeps saying so.
 --- @param remap table Remap facade (apply_scope, snapshot/restore_settings).
 --- @param scope string Manifest scope id served by the remap file.
 --- @param backup_path function scope -> unique backup path.

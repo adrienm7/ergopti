@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 निष्क्रिय: लॉगिन आइटम में ErgoptiPlus को अनुमति दें",
 	"menu.tapholds.guardian_unavailable": "🔴 निष्क्रिय: ErgoptiPlus का पृष्ठभूमि सहायक पंजीकृत नहीं है",
 	"menu.tapholds.open_login_items": "लॉगिन आइटम सेटिंग्स खोलें…",
-	"menu.tapholds.saved_until_guardian": "💾 Tap-holds सेटिंग्स सहेजी गईं: लॉगिन आइटम में ErgoptiPlus को अनुमति मिलते ही वे लागू होंगी (सेटिंग्स खोलने के लिए क्लिक करें)।",
+	"menu.tapholds.saved_until_guardian": "💾 कीबोर्ड सेटिंग्स सहेजी गईं: लॉगिन आइटम में ErgoptiPlus को अनुमति मिलते ही वे लागू होंगी (सेटिंग्स खोलने के लिए क्लिक करें)।",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 मॉडिफायर कुंजियों के लिए tap → combo कॉपी करें",
 	"menu.tapholds.edit_nav_layer": "नेविगेशन परत संपादित करें…",

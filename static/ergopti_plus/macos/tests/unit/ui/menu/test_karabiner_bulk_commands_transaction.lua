@@ -476,6 +476,36 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("names no single submenu in the saved notice a combo command shows (saved-notice-wording)",
+		function()
+			local saved_notifications = package.loaded["infra.notifications"]
+			local notices = {}
+			package.loaded["infra.notifications"] = {
+				notify = function(message)
+					notices[#notices + 1] = message
+					return true
+				end,
+			}
+			local ok, err = pcall(function()
+				local built, observations = build_menu("pending", function(remap)
+					remap.open_login_items = function() return true end
+				end)
+				helpers.assert_true(row_action(find_item(built, COMMAND_CASES[3].label))())
+				observations.terminals.copy_tap_actions_to_combos(true,
+					"persisted-guardian-requires_approval", 1)
+				helpers.assert_eq(#notices, 1)
+				local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
+				local english = hs.json.decode(file:read("*a"))
+				file:close()
+				local text = english[notices[1]]
+				helpers.assert_type(text, "string", "the notice key must exist: " .. tostring(notices[1]))
+				helpers.assert_nil(text:lower():find("tap%-hold"),
+					"key-combination commands announce it too: " .. text)
+			end)
+			package.loaded["infra.notifications"] = saved_notifications
+			if not ok then error(err, 0) end
+		end)
+
 	helpers.it("HS-019 rejects synchronous true callbacks followed by false, nil, or throw", function()
 		for _, mode in ipairs({ "sync-true-false", "sync-true-nil", "sync-true-throw" }) do
 			local built, observations = build_menu(mode)

@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 비활성: 로그인 항목에서 ErgoptiPlus를 허용하세요",
 	"menu.tapholds.guardian_unavailable": "🔴 비활성: ErgoptiPlus 백그라운드 도우미가 등록되지 않았습니다",
 	"menu.tapholds.open_login_items": "로그인 항목 설정 열기…",
-	"menu.tapholds.saved_until_guardian": "💾 탭-홀드 설정을 저장했습니다: 로그인 항목에서 ErgoptiPlus가 허용되면 적용됩니다(클릭하여 설정 열기).",
+	"menu.tapholds.saved_until_guardian": "💾 키보드 설정을 저장했습니다: 로그인 항목에서 ErgoptiPlus가 허용되면 적용됩니다(클릭하여 설정 열기).",
 	"menu.tapholds.title": "⌨️ 탭-홀드",
 	"menu.tapholds.copy_tap_to_combo": "🔁 수정 키에 tap → combo 복사",
 	"menu.tapholds.edit_nav_layer": "탐색 레이어 편집…",
