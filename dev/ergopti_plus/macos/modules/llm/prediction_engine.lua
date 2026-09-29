@@ -172,6 +172,13 @@ local llm_request_counter = 0
 -- because it resets on every individual fetch call, not only on new user input
 local fetch_request_counter = 0
 
+-- What the request in flight or the tooltip shown belongs to: { kind, fetch }.
+-- kind is "automatic" (a prediction the typing pause asked for) or "explicit"
+-- (an action the user asked for: a forced prediction, an answer surface); it
+-- holds only while `fetch` is still the current fetch_request_counter, so any
+-- reset or newer request retires it without a separate clean-up
+local _activity = nil
+
 -- Diagnostic watermark only: callback authority remains the fetch counter above
 -- Cleared at the terminal callback or before logging an explicit revocation
 local _request_log_id = nil
@@ -1768,6 +1775,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	llm_request_counter   = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
+	_activity = { kind = (force_trigger or live) and "explicit" or "automatic", fetch = my_fetch_id }
 	local superseded_log_id = retire_request_log(_request_log_id)
 
 	-- The initiating timer owns this check only while its callback runs: its
@@ -2273,6 +2281,7 @@ function M.open_answer_surface(label)
 	llm_request_counter = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
 	local session = fetch_request_counter
+	_activity = { kind = "explicit", fetch = session }
 	log_request_cancellation(retire_request_log(_request_log_id), "supersede")
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
 	local shown_ok, shown = xpcall(function()
@@ -2873,6 +2882,15 @@ end
 
 --- @return boolean True while predictions are displayed and awaiting user interaction.
 function M.is_visible() return runtime_available() and predictions_visible end
+
+--- Tells what the request in flight or the tooltip shown belongs to: the AI
+--- agent's automatic mode is not held back by an automatic prediction, but
+--- waits for anything the user asked for.
+--- @return string|nil kind "automatic", "explicit", or nil when neither is current.
+function M.ai_activity()
+	if _activity == nil or _activity.fetch ~= fetch_request_counter then return nil end
+	return _activity.kind
+end
 
 --- @return boolean True between an accepted prediction and the incoming F16 chain signal.
 function M.is_chain_pending() return runtime_available() and chain_pending end

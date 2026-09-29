@@ -19,6 +19,9 @@
 ;    HookDispatcher + Keylogger + PrefixWatcher each create an InputHook;
 ;    the LLM bridge no longer registers with HookDispatcher because keystrokes
 ;    were not reaching it on some machines while the prefix hook was reliable.
+; 5. Agent-only feed: while the bridge is inactive (the AI menu switched off,
+;    or its backend not ready), keystrokes still reach the AI agent's automatic
+;    mode through a context of its own, and nothing of the predictions runs.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,6 +49,17 @@ global LLM_BRIDGE_BUFFER_MAX_CHARS := 10000
 global _LLM_Bridge_Buffer := ""
 global _LLM_Bridge_ContentGeneration := 0
 global _LLM_Bridge_Active := false
+; The AI agent's typing context while the prediction bridge is inactive. The
+; agent's automatic mode does not depend on the AI menu's switch (macOS feeds
+; its observer from update_preview, Linux from on_char, whatever the switch
+; says), so the keystrokes the inactive bridge would drop still reach
+; LLM_Agent_OnTyping. It is kept apart from _LLM_Bridge_Buffer, whose content
+; generation fences the prediction outputs: observing for the agent leaves
+; every prediction state untouched.
+global _LLM_Bridge_AgentBuffer := ""
+global _LLM_Bridge_AgentFeeding := false
+global _LLM_Bridge_AgentFeedErrorTick := 0
+global _LLM_BRIDGE_AGENT_FEED_ERROR_THROTTLE_MS := 60000
 ; Fallback path when Ollama becomes ready before PrefixWatcher's InputHook exists.
 global _LLM_Bridge_DispatcherCharFn := 0
 global _LLM_Bridge_DispatcherKeyFn := 0
@@ -817,6 +831,9 @@ LLM_Bridge_Stop() {
 		return
 	_LLM_Bridge_Active := false
 	_LLM_Bridge_ClearBuffer()
+	; The agent-only feed takes over from here on a fresh context: whatever it
+	; held before the bridge started predates everything typed since
+	LLM_Bridge_ResetAgentFeed("the prediction bridge stopped")
 	try LLM_Engine_StopGeneration()   ; Cancel in-flight HTTP before disabling the engine
 	LLM_Engine_SetEnabled(false)
 	try LLM_OllamaCancelWarmupRetry()
@@ -842,6 +859,8 @@ LLM_Bridge_OnPrefixWatcherReady() {
 LLM_Bridge_FeedCharIfActive(ch) {
 	if (IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		LLM_Bridge_OnChar(ch)
+	else
+		_LLM_Bridge_ObserveAgentTyping(0, ch)
 }
 
 /**
@@ -851,8 +870,14 @@ LLM_Bridge_FeedCharIfActive(ch) {
  * @param {boolean} IsPhysicalEvent - True only for the I1-filtered prefix hook.
  */
 LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
-	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) {
+		; Predictions are off: only the AI agent's typing observer listens
+		if (vk = 0x08)
+			_LLM_Bridge_ObserveAgentTyping(1, "")
+		else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
+			LLM_Bridge_MirrorAgentEdit(0, "", true)
 		return
+	}
 	if (vk = 0x08)
 		LLM_Bridge_OnBackspace()
 	else if (vk = 0x09) {
@@ -1078,6 +1103,106 @@ LLM_Bridge_OnFlush() {
 		return
 	_LLM_Bridge_ClearBuffer()
 	LLM_Bridge_ResetPredictions()
+}
+
+; Feeds one keystroke the inactive bridge received to the AI agent's typing
+; observer: the agent-only context is edited, then LLM_Agent_OnTyping arms the
+; automatic mode's pause on it. Nothing of the predictions runs: no buffer, no
+; engine timer, no tooltip. Called from the PrefixWatcher's InputHook
+; callbacks, so a failure is logged (throttled) instead of escaping into the
+; hook, which would stop delivering keystrokes for good.
+; @param {Integer} DeleteFromEnd Characters the keystroke erased.
+; @param {String} InsertedText The character it typed.
+; @returns {Boolean} True when the agent observed it.
+_LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
+	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeedErrorTick
+	global _LLM_BRIDGE_AGENT_FEED_ERROR_THROTTLE_MS
+	if !_LLM_Bridge_AgentFeedIsWanted()
+		return false
+	LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText)
+	try {
+		LLM_Agent_OnTyping(_LLM_Bridge_AgentBuffer)
+	} catch as Err {
+		Now := A_TickCount
+		; Wrap-safe tick delta: A_TickCount overflows at ~49.7 days
+		if (_LLM_Bridge_AgentFeedErrorTick == 0
+				|| ((Now - _LLM_Bridge_AgentFeedErrorTick + 0x100000000) & 0xFFFFFFFF)
+					> _LLM_BRIDGE_AGENT_FEED_ERROR_THROTTLE_MS) {
+			_LLM_Bridge_AgentFeedErrorTick := Now
+			LoggerError("LLM", "AI agent typing observer raised: {1}.", Err.Message)
+		}
+		return false
+	}
+	return true
+}
+
+; Tells whether the inactive bridge feeds the AI agent: its automatic mode
+; watches the typing (LLM_Agent_WatchesTyping: mode "auto", not paused). The
+; answer is read on every keystroke from the agent's own settings, so a mode
+; change, a pause or a restored config starts or stops the feed at the next
+; keystroke with no second copy of that state; the transitions are logged.
+; @returns {Boolean}
+_LLM_Bridge_AgentFeedIsWanted() {
+	global _LLM_Bridge_AgentFeeding
+	Wanted := (IsSet(LLM_Agent_WatchesTyping) && LLM_Agent_WatchesTyping()) ? true : false
+	if (Wanted && !_LLM_Bridge_AgentFeeding) {
+		_LLM_Bridge_AgentFeeding := true
+		LoggerInfo("LLM", "Bridge feeds the AI agent's typing observer only: predictions are not running.")
+	} else if (!Wanted && _LLM_Bridge_AgentFeeding) {
+		LLM_Bridge_ResetAgentFeed("the agent's automatic mode no longer watches the typing")
+	}
+	return Wanted
+}
+
+/**
+ * Applies one edit to the AI agent's context while the agent-only feed runs;
+ * does nothing otherwise. Keystrokes go through _LLM_Bridge_ObserveAgentTyping;
+ * the hotstring engine mirrors its expansions here while predictions are off,
+ * as it mirrors them into _LLM_Bridge_Buffer while they are on.
+ * @param {Integer} DeleteFromEnd Characters removed from the end.
+ * @param {String} InsertedText Text appended after them.
+ * @param {Boolean} ClearAll True to empty the context (Enter, Escape, Tab, an
+ *     edit that cannot be known).
+ * @returns {Boolean} True when the context was edited.
+ */
+LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText := "", ClearAll := false) {
+	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, LLM_BRIDGE_BUFFER_MAX_CHARS
+	if !_LLM_Bridge_AgentFeeding
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if ClearAll {
+			_LLM_Bridge_AgentBuffer := ""
+			return true
+		}
+		KeptLen := Max(0, StrLen(_LLM_Bridge_AgentBuffer) - Max(0, DeleteFromEnd))
+		Edited := SubStr(_LLM_Bridge_AgentBuffer, 1, KeptLen) . InsertedText
+		; The same ceiling as the prediction context: the agent reads only the
+		; current sentence, but an unbroken typing run must not grow forever
+		if (StrLen(Edited) > LLM_BRIDGE_BUFFER_MAX_CHARS)
+			Edited := SubStr(Edited, -LLM_BRIDGE_BUFFER_MAX_CHARS)
+		_LLM_Bridge_AgentBuffer := Edited
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+/**
+ * Stops the agent-only feed and drops its context. The next keystroke starts
+ * it again when the agent still watches the typing. Called when the agent
+ * leaves its automatic mode, on pause and when the prediction bridge stops.
+ * @param {String} Reason Why, for the log.
+ * @returns {Boolean} True when a running feed was stopped.
+ */
+LLM_Bridge_ResetAgentFeed(Reason) {
+	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+	WasFeeding := _LLM_Bridge_AgentFeeding
+	_LLM_Bridge_AgentFeeding := false
+	_LLM_Bridge_AgentBuffer := ""
+	if WasFeeding
+		LoggerInfo("LLM", "Bridge stopped feeding the AI agent's typing observer ({1}).", Reason)
+	return WasFeeding
 }
 
 /**

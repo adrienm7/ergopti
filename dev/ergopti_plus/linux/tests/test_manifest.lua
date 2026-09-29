@@ -238,6 +238,8 @@ return {
 	"tests.unit.modules.llm.test_tone_selection",
 	"tests.unit.modules.llm.test_screen_answers",
 	"tests.unit.modules.llm.test_agent_vectors",
+	"tests.unit.modules.llm.test_remote_formats_vectors",
+	"tests.unit.modules.llm.test_remote_providers",
 	"tests.unit.modules.llm.test_agent_flow",
 	"tests.unit.modules.llm.test_agent_connectors",
 	"tests.unit.modules.llm.test_agent_settings",

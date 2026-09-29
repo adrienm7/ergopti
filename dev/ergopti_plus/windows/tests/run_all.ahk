@@ -515,6 +515,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_token_crypto.ahk
 #Include unit/test_llm_api_common.ahk
 #Include ../modules/llm/api_ollama.ahk
+#Include ../modules/llm/remote_formats.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
@@ -690,6 +691,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_vision.ahk
 #Include unit/test_llm_translate.ahk
 #Include unit/test_llm_agent.ahk
+#Include unit/test_llm_remote_formats.ahk
 #Include unit/test_llm_live_mode.ahk
 #Include unit/test_send_input_actions.ahk
 #Include unit/test_tap_keys.ahk

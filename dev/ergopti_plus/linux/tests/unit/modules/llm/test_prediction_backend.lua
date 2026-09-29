@@ -38,6 +38,7 @@ local function load(backend, entry, stored_settings, without_local_model)
 	}
 	package.loaded["modules.llm.api_remote"] = {
 		provider = function() return { default_model = "qwen-default" } end,
+		serves = function(_, use) return use == "chat" end,
 		chat = function(target, model, _, opts, _, on_done)
 			calls.remote[#calls.remote + 1] = { target = target, model = model, opts = opts }
 			on_done(" que tout le monde aille bien " .. #calls.remote, nil)

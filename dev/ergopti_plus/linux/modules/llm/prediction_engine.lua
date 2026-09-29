@@ -398,6 +398,9 @@ local function schedule(context, output_context, delay_ms, reason, live)
 	local captured = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
+		-- Typing asked for nothing (no trigger typed, no live prompt): the
+		-- automatic agent may replace this offer.
+		automatic = not live and not (type(output_context) == "table" and output_context.explicit == true),
 	}
 	local handle = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
 		if _scope_owner then return end
@@ -479,14 +482,20 @@ end
 --- Processes one physical character after the hotstring buffer recorded it.
 function M.on_char(ch, buffer, output_context)
 	if _scope_owner then return false end
-	if not _enabled then return end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
+	-- A keystroke withdraws the agent's triage in flight and restarts its pause.
+	-- The agent does not depend on the AI menu's switch: it runs with it off.
+	M.drop_agent_triage("typing")
+	if not _enabled then
+		-- Typing over an agent's offer dismisses it.
+		if _predicting or #_suggestions > 0 then M.dismiss() end
+		arm_agent(buffer, output_context)
+		return
+	end
 	-- Typing replaced the selection a tone step was about to rewrite.
 	M.drop_tone("typing")
 	-- The user went on typing: the screen answers would be dismissed at once.
 	M.drop_vision("typing")
-	-- A keystroke withdraws the agent's triage in flight and restarts its pause.
-	M.drop_agent_triage("typing")
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	arm_agent(buffer, output_context)
@@ -496,6 +505,7 @@ function M.on_char(ch, buffer, output_context)
 			schedule(buffer, {
 				app_id = type(output_context) == "table" and output_context.app_id or nil,
 				input_chars = #trigger,
+				explicit = true,
 			}, delay_ms, "Explicit-trigger")
 			return
 		end
@@ -523,9 +533,10 @@ end
 --- @return boolean
 function M.on_hotstring_expired(context, output_context)
 	if _scope_owner then return false end
-	if not _enabled then return false end
-	-- The automatic agent held its pause back while the preview was shown (on_char).
+	-- The automatic agent held its pause back while the preview was shown
+	-- (on_char), with the AI menu's switch on or off.
 	arm_agent(context, output_context)
+	if not _enabled then return false end
 	-- Live mode held its request back while the preview was shown (on_char).
 	if not _live and TriggerSettings.get("after_hotstring") ~= true then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
@@ -658,6 +669,7 @@ function M.predict(context, output_context, override)
 		model = model,
 		profile = profile.id,
 		live = override ~= nil and override.live == true,
+		automatic = type(output_context) == "table" and output_context.automatic == true,
 	}
 	_offer_notified = false
 	_predicting = true
@@ -714,6 +726,11 @@ function M.predict(context, output_context, override)
 		request_index = request_index + 1
 		local think_filter = Parser.new_thinking_filter()
 		local streamed = ""
+		-- The backend serves one request at a time: sending would silently
+		-- cancel the agent's request on it, so that one is withdrawn first.
+		if _agent_triage and _agent_triage.chat.module == backend then
+			M.drop_agent_triage("a prediction needs the backend")
+		end
 		_inflight_backend = backend
 		backend.chat(target, model, messages, {
 			stream = DisplaySettings.get("streaming") == true,
@@ -1724,16 +1741,34 @@ local function code_points(text)
 	return count
 end
 
---- The System 1 transport: triages one sentence on a chat backend. A new
---- backend kind (a triage API rather than a chat model) plugs in here and
---- nowhere else. on_done(triage, err) is called once, unless the request is
---- withdrawn (drop_agent_triage).
+--- The state a Jev System 1 reads: the application, then the sentence.
+--- @param app string The focused application, "" when unknown.
+--- @param sentence string
+--- @return string
+local function jev_state(app, sentence)
+	return "App: " .. app .. "\nText: " .. sentence
+end
+
+--- The System 1 transport: triages one sentence. A chat backend reads the
+--- triage prompt; a Jev System 1 (a decisions provider, or a TypeSafe model
+--- through Backboard: chat.decision) answers the typed question of
+--- agent.jev_questions() instead. A new backend kind plugs in here and nowhere
+--- else. on_done(triage, err) is called once, unless the request is withdrawn
+--- (drop_agent_triage).
 --- @param chat table AgentSettings.chat_target() output.
 --- @param config table Decoded agent.json.
 --- @param sentence string The sentence being typed.
 --- @param ctx table { app, tools }
 --- @param on_done function
 local function system1_transport(chat, config, sentence, ctx, on_done)
+	if chat.decision then
+		chat.module.decide(chat.target, jev_state(ctx.app, sentence), Agent.jev_questions(config),
+			function(answers, err)
+				if err then on_done(nil, err) return end
+				on_done(Agent.parse_jev_answers(config, answers), nil)
+			end)
+		return
+	end
 	local messages = {
 		{ role = "system", content = Agent.system1_prompt(config, ctx) },
 		{ role = "user", content = sentence },
@@ -1745,31 +1780,38 @@ local function system1_transport(chat, config, sentence, ctx, on_done)
 		end)
 end
 
---- The System 2 transport: sends one request for actions. A new backend kind
---- plugs in here and nowhere else. on_done(raw, err) is called once, unless the
---- offer's backend is cancelled (dismiss).
+--- Sends one System 2 request for actions. A new backend kind plugs in here
+--- and nowhere else. on_done(raw, err) is called once, unless the request is
+--- cancelled.
 --- @param chat table AgentSettings.chat_target() output.
 --- @param payload table { system, user, max_tokens }
 --- @param on_done function
-local function system2_transport(chat, payload, on_done)
-	_inflight_backend = chat.module
+local function send_system2(chat, payload, on_done)
 	chat.module.chat(chat.target, chat.model, {
 		{ role = "system", content = payload.system },
 		{ role = "user", content = payload.user },
 	}, offer_request_opts(payload.max_tokens), nil, on_done)
 end
 
+--- The System 2 transport of an offer the user asked for: its backend is the
+--- offer's, so dismissing the offer cancels it.
+--- @param chat table AgentSettings.chat_target() output.
+--- @param payload table { system, user, max_tokens }
+--- @param on_done function
+local function system2_transport(chat, payload, on_done)
+	_inflight_backend = chat.module
+	send_system2(chat, payload, on_done)
+end
+
 --- Tells the user why an agent action cannot run, if it cannot: the pause,
---- the AI switch, then the agent's mode. The agent does not use the AI menu's
---- backend, so the menu's model refuses nothing here.
+--- then the agent's mode. The agent uses neither the AI menu's switch nor its
+--- backend, so neither refuses anything here.
 --- @param what string What the log names the action.
 --- @return boolean refused
 local function agent_refused(what)
-	local reason = nil
-	if _is_paused() then reason = "paused" elseif not _enabled then reason = "disabled" end
-	if reason then
-		Logger.info(LOG, "%s refused (%s).", what, reason)
-		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+	if _is_paused() then
+		Logger.info(LOG, "%s refused (paused).", what)
+		show_notice(MANUAL_REFUSAL_KEYS.paused, "paused")
 		return true
 	end
 	if AgentSettings.get_mode() == "off" then
@@ -1780,7 +1822,9 @@ local function agent_refused(what)
 	return false
 end
 
---- System 2's chat target and agent.json, or nil after telling the user why.
+--- System 2's chat target and agent.json, or nil after telling the user why:
+--- off, no model, a provider without a stored key or that cannot chat all
+--- mean that no System 2 is configured.
 --- @param what string What the log names the action.
 --- @return table|nil chat, table|nil config
 local function system2_chat(what)
@@ -1790,11 +1834,10 @@ local function system2_chat(what)
 	if chat then return chat, config end
 	if reason == "off" or reason == "no_model" then
 		Logger.info(LOG, "%s refused: no System 2 is configured (%s).", what, reason)
-		show_notice(AGENT_KEYS.no_system2, "no_system2")
 	else
 		Logger.warn(LOG, "%s refused: System 2 cannot answer (%s).", what, tostring(reason))
-		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
 	end
+	show_notice(AGENT_KEYS.no_system2, "no_system2")
 	return nil
 end
 
@@ -1817,49 +1860,29 @@ local function run_connector(config, action)
 	return true
 end
 
---- Offers the actions of a System 2 answer, or tells the user why none is
---- offered. The automatic mode stays silent: the user asked for nothing.
---- @param epoch integer The offer's _request_epoch.
---- @param meta table The tooltip's metadata.
+--- Reads the actions of a System 2 answer and logs the refused ones.
 --- @param config table Decoded agent.json.
 --- @param tools table The tool names the request offered.
---- @param quiet boolean The automatic mode's request.
 --- @param full_text string|nil The model's answer.
---- @param err string|nil The backend's error.
-local function finish_agent(epoch, meta, config, tools, quiet, full_text, err)
-	if _scope_owner then return end
-	if epoch ~= _request_epoch then
-		Logger.info(LOG, "Agent answer ignored: a newer action or an edit superseded it.")
-		return
-	end
-	_predicting = false
-	_inflight_backend = nil
-	meta.loading = false
-	local function fail(key, reason)
-		clear_offer()
-		if not quiet then show_notice(key, reason) end
-	end
-	if _is_paused() or not _enabled then
-		Logger.info(LOG, "Agent answer dropped: the AI was paused or switched off while it ran.")
-		clear_offer()
-		return
-	end
-	if err then
-		Logger.warn(LOG, "Agent request failed: %s", tostring(err))
-		return fail(AGENT_KEYS.failed, "failed")
-	end
+--- @return table|nil actions Nil when the answer holds no readable block.
+--- @return table rejected
+local function read_actions(config, tools, full_text)
 	local actions, rejected = Agent.parse_actions(config, Parser.strip_thinking(full_text or ""), Json.decode,
 		{ tools = tools, is_null = Json.is_null })
 	-- The reasons name fields and rules, never the user's text.
 	for _, reason in ipairs(rejected) do Logger.info(LOG, "Agent action refused: %s.", tostring(reason)) end
 	if not actions then
 		Logger.warn(LOG, "Agent answer dropped: no readable %s block (%d chars).", config.system2.tag, #(full_text or ""))
-		return fail(AGENT_KEYS.failed, "failed")
 	end
-	if #actions == 0 then
-		Logger.info(LOG, "Agent answer holds no action.")
-		return fail(AGENT_KEYS.no_action, "no_action")
-	end
+	return actions, rejected
+end
+
+--- Shows validated actions as the tooltip's candidates, each accepted on its own.
+--- @param meta table The tooltip's metadata.
+--- @param config table Decoded agent.json.
+--- @param actions table Validated actions.
+--- @param rejected table The refused ones' reasons, for the log.
+local function offer_actions(meta, config, actions, rejected)
 	local candidates = {}
 	for index, action in ipairs(actions) do
 		local key, args = Agent.label(action)
@@ -1874,18 +1897,54 @@ local function finish_agent(epoch, meta, config, tools, quiet, full_text, err)
 	show_candidates(candidates, meta)
 end
 
---- Asks System 2 for the actions a text implies and offers them in the
---- tooltip, each accepted on its own. A newer action, typing or Escape
---- supersede it; a stale answer is dropped.
+--- Offers the actions of a System 2 answer the user asked for, or tells the
+--- user why none is offered.
+--- @param epoch integer The offer's _request_epoch.
+--- @param meta table The tooltip's metadata.
+--- @param config table Decoded agent.json.
+--- @param tools table The tool names the request offered.
+--- @param full_text string|nil The model's answer.
+--- @param err string|nil The backend's error.
+local function finish_agent(epoch, meta, config, tools, full_text, err)
+	if _scope_owner then return end
+	if epoch ~= _request_epoch then
+		Logger.info(LOG, "Agent answer ignored: a newer action or an edit superseded it.")
+		return
+	end
+	_predicting = false
+	_inflight_backend = nil
+	meta.loading = false
+	local function fail(key, reason)
+		clear_offer()
+		show_notice(key, reason)
+	end
+	if _is_paused() then
+		Logger.info(LOG, "Agent answer dropped: Ergopti+ was paused while it ran.")
+		clear_offer()
+		return
+	end
+	if err then
+		Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+		return fail(AGENT_KEYS.failed, "failed")
+	end
+	local actions, rejected = read_actions(config, tools, full_text)
+	if not actions then return fail(AGENT_KEYS.failed, "failed") end
+	if #actions == 0 then
+		Logger.info(LOG, "Agent answer holds no action.")
+		return fail(AGENT_KEYS.no_action, "no_action")
+	end
+	offer_actions(meta, config, actions, rejected)
+end
+
+--- The System 2 request for a text: its prompt with the local context, and
+--- the text as the user turn.
 --- @param source string "selection", "command" or "typing".
 --- @param text string The source text.
---- @param opts table { chat, config, window?, auto? } auto = { app, intent } for
----   the automatic mode, whose acceptance and dismissal are learnt.
---- @return boolean requested
-local function run_agent(source, text, opts)
-	local config, chat = opts.config, opts.chat
-	local window = opts.window or focused_window()
-	local tools = AgentConnectors.tools(config)
+--- @param config table Decoded agent.json.
+--- @param window table { app, title }
+--- @param tools table The tool names offered.
+--- @return table payload { system, user, max_tokens }
+local function system2_payload(source, text, config, window, tools)
 	local time = AgentSettings.time_context(_now())
 	local ok_zone, zone = pcall(_timezone)
 	local ctx = {
@@ -1893,32 +1952,43 @@ local function run_agent(source, text, opts)
 		timezone = (ok_zone and type(zone) == "string" and zone ~= "") and zone or UNKNOWN_TIMEZONE,
 		language = prompt_language(), tools = tools,
 	}
-	local action = source == "selection" and AGENT_SELECTION_ACTION
-		or source == "command" and AGENT_COMMAND_ACTION or AGENT_AUTO_ACTION
-	-- One offer at a time: a screen reading or a tone step in flight would
-	-- replace or rewrite what the actions are made from.
-	M.drop_vision("superseded")
-	M.drop_tone("superseded")
-	local label = source == "typing" and i18n.get("menu.agent.title") or i18n.get("sg_actions." .. action)
-	local epoch, meta = open_offer(action, label, chat.model, current_focus())
-	_suggestion_context.app_id = opts.auto and opts.auto.app or nil
-	_suggestion_context.agent = { source = source, auto = opts.auto, config = config }
-	local payload = {
+	return {
 		system = Agent.system2_prompt(config, ctx),
 		user = Agent.system2_user_text(config, text),
 		max_tokens = config.system2.max_tokens,
 	}
+end
+
+--- Asks System 2 for the actions a text the user handed over implies and
+--- offers them in the tooltip, each accepted on its own. A newer action,
+--- typing or Escape supersede it; a stale answer is dropped.
+--- @param source string "selection" or "command".
+--- @param text string The source text.
+--- @param opts table { chat, config, window? }
+--- @return boolean requested
+local function run_agent(source, text, opts)
+	local config, chat = opts.config, opts.chat
+	local window = opts.window or focused_window()
+	local tools = AgentConnectors.tools(config)
+	local payload = system2_payload(source, text, config, window, tools)
+	local action = source == "selection" and AGENT_SELECTION_ACTION or AGENT_COMMAND_ACTION
+	-- One offer at a time: a screen reading or a tone step in flight would
+	-- replace or rewrite what the actions are made from.
+	M.drop_vision("superseded")
+	M.drop_tone("superseded")
+	local epoch, meta = open_offer(action, i18n.get("sg_actions." .. action), chat.model, current_focus())
+	_suggestion_context.agent = { source = source, config = config }
 	-- The text, the window and the answer are the user's: only sizes are logged.
 	Logger.info(LOG, "Sending agent request (source=%s, backend=%s, model=%s, %d byte(s), %d tool(s)).",
 		source, chat.backend, chat.model, #text, #tools)
 	send_paced(epoch, "Agent request", function()
 		system2_transport(chat, payload, function(full_text, err)
-			finish_agent(epoch, meta, config, tools, source == "typing", full_text, err)
+			finish_agent(epoch, meta, config, tools, full_text, err)
 		end)
 	end, function()
 		_predicting = false
 		clear_offer()
-		if source ~= "typing" then show_notice(AGENT_KEYS.failed, "failed") end
+		show_notice(AGENT_KEYS.failed, "failed")
 	end, chat.kind)
 	return true
 end
@@ -1985,20 +2055,23 @@ function M.agent_command()
 end
 
 --- Changes the agent's mode, from the menu or the toggle action. The automatic
---- mode needs System 1 and System 2: without them it is refused with a notice
---- and the mode stays as it was.
+--- mode needs a System 1 and a System 2 that can answer (configured, and a
+--- stored key for a provider): without them it is refused with a notice and
+--- the mode stays as it was.
 --- @param mode string "off", "action" or "auto"
 --- @return boolean applied
 function M.set_agent_mode(mode)
 	if _scope_owner then return false end
 	if mode == "auto" then
-		if not AgentSettings.resolve("system1") then
-			Logger.info(LOG, "Automatic agent refused: no System 1 is configured.")
+		local system1, reason1 = AgentSettings.chat_target("system1")
+		if not system1 then
+			Logger.info(LOG, "Automatic agent refused: System 1 cannot answer (%s).", tostring(reason1))
 			show_notice(AGENT_KEYS.no_system1, "no_system1")
 			return false
 		end
-		if not AgentSettings.resolve("system2") then
-			Logger.info(LOG, "Automatic agent refused: no System 2 is configured.")
+		local system2, reason2 = AgentSettings.chat_target("system2")
+		if not system2 then
+			Logger.info(LOG, "Automatic agent refused: System 2 cannot answer (%s).", tostring(reason2))
 			show_notice(AGENT_KEYS.no_system2, "no_system2")
 			return false
 		end
@@ -2029,9 +2102,10 @@ function M.get_agent_last_app()
 	return _agent_last_app
 end
 
---- Withdraws the automatic mode's pause and its triage in flight, if any, and
---- makes any answer to come stale. Called on every keystroke, so it logs only
---- when a triage was actually in flight.
+--- Withdraws the automatic mode's pause, its wait for a backend and its
+--- request in flight (the triage, or System 2's), if any, and makes any answer
+--- to come stale. Called on every keystroke, so it logs only when a request
+--- was actually in flight.
 --- @param reason string What the log names the cause.
 function M.drop_agent_triage(reason)
 	_agent_generation = _agent_generation + 1
@@ -2042,16 +2116,21 @@ function M.drop_agent_triage(reason)
 	local triage = _agent_triage
 	if not triage then return end
 	_agent_triage = nil
-	if triage.chat.module.cancel() ~= true then Logger.error(LOG, "The agent's triage could not be withdrawn.") end
-	Logger.info(LOG, "Agent triage withdrawn (%s).", tostring(reason))
+	if triage.chat.module.cancel() ~= true then Logger.error(LOG, "The agent's request could not be withdrawn.") end
+	Logger.info(LOG, "Agent request withdrawn (%s).", tostring(reason))
 end
 
---- Reports whether another tooltip or AI request has the screen: the
---- automatic agent never covers one.
+--- Reports whether the automatic agent must stay away: live mode, a screen
+--- reading, a tone step, a pause, another mode, or an offer in flight or on
+--- screen that is not typing's own automatic prediction. That prediction does
+--- not block it: it comes before the agent's pause is over, and the agent's
+--- actions replace it when they arrive. The AI menu's switch plays no part.
 --- @return boolean
 local function agent_blocked()
-	return _live ~= nil or _predicting or #_suggestions > 0 or _vision_flow ~= nil or _tone_timer ~= nil
-		or _is_paused() or not _enabled or AgentSettings.get_mode() ~= "auto"
+	local offer = _predicting or #_suggestions > 0
+	local automatic_prediction = _suggestion_context ~= nil and _suggestion_context.automatic == true
+	return _live ~= nil or (offer and not automatic_prediction) or _vision_flow ~= nil or _tone_timer ~= nil
+		or _is_paused() or AgentSettings.get_mode() ~= "auto"
 end
 
 --- Remembers a triaged sentence, forgetting the oldest beyond the memory.
@@ -2067,6 +2146,93 @@ end
 local function already_triaged(sentence)
 	for _, seen in ipairs(_agent_triaged) do if seen == sentence then return true end end
 	return false
+end
+
+--- Sends one request of the automatic mode once its backend is free and its
+--- minimum interval has passed. The backends serve one request at a time, and
+--- the automatic prediction usually holds the same one when the pause ends:
+--- sending would cancel it, so the agent waits on its own timer, which the
+--- next keystroke withdraws (drop_agent_triage).
+--- @param generation integer The keystroke generation the request belongs to.
+--- @param chat table The system's chat target.
+--- @param what string What the log names the request.
+--- @param send function Called when the request may go.
+local function send_when_free(generation, chat, what, send)
+	if _scope_owner or generation ~= _agent_generation then return end
+	local interval = Inference.min_interval_ms(chat.kind)
+	local wait_ms = (_last_request_ms[chat.kind] or -math.huge) + interval - _clock_ms()
+	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
+	if wait_ms > 0 or busy then
+		local delay_ms = math.max(wait_ms, busy and interval or 0)
+		Logger.debug(LOG, "%s waits %d ms for its backend.", what, delay_ms)
+		_agent_timer = _scheduler.after(delay_ms / 1000, function()
+			_agent_timer = nil
+			send_when_free(generation, chat, what, send)
+		end)
+		if type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+			_agent_timer = nil
+			Logger.error(LOG, "%s could not wait for its backend: timer unavailable.", what)
+		end
+		return
+	end
+	_last_request_ms[chat.kind] = _clock_ms()
+	send()
+end
+
+--- Asks System 2 for the actions of the sentence System 1 flagged, showing
+--- nothing meanwhile. The actions are offered only if they arrive for the same
+--- sentence (no keystroke since) while nothing but typing's automatic
+--- prediction has the screen: they replace that prediction. The automatic
+--- mode stays silent otherwise: the user asked for nothing.
+--- @param generation integer The keystroke generation of the sentence.
+--- @param sentence string
+--- @param opts table { chat, config, window, tools, auto = { app, intent } }
+local function auto_system2(generation, sentence, opts)
+	local chat, config, tools = opts.chat, opts.config, opts.tools
+	local payload = system2_payload("typing", sentence, config, opts.window, tools)
+	send_when_free(generation, chat, "Agent request", function()
+		if agent_blocked() then
+			Logger.info(LOG, "Agent request not sent: another tooltip or request has the screen.")
+			return
+		end
+		local state = { chat = chat }
+		_agent_triage = state
+		-- The sentence, the window and the answer are the user's: only sizes are logged.
+		Logger.info(LOG, "Sending agent request (source=typing, backend=%s, model=%s, %d byte(s), %d tool(s)).",
+			chat.backend, chat.model, #sentence, #tools)
+		send_system2(chat, payload, function(full_text, err)
+			if _scope_owner then return end
+			if _agent_triage ~= state or generation ~= _agent_generation then
+				Logger.info(LOG, "Agent answer ignored: typing superseded it.")
+				return
+			end
+			_agent_triage = nil
+			if err then
+				Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+				return
+			end
+			if agent_blocked() then
+				Logger.info(LOG, "Agent actions not shown: another tooltip or request has the screen.")
+				return
+			end
+			local actions, rejected = read_actions(config, tools, full_text)
+			if not actions then return end
+			if #actions == 0 then
+				Logger.info(LOG, "Agent answer holds no action.")
+				return
+			end
+			if _predicting or #_suggestions > 0 then
+				Logger.info(LOG, "Agent actions replace the automatic prediction.")
+			end
+			-- open_offer withdraws the prediction on screen, pending or in flight.
+			local _, meta = open_offer(AGENT_AUTO_ACTION, i18n.get("menu.agent.title"), chat.model, current_focus())
+			_suggestion_context.app_id = opts.auto.app
+			_suggestion_context.agent = { source = "typing", auto = opts.auto, config = config }
+			_predicting = false
+			meta.loading = false
+			offer_actions(meta, config, actions, rejected)
+		end)
+	end)
 end
 
 --- The automatic mode's pause elapsed: triages the current sentence with
@@ -2097,49 +2263,47 @@ local function agent_pause_elapsed(generation, buffer, app)
 			tostring(reason1 or "ready"), tostring(reason2 or "ready"))
 		return
 	end
-	-- The backends serve one request at a time: a triage never waits for one.
-	local wait_ms = (_last_request_ms[system1.kind] or -math.huge) + Inference.min_interval_ms(system1.kind)
-		- _clock_ms()
-	if wait_ms > 0 then
-		Logger.debug(LOG, "Agent triage skipped: the backend's minimum interval has not passed.")
-		return
-	end
-	_last_request_ms[system1.kind] = _clock_ms()
-	remember_triaged(sentence)
 	local window = focused_window()
 	local tools = AgentConnectors.tools(config)
-	local triage_state = { chat = system1 }
-	_agent_triage = triage_state
-	Logger.info(LOG, "Agent triage sent (backend=%s, model=%s, %d char(s)).", system1.backend, system1.model,
-		code_points(sentence))
-	system1_transport(system1, config, sentence, { app = window.app, tools = tools }, function(triage, err)
-		if _scope_owner then return end
-		if _agent_triage ~= triage_state or generation ~= _agent_generation then
-			Logger.info(LOG, "Agent triage ignored: typing superseded it.")
-			return
-		end
-		_agent_triage = nil
-		if err then
-			Logger.warn(LOG, "Agent triage failed: %s", tostring(err))
-			return
-		end
-		if not triage then
-			Logger.info(LOG, "Agent triage unreadable.")
-			return
-		end
-		local threshold = AgentLearning.threshold(config, app, triage.intent)
-		if not Agent.should_act(triage, threshold) then
-			Logger.info(LOG, "Agent triage: %s at %.2f, below %.2f.", triage.intent, triage.probability, threshold)
-			return
-		end
+	send_when_free(generation, system1, "Agent triage", function()
 		if agent_blocked() then
-			Logger.info(LOG, "Agent triage not followed: another tooltip or request has the screen.")
+			Logger.info(LOG, "Agent triage not sent: another tooltip or request has the screen.")
 			return
 		end
-		Logger.info(LOG, "Agent triage: %s at %.2f (threshold %.2f); asking System 2.", triage.intent,
-			triage.probability, threshold)
-		run_agent("typing", sentence, { chat = system2, config = config, window = window,
-			auto = { app = app, intent = triage.intent } })
+		remember_triaged(sentence)
+		local triage_state = { chat = system1 }
+		_agent_triage = triage_state
+		Logger.info(LOG, "Agent triage sent (backend=%s, model=%s, %s, %d char(s)).", system1.backend,
+			system1.model, system1.decision and "Jev decision" or "chat", code_points(sentence))
+		system1_transport(system1, config, sentence, { app = window.app, tools = tools }, function(triage, err)
+			if _scope_owner then return end
+			if _agent_triage ~= triage_state or generation ~= _agent_generation then
+				Logger.info(LOG, "Agent triage ignored: typing superseded it.")
+				return
+			end
+			_agent_triage = nil
+			if err then
+				Logger.warn(LOG, "Agent triage failed: %s", tostring(err))
+				return
+			end
+			if not triage then
+				Logger.info(LOG, "Agent triage unreadable.")
+				return
+			end
+			local threshold = AgentLearning.threshold(config, app, triage.intent)
+			if not Agent.should_act(triage, threshold) then
+				Logger.info(LOG, "Agent triage: %s at %.2f, below %.2f.", triage.intent, triage.probability, threshold)
+				return
+			end
+			if agent_blocked() then
+				Logger.info(LOG, "Agent triage not followed: another tooltip or request has the screen.")
+				return
+			end
+			Logger.info(LOG, "Agent triage: %s at %.2f (threshold %.2f); asking System 2.", triage.intent,
+				triage.probability, threshold)
+			auto_system2(generation, sentence, { chat = system2, config = config, window = window, tools = tools,
+				auto = { app = app, intent = triage.intent } })
+		end)
 	end)
 end
 
@@ -2411,6 +2575,9 @@ local function backend_target(quiet)
 			return refuse("predict(): the API backend is selected but no API entry is — add one in the AI menu.")
 		end
 		local provider = remote.provider(entry.provider)
+		if provider and not remote.serves(entry.provider, "chat") then
+			return refuse("predict(): API entry '%s' is no chat model (the agent's System 1 only).", entry.label)
+		end
 		local model = entry.model ~= "" and entry.model or (provider and provider.default_model) or nil
 		if not model or model == "" then return refuse("predict(): API entry '%s' names no model.", entry.label) end
 		return remote, entry, model

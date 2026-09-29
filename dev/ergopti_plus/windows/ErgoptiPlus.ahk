@@ -554,6 +554,7 @@ KLPF_InitializeCleanup()
 #Include modules/llm/api_ollama.ahk
 #Include modules/llm/rewrite.ahk
 #Include modules/llm/parser.ahk
+#Include modules/llm/remote_formats.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before

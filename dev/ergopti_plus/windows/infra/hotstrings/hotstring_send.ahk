@@ -517,14 +517,17 @@ SendInstant(Text, Prefix := "") {
 ; Mirror a literal edit which this module has already proven reached the screen.
 ; Synthetic sends below the prefix watcher's I1 level never reach its OnChar, so
 ; callers must publish the same edit to the longer LLM context themselves. Keep
-; this helper side-effect-free when the bridge is inactive and require the owner
-; to hold the same Critical transaction as the matching HSE mutation.
+; this helper free of prediction side effects when the bridge is inactive (only
+; the AI agent's own context follows the edit then) and require the owner to
+; hold the same Critical transaction as the matching HSE mutation.
 _HSE_MirrorLiteralEditToLlm(DeleteFromEnd, InsertedText := "") {
 		if !A_IsCritical
 				throw Error("_HSE_MirrorLiteralEditToLlm requires a Critical buffer transaction.")
 		if (IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
 				and IsSet(_LLM_Bridge_ApplyBufferEdit))
 				_LLM_Bridge_ApplyBufferEdit(DeleteFromEnd, InsertedText)
+		else if IsSet(LLM_Bridge_MirrorAgentEdit)
+				LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText)
 }
 
 ; Commit any pending end-char hotstring before the next symbol is emitted.

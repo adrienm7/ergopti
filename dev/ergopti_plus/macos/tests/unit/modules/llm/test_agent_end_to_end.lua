@@ -113,13 +113,51 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 		helpers.assert_eq(world.notices[1], world.i18n.get("llm.agent.off_notice"))
 	end)
 
-	helpers.it("refuses like a manual prediction when the AI is off", function()
+	helpers.it("runs with the AI menu off and its prediction backend not ready", function()
 		local world = build_world()
 		world.engine.set_llm_enabled(false)
+		-- "No Model" in the AI menu: the prediction backend cannot answer
+		local api = require("modules.llm").api_remote
+		api.set_active_entry_id("")
+		helpers.assert_eq(api.is_ready(), false, "the prediction backend is not ready")
+		helpers.assert_eq(trigger(world, "llm_agent_selection"), true)
+		helpers.assert_eq(#world.notices, 0, "no refusal: " .. tostring(world.notices[1]))
+		helpers.assert_eq(#world.posts, 1, "System 2 is asked")
+		helpers.assert_eq(world.posts[1].url, "https://api.cerebras.ai/v1/chat/completions")
+		answer(world.posts[1], TWO_ACTIONS)
+		helpers.assert_eq(#world.renders[#world.renders].texts, 2, "the actions are offered")
+		accept(world, 1)
+		helpers.assert_eq(world.runs[1].action.type, "calendar", "the accepted action runs")
+
+		world.dialog_answer = { "OK", "réunion demain 9h" }
+		helpers.assert_eq(trigger(world, "llm_agent_command"), true)
+		helpers.assert_eq(#world.posts, 2, "the command action too")
+	end)
+
+	helpers.it("refuses while paused, and without an API entry or key for System 2", function()
+		local world = build_world()
+		package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
 		trigger(world, "llm_agent_selection")
+		package.loaded["modules.shortcuts.script_control"] = nil
+		helpers.assert_eq(#world.posts, 0)
+		helpers.assert_nil(world.reads, "nothing is read while paused")
+		helpers.assert_eq(world.notices[1], world.i18n.get("llm.manual_prediction.paused"))
+
+		world.runner.set_system2("openai")
+		trigger(world, "llm_agent_selection")
+		helpers.assert_eq(world.notices[2], world.i18n.get("llm.agent.no_system2"), "no API entry for OpenAI")
+
+		local api = require("modules.llm").api_remote
+		api.set_entries({ { id = "keyless", provider = "openai", token = "", model = "gpt-4o-mini" } })
+		trigger(world, "llm_agent_selection")
+		helpers.assert_eq(world.notices[3], world.i18n.get("llm.agent.no_system2"), "an entry without a key")
+
+		world.runner.set_system2("typesafe")
+		api.set_entries({ { id = "jev", provider = "typesafe", token = "k", model = "jev-latest" } })
+		trigger(world, "llm_agent_selection")
+		helpers.assert_eq(world.notices[4], world.i18n.get("llm.agent.no_system2"), "Jev is not a chat model")
 		helpers.assert_eq(#world.posts, 0)
 		helpers.assert_nil(world.reads)
-		helpers.assert_eq(world.notices[1], world.i18n.get("llm.manual_prediction.disabled"))
 	end)
 
 	helpers.it("tells the user to select a text first", function()

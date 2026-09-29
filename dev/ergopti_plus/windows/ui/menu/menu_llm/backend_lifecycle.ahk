@@ -132,8 +132,18 @@ _LLM_Menu_SelectedApiEntryIsUsable() {
 	}
 	if Matches != 1
 		return false
-	try return _LLMRemoteResolveEntry(Match) is Map
-	catch as Err {
+	try {
+		Resolved := _LLMRemoteResolveEntry(Match)
+		if !(Resolved is Map)
+			return false
+		; A decisions entry (TypeSafe's Jev) answers typed questions, never a
+		; prediction: it lends its key to the agent's System 1 only
+		if !LLM_RemoteFormatServes(Resolved["Format"], "chat") {
+			LoggerInfo("LLM", "The active API entry serves decisions only; it cannot answer predictions.")
+			return false
+		}
+		return true
+	} catch as Err {
 		try LoggerError("LLM", "Remote API lifecycle validation failed: {1}.", Err.Message)
 		return false
 	}

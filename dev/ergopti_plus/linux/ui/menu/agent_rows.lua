@@ -9,10 +9,11 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Row data only: the shared renderer draws it, like every other submenu.
---- 2. A system's backend list is the screen actions' one (the local server,
----    then every provider of api_providers.json in catalogue order); the model
----    row shows the model the system runs and asks for another in a text
----    prompt, empty for the default.
+--- 2. A system's backend list is the local server, then the providers of
+---    api_providers.json that serve it in catalogue order (System 1 also
+---    offers Jev, System 2 only chat models); the model row shows the model
+---    the system runs and asks for another in a text prompt, empty for the
+---    default.
 --- 3. The mode goes through the prediction engine, which refuses the automatic
 ---    mode without System 1 and System 2 and tells the user why.
 --- 4. Dialogs are handed in by the menu builder, so this module never opens a
@@ -74,7 +75,7 @@ end
 local function system_rows(system, dialogs, changed)
 	local spec = AgentSettings.get_spec(system)
 	local parsed = spec ~= "" and require("llm.vision").parse(spec) or nil
-	local choices = AgentSettings.backend_choices()
+	local choices = AgentSettings.backend_choices(system)
 	local current_label = tr("menu.agent.off")
 	local current_choice = nil
 	for _, choice in ipairs(choices) do

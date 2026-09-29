@@ -12,8 +12,10 @@
 ---    shows and does.
 --- 2. Every change goes through the AI menu's setting transaction: runtime
 ---    setter, config.toml, menu refresh, rolled back as a whole on a refusal.
---- 3. The backend lists are the vision backends': the local server, then every
----    provider of api_providers.json in its order. The model row shows the
+--- 3. The backend lists are the local server, then the providers of
+---    api_providers.json that serve the System, in the catalogue's order
+---    (modules/llm/provider_uses.lua): a decisions provider (Jev) triages only,
+---    so it is offered to System 1 alone. The model row shows the
 ---    model in force (the chosen one, or the backend's default) and asks for
 ---    another; an empty answer returns to the default.
 --- 4. The automatic mode needs System 1: choosing it without one shows the
@@ -29,6 +31,7 @@ local AppPickerLib = require("infra.app_picker")
 local dialog       = require("infra.dialog_util")
 local Vision       = require("llm.vision")
 local Agent        = require("llm.agent")
+local ProviderUses = require("modules.llm.provider_uses")
 
 local LOG = "menu_llm.agent_panel"
 
@@ -41,8 +44,10 @@ local MODES = {
 
 -- The two systems: their setting, runtime setter and title key
 local SYSTEMS = {
-	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1", title = "menu.agent.system1" },
-	agent_system2 = { key = "llm_agent_system2", setter = "set_llm_agent_system2", title = "menu.agent.system2" },
+	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1", title = "menu.agent.system1",
+		use = ProviderUses.SYSTEM1 },
+	agent_system2 = { key = "llm_agent_system2", setter = "set_llm_agent_system2", title = "menu.agent.system2",
+		use = ProviderUses.SYSTEM2 },
 }
 
 
@@ -54,12 +59,15 @@ local SYSTEMS = {
 -- =====================================
 -- =====================================
 
---- The backends a System may name: the local server, then every provider.
+--- The backends a System may name: the local server, then the providers that
+--- serve it.
+--- @param use string|nil provider_uses.SYSTEM1 (the default, every provider) or SYSTEM2.
 --- @return table Array of { id, label }.
-function M.backends()
+function M.backends(use)
 	local Remote = require("modules.llm.api_remote")
 	local choices = { { id = Vision.LOCAL_BACKEND, label = i18n.get("llm.vision.local_backend") } }
-	for _, provider_id in ipairs(Remote.PROVIDER_ORDER) do
+	for _, provider_id in ipairs(ProviderUses.provider_ids(Remote.PROVIDER_ORDER, Remote.PROVIDERS,
+		use or ProviderUses.SYSTEM1)) do
 		choices[#choices + 1] = { id = provider_id, label = Remote.PROVIDERS[provider_id].label }
 	end
 	return choices
@@ -175,7 +183,7 @@ local function system_rows(ctx, system)
 			action = function() return apply(ctx, system.key, "", system.setter) end,
 		},
 	}
-	for _, choice in ipairs(M.backends()) do
+	for _, choice in ipairs(M.backends(system.use)) do
 		local id = choice.id
 		items[#items + 1] = {
 			label = choice.label,
