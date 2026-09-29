@@ -44,11 +44,17 @@ local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 
---- « Ergopti uses Karabiner »: `[karabiner] enabled` in config_karabiner.toml.
---- On by default; off means no lease worker, no guardian registration and no
---- ErgoptiPlus rule left in karabiner.json. Karabiner itself is never touched.
+--- « Ergopti uses Karabiner »: `[karabiner] integration_enabled` in
+--- config_karabiner.toml. On by default; off means no lease worker, no guardian
+--- registration and no ErgoptiPlus rule left in karabiner.json. Karabiner
+--- itself is never touched.
 M.INTEGRATION_ENABLED_DEFAULT = true
 local INTEGRATION_SECTION = "karabiner"
+local INTEGRATION_KEY = "integration_enabled"
+-- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
+-- false` on first launch; later builds ignored it. It is not the user's
+-- answer to the switch, so it is never read and a save drops it.
+local LEGACY_INTEGRATION_KEY = "enabled"
 
 
 
@@ -455,13 +461,13 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		return nil, "error"
 	end
 	local integration_enabled = M.INTEGRATION_ENABLED_DEFAULT
-	if integration ~= nil and integration.enabled ~= nil then
-		if type(integration.enabled) ~= "boolean" then
-			Logger.error(LOG, "[%s] enabled in '%s' must be true or false, got a %s — refusing the unsafe user config.",
-				INTEGRATION_SECTION, user_config_path, type(integration.enabled))
+	if integration ~= nil and integration[INTEGRATION_KEY] ~= nil then
+		if type(integration[INTEGRATION_KEY]) ~= "boolean" then
+			Logger.error(LOG, "[%s] %s in '%s' must be true or false, got a %s — refusing the unsafe user config.",
+				INTEGRATION_SECTION, INTEGRATION_KEY, user_config_path, type(integration[INTEGRATION_KEY]))
 			return nil, "error"
 		end
-		integration_enabled = integration.enabled
+		integration_enabled = integration[INTEGRATION_KEY]
 	end
 
 	local defaults = M.build_default_state(tap_hold_keys, mod_combos)
@@ -609,11 +615,16 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 				for _, field in ipairs(fields) do entry[field] = values[field] end
 			end
 		end
+		local integration = document[INTEGRATION_SECTION]
+		if type(integration) == "table" and integration[LEGACY_INTEGRATION_KEY] ~= nil then
+			integration[LEGACY_INTEGRATION_KEY] = nil
+			if next(integration) == nil then document[INTEGRATION_SECTION] = nil end
+		end
 		-- A settings-only candidate carries no switch: only an explicit boolean
 		-- is an integration decision worth writing.
 		if state.enabled ~= nil then
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
-			table_at(document, INTEGRATION_SECTION).enabled = state.enabled
+			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
 		local tap_holds = table_at(document, "tap_holds")
 		tap_holds.enabled = state.tap_holds_enabled ~= false

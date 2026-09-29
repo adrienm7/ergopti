@@ -14,9 +14,12 @@ and the user's personal rules stay active alongside it.
 
 ## « Ergopti uses Karabiner »
 
-`[karabiner] enabled` in `config_karabiner.toml` is the switch (default on,
-`Config.INTEGRATION_ENABLED_DEFAULT`); a value that is not a boolean refuses the
-whole file like a corrupt one. It is read before any lease or guardian work:
+`[karabiner] integration_enabled` in `config_karabiner.toml` is the switch
+(default on, `Config.INTEGRATION_ENABLED_DEFAULT`); a value that is not a
+boolean refuses the whole file like a corrupt one. The older `[karabiner]
+enabled` is never read: builds before 2026-09-22 wrote `enabled = false` on
+first launch without asking, so honouring it would silently turn remapping off
+after an update. A save drops it. It is read before any lease or guardian work:
 off means no generation token, no lease worker, and every rule carrying the
 exact ErgoptiPlus marker removed from `karabiner.json` by
 `managed_rule_removal.lua`. That removal cuts exact byte spans instead of
