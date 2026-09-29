@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ 선택 영역을 감싸는 기호",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "모두 선택 해제",
 	"menu.tapholds.enable": "탭-홀드 활성화",
+	"menu.tapholds.karabiner_off_hint": "사용할 수 없음: Ergopti가 Karabiner를 사용하지 않습니다(설정 참조)",
 	"menu.tapholds.title": "⌨️ 탭-홀드",
 	"menu.tapholds.copy_tap_to_combo": "🔁 수정 키에 tap → combo 복사",
 	"menu.tapholds.edit_nav_layer": "탐색 레이어 편집…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "AI 제안",
 	"notify.personal_info": "개인 정보",
 	"notify.quit_refused": "지금은 종료할 수 없습니다. 다른 작업이 아직 진행 중입니다. 잠시 후 다시 시도하세요.",
+	"notify.karabiner.removed": "Karabiner에서 Ergopti 규칙을 제거했습니다. 사용자 규칙은 그대로입니다.",
 	"notify.report_bug_body": "GitHub 양식이 열리고 진단 정보가 미리 입력되었습니다(줄어든 경우를 대비해 클립보드에도 복사했습니다).",
 	"notify.screenshot_copied": "스크린샷 복사됨",
 	"notify.screenshot_saved": "스크린샷 저장됨",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Ergopti를 제거하시겠습니까? 애플리케이션이 종료됩니다. 설정, 핫스트링, 통계 및 인증 정보는 유지됩니다.",
 	"dialog.uninstall.failed": "Ergopti를 제거하지 못했습니다. 개인 데이터는 유지되었습니다.",
 	"menu.global.start_at_login": "로그인 시 시작",
+	"menu.global.karabiner_integration": "Ergopti에서 Karabiner 사용",
+	"menu.global.remove_from_karabiner": "Karabiner에서 Ergopti 제거",
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
 	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요."
 }

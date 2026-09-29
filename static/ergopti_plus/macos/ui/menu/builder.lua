@@ -612,6 +612,14 @@ function M.generate(ctx, menu_mods, actions)
 			cfg_ctx.state_getters.start_at_login_enabled = function()
 				return require("ui.menu.start_at_login").enabled()
 			end
+			-- « Ergopti uses Karabiner » and « Remove Ergopti from Karabiner »
+			-- need the remap owner; without it the renderer skips both rows.
+			if type(ctx.karabiner) == "table" then
+				local switch_commands, switch_getters = require("ui.menu.remap_switch")
+					.rows(ctx.karabiner, ctx.updateMenu)
+				for id, fn in pairs(switch_commands) do cfg_ctx.commands[id] = fn end
+				for id, fn in pairs(switch_getters) do cfg_ctx.state_getters[id] = fn end
+			end
 			-- Pause owns the bindings axis for the whole pause window: pause_all()
 			-- snapshots what was running and resume_all() restores that snapshot.
 			-- A row that rewrites the configuration in between is either discarded

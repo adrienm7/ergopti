@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ 包围选区的符号",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "全部取消选中",
 	"menu.tapholds.enable": "启用点按/长按",
+	"menu.tapholds.karabiner_off_hint": "不可用：Ergopti 未使用 Karabiner（参见“配置”）",
 	"menu.tapholds.title": "⌨️ 点按/长按",
 	"menu.tapholds.copy_tap_to_combo": "🔁 将点击 → 组合键复制到所有修饰键快捷键",
 	"menu.tapholds.edit_nav_layer": "编辑导航层…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "AI 建议",
 	"notify.personal_info": "个人信息",
 	"notify.quit_refused": "暂时无法退出，另一项操作仍在进行中。请稍后再试。",
+	"notify.karabiner.removed": "已从 Karabiner 中移除 Ergopti 的规则。你自己的规则保持不变。",
 	"notify.report_bug_body": "GitHub 表单已打开并预填了诊断信息（也已复制到剪贴板，以防内容被截短）。",
 	"notify.screenshot_copied": "截图已复制",
 	"notify.screenshot_saved": "截图已保存",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "要卸载 Ergopti 吗？应用程序将关闭。您的设置、热字串、统计数据和凭据将被保留。",
 	"dialog.uninstall.failed": "无法卸载 Ergopti。您的个人数据已保留。",
 	"menu.global.start_at_login": "登录时启动",
+	"menu.global.karabiner_integration": "Ergopti 使用 Karabiner",
+	"menu.global.remove_from_karabiner": "从 Karabiner 中移除 Ergopti",
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
 	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。"
 }

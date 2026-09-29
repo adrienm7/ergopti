@@ -859,8 +859,16 @@ function M.build(ctx)
 				build_sticky_delay_item(karabiner, update_menu),
 			}
 		end,
+		-- With « Ergopti uses Karabiner » off the key rows are greyed: nothing
+		-- can deploy them. Say why right above the first of them, at the top of
+		-- the left hand. The cached tree is shared, so the hint goes into a
+		-- fresh list.
 		["tap_hold_keys_left"] = function()
-			return (build_picker_trees(karabiner, update_menu, enabled)).left
+			local left = (build_picker_trees(karabiner, update_menu, enabled)).left
+			if enabled then return left end
+			local rows = { { label = i18n.get("menu.tapholds.karabiner_off_hint"), disabled = true } }
+			for _, row in ipairs(left) do rows[#rows + 1] = row end
+			return rows
 		end,
 		["tap_hold_keys_right"] = function()
 			return (build_picker_trees(karabiner, update_menu, enabled)).right

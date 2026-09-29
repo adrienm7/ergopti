@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ Símbolos que enquadram a seleção",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Desmarcar tudo",
 	"menu.tapholds.enable": "Ativar os tap-holds",
+	"menu.tapholds.karabiner_off_hint": "Indisponível: o Ergopti não usa o Karabiner (ver Configuração)",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Copiar tap → combo para teclas modificadoras",
 	"menu.tapholds.edit_nav_layer": "Editar a camada de navegação…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "Sugestões de IA",
 	"notify.personal_info": "Informações pessoais",
 	"notify.quit_refused": "Não é possível sair agora, outra operação ainda está em andamento. Tente novamente em instantes.",
+	"notify.karabiner.removed": "As regras do Ergopti foram removidas do Karabiner. Suas próprias regras não foram alteradas.",
 	"notify.report_bug_body": "O formulário do GitHub está aberto e preenchido com o diagnóstico (também copiado para a área de transferência, caso tenha sido encurtado).",
 	"notify.screenshot_copied": "Captura de tela copiada",
 	"notify.screenshot_saved": "Captura de tela salva",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Desinstalar o Ergopti? A aplicação será fechada. As definições, hotstrings, métricas e credenciais serão mantidas.",
 	"dialog.uninstall.failed": "Não foi possível desinstalar o Ergopti. Os seus dados pessoais foram mantidos.",
 	"menu.global.start_at_login": "Iniciar ao entrar na sessão",
+	"menu.global.karabiner_integration": "O Ergopti usa o Karabiner",
+	"menu.global.remove_from_karabiner": "Remover o Ergopti do Karabiner",
 	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema.",
 	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu."
 }

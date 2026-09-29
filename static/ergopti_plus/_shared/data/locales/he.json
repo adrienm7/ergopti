@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ סמלים המקיפים את הבחירה",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "בטל סימון הכל",
 	"menu.tapholds.enable": "הפעל Tap-holds",
+	"menu.tapholds.karabiner_off_hint": "לא זמין: Ergopti אינו משתמש ב-Karabiner (ראו תצורה)",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 העתק לחיצה → קומבו למקשי שינוי",
 	"menu.tapholds.edit_nav_layer": "עריכת שכבת הניווט…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "הצעות AI",
 	"notify.personal_info": "מידע אישי",
 	"notify.quit_refused": "לא ניתן לצאת כעת, פעולה אחרת עדיין מתבצעת. נסו שוב בעוד רגע.",
+	"notify.karabiner.removed": "הכללים של Ergopti הוסרו מ-Karabiner. הכללים שלכם לא השתנו.",
 	"notify.report_bug_body": "טופס GitHub פתוח ומולא מראש באבחון (שהועתק גם ללוח, למקרה שקוצר).",
 	"notify.screenshot_copied": "צילום מסך הועתק",
 	"notify.screenshot_saved": "צילום מסך נשמר",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "להסיר את Ergopti? היישום ייסגר. ההגדרות, קיצורי הטקסט, המדדים ופרטי ההתחברות יישמרו.",
 	"dialog.uninstall.failed": "לא ניתן היה להסיר את Ergopti. הנתונים האישיים שלך נשמרו.",
 	"menu.global.start_at_login": "הפעלה בעת הכניסה למערכת",
+	"menu.global.karabiner_integration": "Ergopti משתמש ב-Karabiner",
+	"menu.global.remove_from_karabiner": "הסרת Ergopti מ-Karabiner",
 	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
 	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט."
 }

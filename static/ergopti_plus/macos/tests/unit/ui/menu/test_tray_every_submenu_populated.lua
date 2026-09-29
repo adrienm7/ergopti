@@ -228,14 +228,29 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_eq(#lost, 0, "rows or subtrees were dropped: " .. table.concat(lost, " | "))
 	end)
 
-	helpers.it("has no Karabiner submenu and no row naming the remap engine", function()
+	helpers.it("names Karabiner only in the two Configuration rows that own the switch", function()
+		-- F2 made « Ergopti uses Karabiner » an explicit switch with its removal
+		-- command; everywhere else the remap engine stays invisible.
+		local i18n = require("infra.i18n")
+		local allowed = {
+			[i18n.get("menu.global.karabiner_integration")] = true,
+			[i18n.get("menu.global.remove_from_karabiner")] = true,
+		}
 		local named = {}
-		walk(MENU, function(row, where)
+		local allowed_seen = 0
+		walk(MENU, function(row, where, depth)
 			if type(row.title) == "string" and row.title:lower():find("karabiner", 1, true) then
-				named[#named + 1] = where .. " '" .. row.title .. "'"
+				local in_configuration = depth == 2
+					and where:find(i18n.get("menu.configuration.title"), 1, true) ~= nil
+				if allowed[row.title] and in_configuration then
+					allowed_seen = allowed_seen + 1
+				else
+					named[#named + 1] = where .. " '" .. row.title .. "'"
+				end
 			end
 		end)
 		helpers.assert_eq(#named, 0, "the remap engine must stay invisible: " .. table.concat(named, ", "))
+		helpers.assert_eq(allowed_seen, 2, "the switch and its removal command must be drawn")
 	end)
 
 	helpers.it("draws the config folder row once, in the Configuration submenu", function()
@@ -321,6 +336,8 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			CONFIG_FOLDER,
 			i18n.get("menu.global.setup_wizard"),
 			i18n.get("menu.global.start_at_login"),
+			i18n.get("menu.global.karabiner_integration"),
+			i18n.get("menu.global.remove_from_karabiner"),
 		}, " | "))
 	end)
 

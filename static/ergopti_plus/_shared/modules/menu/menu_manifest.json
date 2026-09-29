@@ -398,6 +398,27 @@
 			"checked_when": [
 				"start_at_login_enabled"
 			]
+		},
+		{
+			"type": "check",
+			"id": "karabiner_integration",
+			"i18n": "menu.global.karabiner_integration",
+			"checked_when": [
+				"karabiner_integration_enabled"
+			],
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "command",
+			"id": "remove_from_karabiner",
+			"i18n": "menu.global.remove_from_karabiner",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
 	],
 	"debug_menu": [

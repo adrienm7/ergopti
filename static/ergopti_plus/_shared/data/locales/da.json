@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ Symboler der omslutter valget",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Fravælg alle",
 	"menu.tapholds.enable": "Aktivér tap-holds",
+	"menu.tapholds.karabiner_off_hint": "Utilgængelig: Ergopti bruger ikke Karabiner (se Konfiguration)",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Kopier tap → combo for modifikatortaster",
 	"menu.tapholds.edit_nav_layer": "Redigér navigationslaget…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "AI-forslag",
 	"notify.personal_info": "Personlige oplysninger",
 	"notify.quit_refused": "Kan ikke afslutte lige nu, en anden handling er stadig i gang. Prøv igen om et øjeblik.",
+	"notify.karabiner.removed": "Ergoptis regler er fjernet fra Karabiner. Dine egne regler er uændrede.",
 	"notify.report_bug_body": "GitHub-formularen er åben og udfyldt med diagnosen (også kopieret til udklipsholderen, hvis den er blevet forkortet).",
 	"notify.screenshot_copied": "Skærmbillede kopieret",
 	"notify.screenshot_saved": "Skærmbillede gemt",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Vil du afinstallere Ergopti? Programmet lukkes. Dine indstillinger, hotstrings, målinger og loginoplysninger bevares.",
 	"dialog.uninstall.failed": "Ergopti kunne ikke afinstalleres. Dine personlige data er bevaret.",
 	"menu.global.start_at_login": "Start ved login",
+	"menu.global.karabiner_integration": "Ergopti bruger Karabiner",
+	"menu.global.remove_from_karabiner": "Fjern Ergopti fra Karabiner",
 	"dialog.start_at_login.failed": "Automatisk start kunne ikke ændres. Kontrollér systemets startindstillinger.",
 	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen."
 }
