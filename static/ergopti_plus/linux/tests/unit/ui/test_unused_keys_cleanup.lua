@@ -264,6 +264,26 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 			helpers.assert_eq(tap.assignments.number_row_left, "none")
 		end)
 
+	helpers.it("unused keys: an old-shape hotstring choice is offered, not fatal (config-outdated-hotstrings)",
+		function()
+			-- One retired pack in a legacy spelling used to raise in the choice
+			-- decoder: every hotstring went off and the cleanup could list nothing.
+			local source = table.concat({
+				"[hotstrings.groups]",
+				"retired_pack = \"on\"",
+				"",
+				"[stale.section]",
+				"label = \"old\"",
+				"",
+			}, "\n")
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			local offered = {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "hotstrings.groups.retired_pack", "stale.section.label" })
+		end)
+
 	helpers.it("unused keys: an invalid gesture parameter is ignored by the loader and offered", function()
 		local scan = Engine.find_in_source(
 			"[gesture_parameters]\ntap_3__open_url = \"not a url\"\n", Cleanup.collect)
