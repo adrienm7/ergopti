@@ -733,6 +733,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-webview-i18n-cascade.cjs'
 	},
 	{
+		name: 'webview host strings survive the page locale fetch (no raw keys on macOS pages)',
+		cmd: 'node',
+		args: ['tools/test/test-webview-host-strings-survive-failed-fetch.cjs'],
+		repro: 'npm run test:webview-host-strings-survive-failed-fetch'
+	},
+	{
 		name: 'menu labels single source (shared labels.lua consumed by macOS)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-labels-single-source.cjs'],
