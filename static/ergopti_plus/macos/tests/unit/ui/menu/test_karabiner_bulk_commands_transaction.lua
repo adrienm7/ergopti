@@ -45,19 +45,19 @@ local PICKER_ROUTE_CASES = {
 	{
 		setter = "set_combo_combo_action",
 		parent_prefix = "Shift pair  :",
-		picker_label = "menu.tapholds.combo_arrow",
+		picker_label = "menu.shortcuts.key_combinations_chord",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_tap_action",
 		parent_prefix = "Shift pair  :",
-		picker_label = "menu.tapholds.tap_colon",
+		picker_label = "menu.shortcuts.key_combinations_hold_tap",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_hold_action",
 		parent_prefix = "Shift pair  :",
-		picker_label = "menu.tapholds.hold_colon",
+		picker_label = "menu.shortcuts.key_combinations_hold_hold",
 		expected_id = "shift_pair",
 	},
 }
@@ -188,6 +188,8 @@ local function make_remap(observations, mode)
 		set_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		set_combo_symmetric = function() return true end,
+		get_mod_combos_enabled = function() return true end,
+		set_mod_combos_enabled = function() return true end,
 		get_tap_action = function() return "none" end,
 		set_tap_action = function()
 			observations.calls.set_tap_action = observations.calls.set_tap_action + 1
@@ -305,10 +307,16 @@ local function build_menu(mode, configure)
 	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 	local remap = make_remap(observations, mode)
 	if type(configure) == "function" then configure(remap, observations) end
-	local built = menu.build({
+	local ctx = {
 		karabiner = remap,
 		updateMenu = function() observations.refreshes = observations.refreshes + 1 end,
-	})
+	}
+	local built = menu.build(ctx)
+	-- The modifier combinations and their bulk copy live in the « Combinaisons
+	-- de touches » group under Shortcuts, which the same module builds; both
+	-- trees are searched as one.
+	local group = menu.build_key_combinations(ctx)
+	for _, row in ipairs(group) do built.submenu[#built.submenu + 1] = row end
 	package.loaded["infra.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
 	package.loaded["infra.manifest_menu"] = saved_manifest

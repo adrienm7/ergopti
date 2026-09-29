@@ -463,6 +463,7 @@ hotstrings = false
 layout = false
 shortcuts = false
 tap_holds = false
+key_combinations = false
 autocorrection = false
 distances_reduction = false
 sfbs_reduction = false

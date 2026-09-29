@@ -3687,6 +3687,19 @@ input_altering = true
 type = "boolean"
 description_key = "menu.category_enabled.tap_holds"
 
+# The « Combinaisons de touches » switch under Shortcuts: a sub-gate that turns
+# the AltGr / LAlt / CapsLock combination families off while Shortcuts stays
+# on, each family keeping its own choices. macOS keeps the same switch as
+# [mod_combos] enabled in config_karabiner.toml, beside the rules it gates.
+[[features.category_enabled]]
+id = "key_combinations"
+platforms = ["ahk"]
+default = false
+recommended = true
+input_altering = true
+type = "boolean"
+description_key = "menu.shortcuts.key_combinations"
+
 
 
 # ==================
@@ -4314,7 +4327,7 @@ id = "wrap_symbols_menu"
 # Restricted to linux, with the reason attached, because the same operations are
 # reached differently elsewhere: macOS binds them to ctrl chords and lists them
 # in the Ctrl group of `keyboard_slots`, and Windows exposes its own combinations under
-# `modifier_combos`. Declaring one shared row would put a second copy of these
+# `key_combinations`. Declaring one shared row would put a second copy of these
 # operations in two menus that already have them.
 [[menu.shortcuts_menu]]
 type = "section_header"
@@ -4361,12 +4374,17 @@ id = "keyboard_slots"
 # default there and every general catalogue assignment remains opt-in.
 platforms = ["ahk", "hs", "linux"]
 
+# « Combinaisons de touches »: every modifier combination, moved out of the
+# Tap-Hold submenu (macOS) and out of the « Combinaison de modificateurs »
+# group (Windows) into one group with a first-row switch of its own. Its rows
+# are key_combinations_group. Linux's tap-hold engine binds no combination.
 [[menu.shortcuts_menu]]
 type = "group"
-id = "modifier_combos"
-i18n = "menu.shortcuts.group_modifiers"
-platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
+id = "key_combinations"
+i18n = "menu.shortcuts.key_combinations"
+checked_when = ["key_combinations_enabled"]
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 # `list` since 2026-08-08: the handler's whole body was one row with a static
 # label whose submenu another subsystem builds, which is what a provider
 # returning a single `submenu` row says.
@@ -4426,23 +4444,82 @@ id = "extensions_shortcuts"
 # something the handler-bijection ratchet would flag. That menu now dispatches
 # through the shared renderer, which is what let the restriction go.
 
-[[menu.modifier_combos_group]]
+# The « Combinaisons de touches » group under Shortcuts. Its first row is its
+# own switch, retained apart from the Shortcuts one: macOS persists it as
+# [mod_combos] enabled in config_karabiner.toml (absent, it follows the
+# Tap-Holds switch those rules used to belong to), Windows as
+# [category_enabled] key_combinations, a sub-gate of Shortcuts.
+[[menu.key_combinations_group]]
+type = "toggle"
+id = "key_combinations_toggle"
+i18n = "menu.shortcuts.key_combinations_enable"
+checked_when = ["key_combinations_enabled"]
+category = "KeyCombinations"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "---"
+platforms = ["ahk", "hs"]
+
+# macOS: the Karabiner chords' symmetry, their activation delay, and the
+# bulk copy of every pair's tap slot into its chord slot.
+[[menu.key_combinations_group]]
+type = "check"
+id = "combo_symmetric"
+i18n = "menu.tapholds.symmetric"
+checked_when = ["combo_symmetric"]
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "list"
+id = "combo_timings"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "command"
+id = "copy_tap_to_combo"
+i18n = "menu.tapholds.copy_tap_to_combo"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "---"
+
+# macOS: one row per ordered pair of keys, each with its three slots —
+# « Accord (simultané) → », « Maintenir 1 + taper 2 → » and « Maintenir 1 +
+# maintenir 2 → ».
+[[menu.key_combinations_group]]
+type = "list"
+id = "key_combination_rows"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+# Windows: its three AltGr / LAlt / CapsLock combination families. `path` is a
+# feature-manifest SECTION: each row expands to every feature under it, in one
+# submenu labelled by `group_label`, the key names (identical in every locale).
+[[menu.key_combinations_group]]
 type = "feature"
 path = "shortcuts.alt_gr_lalt"
 group_label = "AltGrLAlt"
 platforms = ["ahk"]
+reason_key = "platform_reason.chord_families_are_each_platforms"
 
-[[menu.modifier_combos_group]]
+[[menu.key_combinations_group]]
 type = "feature"
 path = "shortcuts.alt_gr_caps_lock"
 group_label = "AltGrCapsLock"
 platforms = ["ahk"]
+reason_key = "platform_reason.chord_families_are_each_platforms"
 
-[[menu.modifier_combos_group]]
+[[menu.key_combinations_group]]
 type = "feature"
 path = "shortcuts.lalt_caps_lock"
 group_label = "LAltCapsLock"
 platforms = ["ahk"]
+reason_key = "platform_reason.chord_families_are_each_platforms"
 
 # Unrestricted: every driver draws this row from the declaration and registers
 # only what the click does. Windows used to insert its own master row by hand in
@@ -5202,17 +5279,10 @@ type = "command"
 id = "disable_all"
 i18n = "common.clear_to_system"
 
-# macOS rows below: its engine also runs chords (two modifiers pressed
-# together), which have their own tap / hold / combo slots and timings.
-# Everything the Karabiner submenu held now lives here, under the name Windows
-# uses, and nothing says "Karabiner": the engine is an implementation detail.
-[[menu.tap_holds_menu]]
-type = "command"
-id = "copy_tap_to_combo"
-i18n = "menu.tapholds.copy_tap_to_combo"
-platforms = ["hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
-
+# macOS rows below: its engine takes one global tap / hold delay and a sticky
+# delay. Its modifier combinations (two keys pressed together or one held
+# while the other is tapped) moved to « Combinaisons de touches » under
+# Shortcuts, key_combinations_group, with their symmetry and chord delay.
 [[menu.tap_holds_menu]]
 type = "---"
 
@@ -5251,22 +5321,6 @@ i18n = "menu.tapholds.right_hand_tap_hold"
 [[menu.tap_holds_menu]]
 type = "list"
 id = "tap_hold_keys_right"
-
-[[menu.tap_holds_menu]]
-type = "---"
-platforms = ["hs"]
-
-[[menu.tap_holds_menu]]
-type = "section_header"
-i18n = "menu.tapholds.header_shortcuts"
-platforms = ["hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
-
-[[menu.tap_holds_menu]]
-type = "list"
-id = "tap_hold_chords"
-platforms = ["hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # The layer a hold key enters (hold_layer = "nav") is edited key by key in the
 # shared layer editor (_shared/ui/layer_editor), last in the submenu.
@@ -5680,7 +5734,7 @@ restore_exclude = []
 
 [scopes.shortcuts]
 action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
-prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts"]
+prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations"]
 restore_exclude = []
 dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
 

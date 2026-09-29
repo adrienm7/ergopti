@@ -15,13 +15,14 @@
 
 
 ; The three Shortcuts sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock) now
-; live in the manifest's ``modifier_combos_group`` section, one entry per
-; sub-submenu carrying its section path and its ``group_label``. They used to be
-; a Map here as well, which made the manifest section decorative: nothing read
-; it, so adding a fourth combo there changed nothing until someone also edited
-; this file. The sub-submenu label is still the raw v1 key, as the legacy render
-; had it — those are key names (AltGr, LAlt, CapsLock), identical in every
-; locale, so they carry no i18n key.
+; live in the manifest's ``key_combinations_group`` section, one entry per
+; sub-submenu carrying its section path and its ``group_label``, after the
+; group's own first-row switch. They used to be a Map here as well, which made
+; the manifest section decorative: nothing read it, so adding a fourth combo
+; there changed nothing until someone also edited this file. The sub-submenu
+; label is still the raw v1 key, as the legacy render had it — those are key
+; names (AltGr, LAlt, CapsLock), identical in every locale, so they carry no
+; i18n key.
 
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
@@ -51,9 +52,22 @@ _BuildShortcutsSubmenu() {
 	; `command` rows: a static label, a click, and the renderer builds the row.
 	; The category switch is one of them: the Shortcuts master gate.
 	Commands := _SC_ScopeCommands()
-	Getters := Map("shortcuts_enabled", () => IsCategoryGated("Shortcuts"))
+	Getters := Map(
+		"shortcuts_enabled", () => IsCategoryGated("Shortcuts"),
+		"key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands, Getters)
+	GroupBuilders := Map("key_combinations", () => _SC_KeyCombinationsSubmenu())
+
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters)
+}
+
+; The « Combinaisons de touches » group: its own first-row switch (the
+; KeyCombinations sub-gate of Shortcuts), then one submenu per AltGr / LAlt /
+; CapsLock combination family, all declared by key_combinations_group.
+_SC_KeyCombinationsSubmenu() {
+	Commands := Map("key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"))
+	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
+	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", "", Commands, Getters)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
