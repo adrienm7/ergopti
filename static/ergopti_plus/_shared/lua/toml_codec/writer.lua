@@ -758,6 +758,40 @@ function M.publish_if_unchanged(path, content, file_adapter, expected_source)
 	return publish_content(path, content, file_adapter, expected_source)
 end
 
+--- Removes a file only while it still holds exactly the bytes a caller published.
+--- This restores a proven absence: a created file that was edited since is kept.
+--- The macOS adapter exposes `remove_exact`, the Linux one `delete`; an explicit
+--- adapter with neither is refused instead of reaching around it.
+--- @param path string File to remove.
+--- @param file_adapter table|nil Platform file adapter.
+--- @param expected_source table `{ status = "ok", content = string }` precondition.
+--- @return boolean removed
+--- @return string|nil error_message
+function M.remove_if_unchanged(path, file_adapter, expected_source)
+	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
+		or expected_source.status ~= "ok" or type(expected_source.content) ~= "string" then
+		return false, "remove_if_unchanged needs a path and the exact bytes it must still hold"
+	end
+	local refusal = _refused_writes[refusal_key(path)]
+	if refusal then
+		return false, "writes to this file are refused for the session: " .. refusal
+	end
+	local current, status, detail = read_existing(path, file_adapter)
+	if status ~= "ok" or current ~= expected_source.content then
+		return false, "source changed before removal: " .. tostring(detail or status)
+	end
+	local remover = os.remove
+	if type(file_adapter) == "table" then
+		remover = file_adapter.remove_exact or file_adapter.delete
+		if type(remover) ~= "function" then
+			return false, "explicit file adapter has no removal method"
+		end
+	end
+	local call_ok, removed, remove_detail = pcall(remover, path)
+	if call_ok and removed == true then return true end
+	return false, tostring((call_ok and remove_detail) or removed or "removal failed")
+end
+
 --- Refuses every later publication to path for the rest of the session. There
 --- is deliberately no way to lift it: the file stays untouched until a restart
 --- re-evaluates it.
