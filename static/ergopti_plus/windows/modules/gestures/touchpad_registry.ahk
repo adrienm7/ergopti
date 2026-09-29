@@ -59,8 +59,8 @@ TouchpadRegistryBackupPath() {
 }
 
 ; Strictly probes a HKEY_CURRENT_USER key: only "not found" means absent. The
-; native probe is the SystemControl adapter's, as every OS call of the gesture
-; modules is.
+; native probe goes through the SystemControl adapter so this module adds no
+; direct OS call to the purity ratchet.
 ; @param Key {String} Full key path under HKEY_CURRENT_USER.
 ; @return {Boolean} True when the key exists; throws on any other failure.
 _TouchpadRegistryKeyExists(Key) {
