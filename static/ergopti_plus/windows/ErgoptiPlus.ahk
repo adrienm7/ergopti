@@ -1092,6 +1092,7 @@ BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled
 #Include modules/gestures/click.ahk
 #Include modules/gestures/screenshots.ahk
 #Include modules/gestures/window_cycle.ahk
+#Include modules/gestures/virtual_desktops.ahk
 #Include modules/gestures/config.ahk
 BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()

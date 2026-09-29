@@ -674,6 +674,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/click.ahk
 #Include ../modules/gestures/screenshots.ahk
 #Include ../modules/gestures/window_cycle.ahk
+#Include ../modules/gestures/virtual_desktops.ahk
 #Include ../modules/gestures/config.ahk
 ; Load the definitions-only onboarding worker owner so its elevated-launch
 ; reservation can be exercised without constructing the wizard UI.
@@ -686,6 +687,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_onboarding_finish_payload.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_virtual_desktops.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
 #Include unit/test_llm_rewrite.ahk

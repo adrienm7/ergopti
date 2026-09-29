@@ -65,6 +65,8 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.spaces" })
 	Items.Push({ Kind: "action", Id: "desktop_prev" })
 	Items.Push({ Kind: "action", Id: "desktop_next" })
+	Items.Push({ Kind: "action", Id: "desktop_prev_wrap" })
+	Items.Push({ Kind: "action", Id: "desktop_next_wrap" })
 	Items.Push({ Kind: "action", Id: "desktop_new" })
 	Items.Push({ Kind: "action", Id: "desktop_close" })
 	Items.Push({ Kind: "action", Id: "task_view" })
@@ -225,7 +227,9 @@ GestureActionCatalogueData() {
 	Actions["desktop_close"] := { Family: "sg", LabelKey: "sg_actions.desktop_close", Parameter: "", Confirm: false }
 	Actions["desktop_new"] := { Family: "sg", LabelKey: "sg_actions.desktop_new", Parameter: "", Confirm: false }
 	Actions["desktop_next"] := { Family: "sg", LabelKey: "sg_actions.desktop_next", Parameter: "", Confirm: false }
+	Actions["desktop_next_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_next_wrap", Parameter: "", Confirm: false }
 	Actions["desktop_prev"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev", Parameter: "", Confirm: false }
+	Actions["desktop_prev_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev_wrap", Parameter: "", Confirm: false }
 	Actions["doc_end"] := { Family: "sg", LabelKey: "sg_actions.doc_end", Parameter: "", Confirm: false }
 	Actions["doc_start"] := { Family: "sg", LabelKey: "sg_actions.doc_start", Parameter: "", Confirm: false }
 	Actions["enter"] := { Family: "sg", LabelKey: "sg_actions.enter", Parameter: "", Confirm: false }
