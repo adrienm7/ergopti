@@ -27,6 +27,10 @@
 --- 6. One interval owner: the frequency rows persist config.toml [updater]
 ---    check_interval_seconds through the menu's preferences transaction; a
 ---    value outside the presets snaps to the nearest one.
+--- 7. A manual check (check_now) reads the same list with the same ETag, is
+---    recorded like an automatic one and answers the update-check window with
+---    the shared result (updater.check_result): the release it offers is the
+---    one the About row names, and it is not announced again afterwards.
 --- ==============================================================================
 
 local M = {}
@@ -37,6 +41,7 @@ local FileSystem = require("adapters.file_system")
 local JsonCodec = require("adapters.json_codec")
 local Schedule  = require("updater.schedule")
 local Parser    = require("updater.release_parser")
+local CheckResult = require("updater.check_result")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
@@ -283,14 +288,50 @@ function M.new(opts)
 		return { tag = tag, channel = channel }
 	end
 
+	--- The headers of one list request, conditional on this session's copy.
+	local function list_headers()
+		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
+		if list_cache then headers["If-None-Match"] = list_cache.etag end
+		return headers
+	end
+
+	--- Reads one list response: the usable body, or nil with the failure reason
+	--- (an updater.check_result reason name) and its English cause.
+	--- @param result table|nil The HTTP port's result.
+	--- @return string|nil body
+	--- @return string|nil reason
+	--- @return string|nil detail
+	local function read_response(result)
+		local status = type(result) == "table" and tonumber(result.status) or 0
+		if status == 304 and list_cache then
+			Logger.debug(LOG, "Release list unchanged (304); reusing this session's copy.")
+			return list_cache.body
+		end
+		if type(result) == "table" and result.ok == true and type(result.body) == "string"
+			and result.body:match("^%s*%[") then
+			local decoded, decode_error = JsonCodec.decode(result.body)
+			if decode_error or type(decoded) ~= "table" then
+				return nil, "parse_failed", "a malformed release list: " .. tostring(decode_error)
+			end
+			for _, entry in pairs(decoded) do
+				if type(entry) ~= "table" or type(entry.tag_name) ~= "string" or entry.tag_name == "" then
+					return nil, "parse_failed", "a release without a tag"
+				end
+			end
+			local etag = header_value(result.headers, "etag")
+			list_cache = etag and { body = result.body, etag = etag } or nil
+			return result.body
+		end
+		return nil, "no_connection",
+			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
+	end
+
 	--- Sends one conditional request for the release list.
 	local function dispatch(channel)
 		in_flight = true
 		local request_generation = generation
-		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
-		if list_cache then headers["If-None-Match"] = list_cache.etag end
 		local completed = false
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, headers, function(result)
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(result)
 			if completed or not active or request_generation ~= generation then return end
 			completed = true
 			if channel ~= opts.channel() then
@@ -298,32 +339,13 @@ function M.new(opts)
 				Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
 				return
 			end
-			local status = type(result) == "table" and tonumber(result.status) or 0
-			local body
-			if status == 304 and list_cache then
-				Logger.debug(LOG, "Release list unchanged (304); reusing this session's copy.")
-				body = list_cache.body
-			elseif type(result) == "table" and result.ok == true and type(result.body) == "string"
-				and result.body:match("^%s*%[") then
-				local decoded, decode_error = JsonCodec.decode(result.body)
-				if decode_error or type(decoded) ~= "table" then
-					Logger.warn(LOG, "Background check returned a malformed release list: %s.", tostring(decode_error))
-					complete(false, nil)
-					return
+			local body, reason, detail = read_response(result)
+			if not body then
+				if reason == "parse_failed" then
+					Logger.warn(LOG, "Background check returned %s.", detail)
+				else
+					Logger.warn(LOG, "Background check failed: %s.", detail)
 				end
-				for _, entry in pairs(decoded) do
-					if type(entry) ~= "table" or type(entry.tag_name) ~= "string" or entry.tag_name == "" then
-						Logger.warn(LOG, "Background check returned a release without a tag.")
-						complete(false, nil)
-						return
-					end
-				end
-				body = result.body
-				local etag = header_value(result.headers, "etag")
-				list_cache = etag and { body = body, etag = etag } or nil
-			else
-				Logger.warn(LOG, "Background check failed: %s.",
-					tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result"))
 				complete(false, nil)
 				return
 			end
@@ -368,6 +390,61 @@ function M.new(opts)
 	end
 
 	owner._evaluate = function() evaluate() end
+
+	--- Runs one check the user asked for, now, whatever the schedule or the
+	--- pause, and answers with the shared result (updater.check_result). The
+	--- check is recorded like an automatic one; a release it offers becomes the
+	--- one the About row names, and a later automatic check does not announce
+	--- it again: the window already showed it.
+	--- @param channel string Registry channel id to check.
+	--- @param on_result function(result) Receives the check result, exactly once.
+	--- @return boolean dispatched
+	function owner.check_now(channel, on_result)
+		local base = { channel = channel, current = current_version() }
+		local answered = false
+		local function answer(result)
+			if answered then return end
+			answered = true
+			local ok, err = pcall(on_result, result)
+			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
+		end
+		local function fail(reason, detail)
+			save_record(Schedule.record_check(load_record(), opts.now(), false))
+			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
+			answer(CheckResult.failure(base, reason, detail))
+		end
+		Logger.start(LOG, "Manual update check (channel %s)…", tostring(channel))
+		if type(channel) ~= "string" or Updater.channels().channel(channel) == nil then
+			Logger.error(LOG, "Manual update check refused: '%s' is not a registry channel.", tostring(channel))
+			answer(CheckResult.failure(base, "unexpected", "not a registry channel"))
+			return false
+		end
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
+			if answered then return end
+			local body, reason, detail = read_response(response)
+			if not body then return fail(reason, detail) end
+			local result = CheckResult.classify(body, {
+				registry = Updater.channels(), channel = channel,
+				current = base.current, installed = installed_channel(),
+			})
+			local state = Schedule.record_check(load_record(), opts.now(), true)
+			if result.state == "available" then
+				latest = { tag = result.latest, channel = channel }
+				state.last_notified_tag = result.latest
+			elseif channel == opts.channel() then
+				latest = nil
+			end
+			save_record(state)
+			Logger.success(LOG, "Manual update check answered: %s (channel %s, latest %s, %d other channel(s)).",
+				result.state, channel, tostring(result.latest), #result.others)
+			answer(result)
+		end)
+		if not ok_dispatch or sent ~= true then
+			if not answered then fail("no_connection", ok_dispatch and "the request was refused" or tostring(sent)) end
+			return false
+		end
+		return true
+	end
 
 	--- Cancels the armed timer.
 	local function disarm()

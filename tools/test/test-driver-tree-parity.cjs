@@ -203,7 +203,10 @@ const BASELINE_SHARED = 33;
 //   ui/error_dialog; no new asymmetric directory is introduced.
 //   54 → 55 — ui/config_cleanup adds one path on all three drivers. This is
 //   symmetric growth, paired with the shared-count increase above.
-const BASELINE_UNION = 55;
+//   55 → 56 — ui/update_check, the host of the shared update-check window,
+//   lands on macOS first; the Linux and Windows hosts follow in the next
+//   commits and turn it into a shared path (BASELINE_SHARED then rises).
+const BASELINE_UNION = 56;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

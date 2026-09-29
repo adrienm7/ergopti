@@ -400,3 +400,116 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(#ctx.timers, 0, "no timer is armed when checks are off")
 	end)
 end)
+
+-- A list where the installed dev.140 is listed, dev.150 is newer on its own
+-- channel and a stable release was published after the installed build.
+local MIXED = '[{"tag_name":"v1.0.0","prerelease":false,"published_at":"2026-09-03T00:00:00Z","assets":[]},'
+	.. '{"tag_name":"v0.0.0-dev.150","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]},'
+	.. '{"tag_name":"v0.0.0-dev.140","prerelease":true,"published_at":"2026-08-01T00:00:00Z","assets":[]}]'
+
+local UP_TO_DATE = '[{"tag_name":"v0.0.0-dev.140","prerelease":true,"published_at":"2026-08-01T00:00:00Z","assets":[]},'
+	.. '{"tag_name":"v0.0.0-dev.139","prerelease":true,"published_at":"2026-07-31T00:00:00Z","assets":[]}]'
+
+--- Runs one manual check and returns its answers.
+local function check_now(ctx, channel)
+	local answers = {}
+	local dispatched = ctx.owner.check_now(channel, function(result) answers[#answers + 1] = result end)
+	return answers, dispatched
+end
+
+helpers.describe("updater.auto_check (macOS): the manual check answers the update-check window", function()
+	helpers.it("offers a newer release of the checked channel without announcing it", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
+		local answers, dispatched = check_now(ctx, "dev")
+		helpers.assert_true(dispatched, "the manual check is dispatched")
+		helpers.assert_eq(#answers, 1, "one answer")
+		helpers.assert_eq(answers[1].state, "available")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(answers[1].current, "0.0.0-dev.140")
+		helpers.assert_eq(answers[1].channel, "dev")
+		helpers.assert_eq(answers[1].others, { { channel = "main", tag = "v1.0.0" } },
+			"the stable release published after the installed build is listed")
+		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "the About row names the offered release")
+		helpers.assert_eq(#ctx.announced, 0, "the window shows it: no notification")
+		local record = ctx.values[ctx.state_key]
+		helpers.assert_eq(record.last_notified_tag, "v0.0.0-dev.150", "no later announcement of the same release")
+		helpers.assert_eq(record.last_check_at, T0, "the manual check is recorded")
+		helpers.assert_eq(record.failures, 0)
+	end)
+
+	helpers.it("says up to date and still lists newer releases of other channels", function()
+		local list = UP_TO_DATE:gsub("^%[", '[{"tag_name":"v1.0.0","prerelease":false,'
+			.. '"published_at":"2026-08-05T00:00:00Z","assets":[]},')
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = list, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].state, "up_to_date")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.140")
+		helpers.assert_eq(answers[1].others, { { channel = "main", tag = "v1.0.0" } })
+		helpers.assert_nil(ctx.owner.latest(), "nothing to install on the subscribed channel")
+	end)
+
+	helpers.it("says the checked channel has no release yet", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = UP_TO_DATE, headers = {} } } })
+		local answers = check_now(ctx, "main")
+		helpers.assert_eq(answers[1].state, "no_release")
+		helpers.assert_eq(answers[1].channel, "main")
+		helpers.assert_eq(answers[1].others, {}, "the installed dev build is the newest dev release")
+	end)
+
+	helpers.it("answers a failed request with the connection reason and records the failure", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = false, status = 0, error = "timed out" } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].state, "error")
+		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		helpers.assert_contains(answers[1].detail, "timed out")
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
+	end)
+
+	helpers.it("answers an unusable list with the parse reason", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = '[{"name":"no tag"}]', headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].state, "error")
+		helpers.assert_eq(answers[1].reason_key, "updater.parse_failed")
+	end)
+
+	helpers.it("answers once when the transport throws", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, http_throw = true })
+		local answers, dispatched = check_now(ctx, "dev")
+		helpers.assert_eq(dispatched, false)
+		helpers.assert_eq(#answers, 1, "exactly one answer")
+		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+	end)
+
+	helpers.it("refuses a channel the registry does not declare, without a request", function()
+		local ctx = build({ now = T0, record = { seed = SEED } })
+		local answers, dispatched = check_now(ctx, "beta")
+		helpers.assert_eq(dispatched, false)
+		helpers.assert_eq(#ctx.requests, 0, "no request for an unknown channel")
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_unexpected")
+	end)
+
+	helpers.it("runs while the driver is paused: the user asked for it", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, paused = true,
+			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1)
+		helpers.assert_eq(answers[1].state, "available")
+	end)
+
+	helpers.it("reuses the session's list on a 304 with the same ETag", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = MIXED, headers = { ETag = '"abc"' } },
+			{ ok = false, status = 304, headers = {} },
+		} })
+		check_now(ctx, "dev")
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(ctx.requests[2].headers["If-None-Match"], '"abc"', "the second request is conditional")
+		helpers.assert_eq(answers[1].state, "available", "the unchanged list still offers the release")
+	end)
+end)

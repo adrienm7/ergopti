@@ -136,7 +136,8 @@ const MACOS_MODULES = {
 	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
 	error_dialog: 'ui/error_dialog/init.lua',
-	download_window: 'ui/download_window/init.lua'
+	download_window: 'ui/download_window/init.lua',
+	update_check: 'ui/update_check/init.lua'
 };
 
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
@@ -255,7 +256,10 @@ const WINDOWS_EXCLUSIONS = {
 		'no Windows host — the token dialog is a native InputBox, which has no manifest geometry',
 	numeric_prompt:
 		'no Windows host — InputBox asks for a number natively, same reason as ' +
-		'token_prompt above. Linux has no equivalent and needs a webview to ask at all'
+		'token_prompt above. Linux has no equivalent and needs a webview to ask at all',
+	update_check:
+		'no Windows host yet — the manual check still answers with the update prompt; ' +
+		'the WebView host replaces this exclusion with a geometry check'
 };
 
 // ── Linux: the manager must resolve geometry generically, for every app ───────

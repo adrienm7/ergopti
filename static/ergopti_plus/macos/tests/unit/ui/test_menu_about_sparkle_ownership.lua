@@ -16,9 +16,12 @@ helpers.describe("menu_about: Sparkle owns every update mutation", function()
 		helpers.assert_true(source ~= nil, "menu_about.lua source must be locatable")
 		local code = source:gsub("%-%-[^\n]*", "")
 
+		-- Which row or window asks Sparkle is covered behaviourally by
+		-- test_menu_about_check_row.lua and test_update_check_window.lua; here the
+		-- install itself must still be delegated to the launcher.
 		helpers.assert_true(
-			code:find("UpdateLauncher.request_check(channel)", 1, true) ~= nil,
-			"the menu action must delegate the subscribed channel's check to the native Sparkle controller"
+			code:find("UpdateLauncher.request_check(", 1, true) ~= nil,
+			"every install must be delegated to the native Sparkle controller"
 		)
 		for _, forbidden in ipairs({
 			"hs.http.asyncGet",
