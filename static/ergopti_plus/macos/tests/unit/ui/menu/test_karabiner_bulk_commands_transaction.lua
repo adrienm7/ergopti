@@ -615,5 +615,69 @@ helpers.describe("karabiner local clear rows use one bulk transaction", function
 	end)
 end)
 
+-- The guardian status rows
+
+--- Builds the menu over one guardian state, recording which opener runs.
+--- @param state string guardian_state() answer.
+--- @param options table|nil { tap_holds_on = boolean, enabled = boolean }.
+--- @return table built
+--- @return table opened Counts per opener name.
+local function build_guardian_menu(state, options)
+	options = options or {}
+	local opened = { open_guardian_settings = 0, open_login_items = 0 }
+	local built = build_menu("pending", function(remap)
+		remap.get_enabled = function() return options.enabled ~= false end
+		remap.get_tap_holds_enabled = function() return options.tap_holds_on ~= false end
+		remap.guardian_state = function() return state end
+		for name in pairs(opened) do
+			remap[name] = function(on_done)
+				opened[name] = opened[name] + 1
+				on_done(true, "opened")
+				return true
+			end
+		end
+	end)
+	return built, opened
+end
+
+helpers.describe("the Tap-Hold submenu says when the remap guardian holds its rules", function()
+	local CASES = {
+		{ state = "requires_approval", key = "menu.tapholds.guardian_requires_approval",
+			opener = "open_guardian_settings" },
+		{ state = "unavailable", key = "menu.tapholds.guardian_unavailable",
+			opener = "open_login_items" },
+	}
+	for _, case in ipairs(CASES) do
+		helpers.it("shows why and opens Login Items while the guardian is " .. case.state
+			.. " (guardian-status-row)", function()
+			local built, opened = build_guardian_menu(case.state)
+			local status = find_descendant(built, case.key)
+			helpers.assert_not_nil(status, "the reason must be visible without reading the log")
+			helpers.assert_true(status.disabled == true, "the reason row is informative only")
+			local action = row_action(find_descendant(built, "menu.tapholds.open_login_items"))
+			helpers.assert_type(action, "function")
+			helpers.assert_true(action())
+			helpers.assert_eq(opened[case.opener], 1)
+		end)
+	end
+
+	helpers.it("shows no guardian row when nothing waits on it (guardian-status-row)", function()
+		for _, variant in ipairs({
+			{ state = "ready" },
+			{ state = "not_used" },
+			{ state = "unknown" },
+			{ state = "unavailable", options = { tap_holds_on = false } },
+			{ state = "requires_approval", options = { enabled = false } },
+		}) do
+			local built = build_guardian_menu(variant.state, variant.options)
+			helpers.assert_nil(find_descendant(built, "menu.tapholds.open_login_items"),
+				"no Login Items row for " .. variant.state)
+			for _, case in ipairs(CASES) do
+				helpers.assert_nil(find_descendant(built, case.key))
+			end
+		end
+	end)
+end)
+
 package.loaded["infra.dialog_util"] = SAVED_DIALOGS
 package.loaded["infra.config_paths"] = SAVED_PATHS

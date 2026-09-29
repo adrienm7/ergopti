@@ -902,6 +902,44 @@ local function with_karabiner_off_hint(rows, enabled)
 	return hinted
 end
 
+-- The guardian states that leave every tap-hold inert, each with the reason
+-- row it shows and the facade opener its Login Items row calls: the approval
+-- opener rechecks that approval is still what is missing, while an
+-- unregistered helper is fixed from the same pane without that precondition.
+local GUARDIAN_STATUS_ROWS = {
+	requires_approval = { key = "menu.tapholds.guardian_requires_approval", opener = "open_guardian_settings" },
+	unavailable       = { key = "menu.tapholds.guardian_unavailable",       opener = "open_login_items" },
+}
+
+--- The rows that say why switched-on tap-holds do nothing: the remap guardian
+--- is not ready, so no rule deploys, and before these rows only the log said so.
+--- @param karabiner table Remap facade.
+--- @param tap_holds_on boolean Tap-Holds feature switch.
+--- @return table rows Empty unless the rules wait on the guardian.
+local function guardian_status_rows(karabiner, tap_holds_on)
+	if not tap_holds_on or karabiner.get_enabled() ~= true
+		or type(karabiner.guardian_state) ~= "function" then return {} end
+	local ok, state = pcall(karabiner.guardian_state)
+	local spec = ok and GUARDIAN_STATUS_ROWS[state] or nil
+	if not spec then return {} end
+	local opener = karabiner[spec.opener]
+	local rows = { { label = i18n.get(spec.key), disabled = true } }
+	if type(opener) == "function" then
+		rows[2] = {
+			label = i18n.get("menu.tapholds.open_login_items"),
+			action = function()
+				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)
+				return opener(function(opened, detail)
+					if opened ~= true then
+						Logger.error(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
+					end
+				end) == true
+			end,
+		}
+	end
+	return rows
+end
+
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -925,16 +963,20 @@ function M.build(ctx)
 	end
 
 	local enabled = karabiner.get_enabled()
+	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
+		and karabiner.get_tap_holds_enabled() == true
 
 	-- The key lists build their trees on demand, inside the renderer's isolated
 	-- provider call: an unreadable key catalogue then costs the key rows and is
 	-- logged, not the whole Tap-Holds submenu.
 	local providers = {
+		-- The first engine-specific rows: while the guardian is not ready,
+		-- they open with why nothing applies and the way to fix it.
 		["tap_hold_timings"] = function()
-			return {
-				build_delay_item(karabiner, update_menu),
-				build_sticky_delay_item(karabiner, update_menu),
-			}
+			local rows = guardian_status_rows(karabiner, tap_holds_on)
+			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
+			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
+			return rows
 		end,
 		-- With « Ergopti uses Karabiner » off the key rows are greyed: nothing
 		-- can deploy them. Say why right above the first of them, at the top of
@@ -952,9 +994,6 @@ function M.build(ctx)
 	-- The two bulk commands are the ids Windows declares for its own tap-holds:
 	-- the same row, the same label, this engine's implementation behind it.
 	-- Like there, they leave the key combinations of the Shortcuts group alone.
-	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
-		and karabiner.get_tap_holds_enabled() == true
-
 	local commands = {
 		["tapholds_toggle"] = function()
 			return M.set_feature_enabled(karabiner, not tap_holds_on, update_menu)
