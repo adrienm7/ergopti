@@ -347,6 +347,74 @@ helpers.describe("hotstrings_config", function()
       end)
     end)
 
+    --- Runs the cleanup marker of a manager whose catalogue loads `categories`,
+    --- recording every outdated-entry warning.
+    --- @param opts table { categories, config_dir, publish }.
+    --- @param source string config.toml bytes to scan.
+    --- @return table offered Sorted dotted paths the cleanup offers.
+    --- @return table warnings Outdated-entry warnings logged.
+    local function cleanup_offers(opts, source)
+      local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["logger.shim"]
+      local warnings = {}
+      local logger = helpers.make_logger_stub()
+      logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+      package.loaded["logger.shim"] = logger
+      package.loaded["modules.hotstrings.loader"] = {
+        find_toml_files = function() return {} end,
+        list_subdirs = function() return {} end,
+        read_file = function() return nil end,
+        load_catalogue = function()
+          return { committed = true, errors = 0, categories = opts.categories, mappings = {} }
+        end,
+      }
+      local offered = {}
+      local ok, err = pcall(function()
+        require("config_outdated").reset_for_tests()
+        local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
+        Choices.with_file(cfg, source, function()
+          local engine = make_engine()
+          if not opts.publish then engine.load_mappings = function() return false end end
+          helpers.assert_true(cfg.init(engine, opts.config_dir), "the private choices must be readable")
+          local _, committed, reason = cfg.load_all()
+          helpers.assert_eq(committed, opts.publish == true, tostring(reason))
+          for _, key in ipairs(require("config_unused_keys").find_in_source(source, cfg.mark_config_reads).keys) do
+            offered[#offered + 1] = key.section .. "." .. key.key
+          end
+        end)
+      end)
+      package.loaded["modules.hotstrings.loader"] = saved_loader
+      package.loaded["logger.shim"] = saved_logger
+      package.loaded["modules.hotstrings.hotstrings_config"] = nil
+      if not ok then error(err, 0) end
+      table.sort(offered)
+      return offered, warnings
+    end
+
+    helpers.it("offers no choice when the catalogue publication was refused (config-outdated-unpublished)", function()
+      -- A refused publication leaves no catalogue: judging choices against it
+      -- offered every real setting for deletion and warned it as outdated.
+      local source = "[hotstrings.groups]\nprobe = false\nrolls = true\n\n[hotstrings.modules.rolls]\nhc = false\n"
+      local offered, warnings = cleanup_offers({ config_dir = "virtual.toml", publish = false,
+        categories = { probe = { id = "probe", sections = {}, sections_order = {} } } }, source)
+      helpers.assert_eq(offered, {})
+      helpers.assert_eq(warnings, {})
+    end)
+
+    helpers.it("judges a same-stem override's sections against the build (config-outdated-override)", function()
+      -- The user's rolls.toml holds only its own section; the bundled hc
+      -- section still ships, so its choice is kept. A bundled category that
+      -- really lost a section still has that choice offered.
+      local dir = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "") .. "/ergopti_override_probe"
+      local source = "[hotstrings.modules.rolls]\nhc = false\nown = true\n\n[hotstrings.modules.probe]\ngone = true\n"
+      local offered, warnings = cleanup_offers({ config_dir = dir, publish = true, categories = {
+        rolls = { id = "rolls", path = dir .. "/rolls.toml", sections = { own = { count = 1 } }, sections_order = { "own" } },
+        probe = { id = "probe", path = "/bundled/probe.toml", sections = {}, sections_order = {} },
+      } }, source)
+      helpers.assert_eq(offered, { "hotstrings.modules.probe.gone" })
+      helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
+      helpers.assert_true(warnings[1]:find("'hotstrings.modules.probe.gone'", 1, true) ~= nil, warnings[1])
+    end)
+
     helpers.it("ignores an old-shape choice without guessing it or refusing the catalogue (config-outdated-hotstrings)", function()
       -- An old-shape choice is outdated configuration: never guessed ("yes" is
       -- not a switch), never a refusal that turns every hotstring off. The

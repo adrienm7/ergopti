@@ -71,6 +71,9 @@ local _config_dir     = nil
 local _toml_paths     = {}
 local _mappings       = {}
 local _categories     = {}
+-- Set once a catalogue has been published: before that, `_categories` is the
+-- empty table a refused or failed load leaves, which proves nothing retired.
+local _published      = false
 local _parse_errors   = 0
 local _magic_key      = nil
 local _canonical_magic_key = nil
@@ -140,7 +143,7 @@ local function decode_choices(document)
 		groups = nil
 	end
 	for id, value in pairs(groups or {}) do
-		if type(id) == "string" and type(value) == "boolean" then
+		if type(id) == "string" and id ~= "" and type(value) == "boolean" then
 			choices.groups[id] = value
 		else
 			ConfigOutdated.report({ "hotstrings", "groups", tostring(id) }, "a category choice takes true or false", Logger)
@@ -152,10 +155,10 @@ local function decode_choices(document)
 		modules = nil
 	end
 	for id, sections in pairs(modules or {}) do
-		if type(id) == "string" and type(sections) == "table" then
+		if type(id) == "string" and id ~= "" and type(sections) == "table" then
 			choices.modules[id] = {}
 			for name, value in pairs(sections) do
-				if type(name) == "string" and type(value) == "boolean" then
+				if type(name) == "string" and name ~= "" and type(value) == "boolean" then
 					choices.modules[id][name] = value
 				else
 					ConfigOutdated.report({ "hotstrings", "modules", id, tostring(name) },
@@ -169,20 +172,43 @@ local function decode_choices(document)
 	return choices
 end
 
---- Reports the choices naming a category or section the loaded catalogue no
---- longer has: ignored at runtime, offered by the config cleanup.
+--- Whether a published category's sections are the ones this build ships. A
+--- category read from the user's same-stem override holds that file's sections
+--- only: a choice for a bundled section it lacks is not retired, since removing
+--- the override brings the section back.
+--- @param category table Published category record.
+--- @return boolean
+local function sections_are_the_builds(category)
+	if type(_config_dir) ~= "string" or _config_dir:match("%.toml$") then return true end
+	local prefix = _config_dir .. "/"
+	return type(category.path) ~= "string" or category.path:sub(1, #prefix) ~= prefix
+end
+
+--- Whether one explicit choice names something the published catalogue can
+--- prove retired. Nothing is retired before a catalogue was published.
+--- @param id string Category id.
+--- @param section string|nil Section name, for a section choice.
+--- @return boolean retired
+local function choice_is_retired(id, section)
+	if not _published then return false end
+	local category = _categories[id]
+	if category == nil then return true end
+	if section == nil or not sections_are_the_builds(category) then return false end
+	return not (category.sections or {})[section]
+end
+
+--- Reports the choices naming a category or section this build no longer
+--- ships: ignored at runtime, offered by the config cleanup.
 --- @param choices table Decoded choices.
---- @param categories table Loaded categories, keyed by id.
-local function report_retired_choices(choices, categories)
+local function report_retired_choices(choices)
 	for id in pairs(choices.groups) do
-		if not categories[id] then
+		if choice_is_retired(id) then
 			ConfigOutdated.report({ "hotstrings", "groups", id }, "no loaded hotstring category has this id", Logger)
 		end
 	end
 	for id, sections in pairs(choices.modules) do
-		local category = categories[id]
 		for name in pairs(sections) do
-			if not (category and (category.sections or {})[name]) then
+			if choice_is_retired(id, name) then
 				ConfigOutdated.report({ "hotstrings", "modules", id, name }, "no loaded hotstring section has this name", Logger)
 			end
 		end
@@ -1254,8 +1280,9 @@ function M.load_all()
 	_toml_paths = staged_paths
 	_mappings = staged_mappings
 	_categories = staged_categories
+	_published = true
 	_resolve_cache = {}
-	report_retired_choices(choices, _categories)
+	report_retired_choices(choices)
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 		#filtered, _count_groups(filtered), _parse_errors)
@@ -1702,20 +1729,21 @@ function M.restore_configuration(owner, snapshot)
 end
 
 --- Marks the choices this owner consumes for the unused-key cleanup: every
---- explicit choice of a category the current catalogue loads, through the same
---- decoder the reader applies.
+--- well-formed choice the published catalogue cannot prove retired, through
+--- the same decoder the reader applies. Without a published catalogue (a
+--- refused or failed load) every such choice is kept: a transient failure must
+--- never offer the user's real settings for deletion.
 --- @param document table Decoded config.toml.
 --- @param mark function mark(...segments).
 function M.mark_config_reads(document, mark)
 	local choices = decode_choices(document)
-	report_retired_choices(choices, _categories)
+	report_retired_choices(choices)
 	for id in pairs(choices.groups) do
-		if _categories[id] then mark("hotstrings", "groups", id) end
+		if not choice_is_retired(id) then mark("hotstrings", "groups", id) end
 	end
 	for id, sections in pairs(choices.modules) do
-		local category = _categories[id]
 		for name in pairs(sections) do
-			if category and (category.sections or {})[name] then mark("hotstrings", "modules", id, name) end
+			if not choice_is_retired(id, name) then mark("hotstrings", "modules", id, name) end
 		end
 	end
 end
