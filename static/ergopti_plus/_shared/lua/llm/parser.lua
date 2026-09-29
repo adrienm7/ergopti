@@ -149,6 +149,8 @@ local function clean_model_output(text)
 	-- Qwen 3.5 sometimes abbreviates "NEXT_WORDS:" to just "NEXT:" — normalize it
 	-- Pattern: line-start (after newline) followed by "NEXT" + optional space + colon
 	text = text:gsub("(\n)([Nn][Ee][Xx][Tt])%s*:", "%1NEXT_WORDS:")
+	text = text:gsub("%[[Rr][Ee][Ww][Rr][Ii][Tt][Ee]%]", "REWRITE:")
+	text = text:gsub("[Rr][Ee][Ww][Rr][Ii][Tt][Ee]%s*:", "REWRITE:")
 
 	return text
 end
@@ -608,11 +610,20 @@ function M.process_prediction(full_text, tail_text, block, opts)
 	
 	block = clean_model_output(block)
 	
-	local is_advanced = block:find("TAIL_CORRECTED") or block:find("NEXT_WORDS")
+	-- A rewrite answers a rewrite prompt (llm/rewrite.lua): it replaces the whole
+	-- tail span the caller sent and never appends next words
+	local is_rewrite = block:find("REWRITE:", 1, true) ~= nil
+	local is_advanced = is_rewrite or block:find("TAIL_CORRECTED") or block:find("NEXT_WORDS")
 	
 	if is_advanced then
-		local tc = block:match("TAIL_CORRECTED%s*:%s*(.-)[\r\n]+") or block:match("TAIL_CORRECTED%s*:%s*(.-)$") or ""
-		local nw = block:match("NEXT_WORDS%s*:%s*(.-)[\r\n]+") or block:match("NEXT_WORDS%s*:%s*(.-)$") or ""
+		local tc, nw
+		if is_rewrite then
+			tc = block:match("REWRITE:%s*(.-)[\r\n]+") or block:match("REWRITE:%s*(.-)$") or ""
+			nw = ""
+		else
+			tc = block:match("TAIL_CORRECTED%s*:%s*(.-)[\r\n]+") or block:match("TAIL_CORRECTED%s*:%s*(.-)$") or ""
+			nw = block:match("NEXT_WORDS%s*:%s*(.-)[\r\n]+") or block:match("NEXT_WORDS%s*:%s*(.-)$") or ""
+		end
 
 		local function trim(s) return s:match("^%s*(.-)%s*$") or "" end
 
@@ -623,8 +634,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		nw = apply_french_typography(nw)
 		nw = strip_prediction_padding(nw)
 
-		nw = enforce_word_limits(nw, max_w)
-		if nw == "" then return nil end
+		if not is_rewrite then
+			nw = enforce_word_limits(nw, max_w)
+			if nw == "" then return nil end
+		end
 
 		if tc == "" and nw ~= "" then
 			tc = trim((tail_text or ""):gsub("^\"", ""):gsub("\"$", ""))
@@ -657,9 +670,11 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			end
 			return prev[n]
 		end
+		-- A rewrite legitimately replaces the last word ("jd" → "jeudi"), so the
+		-- guard only protects continuations
 		local orig_last = last_word(normalized_full):lower()
 		local tc_last   = last_word(tc_norm):lower()
-		if orig_last ~= "" and tc_last ~= "" then
+		if not is_rewrite and orig_last ~= "" and tc_last ~= "" then
 			local max_len = math.max(#orig_last, #tc_last)
 			local dist    = char_lev(orig_last, tc_last)
 			-- Fully disjoint last words (ratio == 1.0) → stale snapshot
@@ -742,8 +757,21 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			return nil
 		end
 		local window_size = math.min(full_length, math.max(60, corrected_length + 30))
-		local orig_context = utils.utf8_sub(
-			normalized_full, full_length - window_size + 1)
+		local orig_context
+		if is_rewrite then
+			-- The rewrite replaces exactly the span the caller sent. It must be a
+			-- suffix of the context, or the erase count would not match the text.
+			if tail_text == "" or #tail_text > #normalized_full
+				or normalized_full:sub(-#tail_text) ~= tail_text then
+				Logger.warn(LOG, "Rewrite refused: the rewritten span is not the end of the context.")
+				return nil
+			end
+			orig_context = tail_text
+			window_size = full_length
+		else
+			orig_context = utils.utf8_sub(
+				normalized_full, full_length - window_size + 1)
+		end
 
 		-- Snap only at complete Unicode spacing characters, never at one byte that
 		-- happens to occur inside NBSP, NNBSP, CJK, or another multibyte character.
@@ -771,8 +799,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		end
 
 		-- 2. Strip leading context but keep a trace of it for dynamic anchor resolution
+		-- A rewrite keeps its leading deletions: the span starts where the sentence
+		-- starts, so a replaced first word must really be erased.
 		local stripped_ops = {}
-		while #ops > 0 and ops[1].type == "del" do 
+		while not is_rewrite and #ops > 0 and ops[1].type == "del" do 
 			table.insert(stripped_ops, table.remove(ops, 1))
 		end
 		while #ops > 0 and ops[1].type == "ins" and is_spacing_only(ops[1].t2) do
@@ -804,6 +834,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 
 		-- If the LLM matched the context perfectly and only appended words
 		if first_change_idx == -1 then
+			if is_rewrite then return nil end
 			return { deletes = 0, to_type = "", nw = nw_norm, has_corrections = false, chunks = {}, disable_bold = false }
 		end
 
@@ -840,7 +871,9 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		end
 		
 		-- Safety circuit breaker: Prevent massive unprompted deletions
-		local max_allowed_dels = math.max(20, utils.utf8_len(tc_norm) + 10)
+		-- A rewrite may erase its whole span, which the caller chose; nothing else.
+		local max_allowed_dels = is_rewrite and utils.utf8_len(orig_context)
+			or math.max(20, utils.utf8_len(tc_norm) + 10)
 		if true_deletes > max_allowed_dels then
 			Logger.warn(LOG, string.format("Safety trip: Blocked deletion of %d chars.", true_deletes))
 			return nil
@@ -940,6 +973,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		else
 			nw_start_idx = 1
 		end
+		if is_rewrite then nw_start_idx = #visual_ops + 1 end
 
 		local display_nw = ""
 		for k = nw_start_idx, #visual_ops do
@@ -995,7 +1029,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 				break
 			end
 		end
-		if only_equals then
+		if only_equals and not is_rewrite then
 			chunks = {}
 			-- Protect against silent deletion if there are no visible corrections.
 			-- Allow small deletions (≤ 10 chars) when the model appended valid content —
@@ -1020,7 +1054,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			nw = display_nw, 
 			has_corrections = has_corr, 
 			chunks = chunks,
-			disable_bold = disable_bold
+			disable_bold = disable_bold,
+			rewrite = is_rewrite
 		}
 		
 	else
