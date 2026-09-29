@@ -29,7 +29,10 @@ local function menu_over_double(integration_enabled)
 		AVAILABLE_ACTIONS = {
 			{ id = "none", label = "None", category = "Special", holdable = true, tappable = true },
 		},
-		TAP_HOLD_KEYS = { { id = "return_or_enter", label = "Enter" } },
+		-- A left-hand key of the shared catalogue: its row sits right under the
+		-- first hand header, where the hint belongs. Rows are labelled from the
+		-- catalogue's label keys, not from this double's label.
+		TAP_HOLD_KEYS = { { id = "tab", label = "Tab" } },
 		MOD_COMBOS = { { id = "left_shift+right_shift", label = "Shift chord", group = "Shift" } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return integration_enabled end,
@@ -97,7 +100,7 @@ helpers.describe("the macOS Tap-Holds submenu when Ergopti does not use Karabine
 	helpers.it("draws a disabled hint right above the greyed key rows", function()
 		local rows = tap_hold_rows(false)
 		helpers.assert_eq(rows[1].title, "menu.tapholds.enable", "the switch stays the first row")
-		assert_hint_leads(rows, "Enter")
+		assert_hint_leads(rows, "tap_hold.group.tab")
 	end)
 
 	helpers.it("draws the hint above the greyed chord rows, in their Shortcuts group", function()
