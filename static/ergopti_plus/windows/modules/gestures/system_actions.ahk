@@ -193,7 +193,10 @@ GestureSysMicMuteToggle(Sys := 0) {
 
 GestureSysClearClipboard(Sys := 0) {
 	Sys := _GestureSys(Sys)
-	Sys.ClearClipboard()
+	if !Sys.ClearClipboard() {
+		LoggerError("gestures", "The clipboard could not be cleared.")
+		return
+	}
 	LoggerInfo("gestures", "Clipboard cleared.")
 }
 

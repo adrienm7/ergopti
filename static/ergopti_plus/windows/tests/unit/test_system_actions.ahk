@@ -42,6 +42,7 @@ class _SysActionsFake {
 		this.CreateStatuses := []
 		this.Pointer := { X: 0, Y: 0 }
 		this.MonitorList := []
+		this.ClipboardWritable := true
 	}
 	_Log(Name, Args*) {
 		Entry := [Name]
@@ -79,7 +80,7 @@ class _SysActionsFake {
 	MousePosition() => this.Pointer
 	Monitors() => this.MonitorList
 	MoveMouse(X, Y) => this._Log("MoveMouse", X, Y)
-	ClearClipboard() => this._Log("ClearClipboard")
+	ClearClipboard() => (this._Log("ClearClipboard"), this.ClipboardWritable)
 	Defer(Fn, DelayMs := 1) => (this.Deferred.Push(Fn), this.DeferDelays.Push(DelayMs))
 	Notify(Text) => this._Log("Notify", Text)
 	Ask(Text, Title) => (this._Log("Ask", Text, Title), this.Answer)
@@ -214,6 +215,27 @@ _SysActions_ClearClipboardAndCenter() {
 	AssertEqual("", GestureSysMonitorCenter(-5, 10, Fake.MonitorList), "no monitor holds the point")
 }
 Test("system actions: clear_clipboard and center_mouse", _SysActions_ClearClipboardAndCenter)
+
+; SystemControl.ClearClipboard writes through the clipboard owner (CB_Write),
+; which refuses while an earlier restore is still owed: the action then reports
+; the failure instead of claiming an empty clipboard.
+_SysActions_ClearClipboardRefused() {
+	Fake := _SysActionsFake()
+	Fake.ClipboardWritable := false
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try GestureSysClearClipboard(Fake)
+	finally LoggerClearTestSink()
+	AssertEqual(1, _SysActions_CallsNamed(Fake, "ClearClipboard").Length)
+	Reported := false
+	for Line in Lines {
+		AssertFalse(InStr(Line, "Clipboard cleared."), "a refused write is not reported as done")
+		if InStr(Line, "[ERROR]") && InStr(Line, "could not be cleared")
+			Reported := true
+	}
+	AssertTrue(Reported, "the refused write is logged as an error")
+}
+Test("system actions: clear_clipboard reports a clipboard it could not write", _SysActions_ClearClipboardRefused)
 
 _SysActions_QuitAndForceQuit() {
 	Fake := _SysActionsFake()
