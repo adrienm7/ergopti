@@ -240,6 +240,39 @@ helpers.with_stub_scope(MODULES, function()
 				{ "gestures.sensitivities", "swipe_3_right" })
 		end)
 
+		helpers.it("unused keys: an old-shape hotstring choice never reaches the projection (config-outdated-hotstrings)", function()
+			-- The projection asserts booleans, so one `magickey = "on"` failed the
+			-- boot hotstrings sync with an ERROR at every start; the cleanup never
+			-- listed it because the loader took both tables whole.
+			local source = table.concat({
+				"[hotstrings.groups]",
+				"magickey = \"on\"",
+				"rolls = false",
+				"",
+				"[hotstrings.modules]",
+				"magickey = true",
+				"",
+				"[hotstrings.modules.rolls]",
+				"hc = \"yes\"",
+				"sfb = true",
+				"",
+			}, "\n")
+			local flat = Preferences.flatten_document(TomlCodec.decode(source))
+			helpers.assert_eq(flat.hotstrings, { rolls = false })
+			helpers.assert_eq(flat.section_states, { rolls = { sfb = true } })
+			local desired = Preferences.project_hotstring_preferences(flat, { magickey = true, rolls = true },
+				function(name) return name == "rolls" and { { name = "hc" }, { name = "sfb" } } or {} end)
+			helpers.assert_eq(desired.hotstrings.rolls, false)
+			helpers.assert_eq(desired.section_states.rolls.sfb, true)
+			local offered = {}
+			for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+				offered[#offered + 1] = key.section .. "." .. key.key
+			end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "hotstrings.groups.magickey", "hotstrings.modules.magickey",
+				"hotstrings.modules.rolls.hc" })
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)

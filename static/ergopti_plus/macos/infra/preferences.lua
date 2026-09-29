@@ -242,6 +242,40 @@ local function terminator_state_owner(document)
 	end
 end
 
+--- Owner check of one [hotstrings.groups] or [hotstrings.modules.<id>] choice:
+--- the hotstring projection applies true or false only.
+--- @param _ string Choice id.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function boolean_choice(_, value)
+	if type(value) == "boolean" then return true end
+	return false, "a hotstring choice takes true or false"
+end
+
+--- Partitions [hotstrings.modules]: each child is one category's table of
+--- section choices. A child of another shape (an older build's
+--- `magickey = true`) is outdated as a whole; inside a table, each section
+--- choice is kept only when it is a boolean.
+--- @param prefix table Path segments of the modules table.
+--- @param modules table Persisted children.
+--- @param mark function|nil Cleanup mark(...segments).
+--- @return table kept Well-formed section choices, by category.
+local function partition_section_choices(prefix, modules, mark)
+	local kept = {}
+	for id, sections in pairs(modules) do
+		local path = { prefix[1], prefix[2], id }
+		if type(id) ~= "string" or id == "" then
+			ConfigOutdated.report(path, "not a text key")
+		elseif type(sections) ~= "table" or #sections > 0 then
+			ConfigOutdated.report(path, "section choices are not a table")
+		else
+			kept[id] = ConfigOutdated.partition(path, sections, boolean_choice, mark)
+		end
+	end
+	return kept
+end
+
 --- Set of known top-level section names for fast lookup.
 local _known_sections = {}
 for _, s in ipairs(SECTIONS) do _known_sections[s] = true end
@@ -465,6 +499,13 @@ local function flatten_from_disk(grouped, mark)
 						elseif nested_fk == "terminator_states" then
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
 								terminator_state_owner(grouped), mark)
+						elseif nested_fk == "hotstrings" then
+							-- The hotstring projection asserts booleans: an old-shape
+							-- choice reaching it failed the boot hotstrings sync.
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								boolean_choice, mark)
+						elseif nested_fk == "section_states" then
+							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
 						else
 							flat[nested_fk] = owned
 							take(sec_name, disk_key)
@@ -538,6 +579,10 @@ local function flatten_from_disk(grouped, mark)
 						if fk then
 							flat[fk] = disk_val
 							take(sec_name, disk_key)
+						elseif _reverse_nested[lookup] then
+							-- A scalar where this build keeps a table of settings
+							-- (an older build's `groups = "…"`): nothing reads it.
+							ConfigOutdated.report({ sec_name, disk_key }, "a table of settings is expected here")
 						end
 					end
 				end
