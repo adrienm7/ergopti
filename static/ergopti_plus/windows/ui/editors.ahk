@@ -28,7 +28,7 @@ MagicKeyEditor(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("+AlwaysOnTop", t("dialog.magic_key.title"))
+		GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
 		GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
 		GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
 		GuiToShow.Show("Center")

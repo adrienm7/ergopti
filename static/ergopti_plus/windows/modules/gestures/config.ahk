@@ -747,7 +747,7 @@ GestureBuildSetupInstructions() {
 ; Replaces the previous two-step ``Show instructions`` + ``Open touchpad
 ; settings`` menu items — the user only needs one path now.
 GestureShowManualTutorialDialog() {
-		tg := Gui("+AlwaysOnTop", t("onboarding.gestures.register_manual"))
+		tg := Gui("", t("onboarding.gestures.register_manual"))
 		tg.SetFont("s9", "Segoe UI")
 		tg.MarginX := 18
 		tg.MarginY := 14
