@@ -16,7 +16,8 @@
 ;    at most max_export_bytes UTF-8 bytes.
 ; 3. A saved file keeps the report's prefix and suffix and only file-name-safe
 ;    characters, so it cannot leave the diagnostics folder.
-; 4. A report prefills only the fields of the bug form.
+; 4. A report prefills only the fields of the bug form, except its
+;    report_field: the host fills that one with the report text itself.
 ; 5. Both ports replay _shared/tests/corpus/healthcheck/action_vectors.json.
 ; ==============================================================================
 
@@ -126,14 +127,15 @@ HealthCheck_ValidateAction(Message, Context) {
 		case "report":
 			if !_HCActions_BoundedText(Message.Get("text", ""), Limit)
 				return _HCActions_Refuse("bad_text")
-			if !_HCActions_ValidName(Message.Get("name", ""), Schema["report"])
-				return _HCActions_Refuse("bad_name")
 			Given := Message.Get("fields", "")
 			if !(Given is Map)
 				return _HCActions_Refuse("bad_fields")
+			Bug := Context["templates"]["templates"]["bug"]
 			Allowed := Map()
-			for Id in Context["templates"]["templates"]["bug"]["fields"]
+			for Id in Bug["fields"]
 				Allowed[Id] := true
+			; The host fills the report field with the text itself
+			Allowed.Delete(Bug["report_field"])
 			Fields := Map()
 			for Id, Value in Given {
 				if !Allowed.Has(Id)
@@ -142,8 +144,7 @@ HealthCheck_ValidateAction(Message, Context) {
 					return _HCActions_Refuse("bad_fields")
 				Fields[Id] := Value
 			}
-			return Map("action", Map("action", "report", "text", Message["text"], "name", Message["name"],
-				"fields", Fields))
+			return Map("action", Map("action", "report", "text", Message["text"], "fields", Fields))
 		case "open_path":
 			Id := Message.Get("id", "")
 			if !(Id is String) || !_HCActions_PathIds(Schema, Context["driver"]).Has(Id)

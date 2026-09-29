@@ -31,7 +31,13 @@
 #             _shared/tests/corpus/action_parameters/send_input_vectors.json),
 #             or "llm_prompt" (a prompt profile id, optionally followed by
 #             |count; rule pinned by
-#             _shared/tests/corpus/action_parameters/llm_prompt_vectors.json).
+#             _shared/tests/corpus/action_parameters/llm_prompt_vectors.json),
+#             or "llm_vision" (a vision backend, "local" or an API provider,
+#             optionally followed by |model; rule pinned by
+#             _shared/tests/corpus/llm/vision_vectors.json), or "llm_language"
+#             ("ui" for the interface language, or a locale code of
+#             _shared/data/locale_names.json; rule pinned by
+#             _shared/tests/corpus/llm/translate_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
@@ -937,6 +943,110 @@ platform = "all"
 [sg_actions.llm_predict_rewrite]
 platform = "all"
 
+[sg_actions.llm_predict_tone_familiar]
+platform = "all"
+
+[sg_actions.llm_predict_tone_neutral]
+platform = "all"
+
+[sg_actions.llm_predict_tone_formal]
+platform = "all"
+
+[sg_actions.llm_predict_tone_very_formal]
+platform = "all"
+
+[sg_actions.llm_predict_translate_en]
+platform = "all"
+
+[sg_actions.llm_predict_translate_ja]
+platform = "all"
+
+[sg_actions.llm_tone_more_formal]
+# Rewrites the SELECTION one register more formal on the tone ladder
+# (_shared/lua/llm/tone.lua: familiar, neutral, formal, very formal) and
+# replaces it at once, keeping the rewrite selected so the next step applies
+# to it. Each step rewrites the original text, so going back and forth never
+# drifts. It stops at the most formal register; the _cycle variants wrap
+# around to the opposite end. Nothing selected: nothing happens. It refuses
+# like llm_generate_prediction (paused, AI off, backend not ready).
+platform = "all"
+
+[sg_actions.llm_tone_more_familiar]
+platform = "all"
+
+[sg_actions.llm_tone_more_formal_cycle]
+platform = "all"
+
+[sg_actions.llm_tone_more_familiar_cycle]
+platform = "all"
+
+[sg_actions.llm_screen_region]
+# Lets the user draw a screen region, has the vision backend stored for the
+# binding transcribe it (llm/vision.lua, _shared/modules/llm/vision.json), then
+# has the AI menu's text backend draft a reply, a translation and an
+# explanation, offered in the prediction tooltip and typed at the caret on
+# acceptance. A cancelled selection does nothing. It refuses like
+# llm_generate_prediction, and when the backend has no vision model.
+platform = "all"
+parameter = "llm_vision"
+
+[sg_actions.llm_live_prompt_toggle]
+# Turns live mode on with the prompt stored for the binding (llm_prompt
+# parameter, as llm_prompt_prediction), or off when it is on. While on, every
+# keystroke asks for predictions with that prompt and count, using the
+# debounce and minimum word count of _shared/modules/llm/live.json instead of
+# the menu's, so a rewrite prompt such as translate_en shows the current sentence translated as it is typed; Tab
+# replaces the sentence. The menu's profile and settings are left unchanged.
+platform = "all"
+parameter = "llm_prompt"
+
+[sg_actions.llm_screen_full]
+# llm_screen_region on the whole screen the pointer is on, with no selection.
+platform = "all"
+parameter = "llm_vision"
+
+[sg_actions.llm_screen_error]
+# "Why this error?": the user draws a region around an error (a terminal, a
+# log, a dialog, code), the vision model reads it, and the tooltip offers the
+# error_answers of vision.json in order: the explanation in the interface
+# language, then the fix the user can type (a command or the corrected line).
+# Same parameter, refusals and capture as llm_screen_region.
+platform = "all"
+parameter = "llm_vision"
+
+[sg_actions.llm_translate_selection]
+# Translates the SELECTION with the AI menu's current text backend
+# (_shared/modules/llm/translate.json) and shows the translation in the
+# prediction tooltip; accepting it replaces the selection, Escape leaves the
+# text untouched. The parameter is "ui" (the interface language, the default)
+# or a locale code. Nothing selected: a notice. It refuses like
+# llm_generate_prediction (paused, AI off, backend not ready).
+platform = "all"
+parameter = "llm_language"
+
+[sg_actions.llm_agent_selection]
+# "What can I do with this?": System 2 (llm.agent_system2) reads the
+# SELECTION and proposes at most three actions of the closed schema of
+# _shared/modules/llm/agent.json (calendar event, reminder, mail draft, one of
+# the user's shortcuts) as tooltip candidates; accepting one hands it to the
+# driver's connector. Nothing runs without that acceptance. Nothing selected:
+# a notice. It refuses like llm_generate_prediction, and with a notice when
+# no System 2 is chosen.
+platform = "all"
+
+[sg_actions.llm_agent_command]
+# llm_agent_selection on a command the user types in a dialog ("meeting
+# tomorrow 9am with the product team") instead of the selection.
+platform = "all"
+
+[sg_actions.llm_agent_auto_toggle]
+# Switches the agent between its automatic mode and "on action"
+# (llm.agent_mode "auto" <-> "action"; from "off" it goes to "auto"). In the
+# automatic mode, after a pause in typing, System 1 triages the sentence and,
+# above the learned threshold of its intent in the current app, System 2
+# proposes actions in the tooltip; Tab runs the selected one.
+platform = "all"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1347,6 +1457,24 @@ items = [
     "llm_predict_advanced",
     "llm_predict_batch_advanced",
     "llm_predict_rewrite",
+    "llm_predict_tone_familiar",
+    "llm_predict_tone_neutral",
+    "llm_predict_tone_formal",
+    "llm_predict_tone_very_formal",
+    "llm_predict_translate_en",
+    "llm_predict_translate_ja",
+    "llm_tone_more_formal",
+    "llm_tone_more_familiar",
+    "llm_tone_more_formal_cycle",
+    "llm_tone_more_familiar_cycle",
+    "llm_live_prompt_toggle",
+    "llm_screen_region",
+    "llm_screen_full",
+    "llm_screen_error",
+    "llm_translate_selection",
+    "llm_agent_selection",
+    "llm_agent_command",
+    "llm_agent_auto_toggle",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",

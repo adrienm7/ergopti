@@ -21,9 +21,12 @@ function M.daemon()
 	local _, status = Files.read_with_status(Paths.config("config.toml"))
 	assert(status == "absent", "the live daemon fixture requires a fresh configuration")
 	local config = "[script]\nonboarding_done = true\n"
-	-- The AI probe's rewrite runs from a chord, as a user would bind it.
+	-- The AI probe's rewrite runs from a chord, as a user would bind it. Chords
+	-- only fire while the shortcuts feature is on, which it is not by default:
+	-- without it the daemon holds the chord back as it does during a pause.
 	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
-		config = config .. "\n[shortcuts.keyboard]\nsuper_space = \"llm_predict_rewrite\"\n"
+		config = config .. "\n[shortcuts]\nenabled = true\n"
+			.. "\n[shortcuts.keyboard]\nsuper_space = \"llm_predict_rewrite\"\n"
 	end
 	assert(Files.write(Paths.config("config.toml"), config), "live configuration must be created")
 	local Hotstrings = require("modules.hotstrings.hotstrings_config")

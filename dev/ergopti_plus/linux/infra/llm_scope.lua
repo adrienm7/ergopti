@@ -10,7 +10,7 @@ local LOG = "infra.llm_scope"
 local _owner, _sequence = nil, 0
 
 local OWNERS = { "settings", "trigger_settings", "display_settings", "navigation_settings",
-	"profile_settings", "profiles" }
+	"profile_settings", "agent_settings", "profiles" }
 
 --- Builds a terminal owner; the ordinary readers consume a detached candidate.
 --- @param options table Path, backup path, filesystem and optional engine ports.

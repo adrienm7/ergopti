@@ -1563,4 +1563,15 @@ function M.fetch_sequential(...)
 	return ApiMlxFetch.fetch_sequential(...)
 end
 
+--- Sends one request and hands back the model's answer unparsed, through the
+--- chat endpoint whenever the prompt carries instructions.
+--- @see modules.llm.api_ollama M.request_raw for the full contract.
+function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail,
+                       options)
+	if type(on_raw) ~= "function" then error("api_mlx.request_raw: on_raw must be a function") end
+	local force_chat = type(options) == "table" and options.chat == true
+	return ApiMlxInference.post_and_parse(model_name, system_prompt, full_text, tail_text,
+		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), false, on_raw, force_chat)
+end
+
 return M

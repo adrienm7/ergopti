@@ -81,6 +81,89 @@ AL_LaunchWithArgs(AppPath, Args) {
 	}
 }
 
+; Opens a file or a URI (mailto:, an .ics file) with its default handler.
+; Unlike AL_Launch, a failure reaches the caller, which reports it to the user.
+; @param Target {String} The file path or URI.
+; @throws {Error} When Windows refuses to open it.
+AL_OpenStrict(Target) {
+	; Err.Message quotes the target, which can carry a mail body: only its
+	; program name and the Win32 code go on
+	try Run(Target)
+	catch
+		throw Error("Opening '" . AL_ProgramName(Target) . "' failed (Win32 error " . A_LastError . ").", -1)
+	try LoggerInfo("AppLauncher", "Opened '{1}' with its default handler.", AL_ProgramName(Target))
+}
+
+; Starts a program with an argument vector. Each argument is quoted for the
+; Windows command line (CommandLineToArgvW rules), so an argument arrives
+; whole and verbatim, whatever it holds; no shell parses the line.
+; @param Argv {Array} The program, then its arguments.
+; @return {Integer} The process id.
+; @throws {Error} When the program cannot be started.
+AL_LaunchArgvStrict(Argv) {
+	if !(Argv is Array) || Argv.Length == 0
+		throw ValueError("AL_LaunchArgvStrict needs the program and its arguments.")
+	CommandLine := ""
+	for Arg in Argv
+		CommandLine .= (A_Index == 1 ? "" : " ") . AL_QuoteArgument(Arg)
+	Pid := 0
+	; Arguments can carry user text, so only the program and their count go on
+	try Run(CommandLine, , , &Pid)
+	catch
+		throw Error("Launching '" . AL_ProgramName(Argv[1]) . "' failed (Win32 error " . A_LastError . ").", -1)
+	try LoggerInfo("AppLauncher", "Launched '{1}' with {2} argument(s) (pid {3}).",
+		AL_ProgramName(Argv[1]), Argv.Length - 1, Pid)
+	return Pid
+}
+
+; Quotes one argument for the Windows command line: backslashes are doubled
+; only before a quote or the closing quote, and a quote is escaped.
+; @param Arg {String}
+; @return {String}
+AL_QuoteArgument(Arg) {
+	if !(Arg is String)
+		throw TypeError("AL_QuoteArgument expects a string.")
+	if (Arg != "" && !RegExMatch(Arg, '[ \t\n\x0B"]'))
+		return Arg
+	Out := '"'
+	Slashes := 0
+	Loop Parse Arg {
+		if (A_LoopField == "\") {
+			Slashes += 1
+			continue
+		}
+		if (A_LoopField == '"') {
+			Out .= _AL_Backslashes(Slashes * 2 + 1) . '"'
+		} else {
+			Out .= _AL_Backslashes(Slashes) . A_LoopField
+		}
+		Slashes := 0
+	}
+	return Out . _AL_Backslashes(Slashes * 2) . '"'
+}
+
+; @param Count {Integer}
+; @return {String} Count backslashes.
+_AL_Backslashes(Count) {
+	Out := ""
+	loop Count
+		Out .= "\"
+	return Out
+}
+
+; Returns the automation object of a COM server (Outlook.Application), or ""
+; when it is not installed or refuses automation; the caller then takes its
+; documented fallback path.
+; @param ProgId {String}
+; @return {Object|String}
+AL_ComApplication(ProgId) {
+	try return ComObject(ProgId)
+	catch as Err {
+		try LoggerInfo("AppLauncher", "Automation server '{1}' is not available: {2}", ProgId, Err.Message)
+		return ""
+	}
+}
+
 ; Returns true when at least one process with the given name is currently running.
 ; @param ProcessName {String} Process name as shown in the OS task list (e.g. "notepad.exe").
 ; @return {Boolean} True on success, false on error.

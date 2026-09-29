@@ -34,6 +34,7 @@ local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
+local TextPrompt = require("ui.text_prompt")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
@@ -109,7 +110,8 @@ local function succeeded(status)
 	return status == true or status == 0
 end
 
---- Asks the user for a line of text.
+--- Asks the user for a line of text (ui/text_prompt.lua, shared with the AI
+--- agent's command dialog).
 ---
 --- Declared here, above every closure that calls it: a `local` declared after a
 --- closure that uses it is captured as a nil GLOBAL, and the call fails at click
@@ -121,25 +123,7 @@ end
 --- @param hidden boolean|nil Mask the typed text (an API key).
 --- @return string|nil The entered text, or nil when the dialog was cancelled.
 local function prompt_text(title, prompt, initial, hidden)
-	local command = "zenity --entry --title=" .. shell_quote(title)
-		.. " --text=" .. shell_quote(prompt)
-		.. " --entry-text=" .. shell_quote(initial or "")
-		.. (hidden and " --hide-text" or "") .. " 2>/dev/null"
-	local value, ok = Modal.run(function()
-		local pipe = io.popen(command, "r")
-		if not pipe then return nil, nil end
-		local text = pipe:read("*a") or ""
-		return text, pipe:close()
-	end)
-	if value == nil then
-		Logger.error(LOG, "Zenity is unavailable: cannot prompt for '%s'.", tostring(title))
-		return nil
-	end
-	-- A non-zero exit is Cancel or the window being closed. Distinguished from an
-	-- empty entry, which exits zero: the first must change nothing, the second is
-	-- a value the caller gets to refuse with its own message.
-	if not succeeded(ok) then return nil end
-	return (value:gsub("[\r\n]+$", ""))
+	return TextPrompt.ask(title, prompt, initial, hidden)
 end
 
 --- Shows a message the user must acknowledge.
@@ -249,6 +233,8 @@ local function open_action_picker(title, current, binding, on_confirm)
 		send_vocabulary = editor.send_vocabulary,
 		parameter_strings = editor.parameter_strings,
 		prompt_choices = editor.prompt_choices,
+		vision_choices = editor.vision_choices,
+		language_choices = editor.language_choices,
 		default_count = editor.default_count,
 		edit_current_label = editor.edit_current_label,
 	}, function(option, _state, picked) return on_confirm(option, picked) end)
@@ -1740,6 +1726,47 @@ local function _build_llm(ctx)
 		}, "llm_trigger")
 	end
 
+	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
+	-- order, then the user's own), labelled as in the prompt list. The engine
+	-- owns the state the llm_live_prompt_toggle action shares; a prompt chosen
+	-- here runs with the menu's count.
+	dynamic_handlers["llm_live_mode"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles or type(llm.get_live) ~= "function" then
+			Logger.error(LOG, "LLM live mode unavailable; live submenu omitted.")
+			return
+		end
+		local Rewrite = require("llm.rewrite")
+		local live = llm.get_live()
+		local count = ProfileSettings.get("num_predictions") or 1
+		local function choose(profile_id)
+			if llm.set_live(profile_id) and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local rows = { {
+			label = i18n_safe("menu.llm.live_mode_off"),
+			checked = live == nil,
+			action = function() choose(nil) end,
+		} }
+		local prompts = {}
+		for _, profile in ipairs(ProfileSettings.list_built_in()) do prompts[#prompts + 1] = profile end
+		for _, profile in ipairs(ProfileSettings.list_user()) do prompts[#prompts + 1] = profile end
+		for _, profile in ipairs(prompts) do
+			if Rewrite.is_rewrite_profile(profile) then
+				local profile_id = profile.id
+				rows[#rows + 1] = {
+					label = ProfileSettings.menu_label(profile, count),
+					checked = live ~= nil and live.profile_id == profile_id,
+					action = function() choose(profile_id) end,
+				}
+			end
+		end
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.live_mode_title"),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_live_mode")
+	end
+
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
@@ -2144,6 +2171,22 @@ local function _build_llm(ctx)
 	-- The parent carries the same tick as the switch inside, for a user scanning
 	-- the top level; it cannot be clicked, which is why the switch is a row.
 	return { label = i18n_safe("menu.llm.title"), checked = enabled, submenu = items }
+end
+
+--- Builds the AI agent submenu (ui/menu/agent_rows.lua).
+--- @param ctx table Menu context.
+--- @return table Row data { label, submenu }.
+local function _build_agent(ctx)
+	if not ManifestMenu then
+		Logger.error(LOG, "Manifest renderer unavailable — the AI agent submenu cannot be built.")
+		return { label = i18n_safe("menu.agent.title"), disabled = true }
+	end
+	return require("ui.menu.agent_rows").build(ctx, {
+		prompt = function(title, text, initial, hidden, choices)
+			return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+		end,
+		error = function(text) show_error(zenity_plain(text)) end,
+	})
 end
 
 --- Builds the metrics/keylogger submenu.
@@ -3724,6 +3767,7 @@ function M.build(ctx)
 		["keyboard_layout"] = _build_layouts,
 		["hotstrings"]      = _build_hotstrings,
 		["llm"]             = _build_llm,
+		["agent"]           = _build_agent,
 		["metrics"]         = _build_metrics,
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,

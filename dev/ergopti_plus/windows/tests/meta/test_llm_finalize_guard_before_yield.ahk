@@ -139,7 +139,7 @@ _LFGY_RenderCarriesItsOwnGuard() {
 	Fin := _DriverFuncBody("_LLM_Engine_FinalizeRequest")
 	Fin := RegExReplace(Fin, "\s+", " ")
 	Assert(InStr(Fin,
-		'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"])',
+		'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		true) > 0,
 		'_LLM_Engine_FinalizeRequest must thread request and semantic identities into the render — a guard inside the render with nothing to compare against is decoration')
 }

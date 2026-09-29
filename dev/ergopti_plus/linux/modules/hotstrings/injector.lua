@@ -599,4 +599,100 @@ function M.inject_fields(backspace_count, values, is_private)
 	return result
 end
 
+-- The Left arrow, from the control-key names (one source for the code): the
+-- tone actions re-select the text they typed with Shift+Left.
+local KEY_LEFT = nil
+for code, name in pairs(EvdevCodes.CONTROL_NAME_OF) do
+	if name == "left" then KEY_LEFT = code end
+end
+if not KEY_LEFT then error("infra.evdev_codes names no Left arrow") end
+
+-- Code point ranges that extend the character before them instead of starting
+-- a new one: combining marks, variation selectors, emoji skin tones and tag
+-- characters. A caret steps over the whole cluster with one Left arrow.
+local CLUSTER_EXTENDERS = {
+	{ 0x0300, 0x036F }, { 0x1AB0, 0x1AFF }, { 0x1DC0, 0x1DFF }, { 0x20D0, 0x20FF },
+	{ 0xFE00, 0xFE0F }, { 0xFE20, 0xFE2F }, { 0x1F3FB, 0x1F3FF }, { 0xE0020, 0xE007F },
+	{ 0xE0100, 0xE01EF },
+}
+local ZERO_WIDTH_JOINER = 0x200D
+local REGIONAL_INDICATOR_FIRST, REGIONAL_INDICATOR_LAST = 0x1F1E6, 0x1F1FF
+
+--- Whether a code point extends the cluster before it.
+--- @param code integer
+--- @return boolean
+local function extends_cluster(code)
+	if code == ZERO_WIDTH_JOINER then return true end
+	for _, range in ipairs(CLUSTER_EXTENDERS) do
+		if code >= range[1] and code <= range[2] then return true end
+	end
+	return false
+end
+
+--- How many Left arrows move the caret back over `text`.
+---
+--- GTK, Qt, Chromium and Firefox move the caret by user-perceived character
+--- (grapheme cluster), not by byte or UTF-16 unit: "é" is one step whether it
+--- is one code point or "e" plus a combining accent, and an emoji with a skin
+--- tone, a ZWJ family or a flag is one step too. Counting code points instead
+--- would re-select one character too many per accent or emoji, taking text the
+--- rewrite never typed. The clusters are those of the rules above, which cover
+--- what a rewrite produces; "\r\n" is one step.
+--- @param text string Valid UTF-8.
+--- @return integer steps
+function M.caret_steps(text)
+	if type(text) ~= "string" then error("caret_steps expects a string, got " .. type(text)) end
+	local steps, previous, regional_open, after_joiner = 0, nil, false, false
+	for sequence in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		local byte, code = sequence:byte(1), 0
+		if byte < 0x80 then code = byte
+		elseif byte < 0xE0 then code = (byte - 0xC0) * 0x40 + (sequence:byte(2) - 0x80)
+		elseif byte < 0xF0 then
+			code = ((byte - 0xE0) * 0x40 + (sequence:byte(2) - 0x80)) * 0x40 + (sequence:byte(3) - 0x80)
+		else
+			code = (((byte - 0xF0) * 0x40 + (sequence:byte(2) - 0x80)) * 0x40
+				+ (sequence:byte(3) - 0x80)) * 0x40 + (sequence:byte(4) - 0x80)
+		end
+		local regional = code >= REGIONAL_INDICATOR_FIRST and code <= REGIONAL_INDICATOR_LAST
+		local joins = previous ~= nil and (extends_cluster(code) or after_joiner
+			or (previous == 0x0D and code == 0x0A) or (regional and regional_open))
+		if not joins then steps = steps + 1 end
+		-- A flag is a PAIR of regional indicators: the third starts a new flag.
+		regional_open = regional and not (joins and regional_open)
+		after_joiner = code == ZERO_WIDTH_JOINER
+		previous = code
+	end
+	return steps
+end
+
+--- Types a text over the focused selection, then selects exactly what it typed.
+---
+--- Shift+Left per caret step, in the same transaction and on the same channel
+--- as the text, so a keystroke from elsewhere cannot land between them. The
+--- tone actions keep their rewrite selected this way, so the next step applies
+--- to it.
+--- @param text string Non-empty text to type.
+--- @param is_private boolean|nil True when `text` must not be logged.
+--- @return table Commit result { ok, error?, cleanup_ok }.
+function M.inject_selected(text, is_private)
+	if type(text) ~= "string" or text == "" then
+		Logger.error(LOG, "inject_selected(): text is %s, expected a non-empty string.", type(text))
+		return { ok = false, error = "invalid arguments", cleanup_ok = true }
+	end
+	local steps = M.caret_steps(text)
+	local result = run_transaction("inject_selected()", function(tx)
+		if not send_text(tx, text, is_private) then error(tx.error(), 0) end
+		-- The typed text must reach the application before it is selected back.
+		sleep_ms(INTER_PHASE_DELAY_MS)
+		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_DOWN, "selection shift down")
+		for _ = 1, steps do
+			must_emit(tx, KEY_LEFT, EVDEV_VALUE_DOWN, "selection left down")
+			must_emit(tx, KEY_LEFT, EVDEV_VALUE_UP, "selection left up")
+		end
+		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_UP, "selection shift up")
+	end)
+	if result.ok then Logger.done(LOG, "inject_selected(): done (%d step(s) selected).", steps) end
+	return result
+end
+
 return M

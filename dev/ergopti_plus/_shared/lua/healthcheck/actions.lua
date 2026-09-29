@@ -19,7 +19,8 @@
 --- 3. A saved file keeps the report's prefix and suffix and only file-name-safe
 ---    characters, so it cannot leave the diagnostics folder.
 --- 4. A report prefills only the fields of the bug form
----    (_shared/modules/diagnostics/issue_templates.json).
+---    (_shared/modules/diagnostics/issue_templates.json), except its
+---    report_field: the host fills that one with the report text itself.
 --- 5. A refusal returns a stable reason code for the host to log. The AHK port
 ---    (windows/ui/healthcheck/actions.ahk) replays the same vectors
 ---    (_shared/tests/corpus/healthcheck/action_vectors.json).
@@ -103,17 +104,19 @@ end
 function VALIDATORS.report(message, context)
 	local limit = context.schema.max_export_bytes
 	if not bounded_text(message.text, limit) then return nil, "bad_text" end
-	if not valid_name(message.name, context.schema.report) then return nil, "bad_name" end
 	if type(message.fields) ~= "table" then return nil, "bad_fields" end
+	local bug = context.templates.templates.bug
 	local allowed = {}
-	for _, id in ipairs(context.templates.templates.bug.fields) do allowed[id] = true end
+	for _, id in ipairs(bug.fields) do allowed[id] = true end
+	-- The host fills the report field with the text itself
+	allowed[bug.report_field] = nil
 	local fields = {}
 	for id, value in pairs(message.fields) do
 		if not allowed[id] then return nil, "unknown_field" end
 		if not bounded_text(value, limit) then return nil, "bad_fields" end
 		fields[id] = value
 	end
-	return { action = "report", text = message.text, name = message.name, fields = fields }
+	return { action = "report", text = message.text, fields = fields }
 end
 
 function VALIDATORS.open_path(message, context)

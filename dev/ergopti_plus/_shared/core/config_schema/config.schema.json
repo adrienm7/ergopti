@@ -137,6 +137,10 @@
 				"onboarding_seen": { "type": "boolean" },
 				"app_profile_overrides": { "type": ["string", "object"] },
 				"user_profiles": { "type": "string" },
+				"agent_system1": { "type": "string", "pattern": "^$|^[a-z][a-z0-9_]*(\\|[^|\\u0000-\\u001f]{1,200})?$" },
+				"agent_system2": { "type": "string", "pattern": "^$|^[a-z][a-z0-9_]*(\\|[^|\\u0000-\\u001f]{1,200})?$" },
+				"agent_mode": { "type": "string", "enum": ["off", "action", "auto"] },
+				"agent_disabled_apps": { "type": "array", "items": { "type": "string" } },
 				"display": {
 					"type": "object",
 					"additionalProperties": false,

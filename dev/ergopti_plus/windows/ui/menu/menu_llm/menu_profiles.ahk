@@ -805,21 +805,32 @@ LLM_Menu_AutoApplyProfileForModel(MenuState) {
 
 /**
  * Returns the ordered list of profile ids exposed to the Ctrl+<n>
- * hotkeys: built-ins first (raw/basic/advanced/batch_advanced) then user
- * profiles in the order they were defined. Truncated to
+ * hotkeys: built-ins first (raw/basic/advanced/batch_advanced/rewrite) then
+ * user profiles in the order they were defined. The tone ladder profiles are
+ * left out: their own actions rewrite a selection, and taking four of the
+ * nine digits would leave custom profiles none. The live translations are
+ * left out for the same reason: live mode runs them. Truncated to
  * LLM_PROFILE_HOTKEY_LIMIT so we don't try to register more hotkeys than
  * the user can reach on a number row.
  *
  * @returns {Array} Ordered profile id strings.
  */
 LLM_Menu_GetHotkeyProfileOrder(MenuState := 0) {
-	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT, LLM_TONE_LADDER
+	global LLM_PROFILE_LIVE_TRANSLATIONS
 	State := MenuState is Map ? MenuState : _LLM_Menu
 	if !(State is Map) || !State.Has("user_profiles")
 			|| !(State["user_profiles"] is Array)
 		return []
+	SkippedIds := Map()
+	for ToneId in LLM_TONE_LADDER
+		SkippedIds[ToneId] := true
+	for TranslationId in LLM_PROFILE_LIVE_TRANSLATIONS
+		SkippedIds[TranslationId] := true
 	out := []
 	for _, id in LLM_PROFILE_BUILTIN_ORDER {
+		if SkippedIds.Has(id)
+			continue
 		out.Push(id)
 		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
 			return out

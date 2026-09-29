@@ -137,6 +137,39 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     return req_id
 }
 
+/**
+ * Non-blocking POST of a request body the caller wrote whole (the screen
+ * reading's image request), through the same curl transport, reservation and
+ * response classifier as LLM_RemoteGenerate_Async. The credential still
+ * travels in the curl config file only.
+ *
+ * @param {Map}      Resolved   - _LLMRemoteResolveEntry's record.
+ * @param {string}   Url        - Endpoint, from _LLMRemoteBuildUrl.
+ * @param {string}   Payload    - JSON body in the provider's dialect.
+ * @param {function} on_success - Called with the completion text and usage.
+ * @param {function} on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {number}   TimeoutMs  - Override for this request (0 keeps the shared one).
+ * @returns {Integer} Request id, usable with LLM_RemoteCancelAsync.
+ */
+LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0) {
+    global _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+    if !(Resolved is Map)
+        throw TypeError("LLM_RemotePostBody_Async needs a resolved entry.")
+    _LLM_Remote_AsyncCounter += 1
+    req_id := _LLM_Remote_AsyncCounter
+    timeout_ms := (TimeoutMs > 0) ? TimeoutMs
+        : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
+    reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+        timeout_ms, A_TickCount, Resolved)
+    if (_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload, on_success,
+            on_fail, timeout_ms, 0, reservation))
+        return req_id
+    try LoggerError("LLM.remote",
+        "Remote request refused because the non-blocking curl transport is unavailable.")
+    _LLMRemote_FailReserved(req_id, reservation, on_fail)
+    return req_id
+}
+
 _LLMRemote_ReserveRequest(req_id, on_success, on_fail, timeout_ms, start_tick,
         Resolved := 0) {
     global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT

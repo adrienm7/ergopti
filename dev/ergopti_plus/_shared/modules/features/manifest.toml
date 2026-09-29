@@ -1095,6 +1095,43 @@ type = "string"
 description_key = "menu.llm.profiles"
 platforms = ["ahk", "linux"]
 
+[[features.llm]]
+id = "agent_system1"
+default = ""
+recommended = ""
+input_altering = false
+type = "string"
+description_key = "menu.agent.system1_desc"
+
+[[features.llm]]
+id = "agent_system2"
+default = ""
+recommended = ""
+input_altering = false
+type = "string"
+description_key = "menu.agent.system2_desc"
+
+# The agent's mode: "off" (every agent action refuses), "action" (it runs only
+# when an action triggers it, from a gesture, a shortcut or a key), "auto"
+# (also after a typing pause, System 1 then System 2, like the automatic
+# prediction trigger).
+[[features.llm]]
+id = "agent_mode"
+default = "off"
+recommended = "off"
+input_altering = false
+type = "string"
+description_key = "menu.agent.mode_title"
+
+# Applications where the automatic mode never looks at what is typed.
+[[features.llm]]
+id = "agent_disabled_apps"
+default = []
+recommended = []
+input_altering = false
+type = "array"
+description_key = "menu.agent.disabled_apps"
+
 
 
 # =============================
@@ -3806,6 +3843,10 @@ id = "llm"
 greyed_when_paused = true
 
 [[menu.top_level]]
+id = "agent"
+greyed_when_paused = true
+
+[[menu.top_level]]
 id = "---"
 
 [[menu.top_level]]
@@ -3984,6 +4025,14 @@ platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
+id = "llm_live_mode"
+i18n = "menu.llm.live_mode_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs", "linux"]
+
+[[menu.llm_menu]]
+type = "dynamic"
 id = "llm_generation_settings"
 i18n = "menu.llm.generation_menu_title"
 disabled_when_off = true
@@ -4037,6 +4086,37 @@ i18n = "menu.about.changelog"
 type = "command"
 id = "about_releases_page"
 i18n = "menu.about.open_releases_page"
+
+# The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
+# and model of System 1 (fast triage) and System 2 (the actions), and the
+# applications the automatic mode ignores. Every row is `dynamic`: the backend
+# lists come from api_providers.json and the stored API entries, and the
+# application picker is each driver's own.
+[[menu.agent_menu]]
+type = "dynamic"
+id = "agent_mode"
+i18n = "menu.agent.mode_title"
+
+[[menu.agent_menu]]
+type = "---"
+
+[[menu.agent_menu]]
+type = "dynamic"
+id = "agent_system1"
+i18n = "menu.agent.system1"
+
+[[menu.agent_menu]]
+type = "dynamic"
+id = "agent_system2"
+i18n = "menu.agent.system2"
+
+[[menu.agent_menu]]
+type = "---"
+
+[[menu.agent_menu]]
+type = "dynamic"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
 
 # The Applications submenu, macOS only: it lists the bundled applications
 # found on disk and launches them. Linux's copy held only the config-folder row,

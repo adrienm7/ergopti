@@ -140,4 +140,40 @@ function M.screen_id_under_cursor()
 	return result
 end
 
+--- Returns the frame of the screen the cursor is on, in the global coordinates
+--- screencapture -R takes (points, origin at the top left of the main screen).
+--- Not part of the MouseControl port: the screen-reading actions capture the
+--- screen the user is looking at.
+--- @return table|nil frame { x, y, w, h }, or nil when no screen holds the cursor.
+function M.screen_frame_under_cursor()
+	local ok, result = pcall(function()
+		local screen = nil
+		if type(hs.mouse.getCurrentScreen) == "function" then screen = hs.mouse.getCurrentScreen() end
+		if not screen then
+			local pos = hs.mouse.absolutePosition()
+			for _, candidate in ipairs(hs.screen.allScreens() or {}) do
+				local frame = candidate:fullFrame()
+				if type(pos) == "table" and type(frame) == "table"
+					and pos.x >= frame.x and pos.x < frame.x + frame.w
+					and pos.y >= frame.y and pos.y < frame.y + frame.h then
+					screen = candidate
+					break
+				end
+			end
+		end
+		if not screen then return nil end
+		local frame = screen:fullFrame()
+		if type(frame) ~= "table" or not tonumber(frame.w) or not tonumber(frame.h)
+			or frame.w <= 0 or frame.h <= 0 then
+			return nil
+		end
+		return { x = tonumber(frame.x) or 0, y = tonumber(frame.y) or 0, w = frame.w, h = frame.h }
+	end)
+	if not ok then
+		Logger.error(LOG, "screen_frame_under_cursor(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
 return M

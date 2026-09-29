@@ -263,6 +263,10 @@ time_activation_seconds = 0.75
 [llm]
 enabled = false
 user_profiles = ""
+agent_system1 = ""
+agent_system2 = ""
+agent_mode = "off"
+agent_disabled_apps = []
 
 [llm.display]
 pred_indent = 0

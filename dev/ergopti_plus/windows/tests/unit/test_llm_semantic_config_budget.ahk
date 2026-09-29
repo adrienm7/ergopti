@@ -134,7 +134,18 @@ Test("AHK2-18 semantic config: exact count and string boundaries remain accepted
 
 _LSCB_UserProfilesCannotShadowBuiltinIds() {
 	global LLM_PROFILE_BUILTIN_ORDER
-	AssertEqual(5, LLM_PROFILE_BUILTIN_ORDER.Length, "the five built-ins, rewrite included")
+	; The count comes from the shared registry: a new built-in must join the order
+	; (and so the shadowing guard) without a literal to update here
+	Shipped := LLM_LoadProfilesJSON()
+	AssertTrue(Shipped.Length > 0, "the shipped profiles.json must load")
+	AssertEqual(Shipped.Length, LLM_PROFILE_BUILTIN_ORDER.Length,
+		"every built-in of profiles.json is in the order, rewrite, the tone ladder and the translations included")
+	for Profile in Shipped {
+		Listed := false
+		for Id in LLM_PROFILE_BUILTIN_ORDER
+			Listed := Listed || (Id == Profile["id"])
+		AssertTrue(Listed, "the built-in '" . Profile["id"] . "' of profiles.json must be in the order")
+	}
 	for Id in LLM_PROFILE_BUILTIN_ORDER {
 		Profiles := [Map(
 			"id", Id, "label", "Shadow",

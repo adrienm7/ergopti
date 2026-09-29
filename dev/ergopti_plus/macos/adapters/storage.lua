@@ -195,14 +195,24 @@ function M.read_exact(key)
 	return true, result
 end
 
---- Deletes one logical key.
+--- Tells whether a native clear that answered false left the key absent.
+--- hs.settings.clear answers false when the key did not exist, which is a
+--- completed delete; a key still readable afterwards is a refused one.
+--- @param native_key string Physical settings key.
+--- @return boolean absent True when nothing is stored under the key.
+local function cleared_absent(native_key)
+	local ok, remaining = pcall(hs.settings.get, native_key)
+	return ok and remaining == nil
+end
+
+--- Deletes one logical key. Deleting a key that does not exist succeeds.
 --- @param key string Logical settings key.
 --- @return boolean committed
 function M.delete(key)
 	local native_key, key_err = physical_key(key)
 	if not native_key then log_invalid_key("delete", key, key_err); return false end
 	local ok, result = pcall(hs.settings.clear, native_key)
-	if not ok or result == false then
+	if not ok or (result == false and not cleared_absent(native_key)) then
 		Logger.error(LOG, "delete(): failed to clear key '%s' — %s.", key, tostring(result))
 		return false
 	end
@@ -216,7 +226,7 @@ function M.delete_exact(key)
 	local native_key, key_err = physical_key(key)
 	if not native_key then log_invalid_key("delete_exact", key, key_err); return false end
 	local ok, result = pcall(hs.settings.clear, native_key)
-	if not ok or result == false then
+	if not ok or (result == false and not cleared_absent(native_key)) then
 		Logger.error(LOG, "delete_exact(): failed to clear key '%s' — %s.", key, tostring(result))
 		return false
 	end

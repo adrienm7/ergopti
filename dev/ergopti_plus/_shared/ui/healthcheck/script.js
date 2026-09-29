@@ -227,17 +227,24 @@
 	// ==============================
 
 	/**
-	 * The report's file name and the prefilled issue fields, redacted.
-	 * @returns {{name: string, fields: object}}
+	 * The saved report's file name.
+	 * @returns {string}
 	 */
-	function reportParts() {
-		var info = Model.reportInfo(state.snapshot);
-		var name = Model.fileName(info);
-		var fields = Model.issueFields(info, name);
+	function reportName() {
+		return Model.fileName(Model.reportInfo(state.snapshot));
+	}
+
+	/**
+	 * The issue form's identity fields, redacted. The host prefills the report
+	 * itself: the text this page sends, the one Copy copies.
+	 * @returns {object}
+	 */
+	function issueFields() {
+		var fields = Model.issueFields(Model.reportInfo(state.snapshot));
 		Object.keys(fields).forEach(function (id) {
 			fields[id] = Redact.apply(String(fields[id]), state.config.redaction, state.config.context);
 		});
-		return { name: name, fields: fields };
+		return fields;
 	}
 
 	var TOOLBAR = {
@@ -245,11 +252,10 @@
 			post({ action: 'copy', text: exportText() });
 		},
 		'btn-save': function () {
-			post({ action: 'save', text: exportText(), name: reportParts().name });
+			post({ action: 'save', text: exportText(), name: reportName() });
 		},
 		'btn-report': function () {
-			var parts = reportParts();
-			post({ action: 'report', text: exportText(), name: parts.name, fields: parts.fields });
+			post({ action: 'report', text: exportText(), fields: issueFields() });
 		},
 		'btn-open-logs': function () {
 			post({ action: 'open_path', id: 'logs_dir' });

@@ -92,6 +92,28 @@ function M.getFocused()
 	return result or empty_info()
 end
 
+--- Returns an identity of the focused window that changes whenever focus moves
+--- to another window or application: its application's process id and its
+--- window id. Not part of the WindowInfo port: a caller compares two readings to
+--- know the user is still in the window an asynchronous answer was meant for.
+--- @return string|nil identity "<pid>:<window id>", or nil when unreadable.
+function M.focused_identity()
+	local ok, result = pcall(function()
+		local win = hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
+		if not win then return nil end
+		local window_id = win:id()
+		local app = win:application()
+		local pid = app and app:pid()
+		if window_id == nil or pid == nil then return nil end
+		return tostring(pid) .. ":" .. tostring(window_id)
+	end)
+	if not ok then
+		Logger.error(LOG, "focused_identity(): unexpected error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
 --- Returns an array of WindowInfo tables for all currently visible windows.
 --- @return table Array of WindowInfo objects (may be empty).
 function M.getAll()

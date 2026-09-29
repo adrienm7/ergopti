@@ -548,6 +548,15 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/option_validation.ahk
 #Include ../modules/llm/rewrite.ahk
 #Include ../modules/llm/prompt_action.ahk
+#Include ../modules/llm/tone.ahk
+#Include ../modules/llm/tone_action.ahk
+#Include ../modules/llm/vision.ahk
+#Include ../modules/llm/vision_action.ahk
+#Include ../modules/llm/translate.ahk
+#Include ../modules/llm/translate_action.ahk
+#Include ../modules/llm/agent.ahk
+#Include ../modules/llm/agent_connectors.ahk
+#Include ../modules/llm/agent_action.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_semantic_config_identity.ahk
@@ -625,6 +634,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_gestures.ahk
 #Include ../infra/menu_dispatcher.ahk
 #Include ../ui/menu/menu_llm/menu_settings.ahk
+#Include ../ui/menu/menu_llm/menu_agent.ahk
 #Include unit/test_llm_backend_lifecycle_dispatch.ahk
 #Include unit/test_llm_generate_prediction_feedback.ahk
 #Include unit/test_llm_menu_persistence.ahk
@@ -676,6 +686,11 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk
+#Include unit/test_llm_tone.ahk
+#Include unit/test_llm_vision.ahk
+#Include unit/test_llm_translate.ahk
+#Include unit/test_llm_agent.ahk
+#Include unit/test_llm_live_mode.ahk
 #Include unit/test_send_input_actions.ahk
 #Include unit/test_tap_keys.ahk
 #Include unit/test_gesture_cycle_candidates.ahk

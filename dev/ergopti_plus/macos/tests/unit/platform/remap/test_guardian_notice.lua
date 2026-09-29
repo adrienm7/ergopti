@@ -5,7 +5,9 @@
 --- DESCRIPTION:
 --- One notice per approval episode, a click that opens Login Items, a visible
 --- failure when it cannot, and no episode marked as announced when the notice
---- was never delivered.
+--- was never delivered. An `unavailable` guardian (helper not registered, e.g.
+--- after an app update) used to leave the rules inert with no message at all
+--- (guardian-unavailable-never-silent).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -16,7 +18,7 @@ local GuardianNotice = helpers.load_with_stubs("platform.remap.guardian_notice")
 --- @return table notice, table rec
 local function make(opts)
 	opts = opts or {}
-	local rec = { sent = {}, opened = 0, errors = 0 }
+	local rec = { sent = {}, opened = 0, login_items = 0, errors = 0, error_lines = {} }
 	local notice = GuardianNotice.new({
 		notify = function(message, detail, kind, on_click)
 			rec.sent[#rec.sent + 1] = { message = message, detail = detail, kind = kind, on_click = on_click }
@@ -29,9 +31,18 @@ local function make(opts)
 			on_done(opts.open_ok ~= false, opts.open_ok == false and "refused" or "opened")
 			return true
 		end,
+		open_login_items = function(on_done)
+			rec.login_items = rec.login_items + 1
+			on_done(opts.open_ok ~= false, opts.open_ok == false and "open-exited-non-zero" or "opened")
+			return true
+		end,
 		logger = {
-			error = function() rec.errors = rec.errors + 1 end,
+			error = function(_, message, ...)
+				rec.errors = rec.errors + 1
+				rec.error_lines[#rec.error_lines + 1] = string.format(message, ...)
+			end,
 			warn = function() end,
+			info = function() end,
 		},
 		log = "test",
 	})
@@ -79,6 +90,58 @@ helpers.describe("guardian approval notice", function()
 		helpers.assert_true(not notice.observe("requires_approval"))
 		helpers.assert_eq(#rec.sent, 2, "an undelivered notice must not count as announced")
 		helpers.assert_true(rec.errors >= 2)
+	end)
+
+	helpers.it("never stays silent when the helper is unavailable (guardian-unavailable-never-silent)", function()
+		local notice, rec = make()
+		helpers.assert_true(notice.observe("unavailable"), "entry into unavailable must notify")
+		helpers.assert_eq(#rec.sent, 1)
+		helpers.assert_eq(rec.sent[1].message, "karabiner.guardian_unavailable")
+		helpers.assert_eq(rec.sent[1].kind, "error")
+		helpers.assert_eq(#rec.error_lines, 1, "the exact status must be logged as an ERROR")
+		helpers.assert_contains(rec.error_lines[1], "'unavailable'")
+
+		helpers.assert_true(not notice.observe("unavailable"), "a repeated poll is the same episode")
+		helpers.assert_true(not notice.observe(nil), "an unknown probe result does not close the episode")
+		helpers.assert_eq(#rec.sent, 1)
+		helpers.assert_eq(#rec.error_lines, 1, "the ERROR is written once per episode")
+
+		helpers.assert_true(not notice.observe("ready"))
+		helpers.assert_true(notice.observe("unavailable"), "a new episode after recovery notifies again")
+		helpers.assert_eq(#rec.sent, 2)
+	end)
+
+	helpers.it("opens Login Items directly when the unavailable notice is clicked", function()
+		local notice, rec = make()
+		notice.observe("unavailable")
+		helpers.assert_type(rec.sent[1].on_click, "function")
+		rec.sent[1].on_click()
+		helpers.assert_eq(rec.login_items, 1)
+		helpers.assert_eq(rec.opened, 0, "the approval-gated opener refuses an unavailable guardian")
+		local failing, failed = make({ open_ok = false })
+		failing.observe("unavailable")
+		failed.sent[1].on_click()
+		helpers.assert_eq(failed.sent[2].message, "karabiner.guardian_settings_open_failed")
+	end)
+
+	helpers.it("announces a switch between blocking states", function()
+		local notice, rec = make()
+		helpers.assert_true(notice.observe("requires_approval"))
+		helpers.assert_true(notice.observe("unavailable"), "a different blocking cause is a new episode")
+		helpers.assert_true(notice.observe("requires_approval"))
+		helpers.assert_eq(#rec.sent, 3)
+	end)
+
+	helpers.it("retries an undelivered unavailable notice without repeating the ERROR status line", function()
+		local notice, rec = make({ deliver = false })
+		helpers.assert_true(not notice.observe("unavailable"))
+		helpers.assert_true(not notice.observe("unavailable"))
+		helpers.assert_eq(#rec.sent, 2, "an undelivered notice must not count as announced")
+		local status_lines = 0
+		for _, line in ipairs(rec.error_lines) do
+			if line:find("status is 'unavailable'", 1, true) then status_lines = status_lines + 1 end
+		end
+		helpers.assert_eq(status_lines, 1)
 	end)
 
 	helpers.it("rejects an incomplete dependency set", function()

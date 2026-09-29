@@ -6,10 +6,10 @@
  * DESCRIPTION:
  * Turns a version 2 diagnostics snapshot into what the diagnostics window
  * shows and what leaves the machine: the structured HTML of the page, the
- * problems of its summary, the Markdown report (copied, saved and sent to a
- * GitHub issue) and the short summary prefilled into the issue form. Pure:
- * no DOM and no host; the page script (script.js) owns both, so the three
- * drivers render and export through this one formatter.
+ * problems of its summary, the Markdown report (copied, saved and prefilled
+ * into a GitHub issue) and the other fields of that issue form. Pure: no DOM
+ * and no host; the page script (script.js) owns both, so the three drivers
+ * render and export through this one formatter.
  *
  * FEATURES & RATIONALE:
  * 1. The schema (_shared/modules/diagnostics/schema.json) decides the order of
@@ -25,8 +25,9 @@
  * 4. The Markdown report carries the same sections as the page, then the
  *    snapshot itself as a fenced JSON block, so both a person and a tool can
  *    read it. Code fences outgrow every backtick run of their content.
- * 5. The issue summary is English and fixed: it fills a field of the English
- *    GitHub form read by the maintainers, not a label of the user's window.
+ * 5. The page sends the issue form's identity fields only: the host fills the
+ *    form's report field with the exported report itself, the one text the
+ *    Copy button copies too.
  * ==============================================================================
  */
 
@@ -688,13 +689,11 @@
 	/**
 	 * The report's identity: what the issue form and the file name are built from.
 	 * @param {object} snapshot
-	 * @returns {object} { driver, version, commit, os, generated_utc, file_stamp,
-	 *   warn_count, err_count, last_error }
+	 * @returns {object} { driver, version, commit, os, generated_utc, file_stamp }
 	 */
 	function reportInfo(snapshot) {
 		var versions = sectionData(snapshot, 'versions');
 		var system = sectionData(snapshot, 'system');
-		var issues = sectionData(snapshot, 'issues');
 		var generated = String(snapshot.generated_at || '');
 		return {
 			driver: String(snapshot.driver || 'unknown'),
@@ -702,46 +701,8 @@
 			commit: String(isAbsent(versions.commit) ? '' : versions.commit),
 			os: String(isAbsent(system.os) ? 'unknown' : system.os),
 			generated_utc: generated,
-			file_stamp: generated.replace(/[-:]/g, '').replace(/\.\d+/, ''),
-			warn_count: Number(issues.warn_count) || 0,
-			err_count: Number(issues.err_count) || 0,
-			last_error: typeof issues.last_error === 'string' ? issues.last_error : ''
+			file_stamp: generated.replace(/[-:]/g, '').replace(/\.\d+/, '')
 		};
-	}
-
-	/**
-	 * Renders a scalar as the Lua and AHK ports did: integral numbers without a
-	 * fraction, others with two decimals, and an empty string as "(empty)".
-	 * @param {*} value
-	 * @returns {string}
-	 */
-	function scalar(value) {
-		if (typeof value === 'number') return Math.floor(value) === value ? String(value) : value.toFixed(2);
-		var text = String(value);
-		return text === '' ? '(empty)' : text;
-	}
-
-	/**
-	 * The short diagnostics summary prefilled into the issue form.
-	 * @param {object} info From reportInfo().
-	 * @param {string} fileName The saved report's name.
-	 * @returns {string}
-	 */
-	function issueSummary(info, fileName) {
-		var version = String(info.version);
-		if (typeof info.commit === 'string' && info.commit !== '') version += ', commit ' + info.commit;
-		var lastError = typeof info.last_error === 'string' && info.last_error !== ''
-			? info.last_error.split(/\r\n|\r|\n/)[0]
-			: 'none';
-		return [
-			'Version: ' + version,
-			'OS: ' + String(info.os),
-			'Driver: ' + String(info.driver),
-			'Warnings / errors this session: ' + scalar(info.warn_count) + ' / ' + scalar(info.err_count),
-			'Last error: ' + lastError,
-			'',
-			'<!-- The full diagnostics are in your clipboard: paste them below, or attach ' + String(fileName) + '. -->'
-		].join('\n');
 	}
 
 	/**
@@ -763,13 +724,13 @@
 	}
 
 	/**
-	 * The values prefilled into the bug form: the host builds the URL from them.
+	 * The identity fields prefilled into the bug form. The host adds the report
+	 * itself as the form's report field and builds the URL.
 	 * @param {object} info From reportInfo().
-	 * @param {string} name The saved report's name.
 	 * @returns {object}
 	 */
-	function issueFields(info, name) {
-		return { version: info.version, os: info.os, driver: info.driver, diagnostics: issueSummary(info, name) };
+	function issueFields(info) {
+		return { version: info.version, os: info.os, driver: info.driver };
 	}
 
 	global.ErgoptiDiagnostics = {
@@ -782,7 +743,6 @@
 		renderHtml: renderHtml,
 		formatMarkdown: formatMarkdown,
 		reportInfo: reportInfo,
-		issueSummary: issueSummary,
 		fileName: fileName,
 		issueFields: issueFields
 	};

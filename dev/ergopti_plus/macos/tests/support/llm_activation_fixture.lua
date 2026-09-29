@@ -451,6 +451,9 @@ local function build_fixture(backend, save_results, options)
 		state = state,
 		keymap = {
 			get_llm_enabled = function() return runtime_enabled end,
+			-- The live-mode submenu reads the engine's live prompt: never on here
+			get_live_prompt = function() return nil end,
+			set_live_prompt = function() return false end,
 			set_llm_enabled = function(value)
 				calls.keymap_states[#calls.keymap_states + 1] = value
 				if options.keymap_throw_on == value then error("keymap setter exploded") end

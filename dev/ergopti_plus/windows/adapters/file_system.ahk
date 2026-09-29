@@ -39,6 +39,13 @@ FSReadStrict(Path) {
 	return FileRead(Path, "UTF-8")
 }
 
+; Reads a file's raw bytes and preserves native read failures.
+; @param Path {String} File path.
+; @return {Buffer} The bytes; throws when the read fails.
+FSReadBytesStrict(Path) {
+	return FileRead(Path, "RAW")
+}
+
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.
@@ -339,6 +346,19 @@ FSListDirectoryStrict(Path, Directories := false) {
 			throw OSError(A_LastError, A_ThisFunc, "Directory enumeration handle did not close.")
 	}
 	return Entries
+}
+
+; Creates a directory, and its missing parents, when it does not exist.
+; @param Path {String} Absolute directory path.
+; @return {Boolean} True when it was created, false when it already existed.
+; @throws {Error} When it cannot be created.
+FSEnsureDirectoryStrict(Path) {
+	if !(Path is String) || Path == ""
+		throw ValueError("A directory creation requires a non-empty path.")
+	if DirExist(Path)
+		return false
+	DirCreate(Path)
+	return true
 }
 
 ; Deletes a file. Returns true if deleted or already absent, false on error.

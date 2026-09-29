@@ -8,7 +8,9 @@
 --- native construction, start, and exit failures are logged and notified.
 --- Screen Recording is checked before any process starts, and a result is
 --- announced only after screen_capture_flow has verified the file or the
---- clipboard image; an interactive cancel stays silent.
+--- clipboard image; an interactive cancel stays silent. The screen-reading
+--- actions capture through the same owner into a private temporary PNG that is
+--- removed when the operation ends (capture_image).
 --- ==============================================================================
 
 local M = {}
@@ -25,6 +27,14 @@ local LOG = "shortcuts.actions.screenshot_save"
 
 local MKDIR_BIN         = "/bin/mkdir"
 local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
+local SIPS_BIN          = "/usr/bin/sips"
+
+-- A PNG starts with this signature; its IHDR chunk then holds the width and
+-- height as big-endian 32-bit integers at bytes 17-20 and 21-24.
+local PNG_SIGNATURE = "\137PNG\r\n\26\n"
+
+-- The failed downscale is logged once per session: the original is sent instead
+local _downscale_failure_logged = false
 local SCREENSHOT_DIR_REL = "/Pictures/screenshots"
 local SCREENSHOT_STAMP_FMT = "%Y%m%d%H%M%S"
 
@@ -157,7 +167,13 @@ local function create_operation(label, parent)
 end
 
 local function report_operation_failure(operation, context, detail, message_key)
-	if operation_is_authorized(operation) then report_failure(context, detail, message_key) end
+	if not operation_is_authorized(operation) then return end
+	-- A screen reading shows its own notice once capture_image reports the failure
+	if operation.quiet == true then
+		Logger.error(LOG, "Screenshot %s failed: %s.", context, tostring(detail))
+		return
+	end
+	report_failure(context, detail, message_key)
 end
 
 --- Announces the verified outcome of one finished capture.
@@ -495,6 +511,156 @@ function M.capture(flags, parent)
 		})
 		return report_capture_outcome(operation, outcome, detail, target,
 			"shortcuts.screenshot_clipboard_failed")
+	end, "capture")
+end
+
+--- Reads the pixel size a PNG declares in its IHDR chunk.
+--- @param data string The file bytes.
+--- @return number|nil width
+--- @return number|nil height
+local function png_size(data)
+	if type(data) ~= "string" or #data < 24 or data:sub(1, 8) ~= PNG_SIGNATURE
+		or data:sub(13, 16) ~= "IHDR" then
+		return nil, nil
+	end
+	local function uint32(at)
+		local b1, b2, b3, b4 = data:byte(at, at + 3)
+		return ((b1 * 256 + b2) * 256 + b3) * 256 + b4
+	end
+	return uint32(17), uint32(21)
+end
+M._png_size = png_size
+
+--- Reads a captured PNG.
+--- @param path string The capture file.
+--- @return string|nil data The file bytes.
+--- @return string|nil detail Why the image is unusable.
+local function read_capture(path)
+	local data, status, detail = FileSystem.read_with_status(path)
+	if status ~= "ok" or type(data) ~= "string" then
+		return nil, "the capture file is unreadable: " .. tostring(detail or status)
+	end
+	if not png_size(data) then return nil, "the capture file is not a PNG" end
+	return data
+end
+
+--- Encodes captured PNG bytes for a vision request. The adapter is resolved at
+--- call time, like screen_capture_flow's, so a cached instance never keeps
+--- another caller's adapter.
+--- @param data string The file bytes.
+--- @return string|nil encoded Base64 PNG.
+--- @return string|nil detail Why the image cannot be encoded.
+local function encode_capture(data)
+	local encoded, encode_error = require("adapters.screen_capture").encode_base64(data)
+	if not encoded then return nil, "the capture could not be encoded: " .. tostring(encode_error) end
+	return encoded
+end
+
+--- Captures one screenshot into an owned temporary PNG for a screen reading:
+--- never the clipboard, and the file is removed once the operation ends,
+--- whatever its outcome. An image whose longest edge exceeds max_edge is
+--- downscaled with sips first; when that fails the original is sent.
+--- Failures are logged, never notified: on_image reports them to the caller,
+--- which shows its own notice.
+--- @param flags table screencapture flags selecting the area, without -c.
+--- @param parent string|nil Stable parent ID.
+--- @param max_edge number Longest edge, in pixels, the image may keep.
+--- @param on_image function Receives ("image", base64 PNG), ("cancelled") or ("failed", detail).
+--- @return boolean accepted False when nothing was started (on_image is not called).
+function M.capture_image(flags, parent, max_edge, on_image)
+	if type(on_image) ~= "function" then error("screenshot_save.capture_image: on_image must be a function") end
+	if type(max_edge) ~= "number" or max_edge < 1 then
+		error("screenshot_save.capture_image: max_edge must be a positive number")
+	end
+	local scope_id = action_parent(parent)
+	if not screenshot_admission_open(scope_id) then
+		Logger.info(LOG, "Screen reading capture refused: screenshots are paused for '%s'.", scope_id)
+		return false
+	end
+	if type(flags) ~= "table" or CaptureFlow.targets_clipboard(flags) then
+		Logger.error(LOG, "Screen reading capture refused: the flags must be a table without -c.")
+		return false
+	end
+	if not CaptureFlow.ensure_permission("Screen reading") then return false end
+	local operation = create_operation("screen reading", scope_id)
+	if not operation then return false end
+	operation.quiet = true
+
+	local allocated, target, allocation_detail = pcall(FileSystem.create_secure_temp_file)
+	if not allocated or type(target) ~= "string" or target == "" then
+		Logger.error(LOG, "Screen reading capture refused: no temporary file (%s).",
+			tostring(allocated and allocation_detail or target))
+		operation.authorized = false
+		finish_operation(operation)
+		return false
+	end
+	operation.temp_path = target
+
+	--- Hands the capture to the caller.
+	--- @param data string|nil The file bytes already read, nil to read the file now.
+	local function deliver(data)
+		local detail = nil
+		if data == nil then data, detail = read_capture(target) end
+		local encoded = nil
+		if data ~= nil then encoded, detail = encode_capture(data) end
+		if not encoded then
+			Logger.error(LOG, "Screen reading capture unusable: %s.", tostring(detail))
+			on_image("failed", detail)
+			return false
+		end
+		on_image("image", encoded)
+		return true
+	end
+
+	local args = {}
+	for _, flag in ipairs(flags) do args[#args + 1] = tostring(flag) end
+	-- The temp file has no extension; pin the format the request declares.
+	args[#args + 1] = "-t"
+	args[#args + 1] = "png"
+	args[#args + 1] = target
+	local mark = CaptureFlow.clipboard_mark()
+	return start_task(operation, SCREENCAPTURE_BIN, args, function(exit_code, _, stderr)
+		local outcome, detail = CaptureFlow.settle({
+			path = target,
+			mark = mark,
+			exit_code = exit_code,
+			stderr = stderr,
+			interactive = CaptureFlow.is_interactive(flags),
+			destination = "file",
+		})
+		if outcome == CaptureFlow.OUTCOME_CANCELLED then
+			Logger.info(LOG, "Screen reading capture cancelled by the user.")
+			on_image("cancelled")
+			return true
+		end
+		if outcome ~= CaptureFlow.OUTCOME_SAVED then
+			Logger.error(LOG, "Screen reading capture failed: %s.", tostring(detail))
+			on_image("failed", detail or outcome)
+			return false
+		end
+		local data, read_error = read_capture(target)
+		if not data then
+			Logger.error(LOG, "Screen reading capture unusable: %s.", tostring(read_error))
+			on_image("failed", read_error)
+			return false
+		end
+		local width, height = png_size(data)
+		if math.max(width, height) <= max_edge then return deliver(data) end
+		local started = start_task(operation, SIPS_BIN, { "-Z", tostring(math.floor(max_edge)), target },
+			function(sips_exit_code, _, sips_stderr)
+				if sips_exit_code ~= 0 and not _downscale_failure_logged then
+					_downscale_failure_logged = true
+					Logger.info(LOG, "The screenshot could not be downscaled (sips exit %s: %s); "
+						.. "the original is sent.", tostring(sips_exit_code), tostring(sips_stderr))
+				end
+				return deliver()
+			end, "downscale")
+		if started then return true end
+		if not _downscale_failure_logged then
+			_downscale_failure_logged = true
+			Logger.info(LOG, "The screenshot downscale could not start; the original is sent.")
+		end
+		return deliver()
 	end, "capture")
 end
 

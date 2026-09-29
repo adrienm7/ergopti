@@ -240,6 +240,26 @@ global GESTURE_ACTIONS := Map(
 		"llm_prompt_prediction", {
 				Fn: (BindingId := "") => GesturePromptPrediction(BindingId),
 		},
+		; Live mode on with the prompt (and count) the binding names, or off.
+		"llm_live_prompt_toggle", {
+				Fn: (BindingId := "") => GestureLivePromptToggle(BindingId),
+		},
+		; The selection translated into the language the binding names.
+		"llm_translate_selection", {
+				Fn: (BindingId := "") => GestureTranslateSelection(BindingId),
+		},
+		; The AI agent: actions proposed for the selection or for a typed
+		; command, and its automatic mode switched on or back to "on action".
+		; Each shows its own refusals.
+		"llm_agent_selection", {
+				Fn: (*) => LLM_Agent_TriggerSelection(),
+		},
+		"llm_agent_command", {
+				Fn: (*) => LLM_Agent_TriggerCommand(),
+		},
+		"llm_agent_auto_toggle", {
+				Fn: (*) => LLM_Agent_ToggleAuto(),
+		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
 		; when the action is triggered via a gesture slot instead.
@@ -293,6 +313,23 @@ for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER {
 		GESTURE_ACTIONS["llm_predict_" . _PresetProfileId] := { Fn: _GestureMakePromptPresetRunner(_PresetProfileId) }
 }
 
+; ── The tone ladder on the selection ────────────────────────────────────────
+;
+; llm_tone_more_formal / _familiar and their _cycle variants, one per
+; direction x cycle entry of LLM_ToneActions (modules/llm/tone_action.ahk).
+for _ToneActionId, _ToneStep in LLM_ToneActions() {
+		GESTURE_ACTIONS[_ToneActionId] := { Fn: _GestureMakeToneRunner(_ToneStep.Direction, _ToneStep.Cycle) }
+}
+
+; ── Answering what is on the screen ────────────────────────────────────────
+;
+; llm_screen_region, llm_screen_full and llm_screen_error, one per entry of
+; LLM_VisionActions (modules/llm/vision_action.ahk); the binding's llm_vision
+; parameter names the vision backend.
+for _VisionActionId, _VisionKind in LLM_VisionActions() {
+		GESTURE_ACTIONS[_VisionActionId] := { Fn: _GestureMakeVisionRunner(_VisionActionId) }
+}
+
 ; Every persisted gesture action must name the live catalogue.  The empty
 ; sentinel is exclusive to tap-hold, where it means native key passthrough.
 GestureActionIsAssignable(ActionName, AllowNative := false) {
@@ -319,6 +356,16 @@ _GestureMakeSeqEmitter(Seq) {
 ; Same reason: the profile id arrives as a parameter, so each preset keeps its own.
 _GestureMakePromptPresetRunner(ProfileId) {
 		return (*) => LLM_Menu_TriggerPredictionWith(ProfileId, 0)
+}
+
+; Same reason: the direction and the cycle flag arrive as parameters.
+_GestureMakeToneRunner(Direction, Cycle) {
+		return (*) => LLM_Tone_Trigger(Direction, Cycle)
+}
+
+; Same reason: the action id arrives as a parameter.
+_GestureMakeVisionRunner(ActionId) {
+		return (BindingId := "") => GestureScreenVision(ActionId, BindingId)
 }
 
 
@@ -385,6 +432,43 @@ GesturePromptPrediction(BindingId := "", FireFn := 0) {
 		}
 		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
 				Parsed.Get("num_predictions", 0), FireFn)
+}
+
+; Runs the llm_live_prompt_toggle action of one binding. While live mode is on,
+; any toggle binding turns it off, whatever it names, even a value no longer
+; valid: the user must always be able to leave. Otherwise the stored value is
+; re-validated like llm_prompt_prediction's and names the prompt and count.
+; @param {String} BindingId The binding whose parameter to read.
+; @returns {Boolean} True when live mode changed state.
+GestureLivePromptToggle(BindingId := "") {
+		if LLM_Engine_LiveIsActive()
+				return LLM_Menu_StopLiveMode()
+		Value := GestureGetActionParameter(BindingId, "llm_live_prompt_toggle")
+		Parsed := LLM_PromptAction_Parse(Value, &Reason)
+		if !(Parsed is Map) {
+				LoggerWarn("gestures", "llm_live_prompt_toggle ignored for binding '{1}': {2}.", BindingId, Reason)
+				return false
+		}
+		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get("num_predictions", 0))
+}
+
+; Runs a screen action of one binding: its stored value names the vision
+; backend, validated and resolved by the trigger, which shows every refusal.
+; @param {String} ActionId llm_screen_region, llm_screen_full or llm_screen_error.
+; @param {String} BindingId The binding whose parameter to read.
+; @returns {Boolean} True when the capture started.
+GestureScreenVision(ActionId, BindingId := "") {
+		return LLM_Vision_Trigger(LLM_VisionActions()[ActionId],
+				GestureGetActionParameter(BindingId, ActionId), LLM_Vision_AnswersKey(ActionId))
+}
+
+; Runs the llm_translate_selection action of one binding: its stored value
+; names the target language, validated by the trigger after the refusals it
+; shares with llm_generate_prediction.
+; @param {String} BindingId The binding whose parameter to read.
+; @returns {Boolean} True when the selection capture started.
+GestureTranslateSelection(BindingId := "") {
+		return LLM_Translate_Trigger(GestureGetActionParameter(BindingId, "llm_translate_selection"))
 }
 
 GestureOpenConfiguredURL(BindingId := "") {

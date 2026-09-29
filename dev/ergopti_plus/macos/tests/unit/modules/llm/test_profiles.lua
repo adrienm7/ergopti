@@ -53,7 +53,7 @@ local Profiles = helpers.load_with_stubs("modules.llm.profiles")
 -- =====================================
 
 helpers.describe("Profiles.BUILTIN_PROFILES", function()
-	helpers.it("contains the five canonical built-ins, rewrite last", function()
+	helpers.it("contains the five canonical built-ins, then the tone ladder, then the translations", function()
 		local ids = {}
 		for _, p in ipairs(Profiles.BUILTIN_PROFILES) do ids[p.id] = true end
 		helpers.assert_true(ids.raw)
@@ -61,9 +61,26 @@ helpers.describe("Profiles.BUILTIN_PROFILES", function()
 		helpers.assert_true(ids.advanced)
 		helpers.assert_true(ids.batch_advanced)
 		helpers.assert_true(ids.rewrite, "the rewrite profile is offered with the other built-ins")
-		helpers.assert_eq(Profiles.BUILTIN_PROFILES[#Profiles.BUILTIN_PROFILES].id, "rewrite")
-		helpers.assert_eq(Profiles.BUILTIN_PROFILES[#Profiles.BUILTIN_PROFILES].label,
+		-- The live translations close the list, after the tone ladder
+		local TRANSLATIONS = { "translate_en", "translate_ja" }
+		local total = #Profiles.BUILTIN_PROFILES
+		for index, id in ipairs(TRANSLATIONS) do
+			local profile = Profiles.BUILTIN_PROFILES[total - #TRANSLATIONS + index]
+			helpers.assert_eq(profile.id, id, "translation " .. index)
+			helpers.assert_eq(profile.label, "llm.profile." .. id .. ".label", id .. " label key")
+		end
+		-- The tone rungs precede them, from the most familiar to the most formal
+		local Tone = require("llm.tone")
+		local first_rung = total - #TRANSLATIONS - #Tone.LADDER + 1
+		helpers.assert_eq(Profiles.BUILTIN_PROFILES[first_rung - 1].id, "rewrite",
+			"the rewrite profile comes right before the tone ladder")
+		helpers.assert_eq(Profiles.BUILTIN_PROFILES[first_rung - 1].label,
 			"llm.profile.rewrite.label", "labelled from its locale key")
+		for index, rung in ipairs(Tone.LADDER) do
+			local profile = Profiles.BUILTIN_PROFILES[first_rung + index - 1]
+			helpers.assert_eq(profile.id, rung, "tone rung " .. index)
+			helpers.assert_eq(profile.label, "llm.profile." .. rung .. ".label", rung .. " label key")
+		end
 	end)
 
 	helpers.it("each built-in has the required shape", function()

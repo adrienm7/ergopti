@@ -310,6 +310,17 @@ function M.clipboard(opts)
 		fake.contents = previous
 		return true
 	end
+	-- The copy probe: the selection, the clipboard left as it was.
+	function fake.read_selection(emit_combo, sleep_ms)
+		if opts.available == false then return false, "", "clipboard unavailable" end
+		if type(emit_combo) ~= "function" or type(sleep_ms) ~= "function" then
+			return false, "", "invalid_dependencies"
+		end
+		if emit_combo("ctrl+c") ~= true then return false, "", "copy_chord_failed" end
+		if sleep_ms(80) == false then return false, "", "copy_settle_failed" end
+		if opts.selection == nil then return false, "", "no_selection" end
+		return true, opts.selection, nil
+	end
 	function fake.transform_selection(transform, emit_combo, sleep_ms)
 		if opts.available == false then return false, "clipboard unavailable" end
 		if type(transform) ~= "function" or type(emit_combo) ~= "function"

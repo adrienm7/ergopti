@@ -587,6 +587,51 @@ local function text_case()
 	return _text_case
 end
 
+--- Tells whether a codepoint joins the character before it on screen, so one
+--- arrow press moves over both: combining marks, variation selectors, emoji
+--- skin-tone modifiers, tag characters and the zero-width joiner.
+--- @param code number The codepoint.
+--- @return boolean joins
+local function joins_previous(code)
+	return (code >= 0x0300 and code <= 0x036F) or (code >= 0x1AB0 and code <= 0x1AFF)
+		or (code >= 0x1DC0 and code <= 0x1DFF) or (code >= 0x20D0 and code <= 0x20FF)
+		or (code >= 0xFE20 and code <= 0xFE2F) or (code >= 0xFE00 and code <= 0xFE0F)
+		or (code >= 0xE0100 and code <= 0xE01EF) or (code >= 0x1F3FB and code <= 0x1F3FF)
+		or (code >= 0xE0020 and code <= 0xE007F) or code == 0x200D
+end
+
+--- Counts the arrow presses that move over a text. macOS moves the caret over
+--- one composed character sequence per press, not one UTF-16 unit or one
+--- codepoint: é written e + U+0301, 👍🏽, ❤️, a ZWJ family and a flag are one
+--- press each, as is CR LF. Counting codepoints left a combined character, or
+--- the start of the text, out of the reselection.
+--- @param text string Valid UTF-8.
+--- @return number steps Arrow presses from the end of the text to its start.
+local function cursor_steps(text)
+	local steps, previous, regional_open = 0, nil, false
+	for _, code in utf8.codes(text) do
+		local joined = false
+		if previous == nil then
+			joined = false
+		elseif joins_previous(code) or previous == 0x200D then
+			joined = true
+		elseif code == 0x0A and previous == 0x0D then
+			joined = true
+		elseif code >= 0x1F1E6 and code <= 0x1F1FF and regional_open then
+			joined = true
+		end
+		if code >= 0x1F1E6 and code <= 0x1F1FF then
+			regional_open = not joined
+		elseif not joined then
+			regional_open = false
+		end
+		if not joined then steps = steps + 1 end
+		previous = code
+	end
+	return steps
+end
+M._cursor_steps = cursor_steps
+
 --- Asynchronous text-transform engine.
 --- Copies the current selection, applies the callback, pastes the result, then
 --- re-selects the pasted text so repeated transforms work without re-selecting,
@@ -656,7 +701,15 @@ local function reselect_previous_text(count, owner)
 	return false
 end
 
-local function do_transform(transform_func, parent)
+--- The transform callback may return false to decline: nothing is pasted, the
+--- clipboard is restored and `on_declined` runs once the clipboard is released.
+--- With nothing selected, `on_empty` runs once the clipboard is released.
+--- @param transform_func function Receives the selection; returns the text to paste, or false.
+--- @param parent string|nil Stable action parent.
+--- @param on_declined function|nil Runs after a decline released the clipboard.
+--- @param on_empty function|nil Runs after an empty selection released the clipboard.
+--- @return boolean started
+local function do_transform(transform_func, parent, on_declined, on_empty)
 	local scope = text_scope(parent)
 	if scope.paused == true then return false end
 	if _transform_in_flight then
@@ -812,12 +865,48 @@ local function do_transform(transform_func, parent)
 
 	local copy_stage
 	copy_stage = function()
+		--- Ends a transform that pastes nothing and gives the clipboard back.
+		--- @param message string Why nothing is pasted, for the log.
+		--- @return boolean restored True when the user's clipboard is back.
+		local function end_without_paste(message)
+			local restored, restore_error = restore_prior()
+			if not restored then
+				Logger.error(LOG, "Text transform clipboard restore refused: %s.", tostring(restore_error))
+				queue_restore_retry()
+				return false
+			end
+			release()
+			Logger.info(LOG, "%s", message)
+			return true
+		end
 		local ok_selection, selection = call_text_boundary(owner, pasteboard.getContents)
-		if not ok_selection or type(selection) ~= "string" or selection == "" then
+		if not ok_selection or (selection ~= nil and type(selection) ~= "string") then
 			abort_transform("selection copy", selection)
 			return
 		end
+		-- Cmd+C with nothing selected leaves the cleared clipboard empty: the
+		-- user's choice, not a failure
+		if selection == nil or selection == "" then
+			if end_without_paste("Text transform skipped: nothing is selected.")
+				and type(on_empty) == "function" then
+				local ok_empty, empty_error = xpcall(on_empty, debug.traceback)
+				if not ok_empty then
+					Logger.error(LOG, "Text transform empty-selection callback failed: %s.", tostring(empty_error))
+				end
+			end
+			return
+		end
 		local ok_transform, transformed = call_text_boundary(owner, transform_func, selection)
+		if ok_transform and transformed == false then
+			if end_without_paste("Text transform declined by its action: nothing pasted.")
+				and type(on_declined) == "function" then
+				local ok_declined, declined_error = xpcall(on_declined, debug.traceback)
+				if not ok_declined then
+					Logger.error(LOG, "Text transform decline callback failed: %s.", tostring(declined_error))
+				end
+			end
+			return
+		end
 		if not ok_transform or type(transformed) ~= "string" then
 			abort_transform("transform callback", transformed)
 			return
@@ -843,8 +932,8 @@ local function do_transform(transform_func, parent)
 					abort_transform("restore timer", restore_timer_error)
 					return
 				end
-				local len_ok, ulen = pcall(utf8.len, transformed)
-				local count = (len_ok and ulen and ulen > 0) and ulen or #transformed
+				local steps_ok, steps = pcall(cursor_steps, transformed)
+				local count = (steps_ok and steps > 0) and steps or #transformed
 				if count > MAX_RESELECT_CHARS then count = MAX_RESELECT_CHARS end
 				if count > 0 and not reselect_previous_text(count, owner) then
 					abort_transform("text reselection", "synthetic dispatch refused")
@@ -1540,6 +1629,51 @@ function M.wrap_copied_selection(left, right, parent)
 		return false
 	end
 	return do_transform(function(sel) return left .. sel .. right end, parent)
+end
+
+--- Reads the current selection through the clipboard, like wrap_selection,
+--- without changing the document: the user's clipboard is restored before
+--- `on_selection` runs. Nothing selected: logged, `on_selection` never runs and
+--- `on_empty`, when given, runs once the clipboard is restored.
+--- @param parent string|nil Stable action parent.
+--- @param on_selection function Receives the selected text.
+--- @param on_empty function|nil Runs when nothing is selected.
+--- @return boolean started
+function M.read_copied_selection(parent, on_selection, on_empty)
+	if type(on_selection) ~= "function" then
+		error("read_copied_selection: on_selection must be a function")
+	end
+	if on_empty ~= nil and type(on_empty) ~= "function" then
+		error("read_copied_selection: on_empty must be a function or nil")
+	end
+	local selection = nil
+	return do_transform(function(sel)
+		selection = sel
+		return false
+	end, parent, function() on_selection(selection) end, on_empty)
+end
+
+--- Replaces the current selection with `text` and leaves `text` selected, like
+--- the case actions, but only while the selection is still `expected`: text
+--- produced from one selection is never pasted over another.
+--- @param expected string The selection `text` was made from.
+--- @param text string The replacement.
+--- @param parent string|nil Stable action parent.
+--- @param on_checked function Receives true when the selection matched and the
+---        paste follows, false once a changed selection was left alone.
+--- @return boolean started
+function M.replace_copied_selection(expected, text, parent, on_checked)
+	if type(expected) ~= "string" or expected == "" or type(text) ~= "string" or text == "" then
+		error("replace_copied_selection: expected and text must be non-empty strings")
+	end
+	if type(on_checked) ~= "function" then
+		error("replace_copied_selection: on_checked must be a function")
+	end
+	return do_transform(function(sel)
+		if sel ~= expected then return false end
+		on_checked(true)
+		return text
+	end, parent, function() on_checked(false) end)
 end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).

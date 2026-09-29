@@ -28,6 +28,8 @@ local WrapPair      = require("wrap_pair")
 local SendInput     = require("send_input")
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
+local Tone          = require("llm.tone")
+local Vision        = require("llm.vision")
 local JsonCodec     = require("adapters.json_codec")
 local LOG           = "gestures.actions"
 
@@ -1095,6 +1097,18 @@ sg("llm_prompt_prediction", function(binding)
 	end
 	return request_prompt_prediction("llm_prompt_prediction", value)
 end)
+-- Live mode with the binding's prompt, or off when it is on. The value is
+-- handed over even when invalid: a second press of ANY live binding turns live
+-- mode off, and the engine refuses an invalid prompt only when turning it on.
+sg("llm_live_prompt_toggle", function(binding)
+	local value = M.get_action_parameter(binding, "llm_live_prompt_toggle")
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table" or type(keymap.toggle_live_prompt) ~= "function" then
+		Logger.error(LOG, "llm_live_prompt_toggle: the keymap bridge is unavailable: %s.", tostring(keymap))
+		return false
+	end
+	return keymap.toggle_live_prompt(value)
+end)
 -- One ready-made action per built-in profile (llm_predict_<id>), with the AI
 -- menu's count. Derived from profiles.json, like the catalogue, so a new
 -- built-in profile gets its action without a hand-written registration here.
@@ -1107,6 +1121,89 @@ for _, profile in ipairs(BUILTIN_PROMPT_PROFILES) do
 	local profile_id = profile.id
 	local action = "llm_predict_" .. profile_id
 	sg(action, function() return request_prompt_prediction(action, PromptAction.format(profile_id)) end)
+end
+-- The tone ladder on the selection (llm_tone_*): one registration per
+-- direction and end behaviour, through the keymap bridge like the predictions.
+local TONE_ACTIONS = {
+	{ id = "llm_tone_more_formal", direction = Tone.MORE_FORMAL, cycle = false },
+	{ id = "llm_tone_more_familiar", direction = Tone.MORE_FAMILIAR, cycle = false },
+	{ id = "llm_tone_more_formal_cycle", direction = Tone.MORE_FORMAL, cycle = true },
+	{ id = "llm_tone_more_familiar_cycle", direction = Tone.MORE_FAMILIAR, cycle = true },
+}
+for _, tone_action in ipairs(TONE_ACTIONS) do
+	local spec = tone_action
+	sg(spec.id, function()
+		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_tone_step) ~= "function" then
+			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
+			return false
+		end
+		return keymap.request_tone_step(spec.direction, spec.cycle, current_action_parent())
+	end)
+end
+-- Screen reading (llm_screen_region / llm_screen_full / llm_screen_error): the
+-- vision backend is the binding's own parameter, through the keymap bridge like
+-- the predictions; the error explanation reads a region with its own answers.
+local SCREEN_ANSWER_ACTIONS = {
+	{ id = "llm_screen_region", mode = "MODE_REGION", answers = "ANSWERS_SCREEN" },
+	{ id = "llm_screen_full", mode = "MODE_FULL", answers = "ANSWERS_SCREEN" },
+	{ id = "llm_screen_error", mode = "MODE_REGION", answers = "ANSWERS_ERROR" },
+}
+for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
+	local spec = screen_action
+	sg(spec.id, function(binding)
+		local value = M.get_action_parameter(binding, spec.id)
+		if not Vision.is_valid(value) then
+			Logger.warn(LOG, "%s ignored for binding '%s': no valid vision backend is stored ('%s').",
+				spec.id, tostring(binding), tostring(value))
+			return false
+		end
+		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_screen_answers) ~= "function" then
+			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
+			return false
+		end
+		local ScreenAnswer = require("modules.llm.screen_answer")
+		return keymap.request_screen_answers(value, ScreenAnswer[spec.mode], current_action_parent(),
+			ScreenAnswer[spec.answers])
+	end)
+end
+-- Translation of the selection (llm_translate_selection): the target language
+-- is the binding's own parameter, through the keymap bridge like the tone steps.
+sg("llm_translate_selection", function(binding)
+	local value = M.get_action_parameter(binding, "llm_translate_selection")
+	if not M.validate_action_parameter("llm_translate_selection", value) then
+		Logger.warn(LOG, "llm_translate_selection ignored for binding '%s': no valid language is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_selection_translation) ~= "function" then
+		Logger.error(LOG, "llm_translate_selection: the keymap bridge is unavailable: %s.", tostring(keymap))
+		return false
+	end
+	return keymap.request_selection_translation(value, current_action_parent())
+end)
+-- The AI agent (llm_agent_selection / llm_agent_command / llm_agent_auto_toggle):
+-- its settings are the AI agent menu's, so the bindings carry no parameter; the
+-- keymap bridge hands them to modules/llm/agent_runner.lua, which logs and shows
+-- every refusal.
+local AGENT_ACTIONS = {
+	{ id = "llm_agent_selection", bridge = "request_agent_selection", parent = true },
+	{ id = "llm_agent_command", bridge = "request_agent_command" },
+	{ id = "llm_agent_auto_toggle", bridge = "toggle_agent_auto" },
+}
+for _, agent_action in ipairs(AGENT_ACTIONS) do
+	local spec = agent_action
+	sg(spec.id, function()
+		local ok_keymap, keymap = pcall(require, "modules.keymap")
+		if not ok_keymap or type(keymap) ~= "table" or type(keymap[spec.bridge]) ~= "function" then
+			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
+			return false
+		end
+		if spec.parent then return keymap[spec.bridge](current_action_parent()) end
+		return keymap[spec.bridge]()
+	end)
 end
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
@@ -1986,6 +2083,9 @@ function M.validate_action_parameter(action, value)
 	-- Syntax only: whether the profile still exists is checked when the action runs,
 	-- so deleting a custom prompt does not wipe the bindings that name it
 	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
+	-- Syntax only too: whether the provider exists is checked when the action runs
+	if spec == "llm_vision" then return Vision.is_valid(value) end
+	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2021,6 +2121,20 @@ function M.parameter_prompt(action)
 		end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_prompt"), table.concat(lines, "\n"))
 	end
+	if spec == "llm_vision" then
+		local lines = {}
+		for _, choice in ipairs(M.llm_vision_choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
+	end
+	if spec == "llm_language" then
+		local lines = {}
+		for _, choice in ipairs(M.llm_language_choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), table.concat(lines, "\n"))
+	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local samples = WrapPair.describe(wrap_pair_list())
@@ -2038,6 +2152,8 @@ function M.parameter_error(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
+	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
+	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2080,6 +2196,35 @@ function M.llm_prompt_choices()
 		end
 	end
 	return choices
+end
+
+--- The vision backends a llm_vision binding may name: the local server first,
+--- then the API providers in the catalogue's order, each with the vision model
+--- used when the binding names none ("" when the backend needs one).
+--- @return table Array of { value = backend id, label, defaultModel }.
+function M.llm_vision_choices()
+	local Remote = require("modules.llm.api_remote")
+	local defaults = require("modules.llm.screen_answer").config().default_models
+	local choices = { {
+		value = Vision.LOCAL_BACKEND,
+		label = i18n.get("llm.vision.local_backend"),
+		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
+	} }
+	for _, provider_id in ipairs(Remote.PROVIDER_ORDER) do
+		choices[#choices + 1] = {
+			value = provider_id,
+			label = Remote.PROVIDERS[provider_id].label,
+			defaultModel = defaults[provider_id] or "",
+		}
+	end
+	return choices
+end
+
+--- The target languages a llm_language binding may name: the interface
+--- language first, then every shipped locale in the language menu's order.
+--- @return table Array of { value, label }.
+function M.llm_language_choices()
+	return require("modules.llm.selection_translation").choices()
 end
 
 function M.get_action_parameter(binding, action)

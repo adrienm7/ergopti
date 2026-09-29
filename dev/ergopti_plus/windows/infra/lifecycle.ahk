@@ -474,6 +474,10 @@ Ergopti_OnSuspendEnter() {
 	_LifecycleRunRequiredStep(Transition, "suspend-tooltip",
 		TooltipHide.Bind("Suspend", true))
 	_LifecycleRunRequiredStep(Transition, "llm-tooltip", LLM_Tooltip_Hide.Bind(true))
+		; Pausing ends live mode: it is not resumed with the driver, the user
+		; turns it on again ("pause = tout éteint").
+	_LifecycleRunRequiredStep(Transition, "llm-live-mode",
+		() => LLM_Engine_LiveStop("Ergopti+ was paused"))
 	_LifecycleRunRequiredStep(Transition, "llm-generation-timer", LLM_Engine_CancelTimer)
 		; Stop in-flight generation AND clear the prediction cache so a suggestion
 		; produced before the pause cannot re-render after resume on a rebuilt

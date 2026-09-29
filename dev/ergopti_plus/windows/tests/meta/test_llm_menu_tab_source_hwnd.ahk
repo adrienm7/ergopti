@@ -136,9 +136,10 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"source capture must produce one fail-closed HWND/focused-control snapshot")
 	Assert(InStr(CaptureBody, "WIGetFocusedControlToken()") > 0,
 		"source capture must use focused-control identity, not top-level HWND alone")
-	Assert(InStr(OnKeyBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)") > 0,
+	; The third bound argument is live mode's prompt override (or 0)
+	Assert(InStr(OnKeyBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,") > 0,
 		"per-keystroke debounce must bind the source snapshot into its timer closure")
-	Assert(InStr(StartBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)") > 0,
+	Assert(InStr(StartBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,") > 0,
 		"hotstring-chain timer must bind its own source snapshot too")
 	Assert(InStr(FireBody, '"request_accept_source"') > 0,
 		"FirePrediction must attach the bound source to the current request id")
@@ -156,13 +157,13 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"the prefix-cache render must carry the request and semantic identities that own its captured source")
 	ExpectedCallbackCalls := Map(
 		"_LLM_Engine_DispatchVariant",
-			'LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"])',
+			'LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_OnStreamPartial",
 			'LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false, state["request_id"], state["semantic_signature"])',
 		"_LLM_Engine_OnVariantSuccess",
-			'LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"])',
+			'LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_FinalizeRequest",
-			'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"])'
+			'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))'
 	)
 	for CallbackName, ExpectedCall in ExpectedCallbackCalls {
 		CallbackBody := _DriverFuncBody(CallbackName)
@@ -198,9 +199,13 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		and InStr(EngineSrc, '"source_control_token"') == 0,
 		"legacy mutable engine focus fields must not coexist with request/presentation-owned source snapshots")
 	BoundTimers := _TLTSH_Count(DriverSrc,
-		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)")
+		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource")
 	AssertEqual(4, BoundTimers,
 		"all four FirePrediction timer/retry bindings must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
+	; The warmup and rate-limit re-arms replay a prompt action's own request.
+	AssertEqual(2, _TLTSH_Count(DriverSrc,
+		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)"),
+		"both FirePrediction retry bindings must carry the prompt override, or a retried prompt action runs the menu's prompt")
 	AssertEqual(7, _TLTSH_Count(DriverSrc, "LLM_Engine_OnResults("),
 		"OnResults must have one definition plus exactly the six enumerated request-owned render call sites")
 }

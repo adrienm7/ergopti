@@ -312,15 +312,16 @@ _LPP_PresetsRunTheirProfile() {
 			Call := Calls[Calls.Length]
 			AssertEqual(LLM_ResolveSystemPrompt(LLM_FindProfile(Id), 3, 1, 5, "fr"), Call["system"],
 				"llm_predict_" . Id . " runs its own profile with the menu's count")
-			if (Id == "rewrite")
-				AssertEqual(LPP_SENTENCE, Call["tail"], "the rewrite preset sends the sentence")
+			if LLM_Rewrite_IsRewriteProfile(LLM_FindProfile(Id))
+				AssertEqual(LPP_SENTENCE, Call["tail"], "the rewrite preset " . Id . " sends the sentence")
 			else
 				AssertFalse(Call["tail"] == LPP_SENTENCE && Call["max_tokens"]
 					== _LLM_Engine_CallTokenBudget(LLM_Rewrite_MaxTokens(LPP_SENTENCE), 1),
 					"a continuation preset keeps the continuation request shape")
 			Checked += 1
 		}
-		AssertEqual(5, Checked, "one preset per built-in, rewrite included")
+		AssertEqual(11, Checked,
+			"one preset per built-in, rewrite, the tone ladder and the translations included")
 		AssertEqual("advanced", _LLM_Menu["profile_id"], "no preset changes the active profile")
 	}
 }

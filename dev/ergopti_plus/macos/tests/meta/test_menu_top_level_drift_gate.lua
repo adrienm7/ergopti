@@ -35,6 +35,7 @@ local TITLE_KEYS = {
 	keyboard_layout = "menu.layout.title",
 	hotstrings      = "menu.hotstrings.title",
 	llm             = "menu.llm.title",
+	agent           = "menu.agent.title",
 	metrics         = "menu.metrics.title",
 	shortcuts       = "menu.shortcuts.title",
 	tap_holds       = "menu.tapholds.title",
@@ -186,7 +187,10 @@ local function render_root(manifest_text, paused)
 			save_prefs     = function() return true end,
 			updateMenu     = function() end,
 			notify_feature = function() end,
-			llm_handler    = { build_item = function() return stub_row("menu.llm.title") end },
+			llm_handler    = {
+				build_item = function() return stub_row("menu.llm.title") end,
+				build_agent_item = function() return stub_row("menu.agent.title") end,
+			},
 		}
 		local actions = setmetatable({}, { __index = function() return function() end end })
 		return builder.generate(ctx, mods, actions)

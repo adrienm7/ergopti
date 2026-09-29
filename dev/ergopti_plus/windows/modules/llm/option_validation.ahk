@@ -15,11 +15,24 @@ global LLM_OPTION_MAX_STOP_SEQUENCES := 64
 global LLM_OPTION_MAX_AGGREGATE_CHARS := 1048576
 ; Canonical built-in profile ids, those of _shared/modules/llm/profiles.json in
 ; menu order. Validation must reject custom records which would shadow
-; resolution, while menu hotkeys preserve this exact order: "rewrite" comes last
-; so the Ctrl+1…4 hotkeys of the four older built-ins keep their digits.
+; resolution, while menu hotkeys preserve this exact order: "rewrite", the tone
+; ladder and the live translations come last so the Ctrl+1…4 hotkeys of the
+; four older built-ins keep their digits.
 global LLM_PROFILE_BUILTIN_ORDER := [
-	"raw", "basic", "advanced", "batch_advanced", "rewrite"
+	"raw", "basic", "advanced", "batch_advanced", "rewrite",
+	"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal",
+	"translate_en", "translate_ja"
 ]
+; The built-in translations of the current sentence, run by live mode
+; (llm_live_prompt_toggle) or their llm_predict presets rather than as the
+; active profile: like the tone ladder, they take no Ctrl+<n> profile hotkey.
+global LLM_PROFILE_LIVE_TRANSLATIONS := ["translate_en", "translate_ja"]
+; The AI agent's settings (llm.agent_* of the features manifest): the AI menu's
+; state carries and persists them like its own options.
+global LLM_AGENT_SETTING_KEYS := ["agent_system1", "agent_system2", "agent_mode", "agent_disabled_apps"]
+; The agent's modes, in menu order: every agent action refuses, the actions
+; only, the actions and the detection while typing.
+global LLM_AGENT_MODES := ["off", "action", "auto"]
 
 _LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {
 	global LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_AGGREGATE_CHARS
@@ -315,9 +328,11 @@ LLM_Option_TryNormalizeTemperature(Value, &Normalized) {
  * every caller must consciously extend this schema when it adds a new option.
  */
 LLM_Option_TryNormalize(Key, Value, &Normalized) {
+	global LLM_AGENT_MODES
 	static StringKeys := Map(
 		"model", true, "profile_id", true, "language", true,
-		"trigger_shortcut", true, "backend", true, "api_entry_id", true)
+		"trigger_shortcut", true, "backend", true, "api_entry_id", true,
+		"agent_system1", true, "agent_system2", true)
 	; These are semantic consumer bounds, not merely storage types. Keep every
 	; public integer in this one table so boot restore, menu persistence, runtime
 	; publication and interactive setters cannot disagree. max_words=0 is the
@@ -373,9 +388,18 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := Value == 1
 		return true
 	}
-	if (Key == "disabled_apps") {
+	if (Key == "disabled_apps" || Key == "agent_disabled_apps") {
 		Normalized := LLM_Option_NormalizeStringArray(Value, true)
 		return Normalized is Array
+	}
+	if (Key == "agent_mode") {
+		for Mode in LLM_AGENT_MODES {
+			if (Value is String) && Value == Mode {
+				Normalized := Value
+				return true
+			}
+		}
+		return false
 	}
 	if (Key == "user_profiles") {
 		Normalized := LLM_Option_NormalizeUserProfiles(Value)

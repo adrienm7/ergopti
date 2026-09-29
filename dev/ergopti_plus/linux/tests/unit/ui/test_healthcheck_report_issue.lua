@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- The diagnostics page asks, the host does (ui.healthcheck.report.perform):
 --- copy the report, save it as a Markdown file under the logs folder and open
---- that folder, report it on GitHub (copy, save, open the folder, then open the
---- bug form with the page's short summary), open a folder it collected.
+--- that folder, report it on GitHub (copy the report, then open the bug form
+--- with that whole report prefilled, the browser last so the form keeps the
+--- focus), open a folder it collected.
 --- Whatever the page sent, the home folder and the account name reach neither
 --- the clipboard, the file nor the URL (report-bug-flow). Debug > Report a bug
 --- opens the window at its preview.
@@ -62,6 +63,31 @@ local function recording(calls)
 	}
 end
 
+--- Wraps recorded side effects so their order is kept in calls.order.
+--- @param calls table
+--- @param overrides table
+local function ordered(calls, overrides)
+	calls.order = {}
+	for name, fn in pairs(overrides) do
+		if name ~= "identity" then
+			overrides[name] = function(...)
+				calls.order[#calls.order + 1] = name
+				return fn(...)
+			end
+		end
+	end
+end
+
+--- Decodes one percent-encoded query parameter of a URL.
+--- @param url string
+--- @param key string
+--- @return string|nil
+local function query_value(url, key)
+	local raw = url:match("[?&]" .. key .. "=([^&]*)")
+	if raw == nil then return nil end
+	return (raw:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
+end
+
 --- Performs one action as the bridge does.
 --- @param action table
 --- @param adjust function|nil Changes the recorded side effects.
@@ -70,22 +96,23 @@ local function perform(action, adjust)
 	local Report = helpers.load_module("ui.healthcheck.report")
 	local calls = {}
 	local overrides = recording(calls)
+	ordered(calls, overrides)
 	if adjust then adjust(overrides) end
 	local paths = { logs_dir = LOGS_DIR, diagnostics_dir = LOGS_DIR .. "/diagnostics" }
 	return Report.perform(action, paths, documents(), Report.redaction_context(overrides), overrides), calls
 end
 
 helpers.describe("healthcheck page actions (linux)", function()
-	helpers.it("report copies, saves, reveals, then opens the bug form, all redacted (report-bug-flow)", function()
-		local result, calls = perform({ action = "report", text = REPORT, name = NAME, fields = {
-			version = "2.4.0", os = "Fedora Linux 41", driver = "linux",
-			diagnostics = "Errors: 1 — log at /home/jdoe/.local/state",
+	helpers.it("report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {
+			version = "2.4.0", os = "Fedora Linux 41 (/home/jdoe)", driver = "linux",
 		} })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(calls.copy, { "# ErgoptiPlus diagnostics\n\nconfig_dir: ~/.config/ergopti_plus (<user>)\n" })
-		helpers.assert_eq(calls.save[1].dir, LOGS_DIR .. "/diagnostics")
-		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved file is what was copied")
-		helpers.assert_eq(calls.reveal[1], LOGS_DIR .. "/diagnostics/" .. NAME)
+		helpers.assert_eq(result.path, nil, "a report names no file")
+		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), calls.copy[1],
+			"the form's diagnostics field is the report the clipboard holds")
+		helpers.assert_eq(query_value(calls.open_url[1], "os"), "Fedora Linux 41 (~)")
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
@@ -93,12 +120,48 @@ helpers.describe("healthcheck page actions (linux)", function()
 		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
 	end)
 
+	-- The report used to be saved and its folder opened too: the file manager
+	-- came up after the browser and took the focus from the form (report-focus)
+	helpers.it("report saves nothing, opens no folder and opens the browser last (report-focus)", function()
+		local _, calls = perform({ action = "report", text = REPORT, fields = { driver = "linux" } })
+		helpers.assert_eq(#calls.save, 0, "a report saves no file")
+		helpers.assert_eq(#calls.reveal, 0, "a report reveals nothing")
+		helpers.assert_eq(#calls.open, 0, "a report opens no folder")
+		helpers.assert_eq(#calls.notify, 0, "a report raises no notification")
+		helpers.assert_eq(calls.order, { "copy", "open_url" }, "the browser opens last, after the clipboard")
+	end)
+
+	helpers.it("report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)", function()
+		local long = REPORT .. string.rep("line of diagnostics é\n", 2000)
+		local result, calls = perform({ action = "report", text = long, fields = { version = "2.4.0", driver = "linux" } })
+		helpers.assert_eq(result.ok, true)
+		local templates = documents().templates
+		helpers.assert_true(#calls.copy[1] > templates.max_url_bytes, "the fixture exceeds the URL budget")
+		local url = calls.open_url[1]
+		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
+		helpers.assert_eq(query_value(url, "version"), "2.4.0", "the identity fields survive the cut")
+		local prefilled = query_value(url, "diagnostics")
+		local marker = templates.truncation_marker
+		helpers.assert_eq(prefilled:sub(-#marker), marker, "the cut report ends with the truncation marker")
+		local kept = prefilled:sub(1, #prefilled - #marker)
+		helpers.assert_eq(calls.copy[1]:sub(1, #kept), kept, "the prefill is the start of the copied report")
+	end)
+
 	helpers.it("report stops before the browser when the clipboard refuses (report-bug-flow)", function()
-		local result, calls = perform({ action = "report", text = REPORT, name = NAME, fields = { driver = "linux" } },
+		local result, calls = perform({ action = "report", text = REPORT, fields = { driver = "linux" } },
 			function(overrides) overrides.copy = function() return false end end)
 		helpers.assert_eq(result.ok, false)
 		helpers.assert_eq(#calls.save, 0, "nothing is saved")
 		helpers.assert_eq(#calls.open_url, 0, "the form never opens without its report")
+	end)
+
+	helpers.it("save still writes the redacted report and opens its folder", function()
+		local result, calls = perform({ action = "save", text = REPORT, name = NAME })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#calls.copy, 0, "saving leaves the clipboard alone")
+		helpers.assert_eq(calls.save[1].dir, LOGS_DIR .. "/diagnostics")
+		helpers.assert_true(not calls.save[1].text:find(HOME, 1, true), "the file carries no home folder")
+		helpers.assert_eq(calls.reveal, { LOGS_DIR .. "/diagnostics/" .. NAME })
 	end)
 
 	helpers.it("open_path opens the folder the host collected, creating it first", function()

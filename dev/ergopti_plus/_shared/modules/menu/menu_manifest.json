@@ -102,6 +102,10 @@
 			"greyed_when_paused": true
 		},
 		{
+			"id": "agent",
+			"greyed_when_paused": true
+		},
+		{
 			"id": "---"
 		},
 		{
@@ -250,6 +254,18 @@
 		},
 		{
 			"type": "dynamic",
+			"id": "llm_live_mode",
+			"i18n": "menu.llm.live_mode_title",
+			"disabled_when_off": true,
+			"health_dot": false,
+			"platforms": [
+				"ahk",
+				"hs",
+				"linux"
+			]
+		},
+		{
+			"type": "dynamic",
 			"id": "llm_generation_settings",
 			"i18n": "menu.llm.generation_menu_title",
 			"disabled_when_off": true,
@@ -310,6 +326,34 @@
 			"type": "command",
 			"id": "about_releases_page",
 			"i18n": "menu.about.open_releases_page"
+		}
+	],
+	"agent_menu": [
+		{
+			"type": "dynamic",
+			"id": "agent_mode",
+			"i18n": "menu.agent.mode_title"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "dynamic",
+			"id": "agent_system1",
+			"i18n": "menu.agent.system1"
+		},
+		{
+			"type": "dynamic",
+			"id": "agent_system2",
+			"i18n": "menu.agent.system2"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "dynamic",
+			"id": "agent_disabled_apps",
+			"i18n": "menu.agent.disabled_apps"
 		}
 	],
 	"apps_menu": [

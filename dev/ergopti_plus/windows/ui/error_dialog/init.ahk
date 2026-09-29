@@ -244,7 +244,6 @@ _ErrorDialog_BuildReport(Record) {
 		"os",            String(System.Get("os", "unknown")),
 		"driver",        "windows",
 		"generated_utc", Generated,
-		"file_stamp",    RegExReplace(Generated, "[-:]", ""),
 		"warn_count",    Issues.Get("warn_count", 0),
 		"err_count",     Issues.Get("err_count", 0))
 	; The recent warnings and errors of today's errors file, as many as the
@@ -514,8 +513,7 @@ _ErrorDialog_Perform(Epoch, ActionName, PerformFn := 0) {
 		case "copy":
 			PageAction := Map("action", "copy", "text", Report["text"])
 		case "report":
-			PageAction := Map("action", "report", "text", Report["text"], "name", Report["name"],
-				"fields", Report["fields"])
+			PageAction := Map("action", "report", "text", Report["text"], "fields", Report["fields"])
 		default:
 			PageAction := Map("action", "open_path", "id", Session["open_id"])
 	}

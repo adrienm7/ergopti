@@ -35,6 +35,10 @@ local Keycodes         = require("infra.keycodes")
 local keylogger        = require("modules.keylogger")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
+local ToneRewrite      = require("modules.llm.tone_rewrite")
+local ScreenAnswer     = require("modules.llm.screen_answer")
+local SelectionTranslation = require("modules.llm.selection_translation")
+local AgentRunner      = require("modules.llm.agent_runner")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
@@ -593,6 +597,10 @@ function M.set_llm_max_words(w)             return engine.set_llm_max_words(w)  
 function M.set_llm_debounce(seconds)        return engine.set_llm_debounce(seconds)        end
 function M.set_llm_streaming(v)             return engine.set_llm_streaming(v)             end
 function M.set_llm_streaming_multi(v)       return engine.set_llm_streaming_multi(v)       end
+function M.set_llm_agent_system1(v)         return AgentRunner.set_system1(v)              end
+function M.set_llm_agent_system2(v)         return AgentRunner.set_system2(v)              end
+function M.set_llm_agent_mode(v)            return AgentRunner.set_mode(v)                 end
+function M.set_llm_agent_disabled_apps(apps) return AgentRunner.set_disabled_apps(apps)    end
 
 --- Sets the "chain LLM after hotstring" flag, owned here because
 --- update_preview() consumes it directly.
@@ -617,7 +625,9 @@ end
 function M.get_llm_runtime_setting(key)
 	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
 	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
-	return engine.get_llm_runtime_setting(key)
+	local found, value = engine.get_llm_runtime_setting(key)
+	if found then return found, value end
+	return AgentRunner.get_runtime_setting(key)
 end
 
 
@@ -695,6 +705,10 @@ function M.update_preview(buf)
 	-- revoke cursor-relative actions without defeating the user's keep-context
 	-- preference.
 	_state.llm_buffer = buf
+	-- The agent's automatic mode waits for a pause in the typing: every
+	-- keystroke drops what it had in flight and re-arms its own timer
+	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, buf)
+	if not agent_ok then Logger.error(LOG, "Agent typing observer raised: %s.", tostring(agent_error)) end
 
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
 	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
@@ -1494,6 +1508,9 @@ end
 --- and a timer scheduled here would remain natively deliverable after PAUSED.
 --- @return boolean committed True only after the full engine reset settles.
 function M.reset_predictions_for_pause()
+	-- A pause ends live mode: resuming must not redraw a translation unannounced
+	engine.stop_live_prompt("pause", true)
+	AgentRunner.cancel_typing("pause")
 	local deferred_settled = settle_prediction_deferred_handles()
 	local reset_committed = reset_predictions_impl(true, true, true)
 	return deferred_settled and reset_committed
@@ -1553,6 +1570,36 @@ function M.reset_for_action_epoch(epoch)
 	return true
 end
 
+--- Hands an accepted candidate that applies itself (the translation, which
+--- replaces the selection) to its owner, once the tooltip is closed. Nothing
+--- is typed at the caret and the buffer is left alone: the owner changes the
+--- document through its own pipeline.
+--- @param idx number 1-based index of the accepted candidate.
+--- @param pred table The consumed candidate, whose on_accept receives its text.
+--- @return boolean applied True when the owner took the text.
+local function apply_own_acceptance(idx, pred)
+	if type(pred.on_accept) ~= "function" or type(pred.to_type) ~= "string" then
+		error("apply_prediction: a candidate's on_accept must be a function with a text to apply")
+	end
+	Logger.start(LOG, "Handing candidate #%d to its owner (%d byte(s)).", idx, #pred.to_type)
+	local reset_ok, reset_result = xpcall(M.reset_predictions, debug.traceback)
+	if not reset_ok or reset_result ~= true then
+		Logger.error(LOG, "Candidate #%d acceptance cleanup did not commit (result: %s).",
+			idx, tostring(reset_result))
+	end
+	local ok, applied = xpcall(pred.on_accept, debug.traceback, pred.to_type)
+	if not ok then
+		Logger.error(LOG, "Candidate #%d owner raised: %s.", idx, tostring(applied))
+		return false
+	end
+	if applied ~= true then
+		Logger.warn(LOG, "Candidate #%d was refused by its owner.", idx)
+		return false
+	end
+	Logger.success(LOG, "Candidate #%d handed to its owner.", idx)
+	return true
+end
+
 --- Applies the selected prediction: issues deletions, types the completion,
 --- updates the in-memory buffer, and arms the chained LLM request.
 --- @param idx number 1-based index of the prediction to apply.
@@ -1563,6 +1610,7 @@ function M.apply_prediction(idx)
 
 	local pred, all_preds = engine.consume(idx)
 	if not pred then return false end
+	if pred.on_accept ~= nil then return apply_own_acceptance(idx, pred) end
 
 	local delete_count = pred.deletes or 0
 	local text_to_type = pred.to_type or ""
@@ -1575,7 +1623,9 @@ function M.apply_prediction(idx)
 	-- A rewrite already names the exact span it replaces: an overlap match between
 	-- the buffer tail and the rewritten sentence would shrink its deletions.
 	local resolve_overlap = km_utils.resolve_prediction_overlap
-	if pred.rewrite == true then
+	-- A screen-reading answer is typed verbatim at the caret: it does not
+	-- continue the buffer, so the buffer tail must not trim it either.
+	if pred.rewrite == true or pred.verbatim == true then
 		resolve_overlap = function(_, deletes, text) return deletes, text end
 	end
 	local ok_overlap, res_deletes, res_text = pcall(
@@ -1879,6 +1929,110 @@ function M.request_prompt_prediction(value)
 		return false
 	end
 	return engine.request_prompt_prediction(value)
+end
+
+--- Turns live mode on with the binding's prompt, or off when it is on (the
+--- llm_live_prompt_toggle action). The engine owns the live state and shows
+--- every transition and refusal.
+--- @param value string The binding's parameter: "<profile_id>" or "<profile_id>|<count>".
+--- @return boolean handled True when live mode changed state.
+function M.toggle_live_prompt(value)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Live mode toggle skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return engine.toggle_live_prompt(value)
+end
+
+--- Turns live mode on with a prompt, or off with nil (the AI menu's live-mode
+--- submenu). Same engine state as the action.
+--- @param value string|nil "<profile_id>" (the menu's count), or nil for off.
+--- @return boolean committed True when live mode is in the requested state.
+function M.set_live_prompt(value)
+	if value == nil then
+		engine.stop_live_prompt("menu", false)
+		return engine.get_live_prompt() == nil
+	end
+	return engine.start_live_prompt(value)
+end
+
+--- @return table|nil live The engine's live prompt { profile_id, num_predictions }, or nil when off.
+function M.get_live_prompt()
+	return engine.get_live_prompt()
+end
+
+--- Rewrites the selection one step along the tone ladder (the llm_tone_*
+--- actions). The tone module logs and shows every refusal.
+--- @param direction number Tone.MORE_FORMAL or Tone.MORE_FAMILIAR.
+--- @param cycle boolean Whether to wrap around at the ends of the ladder.
+--- @param parent string|nil Stable action parent of the text actions.
+--- @return boolean started True when the selection is being read.
+function M.request_tone_step(direction, cycle, parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Tone step skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return ToneRewrite.step(direction, cycle, parent)
+end
+
+--- Reads the screen and offers answers in the prediction tooltip (the
+--- llm_screen_region, llm_screen_full and llm_screen_error actions). The
+--- screen-answer module logs and shows every refusal.
+--- @param value string The binding's parameter: "<backend>" or "<backend>|<model>".
+--- @param mode string ScreenAnswer.MODE_REGION or ScreenAnswer.MODE_FULL.
+--- @param parent string|nil Stable action parent of the screenshot actions.
+--- @param answers string ScreenAnswer.ANSWERS_SCREEN or ScreenAnswer.ANSWERS_ERROR.
+--- @return boolean started True when the screenshot is being taken.
+function M.request_screen_answers(value, mode, parent, answers)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Screen reading skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return ScreenAnswer.run(value, mode, parent, answers)
+end
+
+--- Translates the selection and offers the translation in the prediction
+--- tooltip (the llm_translate_selection action). The translation module logs
+--- and shows every refusal.
+--- @param value string The binding's parameter: "ui" or a locale code.
+--- @param parent string|nil Stable action parent of the text actions.
+--- @return boolean started True when the selection is being read.
+function M.request_selection_translation(value, parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Selection translation skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return SelectionTranslation.run(value, parent)
+end
+
+--- Offers the actions the selection implies (the llm_agent_selection action).
+--- The agent logs and shows every refusal.
+--- @param parent string|nil Stable action parent of the text actions.
+--- @return boolean started True when the selection is being read.
+function M.request_agent_selection(parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Agent on the selection skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return AgentRunner.run_selection(parent)
+end
+
+--- Asks for a command and offers the actions it implies (the llm_agent_command
+--- action). The agent logs and shows every refusal.
+--- @return boolean started True when the command dialog is about to open.
+function M.request_agent_command()
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Agent command skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return AgentRunner.run_command()
+end
+
+--- Switches the agent between its automatic mode and "on action" (the
+--- llm_agent_auto_toggle action).
+--- @return boolean changed True when the mode changed.
+function M.toggle_agent_auto()
+	return AgentRunner.toggle_auto()
 end
 
 --- Re-arms the LLM inactivity timer.

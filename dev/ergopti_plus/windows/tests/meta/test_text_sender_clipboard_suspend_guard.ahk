@@ -40,7 +40,9 @@ _TSCSG_ClipboardHasSuspendGuardBeforeWrite() {
 
 	ClipWaitPos := InStr(Body, "ClipWait(", true, WritePos)
 	SecondGuardPos := InStr(Body, "A_IsSuspended", true, ClipWaitPos)
-	AtomicPastePos := InStr(Body, '_AHK_SendInput.Bind("^v")', true, SecondGuardPos)
+	; A rewrite's erasure rides in the same atomic batch as the paste.
+	AtomicPastePos := InStr(Body,
+		'_AHK_SendInput.Bind(_TextSenderErasePrefix(Opts) . "^v")', true, SecondGuardPos)
 	FallbackPastePos := InStr(Body,
 		'_TextSenderSendInput("^v", "clipboard paste")', true, SecondGuardPos)
 	Assert(ClipWaitPos > WritePos and SecondGuardPos > ClipWaitPos,
