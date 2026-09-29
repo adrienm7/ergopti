@@ -25,6 +25,7 @@ class _SysActionsFake {
 	__New() {
 		this.Calls := []
 		this.Deferred := []
+		this.DeferDelays := []
 		this.Answer := "Cancel"
 		this.Active := ""
 		this.OwnPidValue := 4000
@@ -79,7 +80,7 @@ class _SysActionsFake {
 	Monitors() => this.MonitorList
 	MoveMouse(X, Y) => this._Log("MoveMouse", X, Y)
 	ClearClipboard() => this._Log("ClearClipboard")
-	Defer(Fn) => this.Deferred.Push(Fn)
+	Defer(Fn, DelayMs := 1) => (this.Deferred.Push(Fn), this.DeferDelays.Push(DelayMs))
 	Notify(Text) => this._Log("Notify", Text)
 	Ask(Text, Title) => (this._Log("Ask", Text, Title), this.Answer)
 }
@@ -152,9 +153,17 @@ Test("system actions: the catalogue confirms empty_trash and unblock_file_select
 ; ======================================
 ; ======================================
 
+; Powering the displays off at once let the release of the keys that fired the
+; action wake them straight back up.
 _SysActions_SleepDisplays() {
+	global GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS
 	Fake := _SysActionsFake()
 	GestureSysSleepDisplays(Fake)
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "PostBroadcast").Length, "nothing is powered off while the keys are held")
+	AssertEqual(1, Fake.Deferred.Length)
+	AssertEqual(GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS, Fake.DeferDelays[1], "the release happens first")
+	AssertTrue(GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS >= 500, "long enough for a chord to be released")
+	Fake.Deferred[1].Call()
 	Posts := _SysActions_CallsNamed(Fake, "PostBroadcast")
 	AssertEqual(1, Posts.Length)
 	AssertEqual(0x0112, Posts[1][2], "WM_SYSCOMMAND")

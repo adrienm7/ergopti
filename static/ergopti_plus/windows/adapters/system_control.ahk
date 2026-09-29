@@ -304,8 +304,9 @@ class SystemControl {
 	}
 
 	; Runs Fn in its own thread, after the current one returns.
-	Defer(Fn) {
-		SetTimer(Fn, -1)
+	; @param {Integer} DelayMs How long to wait first, in ms (positive).
+	Defer(Fn, DelayMs := 1) {
+		SetTimer(Fn, -DelayMs)
 	}
 
 	; Shows a short notice.

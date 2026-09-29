@@ -42,6 +42,9 @@
 global GESTURE_SYS_WM_SYSCOMMAND := 0x0112
 global GESTURE_SYS_SC_MONITORPOWER := 0xF170
 global GESTURE_SYS_MONITOR_OFF := 2
+; How long the displays stay on after sleep_displays fires: releasing the keys
+; that fired it is user input, which would wake them straight back up.
+global GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS := 1000
 
 ; Where Windows stores the app and system light/dark choice, and the settings
 ; area Explorer and the apps re-read it for.
@@ -140,10 +143,16 @@ GESTURE_ACTIONS["open_app"] := { Fn: (BindingId := "") => GestureSysOpenApp(Bind
 ; ======================================
 ; ======================================
 
-; Powers the monitors off, as their own sleep timeout does.
+; Powers the monitors off, as their own sleep timeout does, once the keys that
+; fired the action have had time to be released.
 GestureSysSleepDisplays(Sys := 0) {
-	global GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF
+	global GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS
 	Sys := _GestureSys(Sys)
+	Sys.Defer(_GestureSysPowerOffDisplays.Bind(Sys), GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS)
+}
+
+_GestureSysPowerOffDisplays(Sys) {
+	global GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF
 	if Sys.PostBroadcast(GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF)
 		LoggerInfo("gestures", "Displays put to sleep.")
 	else

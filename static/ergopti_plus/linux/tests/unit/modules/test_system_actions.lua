@@ -14,6 +14,8 @@
 --- 2. The catalogue's `confirm` field was read by no driver: a stray gesture
 ---    would have emptied the trash unasked.
 --- 3. The daemon holds the grabbed keyboard, so every command is backgrounded.
+--- 4. sleep_displays powered the displays off at once, so the release of the
+---    keys that fired it woke them straight back up.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -61,7 +63,8 @@ end
 
 local EXPECTED = {
 	show_desktop = "{ case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac; }",
-	sleep_displays = "{ xset dpms force off; }",
+	-- Powered off at once, the release of the triggering keys woke them again.
+	sleep_displays = "{ sleep 1 && xset dpms force off; }",
 	toggle_dark_mode = "{ case \"$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)\" in"
 		.. " *prefer-dark*) gsettings set org.gnome.desktop.interface color-scheme default;;"
 		.. " *) gsettings set org.gnome.desktop.interface color-scheme prefer-dark;; esac; }",
