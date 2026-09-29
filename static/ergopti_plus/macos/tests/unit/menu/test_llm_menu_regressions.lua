@@ -103,6 +103,20 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		end)
 	end)
 
+	-- The count used to be one key with an "s" injected after it, which no
+	-- language but French and English pluralises that way. The rows now read the
+	-- singular key for one and the plural key for every other count.
+	helpers.it("num_predictions rows read the one/other plural keys (llm-count-plural)", function()
+		with_count_menu(function(menu)
+			local rows = count_rows(menu)
+			helpers.assert_eq(#rows, 10)
+			helpers.assert_eq(rows[1].title, "1 prediction", "one reads the singular key")
+			for i = 2, 10 do
+				helpers.assert_eq(rows[i].title, i .. " predictions", "every other count reads the plural key")
+			end
+		end)
+	end)
+
 	helpers.it("val_modifiers alt+ctrl round-trips (comma string vs TOML array)", function()
 		local entry = load_contract_entry("val_modifiers")
 		local hs = entry.hs

@@ -778,8 +778,11 @@ local function create_menu(deps)
 				Logger.debug(LOG, "Building prediction count menu…")
 				local rows = {}
 				for i = 1, 10 do
+						-- One key per plural form: an injected "s" is French and English only.
+						local count_key = i == 1 and "menu.llm.prediction_count_label_one"
+							or "menu.llm.prediction_count_label_other"
 						table.insert(rows, {
-								label   = string.format(i18n.get("menu.llm.prediction_count_label"), i, i > 1 and "s" or ""),
+								label   = string.format(i18n.get(count_key), i),
 								checked = (state.llm_num_predictions == i),
 								action  = function()
 										Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
