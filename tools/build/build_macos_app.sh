@@ -722,10 +722,11 @@ codesign_app() {
 }
 
 # Zip the bundle as a release artefact. Sparkle expects a zip whose top-level
-# entry is the .app itself (no extra wrapping directory).
+# entry is the .app itself (no extra wrapping directory). -9 is still plain
+# deflate, which ditto, Sparkle and Homebrew extract unchanged, at a smaller size.
 zip_app() {
 	log "Zipping $APP_PATH → $ZIP_PATH"
-	(cd "$BUILD_DIR" && zip -qry "$(basename "$ZIP_PATH")" "$(basename "$APP_PATH")")
+	(cd "$BUILD_DIR" && zip -qry -9 "$(basename "$ZIP_PATH")" "$(basename "$APP_PATH")")
 	[ -f "$ZIP_PATH" ] || fail "Zip did not produce expected output."
 }
 

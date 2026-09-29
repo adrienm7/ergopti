@@ -511,6 +511,10 @@ function buildScriptProblems(source, externals) {
 			`${BUILD_REL}: the Karabiner-Elements installer is back in the bundle; onboarding downloads its own pinned DMG (platform/remap/onboarding.lua)`
 		);
 	}
+	// Maximum deflate is still the plain zip ditto, Sparkle and Homebrew read
+	if (!/^\t\(cd "\$BUILD_DIR" && zip -qry -9 /m.test(shellFunction(source, 'zip_app'))) {
+		problems.push(`${BUILD_REL}: zip_app() must compress the release archive with zip -9`);
+	}
 	for (const entry of externals) {
 		if (!source.includes(entry.owner)) {
 			problems.push(
@@ -549,7 +553,8 @@ const bypasses = [
 			stageLine,
 			`${stageLine}\tmkdir -p "$APP_PATH/Contents/Resources/Tools/Karabiner"\n`
 		)
-	]
+	],
+	['the archive back at default compression', BUILD.replace('zip -qry -9 ', 'zip -qry ')]
 ];
 for (const [label, mutated] of bypasses) {
 	check(mutated !== BUILD, `self-check: the staging call drifted; re-derive "${label}"`);
