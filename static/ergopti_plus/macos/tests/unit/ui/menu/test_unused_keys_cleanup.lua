@@ -214,6 +214,20 @@ helpers.with_stub_scope(MODULES, function()
 			end)
 		end)
 
+		helpers.it("unused keys: an empty [shortcuts.keys] key never discards the file (config-outdated-empty-key)", function()
+			-- Reporting "" raised inside the loader's pcall: the whole config.toml
+			-- was declared corrupt and the session ran on defaults.
+			local source = "[shortcuts.keys]\n\"\" = true\nctrl_s = true\n"
+			Sandbox.with_config(source, function(path)
+				local flat, status = Preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_eq(flat.shortcut_keys, { ctrl_s = true })
+				local scan = Cleanup.find(path, IoAdapter)
+				helpers.assert_eq(scan.status, "ok", "the preview must not fail on the entry it reports")
+				helpers.assert_eq(#scan.keys, 0, "a quoted key has no line the cleanup can cut")
+			end)
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
