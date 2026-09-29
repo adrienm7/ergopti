@@ -203,7 +203,8 @@ function buildRow(m) {
 		? _t('model_browser.status_installed') || 'Installé'
 		: _t('model_browser.status_available') || 'Disponible';
 
-	var typeKey = m.type === 'completion' ? 'model_browser.type_completion' : 'model_browser.type_chat';
+	var typeKey =
+		m.type === 'completion' ? 'model_browser.type_completion' : 'model_browser.type_chat';
 	var typeLabel = _t(typeKey) || (m.type === 'completion' ? 'Complétion' : 'Chat');
 	var typeClass = m.type === 'completion' ? 'chip completion' : 'chip';
 
@@ -234,7 +235,9 @@ function buildRow(m) {
 		_escHtml(typeLabel) +
 		'</span></td>' +
 		'<td class="center">' +
-		(m.url ? '<a class="src-link" data-url="' + _escHtml(m.url) + '" title="HuggingFace ↗">↗</a>' : '') +
+		(m.url
+			? '<a class="src-link" data-url="' + _escHtml(m.url) + '" title="HuggingFace ↗">↗</a>'
+			: '') +
 		'</td>';
 
 	tr.onclick = function (ev) {

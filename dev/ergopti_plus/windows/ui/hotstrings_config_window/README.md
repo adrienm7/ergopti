@@ -6,9 +6,9 @@ Native Gui v2 editor for per-group and per-section hotstring configuration (expa
 
 ## Key files
 
-| File       | Description                                                                |
-| ---------- | -------------------------------------------------------------------------- |
-| `init.ahk` | `HCW_Show()` — opens or focuses the singleton; owns all Gui controls       |
+| File       | Description                                                          |
+| ---------- | -------------------------------------------------------------------- |
+| `init.ahk` | `HCW_Show()` — opens or focuses the singleton; owns all Gui controls |
 
 ## Usage
 

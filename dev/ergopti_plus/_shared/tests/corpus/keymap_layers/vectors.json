@@ -227,7 +227,9 @@
 			"os": "macos",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
 			"expected": {
-				"errors": ["unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"],
+				"errors": [
+					"unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"
+				],
 				"layers": {
 					"nav": {
 						"CapsLock": "keystroke:Backspace@repeat",
@@ -249,7 +251,9 @@
 			"os": "linux",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
 			"expected": {
-				"errors": ["unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"],
+				"errors": [
+					"unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"
+				],
 				"layers": {
 					"nav": {
 						"CapsLock": "keystroke:Backspace@repeat",
@@ -270,7 +274,10 @@
 			"description": "However a chord names its modifiers, it resolves ctrl, alt, shift, meta, fn.",
 			"os": "windows",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyA\" = \"keystroke:meta+shift+alt+ctrl+ArrowUp\"\n",
-			"expected": { "errors": [], "layers": { "nav": { "KeyA": "keystroke:ctrl+alt+shift+meta+ArrowUp" } } }
+			"expected": {
+				"errors": [],
+				"layers": { "nav": { "KeyA": "keystroke:ctrl+alt+shift+meta+ArrowUp" } }
+			}
 		},
 		{
 			"id": "fn_resolves_on_macos",
@@ -294,14 +301,22 @@
 			"description": "On macOS the macos table wins for its key; the other keys keep the all entry.",
 			"os": "macos",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyJ\" = \"word_prev\"\n\"KeyK\" = \"arrow_left\"\n\n[layers.nav.macos]\n\"KeyJ\" = \"arrow_up\"\n",
-			"expected": { "errors": [], "layers": { "nav": { "KeyJ": "keystroke:ArrowUp@repeat", "KeyK": "keystroke:ArrowLeft@repeat" } } }
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": { "KeyJ": "keystroke:ArrowUp@repeat", "KeyK": "keystroke:ArrowLeft@repeat" }
+				}
+			}
 		},
 		{
 			"id": "other_os_entry_leaves_the_all_entry",
 			"description": "On Windows a macos entry changes nothing.",
 			"os": "windows",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyJ\" = \"word_prev\"\n\n[layers.nav.macos]\n\"KeyJ\" = \"arrow_up\"\n",
-			"expected": { "errors": [], "layers": { "nav": { "KeyJ": "keystroke:ctrl+ArrowLeft@repeat" } } }
+			"expected": {
+				"errors": [],
+				"layers": { "nav": { "KeyJ": "keystroke:ctrl+ArrowLeft@repeat" } }
+			}
 		},
 		{
 			"id": "invalid_os_entry_does_not_fall_back",
@@ -402,7 +417,9 @@
 			"os": "macos",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
 			"expected": {
-				"errors": ["unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_windows_only"],
+				"errors": [
+					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_windows_only"
+				],
 				"layers": {
 					"nav": {
 						"MouseMiddle": "keystroke:Escape@repeat"
@@ -461,7 +478,9 @@
 			"toml": "﻿[_meta]\r\nschema_version = 1\r\n\r\n[layers.nav.all]\r\n\"KeyK\" = \"arrow_left\" # left\r\n\"KeyL\"=\"arrow_right\"#right\r\n",
 			"expected": {
 				"errors": [],
-				"layers": { "nav": { "KeyK": "keystroke:ArrowLeft@repeat", "KeyL": "keystroke:ArrowRight@repeat" } }
+				"layers": {
+					"nav": { "KeyK": "keystroke:ArrowLeft@repeat", "KeyL": "keystroke:ArrowRight@repeat" }
+				}
 			}
 		},
 		{

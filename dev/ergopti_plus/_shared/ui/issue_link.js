@@ -58,7 +58,8 @@
 		var bytes;
 		if (cp < 0x80) bytes = [cp];
 		else if (cp < 0x800) bytes = [0xc0 | (cp >> 6), 0x80 | (cp & 0x3f)];
-		else if (cp < 0x10000) bytes = [0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f)];
+		else if (cp < 0x10000)
+			bytes = [0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f)];
 		else {
 			bytes = [
 				0xf0 | (cp >> 18),

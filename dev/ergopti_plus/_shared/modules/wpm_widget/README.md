@@ -13,17 +13,17 @@ Refresh rates, the colour hold and the idle hide are timings, and live in
 
 ## Key files
 
-| File             | Description                                                                  |
-| ---------------- | ---------------------------------------------------------------------------- |
-| `constants.toml` | Pill and graph geometry, colours, neutral sources, opacity, menu bar style   |
+| File             | Description                                                                |
+| ---------------- | -------------------------------------------------------------------------- |
+| `constants.toml` | Pill and graph geometry, colours, neutral sources, opacity, menu bar style |
 
 ## Driver implementations
 
-| Driver  | Consumer                                                                                   |
-| ------- | ------------------------------------------------------------------------------------------ |
+| Driver  | Consumer                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------- |
 | macOS   | `macos/ui/wpm/{wpm_widget,wpm_menubar,shared}.lua` through `_shared/lua/wpm_widget/model.lua` |
-| Linux   | `linux/ui/wpm/{widget,tray_readout}.lua` through `_shared/lua/wpm_widget/model.lua`         |
-| Windows | `windows/ui/wpm/wpm_config.ahk` (`WPMWidget_LoadSharedConst`)                              |
+| Linux   | `linux/ui/wpm/{widget,tray_readout}.lua` through `_shared/lua/wpm_widget/model.lua`           |
+| Windows | `windows/ui/wpm/wpm_config.ahk` (`WPMWidget_LoadSharedConst`)                                 |
 
 The two Lua drivers also share every decision the readouts make — colours per
 source, the graph's curve, when to show, the default place — in

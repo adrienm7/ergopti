@@ -153,7 +153,11 @@ function resolveSystemPrompt(profile, vars = {}) {
 		return { system: profile.raw_prompt, is_batch: false };
 	}
 
-	const isBatch = profile.batch === true && n > 1 && typeof profile.system_multi_template === 'string' && profile.system_multi_template !== '';
+	const isBatch =
+		profile.batch === true &&
+		n > 1 &&
+		typeof profile.system_multi_template === 'string' &&
+		profile.system_multi_template !== '';
 
 	const base = typeof profile.system_single === 'string' ? profile.system_single : null;
 	if (!base) return { system: null, is_batch: isBatch };
@@ -181,10 +185,10 @@ function resolveSystemPrompt(profile, vars = {}) {
 		min_words: String(minWords),
 		max_words: String(maxWords),
 		n: String(n),
-		language,
+		language
 	};
 	const system = template.replace(/\{(\w+)\}/g, (match, name) =>
-		Object.hasOwn(values, name) ? values[name] : match,
+		Object.hasOwn(values, name) ? values[name] : match
 	);
 
 	return { system, is_batch: isBatch };

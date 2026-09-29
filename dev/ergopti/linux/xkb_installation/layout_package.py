@@ -83,9 +83,7 @@ def resolve_roots() -> InstallerRoots:
     cache_dir = os.environ.get(ENV_CACHE_DIR)
     sandboxed = bool(extensions_root or system_root or cache_dir)
     return InstallerRoots(
-        extensions_root=Path(extensions_root)
-        if extensions_root
-        else DEFAULT_EXTENSIONS_ROOT,
+        extensions_root=Path(extensions_root) if extensions_root else DEFAULT_EXTENSIONS_ROOT,
         system_root=Path(system_root) if system_root else DEFAULT_SYSTEM_ROOT,
         cache_dir=Path(cache_dir) if cache_dir else DEFAULT_CACHE_DIR,
         sandboxed=sandboxed,
@@ -258,8 +256,11 @@ def stale_x11_keymap(text: str | None, installed: LayoutSpec) -> LayoutSpec | No
         return None
     if configured.layout == installed.layout and configured.variant == installed.variant:
         return None
-    if (installed.layout == PACKAGE_NAME and installed.variant in SUPPORTED_VARIANTS
-            and configured == LayoutSpec("fr", installed.variant)):
+    if (
+        installed.layout == PACKAGE_NAME
+        and installed.variant in SUPPORTED_VARIANTS
+        and configured == LayoutSpec("fr", installed.variant)
+    ):
         return None
     return configured
 
@@ -408,10 +409,10 @@ def build_french_variant_symbols(variant_id: str, layout_id: str) -> str:
     Other named French sections continue resolving through the include paths.
     """
     return (
-        'default partial alphanumeric_keys\n'
+        "default partial alphanumeric_keys\n"
         'xkb_symbols "ergopti_system_default" {\n'
         '    include "%S/fr"\n'
-        '};\n\n'
+        "};\n\n"
     ) + build_variant_symbols(variant_id, layout_id)
 
 
@@ -433,17 +434,14 @@ def build_evdev_post(layout_id: str, variant_id: str = "") -> str:
     falls back to ONE_LEVEL (dead Shift and AltGr, issue #84).
     """
     identifier = validate_component_identifier(layout_id)
-    sections = ["! layout\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"]
+    sections = [f"! layout\t=\ttypes\n  {identifier}\t=\t+{identifier}\n"]
     for index in range(1, MAX_XKB_LAYOUTS + 1):
-        sections.append(
-            f"! layout[{index}]\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"
-        )
+        sections.append(f"! layout[{index}]\t=\ttypes\n  {identifier}\t=\t+{identifier}\n")
     if variant_id:
         variant = validate_component_identifier(variant_id)
         for suffix in [""] + [f"[{index}]" for index in range(1, MAX_XKB_LAYOUTS + 1)]:
             sections.append(
-                f"! layout{suffix} variant{suffix}\t=\ttypes\n"
-                f"  fr {variant}\t=\t+{identifier}\n"
+                f"! layout{suffix} variant{suffix}\t=\ttypes\n  fr {variant}\t=\t+{identifier}\n"
             )
     return "".join(sections)
 
@@ -538,9 +536,7 @@ def validate_layout_files(symbols_content: str, types_content: str) -> list[str]
     referenced = extract_referenced_types(symbols_content)
     defined = extract_defined_types(types_content)
     for name in sorted(referenced - defined):
-        errors.append(
-            f"symbols reference undefined key type '{name}'"
-        )
+        errors.append(f"symbols reference undefined key type '{name}'")
     if referenced and not defined:
         errors.append("types file defines no key type at all")
     return errors
@@ -625,9 +621,7 @@ def keymap_key_symbols(keymap: str, key: str, group: int = 1) -> list[str]:
     block = keymap_key_block(keymap, key)
     if block is None:
         return []
-    match = re.search(
-        r"symbols\[\s*(?:Group)?" + str(group) + r"\s*\]\s*=\s*\[([^\]]*)\]", block
-    )
+    match = re.search(r"symbols\[\s*(?:Group)?" + str(group) + r"\s*\]\s*=\s*\[([^\]]*)\]", block)
     if not match:
         return []
     return [part.strip() for part in match.group(1).split(",") if part.strip()]
@@ -645,9 +639,7 @@ def keymap_type_level(keymap: str, type_name: str, modifier: str) -> int | None:
     block = keymap_type_block(keymap, type_name)
     if block is None:
         return None
-    match = re.search(
-        r"map\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*(?:Level)?(\d+)", block
-    )
+    match = re.search(r"map\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*(?:Level)?(\d+)", block)
     return int(match.group(1)) if match else None
 
 
@@ -658,7 +650,11 @@ def keymap_type_preserves(keymap: str, type_name: str, modifier: str) -> bool:
         return False
     return (
         re.search(
-            r"preserve\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*" + re.escape(modifier) + r"\b",
+            r"preserve\s*\[\s*"
+            + re.escape(modifier)
+            + r"\s*\]\s*=\s*"
+            + re.escape(modifier)
+            + r"\b",
             block,
         )
         is not None
@@ -717,9 +713,7 @@ def insert_type_sections(destination: str, source: str) -> tuple[str, list[str]]
     for match in _TYPE_BLOCK_RE.finditer(source):
         name = match.group(1)
         block = match.group(0)
-        existing = re.compile(
-            r'type\s+"' + re.escape(name) + r'"\s*\{.*?\};', re.DOTALL
-        )
+        existing = re.compile(r'type\s+"' + re.escape(name) + r'"\s*\{.*?\};', re.DOTALL)
         if existing.search(content):
             content = existing.sub(lambda _m, b=block: b, content, count=1)
         else:
@@ -849,7 +843,7 @@ def pristine_backup(target: Path) -> Path | None:
     """The ``.1`` snapshot taken before the very first legacy modification."""
     numbered: list[tuple[int, Path]] = []
     for candidate in target.parent.glob(f"{target.name}.*"):
-        suffix = candidate.name[len(target.name) + 1:]
+        suffix = candidate.name[len(target.name) + 1 :]
         if suffix.isdigit():
             numbered.append((int(suffix), candidate))
     if not numbered:
@@ -888,9 +882,7 @@ def retire_legacy_installation(system_root: Path) -> list[str]:
         if backup is None:
             continue
         try:
-            still_ours = "ergopti" in target.read_text(
-                encoding="utf-8", errors="replace"
-            ).lower()
+            still_ours = "ergopti" in target.read_text(encoding="utf-8", errors="replace").lower()
         except OSError:
             continue
         if still_ours:
@@ -903,7 +895,7 @@ def retire_legacy_installation(system_root: Path) -> list[str]:
                 continue
             retired.append("/".join(parts))
         for candidate in sorted(target.parent.glob(f"{target.name}.*")):
-            suffix = candidate.name[len(target.name) + 1:]
+            suffix = candidate.name[len(target.name) + 1 :]
             if suffix.isdigit():
                 try:
                     candidate.unlink()

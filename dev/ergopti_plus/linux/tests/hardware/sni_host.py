@@ -111,8 +111,13 @@ def main():
                 items.append((sender, service))
             else:
                 items.append((service, "/StatusNotifierItem"))
-            conn.emit_signal(None, "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
-                             "StatusNotifierItemRegistered", GLib.Variant("(s)", (service,)))
+            conn.emit_signal(
+                None,
+                "/StatusNotifierWatcher",
+                "org.kde.StatusNotifierWatcher",
+                "StatusNotifierItemRegistered",
+                GLib.Variant("(s)", (service,)),
+            )
             GLib.timeout_add(int(args.settle * 1000), inspect)
         invocation.return_value(None)
 
@@ -126,9 +131,17 @@ def main():
         return None
 
     def get_prop(name, path, prop):
-        reply = bus.call_sync(name, path, "org.freedesktop.DBus.Properties", "Get",
-                              GLib.Variant("(ss)", ("org.kde.StatusNotifierItem", prop)),
-                              GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, 5000, None)
+        reply = bus.call_sync(
+            name,
+            path,
+            "org.freedesktop.DBus.Properties",
+            "Get",
+            GLib.Variant("(ss)", ("org.kde.StatusNotifierItem", prop)),
+            GLib.VariantType("(v)"),
+            Gio.DBusCallFlags.NONE,
+            5000,
+            None,
+        )
         return reply.unpack()[0]
 
     def inspect():
@@ -144,10 +157,17 @@ def main():
                     item.setdefault("errors", []).append(f"{prop}: {err.message}")
             labels = []
             if item.get("Menu"):
-                layout = bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "GetLayout",
-                                       GLib.Variant("(iias)", (0, -1, [])),
-                                       GLib.VariantType("(u(ia{sv}av))"),
-                                       Gio.DBusCallFlags.NONE, 5000, None)
+                layout = bus.call_sync(
+                    name,
+                    item["Menu"],
+                    "com.canonical.dbusmenu",
+                    "GetLayout",
+                    GLib.Variant("(iias)", (0, -1, [])),
+                    GLib.VariantType("(u(ia{sv}av))"),
+                    Gio.DBusCallFlags.NONE,
+                    5000,
+                    None,
+                )
                 tree = layout.unpack()[1]
                 rows = menu_rows(tree)
                 labels = [label for _, label in rows]
@@ -155,63 +175,129 @@ def main():
                 # then fetches row properties in a separate batched request.
                 # A full GetLayout alone does not exercise its submenu path.
                 structure = bus.call_sync(
-                    name, item["Menu"], "com.canonical.dbusmenu", "GetLayout",
+                    name,
+                    item["Menu"],
+                    "com.canonical.dbusmenu",
+                    "GetLayout",
                     GLib.Variant("(iias)", (0, -1, ["type", "children-display"])),
                     GLib.VariantType("(u(ia{sv}av))"),
-                    Gio.DBusCallFlags.NONE, 5000, None).unpack()[1]
+                    Gio.DBusCallFlags.NONE,
+                    5000,
+                    None,
+                ).unpack()[1]
                 ids = [node[0] for node in menu_nodes(structure)]
                 grouped = bus.call_sync(
-                    name, item["Menu"], "com.canonical.dbusmenu", "GetGroupProperties",
-                    GLib.Variant("(aias)", (ids, [])), GLib.VariantType("(a(ia{sv}))"),
-                    Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
+                    name,
+                    item["Menu"],
+                    "com.canonical.dbusmenu",
+                    "GetGroupProperties",
+                    GLib.Variant("(aias)", (ids, [])),
+                    GLib.VariantType("(a(ia{sv}))"),
+                    Gio.DBusCallFlags.NONE,
+                    5000,
+                    None,
+                ).unpack()[0]
                 properties_by_id = dict(grouped)
                 for row_id, expected_properties, _ in menu_nodes(tree):
                     observed = properties_by_id.get(row_id, {})
-                    for key, default in (("label", ""), ("visible", True), ("enabled", True),
-                                         ("children-display", "")):
+                    for key, default in (
+                        ("label", ""),
+                        ("visible", True),
+                        ("enabled", True),
+                        ("children-display", ""),
+                    ):
                         if observed.get(key, default) != expected_properties.get(key, default):
                             report["failures"].append(
-                                f"GNOME grouped property {key!r} differs for row {row_id}")
+                                f"GNOME grouped property {key!r} differs for row {row_id}"
+                            )
                 if set(ids) != {node[0] for node in menu_nodes(tree)}:
                     report["failures"].append("GNOME filtered layout loses menu descendants")
                 item["gnome_grouped_rows"] = len(grouped)
                 for expected in args.expect_submenu:
-                    matches = [node for node in menu_nodes(tree)
-                               if node[1].get("label", "").replace("_", "") == expected]
+                    matches = [
+                        node
+                        for node in menu_nodes(tree)
+                        if node[1].get("label", "").replace("_", "") == expected
+                    ]
                     if len(matches) != 1:
-                        report["failures"].append(f"expected one submenu {expected!r}, got {len(matches)}")
+                        report["failures"].append(
+                            f"expected one submenu {expected!r}, got {len(matches)}"
+                        )
                         continue
                     row_id, properties, _ = matches[0]
                     if properties.get("children-display") != "submenu":
-                        report["failures"].append(f"{expected!r} does not advertise submenu children")
+                        report["failures"].append(
+                            f"{expected!r} does not advertise submenu children"
+                        )
                     # GNOME sends opened, then asks about the submenu.
                     # Repeat after closing: a single root GetLayout misses a
                     # menu whose first open or subsequent reopen is empty.
                     for _ in range(2):
-                        bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "Event",
-                                      GLib.Variant("(isvu)", (row_id, "opened", GLib.Variant("i", 0), 0)),
-                                      None, Gio.DBusCallFlags.NONE, 5000, None)
-                        bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "AboutToShow",
-                                      GLib.Variant("(i)", (row_id,)), GLib.VariantType("(b)"),
-                                      Gio.DBusCallFlags.NONE, 5000, None)
-                        subtree = bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "GetLayout",
-                                                GLib.Variant("(iias)", (row_id, -1, [])),
-                                                GLib.VariantType("(u(ia{sv}av))"),
-                                                Gio.DBusCallFlags.NONE, 5000, None).unpack()[1]
+                        bus.call_sync(
+                            name,
+                            item["Menu"],
+                            "com.canonical.dbusmenu",
+                            "Event",
+                            GLib.Variant("(isvu)", (row_id, "opened", GLib.Variant("i", 0), 0)),
+                            None,
+                            Gio.DBusCallFlags.NONE,
+                            5000,
+                            None,
+                        )
+                        bus.call_sync(
+                            name,
+                            item["Menu"],
+                            "com.canonical.dbusmenu",
+                            "AboutToShow",
+                            GLib.Variant("(i)", (row_id,)),
+                            GLib.VariantType("(b)"),
+                            Gio.DBusCallFlags.NONE,
+                            5000,
+                            None,
+                        )
+                        subtree = bus.call_sync(
+                            name,
+                            item["Menu"],
+                            "com.canonical.dbusmenu",
+                            "GetLayout",
+                            GLib.Variant("(iias)", (row_id, -1, [])),
+                            GLib.VariantType("(u(ia{sv}av))"),
+                            Gio.DBusCallFlags.NONE,
+                            5000,
+                            None,
+                        ).unpack()[1]
                         if not any(child_id != row_id for child_id, _ in menu_rows(subtree)):
-                            report["failures"].append(f"{expected!r} opens with no visible children")
+                            report["failures"].append(
+                                f"{expected!r} opens with no visible children"
+                            )
                             item.setdefault("empty_submenus", []).append(subtree)
-                        bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "Event",
-                                      GLib.Variant("(isvu)", (row_id, "closed", GLib.Variant("i", 0), 0)),
-                                      None, Gio.DBusCallFlags.NONE, 5000, None)
+                        bus.call_sync(
+                            name,
+                            item["Menu"],
+                            "com.canonical.dbusmenu",
+                            "Event",
+                            GLib.Variant("(isvu)", (row_id, "closed", GLib.Variant("i", 0), 0)),
+                            None,
+                            Gio.DBusCallFlags.NONE,
+                            5000,
+                            None,
+                        )
                 if args.click_label:
                     target = [row_id for row_id, label in rows if label == args.click_label]
                     if not target:
                         report["failures"].append(f"no row labelled {args.click_label!r} to click")
                     else:
-                        bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "Event",
-                                      GLib.Variant("(isvu)", (target[0], "clicked", GLib.Variant("i", 0), 0)),
-                                      None, Gio.DBusCallFlags.NONE, 5000, None)
+                        bus.call_sync(
+                            name,
+                            item["Menu"],
+                            "com.canonical.dbusmenu",
+                            "Event",
+                            GLib.Variant("(isvu)", (target[0], "clicked", GLib.Variant("i", 0), 0)),
+                            None,
+                            Gio.DBusCallFlags.NONE,
+                            5000,
+                            None,
+                        )
                         item["clicked"] = args.click_label
             item["labels"] = labels
         except GLib.Error as err:
@@ -219,23 +305,33 @@ def main():
         report["registered"].append(item)
 
         if item.get("Status") != "Active":
-            report["failures"].append(f"item status is {item.get('Status')!r}, not 'Active' — panels hide it")
+            report["failures"].append(
+                f"item status is {item.get('Status')!r}, not 'Active' — panels hide it"
+            )
         icon = item.get("IconName") or ""
         if not icon:
             report["failures"].append("the item has no IconName — a blank, unclickable panel slot")
         if icon and not icon.startswith("/") and ("/" in icon or icon.startswith(".")):
             # The panel is another process with another working directory: a
             # relative path resolves to nothing there, whatever it names here.
-            report["failures"].append(f"icon {icon!r} is a relative path — the panel cannot resolve it")
+            report["failures"].append(
+                f"icon {icon!r} is a relative path — the panel cannot resolve it"
+            )
         if args.expect_icon_file:
             theme = item.get("IconThemePath") or ""
-            candidates = [icon] if icon.startswith("/") else [
-                os.path.join(theme, icon + ext) for ext in (".png", ".svg", "")]
+            candidates = (
+                [icon]
+                if icon.startswith("/")
+                else [os.path.join(theme, icon + ext) for ext in (".png", ".svg", "")]
+            )
             if not any(os.path.isfile(c) for c in candidates):
                 report["failures"].append(
-                    f"icon {icon!r} (theme path {theme!r}) is not the bundled Ergopti logo file")
+                    f"icon {icon!r} (theme path {theme!r}) is not the bundled Ergopti logo file"
+                )
         if len(labels) < args.min_labels:
-            report["failures"].append(f"the menu has {len(labels)} row(s), expected at least {args.min_labels}")
+            report["failures"].append(
+                f"the menu has {len(labels)} row(s), expected at least {args.min_labels}"
+            )
         if args.forbid_raw_keys:
             raw = [label for label in labels if re.fullmatch(r"[a-z_]+(\.[a-z0-9_]+)+", label)]
             if raw:
@@ -250,9 +346,17 @@ def main():
             if len(targets) != 1:
                 report["failures"].append(f"expected one rebuild row {args.rebuild_label!r}")
             else:
-                bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "Event",
-                              GLib.Variant("(isvu)", (targets[0], "clicked", GLib.Variant("i", 0), 0)),
-                              None, Gio.DBusCallFlags.NONE, 5000, None)
+                bus.call_sync(
+                    name,
+                    item["Menu"],
+                    "com.canonical.dbusmenu",
+                    "Event",
+                    GLib.Variant("(isvu)", (targets[0], "clicked", GLib.Variant("i", 0), 0)),
+                    None,
+                    Gio.DBusCallFlags.NONE,
+                    5000,
+                    None,
+                )
                 rebuilt = True
                 # Let the panel consume the published replacement, then fetch
                 # fresh item IDs and exercise every submenu and click again.
@@ -271,8 +375,9 @@ def main():
         report["failures"].append("could not own org.kde.StatusNotifierWatcher")
         loop.quit()
 
-    Gio.bus_own_name_on_connection(bus, "org.kde.StatusNotifierWatcher",
-                                   Gio.BusNameOwnerFlags.NONE, on_acquired, on_lost)
+    Gio.bus_own_name_on_connection(
+        bus, "org.kde.StatusNotifierWatcher", Gio.BusNameOwnerFlags.NONE, on_acquired, on_lost
+    )
 
     def on_timeout():
         report["failures"].append(f"no tray item registered within {args.timeout:.0f} s")

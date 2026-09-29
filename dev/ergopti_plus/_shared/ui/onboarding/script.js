@@ -375,7 +375,9 @@ function renderStep5() {
 		document.getElementById('s5-register-section').textContent = _t(
 			'onboarding.gestures.register_section'
 		);
-		document.getElementById('s5-register-auto').textContent = _t('onboarding.gestures.register_auto');
+		document.getElementById('s5-register-auto').textContent = _t(
+			'onboarding.gestures.register_auto'
+		);
 		document.getElementById('s5-register-auto-hint').textContent = _t(
 			'onboarding.gestures.register_auto_hint'
 		);
@@ -410,7 +412,9 @@ function _updateGestureRegisterVisibility() {
 window.setGestureRegisterStatus = function (ok) {
 	var el = document.getElementById('s5-register-status');
 	if (!el) return;
-	el.textContent = _t(ok ? 'onboarding.gestures.register_success' : 'onboarding.gestures.register_failed');
+	el.textContent = _t(
+		ok ? 'onboarding.gestures.register_success' : 'onboarding.gestures.register_failed'
+	);
 	el.classList.remove('hidden');
 	el.classList.toggle('register-ok', !!ok);
 	el.classList.toggle('register-err', !ok);

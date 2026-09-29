@@ -17,14 +17,23 @@
 		{
 			"id": "multi_line_values",
 			"input": {
-				"recent_issues": ["2026-09-23 10:00:01:002 [ERROR] [Probe] boom\nstack traceback:\n\tinit.lua:12", "2026-09-23 10:00:02:003 [WARNING] [Layout] next"]
+				"recent_issues": [
+					"2026-09-23 10:00:01:002 [ERROR] [Probe] boom\nstack traceback:\n\tinit.lua:12",
+					"2026-09-23 10:00:02:003 [WARNING] [Layout] next"
+				]
 			},
 			"expected": "recent_issues:\n  - 2026-09-23 10:00:01:002 [ERROR] [Probe] boom\n    stack traceback:\n    \tinit.lua:12\n  - 2026-09-23 10:00:02:003 [WARNING] [Layout] next"
 		},
 		{
 			"id": "list_of_tables",
 			"input": {
-				"coverage": { "entries": [{ "path": "gestures", "reason": "macOS only" }, { "path": "apps", "reason": "not here" }], "total": 2 }
+				"coverage": {
+					"entries": [
+						{ "path": "gestures", "reason": "macOS only" },
+						{ "path": "apps", "reason": "not here" }
+					],
+					"total": 2
+				}
 			},
 			"expected": "coverage:\n  entries:\n    -\n      path: gestures\n      reason: macOS only\n    -\n      path: apps\n      reason: not here\n  total: 2"
 		}
@@ -32,13 +41,29 @@
 	"markdown_vectors": [
 		{
 			"id": "report_document",
-			"info": { "version": "2.1.0", "commit": "f58d15798 (build)", "os": "Linux | Fedora\n41", "driver": "linux", "generated_utc": "2026-09-23T10:00:00Z", "warn_count": 2, "err_count": 0 },
+			"info": {
+				"version": "2.1.0",
+				"commit": "f58d15798 (build)",
+				"os": "Linux | Fedora\n41",
+				"driver": "linux",
+				"generated_utc": "2026-09-23T10:00:00Z",
+				"warn_count": 2,
+				"err_count": 0
+			},
 			"body": "version: 2.1.0",
 			"expected": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit | f58d15798 (build) |\n| OS | Linux \\| Fedora 41 |\n| Driver | linux |\n| Generated (UTC) | 2026-09-23T10:00:00Z |\n| Warnings / errors this session | 2 / 0 |\n\n```text\nversion: 2.1.0\n```\n"
 		},
 		{
 			"id": "fence_outgrows_backticks",
-			"info": { "version": "2.1.0", "commit": "", "os": "macOS", "driver": "macos", "generated_utc": "2026-09-23T10:00:00Z", "warn_count": 0, "err_count": 0 },
+			"info": {
+				"version": "2.1.0",
+				"commit": "",
+				"os": "macOS",
+				"driver": "macos",
+				"generated_utc": "2026-09-23T10:00:00Z",
+				"warn_count": 0,
+				"err_count": 0
+			},
 			"body": "last_error: a ```` fenced ``` value",
 			"expected": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit |  |\n| OS | macOS |\n| Driver | macos |\n| Generated (UTC) | 2026-09-23T10:00:00Z |\n| Warnings / errors this session | 0 / 0 |\n\n`````text\nlast_error: a ```` fenced ``` value\n`````\n"
 		}

@@ -6,13 +6,13 @@ Coordinates communication with local (Ollama, MLX) and remote LLM backends. Mana
 
 ## Ports used (`_shared/core/ports/`)
 
-| Port               | Usage                                                                      |
-| ------------------ | -------------------------------------------------------------------------- |
-| `HttpClient`       | REST calls to Ollama/MLX APIs and remote endpoints                         |
+| Port               | Usage                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| `HttpClient`       | REST calls to Ollama/MLX APIs and remote endpoints                                 |
 | `FileSystem`       | Reading `_shared/modules/llm/defaults.json` and shell-script dependency installers |
-| `TimerScheduler`   | Debounce timer between keystrokes and the actual LLM request               |
-| `TooltipRenderer`  | Streaming token display during prediction                                  |
-| `ProcessLifecycle` | Launching and watching the Ollama/MLX background process                   |
+| `TimerScheduler`   | Debounce timer between keystrokes and the actual LLM request                       |
+| `TooltipRenderer`  | Streaming token display during prediction                                          |
+| `ProcessLifecycle` | Launching and watching the Ollama/MLX background process                           |
 
 ## Domain module (`_shared/core/domain/`)
 

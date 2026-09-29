@@ -32,9 +32,7 @@ def check_keyboard_element_children(body: str) -> None:
     at least one <modifierMap> and <keyMapSet>,
     and at most one <actions> and <terminators>.
     """
-    logger.info(
-        "%s🔹 Checking <keyboard> element children structure…", LOGS_INDENTATION
-    )
+    logger.info("%s🔹 Checking <keyboard> element children structure…", LOGS_INDENTATION)
     match = re.search(r"<keyboard[^>]*>(.*)</keyboard>", body, flags=re.DOTALL)
     if not match:
         raise ValueError("No <keyboard> block found.")
@@ -48,9 +46,7 @@ def check_keyboard_element_children(body: str) -> None:
     terminators = re.findall(r"<terminators[ >]", inner)
 
     if len(layouts) != 1:
-        raise ValueError(
-            f"<keyboard> must contain exactly one <layouts> (found {len(layouts)})"
-        )
+        raise ValueError(f"<keyboard> must contain exactly one <layouts> (found {len(layouts)})")
     if len(modifiermaps) < 1:
         raise ValueError("<keyboard> must contain at least one <modifierMap>.")
     if len(keymapsets) < 1:
@@ -74,14 +70,10 @@ def check_required_blocks_presence(body: str) -> None:
     required = ["keyMapSet", "actions", "terminators"]
     for block in required:
         if not re.search(rf"<{block}[^>]*>", body):
-            logger.error(
-                "%sRequired block <%s> missing.", LOGS_INDENTATION + "\t", block
-            )
+            logger.error("%sRequired block <%s> missing.", LOGS_INDENTATION + "\t", block)
             raise ValueError(f"Required block <{block}> missing.")
 
-    logger.success(
-        "%sAll required blocks are present.", LOGS_INDENTATION + "\t"
-    )
+    logger.success("%sAll required blocks are present.", LOGS_INDENTATION + "\t")
 
 
 def check_forbidden_tags_or_attributes(body: str) -> None:
@@ -129,20 +121,14 @@ def check_forbidden_tags_or_attributes(body: str) -> None:
     }
     for tag in re.findall(r"<(/?)(\w+)", body):
         if tag[1] not in allowed_tags:
-            logger.error(
-                "%sForbidden tag: <%s>.", LOGS_INDENTATION + "\t", tag[1]
-            )
+            logger.error("%sForbidden tag: <%s>.", LOGS_INDENTATION + "\t", tag[1])
             raise ValueError(f"Forbidden tag: <{tag[1]}>.")
     for attr in re.findall(r"(\w+)=", body):
         if attr not in allowed_attrs:
-            logger.error(
-                "%sForbidden attribute: %s.", LOGS_INDENTATION + "\t", attr
-            )
+            logger.error("%sForbidden attribute: %s.", LOGS_INDENTATION + "\t", attr)
             raise ValueError(f"Forbidden attribute: {attr}.")
 
-    logger.success(
-        "%sNo forbidden tags or attributes.", LOGS_INDENTATION + "\t"
-    )
+    logger.success("%sNo forbidden tags or attributes.", LOGS_INDENTATION + "\t")
 
 
 def check_forbidden_empty_attribute_values(body: str) -> None:
@@ -179,9 +165,7 @@ def check_forbidden_empty_attribute_values(body: str) -> None:
                     )
                     raise ValueError(f"Empty value for attribute {attr}.")
 
-    logger.success(
-        "%sNo forbidden empty attribute values.", LOGS_INDENTATION + "\t"
-    )
+    logger.success("%sNo forbidden empty attribute values.", LOGS_INDENTATION + "\t")
 
 
 def check_keyboard_id_format(body: str) -> None:
@@ -204,9 +188,7 @@ def check_keyboard_id_format(body: str) -> None:
         )
 
     if not rest.isdigit():
-        raise ValueError(
-            f"<keyboard> id part after '-' is not all digits: {rest}"
-        )
+        raise ValueError(f"<keyboard> id part after '-' is not all digits: {rest}")
 
     logger.success("%s<keyboard> id format is valid.", LOGS_INDENTATION + "\t")
 
@@ -225,9 +207,7 @@ def check_consistent_attribute_quotes(body: str) -> None:
                 LOGS_INDENTATION + "\t",
             )
 
-    logger.success(
-        "%sAttribute quotes are consistent.", LOGS_INDENTATION + "\t"
-    )
+    logger.success("%sAttribute quotes are consistent.", LOGS_INDENTATION + "\t")
 
 
 def check_xml_attribute_errors(body: str) -> None:
@@ -263,9 +243,7 @@ def check_xml_attribute_errors(body: str) -> None:
                 (value.startswith('"') and value.endswith('"'))
                 or (value.startswith("'") and value.endswith("'"))
             ):
-                errors.append(
-                    (i, line.strip(), "Attribute value not properly quoted")
-                )
+                errors.append((i, line.strip(), "Attribute value not properly quoted"))
 
         # Check for unclosed quotes anywhere in the line
         # Count total " and ' not escaped
@@ -279,9 +257,7 @@ def check_xml_attribute_errors(body: str) -> None:
     if errors:
         logger.error("%sMalformed XML attributes detected:", LOGS_INDENTATION)
         for line_num, content, reason in errors:
-            logger.error(
-                "%s— Line %d: %s", LOGS_INDENTATION + "\t", line_num, reason
-            )
+            logger.error("%s— Line %d: %s", LOGS_INDENTATION + "\t", line_num, reason)
             logger.error("%s%s", LOGS_INDENTATION + "\t\t", content)
         raise ValueError("Malformed XML attributes found.")
     else:
@@ -300,17 +276,13 @@ def check_max_min_code_state_values(body: str) -> None:
     for code in re.findall(r'code=["\'](-?\d+)["\']', body):
         val = int(code)
         if val < 0 or val > 255:
-            logger.error(
-                "%sCode value out of range: %d", LOGS_INDENTATION + "\t", val
-            )
+            logger.error("%sCode value out of range: %d", LOGS_INDENTATION + "\t", val)
             raise ValueError(f"Code value out of range: {val}")
 
     for state in re.findall(r'state=["\'](-?\d+)["\']', body):
         val = int(state)
         if val < 0 or val > 1000:
-            logger.error(
-                "%sState value out of range: %d", LOGS_INDENTATION + "\t", val
-            )
+            logger.error("%sState value out of range: %d", LOGS_INDENTATION + "\t", val)
             raise ValueError(f"State value out of range: {val}")
 
     logger.success(

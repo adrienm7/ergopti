@@ -6,9 +6,9 @@ GDI+ layered-window overlay that highlights the mouse cursor position. Draws a f
 
 ## Key files
 
-| File      | Description                                                         |
-| --------- | ------------------------------------------------------------------- |
-| `init.ahk`| `Spotlight_Toggle()` / `Spotlight_Show()` / `Spotlight_Hide()` API |
+| File       | Description                                                        |
+| ---------- | ------------------------------------------------------------------ |
+| `init.ahk` | `Spotlight_Toggle()` / `Spotlight_Show()` / `Spotlight_Hide()` API |
 
 ## Notes
 

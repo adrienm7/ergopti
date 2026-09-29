@@ -21,9 +21,7 @@ def add_keymap_9(content: str) -> str:
 
 def add_keymap_select_9(body: str) -> str:
     """Add <keyMapSelect> entry for mapIndex 9."""
-    logger.info(
-        "%s🔹 Adding keymapSelect for index 9…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Adding keymapSelect for index 9…", LOGS_INDENTATION + "\t")
     key_map_select = """\t\t<keyMapSelect mapIndex="9">
 \t\t\t<modifier keys="command caps? anyOption? control?"/>
 \t\t\t<modifier keys="control caps? anyOption?"/>
@@ -52,8 +50,6 @@ def add_keymap(body: str, index: int, keymap_body: str) -> str:
 
     insertion = f'\n\t\t<keyMap index="{index}">{keymap_body}</keyMap>\n'
     # Insert just before the closing </keyMapSet> tag
-    new_body = re.sub(
-        r"(</keyMapSet>)", insertion + r"\1", body, flags=re.DOTALL
-    )
+    new_body = re.sub(r"(</keyMapSet>)", insertion + r"\1", body, flags=re.DOTALL)
 
     return new_body

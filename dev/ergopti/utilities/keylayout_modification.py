@@ -53,9 +53,7 @@ def delete_keymap(body: str, keymap_index: int) -> str:
         LOGS_INDENTATION + "\n",
         keymap_index,
     )
-    keymapselect_pattern = (
-        rf'\n\t*<keyMapSelect mapIndex="{keymap_index}".*?</keyMapSelect>'
-    )
+    keymapselect_pattern = rf'\n\t*<keyMapSelect mapIndex="{keymap_index}".*?</keyMapSelect>'
     body, _ = re.subn(keymapselect_pattern, "", body, flags=re.DOTALL)
 
     logger.info(
@@ -109,9 +107,7 @@ def change_keymap_id(body: str, old_index: int, new_index: int) -> str:
         old_index,
         new_index,
     )
-    body = re.sub(
-        f'<keyMap index="{old_index}"', f'<keyMap index="{new_index}"', body
-    )
+    body = re.sub(f'<keyMap index="{old_index}"', f'<keyMap index="{new_index}"', body)
 
     logger.info(
         '%sUpdating <keyMapSelect mapIndex="%s"> to <keyMapSelect mapIndex="%s">…',
@@ -137,9 +133,7 @@ def replace_modifier_map_id(content: str) -> str:
     # Find the id value in <modifierMap id="...">
     match = re.search(r'\t?<modifierMap\s+id="([^"]+)"', content)
     if not match:
-        logger.warning(
-            "%sNo <modifierMap id=...> found.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <modifierMap id=...> found.", LOGS_INDENTATION + "\t")
         return content
     old_id = match.group(1)
 
@@ -163,19 +157,13 @@ def replace_keymapset_id_with_layout(content: str) -> str:
     # Find the id value in <keyMapSet id="...">
     match = re.search(r'<keyMapSet\s+id="([^"]+)"', content)
     if not match:
-        logger.warning(
-            "%sNo <keyMapSet id=...> found.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <keyMapSet id=...> found.", LOGS_INDENTATION + "\t")
         return content
     old_id = match.group(1)
     # Replace the id in <keyMapSet ...>
-    content = re.sub(
-        r'(<keyMapSet\s+id=")[^"]+("[^>]*>)', r"\1layout\2", content, count=1
-    )
+    content = re.sub(r'(<keyMapSet\s+id=")[^"]+("[^>]*>)', r"\1layout\2", content, count=1)
     # Replace all references to the old id (e.g. mapSet="16c")
-    content = re.sub(
-        rf'(mapSet=")({re.escape(old_id)})(")', r"\1layout\3", content
-    )
+    content = re.sub(rf'(mapSet=")({re.escape(old_id)})(")', r"\1layout\3", content)
     return content
 
 

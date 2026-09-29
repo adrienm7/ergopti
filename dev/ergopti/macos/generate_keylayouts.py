@@ -13,9 +13,7 @@ from pathlib import Path
 # Add paths to import directories
 script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir / "keylayout_generation"))
-sys.path.insert(
-    0, str(script_dir.parent)
-)  # Add drivers directory for utilities
+sys.path.insert(0, str(script_dir.parent))  # Add drivers directory for utilities
 
 from bundle_creation import create_bundle
 from keylayout_ansi_creation import create_keylayout_ansi
@@ -45,15 +43,11 @@ def main(
         kbdedit_files_directory = Path(input_directory).resolve()
     else:
         # If no path is provided, use the "raw_kbdedit_keylayouts" folder
-        kbdedit_files_directory = Path(
-            Path(__file__).parent.resolve() / "raw_kbdedit_keylayouts"
-        )
+        kbdedit_files_directory = Path(Path(__file__).parent.resolve() / "raw_kbdedit_keylayouts")
 
     # Find files to process
     if file_name:
-        kbdedit_file_paths = [
-            kbdedit_files_directory / file_name
-        ]  # Process only one file
+        kbdedit_file_paths = [kbdedit_files_directory / file_name]  # Process only one file
     else:
         kbdedit_file_paths = list(
             kbdedit_files_directory.glob("*_v0.keylayout")
@@ -124,9 +118,7 @@ def generate_bundle_with_all_temp_files(
         version_underscore = simple_version.replace(".", "_")
 
         # Create base keylayout in temp directory
-        base_temp_path = temp_path / (
-            f"Ergopti_{version_underscore}" + kbdedit_file_path.suffix
-        )
+        base_temp_path = temp_path / (f"Ergopti_{version_underscore}" + kbdedit_file_path.suffix)
         content = kbdedit_file_path.read_text(encoding="utf-8")
         content_corrected = correct_keylayout(content, 1)
         base_temp_path.write_text(content_corrected, encoding="utf-8")
@@ -194,15 +186,8 @@ def generate_bundle_with_all_temp_files(
 
         # Determine logo files
         script_dir = Path(__file__).resolve().parent
-        logo = (
-            script_dir / "keylayout_generation" / "data" / "logo_ergopti.icns"
-        )
-        logo_plus = (
-            script_dir
-            / "keylayout_generation"
-            / "data"
-            / "logo_ergopti_plus.icns"
-        )
+        logo = script_dir / "keylayout_generation" / "data" / "logo_ergopti.icns"
+        logo_plus = script_dir / "keylayout_generation" / "data" / "logo_ergopti_plus.icns"
         # Plus Plus variants are disabled — see the commented blocks above.
         # Re-add `logo_plus, logo_plus` and `plus_plus_temp_path,
         # plus_plus_ansi_temp_path` here when re-enabling them.

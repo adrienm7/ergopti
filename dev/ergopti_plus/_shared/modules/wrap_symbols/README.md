@@ -6,9 +6,9 @@ Ordered catalogue of wrap-selection symbol pairs (`wrap_symbols.json`) used by b
 
 ## Key files
 
-| File                | Description                                                                      |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `wrap_symbols.json` | Ordered groups of `{open, close, label_key}` triples; rendered by both menu UIs  |
+| File                | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `wrap_symbols.json` | Ordered groups of `{open, close, label_key}` triples; rendered by both menu UIs |
 
 ## Editing rules
 

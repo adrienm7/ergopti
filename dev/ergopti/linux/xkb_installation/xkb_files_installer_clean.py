@@ -155,7 +155,9 @@ def compile_validation(extensions_root: Path, layout_id: str, variant_id: str = 
             )
             return False
     if not saw_compiler:
-        print("   ⚠️  Paquet installé sans vérification par un compilateur (validation structurelle OK).")
+        print(
+            "   ⚠️  Paquet installé sans vérification par un compilateur (validation structurelle OK)."
+        )
     return True
 
 
@@ -191,7 +193,9 @@ def make_world_readable(root: Path) -> None:
         for path in root.rglob("*"):
             path.chmod(PACKAGE_DIR_MODE if path.is_dir() else PACKAGE_FILE_MODE)
     except OSError as error:
-        print(f"   ⚠️  Droits du paquet non normalisés ({error}) : vérifiez que {root} est lisible par tous.")
+        print(
+            f"   ⚠️  Droits du paquet non normalisés ({error}) : vérifiez que {root} est lisible par tous."
+        )
 
 
 def filesystem_error(action: str, path: Path, error: OSError) -> SystemExit:
@@ -226,13 +230,9 @@ def warn_stale_system_keymap(variant: str) -> None:
     if stale is None:
         return
     pair = f"{stale.layout} + {stale.variant}" if stale.variant else stale.layout
-    print(
-        f"   ⚠️  Le clavier système pointe encore sur une ancienne installation Ergopti ({pair})."
-    )
+    print(f"   ⚠️  Le clavier système pointe encore sur une ancienne installation Ergopti ({pair}).")
     print("       Ses couches Shift/AltGr sont mortes : si vous la sélectionnez, le bug revient.")
-    print(
-        f"       Corrigez avec : sudo localectl set-x11-keymap {PACKAGE_NAME} pc105 {variant}"
-    )
+    print(f"       Corrigez avec : sudo localectl set-x11-keymap {PACKAGE_NAME} pc105 {variant}")
 
 
 def cleanup_previous_installations(roots: InstallerRoots) -> None:
@@ -330,14 +330,18 @@ def install_clean(
         package_dir.parent.mkdir(parents=True, exist_ok=True)
         package_dir.parent.chmod(PACKAGE_DIR_MODE)
     except OSError as error:
-        raise filesystem_error("création du répertoire d'extensions", package_dir.parent, error) from error
+        raise filesystem_error(
+            "création du répertoire d'extensions", package_dir.parent, error
+        ) from error
     recover_interrupted_package_swap(package_dir)
     try:
         staging = tempfile.TemporaryDirectory(
             prefix=f".{PACKAGE_NAME}.staging-", dir=package_dir.parent.parent
         )
     except OSError as error:
-        raise filesystem_error("mise en scène du paquet", package_dir.parent.parent, error) from error
+        raise filesystem_error(
+            "mise en scène du paquet", package_dir.parent.parent, error
+        ) from error
     with staging as staging_name:
         staging_root = Path(staging_name)
         staged_package = staging_root / PACKAGE_NAME
@@ -353,17 +357,15 @@ def install_clean(
             # standalone selections and French-only input-method pickers must
             # produce identical keys (issue #84 follow-up).
             aliased_symbols = add_variant_alias(patched_symbols, variant, layout_id)
-            (staged_package / "symbols" / layout_id).write_text(
-                aliased_symbols, encoding="utf-8"
-            )
+            (staged_package / "symbols" / layout_id).write_text(aliased_symbols, encoding="utf-8")
             (staged_package / "symbols" / "fr").write_text(
                 build_french_variant_symbols(variant, layout_id), encoding="utf-8"
             )
-            (staged_package / "types" / layout_id).write_text(
-                types_content, encoding="utf-8"
-            )
+            (staged_package / "types" / layout_id).write_text(types_content, encoding="utf-8")
             (staged_package / "rules" / "evdev.xml").write_text(
-                build_registry_xml(layout_id, description, [(variant, description)], parent_layout="fr"),
+                build_registry_xml(
+                    layout_id, description, [(variant, description)], parent_layout="fr"
+                ),
                 encoding="utf-8",
             )
             (staged_package / "rules" / "evdev.post").write_text(
@@ -413,9 +415,7 @@ def write_user_text(
 ) -> None:
     """Atomically replace a user file without following a crafted temp symlink."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    previous_mode = (
-        stat.S_IMODE(destination.stat().st_mode) if destination.exists() else 0o600
-    )
+    previous_mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else 0o600
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{destination.name}.ergopti-",
         dir=destination.parent,
@@ -586,9 +586,7 @@ def uninstall_clean(roots: InstallerRoots, deactivate_desktop: bool = True) -> b
             removed = True
     stripped = strip_legacy_evdev_patch(roots.system_root)
     if stripped:
-        print(
-            f"🗑️  {stripped} ligne(s) de règles héritée(s) retirée(s) du fichier evdev système."
-        )
+        print(f"🗑️  {stripped} ligne(s) de règles héritée(s) retirée(s) du fichier evdev système.")
         removed = True
     stale_links = remove_generation_two_links(roots.system_root)
     if stale_links:

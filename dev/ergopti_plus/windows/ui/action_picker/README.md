@@ -6,9 +6,9 @@ Provides all gesture-slot and keyboard-shortcut action pickers. `init.ahk` (the 
 
 ## Key files
 
-| File               | Description                                                               |
-| ------------------ | ------------------------------------------------------------------------- |
-| `init.ahk`         | Public API: `ShowActionPicker(opts, on_confirm)` — singleton host         |
+| File                        | Description                                                                 |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `init.ahk`                  | Public API: `ShowActionPicker(opts, on_confirm)` — singleton host           |
 | `action_picker_webview.ahk` | WebView2 bridge: creates window, injects `initData`, routes bridge messages |
 
 ## Usage

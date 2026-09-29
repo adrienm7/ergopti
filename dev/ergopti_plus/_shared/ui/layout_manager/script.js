@@ -105,29 +105,41 @@ function applyDomStrings() {
  */
 function makeRow(entry, installed, provided, builtin, active, platform) {
 	const source = entry || installed;
-	const files = source.extension && Array.isArray(source.extension.files) ? source.extension.files : [];
-	const hotstrings = files.filter((file) => typeof file.path === 'string' && /^hotstrings\/.+\.toml$/.test(file.path)).length;
+	const files =
+		source.extension && Array.isArray(source.extension.files) ? source.extension.files : [];
+	const hotstrings = files.filter(
+		(file) => typeof file.path === 'string' && /^hotstrings\/.+\.toml$/.test(file.path)
+	).length;
 	const shortcutPath = platform === 'windows' ? 'shortcuts/menu.ahk' : 'shortcuts/menu.lua';
 	const shortcuts = files.some((file) => file.path === shortcutPath) ? 1 : 0;
 	let status;
 	if (builtin) status = 'builtin';
 	else if (provided) status = 'provided';
 	else if (!installed) status = 'available';
-	else if (entry && (installed.sha256 !== entry.sha256
-		|| (entry.extension && entry.extension.sha256 !== (installed.extension && installed.extension.sha256)))) status = 'update';
+	else if (
+		entry &&
+		(installed.sha256 !== entry.sha256 ||
+			(entry.extension &&
+				entry.extension.sha256 !== (installed.extension && installed.extension.sha256)))
+	)
+		status = 'update';
 	else status = 'installed';
 	const isActive = active === source.id;
 	const actions = [];
 	if (status === 'available') actions.push('install');
 	if (status === 'update') actions.push('update');
-	if ((status === 'installed' || status === 'update' || status === 'builtin') && !isActive) actions.push('select');
+	if ((status === 'installed' || status === 'update' || status === 'builtin') && !isActive)
+		actions.push('select');
 	if (status === 'installed' || status === 'update') actions.push('uninstall');
 	return {
 		id: source.id,
 		name: typeof source.name === 'string' && source.name !== '' ? source.name : source.id,
 		author: typeof source.author === 'string' ? source.author : '',
 		licence: typeof source.licence === 'string' ? source.licence : '',
-		homepage: typeof source.homepage === 'string' && /^https:\/\//.test(source.homepage) ? source.homepage : '',
+		homepage:
+			typeof source.homepage === 'string' && /^https:\/\//.test(source.homepage)
+				? source.homepage
+				: '',
 		version: entry && typeof entry.version === 'string' ? entry.version : '',
 		installedVersion: installed && typeof installed.version === 'string' ? installed.version : '',
 		status,
@@ -159,7 +171,16 @@ function layoutRows(state) {
 		const platforms = Array.isArray(entry.platforms) ? entry.platforms : [];
 		if (typeof state.platform === 'string' && !platforms.includes(state.platform)) continue;
 		listed.add(entry.id);
-		rows.push(makeRow(entry, installed[entry.id], Boolean(provided[entry.id]), builtin[entry.id] === true, active, state.platform));
+		rows.push(
+			makeRow(
+				entry,
+				installed[entry.id],
+				Boolean(provided[entry.id]),
+				builtin[entry.id] === true,
+				active,
+				state.platform
+			)
+		);
 	}
 	for (const id of Object.keys(installed).sort()) {
 		if (!listed.has(id) && installed[id] && typeof installed[id].id === 'string') {
@@ -206,7 +227,11 @@ function resultMessage(result, rows) {
 		return { text: _fmt('layout_manager.result_failed', name, _t(key)), isError: true, detail };
 	}
 	if (result.warning === 'not_enabled') {
-		return { text: _fmt('layout_manager.result_installed_not_enabled', name), isError: false, detail };
+		return {
+			text: _fmt('layout_manager.result_installed_not_enabled', name),
+			isError: false,
+			detail
+		};
 	}
 	const keys = {
 		install: 'layout_manager.result_installed',
@@ -214,7 +239,11 @@ function resultMessage(result, rows) {
 		uninstall: 'layout_manager.result_uninstalled',
 		select: 'layout_manager.result_selected'
 	};
-	return { text: _fmt(keys[result.action] || 'layout_manager.result_installed', name), isError: false, detail };
+	return {
+		text: _fmt(keys[result.action] || 'layout_manager.result_installed', name),
+		isError: false,
+		detail
+	};
 }
 
 // ========================================
@@ -250,34 +279,49 @@ function renderRow(row, busy) {
 	const header = element('div', 'layout-header');
 	header.appendChild(element('span', 'layout-name', row.name));
 	const badges = element('span', 'layout-badges');
-	badges.appendChild(element('span', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status)));
-	if (row.active) badges.appendChild(element('span', 'badge badge-active', _t('layout_manager.status_active')));
+	badges.appendChild(
+		element('span', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status))
+	);
+	if (row.active)
+		badges.appendChild(element('span', 'badge badge-active', _t('layout_manager.status_active')));
 	header.appendChild(badges);
 	item.appendChild(header);
 
 	const meta = element('div', 'layout-meta');
-	if (row.author) meta.appendChild(element('span', '', _fmt('layout_manager.meta_author', row.author)));
-	if (row.licence) meta.appendChild(element('span', '', _fmt('layout_manager.meta_licence', row.licence)));
-	if (row.version) meta.appendChild(element('span', '', _fmt('layout_manager.meta_version', row.version)));
+	if (row.author)
+		meta.appendChild(element('span', '', _fmt('layout_manager.meta_author', row.author)));
+	if (row.licence)
+		meta.appendChild(element('span', '', _fmt('layout_manager.meta_licence', row.licence)));
+	if (row.version)
+		meta.appendChild(element('span', '', _fmt('layout_manager.meta_version', row.version)));
 	if (row.installedVersion && row.installedVersion !== row.version) {
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_installed_version', row.installedVersion)));
+		meta.appendChild(
+			element('span', '', _fmt('layout_manager.meta_installed_version', row.installedVersion))
+		);
 	}
 	item.appendChild(meta);
 	if (row.hotstrings || row.shortcuts) {
 		const content = element('div', 'layout-content');
-		content.appendChild(element('div', '', _fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts)));
-		content.appendChild(element('div', 'layout-content-note', _t('layout_manager.extension_opt_in')));
+		content.appendChild(
+			element('div', '', _fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts))
+		);
+		content.appendChild(
+			element('div', 'layout-content-note', _t('layout_manager.extension_opt_in'))
+		);
 		item.appendChild(content);
 	}
 
 	const buttons = element('div', 'layout-actions');
 	if (busy && busy.id === row.id) {
-		const key = busy.action === 'uninstall' ? 'layout_manager.busy_uninstall' : 'layout_manager.busy_install';
+		const key =
+			busy.action === 'uninstall' ? 'layout_manager.busy_uninstall' : 'layout_manager.busy_install';
 		buttons.appendChild(element('span', 'busy', _t(key)));
 	}
 	if (row.homepage) buttons.appendChild(actionButton('open_homepage', row.id, false, 'link'));
 	for (const action of row.actions) {
-		buttons.appendChild(actionButton(action, row.id, Boolean(busy), action === 'uninstall' ? 'danger' : ''));
+		buttons.appendChild(
+			actionButton(action, row.id, Boolean(busy), action === 'uninstall' ? 'danger' : '')
+		);
 	}
 	item.appendChild(buttons);
 	return item;
@@ -351,7 +395,8 @@ function render() {
  * @param {string} [id] - Registry id the action applies to.
  */
 function send(action, id) {
-	if (!LAYOUT_MANAGER_ACTIONS.includes(action)) throw new Error('layout manager: unknown action ' + action);
+	if (!LAYOUT_MANAGER_ACTIONS.includes(action))
+		throw new Error('layout manager: unknown action ' + action);
 	const payload = { action };
 	if (id !== undefined) payload.id = id;
 	setTimeout(function () {

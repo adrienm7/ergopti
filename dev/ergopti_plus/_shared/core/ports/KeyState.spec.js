@@ -98,10 +98,7 @@ function contractTestVectors() {
 		{
 			id: 'is_down_unknown_key_returns_false',
 			description: 'isDown() with an unknown key name returns false.',
-			steps: [
-				{ call: 'isDown', args: ['ERGOPTI_NONEXISTENT_KEY_XYZ'] },
-				{ assert: 'return_false' }
-			]
+			steps: [{ call: 'isDown', args: ['ERGOPTI_NONEXISTENT_KEY_XYZ'] }, { assert: 'return_false' }]
 		},
 		{
 			id: 'is_up_unknown_key_returns_true',

@@ -27,9 +27,7 @@ def sort_keylayout(content: str) -> str:
 
 def reorder_modifiers_and_attributes(body: str) -> str:
     """Standardize encoding, maxout, and key/modifier orders for cosmetic consistency."""
-    logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Reordering modifiers and attributes inside modifierMap…"
-    )
+    logger.info(f"{LOGS_INDENTATION}\t🔹 Reordering modifiers and attributes inside modifierMap…")
 
     # Standardize encoding
     body = body.replace('encoding="utf-8"', 'encoding="UTF-8"')
@@ -47,9 +45,7 @@ def reorder_modifiers_and_attributes(body: str) -> str:
         return f"{before}{sorted_keys}{after}"
 
     # Replace each keys attribute with its sorted version
-    body = re.sub(
-        r'(<modifier\s+keys=")([^"]+)("[^>]*/?>)', sort_keys_attr, body
-    )
+    body = re.sub(r'(<modifier\s+keys=")([^"]+)("[^>]*/?>)', sort_keys_attr, body)
 
     return body
 
@@ -63,13 +59,9 @@ def sort_keymaps(body: str) -> str:
         header, inner_body, footer = match.groups()
 
         # Extract all keyMap blocks in the inner body
-        keymaps = re.findall(
-            r'(<keyMap index="(\d+)">.*?</keyMap>)', inner_body, flags=re.DOTALL
-        )
+        keymaps = re.findall(r'(<keyMap index="(\d+)">.*?</keyMap>)', inner_body, flags=re.DOTALL)
         if not keymaps:
-            logger.warning(
-                f"{LOGS_INDENTATION}\tNo <keyMap> blocks found in <keyMapSet>."
-            )
+            logger.warning(f"{LOGS_INDENTATION}\tNo <keyMap> blocks found in <keyMapSet>.")
             return match.group(0)  # Return original block if no keyMaps
 
         # Sort by index numerically
@@ -160,33 +152,25 @@ def sort_actions(body: str) -> str:
     """
     Sort all <action> blocks by their id attribute inside <actions> blocks.
     """
-    logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Sorting actions by id inside <actions> blocks…"
-    )
+    logger.info(f"{LOGS_INDENTATION}\t🔹 Sorting actions by id inside <actions> blocks…")
 
     def sort_block(match):
         header, body_content, footer = match.groups()
 
         # Extract all <action> blocks
-        actions = re.findall(
-            r"(\s*<action\b.*?>.*?</action>)", body_content, flags=re.DOTALL
-        )
+        actions = re.findall(r"(\s*<action\b.*?>.*?</action>)", body_content, flags=re.DOTALL)
 
         def get_id_or_default(a):
             m = re.search(r'id=["\']([^"\']+)["\']', a)
             return m.group(1) if m else ""
 
-        actions_sorted = sorted(
-            actions, key=lambda a: sort_key(get_id_or_default(a))
-        )
+        actions_sorted = sorted(actions, key=lambda a: sort_key(get_id_or_default(a)))
 
         # Rebuild <actions> block
         return f"{header}{''.join(actions_sorted)}\n\t{footer}"
 
     # Replace <actions> block in the body
-    return re.sub(
-        r"(<actions.*?>)(.*?)(</actions>)", sort_block, body, flags=re.DOTALL
-    )
+    return re.sub(r"(<actions.*?>)(.*?)(</actions>)", sort_block, body, flags=re.DOTALL)
 
 
 def sort_terminators(body: str) -> str:

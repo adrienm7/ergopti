@@ -6,14 +6,14 @@ Tray context menu orchestrator. Assembles the full menu from category-specific b
 
 ## Key files
 
-| File                | Description                                                                      |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `init.ahk`          | `BuildTrayMenu()` — assembles the complete tray menu; called on every tray click  |
-| `menu_gestures.ahk` | Gesture slot sub-menu builder                                                     |
-| `menu_hotstring_switches.ahk` | Hotstring category gate and « all sections » checkbox rows              |
-| `menu_llm.ahk`      | LLM sub-menu builder (backend, model, profile, temperature)                       |
-| `menu_shortcuts.ahk`| Shortcut-group toggles sub-menu builder                                           |
-| `menu_manifest.ahk` | TOML-manifest-driven dynamic section loader                                       |
+| File                          | Description                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `init.ahk`                    | `BuildTrayMenu()` — assembles the complete tray menu; called on every tray click |
+| `menu_gestures.ahk`           | Gesture slot sub-menu builder                                                    |
+| `menu_hotstring_switches.ahk` | Hotstring category gate and « all sections » checkbox rows                       |
+| `menu_llm.ahk`                | LLM sub-menu builder (backend, model, profile, temperature)                      |
+| `menu_shortcuts.ahk`          | Shortcut-group toggles sub-menu builder                                          |
+| `menu_manifest.ahk`           | TOML-manifest-driven dynamic section loader                                      |
 
 ## Key invariant
 

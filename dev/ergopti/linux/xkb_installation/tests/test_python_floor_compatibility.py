@@ -49,11 +49,7 @@ def python_floor() -> tuple[int, int]:
 
 def python_modules() -> list[Path]:
     """Every Python file shipped or exercised by the installer."""
-    return sorted(
-        path
-        for path in INSTALLER_DIR.rglob("*.py")
-        if "__pycache__" not in path.parts
-    )
+    return sorted(path for path in INSTALLER_DIR.rglob("*.py") if "__pycache__" not in path.parts)
 
 
 class PythonFloorTests(unittest.TestCase):
@@ -61,9 +57,7 @@ class PythonFloorTests(unittest.TestCase):
         self.floor = python_floor()
         self.modules = python_modules()
         # A guard that reads nothing passes for free.
-        self.assertGreater(
-            len(self.modules), 10, "the module scan found almost nothing"
-        )
+        self.assertGreater(len(self.modules), 10, "the module scan found almost nothing")
 
     def test_the_declared_floor_is_below_native_unions(self):
         """The whole point of the rule below is that the floor predates PEP 604."""

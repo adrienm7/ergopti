@@ -62,10 +62,10 @@ The Karabiner onboarding error-path calls `callback(false, "…")` and
 
 ### Cluster C — `ErgoptiPlus.ahk` (1 MsgBox + 3–4 French log messages)
 
-| Line    | Issue                                                                                                  | Status                                            |
-| ------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Line    | Issue                                                                                                  | Status                                                        |
+| ------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | 603–605 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI         | **Resolved** — now `MsgBox(t("startup.manifest_missing"), …)` |
-| 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) | Fixed                                             |
+| 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) | Fixed                                                         |
 
 **Fix for MsgBox:** move to a dedicated startup error handler; use i18n key
 `startup.manifest_missing`. **Fix for logs:** translate to English in place

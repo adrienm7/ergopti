@@ -47,8 +47,7 @@ function showError(message) {
 function receive_prompt(request) {
 	if (!request || typeof request !== 'object') return;
 	bounds = { min: request.min, max: request.max };
-	requestEpoch =
-		typeof request.request_epoch === 'number' ? request.request_epoch : null;
+	requestEpoch = typeof request.request_epoch === 'number' ? request.request_epoch : null;
 	showError('');
 
 	const title = document.getElementById('prompt-title');

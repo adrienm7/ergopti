@@ -112,9 +112,7 @@ def _extract_version_from_plist(keylayout_path: Path) -> str:
             current_path = current_path.parent
             if current_path.name.endswith(".bundle"):
                 # Try Contents/ directory in bundle
-                bundle_version_plist = (
-                    current_path / "Contents" / "version.plist"
-                )
+                bundle_version_plist = current_path / "Contents" / "version.plist"
                 if bundle_version_plist.exists():
                     version_plist_path = bundle_version_plist
                     break
@@ -135,9 +133,7 @@ def _extract_version_from_plist(keylayout_path: Path) -> str:
             strings = dict_elem.findall("string")
 
             for i, key in enumerate(keys):
-                if key.text in ["BuildVersion", "SourceVersion"] and i < len(
-                    strings
-                ):
+                if key.text in ["BuildVersion", "SourceVersion"] and i < len(strings):
                     version = strings[i].text.strip()
                     if version:
                         # Add 'v' prefix if not present
@@ -179,9 +175,7 @@ def extract_version_from_file_enhanced(file_path: Path) -> str:
 
 def extract_keymap_body(body: str, index: int) -> str:
     """Extract only the inner body of a keyMap by index."""
-    logger.info(
-        "%s🔹 Extracting body of keymap %d…", LOGS_INDENTATION + "\t", index
-    )
+    logger.info("%s🔹 Extracting body of keymap %d…", LOGS_INDENTATION + "\t", index)
     match = re.search(
         rf'<keyMap index="{index}">(.*?)</keyMap>',
         body,
@@ -257,9 +251,7 @@ def get_symbol(keymap_body: str, macos_code: int, actions_body: str) -> str:
         return action_name
 
     # Find the action block and look for when state="none"
-    action_block_re = (
-        rf'<action[^>]*id="{re.escape(action_name)}"[^>]*>(.*?)</action>'
-    )
+    action_block_re = rf'<action[^>]*id="{re.escape(action_name)}"[^>]*>(.*?)</action>'
     action_block = re.search(action_block_re, actions_body, flags=re.DOTALL)
     if not action_block:
         return action_name

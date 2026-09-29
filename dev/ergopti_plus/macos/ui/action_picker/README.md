@@ -6,9 +6,9 @@ WKWebView-based searchable action chooser for assigning actions to gesture or ke
 
 ## Key files
 
-| File      | Description                                                                |
-| --------- | -------------------------------------------------------------------------- |
-| `init.lua`| `M.open(opts, on_confirm)` — singleton host; injects `initData`, routes bridge messages (`ready`/`confirm`/`cancel`) |
+| File       | Description                                                                                                          |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `init.lua` | `M.open(opts, on_confirm)` — singleton host; injects `initData`, routes bridge messages (`ready`/`confirm`/`cancel`) |
 
 ## Shared frontend
 

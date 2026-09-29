@@ -6,9 +6,9 @@ WKWebView dashboard showing time-per-application usage derived from the keylogge
 
 ## Key files
 
-| File      | Description                                                                |
-| --------- | -------------------------------------------------------------------------- |
-| `init.lua`| `M.show()` — singleton host; data pipeline from SQLite to JS bridge         |
+| File       | Description                                                         |
+| ---------- | ------------------------------------------------------------------- |
+| `init.lua` | `M.show()` — singleton host; data pipeline from SQLite to JS bridge |
 
 ## Data path
 

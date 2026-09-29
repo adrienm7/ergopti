@@ -25,7 +25,10 @@ class ErgoptiGoldenTests(unittest.TestCase):
             if not out_dir.is_dir():
                 continue
             for layout_id, result in generate_xkb_files.convert_bundle(bundle).items():
-                for suffix, generated in ((".xkb", result.symbols_text), (".XCompose", result.compose_text)):
+                for suffix, generated in (
+                    (".xkb", result.symbols_text),
+                    (".XCompose", result.compose_text),
+                ):
                     shipped = out_dir / (layout_id + suffix)
                     compared += 1
                     if shipped.read_bytes() != generated.encode("utf-8"):

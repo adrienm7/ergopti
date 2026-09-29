@@ -7,21 +7,12 @@
 			"bug": {
 				"file": "bug_report.yml",
 				"title_prefix": "[Bug] ",
-				"fields": [
-					"version",
-					"os",
-					"driver",
-					"diagnostics"
-				]
+				"fields": ["version", "os", "driver", "diagnostics"]
 			},
 			"feature": {
 				"file": "feature_request.yml",
 				"title_prefix": "[Feature] ",
-				"fields": [
-					"version",
-					"os",
-					"driver"
-				]
+				"fields": ["version", "os", "driver"]
 			}
 		}
 	},

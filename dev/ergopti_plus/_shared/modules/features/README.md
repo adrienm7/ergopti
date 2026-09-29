@@ -12,9 +12,9 @@ Single source of truth for every feature toggle and its default value across bot
 
 ## Key files
 
-| File            | Description                                                          |
-| --------------- | -------------------------------------------------------------------- |
-| `manifest.toml` | Master feature registry with `default`, `label`, `section`, `id`    |
+| File            | Description                                                      |
+| --------------- | ---------------------------------------------------------------- |
+| `manifest.toml` | Master feature registry with `default`, `label`, `section`, `id` |
 
 ## References
 

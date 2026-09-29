@@ -1122,12 +1122,12 @@ details.cmd-help[open] summary::before {
    arrows) render noticeably smaller/lighter than the text symbols
    (Home/End/Esc) and ⌫ in system-ui, so bump them up to visually match their
    siblings in the grid. */
-.cmd-ref .cmd-sym[data-tok="Delete"],
-.cmd-ref .cmd-sym[data-tok="Tab"],
-.cmd-ref .cmd-sym[data-tok="Left"],
-.cmd-ref .cmd-sym[data-tok="Right"],
-.cmd-ref .cmd-sym[data-tok="Up"],
-.cmd-ref .cmd-sym[data-tok="Down"] {
+.cmd-ref .cmd-sym[data-tok='Delete'],
+.cmd-ref .cmd-sym[data-tok='Tab'],
+.cmd-ref .cmd-sym[data-tok='Left'],
+.cmd-ref .cmd-sym[data-tok='Right'],
+.cmd-ref .cmd-sym[data-tok='Up'],
+.cmd-ref .cmd-sym[data-tok='Down'] {
 	font-size: 22px;
 	font-weight: 600;
 }

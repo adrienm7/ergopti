@@ -109,7 +109,8 @@
 	function render() {
 		var content = document.getElementById('content');
 		if (!state.snapshot || !state.config) {
-			content.innerHTML = '<p class="loading">' + escapeHtml(t('healthcheck.status.loading')) + '</p>';
+			content.innerHTML =
+				'<p class="loading">' + escapeHtml(t('healthcheck.status.loading')) + '</p>';
 			setToolbarEnabled(false);
 			return;
 		}

@@ -36,10 +36,18 @@
 	},
 	"permissions": {
 		"macos": {
-			"accessibility": { "settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" },
-			"screen_recording": { "settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture" },
-			"input_monitoring": { "settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent" },
-			"login_items": { "settings": "x-apple.systempreferences:com.apple.LoginItems-Settings.extension" }
+			"accessibility": {
+				"settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+			},
+			"screen_recording": {
+				"settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+			},
+			"input_monitoring": {
+				"settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+			},
+			"login_items": {
+				"settings": "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
+			}
 		},
 		"windows": {},
 		"linux": {
@@ -106,7 +114,11 @@
 				{ "id": "locale", "type": "text" },
 				{ "id": "keyboard_layout", "type": "text" },
 				{ "id": "ram_free", "type": "bytes" },
-				{ "id": "disk_free", "type": "bytes", "probe": { "macos": "system_details", "linux": "system_details" } },
+				{
+					"id": "disk_free",
+					"type": "bytes",
+					"probe": { "macos": "system_details", "linux": "system_details" }
+				},
 				{ "id": "cpu_usage", "type": "percent", "probe": "cpu_load" },
 				{ "id": "process_cpu", "type": "percent", "probe": "cpu_load" },
 				{ "id": "process_memory", "type": "bytes", "probe": { "macos": "cpu_load" } },
@@ -131,7 +143,13 @@
 			]
 		},
 		{ "id": "features", "kind": "items", "columns": ["id", "enabled"] },
-		{ "id": "unavailable", "kind": "items", "columns": ["feature", "platforms", "reason"], "platforms": ["macos"], "collapsed": true },
+		{
+			"id": "unavailable",
+			"kind": "items",
+			"columns": ["feature", "platforms", "reason"],
+			"platforms": ["macos"],
+			"collapsed": true
+		},
 		{
 			"id": "ai",
 			"fields": [
@@ -149,7 +167,12 @@
 				{ "id": "wifi_signal", "type": "text", "platforms": ["macos"] }
 			]
 		},
-		{ "id": "permissions", "kind": "items", "columns": ["id", "state"], "platforms": ["macos", "linux"] },
+		{
+			"id": "permissions",
+			"kind": "items",
+			"columns": ["id", "state"],
+			"platforms": ["macos", "linux"]
+		},
 		{
 			"id": "peripherals",
 			"kind": "items",

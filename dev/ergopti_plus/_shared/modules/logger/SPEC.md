@@ -230,6 +230,7 @@ in between, or one whose arguments change. Repeat collapsing does.
 
   The `(last: …)` clause appears only when the last formatted body differs from
   the key text. Streaks closed together are summarised in the order they opened.
+
 - **Owners.** Each driver arms the layer once, runs the periodic flush on a
   timer that is never the input path, and runs the terminal flush at exit and
   reload:
@@ -398,15 +399,15 @@ Called during the `init.lua` boot sequence.
 These features exist in one driver only and are **not** part of the shared
 contract. Both drivers are free to keep or remove them independently.
 
-| Feature                        | AHK | HS  | Notes                                                               |
-| ------------------------------ | --- | --- | ------------------------------------------------------------------- |
-| Coloured console output        | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
-| DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
-| Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
-| Stall-tolerant ACK transport   | ✗   | ✓   | Fatal after `stall_fatal_ms` without ACK; sheds DEBUG while stalled |
-| Error window hook              | ✓   | ✓   | Every emitted ERROR reaches the error window (§ 5.2)                |
-| `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
-| `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
+| Feature                      | AHK | HS  | Notes                                                               |
+| ---------------------------- | --- | --- | ------------------------------------------------------------------- |
+| Coloured console output      | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
+| DEBUG-axis indentation       | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
+| Error notification callback  | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
+| Stall-tolerant ACK transport | ✗   | ✓   | Fatal after `stall_fatal_ms` without ACK; sheds DEBUG while stalled |
+| Error window hook            | ✓   | ✓   | Every emitted ERROR reaches the error window (§ 5.2)                |
+| `pcall` wrapper              | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
+| `build` wrapper              | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
 
 ---
 

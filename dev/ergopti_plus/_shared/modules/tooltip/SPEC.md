@@ -97,10 +97,10 @@ Given an accent color `{r, g, b}` in [0.0, 1.0]:
 
 ### Driver Implementations
 
-| Driver      | Function                        | File                      |
-| ----------- | ------------------------------- | ------------------------- |
-| AHK         | `_TooltipMixTintHex(AccentHex)` | `lib/tooltip.ahk`         |
-| Hammerspoon | `M.apply_tint(requested_tint)`  | `ui/tooltip/renderer.lua` |
+| Driver      | Function                        | File                              |
+| ----------- | ------------------------------- | --------------------------------- |
+| AHK         | `_TooltipMixTintHex(AccentHex)` | `lib/tooltip.ahk`                 |
+| Hammerspoon | `M.apply_tint(requested_tint)`  | `ui/tooltip/renderer.lua`         |
 | Reference   | `mixTint(accent)`               | `_shared/modules/tooltip/tint.js` |
 
 The AHK function accepts and returns hex strings (`"RRGGBB"`). The HS function

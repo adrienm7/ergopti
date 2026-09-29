@@ -128,7 +128,7 @@ function contractTestVectors() {
 		{
 			id: 'bind_canonicalises_chord',
 			description:
-				'Two spellings of one chord produce one canonical registration, so the OS never sees the caller\'s spelling.',
+				"Two spellings of one chord produce one canonical registration, so the OS never sees the caller's spelling.",
 			input: { chord: 'shift+ctrl+s' },
 			assert: { registered_chord: 'Ctrl+Shift+S' }
 		},
@@ -171,7 +171,8 @@ function contractTestVectors() {
 		},
 		{
 			id: 'set_enabled_false_suspends',
-			description: 'setEnabled(handle, false) stops the callback firing without releasing the handle.',
+			description:
+				'setEnabled(handle, false) stops the callback firing without releasing the handle.',
 			input: { chord: 'Ctrl+T', enabled: false, press: true },
 			assert: { callback_invoked: false, handle_still_known: true }
 		},
