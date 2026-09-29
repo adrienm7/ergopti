@@ -120,9 +120,18 @@ function M.restore_configuration(enabled)
 end
 
 --- Whether repeat is active, with no repeated disk IO on the input path.
+---
+--- Called for every unmatched character, inside the keyboard hook's guarded
+--- callback: a raise here emergency-stops the whole hook. A configuration that
+--- cannot be read therefore leaves repeat on its neutral default until an
+--- explicit refresh succeeds, and that fallback is cached so the typing path
+--- never retries the disk on each keystroke.
 --- @return boolean enabled
 function M.is_enabled()
-	if _enabled == nil then assert(M.refresh(), "repeat configuration could not be initialized") end
+	if _enabled == nil and not M.refresh() then
+		Logger.error(LOG, "Repeat configuration is unreadable; repeat stays neutral until a refresh succeeds.")
+		_enabled = Manifest.default_for(FEATURE_PATH)
+	end
 	return _enabled
 end
 
