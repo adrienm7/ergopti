@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 
 local LOG = "modules.llm.settings"
@@ -135,8 +136,8 @@ function M.get(name)
 			_values[name] = stored
 			return stored
 		elseif stored ~= nil then
-			Logger.warn(LOG, "Stored '%s' (%s) is outside the accepted range — using the shipped default.",
-				name, tostring(stored))
+			-- Outdated configuration: named once, offered by the cleanup.
+			ConfigOutdated.report(FEATURE_PATH[name], ConfigOutdated.REFUSED, Logger)
 		end
 	end
 	_values[name] = default
@@ -231,7 +232,9 @@ end
 --- @param mark function Consumed-key collector.
 function M.mark_config_reads(document, mark)
 	local preferences = require("infra.llm_preferences")
-	for _, path in pairs(FEATURE_PATH) do preferences.mark_config_read(document, path, mark) end
+	for name, path in pairs(FEATURE_PATH) do
+		preferences.mark_config_read(document, path, mark, function(value) return in_bounds(name, value) end)
+	end
 end
 
 --- Captures the current cache without reading or publishing preferences.

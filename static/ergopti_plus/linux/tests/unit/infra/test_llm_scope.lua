@@ -90,15 +90,15 @@ local function with_scope(body)
 end
 
 helpers.describe("Linux terminal LLM scope", function()
-	helpers.it("refuses malformed owned source before backup or preference mutation", function()
-		with_scope(function(owner, engine, _, path, backup)
+	helpers.it("clears an outdated owned value instead of refusing (config-outdated-llm)", function()
+		-- One old-shape AI leaf made every AI preference read raise, so the
+		-- reset that would remove it was refused because of it.
+		with_scope(function(owner, _, _, path)
 			local malformed = '[llm]\nenabled = "wrong"\n'
 			Sandbox.write_bytes(path, malformed)
-			helpers.assert_eq(owner.apply("clear"), false)
-			helpers.assert_eq(Sandbox.read_bytes(path), malformed)
-			helpers.assert_true(engine.is_enabled())
-			local _, status = Writer.read_classified(backup)
-			helpers.assert_eq(status, "absent")
+			helpers.assert_eq(owner.apply("clear"), true)
+			helpers.assert_true(not Sandbox.read_bytes(path):find('enabled = "wrong"', 1, true),
+				"the clear removes the outdated value")
 			helpers.assert_eq(owner.pending(), false)
 		end)
 	end)
