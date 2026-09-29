@@ -22,6 +22,11 @@ Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolli
 LLM output diff-coloring (`process_prediction`) lives in the shared Lua canon
 `_shared/lua/llm/parser.lua`; the AHK port is `modules/llm/parser.ahk`, pinned to
 the same `_shared/tests/corpus/llm/process_prediction_vectors.json` golden corpus.
+Its rewrite mode (a `REWRITE:` answer) is the one prediction whose erasure the
+accept path applies. `rewrite.ahk` ports `_shared/lua/llm/rewrite.lua` (the
+sentence a rewrite prompt rewrites, its token budget) and `prompt_action.ahk`
+ports `_shared/lua/llm/prompt_action.lua` (the `llm_prompt` value of the
+`llm_prompt_prediction` action), each pinned to its shared corpus.
 
 ## Public API
 

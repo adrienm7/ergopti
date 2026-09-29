@@ -26,6 +26,14 @@
 ;
 ; The set of erase-bearing vectors is derived from the shared corpus rather than
 ; enumerated here, so a new vector joins this test automatically.
+;
+; THE REWRITE EXCEPTION: a rewrite (REWRITE: answer to a rewrite prompt) is the
+; one erase-bearing prediction the accept path now applies. Its record names the
+; exact text it erases, a suffix of the span the engine chose, and the bridge
+; erases it inside the same admission-guarded output as the replacement
+; (test_llm_prompt_prediction.ahk drives that end to end). Section 3 pins that
+; rewrites reach the tooltip with that erasure; sections 1 and 2 still pin the
+; refusal of every other correction.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -55,6 +63,8 @@ _LPRD_EveryEraseBearingVectorIsRefused() {
 		if Expd["is_nil"]
 			continue
 		if (Expd["deletes"] <= 0)
+			continue
+		if _LPRD_IsRewriteVector(Vec)
 			continue
 		Checked += 1
 
@@ -114,3 +124,52 @@ _LPRD_ZeroDeleteVectorsStillProduceSlots() {
 }
 Test("LLM parser: ordinary completions still produce slots after the refusal",
 	_LPRD_ZeroDeleteVectorsStillProduceSlots)
+
+
+
+
+
+; ==================================================================
+; ==================================================================
+; ======= 3/ A rewrite reaches the tooltip with its erasure ========
+; ==================================================================
+; ==================================================================
+
+; Whether a corpus vector exercises the rewrite mode of the shared parser.
+_LPRD_IsRewriteVector(Vec) {
+	return InStr(_LLM_Parser_CleanModelOutput(Vec["block"]), "REWRITE:", true) > 0
+}
+
+_LPRD_RewriteVectorsBecomeSlotsWithTheirErasure() {
+	Path := _LPRD_CorpusPath()
+	Assert(FileExist(Path) != "", "the shared process_prediction corpus must be readable: " . Path)
+	Data := JsonParse(FileRead(Path, "UTF-8"))
+
+	Checked := 0
+	for Vec in Data["vectors"] {
+		if !_LPRD_IsRewriteVector(Vec)
+			continue
+		Expd := Vec["expected"]
+		Slots := LLM_Parser_ParseResponse(Vec["block"], Vec["full_text"], Vec["tail_text"],
+			Vec["min_words"], Vec["max_words"], false, 1, , &Edits)
+		if Expd["is_nil"] {
+			AssertEqual(0, Slots.Length, "vector " . Vec["id"] . ": a refused rewrite offers nothing")
+			continue
+		}
+		Checked += 1
+		AssertEqual(1, Slots.Length, "vector " . Vec["id"] . ": a rewrite becomes a tooltip slot")
+		AssertEqual(Expd["to_type"], Slots[1], "vector " . Vec["id"] . ": the slot types to_type")
+		AssertTrue(Edits.Has(Slots[1]), "vector " . Vec["id"] . ": the slot carries its erasure")
+		Edit := Edits[Slots[1]]
+		AssertEqual(Expd["deletes"], Edit["deletes"], "vector " . Vec["id"] . ": Backspaces to send")
+		AssertEqual(Vec["tail_text"], Edit["span"], "vector " . Vec["id"] . ": the span it rewrites")
+		Span := Edit["span"]
+		AssertEqual(Edit["deleted_text"],
+			SubStr(Span, StrLen(Span) - StrLen(Edit["deleted_text"]) + 1),
+			"vector " . Vec["id"] . ": the erased text is the end of the span")
+	}
+	Assert(Checked >= 3,
+		"the corpus must carry erase-bearing rewrite vectors (found " . Checked . ")")
+}
+Test("LLM parser: a rewrite reaches the tooltip with the exact text it erases",
+	_LPRD_RewriteVectorsBecomeSlotsWithTheirErasure)

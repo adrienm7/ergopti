@@ -133,8 +133,8 @@ _LBBC_EveryRuntimeWriterUsesCanonicalEditor() {
 	AssertEqual(0, _LBBC_Count(Src, "_LLM_Bridge_Buffer .="),
 		"append-assignment bypasses the canonical cap and ABA generation")
 	Assert(InStr(Commit,
-		"_LLM_Bridge_ApplyBufferEdit(0, Transaction.Text)") > 0,
-		"the atomic injected-text commit must use the bounded editor")
+		"_LLM_Bridge_ApplyBufferEdit(StrLen(Transaction.DeletedText), Transaction.Text)") > 0,
+		"the atomic injected-text commit must use the bounded editor, a rewrite's erasure included")
 	Assert(InStr(Options,
 		'"atomic_commit", _LLM_Bridge_CommitInjectedText.Bind(Transaction)') > 0,
 		"TextSender must publish the bounded edit inside the same Critical output transaction as SendInput")

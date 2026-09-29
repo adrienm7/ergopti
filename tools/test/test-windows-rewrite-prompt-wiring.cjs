@@ -1,0 +1,224 @@
+// tools/test/test-windows-rewrite-prompt-wiring.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Windows Rewrite Prompt and Prompt Action Wiring Gate
+ * DESCRIPTION:
+ * The rewrite prompt and the "AI prediction with a chosen prompt" action reach
+ * the Windows driver through AutoHotkey ports and wiring that only the AHK suite
+ * can execute, and that suite runs on Windows CI only. This gate checks, from
+ * the sources, what can be checked anywhere:
+ *
+ * 1. The two ports (modules/llm/rewrite.ahk, modules/llm/prompt_action.ahk) are
+ *    #Included by the driver and by the AHK suite, rewrite.ahk before the parser
+ *    that calls it, and their tests are registered in run_all.ahk and replay the
+ *    shared corpora.
+ * 2. The driver's built-in profile order is exactly the id list of
+ *    _shared/modules/llm/profiles.json, since the llm_predict_<id> actions and
+ *    the menu are built from it.
+ * 3. The parser port carries the rewrite mode of the shared parser and still
+ *    refuses every other erasure; the accept path erases in the same SendInput
+ *    batch as the text, for both the direct and the clipboard sender.
+ * 4. The action picker host sends what the page's prompt editor needs.
+ *
+ * ROOT CAUSE ENCODED:
+ * A module that no runner includes, or a list restated by hand, fails silently
+ * on the platform where nobody can run the suite before CI does.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const SP = path.join(ROOT, 'static', 'ergopti_plus');
+const WIN = path.join(SP, 'windows');
+
+const errors = [];
+let checks = 0;
+const check = (ok, message) => {
+	checks += 1;
+	if (!ok) errors.push(message);
+};
+
+const read = (rel) => fs.readFileSync(path.join(WIN, rel), 'utf8').replace(/^﻿/, '');
+
+/**
+ * Returns the ordered #Include targets of an AHK source.
+ * @param {string} source AHK source text.
+ * @returns {string[]} Include paths as written, forward slashes.
+ */
+const includesOf = (source) =>
+	[...source.matchAll(/^#Include\s+(\S+)\s*$/gm)].map((m) => m[1].replace(/\\/g, '/'));
+
+/**
+ * Returns the body of an AHK function declared at column 0.
+ * @param {string} source AHK source text.
+ * @param {string} name Function name.
+ * @returns {string} Body text, "" when absent.
+ */
+const bodyOf = (source, name) => {
+	const start = source.search(new RegExp(`^${name}\\(.*\\{\\s*$`, 'm'));
+	if (start < 0) return '';
+	const end = source.indexOf('\n}', start);
+	return end < 0 ? '' : source.slice(start, end);
+};
+
+// 1. Includes, order and test registration.
+const entry = includesOf(read('ErgoptiPlus.ahk'));
+const runAll = includesOf(read('tests/run_all.ahk'));
+const bench = includesOf(read('tests/bench_parity_process_prediction.ahk'));
+const position = (list, target) => list.indexOf(target);
+
+for (const [label, list, prefix] of [
+	['ErgoptiPlus.ahk', entry, ''],
+	['tests/run_all.ahk', runAll, '../']
+]) {
+	const rewrite = position(list, `${prefix}modules/llm/rewrite.ahk`);
+	const action = position(list, `${prefix}modules/llm/prompt_action.ahk`);
+	check(rewrite >= 0, `${label} must #Include modules/llm/rewrite.ahk`);
+	check(action >= 0, `${label} must #Include modules/llm/prompt_action.ahk`);
+	check(
+		rewrite >= 0 && rewrite < position(list, `${prefix}modules/llm/parser.ahk`),
+		`${label} must include rewrite.ahk before parser.ahk, whose rewrite record calls it`
+	);
+	check(
+		rewrite >= 0 && rewrite < position(list, `${prefix}modules/llm/prediction_engine.ahk`),
+		`${label} must include rewrite.ahk before the prediction engine`
+	);
+	const validation = position(list, `${prefix}modules/llm/option_validation.ahk`);
+	const gestures = position(list, `${prefix}modules/gestures/init.ahk`);
+	check(
+		validation >= 0 && gestures > validation,
+		`${label} must include option_validation.ahk (LLM_PROFILE_BUILTIN_ORDER) before the gesture actions registered from it`
+	);
+}
+check(
+	position(bench, '../modules/llm/rewrite.ahk') >= 0 &&
+		position(bench, '../modules/llm/rewrite.ahk') < position(bench, '../modules/llm/parser.ahk'),
+	'the parity bench must include rewrite.ahk before parser.ahk'
+);
+
+const TESTS = {
+	'unit/test_llm_rewrite.ahk': 'rewrite_vectors.json',
+	'unit/test_llm_prompt_action.ahk': 'llm_prompt_vectors.json',
+	'unit/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
+	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json'
+};
+for (const [test, needle] of Object.entries(TESTS)) {
+	check(runAll.includes(test), `tests/run_all.ahk must #Include ${test}`);
+	check(read(`tests/${test}`).includes(needle), `tests/${test} must exercise ${needle}`);
+}
+
+// 2. The built-in order is the shared registry's id list.
+const profileIds = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared', 'modules', 'llm', 'profiles.json'), 'utf8')
+).map((profile) => profile.id);
+const validation = read('modules/llm/option_validation.ahk');
+const orderBlock =
+	(validation.match(/global LLM_PROFILE_BUILTIN_ORDER := \[([\s\S]*?)\]/) || [])[1] || '';
+const order = [...orderBlock.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+check(
+	JSON.stringify(order) === JSON.stringify(profileIds),
+	`LLM_PROFILE_BUILTIN_ORDER ${JSON.stringify(order)} must equal the profiles.json ids ${JSON.stringify(profileIds)}`
+);
+const actions = read('modules/gestures/actions.ahk');
+check(
+	/for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER \{/.test(actions) &&
+		actions.includes('GESTURE_ACTIONS["llm_predict_" . _PresetProfileId]'),
+	'the llm_predict_<id> actions must be registered from LLM_PROFILE_BUILTIN_ORDER'
+);
+check(
+	actions.includes('"llm_prompt_prediction", {'),
+	'llm_prompt_prediction must be a registered action'
+);
+const menuProfiles = read('ui/menu/menu_llm/menu_profiles.ahk');
+check(
+	!/for id in \["raw"/.test(menuProfiles) && !/Map\("raw", true/.test(menuProfiles),
+	'the profile menu must list the built-ins from LLM_PROFILE_BUILTIN_ORDER, not a hand-written copy'
+);
+
+// 3. Parser rewrite mode and the erase step.
+const parser = read('modules/llm/parser.ahk');
+const impl = bodyOf(parser, '_LLM_Parser_ProcessPredictionImpl');
+check(impl !== '', 'parser.ahk must define _LLM_Parser_ProcessPredictionImpl');
+for (const [needle, why] of [
+	['is_rewrite := InStr(block, "REWRITE:", true) > 0', 'detects a rewrite from the normalised tag'],
+	[
+		'while (!is_rewrite and ops.Length > 0 and ops[1]["type"] = "del")',
+		"keeps a rewrite's leading deletions"
+	],
+	['if (first_change_idx = -1 and is_rewrite)', 'offers nothing for an unchanged rewrite'],
+	[
+		'max_allowed_dels := is_rewrite ? StrLen(orig_context)',
+		"bounds a rewrite's erasure by its span"
+	],
+	['if (only_equals and !is_rewrite)', 'skips the orphaned-gray guard for a rewrite'],
+	['_LLM_Parser_RewriteRecord(', 'records the exact text a rewrite erases']
+]) {
+	check(impl.includes(needle), `_LLM_Parser_ProcessPredictionImpl ${why}: ${needle}`);
+}
+check(
+	bodyOf(parser, '_LLM_Parser_CleanModelOutput').includes('"i)\\[REWRITE\\]"'),
+	'the output cleaner must normalise the bracketed rewrite tag'
+);
+const injectable = bodyOf(parser, '_LLM_Parser_IsPhysicallyInjectable');
+check(
+	injectable.includes('pred.Get("rewrite", false) == true') && injectable.includes('return false'),
+	'only a rewrite may carry an erasure; every other erase-bearing prediction is still refused'
+);
+
+const sender = read('adapters/text_sender.ahk');
+check(
+	bodyOf(sender, 'TextSend').includes('_AHK_SendInput.Bind(ErasePrefix . "{Text}" . Text)'),
+	'the direct sender must send the erasure and the text as one SendInput batch'
+);
+check(
+	bodyOf(sender, '_TextSendClipboard').includes(
+		'_AHK_SendInput.Bind(_TextSenderErasePrefix(Opts) . "^v")'
+	),
+	'the clipboard sender must send the erasure and the paste as one SendInput batch'
+);
+const bridge = read('modules/keymap/llm_bridge.ahk');
+check(
+	bodyOf(bridge, '_LLM_Bridge_InjectionOptions').includes('"erase_before", Transaction.Deletes'),
+	'the accept transaction must hand its erasure to the sender'
+);
+check(
+	bodyOf(bridge, '_LLM_Bridge_CommitInjectedText').includes(
+		'_LLM_Bridge_ApplyBufferEdit(StrLen(Transaction.DeletedText), Transaction.Text)'
+	),
+	'the buffer must mirror the erasure and the insert in the output transaction'
+);
+
+// 4. The picker host feeds the page's prompt editor.
+const picker = read('ui/action_picker_webview.ahk');
+for (const field of [
+	'promptChoices',
+	'defaultCount',
+	'editCurrentLabel',
+	'promptLabel',
+	'countLabel',
+	'countDefault'
+]) {
+	check(picker.includes(`"${field}"`), `the Windows action picker host must send ${field}`);
+}
+check(
+	picker.includes('_ActPickWeb_Kv("llm_prompt"'),
+	'the picker host must send the llm_prompt prompt and refusal'
+);
+check(
+	/Parameter := \(Kind != ""\)/.test(picker),
+	'every parameterized action must carry its kind and value'
+);
+
+if (errors.length > 0) {
+	console.error('\x1b[31m[ERROR] Windows rewrite prompt wiring:\x1b[0m');
+	for (const e of errors) console.error('    - ' + e);
+	process.exit(1);
+}
+console.log(
+	`\x1b[32m[OK] Windows rewrite prompt and prompt action wiring (${checks} checks).\x1b[0m`
+);

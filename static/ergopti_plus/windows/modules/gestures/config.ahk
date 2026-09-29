@@ -84,7 +84,8 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 }
 
 ; The parameter kind the generated catalogue declares for an action ("url",
-; "search_url", "wrap_pair", "text", "key", "shortcut"), or "" when it takes none.
+; "search_url", "wrap_pair", "text", "key", "shortcut", "llm_prompt"), or "" when
+; it takes none.
 GestureActionParameterSpec(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
 		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
@@ -101,6 +102,15 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 				if (SendInputParse(Spec, Value) is Map)
 						return true
 				ErrorText := GestureSendInputErrorText(Spec)
+				return false
+		}
+		; Syntax only, before the trim too: a padded value is not the one the
+		; shared rules accept. Whether the prompt still exists is checked when the
+		; action runs, so deleting a prompt never invalidates the configuration.
+		if (Spec = "llm_prompt") {
+				if (LLM_PromptAction_Parse(Value) is Map)
+						return true
+				ErrorText := t("dialog.gestures.param_err_llm_prompt")
 				return false
 		}
 		Value := Trim(Value)
@@ -150,6 +160,9 @@ GestureActionParameterPrompt(ActionName) {
 				case "key", "shortcut":
 						return StrReplace(t("dialog.gestures.param_" . GestureActionParameterSpec(ActionName)),
 								"{1}", SendInputDescribeKeys())
+				case "llm_prompt":
+						return StrReplace(t("dialog.gestures.param_llm_prompt"), "{1}",
+								LLM_Menu_PromptChoicesText())
 		}
 		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
 }
@@ -204,9 +217,9 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
 		loop {
-				; The wrap-pair and shortcut prompts list a catalogue under their text.
+				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
 				Result := InputBox(Prompt, Title,
-						(Spec = "wrap_pair" || Spec = "shortcut") ? "w680 h300"
+						(Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt") ? "w680 h300"
 						: (Spec = "key") ? "w680 h220" : "w680 h160", Existing)
 				if (Result.Result != "OK")
 						return false
