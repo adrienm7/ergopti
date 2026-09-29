@@ -1,0 +1,91 @@
+--- _shared/lua/test/toml_leaf_rows_contract.lua
+
+--- Leaf operations reach the batch writer without losing neighbours or keys.
+return function(helpers)
+	local LeafRows = require("toml_codec.leaf_rows")
+	local Writer = require("toml_codec.writer")
+	local Codec = require("toml_codec")
+
+	--- Applies planned rows to exact bytes through the real batch writer.
+	--- @param content string|nil Source bytes; nil is an absent file.
+	--- @param operations table Leaf operations.
+	--- @return table decoded Candidate document.
+	--- @return string candidate Candidate bytes.
+	local function apply(content, operations)
+		local rows = LeafRows.prepare(content or "", operations)
+		local files = { read_with_status = function()
+			if content == nil then return nil, "absent" end
+			return content, "ok"
+		end }
+		local prepared, detail, candidate = Writer.prepare_batch("/virtual/leaf_rows.toml", rows, files)
+		assert(prepared == true, tostring(detail))
+		return Codec.decode(candidate), candidate
+	end
+
+	helpers.describe("toml leaf rows", function()
+		helpers.it("writes bare leaves as ordinary table rows in an absent file", function()
+			local decoded = apply(nil, {
+				{ path = { "hotstrings", "groups", "rolls" }, value = true },
+				{ path = { "hotstrings", "modules", "rolls", "hc" }, value = false },
+			})
+			helpers.assert_eq(decoded.hotstrings.groups.rolls, true)
+			helpers.assert_eq(decoded.hotstrings.modules.rolls.hc, false)
+		end)
+
+		helpers.it("creates one quoted inline table for a runtime identity and its bare siblings", function()
+			local decoded, bytes = apply("[hotstrings]\nkeep = 1\n", {
+				{ path = { "hotstrings", "groups", "rolls" }, value = true },
+				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, value = true },
+			})
+			helpers.assert_eq(decoded.hotstrings.groups, { rolls = true, ["ext:demo:rolls"] = true })
+			helpers.assert_eq(decoded.hotstrings.keep, 1)
+			helpers.assert_true(bytes:find('"ext:demo:rolls"', 1, true) ~= nil, "the identity is quoted")
+		end)
+
+		helpers.it("rewrites an inline table whole and keeps its unknown entries", function()
+			local decoded = apply('[hotstrings]\ngroups = { rolls = false, "ext:x:y" = true, other = true }\n', {
+				{ path = { "hotstrings", "groups", "rolls" }, value = true },
+				{ path = { "hotstrings", "groups", "ext:x:y" }, delete = true },
+			})
+			helpers.assert_eq(decoded.hotstrings.groups, { rolls = true, other = true })
+		end)
+
+		helpers.it("removes an inline table that its deletions leave empty", function()
+			local decoded = apply("[hotstrings]\ngroups = { rolls = true }\nkeep = true\n", {
+				{ path = { "hotstrings", "groups", "rolls" }, delete = true },
+			})
+			helpers.assert_nil(decoded.hotstrings.groups)
+			helpers.assert_eq(decoded.hotstrings.keep, true)
+		end)
+
+		helpers.it("addresses sections below a quoted table header", function()
+			local decoded = apply('[hotstrings.modules."ext:demo:rolls"]\nkeep = true\nold = true\n', {
+				{ path = { "hotstrings", "modules", "ext:demo:rolls", "old" }, delete = true },
+				{ path = { "hotstrings", "modules", "ext:demo:rolls", "new" }, value = true },
+			})
+			helpers.assert_eq(decoded.hotstrings.modules["ext:demo:rolls"], { keep = true, new = true })
+		end)
+
+		helpers.it("refuses a quoted key under an existing table header instead of misparsing it", function()
+			local source = "[hotstrings.groups]\nrolls = true\n"
+			helpers.assert_throws(function()
+				LeafRows.prepare(source, { { path = { "hotstrings", "groups", "ext:demo:rolls" }, value = true } })
+			end, "an unaddressable key must be refused")
+			helpers.assert_eq(#LeafRows.prepare(source, {
+				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, delete = true } }), 0,
+				"an absent quoted key needs no removal")
+			helpers.assert_throws(function()
+				LeafRows.prepare('[hotstrings.groups]\n"ext:demo:rolls" = true\n', {
+					{ path = { "hotstrings", "groups", "ext:demo:rolls" }, delete = true } })
+			end, "a present quoted key under a header cannot be removed by line")
+		end)
+
+		helpers.it("refuses malformed operations", function()
+			for _, operation in ipairs({ { path = { "a" }, value = true }, { path = { "a", "" }, value = true },
+				{ path = { "a", "b" } }, { path = { "a", "b" }, value = true, delete = true } }) do
+				helpers.assert_eq(pcall(LeafRows.prepare, "", { operation }), false)
+			end
+			helpers.assert_eq(pcall(LeafRows.prepare, "[a\n", {}), false, "malformed source")
+		end)
+	end)
+end

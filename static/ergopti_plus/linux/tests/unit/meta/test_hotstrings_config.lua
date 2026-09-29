@@ -5,7 +5,6 @@
 --- config path resolution, edge cases.
 
 local helpers = require("tests.helpers")
-local Fakes = helpers.load_module("tests.fakes")
 local config  = helpers.load_module("modules.hotstrings.hotstrings_config")
 local engine_mod = helpers.load_module("modules.hotstrings.engine")
 
@@ -100,51 +99,50 @@ helpers.describe("hotstrings_config", function()
     end)
 
     helpers.it("a user directory that does not exist still loads the bundled packs", function()
-      -- Discovery is independent of opt-in. Isolate the preference adapter so
+      -- Discovery is independent of opt-in. Isolate the canonical choices so
       -- explicit activation cannot leak into other cases or depend on their state.
-      local previous_storage = package.loaded["adapters.storage"]
       local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
-      package.loaded["adapters.storage"] = Fakes.storage()
       local ok, err = pcall(function()
         local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
-        local engine = make_engine()
-        cfg.init(engine, os.tmpname() .. "_absent_hotstring_directory")
-        cfg.load_all()
+        require("tests.support.hotstring_choices").with_file(cfg, nil, function()
+          local engine = make_engine()
+          cfg.init(engine, os.tmpname() .. "_absent_hotstring_directory")
+          cfg.load_all()
 
-        local Loader = require("modules.hotstrings.loader")
-        local Paths = require("infra.paths")
-        local bundled = Loader.find_toml_files(Paths.shared("modules/hotstrings"))
-        helpers.assert_true(#bundled > 0, "fixture requires the actual bundled TOML inventory")
-        helpers.assert_true(cfg.mapping_count() > 0,
-          "an absent personal directory must not hide discovered bundled mappings")
+          local Loader = require("modules.hotstrings.loader")
+          local Paths = require("infra.paths")
+          local bundled = Loader.find_toml_files(Paths.shared("modules/hotstrings"))
+          helpers.assert_true(#bundled > 0, "fixture requires the actual bundled TOML inventory")
+          helpers.assert_true(cfg.mapping_count() > 0,
+            "an absent personal directory must not hide discovered bundled mappings")
 
-        helpers.assert_true(cfg.disable_all() ~= false, "explicit group disable must commit")
-        helpers.assert_eq(#engine._loaded, 0, "disabled groups must leave no effective engine mappings")
-        helpers.assert_true(cfg.mapping_count() > 0,
-          "the discovered inventory must remain available while its groups are disabled")
-        helpers.assert_true(cfg.enable_all() ~= false, "explicit group and section activation must commit")
-        helpers.assert_true(#engine._loaded > 0,
-          "explicit activation must hand the discovered mappings to the real engine")
+          helpers.assert_true(cfg.disable_all() ~= false, "explicit group disable must commit")
+          helpers.assert_eq(#engine._loaded, 0, "disabled groups must leave no effective engine mappings")
+          helpers.assert_true(cfg.mapping_count() > 0,
+            "the discovered inventory must remain available while its groups are disabled")
+          helpers.assert_true(cfg.enable_all() ~= false, "explicit group and section activation must commit")
+          helpers.assert_true(#engine._loaded > 0,
+            "explicit activation must hand the discovered mappings to the real engine")
 
-        -- Replay an actual bundled trigger through the real matcher: recording a
-        -- non-empty argument alone would miss an engine that ignores publication.
-        local matched = false
-        for _, mapping in ipairs(engine._loaded) do
-          if mapping.auto_expand then
-            engine:reset()
-            local result
-            for char in mapping.trigger:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-              result = engine:on_char(char)
-            end
-            if result and result.trigger == mapping.trigger and result.group == mapping.group then
-              matched = true
-              break
+          -- Replay an actual bundled trigger through the real matcher: recording a
+          -- non-empty argument alone would miss an engine that ignores publication.
+          local matched = false
+          for _, mapping in ipairs(engine._loaded) do
+            if mapping.auto_expand then
+              engine:reset()
+              local result
+              for char in mapping.trigger:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+                result = engine:on_char(char)
+              end
+              if result and result.trigger == mapping.trigger and result.group == mapping.group then
+                matched = true
+                break
+              end
             end
           end
-        end
-        helpers.assert_true(matched, "the real engine must execute an explicitly activated bundled trigger")
+          helpers.assert_true(matched, "the real engine must execute an explicitly activated bundled trigger")
+        end)
       end)
-      package.loaded["adapters.storage"] = previous_storage
       package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
       if not ok then error(err, 0) end
     end)
@@ -155,45 +153,100 @@ helpers.describe("hotstrings_config", function()
   -- ==========================================================================
 
   helpers.describe("group management", function()
-    helpers.it("disable_group disables the group it names", function()
-      config.disable_group("test_group")
-      helpers.assert_eq(config.is_group_enabled("test_group"), false,
-        "a disable that does not disable is the whole bug this reader exists to catch")
+    local Choices = require("tests.support.hotstring_choices")
+    local Codec = require("toml_codec")
+
+    --- A config manager over one real catalogue group and a private config.toml.
+    --- @param source string|table|nil Initial choices.
+    --- @param body function body(cfg, engine, path)
+    local function with_groups(source, body)
+      local saved_loader = package.loaded["modules.hotstrings.loader"]
+      package.loaded["modules.hotstrings.loader"] = {
+        find_toml_files = function() return {} end,
+        list_subdirs = function() return {} end,
+        read_file = function() return nil end,
+        load_catalogue = function()
+          return { committed = true, errors = 0,
+            categories = { probe = { id = "probe", sections = {}, sections_order = {} },
+              ["ext:demo:pack"] = { id = "ext:demo:pack", sections = { main = { count = 1 } }, sections_order = { "main" } } },
+            mappings = { { trigger = "pq", replacement = "probe-result", group = "probe", auto_expand = true },
+              { trigger = "xq", replacement = "pack-result", group = "ext:demo:pack", section = "main", auto_expand = true } } }
+        end,
+      }
+      local ok, err = pcall(function()
+        local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
+        Choices.with_file(cfg, source, function(path)
+          local engine = make_engine()
+          helpers.assert_true(cfg.init(engine, "virtual.toml"), "the private choices must be readable")
+          local _, committed = cfg.load_all()
+          helpers.assert_true(committed, "the fixture catalogue must publish")
+          body(cfg, engine, path)
+        end)
+      end)
+      package.loaded["modules.hotstrings.loader"] = saved_loader
+      package.loaded["modules.hotstrings.hotstrings_config"] = nil
+      if not ok then error(err, 0) end
+    end
+
+    local function fires(engine, trigger, replacement)
+      engine:reset()
+      local result
+      for char in (trigger or "pq"):gmatch(".") do result = engine:on_char(char) end
+      return result ~= nil and result.replacement == (replacement or "probe-result")
+    end
+
+    helpers.it("an empty configuration leaves every category off and unwritten", function()
+      with_groups(nil, function(cfg, engine, path)
+        helpers.assert_eq(cfg.is_group_enabled("probe"), false)
+        helpers.assert_eq(fires(engine), false, "a neutral category must not expand")
+        helpers.assert_nil(Choices.read(path), "reading choices never writes")
+      end)
     end)
 
-    helpers.it("enable_group enables the group it names", function()
-      config.enable_group("test_group")
-      helpers.assert_eq(config.is_group_enabled("test_group"), true,
-        "and the other direction")
+    helpers.it("enable_group publishes the category to the engine and config.toml", function()
+      with_groups("[hotstrings]\nunknown = \"kept\"\n[other]\nvalue = 1\n", function(cfg, engine, path)
+        helpers.assert_true(cfg.enable_group("probe"))
+        helpers.assert_eq(cfg.is_group_enabled("probe"), true)
+        helpers.assert_true(fires(engine), "the enabled category must reach the real engine")
+        local decoded = Codec.decode(Choices.read(path))
+        helpers.assert_eq(decoded.hotstrings.groups.probe, true)
+        helpers.assert_eq(decoded.hotstrings.unknown, "kept", "unknown neighbours survive")
+        helpers.assert_eq(decoded.other.value, 1, "unknown tables survive")
+      end)
     end)
 
-    helpers.it("toggle_group inverts the state it found", function()
-      local before = config.is_group_enabled("test")
-      config.toggle_group("test")
-      helpers.assert_eq(config.is_group_enabled("test"), not before,
-        "a toggle that lands on the same state is a menu row that does nothing")
+    helpers.it("disable_group returns the category to its neutral absence", function()
+      with_groups({ probe = true, foreign = true }, function(cfg, engine, path)
+        helpers.assert_true(fires(engine))
+        helpers.assert_true(cfg.disable_group("probe"))
+        helpers.assert_eq(cfg.is_group_enabled("probe"), false)
+        helpers.assert_eq(fires(engine), false, "a disabled category must leave the engine")
+        local decoded = Codec.decode(Choices.read(path))
+        helpers.assert_nil(decoded.hotstrings.groups.probe, "the neutral value is removed, not repeated")
+        helpers.assert_eq(decoded.hotstrings.groups.foreign, true, "an unknown category choice survives")
+      end)
     end)
 
-    helpers.it("a disable/enable cycle ends where it started", function()
-      -- "cycle OK" asserted with true. The point of a cycle is that it returns
-      -- the state it found: a disable that persisted past the enable leaves a
-      -- group silently off, which the user reads as expansions that stopped
-      -- working for no reason.
-      local before = config.is_group_enabled("cycle_test")
-      config.disable_group("cycle_test")
-      helpers.assert_eq(config.is_group_enabled("cycle_test"), false,
-        "disable must actually disable, or the cycle below proves nothing")
-      config.enable_group("cycle_test")
-      helpers.assert_eq(config.is_group_enabled("cycle_test"), true,
-        "and enable must undo it")
-      if not before then config.disable_group("cycle_test") end
+    helpers.it("toggle_group inverts the state it found and survives a restart", function()
+      with_groups(nil, function(cfg, engine, path)
+        helpers.assert_true(cfg.toggle_group("probe"))
+        helpers.assert_eq(cfg.is_group_enabled("probe"), true,
+          "a toggle that lands on the same state is a menu row that does nothing")
+        helpers.assert_true(cfg.init(make_engine(), "virtual.toml"), "a restart rereads the choices")
+        helpers.assert_eq(cfg.is_group_enabled("probe"), true, "the choice is durable")
+        helpers.assert_eq(Codec.decode(Choices.read(path)).hotstrings.groups.probe, true)
+        helpers.assert_true(fires(engine))
+      end)
     end)
 
     helpers.it("disable_group(nil) changes nothing", function()
-      config.enable_group("nil_probe")
-      config.disable_group(nil)
-      helpers.assert_eq(config.is_group_enabled("nil_probe"), true,
-        "a nil group name must be refused, not applied to whatever was last touched")
+      with_groups({ probe = true }, function(cfg, _, path)
+        local before = Choices.read(path)
+        helpers.assert_eq(cfg.disable_group(nil), false, "a nil group name must be refused")
+        helpers.assert_eq(cfg.is_group_enabled("probe"), true,
+          "a nil group name must not be applied to whatever was last touched")
+        helpers.assert_eq(Choices.read(path), before)
+      end)
     end)
 
     helpers.it("is_group_enabled returns boolean", function()
@@ -201,24 +254,96 @@ helpers.describe("hotstrings_config", function()
       helpers.assert_true(type(result) == "boolean", "returns boolean")
     end)
 
-    helpers.it("keeps the durable group state when persistence fails", function()
-      local previous_storage = package.loaded["adapters.storage"]
-      local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
-      local storage = Fakes.storage({ writes_fail = true })
-      package.loaded["adapters.storage"] = storage
+    helpers.it("republishes the previous catalogue when the write is refused", function()
+      with_groups({ probe = true }, function(cfg, engine, path)
+        local Writer = require("toml_codec.writer")
+        local original = Writer.batch_write
+        Writer.batch_write = function() return false, "injected refusal" end
+        local ok, changed = pcall(cfg.disable_group, "probe")
+        Writer.batch_write = original
+        helpers.assert_true(ok, tostring(changed))
+        helpers.assert_eq(changed, false, "a failed write must be reported")
+        helpers.assert_eq(cfg.is_group_enabled("probe"), true,
+          "a failed write must not publish a disabled group only for this session")
+        helpers.assert_true(fires(engine), "the engine must be back on the previous catalogue")
+        helpers.assert_eq(Codec.decode(Choices.read(path)).hotstrings.groups.probe, true)
+      end)
+    end)
+
+    helpers.it("refuses a write that an external editor raced", function()
+      with_groups({ probe = true }, function(cfg, engine, path)
+        local Writer = require("toml_codec.writer")
+        local original = Writer.batch_write
+        local external = "[hotstrings]\ngroups = { probe = true }\nexternal = 9\n"
+        Writer.batch_write = function(...)
+          local handle = assert(io.open(path, "w"))
+          handle:write(external)
+          handle:close()
+          return original(...)
+        end
+        local ok, changed = pcall(cfg.disable_group, "probe")
+        Writer.batch_write = original
+        helpers.assert_true(ok, tostring(changed))
+        helpers.assert_eq(changed, false, "a lost race must be refused")
+        helpers.assert_eq(Choices.read(path), external, "the external edit wins")
+        helpers.assert_true(fires(engine), "the runtime keeps the published choice")
+      end)
+    end)
+
+    helpers.it("persists an extension identity as a quoted key and reads it back", function()
+      with_groups(nil, function(cfg, engine, path)
+        helpers.assert_true(cfg.set_all_sections("ext:demo:pack", true))
+        helpers.assert_true(fires(engine, "xq", "pack-result"), "the extension section must reach the engine")
+        local bytes = Choices.read(path)
+        helpers.assert_true(bytes:find('"ext:demo:pack" = true', 1, true) ~= nil, "the identity is a quoted key")
+        local decoded = Codec.decode(bytes)
+        helpers.assert_eq(decoded.hotstrings.groups["ext:demo:pack"], true)
+        helpers.assert_eq(decoded.hotstrings.modules["ext:demo:pack"].main, true)
+        helpers.assert_true(cfg.init(make_engine(), "virtual.toml"))
+        helpers.assert_eq(cfg.is_section_enabled("ext:demo:pack", "main"), true, "the choice survives a restart")
+      end)
+    end)
+
+    helpers.it("never gates provider mappings a second time", function()
+      with_groups(nil, function(cfg, engine)
+        helpers.assert_true(cfg.set_extra_mappings_provider(function()
+          return { { trigger = "dq", replacement = "dynamic-result", group = "dynamichotstrings",
+            section = "phoneprefixes", auto_expand = true } }
+        end))
+        local _, committed = cfg.load_all()
+        helpers.assert_true(committed)
+        helpers.assert_eq(cfg.is_group_enabled("dynamichotstrings"), false, "no catalogue choice enables it")
+        helpers.assert_true(fires(engine, "dq", "dynamic-result"),
+          "the provider already applied its own switches; its mappings reach the engine")
+        helpers.assert_eq(fires(engine), false, "catalogue mappings stay behind their neutral gate")
+      end)
+    end)
+
+    helpers.it("marks only the choices of loaded categories as consumed", function()
+      with_groups(nil, function(cfg)
+        local marked = {}
+        cfg.mark_config_reads(Codec.decode('[hotstrings]\ngroups = { probe = true, gone = true }\n'
+          .. '[hotstrings.modules.probe]\nmissing = true\n[hotstrings.modules."ext:demo:pack"]\nmain = false\n'),
+          function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
+        table.sort(marked)
+        helpers.assert_eq(marked, { "hotstrings.groups.probe", "hotstrings.modules.ext:demo:pack.main" })
+      end)
+    end)
+
+    helpers.it("refuses malformed choices instead of guessing them", function()
+      local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
+      local ok, err = pcall(Choices.with_file, cfg, "[hotstrings]\ngroups = { probe = \"yes\" }\n", function(path)
+        local engine = make_engine()
+        helpers.assert_eq(cfg.init(engine, "virtual.toml"), false, "malformed choices must refuse initialisation")
+        local _, committed, reason = cfg.load_all()
+        helpers.assert_eq(committed, false, "no catalogue is published over unreadable choices")
+        helpers.assert_eq(reason, "choices-unavailable")
+        helpers.assert_eq(cfg.is_group_enabled("probe"), false)
+        helpers.assert_eq(cfg.enable_group("probe"), false, "a setter cannot overwrite unreadable choices")
+        helpers.assert_eq(Choices.read(path), "[hotstrings]\ngroups = { probe = \"yes\" }\n")
+      end)
       package.loaded["modules.hotstrings.hotstrings_config"] = nil
-      local failing = require("modules.hotstrings.hotstrings_config")
-      failing.init(make_engine(), "/tmp/nonexistent_ergopti_hs_transaction")
-
-      local changed = failing.disable_group("transaction_probe")
-      local enabled = failing.is_group_enabled("transaction_probe")
-
-      package.loaded["adapters.storage"] = previous_storage
-      package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
-      helpers.assert_eq(changed, false, "a failed write must be reported")
-      helpers.assert_eq(enabled, true,
-        "a failed write must not publish a disabled group only for this session")
-      helpers.assert_eq(storage.get("hotstrings.disabled_groups", nil), nil)
+      if not ok then error(err, 0) end
     end)
   end)
 

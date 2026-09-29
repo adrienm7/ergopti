@@ -101,35 +101,37 @@ helpers.describe("hotstring catalogue: last-known-good sources", function()
 			local loaded = nil
 			local loads = 0
 			local Config = require("modules.hotstrings.hotstrings_config")
-			Config.init({
-				load_mappings = function(_, mappings)
-					loads = loads + 1
-					loaded = mappings
-					return true
-				end,
-			}, "virtual.toml", nil)
+			require("tests.support.hotstring_choices").with_file(Config, { probe = true }, function()
+				Config.init({
+					load_mappings = function(_, mappings)
+						loads = loads + 1
+						loaded = mappings
+						return true
+					end,
+				}, "virtual.toml", nil)
 
-			current = {
-				mappings = { { trigger = "healthy", replacement = "kept", group = "probe" } },
-				categories = { probe = { id = "probe", sections = {}, sections_order = {} } },
-				errors = 0,
-				committed = true,
-			}
-			Config.load_all()
-			helpers.assert_eq(loads, 1)
-			helpers.assert_eq(loaded[1].trigger, "healthy")
+				current = {
+					mappings = { { trigger = "healthy", replacement = "kept", group = "probe" } },
+					categories = { probe = { id = "probe", sections = {}, sections_order = {} } },
+					errors = 0,
+					committed = true,
+				}
+				Config.load_all()
+				helpers.assert_eq(loads, 1)
+				helpers.assert_eq(loaded[1].trigger, "healthy")
 
-			current = {
-				mappings = { { trigger = "partial", replacement = "must-not-publish" } },
-				categories = {},
-				errors = 1,
-				committed = false,
-			}
-			helpers.assert_eq(Config.reload(), 1, "reload must report the retained mapping count")
-			helpers.assert_eq(loads, 1, "the engine must not receive an uncommitted aggregate")
-			helpers.assert_eq(loaded[1].trigger, "healthy")
-			helpers.assert_eq(Config.mapping_count(), 1)
-			helpers.assert_eq(Config.parse_error_count(), 1)
+				current = {
+					mappings = { { trigger = "partial", replacement = "must-not-publish" } },
+					categories = {},
+					errors = 1,
+					committed = false,
+				}
+				helpers.assert_eq(Config.reload(), 1, "reload must report the retained mapping count")
+				helpers.assert_eq(loads, 1, "the engine must not receive an uncommitted aggregate")
+				helpers.assert_eq(loaded[1].trigger, "healthy")
+				helpers.assert_eq(Config.mapping_count(), 1)
+				helpers.assert_eq(Config.parse_error_count(), 1)
+			end)
 		end)
 
 		package.loaded["modules.hotstrings.hotstrings_config"] = nil
@@ -144,7 +146,6 @@ helpers.describe("hotstring catalogue: runtime publication acknowledgement", fun
 		local saved = {}
 		for name, module in pairs(package.loaded) do saved[name] = module end
 		local stage, refusal, calls = "old", nil, 0
-		package.loaded["adapters.storage"] = { get = function(_, default) return default end }
 		package.loaded["modules.hotstrings.loader"] = {
 			find_toml_files = function() return {} end,
 			list_subdirs = function() return {} end,
@@ -168,14 +169,16 @@ helpers.describe("hotstring catalogue: runtime publication acknowledgement", fun
 			end
 			local Config = require("modules.hotstrings.hotstrings_config")
 			Config._set_override_config_dir_for_test(os.tmpname() .. "-absent")
-			Config.init(engine, "virtual-catalogue", nil)
-			Config.load_all()
-			local controls = {
-				stage = function(value) stage = value end,
-				refuse = function(value) refusal = value end,
-				calls = function() return calls end,
-			}
-			body(Config, engine, controls)
+			require("tests.support.hotstring_choices").with_file(Config, { old = true, new = true }, function()
+				Config.init(engine, "virtual-catalogue", nil)
+				Config.load_all()
+				local controls = {
+					stage = function(value) stage = value end,
+					refuse = function(value) refusal = value end,
+					calls = function() return calls end,
+				}
+				body(Config, engine, controls)
+			end)
 		end)
 		for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
 		for name, module in pairs(saved) do package.loaded[name] = module end

@@ -41,6 +41,7 @@ function M.collect(decoded, mark)
 	require("modules.shortcuts.manager").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.chatgpt").mark_config_reads(decoded, mark)
 	require("modules.hotstrings.repeat_key").mark_config_reads(decoded, mark)
+	require("modules.hotstrings.hotstrings_config").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
 	require("infra.metrics_preferences").resolve(decoded, mark)
 	for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings", "profile_settings" }) do
