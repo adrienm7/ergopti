@@ -566,6 +566,14 @@ local function main()
 		driver        = "linux",
 		registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
 	})
+	-- Hotstring choices earlier builds kept in storage.json become config.toml
+	-- leaves once, before any hotstring owner reads them: the canonical readers
+	-- resolve absence to off, which would silence an updated install.
+	require("infra.legacy_hotstring_storage").import({
+		path     = require("infra.config_paths").config("config.toml"),
+		storage  = require("adapters.storage"),
+		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
+	})
 
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()

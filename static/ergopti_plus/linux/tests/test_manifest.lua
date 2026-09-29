@@ -42,6 +42,7 @@ return {
 	"tests.unit.infra.test_global_scope",
 	"tests.unit.infra.test_hotstring_preferences",
 	"tests.unit.infra.test_hotstrings_scope",
+	"tests.unit.infra.test_legacy_hotstring_storage",
 	"tests.unit.infra.test_diagnostic_snapshot",
 	"tests.unit.infra.test_display_server",
 	"tests.unit.infra.test_driver_version",
