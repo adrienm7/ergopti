@@ -55,15 +55,16 @@ local function with_scope(body)
 end
 
 helpers.describe("Linux metrics scope transaction", function()
-	helpers.it("rejects malformed owned source values before creating a backup", function()
-		with_scope(function(owner, collector, _, _, _, path, backup)
+	helpers.it("clears an outdated owned value instead of refusing (config-outdated-metrics)", function()
+		-- An old-shape leaf is outdated configuration: the reset that removes
+		-- it must never be refused because of it.
+		with_scope(function(owner, collector, _, _, _, path)
 			local malformed = '[metrics]\nenabled = "yes"\n'
 			Sandbox.write_bytes(path, malformed)
-			helpers.assert_eq(owner.apply("clear"), false)
-			helpers.assert_eq(Sandbox.read_bytes(path), malformed)
-			helpers.assert_true(collector.is_enabled())
-			local _, status = Writer.read_classified(backup)
-			helpers.assert_eq(status, "absent")
+			helpers.assert_eq(owner.apply("clear"), true)
+			helpers.assert_true(not Sandbox.read_bytes(path):find('enabled = "yes"', 1, true),
+				"the clear removes the outdated value")
+			helpers.assert_eq(collector.is_enabled(), false)
 		end)
 	end)
 

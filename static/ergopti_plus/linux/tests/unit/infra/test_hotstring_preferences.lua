@@ -87,13 +87,63 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 	end)
 
 	helpers.it("keeps a malformed configuration neutral and refuses to write over it", function()
-		local malformed = '[hotstrings]\npreview_star_enabled = "yes"\n'
+		local malformed = '[hotstrings\npreview_star_enabled = true\n'
 		with_preferences(malformed, function(Preferences, path)
 			helpers.assert_eq(Preferences.refresh(), false)
 			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false,
 				"an unreadable choice is never guessed on")
 			helpers.assert_eq(Preferences.set("hotstrings.preview_star_enabled", true), false)
 			helpers.assert_eq(read(path), malformed)
+		end)
+	end)
+
+	--- Runs body with the owner's logger recording ERROR and WARNING lines.
+	--- @param content string Initial bytes.
+	--- @param body function body(Preferences, path, errors, warnings)
+	local function with_recorded_log(content, body)
+		local saved = package.loaded["logger.shim"]
+		local errors, warnings = {}, {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		package.loaded["logger.shim"] = logger
+		require("config_outdated").reset_for_tests()
+		local ok, err = pcall(with_preferences, content, function(Preferences, path)
+			body(Preferences, path, errors, warnings)
+		end)
+		package.loaded["logger.shim"] = saved
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("reads an old-shape leaf as neutral and keeps every other leaf (config-outdated-preferences)", function()
+		-- One wrong-typed leaf made the whole document unreadable: two ERRORs at
+		-- boot, the user's magic key replaced by the default, and a cleanup that
+		-- reported the file as unreadable.
+		local source = '[hotstrings]\ntrigger_char = "#"\npreview_star_enabled = "on"\n'
+		with_recorded_log(source, function(Preferences, path, errors, warnings)
+			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "#")
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false)
+			helpers.assert_eq(errors, {})
+			helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
+			helpers.assert_true(warnings[1]:find("'hotstrings.preview_star_enabled'", 1, true) ~= nil, warnings[1])
+			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "preview_star_enabled" })
+			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", true),
+				"a new choice replaces the old shape")
+			helpers.assert_eq(read(path):match('preview_star_enabled = (%a+)'), "true")
+		end)
+	end)
+
+	helpers.it("reads the leaves under an old scalar parent as neutral (config-outdated-preferences)", function()
+		local source = '[hotstrings]\ntrigger_char = "#"\ndynamic = true\n'
+		with_recorded_log(source, function(Preferences, _, errors)
+			helpers.assert_eq(Preferences.get("hotstrings.dynamic.date.enabled"), false)
+			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "#")
+			helpers.assert_eq(errors, {})
+			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "dynamic" })
 		end)
 	end)
 

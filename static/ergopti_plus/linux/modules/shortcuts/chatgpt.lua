@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 local Shell = require("adapters.shell_runner")
 local Paths = require("infra.config_paths")
@@ -45,17 +46,26 @@ if not M.is_valid(M.DEFAULT_URL) then
 	error("[chatgpt] the manifest default for '" .. FEATURE_PATH .. "' is not an HTTP(S) URL.")
 end
 
---- Resolves only this owner's declared leaf from a decoded configuration.
+--- Resolves only this owner's declared leaf from a decoded configuration. A
+--- stored value that is not an HTTP(S) URL never reaches xdg-open: it is
+--- outdated configuration, warned once, replaced by the manifest default and
+--- left unmarked so the cleanup offers it.
 --- @param document table Decoded configuration.
 --- @param mark function|nil Optional exact-path ownership visitor.
 --- @return string Effective URL.
 local function resolve(document, mark)
 	local section = document.shortcuts
-	assert(section == nil or type(section) == "table", "ChatGPT shortcut section is malformed")
+	if section ~= nil and type(section) ~= "table" then
+		ConfigOutdated.report({ "shortcuts" }, "a table of settings is expected here", Logger)
+		return M.DEFAULT_URL
+	end
 	local stored = section and section.chatgpt_url
 	if stored == nil then return M.DEFAULT_URL end
+	if not M.is_valid(stored) then
+		ConfigOutdated.report({ "shortcuts", "chatgpt_url" }, "the value is not an HTTP(S) URL", Logger)
+		return M.DEFAULT_URL
+	end
 	if mark then mark("shortcuts", "chatgpt_url") end
-	assert(M.is_valid(stored), "ChatGPT shortcut URL must be an HTTP(S) URL")
 	return stored
 end
 
