@@ -491,52 +491,53 @@ end)
 -- ====================================
 
 helpers.describe("AI runtime triggers stay off the boot and typing paths (ai-runtime-triggers)", function()
-	local function source(relative)
-		local fh = assert(io.open(helpers.driver_root() .. "/" .. relative, "r"))
-		local text = fh:read("*a")
-		fh:close()
-		return text
+	--- Counts `.install_for_selection(` calls in code, ignoring comments and the
+	--- two checker definitions, so a new caller anywhere is visible.
+	local function count_calls(text)
+		local calls = 0
+		for line in text:gmatch("[^\n]+") do
+			local code = line:gsub("%-%-.*$", "")
+			if not code:find("function M.install_for_selection(", 1, true) then
+				for _ in code:gmatch("%.install_for_selection%(") do calls = calls + 1 end
+			end
+		end
+		return calls
 	end
 
 	helpers.it("only the selection router grants a runtime install", function()
-		local grants = {}
-		for _, relative in ipairs({
-			"init.lua",
-			"ui/menu/menu_llm/init.lua",
-			"ui/menu/menu_llm/backend_panel.lua",
-			"ui/menu/menu_llm/models_manager_mlx.lua",
-			"ui/menu/menu_llm/runtime_install_offer.lua",
-			"modules/llm/init.lua",
-			"modules/llm/prediction_engine.lua",
-		}) do
-			if source(relative):find("install_for_selection", 1, true) then
-				grants[#grants + 1] = relative
-			end
-		end
-		helpers.assert_eq(table.concat(grants, ","), "ui/menu/menu_llm/runtime_install_offer.lua")
+		local everywhere = helpers.read_driver_source("install_for_selection(")
+		helpers.assert_not_nil(everywhere)
+		local router, router_err = helpers.read_driver_unit("local function mlx_deps()")
+		helpers.assert_not_nil(router, router_err)
+		helpers.assert_eq(count_calls(router), 2, "the router owns one call per runtime")
+		helpers.assert_eq(count_calls(everywhere), 2,
+			"no boot, update, model or other-backend path may grant an install")
 	end)
 
 	helpers.it("boot schedules no checker for a remote API backend", function()
-		local init = source("init.lua")
+		local init, init_err = helpers.read_driver_unit("local function start_llm_bootstrap")
+		helpers.assert_not_nil(init, init_err)
 		local start = init:find("local function start_llm_bootstrap", 1, true)
-		helpers.assert_true(start ~= nil)
 		local body = init:sub(start, init:find("\nend\n", start, true))
 		helpers.assert_true(body:find("and mlx_deps_checker or ollama_deps_checker", 1, true) == nil,
 			"a non-MLX backend (API) must not fall through to the Ollama checker")
 		helpers.assert_true(body:find("BACKEND_OLLAMA", 1, true) ~= nil)
+		helpers.assert_true(body:find("install_for_selection", 1, true) == nil,
+			"boot never grants a download")
 	end)
 
 	helpers.it("the typing path never probes for a runtime", function()
-		for _, relative in ipairs({
-			"modules/llm/prediction_engine.lua",
-			"modules/llm/streaming_handler.lua",
-			"modules/keymap/llm_bridge.lua",
+		for _, banner in ipairs({
+			"--- MODULE: LLM Prediction Engine\n",
+			"--- MODULE: LLM Streaming Handler\n",
+			"--- MODULE: Keymap LLM Bridge\n",
 		}) do
-			local text = source(relative)
+			local text, err = helpers.read_driver_unit(banner)
+			helpers.assert_not_nil(text, err)
 			for _, probe in ipairs({ "ollama_binary", "runtime_install_offer",
 				".runtime_available(", ".runtime_installed(", "_deps_checker" }) do
 				helpers.assert_true(text:find(probe, 1, true) == nil,
-					relative .. " must not reach " .. probe)
+					banner .. " must not reach " .. probe)
 			end
 		end
 	end)
