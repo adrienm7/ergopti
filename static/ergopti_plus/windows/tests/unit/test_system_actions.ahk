@@ -18,6 +18,8 @@
 ; 4. force_quit_frontmost killed unasked (decision of 2026-09-29); once asked,
 ;    a window that could not get its focus back left another one active, which
 ;    the confirmed kill would then have terminated.
+; 5. The refusal for that case covered every confirmed action, so emptying the
+;    Recycle Bin, which reads no window, was no longer run either.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -546,6 +548,33 @@ _SysActions_ForceQuitConfirm() {
 }
 Test("system actions: force_quit_frontmost kills only on OK, the window it was asked from (force-quit-confirm)",
 	_SysActions_ForceQuitConfirm)
+
+; A window that cannot get its focus back (a Start menu or a pop-up that closed
+; when the question opened) refuses only the actions that read the active
+; window once they run: emptying the Recycle Bin reads none, and ran before
+; the confirmation refused every action in that case.
+_SysActions_ConfirmWithoutFocusBack() {
+	global GESTURE_ACTIONS
+	for Id, Runs in Map("empty_trash", 1, "unblock_file_selection", 0, "force_quit_frontmost", 0) {
+		Saved := GESTURE_ACTIONS[Id]
+		Ran := []
+		GESTURE_ACTIONS[Id] := { Fn: (*) => Ran.Push(Id) }
+		try {
+			Fake := _SysActionsFake()
+			Fake.Active := { Hwnd: 0x77, Pid: 7, Class: "CabinetWClass" }
+			Fake.Answer := "OK"
+			Fake.ActivateResult := false
+			GestureInvokeAction(Id, "", Fake)
+			Fake.Deferred[1].Call()
+			AssertEqual(1, _SysActions_CallsNamed(Fake, "Activate").Length, Id . ": the focus is asked back")
+			AssertEqual(Runs, Ran.Length, Id . ": runs " . Runs . " time(s) once the focus cannot come back")
+		} finally {
+			GESTURE_ACTIONS[Id] := Saved
+		}
+	}
+}
+Test("system actions: a lost focus refuses only the actions that read the active window (confirm-focus-scope)",
+	_SysActions_ConfirmWithoutFocusBack)
 
 ; Runs the real force quit against the recording double.
 _SysActions_ForceQuitWith(Fake, *) {
