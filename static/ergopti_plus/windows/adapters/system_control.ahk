@@ -6,7 +6,9 @@
 ; The Win32, COM, registry and shell primitives the system actions
 ; (modules/gestures/system_actions.ahk) are built from: start a program, post
 ; a window message, broadcast a setting change, read and write a registry
-; value, mute the default microphone, close a process, read the active window
+; value, probe a registry key, name the script's session (the virtual desktop
+; actions and the touchpad registry owner use these two), mute the default
+; microphone, close a process, read the active window
 ; and the Explorer windows, create a file exclusively, delete a file's
 ; Zone.Identifier stream, move the pointer, and ask or tell the user.
 ;
@@ -46,7 +48,12 @@ global SYSTEM_CONTROL_GENERIC_WRITE := 0x40000000
 global SYSTEM_CONTROL_CREATE_NEW := 1
 global SYSTEM_CONTROL_FILE_ATTRIBUTE_NORMAL := 0x80
 global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND := 2
+global SYSTEM_CONTROL_ERROR_PATH_NOT_FOUND := 3
 global SYSTEM_CONTROL_ERROR_FILE_EXISTS := 80
+; RegOpenKeyExW: the predefined HKEY_CURRENT_USER handle and the least right
+; that proves a key exists.
+global SYSTEM_CONTROL_HKEY_CURRENT_USER := 0x80000001
+global SYSTEM_CONTROL_KEY_QUERY_VALUE := 0x0001
 ; How long an activated window may take to come to the foreground.
 global SYSTEM_CONTROL_ACTIVATE_WAIT_S := 1
 
@@ -145,6 +152,37 @@ class SystemControl {
 	; @returns {Integer} This script's own process id.
 	OwnPid() {
 		return DllCall("GetCurrentProcessId", "UInt")
+	}
+
+	; @returns {Integer} The Remote Desktop Services session this script runs
+	;   in, which names the per-session registry keys Explorer keeps.
+	; @throws {OSError} When Windows does not report the session.
+	SessionId() {
+		Session := 0
+		if !DllCall("ProcessIdToSessionId", "UInt", this.OwnPid(), "UInt*", &Session)
+			throw OSError(A_LastError, -1, "ProcessIdToSessionId")
+		return Session
+	}
+
+	; Strictly probes a key under HKEY_CURRENT_USER: only "not found" means
+	; absent. A key that exists but cannot be opened is an error, never a
+	; missing key, so a caller cannot mistake a refusal for an empty key.
+	; @param {String} SubKey Key path below HKEY_CURRENT_USER.
+	; @returns {Boolean} True when the key exists.
+	; @throws {OSError} On any other failure to open the key.
+	CurrentUserKeyExists(SubKey) {
+		global SYSTEM_CONTROL_HKEY_CURRENT_USER, SYSTEM_CONTROL_KEY_QUERY_VALUE
+		global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND, SYSTEM_CONTROL_ERROR_PATH_NOT_FOUND
+		Handle := 0
+		Status := DllCall("Advapi32\RegOpenKeyExW", "Ptr", SYSTEM_CONTROL_HKEY_CURRENT_USER,
+			"WStr", SubKey, "UInt", 0, "UInt", SYSTEM_CONTROL_KEY_QUERY_VALUE, "PtrP", &Handle, "UInt")
+		if (Status == 0) {
+			DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+			return true
+		}
+		if (Status == SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND || Status == SYSTEM_CONTROL_ERROR_PATH_NOT_FOUND)
+			return false
+		throw OSError(Status, -1, "HKEY_CURRENT_USER\" . SubKey . " could not be opened.")
 	}
 
 	; @returns {Object|String} { Hwnd, Pid, Class } of the active window, or "".

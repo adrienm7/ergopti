@@ -551,3 +551,31 @@ _SysActions_OpenApp() {
 	}
 }
 Test("system actions: open_app launches the application stored for its binding", _SysActions_OpenApp)
+
+
+
+
+
+; =======================================
+; =======================================
+; ======= 6/ SystemControl Probes =======
+; =======================================
+; =======================================
+
+; The two probes the virtual desktop actions and the touchpad registry owner
+; make through SystemControl, run for real: both only read.
+_SysActions_ControlProbes() {
+	Adapter := SystemControl()
+	AssertTrue(Adapter.CurrentUserKeyExists("Software"), "HKEY_CURRENT_USER\Software exists")
+	AssertFalse(Adapter.CurrentUserKeyExists("Software\ErgoptiTests\Absent_" . A_TickCount),
+		"an absent key is reported absent, not as a failure")
+	AssertTrue(_TouchpadRegistryKeyExists("HKEY_CURRENT_USER\Software"),
+		"the touchpad owner probes its key through the adapter")
+	AssertThrows(() => _TouchpadRegistryKeyExists("HKEY_LOCAL_MACHINE\Software"),
+		"the touchpad owner refuses a key outside HKEY_CURRENT_USER")
+	Expected := 0
+	AssertTrue(DllCall("ProcessIdToSessionId", "UInt", DllCall("GetCurrentProcessId", "UInt"),
+		"UInt*", &Expected), "the test must know its session")
+	AssertEqual(Expected, Adapter.SessionId(), "the script's own session")
+}
+Test("system actions: SystemControl probes a registry key and names the session", _SysActions_ControlProbes)

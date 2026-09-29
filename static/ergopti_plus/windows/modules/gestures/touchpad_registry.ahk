@@ -58,26 +58,16 @@ TouchpadRegistryBackupPath() {
 	return _ConfigDir . _AhkSubDir . "touchpad_registry_backup.txt"
 }
 
-; Strictly probes a HKEY_CURRENT_USER key: only "not found" means absent.
+; Strictly probes a HKEY_CURRENT_USER key: only "not found" means absent. The
+; native probe is the SystemControl adapter's, as every OS call of the gesture
+; modules is.
 ; @param Key {String} Full key path under HKEY_CURRENT_USER.
 ; @return {Boolean} True when the key exists; throws on any other failure.
 _TouchpadRegistryKeyExists(Key) {
-	static HKEY_CURRENT_USER := 0x80000001
-	static KEY_QUERY_VALUE := 0x0001
 	static ROOT := "HKEY_CURRENT_USER\"
 	if (SubStr(Key, 1, StrLen(ROOT)) != ROOT)
 		throw ValueError("The touchpad key must live under " . ROOT)
-	Handle := 0
-	Status := DllCall("Advapi32\RegOpenKeyExW", "Ptr", HKEY_CURRENT_USER,
-		"WStr", SubStr(Key, StrLen(ROOT) + 1), "UInt", 0, "UInt", KEY_QUERY_VALUE,
-		"PtrP", &Handle, "UInt")
-	if (Status == 0) {
-		DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
-		return true
-	}
-	if (Status == 2 || Status == 3)
-		return false
-	throw OSError(Status, A_ThisFunc, "The touchpad key could not be opened.")
+	return SystemControl().CurrentUserKeyExists(SubStr(Key, StrLen(ROOT) + 1))
 }
 
 ; Reads the current value of each of the given names, with its registry type.

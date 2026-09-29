@@ -142,9 +142,7 @@ VirtualDesktopReadState(ListKey := "", SessionKey := "") {
 	if !Reg_TryRead(ListKey, "VirtualDesktopIDs", &IdsHex)
 		IdsHex := ""
 	if !Reg_TryRead(ListKey, "CurrentVirtualDesktop", &CurrentId) {
-		SessionId := 0
-		if !DllCall("ProcessIdToSessionId", "UInt", DllCall("GetCurrentProcessId", "UInt"), "UInt*", &SessionId)
-			throw OSError(A_LastError, -1, "ProcessIdToSessionId")
+		SessionId := SystemControl().SessionId()
 		if !Reg_TryRead(Format(SessionKey, SessionId), "CurrentVirtualDesktop", &CurrentId)
 			CurrentId := ""
 	}
