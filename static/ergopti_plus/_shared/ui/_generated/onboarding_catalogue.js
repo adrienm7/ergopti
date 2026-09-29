@@ -2394,6 +2394,7 @@
 							"label_key": "onboarding.magic_key.desc",
 							"hint_key": "onboarding.magic_key.choose_freely",
 							"custom_label_key": "onboarding.magic_key.option_custom",
+							"max_characters": 3,
 							"options": [
 								{
 									"value": "★",
@@ -3676,6 +3677,7 @@
 							"label_key": "onboarding.magic_key.desc",
 							"hint_key": "onboarding.magic_key.choose_freely",
 							"custom_label_key": "onboarding.magic_key.option_custom",
+							"max_characters": 3,
 							"options": [
 								{
 									"value": "★",
@@ -4539,6 +4541,7 @@
 							"label_key": "onboarding.magic_key.desc",
 							"hint_key": "onboarding.magic_key.choose_freely",
 							"custom_label_key": "onboarding.magic_key.option_custom",
+							"max_characters": 3,
 							"options": [
 								{
 									"value": "★",

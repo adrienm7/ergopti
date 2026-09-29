@@ -5902,6 +5902,8 @@ path = "hotstrings.trigger_char"
 label_key = "onboarding.magic_key.desc"
 hint_key = "onboarding.magic_key.choose_freely"
 custom_label_key = "onboarding.magic_key.option_custom"
+# The trigger is typed by one key, so a custom one is a few characters at most.
+max_characters = 3
 options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave" }, { value = ";", label_key = "onboarding.magic_key.option_semicolon" }]
 
 [onboarding.pages.llm]
