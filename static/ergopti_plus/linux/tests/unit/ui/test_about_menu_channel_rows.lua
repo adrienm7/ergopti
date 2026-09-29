@@ -50,14 +50,24 @@ end
 -- Where the channel submenu sits: after the version row and its separator.
 local CHANNEL_AT = 3
 
+-- The build the version row names, fixed so the row does not depend on the
+-- checkout the suite runs from.
+local IDENTITY = { kind = "release", version = "0.0.0-dev.140", commit = "c3005e0b9" }
+
 local function build(up, changed)
+	local Version = require("infra.version")
+	local real_identity = Version.identity
+	Version.identity = function() return IDENTITY end
 	local mb = helpers.load_module("ui.menu.menu_builder")
-	return mb.build({
+	local ok, items = pcall(mb.build, {
 		_version = "0.0.0-dev.140",
 		updater = up,
 		on_quit = function() end,
 		on_menu_changed = function() if changed then changed.count = changed.count + 1 end end,
 	})
+	Version.identity = real_identity
+	if not ok then error(items, 0) end
+	return items
 end
 
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
@@ -80,7 +90,8 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			local up = fake_updater(subscribed)
 			local rows = submenu_of(build(up), "menu.about.title")
 			helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
-			helpers.assert_eq(rows[1].title, "ErgoptiPlus 0.0.0-dev.140", "the version row comes first")
+			helpers.assert_true(rows[1].title:find("0.0.0-dev.140", 1, true) ~= nil
+				and rows[1].title:find("c3005e0b9", 1, true) ~= nil, "the version row comes first")
 			helpers.assert_eq(rows[2].title, "-", "a separator follows the version")
 			local picker = rows[CHANNEL_AT]
 			helpers.assert_eq(picker.title,

@@ -49,7 +49,9 @@ _AMCR_ChannelPickerFollowsTheRegistry() {
 			UPDATER_CHANNEL := Subscribed
 			Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
 
-			AssertTrue(InStr(Rows[1]["label"], "ErgoptiPlus ") == 1, "the version row comes first")
+			Identity := Updater_BuildIdentity()
+			AssertEqual(Updater_VersionRowLabel(Identity["kind"], Identity["version"], Identity["commit"]),
+				Rows[1]["label"], "the version row comes first")
 			AssertTrue(Rows[2].Has("separator"), "a separator follows the version row")
 			Picker := Rows[_AMCR_PICKER_AT]
 			AssertTrue(Picker.Has("items"), "the channels are one submenu")

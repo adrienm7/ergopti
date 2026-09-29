@@ -28,7 +28,9 @@ _VDSB_OwnerStripsBuildMetadata() {
 }
 
 _VDSB_SurfacesReadTheOwner() {
-	for _, Name in ["_MI_AboutUpdateRows", "_HealthCheck_Versions"] {
+	; The About row reads its version through the build identity, which reads
+	; the owner; the healthcheck reads the owner directly.
+	for _, Name in ["Updater_BuildIdentity", "_HealthCheck_Versions"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . " must be readable")
 		Assert(InStr(Body, "Updater_CurrentVersion()") > 0,
@@ -36,6 +38,12 @@ _VDSB_SurfacesReadTheOwner() {
 		AssertEqual(0, InStr(Body, "BUNDLE_VERSION"),
 			Name . " must never display the raw stamp, which carries +build metadata")
 	}
+	Row := _StripFullLineComments(_DriverFuncBody("_MI_AboutUpdateRows"))
+	Assert(Row != "", "_MI_AboutUpdateRows must be readable")
+	AssertEqual(0, InStr(Row, "BUNDLE_VERSION"),
+		"_MI_AboutUpdateRows must never display the raw stamp, which carries +build metadata")
+	Assert(RegExMatch(_DriverSourceNoComments(), "s)_MI_AboutUpdateRows\([^{]*IdentityFn := Updater_BuildIdentity\)") > 0,
+		"the About row must read the build identity owner by default")
 	Snapshot := HealthCheck_Run()
 	AssertEqual(Updater_CurrentVersion(), Snapshot["sections"]["versions"]["ergopti_version"],
 		"the diagnostics version is the owner's")

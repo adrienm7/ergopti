@@ -58,8 +58,11 @@ local QUICK_DELAY_CATEGORIES = {
 -- picker reads the sections of that pack rather than guessing at a spelling.
 local PERSONAL_CATEGORY = "personal"
 
--- Single source of the driver version.
+-- Single source of the driver version and of the build identity.
 local Version = require("infra.version")
+
+-- The shared wording of the About version row.
+local VersionLabel = require("updater.version_label")
 
 -- The shared automatic-check schedule (frequency presets and their snap).
 local Schedule = require("updater.schedule")
@@ -3454,9 +3457,16 @@ end
 --- @return table rows
 local function _about_update_rows(ctx)
 	local up = ctx.updater
-	local version = up and up.current_version() or Version.VERSION
+	-- The build and the commit it was built from, in the shared wording:
+	-- « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	-- (c3005e0b9) » for a source run. The identity is resolved once per daemon
+	-- by infra/version.lua, so a rebuild reads no file.
+	local identity = Version.identity()
 	local out = {
-		{ label = "ErgoptiPlus " .. tostring(version), disabled = true },
+		{
+			label = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n_safe),
+			disabled = true,
+		},
 		{ separator = true },
 	}
 	if not up then

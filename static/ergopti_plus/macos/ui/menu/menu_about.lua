@@ -20,6 +20,10 @@
 ---    which persists the choice and tells the launcher which feed Sparkle
 ---    reads; the check names the same channel, so the menu cannot diverge from
 ---    Sparkle's feed.
+--- 3. Build identity: the version row names the running build and the commit
+---    it was built from through the shared formatter (updater.version_label),
+---    so a source run reads « Version locale (<commit>) », never a bare
+---    "local", and an unknown commit is said, never guessed.
 --- ==============================================================================
 
 local M = {}
@@ -28,6 +32,7 @@ local Logger    = require("infra.logger")
 local i18n      = require("infra.i18n")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
+local VersionLabel = require("updater.version_label")
 local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
 local LOG       = "menu_about"
@@ -45,10 +50,6 @@ local LOG       = "menu_about"
 
 local function is_local_source()
 	return Updater.is_local_source()
-end
-
-local function current_version()
-	return Updater.current_version()
 end
 
 local function releases_page_url()
@@ -167,19 +168,16 @@ function M.build(ctx)
 		Logger.error(LOG, "No update channel owner in the menu context — the channel rows are left out.")
 	end
 	local channel = owner and owner.get() or Updater.installed_channel()
-	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
 	local local_src = is_local_source()
 
-	-- First disabled item mirrors AHK: "ErgoptiPlus <version>".
-	-- e.g. "ErgoptiPlus v0.2.1-dev" or "ErgoptiPlus local"
-	local ver_display
-	if ver == "local" then
-		ver_display = "ErgoptiPlus local"
-	else
-		ver_display = "ErgoptiPlus " .. ver
-	end
+	-- The build and the commit it was built from, in the shared wording:
+	-- « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	-- (c3005e0b9) » for a source run. The identity is resolved once per Lua
+	-- state by the updater facade, so a rebuild reads no file.
+	local identity = Updater.build_identity()
+	local ver_display = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n.get)
 
 	local menu_items = {}
 
