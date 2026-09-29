@@ -207,6 +207,9 @@ if (windowsSmokeStep !== null) {
 // child processes and bundle tree that tell a slow extraction from a stuck one.
 const SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS = 19;
 const WINDOWS_SMOKE_HANG_HEADROOM = 3;
+// The step's time outside the wait: the Add-Type compile of the dialog probe
+// before it, and the diagnostics, which can wait on a hung window, after it.
+const WINDOWS_SMOKE_STEP_MARGIN_SECONDS = 60;
 // PowerShell names are case-insensitive, so $seconds is the same parameter.
 const WINDOWS_SMOKE_PRINTS_ELAPSED = /Write-Host .*\$Seconds\b/i;
 const WINDOWS_SMOKE_VERDICT = 'if ($crashedEarly -or -not $markerSeen) {';
@@ -224,9 +227,11 @@ const WINDOWS_SMOKE_WAIT_EXITS = [
  * extraction as a blocking dialog, or fail without the evidence that tells
  * the two apart.
  * @param {string[]} script Script lines, such as pipeline.runOf() returns.
+ * @param {string|null} timeoutMinutes The step's `timeout-minutes`, such as
+ *   pipeline.stepField() returns.
  * @returns {string[]}
  */
-function windowsSmokeWaitProblems(script) {
+function windowsSmokeWaitProblems(script, timeoutMinutes) {
 	const problems = [];
 	const code = script.filter((line) => !line.trimStart().startsWith('#'));
 	const bounds = code
@@ -240,6 +245,21 @@ function windowsSmokeWaitProblems(script) {
 			`the Windows exe smoke hang bound (${bounds[0][1]} s) must be at least ` +
 				`${WINDOWS_SMOKE_HANG_HEADROOM} x the slowest green smoke ` +
 				`(${SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS} s): it bounds a hang, it does not detect a dialog`
+		);
+	} else if (!/^\d+$/.test(timeoutMinutes ?? '')) {
+		problems.push(
+			`the Windows exe smoke step must set timeout-minutes to a whole number, got ${timeoutMinutes}`
+		);
+	} else if (
+		Number(bounds[0][1]) + WINDOWS_SMOKE_STEP_MARGIN_SECONDS >
+		Number(timeoutMinutes) * 60
+	) {
+		// GitHub cancels a step at its timeout without running the rest of
+		// the script, so a hang bound it cuts short prints no diagnostics.
+		problems.push(
+			`the Windows exe smoke hang bound (${bounds[0][1]} s) plus ` +
+				`${WINDOWS_SMOKE_STEP_MARGIN_SECONDS} s for the probe compile and the diagnostics ` +
+				`must fit the step's timeout-minutes (${timeoutMinutes})`
 		);
 	}
 	if (
@@ -362,14 +382,22 @@ function windowsSmokeWaitProblems(script) {
 
 if (windowsSmokeStep !== null) {
 	const script = pipeline.runOf(windowsSmokeStep) ?? [];
-	errors.push(...windowsSmokeWaitProblems(script));
+	const timeoutMinutes = pipeline.stepField(windowsSmokeStep, 'timeout-minutes');
+	errors.push(...windowsSmokeWaitProblems(script, timeoutMinutes));
 	// Each rule must be able to fail on the live script, or it proves nothing.
-	for (const [what, mutate] of [
+	for (const [what, mutate, timeout = timeoutMinutes] of [
 		[
 			'a 20 s hang bound',
 			(lines) =>
 				lines.map((line) => line.replace(/^\$hangBoundSeconds = \d+$/, '$hangBoundSeconds = 20'))
 		],
+		[
+			'a hang bound the step timeout cuts short',
+			(lines) =>
+				lines.map((line) => line.replace(/^\$hangBoundSeconds = \d+$/, '$hangBoundSeconds = 300'))
+		],
+		['a step timeout shorter than the hang bound', (lines) => lines, '2'],
+		['a step without a timeout', (lines) => lines, null],
 		[
 			'a wait blind to dialogs',
 			(lines) => lines.filter((line) => !line.includes('[SmokeWindows]::HasDialog($proc.Id)'))
@@ -461,7 +489,7 @@ if (windowsSmokeStep !== null) {
 			(lines) => lines.filter((line) => !/^\s*marker_seconds = /.test(line))
 		]
 	]) {
-		if (windowsSmokeWaitProblems(mutate(script)).length === 0) {
+		if (windowsSmokeWaitProblems(mutate(script), timeout).length === 0) {
 			errors.push(`the Windows exe smoke wait check cannot detect ${what}`);
 		}
 	}
