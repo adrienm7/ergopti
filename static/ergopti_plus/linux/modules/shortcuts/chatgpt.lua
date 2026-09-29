@@ -151,8 +151,15 @@ end
 
 --- Validates this same reader against a detached scoped candidate.
 --- @param document table Decoded configuration.
+--- @param written boolean|nil True for the document a scope just wrote: a URL
+---   there is that write's output, so an invalid one raises.
 --- @return string Effective URL.
-function M.configuration_candidate(document)
+function M.configuration_candidate(document, written)
+	if written then
+		local section = document.shortcuts
+		local stored = type(section) == "table" and section.chatgpt_url or nil
+		assert(stored == nil or M.is_valid(stored), "ChatGPT shortcut URL must be an HTTP(S) URL")
+	end
 	return resolve(document)
 end
 

@@ -643,8 +643,11 @@ end
 
 --- Resolves a detached candidate with the same slot catalogue as the reader.
 --- @param document table Decoded configuration.
+--- @param written boolean|nil True for the document a scope just wrote: every
+---   walked slot is then its own output, so an unassignable one is a real
+---   failure and raises instead of being read as outdated configuration.
 --- @return table state
-function M.configuration_candidate(document)
+function M.configuration_candidate(document, written)
 	local catalogue = assert(action_catalogue(), "keyboard action catalogue is unavailable")
 	local assignments = {}
 	for slot, action in pairs(manifest_defaults()) do
@@ -652,6 +655,8 @@ function M.configuration_candidate(document)
 		if action ~= "none" then assignments[slot] = action end
 	end
 	walk_assignments(document, function(slot, action)
+		assert(not written or action == "none" or (type(action) == "string" and catalogue.is_assignable(action)),
+			"invalid keyboard assignment: " .. slot)
 		-- The loader's rule: an outdated action leaves the slot unbound.
 		local known = stored_assignment_known(slot, action, catalogue)
 		assignments[slot] = known and action ~= "none" and action or nil

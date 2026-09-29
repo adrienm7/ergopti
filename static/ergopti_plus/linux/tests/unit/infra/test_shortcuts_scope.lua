@@ -174,6 +174,27 @@ helpers.describe("Linux terminal shortcut scope", function()
 		end)
 	end
 
+	helpers.it("refuses a reset whose own written action is unassignable (config-outdated-strict-candidate)", function()
+		-- Tolerance is for the user's pre-write values. After the write every
+		-- walked slot is the scope's own output, so an unassignable one there is
+		-- a real failure: the reset must be refused and compensated, never
+		-- committed with the slot silently unbound.
+		with_scope(function(scope, owners, _, path)
+			local refused = Manifest.recommended_for("shortcuts.keyboard.ctrl_g")
+			helpers.assert_true(refused ~= "none", "the fixture needs a recommended keyboard action")
+			local is_assignable = owners.gestures.is_assignable
+			owners.gestures.is_assignable = function(action)
+				if action == refused then return false end
+				return is_assignable(action)
+			end
+			local ok, committed = pcall(scope.apply, "recommended")
+			owners.gestures.is_assignable = is_assignable
+			helpers.assert_true(ok, tostring(committed))
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE, "the refused reset is compensated")
+		end)
+	end)
+
 	helpers.it("refuses a reserved backup before changing runtime", function()
 		with_scope(function(scope, owners, _, path, backup)
 			Sandbox.write_bytes(backup, "reserved")

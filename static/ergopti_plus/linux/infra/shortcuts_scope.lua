@@ -46,10 +46,17 @@ function M.new(options)
 		return nil
 	end
 	local validators = { action_parameter_domain = parameter_domain }
-	local function resolve(config)
-		url.configuration_candidate(config)
-		return { manager = manager.configuration_candidate(config), keyboard = keyboard.configuration_candidate(config),
-			taps = taps.configuration_candidate(config) }
+	--- Resolves every owner's view of a document. The pre-write source is the
+	--- user's, where outdated values are tolerated; the post-write candidate
+	--- (`written`) holds only this scope's output, so owners check it strictly.
+	--- @param config table Decoded document.
+	--- @param written boolean|nil True for the post-write candidate.
+	--- @return table state
+	local function resolve(config, written)
+		url.configuration_candidate(config, written)
+		return { manager = manager.configuration_candidate(config),
+			keyboard = keyboard.configuration_candidate(config, written),
+			taps = taps.configuration_candidate(config, written) }
 	end
 	local function inventory()
 		local bytes, status, detail = Writer.read_classified(options.path, files)
@@ -102,7 +109,7 @@ function M.new(options)
 		end,
 		apply = function(config)
 			if options.is_paused() then return false end
-			local candidate = resolve(config)
+			local candidate = resolve(config, true)
 			candidate.parameters = parameters.parameter_configuration_snapshot(owner)
 			if type(candidate.parameters) ~= "table" then return false end
 			for key in pairs(candidate.parameters) do
