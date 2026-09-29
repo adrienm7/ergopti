@@ -46,7 +46,8 @@ _LLM_Engine_ResolveRemoteTransport() {
  * Validates the prompt override a request may carry: the profile a
  * llm_prompt_prediction binding names, and its own prediction count.
  * @param {Map|Integer} Override 0 for an ordinary request, else
- *     Map("profile_id", Id[, "num_predictions", 1..10]).
+ *     Map("profile_id", Id[, "num_predictions", 1..10][, "live", true]); "live"
+ *     marks the automatic trigger of live mode (prediction_live.ahk).
  * @returns {Map|Integer} A detached, validated copy, or 0 for none.
  */
 _LLM_Engine_NormalizePromptOverride(Override) {
@@ -63,7 +64,10 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 			&& (Count < LLM_PROMPT_ACTION_MIN_PREDICTIONS
 				|| Count > LLM_PROMPT_ACTION_MAX_PREDICTIONS))
 		throw ValueError("A prompt override's prediction count is out of range: " . String(Count) . ".")
-	return Map("profile_id", ProfileId, "num_predictions", Count)
+	Live := Override.Get("live", false)
+	if !(Live is Integer) || (Live != 0 && Live != 1)
+		throw TypeError("A prompt override's live flag must be a Boolean.")
+	return Map("profile_id", ProfileId, "num_predictions", Count, "live", Live ? true : false)
 }
 
 /**
@@ -209,7 +213,9 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
  * @param {Map} Override - A prompt of this request's own (the
  *     llm_prompt_prediction action): Map("profile_id", Id, "num_predictions",
  *     Count or 0 for the menu's). It wins over the active and per-app profiles
- *     and never changes them. 0 for an ordinary request.
+ *     and never changes them. With "live" (live mode's automatic trigger) the
+ *     minimum word count is live.json's, and the request waits while a
+ *     hotstring tooltip is shown. 0 for an ordinary request.
  */
 LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	global _LLM_Engine
@@ -240,6 +246,13 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		return
 
 	Override := _LLM_Engine_NormalizePromptOverride(Override)
+	IsLive := (Override is Map) && Override["live"]
+	; Hotstring tooltips win: a live prediction would replace the preview on the
+	; shared surface. The chain armed when it closes asks again.
+	if (IsLive && _LLM_Engine_HotstringTooltipShown()) {
+		try LoggerDebug("LLM", "Live prediction deferred: a hotstring tooltip is shown.")
+		return
+	}
 	AcceptSource := _LLM_Engine_NormalizeAcceptSource(AcceptSource?)
 
 	; Honour the disable_password_fields user preference: skip prediction in
@@ -285,7 +298,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; The info bar names the prompt that answers THIS request. Keyed by the
 	; request id so a later ordinary request never inherits an override's label.
 	_LLM_Engine["request_prompt_override"] := (Override is Map)
-		? Map("request_id", this_request_id, "profile_id", Override["profile_id"]) : ""
+		? Map("request_id", this_request_id, "profile_id", Override["profile_id"],
+			"live", IsLive) : ""
 
 	; Honour the disabled_apps user preference: skip prediction entirely when the focused
 	; app is on the user's exclusion list, so typed context never leaves an app the user
@@ -325,10 +339,13 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; every consumer of the global one below: temperature, dispatch, budget.
 	request_n_predictions := (Override is Map && Override["num_predictions"] > 0)
 		? Override["num_predictions"] : _LLM_Engine["n_predictions"]
+	; Live mode shows what is typed from the first word: its own floor replaces
+	; the menu's minimum word count for the prompt and the parser alike.
+	request_min_words := IsLive ? LLM_Live_Config()["min_words"] : _LLM_Engine["min_words"]
 	pb := PromptBuilder()
 	pb_cfg := Map(
 		"max_words",            _LLM_Engine["max_words"],
-		"min_words",            _LLM_Engine["min_words"],
+		"min_words",            request_min_words,
 		"num_predictions",      request_n_predictions,
 		"temperature",          _LLM_Engine["temperature"] + 0.0,
 		"auto_raise_temp",      _LLM_Engine["auto_raise_temp"],
@@ -364,7 +381,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	}
 	request_semantic_signature := _LLM_Engine_RequestSemanticSignature(
 		effective_profile_id, profile,
-		(Override is Map) ? Override["num_predictions"] : 0)
+		(Override is Map) ? Override["num_predictions"] : 0, IsLive)
 	_LLM_Engine["active_request_signature"] := request_semantic_signature
 	; Per-prediction output-token budget computed once by the shared PromptBuilder
 	; (max(15, max_words*6+10), default 150) — the single cross-driver source.
@@ -514,7 +531,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	system_prompt := LLM_ResolveSystemPrompt(
 		profile,
 		n_predictions,
-		_LLM_Engine["min_words"],
+		request_min_words,
 		_LLM_Engine["max_words"],
 		_LLM_Engine["language"]
 	)
@@ -579,7 +596,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		state := Map(
 			"ctx",           ctx,
 			"ctx_tail",      tail,
-			"min_words",     _LLM_Engine["min_words"],
+			"min_words",     request_min_words,
 			"max_words",     _LLM_Engine["max_words"],
 			"is_batch",      true,
 			"request_id",    this_request_id,
@@ -610,7 +627,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	state := Map(
 		"ctx",               ctx,
 		"ctx_tail",          tail,
-		"min_words",         _LLM_Engine["min_words"],
+		"min_words",         request_min_words,
 		"max_words",         _LLM_Engine["max_words"],
 		"is_batch",          is_batch_profile,
 		"request_id",        this_request_id,
@@ -697,8 +714,11 @@ _LLM_Engine_ShowLoadingTooltip() {
 	if (IsSet(LLM_Tooltip_IsVisible) and LLM_Tooltip_IsVisible()
 			and IsSet(LLM_Tooltip_IsLoading) and !LLM_Tooltip_IsLoading())
 		return
-	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	RequestId := _LLM_Engine.Get("request_id", 0)
+	; A hotstring tooltip wins over a live one on the shared surface
+	if (_LLM_Engine_RequestIsLive(RequestId) && _LLM_Engine_HotstringTooltipShown())
+		return
+	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	SemanticSignature := _LLM_Engine.Get("active_request_signature", "")
 	Source := _LLM_Engine_RequestAcceptSourceForRender(RequestId)
 	Meta := Map(
@@ -1339,6 +1359,13 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	if (request_id != "" and !_LLM_Engine_IsCurrent(Map(
 			"request_id", request_id, "semantic_signature", semantic_signature))) {
 		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
+		return
+	}
+	; A hotstring preview shown meanwhile keeps the surface: the live answer is
+	; dropped, and the chain armed when the preview closes asks again.
+	if (request_id != "" && _LLM_Engine_RequestIsLive(request_id)
+			&& _LLM_Engine_HotstringTooltipShown()) {
+		try LoggerDebug("LLM", "Live prediction #{1} dropped: a hotstring tooltip is shown.", request_id)
 		return
 	}
 	; Freeze the chain timings BEFORE the final render, not after it. The render

@@ -35,7 +35,12 @@ selected again. `vision.ahk` ports `_shared/lua/llm/vision.lua` (the
 each API dialect and the tagged-answer reader, pinned to `vision_vectors.json`)
 and `vision_action.ahk` runs `llm_screen_region` / `llm_screen_full` on it: a
 screenshot is transcribed by a vision model, then the AI menu's backend drafts
-the answers offered as tooltip candidates.
+the answers offered as tooltip candidates. `prediction_live.ahk` owns live mode
+(`llm_live_prompt_toggle` and the AI menu's live mode submenu): while it is on,
+the automatic typing trigger runs its prompt and count through the same
+prompt-override request path, with the debounce and minimum word count of
+`_shared/modules/llm/live.json`, so a rewrite prompt such as `translate_en`
+shows the current sentence translated as it is typed.
 
 ## Public API
 

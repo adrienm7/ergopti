@@ -27,6 +27,7 @@ local StreamPanel      = require("ui.menu.menu_llm.streaming_panel")
 local WarmupCtrl       = require("ui.menu.menu_llm.warmup_controller")
 local BackendPanel     = require("ui.menu.menu_llm.backend_panel")
 local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
+local LiveModePanel    = require("ui.menu.menu_llm.live_mode_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
@@ -1133,6 +1134,21 @@ local function create_menu(deps)
 				})
 
 				row_for("llm_trigger", { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
+
+
+				-- ===== Live mode submenu =====
+
+				row_for("llm_live_mode", {
+						title    = i18n.get("menu.llm.live_mode_title"),
+						disabled = MenuLayout.row_disabled("llm_live_mode", is_disabled, paused),
+						menu     = LiveModePanel.build({
+								llm_mod     = llm_mod,
+								keymap      = keymap,
+								count       = state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions,
+								is_disabled = is_disabled,
+								update_menu = update_menu,
+						}),
+				})
 
 
 				-- ===== Generation settings submenu =====

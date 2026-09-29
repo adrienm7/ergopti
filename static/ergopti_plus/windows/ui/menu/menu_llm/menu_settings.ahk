@@ -149,6 +149,52 @@ _LLM_Menu_TriggerRows() {
 	return Rows
 }
 
+/**
+ * Builds the live mode submenu (manifest row llm_live_mode).
+ * @returns {Menu} Populated live mode submenu.
+ */
+LLM_Menu_BuildLiveModeMenu() {
+	m := Menu()
+	MenuRenderer_FillFromList(m, "llm_menu", "llm_live_mode", (*) => _LLM_Menu_LiveModeRows())
+	return m
+}
+
+/**
+ * Row data for the live mode submenu: "Off", then every prompt that rewrites
+ * the current sentence (the built-ins in menu order, then the user's custom
+ * prompts), labelled as the prompt list labels them. The row of the current
+ * state is checked; a prompt row turns live mode on with it and the menu's
+ * count, the same engine state the llm_live_prompt_toggle action drives.
+ * @returns {Array} The Off row, then one row per rewrite prompt.
+ */
+_LLM_Menu_LiveModeRows() {
+	global _LLM_Menu
+	Live := LLM_Engine_LiveOverride()
+	Active := Live is Map
+	Rows := [Map(
+		"label",   t("menu.llm.live_mode_off"),
+		"checked", !Active,
+		"action",  (*) => LLM_Menu_StopLiveMode())]
+	; Labels must be unique within a menu: AHK addresses its rows by label
+	Seen := Map(t("menu.llm.live_mode_off"), 1)
+	for Choice in LLM_Menu_PromptChoices() {
+		Id := Choice["value"]
+		if !LLM_Rewrite_IsRewriteProfile(LLM_FindProfile(Id, _LLM_Menu["user_profiles"]))
+			continue
+		Rows.Push(Map(
+			"label",   _LLM_Menu_UniqueMenuLabel(Seen, Choice["label"]),
+			"checked", Active && Live["profile_id"] == Id,
+			"action",  _LLM_Menu_MakeLiveModeHandler(Id)))
+	}
+	return Rows
+}
+
+; A closure per row: built in a helper so each keeps its own profile id.
+; @param {String} ProfileId The prompt the row turns live mode on with.
+_LLM_Menu_MakeLiveModeHandler(ProfileId) {
+	return (*) => LLM_Menu_StartLiveMode(ProfileId, 0)
+}
+
 
 
 
@@ -808,6 +854,64 @@ LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0) {
 	return true
 }
 
+/**
+ * Runs the llm_live_prompt_toggle action: turns live mode on with the prompt
+ * and count of the binding, or off when it is on, whichever binding turned it
+ * on.
+ * @param {String} ProfileId The prompt to run, built-in or custom.
+ * @param {Integer} NumPredictions The binding's own count, 0 for the menu's.
+ * @returns {Boolean} True when live mode changed state.
+ */
+LLM_Menu_ToggleLiveMode(ProfileId, NumPredictions := 0) {
+	if LLM_Engine_LiveIsActive()
+		return LLM_Menu_StopLiveMode()
+	return LLM_Menu_StartLiveMode(ProfileId, NumPredictions)
+}
+
+/**
+ * Turns live mode on with a prompt of its own, or moves it to that prompt.
+ * The menu's active profile and settings are left untouched. The refusals of
+ * a manual prediction apply, but for the empty context: live mode waits for
+ * the user to type. A prompt that no longer exists is refused with its notice
+ * and never replaced by another one.
+ * @param {String} ProfileId The prompt to run, built-in or custom.
+ * @param {Integer} NumPredictions The binding's own count, 0 for the menu's.
+ * @returns {Boolean} True when live mode is on with that prompt.
+ */
+LLM_Menu_StartLiveMode(ProfileId, NumPredictions := 0) {
+	global _LLM_Menu, _LLM_Bridge_Buffer
+	Enabled := _LLM_Menu.Get("enabled", false)
+	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
+		Enabled && _LLM_Menu_BackendIsReadyForUse(), _LLM_Bridge_Buffer)
+	if (Reason != "" && Reason != "empty_context") {
+		_LLM_Menu_ShowManualPredictionRefusal(Reason, StrLen(_LLM_Bridge_Buffer))
+		return false
+	}
+	if !(LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"]) is Map) {
+		LoggerWarn("LLM", "Live mode refused: the prompt '{1}' no longer exists.", ProfileId)
+		_LLM_Menu_ShowManualPredictionNotice("llm.prompt_prediction.unknown_prompt")
+		return false
+	}
+	LLM_Engine_LiveStart(ProfileId, NumPredictions)
+	_LLM_Menu_ShowNotice(StrReplace(t("llm.live.on"), "{1}", LLM_Menu_GetProfileLabel(ProfileId)))
+	LLM_Menu_RequestBuild("live_mode")
+	return true
+}
+
+/**
+ * Turns live mode off and dismisses its tooltip; the menu's "Off" row.
+ * @returns {Boolean} True when live mode was on.
+ */
+LLM_Menu_StopLiveMode() {
+	if !LLM_Engine_LiveStop("turned off by the user")
+		return false
+	if LLM_Tooltip_IsVisible()
+		LLM_Tooltip_Hide()
+	_LLM_Menu_ShowNotice(t("llm.live.off"))
+	LLM_Menu_RequestBuild("live_mode")
+	return true
+}
+
 ; Logs a manual-request refusal at INFO with its reason and shows its notice.
 ; @param {String} Reason A key of LLM_MANUAL_PREDICTION_REFUSALS.
 ; @param {Integer} ContextLength Characters of context the request had.
@@ -821,7 +925,13 @@ _LLM_Menu_ShowManualPredictionRefusal(Reason, ContextLength) {
 ; Shows a manual-request notice the way every refusal is shown.
 ; @param {String} Key The locale key of the notice.
 _LLM_Menu_ShowManualPredictionNotice(Key) {
-	TooltipShow({ Text: t(Key), DurationSec: UI_HOTSTRING_TIMEOUT_SEC },
+	_LLM_Menu_ShowNotice(t(Key))
+}
+
+; Shows an AI notice the way every manual-request refusal is shown.
+; @param {String} Text The translated notice.
+_LLM_Menu_ShowNotice(Text) {
+	TooltipShow({ Text: Text, DurationSec: UI_HOTSTRING_TIMEOUT_SEC },
 		UI_HOTSTRING_TIMEOUT_SEC)
 }
 

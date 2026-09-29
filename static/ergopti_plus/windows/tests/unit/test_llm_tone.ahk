@@ -331,8 +331,14 @@ _LTN_HotkeysSkipTheLadder() {
 			for Id in Order
 				Assert(Id != ToneId, "the tone profile " . ToneId . " must not take a Ctrl+<n> hotkey")
 		}
+		; Live mode's translations stay out of the number row the same way
+		for TranslationId in LLM_PROFILE_LIVE_TRANSLATIONS {
+			for Id in Order
+				Assert(Id != TranslationId, "the translation " . TranslationId . " must not take a Ctrl+<n> hotkey")
+		}
 		AssertEqual(9, Order.Length, "the hotkeys still fill the number row")
-		AssertEqual("user_mine_1", Order[LLM_PROFILE_BUILTIN_ORDER.Length - LLM_TONE_LADDER.Length + 1],
+		AssertEqual("user_mine_1", Order[LLM_PROFILE_BUILTIN_ORDER.Length - LLM_TONE_LADDER.Length
+			- LLM_PROFILE_LIVE_TRANSLATIONS.Length + 1],
 			"the first custom profile follows the prediction built-ins")
 	} finally {
 		LLM_PROFILE_HOTKEY_LIMIT := HadLimit ? SavedLimit : unset

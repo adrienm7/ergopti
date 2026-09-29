@@ -1097,6 +1097,18 @@ sg("llm_prompt_prediction", function(binding)
 	end
 	return request_prompt_prediction("llm_prompt_prediction", value)
 end)
+-- Live mode with the binding's prompt, or off when it is on. The value is
+-- handed over even when invalid: a second press of ANY live binding turns live
+-- mode off, and the engine refuses an invalid prompt only when turning it on.
+sg("llm_live_prompt_toggle", function(binding)
+	local value = M.get_action_parameter(binding, "llm_live_prompt_toggle")
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table" or type(keymap.toggle_live_prompt) ~= "function" then
+		Logger.error(LOG, "llm_live_prompt_toggle: the keymap bridge is unavailable: %s.", tostring(keymap))
+		return false
+	end
+	return keymap.toggle_live_prompt(value)
+end)
 -- One ready-made action per built-in profile (llm_predict_<id>), with the AI
 -- menu's count. Derived from profiles.json, like the catalogue, so a new
 -- built-in profile gets its action without a hand-written registration here.

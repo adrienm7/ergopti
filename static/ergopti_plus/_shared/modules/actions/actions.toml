@@ -952,6 +952,12 @@ platform = "all"
 [sg_actions.llm_predict_tone_very_formal]
 platform = "all"
 
+[sg_actions.llm_predict_translate_en]
+platform = "all"
+
+[sg_actions.llm_predict_translate_ja]
+platform = "all"
+
 [sg_actions.llm_tone_more_formal]
 # Rewrites the SELECTION one register more formal on the tone ladder
 # (_shared/lua/llm/tone.lua: familiar, neutral, formal, very formal) and
@@ -980,6 +986,16 @@ platform = "all"
 # llm_generate_prediction, and when the backend has no vision model.
 platform = "all"
 parameter = "llm_vision"
+
+[sg_actions.llm_live_prompt_toggle]
+# Turns live mode on with the prompt stored for the binding (llm_prompt
+# parameter, as llm_prompt_prediction), or off when it is on. While on, every
+# keystroke asks for predictions with that prompt and count, using the
+# debounce and minimum word count of _shared/modules/llm/live.json instead of
+# the menu's, so a rewrite prompt such as translate_en shows the current sentence translated as it is typed; Tab
+# replaces the sentence. The menu's profile and settings are left unchanged.
+platform = "all"
+parameter = "llm_prompt"
 
 [sg_actions.llm_screen_full]
 # llm_screen_region on the whole screen the pointer is on, with no selection.
@@ -1400,10 +1416,13 @@ items = [
     "llm_predict_tone_neutral",
     "llm_predict_tone_formal",
     "llm_predict_tone_very_formal",
+    "llm_predict_translate_en",
+    "llm_predict_translate_ja",
     "llm_tone_more_formal",
     "llm_tone_more_familiar",
     "llm_tone_more_formal_cycle",
     "llm_tone_more_familiar_cycle",
+    "llm_live_prompt_toggle",
     "llm_screen_region",
     "llm_screen_full",
     "--",

@@ -15,13 +15,18 @@ global LLM_OPTION_MAX_STOP_SEQUENCES := 64
 global LLM_OPTION_MAX_AGGREGATE_CHARS := 1048576
 ; Canonical built-in profile ids, those of _shared/modules/llm/profiles.json in
 ; menu order. Validation must reject custom records which would shadow
-; resolution, while menu hotkeys preserve this exact order: "rewrite" and the
-; tone ladder come last so the Ctrl+1…4 hotkeys of the four older built-ins keep
-; their digits.
+; resolution, while menu hotkeys preserve this exact order: "rewrite", the tone
+; ladder and the live translations come last so the Ctrl+1…4 hotkeys of the
+; four older built-ins keep their digits.
 global LLM_PROFILE_BUILTIN_ORDER := [
 	"raw", "basic", "advanced", "batch_advanced", "rewrite",
-	"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal"
+	"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal",
+	"translate_en", "translate_ja"
 ]
+; The built-in translations of the current sentence, run by live mode
+; (llm_live_prompt_toggle) or their llm_predict presets rather than as the
+; active profile: like the tone ladder, they take no Ctrl+<n> profile hotkey.
+global LLM_PROFILE_LIVE_TRANSLATIONS := ["translate_en", "translate_ja"]
 
 _LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {
 	global LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_AGGREGATE_CHARS

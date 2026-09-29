@@ -72,15 +72,19 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer) 
 		; control. PromptBuilder (macOS parity) derives capped context + tail
 		; inside FirePrediction. Binding the origin prevents a later keystroke in
 		; another control from re-attributing this request before the timer fires.
+		; Live mode redirects this same trigger to its own prompt, count and
+		; debounce; the override is bound with the buffer like the focus origin.
 		AcceptSource := _LLM_Engine_CaptureAcceptSource()
 		_LLM_Engine["last_buffer"] := buffer
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,
+			LLM_Engine_LiveOverride())
 		; A word-end fast-fire (instant_on_word_end) passes a delay override; otherwise the
 		; configured debounce applies. Max(1, ...) keeps an override of 0 near-immediate.
 		HasOverride := delay_override_ms != "" and IsNumber(delay_override_ms)
-		_arm_ms := HasOverride ? Max(1, delay_override_ms) : _LLM_Engine["debounce_ms"]
+		DebounceMs := LLM_Engine_LiveDebounceMs()
+		_arm_ms := HasOverride ? Max(1, delay_override_ms) : DebounceMs
 		TimerPeriod := HasOverride ? -_arm_ms
-			: LLM_Option_DebounceTimerPeriod(_LLM_Engine["debounce_ms"])
+			: LLM_Option_DebounceTimerPeriod(DebounceMs)
 		ScheduleFn.Call(_LLM_Engine["pending_timer"], TimerPeriod)
 		_LLM_Engine["timer_active"] := true
 	} finally {
@@ -115,12 +119,15 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
 	; cancel/re-arm transaction, so a stale callback cannot cancel a newer timer.
 	AcceptSource := _LLM_Engine_CaptureAcceptSource()
 	HasOverride := delaySec != "" and IsNumber(delaySec)
+	DebounceMs := LLM_Engine_LiveDebounceMs()
 	delay_ms := HasOverride
 		? Max(1, Round(delaySec * 1000))
-		: _LLM_Engine["debounce_ms"]
+		: DebounceMs
 	TimerPeriod := HasOverride ? -delay_ms
-		: LLM_Option_DebounceTimerPeriod(_LLM_Engine["debounce_ms"])
-	PendingTimer := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
+		: LLM_Option_DebounceTimerPeriod(DebounceMs)
+	; The hotstring chain is the automatic trigger too: live mode redirects it
+	PendingTimer := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,
+		LLM_Engine_LiveOverride())
 	PreviousCritical := Critical("On")
 	try {
 		if IsSet(PublishGuard) && !PublishGuard.Call()

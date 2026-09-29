@@ -596,6 +596,9 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 						_LLM_Bridge_ApplyBufferEdit()
 				else
 						_LLM_Bridge_ApplyBufferEdit(Effect.DeleteFromEnd, Effect.InsertedText)
+				; Hotstrings win over live mode: it asks again on the expanded text
+				if IsSet(LLM_Bridge_ReissueLiveAfterExpansion)
+						LLM_Bridge_ReissueLiveAfterExpansion()
 		}
 }
 

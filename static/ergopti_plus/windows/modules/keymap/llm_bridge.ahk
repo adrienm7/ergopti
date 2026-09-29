@@ -891,7 +891,10 @@ LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		return
-	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"] && _LLM_Engine["after_hotstring"])
+	; Live mode waits for the hotstring tooltip to close whatever after_hotstring
+	; says: its tooltip follows every keystroke, so it must come back after it.
+	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"]
+			&& (_LLM_Engine["after_hotstring"] || LLM_Engine_LiveIsActive()))
 		return
 	if !(IsObject(items) && items.Length > 0)
 		return false
@@ -1016,6 +1019,28 @@ LLM_Bridge_OnChar(ch) {
 		LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer, 0)
 	else
 		LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
+}
+
+/**
+ * Asks live mode again after a hotstring expansion rewrote the end of the
+ * buffer. The request the trigger's last character armed holds the text the
+ * expansion replaced, and a live tooltip shown for it no longer applies: it is
+ * dismissed, and the request re-issued on the text after the expansion. Does
+ * nothing outside live mode, whose next-word prediction is left as it was.
+ * Called from the hotstring engine's LLM mirror, inside its Critical span.
+ * @returns {Integer} True when a live request was re-armed.
+ */
+LLM_Bridge_ReissueLiveAfterExpansion() {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) || !LLM_Engine_LiveIsActive()
+		return false
+	if LLM_Tooltip_IsVisible()
+		LLM_Bridge_DeferTooltipHide()
+	; Armed even while the consumed preview is still retiring: the live request
+	; waits at fire time for any hotstring tooltip left on screen, whose own
+	; chain (LLM_Bridge_ScheduleAfterHotstring) asks again once it closes.
+	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
+	return true
 }
 
 /**

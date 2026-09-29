@@ -9,6 +9,9 @@
 --- except for the tone actions, which the user fires on a selection precisely
 --- to have it replaced (llm/tone.lua). The screen actions (llm/vision.lua) offer
 --- answers to what is on the screen through the same tooltip and acceptance.
+--- Live mode (llm_live_prompt_toggle) redirects the automatic typing trigger to
+--- a chosen prompt, so a rewrite prompt shows the sentence translated or
+--- rewritten as it is typed; Tab accepts it. It owns no second pipeline.
 --- ==============================================================================
 
 local M = {}
@@ -33,6 +36,8 @@ local Inference = require("modules.llm.inference")
 local Monotonic = require("infra.monotonic")
 local i18n = require("infra.i18n")
 local Base64 = require("compat.base64")
+local Json = require("json")
+local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -86,6 +91,16 @@ local _vision_flow = nil
 -- Whether the session was already told that screenshots go out unscaled
 local _vision_unscaled_logged = false
 
+-- Live mode (llm_live_prompt_toggle and the AI menu's live submenu): nil when
+-- off, else { profile_id, num_predictions } the automatic typing trigger runs
+-- with instead of the menu's. Never persisted: off at every start.
+local _live = nil
+-- The decoded live.json, loaded on the first activation
+local _live_config = nil
+-- Injected by init(): told after every live transition, so the tray redraws
+-- its live submenu's check marks.
+local _on_live_change = nil
+
 -- The reasons a manual request is refused, each with the locale key of the
 -- notice that tells the user. manual_refusal checks them in this order: a pause
 -- outranks everything, then the AI switch, then the backend, then the typed
@@ -108,6 +123,12 @@ local VISION_ACTIONS = { llm_screen_region = "region", llm_screen_full = "full" 
 local VISION_NO_MODEL_KEY = "llm.vision.no_model"
 local VISION_READ_FAILED_KEY = "llm.vision.read_failed"
 local VISION_CAPTURE_FAILED_KEY = "llm.vision.capture_failed"
+
+-- The live mode's action, its notices and its shipped timing
+local LIVE_ACTION = "llm_live_prompt_toggle"
+local LIVE_ON_KEY = "llm.live.on"
+local LIVE_OFF_KEY = "llm.live.off"
+local LIVE_CONFIG_FILE = "modules/llm/live.json"
 
 -- The ready-made prompt actions: one per built-in profile, named after it
 -- (tools/test/test-llm-prompt-actions-single-source.cjs pins the catalogue side).
@@ -246,7 +267,62 @@ local function ends_word(buffer, ch)
 	return previous ~= nil and not is_boundary_char(previous)
 end
 
-local function schedule(context, output_context, delay_ms, reason)
+--- Parses live.json. Exposed for tests.
+--- @param text string|nil The file's content.
+--- @return table|nil config { debounce_ms, min_words }, string|nil reason
+function M.parse_live_config(text)
+	local ok, root = pcall(function() return type(text) == "string" and Json.decode(text) or nil end)
+	if not ok or type(root) ~= "table" then return nil, "live.json is missing or not JSON" end
+	for _, key in ipairs({ "debounce_ms", "min_words" }) do
+		local value = root[key]
+		if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
+			return nil, "live.json " .. key .. " is not a non-negative integer"
+		end
+	end
+	return { debounce_ms = root.debounce_ms, min_words = root.min_words }, nil
+end
+
+--- The shipped live.json. A missing or malformed file is an installation
+--- fault: live mode refuses to start, and the reason is logged.
+--- @return table|nil config
+local function live_config()
+	if _live_config then return _live_config end
+	local path = require("infra.paths").shared(LIVE_CONFIG_FILE)
+	local fh = path and io.open(path, "r")
+	local text = fh and fh:read("*a") or nil
+	if fh then fh:close() end
+	local config, reason = M.parse_live_config(text)
+	if not config then
+		Logger.error(LOG, "Live mode unavailable: %s.", tostring(reason))
+		return nil
+	end
+	_live_config = config
+	return _live_config
+end
+
+--- The request a live keystroke runs, resolved when its timer fires: the live
+--- prompt by exact id, its count, and live.json's minimum word count. A prompt
+--- deleted while live mode ran turns live mode off, never falls back.
+--- @return table|nil override for predict(), nil when live mode is off.
+local function live_override()
+	if not _live then return nil end
+	-- Loaded when live mode started, which refuses without it: never nil here.
+	local config = live_config()
+	local profile = ProfileSettings.resolve_id(_live.profile_id)
+	if not profile then
+		Logger.warn(LOG, "Live mode stopped: the prompt '%s' no longer exists.", _live.profile_id)
+		M.stop_live("prompt deleted", false)
+		return nil
+	end
+	return {
+		profile = profile,
+		num_predictions = _live.num_predictions,
+		min_words = config.min_words,
+		live = true,
+	}
+end
+
+local function schedule(context, output_context, delay_ms, reason, live)
 	if type(context) ~= "string" or context == "" then return false end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
 	local captured = {
@@ -256,7 +332,15 @@ local function schedule(context, output_context, delay_ms, reason)
 	local handle = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
 		if _scope_owner then return end
 		_pending_trigger = nil
-		M.predict(context, captured)
+		if not live then
+			M.predict(context, captured)
+			return
+		end
+		-- A pause or the AI switch turn live mode off; checked again here, since
+		-- the timer may have been armed just before.
+		if _is_paused() or not _enabled then return end
+		local override = live_override()
+		if override then M.predict(context, captured, override) end
 	end)
 	if type(handle) ~= "table" or handle.armed ~= true then
 		_pending_trigger = nil
@@ -285,6 +369,9 @@ function M.init(opts)
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
+	_on_live_change = type(options.on_live_change) == "function" and options.on_live_change or nil
+	-- Live mode is a session state: every start begins with it off.
+	_live = nil
 	M.drop_vision("engine initialised")
 	if _tone_timer then _scheduler.cancel(_tone_timer) end
 	_tone_timer = nil
@@ -333,8 +420,18 @@ function M.on_char(ch, buffer, output_context)
 			return
 		end
 	end
+	-- While a hotstring preview is on screen, the AI tooltip waits for it to go:
+	-- always in live mode, whose tooltip would otherwise cover it at every
+	-- keystroke; with the "after a hotstring" setting otherwise.
 	if type(output_context) == "table" and output_context.hotstring_preview_visible == true
-		and TriggerSettings.get("after_hotstring") == true then return end
+		and (_live or TriggerSettings.get("after_hotstring") == true) then return end
+	if _live then
+		-- The live prompt, count and debounce replace the menu's; a new keystroke
+		-- has already withdrawn the request in flight above.
+		local config = live_config()
+		if config then schedule(buffer, output_context, config.debounce_ms, "Live", true) end
+		return
+	end
 	local immediate = TriggerSettings.get("instant_on_word_end") == true and ends_word(buffer, ch)
 	schedule(buffer, output_context, immediate and 0 or TriggerSettings.get("debounce_ms"),
 		immediate and "Word-end" or "Inactivity")
@@ -346,8 +443,11 @@ end
 --- @return boolean
 function M.on_hotstring_expired(context, output_context)
 	if _scope_owner then return false end
-	if not _enabled or TriggerSettings.get("after_hotstring") ~= true then return false end
+	if not _enabled then return false end
+	-- Live mode held its request back while the preview was shown (on_char).
+	if not _live and TriggerSettings.get("after_hotstring") ~= true then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
+	if _live then return schedule(context, output_context, 0, "Live hotstring-expiry", true) end
 	return schedule(context, output_context, 0, "Hotstring-expiry")
 end
 
@@ -407,9 +507,11 @@ end
 --- budget grows with it. The parser then erases exactly that span.
 --- @param context string
 --- @param output_context table|nil
---- @param override table|nil { profile, num_predictions? } for a request that
----   names its own prompt: that profile and count, instead of the menu's
----   profile (and its automatic choice) and count, which stay unchanged.
+--- @param override table|nil { profile, num_predictions?, min_words?, live? } for
+---   a request that names its own prompt: that profile and count (and live
+---   mode's minimum word count), instead of the menu's profile (and its
+---   automatic choice), count and minimum, which stay unchanged. `live` marks
+---   the offer as live mode's, the one Tab accepts.
 --- @return string|nil refusal A MANUAL_REFUSAL_KEYS reason the user should be
 ---   told, when the request was refused for one.
 function M.predict(context, output_context, override)
@@ -430,7 +532,7 @@ function M.predict(context, output_context, override)
 	if not profile then Logger.error(LOG, "Prediction profile catalogue is unavailable."); return end
 	local params = PromptBuilder.build_params(clean_context, {
 		max_words = Settings.get("max_words"),
-		min_words = Settings.get("min_words"),
+		min_words = override and override.min_words or Settings.get("min_words"),
 		num_predictions = requested,
 		temperature = Settings.get("temperature"),
 		auto_raise_temp = Settings.get("auto_raise_temp"),
@@ -473,14 +575,16 @@ function M.predict(context, output_context, override)
 		input_chars = trigger_chars,
 		model = model,
 		profile = profile.id,
+		live = override ~= nil and override.live == true,
 	}
 	_offer_notified = false
 	_predicting = true
 	_request_epoch = _request_epoch + 1
 	local epoch = _request_epoch
 	show_candidates({}, meta)
-	Logger.info(LOG, "Sending prediction request (backend=%s, model=%s, profile=%s, count=%d, context=%d chars).",
-		M.get_backend(), model, tostring(profile.id), requested, #params.context)
+	Logger.info(LOG, "Sending %sprediction request (backend=%s, model=%s, profile=%s, count=%d, context=%d chars).",
+		_suggestion_context.live and "live " or "", M.get_backend(), model, tostring(profile.id), requested,
+		#params.context)
 
 	local function parse_response(raw, batch, extra_deletes)
 		local parsed = {}
@@ -672,6 +776,121 @@ function M.trigger_prompt(value, output_context)
 	return run_manual(output_context, prompt)
 end
 
+--- Shows the user a notice about a live mode transition.
+--- @param text string The translated notice.
+--- @param what string What the log names the notice.
+local function announce(text, what)
+	if not _notify then
+		Logger.error(LOG, "No notice surface injected — the '%s' notice is only logged.", what)
+	elseif _notify(text) ~= true then
+		Logger.warn(LOG, "The '%s' notice was not shown.", what)
+	end
+end
+
+--- Tells the tray that live mode changed, so its submenu redraws.
+local function live_changed()
+	if not _on_live_change then return end
+	local ok, err = pcall(_on_live_change, M.get_live())
+	if not ok then Logger.warn(LOG, "Live mode observer failed: %s", tostring(err)) end
+end
+
+--- Live mode's state, for the menu and the tests.
+--- @return table|nil { profile_id, num_predictions? } nil when off; a nil
+---   count means the menu's, read at every request.
+function M.get_live()
+	if not _live then return nil end
+	return { profile_id = _live.profile_id, num_predictions = _live.num_predictions }
+end
+
+--- Turns live mode off, withdrawing its request and its offer. The menu's
+--- prediction takes over again at the next keystroke, unchanged.
+--- @param reason string What the log names the cause.
+--- @param notice boolean Tell the user (an explicit toggle); a pause or the AI
+---   switch turn it off silently.
+--- @return boolean stopped False when live mode was already off.
+function M.stop_live(reason, notice)
+	if not _live then return false end
+	local profile_id = _live.profile_id
+	_live = nil
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _suggestion_context and _suggestion_context.live then M.dismiss() end
+	Logger.info(LOG, "Live mode off (%s; prompt %s).", tostring(reason), profile_id)
+	if notice then announce(i18n.get(LIVE_OFF_KEY), "live off") end
+	live_changed()
+	return true
+end
+
+--- Turns live mode on with a prompt, refused like a manual prediction.
+--- @param prompt table { profile_id, num_predictions? } prompt_action.parse() output.
+--- @param source string What the log names the origin.
+--- @return boolean started
+local function start_live(prompt, source)
+	if _scope_owner then return false end
+	-- Live mode needs no text yet: it waits for typing.
+	local reason = manual_refusal()
+	if reason == "empty_context" then reason = nil end
+	if reason then
+		Logger.info(LOG, "Live mode refused (%s).", reason)
+		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+		return false
+	end
+	-- By exact id: a deleted prompt is refused, never replaced by another.
+	local profile = ProfileSettings.resolve_id(prompt.profile_id)
+	if not profile then
+		Logger.warn(LOG, "Live mode refused: the prompt '%s' no longer exists.", prompt.profile_id)
+		show_notice(UNKNOWN_PROMPT_KEY, "unknown_prompt")
+		return false
+	end
+	if not live_config() then return false end
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+	_live = { profile_id = profile.id, num_predictions = prompt.num_predictions }
+	Logger.info(LOG, "Live mode on from %s (prompt %s, count %s).", source, profile.id,
+		prompt.num_predictions and tostring(prompt.num_predictions) or "from the menu")
+	local count = prompt.num_predictions or ProfileSettings.get("num_predictions") or 1
+	local template = i18n.get(LIVE_ON_KEY)
+	local at = template:find("{1}", 1, true)
+	local label = ProfileSettings.menu_label(profile, count)
+	announce(at and (template:sub(1, at - 1) .. label .. template:sub(at + 3)) or template, "live on")
+	live_changed()
+	return true
+end
+
+--- The llm_live_prompt_toggle action: turns live mode on with the binding's
+--- prompt and count, or off when it is on, whatever the binding's parameter.
+--- @param value string The binding's parameter, "<profile_id>" or "<profile_id>|<count>".
+--- @return boolean changed True when live mode was turned on or off.
+function M.toggle_live(value)
+	if _scope_owner then return false end
+	if _live then return M.stop_live("toggled off", true) end
+	local prompt, err = PromptAction.parse(value)
+	if not prompt then
+		Logger.warn(LOG, "Live mode refused: invalid parameter '%s' (%s).", tostring(value), err)
+		return false
+	end
+	return start_live(prompt, "a binding")
+end
+
+--- The AI menu's live submenu: a prompt id turns live mode on with it and the
+--- menu's count, nil turns it off.
+--- @param profile_id string|nil
+--- @return boolean applied
+function M.set_live(profile_id)
+	if _scope_owner then return false end
+	if profile_id == nil then
+		if not _live then return true end
+		return M.stop_live("menu", true)
+	end
+	if _live and _live.profile_id == profile_id and _live.num_predictions == nil then return true end
+	return start_live({ profile_id = profile_id }, "the menu")
+end
+
+--- Told by the daemon after every pause transition: a pause turns live mode off.
+--- @param paused boolean
+function M.on_pause_change(paused)
+	if paused then M.stop_live("Ergopti+ paused", false) end
+end
+
 --- The catalogue actions this engine answers, for the gesture executor's
 --- daemon-injected handlers (modules/shortcuts/action_handlers.lua). The
 --- presets follow the built-in profiles, so a new profile needs no code here.
@@ -680,6 +899,7 @@ function M.action_handlers()
 	local handlers = {
 		llm_generate_prediction = function() return M.trigger_now() end,
 		llm_prompt_prediction = function(_, parameter) return M.trigger_prompt(parameter) end,
+		[LIVE_ACTION] = function(_, parameter) return M.toggle_live(parameter) end,
 	}
 	for _, profile in ipairs(ProfileSettings.list_built_in()) do
 		local value = PromptAction.format(profile.id)
@@ -1275,6 +1495,8 @@ function M.accept(index)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
 	clear_offer()
+	-- The accepted text is not asked about again until the user types.
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 	return true
 end
@@ -1308,6 +1530,18 @@ end
 function M.handle_shortcut(detail)
 	if _scope_owner then return false end
 	if type(detail) ~= "table" or not offer_visible() then return false end
+	-- Tab accepts live mode's rewrite, and only while its tooltip is on screen:
+	-- another offer, a modified Tab or no offer leave Tab to the application.
+	if detail.code == EvdevCodes.KEY_TAB then
+		if not (_suggestion_context and _suggestion_context.live) then return false end
+		for _, held in pairs(type(detail.mods) == "table" and detail.mods or {}) do
+			if held then return false end
+		end
+		if not M.accept(1) then
+			Logger.warn(LOG, "Live rewrite could not be inserted — Tab is swallowed, nothing typed.")
+		end
+		return true
+	end
 	if not NavigationSettings.matches(detail.mods) then return false end
 	local key = tostring(detail.key or detail.char or "")
 	local digit = key:match("^([0-9])$") or key:match("^[Kk][Pp]_?([0-9])$")
@@ -1350,6 +1584,7 @@ function M.disable()
 		return false
 	end
 	_enabled = false
+	M.stop_live("AI switched off", false)
 	M.cancel()
 	Logger.info(LOG, "Prediction engine disabled.")
 	return true
@@ -1586,6 +1821,7 @@ function M.apply_configuration(owner, snapshot)
 	if _scope_owner ~= owner or type(snapshot.enabled) ~= "boolean" then return false end
 	if not M.quiesce_configuration(owner) then return false end
 	_enabled = snapshot.enabled
+	if not _enabled then M.stop_live("AI switched off", false) end
 	return _enabled == snapshot.enabled
 end
 

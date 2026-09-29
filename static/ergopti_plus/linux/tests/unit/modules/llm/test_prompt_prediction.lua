@@ -301,7 +301,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 
 	helpers.it("every built-in has a preset that runs it with the menu's count", function()
 		for _, id in ipairs({ "raw", "basic", "advanced", "batch_advanced", "rewrite",
-			"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal" }) do
+			"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal", "translate_en", "translate_ja" }) do
 			scenario({ buffer = "Bonjour Marc. ok pr jd 14h" }, function(world)
 				local handler = world.handlers["llm_predict_" .. id]
 				helpers.assert_eq(type(handler), "function", "llm_predict_" .. id .. " has a handler")

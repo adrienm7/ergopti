@@ -1741,6 +1741,47 @@ local function _build_llm(ctx)
 		}, "llm_trigger")
 	end
 
+	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
+	-- order, then the user's own), labelled as in the prompt list. The engine
+	-- owns the state the llm_live_prompt_toggle action shares; a prompt chosen
+	-- here runs with the menu's count.
+	dynamic_handlers["llm_live_mode"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles or type(llm.get_live) ~= "function" then
+			Logger.error(LOG, "LLM live mode unavailable; live submenu omitted.")
+			return
+		end
+		local Rewrite = require("llm.rewrite")
+		local live = llm.get_live()
+		local count = ProfileSettings.get("num_predictions") or 1
+		local function choose(profile_id)
+			if llm.set_live(profile_id) and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local rows = { {
+			label = i18n_safe("menu.llm.live_mode_off"),
+			checked = live == nil,
+			action = function() choose(nil) end,
+		} }
+		local prompts = {}
+		for _, profile in ipairs(ProfileSettings.list_built_in()) do prompts[#prompts + 1] = profile end
+		for _, profile in ipairs(ProfileSettings.list_user()) do prompts[#prompts + 1] = profile end
+		for _, profile in ipairs(prompts) do
+			if Rewrite.is_rewrite_profile(profile) then
+				local profile_id = profile.id
+				rows[#rows + 1] = {
+					label = ProfileSettings.menu_label(profile, count),
+					checked = live ~= nil and live.profile_id == profile_id,
+					action = function() choose(profile_id) end,
+				}
+			end
+		end
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.live_mode_title"),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_live_mode")
+	end
+
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
