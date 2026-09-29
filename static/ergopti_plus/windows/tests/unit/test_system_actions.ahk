@@ -28,6 +28,8 @@ class _SysActionsFake {
 		this.Answer := "Cancel"
 		this.Active := ""
 		this.OwnPidValue := 4000
+		this.ShellPidValue := 0
+		this.FramedApp := 0
 		this.Windows := []
 		this.Registry := Map()
 		this.Muted := false
@@ -55,6 +57,8 @@ class _SysActionsFake {
 	SetCaptureMuted(Muted) => (this._Log("SetCaptureMuted", Muted), this.Muted := Muted)
 	CloseProcess(Pid) => this._Log("CloseProcess", Pid)
 	OwnPid() => this.OwnPidValue
+	ShellPid() => this.ShellPidValue
+	FramedAppPid(FrameHwnd) => (this._Log("FramedAppPid", FrameHwnd), this.FramedApp)
 	ActiveWindow() => this.Active
 	WindowsOfProcess(Pid) => (this._Log("WindowsOfProcess", Pid), this.Windows)
 	Activate(Hwnd) => this._Log("Activate", Hwnd)
@@ -221,6 +225,54 @@ _SysActions_QuitAndForceQuit() {
 	}
 }
 Test("system actions: quit and force quit the active process, never the driver or the shell", _SysActions_QuitAndForceQuit)
+
+; A File Explorer folder runs in the shell's explorer.exe by default, and a
+; packaged app's frame in the ApplicationFrameHost.exe every packaged app
+; shares: acting on the whole process closed the desktop and the taskbar, or
+; every packaged app, instead of the active one.
+_SysActions_QuitSharedHosts() {
+	Fake := _SysActionsFake()
+	Fake.ShellPidValue := 900
+	Fake.Active := { Hwnd: 0x300, Pid: 900, Class: "CabinetWClass" }
+	Fake.Windows := [0x300, 0x301, 0x302]
+	GestureSysQuitFrontmostApp(Fake)
+	Closes := _SysActions_CallsNamed(Fake, "PostClose")
+	AssertEqual(1, Closes.Length, "only the active folder window of the shell's process is closed")
+	AssertEqual(0x300, Closes[1][2])
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "WindowsOfProcess").Length, "the desktop and the taskbar are not enumerated")
+	GestureSysForceQuitFrontmost(Fake)
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length, "the shell's process is never terminated")
+
+	Fake := _SysActionsFake()
+	Fake.ShellPidValue := 900
+	Fake.Active := { Hwnd: 0x400, Pid: 610, Class: "ApplicationFrameWindow" }
+	Fake.Windows := [0x400, 0x401]
+	Fake.FramedApp := 7120
+	GestureSysQuitFrontmostApp(Fake)
+	Closes := _SysActions_CallsNamed(Fake, "PostClose")
+	AssertEqual(1, Closes.Length, "only the active packaged app's frame is closed")
+	AssertEqual(0x400, Closes[1][2])
+	GestureSysForceQuitFrontmost(Fake)
+	AssertEqual(0x400, _SysActions_CallsNamed(Fake, "FramedAppPid")[1][2])
+	Kills := _SysActions_CallsNamed(Fake, "CloseProcess")
+	AssertEqual(1, Kills.Length)
+	AssertEqual(7120, Kills[1][2], "the packaged app's own process, not the shared frame host")
+
+	Fake.Calls := []
+	Fake.FramedApp := 0
+	GestureSysForceQuitFrontmost(Fake)
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length, "an unresolved frame is refused, never the host")
+
+	Fake := _SysActionsFake()
+	Fake.ShellPidValue := 900
+	Fake.Active := { Hwnd: 0x500, Pid: 1500, Class: "CabinetWClass" }
+	Fake.Windows := [0x500, 0x501]
+	GestureSysQuitFrontmostApp(Fake)
+	AssertEqual(2, _SysActions_CallsNamed(Fake, "PostClose").Length, "a separate folder process is still quit whole")
+	GestureSysForceQuitFrontmost(Fake)
+	AssertEqual(1500, _SysActions_CallsNamed(Fake, "CloseProcess")[1][2])
+}
+Test("system actions: quit and force quit act on the active app, never the shell or the frame host", _SysActions_QuitSharedHosts)
 
 _SysActions_EmptyTrashAndEject() {
 	Fake := _SysActionsFake()

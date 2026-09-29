@@ -59,6 +59,10 @@ global GESTURE_SYS_CSIDL_DRIVES := 17
 global GESTURE_SYS_SHELL_CLASSES := Map("Progman", true, "WorkerW", true,
 	"Shell_TrayWnd", true, "Shell_SecondaryTrayWnd", true)
 
+; The frame every packaged (UWP) app is drawn in. All of them belong to one
+; shared ApplicationFrameHost.exe; the app itself runs in its own process.
+global GESTURE_SYS_APP_FRAME_CLASS := "ApplicationFrameWindow"
+
 ; The desktop windows: their folder actions act on the Desktop folder.
 global GESTURE_SYS_DESKTOP_CLASSES := Map("Progman", true, "WorkerW", true)
 
@@ -236,8 +240,21 @@ GestureSysQuitRefusal(Active, OwnPid) {
 	return ""
 }
 
+; Whether the active window's process also owns windows that are not the
+; active application's: the shell's explorer.exe owns the desktop and the
+; taskbar (File Explorer folders run in it by default), and
+; ApplicationFrameHost.exe owns the frame of every packaged app.
+; @param {Object} Active { Hwnd, Pid, Class }.
+; @param {Integer} ShellPid The desktop shell's process id (0 = none).
+; @returns {Boolean}
+GestureSysIsSharedHost(Active, ShellPid) {
+	global GESTURE_SYS_APP_FRAME_CLASS
+	return (ShellPid && Active.Pid = ShellPid) || (Active.Class = GESTURE_SYS_APP_FRAME_CLASS)
+}
+
 ; Asks the active application to quit: WM_CLOSE to each of its windows, as
-; their close buttons do, so it can still ask to save.
+; their close buttons do, so it can still ask to save. In a shared host
+; process only the active window is the application's, so only it is closed.
 GestureSysQuitFrontmostApp(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	Active := Sys.ActiveWindow()
@@ -246,25 +263,50 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 		LoggerWarn("gestures", "quit_frontmost_app refused: {1}.", Refusal)
 		return
 	}
+	if GestureSysIsSharedHost(Active, Sys.ShellPid()) {
+		if Sys.PostClose(Active.Hwnd)
+			LoggerInfo("gestures", "Asked the active window of shared process {1} to close.", Active.Pid)
+		else
+			LoggerError("gestures", "The active window of process {1} could not be asked to close.", Active.Pid)
+		return
+	}
 	Closed := 0
 	for Hwnd in Sys.WindowsOfProcess(Active.Pid)
 		Closed += Sys.PostClose(Hwnd) ? 1 : 0
 	LoggerInfo("gestures", "Asked process {1} to close its {2} window(s).", Active.Pid, Closed)
 }
 
+; The process force_quit_frontmost terminates for the active window.
+; @param {Object|String} Active { Hwnd, Pid, Class } or "".
+; @returns {Object} { Pid, Refusal }: Refusal is "" when Pid may be terminated.
+GestureSysForceQuitTarget(Active, Sys) {
+	global GESTURE_SYS_APP_FRAME_CLASS
+	Refusal := GestureSysQuitRefusal(Active, Sys.OwnPid())
+	if (Refusal != "")
+		return { Pid: 0, Refusal: Refusal }
+	if (Active.Pid = Sys.ShellPid())
+		return { Pid: 0, Refusal: "its process also runs the desktop and the taskbar" }
+	if (Active.Class != GESTURE_SYS_APP_FRAME_CLASS)
+		return { Pid: Active.Pid, Refusal: "" }
+	; Terminating the frame host would close every packaged app at once.
+	AppPid := Sys.FramedAppPid(Active.Hwnd)
+	if !AppPid
+		return { Pid: 0, Refusal: "the packaged app behind its frame could not be found" }
+	return { Pid: AppPid, Refusal: "" }
+}
+
 ; Terminates the active application at once, unsaved work included.
 GestureSysForceQuitFrontmost(Sys := 0) {
 	Sys := _GestureSys(Sys)
-	Active := Sys.ActiveWindow()
-	Refusal := GestureSysQuitRefusal(Active, Sys.OwnPid())
-	if (Refusal != "") {
-		LoggerWarn("gestures", "force_quit_frontmost refused: {1}.", Refusal)
+	Target := GestureSysForceQuitTarget(Sys.ActiveWindow(), Sys)
+	if (Target.Refusal != "") {
+		LoggerWarn("gestures", "force_quit_frontmost refused: {1}.", Target.Refusal)
 		return
 	}
-	if Sys.CloseProcess(Active.Pid)
-		LoggerInfo("gestures", "Process {1} terminated.", Active.Pid)
+	if Sys.CloseProcess(Target.Pid)
+		LoggerInfo("gestures", "Process {1} terminated.", Target.Pid)
 	else
-		LoggerError("gestures", "Process {1} could not be terminated.", Active.Pid)
+		LoggerError("gestures", "Process {1} could not be terminated.", Target.Pid)
 }
 
 ; Empties the Recycle Bin of every drive. Confirmed by GestureInvokeAction.
