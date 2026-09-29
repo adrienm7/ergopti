@@ -37,6 +37,7 @@ local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local ToneRewrite      = require("modules.llm.tone_rewrite")
 local ScreenAnswer     = require("modules.llm.screen_answer")
+local SelectionTranslation = require("modules.llm.selection_translation")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
@@ -1557,6 +1558,36 @@ function M.reset_for_action_epoch(epoch)
 	return true
 end
 
+--- Hands an accepted candidate that applies itself (the translation, which
+--- replaces the selection) to its owner, once the tooltip is closed. Nothing
+--- is typed at the caret and the buffer is left alone: the owner changes the
+--- document through its own pipeline.
+--- @param idx number 1-based index of the accepted candidate.
+--- @param pred table The consumed candidate, whose on_accept receives its text.
+--- @return boolean applied True when the owner took the text.
+local function apply_own_acceptance(idx, pred)
+	if type(pred.on_accept) ~= "function" or type(pred.to_type) ~= "string" then
+		error("apply_prediction: a candidate's on_accept must be a function with a text to apply")
+	end
+	Logger.start(LOG, "Handing candidate #%d to its owner (%d byte(s)).", idx, #pred.to_type)
+	local reset_ok, reset_result = xpcall(M.reset_predictions, debug.traceback)
+	if not reset_ok or reset_result ~= true then
+		Logger.error(LOG, "Candidate #%d acceptance cleanup did not commit (result: %s).",
+			idx, tostring(reset_result))
+	end
+	local ok, applied = xpcall(pred.on_accept, debug.traceback, pred.to_type)
+	if not ok then
+		Logger.error(LOG, "Candidate #%d owner raised: %s.", idx, tostring(applied))
+		return false
+	end
+	if applied ~= true then
+		Logger.warn(LOG, "Candidate #%d was refused by its owner.", idx)
+		return false
+	end
+	Logger.success(LOG, "Candidate #%d handed to its owner.", idx)
+	return true
+end
+
 --- Applies the selected prediction: issues deletions, types the completion,
 --- updates the in-memory buffer, and arms the chained LLM request.
 --- @param idx number 1-based index of the prediction to apply.
@@ -1567,6 +1598,7 @@ function M.apply_prediction(idx)
 
 	local pred, all_preds = engine.consume(idx)
 	if not pred then return false end
+	if pred.on_accept ~= nil then return apply_own_acceptance(idx, pred) end
 
 	local delete_count = pred.deletes or 0
 	local text_to_type = pred.to_type or ""
@@ -1932,18 +1964,33 @@ function M.request_tone_step(direction, cycle, parent)
 end
 
 --- Reads the screen and offers answers in the prediction tooltip (the
---- llm_screen_region and llm_screen_full actions). The screen-answer module
---- logs and shows every refusal.
+--- llm_screen_region, llm_screen_full and llm_screen_error actions). The
+--- screen-answer module logs and shows every refusal.
 --- @param value string The binding's parameter: "<backend>" or "<backend>|<model>".
 --- @param mode string ScreenAnswer.MODE_REGION or ScreenAnswer.MODE_FULL.
 --- @param parent string|nil Stable action parent of the screenshot actions.
+--- @param answers string ScreenAnswer.ANSWERS_SCREEN or ScreenAnswer.ANSWERS_ERROR.
 --- @return boolean started True when the screenshot is being taken.
-function M.request_screen_answers(value, mode, parent)
+function M.request_screen_answers(value, mode, parent, answers)
 	if not M.is_runtime_available() then
 		Logger.info(LOG, "Screen reading skipped: a synthetic action is still in flight.")
 		return false
 	end
-	return ScreenAnswer.run(value, mode, parent)
+	return ScreenAnswer.run(value, mode, parent, answers)
+end
+
+--- Translates the selection and offers the translation in the prediction
+--- tooltip (the llm_translate_selection action). The translation module logs
+--- and shows every refusal.
+--- @param value string The binding's parameter: "ui" or a locale code.
+--- @param parent string|nil Stable action parent of the text actions.
+--- @return boolean started True when the selection is being read.
+function M.request_selection_translation(value, parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Selection translation skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return SelectionTranslation.run(value, parent)
 end
 
 --- Re-arms the LLM inactivity timer.

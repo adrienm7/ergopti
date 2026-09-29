@@ -1141,11 +1141,13 @@ for _, tone_action in ipairs(TONE_ACTIONS) do
 		return keymap.request_tone_step(spec.direction, spec.cycle, current_action_parent())
 	end)
 end
--- Screen reading (llm_screen_region / llm_screen_full): the vision backend is
--- the binding's own parameter, through the keymap bridge like the predictions.
+-- Screen reading (llm_screen_region / llm_screen_full / llm_screen_error): the
+-- vision backend is the binding's own parameter, through the keymap bridge like
+-- the predictions; the error explanation reads a region with its own answers.
 local SCREEN_ANSWER_ACTIONS = {
-	{ id = "llm_screen_region", mode = "MODE_REGION" },
-	{ id = "llm_screen_full", mode = "MODE_FULL" },
+	{ id = "llm_screen_region", mode = "MODE_REGION", answers = "ANSWERS_SCREEN" },
+	{ id = "llm_screen_full", mode = "MODE_FULL", answers = "ANSWERS_SCREEN" },
+	{ id = "llm_screen_error", mode = "MODE_REGION", answers = "ANSWERS_ERROR" },
 }
 for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
 	local spec = screen_action
@@ -1161,10 +1163,27 @@ for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
 			Logger.error(LOG, "%s: the keymap bridge is unavailable: %s.", spec.id, tostring(keymap))
 			return false
 		end
-		local mode = require("modules.llm.screen_answer")[spec.mode]
-		return keymap.request_screen_answers(value, mode, current_action_parent())
+		local ScreenAnswer = require("modules.llm.screen_answer")
+		return keymap.request_screen_answers(value, ScreenAnswer[spec.mode], current_action_parent(),
+			ScreenAnswer[spec.answers])
 	end)
 end
+-- Translation of the selection (llm_translate_selection): the target language
+-- is the binding's own parameter, through the keymap bridge like the tone steps.
+sg("llm_translate_selection", function(binding)
+	local value = M.get_action_parameter(binding, "llm_translate_selection")
+	if not M.validate_action_parameter("llm_translate_selection", value) then
+		Logger.warn(LOG, "llm_translate_selection ignored for binding '%s': no valid language is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table" or type(keymap.request_selection_translation) ~= "function" then
+		Logger.error(LOG, "llm_translate_selection: the keymap bridge is unavailable: %s.", tostring(keymap))
+		return false
+	end
+	return keymap.request_selection_translation(value, current_action_parent())
+end)
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
@@ -2045,6 +2064,7 @@ function M.validate_action_parameter(action, value)
 	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
 	-- Syntax only too: whether the provider exists is checked when the action runs
 	if spec == "llm_vision" then return Vision.is_valid(value) end
+	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2087,6 +2107,13 @@ function M.parameter_prompt(action)
 		end
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
 	end
+	if spec == "llm_language" then
+		local lines = {}
+		for _, choice in ipairs(M.llm_language_choices()) do
+			lines[#lines + 1] = choice.value .. " — " .. choice.label
+		end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), table.concat(lines, "\n"))
+	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local samples = WrapPair.describe(wrap_pair_list())
@@ -2105,6 +2132,7 @@ function M.parameter_error(action)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
+	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2169,6 +2197,13 @@ function M.llm_vision_choices()
 		}
 	end
 	return choices
+end
+
+--- The target languages a llm_language binding may name: the interface
+--- language first, then every shipped locale in the language menu's order.
+--- @return table Array of { value, label }.
+function M.llm_language_choices()
+	return require("modules.llm.selection_translation").choices()
 end
 
 function M.get_action_parameter(binding, action)

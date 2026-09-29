@@ -109,4 +109,17 @@ helpers.describe("vision.json holds what the screen actions need", function()
 		end
 		helpers.assert_true(config.default_models[Vision.LOCAL_BACKEND] ~= nil, "a local default model")
 	end)
+
+	helpers.it("the error explanation offers the cause, then the fix", function()
+		local config = read_json("modules/llm/vision.json")
+		helpers.assert_eq(#config.error_answers, 2)
+		helpers.assert_eq(config.error_answers[1].id, "cause")
+		helpers.assert_eq(config.error_answers[2].id, "fix")
+		helpers.assert_true(config.error_answers[1].prompt:find("{language}", 1, true) ~= nil,
+			"the explanation is written in the interface language")
+		for _, answer in ipairs(config.error_answers) do
+			helpers.assert_true(answer.prompt:find(config.answer_tag, 1, true) ~= nil,
+				answer.id .. " must ask for the answer tag")
+		end
+	end)
 end)

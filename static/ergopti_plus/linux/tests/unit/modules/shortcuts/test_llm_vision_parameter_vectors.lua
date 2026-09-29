@@ -1,7 +1,7 @@
 --- tests/unit/modules/shortcuts/test_llm_vision_parameter_vectors.lua
 
 --- ==============================================================================
---- MODULE: llm_screen_region / llm_screen_full parameter (Linux)
+--- MODULE: llm_screen_region / llm_screen_full / llm_screen_error parameter (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/vision_vectors.json, which the macOS suite
 --- and the AutoHotkey port replay too: the binding values through the gesture
@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local json = require("json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-local ACTIONS = { "llm_screen_region", "llm_screen_full" }
+local ACTIONS = { "llm_screen_region", "llm_screen_full", "llm_screen_error" }
 
 --- @param relative string Path under _shared/.
 --- @return table decoded
@@ -54,7 +54,7 @@ helpers.describe("llm_vision parameter replays the shared vision corpus", functi
 	local corpus = read_json("tests/corpus/llm/vision_vectors.json")
 	local config = read_json("modules/llm/vision.json")
 
-	helpers.it("both screen actions declare the llm_vision parameter", function()
+	helpers.it("every screen action declares the llm_vision parameter", function()
 		for _, action in ipairs(ACTIONS) do
 			helpers.assert_eq(Gestures.get_action_parameter_spec(action), "llm_vision", action)
 		end
@@ -103,6 +103,12 @@ helpers.describe("llm_vision parameter replays the shared vision corpus", functi
 		helpers.assert_true(loaded ~= nil, "vision.json loads")
 		helpers.assert_eq(loaded.max_image_edge, config.max_image_edge)
 		helpers.assert_eq(#loaded.answers, #config.answers)
+		helpers.assert_eq(#loaded.error_answers, #config.error_answers)
+		local without_error_answers = {}
+		for key, value in pairs(config) do without_error_answers[key] = value end
+		without_error_answers.error_answers = nil
+		helpers.assert_eq(VisionRequest.parse_config(json.encode(without_error_answers)), nil,
+			"a file without llm_screen_error's answers is refused")
 		helpers.assert_eq(VisionRequest.parse_config('{"screen_tag":"SCREEN:"}'), nil,
 			"an incomplete file is refused, never half used")
 	end)

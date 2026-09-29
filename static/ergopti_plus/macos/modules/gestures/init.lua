@@ -574,6 +574,7 @@ M.send_vocabulary    = Actions.send_vocabulary
 M.llm_prompt_choices = Actions.llm_prompt_choices
 M.llm_prompt_default_count = Actions.llm_prompt_default_count
 M.llm_vision_choices = Actions.llm_vision_choices
+M.llm_language_choices = Actions.llm_language_choices
 M.get_all_action_parameters = Actions.get_all_action_parameters
 M.split_action_parameter_key = Actions.split_action_parameter_key
 M.replace_action_parameters = Actions.replace_action_parameters

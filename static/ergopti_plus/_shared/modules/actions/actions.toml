@@ -34,7 +34,10 @@
 #             _shared/tests/corpus/action_parameters/llm_prompt_vectors.json),
 #             or "llm_vision" (a vision backend, "local" or an API provider,
 #             optionally followed by |model; rule pinned by
-#             _shared/tests/corpus/llm/vision_vectors.json).
+#             _shared/tests/corpus/llm/vision_vectors.json), or "llm_language"
+#             ("ui" for the interface language, or a locale code of
+#             _shared/data/locale_names.json; rule pinned by
+#             _shared/tests/corpus/llm/translate_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
@@ -1002,6 +1005,25 @@ parameter = "llm_prompt"
 platform = "all"
 parameter = "llm_vision"
 
+[sg_actions.llm_screen_error]
+# "Why this error?": the user draws a region around an error (a terminal, a
+# log, a dialog, code), the vision model reads it, and the tooltip offers the
+# error_answers of vision.json in order: the explanation in the interface
+# language, then the fix the user can type (a command or the corrected line).
+# Same parameter, refusals and capture as llm_screen_region.
+platform = "all"
+parameter = "llm_vision"
+
+[sg_actions.llm_translate_selection]
+# Translates the SELECTION with the AI menu's current text backend
+# (_shared/modules/llm/translate.json) and shows the translation in the
+# prediction tooltip; accepting it replaces the selection, Escape leaves the
+# text untouched. The parameter is "ui" (the interface language, the default)
+# or a locale code. Nothing selected: a notice. It refuses like
+# llm_generate_prediction (paused, AI off, backend not ready).
+platform = "all"
+parameter = "llm_language"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1425,6 +1447,8 @@ items = [
     "llm_live_prompt_toggle",
     "llm_screen_region",
     "llm_screen_full",
+    "llm_screen_error",
+    "llm_translate_selection",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",

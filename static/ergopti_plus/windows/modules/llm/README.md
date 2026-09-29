@@ -33,9 +33,16 @@ the selection is rewritten one register up or down, typed over itself and
 selected again. `vision.ahk` ports `_shared/lua/llm/vision.lua` (the
 `llm_vision` binding value, the vision model it resolves to, the request body of
 each API dialect and the tagged-answer reader, pinned to `vision_vectors.json`)
-and `vision_action.ahk` runs `llm_screen_region` / `llm_screen_full` on it: a
-screenshot is transcribed by a vision model, then the AI menu's backend drafts
-the answers offered as tooltip candidates. `prediction_live.ahk` owns live mode
+and `vision_action.ahk` runs `llm_screen_region` / `llm_screen_full` /
+`llm_screen_error` on it: a screenshot is transcribed by a vision model, then
+the AI menu's backend drafts the answers offered as tooltip candidates (for
+`llm_screen_error`, the `error_answers` of `vision.json`: the explanation, then
+the fix). `translate.ahk` ports `_shared/lua/llm/translate.lua` (the
+`llm_language` binding value, the target language, the prompt and the answer
+reader, pinned to `translate_vectors.json`) and `translate_action.ahk` runs
+`llm_translate_selection`: the selection is translated by the AI menu's backend
+and offered as one candidate, which replaces the selection when accepted and
+stays selected. `prediction_live.ahk` owns live mode
 (`llm_live_prompt_toggle` and the AI menu's live mode submenu): while it is on,
 the automatic typing trigger runs its prompt and count through the same
 prompt-override request path, with the debounce and minimum word count of

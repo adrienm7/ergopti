@@ -4,9 +4,9 @@
 ; MODULE: Screen Reading (AHK)
 ; DESCRIPTION:
 ; AutoHotkey port of _shared/lua/llm/vision.lua: the pure logic behind the
-; llm_screen_region and llm_screen_full actions. A vision model transcribes a
-; screenshot, then the AI menu's text backend drafts the answers offered in the
-; prediction tooltip.
+; llm_screen_region, llm_screen_full and llm_screen_error actions. A vision
+; model transcribes a screenshot, then the AI menu's text backend drafts the
+; answers offered in the prediction tooltip.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The binding names the vision backend: "local" (the local Ollama server)
@@ -152,7 +152,8 @@ LLM_Vision_BuildRequest(Fmt, Spec) {
 		throw TypeError("LLM_Vision_BuildRequest: the spec must be a Map.")
 	HasImage := Spec.Has("image")
 	Image := Spec.Get("image", "")
-	Mime := Spec.Get("mime", "")
+	; An absent mime is refused like the Lua nil; Get's "" default would pass as a String
+	Mime := Spec.Get("mime", 0)
 	if HasImage && (!(Image is String) || Image == "" || !(Mime is String))
 		throw ValueError("LLM_Vision_BuildRequest: an image needs base64 data and a mime type.")
 	MaxTokens := Spec.Get("max_tokens", "")
@@ -257,7 +258,7 @@ LLM_Vision_Config() {
 	if (Config is Map)
 		return Config
 	Path := _SharedDir . "\modules\llm\vision.json"
-	Candidate := JsonParse(FileRead(Path, "UTF-8"))
+	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Vision_ValidateConfig(Candidate, Path)
 	Config := Candidate
 	return Config
@@ -279,12 +280,15 @@ _LLM_Vision_ValidateConfig(Candidate, Path) {
 	}
 	if !(Candidate.Get("default_models", "") is Map)
 		throw ValueError(Path . ": default_models must be an object.")
-	Answers := Candidate.Get("answers", "")
-	if !(Answers is Array) || Answers.Length == 0
-		throw ValueError(Path . ": answers must be a non-empty array.")
-	for Answer in Answers {
-		if !(Answer is Map) || !(Answer.Get("id", "") is String) || !(Answer.Get("prompt", "") is String)
-				|| Answer["prompt"] == ""
-			throw ValueError(Path . ": every answer needs an id and a prompt.")
+	; answers: llm_screen_region and llm_screen_full; error_answers: llm_screen_error
+	for ListKey in ["answers", "error_answers"] {
+		Answers := Candidate.Get(ListKey, "")
+		if !(Answers is Array) || Answers.Length == 0
+			throw ValueError(Path . ": " . ListKey . " must be a non-empty array.")
+		for Answer in Answers {
+			if !(Answer is Map) || !(Answer.Get("id", "") is String) || !(Answer.Get("prompt", "") is String)
+					|| Answer["prompt"] == ""
+				throw ValueError(Path . ": every entry of " . ListKey . " needs an id and a prompt.")
+		}
 	}
 }

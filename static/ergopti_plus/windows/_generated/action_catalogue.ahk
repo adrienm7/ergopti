@@ -123,6 +123,8 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "llm_live_prompt_toggle" })
 	Items.Push({ Kind: "action", Id: "llm_screen_region" })
 	Items.Push({ Kind: "action", Id: "llm_screen_full" })
+	Items.Push({ Kind: "action", Id: "llm_screen_error" })
+	Items.Push({ Kind: "action", Id: "llm_translate_selection" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.modifier_chords" })
 	Items.Push({ Kind: "modifier_chords", Level: 2, GroupKey: "sg_actions.sg_order.header.modifier_chord_group" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_media" })
@@ -246,12 +248,14 @@ GestureActionCatalogueData() {
 	Actions["llm_predict_translate_en"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_translate_en", Parameter: "", Confirm: false }
 	Actions["llm_predict_translate_ja"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_translate_ja", Parameter: "", Confirm: false }
 	Actions["llm_prompt_prediction"] := { Family: "sg", LabelKey: "sg_actions.llm_prompt_prediction", Parameter: "llm_prompt", Confirm: false }
+	Actions["llm_screen_error"] := { Family: "sg", LabelKey: "sg_actions.llm_screen_error", Parameter: "llm_vision", Confirm: false }
 	Actions["llm_screen_full"] := { Family: "sg", LabelKey: "sg_actions.llm_screen_full", Parameter: "llm_vision", Confirm: false }
 	Actions["llm_screen_region"] := { Family: "sg", LabelKey: "sg_actions.llm_screen_region", Parameter: "llm_vision", Confirm: false }
 	Actions["llm_tone_more_familiar"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_familiar", Parameter: "", Confirm: false }
 	Actions["llm_tone_more_familiar_cycle"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_familiar_cycle", Parameter: "", Confirm: false }
 	Actions["llm_tone_more_formal"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_formal", Parameter: "", Confirm: false }
 	Actions["llm_tone_more_formal_cycle"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_formal_cycle", Parameter: "", Confirm: false }
+	Actions["llm_translate_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_translate_selection", Parameter: "llm_language", Confirm: false }
 	Actions["lock_screen"] := { Family: "sg", LabelKey: "sg_actions.lock_screen", Parameter: "", Confirm: false }
 	Actions["maximize"] := { Family: "sg", LabelKey: "sg_actions.maximize", Parameter: "", Confirm: false }
 	Actions["microsoft_bold"] := { Family: "sg", LabelKey: "sg_actions.microsoft_bold", Parameter: "", Confirm: false }
