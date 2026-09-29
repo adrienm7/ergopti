@@ -239,7 +239,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 
 	/// The GUI launcher starts Hammerspoon at once and never registers the
 	/// guardian: the driver registers it only after reading « Ergopti uses
-	/// Karabiner » = on, so an integration that is off gets no Background Item.
+	/// Karabiner » = on, so nothing is registered while that switch is off.
 	func testManagedHammerspoonStartsWithoutRegisteringTheGuardian() {
 		var childStartCount = 0
 		var childEnvironment: [String: String] = [:]

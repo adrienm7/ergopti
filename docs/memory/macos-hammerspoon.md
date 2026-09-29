@@ -372,12 +372,14 @@ Karabiner's shared UI, daemon, grabber, or VirtualHID processes.
 `[karabiner] integration_enabled` in `config_karabiner.toml` is read before
 any token, lease worker, or guardian registration, at boot and on toggle. Never
 read the older `[karabiner] enabled`: builds before 2026-09-22 wrote `false`
-there on first launch without asking. The launcher
-never registers the guardian LaunchAgent; the Lua lease controller's first
-guardian observation of a lifecycle does (`--register-remap-guardian`), so a
-user with the switch off never gets a Login Items entry. Turning it off
-removes only marked rules by byte-span surgery proven by decoded equality;
-never re-serialize `karabiner.json`, which would rewrite personal rules.
+there on first launch without asking. The launcher never registers the guardian
+LaunchAgent; the Lua lease controller's first guardian observation of a
+lifecycle does (`--register-remap-guardian`), so nothing is registered while
+the switch is off. Nothing unregisters it either: a guardian registered while
+on stays in Login Items after the switch is turned off, until uninstall.
+Turning it off removes only marked rules by byte-span surgery proven by decoded
+equality; never re-serialize `karabiner.json`, which would rewrite personal
+rules.
 
 ### project-hs-kc-ledger-process-lifecycle
 
