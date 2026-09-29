@@ -1394,7 +1394,6 @@ end
 -- describe the same packs. A refused discovery stops the boot as it does on
 -- Windows: a partial catalogue would hide installed hotstrings without a word.
 local ExtensionPacks = require("infra.extension_packs")
-local HotstringExtensions = require("hotstrings.extensions")
 ExtensionPacks.discover()
 
 -- Initialise the hotstrings_config module so per-group delays and tooltip
@@ -1410,10 +1409,10 @@ do
 		override_path = override_path,
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
-			-- A namespaced extension pack names its own discovered file.
-			if HotstringExtensions.parse_category_key(category) then
-				return ExtensionPacks.source(category)
-			end
+			-- A namespaced extension pack names its own discovered file, and a
+			-- category an extension binds whole reads its metadata from it.
+			local bound = ExtensionPacks.source(category)
+			if bound then return bound end
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
 			end
@@ -1625,14 +1624,19 @@ end
 table.insert(hotfiles, "dynamichotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
+-- A layout extension may bind a category, or some of its sections, to its own
+-- file: the bound rules keep the category and its common tier.
 Logger.debug(LOG, "Loading common TOML hotstring files…")
 local _toml_load_t0 = hs.timer.secondsSinceEpoch()
+local carried_categories = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
+	local path, section_sources = ExtensionPacks.route(name, hotstrings_dir .. fname)
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
-	keymap.load_toml(name, hotstrings_dir .. fname)
+	keymap.load_toml(name, path, section_sources)
 	table.insert(hotfiles, name)
-	hotfile_paths[name] = hotstrings_dir .. fname
+	hotfile_paths[name] = path
+	carried_categories[name] = true
 end
 -- Language packs after the neutral files. A declared pack whose file is missing
 -- is a broken install: it is logged as an error rather than silently absent from
@@ -1641,16 +1645,30 @@ local language_file_count = 0
 for _, pack in ipairs(language_packs) do
 	for _, stem in ipairs(pack.categories) do
 		local name = HotstringLanguages.group_id(pack.id, stem)
-		local path = language_pack_path(pack.id, stem)
+		local path, section_sources = ExtensionPacks.route(name, language_pack_path(pack.id, stem))
 		if path then
 			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
-			keymap.load_toml(name, path)
+			keymap.load_toml(name, path, section_sources)
 			table.insert(hotfiles, name)
 			hotfile_paths[name] = path
+			carried_categories[name] = true
 			language_file_count = language_file_count + 1
 		else
 			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
 		end
+	end
+end
+-- A category an extension binds whole is its file even when no bundled file
+-- carries it. Sections bound into a category this driver does not carry have
+-- no metadata to join, so they are reported instead of guessed.
+for _, route in ipairs(ExtensionPacks.unbundled_routes(carried_categories)) do
+	if route.path then
+		keymap.load_toml(route.category, route.path, route.section_sources)
+		table.insert(hotfiles, route.category)
+		hotfile_paths[route.category] = route.path
+	else
+		Logger.error(LOG, "An extension binds sections of '%s', a category this driver does not carry.",
+			route.category)
 	end
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",

@@ -23,6 +23,9 @@
 --- 4. Partial discovery is refused: a directory that cannot be listed or a
 ---    child whose absence cannot be proven raises instead of publishing a
 ---    catalogue that silently lost an installed pack.
+--- 5. Bound geometry files are routed at discovery: a layout extension may bind
+---    a bundled category, or some of its sections, to its own file. Two owners
+---    of one source refuse the discovery itself, before anything loads.
 --- ==============================================================================
 
 local M = {}
@@ -32,8 +35,10 @@ local Extensions = require("hotstrings.extensions")
 
 local LOG = "extension_packs"
 
--- The packs discovered at boot; nil until discover() commits.
+-- The packs discovered at boot and the bundled sources they bind; nil until
+-- discover() commits.
 local _catalogue = nil
+local _routes = nil
 
 
 
@@ -130,6 +135,31 @@ function M.scan(roots, io_fns)
 	})
 end
 
+--- Routes every bound file through the shared owner, which refuses two owners of
+--- one category or section.
+--- @param packs table Shared extension records.
+--- @return table Map of category to { path, section_sources }.
+local function route_bound_files(packs)
+	local routes = {}
+	for _, pack in ipairs(packs) do
+		for _, file in ipairs(pack.bound_files) do
+			local binding = file.binding
+			local route = routes[binding.category] or {}
+			routes[binding.category] = route
+			if binding.sections == nil then
+				route.path = Extensions.bound_source(packs, binding.category)
+			else
+				for _, section in ipairs(binding.sections) do
+					Extensions.bound_source(packs, binding.category, section)
+				end
+				route.section_sources = route.section_sources or {}
+				route.section_sources[#route.section_sources + 1] = { path = file.path, sections = binding.sections }
+			end
+		end
+	end
+	return routes
+end
+
 --- Discovers this boot's catalogue once; every later reader gets the same packs.
 --- @param roots table|nil Extension roots; defaults to M.roots().
 --- @param io_fns table|nil Scanner collaborators; defaults to this driver's filesystem.
@@ -137,7 +167,10 @@ end
 function M.discover(roots, io_fns)
 	if _catalogue ~= nil then error("Extension packs were already discovered for this boot", 0) end
 	Logger.start(LOG, "Discovering extension packs…")
-	local ok, packs = pcall(M.scan, roots, io_fns)
+	local ok, packs, routes = pcall(function()
+		local found = M.scan(roots, io_fns)
+		return found, route_bound_files(found)
+	end)
 	if not ok then
 		Logger.error(LOG, "Extension discovery was refused: %s.", tostring(packs))
 		error(packs, 0)
@@ -147,7 +180,7 @@ function M.discover(roots, io_fns)
 		files = files + #pack.toml_files
 		bound = bound + #pack.bound_files
 	end
-	_catalogue = packs
+	_catalogue, _routes = packs, routes
 	Logger.success(LOG, "Discovered %d extension(s): %d hotstring pack(s), %d bound geometry file(s).",
 		#packs, files, bound)
 	return packs
@@ -158,6 +191,47 @@ end
 function M.catalogue()
 	if _catalogue == nil then error("Extension packs were read before discovery", 0) end
 	return _catalogue
+end
+
+--- The bundled categories this boot's extensions bind to their own files.
+--- @return table Map of category to { path, section_sources }: path replaces the
+---   bundled file (whole-category binding), section_sources lists { path,
+---   sections } records the registry loads over it (section bindings).
+function M.routes()
+	if _routes == nil then error("Extension routes were read before discovery", 0) end
+	return _routes
+end
+
+--- Where one bundled category loads from this boot.
+--- @param category string Runtime category.
+--- @param bundled_path string|nil The driver's own file for it.
+--- @return string|nil path The file load_toml reads.
+--- @return table|nil section_sources The { path, sections } records it merges over it.
+function M.route(category, bundled_path)
+	local route = M.routes()[category]
+	if route == nil then return bundled_path, nil end
+	return route.path or bundled_path, route.section_sources
+end
+
+--- The bound categories no bundled file carries, in a stable order.
+--- A whole binding is the category's only file, so it still loads. Sections
+--- bound into a category this driver does not carry have no metadata to join:
+--- their entry has no path and the caller reports them instead of guessing one.
+--- @param carried table Set of the categories the driver loaded from its own files.
+--- @return table Array of { category, path, section_sources }.
+function M.unbundled_routes(carried)
+	local routes = M.routes()
+	local names = {}
+	for category in pairs(routes) do
+		if not carried[category] then names[#names + 1] = category end
+	end
+	table.sort(names)
+	local out = {}
+	for _, category in ipairs(names) do
+		local route = routes[category]
+		out[#out + 1] = { category = category, path = route.path, section_sources = route.section_sources }
+	end
+	return out
 end
 
 --- The file that supplies a namespaced pack or a bound historical source.
@@ -199,7 +273,7 @@ end
 
 --- Test seam: forgets the boot catalogue.
 function M._reset()
-	_catalogue = nil
+	_catalogue, _routes = nil, nil
 end
 
 return M

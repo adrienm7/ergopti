@@ -138,6 +138,83 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 	end)
 end)
 
+--- Scanner collaborators for one root whose packs declare the given manifests.
+--- @param manifests table Map of pack id to manifest text.
+--- @param files table Map of pack id to hotstring file stems.
+--- @return table io_fns
+local function packs_io(manifests, files)
+	local ids = {}
+	for id in pairs(manifests) do ids[#ids + 1] = id end
+	table.sort(ids)
+	return {
+		list_dirs = function(root)
+			local dirs = {}
+			for _, id in ipairs(ids) do dirs[#dirs + 1] = root .. "/" .. id end
+			return dirs
+		end,
+		list_files = function(dir)
+			local id = dir:match("^/ext/([^/]+)/hotstrings$")
+			local out = {}
+			for _, stem in ipairs(id and files[id] or {}) do out[#out + 1] = dir .. "/" .. stem .. ".toml" end
+			return out
+		end,
+		read_file = function(path) return manifests[path:match("^/ext/([^/]+)/")] end,
+	}
+end
+
+local MAGICREPEAT_BINDING = '[extension.hotstring_bindings.magicrepeat]\ncategory = "magickey"\n'
+	.. 'feature_section = "hotstrings.magic_key"\nsections = ["repeat_corrections"]\nsource = "common"\n'
+
+helpers.describe("Extension packs: bound geometry routes", function()
+	helpers.it("(layout-extension-binding) routes whole and section bindings to their bundled categories", function()
+		Packs._reset()
+		helpers.assert_true(not pcall(Packs.routes), "no loader may read routes before discovery commits")
+		Packs.discover({ "/ext" }, packs_io({
+			ergopti = MAGICREPEAT_BINDING .. '[extension.hotstring_bindings.rolls]\ncategory = "rolls"\n'
+				.. 'feature_section = "hotstrings.rolls"\nsource = "common"\n',
+			demo = '[extension]\nname = "Demo"\n',
+		}, { ergopti = { "magicrepeat", "rolls" }, demo = { "phrases" } }))
+		helpers.assert_eq(Packs.routes(), {
+			magickey = { section_sources = { { path = "/ext/ergopti/hotstrings/magicrepeat.toml",
+				sections = { "repeat_corrections" } } } },
+			rolls = { path = "/ext/ergopti/hotstrings/rolls.toml" },
+		})
+		helpers.assert_eq(Packs.source("rolls"), "/ext/ergopti/hotstrings/rolls.toml",
+			"a whole binding also names the file the category's metadata comes from")
+		helpers.assert_eq(table.pack(Packs.route("rolls", "/bundled/rolls.toml")),
+			{ "/ext/ergopti/hotstrings/rolls.toml", n = 2 }, "a whole binding replaces the bundled file")
+		helpers.assert_eq(table.pack(Packs.route("magickey", "/bundled/magickey.toml")), {
+			"/bundled/magickey.toml",
+			{ { path = "/ext/ergopti/hotstrings/magicrepeat.toml", sections = { "repeat_corrections" } } },
+			n = 2,
+		}, "a section binding loads over the bundled file")
+		helpers.assert_eq(table.pack(Packs.route("symbols", "/bundled/symbols.toml")),
+			{ "/bundled/symbols.toml", n = 2 }, "an unbound category keeps its bundled file")
+		helpers.assert_eq(Packs.unbundled_routes({ magickey = true }), {
+			{ category = "rolls", path = "/ext/ergopti/hotstrings/rolls.toml" },
+		}, "a whole binding of a category the driver does not carry still loads")
+		helpers.assert_eq(Packs.unbundled_routes({ rolls = true }), {
+			{ category = "magickey", section_sources = {
+				{ path = "/ext/ergopti/hotstrings/magicrepeat.toml", sections = { "repeat_corrections" } },
+			} },
+		}, "sections bound into an absent category come back without a path, to be reported")
+		Packs._reset()
+	end)
+
+	helpers.it("(layout-extension-binding) refuses two owners of one bound section at discovery", function()
+		Packs._reset()
+		local ok, failure = pcall(Packs.discover, { "/ext" }, packs_io({
+			first = MAGICREPEAT_BINDING,
+			second = MAGICREPEAT_BINDING,
+		}, { first = { "magicrepeat" }, second = { "magicrepeat" } }))
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(failure):find("magickey.repeat_corrections", 1, true) ~= nil, tostring(failure))
+		helpers.assert_true(not pcall(Packs.catalogue), "a conflicting binding must not publish a catalogue")
+		helpers.assert_true(not pcall(Packs.routes), "nor half of its routes")
+		Packs._reset()
+	end)
+end)
+
 helpers.describe("Extension packs: registration", function()
 	helpers.it("(layout-extension-macos) preserves user overlay precedence and registers without enable writes", function()
 		local found = Packs.scan({ "/bundled", "/installed", "/user" }, {
