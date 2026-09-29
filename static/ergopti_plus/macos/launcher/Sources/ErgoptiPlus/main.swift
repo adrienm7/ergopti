@@ -723,13 +723,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		return bundledConfigDir() + "/init.lua"
 	}
 
-	// Path to the vendored Karabiner-Elements installer .app. The Lua driver
-	// calls hs.open() on this path when KE is not yet installed so the user
-	// steps through the system-extension approval without any download.
-	private func bundledKarabinerInstallerPath() -> String {
-		return "\(Bundle.main.bundlePath)/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
-	}
-
 	// Path to the vendored Ollama server binary. The Lua driver sets
 	// OLLAMA_MODELS and spawns this binary directly so local LLM inference
 	// works without a separate Ollama install.
@@ -845,7 +838,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
 		env["ERGOPTI_PATHS_FILE"]             = managedPathsFile()
-		env["ERGOPTI_KARABINER_INSTALLER"]    = bundledKarabinerInstallerPath()
 		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
 		env["ERGOPTI_LAUNCHER_EXECUTABLE"]     = launcherPath
 		env["ERGOPTI_REMAP_GUARDIAN_STATUS"]  = remapGuardianStatus.rawValue
