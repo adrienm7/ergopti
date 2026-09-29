@@ -115,13 +115,23 @@ helpers.describe("Linux system actions", function()
 		end)
 	end)
 
-	helpers.it("empty_trash falls back to kdialog's question (system-actions)", function()
+	-- kdialog's --warningcontinuecancel focuses Continue, so a stray Return
+	-- emptied the trash: its default button must be the one that cancels.
+	helpers.it("empty_trash falls back to kdialog's question, Cancel as default (system-actions)", function()
+		local Quote = require("adapters.shell_runner").quote
+		local i18n = require("infra.i18n")
 		with_recorded_shell(function(commands)
 			Gestures.execute_action("empty_trash", "tap_3")
 			local run = launched(commands)
-			helpers.assert_true(run[1]:find("^kdialog %-%-title ") ~= nil, run[1])
-			helpers.assert_true(run[1]:find("--warningcontinuecancel", 1, true) ~= nil, run[1])
-			helpers.assert_true(run[1]:find("&& { gio trash --empty; }", 1, true) ~= nil, run[1])
+			helpers.assert_eq(#run, 1)
+			helpers.assert_true(run[1]:find("^{ kdialog %-%-title ") ~= nil, run[1])
+			helpers.assert_true(run[1]:find(" --warningyesno ", 1, true) ~= nil, run[1])
+			helpers.assert_true(run[1]:find(" --yes-label " .. Quote(i18n.get("button.cancel"))
+				.. " --no-label " .. Quote(i18n.get("dialog.confirm_action.confirm")) .. "; ", 1, true) ~= nil,
+				"the default Yes button cancels, No continues: " .. run[1])
+			local chained = "; [ $? -eq 1 ]; } && { gio trash --empty; } 2>/dev/null &"
+			helpers.assert_eq(run[1]:sub(-#chained), chained,
+				"only No (exit 1) empties the trash, and the whole question is backgrounded")
 		end, function(command)
 			if command:find("command -v", 1, true) then return command:find("kdialog", 1, true) ~= nil end
 			return true
