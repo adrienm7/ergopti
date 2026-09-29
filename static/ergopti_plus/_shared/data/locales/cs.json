@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Otevřít web Ollama",
 	"ollama.runtime_missing_title": "Ollama není nainstalována",
 	"ollama.runtime_missing_body": "AI zůstane vypnutá, dokud nebude Ollama nainstalována. Vyberte backend Ollama v nabídce AI a stáhněte ji, nebo ji nainstalujte z ollama.com.",
+	"ollama.switch_declined_body": "Ollama nebyla nainstalována, takže aktuální backend AI zůstává aktivní. Vyberte znovu backend Ollama a stáhněte ji, nebo ji nainstalujte z ollama.com.",
 	"ollama.downloading": "Stahování modelu Ollama…",
 	"ollama.fail_title": "Chyba Ollama",
 	"ollama.install_subtitle": "Příprava lokálního serveru Ollama…",

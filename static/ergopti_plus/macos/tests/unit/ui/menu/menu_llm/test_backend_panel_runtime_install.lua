@@ -69,6 +69,7 @@ local function with_rows(opts, scenario)
 			runtime_backend = opts.backend,
 			switches = {},
 			dialogs = 0,
+			notices = {},
 			mlx = new_checker(opts.mlx_installed ~= false),
 			ollama = new_checker(opts.ollama_installed ~= false),
 		}
@@ -90,7 +91,12 @@ local function with_rows(opts, scenario)
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["infra.notifications"] = {
+			notify = function(title, body)
+				record.notices[#record.notices + 1] = { title = title, body = body }
+				return true
+			end,
+		}
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function()
 				record.dialogs = record.dialogs + 1
@@ -184,6 +190,9 @@ helpers.describe("Ollama row waits for the accepted download (backend-runtime-in
 			helpers.assert_eq(record.ollama.installs, 0)
 			helpers.assert_eq(#record.switches, 0)
 			helpers.assert_eq(state.llm_backend, "api")
+			helpers.assert_eq(#record.notices, 1)
+			helpers.assert_eq(record.notices[1].body, "ollama.switch_declined_body",
+				"the previous backend keeps running, so the notice must not say the AI is off")
 		end)
 	end)
 

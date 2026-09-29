@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Открыть сайт Ollama",
 	"ollama.runtime_missing_title": "Ollama не установлена",
 	"ollama.runtime_missing_body": "ИИ остаётся выключенным, пока Ollama не установлена. Выберите бэкенд Ollama в меню ИИ, чтобы загрузить её, или установите её с ollama.com.",
+	"ollama.switch_declined_body": "Ollama не установлена, поэтому текущий бэкенд ИИ остаётся активным. Выберите бэкенд Ollama снова, чтобы загрузить её, или установите её с ollama.com.",
 	"ollama.downloading": "Загрузка модели Ollama…",
 	"ollama.fail_title": "Ошибка Ollama",
 	"ollama.install_subtitle": "Подготовка локального сервера Ollama…",

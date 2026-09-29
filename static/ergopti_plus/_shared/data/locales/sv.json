@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Öppna Ollamas webbplats",
 	"ollama.runtime_missing_title": "Ollama är inte installerat",
 	"ollama.runtime_missing_body": "AI:n förblir avstängd tills Ollama är installerat. Välj Ollama-backend i AI-menyn för att ladda ned det, eller installera det från ollama.com.",
+	"ollama.switch_declined_body": "Ollama installerades inte, så den nuvarande AI-backenden förblir aktiv. Välj Ollama-backend igen för att ladda ned det, eller installera det från ollama.com.",
 	"ollama.downloading": "Laddar ned Ollama-modell…",
 	"ollama.fail_title": "Ollama-fel",
 	"ollama.install_subtitle": "Förbereder lokal Ollama-server…",

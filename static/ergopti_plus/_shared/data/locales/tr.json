@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Ollama web sitesini aç",
 	"ollama.runtime_missing_title": "Ollama yüklü değil",
 	"ollama.runtime_missing_body": "Ollama yüklenene kadar yapay zekâ kapalı kalır. İndirmek için yapay zekâ menüsünde Ollama arka ucunu seçin ya da ollama.com’dan yükleyin.",
+	"ollama.switch_declined_body": "Ollama yüklenmedi, bu yüzden mevcut yapay zekâ arka ucu etkin kalır. İndirmek için Ollama arka ucunu yeniden seçin ya da ollama.com’dan yükleyin.",
 	"ollama.downloading": "Ollama modeli indiriliyor…",
 	"ollama.fail_title": "Ollama hatası",
 	"ollama.install_subtitle": "Yerel Ollama sunucusu hazırlanıyor…",
