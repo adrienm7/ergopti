@@ -357,11 +357,15 @@ end
 
 --- Resolves the exact tap-key catalogue against a detached configuration.
 --- @param document table Decoded configuration.
+--- @param written boolean|nil True for the document a scope just wrote: an
+---   unassignable key there is that write's failure and raises.
 --- @return table state
-function M.configuration_candidate(document)
+function M.configuration_candidate(document, written)
 	local values, assignments = {}, {}
 	local catalogue = assert(action_catalogue(), "tap-key action catalogue is unavailable")
 	walk_assignments(document, function(id, value)
+		assert(not written or value == "none" or (type(value) == "string" and catalogue.is_assignable(value)),
+			"invalid tap-key assignment: " .. id)
 		-- The loader's rule: an outdated action runs as "none".
 		values[id] = stored_action_known(id, value, catalogue) and value or "none"
 	end)
