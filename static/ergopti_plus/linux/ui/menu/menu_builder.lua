@@ -1483,6 +1483,12 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
+			-- The bound categories in the menu manifest's order, the one Windows
+			-- walks too, rather than in load order; the packs follow as loaded.
+			for extension_id, list in pairs(by_extension) do
+				by_extension[extension_id] = Extensions.menu_order(list, classes)
+			end
+
 			if #order == 0 then
 				rows[#rows + 1] = {
 					label    = i18n_safe("menu.extensions.none_installed"),

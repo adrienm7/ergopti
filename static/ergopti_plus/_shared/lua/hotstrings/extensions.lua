@@ -424,4 +424,42 @@ function M.bound_source(packs, category, section)
 	return owner
 end
 
+--- The historical categories an extension binds, in the order its Hotstrings
+--- submenu lists them.
+---
+--- The discovery catalogue sorts bound files by stem, which put rolls before
+--- SFB reduction on macOS and Linux while Windows walked the menu manifest's
+--- hotstring groups (SFB reduction, then rolls, as every driver listed them
+--- before they moved into the Ergopti extension). That manifest is the one
+--- ordering source: its standard, then ergopti, then dynamic lists, under
+--- either spelling of an id; a category none of them names keeps its place
+--- after those, in the given order.
+--- @param names table Category ids.
+--- @param hotstring_groups table|nil The menu manifest's hotstring_groups table.
+--- @return table A new array.
+function M.menu_order(names, hotstring_groups)
+	local rank, count = {}, 0
+	local classes = type(hotstring_groups) == "table" and hotstring_groups or {}
+	for _, class in ipairs({ "standard", "ergopti", "dynamic" }) do
+		for _, id in ipairs(type(classes[class]) == "table" and classes[class] or {}) do
+			count = count + 1
+			if type(id) == "string" then
+				local flat = id:gsub("_", "")
+				rank[id] = rank[id] or count
+				rank[flat] = rank[flat] or count
+			end
+		end
+	end
+	local indexed = {}
+	for index, name in ipairs(names) do indexed[index] = { name = name, index = index } end
+	table.sort(indexed, function(a, b)
+		local rank_a, rank_b = rank[a.name] or math.huge, rank[b.name] or math.huge
+		if rank_a ~= rank_b then return rank_a < rank_b end
+		return a.index < b.index
+	end)
+	local out = {}
+	for index, entry in ipairs(indexed) do out[index] = entry.name end
+	return out
+end
+
 return M
