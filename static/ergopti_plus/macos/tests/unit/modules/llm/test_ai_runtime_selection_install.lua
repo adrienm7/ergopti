@@ -383,6 +383,32 @@ helpers.describe("MLX bootstraps only on its selection (ai-runtime-mlx)", functi
 		helpers.assert_eq(#state.tasks, 1, "a re-selection must reuse the installed runtime")
 		helpers.assert_eq(results[#results], true)
 	end))
+
+	helpers.it("reinstalls a runtime removed after it was ready", scoped(function()
+		local state = new_state()
+		state.absent = {}
+		state.files[MLX_VENV .. "/bin/python"] = true
+		state.files[MLX_VENV .. "/.last_sync_hash"] = true
+		local checker = load_mlx_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_eq(#state.tasks, 0)
+
+		-- The user deletes the venv while the app runs.
+		state.files = {}
+		state.absent = {
+			[MLX_VENV .. "/bin/python"] = true,
+			[MLX_VENV .. "/.last_sync_hash"] = true,
+		}
+		local plain
+		helpers.assert_true(checker.check_and_install_deps(function(ok) plain = ok end))
+		helpers.assert_eq(plain, false, "a plain check must not report a removed runtime ready")
+		helpers.assert_eq(checker.get_state(), "missing")
+		helpers.assert_eq(#state.tasks, 0, "a plain check still never installs")
+
+		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_eq(#state.tasks, 1, "selecting MLX again must reinstall the removed runtime")
+	end))
 end)
 
 

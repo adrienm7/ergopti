@@ -880,6 +880,14 @@ function M.check_and_install_deps(on_complete, replay_token)
 		Logger.debug(LOG, "MLX dependency bootstrap rejected by pause admission.")
 		return false
 	end
+	-- "ready" describes the filesystem as last seen: a venv removed since then
+	-- (by hand, or invalidated after a failed import probe) must be checked
+	-- again, or a selection would report the runtime ready and install nothing.
+	if _bootstrap_state == "ready" and not _task_running and not M.runtime_installed() then
+		Logger.info(LOG, "The MLX runtime was removed since it was last ready; checking it again.")
+		_bootstrap_state = "pending"
+		_last_failure_message = nil
+	end
 	-- If already done, fire the callback immediately — no need to re-run.
 	if _bootstrap_state == "ready" then
 		if replay_token ~= nil then
