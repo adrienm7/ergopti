@@ -113,6 +113,8 @@ function M.register(helpers, opts)
 	local driver = assert(opts and opts.driver, "the contract needs the driver name")
 	local Manifest = require("infra.manifest_reader")
 	local index = Answers.load(catalogue_text(), driver)
+	-- The catalogue offers the trigger choice only where config.toml owns it.
+	local trigger = index.entries["hotstrings.trigger_char"] and "hotstrings.trigger_char" or nil
 
 	helpers.describe("onboarding answers (" .. driver .. ")", function()
 		helpers.it("names only this driver's configuration paths, with their neutral values", function()
@@ -158,17 +160,23 @@ function M.register(helpers, opts)
 				{ { { path = item.path, value = "surprise" } }, "recommendation" },
 				{ { [2] = { path = master, value = true } }, "not a list" },
 				{ { "gestures.enabled" }, "not a table" },
-				{ { { path = "hotstrings.trigger_char", value = "" } }, "visible text" },
-				{ { { path = "hotstrings.trigger_char", value = "ab" } }, "at most 1" },
-				{ { { path = "hotstrings.trigger_char", value = "a\nb" } }, "visible text" },
 			}
+			if trigger then
+				cases[#cases + 1] = { { { path = trigger, value = "" } }, "visible text" }
+				cases[#cases + 1] = { { { path = trigger, value = "ab" } }, "at most 1" }
+				cases[#cases + 1] = { { { path = trigger, value = "a\nb" } }, "visible text" }
+			else
+				cases[#cases + 1] = { { { path = "hotstrings.trigger_char", value = "§" } }, "no wizard path" }
+			end
 			for _, case in ipairs(cases) do
 				local rows, why = Answers.rows(index, case[1], Manifest)
 				helpers.assert_nil(rows, case[2])
 				helpers.assert_contains(tostring(why), case[2])
 			end
-			local star = assert(Answers.rows(index, { { path = "hotstrings.trigger_char", value = "§" } }, Manifest))
-			helpers.assert_eq(star[1].value, "§", "a multi-byte trigger character is one character")
+			if trigger then
+				local star = assert(Answers.rows(index, { { path = trigger, value = "§" } }, Manifest))
+				helpers.assert_eq(star[1].value, "§", "a multi-byte trigger character is one character")
+			end
 		end)
 
 		helpers.it("writes one versioned batch and never writes a refused one", function()
@@ -244,7 +252,8 @@ function M.register(helpers, opts)
 			}, "\n"))
 			local values = Answers.current_values(index, decoded)
 			helpers.assert_eq(values[master], true)
-			helpers.assert_eq(values["hotstrings.trigger_char"], "ù")
+			helpers.assert_eq(values["hotstrings.trigger_char"], trigger and "ù" or nil,
+				"the trigger is read back only where the wizard asks for it")
 			helpers.assert_nil(values["script.log_level"], "a path the wizard does not own is not reported")
 			helpers.assert_nil(values[page(index, "llm").master.path], "an absent key keeps its neutral value")
 		end)

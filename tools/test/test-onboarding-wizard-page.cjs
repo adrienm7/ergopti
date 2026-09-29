@@ -635,9 +635,10 @@ function cataloguePaths(driver) {
 			);
 		}
 	}
+	assert.equal(described.magic_key, undefined, 'the Linux tray owns the trigger character');
 	assert.ok(
-		operations.some((op) => op.path === 'hotstrings.trigger_char'),
-		'a Yes also sets the trigger character'
+		!operations.some((op) => op.path === 'hotstrings.trigger_char'),
+		'Linux never receives a trigger its runtime does not read from config.toml'
 	);
 })();
 
@@ -661,7 +662,7 @@ function cataloguePaths(driver) {
 			);
 		}
 	}
-	assert.equal(checked, Object.keys(DRIVER_MANIFESTS).length, 'every driver asks for the trigger');
+	assert.equal(checked, 2, 'Windows and macOS ask for the trigger');
 })();
 
 (function magicKeyFollowsTheSystemLayoutAndRefusesAnEmptyCustomValue() {

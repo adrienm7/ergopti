@@ -92,6 +92,53 @@ helpers.describe("hotstrings config: sections are opt-in", function()
 		end)
 	end)
 
+	-- The setup wizard writes its hotstring answers only to config.toml, at the
+	-- manifest's Linux file_path and section_path: this runtime must read them
+	-- there, or a Yes is saved and reported while every section stays off.
+	helpers.it("(hs-opt-in-linux) the wizard's config.toml answers are the choices in force", function()
+		local Answers = require("onboarding_answers")
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/" .. Answers.CATALOGUE_PATH, "r"))
+		local index = Answers.load(handle:read("*a"), "linux")
+		handle:close()
+		local operations = {
+			{ path = "hotstrings.groups.french_autocorrection", value = true },
+			{ path = "hotstrings.modules.french_autocorrection.accents", value = true },
+		}
+		for _, operation in ipairs(operations) do
+			helpers.assert_not_nil(index.entries[operation.path], "the Linux wizard asks for " .. operation.path)
+		end
+		local rows = assert(Answers.rows(index, operations, require("infra.manifest_reader")))
+		local lines = {}
+		for _, row in ipairs(rows) do
+			helpers.assert_nil(row.delete, "an opt-in answer is an explicit value")
+			lines[#lines + 1] = "[" .. row.section .. "]\n" .. row.key .. " = " .. tostring(row.value) .. "\n"
+		end
+		local saved_loader = package.loaded["modules.hotstrings.loader"]
+		package.loaded["modules.hotstrings.loader"] = {
+			find_toml_files = function() return {} end,
+			list_subdirs = function() return {} end,
+			read_file = function() return nil end,
+			load_catalogue = function()
+				return { committed = true, errors = 0, categories = CATEGORIES, mappings = {} }
+			end,
+		}
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			Choices.with_file(Config, table.concat(lines), function()
+				Config.init({ load_mappings = function() return true end }, "virtual.toml", nil)
+				local _, committed = Config.load_all()
+				helpers.assert_true(committed, "the fixture catalogue must publish")
+				helpers.assert_eq(Config.is_group_enabled("french_autocorrection"), true)
+				helpers.assert_eq(Config.is_section_checked("french_autocorrection", "accents"), true)
+				helpers.assert_eq(Config.is_section_checked("french_autocorrection", "minus"), false,
+					"a section the wizard left unanswered stays opt-in")
+			end)
+		end)
+		package.loaded["modules.hotstrings.loader"] = saved_loader
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("(hs-opt-in-linux) an unknown category refuses the whole language write", function()
 		with_config(function(Config, path)
 			helpers.assert_eq(Config.set_categories_sections({ "french_autocorrection", "nope" }, true), false)

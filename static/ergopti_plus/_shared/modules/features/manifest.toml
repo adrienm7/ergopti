@@ -5832,6 +5832,7 @@ restore_exclude = []
 #   hint_key     Per-platform warning shown under the question.
 #   note_key     Per-platform explanation for a page without a question.
 #   consent      The answer is a privacy consent: never pre-selected.
+#   magic_key    The hotstrings page's trigger choice, asked on `platforms` only.
 # The wizard persists only manifest paths. A checklist's pre-selection is the
 # manifest `recommended` value, and every question starts at No.
 [onboarding]
@@ -5899,6 +5900,10 @@ neutral_label_key = "onboarding.hotstrings.all_languages"
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"
+# Linux accepts only the symbols of keymap/terminators.validate_magic_key,
+# which refuses the proposed ; and ù: its tray chooses the trigger, which it
+# keeps as config.toml's hotstrings.trigger_char.
+platforms = ["ahk", "hs"]
 label_key = "onboarding.magic_key.desc"
 hint_key = "onboarding.magic_key.choose_freely"
 custom_label_key = "onboarding.magic_key.option_custom"
