@@ -36,6 +36,7 @@ local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
+local ConfigOutdated = require("config_outdated")
 local LOG       = "preferences"
 
 
@@ -178,6 +179,28 @@ local NESTED_KEY_MAP = {
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
 	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
 }
+
+--- Nested tables whose every child is a manifest-declared setting. A child the
+--- manifest no longer declares, or whose value it no longer accepts (the
+--- removed at_hash hotkey under [shortcuts.keys]), is outdated: it never
+--- reaches the state, so no replay can refuse it, and the shared rule warns
+--- once and leaves it for the config cleanup.
+local MANIFEST_CHILD_TABLES = {
+	shortcut_keys            = true,
+	script_control_shortcuts = true,
+	gesture_modes            = true,
+	gesture_sensitivities    = true,
+}
+
+--- Whether a manifest-declared child of a nested table still holds a value
+--- this build accepts.
+--- @param path string Canonical dotted path of the child.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail Why the child is outdated.
+local function manifest_child_fits(path, value)
+	return ConfigOutdated.manifest_value_fits(Manifest.find_entry_by_path(path), value, "hs")
+end
 
 --- Set of known top-level section names for fast lookup.
 local _known_sections = {}
@@ -395,8 +418,14 @@ local function flatten_from_disk(grouped, mark)
 								owned[inner_key] = inner_val
 							end
 						end
-						flat[nested_fk] = owned
-						take(sec_name, disk_key)
+						if MANIFEST_CHILD_TABLES[nested_fk] then
+							local prefix = sec_name .. "." .. disk_key .. "."
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								function(id, value) return manifest_child_fits(prefix .. id, value) end, mark)
+						else
+							flat[nested_fk] = owned
+							take(sec_name, disk_key)
+						end
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
 					elseif sec_name == "gestures" then
