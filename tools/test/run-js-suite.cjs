@@ -296,6 +296,7 @@ const CHECKS = [
 	{ name: 'action picker bridge (shared frontend ↔ both hosts)', cmd: 'node', args: ['tools/test/test-action-picker-bridge.cjs'], repro: 'node tools/test/test-action-picker-bridge.cjs' },
 	{ name: 'the selection case actions share one text-case corpus that every driver suite replays', cmd: 'node', args: ['tools/test/test-text-case-vectors-shared.cjs'], repro: 'npm run test:text-case-vectors-shared' },
 	{ name: 'the wrap_selection parameter rule is one shared corpus every driver suite replays', cmd: 'node', args: ['tools/test/test-wrap-pair-vectors-shared.cjs'], repro: 'npm run test:wrap-pair-vectors-shared' },
+	{ name: 'one ready-made prompt action per built-in prompt profile', cmd: 'node', args: ['tools/test/test-llm-prompt-actions-single-source.cjs'], repro: 'npm run test:llm-prompt-actions-single-source' },
 	{ name: 'the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays', cmd: 'node', args: ['tools/test/test-send-input-vectors-shared.cjs'], repro: 'npm run test:send-input-vectors-shared' },
 	{ name: 'the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys', cmd: 'node', args: ['tools/test/test-tap-keys-single-source.cjs'], repro: 'npm run test:tap-keys-single-source' },
 	{ name: 'a manual prediction is refused for the same four reasons, with the same notices, on every driver', cmd: 'node', args: ['tools/test/test-manual-prediction-refusals-single-source.cjs'], repro: 'npm run test:manual-prediction-refusals' },

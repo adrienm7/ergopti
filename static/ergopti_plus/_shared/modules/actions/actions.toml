@@ -28,7 +28,10 @@
 #             _shared/tests/corpus/action_parameters/wrap_pair_vectors.json), or
 #             "text", "key" and "shortcut" (a text to type, a key, modifiers
 #             plus a key; vocabulary send_keys.json, rule pinned by
-#             _shared/tests/corpus/action_parameters/send_input_vectors.json).
+#             _shared/tests/corpus/action_parameters/send_input_vectors.json),
+#             or "llm_prompt" (a prompt profile id, optionally followed by
+#             |count; rule pinned by
+#             _shared/tests/corpus/action_parameters/llm_prompt_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
@@ -906,6 +909,34 @@ parameter = "wrap_pair"
 # cannot predict never looks broken.
 platform = "all"
 
+[sg_actions.llm_prompt_prediction]
+# Asks the AI for predictions now with the prompt profile stored for the
+# binding (built-in or custom) and, optionally, a prediction count of its own
+# instead of the AI menu's. A rewrite profile (llm/rewrite.lua) rewrites the
+# current sentence instead of continuing it. It refuses like
+# llm_generate_prediction, and also when the stored profile no longer exists.
+platform = "all"
+parameter = "llm_prompt"
+
+[sg_actions.llm_predict_raw]
+# One ready-made action per built-in prompt profile of
+# _shared/modules/llm/profiles.json (tools/test/test-llm-prompt-actions-single-source.cjs
+# pins the set): llm_prompt_prediction with that profile and the AI menu's
+# prediction count, so an official prompt needs no parameter to bind.
+platform = "all"
+
+[sg_actions.llm_predict_basic]
+platform = "all"
+
+[sg_actions.llm_predict_advanced]
+platform = "all"
+
+[sg_actions.llm_predict_batch_advanced]
+platform = "all"
+
+[sg_actions.llm_predict_rewrite]
+platform = "all"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1310,6 +1341,12 @@ items = [
     "--",
     "##ai",
     "llm_generate_prediction",
+    "llm_prompt_prediction",
+    "llm_predict_raw",
+    "llm_predict_basic",
+    "llm_predict_advanced",
+    "llm_predict_batch_advanced",
+    "llm_predict_rewrite",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",
