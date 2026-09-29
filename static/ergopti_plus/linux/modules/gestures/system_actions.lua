@@ -92,8 +92,11 @@ function M.confirmed_command(action_label, command, has_command)
 			.. " --text=" .. quote(message)
 			.. " --ok-label=" .. quote(continue) .. " --cancel-label=" .. quote(cancel)
 	elseif has_command("kdialog") then
-		ask = "kdialog --title " .. quote(title) .. " --warningcontinuecancel " .. quote(message)
-			.. " --continue-label " .. quote(continue) .. " --cancel-label " .. quote(cancel)
+		-- kdialog has no "dangerous" option: Return always presses its first
+		-- (Yes) button. That button is therefore Cancel, and only No, labelled
+		-- Continue, confirms (exit 1); Escape and closing the window exit 2.
+		ask = "{ kdialog --title " .. quote(title) .. " --warningyesno " .. quote(message)
+			.. " --yes-label " .. quote(cancel) .. " --no-label " .. quote(continue) .. "; [ $? -eq 1 ]; }"
 	else
 		return nil
 	end
