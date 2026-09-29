@@ -382,6 +382,9 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 		enabled                   = true,
 		tap_holds_enabled         = recommended and Manifest.recommended_for("tap_holds.enabled")
 			or Manifest.default_for("tap_holds.enabled"),
+		-- Absent: the key combinations follow the Tap-Holds switch
+		-- (Generator.key_combinations_enabled), in the preset as on a fresh install.
+		mod_combos_enabled        = nil,
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = mod_combos_config,
 		tap_hold_timeout_ms       = TAP_HOLD_TIMEOUT_MS_DEFAULT,
@@ -510,6 +513,16 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	-- Absence is neutral even when other explicit remap preferences are present.
 	local tap_holds_enabled = tap_holds.enabled == true
 
+	-- The key-combinations switch stays absent until the user sets it: absent,
+	-- the combinations follow the Tap-Holds switch (Generator.key_combinations_enabled).
+	local mod_combos_enabled = nil
+	if type(combos.enabled) == "boolean" then
+		mod_combos_enabled = combos.enabled
+	elseif combos.enabled ~= nil then
+		Logger.error(LOG, "[mod_combos] enabled must be true or false, not %s — it follows Tap-Holds.",
+			tostring(combos.enabled))
+	end
+
 	Logger.info(LOG, "User config loaded.")
 	-- A `[karabiner] enabled` written by an earlier version is ignored on
 	-- purpose, `false` included: the integration is always on and is no longer
@@ -517,6 +530,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	return {
 		enabled                   = true,
 		tap_holds_enabled         = tap_holds_enabled,
+		mod_combos_enabled        = mod_combos_enabled,
 		tap_hold_config           = tap_holds.config,
 		mod_combos_config         = combos.config,
 		tap_hold_timeout_ms       = timeout_ms,
@@ -582,6 +596,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 		tap_holds.sticky_timeout_ms = state.sticky_timeout_ms
 		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" })
 		local mod_combos = table_at(document, "mod_combos")
+		-- Written only once set: an absent flag follows the Tap-Holds switch.
+		mod_combos.enabled = state.mod_combos_enabled
 		mod_combos.simultaneous_threshold_ms = state.simultaneous_threshold_ms
 		mod_combos.symmetric = state.combo_symmetric == true
 		merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" })

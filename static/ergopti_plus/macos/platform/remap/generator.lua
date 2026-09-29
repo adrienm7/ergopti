@@ -1464,6 +1464,24 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Whether the key-combination rules are generated for a state.
+---
+--- The one place the inheritance rule lives: `mod_combos_enabled` is the
+--- persisted [mod_combos] enabled flag, and while a file has never set it the
+--- combinations follow the Tap-Holds switch — they were Tap-Holds rules until
+--- they got a switch of their own, so an untouched file behaves as before. An
+--- absent Tap-Holds switch counts as on, as it does for the per-key rules.
+--- @param state table Remap state (tap_holds_enabled, mod_combos_enabled).
+--- @return boolean
+function M.key_combinations_enabled(state)
+	if type(state) ~= "table" then error("key_combinations_enabled needs a remap state", 2) end
+	if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
+	if state.mod_combos_enabled ~= nil then
+		error("mod_combos_enabled must be a boolean or absent, got " .. type(state.mod_combos_enabled), 2)
+	end
+	return state.tap_holds_enabled ~= false
+end
+
 --- Assembles the full Karabiner JSON structure from current state.
 ---
 --- Rule priority order (highest → lowest):
@@ -1524,6 +1542,10 @@ function M.build_karabiner_json(
 	-- script-control sentinels need, so switching Tap-Holds off (like a pause)
 	-- must never cost the user the way back.
 	local tap_hold_feature_rules = {}
+	-- Rules owned by the key-combinations switch (M.key_combinations_enabled).
+	-- They were Tap-Holds feature rules until the combinations got a switch
+	-- of their own, under Shortcuts.
+	local key_combination_rules = {}
 
 
 	-- CapsWord must be first — it must match before any modifier combo or
@@ -1608,7 +1630,7 @@ function M.build_karabiner_json(
 		)
 		for _, rule in ipairs(generated) do
 			all_rules[#all_rules + 1] = rule
-			tap_hold_feature_rules[rule] = true
+			key_combination_rules[rule] = true
 			Logger.debug(LOG, "  → rule: %s", rule.description)
 		end
 
@@ -1722,16 +1744,23 @@ function M.build_karabiner_json(
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
 	end
 
-	-- Tap-Holds switched off: drop the feature's rules after the legacy capture
-	-- above, which must keep describing the complete historical graph. Keys then
-	-- behave natively while every stored assignment stays untouched.
-	if state.tap_holds_enabled == false then
+	-- Tap-Holds or key combinations switched off: drop that feature's rules
+	-- after the legacy capture above, which must keep describing the complete
+	-- historical graph. Keys then behave natively while every stored assignment
+	-- stays untouched. The two switches are independent; the var-based tap and
+	-- hold slots of a pair still read key 1's held variable, which only key 1's
+	-- own tap-hold rule sets.
+	local tap_holds_on = state.tap_holds_enabled ~= false
+	local combinations_on = M.key_combinations_enabled(state)
+	if not tap_holds_on or not combinations_on then
 		local kept = {}
 		for _, rule in ipairs(all_rules) do
-			if not tap_hold_feature_rules[rule] then kept[#kept + 1] = rule end
+			local dropped = (not tap_holds_on and tap_hold_feature_rules[rule])
+				or (not combinations_on and key_combination_rules[rule])
+			if not dropped then kept[#kept + 1] = rule end
 		end
-		Logger.info(LOG, "Tap-Holds switched off: %d feature rule(s) not generated.",
-			#all_rules - #kept)
+		Logger.info(LOG, "Switched off (tap-holds %s, key combinations %s): %d feature rule(s) not generated.",
+			tap_holds_on and "on" or "off", combinations_on and "on" or "off", #all_rules - #kept)
 		all_rules = kept
 	end
 

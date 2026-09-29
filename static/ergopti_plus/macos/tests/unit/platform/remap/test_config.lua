@@ -179,6 +179,42 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 	end)
 end)
 
+-- The key combinations moved under Shortcuts with a switch of their own. An
+-- absent flag must stay absent through a load and a save, so it keeps
+-- following the Tap-Holds switch; an explicit one is kept as written.
+helpers.describe("Config: the key-combinations switch", function()
+	helpers.it("persists [mod_combos] enabled when set and leaves it absent otherwise", function()
+		local codec = package.loaded["infra.toml.codec"]
+		local original_encode = codec.encode
+		local encoded = nil
+		codec.encode = function(value)
+			encoded = value
+			error("stop before the disk write")
+		end
+		local state = Config.build_default_state({}, {})
+		helpers.assert_nil(state.mod_combos_enabled, "a fresh install follows the Tap-Holds switch")
+		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
+		helpers.assert_nil(encoded.mod_combos.enabled, "an inherited switch is not written")
+		state.mod_combos_enabled = false
+		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
+		codec.encode = original_encode
+		helpers.assert_eq(encoded.mod_combos.enabled, false)
+
+		local original_load = Config._load_toml_file
+		for _, case in ipairs({ { stored = false }, { stored = true }, {} }) do
+			Config._load_toml_file = function()
+				return {
+					tap_holds = { enabled = true, config = {} },
+					mod_combos = { enabled = case.stored, config = {} },
+				}
+			end
+			local loaded = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
+			helpers.assert_eq(loaded.mod_combos_enabled, case.stored)
+		end
+		Config._load_toml_file = original_load
+	end)
+end)
+
 helpers.describe("Config pause and suspend invariant", function()
 	helpers.it("pause must prevent combo/tap_hold activation (regression for project_suspend_pause_invariant)", function()
 		-- Guard lives in dispatch (shortcuts/gestures); config build must remain safe under pause
