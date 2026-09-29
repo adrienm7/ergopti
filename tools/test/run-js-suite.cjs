@@ -739,6 +739,12 @@ const CHECKS = [
 		repro: 'npm run test:webview-host-strings-survive-failed-fetch'
 	},
 	{
+		name: 'shared pages never show a raw locale key (keys in en.json, catalogue delivered and shipped)',
+		cmd: 'node',
+		args: ['tools/test/test-shared-pages-never-show-raw-keys.cjs'],
+		repro: 'npm run test:shared-pages-never-show-raw-keys'
+	},
+	{
 		name: 'menu labels single source (shared labels.lua consumed by macOS)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-labels-single-source.cjs'],

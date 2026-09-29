@@ -75,6 +75,7 @@
 		"test:i18n-fallback-path": "node ./tools/test/test-i18n-fallback-path.cjs",
 		"test:i18n-cascade": "node ./tools/test/test-webview-i18n-cascade.cjs",
 		"test:webview-host-strings-survive-failed-fetch": "node ./tools/test/test-webview-host-strings-survive-failed-fetch.cjs",
+		"test:shared-pages-never-show-raw-keys": "node ./tools/test/test-shared-pages-never-show-raw-keys.cjs",
 		"test:drift-guard-coverage": "node ./tools/test/test-drift-guard-covers-every-output.cjs",
 		"test:drift-guard-coverage-oracle": "node ./tools/test/test-drift-guard-coverage-oracle.cjs",
 		"test:drift-restore-refusal": "node ./tools/test/test-drift-restore-refusal.cjs",
