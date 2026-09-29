@@ -16,20 +16,24 @@
 ---    boot and the grant poll keep running while it is open. A blocking modal
 ---    would park the main runloop, and the non-blocking alert sheet cannot be
 ---    closed by its owner once the grant arrives.
---- 3. Never takes focus: it is shown at the floating level every ErgoptiPlus
----    window has, without activating the app. The factory's forced focus finds
----    the window through Accessibility, which an untrusted process cannot do;
----    its fallback then set the screen-saver level, above System Settings and
----    the macOS prompt the steps point to, and took focus from Settings.
+--- 3. Accessibility never takes focus: it is shown at the floating level,
+---    without activating the app. The factory's forced focus finds the window
+---    through Accessibility, which an untrusted process cannot do; its fallback
+---    then set the screen-saver level, above System Settings and the macOS
+---    prompt the steps point to, and took focus from Settings. Every other kind
+---    is asked for by a trusted process and is an ordinary window: focused at
+---    the normal level, never kept above other apps (ui-focus-not-topmost).
 --- 4. One owner: at most one dialog exists. Showing the same permission again
 ---    raises the open window instead of stacking a copy; showing another
----    permission replaces it.
+---    permission replaces it. Its owner hears of every close through on_closed.
 --- 5. Closed by its owner: the caller closes it as soon as its poll sees the
 ---    grant, so nobody has to dismiss a dialog about a permission already given.
---- 6. Names the entry macOS lists: the grant belongs to the running runtime,
----    listed as "Hammerspoon", so the steps name it and give its bundle path for
----    the + button. The icon shown is that runtime's own icon, the one beside
----    the switch in the list.
+--- 6. Names the entry macOS lists: the Accessibility grant belongs to the
+---    running runtime, listed as "Hammerspoon", so its steps name it and give
+---    its bundle path for the + button. The icon shown is that runtime's own
+---    icon, the one beside the switch in the list. The Login Items steps name
+---    "Allow in the Background", where macOS lists the remap guardian under the
+---    app's name; that list has no + button, so they quote no path.
 --- ==============================================================================
 
 local M = {}
@@ -44,17 +48,32 @@ local LOG = "permission_dialog"
 -- Script message handler the page posts its button actions to.
 M.BRIDGE = "permission_dialog_bridge"
 
--- Permissions this dialog explains; each owns the locale keys under its prefix.
+-- Permissions this dialog explains. Each owns the locale keys under its prefix
+-- and lists its steps in order; the first names the button that opens the
+-- pane. `names_bundle` adds the + step quoting the runtime path, and
+-- `floating` marks the one kind shown before Accessibility is granted (see
+-- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused instead.
 M.KINDS = {
-	accessibility = { prefix = "permission_dialog.accessibility" },
+	accessibility = {
+		prefix       = "permission_dialog.accessibility",
+		steps        = { "step_opened", "step_toggle" },
+		names_bundle = true,
+		floating     = true,
+	},
+	login_items = {
+		prefix       = "permission_dialog.login_items",
+		steps        = { "step_opened", "step_section", "step_toggle" },
+		names_bundle = false,
+		floating     = false,
+	},
 }
 
 -- Gap between the dialog and the left edge of the screen. System Settings
 -- opens centered with its switches on the right of the list, so a dialog on
--- the left leaves them uncovered while it floats above the Settings window.
+-- the left leaves them uncovered beside the Settings window.
 local SCREEN_MARGIN = 40
 
--- The open dialog: { kind, webview, usercontent, open_settings }, or nil.
+-- The open dialog: { kind, webview, usercontent, open_settings, on_closed }, or nil.
 local _session = nil
 
 
@@ -74,8 +93,24 @@ local function validate(spec)
 	if type(spec.open_settings) ~= "function" then
 		error("permission_dialog.show: open_settings must be a function", 3)
 	end
-	if type(spec.bundle_path) ~= "string" or spec.bundle_path == "" then
+	if M.KINDS[spec.kind].names_bundle
+		and (type(spec.bundle_path) ~= "string" or spec.bundle_path == "") then
 		error("permission_dialog.show: bundle_path must be a non-empty string", 3)
+	end
+	if spec.on_closed ~= nil and type(spec.on_closed) ~= "function" then
+		error("permission_dialog.show: on_closed must be a function when given", 3)
+	end
+end
+
+--- Tells a session's owner, once, that its dialog is gone.
+--- @param session table The dialog that closed.
+local function notify_closed(session)
+	local on_closed = session.on_closed
+	if on_closed == nil then return end
+	session.on_closed = nil
+	local ok, err = xpcall(on_closed, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "The %s permission dialog owner failed on close: %s.", session.kind, tostring(err))
 	end
 end
 
@@ -105,23 +140,32 @@ end
 
 --- Resolves every translated string of one dialog.
 --- @param kind string Permission kind.
---- @param bundle_path string Path of the runtime the grant belongs to.
+--- @param bundle_path string|nil Path of the runtime the grant belongs to, for
+---        a kind that names it.
 --- @return table content { locale, window_title, title, body, steps, open_label, later_label }
 function M.content(kind, bundle_path)
-	local prefix = M.KINDS[kind].prefix
+	local spec = M.KINDS[kind]
+	local prefix = spec.prefix
 	local open_label = i18n.get("permission_dialog.open_settings")
+	local steps = {}
+	for index, name in ipairs(spec.steps) do
+		if index == 1 then
+			-- The dialog opens before the pane does, and the pane may not open
+			-- at all, so this step names the button that opens it again.
+			steps[index] = i18n.format(prefix .. "." .. name, open_label)
+		else
+			steps[index] = i18n.get(prefix .. "." .. name)
+		end
+	end
+	if spec.names_bundle then
+		steps[#steps + 1] = i18n.format("permission_dialog.step_add", bundle_path)
+	end
 	return {
 		locale       = i18n.get_locale(),
 		window_title = i18n.get("permission_dialog.window_title"),
 		title        = i18n.get(prefix .. ".title"),
 		body         = i18n.get(prefix .. ".body"),
-		steps        = {
-			-- The dialog opens before the pane does, and the pane may not open
-			-- at all, so this step names the button that opens it again.
-			i18n.format(prefix .. ".step_opened", open_label),
-			i18n.get(prefix .. ".step_toggle"),
-			i18n.format("permission_dialog.step_add", bundle_path),
-		},
+		steps        = steps,
 		open_label   = open_label,
 		later_label  = i18n.get("common.later"),
 	}
@@ -154,7 +198,8 @@ local STYLE = table.concat({
 --- direction follows the translated text (dir="auto"): Arabic and Hebrew read
 --- right to left, and the bundle path stays left to right inside them.
 --- @param content table Translated strings from M.content.
---- @param bundle_path string Path quoted in the + step.
+--- @param bundle_path string|nil Path quoted in the + step, nil for a kind
+---        without one.
 --- @param icon_url string|nil Data URL of the app icon.
 --- @return string html
 function M.render(content, bundle_path, icon_url)
@@ -162,7 +207,7 @@ function M.render(content, bundle_path, icon_url)
 	for index, step in ipairs(content.steps) do
 		local text = escape_html(step)
 		-- The path is the one fragment the user copies; it is set apart as code.
-		if index == #content.steps then
+		if bundle_path ~= nil and index == #content.steps then
 			local quoted = escape_html(bundle_path)
 			local at = text:find(quoted, 1, true)
 			if at ~= nil then
@@ -204,13 +249,19 @@ local function dialog_frame(geometry)
 	return frame
 end
 
---- Raises the open window of a session within its own level: show() orders
---- it front without the screen-saver level bringToFront(true) would set.
+--- Raises the open window of a session. The floating kind is raised within
+--- its own level: show() orders it front without the screen-saver level
+--- bringToFront(true) would set. Every other kind is presented again like any
+--- window, raised and focused at the normal level.
 --- @param session table The open dialog.
 --- @return boolean raised
 local function raise(session)
 	local ok, err = pcall(function()
-		session.webview:show()
+		if M.KINDS[session.kind].floating then
+			session.webview:show()
+		elseif ui_builder.force_focus(session.webview, false) == false then
+			error("the window could not be focused")
+		end
 	end)
 	if not ok then
 		Logger.warn(LOG, "The %s permission dialog could not be raised: %s.", session.kind, tostring(err))
@@ -250,7 +301,10 @@ end
 --- Never blocks: the call returns as soon as the window is on screen.
 --- @param spec table { kind = a key of M.KINDS,
 ---        open_settings = fn() -> boolean (reopens the exact pane),
----        bundle_path = string (runtime the grant belongs to) }.
+---        bundle_path = string (runtime the grant belongs to; required by a
+---        kind that names it),
+---        on_closed = fn()|nil (called once when this dialog closes, whoever
+---        closes it; an open dialog keeps the one it was opened with) }.
 --- @return boolean shown True when the dialog of this kind is open.
 function M.show(spec)
 	validate(spec)
@@ -274,7 +328,13 @@ function M.show(spec)
 		Logger.error(LOG, "The permission dialog bridge could not be created: %s.", tostring(usercontent))
 		return false
 	end
-	local session = { kind = spec.kind, usercontent = usercontent, open_settings = spec.open_settings }
+	local session = {
+		kind          = spec.kind,
+		usercontent   = usercontent,
+		open_settings = spec.open_settings,
+		on_closed     = spec.on_closed,
+	}
+	local floating = M.KINDS[spec.kind].floating == true
 	usercontent:setCallback(function(message)
 		local body = type(message) == "table" and message.body or nil
 		on_action(session, type(body) == "table" and body.action or nil)
@@ -288,13 +348,15 @@ function M.show(spec)
 		usercontent   = usercontent,
 		html_string   = M.render(content, spec.bundle_path, app_icon_url()),
 		inject_i18n   = false,
-		focus         = false,
-		-- The factory's one floating exception: see ui_builder.PERMISSION_DIALOG_CHROME.
-		chrome        = ui_builder.PERMISSION_DIALOG_CHROME,
+		-- Accessibility is the factory's one floating exception (see
+		-- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused.
+		focus         = not floating,
+		chrome        = floating and ui_builder.PERMISSION_DIALOG_CHROME or nil,
 		on_close      = function()
 			if _session == session then
 				_session = nil
 				Logger.info(LOG, "The %s permission dialog was closed by the user.", session.kind)
+				notify_closed(session)
 			end
 		end,
 	})
@@ -302,6 +364,8 @@ function M.show(spec)
 		-- A raise here must not leave an owner without a window: every later
 		-- request would then "raise" nothing instead of opening the dialog.
 		if _session == session then _session = nil end
+		-- A dialog that never opened has no close to report.
+		session.on_closed = nil
 		Logger.error(LOG, "The %s permission dialog window could not be created: %s.", spec.kind,
 			tostring(built and "no window" or webview))
 		return false
@@ -323,6 +387,7 @@ function M.close(kind)
 	local session = _session
 	if session == nil or (kind ~= nil and session.kind ~= kind) then return true end
 	_session = nil
+	notify_closed(session)
 	local webview = session.webview
 	if webview == nil then return true end
 	local ok, err = pcall(function() webview:delete() end)
