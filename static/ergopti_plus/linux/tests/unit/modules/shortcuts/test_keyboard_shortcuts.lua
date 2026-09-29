@@ -225,6 +225,8 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		local warnings = {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		-- The outdated-entry rule warns once per process; start from a fresh one.
+		require("config_outdated").reset_for_tests()
 		local saved_logger = package.loaded["logger.shim"]
 		package.loaded["logger.shim"] = logger
 		local ok, err = pcall(function()

@@ -38,6 +38,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
@@ -1702,7 +1703,15 @@ local function walk_user_config(config, visit)
 		if type(section) ~= "table" or not visit.action then return end
 		for slot, action in pairs(section) do
 			if M.DEFAULT_GESTURES[slot] and type(action) == "string" then
-				visit.action(section_name, slot, action)
+				-- A retired action is outdated configuration: neither the loader
+				-- nor the cleanup marker takes it, so it is warned about once and
+				-- offered for removal instead of being kept forever.
+				if M.is_assignable(action) then
+					visit.action(section_name, slot, action)
+				else
+					ConfigOutdated.report(section_name .. "." .. slot,
+						"action '" .. action .. "' no longer exists", Logger)
+				end
 			end
 		end
 	end

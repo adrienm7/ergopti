@@ -39,6 +39,7 @@ end
 local TomlCodec     = require("toml_codec")
 local TomlWriter    = require("toml_codec.writer")
 local RecordScanner = require("toml_codec.record_scanner")
+local ConfigOutdated = require("config_outdated")
 local LOG           = "config_unused_keys"
 
 --- The confirmation dialog lists at most this many keys; the rest are counted.
@@ -158,7 +159,9 @@ function M.find_in_source(source, collect)
 	if not scan then return { status = "malformed", keys = {} } end
 
 	local consumption = M.new_consumption()
-	collect(decoded, consumption.mark)
+	-- An entry its owner reports as outdated is offered even when another
+	-- reader also reads it: warned and offered are one set.
+	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark) end)
 
 	local keys = {}
 	for _, record in ipairs(scan.records) do
@@ -166,7 +169,8 @@ function M.find_in_source(source, collect)
 		-- stamp the boot migration reads before any reader runs. The Windows
 		-- loader skips the same tables.
 		local metadata = record.addressable and record.path[1]:sub(1, 1) == "_"
-		if record.addressable and not metadata and not consumption.touches(record.path) then
+		local stale = record.addressable and outdated[table.concat(record.path, ".")] == true
+		if record.addressable and not metadata and (stale or not consumption.touches(record.path)) then
 			keys[#keys + 1] = {
 				section = record.section,
 				key     = record.key,

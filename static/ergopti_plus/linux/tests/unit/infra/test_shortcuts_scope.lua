@@ -144,13 +144,16 @@ helpers.describe("Linux terminal shortcut scope", function()
 		end)
 	end)
 
-	helpers.it("rejects malformed owned values before backup without losing admission", function()
+	helpers.it("clears an outdated owned value instead of refusing (config-outdated-shortcuts)", function()
+		-- An old-shape or retired slot value is outdated configuration: the
+		-- reset that would remove it must never be refused because of it.
 		with_scope(function(scope, owners, controls, path)
 			local malformed = SOURCE:gsub('ctrl_j = "open_url"', 'ctrl_j = false')
 			Sandbox.write_bytes(path, malformed)
-			helpers.assert_eq(scope.apply("clear"), false)
-			helpers.assert_eq(Sandbox.read_bytes(path), malformed)
-			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(scope.apply("clear"), true)
+			helpers.assert_true(not Sandbox.read_bytes(path):find("ctrl_j = false", 1, true),
+				"the clear removes the outdated value")
+			helpers.assert_eq(#controls.backups, 1)
 			helpers.assert_true(owners.manager.configuration_admitted())
 		end)
 	end)
