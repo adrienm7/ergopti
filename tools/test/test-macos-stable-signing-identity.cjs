@@ -95,7 +95,7 @@ function shellFunction(source, name) {
  * @returns {{status: number|null, stderr: string, calls: string[][], leftovers: string[], imported: Buffer|null}}
  */
 function replay(source, options) {
-	const signing = sliceBetween(source, '======= 10/ Codesign + zip', '======= 11/ Entrypoint');
+	const signing = sliceBetween(source, '======= 9/ Codesign + zip', '======= 10/ Entrypoint');
 	const entry = shellFunction(source, options.entry === 'main' ? 'main' : 'build_native_helper');
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-signing-'));
 	const posix = tmp.replaceAll('\\', '/');
@@ -135,7 +135,7 @@ REPO_ROOT="$T/repo"
 LAUNCHER_DIR="$T/launcher"
 BUNDLE_ID="com.ergoptiplus.app"
 ERGOPTI_VERSION=0.0.0-dev ERGOPTI_BUILD=1 ERGOPTI_CHANNEL=main
-HAMMERSPOON_VERSION=1.1.1 KARABINER_VERSION=16.0.0 OLLAMA_VERSION=0.0.0
+HAMMERSPOON_VERSION=1.1.1 OLLAMA_VERSION=0.0.0
 BUILD_DIR="$T/build"
 APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
@@ -152,7 +152,6 @@ ${entry}
 clean_build_dir() { :; }
 download_hammerspoon() { record download; }
 build_launcher() { printf '%s\\n' "$T/launcher.bin"; }
-download_karabiner() { :; }
 download_ollama() { :; }
 assemble_native_runtime() {
 	mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
@@ -161,7 +160,6 @@ assemble_native_runtime() {
 assemble_app() {
 	assemble_native_runtime
 	mkdir -p "$APP_PATH/Contents/Frameworks/Hammerspoon.app" \\
-		"$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app" \\
 		"$APP_PATH/Contents/Resources/static/ergopti_plus/macos/socket"
 	: > "$APP_PATH/Contents/Resources/static/ergopti_plus/macos/socket/core.so"
 }
@@ -327,12 +325,11 @@ function checkKeychain(run, label) {
 const FULL_ORDER = [
 	'/socket/core.so',
 	'/Contents/Frameworks/Hammerspoon.app',
-	'/Karabiner/Karabiner-Elements.app',
 	'/Contents/Frameworks/Sparkle.framework',
 	'/Contents/MacOS/ErgoptiPlus',
 	'/ErgoptiPlus.app'
 ];
-const HELPER_ORDER = FULL_ORDER.slice(3);
+const HELPER_ORDER = FULL_ORDER.slice(2);
 
 const full = replay(BUILD, { entry: 'main', base64: B64, password: P12_PASSWORD, dr: CERT_DR });
 errors.push(

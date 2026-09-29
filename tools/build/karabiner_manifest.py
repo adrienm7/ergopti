@@ -1,10 +1,13 @@
 # tools/build/karabiner_manifest.py
-"""Read the same pinned package metadata used by direct Hammerspoon onboarding."""
+"""Validate the pinned Karabiner package identity that onboarding downloads and installs.
+
+platform/remap/onboarding.lua fetches the DMG named by this manifest on first
+use; the application bundle no longer vendors it.
+"""
 
 import json
 from pathlib import Path
 import re
-import sys
 from urllib.parse import urlsplit
 
 
@@ -16,7 +19,7 @@ FIELDS = ("version", "file_name", "sha256", "source_url")
 
 
 def read_manifest(path=MANIFEST):
-    """Reject incomplete or unsafe package identity before a build downloads it."""
+    """Reject an incomplete or unsafe package identity before onboarding can download it."""
     manifest = json.loads(Path(path).read_text(encoding="utf-8"))
     if (
         not isinstance(manifest, dict)
@@ -46,10 +49,3 @@ def read_manifest(path=MANIFEST):
     ):
         raise ValueError("Invalid Karabiner package URL")
     return manifest
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 1:
-        raise SystemExit("Usage: karabiner_manifest.py")
-    manifest = read_manifest()
-    print("\t".join(manifest[key] for key in FIELDS))
