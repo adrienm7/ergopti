@@ -322,7 +322,7 @@ _ErrorDialog_Present(Record) {
 
 ; Keep native title construction independently testable without reporting a real error.
 _ErrorDialog_NewWindow() {
-	return Gui_Create("+Resize +AlwaysOnTop +MinSize440x320", t("common.error_title"))
+	return Gui_Create("+Resize +MinSize440x320", t("common.error_title"))
 }
 
 ; Opens the window for one error, without taking the keyboard.

@@ -547,8 +547,7 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 		"owner", "", "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
 	_LLM_Menu_ApiTestProgress := State
 	try {
-		Worker := Gui("+AlwaysOnTop +ToolWindow",
-			t("menu.llm.api_dialog_title"))
+		Worker := Gui("", t("menu.llm.api_dialog_title"))
 		State["label"] := Worker.Add("Text", "w300",
 			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
 		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)

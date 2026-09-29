@@ -35,7 +35,7 @@ ShowKeyboardSlotPicker(Prefix) {
 		SlotLabels := []
 		for SlotId in Slots
 				SlotLabels.Push(_GestureActionLabel(SlotId))
-		W := Gui_Create("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
+		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
@@ -104,7 +104,7 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 						break
 				}
 		}
-		W := Gui_Create("+AlwaysOnTop", Title)
+		W := Gui_Create("", Title)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12

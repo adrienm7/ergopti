@@ -116,7 +116,7 @@ GestureSystemNotice(Slot, OnDone := 0) {
 		State["callbacks"][Group].Push(OnDone)
 	if State["windows"].Has(Group)
 		return true
-	G := Gui("+AlwaysOnTop", t("menu.gestures.conflict_title"))
+	G := Gui("", t("menu.gestures.conflict_title"))
 	G.AddText("w440", t("gesture.slots." . Slot) . "`n" . t("gestures.system.not_configured"))
 	G.AddButton("xm", t("menu.gestures.open_settings")).OnEvent("Click",
 		(*) => GestureSystemFinishNotice(Group, G, "settings"))

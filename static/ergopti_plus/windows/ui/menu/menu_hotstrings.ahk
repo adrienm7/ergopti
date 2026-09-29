@@ -385,7 +385,7 @@ _HS_DelimCommit(BuildFn, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 ; Mini GUI: one-shot dialog to pick a delimiter character and its consume mode.
 ; Returns "" on cancel, or triggers the add immediately.
 _HS_DelimAddCustom() {
-	G := Gui("+AlwaysOnTop +Owner", t("dialog.hotstrings.new_delimiter_title"))
+	G := Gui("+Owner", t("dialog.hotstrings.new_delimiter_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
