@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "AI-förutsägelse föreslår slutet på din mening medan du skriver. Modeller laddas ned senare från menyn Artificiell intelligens; inget laddas ned nu.",
 	"onboarding.page.shortcuts.description": "Kortkommandon som kör Ergopti-åtgärder: ändra skiftläge för markeringen, omsluta den, skärmbilder, byta fönster och mer. Listan nedan innehåller de kortkommandon Ergopti rekommenderar.",
 	"onboarding.page.tap_holds.description": "En tap-hold ger en tangent två roller: nedtryckt skriver den en sak, hållen fungerar den som en annan tangent. Caps Lock kan till exempel skriva Enter vid tryck och fungera som modifierare när den hålls ned. När funktionen är aktiverad väljer du tangenterna i menyn Tap-Holds, som också kan importera de tangenter Ergopti rekommenderar.",
+	"onboarding.page.tap_holds.menu_note": "På det här systemet slås tap-holds på i menyn Tap-Holds, där du också väljer tangenterna, så det finns inget att aktivera här.",
 	"onboarding.warning_label": "Varning",
 	"onboarding.welcome.heading": "Språk",
 	"onboarding.welcome.title": "ErgoptiPlus — Inställning",

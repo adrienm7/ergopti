@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "AI-voorspelling stelt tijdens het typen het einde van uw zin voor. Modellen worden later gedownload via het menu Kunstmatige intelligentie; nu wordt er niets gedownload.",
 	"onboarding.page.shortcuts.description": "Sneltoetsen die Ergopti-acties uitvoeren: hoofdletters van de selectie wijzigen, de selectie omsluiten, schermafbeeldingen, van venster wisselen en meer. De lijst hieronder bevat de sneltoetsen die Ergopti aanbeveelt.",
 	"onboarding.page.tap_holds.description": "Een tap-hold geeft een toets twee rollen: aangetikt levert hij het ene op, ingedrukt gehouden werkt hij als een andere toets. Caps Lock kan bijvoorbeeld Enter typen bij aantikken en als modificatietoets dienen bij vasthouden. Kies na het inschakelen de toetsen in het menu Tik-vasthouden, dat ook de door Ergopti aanbevolen toetsen kan importeren.",
+	"onboarding.page.tap_holds.menu_note": "Op dit systeem schakel je tik-vasthouden in via het menu Tik-vasthouden, waar je ook de toetsen kiest, dus hier hoeft niets te worden ingeschakeld.",
 	"onboarding.warning_label": "Waarschuwing",
 	"onboarding.welcome.heading": "Taal",
 	"onboarding.welcome.title": "ErgoptiPlus — Installatie",

@@ -2447,10 +2447,7 @@
 						"description_key": "onboarding.page.tap_holds.description",
 						"consent": false,
 						"groups": [],
-						"master": {
-							"path": "tap_holds.enabled",
-							"default": false
-						}
+						"note_key": "onboarding.page.tap_holds.menu_note"
 					},
 					{
 						"id": "shortcuts",
@@ -3730,10 +3727,7 @@
 						"description_key": "onboarding.page.tap_holds.description",
 						"consent": false,
 						"groups": [],
-						"master": {
-							"path": "tap_holds.enabled",
-							"default": false
-						}
+						"note_key": "onboarding.page.tap_holds.menu_note"
 					},
 					{
 						"id": "shortcuts",

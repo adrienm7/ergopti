@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "Yapay zekâ tahmini, siz yazarken cümlenizin sonunu önerir. Modeller daha sonra Yapay Zeka menüsünden indirilir; şimdi hiçbir şey indirilmez.",
 	"onboarding.page.shortcuts.description": "Ergopti eylemlerini çalıştıran klavye kısayolları: seçimin büyük/küçük harfini değiştirme, seçimi sarma, ekran görüntüsü alma, pencere değiştirme ve daha fazlası. Aşağıdaki liste Ergopti’nin önerdiği kısayolları içerir.",
 	"onboarding.page.tap_holds.description": "Tap-hold bir tuşa iki görev verir: dokunulduğunda bir şey yazar, basılı tutulduğunda başka bir tuş gibi davranır. Örneğin Caps Lock dokunulduğunda Enter yazabilir, basılı tutulduğunda değiştirici tuş olabilir. Etkinleştirdikten sonra tuşları Dokunma-Basılı Tutma menüsünden seçin; bu menü Ergopti’nin önerdiği tuşları da içe aktarabilir.",
+	"onboarding.page.tap_holds.menu_note": "Bu sistemde dokunma-basılı tutma, tuşları da seçtiğiniz Dokunma-Basılı Tutma menüsünden açılır, bu yüzden burada etkinleştirilecek bir şey yoktur.",
 	"onboarding.warning_label": "Uyarı",
 	"onboarding.welcome.heading": "Dil",
 	"onboarding.welcome.title": "ErgoptiPlus — Kurulum",

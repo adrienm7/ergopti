@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "Die KI-Vorhersage schlägt beim Tippen das Ende Ihres Satzes vor. Modelle werden später über das Menü Künstliche Intelligenz heruntergeladen; jetzt wird nichts heruntergeladen.",
 	"onboarding.page.shortcuts.description": "Tastenkürzel, die Ergopti-Aktionen ausführen: Groß-/Kleinschreibung der Auswahl ändern, sie einrahmen, Bildschirmfotos, Fensterwechsel und mehr. Die folgende Liste enthält die von Ergopti empfohlenen Kürzel.",
 	"onboarding.page.tap_holds.description": "Ein Tap-Hold gibt einer Taste zwei Rollen: angetippt erzeugt sie eine Sache, gehalten wirkt sie wie eine andere Taste. Zum Beispiel kann die Feststelltaste beim Antippen Enter eingeben und beim Halten als Modifikator dienen. Wählen Sie nach dem Aktivieren die Tasten im Menü Tap-Holds, das auch die von Ergopti empfohlenen Tasten importieren kann.",
+	"onboarding.page.tap_holds.menu_note": "Auf diesem System werden Tap-Holds im Menü Tap-Holds eingeschaltet, in dem Sie auch die Tasten auswählen, daher gibt es hier nichts zu aktivieren.",
 	"onboarding.warning_label": "Hinweis",
 	"onboarding.welcome.heading": "Sprache",
 	"onboarding.welcome.title": "ErgoptiPlus — Einrichtung",

@@ -5842,8 +5842,11 @@ order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", 
 title_key = "menu.tapholds.title"
 question_key = "menu.tapholds.enable"
 description_key = "onboarding.page.tap_holds.description"
-master = { ahk = "category_enabled.tap_holds", hs = "tap_holds.enabled", linux = "tap_holds.enabled" }
+master = { ahk = "category_enabled.tap_holds" }
 checklist = "none"
+# macOS keeps the switch in config_karabiner.toml and Linux in tap_hold.toml,
+# both written by their Tap-Holds menu: a config.toml answer would never be read.
+note_key = { hs = "onboarding.page.tap_holds.menu_note", linux = "onboarding.page.tap_holds.menu_note" }
 
 [onboarding.pages.shortcuts]
 title_key = "menu.shortcuts.title"

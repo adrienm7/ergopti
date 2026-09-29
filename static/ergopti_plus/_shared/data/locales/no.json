@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "KI-prediksjon foreslår slutten på setningen mens du skriver. Modeller lastes ned senere fra menyen Kunstig intelligens; ingenting lastes ned nå.",
 	"onboarding.page.shortcuts.description": "Hurtigtaster som kjører Ergopti-handlinger: endre store og små bokstaver i markeringen, omslutte den, skjermbilder, bytte vindu og mer. Listen nedenfor inneholder hurtigtastene Ergopti anbefaler.",
 	"onboarding.page.tap_holds.description": "Et tap-hold gir en tast to roller: trykket skriver den én ting, holdt nede fungerer den som en annen tast. Caps Lock kan for eksempel skrive Enter ved trykk og fungere som modifikator når den holdes nede. Når funksjonen er slått på, velger du tastene i menyen Tap-Holds, som også kan importere tastene Ergopti anbefaler.",
+	"onboarding.page.tap_holds.menu_note": "På dette systemet slås tap-holds på fra menyen Tap-Holds, der du også velger tastene, så det er ingenting å aktivere her.",
 	"onboarding.warning_label": "Advarsel",
 	"onboarding.welcome.heading": "Språk",
 	"onboarding.welcome.title": "ErgoptiPlus — Oppsett",
