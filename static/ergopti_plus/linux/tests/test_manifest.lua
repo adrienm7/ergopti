@@ -189,6 +189,7 @@ return {
 	"tests.unit.modules.hotstrings.test_dynamic_unicode_suffix",
 	"tests.unit.modules.hotstrings.test_expansion_delay",
 	"tests.unit.modules.hotstrings.test_hotstrings_menu_skeleton",
+	"tests.unit.modules.hotstrings.test_hotstrings_scope_overrides",
 	"tests.unit.modules.hotstrings.test_injector_caps_lock",
 	"tests.unit.modules.hotstrings.test_injector_held_terminator",
 	"tests.unit.modules.hotstrings.test_injector_fast_channel",
