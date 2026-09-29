@@ -110,6 +110,12 @@ function M.partition(prefix, map, is_known, mark)
 	if type(map) ~= "table" then error("config_outdated.partition needs a table", 2) end
 	if type(is_known) ~= "function" then error("config_outdated.partition needs an is_known owner", 2) end
 	local kept, outdated = {}, {}
+	-- A TOML array decodes as a sequence: an older build's list where this
+	-- build keeps id = value settings is outdated as a whole.
+	if #map > 0 then
+		M.report(prefix, "a list is not a table of settings")
+		return kept, outdated
+	end
 	for id, value in pairs(map) do
 		local known, detail = false, "not a text key"
 		if type(id) == "string" and id ~= "" then known, detail = is_known(id, value) end
