@@ -1050,18 +1050,21 @@ end)
 -- for users who never bind one of these.
 --- Builds a gesture action that runs one function of a parent-scoped owner of
 --- the shortcut layer under the dispatching parent, so PAUSE of that parent
---- fences it and a sibling parent's PAUSE does not.
+--- fences it and a sibling parent's PAUSE does not. A confirmed action also
+--- gets the application the user acted from, which its question read before
+--- bringing the driver to the front (execute_single).
 --- @param module_name string The owner module.
---- @param method string Public function taking the parent as its last argument.
+--- @param method string Public function taking the parent, then that
+--- application (nil for an action that asks nothing).
 --- @return function
 local function owner_action(module_name, method)
-	return function()
+	return function(_, acted_from)
 		local ok, Owner = pcall(require, module_name)
 		if not ok or type(Owner) ~= "table" or type(Owner[method]) ~= "function" then
 			Logger.error(LOG, "Action '%s.%s' is unavailable: %s.", module_name, method, tostring(Owner))
 			return false
 		end
-		return Owner[method](current_action_parent())
+		return Owner[method](current_action_parent(), acted_from)
 	end
 end
 
@@ -2554,8 +2557,10 @@ end
 --- @param s table The registry entry.
 --- @param parent string The dispatch parent.
 --- @param control_plane boolean Whether the action is script control.
+--- @param acted_from table|nil The application a confirmation read before its
+--- question, handed to the handler after the binding.
 --- @return boolean True when the handler ran under a still-admitted parent.
-local function dispatch_single(name, binding, s, parent, control_plane)
+local function dispatch_single(name, binding, s, parent, control_plane, acted_from)
 	local prior_parent = _dispatch_parent
 	_dispatch_parent = parent
 	-- Any tap action (other than the click-toggle itself) must deactivate a held click
@@ -2579,7 +2584,7 @@ local function dispatch_single(name, binding, s, parent, control_plane)
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
 	local dispatch_ok, callback_ok = xpcall(function()
 		return Logger.callback(LOG,
-			"Gesture action '" .. tostring(name) .. "'", s.fn, binding)
+			"Gesture action '" .. tostring(name) .. "'", s.fn, binding, acted_from)
 	end, debug.traceback)
 	local admission_committed = control_plane or aux_admission_open(parent)
 	_dispatch_parent = prior_parent
@@ -2620,12 +2625,12 @@ function M.execute_single(name, binding)
 		end
 		-- The action owns the dispatch whether or not its question could be shown
 		-- (ask logs why not): a fallback provider must never run it unasked.
-		ActionConfirm.ask(M.get_label(name), function()
+		ActionConfirm.ask(M.get_label(name), function(acted_from)
 			if not aux_admission_open(parent) then
 				Logger.info(LOG, "'%s' was confirmed after its scope was paused — not run.", name)
 				return
 			end
-			dispatch_single(name, binding, s, parent, control_plane)
+			dispatch_single(name, binding, s, parent, control_plane, acted_from)
 		end)
 		return true
 	end

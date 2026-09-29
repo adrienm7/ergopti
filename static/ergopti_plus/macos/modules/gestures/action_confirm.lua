@@ -15,10 +15,13 @@
 ---    not expect must not destroy anything.
 --- 3. One question at a time: a second press while one is shown is refused and
 ---    logged instead of stacking alerts whose answers could run twice.
---- 4. The alert brings the driver to the front, so the window the user acted
----    from gets its focus back before the action runs: force_quit_frontmost
----    would otherwise target the driver itself. When that window cannot get it
----    back, the action does not run against whatever is in front instead.
+--- 4. The alert brings the driver to the front, so the application the user
+---    acted from is read before it and handed to the action:
+---    force_quit_frontmost kills that one, never the driver in front once the
+---    alert is gone. It is read from NSWorkspace, not the accessibility API, so
+---    a hung application or one with no window is still the one killed.
+--- 5. That application gets its focus back before the action runs, as best
+---    effort: no action depends on it any more, so a failure is only logged.
 --- ==============================================================================
 
 local M = {}
@@ -47,7 +50,9 @@ end
 
 --- Asks whether an action may run, and runs it only on the explicit answer.
 --- @param action_label string The action's localized label, quoted in the question.
---- @param on_confirmed function Runs the action; called at most once.
+--- @param on_confirmed function fn(acted_from) runs the action; called at most
+--- once. acted_from is the frontmost application when the question was asked,
+--- { pid, bundle_id }, or nil when it could not be read.
 --- @return boolean asked True when the question is shown.
 function M.ask(action_label, on_confirmed)
 	if type(on_confirmed) ~= "function" then
@@ -63,9 +68,8 @@ function M.ask(action_label, on_confirmed)
 			tostring(action_label))
 		return false
 	end
-	-- Read before the alert takes the focus; nil when no window has it (the
-	-- desktop), and then there is no focus to give back.
-	local prior_window = WindowInfo.focused_window_id()
+	-- Read before the alert brings the driver to the front.
+	local acted_from = WindowInfo.frontmost_application()
 	local confirm_label = i18n.get("dialog.confirm_action.confirm")
 	local cancel_label = i18n.get("button.cancel")
 	local question = {}
@@ -79,13 +83,12 @@ function M.ask(action_label, on_confirmed)
 				Logger.info(LOG, "'%s' was cancelled at its confirmation.", tostring(action_label))
 				return
 			end
-			if prior_window ~= nil and not WindowManager.activate(prior_window) then
-				Logger.warn(LOG, "'%s' was confirmed, but the window it was asked from cannot get its focus"
-					.. " back — not run.", tostring(action_label))
-				return
-			end
 			Logger.info(LOG, "'%s' was confirmed.", tostring(action_label))
-			on_confirmed()
+			if acted_from ~= nil and not WindowManager.activate(acted_from.bundle_id) then
+				Logger.info(LOG, "'%s': %s could not get its focus back.", tostring(action_label),
+					acted_from.bundle_id)
+			end
+			on_confirmed(acted_from)
 		end,
 		i18n.get("dialog.confirm_action.title"),
 		i18n.format("dialog.confirm_action.message", action_label),

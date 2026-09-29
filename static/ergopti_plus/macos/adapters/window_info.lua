@@ -92,18 +92,46 @@ function M.getFocused()
 	return result or empty_info()
 end
 
---- Returns the id of the focused window. Not part of the WindowInfo port: a
---- caller hands it to WindowManager.activate to give that window its focus back
---- after a dialog of the driver took it.
---- @return number|nil window_id Nil when no window is focused or it is unreadable.
-function M.focused_window_id()
+--- Returns the frontmost application's process id and bundle identifier. Not
+--- part of the WindowInfo port: a caller reads it before a dialog of the
+--- driver takes the front. Read from NSWorkspace, never through the
+--- accessibility API, so an application that does not answer (a beachball)
+--- or has no window is still read, and the read never waits on it.
+--- @return table|nil application { pid, bundle_id }; nil when unreadable, or
+--- when the application has no bundle identifier.
+function M.frontmost_application()
 	local ok, result = pcall(function()
-		local win = hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
-		if not win then return nil end
-		return win:id()
+		local app = hs.application and hs.application.frontmostApplication
+			and hs.application.frontmostApplication()
+		if not app then return nil end
+		local pid, bundle_id = app:pid(), app:bundleID()
+		if type(pid) ~= "number" or type(bundle_id) ~= "string" or bundle_id == "" then return nil end
+		return { pid = pid, bundle_id = bundle_id }
 	end)
 	if not ok then
-		Logger.error(LOG, "focused_window_id(): unexpected error — %s", tostring(result))
+		Logger.error(LOG, "frontmost_application(): unexpected error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
+--- Returns the bundle identifier of the application a process id runs, from
+--- NSWorkspace like frontmost_application. Not part of the WindowInfo port: a
+--- caller checks that a process read earlier is still the same application.
+--- @param pid number Process id.
+--- @return string|nil bundle_id Nil when no application runs under that pid.
+function M.application_bundle_id(pid)
+	if type(pid) ~= "number" then error("application_bundle_id: pid must be a number", 2) end
+	local ok, result = pcall(function()
+		local app = hs.application and hs.application.applicationForPID
+			and hs.application.applicationForPID(pid)
+		if not app then return nil end
+		local bundle_id = app:bundleID()
+		if type(bundle_id) ~= "string" or bundle_id == "" then return nil end
+		return bundle_id
+	end)
+	if not ok then
+		Logger.error(LOG, "application_bundle_id(): unexpected error — %s", tostring(result))
 		return nil
 	end
 	return result

@@ -20,7 +20,9 @@
 ---    `osascript -ss` prints and parsed by _shared/lua/file_selection, which
 ---    refuses a report it cannot read exactly instead of acting on part of it.
 --- 4. Confirmation is not asked here: modules/gestures/actions.lua asks for
----    every action the catalogue declares `confirm = true` before it runs.
+---    every action the catalogue declares `confirm = true` before it runs, and
+---    hands a confirmed force quit the application that was frontmost when it
+---    asked, since its alert has brought the driver to the front since.
 --- ==============================================================================
 
 local M = {}
@@ -33,6 +35,7 @@ local Clipboard = require("adapters.clipboard")
 local MouseControl = require("adapters.mouse_control")
 local FileSystem = require("adapters.file_system")
 local TccGrant = require("adapters.tcc_grant")
+local WindowInfo = require("adapters.window_info")
 local FileSelection = require("file_selection")
 local AppParameter = require("app_parameter")
 
@@ -216,17 +219,53 @@ M.SHELL_BUNDLES = {
 	["com.apple.loginwindow"] = true,
 }
 
+--- Hands on the application a confirmation read before its question, once it
+--- is checked to be neither the driver nor the shell and to still run under
+--- the same identity: the pid of an application that quit meanwhile may name
+--- another process.
+--- @param label string
+--- @param acted_from table { pid, bundle_id } from WindowInfo.frontmost_application.
+--- @param own_bundle string The driver's own bundle identifier.
+--- @param on_front function fn(pid, bundle_id) for another application.
+--- @return boolean started What on_front returned.
+local function with_acted_from(label, acted_from, own_bundle, on_front)
+	local pid, bundle_id = acted_from.pid, acted_from.bundle_id
+	if type(pid) ~= "number" or pid ~= math.floor(pid) or pid <= 1 or type(bundle_id) ~= "string" then
+		Logger.error(LOG, "%s refused: unreadable application '%s' (pid %s).", label, tostring(bundle_id), tostring(pid))
+		return false
+	end
+	if bundle_id == own_bundle then
+		Logger.warn(LOG, "%s refused: ErgoptiPlus itself was frontmost (use Quit in its menu).", label)
+		return false
+	end
+	if M.SHELL_BUNDLES[bundle_id] then
+		Logger.warn(LOG, "%s refused: %s is the macOS desktop shell.", label, bundle_id)
+		return false
+	end
+	local running = WindowInfo.application_bundle_id(pid)
+	if running ~= bundle_id then
+		Logger.warn(LOG, "%s refused: %s (pid %d) no longer runs (that pid now runs %s).", label, bundle_id, pid,
+			running or "nothing")
+		return false
+	end
+	return on_front(string.format("%d", pid), bundle_id) == true
+end
+
 --- Reads the frontmost application, refusing the driver itself and the shell.
+--- A confirmed action passes the application read before its question
+--- (action_confirm): its alert has since brought the driver to the front.
 --- @param label string
 --- @param on_front function fn(pid, bundle_id) for another application.
 --- @param parent string|nil
+--- @param acted_from table|nil { pid, bundle_id }, read before a confirmation.
 --- @return boolean started
-local function with_frontmost(label, on_front, parent)
+local function with_frontmost(label, on_front, parent, acted_from)
 	local own_bundle, detail = TccGrant.bundle_id()
 	if not own_bundle then
 		Logger.error(LOG, "%s refused: the driver's own bundle identifier is unknown (%s).", label, tostring(detail))
 		return false
 	end
+	if acted_from ~= nil then return with_acted_from(label, acted_from, own_bundle, on_front) end
 	return run_script(string.format(M.SCRIPTS.frontmost_process, own_bundle), false, label, function(ok, out)
 		if not ok or type(out) ~= "string" then
 			Logger.error(LOG, "%s: the frontmost application could not be read.", label)
@@ -264,21 +303,25 @@ end
 
 --- Asks the frontmost application to quit, as its own Quit command does.
 --- @param parent string|nil
+--- @param acted_from table|nil The application a confirmation read before its question.
 --- @return boolean started
-function M.quit_frontmost_app(parent)
+function M.quit_frontmost_app(parent, acted_from)
 	return with_frontmost("Quit the frontmost application", function(_, bundle_id)
-		run_script_logged(string.format(M.SCRIPTS.quit_application, bundle_id),
+		return run_script_logged(string.format(M.SCRIPTS.quit_application, bundle_id),
 			"Quit " .. bundle_id, parent)
-	end, parent)
+	end, parent, acted_from)
 end
 
 --- Kills the frontmost application at once (SIGKILL), as Force Quit does.
+--- Confirmed first (catalogue `confirm = true`), it kills the application
+--- that was frontmost when the question was asked.
 --- @param parent string|nil
+--- @param acted_from table|nil The application a confirmation read before its question.
 --- @return boolean started
-function M.force_quit_frontmost(parent)
+function M.force_quit_frontmost(parent, acted_from)
 	return with_frontmost("Force quit the frontmost application", function(pid, bundle_id)
-		run_logged(M.KILL_BIN, { "-KILL", pid }, "Force quit " .. bundle_id, parent)
-	end, parent)
+		return run_logged(M.KILL_BIN, { "-KILL", pid }, "Force quit " .. bundle_id, parent)
+	end, parent, acted_from)
 end
 
 

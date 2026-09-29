@@ -14,6 +14,10 @@
 ---    hs.execute would park the runloop that feeds the keyboard tap.
 --- 3. The Finder selection must reach xattr and chmod as exact argv entries,
 ---    and an unreadable or empty selection must start nothing.
+--- 4. A confirmed force quit read the frontmost application after its alert,
+---    which had brought the driver to the front: it refused instead of killing
+---    the application the user acted from, a hung one or one with no window
+---    included. It now kills the application read before the question.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -25,6 +29,7 @@ local OWNED = {
 	"adapters.mouse_control",
 	"adapters.file_system",
 	"adapters.tcc_grant",
+	"adapters.window_info",
 	"infra.notifications",
 	"infra.i18n",
 	"infra.logger",
@@ -35,7 +40,7 @@ local OWN_BUNDLE = "com.ergoptiplus.app"
 
 --- Loads the module over recording doubles and hands both to `body`.
 --- @param body function fn(System, record)
---- @param options table|nil { frame, create_statuses }
+--- @param options table|nil { frame, create_statuses, running = { [pid] = bundle id } }
 local function with_system(body, options)
 	options = options or {}
 	helpers.with_fresh_modules(OWNED, function()
@@ -79,6 +84,10 @@ local function with_system(body, options)
 			end,
 		}
 		package.loaded["adapters.tcc_grant"] = { bundle_id = function() return OWN_BUNDLE end }
+		local running = options.running or {}
+		package.loaded["adapters.window_info"] = {
+			application_bundle_id = function(pid) return running[pid] end,
+		}
 		local System = require("modules.gestures.system_actions")
 		body(System, record)
 	end)
@@ -192,6 +201,45 @@ helpers.describe("macOS system actions start their exact native command", functi
 			helpers.assert_eq(#record.runs, 3, "an unreadable answer kills nothing")
 		end)
 	end)
+
+	-- The confirmation's alert brings the driver to the front, so a confirmed
+	-- force quit that read the frontmost application then found itself.
+	helpers.it("a confirmed force quit kills the application read before its question (force-quit-acted-from)",
+		function()
+			with_system(function(System, record)
+				helpers.assert_eq(System.force_quit_frontmost(PARENT,
+					{ pid = 4242, bundle_id = "com.apple.Safari" }), true)
+				assert_run(record.runs[1], "/bin/kill", { "-KILL", "4242" })
+				helpers.assert_eq(#record.runs, 1, "the frontmost application is not read again after the question")
+			end, { running = { [4242] = "com.apple.Safari" } })
+		end)
+
+	helpers.it("a confirmed force quit refuses the driver, the shell and a pid that changed (force-quit-acted-from)",
+		function()
+			local running = {
+				[500] = OWN_BUNDLE, [301] = "com.apple.finder", [302] = "com.apple.dock",
+				[303] = "com.apple.loginwindow", [812] = "com.apple.TextEdit",
+			}
+			with_system(function(System, record)
+				local refused = {
+					{ pid = 500, bundle_id = OWN_BUNDLE },
+					{ pid = 301, bundle_id = "com.apple.finder" },
+					{ pid = 302, bundle_id = "com.apple.dock" },
+					{ pid = 303, bundle_id = "com.apple.loginwindow" },
+					-- Quit while the question was shown: nothing runs under its pid.
+					{ pid = 4242, bundle_id = "com.apple.Safari" },
+					-- The pid now names another application.
+					{ pid = 812, bundle_id = "com.apple.Safari" },
+					{ pid = 1, bundle_id = "com.apple.Safari" },
+					{ pid = "4242", bundle_id = "com.apple.Safari" },
+				}
+				for _, acted_from in ipairs(refused) do
+					helpers.assert_eq(System.force_quit_frontmost(PARENT, acted_from), false,
+						tostring(acted_from.bundle_id) .. " " .. tostring(acted_from.pid) .. " is refused")
+				end
+				helpers.assert_eq(#record.runs, 0, "nothing is killed and nothing is read instead")
+			end, { running = running })
+		end)
 
 	helpers.it("open_app opens by bundle identifier or by name", function()
 		with_system(function(System, record)

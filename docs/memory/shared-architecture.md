@@ -114,9 +114,11 @@ MsgBox), Linux a zenity/kdialog question chained in front of the command of
 action that is not one of those commands. Action: declare `confirm` in the
 catalogue and add the confirm-gate test case; do not add a second prompt inside
 the handler. The question's own window takes the focus, so an action that
-acts on the active window must not read it after the answer: macOS and
-Windows give the window it was asked from its focus back and refuse to run
-when they cannot, Linux reads it (`TARGETS`) before the question. Windows
+acts on the active window must not read it after the answer: macOS reads the
+frontmost application before its alert (from NSWorkspace: the accessibility API
+cannot read a hung or windowless application) and hands it to the action,
+Windows gives the window it was asked from its focus back and refuses to run
+when it cannot, Linux reads it (`TARGETS`) before the question. Windows
 native calls of system actions go through
 `adapters/system_control.ahk`: the modules/infra/platform OS-call ratchet has
 almost no headroom left.

@@ -15,8 +15,10 @@
 --- 2. force_quit_frontmost killed the frontmost application unasked, against
 ---    the decision of 2026-09-29 that it asks like the other destructive ones.
 --- 3. The alert brings the driver to the front: a confirmed force quit then
----    found the driver frontmost, unless the window the user acted from got
----    its focus back first.
+---    found the driver frontmost. Giving the focused window its focus back did
+---    not cover an application with no window or a hung one, whose window the
+---    accessibility API cannot read: the application the user acted from is
+---    read before the alert, and the confirmed action gets it.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -34,18 +36,18 @@ local CONFIRM_OWNED = {
 --- Loads the confirmation module over a recording alert.
 --- @param body function fn(Confirm, alerts, focus)
 --- @param frame table|nil The screen frame under the pointer.
---- @param focus table|nil { window = focused window id, activates = true|false }.
+--- @param focus table|nil { front = frontmost application, activates = true|false }.
 local function with_confirm(body, frame, focus)
-	focus = focus or { window = nil, activates = true }
+	focus = focus or { front = nil, activates = true }
 	focus.activated = {}
 	helpers.with_fresh_modules(CONFIRM_OWNED, function()
 		local alerts = {}
 		package.loaded["adapters.window_info"] = {
-			focused_window_id = function() return focus.window end,
+			frontmost_application = function() return focus.front end,
 		}
 		package.loaded["adapters.window_manager"] = {
-			activate = function(window_id)
-				focus.activated[#focus.activated + 1] = window_id
+			activate = function(spec)
+				focus.activated[#focus.activated + 1] = spec
 				return focus.activates
 			end,
 		}
@@ -104,36 +106,48 @@ helpers.describe("action confirmation (macOS)", function()
 		end, FRAME)
 	end)
 
-	helpers.it("gives the window it was asked from its focus back, then runs (confirm-focus-back)", function()
-		local order = {}
-		local focus = { window = 4242, activates = true }
+	-- The alert brings the driver to the front: what is frontmost once it is
+	-- answered is the driver, never the application the user acted from.
+	helpers.it("hands the action the application read before the alert (confirm-acted-from)", function()
+		local safari = { pid = 4242, bundle_id = "com.apple.Safari" }
+		local focus = { front = safari, activates = true }
 		with_confirm(function(Confirm, alerts)
-			Confirm.ask("x", function() order[#order + 1] = "run:" .. tostring(focus.activated[1]) end)
+			local got = {}
+			Confirm.ask("x", function(acted_from) got[#got + 1] = acted_from end)
+			focus.front = { pid = 500, bundle_id = "com.ergoptiplus.app" }
 			helpers.assert_eq(#focus.activated, 0, "the focus stays with the alert while it asks")
 			alerts[1][3]("dialog.confirm_action.confirm")
-			helpers.assert_eq(focus.activated, { 4242 })
-			helpers.assert_eq(order, { "run:4242" }, "the action runs after the focus is given back")
+			helpers.assert_eq(got, { safari })
+			helpers.assert_eq(focus.activated, { "com.apple.Safari" }, "that application gets its focus back")
 		end, FRAME, focus)
 	end)
 
-	helpers.it("runs nothing when that window cannot get its focus back (confirm-focus-back)", function()
-		local focus = { window = 4242, activates = false }
+	-- A hung application may refuse the focus: the action it was confirmed for
+	-- targets the application it got, so it still runs.
+	helpers.it("runs even when that application cannot get its focus back (confirm-acted-from)", function()
+		local safari = { pid = 4242, bundle_id = "com.apple.Safari" }
+		local focus = { front = safari, activates = false }
 		with_confirm(function(Confirm, alerts)
-			local ran = false
-			Confirm.ask("x", function() ran = true end)
+			local got = {}
+			Confirm.ask("x", function(acted_from) got[#got + 1] = acted_from end)
 			alerts[1][3]("dialog.confirm_action.confirm")
-			helpers.assert_eq(ran, false, "the action must not target whatever is in front instead")
+			helpers.assert_eq(got, { safari })
 			helpers.assert_eq(Confirm.is_pending(), false)
 		end, FRAME, focus)
 	end)
 
-	helpers.it("with no focused window there is no focus to give back (confirm-focus-back)", function()
-		local focus = { window = nil, activates = false }
+	helpers.it("with no readable application, the action runs with none (confirm-acted-from)", function()
+		local focus = { front = nil, activates = false }
 		with_confirm(function(Confirm, alerts)
-			local ran = false
-			Confirm.ask("x", function() ran = true end)
+			local runs = 0
+			local got = "unset"
+			Confirm.ask("x", function(acted_from)
+				runs = runs + 1
+				got = acted_from
+			end)
 			alerts[1][3]("dialog.confirm_action.confirm")
-			helpers.assert_eq(ran, true)
+			helpers.assert_eq(runs, 1)
+			helpers.assert_eq(got, nil)
 			helpers.assert_eq(#focus.activated, 0)
 		end, FRAME, focus)
 	end)
@@ -182,8 +196,8 @@ local function with_recorded_system(body)
 	}
 	package.loaded["modules.gestures.system_actions"] = setmetatable({}, {
 		__index = function(_, method)
-			return function(parent)
-				calls[#calls + 1] = { method = method, parent = parent }
+			return function(parent, acted_from)
+				calls[#calls + 1] = { method = method, parent = parent, acted_from = acted_from }
 				return true
 			end
 		end,
@@ -205,6 +219,7 @@ helpers.describe("the macOS dispatcher confirms before destructive actions", fun
 	end)
 
 	helpers.it("every confirm action asks, and runs only from the answer, under its parent", function()
+		local acted_from = { pid = 4242, bundle_id = "com.apple.Safari" }
 		with_recorded_system(function(calls)
 			for _, id in ipairs({ "empty_trash", "remove_quarantine_selection", "force_quit_frontmost" }) do
 				questions = {}
@@ -213,8 +228,9 @@ helpers.describe("the macOS dispatcher confirms before destructive actions", fun
 				helpers.assert_eq(#questions, 1, id .. " must ask")
 				helpers.assert_eq(questions[1].label, Actions.get_label(id))
 				helpers.assert_eq(#calls, before, id .. " must not run before the answer")
-				questions[1].on_confirmed()
-				helpers.assert_eq(calls[#calls], { method = id, parent = "shortcut_bindings" })
+				questions[1].on_confirmed(acted_from)
+				helpers.assert_eq(calls[#calls], { method = id, parent = "shortcut_bindings", acted_from = acted_from },
+					id .. " gets the application read before its question (confirm-acted-from)")
 			end
 		end)
 	end)
