@@ -177,3 +177,37 @@ helpers.describe("layout scope provider", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+helpers.describe("macOS scoped preferences under a composition", function()
+	helpers.it("reverts a commit: runtime, staged source, checkpoint and the exact bytes", function()
+		local owner, _, state, files, _, prefs, save, _, original = fixture()
+		helpers.assert_eq(owner.apply("clear"), true)
+		helpers.assert_eq(state.layout_on_pause, false)
+		helpers.assert_eq(owner.revert(), true)
+		helpers.assert_eq(files.config, original)
+		helpers.assert_eq(state.layout_pause_switch_enabled, true)
+		helpers.assert_eq(state.layout_on_pause, "French")
+		helpers.assert_eq(state.layout_on_resume, "Ergopti+")
+		helpers.assert_eq(prefs.source_snapshot("config").content, original)
+		helpers.assert_eq(owner.pending(), false)
+		helpers.assert_eq(save(), true, "the ordinary writer continues from the restored checkpoint")
+		helpers.assert_eq(owner.revert(), false, "one commit reverts once")
+	end)
+
+	helpers.it("release forgets the inverse once the composition commits", function()
+		local owner, _, _, files = fixture()
+		helpers.assert_eq(owner.apply("clear"), true)
+		local committed = files.config
+		owner.release()
+		helpers.assert_eq(owner.revert(), false)
+		helpers.assert_eq(files.config, committed)
+	end)
+
+	helpers.it("a composed request skips the per-scope question it already asked", function()
+		local owner, _, _, _, controls = fixture()
+		controls.confirm = false
+		helpers.assert_eq(owner.apply("clear"), false, "a menu row still asks")
+		helpers.assert_eq(owner.apply("clear", true), true)
+	end)
+end)
+

@@ -38,12 +38,35 @@ function M.new(options)
 	function owner.retry_restore()
 		return transaction == nil or transaction.retry_restore() == true
 	end
-	function owner.apply(mode)
+	--- Undoes the last commit under the global writer fence; the transaction
+	--- restores the runtime, the staged source and checkpoint, then the file.
+	--- @return boolean reverted
+	function owner.revert()
+		if transaction == nil then return false end
+		return options.admission("Preference scope revert: " .. options.scope, function()
+			if options.paused() ~= false then return false end
+			local reverted, detail = transaction.revert()
+			if reverted ~= true then
+				Logger.warn(LOG, "Scope %s revert did not settle: %s.", options.scope, tostring(detail))
+			end
+			return reverted == true
+		end, owner)
+	end
+	--- Forgets the last commit's inverse once its composition has committed.
+	function owner.release()
+		if transaction ~= nil then transaction.release() end
+	end
+	--- Applies one mode. A composed scope asks once for every category, so it
+	--- passes preconfirmed; a menu row asks here.
+	--- @param mode string "recommended" or "clear".
+	--- @param preconfirmed boolean|nil True when the caller already asked.
+	--- @return boolean committed
+	function owner.apply(mode, preconfirmed)
 		if mode ~= "clear" and mode ~= "recommended" then return false end
 		return options.admission("Preference scope: " .. options.scope, function()
 			if options.paused() ~= false then return false end
 			if owner.pending() and owner.retry_restore() ~= true then return false end
-			if options.confirm(mode) ~= true then return false end
+			if preconfirmed ~= true and options.confirm(mode) ~= true then return false end
 			-- The modal runs a native event loop; pause may acquire the engine while
 			-- confirmation is open, so its admission must be checked again.
 			if options.paused() ~= false then return false end

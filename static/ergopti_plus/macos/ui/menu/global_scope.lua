@@ -1,0 +1,116 @@
+--- ui/menu/global_scope.lua
+
+--- ==============================================================================
+--- MODULE: Global Scope (macOS)
+--- DESCRIPTION:
+--- Restores Ergopti's recommended values, or clears every category to the
+--- system's own behaviour, by composing the per-scope owners through the shared
+--- composition in the manifest's `[scopes.global]` order. One confirmation
+--- covers every category; each owner keeps its own backup, conflict detection
+--- and runtime acknowledgement, and a refusal reverts every committed one.
+---
+--- FEATURES & RATIONALE:
+--- 1. Existing Owners: the config.toml categories are the scoped owners the
+---    menus already use (each takes the global writer fence itself); the remap
+---    file joins through the remap engine's asynchronous scope request, the
+---    keys under tap_holds and the chords under shortcuts.
+--- 2. Live Owners Only: a category whose owner is unavailable on this Mac is
+---    skipped and reported, never guessed.
+--- 3. Consent: AI and metrics consent stay out of « recommended » through the
+---    manifest's scope exclusions, which each owner applies.
+--- ==============================================================================
+
+local M = {}
+local Manifest = require("infra.manifest_reader")
+local Composition = require("config_scope_composition")
+local Participant = require("config_scope_participant")
+local Logger = require("infra.logger")
+local LOG = "menu.global_scope"
+
+--- The remap engine's part of one scope, as an asynchronous participant: its
+--- inverse is the settings snapshot the engine restores through the same gate.
+--- @param remap table Remap facade (apply_scope, snapshot/restore_settings).
+--- @param scope string Manifest scope id served by the remap file.
+--- @param backup_path function scope -> unique backup path.
+--- @return table participant See config_scope_composition.
+local function remap_participant(remap, scope, backup_path)
+	local snapshot, committed = nil, false
+	local participant = {}
+	function participant.apply(mode, done)
+		snapshot, committed = remap.snapshot_settings(), false
+		if type(snapshot) ~= "table" then return done(false, "remap settings are owned by another transaction") end
+		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason)
+			committed = ok == true
+			return done(committed, reason)
+		end)
+	end
+	function participant.revert(done)
+		if not committed then return done(false, "no committed remap scope to revert") end
+		remap.restore_settings(snapshot, function(ok, reason)
+			if ok == true then committed = false end
+			return done(ok == true, reason)
+		end)
+	end
+	function participant.release() snapshot, committed = nil, false end
+	function participant.pending() return remap.settings_pending() == true end
+	function participant.retry_restore(done) return done(remap.retry_settings_recovery() == true) end
+	return participant
+end
+
+--- Creates the global owner from the menu's scope owners.
+--- @param options table owners (scope id -> function returning the scoped owner
+---   or nil when unavailable), remap (facade or nil), backup_path(scope),
+---   confirm(mode), paused() and refresh(committed, report).
+--- @return table owner apply(mode), pending(), retry_restore(done).
+function M.new(options)
+	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
+	for _, name in ipairs({ "backup_path", "confirm", "paused", "refresh" }) do
+		assert(type(options[name]) == "function", "the global scope needs " .. name)
+	end
+	local function participants()
+		local registry = {}
+		for id, provider in pairs(options.owners) do
+			assert(type(provider) == "function", "scope owner provider must be a function: " .. tostring(id))
+			local owner = provider()
+			if owner ~= nil then
+				registry[id] = Participant.synchronous({
+					apply = function(mode) return owner.apply(mode, true) end,
+					owner = function() return owner end,
+				})
+			end
+		end
+		local remap = options.remap
+		if type(remap) == "table" and type(remap.get_enabled) == "function" and remap.get_enabled() == true then
+			registry.tap_holds = remap_participant(remap, "tap_holds", options.backup_path)
+			local chords = remap_participant(remap, "shortcuts", options.backup_path)
+			registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
+		end
+		return registry
+	end
+	local composition = Composition.new({ manifest = Manifest, scope = "global", logger = Logger, log = LOG,
+		participants = participants })
+	local owner = { pending = composition.pending, retry_restore = composition.retry_restore }
+	--- Asks once, then applies one mode to every available category.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean accepted True once the composition started.
+	function owner.apply(mode)
+		if options.paused() ~= false then return false end
+		if composition.pending() then
+			local settled = false
+			composition.retry_restore(function(ok) settled = ok == true end)
+			if not settled then
+				Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
+				return false
+			end
+		end
+		if options.confirm(mode) ~= true then return false end
+		-- The modal runs a native event loop; pause may start while it is open.
+		if options.paused() ~= false then return false end
+		return composition.apply(mode, function(committed, report)
+			options.refresh(committed == true, report)
+		end)
+	end
+	return owner
+end
+
+return M
