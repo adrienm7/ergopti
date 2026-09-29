@@ -284,7 +284,26 @@ local function group_for_disk(flat)
 					end
 				end
 			elseif type(v) == "table" then
-				set_path(grouped[nested.sec], nested.key, v)
+				-- Copy into the section: [shortcuts.script_control] also holds the
+				-- `enabled` scalar. Storing the state table itself let that scalar
+				-- be written INTO the live key-slot table, which then handed a
+				-- boolean to the script-control setter as if it were a key slot.
+				local owned = {}
+				for inner_key, inner_val in pairs(v) do
+					if not _reverse_scalar[nested.sec .. ":" .. nested.key .. "." .. inner_key] then
+						owned[inner_key] = inner_val
+					end
+				end
+				local parts = {}
+				for part in nested.key:gmatch("[^%.]+") do parts[#parts + 1] = part end
+				local target = grouped[nested.sec]
+				for i = 1, #parts - 1 do
+					if type(target[parts[i]]) ~= "table" then target[parts[i]] = {} end
+					target = target[parts[i]]
+				end
+				local leaf = parts[#parts]
+				if type(target[leaf]) ~= "table" then target[leaf] = {} end
+				for inner_key, inner_val in pairs(owned) do target[leaf][inner_key] = inner_val end
 			end
 		elseif scalar then
 			v = scalar_units(scalar, v, false)
@@ -361,7 +380,19 @@ local function flatten_from_disk(grouped, mark)
 					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
-						flat[nested_fk] = disk_val
+						-- A scalar can share the table (shortcuts.script_control.enabled):
+						-- it goes to its own state key, never into the nested map.
+						local owned = {}
+						for inner_key, inner_val in pairs(disk_val) do
+							local scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key .. "." .. inner_key]
+							if scalar_fk then
+								flat[scalar_fk] = inner_val
+								take(sec_name, disk_key, inner_key)
+							else
+								owned[inner_key] = inner_val
+							end
+						end
+						flat[nested_fk] = owned
 						take(sec_name, disk_key)
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
