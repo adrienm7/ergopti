@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "일치하는 동작 없음",
 	"dialog.action_picker.requires_tool": "{1} 필요",
 	"dialog.action_picker.requires_x11": "X11 세션 전용",
+	"dialog.action_picker.requires_workspaces": "X11, KDE Plasma, sway 또는 Hyprland 전용",
 	"dialog.action_picker.search": "동작 검색…",
 	"dialog.action_picker.prompt_label": "프롬프트",
 	"dialog.action_picker.count_label": "예측 개수",

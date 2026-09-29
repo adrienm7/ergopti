@@ -233,7 +233,7 @@ helpers.describe("modules/gestures/manager.lua", function()
     -- This driver used private ws_prev / ws_next ids labelled through the
     -- catalogue's desktop_* keys, so no other driver's binding and no picker
     -- entry could name them. They are the shared ids now.
-    for _, id in ipairs({ "desktop_prev", "desktop_next" }) do
+    for _, id in ipairs({ "desktop_prev", "desktop_next", "desktop_prev_wrap", "desktop_next_wrap" }) do
       local label = M.get_action_label(id)
       helpers.assert_eq(label, i18n.get("sg_actions." .. id), id .. " must resolve through sg_actions." .. id)
       helpers.assert_true(label ~= id and label ~= "sg_actions." .. id,

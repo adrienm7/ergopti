@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "कोई मिलती-जुलती क्रिया नहीं",
 	"dialog.action_picker.requires_tool": "{1} आवश्यक है",
 	"dialog.action_picker.requires_x11": "केवल X11 सत्र में",
+	"dialog.action_picker.requires_workspaces": "केवल X11, KDE Plasma, sway या Hyprland में",
 	"dialog.action_picker.search": "क्रिया खोजें…",
 	"dialog.action_picker.prompt_label": "प्रॉम्प्ट",
 	"dialog.action_picker.count_label": "पूर्वानुमानों की संख्या",

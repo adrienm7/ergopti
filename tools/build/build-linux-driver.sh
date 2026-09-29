@@ -210,6 +210,8 @@ REQUIRED_FILES=(
 	"_shared/lua/unicode_case/init.lua"
 	"_shared/lua/unicode_case/data.lua"
 	"_shared/lua/wrap_pair/init.lua"
+	# Where a previous/next desktop step lands; the gesture manager loads it.
+	"_shared/lua/desktop_navigation/init.lua"
 	"_shared/lua/send_input/init.lua"
 	"_shared/modules/actions/send_keys.json"
 	"_shared/modules/actions/tap_keys.json"

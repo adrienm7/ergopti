@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "Eşleşen eylem yok",
 	"dialog.action_picker.requires_tool": "{1} gerektirir",
 	"dialog.action_picker.requires_x11": "Yalnızca X11 oturumu",
+	"dialog.action_picker.requires_workspaces": "Yalnızca X11, KDE Plasma, sway veya Hyprland",
 	"dialog.action_picker.search": "Bir eylem ara…",
 	"dialog.action_picker.prompt_label": "İstem",
 	"dialog.action_picker.count_label": "Tahmin sayısı",

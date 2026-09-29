@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "没有匹配的操作",
 	"dialog.action_picker.requires_tool": "需要 {1}",
 	"dialog.action_picker.requires_x11": "仅限 X11 会话",
+	"dialog.action_picker.requires_workspaces": "仅限 X11、KDE Plasma、sway 或 Hyprland",
 	"dialog.action_picker.search": "搜索操作…",
 	"dialog.action_picker.prompt_label": "提示词",
 	"dialog.action_picker.count_label": "预测数量",

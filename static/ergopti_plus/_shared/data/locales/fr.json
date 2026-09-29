@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "Aucune action correspondante",
 	"dialog.action_picker.requires_tool": "Nécessite {1}",
 	"dialog.action_picker.requires_x11": "Session X11 uniquement",
+	"dialog.action_picker.requires_workspaces": "X11, KDE Plasma, sway ou Hyprland uniquement",
 	"dialog.action_picker.search": "Rechercher une action…",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Nombre de prédictions",

@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "Нет подходящего действия",
 	"dialog.action_picker.requires_tool": "Требуется {1}",
 	"dialog.action_picker.requires_x11": "Только в сеансе X11",
+	"dialog.action_picker.requires_workspaces": "Только X11, KDE Plasma, sway или Hyprland",
 	"dialog.action_picker.search": "Поиск действия…",
 	"dialog.action_picker.prompt_label": "Промпт",
 	"dialog.action_picker.count_label": "Число прогнозов",
