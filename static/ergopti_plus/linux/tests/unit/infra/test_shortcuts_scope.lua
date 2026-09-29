@@ -158,6 +158,22 @@ helpers.describe("Linux terminal shortcut scope", function()
 		end)
 	end)
 
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("resets over a plain keyboard or tap_keys value instead of refusing: " .. mode
+			.. " (config-outdated-shortcut-shape)", function()
+			-- The candidate readers asserted a table, so a value an older build
+			-- left as `keyboard = "…"` refused Restore recommended and Clear.
+			with_scope(function(scope, owners, _, path)
+				local stale = '[shortcuts]\nenabled = true\nkeyboard = "x"\ntap_keys = "y"\n'
+				Sandbox.write_bytes(path, stale)
+				local ok, committed = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
+				helpers.assert_true(ok, tostring(committed))
+				helpers.assert_eq(scope.apply(mode), true)
+				helpers.assert_true(owners.manager.configuration_admitted())
+			end)
+		end)
+	end
+
 	helpers.it("refuses a reserved backup before changing runtime", function()
 		with_scope(function(scope, owners, _, path, backup)
 			Sandbox.write_bytes(backup, "reserved")

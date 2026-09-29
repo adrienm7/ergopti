@@ -290,12 +290,14 @@ local function manifest_defaults()
 	return defaults
 end
 
---- Visits canonical assignments whose chord belongs to this owner.
+--- Visits canonical assignments whose chord belongs to this owner. A
+--- [shortcuts] or keyboard value of another shape is outdated configuration:
+--- reported once and walked as empty, so the cleanup offers it.
 --- @param decoded table Decoded configuration.
 --- @param consume function Consumer receiving slot and stored value.
 local function walk_assignments(decoded, consume)
-	local shortcuts = type(decoded.shortcuts) == "table" and decoded.shortcuts or {}
-	local assignments = type(shortcuts.keyboard) == "table" and shortcuts.keyboard or {}
+	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger) or {}
+	local assignments = ConfigOutdated.settings_table(shortcuts.keyboard, { "shortcuts", "keyboard" }, Logger) or {}
 	for slot, value in pairs(assignments) do
 		if owns_slot(slot) then consume(slot, value) end
 	end
@@ -643,9 +645,6 @@ end
 --- @param document table Decoded configuration.
 --- @return table state
 function M.configuration_candidate(document)
-	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
-	local section = document.shortcuts or {}
-	assert(section.keyboard == nil or type(section.keyboard) == "table", "keyboard assignments are malformed")
 	local catalogue = assert(action_catalogue(), "keyboard action catalogue is unavailable")
 	local assignments = {}
 	for slot, action in pairs(manifest_defaults()) do

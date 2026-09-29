@@ -140,8 +140,9 @@ end
 --- @param decoded table Decoded config.toml.
 --- @param consume function Consumer receiving key id and value.
 local function walk_assignments(decoded, consume)
-	local shortcuts = type(decoded.shortcuts) == "table" and decoded.shortcuts or {}
-	local assignments = type(shortcuts.tap_keys) == "table" and shortcuts.tap_keys or {}
+	-- Another shape is outdated configuration: reported once, walked as empty.
+	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger) or {}
+	local assignments = ConfigOutdated.settings_table(shortcuts.tap_keys, { "shortcuts", "tap_keys" }, Logger) or {}
 	for _, key in ipairs(M.keys()) do
 		if assignments[key.id] ~= nil then consume(key.id, assignments[key.id]) end
 	end
@@ -358,9 +359,6 @@ end
 --- @param document table Decoded configuration.
 --- @return table state
 function M.configuration_candidate(document)
-	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
-	local section = document.shortcuts or {}
-	assert(section.tap_keys == nil or type(section.tap_keys) == "table", "tap-key assignments are malformed")
 	local values, assignments = {}, {}
 	local catalogue = assert(action_catalogue(), "tap-key action catalogue is unavailable")
 	walk_assignments(document, function(id, value)

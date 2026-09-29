@@ -94,6 +94,27 @@ function M.report(segments, detail, sink)
 	return true
 end
 
+--- Reads a persisted table of id = value settings. Another shape where this
+--- build keeps such a table (a scalar, or an older build's list) is outdated
+--- as a whole: reported once and read as absent, never asserted on.
+--- @param value any Persisted value.
+--- @param segments table|string Path of the table.
+--- @param sink table|nil The reporting owner's logger.
+--- @return table|nil settings The table, or nil when absent or outdated.
+function M.settings_table(value, segments, sink)
+	if value == nil then return nil end
+	if type(value) ~= "table" then
+		M.report(segments, "a table of settings is expected here", sink)
+		return nil
+	end
+	-- A TOML array decodes as a sequence.
+	if #value > 0 then
+		M.report(segments, "a list is not a table of settings", sink)
+		return nil
+	end
+	return value
+end
+
 --- Splits a persisted id → value table into the entries a live owner knows and
 --- the outdated ones. Every kept entry is marked for the cleanup; every other
 --- one is reported and left unmarked, so the cleanup offers it.
@@ -110,12 +131,7 @@ function M.partition(prefix, map, is_known, mark)
 	if type(map) ~= "table" then error("config_outdated.partition needs a table", 2) end
 	if type(is_known) ~= "function" then error("config_outdated.partition needs an is_known owner", 2) end
 	local kept, outdated = {}, {}
-	-- A TOML array decodes as a sequence: an older build's list where this
-	-- build keeps id = value settings is outdated as a whole.
-	if #map > 0 then
-		M.report(prefix, "a list is not a table of settings")
-		return kept, outdated
-	end
+	if M.settings_table(map, prefix) == nil then return kept, outdated end
 	for id, value in pairs(map) do
 		local known, detail = false, "not a text key"
 		if type(id) == "string" and id ~= "" then known, detail = is_known(id, value) end

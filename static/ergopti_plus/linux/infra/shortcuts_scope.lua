@@ -85,6 +85,17 @@ function M.new(options)
 		manifest = Manifest, owned_paths = inventory, owners = validators, capture = capture, restore = apply_state,
 		prepare_batch = function(path, updates, adapter)
 			local operations = {}
+			-- A plain value an older build left where this scope keeps a table of
+			-- assignments (`keyboard = "…"`) would make every row below it
+			-- unwritable. The scope owns that container, so the outdated value
+			-- goes with its reset instead of refusing it.
+			local section = type(document) == "table" and document.shortcuts or nil
+			for _, key in ipairs(type(section) == "table" and { "keyboard", "tap_keys" } or {}) do
+				local value = section[key]
+				if value ~= nil and (type(value) ~= "table" or #value > 0) then
+					operations[#operations + 1] = { section = "shortcuts", key = key, delete = true }
+				end
+			end
 			for _, row in ipairs(updates) do operations[#operations + 1] = row end
 			for _, row in ipairs(legacy) do operations[#operations + 1] = row end
 			return Writer.prepare_batch(path, operations, adapter, source)

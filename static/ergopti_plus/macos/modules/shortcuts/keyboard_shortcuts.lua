@@ -33,6 +33,7 @@ local Writer      = require("toml_codec.writer")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
+local ConfigOutdated = require("config_outdated")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -199,13 +200,25 @@ local function owned_slots()
 	return index
 end
 
-local function walk_assignments(decoded, consume)
-	local shortcuts = decoded.shortcuts
+--- Visits the stored assignments of the owned slots. A [shortcuts] or
+--- keyboard value of another shape in config.toml (an older build's
+--- `keyboard = "…"`) is outdated configuration: reported once, walked as empty
+--- and left unmarked, never an assertion that stops the whole shortcut layer.
+--- A scope candidate is built by the scope itself, so the same shape there is
+--- its own failure and is refused.
+--- @param decoded table Decoded configuration.
+--- @param consume function consume(slot, action).
+--- @param candidate boolean|nil True for a scope candidate.
+local function walk_assignments(decoded, consume, candidate)
+	if candidate then
+		assert(decoded.shortcuts == nil or type(decoded.shortcuts) == "table", "shortcuts must be a table")
+		assert(decoded.shortcuts == nil or decoded.shortcuts.keyboard == nil
+			or type(decoded.shortcuts.keyboard) == "table", "keyboard assignments must be a table")
+	end
+	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger)
 	if shortcuts == nil then return end
-	assert(type(shortcuts) == "table", "shortcuts must be a table")
-	local assignments = shortcuts.keyboard
+	local assignments = ConfigOutdated.settings_table(shortcuts.keyboard, { "shortcuts", "keyboard" }, Logger)
 	if assignments == nil then return end
-	assert(type(assignments) == "table", "keyboard assignments must be a table")
 	local known = owned_slots()
 	for slot, action in pairs(assignments) do
 		if known[slot] then consume(slot, action) end
@@ -226,7 +239,7 @@ local function load_assignments(candidate)
 			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
 				slot, tostring(action), loaded[slot] or "none")
 		end
-	end)
+	end, candidate ~= nil)
 	_actions, _loaded = loaded, true
 end
 

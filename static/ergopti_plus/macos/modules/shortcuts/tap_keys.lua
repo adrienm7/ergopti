@@ -30,6 +30,7 @@ local M = {}
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local Manifest   = require("infra.manifest_reader")
+local ConfigOutdated = require("config_outdated")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
@@ -98,16 +99,27 @@ local function read_config()
 	assert(status == "ok" or status == "absent", "tap-key configuration unavailable: " .. tostring(detail))
 	local decoded = Codec.decode(content or "")
 	assert(type(decoded) == "table", "tap-key configuration is malformed")
-	assert(decoded.shortcuts == nil or type(decoded.shortcuts) == "table", "shortcuts must be a table")
 	return decoded, { status = status, content = content }
 end
 
-local function walk_assignments(decoded, consume)
-	local shortcuts = decoded.shortcuts or {}
-	assert(type(shortcuts) == "table", "shortcuts must be a table")
-	local assignments = shortcuts.tap_keys
+--- Visits the stored assignments of the catalogue's tap keys. A [shortcuts]
+--- or tap_keys value of another shape in config.toml is outdated
+--- configuration: reported once, walked as empty and left unmarked for the
+--- cleanup. A scope candidate is built by the scope itself, so the same shape
+--- there is its own failure and is refused.
+--- @param decoded table Decoded configuration.
+--- @param consume function consume(id, action).
+--- @param candidate boolean|nil True for a scope candidate.
+local function walk_assignments(decoded, consume, candidate)
+	if candidate then
+		assert(decoded.shortcuts == nil or type(decoded.shortcuts) == "table", "shortcuts must be a table")
+		assert(decoded.shortcuts == nil or decoded.shortcuts.tap_keys == nil
+			or type(decoded.shortcuts.tap_keys) == "table", "tap-key assignments must be a table")
+	end
+	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger)
+	if shortcuts == nil then return end
+	local assignments = ConfigOutdated.settings_table(shortcuts.tap_keys, { "shortcuts", "tap_keys" }, Logger)
 	if assignments == nil then return end
-	assert(type(assignments) == "table", "tap-key assignments must be a table")
 	for _, key in ipairs(M.keys()) do
 		if assignments[key.id] ~= nil then consume(key.id, assignments[key.id]) end
 	end
@@ -128,7 +140,7 @@ local function load_configuration(is_assignable, candidate)
 	if decoded == nil then decoded = read_config() end
 	assert(type(decoded) == "table", "tap-key candidate must be a table")
 	local configured, loaded = {}, {}
-	walk_assignments(decoded, function(id, value) configured[id] = value end)
+	walk_assignments(decoded, function(id, value) configured[id] = value end, candidate ~= nil)
 	for _, key in ipairs(M.keys()) do
 		local action = configured[key.id]
 		if action == nil then action = Manifest.default_for(CONFIG_SECTION .. "." .. key.id) end

@@ -135,6 +135,23 @@ helpers.describe("keyboard shortcuts: unknown action ids", function()
 		helpers.assert_eq(#observed.bound, 1, "only the valid slot may own a native hotkey")
 		helpers.assert_true(names(observed.warnings, "no_such_action"), "the ignored id must be named in a warning")
 	end)
+
+	helpers.it("starts over a plain [shortcuts] keyboard value and leaves it unmarked (config-outdated-shortcut-shape)", function()
+		-- walk_assignments asserted a table: an older build's `keyboard = "x"`
+		-- made start() fail with an ERROR, rolling back the whole shortcut
+		-- layer, and made the cleanup report the file as unreadable.
+		require("config_outdated").reset_for_tests()
+		local stale = "[shortcuts]\nkeyboard = \"x\"\n"
+		local observed = with_subject({}, function(subject)
+			package.loaded["adapters.file_system"].read_with_status = function() return stale, "ok" end
+			helpers.assert_eq(subject.start(), true, "an outdated value never stops the layer")
+			local marked = {}
+			subject.mark_config_reads(require("toml_codec").decode(stale),
+				function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
+			helpers.assert_eq(marked, {}, "left unmarked, so the cleanup offers it")
+		end)
+		helpers.assert_true(names(observed.warnings, "'shortcuts.keyboard'"), "the outdated value is named once")
+	end)
 end)
 
 return true
