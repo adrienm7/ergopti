@@ -25,6 +25,10 @@ helpers.describe("hotstring priority overrides", function()
 		local fail_writes = false
 		local fail_rename = false
 		local created_config_dir = false
+		-- The category choices live in a private config.toml the real writer owns.
+		local choice_path = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
+			.. "/ergopti_priority_choices_" .. os.time() .. "_" .. math.random(100000, 999999) .. ".toml"
+		assert(assert(io.open(choice_path, "w")):close())
 
 		local function memory_handle(mode, commit)
 			local chunks = {}
@@ -131,6 +135,7 @@ helpers.describe("hotstring priority overrides", function()
 
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			local config = require("modules.hotstrings.hotstrings_config")
+			assert(config._set_config_file_for_test(choice_path))
 			local engine = Engine.new()
 			config.init(engine, "/virtual/catalogue.toml")
 			config.load_all()
@@ -158,6 +163,7 @@ helpers.describe("hotstring priority overrides", function()
 
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			local restarted = require("modules.hotstrings.hotstrings_config")
+			assert(restarted._set_config_file_for_test(choice_path))
 			local restarted_engine = Engine.new()
 			restarted.init(restarted_engine, "/virtual/catalogue.toml")
 			restarted.load_all()
@@ -188,6 +194,7 @@ helpers.describe("hotstring priority overrides", function()
 
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			restarted = require("modules.hotstrings.hotstrings_config")
+			assert(restarted._set_config_file_for_test(choice_path))
 			restarted_engine = Engine.new()
 			restarted.init(restarted_engine, "/virtual/catalogue.toml")
 			restarted.load_all()
@@ -253,6 +260,7 @@ helpers.describe("hotstring priority overrides", function()
 
 				package.loaded["modules.hotstrings.hotstrings_config"] = nil
 				restarted = require("modules.hotstrings.hotstrings_config")
+				assert(restarted._set_config_file_for_test(choice_path))
 				restarted_engine = Engine.new()
 				restarted.init(restarted_engine, "/virtual/catalogue.toml")
 				restarted.load_all()
@@ -269,6 +277,8 @@ helpers.describe("hotstring priority overrides", function()
 		io.open = previous_open
 		os.rename = previous_rename
 		os.remove = previous_remove
+		os.remove(choice_path)
+		os.remove(choice_path .. ".tmp")
 		Loader.load_catalogue = previous_load_catalogue
 		package.loaded["adapters.storage"] = previous_storage
 		package.loaded["adapters.shell_runner"] = previous_shell
