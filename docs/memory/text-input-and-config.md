@@ -62,6 +62,18 @@ bundled section ships disabled, so an absent per-section state means "manifest
 default": macOS and Linux persist an explicit `true` on enable rather than
 clearing the key.
 
+### project-layout-extension-bound-hotstrings
+
+SFB reduction, rolls and the magic key's `repeat_corrections` section live in
+the Ergopti layout extension (`static/layouts/registry/ergopti/hotstrings/`),
+bound by `[extension.hotstring_bindings.<stem>]` to their historical category,
+feature section and common tier, so preference ids never change. Resolve their
+file through the bound-source owner (`HotstringsBoundTomlPath`, macOS
+`ExtensionPacks.route`, Linux `route_bound_sources`), never the shared folder;
+the Windows TSV cache must not compile them. "Installed" is discovery: the
+manager's committed generations plus the shipped Ergopti `{ pack = dir }` root,
+placed after them so a stale generation cannot hide the bindings.
+
 ### project-hotstrings-self-healing-cache
 
 Grouped hotstrings are canonical TOML plus a gitignored TSV runtime cache, not
