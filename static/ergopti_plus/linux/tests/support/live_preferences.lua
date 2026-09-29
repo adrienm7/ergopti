@@ -20,7 +20,8 @@ function M.daemon()
 	local Files = require("adapters.file_system")
 	local _, status = Files.read_with_status(Paths.config("config.toml"))
 	assert(status == "absent", "the live daemon fixture requires a fresh configuration")
-	local config = "[script]\nonboarding_done = true\n"
+	-- Any config.toml is a configured driver, so the setup wizard stays closed.
+	local config = ""
 	-- The AI probe's rewrite runs from a chord, as a user would bind it. Chords
 	-- only fire while the shortcuts feature is on, which it is not by default:
 	-- without it the daemon holds the chord back as it does during a pause.
