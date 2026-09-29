@@ -333,4 +333,7 @@ window stayed above every app. Present windows with `ui_builder.force_focus`
 requested again (Windows; `Gui_Create` refuses a topmost option) and
 `webview_manager._present_gtk_window` (Linux). Only the overlay allowlist in
 `tools/test/test-ui-focus-fix.cjs` (tooltips, previews, WPM widget, spotlight)
-may stay on top; that gate scans all three drivers.
+may stay on top, each entry pinned to its exact site count; the overlay
+adapters are topmost by default, so every file loading one is listed. That
+gate scans the three drivers, the shared Lua, extensions and Ergopti's own
+vendor scripts.
