@@ -873,6 +873,10 @@ _ConfigBuildCategoryIntentPlan(Category, Bool) {
 			Root := StrLower(Category)
 			if Projected.Has(Root)
 				RuntimePatches.Push({ target: Features, key: Root, value: Projected[Root] })
+		case "KeyCombinations":
+			; A sub-gate of Shortcuts: its families live under Features["shortcuts"].
+			if Projected.Has("shortcuts")
+				RuntimePatches.Push({ target: Features, key: "shortcuts", value: Projected["shortcuts"] })
 		case "TapHolds":
 			CandidateTapHold := ProjectedTapHold
 		default:
@@ -1005,6 +1009,7 @@ _CategoryEnabledKey(Category) {
 				case "Shortcuts":  return "shortcuts"
 				case "Hotstrings": return "hotstrings"
 				case "TapHolds":   return "tap_holds"
+				case "KeyCombinations": return "key_combinations"
 				; Hotstring sub-category gates — snake_case to match the v2 schema.
 				case "DistancesReduction": return "distances_reduction"
 				case "SFBsReduction":      return "sfbs_reduction"

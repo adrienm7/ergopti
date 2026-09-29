@@ -15,9 +15,9 @@
 ;   * ``accented_letters_group`` listed four letter_picker ids, while
 ;     _MR_BuildBuiltinGroup built the submenu from a hardcoded array of the same
 ;     four paths.
-;   * ``modifier_combos_group`` listed three feature-section paths, while the
-;     same builder read them from a _SHORTCUTS_SUBMAP_V1V2 Map in
-;     ui/menu/menu_shortcuts.ahk.
+;   * ``modifier_combos_group`` (now key_combinations_group) listed three
+;     feature-section paths, while the same builder read them from a
+;     _SHORTCUTS_SUBMAP_V1V2 Map in ui/menu/menu_shortcuts.ahk.
 ;
 ; None of this was visible as a bug: the menus rendered correctly, because the
 ; code copy was in sync. The failure mode is the next edit — adding a fourth
@@ -108,30 +108,46 @@ Test("manifest_menu: every accented-letter row names a picker id", () => (
 	)
 ))
 
-Test("manifest_menu: modifier_combos_group carries the three combos", () => (
+Test("manifest_menu: key_combinations_group carries the three Windows combination families", () => (
+	; The families moved from the retired modifier_combos_group into the
+	; « Combinaisons de touches » group, after its own first-row switch; the
+	; renderer expands each feature row naming a section and a group_label.
 	AssertEqual(
 		"shortcuts.alt_gr_lalt,shortcuts.alt_gr_caps_lock,shortcuts.lalt_caps_lock",
-		_MM_RowValues("modifier_combos_group", "path"),
-		"the modifier-combos submenu expands the features under exactly these sections"
+		_MM_AhkFeatureRowValues("key_combinations_group", "path"),
+		"the key-combinations submenu expands the features under exactly these sections"
 	)
 ))
 
-Test("manifest_menu: every modifier-combo row names its section path", () => (
-	AssertTrue(
-		_MM_EveryRowHasKey("modifier_combos_group", "path"),
-		"each row expands the features under its path; a row without one is skipped"
-	)
-))
-
-Test("manifest_menu: every modifier-combo row names its submenu label", () => (
+Test("manifest_menu: every key-combination family names its submenu label", () => (
 	; group_label is what the sub-submenu is titled with. It used to be the KEY of
 	; the _SHORTCUTS_SUBMAP_V1V2 Map, which is why the manifest section could not
 	; drive the render on its own and stayed decorative.
-	AssertTrue(
-		_MM_EveryRowHasKey("modifier_combos_group", "group_label"),
-		"a row without group_label is skipped — the submenu would silently lose a combo"
+	AssertEqual(
+		"AltGrLAlt,AltGrCapsLock,LAltCapsLock",
+		_MM_AhkFeatureRowValues("key_combinations_group", "group_label"),
+		"a row without group_label would render no family submenu"
 	)
 ))
+
+Test("manifest_menu: the key-combinations group opens with its own switch", () => (
+	AssertEqual(
+		"key_combinations_toggle",
+		_MR_Get(_MR_GetMenuDef("key_combinations_group")[1], "id"),
+		"the first row of the group is its KeyCombinations switch"
+	)
+))
+
+; Joins one field of the Windows ``feature`` rows of a manifest section, in order.
+_MM_AhkFeatureRowValues(SectionKey, Key) {
+	Joined := ""
+	for Row in _MR_GetMenuDef(SectionKey) {
+		if (_MR_Get(Row, "type") != "feature" or !_MR_IsForAhk(Row))
+			continue
+		Joined .= (Joined == "" ? "" : ",") . _MR_Get(Row, Key)
+	}
+	return Joined
+}
 
 
 

@@ -87,7 +87,7 @@ const OPENS_SUBMENU = {
 	hotstrings: 'hotstrings_menu',
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
-	modifier_combos: 'modifier_combos_group',
+	key_combinations: 'key_combinations_group',
 	accented_letters: 'accented_letters_group',
 	hotstrings_params: 'hotstrings_params_group',
 	// The language selector. Its rows inherit `top_level/language`'s visibility,
@@ -526,7 +526,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // linux 13 → 12 in 2026-09: the Updates submenu folded into About (about_menu
 // renders the same rows on all three drivers), so one menu key went away
 // without any row leaving the renderer.
-const RENDERED_THROUGH_SHARED = { hs: 14, linux: 13 };
+// hs 14 → 15: the « Combinaisons de touches » group under Shortcuts
+// (key_combinations_group) renders the Karabiner chords through the renderer.
+const RENDERED_THROUGH_SHARED = { hs: 15, linux: 13 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

@@ -13,7 +13,10 @@
 ---    header of its hand. Which keys, in which order and under which hand is
 ---    the shared key catalogue's ([tap_hold.catalog]). Items are grayed out
 ---    while the remap engine is not initialised.
---- 2. Chords section: modifier combos grouped by key, also grayed then.
+--- 2. Key combinations: the modifier chords, grouped by key, are the
+---    « Combinaisons de touches » group of the Shortcuts submenu, built here
+---    (M.build_key_combinations) because this engine runs them. Their own
+---    first-row switch is the persisted [mod_combos] enabled.
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
 --- ==============================================================================
@@ -547,7 +550,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		},
 		{ separator = true },
 		{
-			label = string.format(i18n.get("menu.tapholds.combo_arrow"), combo_slbl),
+			label = string.format(i18n.get("menu.shortcuts.key_combinations_chord"), combo_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_combo_action(cid, action_id) end,
@@ -557,7 +560,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.tapholds.tap_colon"), tap_slbl),
+			label = string.format(i18n.get("menu.shortcuts.key_combinations_hold_tap"), tap_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_tap_action(cid, action_id) end,
@@ -567,7 +570,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.tapholds.hold_colon"), hold_slbl),
+			label = string.format(i18n.get("menu.shortcuts.key_combinations_hold_hold"), hold_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_hold_action(cid, action_id) end,
@@ -735,24 +738,18 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 	}
 end
 
---- Builds the symmetric-shortcut toggle item.
---- When on, "touche 1 + touche 2" and "touche 2 + touche 1" fire the same action;
---- the reverse half of each pair is hidden from the Raccourcis section to avoid duplicates.
+--- Toggles symmetric combinations: when on, "touche 1 + touche 2" and "touche 2
+--- + touche 1" fire the same chord, and the reverse half of each pair is hidden
+--- from the pair rows to avoid duplicates. The row is the manifest's `check`
+--- combo_symmetric; this is only what a click does.
 --- @param karabiner   table    The karabiner module.
 --- @param update_menu function Callback to refresh the menu bar.
---- @return table hs.menubar menu item.
-local function build_combo_symmetric_item(karabiner, update_menu)
-	local is_symmetric = karabiner.get_combo_symmetric()
-
-	return {
-		label   = i18n.get("menu.tapholds.symmetric"),
-		checked = is_symmetric,
-		action      = function()
-			commit_menu_setting(karabiner, "Combo symmetry", function()
-				return karabiner.set_combo_symmetric(not is_symmetric)
-			end, update_menu)
-		end,
-	}
+--- @return boolean accepted
+local function toggle_combo_symmetric(karabiner, update_menu)
+	local is_symmetric = karabiner.get_combo_symmetric() == true
+	return commit_menu_setting(karabiner, "Combo symmetry", function()
+		return karabiner.set_combo_symmetric(not is_symmetric)
+	end, update_menu)
 end
 
 
@@ -832,7 +829,8 @@ end
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
 --- same declaration Windows renders: the bulk commands, then this engine's
---- timings, the per-key tap/hold bindings, and the modifier chords. This module
+--- timings and the per-key tap/hold bindings under one header per hand. The
+--- modifier chords are M.build_key_combinations', under Shortcuts. This module
 --- supplies only the provider rows and the command capabilities.
 ---
 --- The manifest's `tapholds_toggle` row is the Tap-Holds feature switch. It
@@ -858,8 +856,6 @@ function M.build(ctx)
 		["tap_hold_timings"] = function()
 			return {
 				build_delay_item(karabiner, update_menu),
-				build_simultaneous_threshold_item(karabiner, update_menu),
-				build_combo_symmetric_item(karabiner, update_menu),
 				build_sticky_delay_item(karabiner, update_menu),
 			}
 		end,
@@ -868,10 +864,6 @@ function M.build(ctx)
 		end,
 		["tap_hold_keys_right"] = function()
 			return (build_picker_trees(karabiner, update_menu, enabled)).right
-		end,
-		["tap_hold_chords"] = function()
-			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
-			return chords
 		end,
 	}
 
@@ -908,16 +900,6 @@ function M.build(ctx)
 		-- stack, which a menu build has no use for.
 		["edit_nav_layer"] = function()
 			return require("ui.layer_editor").open({ karabiner = karabiner })
-		end,
-		["copy_tap_to_combo"] = function()
-			return run_bulk_menu_command(
-				karabiner,
-				"copy_tap_actions_to_combos",
-				"Propagating tap → combo for all modifier combos…",
-				"Tap → combo propagation done (%d combo(s) updated).",
-				true,
-				update_menu
-			)
 		end,
 	}
 
@@ -967,6 +949,99 @@ function M.set_feature_enabled(karabiner, enabled, update_menu)
 		end
 	end
 	if type(update_menu) == "function" then update_menu() end
+	return true
+end
+
+--- Builds the « Combinaisons de touches » group of the Shortcuts submenu: the
+--- rows `key_combinations_group` declares, answered by this engine's chords.
+---
+--- It opens with its own switch (persisted [mod_combos] enabled; while the
+--- user never set it, it follows the Tap-Holds switch those rules belonged
+--- to), then the symmetry check, the chord delay, the tap → chord copy, and
+--- one row per ordered pair of keys with its three slots.
+--- @param ctx table Global UI context (must contain ctx.karabiner).
+--- @return table|nil The rendered rows of the group's submenu, or nil.
+function M.build_key_combinations(ctx)
+	local karabiner   = ctx and ctx.karabiner
+	local update_menu = ctx and ctx.updateMenu
+
+	if not karabiner then
+		Logger.warn(LOG, "Remap module absent from context — key-combinations group skipped.")
+		return nil
+	end
+
+	local enabled = karabiner.get_enabled()
+	local providers = {
+		["combo_timings"] = function()
+			return { build_simultaneous_threshold_item(karabiner, update_menu) }
+		end,
+		["key_combination_rows"] = function()
+			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
+			return chords
+		end,
+	}
+
+	local combos_on = karabiner.get_mod_combos_enabled() == true
+	local commands = {
+		["key_combinations_toggle"] = function()
+			return M.set_key_combinations_enabled(karabiner, not combos_on, update_menu)
+		end,
+		["combo_symmetric"] = function()
+			return toggle_combo_symmetric(karabiner, update_menu)
+		end,
+		["copy_tap_to_combo"] = function()
+			return run_bulk_menu_command(
+				karabiner,
+				"copy_tap_actions_to_combos",
+				"Propagating tap → combo for all modifier combos…",
+				"Tap → combo propagation done (%d combo(s) updated).",
+				true,
+				update_menu
+			)
+		end,
+	}
+
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = commands
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["key_combinations_enabled"] = function() return combos_on end
+	render_ctx.state_getters["combo_symmetric"] = function() return karabiner.get_combo_symmetric() == true end
+
+	-- The rows ManifestMenu.build returns are already rendered: the group row
+	-- takes them as its finished submenu.
+	return ManifestMenu.build("key_combinations_group", "KeyCombinations", nil, nil, render_ctx, providers)
+end
+
+--- Switches the key combinations, persists the choice, then redeploys the
+--- rules. Like the Tap-Holds switch, a refused deploy is logged and does not
+--- undo the user's choice.
+--- @param karabiner table Remap module.
+--- @param enabled boolean Desired switch state.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean committed
+function M.set_key_combinations_enabled(karabiner, enabled, update_menu)
+	if type(karabiner) ~= "table" or type(karabiner.set_mod_combos_enabled) ~= "function" then
+		Logger.error(LOG, "Key-combinations switch is unavailable.")
+		return false
+	end
+	Logger.start(LOG, "Switching the key combinations %s…", enabled and "on" or "off")
+	if karabiner.set_mod_combos_enabled(enabled == true) ~= true then
+		Logger.error(LOG, "Key-combinations switch did not persist.")
+		return false
+	end
+	_picker_cache = nil
+	local ok_call, accepted = pcall(karabiner.regenerate, function(ok, reason)
+		if ok ~= true then
+			Logger.warn(LOG, "Key-combination rules not redeployed yet: %s.", tostring(reason))
+		end
+	end)
+	if not ok_call then
+		Logger.error(LOG, "Key-combination redeploy raised: %s.", tostring(accepted))
+	end
+	if type(update_menu) == "function" then update_menu() end
+	Logger.success(LOG, "Key combinations switched %s.", enabled and "on" or "off")
 	return true
 end
 

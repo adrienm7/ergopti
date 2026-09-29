@@ -832,7 +832,14 @@ function M.build(ctx)
 	local dyn_handlers = {
 	}
 
-	local group_builders = {}
+	-- « Combinaisons de touches »: the Karabiner chords moved here from the
+	-- Tap-Holds submenu, with their own first-row switch. The remap menu owns
+	-- their rows, as it owns the engine they configure.
+	local group_builders = {
+		["key_combinations"] = function()
+			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
+		end,
+	}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own
 	-- assignments, so the manifest can name the section but not enumerate it. The
@@ -881,6 +888,12 @@ function M.build(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
+	-- Ticks the « Combinaisons de touches » title while its own switch is on.
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		local karabiner = ctx.karabiner
+		return type(karabiner) == "table" and type(karabiner.get_mod_combos_enabled) == "function"
+			and karabiner.get_mod_combos_enabled() == true
+	end
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 

@@ -119,6 +119,41 @@ TestMasterGates_RequiresCategoryGateCallback() {
 }
 Test("master gates: explicit category-gate callback contract fails fast", TestMasterGates_RequiresCategoryGateCallback)
 
+; « Combinaisons de touches » is a sub-gate of Shortcuts: off, it turns only the
+; AltGr / LAlt / CapsLock families off, each keeping its parameters, while
+; every other shortcut stays live. Its families are the Windows feature rows of
+; key_combinations_group, the rows the menu draws.
+TestMasterGates_KeyCombinationsSubGate() {
+	Families := ["alt_gr_lalt", "alt_gr_caps_lock", "lalt_caps_lock"]
+	Candidate() {
+		Out := Map("shortcuts", Map("gpt", Map("enabled", true, "link", "https://example.test")))
+		for Family in Families
+			Out["shortcuts"][Family] := Map("backspace", true, "tab", false)
+		return Out
+	}
+	Gates(Shortcuts, KeyCombinations) {
+		Values := Map("Shortcuts", Shortcuts, "KeyCombinations", KeyCombinations)
+		return (Name) => Values.Get(Name, true)
+	}
+
+	Off := Candidate()
+	ApplyMasterGatesToFeatures(Off, Map(), Gates(true, false))
+	for Family in Families
+		AssertFalse(Off["shortcuts"][Family]["backspace"], Family . " goes off with its switch")
+	AssertTrue(Off["shortcuts"]["gpt"]["enabled"], "the other shortcuts stay live")
+
+	On := Candidate()
+	ApplyMasterGatesToFeatures(On, Map(), Gates(true, true))
+	for Family in Families
+		AssertTrue(On["shortcuts"][Family]["backspace"], Family . " stays as chosen with its switch on")
+
+	Master := Candidate()
+	ApplyMasterGatesToFeatures(Master, Map(), Gates(false, true))
+	AssertFalse(Master["shortcuts"]["alt_gr_lalt"]["backspace"], "the Shortcuts master still gates the families")
+}
+Test("master gates: the key-combinations switch gates only its families (key-combinations-gate)",
+	TestMasterGates_KeyCombinationsSubGate)
+
 TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 	global _SharedDir, CategoryEnabled
 	FixtureRoot := A_Temp . "\ergopti_master_gates_invalid_" . A_TickCount

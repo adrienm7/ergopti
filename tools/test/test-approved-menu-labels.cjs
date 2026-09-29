@@ -53,6 +53,25 @@ const APPROVED = {
 	'menu.tapholds.right_hand_tap_hold': {
 		fr: 'Main droite — Tap / Hold',
 		en: 'Right hand — Tap / Hold'
+	},
+	// The modifier combinations moved to their own group under Shortcuts (A4),
+	// with a first-row switch and slots that say what each one waits for.
+	'menu.shortcuts.key_combinations': { fr: 'Combinaisons de touches', en: 'Key combinations' },
+	'menu.shortcuts.key_combinations_enable': {
+		fr: 'Activer les combinaisons de touches',
+		en: 'Enable key combinations'
+	},
+	'menu.shortcuts.key_combinations_chord': {
+		fr: 'Accord (simultané) → %s',
+		en: 'Chord (simultaneous) → %s'
+	},
+	'menu.shortcuts.key_combinations_hold_tap': {
+		fr: 'Maintenir 1 + taper 2 → %s',
+		en: 'Hold 1 + tap 2 → %s'
+	},
+	'menu.shortcuts.key_combinations_hold_hold': {
+		fr: 'Maintenir 1 + maintenir 2 → %s',
+		en: 'Hold 1 + hold 2 → %s'
 	}
 };
 
