@@ -199,6 +199,12 @@ jobs:
       - name: Self-test the launch verdict
         run: python3 tools/diagnostics/macos_launch_gate_test.py
 
+      # The build no longer downloads Karabiner-Elements: onboarding fetches the
+      # pinned DMG on a user's first run. Validating the pin here makes a bad
+      # bump fail CI instead of that first install.
+      - name: Validate the Karabiner-Elements pin onboarding downloads
+        run: python3 -m unittest discover -s tools/build -p 'karabiner_manifest_test.py'
+
       # The only list of launch scenarios lives in macos_launch_gate.py; the
       # launch matrix below reads it from this output.
       - name: Resolve the launch-gate scenario profile
