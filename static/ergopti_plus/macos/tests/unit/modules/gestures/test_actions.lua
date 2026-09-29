@@ -458,7 +458,7 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 		local original_emit = SyntheticInput.emit_key_stroke
 		SyntheticInput.emit_key_stroke = function() return false end
 
-		local dispatched = Actions2.execute_single("mission_control")
+		local dispatched = Actions2.execute_single("space_next")
 		SyntheticInput.emit_key_stroke = original_emit
 
 		helpers.assert_eq(dispatched, true,

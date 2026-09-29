@@ -14,14 +14,14 @@ helpers.describe("gesture Actions dispatch fences", function()
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		it("refuses the action when held-click release returns " .. mode, function(fresh_actions, with_feature_lifecycles)
 			local actions, calls = fresh_actions({ release_mode = mode })
-			helpers.assert_eq(actions.execute_single("mission_control"), false)
+			helpers.assert_eq(actions.execute_single("space_next"), false)
 			helpers.assert_eq(#calls.keys, 0)
 		end)
 	end
 
 	it("revalidates PAUSE after held-click release before dispatch", function(fresh_actions, with_feature_lifecycles)
 		local actions, calls = fresh_actions({ pause_on_release = true })
-		helpers.assert_eq(actions.execute_single("mission_control"), false)
+		helpers.assert_eq(actions.execute_single("space_next"), false)
 		helpers.assert_eq(calls.aux_is_paused(), true)
 		helpers.assert_eq(#calls.keys, 0)
 	end)

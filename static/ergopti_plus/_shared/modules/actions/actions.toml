@@ -418,10 +418,19 @@ emit_linux = "super+Up"
 
 # --- Espaces / bureaux virtuels ---
 
+# One Space left or right, as Ctrl+Arrow does: stops at the first and last.
 [sg_actions.space_prev]
 platform = "hs"
 
 [sg_actions.space_next]
+platform = "hs"
+
+# The same step, wrapping at the edges: from the last Space of the focused
+# screen to its first, and from the first to its last.
+[sg_actions.space_prev_wrap]
+platform = "hs"
+
+[sg_actions.space_next_wrap]
 platform = "hs"
 
 [sg_actions.mission_control]
@@ -1400,6 +1409,8 @@ items = [
     "##spaces",
     "space_prev",
     "space_next",
+    "space_prev_wrap",
+    "space_next_wrap",
     "mission_control",
     "app_expose",
     "desktop_prev",

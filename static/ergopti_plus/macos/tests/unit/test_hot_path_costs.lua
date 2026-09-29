@@ -66,7 +66,7 @@ end)
 
 helpers.describe("gestures: the Spaces binding is loaded and queried once", function()
 	helpers.it("hoists the require and caches the layout", function()
-		local src = helpers.read_driver_source("spaceNav")
+		local src = helpers.read_driver_source("local function focused_screen_spaces")
 		helpers.assert_true(src ~= nil and src ~= "", "the gesture actions must be locatable")
 
 		local code = src:gsub("%-%-[^\n]*", "")
@@ -79,14 +79,18 @@ helpers.describe("gestures: the Spaces binding is loaded and queried once", func
 
 		-- The FOCUSED space must stay live: it changes with every navigation, so
 		-- caching it would break the edge detection this code exists for.
-		-- Anchored on the CALL: "local function _cached_all_spaces(spaces)" contains
-		-- the same text and sits a hundred lines above the site being checked.
-		local at = code:find("= _cached_all_spaces(spaces)", 1, true)
-		helpers.assert_true(at ~= nil, "the cached lookup must be used, not merely defined")
-		local after = code:sub(at, at + 200)
-		helpers.assert_true(after:find("pcall(spaces.focusedSpace)", 1, true) ~= nil,
+		-- Anchored on the reader's body: "local function _cached_all_spaces"
+		-- sits above it and must not satisfy the check. The behaviour itself is
+		-- pinned by test_space_navigation_actions.lua (one layout read, a live
+		-- focused Space per navigation).
+		local at = code:find("local function focused_screen_spaces", 1, true)
+		helpers.assert_true(at ~= nil, "the focused-screen reader must exist")
+		local body = code:sub(at, at + 600)
+		helpers.assert_true(body:find("pcall(spaces.focusedSpace)", 1, true) ~= nil,
 			"the focused Space must still be read live — it changes with every navigation, and "
 				.. "caching it would break the very edge check this guards")
+		helpers.assert_true(body:find("_cached_all_spaces(spaces", 1, true) ~= nil,
+			"the cached layout lookup must be used, not merely defined")
 	end)
 end)
 

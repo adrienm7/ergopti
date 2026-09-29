@@ -25,6 +25,7 @@ local Sticky        = require("modules.gestures.sticky_modifiers")
 local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local WrapPair      = require("wrap_pair")
+local DesktopNavigation = require("desktop_navigation")
 local SendInput     = require("send_input")
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
@@ -576,10 +577,12 @@ local _all_spaces_at    = 0
 
 --- Returns (ok, allSpaces) using a short-lived cache.
 --- @param spaces table The Spaces binding module.
+--- @param refresh boolean|nil True to re-read the layout whatever its age.
 --- @return boolean, table|nil
-local function _cached_all_spaces(spaces)
+local function _cached_all_spaces(spaces, refresh)
 	local now = hs.timer.secondsSinceEpoch()
-	if _all_spaces_cache ~= nil and (now - _all_spaces_at) < SPACES_LAYOUT_TTL_SEC then
+	if refresh ~= true and _all_spaces_cache ~= nil
+		and (now - _all_spaces_at) < SPACES_LAYOUT_TTL_SEC then
 		return true, _all_spaces_cache
 	end
 	local ok, all = pcall(spaces.allSpaces)
@@ -590,48 +593,149 @@ local function _cached_all_spaces(spaces)
 	return ok, all
 end
 
---- Navigates between macOS Spaces (Desktops).
-local function spaceNav(goNext)
-	-- space_wrap is persisted, restored and exposed as a menu checkbox, but nothing
-	-- ever read it: the toggle looked functional and did nothing. macOS itself stops
-	-- at the first and last Space, so honouring the setting means suppressing the
-	-- navigation at the edge rather than asking the OS to wrap.
-	if _state and _state.space_wrap == false then
-		local spaces = _spaces_module()
-		if spaces and type(spaces.spaceType) == "function" then
-			-- allSpaces is a private-API round-trip and this runs on the gesture
-			-- frame callback, where a stall shows up directly as input lag. The
-			-- Space LAYOUT changes only when the user adds or removes a desktop,
-			-- so it is cached briefly; the focused Space, which changes with every
-			-- navigation, is always read live.
-			local ok_all, all = _cached_all_spaces(spaces)
-			local ok_cur, cur = pcall(spaces.focusedSpace)
-			if ok_all and ok_cur and type(all) == "table" and cur then
-				local screen_spaces
-				for _, list in pairs(all) do
-					for _, id in ipairs(list) do
-						if id == cur then screen_spaces = list break end
-					end
-					if screen_spaces then break end
-				end
-				if screen_spaces and #screen_spaces > 0 then
-					local at_edge = (goNext and screen_spaces[#screen_spaces] == cur)
-						or ((not goNext) and screen_spaces[1] == cur)
-					if at_edge then
-						Logger.debug(LOG, "Space navigation suppressed at the edge (space_wrap disabled).")
-						return
-					end
-				end
+--- The Spaces of the screen that holds the focused Space, in Ctrl+Arrow order,
+--- and the position of the focused one among them.
+---
+--- allSpaces is a private-API round-trip and this runs on the gesture frame
+--- callback, where a stall shows up directly as input lag. The Space LAYOUT
+--- changes only when the user adds or removes a desktop, so it is cached
+--- briefly; the focused Space, which changes with every navigation, is always
+--- read live. A focused Space missing from the cached layout means a desktop
+--- was added within the cache lifetime, so the layout is read once more.
+--- @param spaces table The Spaces binding module.
+--- @return table|nil list Ordered Space ids of the focused screen.
+--- @return integer|nil index 0-based position of the focused Space in list.
+--- @return string|nil reason Why the layout could not be read.
+local function focused_screen_spaces(spaces)
+	local ok_cur, cur = pcall(spaces.focusedSpace)
+	if not ok_cur or cur == nil then
+		return nil, nil, "the focused Space is unreadable (" .. tostring(cur) .. ")"
+	end
+	for _, refresh in ipairs({ false, true }) do
+		local ok_all, all = _cached_all_spaces(spaces, refresh)
+		if not ok_all or type(all) ~= "table" then
+			return nil, nil, "the Space layout is unreadable (" .. tostring(all) .. ")"
+		end
+		for _, list in pairs(all) do
+			for position, id in ipairs(list) do
+				if id == cur then return list, position - 1, nil end
 			end
 		end
 	end
+	return nil, nil, "the focused Space " .. tostring(cur) .. " is on no screen"
+end
 
-	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
-	-- AppleScript-generated key events carry no Ergopti provenance. Both taps then
-	-- treated this Space navigation as physical typing, so action-epoch consumers
-	-- could retain text/LLM state from the previous desktop. Numeric Quartz keycodes
-	-- are supported by the same exact-tag adapter used by named gesture keys.
-	postKeyStroke({ "ctrl" }, key_code)
+-- Ctrl+Left and Ctrl+Right, as Quartz key codes. AppleScript-generated key
+-- events carry no Ergopti provenance: both taps then treated a Space
+-- navigation as physical typing, so action-epoch consumers could retain
+-- text/LLM state from the previous desktop. Numeric Quartz keycodes are
+-- supported by the same exact-tag adapter used by named gesture keys.
+local SPACE_STEP_KEY = { [DesktopNavigation.PREVIOUS] = 123, [DesktopNavigation.NEXT] = 124 }
+
+--- Moves one Space in a direction, as Ctrl+Arrow does: macOS stops at the
+--- first and the last Space of the screen.
+--- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
+--- @return boolean posted
+local function space_step(direction)
+	return postKeyStroke({ "ctrl" }, SPACE_STEP_KEY[direction])
+end
+
+--- Jumps to one Space of the focused screen, or walks there one Ctrl+Arrow at
+--- a time when the jump is refused.
+---
+--- gotoSpace clicks the Space's button in Mission Control through the Dock's
+--- accessibility tree and waits for Mission Control to open, so it holds the
+--- Hammerspoon run loop for a moment. It therefore never runs inside the
+--- gesture or hotkey callback that asked for it (the caller defers it through
+--- the auxiliary owner), and only for a jump across the whole screen: a
+--- neighbour is always a single keystroke.
+--- @param spaces table The Spaces binding module.
+--- @param space_id integer The Space to land on.
+--- @param steps integer Signed number of single steps to the same Space.
+--- @return boolean arrived
+local function goto_space_or_walk(spaces, space_id, steps)
+	local ok, went, err = pcall(spaces.gotoSpace, space_id)
+	if ok and went == true then
+		Logger.debug(LOG, "Wrapped to Space %s.", tostring(space_id))
+		return true
+	end
+	Logger.warn(LOG, "Jump to Space %s refused (%s) — walking %d Space(s) with Ctrl+Arrow instead.",
+		tostring(space_id), tostring(ok and err or went), math.abs(steps))
+	local direction = steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS
+	for _ = 1, math.abs(steps) do
+		if not space_step(direction) then return false end
+	end
+	return true
+end
+
+--- Moves one Space in a direction, wrapping at the edges of the focused
+--- screen: from its last Space to its first and from its first to its last.
+--- macOS stops at both ends, so the wrap is Ergopti's.
+---
+--- Without a readable layout the edge cannot be told apart from the middle:
+--- the step is then the plain one, and the log says the wrap was not possible.
+--- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
+--- @return boolean handled
+local function space_wrap(direction)
+	local spaces = _spaces_module()
+	if not spaces then
+		Logger.warn(LOG, "The Spaces binding is unavailable — moving one Space without wrapping.")
+		return space_step(direction)
+	end
+	local list, index, reason = focused_screen_spaces(spaces)
+	if not list then
+		Logger.warn(LOG, "Cannot wrap: %s — moving one Space without wrapping.", reason)
+		return space_step(direction)
+	end
+	local target = DesktopNavigation.target(index, #list, direction, true)
+	local steps = target - index
+	if steps == 0 then
+		Logger.debug(LOG, "The focused screen has a single Space — nothing to wrap to.")
+		return true
+	end
+	if math.abs(steps) == 1 then return space_step(direction) end
+	local target_id = list[target + 1]
+	Logger.debug(LOG, "Wrapping from Space %s to Space %s.", tostring(list[index + 1]), tostring(target_id))
+	return AuxOwner.after(0, "space wrap", function()
+		return goto_space_or_walk(spaces, target_id, steps)
+	end, current_action_parent())
+end
+
+--- Navigates between macOS Spaces (Desktops).
+local function spaceNav(goNext)
+	local direction = goNext and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS
+	-- space_wrap is persisted, restored and exposed as a menu checkbox. macOS
+	-- itself stops at the first and last Space, so honouring the setting means
+	-- suppressing the navigation at the edge rather than asking the OS to wrap.
+	if _state and _state.space_wrap == false then
+		local spaces = _spaces_module()
+		local list, index = nil, nil
+		if spaces then list, index = focused_screen_spaces(spaces) end
+		if list and DesktopNavigation.target(index, #list, direction, false) == index then
+			Logger.debug(LOG, "Space navigation suppressed at the edge (space_wrap disabled).")
+			return
+		end
+	end
+	space_step(direction)
+end
+
+--- Opens Mission Control or App Exposé through the Dock itself. The F3 key and
+--- Ctrl+Down posted before do nothing once the user changes or disables those
+--- shortcuts in System Settings; the Dock notification does not depend on them.
+--- @param method string toggleMissionControl or toggleAppExpose.
+--- @return boolean toggled
+local function dock_toggle(method)
+	local spaces = _spaces_module()
+	if not spaces or type(spaces[method]) ~= "function" then
+		Logger.error(LOG, "The Spaces binding has no %s — the action is a no-op.", method)
+		return false
+	end
+	local ok, err = pcall(spaces[method])
+	if not ok then
+		Logger.error(LOG, "The Spaces binding's %s raised: %s.", method, tostring(err))
+		return false
+	end
+	return true
 end
 
 -- Axis actions (prev / next)
@@ -895,12 +999,10 @@ sg("maximize",                     function()
 end)
 sg("space_prev",             function() spaceNav(false) end)
 sg("space_next",               function() spaceNav(true) end)
-sg("mission_control",        function()
-	postKeyStroke({}, 160)
-end)
-sg("app_expose",                  function()
-	postKeyStroke({ "ctrl" }, 125)
-end)
+sg("space_prev_wrap",        function() return space_wrap(DesktopNavigation.PREVIOUS) end)
+sg("space_next_wrap",        function() return space_wrap(DesktopNavigation.NEXT) end)
+sg("mission_control",        function() return dock_toggle("toggleMissionControl") end)
+sg("app_expose",             function() return dock_toggle("toggleAppExpose") end)
 
 -- Cursor movement
 sg("line_up",               function() return defer_key("line up", {"alt"}, "up") end)
