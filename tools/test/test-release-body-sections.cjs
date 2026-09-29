@@ -54,7 +54,9 @@ const EN = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.j
 const CI_ENV = {
 	VERSION: '1.2.3',
 	TAG: 'v1.2.3',
+	CHANNEL: 'main',
 	GITHUB_REPOSITORY: 'adrienm7/ergopti',
+	GITHUB_REPOSITORY_OWNER: 'adrienm7',
 	GITHUB_RUN_ID: '4242',
 	LINUX_BUNDLE_ASSET: JSON.parse(
 		fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8')
@@ -164,7 +166,8 @@ function expand(text, env, escapable) {
  * Interprets the release-body step for one set of inputs and returns the
  * body file it writes.
  */
-function buildCiBody(env, changelog) {
+function buildCiBody(inputs, changelog) {
+	const env = { ...inputs };
 	const script = releaseBodyScript();
 	let body = '';
 	let inGroup = false;
@@ -209,6 +212,11 @@ function buildCiBody(env, changelog) {
 			if (!inGroup) throw new Error('the changelog sed writes outside the body group');
 			const drop = new RegExp(sed[1].replace(/\[\[:space:\]\]/g, '[ \\t]'));
 			body += changelog.split('\n').filter((l) => !drop.test(l)).join('\n');
+			continue;
+		}
+		// The cask token comes from the real generator the step runs.
+		if (trimmed === 'cask="$(node tools/build/homebrew-cask.cjs --token "$CHANNEL")"') {
+			env.cask = require(path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs')).tokenForChannel(env.CHANNEL);
 			continue;
 		}
 		if (
