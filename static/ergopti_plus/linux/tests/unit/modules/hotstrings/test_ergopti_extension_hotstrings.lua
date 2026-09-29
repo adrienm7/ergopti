@@ -166,7 +166,9 @@ end
 --- @return table categories
 local function load_with_user_folder(dir)
 	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-	Config.init({ load_mappings = function() end }, dir)
+	-- The engine accepts the catalogue: the owner publishes a catalogue only
+	-- once its engine has, so a silent stub would leave every category out.
+	Config.init({ load_mappings = function() return true end }, dir)
 	Config.load_all()
 	return Config.get_categories()
 end
@@ -214,4 +216,17 @@ helpers.describe("Ergopti extension hotstrings: the user's own copies", function
 			helpers.assert_eq(categories.magickey.sections.repeat_corrections.extension,
 				{ id = "ergopti", name = "Ergopti" })
 		end)
+end)
+
+helpers.describe("Ergopti extension hotstrings: the Hotstrings scope", function()
+	-- The scope planner writes a manifest recommendation only for a bundled
+	-- category. Listing the bundled folder alone left the moved categories out,
+	-- so « restore recommended » skipped their sections' delays.
+	helpers.it("(ergopti-hotstrings-ext) keeps the moved categories bundled for restore and clear", function()
+		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		local bundled = Config.bundled_categories()
+		for _, id in ipairs({ "sfbsreduction", "rolls", "magickey" }) do
+			helpers.assert_true(bundled[id] == true, id .. " is restored to its manifest recommendation")
+		end
+	end)
 end)

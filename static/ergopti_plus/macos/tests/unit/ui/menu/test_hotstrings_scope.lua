@@ -14,6 +14,7 @@ local Codec = require("toml_codec")
 local Paths = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
 local Languages = require("hotstrings.languages")
+local Extensions = require("hotstrings.extensions")
 
 local ORIGINAL_CONFIG = table.concat({
 	"[hotstrings]",
@@ -55,11 +56,54 @@ local ORIGINAL_OVERRIDES = table.concat({
 	"",
 }, "\n")
 
+--- The file a bundled category loads from: the bundled folder, or the file the
+--- shipped Ergopti extension binds to that category (SFB reduction and rolls
+--- moved there), resolved by the shared extension scanner the drivers use.
+--- @param name string Corpus stem.
+--- @return string path
+local function corpus_path(name)
+	local bundled = Paths.shared("modules/hotstrings/" .. name .. ".toml")
+	local handle = io.open(bundled, "rb")
+	if handle then
+		handle:close()
+		return bundled
+	end
+	local shipped = require("modules.keymap.layout_registry").shipped_extension_root({
+		settings = { ergopti_family = "ergopti" },
+		bundled_dir = Paths.shared("../../layouts/registry/"),
+		exists = function(path)
+			local file = io.open(path, "rb")
+			if file then file:close() end
+			return file ~= nil
+		end,
+	})
+	local found = Extensions.scan({ assert(shipped, "the Ergopti extension ships with the app") }, {
+		list_dirs = function() return {} end,
+		list_files = function(dir)
+			local files = {}
+			local listing = assert(io.popen('ls -1 "' .. dir .. '" 2>/dev/null'))
+			for entry in listing:lines() do
+				if entry:match("%.toml$") then files[#files + 1] = dir .. "/" .. entry end
+			end
+			listing:close()
+			return files
+		end,
+		read_file = function(path)
+			local file = io.open(path, "rb")
+			if not file then return nil end
+			local content = file:read("*a")
+			file:close()
+			return content
+		end,
+	})
+	return assert(Extensions.bound_source(found, name), "no bundled or bound corpus for " .. name)
+end
+
 --- Parses a bundled corpus file the way the registry registers it.
 --- @param name string Corpus stem.
 --- @return table entry { sections, metadata }
 local function corpus(name)
-	local parsed, committed = TomlReader.parse(Paths.shared("modules/hotstrings/" .. name .. ".toml"))
+	local parsed, committed = TomlReader.parse(corpus_path(name))
 	assert(committed == true, "corpus fixture unreadable: " .. name)
 	local sections = {}
 	for _, section in ipairs(parsed.sections_order or {}) do
