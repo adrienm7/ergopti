@@ -159,7 +159,7 @@ function M.register(helpers, opts)
 				{ { [2] = { path = master, value = true } }, "not a list" },
 				{ { "gestures.enabled" }, "not a table" },
 				{ { { path = "hotstrings.trigger_char", value = "" } }, "visible text" },
-				{ { { path = "hotstrings.trigger_char", value = "abcd" } }, "at most 3" },
+				{ { { path = "hotstrings.trigger_char", value = "ab" } }, "at most 1" },
 				{ { { path = "hotstrings.trigger_char", value = "a\nb" } }, "visible text" },
 			}
 			for _, case in ipairs(cases) do
