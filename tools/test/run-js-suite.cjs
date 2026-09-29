@@ -1596,6 +1596,12 @@ const CHECKS = [
 		repro: 'npm run test:text-case-vectors-shared'
 	},
 	{
+		name: 'the previous/next desktop actions share one desktop-navigation corpus that every driver suite replays',
+		cmd: 'node',
+		args: ['tools/test/test-desktop-navigation-vectors-shared.cjs'],
+		repro: 'npm run test:desktop-navigation-vectors-shared'
+	},
+	{
 		name: 'the wrap_selection parameter rule is one shared corpus every driver suite replays',
 		cmd: 'node',
 		args: ['tools/test/test-wrap-pair-vectors-shared.cjs'],

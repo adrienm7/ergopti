@@ -37,8 +37,9 @@ return function(helpers, json, shared_root)
 			local corpus = read_corpus()
 			helpers.assert_true(#corpus.invalid >= 7, "the corpus must hold its invalid inputs")
 			for _, vector in ipairs(corpus.invalid) do
-				local ok = pcall(Navigation.target, vector.index, vector.count, vector.direction, vector.wrap)
+				local ok, err = pcall(Navigation.target, vector.index, vector.count, vector.direction, vector.wrap)
 				helpers.assert_eq(ok, false, vector.id .. " must be refused")
+				helpers.assert_contains(tostring(err), "desktop_navigation:", vector.id .. " must be refused by the rule")
 			end
 		end)
 	end)
