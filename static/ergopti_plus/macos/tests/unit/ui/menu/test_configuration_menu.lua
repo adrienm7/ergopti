@@ -220,8 +220,6 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 				"menu.global.start_at_login",
 				"menu.global.karabiner_integration",
 				"menu.global.remove_from_karabiner",
-				"-",
-				"menu.global.uninstall",
 			}, ", "))
 			helpers.assert_eq(row_titled(rows, "menu.global.karabiner_integration").checked, enabled)
 		end
