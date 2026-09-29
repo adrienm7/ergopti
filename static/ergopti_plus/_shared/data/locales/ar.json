@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ رموز تحيط بالنص المحدد",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "إلغاء تحديد الكل",
 	"menu.tapholds.enable": "تفعيل نقر-ضغط",
+	"menu.tapholds.karabiner_off_hint": "غير متاح: لا يستخدم Ergopti برنامج Karabiner (راجع الإعدادات)",
 	"menu.tapholds.title": "⌨️ نقر-ضغط",
 	"menu.tapholds.copy_tap_to_combo": "🔁 نسخ النقر ← كومبو للمفاتيح المعدِّلة",
 	"menu.tapholds.edit_nav_layer": "تحرير طبقة التنقل…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "اقتراحات الذكاء الاصطناعي",
 	"notify.personal_info": "معلومات شخصية",
 	"notify.quit_refused": "تعذّر الإنهاء الآن، لا تزال عملية أخرى قيد التنفيذ. حاول مرة أخرى بعد لحظة.",
+	"notify.karabiner.removed": "أُزيلت قواعد Ergopti من Karabiner. قواعدك الخاصة لم تتغير.",
 	"notify.report_bug_body": "نموذج GitHub مفتوح ومعبأ مسبقًا بالتشخيص (ونُسخ أيضًا إلى الحافظة، في حال اختُصر).",
 	"notify.screenshot_copied": "تم نسخ لقطة الشاشة",
 	"notify.screenshot_saved": "تم حفظ لقطة الشاشة",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "هل تريد إلغاء تثبيت Ergopti؟ سيُغلق التطبيق. ستُحفظ إعداداتك واختصارات النص والمقاييس وبيانات الاعتماد.",
 	"dialog.uninstall.failed": "تعذّر إلغاء تثبيت Ergopti. تم الاحتفاظ ببياناتك الشخصية.",
 	"menu.global.start_at_login": "التشغيل عند تسجيل الدخول",
+	"menu.global.karabiner_integration": "يستخدم Ergopti برنامج Karabiner",
+	"menu.global.remove_from_karabiner": "إزالة Ergopti من Karabiner",
 	"dialog.start_at_login.failed": "تعذر تغيير التشغيل التلقائي. تحقق من إعدادات بدء التشغيل في النظام.",
 	"onboarding.error.open_failed": "تعذر فتح معالج الإعداد. تحقق من السجلات ثم حاول مجددًا من القائمة."
 }

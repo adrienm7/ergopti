@@ -4190,6 +4190,26 @@ id = "start_at_login"
 i18n = "menu.global.start_at_login"
 checked_when = ["start_at_login_enabled"]
 
+# « Ergopti uses Karabiner » (config_karabiner.toml [karabiner] enabled, default
+# on). Off: no lease worker, no guardian registration, and every ErgoptiPlus
+# rule removed from karabiner.json; Karabiner itself is never quit or
+# reconfigured. The command below turns it off, or only cleans the file when
+# it already is.
+[[menu.configuration_menu]]
+type = "check"
+id = "karabiner_integration"
+i18n = "menu.global.karabiner_integration"
+checked_when = ["karabiner_integration_enabled"]
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.configuration_menu]]
+type = "command"
+id = "remove_from_karabiner"
+i18n = "menu.global.remove_from_karabiner"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
 # They are `command` now, like the four rows below them, and the label is the

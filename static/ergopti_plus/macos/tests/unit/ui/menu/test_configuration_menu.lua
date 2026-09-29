@@ -153,3 +153,90 @@ helpers.describe("configuration submenu (macOS): a pause gates what rewrites the
 		end)
 	end
 end)
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 3/ Ergopti Uses Karabiner ==========
+-- ============================================
+-- ============================================
+
+--- Builds the Configuration submenu over a remap owner double.
+--- @param enabled boolean Current « Ergopti uses Karabiner » state.
+--- @param calls table Receives the owner requests.
+--- @return table|nil rows
+local function rows_with_karabiner(enabled, calls)
+	local builder = helpers.load_with_stubs("ui.menu.builder")
+	local i18n = require("infra.i18n")
+	i18n.get = function(key) return key end
+	i18n.build_language_menu_items = function() return {} end
+	local karabiner = {
+		get_enabled = function() return enabled end,
+		set_enabled = function(value, on_done)
+			calls[#calls + 1] = "set_enabled:" .. tostring(value)
+			on_done(true, "stopped")
+			return true
+		end,
+		remove_from_karabiner = function(on_done)
+			calls[#calls + 1] = "remove_from_karabiner"
+			on_done(true, "removed", 2)
+			return true
+		end,
+	}
+	local ctx = { config = { log_level = 2 }, paused = false, karabiner = karabiner, updateMenu = function() end }
+	local ok, menu = pcall(builder.generate, ctx, {}, recording_actions({}))
+	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(menu))
+	for _, item in ipairs(menu) do
+		if item.title == "menu.configuration.title" then return item.menu end
+	end
+	return nil
+end
+
+--- Finds one row by the key of its label.
+--- @param rows table Rendered rows.
+--- @param title string Label key.
+--- @return table|nil row
+local function row_titled(rows, title)
+	for _, row in ipairs(rows or {}) do
+		if row.title == title then return row end
+	end
+	return nil
+end
+
+helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", function()
+	helpers.it("draws the switch ticked from the remap owner and the removal after login startup", function()
+		for _, enabled in ipairs({ true, false }) do
+			local rows = rows_with_karabiner(enabled, {})
+			local drawn = {}
+			for index, row in ipairs(rows) do drawn[index] = row.title end
+			helpers.assert_eq(table.concat(drawn, ", "), table.concat({
+				"common.restore_recommended",
+				"menu.global.clean_unused_keys",
+				"-",
+				"menu.global.config_folder",
+				"menu.global.setup_wizard",
+				"menu.global.start_at_login",
+				"menu.global.karabiner_integration",
+				"menu.global.remove_from_karabiner",
+				"-",
+				"menu.global.uninstall",
+			}, ", "))
+			helpers.assert_eq(row_titled(rows, "menu.global.karabiner_integration").checked, enabled)
+		end
+	end)
+
+	helpers.it("turns the switch to the opposite state and removes through the owner", function()
+		local calls = {}
+		local rows = rows_with_karabiner(true, calls)
+		row_titled(rows, "menu.global.karabiner_integration").fn()
+		row_titled(rows, "menu.global.remove_from_karabiner").fn()
+		helpers.assert_eq(table.concat(calls, ", "), "set_enabled:false, remove_from_karabiner")
+
+		calls = {}
+		rows = rows_with_karabiner(false, calls)
+		row_titled(rows, "menu.global.karabiner_integration").fn()
+		helpers.assert_eq(table.concat(calls, ", "), "set_enabled:true")
+	end)
+end)

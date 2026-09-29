@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ चयन को घेरने वाले प्रतीक",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "सभी अचुनें",
 	"menu.tapholds.enable": "Tap-holds सक्षम करें",
+	"menu.tapholds.karabiner_off_hint": "अनुपलब्ध: Ergopti, Karabiner का उपयोग नहीं करता (कॉन्फ़िगरेशन देखें)",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 मॉडिफायर कुंजियों के लिए tap → combo कॉपी करें",
 	"menu.tapholds.edit_nav_layer": "नेविगेशन परत संपादित करें…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "AI सुझाव",
 	"notify.personal_info": "व्यक्तिगत जानकारी",
 	"notify.quit_refused": "अभी बंद नहीं किया जा सकता, एक अन्य प्रक्रिया अभी चल रही है। कुछ क्षण बाद फिर से प्रयास करें।",
+	"notify.karabiner.removed": "Ergopti के नियम Karabiner से हटा दिए गए। आपके अपने नियम अपरिवर्तित हैं।",
 	"notify.report_bug_body": "GitHub फ़ॉर्म खुला है और उसमें निदान पहले से भरा है (क्लिपबोर्ड में भी कॉपी किया गया है, अगर उसे छोटा किया गया हो)।",
 	"notify.screenshot_copied": "स्क्रीनशॉट कॉपी किया गया",
 	"notify.screenshot_saved": "स्क्रीनशॉट सहेजा गया",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Ergopti अनइंस्टॉल करें? ऐप बंद हो जाएगा। आपकी सेटिंग, हॉटस्ट्रिंग, मेट्रिक और लॉगिन जानकारी सुरक्षित रहेंगी।",
 	"dialog.uninstall.failed": "Ergopti अनइंस्टॉल नहीं हो सका। आपका निजी डेटा सुरक्षित रखा गया है।",
 	"menu.global.start_at_login": "लॉगिन पर शुरू करें",
+	"menu.global.karabiner_integration": "Ergopti, Karabiner का उपयोग करता है",
+	"menu.global.remove_from_karabiner": "Karabiner से Ergopti हटाएँ",
 	"dialog.start_at_login.failed": "स्वचालित स्टार्टअप नहीं बदला जा सका। सिस्टम की स्टार्टअप सेटिंग जाँचें।",
 	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।"
 }

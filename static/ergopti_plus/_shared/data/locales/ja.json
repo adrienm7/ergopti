@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ 選択範囲を囲む記号",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "すべてチェック解除",
 	"menu.tapholds.enable": "タップホールドを有効にする",
+	"menu.tapholds.karabiner_off_hint": "利用不可：Ergopti は Karabiner を使用していません（設定を参照）",
 	"menu.tapholds.title": "⌨️ タップホールド",
 	"menu.tapholds.copy_tap_to_combo": "🔁 修飾キーにタップ→コンボをコピー",
 	"menu.tapholds.edit_nav_layer": "ナビゲーションレイヤーを編集…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "AI提案",
 	"notify.personal_info": "個人情報",
 	"notify.quit_refused": "現在は終了できません。別の処理がまだ実行中です。しばらくしてからもう一度お試しください。",
+	"notify.karabiner.removed": "Ergopti のルールを Karabiner から削除しました。ご自身のルールは変更されていません。",
 	"notify.report_bug_body": "GitHub のフォームを開き、診断情報を入力済みです（短縮された場合に備えて、クリップボードにもコピーしました）。",
 	"notify.screenshot_copied": "スクリーンショットをコピーしました",
 	"notify.screenshot_saved": "スクリーンショットを保存しました",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Ergopti をアンインストールしますか？アプリケーションは終了します。設定、ホットストリング、統計情報、認証情報は保持されます。",
 	"dialog.uninstall.failed": "Ergopti をアンインストールできませんでした。個人データは保持されています。",
 	"menu.global.start_at_login": "ログイン時に起動",
+	"menu.global.karabiner_integration": "Ergopti で Karabiner を使用",
+	"menu.global.remove_from_karabiner": "Karabiner から Ergopti を削除",
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。"
 }

@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ Символи, що обрамляють виділення",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Зняти всі позначки",
 	"menu.tapholds.enable": "Увімкнути натискання-утримання",
+	"menu.tapholds.karabiner_off_hint": "Недоступно: Ergopti не використовує Karabiner (див. «Конфігурація»)",
 	"menu.tapholds.title": "⌨️ Натискання-Утримання",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Скопіювати натискання → комбо для клавіш-модифікаторів",
 	"menu.tapholds.edit_nav_layer": "Редагувати шар навігації…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "Пропозиції ШІ",
 	"notify.personal_info": "Особиста інформація",
 	"notify.quit_refused": "Зараз неможливо вийти: інша операція ще виконується. Спробуйте ще раз за мить.",
+	"notify.karabiner.removed": "Правила Ergopti вилучено з Karabiner. Ваші власні правила не змінено.",
 	"notify.report_bug_body": "Форму GitHub відкрито й заповнено діагностикою (її також скопійовано до буфера обміну на випадок, якщо її скорочено).",
 	"notify.screenshot_copied": "Знімок скопійовано",
 	"notify.screenshot_saved": "Знімок збережено",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Видалити Ergopti? Застосунок закриється. Налаштування, хотстрінги, метрики й облікові дані буде збережено.",
 	"dialog.uninstall.failed": "Не вдалося видалити Ergopti. Ваші особисті дані збережено.",
 	"menu.global.start_at_login": "Запускати під час входу в систему",
+	"menu.global.karabiner_integration": "Ergopti використовує Karabiner",
+	"menu.global.remove_from_karabiner": "Вилучити Ergopti з Karabiner",
 	"dialog.start_at_login.failed": "Не вдалося змінити автозапуск. Перевірте налаштування автозапуску системи.",
 	"onboarding.error.open_failed": "Не вдалося відкрити майстер налаштування. Перевірте журнали та повторіть спробу через меню."
 }

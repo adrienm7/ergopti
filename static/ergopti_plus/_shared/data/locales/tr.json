@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.wrap_symbols_title": "  ↳ Seçimi çerçeveleyen semboller",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Tümünün işaretini kaldır",
 	"menu.tapholds.enable": "Dokunma-basılı tutmayı etkinleştir",
+	"menu.tapholds.karabiner_off_hint": "Kullanılamıyor: Ergopti, Karabiner'ı kullanmıyor (bkz. Yapılandırma)",
 	"menu.tapholds.title": "⌨️ Dokunma-Basılı Tutma",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Değiştirici tuşlar için tap → combo kopyala",
 	"menu.tapholds.edit_nav_layer": "Gezinme katmanını düzenle…",
@@ -1697,6 +1698,7 @@
 	"notify.llm_suggestions": "YZ Önerileri",
 	"notify.personal_info": "Kişisel bilgiler",
 	"notify.quit_refused": "Şu anda çıkılamıyor, başka bir işlem hâlâ sürüyor. Birazdan tekrar deneyin.",
+	"notify.karabiner.removed": "Ergopti kuralları Karabiner'dan kaldırıldı. Kendi kurallarınız değişmedi.",
 	"notify.report_bug_body": "GitHub formu açık ve tanılama bilgileriyle önceden dolduruldu (kısaltılmış olma ihtimaline karşı panoya da kopyalandı).",
 	"notify.screenshot_copied": "Ekran görüntüsü kopyalandı",
 	"notify.screenshot_saved": "Ekran görüntüsü kaydedildi",
@@ -2965,6 +2967,8 @@
 	"dialog.uninstall.confirm": "Ergopti kaldırılsın mı? Uygulama kapanacak. Ayarlarınız, hotstring’leriniz, ölçümleriniz ve kimlik bilgileriniz korunacak.",
 	"dialog.uninstall.failed": "Ergopti kaldırılamadı. Kişisel verileriniz korundu.",
 	"menu.global.start_at_login": "Oturum açıldığında başlat",
+	"menu.global.karabiner_integration": "Ergopti, Karabiner'ı kullanır",
+	"menu.global.remove_from_karabiner": "Ergopti'yi Karabiner'dan kaldır",
 	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
 	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin."
 }
