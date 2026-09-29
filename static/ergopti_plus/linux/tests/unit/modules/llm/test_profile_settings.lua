@@ -276,3 +276,84 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		restore()
 	end)
 end)
+
+helpers.describe("LLM profile settings: a prompt named by a binding", function()
+	local function load_settings(initial)
+		local encoded = {}
+		for key, value in pairs(initial or {}) do
+			encoded[key] = key == "llm.user_profiles" and RegistryCodec.encode(value) or value
+		end
+		replace("infra.llm_preferences", PreferencesFixture.new({ initial = encoded }))
+		package.loaded["modules.llm.profile_settings"] = nil
+		local settings = require("modules.llm.profile_settings")
+		settings._reset()
+		return settings
+	end
+
+	helpers.it("offers the rewrite prompt with the other built-ins, in menu order", function()
+		local settings = load_settings()
+		local ids = {}
+		for index, profile in ipairs(settings.list_built_in()) do ids[index] = profile.id end
+		helpers.assert_eq(table.concat(ids, ","), "raw,basic,advanced,batch_advanced,rewrite")
+		helpers.assert_true(require("llm.rewrite").is_rewrite_profile(settings.resolve_id("rewrite")),
+			"the rewrite built-in is recognised by its prompt")
+		helpers.assert_true(settings.set("active", "rewrite", "small"), "and selectable like the others")
+		restore()
+	end)
+
+	helpers.it("resolves an exact id, built-in or custom, and never falls back to basic", function()
+		local settings = load_settings({ ["llm.user_profiles"] = {
+			{ id = "user_formal", label = "Formal", system_single = "Formal {context}", batch = false },
+		} })
+		helpers.assert_eq(settings.resolve_id("advanced").id, "advanced")
+		helpers.assert_eq(settings.resolve_id("user_formal").label, "Formal")
+		helpers.assert_eq(settings.resolve_id("user_deleted"), nil, "an unknown id resolves to nothing")
+		helpers.assert_eq(settings.resolve_id(""), nil)
+		settings.resolve_id("advanced").system_single = "tampered"
+		helpers.assert_true(settings.resolve_id("advanced").system_single ~= "tampered",
+			"the caller gets a detached copy")
+		restore()
+	end)
+
+	helpers.it("labels a profile as the menu lists it, filling only the placeholders it has", function()
+		local settings = load_settings()
+		local i18n = require("infra.i18n")
+		local basic = settings.resolve_id("basic")
+		helpers.assert_eq(settings.menu_label(basic, 3), i18n.get("llm.profile.basic.label"),
+			"a label without {n} gets no count appended")
+		local batch = settings.menu_label(settings.resolve_id("batch_advanced"), 3)
+		helpers.assert_true(batch:find("{n}", 1, true) == nil and batch:find("{s}", 1, true) == nil
+			and batch:find("3", 1, true) ~= nil, "the batch label states the count: " .. batch)
+		helpers.assert_eq(settings.menu_label({ id = "user_x", label = "50% off" }, 3), "50% off")
+		restore()
+	end)
+
+	helpers.it("lists the rewrite prompt in the AI menu under its own label", function()
+		local settings = load_settings({ ["llm.profiles.auto_profile_for_model"] = false })
+		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu = menu_builder.build({
+			llm = {
+				is_enabled = function() return true end,
+				toggle = function() return true end,
+				get_models = function() return {} end,
+				get_current_model = function() return "small" end,
+			},
+			on_menu_changed = function() end,
+		})
+		local function find(rows, title)
+			for _, row in ipairs(rows or {}) do
+				if row.title == title then return row end
+				local nested = find(row.menu, title)
+				if nested then return nested end
+			end
+		end
+		local i18n = require("infra.i18n")
+		local rewrite = find(menu, i18n.get("llm.profile.rewrite.label"))
+		helpers.assert_not_nil(rewrite, "the rewrite prompt has its row")
+		helpers.assert_not_nil(find(menu, i18n.get("llm.profile.basic.label")),
+			"the basic row is its label alone, with no count appended")
+		rewrite.fn()
+		helpers.assert_eq(settings.get("active"), "rewrite", "choosing the row selects the prompt")
+		restore()
+	end)
+end)

@@ -15,6 +15,8 @@ local HttpBridge = require("infra.llm_bridge")
 local PromptBuilder = require("llm.prompt_builder")
 local ProfileSelector = require("llm.profile_selector")
 local Parser = require("llm.parser")
+local Rewrite = require("llm.rewrite")
+local PromptAction = require("llm.prompt_action")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
@@ -62,6 +64,15 @@ local MANUAL_REFUSAL_KEYS = {
 	backend_not_ready = "llm.manual_prediction.backend_not_ready",
 	empty_context     = "llm.manual_prediction.empty_context",
 }
+
+-- The notice of a prompt action whose binding names a prompt that no longer
+-- exists (a deleted custom prompt). Kept apart from MANUAL_REFUSAL_KEYS, which
+-- the three drivers declare identically.
+local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
+
+-- The ready-made prompt actions: one per built-in profile, named after it
+-- (tools/test/test-llm-prompt-actions-single-source.cjs pins the catalogue side).
+local PRESET_ACTION_PREFIX = "llm_predict_"
 
 local function get_ollama()
 	local ok, module = pcall(require, "modules.llm.api_ollama")
@@ -327,9 +338,19 @@ local function resolve_system_prompt(profile, params, count)
 end
 
 --- Starts a prediction from the given context buffer.
+---
+--- A rewrite profile (llm/rewrite.lua) asks for the current sentence rewritten,
+--- whatever triggered the request: its tail is that sentence, the context is
+--- widened to hold all of it when the menu's cap would cut it, and its token
+--- budget grows with it. The parser then erases exactly that span.
 --- @param context string
 --- @param output_context table|nil
-function M.predict(context, output_context)
+--- @param override table|nil { profile, num_predictions? } for a request that
+---   names its own prompt: that profile and count, instead of the menu's
+---   profile (and its automatic choice) and count, which stay unchanged.
+--- @return string|nil refusal A MANUAL_REFUSAL_KEYS reason the user should be
+---   told, when the request was refused for one.
+function M.predict(context, output_context, override)
 	if _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	if _is_secure_context() then
@@ -342,8 +363,8 @@ function M.predict(context, output_context)
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
-	local requested = ProfileSettings.get("num_predictions") or 1
-	local profile = ProfileSettings.resolve(model)
+	local requested = override and override.num_predictions or ProfileSettings.get("num_predictions") or 1
+	local profile = override and override.profile or ProfileSettings.resolve(model)
 	if not profile then Logger.error(LOG, "Prediction profile catalogue is unavailable."); return end
 	local params = PromptBuilder.build_params(clean_context, {
 		max_words = Settings.get("max_words"),
@@ -354,6 +375,18 @@ function M.predict(context, output_context)
 		language = prompt_language(),
 		context_window_chars = max_context_chars(),
 	})
+	local rewrite = Rewrite.is_rewrite_profile(profile)
+	if rewrite then
+		local sentence = Rewrite.sentence_span(clean_context)
+		if sentence == "" then
+			Logger.debug(LOG, "Rewrite suppressed: no sentence is being typed.")
+			return "empty_context"
+		end
+		-- Both are suffixes of the typed text, so the longer one holds the other.
+		if #sentence > #params.context then params.context = sentence end
+		params.context_tail = Rewrite.sentence_span(params.context)
+		params.max_tokens = Rewrite.max_tokens(params.context_tail)
+	end
 	local is_batch = profile.batch == true and requested > 1
 	local base_temperature = Settings.get("temperature")
 	local auto_raise = Settings.get("auto_raise_temp") == true
@@ -384,8 +417,8 @@ function M.predict(context, output_context)
 	_request_epoch = _request_epoch + 1
 	local epoch = _request_epoch
 	show_candidates({}, meta)
-	Logger.info(LOG, "Sending prediction request (backend=%s, model=%s, context=%d chars).",
-		M.get_backend(), model, #params.context)
+	Logger.info(LOG, "Sending prediction request (backend=%s, model=%s, profile=%s, count=%d, context=%d chars).",
+		M.get_backend(), model, tostring(profile.id), requested, #params.context)
 
 	local function parse_response(raw, batch, extra_deletes)
 		local parsed = {}
@@ -444,7 +477,10 @@ function M.predict(context, output_context)
 			temperature = is_batch and params.temperature
 				or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
 				or base_temperature,
-			max_tokens = (_max_tokens or params.max_tokens) * (is_batch and requested or 1),
+			-- A rewrite's budget follows its sentence; the continuation override
+			-- would truncate it and erase text it could not retype.
+			max_tokens = (rewrite and params.max_tokens or _max_tokens or params.max_tokens)
+				* (is_batch and requested or 1),
 			-- Decided from the prompt, as macOS does: one continuation, unless the
 			-- prompt asks for the two-line correction format or a batch. By id, a
 			-- user's copy of "basic" never got the single-line stops.
@@ -498,39 +534,96 @@ local function manual_refusal()
 	return nil, buffer
 end
 
---- Runs a prediction now from the whole typing buffer: the llm_generate_prediction
---- action. Automatic triggers wait for typing; this one is a chord pressed on
---- purpose, so every refusal is logged at INFO and shown as a notification, as
---- the other two drivers do.
---- @param output_context table|nil { app_id } for the metrics; nil lets the
----   daemon's observers fall back to the focused application.
+--- Shows the user a notice about a request that did not run.
+--- @param key string Locale key of the notice.
+--- @param reason string What the log names the refusal.
+local function show_notice(key, reason)
+	if not _notify then
+		Logger.error(LOG, "No notice surface injected — the '%s' refusal is only logged.", reason)
+	elseif _notify(i18n.get(key)) ~= true then
+		Logger.warn(LOG, "The '%s' refusal notice was not shown.", reason)
+	end
+end
+
+--- Runs a prediction now from the whole typing buffer, with the menu's prompt
+--- or with the one a binding names. A chord pressed on purpose, so every
+--- refusal is logged at INFO and shown as a notification, as the other two
+--- drivers do.
+--- @param output_context table|nil { app_id } for the metrics.
+--- @param prompt table|nil prompt_action.parse() output, nil for the menu's prompt.
 --- @return boolean requested True when predict() was started.
-function M.trigger_now(output_context)
+local function run_manual(output_context, prompt)
 	if _scope_owner then return false end
 	local reason, context = manual_refusal()
 	if reason then
 		Logger.info(LOG, "Manual prediction refused (%s).", reason)
-		if not _notify then
-			Logger.error(LOG, "No notice surface injected — the '%s' refusal is only logged.", reason)
-		elseif _notify(i18n.get(MANUAL_REFUSAL_KEYS[reason])) ~= true then
-			Logger.warn(LOG, "The '%s' refusal notice was not shown.", reason)
-		end
+		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
 		return false
+	end
+	local override = nil
+	if prompt then
+		-- By exact id: a deleted prompt is refused, never replaced by another.
+		local profile = ProfileSettings.resolve_id(prompt.profile_id)
+		if not profile then
+			Logger.warn(LOG, "Prompt prediction refused: the prompt '%s' no longer exists.", prompt.profile_id)
+			show_notice(UNKNOWN_PROMPT_KEY, "unknown_prompt")
+			return false
+		end
+		override = { profile = profile, num_predictions = prompt.num_predictions }
 	end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-	Logger.info(LOG, "Manual prediction requested (%d context byte(s)).", #context)
-	M.predict(context, output_context)
+	Logger.info(LOG, "Manual prediction requested (%d context byte(s), prompt %s).", #context,
+		override and override.profile.id or "from the menu")
+	local refusal = M.predict(context, output_context, override)
+	if type(refusal) == "string" then
+		Logger.info(LOG, "Manual prediction refused (%s).", refusal)
+		show_notice(MANUAL_REFUSAL_KEYS[refusal], refusal)
+		return false
+	end
 	return true
 end
 
+--- Runs a prediction now from the whole typing buffer: the llm_generate_prediction
+--- action. Automatic triggers wait for typing; this one is a chord pressed on
+--- purpose.
+--- @param output_context table|nil { app_id } for the metrics; nil lets the
+---   daemon's observers fall back to the focused application.
+--- @return boolean requested True when predict() was started.
+function M.trigger_now(output_context)
+	return run_manual(output_context, nil)
+end
+
+--- Runs a prediction now with the prompt a binding names: the
+--- llm_prompt_prediction action and its ready-made llm_predict_<id> presets.
+--- The profile and count apply to this request only; the menu's stay as they are.
+--- @param value string The binding's parameter, "<profile_id>" or "<profile_id>|<count>".
+--- @param output_context table|nil { app_id } for the metrics.
+--- @return boolean requested True when predict() was started.
+function M.trigger_prompt(value, output_context)
+	if _scope_owner then return false end
+	local prompt, err = PromptAction.parse(value)
+	if not prompt then
+		Logger.warn(LOG, "Prompt prediction refused: invalid parameter '%s' (%s).", tostring(value), err)
+		return false
+	end
+	return run_manual(output_context, prompt)
+end
+
 --- The catalogue actions this engine answers, for the gesture executor's
---- daemon-injected handlers (modules/shortcuts/action_handlers.lua).
+--- daemon-injected handlers (modules/shortcuts/action_handlers.lua). The
+--- presets follow the built-in profiles, so a new profile needs no code here.
 --- @return table { [action_id] = function(binding, parameter) }
 function M.action_handlers()
-	return {
+	local handlers = {
 		llm_generate_prediction = function() return M.trigger_now() end,
+		llm_prompt_prediction = function(_, parameter) return M.trigger_prompt(parameter) end,
 	}
+	for _, profile in ipairs(ProfileSettings.list_built_in()) do
+		local value = PromptAction.format(profile.id)
+		handlers[PRESET_ACTION_PREFIX .. profile.id] = function() return M.trigger_prompt(value) end
+	end
+	return handlers
 end
 
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring

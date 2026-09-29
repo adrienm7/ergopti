@@ -20,7 +20,12 @@ function M.daemon()
 	local Files = require("adapters.file_system")
 	local _, status = Files.read_with_status(Paths.config("config.toml"))
 	assert(status == "absent", "the live daemon fixture requires a fresh configuration")
-	assert(Files.write(Paths.config("config.toml"), "[script]\nonboarding_done = true\n"), "live configuration must be created")
+	local config = "[script]\nonboarding_done = true\n"
+	-- The AI probe's rewrite runs from a chord, as a user would bind it.
+	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
+		config = config .. "\n[shortcuts.keyboard]\nsuper_space = \"llm_predict_rewrite\"\n"
+	end
+	assert(Files.write(Paths.config("config.toml"), config), "live configuration must be created")
 	local Hotstrings = require("modules.hotstrings.hotstrings_config")
 	Hotstrings.init(require("modules.hotstrings.engine").new(), "tests/e2e/fixtures/daemon_keys.toml")
 	Hotstrings.load_all()

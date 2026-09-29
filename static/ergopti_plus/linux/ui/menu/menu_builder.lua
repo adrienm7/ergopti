@@ -248,6 +248,9 @@ local function open_action_picker(title, current, binding, on_confirm)
 		items = items,
 		send_vocabulary = editor.send_vocabulary,
 		parameter_strings = editor.parameter_strings,
+		prompt_choices = editor.prompt_choices,
+		default_count = editor.default_count,
+		edit_current_label = editor.edit_current_label,
 	}, function(option, _state, picked) return on_confirm(option, picked) end)
 end
 
@@ -1796,8 +1799,9 @@ local function _build_llm(ctx)
 		local active_builtin = nil
 		for _, profile in ipairs(ProfileSettings.list_built_in()) do
 			local profile_id = profile.id
-			local label = i18n_safe("llm.profile." .. profile.id .. ".label")
-			label = _fill(_fill(label, "{n}", count), "{s}", count == 1 and "" or "s")
+			-- The same label the action picker lists the profile under. _fill
+			-- appended the count to every label without {n}: "Basic — … 3 s".
+			local label = ProfileSettings.menu_label(profile, count)
 			if effective == profile_id then
 				effective_label = label
 				active_builtin = profile

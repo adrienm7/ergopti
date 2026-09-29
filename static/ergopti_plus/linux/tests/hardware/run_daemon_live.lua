@@ -54,6 +54,8 @@ local KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL, KEY_ENTER, KEY_LEFT = 58, 42, 2
 local LLM_PORT = os.getenv("ERGOPTI_LIVE_LLM_PORT")
 local LLM_LOG = os.getenv("ERGOPTI_LIVE_LLM_LOG")
 local LLM_REPLY = os.getenv("ERGOPTI_LIVE_LLM_REPLY")
+local LLM_REWRITE_REPLY = os.getenv("ERGOPTI_LIVE_LLM_REWRITE_REPLY")
+local KEY_LEFTMETA, KEY_SPACE = 125, 57
 local LLM_KEY = "live-test-key"
 
 local Monotonic = require("infra.monotonic")
@@ -463,6 +465,57 @@ if LLM_PORT then
 		if #alt_chords > 0 then
 			failures[#failures + 1] = string.format(
 				"%d key(s) of the prediction went out while Alt was held (Alt+letter shortcuts)", #alt_chords)
+		end
+	end
+end
+
+-- The rewrite prompt, bound to Super+Space by the live preferences: the
+-- sentence being typed is sent as TAIL, and accepting the rewrite erases it
+-- whole before typing the rewritten one.
+if LLM_PORT and LLM_REWRITE_REPLY then
+	local Json = require("json")
+	--- The user turn of the first rewrite request after `from`, if one arrived.
+	--- A typing trigger may have asked for a continuation meanwhile.
+	local function rewrite_turn(from)
+		for index = from + 1, #api_requests() do
+			local body = Json.decode(Json.decode(api_requests()[index]).body)
+			local system, user = "", ""
+			for _, message in ipairs(body.messages or {}) do
+				if message.role == "system" then system = message.content else user = message.content end
+			end
+			if system:find("REWRITE:", 1, true) then return user end
+		end
+		return nil
+	end
+	local before = #api_requests()
+	type_text(" ok pr jd")
+	read_output(1)
+	press(KEY_LEFTMETA, 0.2, function() press(KEY_SPACE, 0.05) end)
+	local turn = await(function() return rewrite_turn(before) end, 6)
+	if not turn then
+		failures[#failures + 1] = "Super+Space sent no rewrite request to the API"
+	else
+		print("  the API received the user turn: " .. turn)
+		if turn:sub(-#'TAIL: "ok pr jd"') ~= 'TAIL: "ok pr jd"' then
+			failures[#failures + 1] = "the rewrite request did not send the sentence as TAIL"
+		end
+		sleep(1.5)
+		Keyboard.emit(KEY_1, 1)
+		Keyboard.emit(KEY_1, 0)
+		local rewritten, rewrite_trail = read_output(3)
+		print(string.format("  after 1 the desktop received %q", rewritten))
+		print("  key events: " .. rewrite_trail)
+		local erased = 0
+		for event in rewrite_trail:gmatch("%S+") do
+			if event == EvdevCodes.KEY_BACKSPACE .. "↓" then erased = erased + 1 end
+		end
+		if erased ~= #"ok pr jd" then
+			failures[#failures + 1] = string.format("the rewrite erased %d character(s), not the sentence's %d",
+				erased, #"ok pr jd")
+		end
+		local expected = LLM_REWRITE_REPLY:gsub("^REWRITE:%s*", "")
+		if rewritten ~= expected then
+			failures[#failures + 1] = string.format("the rewrite typed %q, not %q", rewritten, expected)
 		end
 	end
 end
