@@ -15,6 +15,12 @@ return function(helpers)
 			read_with_status = function(path)
 				return files[path], files[path] and "ok" or "absent"
 			end,
+			delete = function(path)
+				if controls.refuse == path then return false end
+				files[path] = nil
+				writes[#writes + 1] = "-" .. path
+				return true
+			end,
 			write_if_unchanged = function(path, content, expected)
 				if controls.refuse == path then return false end
 				if expected.status == "absent" and files[path] ~= nil then return false end
@@ -248,6 +254,153 @@ return function(helpers)
 					helpers.assert_eq(owner.pending(), false)
 				end
 			end
+		end)
+	end)
+
+	--- A preset owner over a separate file, routing the manifest's tap_holds rows.
+	--- Its runtime marker follows the preset candidate's master flag.
+	local function preset_fixture(preset_source)
+		local options, files, writes, runtime, controls, original = fixture()
+		files.taps = preset_source
+		options.presets = { tap_hold = {
+			path = "taps", backup_path = "taps-backup", prefixes = { "tap_holds" },
+			render = function(mode, document, rows)
+				helpers.assert_true(mode == "recommended" or mode == "clear")
+				local tap_hold = document.tap_hold or {}
+				for _, row in ipairs(rows) do
+					helpers.assert_eq(row.section .. "." .. row.key, "tap_holds.enabled")
+					tap_hold.enabled = not row.delete and row.value or nil
+				end
+				tap_hold.keys = mode == "recommended" and { caps_lock = { tap_action = "escape" } } or nil
+				document.tap_hold = tap_hold
+				return Codec.encode(document)
+			end,
+		} }
+		options.capture = function() return { marker = runtime.marker } end
+		options.apply = function(decoded, updates, _, _, presets)
+			helpers.assert_eq(decoded, nil, "a preset-only scope has no configuration candidate")
+			helpers.assert_eq(#updates, 0)
+			runtime.marker = presets.tap_hold.decoded.tap_hold.enabled
+			if controls.external_edit then files[controls.external_edit.path] = controls.external_edit.content end
+			return controls.apply_result ~= false
+		end
+		return options, files, writes, runtime, controls, original
+	end
+
+	helpers.describe("preset scope publication", function()
+		helpers.it("publishes the preset file with a verified backup and leaves config.toml untouched", function()
+			for _, mode in ipairs({ "recommended", "clear" }) do
+				local source = '[tap_hold]\nenabled = false\nfuture = "keep"\n[other]\nvalue = 17\n'
+				local options, files, writes, runtime, _, original = preset_fixture(source)
+				local owner = require("config_scope_transaction").new(options)
+				local ok, detail = owner.apply("tap_holds", mode)
+				helpers.assert_eq(ok, true, detail)
+				local stored = Codec.decode(files.taps)
+				helpers.assert_eq(stored.tap_hold.future, "keep")
+				helpers.assert_eq(stored.other.value, 17)
+				helpers.assert_eq(stored.tap_hold.enabled, mode == "recommended"
+					and Manifest.recommended_for("tap_holds.enabled") or nil)
+				helpers.assert_eq(files["taps-backup"], source)
+				helpers.assert_eq(files.config, original)
+				helpers.assert_eq(files.backup, nil)
+				helpers.assert_eq(writes, { "taps-backup", "taps" })
+				helpers.assert_eq(runtime.marker, stored.tap_hold.enabled)
+				helpers.assert_eq(owner.pending(), false)
+			end
+		end)
+
+		helpers.it("creates an absent preset file without creating config.toml", function()
+			local options, files, writes = preset_fixture(nil)
+			files.config = nil
+			local ok, detail = require("config_scope_transaction").new(options).apply("tap_holds", "recommended")
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_eq(files.config, nil)
+			helpers.assert_eq(files["taps-backup"], nil, "an absent source has nothing to back up")
+			helpers.assert_eq(writes, { "taps" })
+		end)
+
+		helpers.it("keeps an external preset edit made during runtime application", function()
+			local source = '[tap_hold]\nenabled = false\n'
+			local options, files, _, runtime, controls = preset_fixture(source)
+			controls.external_edit = { path = "taps", content = '[tap_hold]\nfuture = "external"\n' }
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("tap_holds", "recommended"), false)
+			helpers.assert_eq(files.taps, controls.external_edit.content)
+			helpers.assert_eq(runtime.marker, "original")
+			helpers.assert_eq(owner.pending(), false)
+		end)
+
+		helpers.it("restores a published preset when the configuration publication is refused", function()
+			local source = '[tap_hold]\nenabled = false\n'
+			local options, files, _, runtime, controls, original = preset_fixture(source)
+			options.apply = function() runtime.marker = "candidate"; return true end
+			options.owned_paths = function() return { "gestures.action_parameters.tap_hold__caps_lock__open_url" } end
+			options.owners = { action_parameter_domain = function(path)
+				if path == "gestures.action_parameters.tap_hold__caps_lock__open_url" then return "tap_hold" end
+			end }
+			controls.refuse = "config"
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("tap_holds", "clear"), false)
+			helpers.assert_eq(files.taps, source, "the preset bytes are put back exactly")
+			helpers.assert_eq(files.config, original)
+			helpers.assert_eq(runtime.marker, "original")
+			helpers.assert_eq(owner.pending(), false)
+		end)
+	end)
+
+	helpers.describe("committed scope revert", function()
+		helpers.it("reverts runtime and every published file, removing a file it created", function()
+			local options, files, writes, runtime = preset_fixture(nil)
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("tap_holds", "recommended"), true)
+			helpers.assert_eq(owner.committed(), true)
+			helpers.assert_eq(runtime.marker, true)
+			local reverted, detail = owner.revert()
+			helpers.assert_eq(reverted, true, detail)
+			helpers.assert_eq(files.taps, nil, "the created preset file is removed again")
+			helpers.assert_eq(runtime.marker, "original")
+			helpers.assert_eq(writes[#writes], "-taps")
+			helpers.assert_eq(owner.committed(), false)
+			helpers.assert_eq(owner.revert(), false, "one commit reverts once")
+		end)
+
+		helpers.it("puts the exact configuration bytes back after a committed single-file scope", function()
+			local options, files, _, runtime, _, original = fixture()
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("gestures", "clear"), true)
+			helpers.assert_true(files.config ~= original)
+			helpers.assert_eq(owner.revert(), true)
+			helpers.assert_eq(files.config, original)
+			helpers.assert_eq(runtime.marker, "original")
+		end)
+
+		helpers.it("retains a revert refused by a later edit until the edit is undone", function()
+			local options, files, _, runtime, controls, original = fixture()
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("gestures", "clear"), true)
+			local candidate = files.config
+			files.config = candidate .. "# external edit\n"
+			helpers.assert_eq(owner.revert(), false)
+			helpers.assert_eq(owner.pending(), true)
+			helpers.assert_eq(files.config, candidate .. "# external edit\n", "the later edit is never overwritten")
+			helpers.assert_eq(runtime.marker, "original", "the runtime inverse is settled first")
+			helpers.assert_eq(owner.apply("gestures", "clear"), false, "debt refuses another transaction")
+			controls.restore_result = false
+			files.config = candidate
+			helpers.assert_eq(owner.retry_restore(), true, "a settled runtime step is not repeated")
+			helpers.assert_eq(files.config, original)
+			helpers.assert_eq(owner.pending(), false)
+		end)
+
+		helpers.it("release forgets the inverse so a composed commit cannot be reverted", function()
+			local options = fixture()
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("gestures", "clear"), true)
+			owner.release()
+			helpers.assert_eq(owner.committed(), false)
+			local reverted, detail = owner.revert()
+			helpers.assert_eq(reverted, false)
+			helpers.assert_true(detail:find("no committed", 1, true) ~= nil, detail)
 		end)
 	end)
 
