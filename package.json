@@ -271,6 +271,7 @@
 		"test:llm-test-request-single-source": "node ./tools/test/test-llm-test-request-single-source.cjs",
 		"test:llm-model-extras-single-source": "node ./tools/test/test-llm-model-extras-single-source.cjs",
 		"test:version-compare-contract": "node ./tools/test/test-version-compare-contract.cjs",
+		"test:showcase-action-platforms": "node ./tools/test/test-showcase-action-platforms.cjs",
 		"test:llm-stop-sequences-single-source": "node ./tools/test/test-llm-stop-sequences-single-source.cjs",
 		"test:shared-toml-codec-purity": "node ./tools/test/test-shared-toml-codec-purity.cjs",
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",

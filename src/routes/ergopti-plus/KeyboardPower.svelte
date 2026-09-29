@@ -16,6 +16,7 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import { isActionOnPlatform } from './action-platforms.js';
 	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
 	import { ui } from './state.svelte.js';
@@ -39,9 +40,7 @@ FEATURES & RATIONALE:
 	 * @returns {Array<object>}
 	 */
 	function forPlatform(actions) {
-		return actions.filter(
-			(a) => a.platform === 'all' || (platformTag !== null && a.platform === platformTag)
-		);
+		return actions.filter((a) => isActionOnPlatform(a.platform, platformTag));
 	}
 
 	// Same group → section structure as the driver's action picker, with
