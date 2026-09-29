@@ -77,6 +77,10 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 			AssertEqual("true", Entry["auto_expand"])
 		}
 		AssertEqual(HSE_PRIORITY_COMMON, _HSE_SourcePriority("rolls"), "the groups keep the common tier")
+		Route := _HotstringBoundSources["magickey"]
+		AssertEqual("ergopti", Route["section_extensions"]["repeat_corrections"],
+			"the repeat corrections name the extension whose submenu lists them")
+		AssertEqual("ergopti", _HotstringBoundSources["rolls"]["extension"])
 	}
 }
 Test("ergopti extension: the shipped groups load from the extension under their historical ids (ergopti-hotstrings-ext)",
@@ -119,6 +123,16 @@ _EHX_MenuListsBoundCategoriesUnderTheExtension() {
 		"a category is listed under the extension that binds it, and only there")
 	Assert(InStr(_DriverSourceNoComments(), '"hotstring_categories_ergopti"') == 0,
 		"the « Disposition Ergopti » section is gone from the hotstrings menu")
+	Assert(InStr(Bound, "_HS_BoundSectionRows(ExtensionId, Result)") > 0,
+		"the submenu also lists the sections the extension binds (the repeat corrections)")
+	Sections := _DriverFuncBody("_HS_BoundSectionRows")
+	Assert(Sections != "", "the bound section rows builder must resolve")
+	Assert(InStr(Sections, "MenuRowFromManifest(Entry, Category)") > 0,
+		"a bound section keeps its manifest row, so its switch is the historical preference")
+	SubMenusBody := _DriverFuncBody("InitSubMenus")
+	Assert(SubMenusBody != "", "the category submenus builder must resolve")
+	Assert(InStr(SubMenusBody, "HotstringsBoundSections(V1Cat).Has(StrLower(SecId))") > 0,
+		"a bound section leaves its category's submenu (the magic key's repeat corrections)")
 }
 Test("ergopti extension: the Hotstrings menu lists the groups under « Hotstrings Ergopti » (ergopti-hotstrings-ext)",
 	_EHX_MenuListsBoundCategoriesUnderTheExtension)

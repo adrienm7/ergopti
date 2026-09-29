@@ -42,9 +42,12 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 			group_counts = { rolls = 7, sfbsreduction = 5 },
 			ext_details = { { id = "demo", name = "Demo", total = 3, groups = { "ext:demo:phrases" } } },
 		}
-		helpers.assert_eq(Builder.extension_menus(ctx, counts, by_extension), {
-			{ id = "demo", name = "Demo", groups = { "ext:demo:phrases" }, total = 3 },
-			{ id = "ergopti", name = "Ergopti", groups = { "rolls", "sfbsreduction" }, total = 12 },
+		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local bound_sections = Hotstrings.bound_sections(ctx)
+		helpers.assert_eq(Builder.extension_menus(ctx, counts, by_extension, bound_sections), {
+			{ id = "demo", name = "Demo", groups = { "ext:demo:phrases" }, sections = {}, total = 3 },
+			{ id = "ergopti", name = "Ergopti", groups = { "rolls", "sfbsreduction" },
+				sections = { { group = "magickey", section = "repeat_corrections" } }, total = 12 },
 		})
 		local source = helpers.read_driver_source("function M.extension_menus")
 		helpers.assert_true(source:find('i18n.get("menu.extensions.hotstrings_of"), menu.name)', 1, true) ~= nil,
@@ -53,11 +56,46 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 			"the « Disposition Ergopti » section is gone")
 	end)
 
+	helpers.it("(ergopti-hotstrings-ext) moves the repeat corrections from the magic key into the Ergopti submenu", function()
+		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local toggled = {}
+		local sections = {
+			magickey = {
+				{ name = "repeat_corrections", count = 14, description = "Repeat corrections" },
+				{ name = "text_expansion_symbols", count = 150, description = "Symbols" },
+			},
+		}
+		local ctx = context({ "magickey" }, { ERGOPTI })
+		ctx.applyTriggerChar = function(text) return text end
+		ctx.state = { hotstrings = {}, sections_order_overrides = {} }
+		ctx.keymap = {
+			get_sections = function(name) return sections[name] or {} end,
+			is_group_enabled = function() return true end,
+			is_section_enabled = function() return true end,
+			enable_section = function(group, section) toggled[#toggled + 1] = group .. "." .. section end,
+			disable_section = function(group, section) toggled[#toggled + 1] = group .. "." .. section end,
+		}
+		local by_extension = Hotstrings.bound_sections(ctx)
+		local rows, total = Hotstrings.build_bound_section_rows(ctx, by_extension.ergopti)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].label, "Repeat corrections (14)")
+		helpers.assert_eq(rows[1].checked, true)
+		helpers.assert_eq(total, 14)
+		local labels = {}
+		for _, group in ipairs(Hotstrings.build_groups(ctx, nil, {})) do
+			for _, row in ipairs(group.items or {}) do labels[#labels + 1] = tostring(row.label) end
+		end
+		local text = table.concat(labels, "|")
+		helpers.assert_true(text:find("Symbols (150)", 1, true) ~= nil, text)
+		helpers.assert_true(text:find("Repeat corrections", 1, true) == nil,
+			"the bound section leaves the magic key submenu: " .. text)
+	end)
+
 	helpers.it("(ergopti-hotstrings-ext) lists nothing for an extension that is not installed", function()
 		local Builder = helpers.load_with_stubs("ui.menu.builder")
 		local ctx = context({ "autocorrection", "magickey" }, {})
 		local by_extension, bound = Builder.bound_groups(ctx)
 		helpers.assert_eq(bound, {})
-		helpers.assert_eq(Builder.extension_menus(ctx, { group_counts = {}, ext_details = {} }, by_extension), {})
+		helpers.assert_eq(Builder.extension_menus(ctx, { group_counts = {}, ext_details = {} }, by_extension, {}), {})
 	end)
 end)

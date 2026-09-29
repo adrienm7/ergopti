@@ -87,8 +87,9 @@ end
 --- @param ctx table Menu context carrying `extension_packs`.
 --- @param counts table Result of HotCounter.count_all().
 --- @param by_extension table First result of M.bound_groups().
---- @return table Array of { id, name, groups, total }.
-function M.extension_menus(ctx, counts, by_extension)
+--- @param bound_sections table|nil First result of menu_hotstrings.bound_sections().
+--- @return table Array of { id, name, groups, sections, total }.
+function M.extension_menus(ctx, counts, by_extension, bound_sections)
 	local ext_by_id = {}
 	for _, ext in ipairs(counts.ext_details) do ext_by_id[ext.id] = ext end
 	local menus = {}
@@ -100,8 +101,9 @@ function M.extension_menus(ctx, counts, by_extension)
 			total = total + ((counts.group_counts and counts.group_counts[name]) or 0)
 		end
 		for _, name in ipairs(ext and ext.groups or {}) do names[#names + 1] = name end
-		if #names > 0 then
-			menus[#menus + 1] = { id = pack.id, name = pack.name, groups = names, total = total }
+		local sections = (bound_sections or {})[pack.id] or {}
+		if #names > 0 or #sections > 0 then
+			menus[#menus + 1] = { id = pack.id, name = pack.name, groups = names, sections = sections, total = total }
 		end
 	end
 	return menus
@@ -359,7 +361,9 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- extension, then each category's own rows with its switch and sections.
 	local manifest_row = "hotstring_extensions"
 	local extension_rows = {}
-	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION)) do
+	local BOUND_SECTIONS = type(menu_mods.hotstrings.bound_sections) == "function"
+		and menu_mods.hotstrings.bound_sections(ctx) or {}
+	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION, BOUND_SECTIONS)) do
 		local only = {}
 		for _, name in ipairs(menu.groups) do only[name] = true end
 		local items = {}
@@ -368,9 +372,16 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		for _, row in ipairs(bulk) do items[#items + 1] = row end
 		items[#items + 1] = { separator = true }
 		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
+		-- The sections it binds inside a bundled category (the repeat corrections).
+		local section_rows, section_total = {}, 0
+		if #menu.sections > 0 and type(menu_mods.hotstrings.build_bound_section_rows) == "function" then
+			section_rows, section_total = menu_mods.hotstrings.build_bound_section_rows(ctx, menu.sections)
+		end
+		if #section_rows > 0 and #menu.groups > 0 then items[#items + 1] = { separator = true } end
+		for _, row in ipairs(section_rows) do items[#items + 1] = row end
 		extension_rows[#extension_rows + 1] = {
 			label = string.format(i18n.get("menu.extensions.hotstrings_of"), menu.name)
-				.. " (" .. fmt_grand(menu.total) .. ")",
+				.. " (" .. fmt_grand(menu.total + section_total) .. ")",
 			items = items,
 		}
 	end

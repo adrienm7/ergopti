@@ -60,7 +60,7 @@ helpers.describe("extension geometry: routing bound files into bundled categorie
 				extension = { id = "ergopti", name = "ergopti" } },
 			{ path = "/bundled/french/magickey.toml", category = "french_magickey" },
 			{ path = "/ext/ergopti/hotstrings/magicrepeat.toml", category = "magickey",
-				only_sections = { "repeat_corrections" } },
+				only_sections = { "repeat_corrections" }, extension = { id = "ergopti", name = "ergopti" } },
 		})
 	end)
 

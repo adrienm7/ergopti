@@ -25,7 +25,8 @@ global _HotstringExtensionPaths := Map()
 ; The bundled categories this boot's extensions bind to their own files, keyed
 ; by category lowercased without underscores (the spelling every caller of
 ; HotstringsBundledTomlPath folds to): Map("path", the file of a whole-category
-; binding or "", "sections", Map(section → file), "extension", "name").
+; binding or "", "sections", Map(section → file), "section_extensions",
+; Map(section → pack id), "extension", "name").
 ; Committed once by HotstringExtensions_Prepare; read through
 ; HotstringsBoundTomlPath (hotstrings_cache.ahk).
 global _HotstringBoundSources := Map()
@@ -116,7 +117,8 @@ HotstringExtensions_Prepare(Target, Roots) {
  * @param {Array} Packs Discovered packs.
  * @returns {Map} Category folded to lowercase without underscores → Map("path",
  *   whole-category file or "", "sections", Map(lowercase section → file),
- *   "extension", "name": the pack binding it whole, "" otherwise).
+ *   "section_extensions", Map(lowercase section → pack id), "extension",
+ *   "name": the pack binding it whole, "" otherwise).
  */
 HotstringExtensions_RouteBound(Packs) {
 	Routes := Map()
@@ -126,7 +128,8 @@ HotstringExtensions_RouteBound(Packs) {
 			Category := Binding["category"]
 			Key := StrLower(StrReplace(Category, "_"))
 			if !Routes.Has(Key)
-				Routes[Key] := Map("path", "", "sections", Map(), "extension", "", "name", "")
+				Routes[Key] := Map("path", "", "sections", Map(), "section_extensions", Map(),
+					"extension", "", "name", "")
 			Route := Routes[Key]
 			if !Binding.Has("sections") {
 				Route["path"] := HotstringExtensions_Source(Packs, Category)
@@ -134,8 +137,10 @@ HotstringExtensions_RouteBound(Packs) {
 				Route["name"] := Pack.name
 				continue
 			}
-			for Section in Binding["sections"]
+			for Section in Binding["sections"] {
 				Route["sections"][StrLower(Section)] := HotstringExtensions_Source(Packs, Category, Section)
+				Route["section_extensions"][StrLower(Section)] := Pack.id
+			}
 		}
 	}
 	return Routes
