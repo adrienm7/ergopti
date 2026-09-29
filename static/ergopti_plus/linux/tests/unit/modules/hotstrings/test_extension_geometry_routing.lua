@@ -98,12 +98,16 @@ helpers.describe("extension geometry: routing bound files into bundled categorie
 		local geometry = temp_toml('[_meta]\ndescription = { en = "Geometry" }\n'
 			.. '[[repeat_corrections]]\n"geometryrule" = { output = "NEW" }\n'
 			.. '[[other]]\n"strayrule" = { output = "NO" }\n')
+		local pack = temp_toml('[_meta]\ndescription = { en = "Pack" }\n'
+			.. '[[phrases]]\n"packrule" = { output = "PACK" }\n')
 		local ok, catalogue = pcall(Loader.load_catalogue, {
 			{ path = bundled, category = "magickey", skip_sections = { "repeat_corrections" } },
 			{ path = geometry, category = "magickey", only_sections = { "repeat_corrections" } },
+			{ path = pack, category = "ext:demo:phrases", extension = "demo" },
 		})
 		os.remove(bundled)
 		os.remove(geometry)
+		os.remove(pack)
 		helpers.assert_true(ok, tostring(catalogue))
 		local by_trigger = {}
 		for _, mapping in ipairs(catalogue.mappings) do by_trigger[mapping.trigger] = mapping end
@@ -113,6 +117,8 @@ helpers.describe("extension geometry: routing bound files into bundled categorie
 		helpers.assert_eq(by_trigger.geometryrule.group, "magickey", "the rules keep their historical category")
 		helpers.assert_eq(by_trigger.geometryrule.section, "repeat_corrections")
 		helpers.assert_eq(by_trigger.geometryrule.priority, 10, "and the common source tier")
+		helpers.assert_eq(by_trigger.packrule.priority, 30,
+			"an ordinary extension pack keeps the package tier the Windows engine gives it")
 		local category = catalogue.categories.magickey
 		helpers.assert_eq(category.sections_order, { "repeat_corrections", "symbols" })
 		helpers.assert_eq(category.sections.repeat_corrections.count, 1)

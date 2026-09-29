@@ -53,7 +53,8 @@ M.DEFAULT_TIERS = {
 -- =========================================
 
 --- Source-default priority for a category (the group a mapping was loaded from).
---- @param category string|nil Category name, e.g. "personal", "ext.demo", "rolls".
+--- @param category string|nil Category name, e.g. "personal", "ext.demo",
+---   "ext:demo:phrases", "rolls".
 --- @param tiers table|nil Tier table; defaults to M.DEFAULT_TIERS.
 --- @return number The source-default priority.
 function M.source_priority(category, tiers)
@@ -66,7 +67,10 @@ function M.source_priority(category, tiers)
 	-- had at startup instead of silently dropping to common.
 	if c == "custom" then return t.personal end
 	if c:sub(1, 13) == "personal_ext_" then return t.package end
-	if c:sub(1, 4) == "ext." then return t.package end
+	-- "ext.<id>" is the preference owner of an extension; "ext:<id>:<stem>" is
+	-- the group each of its hotstring files registers under on every driver.
+	-- Both are the package tier, as the Windows engine scores them.
+	if c:sub(1, 4) == "ext." or c:sub(1, 4) == "ext:" then return t.package end
 	return t.common
 end
 
