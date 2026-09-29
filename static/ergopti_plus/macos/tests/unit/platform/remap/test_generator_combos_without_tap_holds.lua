@@ -259,6 +259,33 @@ helpers.with_fresh_modules({
 			end
 		end)
 
+		-- Key 1 is its native key with the Tap-Holds off (decision of
+		-- 2026-09-29: its rule only tracks its held variable and passes the key
+		-- through). A non-modifier key 1 is therefore typed, and a lock key
+		-- toggles, before its slot fires: pinned so a change is deliberate.
+		helpers.it("a non-modifier key 1 is typed natively before its slot (key1-pass-through)", function()
+			local cases = {
+				{ pair = "ret_tab", key1 = "return_or_enter", tap2 = true,
+					slots = { combo = "none", tap = "arrow_left", hold = "none" }, action = "left_arrow" },
+				{ pair = "caps_tab", key1 = "caps_lock", tap2 = true,
+					slots = { combo = "none", tap = "arrow_left", hold = "none" }, action = "left_arrow" },
+				{ pair = "bsp_tab", key1 = "delete_or_backspace", tap2 = false,
+					slots = { combo = "none", tap = "none", hold = "delete_fwd" }, action = "delete_forward" },
+			}
+			for _, case in ipairs(cases) do
+				local engine = engine_for(rules_of(state_with(false, true, case.pair, case.slots)))
+				engine:down(case.key1)
+				if case.tap2 then engine:tap("tab") else engine:down("tab") end
+				local keys_typed = typed(engine)
+				local context = case.pair .. ": " .. describe(keys_typed)
+				helpers.assert_eq(#keys_typed, 2, context)
+				helpers.assert_eq(keys_typed[1].key_code, case.key1, context .. " — key 1 is typed first")
+				helpers.assert_eq(keys_typed[2].key_code, case.action, context .. " — then the slot's action")
+				helpers.assert_true(next(keys_typed[2].flags) == nil, context .. " — the action is bare")
+				helpers.assert_eq(engine:variable(held_var(case.key1)), 1, context)
+			end
+		end)
+
 		helpers.it("key 1 only tracks its variable and passes through (combos-without-tap-holds)", function()
 			local rules = rules_of(state_with(false, true, "lcmd_tab",
 				{ combo = "none", tap = "none", hold = "delete_fwd" }))
