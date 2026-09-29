@@ -848,6 +848,36 @@ function M.extension_packs(found)
 	return entries
 end
 
+--- The sections of a list that a set leaves out, in list order.
+--- @param list table Section names.
+--- @param set table Set of section names to leave out.
+--- @return table
+local function sections_without(list, set)
+	local out = {}
+	for _, name in ipairs(list) do
+		if not set[name] then out[#out + 1] = name end
+	end
+	return out
+end
+
+--- The bound sections a user's copy of a category declares itself.
+--- An unreadable copy declares none: the loader reports the file, and the
+--- extension keeps supplying its sections.
+--- @param path string The user's file.
+--- @param sections table Section names an extension binds in that category.
+--- @return table Set of the sections the file declares.
+local function carried_sections(path, sections)
+	local carried = {}
+	local ok, data, committed = pcall(TomlReader.parse, path)
+	if not ok or committed ~= true or type(data) ~= "table" or type(data.sections) ~= "table" then
+		return carried
+	end
+	for _, name in ipairs(sections) do
+		if data.sections[name] ~= nil then carried[name] = true end
+	end
+	return carried
+end
+
 --- Routes the bundled categories an extension binds to the files it ships.
 ---
 --- A whole-category binding replaces the bundled file; a section binding loads
@@ -855,10 +885,17 @@ end
 --- category's metadata, from the bundled one. The rules keep their category and
 --- common source tier, so existing preferences still address them. Every bound
 --- source is resolved through the shared owner, which refuses two owners.
+---
+--- The user's own copy of a category (resolve_paths overlays it on the bundled
+--- one) is an explicit override and keeps what it carries: the whole category,
+--- or each bound section it declares itself. An extension binding replaces the
+--- bundled file, never the user's.
 --- @param paths table Loader sources: paths, or { path, category, … } tables.
 --- @param found table Records from discover_extensions().
+--- @param user_paths table|nil Set of the source paths the user's folder supplies.
 --- @return table The sources with the bound files routed in.
-function M.route_bound_sources(paths, found)
+function M.route_bound_sources(paths, found, user_paths)
+	user_paths = user_paths or {}
 	local bound_sections, section_files, whole, whole_order, owners = {}, {}, {}, {}, {}
 	for _, extension in ipairs(found) do
 		for _, file in ipairs(extension.bound_files or {}) do
@@ -884,17 +921,30 @@ function M.route_bound_sources(paths, found)
 		end
 	end
 
-	local routed, placed = {}, {}
+	local routed, placed, kept = {}, {}, {}
 	for _, source in ipairs(paths) do
 		local path = type(source) == "table" and source.path or source
 		local category = type(source) == "table" and source.category or path:match("([^/\\]+)%.toml$")
-		if whole[category] then
+		local user = user_paths[path] == true
+		if whole[category] and user then
+			Logger.info(LOG, "Extensions: the user's copy of '%s' overrides the file extension '%s' binds.",
+				category, owners[category].id)
+			routed[#routed + 1] = { path = path, category = category, extension = owners[category] }
+		elseif whole[category] then
 			routed[#routed + 1] = { path = whole[category], category = category, extension = owners[category] }
 		elseif bound_sections[category] then
 			local entry = type(source) == "table" and source or { path = path }
+			local skipped = bound_sections[category]
+			if user then
+				kept[category] = carried_sections(path, skipped)
+				skipped = sections_without(skipped, kept[category])
+				if #skipped < #bound_sections[category] then
+					Logger.info(LOG, "Extensions: the user's copy of '%s' keeps its own bound section(s).", category)
+				end
+			end
 			routed[#routed + 1] = {
 				path = entry.path, category = category, extension = entry.extension,
-				skip_sections = bound_sections[category],
+				skip_sections = skipped,
 			}
 		else
 			routed[#routed + 1] = source
@@ -908,7 +958,18 @@ function M.route_bound_sources(paths, found)
 		end
 	end
 	-- After the bundled files, so the category record starts from their metadata.
-	for _, entry in ipairs(section_files) do routed[#routed + 1] = entry end
+	-- A section the user's copy declares itself is not loaded a second time.
+	for _, entry in ipairs(section_files) do
+		local carried = kept[entry.category]
+		local only = carried and sections_without(entry.only_sections, carried) or entry.only_sections
+		if #only == #entry.only_sections then
+			routed[#routed + 1] = entry
+		elseif #only > 0 then
+			routed[#routed + 1] = {
+				path = entry.path, category = entry.category, only_sections = only, extension = entry.extension,
+			}
+		end
+	end
 	if next(whole) or #section_files > 0 then
 		Logger.info(LOG, "Extensions: routed %d section file(s) into bundled categories.", #section_files)
 	end
@@ -950,10 +1011,12 @@ end
 --- what a category is: a same-stem file in the user's directory is an explicit
 --- override, not a second category with the same name. The standalone installer
 --- no longer seeds those files; its one-time migration retires only copies that
---- are byte-identical to the previously installed canonical bundle.
+--- are byte-identical to the previously installed canonical bundle. The user's
+--- copies stay overrides when an extension binds their category, so they are
+--- handed to route_bound_sources by path.
 --- @return table Array of absolute paths.
 local function resolve_paths()
-	local by_stem, order = {}, {}
+	local by_stem, order, user_paths = {}, {}, {}
 
 	--- @param path string
 	local function add(path)
@@ -982,7 +1045,10 @@ local function resolve_paths()
 	-- Second, so the user's copy of a category replaces the bundled one.
 	if _config_dir then
 		for _, path in ipairs(Loader.find_toml_files(_config_dir)) do
-			if not in_language_folder(path, _config_dir) then add(path) end
+			if not in_language_folder(path, _config_dir) then
+				add(path)
+				user_paths[path] = true
+			end
 		end
 	end
 
@@ -998,7 +1064,11 @@ local function resolve_paths()
 				local path = bundled .. rel
 				if _config_dir then
 					local fh = io.open(_config_dir .. rel, "r")
-					if fh then fh:close(); path = _config_dir .. rel end
+					if fh then
+						fh:close()
+						path = _config_dir .. rel
+						user_paths[path] = true
+					end
 				end
 				paths[#paths + 1] = { path = path, category = Languages.group_id(pack.id, stem) }
 			end
@@ -1010,7 +1080,7 @@ local function resolve_paths()
 	-- replace the bundled category of that name. Appended rather than merged for
 	-- the same reason — an extension adds categories, it never substitutes one.
 	local found = M.discover_extensions()
-	paths = M.route_bound_sources(paths, found)
+	paths = M.route_bound_sources(paths, found, user_paths)
 	for _, entry in ipairs(M.extension_packs(found)) do
 		paths[#paths + 1] = entry
 	end

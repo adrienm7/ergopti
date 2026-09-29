@@ -120,6 +120,46 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		Packs._reset()
 	end)
 
+	helpers.it("(ergopti-hotstrings-ext) keeps the user's own copies over the extension's files", function()
+		Packs._reset()
+		Packs.discover(roots(true), real_io())
+		local function pack(section)
+			local path = os.tmpname()
+			local fh = assert(io.open(path, "w"))
+			fh:write("[_meta]\nsections_order = [\"" .. section .. "\"]\n\n[[" .. section .. "]]\n"
+				.. "\"zqx\" = { output = \"mine\", is_word = false, auto_expand = true,"
+				.. " is_case_sensitive = false, final_result = false }\n")
+			fh:close()
+			return path
+		end
+		local rolls, fixes, others = pack("mine"), pack("repeat_corrections"), pack("replace")
+
+		local routed = table.pack(Packs.route("rolls", rolls, true))
+		local with_fixes = table.pack(Packs.route("magickey", fixes, true))
+		local without_fixes, sources = Packs.route("magickey", others, true)
+		local shipped = Packs.route("rolls", rolls, false)
+		for _, path in ipairs({ rolls, fixes, others }) do os.remove(path) end
+		Packs._reset()
+
+		helpers.assert_eq(routed, { rolls, n = 2 },
+			"the user's copy of a category an extension binds whole is an explicit override")
+		helpers.assert_eq(with_fixes, { fixes, n = 2 },
+			"a user's magickey.toml keeps the repeat corrections it declares itself")
+		helpers.assert_eq(without_fixes, others)
+		helpers.assert_eq(#sources, 1, "the extension supplies the repeat corrections a user's copy lacks")
+		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
+		helpers.assert_true(shipped:find("/layouts/registry/ergopti/hotstrings/rolls.toml", 1, true) ~= nil,
+			"the driver's own file still yields to the extension")
+
+		-- The boot hands every file of the configured folder over as the user's copy.
+		local boot = helpers.read_driver_source("local function is_user_hotstrings_copy(path)")
+		helpers.assert_true(boot ~= nil, "the boot's user-copy predicate must be locatable")
+		local _, routes = boot:gsub("ExtensionPacks%.route%(name, own, is_user_hotstrings_copy%(own%)%)", "")
+		helpers.assert_eq(routes, 2, "the common and the language files are routed with their origin")
+		helpers.assert_true(boot:find("if is_user_hotstrings_copy(own) and ok_attr", 1, true) ~= nil,
+			"the metadata resolver reads the user's copy of a bound category, which is what loads")
+	end)
+
 	helpers.it("(ergopti-hotstrings-ext) routes nothing when Ergopti is not installed", function()
 		Packs._reset()
 		Packs.discover(roots(false), real_io())

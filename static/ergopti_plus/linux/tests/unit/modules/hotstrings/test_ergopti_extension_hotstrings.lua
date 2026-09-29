@@ -131,3 +131,87 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		helpers.assert_true(catalogue.categories.magickey.count > 0, "the bundled magic key category still loads")
 	end)
 end)
+
+--- Creates an empty temporary folder standing for the user's hotstrings folder.
+--- @return string
+local function user_folder()
+	local dir = os.tmpname()
+	os.remove(dir)
+	assert(os.execute("mkdir '" .. dir .. "'"))
+	return dir
+end
+
+--- Writes one file.
+--- @param path string
+--- @param text string
+local function write(path, text)
+	local fh = assert(io.open(path, "w"))
+	fh:write(text)
+	fh:close()
+end
+
+--- A one-section pack with one entry, as a user writes an override.
+--- @param section string
+--- @param trigger string
+--- @param output string
+--- @return string
+local function one_entry_pack(section, trigger, output)
+	return "[_meta]\nsections_order = [\"" .. section .. "\"]\n\n[[" .. section .. "]]\n\"" .. trigger
+		.. "\" = { output = \"" .. output .. "\", is_word = false, auto_expand = true,"
+		.. " is_case_sensitive = false, final_result = false }\n"
+end
+
+--- Loads the catalogue the way the daemon does, with `dir` as the user's folder.
+--- @param dir string
+--- @return table categories
+local function load_with_user_folder(dir)
+	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+	Config.init({ load_mappings = function() end }, dir)
+	Config.load_all()
+	return Config.get_categories()
+end
+
+helpers.describe("Ergopti extension hotstrings: the user's own copies", function()
+	helpers.it("(ergopti-hotstrings-ext) keeps a user's rolls.toml over the extension's file", function()
+		local dir = user_folder()
+		write(dir .. "/rolls.toml", one_entry_pack("mine", "zqx", "my roll"))
+		local ok, categories = pcall(load_with_user_folder, dir)
+		os.remove(dir .. "/rolls.toml")
+		os.remove(dir)
+		helpers.assert_true(ok, tostring(categories))
+		helpers.assert_eq(categories.rolls.path, dir .. "/rolls.toml",
+			"the user's copy of a category is an explicit override, extension or not")
+		helpers.assert_eq(categories.rolls.count, 1, "and it is the only source of the category")
+		helpers.assert_eq(categories.rolls.sections.mine.count, 1)
+		helpers.assert_eq(categories.rolls.extension, { id = "ergopti", name = "Ergopti" },
+			"the category is still listed under the extension that binds it")
+		helpers.assert_eq(categories.sfbsreduction.count, 34, "the other bound category still comes from the extension")
+	end)
+
+	helpers.it("(ergopti-hotstrings-ext) keeps the repeat corrections a user's magickey.toml declares", function()
+		local dir = user_folder()
+		write(dir .. "/magickey.toml", one_entry_pack("repeat_corrections", "zqê", "my fix"))
+		local ok, categories = pcall(load_with_user_folder, dir)
+		os.remove(dir .. "/magickey.toml")
+		os.remove(dir)
+		helpers.assert_true(ok, tostring(categories))
+		local section = categories.magickey.sections.repeat_corrections
+		helpers.assert_eq(categories.magickey.path, dir .. "/magickey.toml")
+		helpers.assert_eq(section.count, 1, "the user's own section, not the extension's 14 on top of it")
+		helpers.assert_nil(section.extension)
+	end)
+
+	helpers.it("(ergopti-hotstrings-ext) adds the extension's repeat corrections to a user's magickey.toml without them",
+		function()
+			local dir = user_folder()
+			write(dir .. "/magickey.toml", one_entry_pack("replace", "zqk", "my key"))
+			local ok, categories = pcall(load_with_user_folder, dir)
+			os.remove(dir .. "/magickey.toml")
+			os.remove(dir)
+			helpers.assert_true(ok, tostring(categories))
+			helpers.assert_eq(categories.magickey.sections.replace.count, 1)
+			helpers.assert_eq(categories.magickey.sections.repeat_corrections.count, 14)
+			helpers.assert_eq(categories.magickey.sections.repeat_corrections.extension,
+				{ id = "ergopti", name = "Ergopti" })
+		end)
+end)
