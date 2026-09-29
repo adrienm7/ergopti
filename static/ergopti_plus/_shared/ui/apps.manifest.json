@@ -35,6 +35,13 @@
 			"min_height": 380,
 			"vhost": "ergopti.download"
 		},
+		"permission_dialog": {
+			"width": 560,
+			"height": 400,
+			"min_width": 560,
+			"min_height": 400,
+			"vhost": "ergopti.permissiondialog"
+		},
 		"error_dialog": {
 			"width": 560,
 			"height": 460,

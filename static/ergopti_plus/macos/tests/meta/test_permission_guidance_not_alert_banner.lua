@@ -1,0 +1,68 @@
+--- tests/meta/test_permission_guidance_not_alert_banner.lua
+
+--- ==============================================================================
+--- MODULE: Permission guidance is never a one-line banner (permission-dialog-native)
+--- DESCRIPTION:
+--- After an update, the Accessibility wait printed its instructions with
+--- hs.alert: one long line along the Dock that could not be clicked. Those
+--- instructions now live in ui.permission_dialog. This guard scans the whole
+--- driver so no permission or onboarding instruction returns to hs.alert; the
+--- only banners left are short transient confirmations, listed below with the
+--- exact locale keys they may show.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+-- The only banners allowed: the locale keys of short transient confirmations.
+-- Keep-awake confirms a toggle for a moment; it explains nothing.
+local ALLOWED_BANNER_KEYS = {
+	["shortcuts.keep_awake_on"] = true,
+	["shortcuts.keep_awake_off"] = true,
+}
+
+
+--- Returns source text with every line comment removed, as a list of lines.
+--- @param src string Source text.
+--- @return table lines
+local function code_lines(src)
+	local lines = {}
+	for line in (src .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = (line:gsub("%-%-.*$", "")) end
+	return lines
+end
+
+helpers.describe("permission guidance is a dialog, not a banner (permission-dialog-native)", function()
+	helpers.it("no permission or onboarding instruction uses hs.alert", function()
+		-- Every production file that mentions hs.alert, found by symbol, not path.
+		local src = helpers.read_driver_source("hs.alert")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"the keep-awake confirmation banner must stay discoverable, or the scan is blind")
+		local offenders = {}
+		local shown = 0
+		for _, line in ipairs(code_lines(src)) do
+			if line:find("%f[%w]hs%.alert") and not line:find("hs%.alert%.close") then
+				local key = line:match('i18n%.get%("([^"]+)"%)')
+				if key ~= nil and ALLOWED_BANNER_KEYS[key] then
+					shown = shown + 1
+				else
+					offenders[#offenders + 1] = line
+				end
+			end
+		end
+		helpers.assert_eq(shown, 2, "both keep-awake confirmations must still be found by the scan")
+		helpers.assert_eq(#offenders, 0, "hs.alert banner outside the allowlist:\n" .. table.concat(offenders, "\n"))
+	end)
+
+	helpers.it("the boot's Accessibility wait opens the permission dialog", function()
+		local unit, err = helpers.read_driver_unit("local function show_accessibility_guidance()")
+		helpers.assert_true(unit ~= nil, tostring(err))
+		local body = table.concat(code_lines(unit), "\n")
+		local at = body:find("local function show_accessibility_guidance()", 1, true)
+		local stop = body:find("\nend\n", at, true)
+		local fn = body:sub(at, stop)
+		helpers.assert_true(fn:find('require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)',
+			1, true) ~= nil, "the wait must show the native dialog")
+		helpers.assert_true(fn:find("xpcall(", 1, true) ~= nil, "a dialog failure must never stop the boot")
+		helpers.assert_true(body:find("show_guidance = function() close_guidance = show_accessibility_guidance() end",
+			1, true) ~= nil, "the wait must own the dialog it closes on the grant")
+	end)
+end)

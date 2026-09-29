@@ -13,8 +13,9 @@
 ---    switch as checked while macOS refuses the new binary. The entry is reset
 ---    before the prompt so the switch the user turns on is the current one.
 --- 2. Everything is opened for the user: the macOS prompt, the exact Settings
----    pane, and an on-screen banner naming the entry to turn on. The banner
----    needs no notification permission, which a fresh install may not have.
+---    pane, and a native dialog naming the entry to turn on. The dialog needs
+---    no notification permission, which a fresh install may not have, and the
+---    wait closes it as soon as the grant arrives.
 --- 3. No relaunch: trust is polled, and the boot continues as soon as it is
 ---    granted. A bounded deadline keeps an ignored request from leaving a
 ---    process with no input and no menu running forever.
