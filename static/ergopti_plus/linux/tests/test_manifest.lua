@@ -55,6 +55,7 @@ return {
 	"tests.unit.infra.test_llm_scope",
 	"tests.unit.modules.llm.test_scope_native_ack",
 	"tests.unit.infra.test_metrics_scope",
+	"tests.unit.infra.test_onboarding_answers",
 	"tests.unit.infra.test_shortcuts_scope",
 	"tests.unit.infra.test_tap_hold_scope",
 	"tests.unit.infra.test_paths_shared_root_layouts",

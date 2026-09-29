@@ -884,27 +884,19 @@
 						"title_key": "menu.tapholds.title",
 						"question_key": "menu.tapholds.enable",
 						"description_key": "onboarding.page.tap_holds.description",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "category_enabled.tap_holds",
 							"default": false
-						},
-						"consent": false,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					},
 					{
 						"id": "shortcuts",
 						"title_key": "menu.shortcuts.title",
 						"question_key": "menu.shortcuts.enable",
 						"description_key": "onboarding.page.shortcuts.description",
-						"master": {
-							"path": "category_enabled.shortcuts",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"items": [
@@ -1460,20 +1452,18 @@
 									}
 								]
 							}
-						]
+						],
+						"master": {
+							"path": "category_enabled.shortcuts",
+							"default": false
+						}
 					},
 					{
 						"id": "gestures",
 						"title_key": "menu.gestures.title",
 						"question_key": "menu.gestures.enable",
 						"description_key": "onboarding.gestures.desc",
-						"master": {
-							"path": "gestures.enabled",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"items": [
@@ -1619,20 +1609,18 @@
 									}
 								]
 							}
-						]
+						],
+						"master": {
+							"path": "gestures.enabled",
+							"default": false
+						}
 					},
 					{
 						"id": "keyboard_layout",
 						"title_key": "menu.layout.title",
 						"question_key": "menu.layout.enable",
 						"description_key": "onboarding.page.keyboard_layout.description",
-						"master": {
-							"path": "category_enabled.layout",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"items": [
@@ -1682,20 +1670,18 @@
 									}
 								]
 							}
-						]
+						],
+						"master": {
+							"path": "category_enabled.layout",
+							"default": false
+						}
 					},
 					{
 						"id": "hotstrings",
 						"title_key": "menu.hotstrings.title",
 						"question_key": "menu.hotstrings.enable",
 						"description_key": "onboarding.page.hotstrings.description",
-						"master": {
-							"path": "category_enabled.hotstrings",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"select_all": true,
@@ -2397,6 +2383,10 @@
 								]
 							}
 						],
+						"master": {
+							"path": "category_enabled.hotstrings",
+							"default": false
+						},
 						"magic_key": {
 							"path": "hotstrings.trigger_char",
 							"default": "★",
@@ -2425,28 +2415,24 @@
 						"title_key": "menu.llm.title",
 						"question_key": "menu.llm.enable",
 						"description_key": "onboarding.page.llm.description",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "llm.enabled",
 							"default": false
-						},
-						"consent": false,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					},
 					{
 						"id": "metrics",
 						"title_key": "menu.metrics.title",
 						"question_key": "menu.metrics.enable",
 						"description_key": "onboarding.metrics.desc",
+						"consent": true,
+						"groups": [],
 						"master": {
 							"path": "metrics.metrics_enabled",
 							"default": false
-						},
-						"consent": true,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					}
 				]
 			},
@@ -2458,27 +2444,19 @@
 						"title_key": "menu.tapholds.title",
 						"question_key": "menu.tapholds.enable",
 						"description_key": "onboarding.page.tap_holds.description",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "tap_holds.enabled",
 							"default": false
-						},
-						"consent": false,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					},
 					{
 						"id": "shortcuts",
 						"title_key": "menu.shortcuts.title",
 						"question_key": "menu.shortcuts.enable",
 						"description_key": "onboarding.page.shortcuts.description",
-						"master": {
-							"path": "shortcuts.enabled",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"items": [
@@ -2807,20 +2785,18 @@
 									}
 								]
 							}
-						]
+						],
+						"master": {
+							"path": "shortcuts.enabled",
+							"default": false
+						}
 					},
 					{
 						"id": "gestures",
 						"title_key": "menu.gestures.title",
 						"question_key": "menu.gestures.enable",
 						"description_key": "onboarding.gestures.desc",
-						"master": {
-							"path": "gestures.enabled",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": "dialog.gestures.warning_msg",
-						"note_key": null,
 						"groups": [
 							{
 								"items": [
@@ -2966,31 +2942,28 @@
 									}
 								]
 							}
-						]
+						],
+						"master": {
+							"path": "gestures.enabled",
+							"default": false
+						},
+						"hint_key": "dialog.gestures.warning_msg"
 					},
 					{
 						"id": "keyboard_layout",
 						"title_key": "menu.layout.title",
 						"question_key": "menu.layout.enable",
 						"description_key": "onboarding.page.keyboard_layout.description",
-						"master": null,
 						"consent": false,
-						"hint_key": null,
-						"note_key": "onboarding.page.keyboard_layout.system_note",
-						"groups": []
+						"groups": [],
+						"note_key": "onboarding.page.keyboard_layout.system_note"
 					},
 					{
 						"id": "hotstrings",
 						"title_key": "menu.hotstrings.title",
 						"question_key": "menu.hotstrings.enable",
 						"description_key": "onboarding.page.hotstrings.description",
-						"master": {
-							"path": "hotstrings.enabled",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"select_all": true,
@@ -3692,6 +3665,10 @@
 								]
 							}
 						],
+						"master": {
+							"path": "hotstrings.enabled",
+							"default": false
+						},
 						"magic_key": {
 							"path": "hotstrings.trigger_char",
 							"default": "★",
@@ -3720,28 +3697,24 @@
 						"title_key": "menu.llm.title",
 						"question_key": "menu.llm.enable",
 						"description_key": "onboarding.page.llm.description",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "llm.enabled",
 							"default": false
-						},
-						"consent": false,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					},
 					{
 						"id": "metrics",
 						"title_key": "menu.metrics.title",
 						"question_key": "menu.metrics.enable",
 						"description_key": "onboarding.metrics.desc",
+						"consent": true,
+						"groups": [],
 						"master": {
 							"path": "metrics.enabled",
 							"default": false
-						},
-						"consent": true,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					}
 				]
 			},
@@ -3753,27 +3726,19 @@
 						"title_key": "menu.tapholds.title",
 						"question_key": "menu.tapholds.enable",
 						"description_key": "onboarding.page.tap_holds.description",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "tap_holds.enabled",
 							"default": false
-						},
-						"consent": false,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					},
 					{
 						"id": "shortcuts",
 						"title_key": "menu.shortcuts.title",
 						"question_key": "menu.shortcuts.enable",
 						"description_key": "onboarding.page.shortcuts.description",
-						"master": {
-							"path": "shortcuts.enabled",
-							"default": false
-						},
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"items": [
@@ -3832,42 +3797,40 @@
 									}
 								]
 							}
-						]
+						],
+						"master": {
+							"path": "shortcuts.enabled",
+							"default": false
+						}
 					},
 					{
 						"id": "gestures",
 						"title_key": "menu.gestures.title",
 						"question_key": "menu.gestures.enable",
 						"description_key": "onboarding.gestures.desc",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "gestures.enabled",
 							"default": false
 						},
-						"consent": false,
-						"hint_key": "gestures.system.warning",
-						"note_key": null,
-						"groups": []
+						"hint_key": "gestures.system.warning"
 					},
 					{
 						"id": "keyboard_layout",
 						"title_key": "menu.layout.title",
 						"question_key": "menu.layout.enable",
 						"description_key": "onboarding.page.keyboard_layout.description",
-						"master": null,
 						"consent": false,
-						"hint_key": null,
-						"note_key": "onboarding.page.keyboard_layout.system_note",
-						"groups": []
+						"groups": [],
+						"note_key": "onboarding.page.keyboard_layout.system_note"
 					},
 					{
 						"id": "hotstrings",
 						"title_key": "menu.hotstrings.title",
 						"question_key": "menu.hotstrings.enable",
 						"description_key": "onboarding.page.hotstrings.description",
-						"master": null,
 						"consent": false,
-						"hint_key": null,
-						"note_key": null,
 						"groups": [
 							{
 								"select_all": true,
@@ -4597,28 +4560,24 @@
 						"title_key": "menu.llm.title",
 						"question_key": "menu.llm.enable",
 						"description_key": "onboarding.page.llm.description",
+						"consent": false,
+						"groups": [],
 						"master": {
 							"path": "llm.enabled",
 							"default": false
-						},
-						"consent": false,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					},
 					{
 						"id": "metrics",
 						"title_key": "menu.metrics.title",
 						"question_key": "menu.metrics.enable",
 						"description_key": "onboarding.metrics.desc",
+						"consent": true,
+						"groups": [],
 						"master": {
 							"path": "metrics.enabled",
 							"default": false
-						},
-						"consent": true,
-						"hint_key": null,
-						"note_key": null,
-						"groups": []
+						}
 					}
 				]
 			}

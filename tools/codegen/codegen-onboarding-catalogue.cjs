@@ -666,17 +666,19 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 	if (!master && groups.length === 0 && !note) {
 		throw new Error(`onboarding page ${id} asks nothing on ${platform}: declare a note_key`);
 	}
+	// Absent fields are omitted, never null: the Lua hosts' JSON reader turns a
+	// null into a table, which would read as a present value.
 	const built = {
 		id,
 		title_key: page.title_key,
 		question_key: page.question_key,
 		description_key: page.description_key,
-		master,
 		consent: page.consent === true,
-		hint_key: hint || null,
-		note_key: note || null,
 		groups
 	};
+	if (master) built.master = master;
+	if (hint) built.hint_key = hint;
+	if (note) built.note_key = note;
 	if (page.checklist === 'hotstrings')
 		built.magic_key = magicKeyFor(id, page, platform, projection, labels);
 	return built;
@@ -743,6 +745,12 @@ function buildCatalogue() {
 			})(page.groups);
 		}
 	}
+	(function refuseNull(value, where) {
+		if (value === null) throw new Error(`the catalogue carries a null at ${where}`);
+		if (typeof value === 'object') {
+			for (const [key, child] of Object.entries(value)) refuseNull(child, `${where}.${key}`);
+		}
+	})(platforms, 'platforms');
 	// A label kept for an item no platform lists outlives the gap it filled.
 	for (const id of order) {
 		for (const itemPath of Object.keys(manifest.onboarding.pages[id].labels || {})) {
