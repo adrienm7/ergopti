@@ -438,6 +438,19 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(record.failures, 0)
 	end)
 
+	helpers.it("leaves the About row to a channel switched to while the check ran", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers, dispatched = check_now(ctx, "dev")
+		helpers.assert_true(dispatched)
+		ctx.channel = "main"
+		ctx.owner.on_channel_changed()
+		ctx.pending[1]({ ok = true, status = 200, body = MIXED, headers = {} })
+		helpers.assert_eq(answers[1].state, "available", "the window still gets its answer")
+		helpers.assert_nil(ctx.owner.latest(), "the About row offers no release of the previous channel")
+		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag,
+			"a release of the previous channel does not silence the new channel's announcement")
+	end)
+
 	helpers.it("says up to date and still lists newer releases of other channels", function()
 		local list = UP_TO_DATE:gsub("^%[", '[{"tag_name":"v1.0.0","prerelease":false,'
 			.. '"published_at":"2026-08-05T00:00:00Z","assets":[]},')

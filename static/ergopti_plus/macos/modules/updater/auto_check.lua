@@ -428,10 +428,14 @@ function M.new(opts)
 				current = base.current, installed = installed_channel(),
 			})
 			local state = Schedule.record_check(load_record(), opts.now(), true)
-			if result.state == "available" then
+			-- A channel switched while the request ran leaves the About row to the
+			-- new channel, as dispatch() does: the window still gets its answer
+			if channel ~= opts.channel() then
+				Logger.info(LOG, "The manual check of '%s' leaves the About row to the new channel.", channel)
+			elseif result.state == "available" then
 				latest = { tag = result.latest, channel = channel }
 				state.last_notified_tag = result.latest
-			elseif channel == opts.channel() then
+			else
 				latest = nil
 			end
 			save_record(state)
