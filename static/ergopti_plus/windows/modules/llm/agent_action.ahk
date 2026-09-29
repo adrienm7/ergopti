@@ -714,9 +714,23 @@ _LLM_Agent_TimeZone() {
 ; =================================
 
 /**
- * Called by the LLM bridge on every typed character and Backspace: settles a
- * suggestion the user typed over, retires the flow in flight and, in the
- * automatic mode, arms the pause timer on the new buffer.
+ * Tells whether the automatic mode watches the typing: its mode is "auto" and
+ * Ergopti+ is not paused. While predictions are off the LLM bridge feeds
+ * LLM_Agent_OnTyping on this alone, so the AI menu's switch never starves the
+ * automatic mode; the agent's mode and the pause start and stop that feed.
+ * @returns {Boolean}
+ */
+LLM_Agent_WatchesTyping() {
+	if A_IsSuspended
+		return false
+	return LLM_Agent_Setting("agent_mode") == "auto"
+}
+
+/**
+ * Called by the LLM bridge on every typed character and Backspace, with the
+ * predictions on or, in the automatic mode, off: settles a suggestion the user
+ * typed over, retires the flow in flight and, in the automatic mode, arms the
+ * pause timer on the new buffer.
  * @param {String} Buffer The typed context, most recent character last.
  * @returns {Boolean} True when the pause timer was armed.
  */
@@ -953,14 +967,37 @@ _LLM_Agent_CancelPause() {
 	_LLM_Agent_Auto["timer"] := 0
 }
 
-; Leaves the automatic mode's state behind.
+; Leaves the automatic mode's state behind, the bridge's agent-only typing
+; feed included.
 _LLM_Agent_StopAuto(Reason) {
 	global _LLM_Agent_Auto
 	_LLM_Agent_CancelPause()
 	_LLM_Agent_SettleOffer(false)
 	_LLM_Agent_Auto["triaged"] := Map()
 	_LLM_Agent_Auto["order"] := []
+	if IsSet(LLM_Bridge_ResetAgentFeed)
+		LLM_Bridge_ResetAgentFeed(Reason)
 	LoggerInfo("LLM", "AI agent automatic mode stopped ({1}).", Reason)
+}
+
+/**
+ * Pause step of the lifecycle ("pause = tout éteint"): retires the flow in
+ * flight, whose answer could otherwise land after the resume, the armed pause
+ * timer, which native Suspend does not stop, and the bridge's agent-only typing
+ * feed with its context. The suggestion the pause hid is dropped unlearned:
+ * the user did not dismiss it. Resuming needs nothing: the next keystroke
+ * starts the feed again when the agent still watches the typing.
+ * @returns {Boolean} True, the lifecycle step's contract.
+ */
+LLM_Agent_OnSuspend() {
+	global _LLM_Agent_Generation, _LLM_Agent_Auto
+	_LLM_Agent_Generation += 1
+	_LLM_Agent_CancelPause()
+	_LLM_Agent_Auto["offer"] := ""
+	if IsSet(LLM_Bridge_ResetAgentFeed)
+		LLM_Bridge_ResetAgentFeed("Ergopti+ was paused")
+	LoggerInfo("LLM", "AI agent #{1}: typing watch and flow in flight retired by the pause.", _LLM_Agent_Generation)
+	return true
 }
 
 ; Arms a one-shot timer (a negative period) or cancels one (0), through the

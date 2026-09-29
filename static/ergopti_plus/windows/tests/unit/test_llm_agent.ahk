@@ -477,6 +477,8 @@ _LAG_Run(Menu, Screen, Body) {
 			_LLM_Menu["api_entries"].Push(Entry)
 			_LLM_Engine["api_entries"].Push(Entry.Clone())
 		}
+		; The prediction engine's requests, which the agent's scenarios expect none of
+		Fx.Predictions := Calls
 		Body.Call(Fx, Lines, Sent)
 	}
 }
@@ -1291,3 +1293,203 @@ _LAG_SchedulerIsOneShot() {
 	AssertThrows(() => _LLM_Agent_Schedule((*) => 0, "-5"), "a period is an integer")
 }
 Test("LLM agent: the agent's timers are one-shots", _LAG_SchedulerIsOneShot)
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 10/ The automatic mode with the AI off =======
+; ======================================================
+; ======================================================
+
+; Runs Body() with the prediction bridge inactive, as the AI menu's switch
+; leaves it, and its agent-only feed and prediction state put back afterwards.
+_LAG_WithBridgeOff(Body) {
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
+	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LLM_Bridge_AgentFeedErrorTick
+	Saved := {
+		Active: _LLM_Bridge_Active, Buffer: _LLM_Bridge_Buffer, Generation: _LLM_Bridge_ContentGeneration,
+		Agent: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding, ErrorTick: _LLM_Bridge_AgentFeedErrorTick
+	}
+	try {
+		_LLM_Bridge_Active := false
+		_LLM_Bridge_Buffer := "earlier prediction context"
+		_LLM_Bridge_AgentBuffer := ""
+		_LLM_Bridge_AgentFeeding := false
+		Body.Call()
+	} finally {
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_Buffer := Saved.Buffer
+		_LLM_Bridge_ContentGeneration := Saved.Generation
+		_LLM_Bridge_AgentBuffer := Saved.Agent
+		_LLM_Bridge_AgentFeeding := Saved.Feeding
+		_LLM_Bridge_AgentFeedErrorTick := Saved.ErrorTick
+	}
+}
+
+; Types Text character by character through the bridge's PrefixWatcher entry
+; point and returns the newest pause callback the agent armed, "" when none.
+_LAG_TypeThroughBridge(Fx, Text) {
+	global LLM_AGENT_LEARNING_SAVE_DELAY_MS
+	Before := Fx.Scheduled.Length
+	for Char in StrSplit(Text)
+		LLM_Bridge_FeedCharIfActive(Char)
+	Index := Fx.Scheduled.Length
+	while (Index > Before) {
+		Entry := Fx.Scheduled[Index]
+		if (Entry["period"] < 0 && Entry["period"] != -LLM_AGENT_LEARNING_SAVE_DELAY_MS)
+			return Entry["fn"]
+		Index -= 1
+	}
+	return ""
+}
+
+; The prediction state the agent-only feed must leave alone.
+; @returns {Map}
+_LAG_PredictionSnapshot(Fx) {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Engine, _Stub_LlmTooltipCalls
+	return Map("buffer", _LLM_Bridge_Buffer, "generation", _LLM_Bridge_ContentGeneration,
+		"timer", _LLM_Engine.Get("timer_active", false) ? true : false,
+		"last_buffer", _LLM_Engine.Get("last_buffer", ""),
+		"requests", Fx.Predictions.Length, "tooltips", _Stub_LlmTooltipCalls.Length)
+}
+
+; Asserts that nothing of the predictions moved while the agent watched.
+_LAG_AssertNoPrediction(Fx, Before) {
+	After := _LAG_PredictionSnapshot(Fx)
+	AssertEqual("earlier prediction context", After["buffer"], "the prediction context is untouched")
+	AssertEqual(Before["generation"], After["generation"], "its content generation too")
+	AssertEqual(Before["timer"], After["timer"], "no prediction timer is armed")
+	AssertEqual(Before["last_buffer"], After["last_buffer"], "the engine saw no keystroke")
+	AssertEqual(0, After["requests"], "no prediction is requested")
+	AssertEqual(Before["tooltips"], After["tooltips"], "no prediction tooltip or spinner")
+}
+
+; The root cause: turning the AI menu off stops the prediction bridge, and the
+; bridge used to drop every keystroke then, so the automatic mode never saw one.
+_LAG_AutoWithAiOff() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		Fx.App := "Slack"
+		TooltipHide("AgentTest", true)
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+			Before := _LAG_PredictionSnapshot(Fx)
+			Pause := _LAG_TypeThroughBridge(Fx, LAG_TYPED . "x")
+			AssertTrue(HasMethod(Pause, "Call"), "with the AI off, typing arms the agent's pause")
+			AssertTrue(_LLM_Bridge_AgentFeeding, "the bridge feeds the agent alone")
+			AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "feeds the AI agent's typing observer only"),
+				"which is logged once")
+			; Backspace erases in the agent's context and re-arms the pause
+			LLM_Bridge_FeedKeyDownIfActive(0x08, true)
+			AssertEqual(LAG_TYPED, _LLM_Bridge_AgentBuffer, "Backspace erased the last character")
+			AssertFalse(Pause.Call(), "the pause armed before the Backspace fires for nothing")
+			Pause := Fx.Scheduled[Fx.Scheduled.Length]
+			AssertTrue(Pause["period"] < 0, "the Backspace armed a new pause")
+			AssertTrue(Pause["fn"].Call(), "the pause triages the sentence")
+			AssertEqual(1, Fx.Remote.Length, "one System 1 request")
+			AssertEqual(LAG_SELECTION, _LAG_Request(Fx.Remote[1])["user"], "on the current sentence")
+			_LAG_AssertNoPrediction(Fx, Before)
+			; An expansion the hotstring engine mirrors reaches the agent's context only
+			PreviousCritical := Critical("On")
+			try _HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 5, InsertedText: "contrat" })
+			finally Critical(PreviousCritical)
+			AssertEqual("Bonjour. On se voit jeudi 14h avec Paul pour le contrat", _LLM_Bridge_AgentBuffer,
+				"the expansion reached the agent's context")
+			_LAG_AssertNoPrediction(Fx, Before)
+			; Enter starts a fresh context, as it flushes the prediction one
+			LLM_Bridge_FeedKeyDownIfActive(0x0D, true)
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "Enter empties the agent's context")
+		}
+	}
+}
+Test("LLM agent: with the AI menu off, a typing pause is triaged and nothing predicts", _LAG_AutoWithAiOff)
+
+_LAG_ActionModeWithAiOff() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		TooltipHide("AgentTest", true)
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+			Before := _LAG_PredictionSnapshot(Fx)
+			AssertEqual("", _LAG_TypeThroughBridge(Fx, LAG_TYPED), "on action, typing arms nothing")
+			AssertFalse(_LLM_Bridge_AgentFeeding, "the bridge feeds nothing")
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "and keeps no context")
+			AssertEqual(0, Fx.Scheduled.Length, "no timer at all")
+			AssertEqual(0, Fx.Remote.Length, "no triage")
+			_LAG_AssertNoPrediction(Fx, Before)
+		}
+	}
+}
+Test("LLM agent: with the AI menu off, the agent on action watches no typing", _LAG_ActionModeWithAiOff)
+
+_LAG_ModeChangesStopTheFeed() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		TooltipHide("AgentTest", true)
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Menu, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+			Old := _LAG_TypeThroughBridge(Fx, "Envoie le devis")
+			AssertTrue(_LLM_Bridge_AgentFeeding, "precondition: the feed runs")
+			AssertTrue(LLM_Agent_SetMode("off"), "the agent is turned off")
+			AssertFalse(_LLM_Bridge_AgentFeeding, "which stops the feed")
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "and drops its context")
+			AssertEqual(0, Fx.Scheduled[Fx.Scheduled.Length]["period"], "and cancels the armed pause")
+			AssertFalse(Old.Call(), "which would fire for nothing")
+			AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "stopped feeding the AI agent's typing observer"),
+				"the stop is logged")
+			AssertEqual("", _LAG_TypeThroughBridge(Fx, " à Paul"), "typing then arms nothing")
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "nor keeps any context")
+			; The toggle back to auto starts it again on a fresh context
+			AssertTrue(LLM_Agent_ToggleAuto(), "the toggle turns the automatic mode on")
+			AssertTrue(HasMethod(_LAG_TypeThroughBridge(Fx, "Rappelle-moi"), "Call"), "typing arms it again")
+			AssertEqual("Rappelle-moi", _LLM_Bridge_AgentBuffer, "from what was typed since")
+			; And the toggle to on action stops it
+			AssertTrue(LLM_Agent_ToggleAuto(), "the toggle turns it back to on action")
+			AssertEqual("action", _LLM_Menu["agent_mode"], "on action")
+			AssertFalse(_LLM_Bridge_AgentFeeding, "the feed is stopped")
+			AssertEqual("", _LAG_TypeThroughBridge(Fx, " le garage"), "and typing arms nothing")
+			AssertEqual(0, Fx.Remote.Length, "none of this triaged anything")
+		}
+	}
+}
+Test("LLM agent: leaving the automatic mode stops the typing feed, entering it starts it",
+	_LAG_ModeChangesStopTheFeed)
+
+_LAG_PauseStopsTheFeed() {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		TooltipHide("AgentTest", true)
+		AssertTrue(InStr(_DriverFuncBody("Ergopti_OnSuspendEnter"), '"llm-agent-typing", LLM_Agent_OnSuspend') > 0,
+			"pausing runs the agent's typing step")
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+			Old := _LAG_TypeThroughBridge(Fx, LAG_TYPED)
+			AssertTrue(_LLM_Bridge_AgentFeeding, "precondition: the feed runs")
+			Suspend(true)
+			try {
+				AssertTrue(LLM_Agent_OnSuspend(), "the pause step runs")
+				AssertFalse(_LLM_Bridge_AgentFeeding, "the pause stops the feed")
+				AssertEqual("", _LLM_Bridge_AgentBuffer, "and drops its context")
+				AssertEqual("", _LAG_TypeThroughBridge(Fx, " demain"), "a keystroke while paused arms nothing")
+				AssertFalse(_LLM_Bridge_AgentFeeding, "nor starts the feed")
+			} finally {
+				Suspend(false)
+			}
+			AssertFalse(Old.Call(), "the pause armed before it fires for nothing")
+			AssertEqual(0, Fx.Remote.Length, "no triage")
+			Pause := _LAG_TypeThroughBridge(Fx, "Envoie le devis à Paul demain")
+			AssertTrue(HasMethod(Pause, "Call"), "after the resume, typing feeds the agent again")
+			AssertEqual("Envoie le devis à Paul demain", _LLM_Bridge_AgentBuffer, "on a fresh context")
+			AssertTrue(Pause.Call(), "and its pause triages")
+			AssertEqual(1, Fx.Remote.Length, "one System 1 request")
+		}
+	}
+}
+Test("LLM agent: a pause stops the typing feed, the resume lets it start again", _LAG_PauseStopsTheFeed)

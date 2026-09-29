@@ -484,6 +484,10 @@ Ergopti_OnSuspendEnter() {
 		; context ("pause = tout eteint" invariant). StopGeneration drops last_ctx /
 		; last_results, bumps request_id, and cancels async streams.
 	_LifecycleRunRequiredStep(Transition, "llm-generation", LLM_Engine_StopGeneration)
+		; The AI agent watches the typing with the AI menu's switch off too: its
+		; pause timer and its flow in flight are retired separately.
+	if IsSet(LLM_Agent_OnSuspend)
+		_LifecycleRunRequiredStep(Transition, "llm-agent-typing", LLM_Agent_OnSuspend)
 		; Cancel the Ollama warm-up retry timer so it does not make background HTTP
 		; calls while the driver is paused ("pause = tout éteint" invariant).
 	_LifecycleRunRequiredStep(Transition, "ollama-warmup",
