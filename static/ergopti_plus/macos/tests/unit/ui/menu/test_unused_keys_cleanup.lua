@@ -291,6 +291,25 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq(offered, { "shortcuts.keyboard", "shortcuts.tap_keys" })
 		end)
 
+		helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)", function()
+			-- The inline table was one record kept by its live member, so the
+			-- warned at_hash was never offered: warned and offered differed.
+			local source = "[shortcuts]\nkeys = { at_hash = true, layer_scroll = true }\n"
+			Sandbox.with_config(source, function(path)
+				local before = driver_state(path)
+				local keys = Cleanup.find(path, IoAdapter).keys
+				helpers.assert_eq(#keys, 1)
+				helpers.assert_eq({ keys[1].section, keys[1].key, keys[1].value }, { "shortcuts.keys", "at_hash", "true" })
+				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP,
+					file_adapter = IoAdapter })
+				helpers.assert_eq(result.status, "removed")
+				helpers.assert_eq(result.removed, 1)
+				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { layer_scroll = true }\n")
+				helpers.assert_eq(driver_state(path), before, "the live member keeps its value")
+				helpers.assert_eq(#Cleanup.find(path, IoAdapter).keys, 0)
+			end)
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
