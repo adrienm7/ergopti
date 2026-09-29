@@ -239,24 +239,6 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 end
 
 local config_paths       = require("infra.config_paths")
-local gestures           = require("modules.gestures")
-local keymap             = require("modules.keymap")
-local ManifestReader     = require("infra.manifest_reader")
--- Wire keymap → locale so trigger-character substitutions (★) use the live char.
--- Read from the manifest rather than from the `magic_key` local: that one is
--- declared ~500 lines below, so naming it here would capture the GLOBAL of the
--- same name — nil — and every ★ substitution would silently render empty. Same
--- trap as project-lua-closure-before-local-nil-global.
-locale_mod.set_trigger_provider(function()
-	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for("hotstrings.trigger_char")
-end)
--- Expose keymap in the global table so the Hammerspoon console can call
--- keymap.perf_report_all() / perf_enable() / perf_reset() without
--- having to type out require("modules.keymap") each time.
-_G.keymap = keymap
-local shortcuts          = require("modules.shortcuts")
-local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 Boot.mark("Core module requires")
 Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 
@@ -283,6 +265,26 @@ if config_paths_ready ~= true then
 	abort_pre_runtime_boot("config_paths", CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
+-- Configuration consumers may perform reads during require; path ownership comes first.
+local gestures           = require("modules.gestures")
+local keymap             = require("modules.keymap")
+local ManifestReader     = require("infra.manifest_reader")
+-- Wire keymap → locale so trigger-character substitutions (★) use the live char.
+-- Read from the manifest rather than from the `magic_key` local: that one is
+-- declared ~500 lines below, so naming it here would capture the GLOBAL of the
+-- same name — nil — and every ★ substitution would silently render empty. Same
+-- trap as project-lua-closure-before-local-nil-global.
+locale_mod.set_trigger_provider(function()
+	return keymap.get_trigger_char and keymap.get_trigger_char()
+		or ManifestReader.default_for("hotstrings.trigger_char")
+end)
+-- Expose keymap in the global table so the Hammerspoon console can call
+-- keymap.perf_report_all() / perf_enable() / perf_reset() without
+-- having to type out require("modules.keymap") each time.
+_G.keymap = keymap
+local shortcuts          = require("modules.shortcuts")
+local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+
 boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir()),
 	BootJournal.describe_path(config_paths.get_config_dir()))
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
