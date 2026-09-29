@@ -524,6 +524,24 @@ _KLT_MagicKeyDeclarationCase() {
 Test("magic key: only a declared or chosen key takes an emulated layout's unshifted level (layout-magic-key)",
 	() => _KLT_WithEmulation(_KLT_MagicKeyYieldCase))
 
+; Evaluates an AltGr row's criterion on the Kana layout family, with no AltGr
+; tap-hold. On the standard family IsRealAltGrPress also requires the physical
+; RAlt, which no test can press, so the criterion is false there whatever the
+; row decides (see test_altgr_combos_stand_down.ahk).
+; @param Criterion {Func} The #HotIf criterion the row was registered under.
+; @returns {Boolean} The criterion's answer while AltGr is held as AltGr.
+_KLT_AltGrRowOnKanaFamily(Criterion) {
+	global TapHold
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
+	try {
+		TapHold := Map("keys", Map(), "layers", Map())
+		return Criterion.Call()
+	} finally {
+		TapHold := Saved.TapHold
+		_TestRestoreAltGrFamily(Saved.Family)
+	}
+}
+
 _KLT_MagicKeyYieldCase() {
 	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, ScriptInformation
 	State := MasterGateState()
@@ -550,7 +568,8 @@ _KLT_MagicKeyYieldCase() {
 		ScriptInformation["MagicKeySourceOverridesEmulation"] := true
 		AssertFalse(Capture.Rows["SC02E"].Call(), "a declared or chosen key's unshifted level is the remap's")
 		AssertTrue(Capture.Rows["+SC02E"].Call(), "Shift keeps the emulated layout's character")
-		AssertTrue(Capture.Rows["SC138 & SC02E"].Call(), "AltGr keeps the emulated layout's character")
+		AssertTrue(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"]),
+			"AltGr keeps the emulated layout's character")
 		AssertTrue(Capture.Rows["SC010"].Call(), "every other key stays with the emulation")
 		ScriptInformation["MagicKeySourceScan"] := "SC027"
 		AssertTrue(Capture.Rows["SC02E"].Call(), "the yield follows the chosen key, not a fixed position")
