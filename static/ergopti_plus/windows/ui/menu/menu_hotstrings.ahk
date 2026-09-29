@@ -382,10 +382,22 @@ _HS_DelimCommit(BuildFn, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 	return true
 }
 
+; The open add-delimiter dialog, "" when none is open.
+global _HS_DelimAddGui := ""
+
 ; Mini GUI: one-shot dialog to pick a delimiter character and its consume mode.
-; Returns "" on cancel, or triggers the add immediately.
+; Returns "" on cancel, or triggers the add immediately. It is an unowned
+; window with its own taskbar entry: an owned window has none, so once another
+; app covered it the dialog this thread waits on could not be reached again.
 _HS_DelimAddCustom() {
-	G := Gui("+Owner", t("dialog.hotstrings.new_delimiter_title"))
+	global _HS_DelimAddGui
+	if IsObject(_HS_DelimAddGui) {
+		; Requested again: bring the open dialog back instead of stacking a
+		; second one over it.
+		WMPresentWindow(_HS_DelimAddGui)
+		return
+	}
+	G := Gui("", t("dialog.hotstrings.new_delimiter_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
@@ -401,8 +413,10 @@ _HS_DelimAddCustom() {
 	G.OnEvent("Escape", (*) => G.Destroy())
 
 	G.Show("Center AutoSize")
+	_HS_DelimAddGui := G
 	; Block until the GUI is closed (OK or Cancel)
-	WinWaitClose("ahk_id " . G.Hwnd)
+	try WinWaitClose("ahk_id " . G.Hwnd)
+	finally _HS_DelimAddGui := ""
 
 	if (!Result.OK or Result.Char == "") {
 		return
