@@ -743,22 +743,86 @@ LLM_Menu_ManualPredictionRefusal(IsSuspended, Enabled, BackendReady, Context) {
  * @returns {Boolean} True when a prediction was requested.
  */
 LLM_Menu_TriggerPrediction(FireFn := 0) {
-	global _LLM_Menu, _LLM_Bridge_Buffer, LLM_MANUAL_PREDICTION_REFUSALS
+	global _LLM_Menu, _LLM_Bridge_Buffer
 	Context := SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"])
 	Enabled := _LLM_Menu.Get("enabled", false)
 	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
 		Enabled && _LLM_Menu_BackendIsReadyForUse(), Context)
 	if (Reason != "") {
-		LoggerInfo("LLM", "Manual prediction refused ({1}): backend '{2}', {3} context character(s).",
-			Reason, _LLM_Menu.Get("backend", ""), StrLen(Context))
-		TooltipShow({ Text: t(LLM_MANUAL_PREDICTION_REFUSALS[Reason]),
-			DurationSec: UI_HOTSTRING_TIMEOUT_SEC }, UI_HOTSTRING_TIMEOUT_SEC)
+		_LLM_Menu_ShowManualPredictionRefusal(Reason, StrLen(Context))
 		return false
 	}
 	LoggerInfo("LLM", "Manual prediction requested ({1} context character(s)).", StrLen(Context))
 	Fire := HasMethod(FireFn, "Call") ? FireFn : LLM_Engine_FirePrediction
 	Fire(Context)
 	return true
+}
+
+/**
+ * Fires an immediate prediction with a prompt of its own: the
+ * llm_prompt_prediction action and the llm_predict_<profile> presets. It is
+ * llm_generate_prediction with the named profile and count for this request
+ * only: the active profile, the per-app overrides and the menu's count are
+ * left untouched. The same refusals are logged and shown; a prompt that no
+ * longer exists (a deleted custom prompt) is refused with its own notice and is
+ * never replaced by another one.
+ * @param {String} ProfileId The profile to run, built-in or custom.
+ * @param {Integer} NumPredictions The binding's own count, 0 for the menu's.
+ * @param {Func} FireFn Receives the context and the override Map; the engine
+ *     when omitted.
+ * @returns {Boolean} True when a prediction was requested.
+ */
+LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0) {
+	global _LLM_Menu, _LLM_Bridge_Buffer
+	Profile := LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"])
+	; A rewrite rewrites the current sentence, whatever its length: the engine
+	; receives the whole buffer and extends its capped context to the sentence.
+	; Its "nothing typed" is an empty sentence, not an empty buffer.
+	IsRewrite := LLM_Rewrite_IsRewriteProfile(Profile)
+	Context := IsRewrite ? _LLM_Bridge_Buffer
+		: SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"])
+	Enabled := _LLM_Menu.Get("enabled", false)
+	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
+		Enabled && _LLM_Menu_BackendIsReadyForUse(),
+		IsRewrite ? LLM_Rewrite_SentenceSpan(Context) : Context)
+	if (Reason != "") {
+		_LLM_Menu_ShowManualPredictionRefusal(Reason, StrLen(Context))
+		return false
+	}
+	if !(Profile is Map) {
+		LoggerWarn("LLM", "Prompt prediction refused: the prompt '{1}' no longer exists.", ProfileId)
+		_LLM_Menu_ShowManualPredictionNotice("llm.prompt_prediction.unknown_prompt")
+		return false
+	}
+	LoggerInfo("LLM", "Prompt prediction requested with '{1}' ({2} prediction(s), {3} context character(s)).",
+		ProfileId, (NumPredictions > 0) ? NumPredictions : _LLM_Menu["n_predictions"], StrLen(Context))
+	Override := Map("profile_id", ProfileId, "num_predictions", NumPredictions)
+	if HasMethod(FireFn, "Call") {
+		FireFn(Context, Override)
+		return true
+	}
+	; A debounce armed by the last keystroke would otherwise fire right after
+	; and supersede this request with the active profile.
+	LLM_Engine_CancelTimer()
+	LLM_Engine_FirePrediction(Context, , Override)
+	return true
+}
+
+; Logs a manual-request refusal at INFO with its reason and shows its notice.
+; @param {String} Reason A key of LLM_MANUAL_PREDICTION_REFUSALS.
+; @param {Integer} ContextLength Characters of context the request had.
+_LLM_Menu_ShowManualPredictionRefusal(Reason, ContextLength) {
+	global _LLM_Menu, LLM_MANUAL_PREDICTION_REFUSALS
+	LoggerInfo("LLM", "Manual prediction refused ({1}): backend '{2}', {3} context character(s).",
+		Reason, _LLM_Menu.Get("backend", ""), ContextLength)
+	_LLM_Menu_ShowManualPredictionNotice(LLM_MANUAL_PREDICTION_REFUSALS[Reason])
+}
+
+; Shows a manual-request notice the way every refusal is shown.
+; @param {String} Key The locale key of the notice.
+_LLM_Menu_ShowManualPredictionNotice(Key) {
+	TooltipShow({ Text: t(Key), DurationSec: UI_HOTSTRING_TIMEOUT_SEC },
+		UI_HOTSTRING_TIMEOUT_SEC)
 }
 
 /**

@@ -27,6 +27,7 @@ local text_utils = require("infra.text_utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
+local Rewrite        = require("llm.rewrite")
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -247,8 +248,11 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 
     local t0_req = TimerScheduler.now()
 
-    -- Advanced mode is only the strict correction profile
-    local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
+    -- Advanced mode is the strict correction profile and the rewrite profile:
+    -- line mode posts the bare context to the completions endpoint, which drops
+    -- the instructions a rewrite depends on
+    local is_advanced_prompt = type(final_sys) == "string"
+        and (final_sys:find("TAIL_CORRECTED", 1, true) ~= nil or Rewrite.is_rewrite_prompt(final_sys))
     local line_mode = (force_line_mode == true) or ((not is_batch) and (not is_advanced_prompt))
 
     local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
@@ -487,7 +491,9 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		merged_prompt = final_sys .. "\n\n" .. (user_prompt or "")
 	end
 
-	local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
+	-- Same classification as post_and_parse: a rewrite needs its instructions
+	local is_advanced_prompt = type(final_sys) == "string"
+		and (final_sys:find("TAIL_CORRECTED", 1, true) ~= nil or Rewrite.is_rewrite_prompt(final_sys))
 	local line_mode = (not is_batch) and (not is_advanced_prompt)
 	local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
 

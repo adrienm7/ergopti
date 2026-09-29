@@ -262,10 +262,12 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 				. _ActPickWeb_Kv("text", It.Text)
 				. "}"
 		} else {
-			; send_text / send_key / send_shortcut carry their kind, and the value
-			; the binding holds, for the page's own editor.
+			; Every parameterized action carries its kind and the value the binding
+			; holds: the page edits text/key/shortcut/llm_prompt itself, and its
+			; "edit the current action" button reopens any of them. Other kinds
+			; confirm without a value, and the native prompt asks for it.
 			Kind := GestureActionParameterSpec(It.Id)
-			Parameter := (Kind = "text" || Kind = "key" || Kind = "shortcut")
+			Parameter := (Kind != "")
 				? "," . _ActPickWeb_Kv("parameter", Kind) . "," . _ActPickWeb_Kv("parameterValue",
 					(BindingId = "") ? "" : GestureGetActionParameter(BindingId, It.Id))
 				: ""
@@ -291,6 +293,9 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("platform", "ahk") . ","
 		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
+		. '"promptChoices":' . _ActPickWeb_PromptChoicesJson() . ","
+		. '"defaultCount":' . _ActPickWeb_DefaultCount() . ","
+		. _ActPickWeb_Kv("editCurrentLabel", t("dialog.action_picker.edit_current")) . ","
 		. '"items":[' . ItemsJson . "]"
 		. "}"
 
@@ -309,6 +314,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 
 ; The editor's localized strings: its buttons, its capture hints, and each
 ; kind's prompt and refusal, the same texts the native prompt shows.
+; countDefault stays raw, with its {1}: the page puts the menu's count in it.
 _ActPickWeb_ParameterStringsJson() {
 	Prompts := ""
 	Errors := ""
@@ -316,12 +322,37 @@ _ActPickWeb_ParameterStringsJson() {
 		Prompts .= (Prompts = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureActionParameterPrompt(Pair[2]))
 		Errors .= (Errors = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureSendInputErrorText(Pair[1]))
 	}
+	Prompts .= "," . _ActPickWeb_Kv("llm_prompt", GestureActionParameterPrompt("llm_prompt_prediction"))
+	Errors .= "," . _ActPickWeb_Kv("llm_prompt", t("dialog.gestures.param_err_llm_prompt"))
 	return "{"
 		. _ActPickWeb_Kv("save", t("button.save")) . ","
 		. _ActPickWeb_Kv("back", t("dialog.action_picker.back")) . ","
 		. _ActPickWeb_Kv("captureKey", t("dialog.action_picker.capture_key")) . ","
 		. _ActPickWeb_Kv("captureShortcut", t("dialog.action_picker.capture_shortcut")) . ","
+		. _ActPickWeb_Kv("promptLabel", t("dialog.action_picker.prompt_label")) . ","
+		. _ActPickWeb_Kv("countLabel", t("dialog.action_picker.count_label")) . ","
+		. _ActPickWeb_Kv("countDefault", t("dialog.action_picker.count_default")) . ","
 		. '"prompts":{' . Prompts . '},"errors":{' . Errors . "}}"
+}
+
+; The prompts a llm_prompt value may name, built-ins in menu order then the
+; user's custom ones, each with the label the AI menu shows.
+_ActPickWeb_PromptChoicesJson() {
+	Json := ""
+	for Choice in LLM_Menu_PromptChoices()
+		Json .= (Json = "" ? "" : ",") . "{"
+			. _ActPickWeb_Kv("value", Choice["value"]) . ","
+			. _ActPickWeb_Kv("label", Choice["label"]) . "}"
+	return "[" . Json . "]"
+}
+
+; The AI menu's prediction count, which a value without a count of its own uses.
+_ActPickWeb_DefaultCount() {
+	global _LLM_Menu
+	Count := _LLM_Menu["n_predictions"]
+	if !IsInteger(Count)
+		throw TypeError("The AI menu's prediction count must be an integer, got " . Type(Count) . ".")
+	return String(Integer(Count))
 }
 
 ; Builds one JSON key/value pair (key:"value") with the value safely escaped.

@@ -545,7 +545,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	CompletionError := ""
 	if _TextSenderHasAtomicHooks(Opts) {
 		Result := _TextSenderRunAtomicOutput(
-			_AHK_SendInput.Bind("^v"), Opts, "clipboard paste")
+			_AHK_SendInput.Bind(_TextSenderErasePrefix(Opts) . "^v"), Opts, "clipboard paste")
 		if !Result.Ok {
 			_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
 			_TextSenderInvokeCallback(Callback, false, Result.ErrorMessage)
@@ -678,18 +678,46 @@ _TextSenderFinishClipboard() {
 	SetTimer(_TextSenderStartClipboard, -1)
 }
 
+; The keystrokes that erase Count characters before the text of an atomic
+; output. They lead the SAME SendInput string as the text or the paste, so the
+; erasure and its replacement reach the OS as one batch: no physical key can land
+; between them, and admission is checked once for both.
+; @param Opts {Map|0} TextSend options; "erase_before" is the Backspace count.
+; @returns {String} "{Backspace N}", or "" when nothing is erased.
+_TextSenderErasePrefix(Opts) {
+	Count := (Opts is Map) ? Opts.Get("erase_before", 0) : 0
+	if !(Count is Integer) or Count < 0
+		throw ValueError("erase_before must be a non-negative integer.")
+	return (Count > 0) ? "{Backspace " . Count . "}" : ""
+}
+
 ; Inserts text at the current insertion point.
 ; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
 ; code path.
 ; @param Text     {String}   The Unicode text to insert.
-; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
+; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto",
+;                              erase_before?: Integer — Backspaces sent first, in
+;                              the same batch; atomic (admission-owned) output only }
 ; @param Callback {Func|0}   Called with no arguments on completion.
 TextSend(Text, Opts, Callback) {
 	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
+	; Erasing typed text is only safe where admission proves the target is
+	; unchanged: without it the Backspaces could land in whatever has focus now.
+	try
+		ErasePrefix := _TextSenderErasePrefix(Opts)
+	catch as Err {
+		_TextSenderInvokeCallback(Callback, false, Err.Message)
+		return
+	}
+	if (ErasePrefix != "" and !_TextSenderHasAtomicHooks(Opts)) {
+		_TextSenderInvokeCallback(Callback, false,
+			"erasing before the text requires an atomic, admission-guarded output")
+		return
+	}
 
 	; Resolve "auto" to a concrete strategy based on payload length.
 	if Mode = "auto"
@@ -724,7 +752,7 @@ TextSend(Text, Opts, Callback) {
 				return
 			}
 			Result := _TextSenderRunAtomicOutput(
-				_AHK_SendInput.Bind("{Text}" . Text), Opts, "direct-mode SendInput text")
+				_AHK_SendInput.Bind(ErasePrefix . "{Text}" . Text), Opts, "direct-mode SendInput text")
 			_TextSenderInvokeCallback(Callback, Result.Ok, Result.ErrorMessage)
 		} else {
 			Ok := true

@@ -160,6 +160,10 @@ local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
 local HTTP_OWNER = "updater"
 local RELEASE_TIMEOUT_MS = 15000
 local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
+-- Transport pages fit the existing 2 MiB ceiling; the canonical URL still
+-- determines the total candidate count (100), independently of page size.
+local RELEASE_PAGE_SIZE = 20
+local _release_fetch_cancel = nil
 local DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
 local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 local MAX_CHECKSUM_BODY_BYTES = 4096
@@ -451,8 +455,9 @@ end
 --- @return string url
 --- @return table headers
 --- @return table options
-local function _build_fetch_request(channel)
-	local etag_file = etag_cache_path(channel)
+local function _build_fetch_request(channel, page)
+	local cache_key = page and (channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE) or channel
+	local etag_file = etag_cache_path(cache_key)
 	local parent = etag_file:match("^(.*)/[^/]+$")
 	local options = {
 		owner = HTTP_OWNER,
@@ -467,9 +472,13 @@ local function _build_fetch_request(channel)
 	-- conditional only while this process holds the list the saved ETag names.
 	if parent and Fs.exists(parent) then
 		options.etag_save = etag_file
-		if _list_cache[channel] and Fs.exists(etag_file) then options.etag_compare = etag_file end
+		if _list_cache[cache_key] and Fs.exists(etag_file) then options.etag_compare = etag_file end
 	end
-	return M.release_api_url(), {
+	local url = M.release_api_url()
+	if page then
+		url = url:gsub("per_page=%d+", "per_page=" .. RELEASE_PAGE_SIZE) .. "&page=" .. page
+	end
+	return url, {
 		Accept = "application/vnd.github+json",
 		["User-Agent"] = USER_AGENT,
 	}, options
@@ -482,34 +491,69 @@ M._build_fetch_request = _build_fetch_request
 --- @param callback function Receives body, status, error.
 --- @return boolean Whether the asynchronous request was dispatched.
 local function _fetch_releases(channel, callback)
-	local url, headers, options = M._build_fetch_request(channel)
-	return M._http_client.get(url, headers, options, function(result)
-		local status = tonumber(result and result.status) or 0
-		if status == 304 then
-			local cached = _list_cache[channel]
-			if not cached then
-				Logger.warn(LOG, "GitHub answered 304 for channel %s without a cached release list.", channel)
-				callback(nil, status, "not modified, and no release list is cached")
+	local count = tonumber(M.release_api_url():match("[?&]per_page=(%d+)"))
+	if not count or count < 1 or count % RELEASE_PAGE_SIZE ~= 0 then
+		callback(nil, 0, "release candidate count must be a multiple of the transport page size")
+		return false
+	end
+	local chunks, terminal, all_unchanged = {}, false, true
+	local cancel
+	local function finish(body, status, err)
+		if terminal then return end
+		terminal = true
+		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
+		callback(body, status, err)
+	end
+	cancel = function() finish(nil, 0, "cancelled") end
+	_release_fetch_cancel = cancel
+	local fetch_page
+	fetch_page = function(page)
+		local url, headers, options = M._build_fetch_request(channel, page)
+		local key = channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE
+		local answered = false
+		local sent = M._http_client.get(url, headers, options, function(result)
+			if terminal or answered then return end
+			answered = true
+			local status = tonumber(result and result.status) or 0
+			local body = result and result.body
+			if status == 304 then
+				body = _list_cache[key]
+				if not body then
+					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
+					finish(nil, status, "not modified, and no release page is cached")
+					return
+				end
+				Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s page %d; reusing the cached page.", channel, page)
+			elseif not result or result.ok ~= true then
+				if status == 403 then Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s page %d.", channel, page) end
+				finish(nil, status, result and result.error or "empty HTTP result")
+				return
+			else
+				all_unchanged = false
+			end
+			local valid, decoded = pcall(Json.decode, body)
+			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
+				or type(decoded) ~= "table" then
+				finish(nil, status, "invalid release page JSON")
 				return
 			end
-			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s; reusing the cached list.", channel)
-			callback(cached, status, nil)
-			return
-		end
-		if not result or result.ok ~= true then
-			if status == 403 then
-				Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.", channel)
+			local entries = Parser.split_releases_array(body)
+			if #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
+				finish(nil, status, "invalid release page entries")
+				return
 			end
-			callback(nil, status, result and result.error or "empty HTTP result")
-			return
-		end
-		if type(result.body) ~= "string" or result.body == "" then
-			callback(nil, status, "empty response body")
-			return
-		end
-		_list_cache[channel] = result.body
-		callback(result.body, status, nil)
-	end)
+			_list_cache[key] = body
+			for _, entry in ipairs(entries) do chunks[#chunks + 1] = entry end
+			if #entries < RELEASE_PAGE_SIZE or #chunks == count then
+				finish("[" .. table.concat(chunks, ",") .. "]", all_unchanged and 304 or 200, nil)
+			else
+				fetch_page(page + 1)
+			end
+		end)
+		if sent ~= true and not answered then finish(nil, 0, "release page dispatch refused") end
+		return sent == true
+	end
+	return fetch_page(1)
 end
 
 M._fetch_releases = _fetch_releases
@@ -1029,6 +1073,7 @@ end
 --- @return boolean
 function M.cancel_update()
 	local http_cancelled = M._http_client.cancel(HTTP_OWNER)
+	if http_cancelled and _release_fetch_cancel then _release_fetch_cancel() end
 	local digest_cancelled = M._file_digest.cancel()
 	if not http_cancelled or not digest_cancelled then return false end
 	if _state == "installing" then return true end

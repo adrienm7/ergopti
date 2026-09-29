@@ -58,6 +58,14 @@ _HotstringsScopeSections(Entry) {
 	return _HCW_GetSections(Entry, FSReadUtf8Exact)
 }
 
+; Resolve both sides of source identity without changing admitted write paths.
+_HotstringsScopeSourceKey(Path) {
+	Loop Files, Path
+		return StrLower(A_LoopFileFullPath)
+	; Missing files have no sections; preserve their lexical identity.
+	return _ConfigWriteLeaseKey(Path)
+}
+
 /**
  * Owns additional files without introducing a second transaction coordinator.
  */
@@ -68,6 +76,7 @@ class HotstringsScopeFiles {
 		this.languages := Options.Get("language_paths", _HotstringsScopeLanguagePaths)
 		this.overrides := Options.Has("override_path") ? Options["override_path"] : HotstringsConfigPath()
 		this.personal := Options.Has("personal_path") ? Options["personal_path"] : PersonalTomlPath()
+		this.personalKey := _HotstringsScopeSourceKey(this.personal)
 		this.paths := [this.overrides]
 		this.owned := Map(StrLower(this.overrides), true)
 		for Entry in this.catalogue.Call() {
@@ -86,7 +95,7 @@ class HotstringsScopeFiles {
 			if Entry.IsPersonal {
 				if !this.owned.Has(StrLower(Entry.Path))
 					throw Error("The personal hotstring catalogue changed before admission.")
-				if StrLower(Entry.Path) != StrLower(this.personal)
+				if _HotstringsScopeSourceKey(Entry.Path) != this.personalKey
 					continue
 				for Section in this.sections.Call(Entry) {
 					Paths.Push("hotstrings.personal." . Section.Name . ".enabled")

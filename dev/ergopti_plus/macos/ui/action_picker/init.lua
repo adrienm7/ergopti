@@ -96,7 +96,8 @@ end
 
 --- Open the action picker for a new target, replacing any prior target.
 --- @param opts table { title, label, current, items, allow_native (bool),
----   native_label, send_vocabulary, parameter_strings }; the last two come from
+---   native_label, send_vocabulary, parameter_strings, prompt_choices,
+---   default_count, edit_current_label }; the last five come from
 ---   ShortcutUtils.picker_parameter_fields and turn the page's editor on.
 --- @param on_confirm function Invoked with the chosen action id, and the value the
 ---   page's editor collected for it, if any, on a pick. An explicit false return
@@ -146,6 +147,10 @@ function M.open(opts, on_confirm)
 		platform          = "hs",
 		sendVocabulary    = opts.send_vocabulary,
 		parameterStrings  = opts.parameter_strings,
+		-- The llm_prompt editor's choices and the count a binding without its own uses
+		promptChoices     = opts.prompt_choices,
+		defaultCount      = opts.default_count,
+		editCurrentLabel  = opts.edit_current_label,
 	}
 
 	local function push_init()

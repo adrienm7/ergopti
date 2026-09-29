@@ -82,7 +82,9 @@ local function load_fixture(options)
 		DEFAULT_STATE = defaults,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
-		get_active_profile = function() return nil end,
+		-- The global profile, and the registry prompt actions look profiles up in
+		get_active_profile = function() return options.active_profile end,
+		find_profile = function(id) return (options.profiles or {})[id] end,
 		is_backend_ready = function() return true end,
 		set_runtime_llm_enabled = function() end,
 		set_llm_streaming = function() end,
@@ -91,9 +93,15 @@ local function load_fixture(options)
 			if options.on_cancel then options.on_cancel(fixture) end
 			return true
 		end,
-		fetch_llm_prediction = function(_context, _tail, _model, _temperature, _max_tokens,
-			_num_predictions, on_success, on_fail, _sequential, _force, _request_id, on_partial)
+		fetch_llm_prediction = function(context, tail, model, temperature, max_tokens,
+			num_predictions, on_success, on_fail, _sequential, force, _request_id, on_partial,
+			profile_override)
 			fixture.fetches = fixture.fetches + 1
+			fixture.last_fetch = {
+				context = context, tail = tail, model = model, temperature = temperature,
+				max_tokens = max_tokens, num_predictions = num_predictions, force = force,
+				profile_override = profile_override,
+			}
 			fixture.on_success = on_success
 			fixture.on_fail = on_fail
 			fixture.on_partial = on_partial

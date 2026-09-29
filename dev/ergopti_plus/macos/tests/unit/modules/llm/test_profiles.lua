@@ -53,13 +53,17 @@ local Profiles = helpers.load_with_stubs("modules.llm.profiles")
 -- =====================================
 
 helpers.describe("Profiles.BUILTIN_PROFILES", function()
-	helpers.it("contains the four canonical built-ins", function()
+	helpers.it("contains the five canonical built-ins, rewrite last", function()
 		local ids = {}
 		for _, p in ipairs(Profiles.BUILTIN_PROFILES) do ids[p.id] = true end
 		helpers.assert_true(ids.raw)
 		helpers.assert_true(ids.basic)
 		helpers.assert_true(ids.advanced)
 		helpers.assert_true(ids.batch_advanced)
+		helpers.assert_true(ids.rewrite, "the rewrite profile is offered with the other built-ins")
+		helpers.assert_eq(Profiles.BUILTIN_PROFILES[#Profiles.BUILTIN_PROFILES].id, "rewrite")
+		helpers.assert_eq(Profiles.BUILTIN_PROFILES[#Profiles.BUILTIN_PROFILES].label,
+			"llm.profile.rewrite.label", "labelled from its locale key")
 	end)
 
 	helpers.it("each built-in has the required shape", function()
@@ -221,6 +225,26 @@ helpers.describe("Profiles.get_active_profile", function()
 		local p = Profiles.get_active_profile("a_profile_id_from_two_versions_ago", nil)
 		helpers.assert_true(p ~= nil, "an unknown id must fall back to a real profile, not nil")
 		helpers.assert_eq(type(p.id), "string", "and it must carry an id the caller can log")
+	end)
+end)
+
+
+
+
+
+helpers.describe("Profiles.find_profile (strict lookup for prompt actions)", function()
+	helpers.it("finds a built-in and a user profile by exact id", function()
+		helpers.assert_eq(Profiles.find_profile("rewrite", {}).id, "rewrite")
+		local custom = { id = "custom_7", system_single = "{context}" }
+		helpers.assert_true(rawequal(Profiles.find_profile("custom_7", { custom }), custom))
+	end)
+
+	helpers.it("returns nil for an unknown id instead of falling back to basic", function()
+		helpers.assert_nil(Profiles.find_profile("custom_deleted", {}),
+			"a binding naming a deleted prompt must be refused, not run another prompt")
+		helpers.assert_nil(Profiles.find_profile("parallel", {}), "no legacy migration either")
+		helpers.assert_nil(Profiles.find_profile("", {}))
+		helpers.assert_nil(Profiles.find_profile(nil, {}))
 	end)
 end)
 

@@ -29,13 +29,20 @@
 
 		<main id="list" tabindex="-1"></main>
 
-		<!-- The editor of a send_text / send_key / send_shortcut value, shown in
-		     place of the list once such an action is picked. -->
+		<!-- The editor of a send_text / send_key / send_shortcut value, or of the
+		     prompt and count of an llm_prompt_prediction, shown in place of the
+		     list once such an action is picked. -->
 		<section id="param" hidden>
 			<h2 id="param-title"></h2>
 			<p id="param-prompt"></p>
 			<p id="param-hint"></p>
 			<input id="param-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+			<div id="param-choice" hidden>
+				<label id="param-profile-label" for="param-profile"></label>
+				<select id="param-profile"></select>
+				<label id="param-count-label" for="param-count"></label>
+				<select id="param-count"></select>
+			</div>
 			<p id="param-error" hidden></p>
 			<div class="param-buttons">
 				<button id="param-back" type="button"></button>
@@ -52,6 +59,7 @@
 
 		<footer id="ftr">
 			<span id="count"></span>
+			<button id="btn-edit-current" type="button" hidden></button>
 			<button id="btn-cancel" type="button" onclick="doCancel()"></button>
 		</footer>
 

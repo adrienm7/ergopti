@@ -95,6 +95,9 @@ _LLM_Parser_CleanModelOutput(text) {
 	out := RegExReplace(out, "i)TAIL_CORRECTED\s*:", "TAIL_CORRECTED:")
 	out := RegExReplace(out, "i)NEXT_WORDS\s*:", "NEXT_WORDS:")
 	out := RegExReplace(out, "im)(^|\n)(NEXT)\s*:", "$1NEXT_WORDS:")
+	; A rewrite prompt's tag, in whatever case or bracket form the model wrote it
+	out := RegExReplace(out, "i)\[REWRITE\]", "REWRITE:")
+	out := RegExReplace(out, "i)REWRITE\s*:", "REWRITE:")
 	; Strip NUL bytes and other non-printable ASCII control characters (but keep \t, \n, \r)
 	out := RegExReplace(out, "[\x00-\x08\x0B\x0C\x0E-\x1F]", "")
 	return out
@@ -447,15 +450,24 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 	block := StrReplace(block, "'", "’")
 	block := _LLM_Parser_CleanModelOutput(block)
 
-	is_advanced := (InStr(block, "TAIL_CORRECTED") or InStr(block, "NEXT_WORDS"))
+	; A rewrite answers a rewrite prompt (modules/llm/rewrite.ahk): it replaces the
+	; whole tail span the caller sent and never appends next words. The cleaner
+	; above normalised every spelling of the tag to this exact one.
+	is_rewrite := InStr(block, "REWRITE:", true) > 0
+	is_advanced := (is_rewrite or InStr(block, "TAIL_CORRECTED") or InStr(block, "NEXT_WORDS"))
 
 	if is_advanced {
 		tc := ""
 		nw := ""
-		if RegExMatch(block, "i)TAIL_CORRECTED\s*:\s*(.*?)(?:\r?\n|$)", &m)
-			tc := _LLM_Parser_Trim(m[1])
-		if RegExMatch(block, "i)NEXT_WORDS\s*:\s*(.*?)(?:\r?\n|$)", &m)
-			nw := _LLM_Parser_Trim(m[1])
+		if is_rewrite {
+			if RegExMatch(block, "REWRITE:\s*(.*?)(?:\r?\n|$)", &m)
+				tc := _LLM_Parser_Trim(m[1])
+		} else {
+			if RegExMatch(block, "i)TAIL_CORRECTED\s*:\s*(.*?)(?:\r?\n|$)", &m)
+				tc := _LLM_Parser_Trim(m[1])
+			if RegExMatch(block, "i)NEXT_WORDS\s*:\s*(.*?)(?:\r?\n|$)", &m)
+				nw := _LLM_Parser_Trim(m[1])
+		}
 		tc := RegExReplace(tc, "\s*\]$", "")
 		tc := RegExReplace(tc, '^"', "")
 		tc := RegExReplace(tc, '"$', "")
@@ -466,7 +478,8 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		nw := _LLM_Parser_ApplyFrenchTypography(nw)
 		nw := RegExReplace(nw, "^[\s\.…]+", "")
 		nw := RegExReplace(nw, "[\s\.…]+$", "")
-		nw := _LLM_Parser_EnforceWordLimits(nw, max_words)
+		if !is_rewrite
+			nw := _LLM_Parser_EnforceWordLimits(nw, max_words)
 		; Cap tc the same way. Its capture is bounded only by line length, and it
 		; feeds _LLM_Parser_TokenDiffOps — an O(n^2) dynamic program whose per-cell
 		; body allocates a fresh char array twice and a full (n1+1)x(n2+1) matrix
@@ -476,17 +489,25 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		; keyboard hook). The crash firewall catches exceptions, not elapsed time,
 		; so this degraded to a hang with nothing logged. A correction can never
 		; legitimately exceed the prediction budget.
-		tc := _LLM_Parser_EnforceWordLimits(tc, max_words)
-		if (nw = "")
-			return ""
+		; A rewrite is a whole sentence, not a few predicted words: capping it to
+		; max_words would erase the span and retype only its start. Its length is
+		; bounded by the span-sized token budget the engine sends instead
+		; (LLM_Rewrite_MaxTokens), and it carries no next words to require.
+		if !is_rewrite {
+			tc := _LLM_Parser_EnforceWordLimits(tc, max_words)
+			if (nw = "")
+				return ""
+		}
 		if (tc = "" and nw != "")
 			tc := _LLM_Parser_Trim(RegExReplace(tail_text, '^"', ""))
 		if (tc = "" and nw = "")
 			return ""
 
+		; A rewrite legitimately replaces the last word ("jd" becomes "jeudi"), so
+		; the stale-snapshot guard only protects continuations.
 		orig_last := _LLM_Parser_LastWord(full_text)
 		tc_last := _LLM_Parser_LastWord(tc)
-		if (orig_last != "" and tc_last != "") {
+		if (!is_rewrite and orig_last != "" and tc_last != "") {
 			max_len := Max(StrLen(orig_last), StrLen(tc_last))
 			dist := _LLM_Parser_CharLev(StrLower(orig_last), StrLower(tc_last))
 			if (max_len > 0 and dist >= max_len)
@@ -552,7 +573,20 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		; Sliding window of the buffer context, snapped to a word boundary.
 		nf_len := StrLen(normalized_full)
 		window_size := Min(nf_len, Max(60, StrLen(tc_norm) + 30))
-		orig_context := SubStr(normalized_full, nf_len - window_size + 1)
+		if is_rewrite {
+			; The rewrite replaces exactly the span the caller sent. It must be a
+			; suffix of the context, or the erase count would not match the text.
+			tail_len := StrLen(tail_text)
+			if (tail_len == 0 or tail_len > nf_len
+					or !(SubStr(normalized_full, nf_len - tail_len + 1) == tail_text)) {
+				try LoggerWarn("LLM.parser", "Rewrite refused: the rewritten span is not the end of the context.")
+				return ""
+			}
+			orig_context := tail_text
+			window_size := nf_len
+		} else {
+			orig_context := SubStr(normalized_full, nf_len - window_size + 1)
+		}
 		if (window_size < nf_len and !(orig_context ~= "^[\s" . Chr(0x00A0) . Chr(0x202F) . "]")) {
 			snap := RegExMatch(orig_context, "[\s" . Chr(0x00A0) . Chr(0x202F) . "]")
 			if (snap)
@@ -562,9 +596,11 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		; 1. Diff strictly against TAIL_CORRECTED.
 		ops := _LLM_Parser_TokenDiffOps(orig_context, tc_norm)
 
-		; 2. Strip leading context (free deletes + leading inserted spaces).
+		; 2. Strip leading context (free deletes + leading inserted spaces). A
+		; rewrite keeps its leading deletions: the span starts where the sentence
+		; starts, so a replaced first word must really be erased.
 		stripped_ops := []
-		while (ops.Length > 0 and ops[1]["type"] = "del")
+		while (!is_rewrite and ops.Length > 0 and ops[1]["type"] = "del")
 			stripped_ops.Push(ops.RemoveAt(1))
 		while (ops.Length > 0 and ops[1]["type"] = "ins" and ops[1]["t2"] ~= "^[\s" . Chr(0x00A0) . Chr(0x202F) . "]+$")
 			stripped_ops.Push(ops.RemoveAt(1))
@@ -587,7 +623,10 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 			}
 		}
 
-		; Context matched perfectly; the model only appended words.
+		; Context matched perfectly; the model only appended words. A rewrite
+		; identical to its span offers nothing.
+		if (first_change_idx = -1 and is_rewrite)
+			return ""
 		if (first_change_idx = -1)
 			return Map("deletes", 0, "to_type", "", "nw", nw_norm, "has_corrections", false, "chunks", [], "disable_bold", false)
 
@@ -626,8 +665,9 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 			}
 		}
 
-		; Safety circuit breaker against massive unprompted deletions.
-		max_allowed_dels := Max(20, StrLen(tc_norm) + 10)
+		; Safety circuit breaker against massive unprompted deletions. A rewrite
+		; may erase its whole span, which the caller chose; nothing else.
+		max_allowed_dels := is_rewrite ? StrLen(orig_context) : Max(20, StrLen(tc_norm) + 10)
 		if (true_deletes > max_allowed_dels)
 			return ""
 		if (RegExReplace(true_to_type, "[\s\.…]", "") = "")
@@ -726,6 +766,8 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		} else {
 			nw_start_idx := 1
 		}
+		if is_rewrite
+			nw_start_idx := visual_ops.Length + 1
 
 		display_nw := ""
 		Loop visual_ops.Length {
@@ -788,7 +830,7 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 				break
 			}
 		}
-		if only_equals {
+		if (only_equals and !is_rewrite) {
 			chunks := []
 			if (true_deletes > 0) {
 				appended_len := StrLen(true_to_type)
@@ -799,13 +841,18 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 
 		disable_bold := (chunks.Length > 0 and chunks[chunks.Length]["type"] = "insert" and (display_nw ~= "\S") > 0)
 
+		if is_rewrite
+			return _LLM_Parser_RewriteRecord(orig_context, true_deletes, true_to_type,
+				has_corr, chunks, disable_bold)
+
 		return Map(
 			"deletes", true_deletes,
 			"to_type", true_to_type,
 			"nw", display_nw,
 			"has_corrections", has_corr,
 			"chunks", chunks,
-			"disable_bold", disable_bold
+			"disable_bold", disable_bold,
+			"rewrite", false
 		)
 	}
 
@@ -907,6 +954,42 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 }
 
 /**
+ * Builds the record of a rewrite, whose erasure the accept step performs.
+ * The physical operations cover every character of the span from the first
+ * change on, so the erased text is exactly the span's last ``Units`` code
+ * units. The count reaching the accept step is in codepoints (one Backspace
+ * per character, as the shared parser counts it); an erasure that would start
+ * inside a surrogate pair takes the whole character and retypes its lead.
+ * @param {String} Span The rewritten span, an exact suffix of the context.
+ * @param {Integer} Units UTF-16 code units the diff erases from its end.
+ * @param {String} ToType Text typed after the erasure.
+ * @returns {Map} The prediction record, with deleted_text and span.
+ */
+_LLM_Parser_RewriteRecord(Span, Units, ToType, HasCorrections, Chunks, DisableBold) {
+	SpanLength := StrLen(Span)
+	if (Units < 0 or Units > SpanLength)
+		throw ValueError("A rewrite cannot erase " . Units . " of its " . SpanLength . " span units.")
+	DeletedText := (Units > 0) ? SubStr(Span, SpanLength - Units + 1) : ""
+	FirstUnit := (DeletedText != "") ? Ord(SubStr(DeletedText, 1, 1)) : 0
+	if (FirstUnit >= 0xDC00 and FirstUnit <= 0xDFFF and Units < SpanLength) {
+		Lead := SubStr(Span, SpanLength - Units, 1)
+		DeletedText := Lead . DeletedText
+		ToType := Lead . ToType
+	}
+	return Map(
+		"deletes", LLM_Rewrite_CodepointLength(DeletedText),
+		"deleted_text", DeletedText,
+		"span", Span,
+		"to_type", ToType,
+		"nw", "",
+		"has_corrections", HasCorrections,
+		"chunks", Chunks,
+		"disable_bold", DisableBold,
+		"rewrite", true
+	)
+}
+
+/**
  * True when a parsed prediction can be injected without erasing anything first.
  *
  * ``deletes`` counts characters the accept step must ERASE before typing
@@ -915,10 +998,15 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
  * (LLM_Bridge_OnAccept) types without erasing, so a prediction carrying
  * ``deletes > 0`` is appended to the very characters it was meant to replace and
  * the sentence comes out garbled. Refusing the suggestion costs the user a
- * correction they can still make by hand; accepting it costs them their sentence,
- * so refuse until the erase step exists on this driver.
+ * correction they can still make by hand; accepting it costs them their sentence.
+ *
+ * A rewrite is the one exception. Its record names the exact text it erases
+ * (``deleted_text``, a suffix of the span the caller chose), and the accept
+ * path erases it inside the same admission-guarded output transaction that
+ * types the replacement (_LLM_Bridge_InjectionOptions, "erase_before"). An
+ * ordinary correction keeps no such record, so it is still refused.
  * @param {Map} pred A record returned by LLM_Parser_ProcessPrediction.
- * @returns {Integer} 1 when the prediction needs no erasure.
+ * @returns {Integer} 1 when the prediction needs no erasure, or is a rewrite.
  */
 _LLM_Parser_IsPhysicallyInjectable(pred) {
 	if !(pred is Map)
@@ -926,15 +1014,22 @@ _LLM_Parser_IsPhysicallyInjectable(pred) {
 	deletes := pred.Has("deletes") ? pred["deletes"] : 0
 	if (deletes <= 0)
 		return true
+	if (pred.Get("rewrite", false) == true)
+		return true
 	try LoggerWarn("LLM.parser", "Dropping a correction that needs {1} character(s) erased — the Windows accept path types without erasing, so injecting it would append the fix to the typo instead of replacing it.", deletes)
 	return false
 }
 
 /**
  * Full post-API parse path — mirrors api_ollama.lua post_and_parse.
+ * @param {VarRef} out_edits Receives Map(slot text → rewrite edit) for the
+ *     slots that are rewrites: Map("deletes", Codepoints, "deleted_text",
+ *     Text, "span", Span). The slots stay plain strings, so the tooltip, the
+ *     cache and the dedup keep their shape; the edit travels beside them.
  * @returns {Array} Slot strings (to_type) ready for the tooltip.
  */
-LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "") {
+LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "", &out_edits := "") {
+	out_edits := Map()
 	raw := LLM_Parser_StripThinking(raw)
 	if (raw = "")
 		return []
@@ -959,7 +1054,14 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 	if IsSet(out_stats)
 		out_stats := stats
 	out := []
-	for _, p in slots
-		out.Push(_LLM_ApiCommon_PredText(p))
+	for _, p in slots {
+		text := _LLM_ApiCommon_PredText(p)
+		out.Push(text)
+		if (p is Map and p.Get("rewrite", false) == true)
+			out_edits[text] := Map(
+				"deletes", p["deletes"],
+				"deleted_text", p["deleted_text"],
+				"span", p["span"])
+	}
 	return out
 }

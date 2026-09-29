@@ -53,16 +53,42 @@ LLM_Menu_GetProfileLabel(id) {
 			return p.Has("label") ? p["label"] : id
 	}
 
-	; Built-in profile labels
-	if (id == "raw")
-		return t("llm.profile.raw.label")
-	if (id == "basic")
-		return t("llm.profile.basic.label")
-	if (id == "advanced")
-		return t("llm.profile.advanced.label")
-	if (id == "batch_advanced")
-		return StrReplace(StrReplace(t("llm.profile.batch_advanced.label"), "{n}", n), "{s}", s)
+	; Built-in profile labels: every built-in owns llm.profile.<id>.label; only
+	; the batch one uses the {n}/{s} placeholders, which the others lack.
+	if LLM_Option_IsBuiltinProfileId(id)
+		return StrReplace(StrReplace(t("llm.profile." . id . ".label"), "{n}", n), "{s}", s)
 	return id
+}
+
+/**
+ * The prompts a binding can run, as the AI menu lists them: the built-ins in
+ * menu order, then the user's custom profiles.
+ * @returns {Array} Maps with "value" (the profile ID) and "label".
+ */
+LLM_Menu_PromptChoices() {
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER
+	Choices := []
+	for Id in LLM_PROFILE_BUILTIN_ORDER
+		Choices.Push(Map("value", Id, "label", LLM_Menu_GetProfileLabel(Id)))
+	for Profile in _LLM_Menu["user_profiles"] {
+		if !(Profile is Map) || !Profile.Has("id")
+			continue
+		Choices.Push(Map("value", Profile["id"],
+			"label", LLM_Menu_GetProfileLabel(Profile["id"])))
+	}
+	return Choices
+}
+
+/**
+ * The prompt list the native parameter prompt shows: one "<id> — <label>" line
+ * per available prompt, the ID being what the user types.
+ * @returns {String}
+ */
+LLM_Menu_PromptChoicesText() {
+	Text := ""
+	for Choice in LLM_Menu_PromptChoices()
+		Text .= (Text == "" ? "" : "`n") . Choice["value"] . " — " . Choice["label"]
+	return Text
 }
 
 /**
@@ -98,7 +124,7 @@ LLM_Menu_BuildProfileMenu() {
  *                  auto-detect toggle and the per-app overrides submenu.
  */
 _LLM_Menu_ProfileRows() {
-	global _LLM_Menu
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER
 	Rows := []
 
 	; Row labels must be unique WITHIN this menu: AHK v2's Menu.Add with an
@@ -117,7 +143,7 @@ _LLM_Menu_ProfileRows() {
 	; Section header: built-in profiles
 	Rows.Push(Map("label", t("menu.profiles.header_default_profiles")))
 
-	for id in ["raw", "basic", "advanced", "batch_advanced"] {
+	for id in LLM_PROFILE_BUILTIN_ORDER {
 		base_label := LLM_Menu_GetProfileLabel(id)
 		hint := LLM_Menu_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
@@ -157,7 +183,7 @@ _LLM_Menu_ProfileRows() {
 	; the next driver update); cloning them into a user profile is the
 	; supported way to customise their prompts.
 	active_id := _LLM_Menu["profile_id"]
-	is_builtin := (active_id == "raw" or active_id == "basic" or active_id == "advanced" or active_id == "batch_advanced")
+	is_builtin := LLM_Option_IsBuiltinProfileId(active_id)
 	if is_builtin {
 		Rows.Push(Map(
 			"label",  t("menu.profiles.clone_builtin"),
@@ -373,12 +399,15 @@ _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 }
 
 _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
+	global LLM_PROFILE_BUILTIN_ORDER
 	if !(MenuState is Map) || !MenuState.Has("app_profile_overrides")
 			|| !(MenuState["app_profile_overrides"] is Map)
 			|| !MenuState.Has("user_profiles")
 			|| !(MenuState["user_profiles"] is Array)
 		return false
-	Valid := Map("raw", true, "basic", true, "advanced", true, "batch_advanced", true)
+	Valid := Map()
+	for Id in LLM_PROFILE_BUILTIN_ORDER
+		Valid[Id] := true
 	for Profile in MenuState["user_profiles"] {
 		if !(Profile is Map) || !Profile.Has("id")
 				|| !(Profile["id"] is String) || Profile["id"] == ""

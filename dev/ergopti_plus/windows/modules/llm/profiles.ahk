@@ -72,6 +72,25 @@ LLM_GetActiveProfile(active_id, user_profiles := []) {
 	return Map("id", "raw", "system_single", "{context}", "batch", false)
 }
 
+/**
+ * Retrieves a profile by its exact ID among the built-in and user profiles.
+ * Unlike LLM_GetActiveProfile it never substitutes another profile: a request
+ * that names a prompt of its own (the llm_prompt_prediction action) must run
+ * that prompt or nothing, and an absent one is the caller's refusal to report.
+ * @param {String} ProfileId - ID of the requested profile.
+ * @param {Array} user_profiles - User-defined profiles.
+ * @returns {Map|String} The matched profile, or "" when none has this ID.
+ */
+LLM_FindProfile(ProfileId, user_profiles := []) {
+	if !(ProfileId is String) || ProfileId == ""
+		return ""
+	for _, p in LLM_GetAllProfiles(user_profiles) {
+		if (p is Map && p.Has("id") && p["id"] == ProfileId)
+			return p
+	}
+	return ""
+}
+
 
 
 

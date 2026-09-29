@@ -606,6 +606,11 @@ final class LauncherLogTests: XCTestCase {
 			XCTAssertEqual(process.terminationStatus, LeaseWorkerExit.success.rawValue)
 		}
 
+		XCTAssertEqual(
+			try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted(),
+			["launcher.log"],
+			"the append-integrity helpers must not discard records through retention rotation"
+		)
 		let payload = String(repeating: "x", count: 2_048)
 		var expected = Set<String>()
 		for writer in 0..<writerCount {

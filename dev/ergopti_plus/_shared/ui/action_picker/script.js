@@ -23,8 +23,14 @@
  * the page opens its own editor (a text field, a key capture, a shortcut
  * capture), validates the value with the drivers' rules over the vocabulary the
  * host passes (`sendVocabulary`), and posts {action:'confirm',id,parameter}.
+ * An llm_prompt action opens a choice of prompt profile and prediction count,
+ * from the list the host passes (`promptChoices`, `defaultCount`), and posts
+ * "<profile_id>" or "<profile_id>|<count>".
  * Other kinds (a URL, a wrap pair) confirm without one and keep the host's own
  * prompt.
+ *
+ * When the current action takes a parameter, an "edit" button reopens it
+ * directly: its own editor for the kinds above, the host's prompt otherwise.
  * ==============================================================================
  */
 
@@ -94,9 +100,13 @@ function init(data) {
 	sendVocabulary = data.sendVocabulary || null;
 	hostPlatform = data.platform || '';
 	paramStrings = data.parameterStrings || null;
+	promptChoices = Array.isArray(data.promptChoices) ? data.promptChoices : null;
+	defaultCount = typeof data.defaultCount === 'number' ? data.defaultCount : null;
 	if (paramStrings) {
 		el('param-back').textContent = paramStrings.back || '';
 		el('param-save').textContent = paramStrings.save || '';
+		el('param-profile-label').textContent = paramStrings.promptLabel || '';
+		el('param-count-label').textContent = paramStrings.countLabel || '';
 	}
 	if (editing) closeParamEditor();
 
@@ -124,7 +134,34 @@ function init(data) {
 
 	collapsed.clear();
 	render();
+	updateEditCurrent(data.editCurrentLabel || '');
 	focusSearch();
+}
+
+// The current action, when it takes a parameter the user may want to change.
+function editableCurrent() {
+	const entry = findActionEntry(currentId);
+	if (!entry || entry.special || entry.disabled || !entry.parameter) return null;
+	return entry;
+}
+
+function updateEditCurrent(label) {
+	const button = el('btn-edit-current');
+	const entry = editableCurrent();
+	button.textContent = label;
+	button.hidden = entry === null || label === '';
+}
+
+// Reopens the current action's parameter: the page's editor when it has one,
+// otherwise a confirm, which makes the host ask for the value again.
+function editCurrent() {
+	const entry = editableCurrent();
+	if (!entry) return;
+	if (canEdit(entry)) {
+		openParamEditor(entry);
+		return;
+	}
+	post({ action: 'confirm', id: entry.id });
 }
 
 function focusSearch() {
@@ -391,7 +428,8 @@ function headingDomToEntry(nth) {
 
 // The parameter kinds this page edits itself. Every other kind is left to the
 // host's own prompt, which receives a confirm without a `parameter`.
-const EDITABLE_KINDS = new Set(['text', 'key', 'shortcut']);
+const EDITABLE_KINDS = new Set(['text', 'key', 'shortcut', 'llm_prompt']);
+const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
 // Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
 // host's platform ("hs" makes Command the primary modifier), and the localized
@@ -400,6 +438,12 @@ const EDITABLE_KINDS = new Set(['text', 'key', 'shortcut']);
 let sendVocabulary = null;
 let hostPlatform = '';
 let paramStrings = null;
+
+// Host-supplied for llm_prompt: the prompt profiles a binding may run
+// ([{value: id, label}], built-in then custom) and the AI menu's prediction
+// count, offered as the default.
+let promptChoices = null;
+let defaultCount = null;
 
 // The entry being edited, or null while the list is shown.
 let editing = null;
@@ -462,12 +506,33 @@ function parseSendShortcut(value) {
 	return mods.concat([key]).join('+');
 }
 
+// The rules pinned by _shared/tests/corpus/action_parameters/llm_prompt_vectors.json:
+// "<profile_id>" or "<profile_id>|<count>", the count from 1 to 10.
+const LLM_PROMPT_MAX_ID_LENGTH = 128;
+const LLM_PROMPT_MIN_PREDICTIONS = 1;
+const LLM_PROMPT_MAX_PREDICTIONS = 10;
+
+// {profileId, numPredictions (null = the menu's count)}, or null when invalid.
+function parseLlmPrompt(value) {
+	const parts = value.split('|');
+	if (parts.length > 2) return null;
+	const profileId = parts[0];
+	if (profileId === '' || profileId.length > LLM_PROMPT_MAX_ID_LENGTH) return null;
+	if (!/^[A-Za-z0-9_-]+$/.test(profileId)) return null;
+	if (parts.length === 1) return { profileId: profileId, numPredictions: null };
+	if (!/^[0-9]+$/.test(parts[1])) return null;
+	const count = Number(parts[1]);
+	if (count < LLM_PROMPT_MIN_PREDICTIONS || count > LLM_PROMPT_MAX_PREDICTIONS) return null;
+	return { profileId: profileId, numPredictions: count };
+}
+
 // Canonical form of a value, or null when invalid.
 function parseParameter(kind, value) {
 	if (typeof value !== 'string') return null;
 	if (kind === 'text') return parseSendText(value);
 	if (kind === 'key') return parseSendKey(value, false);
 	if (kind === 'shortcut') return parseSendShortcut(value);
+	if (kind === 'llm_prompt') return parseLlmPrompt(value) === null ? null : value;
 	return null;
 }
 
@@ -515,20 +580,63 @@ function captureShortcut(e) {
 }
 
 function canEdit(entry) {
-	return entry && EDITABLE_KINDS.has(entry.parameter) && sendVocabulary !== null && paramStrings !== null;
+	if (!entry || !EDITABLE_KINDS.has(entry.parameter) || paramStrings === null) return false;
+	if (entry.parameter === 'llm_prompt') return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
+	return SEND_INPUT_KINDS.has(entry.parameter) && sendVocabulary !== null;
+}
+
+function appendOption(select, value, label) {
+	const option = document.createElement('option');
+	option.value = value;
+	option.textContent = label;
+	select.appendChild(option);
+}
+
+// Fills the prompt and count choices, selecting the binding's current value;
+// a value naming a deleted prompt starts from the first prompt instead.
+function fillPromptChoices(value) {
+	const current = parseLlmPrompt(value || '');
+	const profile = el('param-profile');
+	const count = el('param-count');
+	profile.innerHTML = '';
+	count.innerHTML = '';
+	let selected = promptChoices[0].value;
+	for (const choice of promptChoices) {
+		appendOption(profile, choice.value, choice.label);
+		if (current && choice.value === current.profileId) selected = choice.value;
+	}
+	profile.value = selected;
+	const defaultLabel = (paramStrings.countDefault || '{1}').replace('{1}', String(defaultCount));
+	appendOption(count, '', defaultLabel);
+	for (let n = LLM_PROMPT_MIN_PREDICTIONS; n <= LLM_PROMPT_MAX_PREDICTIONS; n++) appendOption(count, String(n), String(n));
+	count.value = current && current.numPredictions !== null ? String(current.numPredictions) : '';
+}
+
+// The value the prompt choices describe.
+function promptChoiceValue() {
+	const count = el('param-count').value;
+	return count === '' ? el('param-profile').value : el('param-profile').value + '|' + count;
 }
 
 function openParamEditor(entry) {
 	editing = entry;
+	const choosing = entry.parameter === 'llm_prompt';
 	el('param-title').textContent = entry.label;
-	el('param-prompt').textContent = (paramStrings.prompts || {})[entry.parameter] || '';
+	el('param-prompt').textContent = choosing ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
 	el('param-hint').textContent = entry.parameter === 'key' ? paramStrings.captureKey
 		: entry.parameter === 'shortcut' ? paramStrings.captureShortcut : '';
-	el('param-input').value = entry.parameterValue || '';
 	el('param-error').hidden = true;
+	el('param-input').hidden = choosing;
+	el('param-choice').hidden = !choosing;
 	el('param').hidden = false;
 	el('list').hidden = true;
 	el('search-bar').hidden = true;
+	if (choosing) {
+		fillPromptChoices(entry.parameterValue);
+		el('param-profile').focus();
+		return;
+	}
+	el('param-input').value = entry.parameterValue || '';
 	el('param-input').focus();
 	// Selected, the current value is replaced by the first key typed or captured.
 	el('param-input').select();
@@ -544,7 +652,7 @@ function closeParamEditor() {
 
 function saveParameter() {
 	if (!editing) return;
-	const value = el('param-input').value;
+	const value = editing.parameter === 'llm_prompt' ? promptChoiceValue() : el('param-input').value;
 	if (parseParameter(editing.parameter, value) === null) {
 		el('param-error').textContent = (paramStrings.errors || {})[editing.parameter] || '';
 		el('param-error').hidden = false;
@@ -623,8 +731,21 @@ function onParamKeydown(e) {
 	const input = el('param-input');
 	if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
 	else if (editing.parameter === 'shortcut') onShortcutCaptureKeydown(e, input);
+	else if (editing.parameter === 'llm_prompt') onChoiceEditorKeydown(e);
 	else onPlainEditorKeydown(e, input);
 	return true;
+}
+
+// The choices always hold a valid value, so Enter saves it; the arrows keep
+// moving inside the focused list.
+function onChoiceEditorKeydown(e) {
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		saveParameter();
+	} else if (e.key === 'Escape') {
+		e.preventDefault();
+		closeParamEditor();
+	}
 }
 
 // ============================================================
@@ -635,6 +756,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	el('search').addEventListener('input', function () { render(); });
 	el('param-back').addEventListener('click', function () { closeParamEditor(); });
 	el('param-save').addEventListener('click', function () { saveParameter(); });
+	el('btn-edit-current').addEventListener('click', function () { editCurrent(); });
 
 	document.addEventListener('keydown', function (e) {
 		// While a value is being edited every key belongs to the editor: Escape
