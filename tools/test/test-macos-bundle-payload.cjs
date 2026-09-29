@@ -593,8 +593,17 @@ const resolved = payload.resolvePayload(manifest, payload.trackedFiles(ROOT, man
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-macos-payload-'));
 let staged;
 let checkedReferences = 0;
+// A junction needs no privilege on Windows and reads as a link like a symlink
+const linkType = process.platform === 'win32' ? 'junction' : 'dir';
 try {
-	const staticRoot = path.join(scratch, 'static');
+	// Stage through a symbolic-link ancestor, as every macOS temporary folder
+	// and a checkout under /tmp are (/var and /tmp point into /private): the
+	// stager must accept links above the root it is given
+	const realParent = path.join(scratch, 'real');
+	const linkedParent = path.join(scratch, 'linked');
+	fs.mkdirSync(realParent);
+	fs.symlinkSync(realParent, linkedParent, linkType);
+	const staticRoot = path.join(linkedParent, 'static');
 	const copied = payload.stage(ROOT, staticRoot);
 	staged = new Set(walk(staticRoot));
 	check(
@@ -611,6 +620,24 @@ try {
 			check(sourceMode === stagedMode, `stage() changed the executable bits of ${file.target}`);
 		}
 	}
+	// ...but never a link below that root, which would write the payload
+	// outside the bundle
+	const hijacked = path.join(scratch, 'hijacked');
+	const outside = path.join(scratch, 'outside');
+	fs.mkdirSync(hijacked);
+	fs.mkdirSync(outside);
+	fs.symlinkSync(outside, path.join(hijacked, 'ergopti_plus'), linkType);
+	let refusal = '';
+	try {
+		payload.stage(ROOT, hijacked);
+	} catch (error) {
+		refusal = error.message;
+	}
+	check(
+		refusal.startsWith('Unsafe payload directory'),
+		`stage() did not refuse a link below its root: ${refusal || 'no error'}`
+	);
+	check(fs.readdirSync(outside).length === 0, 'stage() wrote through a link below its root');
 	const read = (target) =>
 		target.startsWith('repo:')
 			? fs.readFileSync(path.join(ROOT, target.slice('repo:'.length)), 'utf8')
