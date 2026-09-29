@@ -769,6 +769,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-version-compare-contract.cjs'
 	},
 	{
+		name: 'showcase page lists each catalogue action on exactly its declared drivers',
+		cmd: 'node',
+		args: ['tools/test/test-showcase-action-platforms.cjs'],
+		repro: 'npm run test:showcase-action-platforms'
+	},
+	{
 		name: 'LLM stop-sequences single source (no re-inlined literals in backends)',
 		cmd: 'node',
 		args: ['tools/test/test-llm-stop-sequences-single-source.cjs'],
