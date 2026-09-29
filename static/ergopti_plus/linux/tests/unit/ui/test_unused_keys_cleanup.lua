@@ -38,7 +38,7 @@ end)()
 local FIXTURE = table.concat({
 	"[hotstrings]",
 	"enabled = false",
-	"trigger_char = \"★\"",
+	"trigger_char = \"§\"",
 	"stale_toggle = false",
 	"",
 	"[metrics]",
@@ -79,7 +79,7 @@ local EXPECTED = {
 }
 
 local SURVIVORS = {
-	{ { "hotstrings", "trigger_char" }, "★" },
+	{ { "hotstrings", "trigger_char" }, "§" },
 	{ { "metrics", "enabled" }, true },
 	{ { "gestures", "tap_3" }, "open_url" },
 	{ { "gesture_parameters", "tap_3__open_url" }, "https://example.com" },
@@ -139,6 +139,8 @@ local function driver_state(path)
 
 	local paths = require("infra.config_paths")
 	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
+	local previous_preferences = package.loaded["infra.hotstring_preferences"]
+	local previous_magic_key = package.loaded["modules.hotstrings.magic_key"]
 	paths.config = function(name)
 		helpers.assert_eq(name, "config.toml")
 		return path
@@ -146,8 +148,17 @@ local function driver_state(path)
 	local ok_url, chatgpt_url = pcall(function()
 		return helpers.load_module("modules.shortcuts.chatgpt").get_url()
 	end)
+	-- The magic key is read from config.toml by the hotstring preferences, not
+	-- by the setup wizard, which leaves the Linux trigger to the tray.
+	package.loaded["infra.hotstring_preferences"] = nil
+	local ok_key, magic_key = pcall(function()
+		return helpers.load_module("modules.hotstrings.magic_key").get()
+	end)
 	paths.config, package.loaded["modules.shortcuts.chatgpt"] = previous_config, previous_chatgpt
+	package.loaded["infra.hotstring_preferences"] = previous_preferences
+	package.loaded["modules.hotstrings.magic_key"] = previous_magic_key
 	if not ok_url then error(chatgpt_url, 0) end
+	if not ok_key then error(magic_key, 0) end
 
 	local decoded = TomlCodec.decode(Sandbox.read_bytes(path))
 	return {
@@ -156,6 +167,7 @@ local function driver_state(path)
 		gestures_enabled = enable_requested,
 		shortcuts_enabled = shortcuts.is_enabled(),
 		chatgpt_url = chatgpt_url,
+		magic_key = magic_key,
 		update_channel = update_channel,
 		wizard = require("ui.onboarding.bridge").config_values(decoded),
 	}

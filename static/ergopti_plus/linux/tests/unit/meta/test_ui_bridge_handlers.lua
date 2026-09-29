@@ -1155,7 +1155,7 @@ helpers.describe("ui.bridge_handlers", function()
 				return batch_write(path, updates)
 			end
 			local result = finish(state, { locale = "en", config_dir = target,
-				operations = { { path = "hotstrings.trigger_char", value = ";" } } })
+				operations = { { path = "hotstrings.groups.distancesreduction", value = true } } })
 			helpers.assert_true(result.done)
 			helpers.assert_eq(folder_at_write, target, "the folder switches before any choice is written")
 			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
