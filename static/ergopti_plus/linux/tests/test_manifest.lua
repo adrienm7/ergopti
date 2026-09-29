@@ -38,6 +38,7 @@ return {
 	"tests.unit.infra.test_config_scope_composition",
 	"tests.unit.infra.test_config_scope_transaction",
 	"tests.unit.infra.test_gesture_scope",
+	"tests.unit.infra.test_global_scope",
 	"tests.unit.infra.test_diagnostic_snapshot",
 	"tests.unit.infra.test_display_server",
 	"tests.unit.infra.test_driver_version",

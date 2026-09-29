@@ -217,6 +217,43 @@ return function(helpers)
 			helpers.assert_eq(trace, {})
 		end)
 
+		helpers.it("adapts a synchronous owner so the composition reverts the owner that committed", function()
+			local Participant = require("config_scope_participant")
+			local owners, trace = {}, {}
+			local function owner_for(index)
+				local owner = { committed = false }
+				function owner.revert()
+					trace[#trace + 1] = "revert:" .. index
+					return owner.committed, owner.committed and nil or "nothing committed"
+				end
+				function owner.release() trace[#trace + 1] = "release:" .. index end
+				function owner.pending() return false end
+				function owner.retry_restore() return true end
+				return owner
+			end
+			local participant = Participant.synchronous({
+				apply = function(mode)
+					owners[#owners + 1] = owner_for(#owners + 1)
+					owners[#owners].committed = mode == "recommended"
+					return owners[#owners].committed, owners[#owners].committed and nil or "refused"
+				end,
+				owner = function() return owners[#owners] end,
+			})
+			local settled = {}
+			participant.retry_restore(function(ok) settled[#settled + 1] = ok end)
+			helpers.assert_eq(participant.pending(), false, "no owner means no debt")
+			participant.revert(function(ok, detail) settled[#settled + 1] = { ok, detail } end)
+			participant.apply("clear", function(ok, detail) settled[#settled + 1] = { ok, detail } end)
+			participant.apply("recommended", function(ok) settled[#settled + 1] = ok end)
+			participant.revert(function(ok) settled[#settled + 1] = ok end)
+			participant.release()
+			helpers.assert_eq(settled, { true, { false, "no committed scope to revert" }, { false, "refused" }, true, true })
+			helpers.assert_eq(trace, { "revert:2", "release:2" }, "only the latest owner is addressed")
+			local broken = Participant.synchronous({ apply = function() return true end,
+				owner = function() return { pending = function() return false end } end })
+			helpers.assert_throws(function() broken.pending() end)
+		end)
+
 		helpers.it("ignores a duplicate settlement instead of running the next participant twice", function()
 			local trace = {}
 			local doubled = participant(trace, "tap_holds")

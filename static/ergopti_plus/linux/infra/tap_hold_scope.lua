@@ -177,6 +177,16 @@ function M.apply(mode, is_paused)
 	return committed == true, detail
 end
 
+--- The tap-hold participant of a composed scope, bound to the retained owner.
+--- @param is_paused function Live pause getter.
+--- @return table participant See config_scope_composition.
+function M.participant(is_paused)
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply(mode, is_paused) end,
+		owner = function() return _owner end,
+	})
+end
+
 --- Test seam: forgets the retained owner.
 function M._reset_for_test()
 	_owner, _sequence = nil, 0

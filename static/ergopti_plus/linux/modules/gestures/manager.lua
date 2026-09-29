@@ -1012,6 +1012,9 @@ function M.set_enabled(enabled)
 		debt = nil
 		return true
 	end
+	-- A refused switch commits nothing, so a composed scope has nothing to undo.
+	function owner.revert() return false, "no committed gesture scope to revert" end
+	function owner.release() end
 	_scope_owner = owner
 	if owner.retry_restore() then
 		Logger.error(LOG, "Gesture state was refused — the previous runtime was restored.")
@@ -1383,6 +1386,15 @@ function M.apply_scope(mode)
 	local committed, detail = _scope_owner.apply(mode)
 	if not committed then Logger.error(LOG, "Gesture scope '%s' was refused: %s.", mode, tostring(detail)) end
 	return committed, detail, backup
+end
+
+--- The gesture participant of a composed scope, bound to the retained owner.
+--- @return table participant See config_scope_composition.
+function M.scope_participant()
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply_scope(mode) end,
+		owner = function() return _scope_owner end,
+	})
 end
 
 --- Resets all gesture actions to defaults.

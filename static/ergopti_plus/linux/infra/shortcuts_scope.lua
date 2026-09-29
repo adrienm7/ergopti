@@ -119,6 +119,19 @@ function M.new(options)
 		if #held > 0 then release() end
 		return true
 	end
+	--- Undoes the last commit under the same dispatch ownership as apply().
+	function owner.revert()
+		if #held > 0 or options.is_paused() then return false, "shortcut configuration is already owned" end
+		for _, port in ipairs(ports) do
+			local called, acquired = pcall(port.acquire, owner)
+			if not called or acquired ~= true then release(); return false, "shortcut configuration is already owned" end
+			held[#held + 1] = port
+		end
+		local reverted, detail = transaction.revert()
+		if not transaction.pending() then release() end
+		return reverted, detail
+	end
+	function owner.release() transaction.release() end
 	return owner
 end
 
@@ -138,6 +151,16 @@ function M.apply(mode, is_paused)
 	if committed == true then Logger.success(LOG, "Shortcut preference scope %s completed.", mode)
 	else Logger.error(LOG, "Shortcut preference scope %s refused: %s.", mode, tostring(detail)) end
 	return committed == true
+end
+
+--- The shortcut participant of a composed scope, bound to the retained owner.
+--- @param is_paused function Live pause getter.
+--- @return table participant See config_scope_composition.
+function M.participant(is_paused)
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply(mode, is_paused) end,
+		owner = function() return _owner end,
+	})
 end
 
 return M

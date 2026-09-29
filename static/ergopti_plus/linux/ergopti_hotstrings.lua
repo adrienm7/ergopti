@@ -1758,7 +1758,6 @@ local function main()
 					Logger.info(LOG, "[stub] Setup wizard — webview manager not available.")
 				end
 			end,
-			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
 				Logger.info(LOG, "Log level set to %s.", lvl)
