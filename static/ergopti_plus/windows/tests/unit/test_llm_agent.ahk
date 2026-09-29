@@ -10,9 +10,9 @@
 ; the focused application, the connectors' COM, file and process calls, the
 ; timer and the local state store.
 ;
-; Phase 1: a selection or a command -> one System 2 request -> one candidate
-; per valid action -> accepting one runs its connector. Phase 2: a typing pause
-; -> one System 1 triage -> System 2 above the threshold. Phase 3: accepting or
+; On action: a selection or a command -> one System 2 request -> one candidate
+; per valid action -> accepting one runs its connector. Automatic: a typing pause
+; -> one System 1 triage -> System 2 above the threshold. Learning: accepting or
 ; dismissing an automatic suggestion moves the threshold of its intent in its
 ; application, persisted in the local state store.
 ;
@@ -498,11 +498,11 @@ _LAG_System2Prompt(Source, App := "Mail") {
 
 
 
-; =================================================
-; =================================================
-; ======= 4/ Phase 1: selection and command =======
-; =================================================
-; =================================================
+; ===================================================
+; ===================================================
+; ======= 4/ On action: selection and command =======
+; ===================================================
+; ===================================================
 
 global LAG_ANSWER := 'Voici. ACTIONS: [{"type":"calendar","title":"Devis avec Paul","start":"2026-10-01T14:00",'
 	. '"attendees":["paul@example.com"]},{"type":"mail","to":["paul@example.com"],"subject":"Devis",'
@@ -857,11 +857,11 @@ Test("LLM agent: a tool of the tools folder runs with the input as its argument"
 
 
 
-; ===============================================
-; ===============================================
-; ======= 6/ Phase 2: automatic detection =======
-; ===============================================
-; ===============================================
+; ======================================
+; ======================================
+; ======= 6/ Automatic detection =======
+; ======================================
+; ======================================
 
 global LAG_TYPED := "Bonjour. " . LAG_SELECTION
 
@@ -970,11 +970,11 @@ Test("LLM agent: the automatic mode respects its threshold, the keystrokes and t
 
 
 
-; ====================================
-; ====================================
-; ======= 7/ Phase 3: learning =======
-; ====================================
-; ====================================
+; ===========================
+; ===========================
+; ======= 7/ Learning =======
+; ===========================
+; ===========================
 
 _LAG_Learning() {
 	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
