@@ -20,12 +20,16 @@
 --- 3. Installing is not enabling: registration never writes a preference. The
 ---    canonical projection gives every new group and section the manifest's
 ---    dynamic default, which is off, until the user turns it on.
---- 4. Partial discovery is refused: a directory that cannot be listed or a
----    child whose absence cannot be proven raises instead of publishing a
----    catalogue that silently lost an installed pack.
+--- 4. One broken pack never stops the boot: a pack whose manifest, listing or
+---    hotstring file cannot be read, a root that cannot be listed and an
+---    unreadable installed-layouts record are each logged as an error and left
+---    out, so a stray third-party folder costs that pack, not the keymap, the
+---    menubar and every bundled hotstring. The scanner itself still refuses a
+---    child whose absence it cannot prove, so the log names every lost pack.
 --- 5. Bound geometry files are routed at discovery: a layout extension may bind
----    a bundled category, or some of its sections, to its own file. Two owners
----    of one source refuse the discovery itself, before anything loads.
+---    a bundled category, or some of its sections, to its own file. A pack that
+---    claims a source another pack already owns is refused and left out, before
+---    anything loads, so no reader ever sees two owners.
 --- ==============================================================================
 
 local M = {}
@@ -77,8 +81,14 @@ local function children(path, kind)
 			local ok_child, attributes = pcall(hs.fs.attributes, full)
 			if not ok_child then error("Extension child inspection did not commit", 0) end
 			if attributes == nil then
-				local _, status = FileSystem.classify_no_follow(full)
-				if status ~= "absent" then error("Extension child inspection did not commit", 0) end
+				local link, status = FileSystem.classify_no_follow(full)
+				if status == "ok" and type(link) == "table" and link.mode == "link" then
+					-- A linked pack folder whose target moved or sits on an unmounted
+					-- drive: that entry is proven unusable, its siblings are not.
+					Logger.error(LOG, "Extension entry '%s' links to a target that no longer exists; it is skipped.", full)
+				elseif status ~= "absent" then
+					error("Extension child inspection did not commit", 0)
+				end
 			elseif attributes.mode == kind then
 				out[#out + 1] = full
 			end
@@ -116,11 +126,29 @@ function M.roots()
 	local shared = require("infra.paths").shared_root()
 	if not shared then error("The shared extension directory cannot be resolved", 0) end
 	local roots = { shared .. "/../extensions" }
-	for _, root in ipairs(require("modules.keymap.layout_registry").extension_roots()) do
-		roots[#roots + 1] = root
+	-- The installed-layouts record may have been written by another build or cut
+	-- short by a crash or a sync tool. Its layouts' packs are then missing from
+	-- this boot, reported, while the bundled and the user's packs still load.
+	local ok_installed, installed = pcall(function()
+		return require("modules.keymap.layout_registry").extension_roots()
+	end)
+	if ok_installed then
+		for _, root in ipairs(installed) do roots[#roots + 1] = root end
+	else
+		Logger.error(LOG, "The installed layouts' extensions are skipped this boot: %s.", tostring(installed))
 	end
 	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "extensions"
 	return roots
+end
+
+--- This driver's filesystem, as the shared scanner's collaborators.
+--- @return table { list_dirs, list_files, read_file }
+local function default_io()
+	return {
+		list_dirs  = function(path) return children(path, "directory") end,
+		list_files = function(path) return children(path, "file") end,
+		read_file  = read_manifest,
+	}
 end
 
 --- Discovers packs in canonical precedence order, without changing any state.
@@ -128,11 +156,46 @@ end
 --- @param io_fns table|nil Scanner collaborators; defaults to this driver's filesystem.
 --- @return table Shared extension records.
 function M.scan(roots, io_fns)
-	return Extensions.scan(roots or M.roots(), io_fns or {
-		list_dirs  = function(path) return children(path, "directory") end,
-		list_files = function(path) return children(path, "file") end,
-		read_file  = read_manifest,
-	})
+	return Extensions.scan(roots or M.roots(), io_fns or default_io())
+end
+
+--- Resolves every bound file of the given packs through the shared owner, which
+--- raises on two owners of one category or section.
+--- @param packs table Shared extension records.
+local function check_bound_owners(packs)
+	for _, pack in ipairs(packs) do
+		for _, file in ipairs(pack.bound_files) do
+			local binding = file.binding
+			if binding.sections == nil then
+				Extensions.bound_source(packs, binding.category)
+			else
+				for _, section in ipairs(binding.sections) do
+					Extensions.bound_source(packs, binding.category, section)
+				end
+			end
+		end
+	end
+end
+
+--- Keeps the packs, in catalogue order, whose bound sources no earlier pack owns.
+--- The accepted set never holds two owners, so a conflict always involves the
+--- pack under test, and every later reader of the catalogue resolves without one.
+--- @param packs table Shared extension records.
+--- @param report function Receives ({ id, dir }, err) for each refused pack.
+--- @return table Accepted records.
+local function accept_bound_owners(packs, report)
+	local accepted = {}
+	for _, pack in ipairs(packs) do
+		local candidate = { pack }
+		for _, kept in ipairs(accepted) do candidate[#candidate + 1] = kept end
+		local ok, err = pcall(check_bound_owners, candidate)
+		if ok then
+			accepted[#accepted + 1] = pack
+		else
+			report({ id = pack.id, dir = pack.dir }, err)
+		end
+	end
+	return accepted
 end
 
 --- Routes every bound file through the shared owner, which refuses two owners of
@@ -160,29 +223,52 @@ local function route_bound_files(packs)
 	return routes
 end
 
+--- Names the root or pack a discovery failure belongs to, for the log.
+--- @param where table { root, dir, id } as the scanner reports it.
+--- @return string
+local function describe_failure(where)
+	if where.id then return string.format("pack '%s' (%s)", where.id, tostring(where.dir)) end
+	if where.root then return string.format("root '%s'", where.root) end
+	return "roots"
+end
+
 --- Discovers this boot's catalogue once; every later reader gets the same packs.
+--- A root, a pack or a bound source that cannot be read or owned is logged and
+--- left out; the rest of the catalogue still commits, so the boot goes on.
 --- @param roots table|nil Extension roots; defaults to M.roots().
 --- @param io_fns table|nil Scanner collaborators; defaults to this driver's filesystem.
 --- @return table Shared extension records.
 function M.discover(roots, io_fns)
 	if _catalogue ~= nil then error("Extension packs were already discovered for this boot", 0) end
 	Logger.start(LOG, "Discovering extension packs…")
-	local ok, packs, routes = pcall(function()
-		local found = M.scan(roots, io_fns)
-		return found, route_bound_files(found)
-	end)
-	if not ok then
-		Logger.error(LOG, "Extension discovery was refused: %s.", tostring(packs))
-		error(packs, 0)
+	local skipped = 0
+	local function report(where, err)
+		skipped = skipped + 1
+		Logger.error(LOG, "Extension %s is left out of this boot: %s.", describe_failure(where), tostring(err))
 	end
+	local collaborators = {}
+	for key, value in pairs(io_fns or default_io()) do collaborators[key] = value end
+	collaborators.on_error = report
+	local ok, found = pcall(function() return Extensions.scan(roots or M.roots(), collaborators) end)
+	if not ok then
+		report({}, found)
+		found = {}
+	end
+	local packs = accept_bound_owners(found, report)
+	local routes = route_bound_files(packs)
 	local files, bound = 0, 0
 	for _, pack in ipairs(packs) do
 		files = files + #pack.toml_files
 		bound = bound + #pack.bound_files
 	end
 	_catalogue, _routes = packs, routes
-	Logger.success(LOG, "Discovered %d extension(s): %d hotstring pack(s), %d bound geometry file(s).",
-		#packs, files, bound)
+	if skipped > 0 then
+		Logger.warn(LOG, "Discovered %d extension(s): %d hotstring pack(s), %d bound geometry file(s); %d left out.",
+			#packs, files, bound, skipped)
+	else
+		Logger.success(LOG, "Discovered %d extension(s): %d hotstring pack(s), %d bound geometry file(s).",
+			#packs, files, bound)
+	end
 	return packs
 end
 
@@ -253,19 +339,28 @@ end
 -- ===============================
 
 --- Registers every namespaced pack with the existing loader, activating none.
+--- A file the loader refuses (a TOML error in a pack that is off by default) is
+--- logged and dropped from its pack's toml_files, so the catalogue the menu reads
+--- offers only groups the keymap holds and the boot goes on without it.
 --- @param packs table Shared extension records.
 --- @param keymap table Keymap owner exposing load_toml(name, path).
 --- @return table Registered { name, path, extension } entries in load order.
 function M.load(packs, keymap)
 	local loaded = {}
 	for _, extension in ipairs(packs) do
+		local registered = {}
 		for _, file in ipairs(extension.toml_files) do
 			local category = Extensions.category_key(extension.id, file.stem)
-			if keymap.load_toml(category, file.path) ~= true then
-				error("Extension hotstring registration did not commit: " .. category, 0)
+			local ok, committed = pcall(keymap.load_toml, category, file.path)
+			if ok and committed == true then
+				registered[#registered + 1] = file
+				loaded[#loaded + 1] = { name = category, path = file.path, extension = extension.id }
+			else
+				Logger.error(LOG, "Extension hotstring file '%s' could not be registered and is left out: %s.",
+					category, ok and file.path or tostring(committed))
 			end
-			loaded[#loaded + 1] = { name = category, path = file.path, extension = extension.id }
 		end
+		extension.toml_files = registered
 	end
 	Logger.debug(LOG, "Registered %d extension hotstring pack(s).", #loaded)
 	return loaded

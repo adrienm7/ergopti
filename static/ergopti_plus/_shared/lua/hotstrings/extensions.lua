@@ -196,6 +196,56 @@ end
 -- =====================================
 -- =====================================
 
+--- Reads one extension directory into its catalogue record.
+--- @param dir string Extension directory.
+--- @param id string Extension id, the directory name.
+--- @param list_files function Injected file listing.
+--- @param read_file function|nil Injected manifest reader.
+--- @return table Record { id, name, dir, descriptions, toml_files, bound_files, magic_key }.
+local function read_pack(dir, id, list_files, read_file)
+	local manifest_text = nil
+	if type(read_file) == "function" then
+		manifest_text = read_file(dir .. "/" .. MANIFEST_NAME)
+	end
+
+	local name, descriptions, bindings, magic_key = parse_manifest(manifest_text)
+	local toml_files, bound_files = {}, {}
+	local bound_found = {}
+	for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
+		local stem = path:match("([^/\\]+)%.toml$")
+		if stem and bindings[stem] then
+			bound_files[#bound_files + 1] = { path = path, stem = stem, binding = bindings[stem] }
+			bound_found[stem] = true
+		elseif stem then
+			toml_files[#toml_files + 1] = { path = path, stem = stem }
+		end
+	end
+	-- A binding names a file the pack must carry. Publishing the pack
+	-- without it would leave a historical section with no source, which
+	-- reads as "the rules were removed" rather than "the install is broken".
+	for stem in pairs(bindings) do
+		if not bound_found[stem] then
+			error("Bound extension hotstring file is missing (content withheld)", 0)
+		end
+	end
+
+	-- Sorted so the menu order is the same on every machine. A
+	-- directory listing is not ordered by any contract, and a menu
+	-- whose rows move between launches is one nobody learns.
+	table.sort(toml_files, function(a, b) return a.stem < b.stem end)
+	table.sort(bound_files, function(a, b) return a.stem < b.stem end)
+
+	return {
+		id           = id,
+		name         = name or id,
+		dir          = dir,
+		descriptions = descriptions,
+		toml_files   = toml_files,
+		bound_files  = bound_files,
+		magic_key    = magic_key,
+	}
+end
+
 --- Scans one or more roots for installed extensions.
 ---
 --- Later roots win on a repeated id, which is what lets a user override a bundled
@@ -204,8 +254,12 @@ end
 --- A file with a historical binding is listed apart, in `bound_files`: it is the
 --- source of a bundled category, not a namespaced pack, so every consumer that
 --- offers `toml_files` as `ext:` categories leaves it out without knowing why.
+--- Without `on_error` any unreadable root or invalid pack raises. With it, the
+--- failure is handed to `on_error({ root, dir, id }, err)` and only that root or
+--- pack is left out: a driver that must keep booting reports one broken pack
+--- instead of losing every extension, and every bundled feature, to it.
 --- @param roots table Array of absolute directory paths, in precedence order.
---- @param io_fns table { list_dirs, list_files, read_file } — injected I/O.
+--- @param io_fns table { list_dirs, list_files, read_file, on_error? } — injected I/O.
 --- @return table Array of { id, name, dir, descriptions, toml_files, bound_files, magic_key };
 ---   toml_files entries are { path, stem }, bound_files entries { path, stem, binding },
 ---   magic_key the declared physical key code or nil.
@@ -214,57 +268,35 @@ function M.scan(roots, io_fns)
 	local list_dirs = io_fns.list_dirs
 	local list_files = io_fns.list_files
 	local read_file = io_fns.read_file
+	local on_error = io_fns.on_error
 	if type(list_dirs) ~= "function" or type(list_files) ~= "function" then return {} end
+	if on_error ~= nil and type(on_error) ~= "function" then error("Extension scan on_error must be a function", 0) end
 
 	local by_id, order = {}, {}
 
 	for _, root in ipairs(roots) do
 		if type(root) == "string" and root ~= "" then
-			for _, dir in ipairs(list_dirs(root) or {}) do
+			local listed, dirs = true, nil
+			if on_error then listed, dirs = pcall(list_dirs, root) else dirs = list_dirs(root) end
+			if not listed then
+				on_error({ root = root }, dirs)
+				dirs = {}
+			end
+			for _, dir in ipairs(dirs or {}) do
 				local id = dir:match("([^/\\]+)[/\\]?$")
 				if id and id ~= "" then
-					local manifest_text = nil
-					if type(read_file) == "function" then
-						manifest_text = read_file(dir .. "/" .. MANIFEST_NAME)
+					local read, record = true, nil
+					if on_error then
+						read, record = pcall(read_pack, dir, id, list_files, read_file)
+					else
+						record = read_pack(dir, id, list_files, read_file)
 					end
-
-					local name, descriptions, bindings, magic_key = parse_manifest(manifest_text)
-					local toml_files, bound_files = {}, {}
-					local bound_found = {}
-					for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
-						local stem = path:match("([^/\\]+)%.toml$")
-						if stem and bindings[stem] then
-							bound_files[#bound_files + 1] = { path = path, stem = stem, binding = bindings[stem] }
-							bound_found[stem] = true
-						elseif stem then
-							toml_files[#toml_files + 1] = { path = path, stem = stem }
-						end
+					if read then
+						if not by_id[id] then order[#order + 1] = id end
+						by_id[id] = record
+					else
+						on_error({ root = root, dir = dir, id = id }, record)
 					end
-					-- A binding names a file the pack must carry. Publishing the pack
-					-- without it would leave a historical section with no source, which
-					-- reads as "the rules were removed" rather than "the install is broken".
-					for stem in pairs(bindings) do
-						if not bound_found[stem] then
-							error("Bound extension hotstring file is missing (content withheld)", 0)
-						end
-					end
-
-					-- Sorted so the menu order is the same on every machine. A
-					-- directory listing is not ordered by any contract, and a menu
-					-- whose rows move between launches is one nobody learns.
-					table.sort(toml_files, function(a, b) return a.stem < b.stem end)
-					table.sort(bound_files, function(a, b) return a.stem < b.stem end)
-
-					if not by_id[id] then order[#order + 1] = id end
-					by_id[id] = {
-						id           = id,
-						name         = name or id,
-						dir          = dir,
-						descriptions = descriptions,
-						toml_files   = toml_files,
-						bound_files  = bound_files,
-						magic_key    = magic_key,
-					}
 				end
 			end
 		end

@@ -1391,8 +1391,8 @@ end
 -- Discover the extension packs once for this boot — the bundled ones, the
 -- committed generations of installed layouts, then the user's folder — before
 -- the override resolver, the loader and the menu read them, so all three
--- describe the same packs. A refused discovery stops the boot as it does on
--- Windows: a partial catalogue would hide installed hotstrings without a word.
+-- describe the same packs. A pack, root or installed-layouts record that cannot
+-- be read is logged and left out: one optional folder never costs the keymap.
 local ExtensionPacks = require("infra.extension_packs")
 ExtensionPacks.discover()
 

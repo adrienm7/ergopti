@@ -8,11 +8,27 @@
 --- engine, and a layout installed through the manager could not bring its
 --- hotstrings. These tests pin the discovery the Linux and Windows drivers
 --- already perform: the same roots in the same order, the shared scanner, the
---- existing TOML loader, no activation, and a refusal of any partial catalogue.
+--- existing TOML loader and no activation. The scanner refuses a partial
+--- listing; the boot catalogue leaves out, and logs, only the broken pack.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Logger = require("infra.logger")
 local Packs = require("infra.extension_packs")
+
+--- Runs a callback while capturing the extension packs' error log lines.
+--- @param callback function Body.
+--- @return table Captured error messages, formatted.
+--- @return any Callback result.
+local function capturing_errors(callback)
+	local saved = Logger.error
+	local errors = {}
+	Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+	local ok, result = pcall(callback)
+	Logger.error = saved
+	if not ok then error(result, 0) end
+	return errors, result
+end
 
 --- Runs a callback with stubbed filesystem collaborators, restoring them after.
 --- @param attributes function Replacement for hs.fs.attributes.
@@ -45,6 +61,41 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 			}
 			helpers.assert_eq(Packs.roots(), { "/app/_shared/../extensions", "/installed/generation", "/user/extensions" })
 		end)
+	end)
+
+	helpers.it("(layout-extension-macos) boots without installed layouts' packs when their record is unreadable", function()
+		helpers.with_stub_scope({ "infra.paths", "infra.config_paths", "modules.keymap.layout_registry" }, function()
+			package.loaded["infra.paths"] = { shared_root = function() return "/app/_shared" end }
+			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/user/" end }
+			package.loaded["modules.keymap.layout_registry"] = {
+				extension_roots = function() error("the installed-layouts record has schema version 99", 0) end,
+			}
+			local errors, roots = capturing_errors(Packs.roots)
+			helpers.assert_eq(roots, { "/app/_shared/../extensions", "/user/extensions" },
+				"a corrupt installed record costs its layouts' packs, never the bundled or user ones")
+			helpers.assert_eq(#errors, 1)
+			helpers.assert_true(errors[1]:find("schema version 99", 1, true) ~= nil, errors[1])
+		end)
+	end)
+
+	helpers.it("(layout-extension-macos) skips a pack folder linked to a missing target, keeping its siblings", function()
+		local errors, found = capturing_errors(function()
+			return with_filesystem(function(path)
+				if path == "/packs/moved" then return nil end
+				return { mode = path:match("%.toml$") and "file" or "directory" }
+			end, {
+				classify_no_follow = function(path)
+					if path == "/packs/moved" then return { mode = "link" }, "ok" end
+					return nil, "absent"
+				end,
+				read_with_status = function() return nil, "absent" end,
+			}, { try_entries = function(path)
+				return path == "/packs" and { "moved", "sample" } or {}, true
+			end }, function() return Packs.scan({ "/packs" }) end)
+		end)
+		helpers.assert_eq(#found, 1)
+		helpers.assert_eq(found[1].id, "sample")
+		helpers.assert_eq(#errors, 1, "the dangling link is reported, not silently dropped")
 	end)
 
 	helpers.it("(layout-extension-macos) refuses an unresolvable shared root instead of dropping bundled packs", function()
@@ -125,15 +176,41 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 		Packs._reset()
 	end)
 
-	helpers.it("(layout-extension-macos) a refused discovery leaves no catalogue behind", function()
+	helpers.it("(layout-extension-macos) leaves a broken pack out of the boot catalogue and reports it", function()
 		Packs._reset()
-		local ok = pcall(Packs.discover, { "/ext" }, {
-			list_dirs = function() return { "/ext/broken" } end,
-			list_files = function() return {} end,
-			read_file = function() return "[extension.hotstring_bindings.x]\nenabled = true\n" end,
-		})
-		helpers.assert_true(not ok)
-		helpers.assert_true(not pcall(Packs.catalogue), "a refused scan must not publish a partial catalogue")
+		local manifests = {
+			["/ext/broken/manifest.toml"] = "[extension.hotstring_bindings.x]\nenabled = true\n",
+			["/ext/garbled/manifest.toml"] = "[extension\nname = ",
+			["/ext/healthy/manifest.toml"] = '[extension]\nname = "Healthy"\n',
+		}
+		local errors, found = capturing_errors(function()
+			return Packs.discover({ "/ext", "/unlistable" }, {
+				list_dirs = function(root)
+					if root == "/unlistable" then error("Extension directory enumeration did not commit", 0) end
+					return { "/ext/broken", "/ext/garbled", "/ext/healthy" }
+				end,
+				list_files = function(dir) return { dir .. "/words.toml" } end,
+				read_file = function(path) return manifests[path] end,
+			})
+		end)
+		helpers.assert_eq(#found, 1, "one broken pack must not cost the boot every other pack")
+		helpers.assert_eq(found[1].id, "healthy")
+		helpers.assert_eq(Packs.catalogue(), found)
+		helpers.assert_eq(#errors, 3, "each left-out pack and root is reported")
+		helpers.assert_true(errors[1]:find("'broken'", 1, true) ~= nil, errors[1])
+		helpers.assert_true(errors[3]:find("/unlistable", 1, true) ~= nil, errors[3])
+		Packs._reset()
+	end)
+
+	helpers.it("(layout-extension-macos) commits an empty catalogue when no root can be resolved", function()
+		Packs._reset()
+		helpers.with_stub_scope({ "infra.paths" }, function()
+			package.loaded["infra.paths"] = { shared_root = function() return nil end }
+			local errors, found = capturing_errors(function() return Packs.discover() end)
+			helpers.assert_eq(found, {})
+			helpers.assert_eq(#errors, 1)
+			helpers.assert_eq(Packs.routes(), {}, "the loader still reads a committed, empty route table")
+		end)
 		Packs._reset()
 	end)
 end)
@@ -201,16 +278,35 @@ helpers.describe("Extension packs: bound geometry routes", function()
 		Packs._reset()
 	end)
 
-	helpers.it("(layout-extension-binding) refuses two owners of one bound section at discovery", function()
+	helpers.it("(layout-extension-binding) leaves out the second owner of one bound section", function()
 		Packs._reset()
-		local ok, failure = pcall(Packs.discover, { "/ext" }, packs_io({
-			first = MAGICREPEAT_BINDING,
-			second = MAGICREPEAT_BINDING,
-		}, { first = { "magicrepeat" }, second = { "magicrepeat" } }))
-		helpers.assert_eq(ok, false)
-		helpers.assert_true(tostring(failure):find("magickey.repeat_corrections", 1, true) ~= nil, tostring(failure))
-		helpers.assert_true(not pcall(Packs.catalogue), "a conflicting binding must not publish a catalogue")
-		helpers.assert_true(not pcall(Packs.routes), "nor half of its routes")
+		local errors, found = capturing_errors(function()
+			return Packs.discover({ "/ext" }, packs_io({
+				first = MAGICREPEAT_BINDING,
+				second = MAGICREPEAT_BINDING,
+			}, { first = { "magicrepeat" }, second = { "magicrepeat" } }))
+		end)
+		helpers.assert_eq(#found, 1)
+		helpers.assert_eq(found[1].id, "first")
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_true(errors[1]:find("magickey.repeat_corrections", 1, true) ~= nil, errors[1])
+		helpers.assert_eq(Packs.source("magickey", "repeat_corrections"), "/ext/first/hotstrings/magicrepeat.toml",
+			"readers resolve the one accepted owner instead of raising on every call")
+		Packs._reset()
+	end)
+
+	helpers.it("(layout-extension-binding) refuses a whole binding over a section another pack already owns", function()
+		Packs._reset()
+		local errors, found = capturing_errors(function()
+			return Packs.discover({ "/ext" }, packs_io({
+				a_sections = MAGICREPEAT_BINDING,
+				b_whole = '[extension.hotstring_bindings.magic]\ncategory = "magickey"\n'
+					.. 'feature_section = "hotstrings.magic_key"\nsource = "common"\n',
+			}, { a_sections = { "magicrepeat" }, b_whole = { "magic" } }))
+		end)
+		helpers.assert_eq(#found, 1, "a whole binding scanned after a section binding still conflicts")
+		helpers.assert_eq(found[1].id, "a_sections")
+		helpers.assert_eq(#errors, 1)
 		Packs._reset()
 	end)
 end)
@@ -251,9 +347,21 @@ helpers.describe("Extension packs: registration", function()
 			"a bound file supplies its historical category, never a second ext: group")
 	end)
 
-	helpers.it("(layout-extension-macos) rejects an unsuccessful existing-loader registration", function()
-		local ok = pcall(Packs.load, { { id = "sample", toml_files = { { stem = "rolls", path = "/private/rolls.toml" } },
-			bound_files = {} } }, { load_toml = function() return false end })
-		helpers.assert_true(not ok, "an installed pack must not silently disappear from the live catalogue")
+	helpers.it("(layout-extension-macos) reports and drops a pack file the loader refuses, keeping the boot", function()
+		local packs = { { id = "sample", bound_files = {}, toml_files = {
+			{ stem = "broken", path = "/private/broken.toml" },
+			{ stem = "raising", path = "/private/raising.toml" },
+			{ stem = "rolls", path = "/private/rolls.toml" },
+		} } }
+		local errors, loaded = capturing_errors(function()
+			return Packs.load(packs, { load_toml = function(_, path)
+				if path == "/private/raising.toml" then error("reader crashed", 0) end
+				return path ~= "/private/broken.toml"
+			end })
+		end)
+		helpers.assert_eq(loaded, { { name = "ext:sample:rolls", path = "/private/rolls.toml", extension = "sample" } })
+		helpers.assert_eq(packs[1].toml_files, { { stem = "rolls", path = "/private/rolls.toml" } },
+			"the menu's catalogue offers only the groups the keymap registered")
+		helpers.assert_eq(#errors, 2, "an installed pack must not disappear without a logged error")
 	end)
 end)

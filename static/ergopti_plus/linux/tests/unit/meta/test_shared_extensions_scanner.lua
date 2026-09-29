@@ -190,6 +190,34 @@ helpers.describe("extensions: scanning finds packs and names them", function()
 		helpers.assert_eq(0, #found, "no extensions installed is the normal state, not an error")
 	end)
 
+	helpers.it("(extension-isolation) hands one broken pack or root to on_error and keeps the rest", function()
+		local io_fns = fake_fs({
+			["/bundled"] = { "/bundled/demo" },
+			["/user"] = { "/user/demo", "/user/broken", "/user/healthy" },
+		}, {
+			["/user/demo/manifest.toml"] = "[extension\nname = ",
+			["/user/broken/manifest.toml"] = "[extension.magic_key]\nkey = 3\n",
+		})
+		local strict = pcall(Extensions.scan, { "/bundled", "/user" }, io_fns)
+		helpers.assert_eq(false, strict, "without on_error a broken pack still refuses the whole scan")
+
+		local list_dirs = io_fns.list_dirs
+		io_fns.list_dirs = function(root)
+			if root == "/gone" then error("unlistable root", 0) end
+			return list_dirs(root)
+		end
+		local failures = {}
+		io_fns.on_error = function(where, err) failures[#failures + 1] = { where = where, err = err } end
+		local found = Extensions.scan({ "/bundled", "/gone", "/user" }, io_fns)
+		helpers.assert_eq({ "demo", "healthy" }, { found[1].id, found[2].id })
+		helpers.assert_eq(2, #found, "only the broken packs are left out")
+		helpers.assert_eq("/bundled/demo", found[1].dir,
+			"a broken user override leaves the bundled copy of that id in place")
+		helpers.assert_eq({ { root = "/gone" }, { root = "/user", dir = "/user/demo", id = "demo" },
+			{ root = "/user", dir = "/user/broken", id = "broken" } },
+			{ failures[1].where, failures[2].where, failures[3].where })
+	end)
+
 end)
 
 
