@@ -2448,11 +2448,39 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 		try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
 	}
 	; The list answers every channel: keep this channel's latest release so every
-	; downstream parser receives a single-object JSON string.
+	; downstream parser receives a single-object JSON string. A manual check also
+	; keeps, on its request, the other channels with a newer release: the
+	; update-check window lists them.
 	if (_Updater_JsonPayloadIsUsable(Json)
-		and SubStr(LTrim(Json), 1, 1) == "[")
+		and SubStr(LTrim(Json), 1, 1) == "[") {
+		if IsSet(Request)
+			_Updater_RecordOtherChannels(Request, Json, Channel)
 		Json := _Updater_SelectChannelRelease(Json, Channel)
+	}
 	return Json
+}
+
+; Keeps on a manual request the other channels whose latest release in the list
+; was published after the installed build (UpdateChannels_NewerElsewhere).
+; @param Request {Object} The request context; only a manual one is annotated.
+; @param Json {String} The release list.
+; @param Channel {String} The checked channel.
+_Updater_RecordOtherChannels(Request, Json, Channel) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if (Type(Request) != "Object") || !Request.HasProp("Origin")
+		|| (Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
+		return
+	Releases := []
+	for _, Chunk in _Updater_SplitReleasesArray(Json)
+		Releases.Push(Map("tag", Updater_ParseTagName(Chunk), "published_at", _Updater_ParsePublishedAt(Chunk)))
+	Request.OtherChannels := UpdateChannels_NewerElsewhere(Releases, Channel, Updater_CurrentVersion())
+}
+
+; The other channels a manual check found with a newer release, or none.
+; @param Request {Object}
+; @returns {Array} of Map("channel", Id, "tag", Tag)
+_Updater_RequestOtherChannels(Request) {
+	return (Type(Request) == "Object" && Request.HasProp("OtherChannels")) ? Request.OtherChannels : []
 }
 
 ; Returns the JSON object of a channel's latest release in a releases array,

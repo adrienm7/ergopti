@@ -462,6 +462,7 @@ if UIASW_IsWorkerInvocation()
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include ui/error_dialog/init.ahk
+#Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.

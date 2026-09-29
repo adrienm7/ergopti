@@ -170,7 +170,9 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    drivers; measured from the combined staged tree.
 //   33/55 (60.0 %) — ui/config_cleanup hosts the common cleanup WebView on all
 //                    three drivers; the shared ratio rises from 59.3 %.
-const BASELINE_SHARED = 33;
+//   34/56 (60.7 %) — ui/update_check hosts the shared update-check window on
+//                    all three drivers (the union took the path with macOS).
+const BASELINE_SHARED = 34;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -204,8 +206,8 @@ const BASELINE_SHARED = 33;
 //   54 → 55 — ui/config_cleanup adds one path on all three drivers. This is
 //   symmetric growth, paired with the shared-count increase above.
 //   55 → 56 — ui/update_check, the host of the shared update-check window,
-//   lands on macOS first; the Linux and Windows hosts follow in the next
-//   commits and turn it into a shared path (BASELINE_SHARED then rises).
+//   landed on macOS first; the Linux and Windows hosts made it a shared path
+//   (BASELINE_SHARED 34).
 const BASELINE_UNION = 56;
 
 // ── The canonical features, the third measurement this gate never had ───────
