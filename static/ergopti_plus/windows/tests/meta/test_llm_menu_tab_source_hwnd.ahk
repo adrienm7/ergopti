@@ -198,9 +198,13 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		and InStr(EngineSrc, '"source_control_token"') == 0,
 		"legacy mutable engine focus fields must not coexist with request/presentation-owned source snapshots")
 	BoundTimers := _TLTSH_Count(DriverSrc,
-		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)")
+		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource")
 	AssertEqual(4, BoundTimers,
 		"all four FirePrediction timer/retry bindings must carry AcceptSource; a newly added raw Bind is an unowned-control regression")
+	; The warmup and rate-limit re-arms replay a prompt action's own request.
+	AssertEqual(2, _TLTSH_Count(DriverSrc,
+		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)"),
+		"both FirePrediction retry bindings must carry the prompt override, or a retried prompt action runs the menu's prompt")
 	AssertEqual(7, _TLTSH_Count(DriverSrc, "LLM_Engine_OnResults("),
 		"OnResults must have one definition plus exactly the six enumerated request-owned render call sites")
 }
