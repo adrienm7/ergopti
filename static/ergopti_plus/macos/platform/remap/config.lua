@@ -14,10 +14,10 @@
 --- 2. Layout-Aware Actions: Actions with a "logical_char" field are resolved
 ---    to a physical key_code via modules.keymap.layout at load time, so the KE config
 ---    always references the correct physical key regardless of the OS layout.
---- 3. Migration: load_user_config() silently upgrades legacy JSON shapes
----    (bare string, {tap,hold} without combo slot) to the current format, and
----    seeds any newly added combos from defaults so the saved file stays valid
----    across updates.
+--- 3. Sparse Persistence: save_user_config() writes only non-neutral leaves
+---    and preserves every field it does not own; load_user_config() reads an
+---    absent table, key, slot or timing as its neutral value and upgrades the
+---    legacy bare-string combo shape.
 --- 4. Corruption Safety: an unparseable config_karabiner.toml is never silently
 ---    replaced. The read path falls back to defaults without touching the file
 ---    and the write path refuses to publish over it, so the user keeps a file
@@ -432,7 +432,7 @@ end
 
 --- Loads config_karabiner.toml.
 --- If the file is absent (first launch), builds and returns the default state.
---- Silently migrates legacy JSON shapes and seeds missing combos from defaults.
+--- A sparse file is completed with neutral values; legacy combos are upgraded.
 --- @param tap_hold_keys table List from load_tap_hold_keys.
 --- @param mod_combos table List from load_mod_combos.
 --- @param user_config_path string Absolute path to config_karabiner.toml.
@@ -470,73 +470,64 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		integration_enabled = integration[INTEGRATION_KEY]
 	end
 
-	local defaults = M.build_default_state(tap_hold_keys, mod_combos)
+	-- Saves are sparse against the neutral state: an absent table, key, slot or
+	-- timing IS the neutral value, so it is completed silently. Only a present
+	-- value of the wrong type is an anomaly worth a warning.
 	local tap_holds = type(data.tap_holds) == "table" and data.tap_holds or {}
 	local combos    = type(data.mod_combos) == "table" and data.mod_combos or {}
 
-	if type(tap_holds.config) ~= "table" then
-		Logger.warn(LOG, "Missing tap_hold_config in saved config — using defaults.")
-		tap_holds.config = defaults.tap_hold_config
-	else
-		-- Seed any tap/hold keys missing from the persisted config (new keys added after save)
-		for _, key_def in ipairs(tap_hold_keys) do
-			if not tap_holds.config[key_def.id] then
-				tap_holds.config[key_def.id] = defaults.tap_hold_config[key_def.id]
-			end
+	local function owned_table(parent, key, label)
+		if parent[key] == nil then return {} end
+		if type(parent[key]) == "table" then return parent[key] end
+		Logger.warn(LOG, "Ignoring the non-table %s in the saved config — using neutral bindings.", label)
+		return {}
+	end
+
+	local function complete_slots(entry, slots)
+		for _, slot in ipairs(slots) do
+			if entry[slot] == nil then entry[slot] = "none" end
 		end
 	end
 
-	if type(combos.config) ~= "table" then
-		Logger.warn(LOG, "Missing mod_combos_config in saved config — using defaults.")
-		combos.config = defaults.mod_combos_config
-	else
-		for id, entry in pairs(combos.config) do
-			if type(entry) == "string" then
-				Logger.info(LOG, "Migrating combo '%s' from legacy string format.", id)
-				combos.config[id] = { tap = "none", hold = entry, combo = "none" }
-			elseif type(entry) == "table" and entry.combo == nil then
-				Logger.info(LOG, "Migrating combo '%s' to include combo slot.", id)
-				entry.combo = "none"
-			end
-		end
-		-- Seed any combos that are missing from the persisted config (new combos added after save)
-		for _, combo_def in ipairs(mod_combos) do
-			if not combos.config[combo_def.id] then
-				combos.config[combo_def.id] = defaults.mod_combos_config[combo_def.id]
-			end
+	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]")
+	for _, key_def in ipairs(tap_hold_keys) do
+		if tap_hold_config[key_def.id] == nil then tap_hold_config[key_def.id] = {} end
+		if type(tap_hold_config[key_def.id]) == "table" then
+			complete_slots(tap_hold_config[key_def.id], { "tap", "hold" })
 		end
 	end
 
-	-- Fields absent in old saves get the canonical default, not a silent magic number
-	local timeout_ms = tonumber(tap_holds.timeout_ms)
-	if not timeout_ms then
-		Logger.warn(LOG, "Missing tap_hold_timeout_ms in saved config — using default (%d ms).",
-			TAP_HOLD_TIMEOUT_MS_DEFAULT)
-		timeout_ms = TAP_HOLD_TIMEOUT_MS_DEFAULT
+	local combos_config = owned_table(combos, "config", "[mod_combos.config]")
+	for id, entry in pairs(combos_config) do
+		if type(entry) == "string" then
+			Logger.info(LOG, "Migrating combo '%s' from legacy string format.", id)
+			combos_config[id] = { tap = "none", hold = entry, combo = "none" }
+		end
+	end
+	for _, combo_def in ipairs(mod_combos) do
+		if combos_config[combo_def.id] == nil then combos_config[combo_def.id] = {} end
+	end
+	for _, entry in pairs(combos_config) do
+		if type(entry) == "table" then complete_slots(entry, { "tap", "hold", "combo" }) end
 	end
 
-	local sticky_ms = tonumber(tap_holds.sticky_timeout_ms)
-	if not sticky_ms then
-		Logger.warn(LOG, "Missing sticky_timeout_ms in saved config — using default (%d ms).",
-			STICKY_TIMEOUT_MS_DEFAULT)
-		sticky_ms = STICKY_TIMEOUT_MS_DEFAULT
+	-- Reads one optional number; absence is the canonical default.
+	local function timing(section, key, default, label)
+		if section[key] == nil then return default end
+		local value = tonumber(section[key])
+		if value then return value end
+		Logger.warn(LOG, "Ignoring the non-numeric %s in the saved config — using the default (%d ms).",
+			label, default)
+		return default
 	end
+	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, "tap_holds.timeout_ms")
+	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
+		"tap_holds.sticky_timeout_ms")
+	local simultaneous_ms = timing(combos, "simultaneous_threshold_ms", SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
+		"mod_combos.simultaneous_threshold_ms")
 
-	local simultaneous_ms = tonumber(combos.simultaneous_threshold_ms)
-	if not simultaneous_ms then
-		Logger.warn(LOG, "Missing simultaneous_threshold_ms in saved config — using default (%d ms).",
-			SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
-		simultaneous_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT
-	end
-
-	local combo_symmetric
-	if combos.symmetric == nil then
-		Logger.warn(LOG, "Missing combo_symmetric in saved config — using default (%s).",
-			tostring(COMBO_SYMMETRIC_DEFAULT))
-		combo_symmetric = COMBO_SYMMETRIC_DEFAULT
-	else
-		combo_symmetric = combos.symmetric == true
-	end
+	local combo_symmetric = COMBO_SYMMETRIC_DEFAULT
+	if combos.symmetric ~= nil then combo_symmetric = combos.symmetric == true end
 
 	-- Absence is neutral even when other explicit remap preferences are present.
 	local tap_holds_enabled = tap_holds.enabled == true
@@ -556,8 +547,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		enabled                   = integration_enabled,
 		tap_holds_enabled         = tap_holds_enabled,
 		mod_combos_enabled        = mod_combos_enabled,
-		tap_hold_config           = tap_holds.config,
-		mod_combos_config         = combos.config,
+		tap_hold_config           = tap_hold_config,
+		mod_combos_config         = combos_config,
 		tap_hold_timeout_ms       = timeout_ms,
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
@@ -565,7 +556,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	}, "ok"
 end
 
---- Persists the current full state to config_karabiner.toml.
+--- Persists the non-neutral state sparsely to config_karabiner.toml.
 --- Refuses to publish over a file that exists but cannot be decoded as TOML:
 --- load_user_config() already falls back to defaults without touching such a
 --- file, so the overwrite performed by the very next setter is where the user's
@@ -608,11 +599,19 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 			assert(type(parent[key]) == "table", "owned remap table conflicts with a scalar")
 			return parent[key]
 		end
+		local function assign(target, key, value, neutral)
+			if not overwrite_corrupt and value == neutral then value = nil end
+			target[key] = value
+		end
 		local function merge_bindings(target, updates, fields)
 			for id, values in pairs(updates or {}) do
 				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
 				local entry = table_at(target, id)
-				for _, field in ipairs(fields) do entry[field] = values[field] end
+				for _, field in ipairs(fields) do
+					local neutral = field ~= "timeout_ms" and "none" or nil
+					assign(entry, field, values[field], neutral)
+				end
+				if next(entry) == nil then target[id] = nil end
 			end
 		end
 		local integration = document[INTEGRATION_SECTION]
@@ -627,16 +626,20 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
 		local tap_holds = table_at(document, "tap_holds")
-		tap_holds.enabled = state.tap_holds_enabled ~= false
-		tap_holds.timeout_ms = state.tap_hold_timeout_ms
-		tap_holds.sticky_timeout_ms = state.sticky_timeout_ms
+		assign(tap_holds, "enabled", state.tap_holds_enabled, Manifest.default_for("tap_holds.enabled"))
+		assign(tap_holds, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
+		assign(tap_holds, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
 		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" })
 		local mod_combos = table_at(document, "mod_combos")
 		-- Written only once set: an absent flag follows the Tap-Holds switch.
 		mod_combos.enabled = state.mod_combos_enabled
-		mod_combos.simultaneous_threshold_ms = state.simultaneous_threshold_ms
-		mod_combos.symmetric = state.combo_symmetric == true
+		assign(mod_combos, "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+		assign(mod_combos, "symmetric", state.combo_symmetric, COMBO_SYMMETRIC_DEFAULT)
 		merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" })
+		if next(tap_holds.config) == nil then tap_holds.config = nil end
+		if next(mod_combos.config) == nil then mod_combos.config = nil end
+		if next(tap_holds) == nil then document.tap_holds = nil end
+		if next(mod_combos) == nil then document.mod_combos = nil end
 		return TomlCodec.encode(document)
 	end)
 	if not ok or type(payload) ~= "string" then

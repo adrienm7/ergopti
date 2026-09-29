@@ -39,7 +39,7 @@ local function with_source(source, body)
 		state.tap_hold_config.escape = { tap = "paste", hold = "shift" }
 		state.mod_combos_config.esc_tab = { tap = "none", hold = "none", combo = "none" }
 		local ok, err = pcall(body, function() return config.save_user_config(state, "owned-remap-config.toml") end,
-			state, captured, codec)
+			state, captured, codec, config)
 		files.read_with_status, files.write_if_unchanged = old_read, old_write
 		if not ok then error(err, 0) end
 	end)
@@ -56,7 +56,7 @@ helpers.describe("Remap configuration owned fields", function()
 			helpers.assert_eq(stored.tap_holds.config.future_key, { tap = "future" })
 			helpers.assert_eq(stored.mod_combos.future, "keep")
 			helpers.assert_eq(stored.mod_combos.config.esc_tab,
-				{ tap = "none", hold = "none", combo = "none", custom = { note = "keep" } })
+				{ custom = { note = "keep" } })
 			helpers.assert_eq(stored.mod_combos.config.future_combo, { combo = "future" })
 			helpers.assert_eq(captured.writes, 1)
 		end)
@@ -70,6 +70,56 @@ helpers.describe("Remap configuration owned fields", function()
 			end)
 		end)
 	end
+	helpers.it("removes neutral leaves while preserving unknown neighbors and reloads the same intent", function()
+		with_source(SOURCE, function(save, state, captured, codec, config)
+			state.tap_hold_config.escape = { tap = "none", hold = "none" }
+			helpers.assert_true(save())
+			local stored = codec.decode(captured.content)
+			helpers.assert_nil(stored.tap_holds.enabled)
+			helpers.assert_nil(stored.tap_holds.timeout_ms)
+			helpers.assert_nil(stored.tap_holds.sticky_timeout_ms)
+			helpers.assert_nil(stored.mod_combos.simultaneous_threshold_ms)
+			helpers.assert_nil(stored.mod_combos.symmetric)
+			helpers.assert_eq(stored.tap_holds.config.escape, { custom = { note = "keep" } })
+			helpers.assert_eq(stored.mod_combos.config.esc_tab, { custom = { note = "keep" } })
+			helpers.assert_eq(stored.tap_holds.config.future_key.tap, "future")
+			require("adapters.file_system").read_with_status = function() return captured.content, "ok" end
+			local reloaded, status = config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, "owned-remap-config.toml")
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(reloaded.tap_holds_enabled, false)
+			helpers.assert_eq(reloaded.tap_hold_timeout_ms, state.tap_hold_timeout_ms)
+			helpers.assert_eq(reloaded.sticky_timeout_ms, state.sticky_timeout_ms)
+			helpers.assert_eq(reloaded.simultaneous_threshold_ms, state.simultaneous_threshold_ms)
+			helpers.assert_eq(reloaded.combo_symmetric, state.combo_symmetric)
+		end)
+	end)
+	helpers.it("keeps explicit non-neutral bindings, master and custom timing values", function()
+		with_source("", function(save, state, captured, codec)
+			state.tap_holds_enabled = true
+			state.tap_hold_timeout_ms = state.tap_hold_timeout_ms + 13
+			state.sticky_timeout_ms = state.sticky_timeout_ms + 17
+			state.simultaneous_threshold_ms = state.simultaneous_threshold_ms + 19
+			state.combo_symmetric = not state.combo_symmetric
+			state.tap_hold_config.escape.timeout_ms = 337
+			helpers.assert_true(save())
+			local stored = codec.decode(captured.content)
+			helpers.assert_eq(stored.tap_holds.enabled, true)
+			helpers.assert_eq(stored.tap_holds.timeout_ms, state.tap_hold_timeout_ms)
+			helpers.assert_eq(stored.tap_holds.sticky_timeout_ms, state.sticky_timeout_ms)
+			helpers.assert_eq(stored.tap_holds.config.escape, { tap = "paste", hold = "shift", timeout_ms = 337 })
+			helpers.assert_eq(stored.mod_combos.simultaneous_threshold_ms, state.simultaneous_threshold_ms)
+			helpers.assert_eq(stored.mod_combos.symmetric, state.combo_symmetric)
+			helpers.assert_nil(stored.mod_combos.config)
+		end)
+	end)
+	helpers.it("does not seed any setting when saving neutral intent", function()
+		with_source("", function(save, state, captured, codec)
+			state.tap_hold_config.escape = { tap = "none", hold = "none" }
+			helpers.assert_true(save())
+			helpers.assert_eq(codec.decode(captured.content), {})
+		end)
+	end)
+
 end)
 
 return true
