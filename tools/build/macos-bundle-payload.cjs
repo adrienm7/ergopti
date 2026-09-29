@@ -26,8 +26,9 @@
  *    resolution, so the manifest cannot keep a stale justification. License
  *    notices of vendored code stay through a group's `except` list.
  * 3. Fail fast: an unknown manifest key, a pattern outside the declared trees,
- *    an `only` file that is not tracked, an existing destination file or a
- *    tree that stages nothing stops the build instead of shipping a gap.
+ *    an `only` file that is not tracked, an existing destination file, a
+ *    tree that stages nothing or an untracked file the payload would ship
+ *    stops the build instead of shipping a gap.
  *
  * USAGE:  node tools/build/macos-bundle-payload.cjs stage <repo-root> <static-root>
  *         Copies the payload into <static-root> (Contents/Resources/static).
@@ -215,19 +216,30 @@ function loadManifest(root) {
 // ===========================================
 
 /**
+ * Runs `git ls-files` over the manifest's tree sources.
+ * @param {string} root Repository root.
+ * @param {{trees: object[]}} manifest Validated manifest.
+ * @param {string[]} options Extra ls-files options.
+ * @return {string[]} Repository-relative POSIX paths.
+ */
+function listFiles(root, manifest, options) {
+	const sources = manifest.trees.map((tree) => tree.source);
+	return execFileSync('git', ['-C', root, 'ls-files', '-z', ...options, '--', ...sources], {
+		encoding: 'utf8',
+		maxBuffer: 64 * 1024 * 1024
+	})
+		.split('\0')
+		.filter(Boolean);
+}
+
+/**
  * Lists the tracked files below the manifest's tree sources.
  * @param {string} root Repository root.
  * @param {{trees: object[]}} manifest Validated manifest.
  * @return {string[]} Repository-relative POSIX paths.
  */
 function trackedFiles(root, manifest) {
-	const sources = manifest.trees.map((tree) => tree.source);
-	return execFileSync('git', ['-C', root, 'ls-files', '-z', '--', ...sources], {
-		encoding: 'utf8',
-		maxBuffer: 64 * 1024 * 1024
-	})
-		.split('\0')
-		.filter(Boolean);
+	return listFiles(root, manifest, []);
 }
 
 /**
@@ -320,6 +332,31 @@ function resolvePayload(manifest, tracked) {
 	return { files, unfiltered };
 }
 
+/**
+ * Refuses a checkout holding an untracked, non-ignored file the payload would
+ * ship once tracked. The stager copies tracked files only, so a module created
+ * but never added would otherwise be left out of a local build without a word
+ * and fail its require() at boot; ignored state stays out on purpose.
+ * @param {string} root Repository root.
+ * @param {{trees: object[], exclude: object[]}} manifest Validated manifest.
+ */
+function requireTrackedPayload(root, manifest) {
+	const untracked = listFiles(root, manifest, ['--others', '--exclude-standard']).filter(
+		(source) => {
+			const tree = manifest.trees.find((candidate) => source.startsWith(`${candidate.source}/`));
+			const relative = source.slice(tree.source.length + 1);
+			if (tree.only && !tree.only.includes(relative)) return false;
+			return exclusionFor(manifest, `${tree.target}/${relative}`) === null;
+		}
+	);
+	if (untracked.length > 0) {
+		throw new Error(
+			'Untracked files would be left out of the bundle; git add or ignore them:\n' +
+				untracked.map((source) => `  ${source}`).join('\n')
+		);
+	}
+}
+
 // ===========================================
 // ===========================================
 // ======= 3/ Staging ========================
@@ -388,6 +425,7 @@ function stage(root, staticRoot) {
 if (require.main === module) {
 	const [command, rootArgument, staticRootArgument, ...rest] = process.argv.slice(2);
 	if (command === 'stage' && rootArgument && staticRootArgument && rest.length === 0) {
+		requireTrackedPayload(rootArgument, loadManifest(rootArgument));
 		const count = stage(rootArgument, staticRootArgument);
 		console.error(`[macos-bundle-payload] staged ${count} files into ${staticRootArgument}`);
 	} else if (command === 'list' && rootArgument && staticRootArgument === undefined) {
@@ -408,6 +446,7 @@ module.exports = {
 	parseManifest,
 	loadManifest,
 	trackedFiles,
+	requireTrackedPayload,
 	exclusionFor,
 	resolvePayload,
 	stage

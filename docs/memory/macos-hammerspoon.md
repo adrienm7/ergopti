@@ -70,7 +70,9 @@ the gate judges must embed the public key.
 
 `Contents/Resources/static` holds only what
 `tools/build/macos-bundle-manifest.json` declares, staged from tracked files by
-`tools/build/macos-bundle-payload.cjs`; `test-macos-bundle-payload.cjs` scans
+`tools/build/macos-bundle-payload.cjs`, whose `stage` command refuses a local
+build while an untracked, non-ignored file the payload would ship exists (git
+add or ignore it first); `test-macos-bundle-payload.cjs` scans
 the staged Lua, shell, JavaScript and HTML for every path they read. A file
 whose name is joined at run time (the logos, the onboarding preview, the MLX
 `pyproject.toml`/`uv.lock`) is invisible to that scan: add its reader to

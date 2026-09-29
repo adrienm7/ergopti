@@ -46,6 +46,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync, spawnSync } = require('child_process');
 
 const payload = require('../build/macos-bundle-payload.cjs');
 
@@ -638,6 +639,63 @@ try {
 		`stage() did not refuse a link below its root: ${refusal || 'no error'}`
 	);
 	check(fs.readdirSync(outside).length === 0, 'stage() wrote through a link below its root');
+
+	// The build's stage command copies tracked files only, so it must refuse an
+	// untracked runtime file (a module never added would be missing at boot)
+	// while leaving ignored state and untracked files of excluded groups alone
+	const checkout = path.join(scratch, 'checkout');
+	const writeFile = (relative, text) => {
+		fs.mkdirSync(path.dirname(path.join(checkout, relative)), { recursive: true });
+		fs.writeFileSync(path.join(checkout, relative), text);
+	};
+	writeFile(
+		payload.MANIFEST_REL,
+		JSON.stringify({
+			trees: [{ source: 'driver', target: 'app', reason: 'fixture' }],
+			external: [{ target: 'stamp.txt', owner: 'fixture', reason: 'fixture' }],
+			exclude: [{ group: 'tests', reason: 'fixture', patterns: ['app/tests/**'] }]
+		})
+	);
+	writeFile('.gitignore', '*.log\n');
+	writeFile('driver/init.lua', 'require("modules.fresh")\n');
+	writeFile('driver/tests/run.lua', '');
+	writeFile('driver/modules/fresh.lua', 'return {}\n');
+	writeFile('driver/tests/fresh_test.lua', '');
+	writeFile('driver/cache.log', '');
+	// A hook's GIT_DIR or GIT_INDEX_FILE would point the fixture at the real index
+	const env = Object.fromEntries(
+		Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+	);
+	const git = (...args) => execFileSync('git', ['-C', checkout, ...args], { stdio: 'pipe', env });
+	git('init', '-q');
+	git('add', '--', 'driver/init.lua', 'driver/tests/run.lua');
+	const stageCommand = (destination) =>
+		spawnSync(
+			process.execPath,
+			[path.join(ROOT, 'tools/build/macos-bundle-payload.cjs'), 'stage', checkout, destination],
+			{ encoding: 'utf8', env }
+		);
+	const untrackedRun = stageCommand(path.join(scratch, 'untracked-static'));
+	check(
+		untrackedRun.status !== 0 && untrackedRun.stderr.includes('driver/modules/fresh.lua'),
+		`the stage command shipped a bundle without an untracked runtime file (exit ${untrackedRun.status})`
+	);
+	check(
+		!untrackedRun.stderr.includes('fresh_test.lua') && !untrackedRun.stderr.includes('cache.log'),
+		'the stage command refused an untracked test or an ignored file it never ships'
+	);
+	git('add', '--', 'driver/modules/fresh.lua');
+	const trackedStatic = path.join(scratch, 'tracked-static');
+	const trackedRun = stageCommand(trackedStatic);
+	check(
+		trackedRun.status === 0 && fs.existsSync(path.join(trackedStatic, 'app/modules/fresh.lua')),
+		`the stage command failed once every runtime file was tracked: ${trackedRun.stderr}`
+	);
+	check(
+		!fs.existsSync(path.join(trackedStatic, 'app/cache.log')),
+		'the stage command shipped an ignored file'
+	);
+
 	const read = (target) =>
 		target.startsWith('repo:')
 			? fs.readFileSync(path.join(ROOT, target.slice('repo:'.length)), 'utf8')
