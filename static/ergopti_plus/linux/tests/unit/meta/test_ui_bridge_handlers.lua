@@ -1143,6 +1143,25 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(captured.notices, 1)
 		end)
 
+		-- Category, section and magic-key choices are config.toml leaves of the
+		-- chosen folder: written before the switch, they stayed in the old one and
+		-- the next start switched every catalogue off.
+		helpers.it("writes the hotstring choices into the chosen configuration folder", function()
+			local state, values, captured = onboarding_state()
+			local target = scratch_dir()
+			local folder_at_write = nil
+			local batch_write = state.writer.batch_write
+			state.writer.batch_write = function(path, updates)
+				folder_at_write = values.config_dir
+				return batch_write(path, updates)
+			end
+			local result = finish(state, { locale = "en", config_dir = target,
+				operations = { { path = "hotstrings.trigger_char", value = ";" } } })
+			helpers.assert_true(result.done)
+			helpers.assert_eq(folder_at_write, target, "the folder switches before any choice is written")
+			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
+		end)
+
 		helpers.it("rejects malformed finish data without writing or closing", function()
 			for label, answers in pairs({
 				["string value"] = { locale = "en", config_dir = "",
