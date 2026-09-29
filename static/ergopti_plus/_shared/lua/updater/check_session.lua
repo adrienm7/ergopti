@@ -109,7 +109,13 @@ function M.new(opts)
 		if answer.state == "error" then
 			page.reason_key = answer.reason_key
 			local ok, path = pcall(opts.log_path)
-			page.log_path = ok and type(path) == "string" and path or ""
+			if ok and type(path) == "string" then
+				page.log_path = path
+			else
+				-- The page then hides its log line and button; the log says why
+				opts.log("error", "Today's log path is unavailable for the update-check window: %s.", tostring(path))
+				page.log_path = ""
+			end
 		end
 		return page
 	end
