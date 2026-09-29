@@ -154,6 +154,7 @@ global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 
 
 #Include actions.ahk
+#Include system_actions.ahk
 
 
 

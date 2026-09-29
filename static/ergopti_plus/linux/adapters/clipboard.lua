@@ -102,6 +102,10 @@ local function backend()
 				-- trailing newline every time it round-trips is a corruption.
 				read  = string.format("timeout %d wl-paste --no-newline 2>/dev/null", READ_TIMEOUT_S),
 				write = "wl-copy",
+				-- A file manager publishes a copied selection under this target
+				-- (RFC 2483); the plain read gets its text form, if any.
+				read_uri_list = string.format(
+					"timeout %d wl-paste --no-newline --type text/uri-list 2>/dev/null", READ_TIMEOUT_S),
 			}
 		end
 		return nil
@@ -113,6 +117,8 @@ local function backend()
 				name  = "xclip",
 				read  = string.format("timeout %d xclip -selection clipboard -o 2>/dev/null", READ_TIMEOUT_S),
 				write = "xclip -selection clipboard -in",
+				read_uri_list = string.format(
+					"timeout %d xclip -selection clipboard -t text/uri-list -o 2>/dev/null", READ_TIMEOUT_S),
 			}
 		end
 		if Shell.has_command("xsel") then
@@ -388,6 +394,39 @@ function M.read_selection(emit_combo, sleep_ms)
 	if not copied then return false, "", selected end
 	Logger.debug(LOG, "Read a %d-byte selection via %s.", #selected, b.name)
 	return true, selected, nil
+end
+
+--- Reads the file manager's selection by copying it: the text/uri-list it
+--- publishes on Ctrl+C, then puts the clipboard's text back. xsel cannot ask
+--- for a target, so it has no route; the caller parses the list
+--- (_shared/lua/file_selection).
+--- @param emit_combo function combo -> boolean
+--- @param sleep_ms function Blocking millisecond wait.
+--- @return boolean ok
+--- @return string uri_list The text/uri-list ("" when nothing was copied).
+--- @return string|nil reason "no_file_selection", or why the read failed.
+function M.read_selection_uri_list(emit_combo, sleep_ms)
+	local b, why = selection_backend(emit_combo, sleep_ms)
+	if not b then return false, "", why end
+	if not b.read_uri_list then return false, "", b.name .. " cannot read a text/uri-list" end
+	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
+	-- A text sentinel first, as copy_selection does: files copied earlier
+	-- would otherwise still answer the uri-list read when nothing is selected.
+	if not write_backend_checked(b, "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__") then
+		return false, "", "clipboard_probe_write_failed"
+	end
+	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
+	local settled = copy_ok and copied == true and wait_checked(sleep_ms, COPY_SETTLE_MS)
+	-- Nothing copied leaves the sentinel, which offers no uri-list target: the
+	-- read then fails, which is "no file selected".
+	local read_ok, uri_list = false, ""
+	if settled then read_ok, uri_list = Shell.exec_checked(b.read_uri_list) end
+	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
+	if not settled then return false, "", "copy_chord_failed" end
+	if not read_ok or uri_list == "" then return false, "", "no_file_selection" end
+	Logger.debug(LOG, "Read a %d-byte uri-list selection via %s.", #uri_list, b.name)
+	return true, uri_list, nil
 end
 
 --- Copies and replaces the focused selection while preserving the clipboard.

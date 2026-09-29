@@ -989,6 +989,10 @@ sg("space_prev_wrap",        function() return wrapping_space_step(DesktopNaviga
 sg("space_next_wrap",        function() return wrapping_space_step(DesktopNavigation.NEXT) end)
 sg("mission_control",        function() return dock_toggle("toggleMissionControl") end)
 sg("app_expose",             function() return dock_toggle("toggleAppExpose") end)
+-- Command + the Mission Control key: macOS's own Show Desktop shortcut.
+sg("show_desktop",                function()
+	return postKeyStroke({ "cmd" }, 160)
+end)
 
 -- Cursor movement
 sg("line_up",               function() return defer_key("line up", {"alt"}, "up") end)
@@ -1357,6 +1361,19 @@ sg("notification_center",          function()
 		"tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"",
 		"open notification center", nil, current_action_parent())
 end)
+
+-- The system actions that run a native command (modules/gestures/system_actions),
+-- each under the dispatching parent. The ones the catalogue declares
+-- `confirm = true` are asked for by execute_single before they run.
+local SYSTEM_ACTIONS = {
+	"minimize_all", "quit_frontmost_app", "force_quit_frontmost", "clear_clipboard",
+	"center_mouse", "mic_mute_toggle", "sleep_displays", "toggle_dark_mode",
+	"empty_trash", "eject_all_disks", "remove_quarantine_selection",
+	"make_executable_selection", "open_terminal_here", "new_text_file_here",
+}
+for _, system_action in ipairs(SYSTEM_ACTIONS) do
+	sg(system_action, owner_action("modules.gestures.system_actions", system_action))
+end
 
 -- Applications and Stats
 -- These four target the same modules the menu dispatches to (ui/menu/init.lua),
@@ -2511,18 +2528,14 @@ function M.get_label(name)
 	return name
 end
 
---- Dispatches a registered single-shot action.
+--- Runs one registered single action under the parent that dispatched it.
 --- @param name string Action identifier.
 --- @param binding table|nil The binding that invoked it.
---- @return boolean True when a handler was found and invoked; false when the
---- action is unknown here, so the caller can try its own fallback instead of
---- assuming the action ran.
-function M.execute_single(name, binding)
-	local parent = parent_for_binding(binding)
-	local control_plane = is_script_control_plane_action(name, binding)
-	if not control_plane and not aux_admission_open(parent) then return false end
-	local s = SG[name]
-	if not s or type(s.fn) ~= "function" then return false end
+--- @param s table The registry entry.
+--- @param parent string The dispatch parent.
+--- @param control_plane boolean Whether the action is script control.
+--- @return boolean True when the handler ran under a still-admitted parent.
+local function dispatch_single(name, binding, s, parent, control_plane)
 	local prior_parent = _dispatch_parent
 	_dispatch_parent = parent
 	-- Any tap action (other than the click-toggle itself) must deactivate a held click
@@ -2559,6 +2572,44 @@ function M.execute_single(name, binding)
 	-- refuses. Only transport failure or a superseded lifecycle admission lets
 	-- the caller fall through to another action provider.
 	return callback_ok == true and admission_committed == true
+end
+
+--- Dispatches a registered single-shot action. An action the catalogue
+--- declares `confirm = true` only asks here; it runs from the answer, and only
+--- while its parent is still admitted.
+--- @param name string Action identifier.
+--- @param binding table|nil The binding that invoked it.
+--- @return boolean True when a handler was found and invoked (or its
+--- confirmation asked for); false when the action is unknown here, so the
+--- caller can try its own fallback instead of assuming the action ran.
+function M.execute_single(name, binding)
+	local parent = parent_for_binding(binding)
+	local control_plane = is_script_control_plane_action(name, binding)
+	if not control_plane and not aux_admission_open(parent) then return false end
+	local s = SG[name]
+	if not s or type(s.fn) ~= "function" then return false end
+	local meta = Catalogue.actions[name]
+	if meta and meta.confirm == true then
+		-- Required on the first confirmation only: the alert pulls in the dialog
+		-- and screen adapters, which no other action needs at load.
+		local ok_confirm, ActionConfirm = pcall(require, "modules.gestures.action_confirm")
+		if not ok_confirm or type(ActionConfirm) ~= "table" or type(ActionConfirm.ask) ~= "function" then
+			Logger.error(LOG, "'%s' needs a confirmation that cannot be asked (%s) — not run.",
+				tostring(name), tostring(ActionConfirm))
+			return false
+		end
+		-- The action owns the dispatch whether or not its question could be shown
+		-- (ask logs why not): a fallback provider must never run it unasked.
+		ActionConfirm.ask(M.get_label(name), function()
+			if not aux_admission_open(parent) then
+				Logger.info(LOG, "'%s' was confirmed after its scope was paused — not run.", name)
+				return
+			end
+			dispatch_single(name, binding, s, parent, control_plane)
+		end)
+		return true
+	end
+	return dispatch_single(name, binding, s, parent, control_plane)
 end
 
 function M.execute_axis(name, goNext)

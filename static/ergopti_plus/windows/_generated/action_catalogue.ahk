@@ -154,6 +154,20 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.system" })
 	Items.Push({ Kind: "action", Id: "lock_screen" })
 	Items.Push({ Kind: "action", Id: "notification_center" })
+	Items.Push({ Kind: "action", Id: "show_desktop" })
+	Items.Push({ Kind: "action", Id: "sleep_displays" })
+	Items.Push({ Kind: "action", Id: "toggle_dark_mode" })
+	Items.Push({ Kind: "action", Id: "mic_mute_toggle" })
+	Items.Push({ Kind: "action", Id: "clear_clipboard" })
+	Items.Push({ Kind: "action", Id: "center_mouse" })
+	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
+	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
+	Items.Push({ Kind: "action", Id: "empty_trash" })
+	Items.Push({ Kind: "action", Id: "eject_all_disks" })
+	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.file_actions" })
+	Items.Push({ Kind: "action", Id: "unblock_file_selection" })
+	Items.Push({ Kind: "action", Id: "open_terminal_here" })
+	Items.Push({ Kind: "action", Id: "new_text_file_here" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.system_actions" })
 	Items.Push({ Kind: "action", Id: "screen_capture" })
 	Items.Push({ Kind: "action", Id: "screen_capture_instant" })
@@ -217,6 +231,8 @@ GestureActionCatalogueData() {
 	Actions["brightness_up"] := { Family: "sg", LabelKey: "sg_actions.brightness_up", Parameter: "", Confirm: false }
 	Actions["caps_lock"] := { Family: "sg", LabelKey: "sg_actions.caps_lock", Parameter: "", Confirm: false }
 	Actions["caps_word"] := { Family: "sg", LabelKey: "sg_actions.caps_word", Parameter: "", Confirm: false }
+	Actions["center_mouse"] := { Family: "sg", LabelKey: "sg_actions.center_mouse", Parameter: "", Confirm: false }
+	Actions["clear_clipboard"] := { Family: "sg", LabelKey: "sg_actions.clear_clipboard", Parameter: "", Confirm: false }
 	Actions["close_window"] := { Family: "sg", LabelKey: "sg_actions.close_window", Parameter: "", Confirm: false }
 	Actions["copy"] := { Family: "sg", LabelKey: "sg_actions.copy", Parameter: "", Confirm: false }
 	Actions["copy_selected_path"] := { Family: "sg", LabelKey: "sg_actions.copy_selected_path", Parameter: "", Confirm: false }
@@ -232,9 +248,12 @@ GestureActionCatalogueData() {
 	Actions["desktop_prev_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev_wrap", Parameter: "", Confirm: false }
 	Actions["doc_end"] := { Family: "sg", LabelKey: "sg_actions.doc_end", Parameter: "", Confirm: false }
 	Actions["doc_start"] := { Family: "sg", LabelKey: "sg_actions.doc_start", Parameter: "", Confirm: false }
+	Actions["eject_all_disks"] := { Family: "sg", LabelKey: "sg_actions.eject_all_disks", Parameter: "", Confirm: false }
+	Actions["empty_trash"] := { Family: "sg", LabelKey: "sg_actions.empty_trash", Parameter: "", Confirm: true }
 	Actions["enter"] := { Family: "sg", LabelKey: "sg_actions.enter", Parameter: "", Confirm: false }
 	Actions["escape"] := { Family: "sg", LabelKey: "sg_actions.escape", Parameter: "", Confirm: false }
 	Actions["find"] := { Family: "sg", LabelKey: "sg_actions.find", Parameter: "", Confirm: false }
+	Actions["force_quit_frontmost"] := { Family: "sg", LabelKey: "sg_actions.force_quit_frontmost", Parameter: "", Confirm: false }
 	Actions["fullscreen"] := { Family: "sg", LabelKey: "sg_actions.fullscreen", Parameter: "", Confirm: false }
 	Actions["left_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.left_click_toggle", Parameter: "", Confirm: false }
 	Actions["line_down"] := { Family: "sg", LabelKey: "sg_actions.line_down", Parameter: "", Confirm: false }
@@ -268,11 +287,13 @@ GestureActionCatalogueData() {
 	Actions["llm_translate_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_translate_selection", Parameter: "llm_language", Confirm: false }
 	Actions["lock_screen"] := { Family: "sg", LabelKey: "sg_actions.lock_screen", Parameter: "", Confirm: false }
 	Actions["maximize"] := { Family: "sg", LabelKey: "sg_actions.maximize", Parameter: "", Confirm: false }
+	Actions["mic_mute_toggle"] := { Family: "sg", LabelKey: "sg_actions.mic_mute_toggle", Parameter: "", Confirm: false }
 	Actions["microsoft_bold"] := { Family: "sg", LabelKey: "sg_actions.microsoft_bold", Parameter: "", Confirm: false }
 	Actions["minimize_all"] := { Family: "sg", LabelKey: "sg_actions.minimize_all", Parameter: "", Confirm: false }
 	Actions["mute"] := { Family: "sg", LabelKey: "sg_actions.mute", Parameter: "", Confirm: false }
 	Actions["nav_back"] := { Family: "sg", LabelKey: "sg_actions.nav_back", Parameter: "", Confirm: false }
 	Actions["nav_forward"] := { Family: "sg", LabelKey: "sg_actions.nav_forward", Parameter: "", Confirm: false }
+	Actions["new_text_file_here"] := { Family: "sg", LabelKey: "sg_actions.new_text_file_here", Parameter: "", Confirm: false }
 	Actions["none"] := { Family: "sg", LabelKey: "sg_actions.none", Parameter: "", Confirm: false }
 	Actions["notification_center"] := { Family: "sg", LabelKey: "sg_actions.notification_center", Parameter: "", Confirm: false }
 	Actions["ocr_screenshot"] := { Family: "sg", LabelKey: "sg_actions.ocr_screenshot", Parameter: "", Confirm: false }
@@ -294,6 +315,7 @@ GestureActionCatalogueData() {
 	Actions["open_personal_shortcuts"] := { Family: "sg", LabelKey: "sg_actions.open_personal_shortcuts", Parameter: "", Confirm: false }
 	Actions["open_script_source"] := { Family: "sg", LabelKey: "sg_actions.open_script_source", Parameter: "", Confirm: false }
 	Actions["open_system_settings"] := { Family: "sg", LabelKey: "sg_actions.open_system_settings", Parameter: "", Confirm: false }
+	Actions["open_terminal_here"] := { Family: "sg", LabelKey: "sg_actions.open_terminal_here", Parameter: "", Confirm: false }
 	Actions["open_today_log"] := { Family: "sg", LabelKey: "sg_actions.open_today_log", Parameter: "", Confirm: false }
 	Actions["open_url"] := { Family: "sg", LabelKey: "sg_actions.open_url", Parameter: "url", Confirm: false }
 	Actions["open_window_spy"] := { Family: "sg", LabelKey: "sg_actions.open_window_spy", Parameter: "", Confirm: false }
@@ -302,6 +324,7 @@ GestureActionCatalogueData() {
 	Actions["paste"] := { Family: "sg", LabelKey: "sg_actions.paste", Parameter: "", Confirm: false }
 	Actions["paste_plain"] := { Family: "sg", LabelKey: "sg_actions.paste_plain", Parameter: "", Confirm: false }
 	Actions["pick_color"] := { Family: "sg", LabelKey: "sg_actions.pick_color", Parameter: "", Confirm: false }
+	Actions["quit_frontmost_app"] := { Family: "sg", LabelKey: "sg_actions.quit_frontmost_app", Parameter: "", Confirm: false }
 	Actions["redo"] := { Family: "sg", LabelKey: "sg_actions.redo", Parameter: "", Confirm: false }
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
@@ -333,6 +356,8 @@ GestureActionCatalogueData() {
 	Actions["send_key"] := { Family: "sg", LabelKey: "sg_actions.send_key", Parameter: "key", Confirm: false }
 	Actions["send_shortcut"] := { Family: "sg", LabelKey: "sg_actions.send_shortcut", Parameter: "shortcut", Confirm: false }
 	Actions["send_text"] := { Family: "sg", LabelKey: "sg_actions.send_text", Parameter: "text", Confirm: false }
+	Actions["show_desktop"] := { Family: "sg", LabelKey: "sg_actions.show_desktop", Parameter: "", Confirm: false }
+	Actions["sleep_displays"] := { Family: "sg", LabelKey: "sg_actions.sleep_displays", Parameter: "", Confirm: false }
 	Actions["snap_left"] := { Family: "sg", LabelKey: "sg_actions.snap_left", Parameter: "", Confirm: false }
 	Actions["snap_right"] := { Family: "sg", LabelKey: "sg_actions.snap_right", Parameter: "", Confirm: false }
 	Actions["space"] := { Family: "sg", LabelKey: "sg_actions.space", Parameter: "", Confirm: false }
@@ -348,9 +373,11 @@ GestureActionCatalogueData() {
 	Actions["teleport_mouse"] := { Family: "sg", LabelKey: "sg_actions.teleport_mouse", Parameter: "", Confirm: false }
 	Actions["titlecase_selection"] := { Family: "sg", LabelKey: "sg_actions.titlecase_selection", Parameter: "", Confirm: false }
 	Actions["toggle_capslock"] := { Family: "sg", LabelKey: "sg_actions.toggle_capslock", Parameter: "", Confirm: false }
+	Actions["toggle_dark_mode"] := { Family: "sg", LabelKey: "sg_actions.toggle_dark_mode", Parameter: "", Confirm: false }
 	Actions["track_next"] := { Family: "sg", LabelKey: "sg_actions.track_next", Parameter: "", Confirm: false }
 	Actions["track_play"] := { Family: "sg", LabelKey: "sg_actions.track_play", Parameter: "", Confirm: false }
 	Actions["track_prev"] := { Family: "sg", LabelKey: "sg_actions.track_prev", Parameter: "", Confirm: false }
+	Actions["unblock_file_selection"] := { Family: "sg", LabelKey: "sg_actions.unblock_file_selection", Parameter: "", Confirm: true }
 	Actions["undo"] := { Family: "sg", LabelKey: "sg_actions.undo", Parameter: "", Confirm: false }
 	Actions["uppercase_selection"] := { Family: "sg", LabelKey: "sg_actions.uppercase_selection", Parameter: "", Confirm: false }
 	Actions["vol_down"] := { Family: "sg", LabelKey: "sg_actions.vol_down", Parameter: "", Confirm: false }

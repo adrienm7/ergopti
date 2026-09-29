@@ -143,3 +143,52 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end)
 end)
+
+--- Makes the simulated session answer a text/uri-list read only when the
+--- clipboard holds one, as xclip and wl-paste refuse a target nobody offers.
+--- @param shell table The simulated shell of with_session.
+local function offer_uri_list_only_for_files(shell)
+	local read = shell.exec_checked
+	function shell.exec_checked(command)
+		if command:find("text/uri-list", 1, true) and not shell.current:find("^file:") then
+			shell.reads[#shell.reads + 1] = command
+			return false, "", "target text/uri-list not available"
+		end
+		return read(command)
+	end
+end
+
+helpers.describe("clipboard file-selection probe (text/uri-list)", function()
+	for _, case in ipairs({
+		{ kind = "x11", needle = "xclip -selection clipboard -t text/uri-list -o" },
+		{ kind = "wayland", needle = "wl-paste --no-newline --type text/uri-list" },
+	}) do
+		helpers.it("reads the copied files as text/uri-list and restores the clipboard (" .. case.kind .. ")", function()
+			with_session(case.kind, "file:///home/ana/run.sh\r\n", function(clipboard, shell, combos, _, emit, sleep_ms)
+				offer_uri_list_only_for_files(shell)
+				local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
+
+				helpers.assert_true(ok, "the copied files are read: " .. tostring(reason))
+				helpers.assert_eq(uri_list, "file:///home/ana/run.sh\r\n")
+				helpers.assert_eq(combos, { "ctrl+c" }, "the probe copies and pastes nothing")
+				helpers.assert_true(shell.reads[#shell.reads]:find(case.needle, 1, true) ~= nil,
+					"the uri-list target is asked for: " .. shell.reads[#shell.reads])
+				helpers.assert_true(shell.writes[1].text:find("^__ERGOPTI_SELECTION_PROBE_") ~= nil,
+					"a sentinel replaces files copied earlier before the copy")
+				helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the clipboard is put back")
+			end)
+		end)
+	end
+
+	helpers.it("reports no file selection when the copy published no uri-list", function()
+		with_session("x11", nil, function(clipboard, shell, _, _, emit, sleep_ms)
+			offer_uri_list_only_for_files(shell)
+			local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
+
+			helpers.assert_true(not ok, "nothing was copied")
+			helpers.assert_eq(uri_list, "")
+			helpers.assert_eq(reason, "no_file_selection")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the sentinel never remains")
+		end)
+	end)
+end)

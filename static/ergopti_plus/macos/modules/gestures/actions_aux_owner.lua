@@ -509,6 +509,20 @@ function M.applescript(script, label, callback, parent)
 		script, label or "AppleScript", callback, parent)
 end
 
+--- Runs one owned program with an argument vector (ShellRunner.run).
+--- @param executable string Absolute path of the program.
+--- @param args table Argument vector.
+--- @param label string Diagnostic label.
+--- @param callback function|nil fn(ok, stdout, stderr), delivered only while
+---   the parent scope that started the process is still admitted.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.run(executable, args, label, callback, parent)
+	return start_shell(function(payload, terminal)
+		return ShellRunner.run(payload.executable, payload.args, terminal)
+	end, { executable = executable, args = args }, label or "process", callback, parent)
+end
+
 local function settle_all(parent)
 	local scope = action_scope(parent)
 	local timers, shells = {}, {}
