@@ -185,9 +185,11 @@ with a switch of their own. macOS persists it as `[mod_combos] enabled` in
 `config_karabiner.toml`; absent, it follows the Tap-Holds switch, and that
 rule lives only in `Generator.key_combinations_enabled`. Windows keeps it as
 the `KeyCombinations` sub-gate of Shortcuts, whose families the master gate
-reads from the group's `feature` rows. Action: never mark combo rules as
-Tap-Holds feature rules again, and add a Windows family as a row of the
-group, not as a gate list.
+reads from the group's `feature` rows; its manifest default is on, because
+the sparse writer drops a value equal to the default and an absent key must
+keep the families that existed before the switch. Action: never mark combo
+rules as Tap-Holds feature rules again, add a Windows family as a row of the
+group, not as a gate list, and never make that default off.
 
 ### project-two-keys-for-one-row-is-two-menus
 

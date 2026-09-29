@@ -3691,12 +3691,17 @@ description_key = "menu.category_enabled.tap_holds"
 # the AltGr / LAlt / CapsLock combination families off while Shortcuts stays
 # on, each family keeping its own choices. macOS keeps the same switch as
 # [mod_combos] enabled in config_karabiner.toml, beside the rules it gates.
+# Its neutral value is on: the gate can only narrow what Shortcuts and each
+# family already enable, so it activates nothing alone. An absent key must
+# leave the families as the Shortcuts master had them before this switch
+# existed, and the sparse writer deletes a value equal to the default, so a
+# default of off would both disable upgraded configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
 platforms = ["ahk"]
-default = false
+default = true
 recommended = true
-input_altering = true
+input_altering = false
 type = "boolean"
 description_key = "menu.shortcuts.key_combinations"
 
