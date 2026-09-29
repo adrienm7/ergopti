@@ -115,7 +115,7 @@ _LSD_ErgoptiHotstringsWiringCase() {
 	Assert(Gate != "", "the runtime category gate must resolve")
 	Assert(InStr(Gate, "_MG_SupersedeErgoptiHotstrings") == 0,
 		"a layout choice must never cut off enabled geometry hotstrings")
-	Rows := _DriverFuncBody("_HS_CategoryRowsErgopti")
+	Rows := _DriverFuncBody("_HS_BoundCategoryRows")
 	Assert(Rows != "", "the Ergopti hotstring menu builder must resolve")
 	Assert(InStr(Rows, "LayoutErgoptiHotstringsReason") == 0,
 		"geometry hotstrings stay editable under any detected or emulated layout")
