@@ -57,12 +57,21 @@ local function daemon_handlers()
 end
 
 --- Runs `body` with every tool probe answering "absent", without a shell.
+--- The compositor sockets are hidden too: the workspace requirement reads
+--- them, so a developer running the suite from sway or Hyprland would see
+--- that compositor instead of the session the test scripts.
 --- @param body function
 local function without_tools(body)
 	local Shell = require("adapters.shell_runner")
+	local real_getenv = os.getenv
+	os.getenv = function(name)
+		if name == "HYPRLAND_INSTANCE_SIGNATURE" or name == "SWAYSOCK" then return nil end
+		return real_getenv(name)
+	end
 	Shell._set_runner(function() return false end)
 	local ok, err = pcall(body)
 	Shell._reset_runner()
+	os.getenv = real_getenv
 	if not ok then error(err, 0) end
 end
 
