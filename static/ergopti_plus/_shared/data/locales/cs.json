@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Neaktivní: povolte ErgoptiPlus v Položkách přihlášení",
 	"menu.tapholds.guardian_unavailable": "🔴 Neaktivní: pomocník ErgoptiPlus na pozadí není zaregistrován",
 	"menu.tapholds.open_login_items": "Otevřít nastavení Položek přihlášení…",
-	"menu.tapholds.saved_until_guardian": "💾 Nastavení klepnutí-přidržení uloženo: projeví se, jakmile bude ErgoptiPlus povolen v Položkách přihlášení (kliknutím otevřete nastavení).",
+	"menu.tapholds.saved_until_guardian": "💾 Nastavení klávesnice uloženo: projeví se, jakmile bude ErgoptiPlus povolen v Položkách přihlášení (kliknutím otevřete nastavení).",
 	"menu.tapholds.title": "⌨️ Klepnutí-Přidržení",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Zkopírovat tap → combo pro modifikátory",
 	"menu.tapholds.edit_nav_layer": "Upravit navigační vrstvu…",

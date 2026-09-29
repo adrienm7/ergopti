@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Неактивно: разрешите ErgoptiPlus в «Объектах входа»",
 	"menu.tapholds.guardian_unavailable": "🔴 Неактивно: фоновый помощник ErgoptiPlus не зарегистрирован",
 	"menu.tapholds.open_login_items": "Открыть настройки «Объектов входа»…",
-	"menu.tapholds.saved_until_guardian": "💾 Настройки касания-удержания сохранены: они вступят в силу, когда ErgoptiPlus будет разрешён в «Объектах входа» (нажмите, чтобы открыть настройки).",
+	"menu.tapholds.saved_until_guardian": "💾 Настройки клавиатуры сохранены: они вступят в силу, когда ErgoptiPlus будет разрешён в «Объектах входа» (нажмите, чтобы открыть настройки).",
 	"menu.tapholds.title": "⌨️ Касание-Удержание",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Скопировать нажатие → комбо для клавиш-модификаторов",
 	"menu.tapholds.edit_nav_layer": "Изменить слой навигации…",

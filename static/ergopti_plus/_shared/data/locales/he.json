@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 לא פעיל: אשרו את ErgoptiPlus בפריטי התחברות",
 	"menu.tapholds.guardian_unavailable": "🔴 לא פעיל: עוזר הרקע של ErgoptiPlus אינו רשום",
 	"menu.tapholds.open_login_items": "פתיחת הגדרות פריטי התחברות…",
-	"menu.tapholds.saved_until_guardian": "💾 הגדרות ה-Tap-holds נשמרו: הן יחולו ברגע ש-ErgoptiPlus יאושר בפריטי התחברות (לחצו לפתיחת ההגדרות).",
+	"menu.tapholds.saved_until_guardian": "💾 הגדרות המקלדת נשמרו: הן יחולו ברגע ש-ErgoptiPlus יאושר בפריטי התחברות (לחצו לפתיחת ההגדרות).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 העתק לחיצה → קומבו למקשי שינוי",
 	"menu.tapholds.edit_nav_layer": "עריכת שכבת הניווט…",

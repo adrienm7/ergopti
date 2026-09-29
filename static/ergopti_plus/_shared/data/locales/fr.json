@@ -1595,7 +1595,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inactifs : autorisez ErgoptiPlus dans Ouverture",
 	"menu.tapholds.guardian_unavailable": "🔴 Inactifs : l’assistant en arrière-plan d’ErgoptiPlus n’est pas enregistré",
 	"menu.tapholds.open_login_items": "Ouvrir les réglages d’Ouverture…",
-	"menu.tapholds.saved_until_guardian": "💾 Réglages des tap-holds enregistrés : ils s’appliqueront dès qu’ErgoptiPlus sera autorisé dans Ouverture (cliquer pour ouvrir les réglages).",
+	"menu.tapholds.saved_until_guardian": "💾 Réglages du clavier enregistrés : ils s’appliqueront dès qu’ErgoptiPlus sera autorisé dans Ouverture (cliquer pour ouvrir les réglages).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Propager tap → combo sur tous les raccourcis",
 	"menu.tapholds.edit_nav_layer": "Éditer la couche de navigation…",

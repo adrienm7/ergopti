@@ -1578,7 +1578,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Etkin değil: Giriş Öğeleri'nde ErgoptiPlus'a izin verin",
 	"menu.tapholds.guardian_unavailable": "🔴 Etkin değil: ErgoptiPlus arka plan yardımcısı kayıtlı değil",
 	"menu.tapholds.open_login_items": "Giriş Öğeleri ayarlarını aç…",
-	"menu.tapholds.saved_until_guardian": "💾 Dokunma-basılı tutma ayarları kaydedildi: ErgoptiPlus'a Giriş Öğeleri'nde izin verildiğinde uygulanacak (ayarları açmak için tıklayın).",
+	"menu.tapholds.saved_until_guardian": "💾 Klavye ayarları kaydedildi: ErgoptiPlus'a Giriş Öğeleri'nde izin verildiğinde uygulanacak (ayarları açmak için tıklayın).",
 	"menu.tapholds.title": "⌨️ Dokunma-Basılı Tutma",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Değiştirici tuşlar için tap → combo kopyala",
 	"menu.tapholds.edit_nav_layer": "Gezinme katmanını düzenle…",

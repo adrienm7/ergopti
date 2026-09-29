@@ -1595,7 +1595,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inactive: allow ErgoptiPlus in Login Items",
 	"menu.tapholds.guardian_unavailable": "🔴 Inactive: the ErgoptiPlus background helper is not registered",
 	"menu.tapholds.open_login_items": "Open Login Items settings…",
-	"menu.tapholds.saved_until_guardian": "💾 Tap-Hold settings saved: they apply once ErgoptiPlus is allowed in Login Items (click to open the settings).",
+	"menu.tapholds.saved_until_guardian": "💾 Keyboard settings saved: they apply once ErgoptiPlus is allowed in Login Items (click to open the settings).",
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Copy tap → combo for all modifier shortcuts",
 	"menu.tapholds.edit_nav_layer": "Edit the navigation layer…",
