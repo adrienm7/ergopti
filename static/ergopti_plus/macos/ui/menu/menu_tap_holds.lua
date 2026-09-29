@@ -825,6 +825,17 @@ local function build_picker_trees(karabiner, update_menu, enabled)
 	return tap_hold, raccourcis
 end
 
+--- Leads a greyed group of rows with the reason they are unavailable.
+--- @param rows table Cached rows, shared with later builds and never mutated.
+--- @param enabled boolean « Ergopti uses Karabiner ».
+--- @return table rows The cached rows when on, or a fresh list led by the hint.
+local function with_karabiner_off_hint(rows, enabled)
+	if enabled then return rows end
+	local hinted = { { label = i18n.get("menu.tapholds.karabiner_off_hint"), disabled = true } }
+	for _, row in ipairs(rows) do hinted[#hinted + 1] = row end
+	return hinted
+end
+
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -861,14 +872,11 @@ function M.build(ctx)
 		end,
 		-- With « Ergopti uses Karabiner » off the key rows are greyed: nothing
 		-- can deploy them. Say why right above the first of them, at the top of
-		-- the left hand. The cached tree is shared, so the hint goes into a
-		-- fresh list.
+		-- the left hand; the chord rows, under Shortcuts, get the same hint
+		-- (M.build_key_combinations). The cached trees are shared, so the hint
+		-- goes into a fresh list.
 		["tap_hold_keys_left"] = function()
-			local left = (build_picker_trees(karabiner, update_menu, enabled)).left
-			if enabled then return left end
-			local rows = { { label = i18n.get("menu.tapholds.karabiner_off_hint"), disabled = true } }
-			for _, row in ipairs(left) do rows[#rows + 1] = row end
-			return rows
+			return with_karabiner_off_hint((build_picker_trees(karabiner, update_menu, enabled)).left, enabled)
 		end,
 		["tap_hold_keys_right"] = function()
 			return (build_picker_trees(karabiner, update_menu, enabled)).right
@@ -984,9 +992,10 @@ function M.build_key_combinations(ctx)
 		["combo_timings"] = function()
 			return { build_simultaneous_threshold_item(karabiner, update_menu) }
 		end,
+		-- Greyed with « Ergopti uses Karabiner » off, and led by the reason.
 		["key_combination_rows"] = function()
 			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
-			return chords
+			return with_karabiner_off_hint(chords, enabled)
 		end,
 	}
 
