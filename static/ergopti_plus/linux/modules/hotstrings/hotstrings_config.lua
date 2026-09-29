@@ -1256,35 +1256,6 @@ function M.reset_defaults()
 	return #changes
 end
 
---- Copies every known category's gate, the exact inverse of a bulk change.
---- @return table snapshot `{ [category] = enabled }` for restore_disabled().
-function M.capture_disabled()
-	local snapshot = {}
-	for _, id in ipairs(known_categories()) do
-		if addressable(id) then snapshot[id] = M.is_group_enabled(id) end
-	end
-	return snapshot
-end
-
---- Reinstates category gates captured by capture_disabled(): committed like
---- every other category change, engine first, then config.toml.
---- @param snapshot table Gates from capture_disabled().
---- @return boolean restored
-function M.restore_disabled(snapshot)
-	assert(type(snapshot) == "table", "restore_disabled requires captured category gates")
-	local changes = {}
-	for _, id in ipairs(known_categories()) do
-		local enabled = snapshot[id]
-		if type(enabled) == "boolean" and addressable(id) and M.is_group_enabled(id) ~= enabled then
-			changes[#changes + 1] = { group = id, enabled = enabled }
-		end
-	end
-	if #changes > 0 and not commit_choices(changes, "Restore hotstring categories") then return false end
-	notify_change()
-	Logger.info(LOG, "Hotstring categories restored to their previous gates.")
-	return true
-end
-
 --- Whether a category's gate is open.
 --- @param group_name string
 --- @return boolean

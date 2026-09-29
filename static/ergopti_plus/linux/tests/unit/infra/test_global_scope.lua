@@ -13,7 +13,8 @@ local helpers = require("tests.helpers")
 local Codec = require("toml_codec")
 
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
-local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "infra.llm_scope", "infra.metrics_scope" }
+local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "infra.llm_scope", "infra.metrics_scope",
+	"infra.hotstrings_scope" }
 
 --- A stub participant journaling into a shared trace.
 local function stub(trace, name, refuse)
@@ -124,43 +125,36 @@ helpers.describe("Linux global scope: registry and composition", function()
 	end)
 end)
 
-helpers.describe("Linux global scope: hotstring categories", function()
-	--- A real category manager with no persisted gate and one known category.
-	local function fresh_config()
-		require("adapters.storage").set("hotstrings.disabled_categories", "")
-		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-		Config.init({ load_mappings = function() end }, os.tmpname() .. "_absent.toml", nil)
-		Config._set_categories_for_test({ autocorrection = { id = "autocorrection", sections = {} } })
-		helpers.assert_true(Config.disable_group("autocorrection"))
-		helpers.assert_eq(Config.is_group_enabled("autocorrection"), false)
-		return Config
-	end
-
-	helpers.it("the Configuration row still reopens every hotstring category", function()
+helpers.describe("Linux global scope: hotstrings", function()
+	-- The interim participant only reopened the category gates; the real owner
+	-- restores both hotstring files and needs the daemon's live runtimes.
+	helpers.it("registers the hotstrings scope owner with the daemon's runtimes", function()
 		with_modules(function()
-			local Config = fresh_config()
-			local GlobalScope = require("infra.global_scope")
-			local registry = GlobalScope.participants({ config = Config, is_paused = function() return false end })
-			helpers.assert_not_nil(registry.hotstrings, "hotstrings take part in the global restore")
-			local committed, report = GlobalScope.apply("recommended", registry)
-			helpers.assert_eq(committed, true, report.detail)
-			helpers.assert_eq(report.applied, { "hotstrings" })
-			for _, id in ipairs(report.skipped) do helpers.assert_true(id ~= "hotstrings", "hotstrings were skipped") end
-			helpers.assert_eq(Config.is_group_enabled("autocorrection"), true)
+			local seen, participant = nil, stub({}, "hotstrings")
+			package.loaded["infra.hotstrings_scope"] = {
+				participant = function(is_paused, ports)
+					seen = { paused = is_paused(), ports = ports }
+					return participant
+				end,
+			}
+			local dynamic, preview = {}, {}
+			local registry = require("infra.global_scope").participants({ config = {}, dyn_hotstrings = dynamic,
+				tooltip_preview = preview, is_paused = function() return false end })
+			helpers.assert_true(registry.hotstrings == participant, "hotstrings take part through their scope owner")
+			helpers.assert_not_nil(seen, "the owner's participant was asked for")
+			helpers.assert_eq(seen.paused, false)
+			helpers.assert_true(seen.ports.dynamic == dynamic, "the dynamic runtime reaches the owner")
+			helpers.assert_true(seen.ports.preview == preview, "the preview runtime reaches the owner")
 		end)
 	end)
 
-	helpers.it("a later refusal closes the exact category gates again", function()
+	helpers.it("leaves hotstrings out when the daemon runs none", function()
 		with_modules(function()
-			local Config = fresh_config()
-			local GlobalScope = require("infra.global_scope")
-			local registry = GlobalScope.participants({ config = Config, is_paused = function() return false end })
-			registry.llm = stub({}, "llm", true)
-			local committed, report = GlobalScope.apply("recommended", registry)
-			helpers.assert_eq(committed, false)
-			helpers.assert_eq(report.applied, { "hotstrings" })
-			helpers.assert_eq(report.reverted, true)
-			helpers.assert_eq(Config.is_group_enabled("autocorrection"), false)
+			package.loaded["infra.hotstrings_scope"] = {
+				participant = function() error("no hotstrings owner without a hotstrings configuration") end,
+			}
+			local registry = require("infra.global_scope").participants({ is_paused = function() return false end })
+			helpers.assert_nil(registry.hotstrings)
 		end)
 	end)
 end)
