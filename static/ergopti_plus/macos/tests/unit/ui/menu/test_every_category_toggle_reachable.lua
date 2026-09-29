@@ -85,7 +85,6 @@ local function gestures_double(observed)
 		get_action_parameter = function() return nil end,
 		get_mode = function() return "single" end,
 		get_sensitivity = function() return 1 end,
-		get_space_wrap = function() return false end,
 		enable_all = function() observed.gesture_calls[#observed.gesture_calls + 1] = "enable"; return true end,
 		disable_all = function() observed.gesture_calls[#observed.gesture_calls + 1] = "disable"; return true end,
 	}

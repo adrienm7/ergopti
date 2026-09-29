@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "감싸는 기호",
 	"menu.gestures.auto_configure": "🔧 자동 구성 (레지스트리)",
 	"menu.gestures.change_action": "동작 변경",
-	"menu.gestures.circular_spaces": "순환 공간 탐색 (1 ↔ N)",
 	"menu.gestures.conflict_title": "제스처 충돌",
 	"menu.gestures.default_sensitivity": "(일반 기본값)",
 	"menu.gestures.enabled": "️ 제스처",

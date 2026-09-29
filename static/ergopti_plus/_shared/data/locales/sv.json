@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "Omslutande symboler",
 	"menu.gestures.auto_configure": "🔧 Automatisk konfiguration (register)",
 	"menu.gestures.change_action": "Ändra åtgärd",
-	"menu.gestures.circular_spaces": "Cirkulär Spaces-navigering (1 ↔ N)",
 	"menu.gestures.conflict_title": "Gestkonflikt",
 	"menu.gestures.default_sensitivity": "(Allmänt standardvärde)",
 	"menu.gestures.enabled": "️ Gester",

@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "Obklopující symboly",
 	"menu.gestures.auto_configure": "🔧 Automatická konfigurace (registr)",
 	"menu.gestures.change_action": "Změnit akci",
-	"menu.gestures.circular_spaces": "Kruhová navigace Spaces (1 ↔ N)",
 	"menu.gestures.conflict_title": "Konflikt gest",
 	"menu.gestures.default_sensitivity": "(Obecné výchozí)",
 	"menu.gestures.enabled": "️ Gesta",

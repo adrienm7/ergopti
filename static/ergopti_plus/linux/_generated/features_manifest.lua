@@ -860,9 +860,6 @@ M.unavailable = {
 		path = "shortcuts.keyboard.hs_ctrl_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "gestures.space_wrap", section = "gestures", reason_key = "", platforms = { "hs" },
-	},
-	{
 		path = "gestures.swipe_2_diag", section = "gestures", reason_key = "", platforms = { "hs" },
 	},
 	{

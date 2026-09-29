@@ -2587,20 +2587,6 @@ description_key = "menu.gestures.tap_4"
 
 # --- 2-finger remaining directions ---
 [[features.gestures]]
-id = "space_wrap"
-platforms = ["hs"]
-default = true
-recommended = true
-input_altering = false
-type = "boolean"
-# The config id stays "space_wrap" (persisted setting + get/set_space_wrap), but
-# the menu label is the canonical "circular_spaces" i18n key — the menu manifest,
-# the locales and menu_gestures.lua all use it. The duplicate "space_wrap" locale
-# entry was dropped by the i18n canonicalization, so this description_key must
-# point at the surviving key or it resolves to nothing.
-description_key = "menu.gestures.circular_spaces"
-
-[[features.gestures]]
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 default = "none"
@@ -5129,18 +5115,8 @@ platforms = ["hs", "ahk", "linux"]
 [[menu.gestures_menu]]
 type = "---"
 
-[[menu.gestures_menu]]
-type = "check"
-id = "circular_spaces"
-i18n = "menu.gestures.circular_spaces"
-checked_when = ["gesture_space_wrap"]
-disabled_when = ["gestures_enabled"]
-platforms = ["hs"]
-reason_key = "platform_reason.touchpad_stack_is_per_driver"
-[[menu.gestures_menu]]
-type = "---"
-platforms = ["hs"]
-
+# The circular Spaces checkbox that stood here is retired: the wrap is its own
+# pair of actions (space_prev_wrap / space_next_wrap), bindable like any other.
 [[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_2"

@@ -411,7 +411,6 @@ helpers.describe("menu preferences: first-click rollback", function()
 		local result = MenuState.sync_state_to_modules({ hotstrings = {}, gestures = true }, {
 			gesture_modes = { swipe_left = "continuous" },
 			gesture_sensitivities = { swipe_left = 1.25 },
-			gesture_space_wrap = false,
 		}, false, {
 			keymap = { set_llm_model = function() return true end },
 			gestures = {
@@ -419,7 +418,6 @@ helpers.describe("menu preferences: first-click rollback", function()
 				is_enabled = function() return true end,
 				set_mode = function(_, value) observed.mode = value end,
 				set_sensitivity = function(_, value) observed.sensitivity = value end,
-				set_space_wrap = function(value) observed.space_wrap = value end,
 			},
 			hotstring_editor = {},
 			core_mods = {},
@@ -431,7 +429,6 @@ helpers.describe("menu preferences: first-click rollback", function()
 		helpers.assert_eq(observed, {
 			mode = "continuous",
 			sensitivity = 1.25,
-			space_wrap = false,
 		})
 	end)
 end)

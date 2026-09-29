@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "包裹符号",
 	"menu.gestures.auto_configure": "🔧 自动配置（注册表）",
 	"menu.gestures.change_action": "更改操作",
-	"menu.gestures.circular_spaces": "循环切换空间（1 ↔ N）",
 	"menu.gestures.conflict_title": "手势冲突",
 	"menu.gestures.default_sensitivity": "（通用默认值）",
 	"menu.gestures.enabled": "️ 手势",

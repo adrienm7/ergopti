@@ -1260,27 +1260,6 @@
 			"type": "---"
 		},
 		{
-			"type": "check",
-			"id": "circular_spaces",
-			"i18n": "menu.gestures.circular_spaces",
-			"checked_when": [
-				"gesture_space_wrap"
-			],
-			"disabled_when": [
-				"gestures_enabled"
-			],
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
 			"type": "list",
 			"id": "gesture_slots_2",
 			"platforms": [

@@ -618,9 +618,6 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				if type(gestures.set_sensitivity) == "function" then try("gestures", "gestures.set_sensitivity", gestures.set_sensitivity, slot, sens) end
 			end
 		end
-		if saved.gesture_space_wrap ~= nil then
-			if type(gestures.set_space_wrap) == "function" then try("gestures", "gestures.set_space_wrap", gestures.set_space_wrap, saved.gesture_space_wrap) end
-		end
 	end
 	-- Drive shortcuts with binding-only helpers so the script-control eventtap
 	-- (AltGr+Enter/Backspace/Escape) is never destroyed mid-session.

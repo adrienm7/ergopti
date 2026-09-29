@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "الرموز المحيطة",
 	"menu.gestures.auto_configure": "🔧 الإعداد التلقائي (السجل)",
 	"menu.gestures.change_action": "تغيير الإجراء",
-	"menu.gestures.circular_spaces": "التنقل الدائري بين المساحات (1 ↔ N)",
 	"menu.gestures.conflict_title": "تعارض الإيماءات",
 	"menu.gestures.default_sensitivity": "(الافتراضي العام)",
 	"menu.gestures.enabled": "️ إيماءات",

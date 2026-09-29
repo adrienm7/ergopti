@@ -1004,7 +1004,6 @@
 	"menu.shortcuts.wrap_symbols": "Wrapping symbols",
 	"menu.gestures.auto_configure": "🔧 Auto-configure (registry)",
 	"menu.gestures.change_action": "Change action",
-	"menu.gestures.circular_spaces": "Circular Spaces navigation (1 ↔ N)",
 	"menu.gestures.conflict_title": "Gesture conflict",
 	"menu.gestures.default_sensitivity": "(General default)",
 	"menu.gestures.enabled": "️ Gestures",

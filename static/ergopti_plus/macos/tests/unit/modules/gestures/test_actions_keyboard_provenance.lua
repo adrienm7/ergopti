@@ -38,7 +38,7 @@ helpers.describe("gestures.actions: context navigation has exact action provenan
 			package.loaded["modules.gestures.actions"] = nil
 			local fixture = Fixture.load("modules.gestures.actions")
 			local actions = fixture.subject
-			actions.init({ space_wrap = true })
+			actions.init({})
 			local epoch_before = fixture.synthetic.current_action_epoch()
 
 			if case.axis then

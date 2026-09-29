@@ -1009,7 +1009,6 @@
 	"menu.shortcuts.wrap_symbols": "囲み記号",
 	"menu.gestures.auto_configure": "🔧 自動設定（レジストリ）",
 	"menu.gestures.change_action": "アクションを変更",
-	"menu.gestures.circular_spaces": "循環スペースナビゲーション (1 ↔ N)",
 	"menu.gestures.conflict_title": "ジェスチャーの競合",
 	"menu.gestures.default_sensitivity": "（一般デフォルト）",
 	"menu.gestures.enabled": "️ ジェスチャー",

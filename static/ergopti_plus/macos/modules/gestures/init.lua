@@ -93,7 +93,6 @@ M.DEFAULT_STATE = {
 	gestures = Manifest.default_for("gestures.enabled"),
 	modes = {},
 	sensitivities = {},
-	space_wrap = Manifest.default_for("gestures.space_wrap"),
 }
 
 -- Initialize modes and sensitivities
@@ -132,7 +131,6 @@ local CoreState = {
 	ga             = {},
 	modes          = {},
 	sensitivities  = {},
-	space_wrap     = true,
 	-- Flat binding__action → parameter map. Keeping this separate from action
 	-- assignments prevents a URL selected for one gesture leaking into another.
 	action_params  = {},
@@ -142,7 +140,6 @@ local CoreState = {
 for k, v in pairs(M.DEFAULT_GESTURES) do CoreState.ga[k] = v end
 for k, v in pairs(M.DEFAULT_STATE.modes) do CoreState.modes[k] = v end
 for k, v in pairs(M.DEFAULT_STATE.sensitivities) do CoreState.sensitivities[k] = v end
-CoreState.space_wrap = M.DEFAULT_STATE.space_wrap
 
 -- Initialize action dependencies without acquiring input devices.
 Actions.init(CoreState)
@@ -660,12 +657,6 @@ function M.set_sensitivity(slot, s)
 		Logger.warn(LOG, "set_sensitivity('%s'): non-numeric/non-positive value %s — using default %s.",
 			tostring(slot), tostring(s), tostring(M.DEFAULT_SENSITIVITY))
 	end
-	return true
-end
-function M.get_space_wrap()         return CoreState.space_wrap                 end
-function M.set_space_wrap(wrap)
-	if type(wrap) ~= "boolean" then return false end
-	CoreState.space_wrap = wrap
 	return true
 end
 
