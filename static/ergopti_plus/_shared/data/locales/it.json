@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "Suggerimenti IA",
 	"notify.personal_info": "Informazioni personali",
 	"notify.quit_refused": "Impossibile uscire ora, un’altra operazione è ancora in corso. Riprova tra un momento.",
-	"notify.report_bug_body": "La diagnostica è stata copiata e salvata (il file viene mostrato). Incollala nel modulo GitHub appena aperto.",
+	"notify.report_bug_body": "Il modulo GitHub è aperto e precompilato con la diagnostica (copiata anche negli appunti, nel caso sia stata accorciata).",
 	"notify.screenshot_copied": "Screenshot copiato",
 	"notify.screenshot_saved": "Screenshot salvato",
 	"notify.screenshot_saved_path": "Salvato: %s",

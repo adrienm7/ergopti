@@ -15,8 +15,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting a problem. ErgoptiPlus's Debug > Report a bug fills in the version, the system and a diagnostics summary, and copies the full diagnostics to your clipboard.
-        Merci de signaler ce problème. Débogage > Signaler un bug remplit la version, le système et un résumé du diagnostic, et copie le diagnostic complet dans le presse-papiers.
+        Thank you for reporting a problem. ErgoptiPlus's Debug > Report a bug fills in the version, the system and the diagnostics, and copies the full diagnostics to your clipboard in case they had to be shortened here.
+        Merci de signaler ce problème. Débogage > Signaler un bug remplit la version, le système et le diagnostic, et copie le diagnostic complet dans le presse-papiers au cas où il aurait dû être raccourci ici.
   - type: textarea
     id: what_happened
     attributes:
@@ -60,7 +60,7 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Paste the diagnostics copied by Debug > Report a bug (Ctrl+V or Cmd+V), or drag the saved .md file here. The home folder, the account name and tokens are already removed. / Collez le diagnostic copié par Débogage > Signaler un bug, ou glissez ici le fichier .md enregistré. Le dossier personnel, le nom du compte et les jetons sont déjà retirés.
+      description: Filled in by Debug > Report a bug. If it ends with […], replace it with the full diagnostics from your clipboard (Ctrl+V or Cmd+V). The home folder, the account name and tokens are already removed. / Rempli par Débogage > Signaler un bug. S'il se termine par […], remplacez-le par le diagnostic complet du presse-papiers. Le dossier personnel, le nom du compte et les jetons sont déjà retirés.
     validations:
       required: false
   - type: checkboxes

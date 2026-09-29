@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "Návrhy AI",
 	"notify.personal_info": "Osobní informace",
 	"notify.quit_refused": "Nyní nelze ukončit, jiná operace stále probíhá. Zkuste to znovu za chvíli.",
-	"notify.report_bug_body": "Diagnostika byla zkopírována a uložena (soubor je zobrazen). Vložte ji do formuláře GitHub, který se právě otevřel.",
+	"notify.report_bug_body": "Formulář GitHub je otevřený a předvyplněný diagnostikou (zkopírovanou také do schránky pro případ, že byla zkrácena).",
 	"notify.screenshot_copied": "Snímek zkopírován",
 	"notify.screenshot_saved": "Snímek uložen",
 	"notify.screenshot_saved_path": "Uloženo: %s",

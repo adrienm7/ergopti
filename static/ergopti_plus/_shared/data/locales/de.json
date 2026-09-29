@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "KI-Vorschläge",
 	"notify.personal_info": "Persönliche Informationen",
 	"notify.quit_refused": "Beenden ist gerade nicht möglich, ein anderer Vorgang läuft noch. Versuchen Sie es gleich erneut.",
-	"notify.report_bug_body": "Die Diagnose wurde kopiert und gespeichert (die Datei wird angezeigt). Fügen Sie sie in das gerade geöffnete GitHub-Formular ein.",
+	"notify.report_bug_body": "Das GitHub-Formular ist geöffnet und mit der Diagnose vorausgefüllt (auch in die Zwischenablage kopiert, falls sie gekürzt wurde).",
 	"notify.screenshot_copied": "Screenshot kopiert",
 	"notify.screenshot_saved": "Screenshot gespeichert",
 	"notify.screenshot_saved_path": "Gespeichert: %s",

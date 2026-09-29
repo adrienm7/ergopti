@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "Suggestions IA",
 	"notify.personal_info": "Informations personnelles",
 	"notify.quit_refused": "Impossible de quitter pour l’instant, une autre opération est en cours. Réessayez dans un instant.",
-	"notify.report_bug_body": "Le diagnostic est copié et enregistré (le fichier est affiché). Collez-le dans le formulaire GitHub qui vient de s’ouvrir.",
+	"notify.report_bug_body": "Le formulaire GitHub est ouvert et prérempli avec le diagnostic (également copié dans le presse-papiers, au cas où il aurait été raccourci).",
 	"notify.screenshot_copied": "Capture copiée",
 	"notify.screenshot_saved": "Capture sauvegardée",
 	"notify.screenshot_saved_path": "Sauvegardé : %s",

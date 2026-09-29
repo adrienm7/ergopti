@@ -182,7 +182,6 @@ local function build_report(record)
 		os            = tostring(system.os or "unknown"),
 		driver        = Health.DRIVER,
 		generated_utc = generated,
-		file_stamp    = (generated:gsub("[-:]", "")),
 		warn_count    = tonumber(issues.warn_count) or 0,
 		err_count     = tonumber(issues.err_count) or 0,
 	}
@@ -326,8 +325,7 @@ local function perform(name, context)
 	if name == "copy" then
 		action = { action = "copy", text = session.report.text }
 	elseif name == "report" then
-		action = { action = "report", text = session.report.text, name = session.report.name,
-			fields = session.report.fields }
+		action = { action = "report", text = session.report.text, fields = session.report.fields }
 	else
 		action = { action = "open_path", id = session.open_id }
 	end

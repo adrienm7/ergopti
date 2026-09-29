@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "KI-suggesties",
 	"notify.personal_info": "Persoonlijke gegevens",
 	"notify.quit_refused": "Afsluiten is nu niet mogelijk, er loopt nog een andere bewerking. Probeer het zo opnieuw.",
-	"notify.report_bug_body": "De diagnose is gekopieerd en opgeslagen (het bestand wordt getoond). Plak ze in het GitHub-formulier dat net is geopend.",
+	"notify.report_bug_body": "Het GitHub-formulier is geopend en vooraf ingevuld met de diagnose (ook naar het klembord gekopieerd, voor het geval ze is ingekort).",
 	"notify.screenshot_copied": "Schermafbeelding gekopieerd",
 	"notify.screenshot_saved": "Schermafbeelding opgeslagen",
 	"notify.screenshot_saved_path": "Opgeslagen: %s",

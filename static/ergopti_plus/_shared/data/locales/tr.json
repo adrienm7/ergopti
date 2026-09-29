@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "YZ Önerileri",
 	"notify.personal_info": "Kişisel bilgiler",
 	"notify.quit_refused": "Şu anda çıkılamıyor, başka bir işlem hâlâ sürüyor. Birazdan tekrar deneyin.",
-	"notify.report_bug_body": "Tanılama kopyalandı ve kaydedildi (dosya gösteriliyor). Az önce açılan GitHub formuna yapıştırın.",
+	"notify.report_bug_body": "GitHub formu açık ve tanılama bilgileriyle önceden dolduruldu (kısaltılmış olma ihtimaline karşı panoya da kopyalandı).",
 	"notify.screenshot_copied": "Ekran görüntüsü kopyalandı",
 	"notify.screenshot_saved": "Ekran görüntüsü kaydedildi",
 	"notify.screenshot_saved_path": "Kaydedildi: %s",

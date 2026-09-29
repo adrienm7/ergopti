@@ -185,17 +185,22 @@ function init(page, detailed, mode) {
 	const report = page.posted[page.posted.length - 1];
 	if (!report || report.action !== 'report') fail('Report did not post a report action');
 	else {
+		// The host prefills the preview itself as the form's report field:
+		// a report names no file, since nothing is saved
 		if (report.text !== preview) fail('Report sends a text other than the preview');
-		if (!/^ergopti-diagnostics-linux-2\.1\.0-20260924T100000Z\.md$/.test(report.name)) fail(`bad report name ${report.name}`);
-		for (const id of ['version', 'os', 'driver', 'diagnostics']) {
-			if (typeof report.fields[id] !== 'string') fail(`the report does not prefill ${id}`);
+		if (Object.keys(report).sort().join(',') !== 'action,fields,text') {
+			fail(`Report sends ${Object.keys(report).sort().join(',')}, not only its text and fields`);
+		}
+		if (Object.keys(report.fields).sort().join(',') !== 'driver,os,version') {
+			fail(`Report prefills ${Object.keys(report.fields).sort().join(',')}, not only the identity fields`);
 		}
 		if (JSON.stringify(report.fields).includes('/home/jdoe')) fail('the prefilled fields are not redacted');
 	}
 
 	page.elements['btn-save'].dispatch('click');
 	const save = page.posted[page.posted.length - 1];
-	if (!save || save.action !== 'save' || save.text !== preview || save.name !== report.name) fail('Save does not send the preview and its name');
+	if (!save || save.action !== 'save' || save.text !== preview) fail('Save does not send the preview');
+	else if (!/^ergopti-diagnostics-linux-2\.1\.0-20260924T100000Z\.md$/.test(save.name)) fail(`bad saved report name ${save.name}`);
 
 	page.elements['btn-open-logs'].dispatch('click');
 	const logs = page.posted[page.posted.length - 1];
@@ -226,6 +231,15 @@ function init(page, detailed, mode) {
 	// Action results reach the status line; AHK sends 1 for true
 	page.sandbox.window.receiveDiagnostics({ type: 'action', action: 'save', ok: 1, path: '/tmp/r.md' });
 	if (!page.elements.status.textContent.includes('/tmp/r.md')) fail('a saved report does not say where it went');
+	{
+		// A report opened the prefilled form: the status says so, not where a
+		// file went
+		const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+		page.sandbox.window.receiveDiagnostics({ type: 'action', action: 'report', ok: true });
+		if (page.elements.status.textContent !== en['notify.report_bug_body']) {
+			fail(`a sent report reads "${page.elements.status.textContent}"`);
+		}
+	}
 	page.sandbox.window.receiveDiagnostics({ type: 'action', action: 'copy', ok: false });
 	if (!/fail/.test(page.elements.status.className)) fail('a failed action is not shown as a failure');
 	// Today's errors file does not exist before the day's first warning: no

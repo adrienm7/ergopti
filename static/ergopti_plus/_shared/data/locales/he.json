@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "הצעות AI",
 	"notify.personal_info": "מידע אישי",
 	"notify.quit_refused": "לא ניתן לצאת כעת, פעולה אחרת עדיין מתבצעת. נסו שוב בעוד רגע.",
-	"notify.report_bug_body": "האבחון הועתק ונשמר (הקובץ מוצג). הדביקו אותו בטופס GitHub שנפתח זה עתה.",
+	"notify.report_bug_body": "טופס GitHub פתוח ומולא מראש באבחון (שהועתק גם ללוח, למקרה שקוצר).",
 	"notify.screenshot_copied": "צילום מסך הועתק",
 	"notify.screenshot_saved": "צילום מסך נשמר",
 	"notify.screenshot_saved_path": "נשמר: %s",

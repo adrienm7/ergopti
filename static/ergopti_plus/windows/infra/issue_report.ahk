@@ -4,16 +4,16 @@
 ; MODULE: Bug Report Text
 ; DESCRIPTION:
 ; AHK port of _shared/lua/diagnostics/issue_report.lua: the full diagnostics
-; as Markdown (copied to the clipboard and saved as a .md file), the short
-; summary prefilled into the GitHub issue form, and the saved file's name. Both
-; ports replay _shared/tests/corpus/diagnostics/issue_report_vectors.json.
+; as Markdown, copied to the clipboard and prefilled into the GitHub issue
+; form. Both ports replay
+; _shared/tests/corpus/diagnostics/issue_report_vectors.json.
 ;
 ; FEATURES & RATIONALE:
 ; 1. IssueReport_Dump writes every field of a diagnostic snapshot, keys
 ;    sorted, so the report is complete and deterministic.
-; 2. The prefill carries only a summary: GitHub cannot receive a file through
-;    a URL and answers 414 a little above 8 KB, so the full report travels
-;    through the clipboard and the saved file.
+; 2. The whole report is prefilled: GitHub answers 414 a little above 8 KB,
+;    so the issue link cuts it to its budget, and the clipboard keeps it
+;    whole.
 ; 3. Nothing here redacts: the caller redacts the finished text with
 ;    Redact_Apply, the single place that decides what leaves the machine.
 ; ==============================================================================
@@ -113,11 +113,11 @@ IssueReport_Dump(Snapshot) {
 
 
 
-; ===========================================
-; ===========================================
-; ======= 2/ Summary, Report And Name =======
-; ===========================================
-; ===========================================
+; ==================================
+; ==================================
+; ======= 2/ Markdown Report =======
+; ==================================
+; ==================================
 
 ; Joins an array of strings.
 _IssueReport_Join(Parts, Separator) {
@@ -147,30 +147,6 @@ _IssueReport_Fence(Text) {
 	return Fence
 }
 
-; The short diagnostics summary prefilled into the issue form.
-; @param Info {Map} { version, commit, os, driver, warn_count, err_count, last_error }
-; @param FileName {String} The saved report's name.
-; @returns {String}
-IssueReport_Summary(Info, FileName) {
-	Version := String(Info["version"])
-	Commit := Info.Get("commit", "")
-	if (Commit != "")
-		Version .= ", commit " . Commit
-	LastError := Info.Get("last_error", "")
-	FirstLine := (LastError == "") ? "none" : StrSplit(StrReplace(LastError, "`r", "`n"), "`n")[1]
-	return _IssueReport_Join([
-		"Version: " . Version,
-		"OS: " . Info["os"],
-		"Driver: " . Info["driver"],
-		"Warnings / errors this session: " . _IssueReport_Scalar(Info["warn_count"])
-			. " / " . _IssueReport_Scalar(Info["err_count"]),
-		"Last error: " . FirstLine,
-		"",
-		"<!-- The full diagnostics are in your clipboard: paste them below, or attach "
-			. FileName . ". -->"
-	], "`n")
-}
-
 ; The full report, as a Markdown document.
 ; @param Info {Map} { version, commit, os, driver, generated_utc, warn_count, err_count }
 ; @param Body {String} The dumped snapshot.
@@ -195,19 +171,4 @@ IssueReport_Markdown(Info, Body) {
 		Fence,
 		""
 	], "`n")
-}
-
-; The saved report's name: driver, version and UTC time, file-name safe.
-; @param Info {Map} { driver, version, file_stamp }
-; @returns {String}
-IssueReport_FileName(Info) {
-	return "ergopti-diagnostics-" . _IssueReport_Safe(Info["driver"]) . "-"
-		. _IssueReport_Safe(Info["version"]) . "-" . _IssueReport_Safe(Info["file_stamp"]) . ".md"
-}
-
-; Replaces each character outside A-Z a-z 0-9 . _ - by "_" (the regex engine
-; reads a surrogate pair as one character, as the Lua port reads a UTF-8
-; sequence).
-_IssueReport_Safe(Value) {
-	return RegExReplace(String(Value), "[^A-Za-z0-9._\-]", "_")
 }

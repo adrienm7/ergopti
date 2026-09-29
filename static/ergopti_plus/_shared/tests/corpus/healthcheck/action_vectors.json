@@ -32,7 +32,7 @@
 	},
 	"templates": {
 		"templates": {
-			"bug": { "file": "bug_report.yml", "title_prefix": "[Bug] ", "fields": ["version", "os", "driver", "diagnostics"] }
+			"bug": { "file": "bug_report.yml", "title_prefix": "[Bug] ", "fields": ["version", "os", "driver", "diagnostics"], "report_field": "diagnostics" }
 		}
 	},
 	"vectors": [
@@ -52,11 +52,13 @@
 		{ "id": "save_name_without_a_body", "driver": "macos", "message": { "action": "save", "text": "x", "name": "ergopti-diagnostics-.md" }, "error": "bad_name" },
 		{ "id": "save_name_too_long", "driver": "macos", "message": { "action": "save", "text": "x", "name": "ergopti-diagnostics-0123456789012345678901234567890123456789.md" }, "error": "bad_name" },
 		{ "id": "save_without_a_name", "driver": "macos", "message": { "action": "save", "text": "x" }, "error": "bad_name" },
-		{ "id": "report_ok", "driver": "windows", "message": { "action": "report", "text": "# report", "name": "ergopti-diagnostics-windows-2.1.0-x.md", "fields": { "version": "2.1.0", "os": "Windows 11", "driver": "windows", "diagnostics": "Version: 2.1.0" } }, "expected": { "action": "report", "text": "# report", "name": "ergopti-diagnostics-windows-2.1.0-x.md", "fields": { "version": "2.1.0", "os": "Windows 11", "driver": "windows", "diagnostics": "Version: 2.1.0" } } },
-		{ "id": "report_unknown_field", "driver": "windows", "message": { "action": "report", "text": "x", "name": "ergopti-diagnostics-w.md", "fields": { "url": "https://example.com" } }, "error": "unknown_field" },
-		{ "id": "report_fields_not_an_object", "driver": "linux", "message": { "action": "report", "text": "x", "name": "ergopti-diagnostics-l.md", "fields": "version" }, "error": "bad_fields" },
-		{ "id": "report_empty_field", "driver": "linux", "message": { "action": "report", "text": "x", "name": "ergopti-diagnostics-l.md", "fields": { "os": "" } }, "error": "bad_fields" },
-		{ "id": "report_bad_name", "driver": "linux", "message": { "action": "report", "text": "x", "name": "report.md", "fields": {} }, "error": "bad_name" },
+		{ "id": "report_ok", "driver": "windows", "message": { "action": "report", "text": "# report", "fields": { "version": "2.1.0", "os": "Windows 11", "driver": "windows" } }, "expected": { "action": "report", "text": "# report", "fields": { "version": "2.1.0", "os": "Windows 11", "driver": "windows" } } },
+		{ "id": "report_ignores_a_file_name", "driver": "macos", "message": { "action": "report", "text": "# report", "name": "report.md", "fields": { "driver": "macos" } }, "expected": { "action": "report", "text": "# report", "fields": { "driver": "macos" } } },
+		{ "id": "report_field_filled_by_the_host", "driver": "linux", "message": { "action": "report", "text": "# report", "fields": { "diagnostics": "Version: 2.1.0" } }, "error": "unknown_field" },
+		{ "id": "report_unknown_field", "driver": "windows", "message": { "action": "report", "text": "x", "fields": { "url": "https://example.com" } }, "error": "unknown_field" },
+		{ "id": "report_fields_not_an_object", "driver": "linux", "message": { "action": "report", "text": "x", "fields": "version" }, "error": "bad_fields" },
+		{ "id": "report_empty_field", "driver": "linux", "message": { "action": "report", "text": "x", "fields": { "os": "" } }, "error": "bad_fields" },
+		{ "id": "report_empty_text", "driver": "windows", "message": { "action": "report", "text": "", "fields": {} }, "error": "bad_text" },
 		{ "id": "open_path_ok", "driver": "windows", "message": { "action": "open_path", "id": "logs_dir" }, "expected": { "action": "open_path", "id": "logs_dir" } },
 		{ "id": "open_path_platform_field", "driver": "macos", "message": { "action": "open_path", "id": "launcher_log" }, "expected": { "action": "open_path", "id": "launcher_log" } },
 		{ "id": "open_path_field_of_another_platform", "driver": "windows", "message": { "action": "open_path", "id": "launcher_log" }, "error": "unknown_path" },

@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "AI 제안",
 	"notify.personal_info": "개인 정보",
 	"notify.quit_refused": "지금은 종료할 수 없습니다. 다른 작업이 아직 진행 중입니다. 잠시 후 다시 시도하세요.",
-	"notify.report_bug_body": "진단 정보를 복사하고 저장했습니다(파일이 표시됩니다). 방금 열린 GitHub 양식에 붙여 넣으세요.",
+	"notify.report_bug_body": "GitHub 양식이 열리고 진단 정보가 미리 입력되었습니다(줄어든 경우를 대비해 클립보드에도 복사했습니다).",
 	"notify.screenshot_copied": "스크린샷 복사됨",
 	"notify.screenshot_saved": "스크린샷 저장됨",
 	"notify.screenshot_saved_path": "저장됨: %s",

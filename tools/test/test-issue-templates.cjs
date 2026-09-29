@@ -120,6 +120,17 @@ for (const id of templateIds) {
 			failures.push(`${template.file}: "${fieldId}" is a ${field.type}, which a URL cannot prefill`);
 		}
 	}
+	// The host fills report_field with the full report: the budget cuts the
+	// last field first, so any other place would drop the identity fields
+	if (template.report_field !== undefined) {
+		const fields = template.fields || [];
+		if (fields[fields.length - 1] !== template.report_field) {
+			failures.push(`template "${id}": report_field "${template.report_field}" must be its last field`);
+		}
+	}
+}
+if (!registry.templates.bug || registry.templates.bug.report_field === undefined) {
+	failures.push('the bug template names no report_field for the full report');
 }
 if (fieldsChecked < 4) failures.push(`only ${fieldsChecked} prefilled field(s) checked`);
 if (labelsChecked < templateIds.length) failures.push(`only ${labelsChecked} form label(s) checked`);
@@ -136,8 +147,8 @@ try {
 if (!repository || !repository.owner || !repository.repo) {
 	failures.push('the updater defaults declare no github.owner/github.repo');
 } else {
-	// What the app sends: short identity fields and a summary that can be as
-	// long as a stack trace, accented and with emoji (6 and 12 bytes encoded)
+	// What the app sends: short identity fields and the full report, far over
+	// the budget, accented and with emoji (6 and 12 bytes encoded)
 	const long = 'Paramètres généraux — échec répété 😀 à l’ouverture de la fenêtre. '.repeat(120);
 	const values = {
 		title: 'Échec à l’ouverture 😀',

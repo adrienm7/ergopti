@@ -14,7 +14,7 @@
 ---    diagnostics.redact with the rules of
 ---    _shared/modules/diagnostics/redaction.json (what leaves the machine).
 --- 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
----    diagnostics.issue_report (the bug report text, summary and file name).
+---    diagnostics.issue_report (the bug report text).
 --- 5. _shared/tests/corpus/healthcheck/action_vectors.json through
 ---    healthcheck.actions (what the diagnostics page may ask its host to do).
 --- 6. _shared/tests/corpus/diagnostics/error_policy_vectors.json through
@@ -125,7 +125,7 @@ helpers.describe("diagnostics corpus (linux): bug report text", function()
 	local IssueReport = require("diagnostics.issue_report")
 
 	helpers.it("has vectors (issue-report-corpus)", function()
-		for _, list in ipairs({ "dump_vectors", "summary_vectors", "markdown_vectors", "file_name_vectors" }) do
+		for _, list in ipairs({ "dump_vectors", "markdown_vectors" }) do
 			helpers.assert_true(type(corpus[list]) == "table" and #corpus[list] >= 2,
 				"the bug-report corpus must hold its " .. list)
 		end
@@ -136,21 +136,17 @@ helpers.describe("diagnostics corpus (linux): bug report text", function()
 			helpers.assert_eq(IssueReport.dump(vector.input), vector.expected, vector.id)
 		end)
 	end
-	for _, vector in ipairs(corpus.summary_vectors or {}) do
-		helpers.it("summary: " .. vector.id .. " (issue-report-corpus)", function()
-			helpers.assert_eq(IssueReport.summary(vector.info, vector.file_name), vector.expected, vector.id)
-		end)
-	end
 	for _, vector in ipairs(corpus.markdown_vectors or {}) do
 		helpers.it("markdown: " .. vector.id .. " (issue-report-corpus)", function()
 			helpers.assert_eq(IssueReport.markdown(vector.info, vector.body), vector.expected, vector.id)
 		end)
 	end
-	for _, vector in ipairs(corpus.file_name_vectors or {}) do
-		helpers.it("file_name: " .. vector.id .. " (issue-report-corpus)", function()
-			helpers.assert_eq(IssueReport.file_name(vector.info), vector.expected, vector.id)
-		end)
-	end
+	-- The report goes to GitHub whole (the issue link cuts it): no summary of
+	-- it and no saved file name is left to drift from the page's
+	helpers.it("has no summary and no file name of its own (issue-report-corpus)", function()
+		helpers.assert_eq(IssueReport.summary, nil)
+		helpers.assert_eq(IssueReport.file_name, nil)
+	end)
 end)
 
 helpers.describe("diagnostics corpus (linux): page actions (page-actions-corpus)", function()

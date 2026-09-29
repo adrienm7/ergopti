@@ -1643,7 +1643,7 @@
 	"notify.llm_suggestions": "Sugerencias IA",
 	"notify.personal_info": "Información personal",
 	"notify.quit_refused": "No se puede salir ahora, otra operación sigue en curso. Inténtalo de nuevo en un momento.",
-	"notify.report_bug_body": "El diagnóstico se ha copiado y guardado (se muestra el archivo). Pégalo en el formulario de GitHub que se acaba de abrir.",
+	"notify.report_bug_body": "El formulario de GitHub está abierto y rellenado con el diagnóstico (también copiado al portapapeles, por si se ha acortado).",
 	"notify.screenshot_copied": "Captura copiada",
 	"notify.screenshot_saved": "Captura guardada",
 	"notify.screenshot_saved_path": "Guardado: %s",
