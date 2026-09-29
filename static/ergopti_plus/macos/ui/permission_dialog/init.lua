@@ -289,6 +289,8 @@ function M.show(spec)
 		html_string   = M.render(content, spec.bundle_path, app_icon_url()),
 		inject_i18n   = false,
 		focus         = false,
+		-- The factory's one floating exception: see ui_builder.PERMISSION_DIALOG_CHROME.
+		chrome        = ui_builder.PERMISSION_DIALOG_CHROME,
 		on_close      = function()
 			if _session == session then
 				_session = nil

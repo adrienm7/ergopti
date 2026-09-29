@@ -592,15 +592,30 @@ function M.set_window_title(view, title)
 	return true
 end
 
+--- The one window kept above other apps: the macOS permission dialog
+--- (ui/permission_dialog). It is shown only while ErgoptiPlus is not trusted
+--- for Accessibility, where force_focus cannot find it (hswindow() is an
+--- Accessibility lookup), and its steps are followed in System Settings, the
+--- active app, whose first click would bury a window at the normal level. It
+--- floats, never activates the app (it requires focus = false) and its owner
+--- closes it as soon as the grant arrives. No other window may name this chrome.
+M.PERMISSION_DIALOG_CHROME = "permission_dialog"
+
 --- Centralized factory to create a webview window with consistent properties.
 --- @param opts table The configuration options for the webview; focus = false
----        shows the window without activating the app or changing its level.
+---        shows the window without activating the app or changing its level;
+---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
 	if opts.level ~= nil then
 		-- Refused before the native window exists, so nothing is left to clean up.
 		Logger.error(LOG, "WebView factory refused a window level: windows are focused, never kept on top.")
+		return nil
+	end
+	if opts.chrome ~= nil and (opts.chrome ~= M.PERMISSION_DIALOG_CHROME or opts.focus ~= false) then
+		Logger.error(LOG, "WebView factory refused chrome '%s': only the permission dialog floats, unfocused.",
+			tostring(opts.chrome))
 		return nil
 	end
 	if _factory_build_owner then
@@ -829,16 +844,23 @@ end
 --- Every window applies these steps, in this order, and a window that skips this
 --- function is caught by test_window_chrome_everywhere.
 --- @param wv table The hs.webview window.
---- @param opts table|nil { style_masks? } override for the mask; a level is refused.
+--- @param opts table|nil { style_masks?, chrome? } override for the mask; a level
+---        is refused, and chrome = M.PERMISSION_DIALOG_CHROME floats (see there).
 --- @return table Array of { name = string, apply = function } mutation steps.
 function M.window_chrome_steps(wv, opts)
 	opts = opts or {}
 	if opts.level ~= nil then
 		error("window_chrome_steps: windows take no level; they are focused, never kept on top", 2)
 	end
+	if opts.chrome ~= nil and opts.chrome ~= M.PERMISSION_DIALOG_CHROME then
+		error("window_chrome_steps: unknown chrome '" .. tostring(opts.chrome) .. "'", 2)
+	end
 	local level = hs.drawing.windowLevels.normal
+	if opts.chrome == M.PERMISSION_DIALOG_CHROME then
+		level = hs.drawing.windowLevels.floating
+	end
 	if type(level) ~= "number" then
-		error("window_chrome_steps: hs.drawing.windowLevels.normal is unavailable", 2)
+		error("window_chrome_steps: the window level is unavailable", 2)
 	end
 	local masks = hs.webview.windowMasks
 	local style = opts.style_masks
