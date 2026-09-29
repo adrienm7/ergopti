@@ -347,6 +347,44 @@ helpers.describe("hotstrings scope: refusals", function()
 		end)
 	end
 
+	-- The Configuration row once deleted every explicit choice, which is the
+	-- neutral state: every catalogue off, the opposite of its label.
+	helpers.it("routes the Configuration restore row to the recommended hotstrings", function()
+		with_scope(function(c)
+			local execute = os.execute
+			local passed, err = pcall(function()
+				os.execute = function(command)
+					if command:find("command -v zenity", 1, true) then return 0 end
+					if command:find("zenity --question", 1, true) then return 0 end
+					return execute(command)
+				end
+				local i18n = require("infra.i18n")
+				local menu = require("ui.menu.menu_builder").build({ config = c.Config, paused = false,
+					is_paused = function() return false end, dyn_hotstrings = c.dynamic,
+					tooltip_preview = c.preview_port })
+				local action
+				for _, item in ipairs(menu) do
+					if item.title == i18n.get("menu.configuration.title") then
+						for _, row in ipairs(item.menu or {}) do
+							if row.title == i18n.get("common.restore_recommended") then action = row.fn end
+						end
+					end
+				end
+				helpers.assert_eq(type(action), "function", "the Configuration row is registered")
+				action()
+				helpers.assert_true(c.Config.is_group_enabled("rolls"), "an explicit off choice is restored on")
+				helpers.assert_true(c.Config.is_section_enabled("autocorrection", "caps"))
+				helpers.assert_true(fires(c.engine, "cq", "caps-result"), "the restored catalogue fires")
+				helpers.assert_true(c.RepeatKey.is_enabled())
+				local document = Codec.decode(read(c.config_path))
+				helpers.assert_eq(document.hotstrings.groups.rolls, true)
+				helpers.assert_eq(document.other.value, 1)
+			end)
+			os.execute = execute
+			if not passed then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("refuses to start while paused", function()
 		with_scope(function(c)
 			c.paused = true
