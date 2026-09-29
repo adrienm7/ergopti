@@ -1786,6 +1786,20 @@ boot_note("Remap guardian status reported by the launcher: %s.",
 if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
 	error("karabiner.init did not commit")
 end
+-- Tap-holds stay off until the remap guardian is allowed in the background,
+-- which nothing told the user: its first requires_approval answer now opens
+-- the numbered Login Items steps. A failure here only costs those steps (the
+-- approval notice keeps its banner), never the boot.
+do
+	local presenter_ok, registered = xpcall(function()
+		return karabiner.set_approval_presenter(function()
+			return require("ui.permission_dialog.login_items_guide").offer(karabiner)
+		end)
+	end, debug.traceback)
+	if presenter_ok ~= true or registered ~= true then
+		Logger.error(LOG, "Login Items steps unavailable; the approval banner remains: %s.", tostring(registered))
+	end
+end
 Boot.mark("UI: karabiner.init")
 Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")
 

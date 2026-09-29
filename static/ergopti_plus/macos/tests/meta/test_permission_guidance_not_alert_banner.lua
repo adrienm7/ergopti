@@ -79,4 +79,27 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_true(wait_at ~= nil and body:find("watch_reopen = watch_launcher_reopen,", wait_at, true) ~= nil,
 			"the wait must be given the reopen watch, or a closed dialog cannot come back")
 	end)
+
+	-- The unit suite never runs init.lua, so the one registration that makes
+	-- the guardian's approval open the Login Items steps is pinned here.
+	helpers.it("the boot registers the Login Items steps before its first deploy (guardian-approval-steps)",
+		function()
+			local unit, err = helpers.read_driver_unit("karabiner.set_approval_presenter(")
+			helpers.assert_true(unit ~= nil, tostring(err))
+			local body = table.concat(code_lines(unit), "\n")
+			local init_at = body:find("karabiner.init(file_system)", 1, true)
+			local register_at = body:find("karabiner.set_approval_presenter(function()", 1, true)
+			local deploy_at = body:find("karabiner.regenerate()", 1, true)
+			helpers.assert_true(init_at ~= nil and register_at ~= nil and deploy_at ~= nil,
+				"the bridge init, the registration and the boot deploy must all be found")
+			helpers.assert_true(init_at < register_at and register_at < deploy_at,
+				"the presenter must exist before the first guardian answer the boot deploy asks for")
+			local registration = body:sub(register_at, body:find("\nend\n", register_at, true))
+			helpers.assert_true(registration:find(
+				'require("ui.permission_dialog.login_items_guide").offer(karabiner)', 1, true) ~= nil,
+				"the presenter must offer the steps through the guide, once per launch")
+			local guarded = body:sub(1, register_at):match(".*()xpcall%(function%(%)")
+			helpers.assert_true(guarded ~= nil and guarded > init_at,
+				"a registration failure must cost the steps, never the boot")
+		end)
 end)

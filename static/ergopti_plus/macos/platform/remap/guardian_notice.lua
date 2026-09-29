@@ -22,6 +22,11 @@
 ---    state other than `requires_approval` by design.
 --- 4. Owned: an instance is created by the remap bridge that probes the status,
 ---    so its state lives and dies with that bridge's lifecycle.
+--- 5. Steps before a banner: `requires_approval` is first offered to the
+---    presenter the boot registered, which opens the numbered Login Items steps
+---    in the permission dialog. The banner goes out only when it declines
+---    (already offered in this launch, or unavailable), so one episode never
+---    announces itself twice.
 --- ==============================================================================
 
 local M = {}
@@ -33,14 +38,16 @@ local UNAVAILABLE = "unavailable"
 --- @param deps table { notify = fn(msg, body, kind, on_click), text = fn(key) -> string,
 ---        open_settings = fn(on_done) -> boolean (approval opener),
 ---        open_login_items = fn(on_done) -> boolean (unconditional opener),
----        logger = table, log = string }.
+---        present_approval = fn() -> boolean (true when the Login Items steps
+---        took the announcement), logger = table, log = string }.
 --- @return table notice Object with observe(status).
 function M.new(deps)
 	if type(deps) ~= "table" or type(deps.notify) ~= "function"
 		or type(deps.text) ~= "function" or type(deps.open_settings) ~= "function"
-		or type(deps.open_login_items) ~= "function"
+		or type(deps.open_login_items) ~= "function" or type(deps.present_approval) ~= "function"
 		or type(deps.logger) ~= "table" or type(deps.log) ~= "string" then
-		error("guardian_notice.new(): notify, text, open_settings, open_login_items, logger and log are required", 2)
+		error("guardian_notice.new(): notify, text, open_settings, open_login_items, present_approval,"
+			.. " logger and log are required", 2)
 	end
 	-- Blocking status whose notice was delivered in the current episode.
 	local announced = nil
@@ -89,6 +96,11 @@ function M.new(deps)
 				status)
 		end
 		logged = status
+		if status == REQUIRES_APPROVAL and deps.present_approval() == true then
+			announced = status
+			deps.logger.warn(deps.log, "Remap engine awaits Login Items approval — steps shown to the user.")
+			return true
+		end
 		local sent, err = deps.notify(deps.text(spec.key), nil, spec.kind, spec.on_click)
 		if sent ~= true then
 			deps.logger.error(deps.log, "Guardian '%s' notice was not delivered: %s.", status, tostring(err))
