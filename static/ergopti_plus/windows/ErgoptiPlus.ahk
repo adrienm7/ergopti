@@ -832,47 +832,32 @@ global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
-; When Ergopti keyboard emulation is off, MagicKeySourceScan must point to
-; the physical key that produces MagicKeySourceChar ("j" by default) on the
-; user's active OS layout. On bépo, "j" lives on a different scancode than
-; SC02E (the Ergopti/QWERTY position), so we probe the layout at startup.
+; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
+; user's configured key always wins; then the key the active layout's extension
+; declares — the emulated registry layout, or the built-in Ergopti emulation;
+; then, with no layout emulated, the key that types MagicKeySourceChar ("j" by
+; default) on the user's own OS layout — on bépo not the SC02E Ergopti/QWERTY
+; position; then the shipped default.
 ;
-; Strategy: enumerate scancodes 0x01→0x7F, call ToUnicodeEx on each with no
-; modifiers, and pick the one whose output matches MagicKeySourceChar.
-; VkKeyScanExW is not used here because it fails on layouts like bépo where
-; the target character ("j") sits behind a driver-level remapping that the
-; API cannot see.
-;
-; The layout is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read (through
-; the KS_ResolveKeyboardLayout cascade: foreground, then the AHK thread, then
-; the system default), so the scan and the AltGr family describe one layout and
-; the layout poll, seeded with the same HKL, reloads when the user switched.
-; The no-modifier scancode scan lives in adapters/key_state.ahk so the
-; layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated there;
-; this boot step only interprets the result and updates ScriptInformation.
-if !Features["layout"]["ergopti_base"] {
-	_HKL := _LAYOUT_REMAP_HKL
-	if _HKL != 0 {
-		_TargetChar := ScriptInformation["MagicKeySourceChar"]
-		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
-		if _Found["scan"] != 0 {
-			ScriptInformation["MagicKeySourceScan"] := Format("SC{:03X}", _Found["scan"])
-			LoggerInfo("ErgoptiPlus",
-				"Magic-key source resolved from layout: char='{1}', VK=0x{2:X}, scan={3} (HKL=0x{4:X}).",
-				_TargetChar, _Found["vk"], ScriptInformation["MagicKeySourceScan"], _HKL)
-		} else {
-			LoggerWarn("ErgoptiPlus",
-				"Magic-key source: char '{1}' not found on any base scancode of layout"
-				. " HKL=0x{2:X} — keeping default scan {3}.",
-				_TargetChar, _HKL, ScriptInformation["MagicKeySourceScan"])
-		}
-	} else {
-		LoggerWarn("ErgoptiPlus",
-			"Magic-key source resolution skipped: could not obtain a valid HKL at startup"
-			. " — keeping default scan {1}.",
-			ScriptInformation["MagicKeySourceScan"])
-	}
-}
+; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
+; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
+; thread, then the system default), so the scan and the AltGr family describe
+; one layout and the layout poll, seeded with the same HKL, reloads when the
+; user switched — only when the key follows the OS layout at all.
+_MagicKeySource := LayoutRegistry_MagicKeySource(Map(
+	"chosen", ScriptInformation["MagicKeySourceScanChosen"],
+	"configured", ScriptInformation["MagicKeySourceScan"],
+	"declared", LayoutRegistry_DeclaredMagicKey(
+		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
+			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
+			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
+		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
+	"emulated", KeylayoutEmulation_SelectedId() != "" || Features["layout"]["ergopti_base"],
+	"keycodes", LayoutRegistry_Keycodes(),
+	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"])))
+ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
+ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
+LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 
 ; Safe nested read

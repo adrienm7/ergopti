@@ -1,5 +1,5 @@
 {
-	"description": "The physical magic key a layout extension declares ([extension.magic_key] key = <KeyboardEvent.code>). Each case gives one manifest, whether the extension scanners accept its shape (valid), the key they must report (an empty string when none is declared) and whether the registry index builder, which also checks the code against _shared/data/keycodes/physical_keys.json, accepts it for a published layout (published). Replayed by _shared/lua/hotstrings/extensions.lua (macOS and Linux), windows/infra/hotstrings/extension_packs.ahk and tools/build/build-layouts-index.cjs.",
+	"description": "The physical magic key a layout extension declares ([extension.magic_key] key = <KeyboardEvent.code>). Each case gives one manifest, whether the extension scanners accept its shape (valid), the key they must report (an empty string when none is declared) and whether the registry index builder, which also checks that the code names a key of _shared/data/keycodes/physical_keys.json that a keyboard layout defines (_shared/modules/layouts/mac_keycodes.json), accepts it for a published layout (published). Replayed by _shared/lua/hotstrings/extensions.lua (macOS and Linux), windows/infra/hotstrings/extension_packs.ahk and tools/build/build-layouts-index.cjs.",
 	"cases": [
 		{
 			"name": "a declared key is reported",
@@ -27,6 +27,13 @@
 			"manifest": "[extension.magic_key]\nkey = \"KeyUnknown\"\n",
 			"valid": true,
 			"magic_key": "KeyUnknown",
+			"published": false
+		},
+		{
+			"name": "a key no keyboard layout defines is refused at publication",
+			"manifest": "[extension.magic_key]\nkey = \"F5\"\n",
+			"valid": true,
+			"magic_key": "F5",
 			"published": false
 		},
 		{

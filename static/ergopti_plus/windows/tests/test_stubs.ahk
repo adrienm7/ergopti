@@ -75,6 +75,12 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
+    ; The physical magic key as the boot resolves it (feature_state.ahk and
+    ; LayoutRegistry_MagicKeySource): the shipped default, not chosen, fixed.
+    "MagicKeySourceScan", "SC02E",
+    "MagicKeySourceChar", "j",
+    "MagicKeySourceScanChosen", false,
+    "MagicKeySourceFollowsOsLayout", false,
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",

@@ -151,7 +151,20 @@ _KLE_BaseCriterion(Sc, Shift, *) {
 		return false
 	if KLE_State != KEYLAYOUT_NEUTRAL_STATE
 		return true
+	if !Shift && _KLE_MagicKeyOwnsKey(Sc)
+		return false
 	return KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift)
+}
+
+; The magic key is a general feature, never part of the emulated layout: once
+; the user turned a key into it, that key's unshifted level belongs to the
+; magic-key remap (modules/keymap/layout.ahk) whatever layout is emulated, as
+; the independent digit row belongs to its own override. Shift, AltGr and the
+; shortcut chords keep the emulated layout's characters.
+_KLE_MagicKeyOwnsKey(Sc) {
+	global Features, ScriptInformation
+	return Sc == ScriptInformation["MagicKeySourceScan"]
+		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"]
 }
 
 _KLE_DigitsOwnKey(Sc, Shift) {

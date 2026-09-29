@@ -292,9 +292,12 @@ _LayoutRemapPort() {
 	return Port
 }
 
+; Whether no boot registration follows the OS layout: the Ergopti emulation
+; types every key itself, and a magic key the user chose, the active layout
+; declared or an emulated layout fixed never moves with the OS layout.
 _LayoutRemapEmulated() {
-	global Features
-	return Features["layout"]["ergopti_base"]
+	global Features, ScriptInformation
+	return Features["layout"]["ergopti_base"] || !ScriptInformation["MagicKeySourceFollowsOsLayout"]
 }
 
 _LayoutRemapMagicChar() {
