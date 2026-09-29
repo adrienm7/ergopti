@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "لا يوجد إجراء مطابق",
 	"dialog.action_picker.requires_tool": "يتطلب {1}",
 	"dialog.action_picker.requires_x11": "جلسة X11 فقط",
+	"dialog.action_picker.requires_workspaces": "X11 أو KDE Plasma أو sway أو Hyprland فقط",
 	"dialog.action_picker.search": "البحث عن إجراء…",
 	"dialog.action_picker.prompt_label": "الموجّه",
 	"dialog.action_picker.count_label": "عدد التنبؤات",

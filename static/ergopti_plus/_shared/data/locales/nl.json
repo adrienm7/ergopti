@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "Geen overeenkomende actie",
 	"dialog.action_picker.requires_tool": "Vereist {1}",
 	"dialog.action_picker.requires_x11": "Alleen X11-sessie",
+	"dialog.action_picker.requires_workspaces": "Alleen X11, KDE Plasma, sway of Hyprland",
 	"dialog.action_picker.search": "Zoek een actie…",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Aantal voorspellingen",

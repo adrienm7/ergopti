@@ -275,6 +275,7 @@ return {
 	"tests.unit.modules.test_gesture_binding_transaction",
 	"tests.unit.modules.test_desktop_navigation_actions",
 	"tests.unit.modules.test_desktop_navigation_vectors",
+	"tests.unit.modules.test_workspace_switcher",
 	"tests.unit.modules.test_gesture_dispatch",
 	"tests.unit.modules.test_text_actions_route_through_handlers",
 	"tests.unit.modules.test_gesture_enable_transaction",

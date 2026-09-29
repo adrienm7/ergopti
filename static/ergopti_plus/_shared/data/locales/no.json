@@ -176,6 +176,7 @@
 	"dialog.action_picker.no_results": "Ingen samsvarende handling",
 	"dialog.action_picker.requires_tool": "Krever {1}",
 	"dialog.action_picker.requires_x11": "Kun X11-økt",
+	"dialog.action_picker.requires_workspaces": "Kun X11, KDE Plasma, sway eller Hyprland",
 	"dialog.action_picker.search": "Søk etter en handling…",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Antall prediksjoner",

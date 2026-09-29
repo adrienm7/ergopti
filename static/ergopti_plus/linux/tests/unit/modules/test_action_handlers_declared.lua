@@ -527,54 +527,77 @@ end)
 
 -- =========================================================
 -- =========================================================
--- ======= 6/ Workspaces: wmctrl, then the keyboard ========
+-- ======= 6/ Workspaces: plain and wrapping ===============
 -- =========================================================
 -- =========================================================
 
+-- desktop_prev / desktop_next wrapped around on this driver (the wmctrl pick
+-- was modulo) while Windows and macOS stop at the edge, and nothing else could
+-- wrap. The plain pair now stops, the _wrap pair wraps, through the real
+-- dispatcher and the workspace switcher it hands the step to.
 helpers.describe("linux actions: workspace switch", function()
 
-	--- Runs a workspace action with wmctrl and the uinput emitter each
-	--- succeeding or not.
-	--- @return table commands The shell commands run.
+	local THREE = "0  - DG: x\n1  - DG: x\n2  * DG: x\n"
+
+	--- Runs one workspace action in an X11 session with wmctrl on the PATH.
+	--- @param action string Action id.
+	--- @param listing string|false What `wmctrl -d` prints, or false when it fails.
+	--- @param uinput_ok boolean Whether the virtual keyboard accepts a combo.
+	--- @return table switched The `wmctrl -s` commands run.
 	--- @return table pressed The combos pressed on the virtual keyboard.
-	local function switch(action, wmctrl_ok, uinput_ok)
+	--- @return table commands Every other command run (xdotool fallbacks).
+	local function switch(action, listing, uinput_ok)
+		local Display = require("infra.display_server")
+		local Shell = require("adapters.shell_runner")
 		local saved = package.loaded["modules.gestures.combo_emitter"]
-		local pressed, commands = {}, {}
+		local pressed, switched, commands = {}, {}, {}
 		package.loaded["modules.gestures.combo_emitter"] = {
 			press = function(combo) pressed[#pressed + 1] = combo; return uinput_ok end,
 		}
+		Display._set_for_test(Display.X11, "xfce")
+		Shell._set_runner(function(cmd)
+			if cmd:find("command -v 'wmctrl'", 1, true) then return true end
+			if cmd:find("wmctrl -d", 1, true) then return listing end
+			if cmd:find("wmctrl -s", 1, true) then switched[#switched + 1] = cmd; return true end
+			return nil
+		end)
 		local real = os.execute
-		os.execute = function(cmd)
-			commands[#commands + 1] = tostring(cmd)
-			if tostring(cmd):find("wmctrl", 1, true) and not wmctrl_ok then return nil, "exit", 1 end
-			return true
-		end
+		os.execute = function(cmd) commands[#commands + 1] = tostring(cmd); return true end
+		package.loaded["modules.gestures.workspace_switcher"] = nil
 		local ok, err = pcall(function()
 			helpers.load_module("modules.gestures.manager").execute_action(action, "tap_hold")
 		end)
 		os.execute = real
+		Shell._reset_runner()
+		Display._set_for_test(nil, nil)
 		package.loaded["modules.gestures.combo_emitter"] = saved
 		if not ok then error(err, 0) end
-		return commands, pressed
+		return switched, pressed, commands
 	end
 
-	local COMBO = { desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }
-
-	helpers.it("asks wmctrl first, and presses nothing when it switched (workspace-uinput)", function()
-		for action in pairs(COMBO) do
-			local commands, pressed = switch(action, true, true)
-			helpers.assert_eq(#commands, 1, action .. " runs wmctrl alone")
-			helpers.assert_contains(commands[1], "wmctrl -s")
-			helpers.assert_nil(commands[1]:find("xdotool", 1, true), action .. ": " .. commands[1])
-			helpers.assert_eq(pressed, {}, action .. ": wmctrl switched, no keystroke on top")
-		end
+	helpers.it("wraps from the last desktop to the first only with a _wrap action", function()
+		local switched, pressed = switch("desktop_next", THREE, true)
+		helpers.assert_eq(switched, {}, "desktop_next must stop at the last desktop")
+		helpers.assert_eq(pressed, {}, "and must not press the desktop's shortcut either")
+		switched, pressed = switch("desktop_next_wrap", THREE, true)
+		helpers.assert_eq(switched, { "timeout 1 wmctrl -s '0' >/dev/null 2>&1" },
+			"desktop_next_wrap goes from the last desktop to the first")
+		helpers.assert_eq(pressed, {})
 	end)
 
-	helpers.it("presses the desktop's combo through uinput when wmctrl cannot switch (workspace-uinput)", function()
+	helpers.it("steps inside the row with the plain actions", function()
+		local switched = switch("desktop_prev", THREE, true)
+		helpers.assert_eq(switched, { "timeout 1 wmctrl -s '1' >/dev/null 2>&1" })
+		switched = switch("desktop_prev_wrap", THREE, true)
+		helpers.assert_eq(switched, { "timeout 1 wmctrl -s '1' >/dev/null 2>&1" })
+	end)
+
+	helpers.it("presses the desktop's combo through uinput when wmctrl cannot list (workspace-uinput)", function()
 		-- Under Wayland wmctrl has no desktop to ask, and `xdotool key` talks to
 		-- nothing: the uinput device is the one path that reaches the compositor.
-		for action, combo in pairs(COMBO) do
-			local commands, pressed = switch(action, false, true)
+		for action, combo in pairs({ desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }) do
+			local switched, pressed, commands = switch(action, false, true)
+			helpers.assert_eq(switched, {})
 			helpers.assert_eq(pressed, { combo }, action .. " presses " .. combo .. " on the virtual keyboard")
 			for _, command in ipairs(commands) do
 				helpers.assert_nil(command:find("xdotool", 1, true), action .. " ran " .. command)
@@ -583,57 +606,8 @@ helpers.describe("linux actions: workspace switch", function()
 	end)
 
 	helpers.it("uses xdotool only when the uinput device cannot be written either (workspace-uinput)", function()
-		for action, combo in pairs(COMBO) do
-			local commands = switch(action, false, false)
-			helpers.assert_contains(commands[#commands], "xdotool key " .. combo)
-		end
-	end)
-
-	helpers.it("fails the wmctrl command when wmctrl cannot list the desktops (workspace-uinput)", function()
-		-- The command used to end in `| xargs -r wmctrl -s`, which exits 0 on
-		-- empty input: a wmctrl that could not list anything reported success
-		-- and nothing ran after it. Run for real against stand-in wmctrls.
-		local commands = switch("desktop_prev", true, true)
-		local dir = os.tmpname()
-		os.remove(dir)
-		os.execute("mkdir " .. dir)
-		local log = dir .. "/switched"
-		--- Writes an executable shell script.
-		local function script(path, body)
-			local fh = assert(io.open(path, "w"))
-			fh:write("#!/bin/sh\n", body, "\n")
-			fh:close()
-			os.execute("chmod +x " .. path)
-		end
-		local function stand_in(body) script(dir .. "/wmctrl", body) end
-		-- The command may rely on wmctrl and timeout only: no package declares
-		-- anything else (it used awk, which a minimal openSUSE lacks). So the
-		-- PATH it runs under holds the stand-in wmctrl and a timeout that execs
-		-- the real one, and nothing more. The real timeout is looked up by the
-		-- shell itself, on the PATH the script started with.
-		script(dir .. "/timeout", "real=$(PATH=$HOST_PATH; command -v timeout) || exit 127\n"
-			.. "exec \"$real\" \"$@\"")
-		-- Run as a script file, the way the daemon's shell runs it: a quoted
-		-- script path is also what the Windows test mode hands to sh.
-		local function run()
-			script(dir .. "/switch.sh", "HOST_PATH=$PATH; export HOST_PATH; PATH=" .. dir
-				.. "; export PATH\n" .. commands[1])
-			local result = os.execute("'" .. dir .. "/switch.sh'")
-			return result == true or result == 0
-		end
-		stand_in("echo 'Cannot get current desktop properties.' >&2; exit 1")
-		helpers.assert_true(not run(), "wmctrl -d failing must fail the command, so the combo is pressed")
-		stand_in('if [ "$1" = -d ]; then printf "0  * DG: x\\n1  - DG: x\\n2  - DG: x\\n"; '
-			.. 'else echo "$2" > "${0%/*}/switched"; fi')
-		helpers.assert_true(run(), "a listed desktop is switched to with only wmctrl and timeout on the PATH")
-		local fh = assert(io.open(log, "r"))
-		helpers.assert_eq(fh:read("*l"), "2", "the previous desktop of the first one wraps to the last")
-		fh:close()
-		os.remove(log)
-		stand_in('if [ "$1" = -d ]; then printf "0  - DG: x\\n1  - DG: x\\n"; '
-			.. 'else echo "$2" > "${0%/*}/switched"; fi')
-		helpers.assert_true(not run(), "a listing with no current desktop must fail, so the combo is pressed")
-		os.execute("rm -rf " .. dir)
+		local _, _, commands = switch("desktop_next", false, false)
+		helpers.assert_contains(commands[#commands], "xdotool key ctrl+alt+Right")
 	end)
 
 end)

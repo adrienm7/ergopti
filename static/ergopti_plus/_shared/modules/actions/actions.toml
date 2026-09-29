@@ -43,7 +43,9 @@
 #             Capabilities the action needs on that OS. The picker greys a row
 #             whose requirement the driver proves absent, with the reason as a
 #             hint, instead of offering a binding that would do nothing. Linux
-#             understands "tool:<binary>" (on PATH) and "session:x11"; macOS
+#             understands "tool:<binary>" (on PATH), "session:x11" and
+#             "session:workspaces" (a session whose workspaces another process
+#             can read and pick: X11, KDE Plasma, sway or Hyprland); macOS
 #             and Windows declare no probe yet, so the generator refuses a
 #             token for them rather than emitting one nothing checks.
 #   scalable  (axis only) whether the axis repeats with the swipe distance.
@@ -440,26 +442,29 @@ platform = "hs"
 platform = "hs"
 
 [sg_actions.desktop_prev]
-# Linux switches workspace through wmctrl, falling back to xdotool: both X11.
+# One desktop left or right, stopping at the first and the last. Linux drives
+# the session's own interface (wmctrl, KWin, sway, Hyprland) and presses the
+# desktop's Ctrl+Alt+Arrow where there is none, so no session is left out.
 platform = "ahk,linux"
-requires_linux = ["session:x11"]
 emit_ahk_key = "Left"
 emit_ahk_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_next]
 platform = "ahk,linux"
-requires_linux = ["session:x11"]
 emit_ahk_key = "Right"
 emit_ahk_mods = ["ctrl", "super"]
 
 # The same step, wrapping at the edges: from the last desktop to the first and
 # from the first to the last. Windows reads the position from the registry
-# Explorer keeps and presses Ctrl+Win+Arrow once per desktop.
+# Explorer keeps and presses Ctrl+Win+Arrow once per desktop; Linux needs a
+# session that tells where the edge is (GNOME under Wayland does not).
 [sg_actions.desktop_prev_wrap]
-platform = "ahk"
+platform = "ahk,linux"
+requires_linux = ["session:workspaces"]
 
 [sg_actions.desktop_next_wrap]
-platform = "ahk"
+platform = "ahk,linux"
+requires_linux = ["session:workspaces"]
 
 [sg_actions.desktop_new]
 platform = "ahk"

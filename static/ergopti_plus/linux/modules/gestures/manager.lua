@@ -49,6 +49,7 @@ local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local ShellRunner = require("adapters.shell_runner")
+local DesktopNavigation = require("desktop_navigation")
 local LOG = "modules.gestures.manager"
 local ENABLED_PATH = "gestures.enabled"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
@@ -310,44 +311,17 @@ local function primary_selection()
 	return (value:gsub("%s+$", ""))
 end
 
--- Seconds each wmctrl call may take. The daemon waits for it while it holds
--- the keyboard, so a hung X server must cost a second, not the keyboard.
-local WMCTRL_TIMEOUT_S = 1
-
---- A shell command that switches to the workspace `delta` steps away.
----
---- `wmctrl -s` takes an ABSOLUTE, zero-based desktop index and has no relative
---- form. This shipped as `wmctrl -s -1` and `wmctrl -s +1`, which wmctrl rejects
---- every time — so the wmctrl branch was dead and the `||` fallback carried the
---- feature, which makes both actions silently X11-only. libinput-gestures hit the
---- same wall and had to add its own ws_up/ws_down for exactly this reason.
----
---- The neighbour is therefore computed from `wmctrl -d`, whose current desktop is
---- the row marked `*`, with wraparound at both ends.
----
---- The command fails whenever no desktop was switched to. It used to end in
---- `| xargs -r wmctrl -s`, which exits 0 on empty input, so a wmctrl that could
---- list nothing (every Wayland session) reported success and its keystroke
---- fallback never ran. Each wmctrl is bounded by WMCTRL_TIMEOUT_S.
----
---- The row is picked with shell builtins only. It used awk, which no package
---- declares as a dependency and a minimal openSUSE lacks: the pick then printed
---- nothing and every switch fell through to the keystroke. A listing with no
---- current desktop also fails now, instead of counting from desktop 0.
---- @param delta integer -1 for the previous workspace, 1 for the next.
---- @return string
-local function workspace_switch_command(delta)
-	local pick = "{ n=0; cur=; while read -r id mark rest; do"
-		.. " [ \"$mark\" = \"*\" ] && cur=$id; n=$((n + 1)); done;"
-		.. " [ -n \"$cur\" ] && echo $(( ((cur + (" .. tostring(delta) .. ")) % n + n) % n )); }"
-	return "t=$(timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -d 2>/dev/null | " .. pick .. ")"
-		.. " && [ -n \"$t\" ] && timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -s \"$t\" 2>/dev/null"
-end
-
--- The combination the desktops bind to the previous and the next workspace,
--- pressed when wmctrl cannot switch. Under Wayland it is the only way another
--- process can: no protocol lets it name a workspace.
-local WORKSPACE_COMBO = { desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }
+-- The four workspace actions and the step each asks for. The plain pair stops
+-- at the first and the last workspace, as Windows and macOS do; the _wrap pair
+-- goes on to the other end. modules/gestures/workspace_switcher.lua drives
+-- whatever interface the session offers and presses the desktop's own shortcut
+-- when there is none.
+local WORKSPACE_ACTIONS = {
+	desktop_prev      = { direction = DesktopNavigation.PREVIOUS, wrap = false },
+	desktop_next      = { direction = DesktopNavigation.NEXT,     wrap = false },
+	desktop_prev_wrap = { direction = DesktopNavigation.PREVIOUS, wrap = true },
+	desktop_next_wrap = { direction = DesktopNavigation.NEXT,     wrap = true },
+}
 
 -- How long a media tool may take before its key is pressed instead.
 local MEDIA_TOOL_TIMEOUT_S = 1
@@ -666,12 +640,12 @@ local function _execute_action(action_name, go_next, binding)
 		return
 	end
 
-	if WORKSPACE_COMBO[action_name] then
-		-- wmctrl on its own, and waited for: only its exit status says whether
-		-- the combination is still needed.
-		if not ShellRunner.run(workspace_switch_command(action_name == "desktop_next" and 1 or -1)) then
-			_press_combo(WORKSPACE_COMBO[action_name])
-		end
+	local workspace = WORKSPACE_ACTIONS[action_name]
+	if workspace then
+		-- Waited for: only the switcher's answer says whether the desktop's own
+		-- shortcut is still needed.
+		require("modules.gestures.workspace_switcher").switch(
+			workspace.direction, workspace.wrap, _press_combo)
 		return
 	elseif MEDIA_ACTIONS[action_name] then
 		-- The tool on its own, and waited for: only its exit status says whether
@@ -750,7 +724,7 @@ function M.is_runnable(action_name)
 		or OPEN_WINDOW[action_name] ~= nil
 		or OPEN_PATH[action_name] ~= nil
 		or OPEN_LOG[action_name] ~= nil
-		or WORKSPACE_COMBO[action_name] ~= nil
+		or WORKSPACE_ACTIONS[action_name] ~= nil
 		or MEDIA_ACTIONS[action_name] ~= nil
 		or _action_handlers[action_name] ~= nil
 		or SCREENSHOT_COMMANDS[action_name] ~= nil
@@ -765,7 +739,7 @@ end
 function M.runnable_action_ids()
 	local seen, out = { none = true }, { "none" }
 	for _, source in ipairs({ MODIFIER_ACTION_COMMANDS, _EMIT_ROWS, OPEN_WINDOW, OPEN_PATH,
-		OPEN_LOG, WORKSPACE_COMBO, MEDIA_ACTIONS,
+		OPEN_LOG, WORKSPACE_ACTIONS, MEDIA_ACTIONS,
 		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS }) do
 		for action_name in pairs(source) do
 			if not seen[action_name] then
@@ -792,7 +766,7 @@ function M.get_executable_action_names()
 end
 
 --- Whether one requirement token from the catalogue holds on this machine.
---- @param token string "tool:<binary>" or "session:x11".
+--- @param token string "tool:<binary>", "session:x11" or "session:workspaces".
 --- @return boolean|nil True/false when proven, nil when it cannot be told —
 ---   a probe that could not read the machine must never take a binding away.
 --- @return string|nil hint Localized reason when the requirement is absent.
@@ -811,6 +785,19 @@ local function requirement_holds(token)
 		local kind = Display.kind()
 		if kind == Display.X11 then return true, nil end
 		if kind == Display.WAYLAND then return false, i18n.get("dialog.action_picker.requires_x11") end
+		return nil, nil
+	end
+	if token == "session:workspaces" then
+		-- A session that lets another process read and pick its workspaces:
+		-- X11 (wmctrl), KDE Plasma (KWin over D-Bus), sway or Hyprland.
+		local backend, reason = require("modules.gestures.workspace_switcher").detect()
+		if backend then return true, nil end
+		local missing = reason:match("^tool:(.+)$")
+		if missing then
+			local hint = i18n.get("dialog.action_picker.requires_tool"):gsub("{1}", function() return missing end)
+			return false, hint
+		end
+		if reason == "unsupported" then return false, i18n.get("dialog.action_picker.requires_workspaces") end
 		return nil, nil
 	end
 	error("unknown action requirement token '" .. tostring(token) .. "'")

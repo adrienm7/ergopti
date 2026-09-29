@@ -229,6 +229,29 @@ helpers.describe("action picker items (Linux)", function()
 		helpers.assert_eq(by_id.open_url.hint,
 			(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "xdg-open")))
 		helpers.assert_eq(by_id.enter.disabled, nil, "an action with no requirement stays enabled")
+		-- GNOME under Wayland lets no process read its workspaces: the plain
+		-- step presses its own shortcut, which stops at the edges, but nothing
+		-- can tell where the edge is to wrap past it.
+		helpers.assert_eq(by_id.desktop_next.disabled, nil, "the plain step works on every desktop")
+		helpers.assert_eq(by_id.desktop_next_wrap.disabled, true, "GNOME cannot wrap its workspaces")
+		helpers.assert_eq(by_id.desktop_next_wrap.hint,
+			require("infra.i18n").get("dialog.action_picker.requires_workspaces"))
+		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true)
+	end)
+
+	helpers.it("names the missing tool when a desktop could wrap without it", function()
+		local Display = require("infra.display_server")
+		local M = recording_manager()
+		Display._set_for_test(Display.X11, "xfce")
+		local ok, items
+		without_tools(function() ok, items = pcall(M.get_picker_items) end)
+		Display._set_for_test(nil, nil)
+		helpers.assert_true(ok, tostring(items))
+		local by_id = {}
+		for _, item in ipairs(items) do if item.type == "action" then by_id[item.id] = item end end
+		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true, "X11 without wmctrl cannot list its desktops")
+		helpers.assert_eq(by_id.desktop_prev_wrap.hint,
+			(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
 	end)
 
 end)
