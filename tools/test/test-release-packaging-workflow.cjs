@@ -207,6 +207,8 @@ if (windowsSmokeStep !== null) {
 // child processes and bundle tree that tell a slow extraction from a stuck one.
 const SLOWEST_GREEN_WINDOWS_SMOKE_SECONDS = 19;
 const WINDOWS_SMOKE_HANG_HEADROOM = 3;
+// PowerShell names are case-insensitive, so $seconds is the same parameter.
+const WINDOWS_SMOKE_PRINTS_ELAPSED = /Write-Host .*\$Seconds\b/i;
 
 /**
  * Lists why a Windows exe smoke script would read a slow first-launch
@@ -254,15 +256,17 @@ function windowsSmokeWaitProblems(script) {
 		problems.push(`the Windows exe smoke lost its wait loop: ${error.message}`);
 	}
 	try {
-		const diagnostics = pipeline.scriptBlock(code, 'function Write-LaunchDiagnostics');
-		for (const [token, what] of [
-			['$Seconds', 'the elapsed time'],
-			['[SmokeWindows]::Describe', 'the windows of the process'],
-			['Win32_Process', 'its child processes'],
-			['$ergoptiDir', 'the bundle tree']
+		// The opener declares the parameters, so a token found there proves
+		// nothing is printed: only the body counts.
+		const diagnostics = pipeline.scriptBlock(code, 'function Write-LaunchDiagnostics').slice(1);
+		for (const [pattern, what] of [
+			[WINDOWS_SMOKE_PRINTS_ELAPSED, 'the elapsed time'],
+			[/\[SmokeWindows\]::Describe\(/, 'the windows of the process'],
+			[/\bWin32_Process\b/, 'its child processes'],
+			[/\$ergoptiDir\b/, 'the bundle tree']
 		]) {
-			if (!diagnostics.some((line) => line.includes(token))) {
-				problems.push(`the Windows exe smoke diagnostics must print ${what} (${token})`);
+			if (!diagnostics.some((line) => pattern.test(line))) {
+				problems.push(`the Windows exe smoke diagnostics must print ${what} (${pattern.source})`);
 			}
 		}
 		const verdict = pipeline.scriptBlock(code, 'if ($crashedEarly -or -not $markerSeen) {');
@@ -295,6 +299,10 @@ if (windowsSmokeStep !== null) {
 		[
 			'a failure without diagnostics',
 			(lines) => lines.filter((line) => !/^\s*Write-LaunchDiagnostics\b/.test(line))
+		],
+		[
+			'diagnostics that never print the elapsed time',
+			(lines) => lines.filter((line) => !WINDOWS_SMOKE_PRINTS_ELAPSED.test(line))
 		],
 		[
 			'evidence without the marker time',
