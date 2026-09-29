@@ -51,7 +51,7 @@ local function load_manifest()
 	return ManifestMenu.get_root()
 end
 
---- The bundled categories each installed extension binds whole, in catalogue order.
+--- The bundled categories each installed extension binds whole, in menu order.
 ---
 --- A layout extension may carry a whole category written for its geometry
 --- (Ergopti's SFB reduction and rolls). The category keeps its historical id, so
@@ -77,6 +77,11 @@ function M.bound_groups(ctx)
 				groups[category] = true
 			end
 		end
+	end
+	-- The menu manifest's order, the one Windows walks too, not the stems'.
+	local manifest = load_manifest()
+	for _, entry in pairs(by_extension) do
+		entry.groups = Extensions.menu_order(entry.groups, type(manifest) == "table" and manifest.hotstring_groups or nil)
 	end
 	return by_extension, groups
 end
@@ -364,14 +369,16 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local BOUND_SECTIONS = type(menu_mods.hotstrings.bound_sections) == "function"
 		and menu_mods.hotstrings.bound_sections(ctx) or {}
 	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION, BOUND_SECTIONS)) do
-		local only = {}
-		for _, name in ipairs(menu.groups) do only[name] = true end
 		local items = {}
 		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
 			and menu_mods.hotstrings.build_language_bulk_actions(ctx, menu.groups) or {}
 		for _, row in ipairs(bulk) do items[#items + 1] = row end
 		items[#items + 1] = { separator = true }
-		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
+		-- One group at a time: a single pass over the loaded groups would draw them
+		-- in load order instead of the submenu's own.
+		for _, name in ipairs(menu.groups) do
+			for _, row in ipairs(collect_groups({ [name] = true }, counts)) do items[#items + 1] = row end
+		end
 		-- The sections it binds inside a bundled category (the repeat corrections).
 		local section_rows, section_total = {}, 0
 		if #menu.sections > 0 and type(menu_mods.hotstrings.build_bound_section_rows) == "function" then

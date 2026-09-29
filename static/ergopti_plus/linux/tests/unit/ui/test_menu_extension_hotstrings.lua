@@ -88,6 +88,10 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 		helpers.assert_true(text:find(" (7)", 1, true) ~= nil, "rolls: " .. text)
 		helpers.assert_true(text:find(" (5)", 1, true) ~= nil, "SFB reduction: " .. text)
 		helpers.assert_true(text:find("repeat_corrections (14)", 1, true) ~= nil, "repeat corrections: " .. text)
+		-- The menu manifest's order, which Windows walks too and every driver
+		-- listed before the move, although rolls loads first here.
+		helpers.assert_true(text:find(" (5)", 1, true) < text:find(" (7)", 1, true),
+			"SFB reduction comes before rolls: " .. text)
 	end)
 
 	helpers.it("(ergopti-hotstrings-ext) takes the repeat corrections out of the magic key submenu", function()

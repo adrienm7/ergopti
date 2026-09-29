@@ -46,10 +46,14 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 		local bound_sections = Hotstrings.bound_sections(ctx)
 		helpers.assert_eq(Builder.extension_menus(ctx, counts, by_extension, bound_sections), {
 			{ id = "demo", name = "Demo", groups = { "ext:demo:phrases" }, sections = {}, total = 3 },
-			{ id = "ergopti", name = "Ergopti", groups = { "rolls", "sfbsreduction" },
+			-- The menu manifest's order, which Windows walks too and every driver
+			-- listed before the move: SFB reduction, then rolls.
+			{ id = "ergopti", name = "Ergopti", groups = { "sfbsreduction", "rolls" },
 				sections = { { group = "magickey", section = "repeat_corrections" } }, total = 12 },
 		})
 		local source = helpers.read_driver_source("function M.extension_menus")
+		helpers.assert_true(source:find("for _, name in ipairs(menu.groups) do\n\t\t\tfor _, row in ipairs(collect_groups({ [name] = true }, counts))",
+			1, true) ~= nil, "the submenu draws its groups in that order, not in load order")
 		helpers.assert_true(source:find('i18n.get("menu.extensions.hotstrings_of"), menu.name)', 1, true) ~= nil,
 			"each submenu is labelled « Hotstrings <extension> »")
 		helpers.assert_true(source:find('["hotstring_categories_ergopti"]', 1, true) == nil,
