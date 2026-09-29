@@ -283,6 +283,7 @@ InstallHotstringHooks()
 #Include ../adapters/crypto.ahk
 #Include ../adapters/network_info.ahk
 #Include ../adapters/window_manager.ahk
+#Include ../adapters/system_control.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
 #Include ../ui/spotlight/ownership.ahk
@@ -690,6 +691,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_virtual_desktops.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
+#Include unit/test_system_actions.ahk
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk

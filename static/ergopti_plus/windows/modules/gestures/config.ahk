@@ -334,10 +334,52 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 
 ; Preserve the zero-argument contract for ordinary actions (including user
 ; extensions) while passing binding context only to actions that declare it.
-GestureInvokeAction(ActionName, BindingId := "") {
+; An action the catalogue declares `confirm = true` (empty_trash,
+; unblock_file_selection) only asks here, off the hotkey thread; it runs from
+; the answer. Sys is the SystemControl adapter, a recording double in tests.
+GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
 		global GESTURE_ACTIONS
 		if !GESTURE_ACTIONS.Has(ActionName)
 				return
+		if GestureActionNeedsConfirm(ActionName) {
+				Sys := IsObject(Sys) ? Sys : SystemControl()
+				Active := Sys.ActiveWindow()
+				Sys.Defer(_GestureConfirmThenInvoke.Bind(ActionName, BindingId, IsObject(Active) ? Active.Hwnd : 0, Sys))
+				return
+		}
+		return _GestureRunAction(ActionName, BindingId)
+}
+
+; Whether the generated catalogue asks to confirm an action before it runs.
+GestureActionNeedsConfirm(ActionName) {
+		global GESTURE_ACTION_CATALOGUE
+		return IsSet(GESTURE_ACTION_CATALOGUE) && GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
+				&& GESTURE_ACTION_CATALOGUE.Actions[ActionName].Confirm
+}
+
+; Asks whether a destructive action may run (Cancel is the default button),
+; then gives the window the user acted on its focus back and runs it. The
+; question can outlive a Suspend, which disarms hotkeys and not this thread.
+_GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
+		Label := _GestureActionLabel(ActionName)
+		Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
+		if (Answer != "OK") {
+				LoggerInfo("gestures", "'{1}' was cancelled at its confirmation.", ActionName)
+				return
+		}
+		if A_IsSuspended {
+				LoggerInfo("gestures", "'{1}' was confirmed while the script was suspended — not run.", ActionName)
+				return
+		}
+		LoggerInfo("gestures", "'{1}' was confirmed.", ActionName)
+		if (PriorHwnd && !Sys.Activate(PriorHwnd))
+				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
+		_GestureRunAction(ActionName, BindingId)
+}
+
+; Runs one registered action, contained and timed.
+_GestureRunAction(ActionName, BindingId) {
+		global GESTURE_ACTIONS
 		; The single choke point all three dispatchers share (gesture, keyboard-shortcut
 		; slot, tap-hold), so one segment here covers every user-triggered action.
 		; A slow action was previously attributable to nothing: the gesture ended, the

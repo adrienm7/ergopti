@@ -377,6 +377,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/llm_nav_event_owner.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
+#Include adapters/system_control.ahk
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk

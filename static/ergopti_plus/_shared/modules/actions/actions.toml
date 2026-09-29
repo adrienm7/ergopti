@@ -38,7 +38,14 @@
 #             ("ui" for the interface language, or a locale code of
 #             _shared/data/locale_names.json; rule pinned by
 #             _shared/tests/corpus/llm/translate_vectors.json).
-#   confirm   true for a destructive action that must ask before it runs.
+#   confirm   true for a destructive action that must ask before it runs. Each
+#             driver's dispatcher asks, off the input thread, and runs the
+#             action only on the explicit answer: macOS execute_single
+#             (modules/gestures/action_confirm.lua), Windows GestureInvokeAction
+#             (modules/gestures/config.ahk), Linux a zenity/kdialog question
+#             chained to the command (modules/gestures/system_actions.lua),
+#             which is why Linux refuses to load a confirm action that is not
+#             one of those commands.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
 #             whose requirement the driver proves absent, with the reason as a
@@ -482,8 +489,12 @@ emit_ahk_key = "Tab"
 emit_ahk_mods = ["super"]
 
 [sg_actions.minimize_all]
-platform = "ahk"
-emit_ahk_key = "d"
+# Windows minimizes with Win+M (Win+D is show_desktop, which toggles back);
+# macOS minimizes every window of every visible app through System Events.
+# Linux is not implemented, not impossible: EWMH has no "minimize all" request,
+# so it needs a per-window pass (xdotool on X11; nothing on Wayland).
+platform = "ahk,hs"
+emit_ahk_key = "m"
 emit_ahk_mods = ["super"]
 
 # --- Déplacement curseur ---
@@ -721,6 +732,100 @@ platform = "all"
 emit_ahk_key = "n"
 emit_ahk_mods = ["super"]
 emit_linux = "super+v"
+
+# --- System actions (D5) ---
+# Each runs one native command, asynchronously, never on the keyboard hook:
+# macOS modules/gestures/system_actions.lua, Linux
+# modules/gestures/system_actions.lua, Windows
+# modules/gestures/system_actions.ahk. Every suite pins the exact command.
+
+[sg_actions.show_desktop]
+# Windows Win+D, macOS Command + the Mission Control key; Linux toggles the
+# EWMH "showing the desktop" mode through wmctrl, which only X11 honours.
+platform = "all"
+requires_linux = ["session:x11", "tool:wmctrl"]
+emit_ahk_key = "d"
+emit_ahk_mods = ["super"]
+
+[sg_actions.sleep_displays]
+# macOS pmset displaysleepnow, Windows SC_MONITORPOWER, Linux DPMS off (X11).
+platform = "all"
+requires_linux = ["session:x11", "tool:xset"]
+
+[sg_actions.toggle_dark_mode]
+# macOS System Events appearance, Windows the Personalize registry values plus
+# the ImmersiveColorSet broadcast, Linux the GNOME color-scheme setting.
+platform = "all"
+requires_linux = ["tool:gsettings"]
+
+[sg_actions.mic_mute_toggle]
+# macOS input level 0 and back, Windows the default capture endpoint's mute,
+# Linux the default PulseAudio/PipeWire source's mute.
+platform = "all"
+requires_linux = ["tool:pactl"]
+
+[sg_actions.clear_clipboard]
+# Linux clears through the session's clipboard tool (wl-copy, xclip or xsel);
+# with none installed the action logs an error.
+platform = "all"
+
+[sg_actions.center_mouse]
+# The centre of the screen under the pointer. Linux, as for teleport_mouse, has
+# no compositor-independent way to warp the pointer.
+platform = "ahk,hs"
+
+[sg_actions.quit_frontmost_app]
+# Asks the active application to quit (macOS its Quit command, Windows WM_CLOSE
+# to each of its windows, Linux SIGTERM to the active window's process, X11).
+# The driver itself is refused: script_quit owns its teardown.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool"]
+
+[sg_actions.force_quit_frontmost]
+# Kills the active application at once (SIGKILL, TerminateProcess).
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool"]
+
+[sg_actions.empty_trash]
+platform = "all"
+requires_linux = ["tool:gio"]
+confirm = true
+
+[sg_actions.eject_all_disks]
+# Linux is not implemented, not impossible: udisksctl can unmount and power off
+# each removable drive, but telling them apart needs a parsed lsblk listing.
+platform = "hs,ahk"
+
+[sg_actions.clear_notifications]
+# Best effort: the notification daemons that expose a command (dunst, mako,
+# SwayNC). GNOME Shell and KDE Plasma expose none, and neither do macOS nor
+# Windows, where the notification centre (notification_center) is the way.
+platform = "linux"
+
+# The file-manager selection helpers. The selection is Finder's (osascript -ss,
+# parsed by _shared/lua/file_selection), Explorer's SelectedItems (COM), or the
+# text/uri-list a Linux file manager publishes on copy.
+
+[sg_actions.remove_quarantine_selection]
+platform = "hs"
+confirm = true
+
+[sg_actions.unblock_file_selection]
+# The Windows counterpart of the quarantine: the Zone.Identifier stream (Mark
+# of the Web) of each selected file, recursively for a folder.
+platform = "ahk"
+confirm = true
+
+[sg_actions.make_executable_selection]
+platform = "hs,linux"
+
+[sg_actions.open_terminal_here]
+# The folder of the active Finder or Explorer window. Linux is not
+# implemented, not impossible: its file managers expose no current folder.
+platform = "hs,ahk"
+
+[sg_actions.new_text_file_here]
+platform = "hs,ahk"
 
 # --- UI / Fenêtres de l'app ---
 
@@ -1531,6 +1636,24 @@ items = [
     "lock_screen",
     "notification_center",
     "spotlight",
+    "show_desktop",
+    "sleep_displays",
+    "toggle_dark_mode",
+    "mic_mute_toggle",
+    "clear_clipboard",
+    "center_mouse",
+    "quit_frontmost_app",
+    "force_quit_frontmost",
+    "empty_trash",
+    "eject_all_disks",
+    "clear_notifications",
+    "--",
+    "##file_actions",
+    "remove_quarantine_selection",
+    "unblock_file_selection",
+    "make_executable_selection",
+    "open_terminal_here",
+    "new_text_file_here",
     "--",
     "##system_actions",
     "screen_capture",

@@ -283,7 +283,7 @@ function M.storage(opts)
 end
 
 --- A clipboard that remembers what was written to it.
---- @param opts table|nil { available = boolean, initial = string, selection = string }
+--- @param opts table|nil { available = boolean, initial = string, selection = string, uri_list = string }
 --- @return table
 function M.clipboard(opts)
 	opts = opts or {}
@@ -320,6 +320,17 @@ function M.clipboard(opts)
 		if sleep_ms(80) == false then return false, "", "copy_settle_failed" end
 		if opts.selection == nil then return false, "", "no_selection" end
 		return true, opts.selection, nil
+	end
+	-- The file manager's copied selection, as the text/uri-list it publishes.
+	function fake.read_selection_uri_list(emit_combo, sleep_ms)
+		if opts.available == false then return false, "", "clipboard unavailable" end
+		if type(emit_combo) ~= "function" or type(sleep_ms) ~= "function" then
+			return false, "", "invalid_dependencies"
+		end
+		if emit_combo("ctrl+c") ~= true then return false, "", "copy_chord_failed" end
+		if sleep_ms(80) == false then return false, "", "copy_chord_failed" end
+		if opts.uri_list == nil then return false, "", "no_file_selection" end
+		return true, opts.uri_list, nil
 	end
 	function fake.transform_selection(transform, emit_combo, sleep_ms)
 		if opts.available == false then return false, "clipboard unavailable" end

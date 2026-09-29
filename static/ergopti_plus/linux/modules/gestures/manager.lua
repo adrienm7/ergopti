@@ -50,6 +50,7 @@ local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
+local SystemActions = require("modules.gestures.system_actions")
 local LOG = "modules.gestures.manager"
 local ENABLED_PATH = "gestures.enabled"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
@@ -89,6 +90,16 @@ if not _ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~=
 	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.slots) ~= "table" then
 	error("_generated/action_catalogue.lua is missing or invalid — run `npm run gen`: "
 		.. tostring(Catalogue))
+end
+
+-- A confirmation is chained in front of a shell command (system_actions), so
+-- an action the catalogue asks to confirm must be one: anything else would run
+-- unasked. Checked once, here, rather than discovered on the first press.
+for action_name, meta in pairs(Catalogue.actions) do
+	if meta.confirm == true and SystemActions.COMMANDS[action_name] == nil then
+		error("the catalogue asks to confirm '" .. action_name
+			.. "', which is not a system command this driver can confirm")
+	end
 end
 
 -- Wall-clock source (seconds) for gesture tap/swipe timing. Defaults to the
@@ -640,6 +651,25 @@ local function _execute_action(action_name, go_next, binding)
 		return
 	end
 
+	if SystemActions.COMMANDS[action_name] then
+		local meta = Catalogue.actions[action_name]
+		local command = SystemActions.command_for(action_name, M.get_action_label(action_name),
+			meta ~= nil and meta.confirm == true)
+		if command then run_background(command) end
+		return
+	end
+	local system_handler = SystemActions.HANDLERS[action_name]
+	if system_handler then
+		local ok, err = pcall(system_handler, {
+			run_background = run_background,
+			clipboard = require("adapters.clipboard"),
+			emit_combo = require("modules.gestures.combo_emitter").press,
+			sleep_ms = require("adapters.event_loop").sleep_ms,
+		})
+		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
+		return
+	end
+
 	local workspace = WORKSPACE_ACTIONS[action_name]
 	if workspace then
 		-- Waited for: only the switcher's answer says whether the desktop's own
@@ -730,6 +760,8 @@ function M.is_runnable(action_name)
 		or SCREENSHOT_COMMANDS[action_name] ~= nil
 		or DIRECT_COMMANDS[action_name] ~= nil
 		or BUILTIN_HANDLERS[action_name] ~= nil
+		or SystemActions.COMMANDS[action_name] ~= nil
+		or SystemActions.HANDLERS[action_name] ~= nil
 end
 
 --- Every id the executor can run, for the catalogue parity test's reverse
@@ -740,7 +772,8 @@ function M.runnable_action_ids()
 	local seen, out = { none = true }, { "none" }
 	for _, source in ipairs({ MODIFIER_ACTION_COMMANDS, _EMIT_ROWS, OPEN_WINDOW, OPEN_PATH,
 		OPEN_LOG, WORKSPACE_ACTIONS, MEDIA_ACTIONS,
-		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS }) do
+		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS,
+		SystemActions.COMMANDS, SystemActions.HANDLERS }) do
 		for action_name in pairs(source) do
 			if not seen[action_name] then
 				seen[action_name] = true

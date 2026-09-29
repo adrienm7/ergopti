@@ -126,6 +126,7 @@ graph TD
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_shell_runner["ShellRunner.ahk"]
         WINDOWS_storage["Storage.ahk"]
+        WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_text_sender["TextSender.ahk"]
         WINDOWS_timer_scheduler["TimerScheduler.ahk"]
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
