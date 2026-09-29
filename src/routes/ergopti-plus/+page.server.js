@@ -27,6 +27,10 @@ export const prerender = true;
 const SHARED_ROOT = resolve(process.cwd(), 'static/ergopti_plus/_shared');
 const LLM_ROOT = resolve(SHARED_ROOT, 'modules/llm');
 const HOTSTRINGS_ROOT = resolve(SHARED_ROOT, 'modules/hotstrings');
+// The Ergopti layout extension carries the hotstrings written for its key
+// positions (SFB reduction, rolls, repeat corrections), bound to their
+// historical categories by its manifest; every driver ships it installed.
+const ERGOPTI_EXTENSION_ROOT = resolve(process.cwd(), 'static/layouts/registry/ergopti');
 const UI_ROOT = resolve(SHARED_ROOT, 'ui');
 const LOCALES_ROOT = resolve(SHARED_ROOT, 'data/locales');
 // Canonical language display order — single source shared with the drivers.
@@ -214,9 +218,28 @@ function loadHotstringCategories() {
 		return n;
 	};
 
-	const categories = order.map((id) => {
-		const doc = parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, `${id}.toml`), 'utf-8'));
+	// Where each bound category or section lives in the Ergopti extension.
+	const bindings =
+		parseToml(readFileSync(resolve(ERGOPTI_EXTENSION_ROOT, 'manifest.toml'), 'utf-8')).extension
+			?.hotstring_bindings ?? {};
+	const readBound = (stem) =>
+		parseToml(readFileSync(resolve(ERGOPTI_EXTENSION_ROOT, 'hotstrings', `${stem}.toml`), 'utf-8'));
+	const wholeBound = Object.entries(bindings)
+		.filter(([, binding]) => binding.sections === undefined)
+		.map(([stem, binding]) => ({ id: binding.category, stem }));
+	const sectionBound = Object.entries(bindings).filter(
+		([, binding]) => binding.sections !== undefined
+	);
+
+	const categories = [...order, ...wholeBound.map((bound) => bound.id)].map((id) => {
+		const bound = wholeBound.find((candidate) => candidate.id === id);
+		const doc = bound
+			? readBound(bound.stem)
+			: parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, `${id}.toml`), 'utf-8'));
 		let count = countEntries(doc);
+		for (const [stem, binding] of sectionBound) {
+			if (binding.category === id) count += countEntries(readBound(stem));
+		}
 		for (const lang of languages) {
 			if (!(index.languages[lang]?.categories_order ?? []).includes(id)) continue;
 			count += countEntries(

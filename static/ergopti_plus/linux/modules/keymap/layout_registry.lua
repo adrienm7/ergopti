@@ -818,4 +818,17 @@ function M.extension_roots(deps)
 	return Extension.roots(resolved.local_dir, record)
 end
 
+--- The extension root of the Ergopti family the driver ships, installed by shipping.
+--- @param deps table|nil Optional filesystem collaborators.
+--- @return table|nil { pack = dir } scanner root; nil when the registry is not shipped.
+function M.shipped_extension_root(deps)
+	local resolved, reason = resolve_deps(deps)
+	if not resolved then error(reason, 0) end
+	local root = Extension.shipped_root(resolved.bundled_dir, resolved.settings, resolved.exists)
+	if root == nil then
+		Logger.warn(LOG, "No shipped Ergopti extension: the driver ships no layout registry.")
+	end
+	return root
+end
+
 return M

@@ -859,13 +859,16 @@ end
 --- @param found table Records from discover_extensions().
 --- @return table The sources with the bound files routed in.
 function M.route_bound_sources(paths, found)
-	local bound_sections, section_files, whole, whole_order = {}, {}, {}, {}
+	local bound_sections, section_files, whole, whole_order, owners = {}, {}, {}, {}, {}
 	for _, extension in ipairs(found) do
 		for _, file in ipairs(extension.bound_files or {}) do
 			local binding = file.binding
 			if binding.sections == nil then
 				whole[binding.category] = Extensions.bound_source(found, binding.category)
 				whole_order[#whole_order + 1] = binding.category
+				-- The category record names the extension that supplies it, so the
+				-- menu lists it under that extension's own submenu.
+				owners[binding.category] = { id = extension.id, name = extension.name }
 			else
 				for _, section in ipairs(binding.sections) do
 					Extensions.bound_source(found, binding.category, section)
@@ -885,7 +888,7 @@ function M.route_bound_sources(paths, found)
 		local path = type(source) == "table" and source.path or source
 		local category = type(source) == "table" and source.category or path:match("([^/\\]+)%.toml$")
 		if whole[category] then
-			routed[#routed + 1] = { path = whole[category], category = category }
+			routed[#routed + 1] = { path = whole[category], category = category, extension = owners[category] }
 		elseif bound_sections[category] then
 			local entry = type(source) == "table" and source or { path = path }
 			routed[#routed + 1] = {
@@ -899,7 +902,9 @@ function M.route_bound_sources(paths, found)
 	end
 	-- A category the bundled catalogue no longer carries is still the file's.
 	for _, category in ipairs(whole_order) do
-		if not placed[category] then routed[#routed + 1] = { path = whole[category], category = category } end
+		if not placed[category] then
+			routed[#routed + 1] = { path = whole[category], category = category, extension = owners[category] }
+		end
 	end
 	-- After the bundled files, so the category record starts from their metadata.
 	for _, entry in ipairs(section_files) do routed[#routed + 1] = entry end

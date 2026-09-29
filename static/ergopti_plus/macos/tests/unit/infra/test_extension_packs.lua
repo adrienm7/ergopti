@@ -58,8 +58,10 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/user/" end }
 			package.loaded["modules.keymap.layout_registry"] = {
 				extension_roots = function() return { "/installed/generation" } end,
+				shipped_extension_root = function() return { pack = "/app/layouts/registry/ergopti" } end,
 			}
-			helpers.assert_eq(Packs.roots(), { "/app/_shared/../extensions", "/installed/generation", "/user/extensions" })
+			helpers.assert_eq(Packs.roots(), { "/app/_shared/../extensions", "/installed/generation",
+				{ pack = "/app/layouts/registry/ergopti" }, "/user/extensions" })
 		end)
 	end)
 
@@ -69,6 +71,8 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/user/" end }
 			package.loaded["modules.keymap.layout_registry"] = {
 				extension_roots = function() error("the installed-layouts record has schema version 99", 0) end,
+				-- No Ergopti extension shipped here: only the installed record is at stake.
+				shipped_extension_root = function() return nil end,
 			}
 			local errors, roots = capturing_errors(Packs.roots)
 			helpers.assert_eq(roots, { "/app/_shared/../extensions", "/user/extensions" },
@@ -96,6 +100,19 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 		helpers.assert_eq(#found, 1)
 		helpers.assert_eq(found[1].id, "sample")
 		helpers.assert_eq(#errors, 1, "the dangling link is reported, not silently dropped")
+	end)
+
+	helpers.it("(ergopti-hotstrings-ext) counts the shipped Ergopti as installed, and nothing when none shipped", function()
+		local LayoutRegistry = require("modules.keymap.layout_registry")
+		local settings = { ergopti_family = "ergopti" }
+		local files = { ["/app/registry/ergopti/manifest.toml"] = true }
+		local deps = { settings = settings, bundled_dir = "/app/registry/",
+			exists = function(path) return files[path] == true end }
+		helpers.assert_eq(LayoutRegistry.shipped_extension_root(deps), { pack = "/app/registry/ergopti" })
+		files = {}
+		helpers.assert_nil(LayoutRegistry.shipped_extension_root(deps), "a registry without the extension ships none")
+		deps.bundled_dir = nil
+		helpers.assert_nil(LayoutRegistry.shipped_extension_root(deps))
 	end)
 
 	helpers.it("(layout-extension-macos) refuses an unresolvable shared root instead of dropping bundled packs", function()

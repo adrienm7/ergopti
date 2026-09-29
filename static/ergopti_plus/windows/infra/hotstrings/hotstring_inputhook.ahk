@@ -889,6 +889,12 @@ HotstringPrefixWatcherRebuildIndex() {
 			_RegisterCategoryTriggers(Category, NewIndex, NewSet)
 			_tomlCats += 1
 		}
+		; A section a layout extension binds (the magic key's repeat corrections
+		; on Ergopti) is indexed from the extension's file, as it is registered.
+		for Section, BoundPath in HotstringsBoundSections(Category) {
+			_RegisterCategoryTriggers(Category, NewIndex, NewSet, BoundPath, Section)
+			_tomlCats += 1
+		}
 	}
 	; Extension packs. The six categories above enumerate FILES the driver ships;
 	; the engine additionally registers every other *.toml under

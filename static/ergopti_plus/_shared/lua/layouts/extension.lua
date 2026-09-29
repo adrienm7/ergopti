@@ -174,4 +174,30 @@ function M.roots(local_dir, record)
 	return roots
 end
 
+--- The extension root of the layout family every driver ships built in.
+---
+--- Installed means discoverable: a layout manager installation commits a
+--- generation root (M.roots), and the Ergopti family counts as installed wherever
+--- the driver ships the registry folder, because its layouts work from that copy
+--- without any download (Windows emulates them, macOS and Linux install them
+--- offline) and machines already type on them without an installed record. Its
+--- extension folder is named after the family: the family's layouts declare it
+--- as their extension_source. Placed after the installed generations, so a
+--- generation staged before this app version cannot hide the extension files
+--- the app's own code expects; the user's folder still overrides it.
+--- @param bundled_dir string|nil Shipped registry folder, ending in a separator.
+--- @param settings table Registry settings (ergopti_family).
+--- @param exists function exists(path) -> boolean
+--- @return table|nil { pack = dir } scanner root; nil when no registry shipped.
+function M.shipped_root(bundled_dir, settings, exists)
+	if type(settings) ~= "table" or not Registry.is_valid_id(settings.ergopti_family)
+		or type(exists) ~= "function" then
+		error("shipped_root needs the registry settings and an exists function", 0)
+	end
+	if type(bundled_dir) ~= "string" or bundled_dir == "" then return nil end
+	local dir = bundled_dir .. settings.ergopti_family
+	if not exists(dir .. "/manifest.toml") then return nil end
+	return { pack = dir }
+end
+
 return M

@@ -56,7 +56,8 @@ helpers.describe("extension geometry: routing bound files into bundled categorie
 		}, found)
 		helpers.assert_eq(routed, {
 			{ path = "/bundled/magickey.toml", category = "magickey", skip_sections = { "repeat_corrections" } },
-			{ path = "/ext/ergopti/hotstrings/rolls.toml", category = "rolls" },
+			{ path = "/ext/ergopti/hotstrings/rolls.toml", category = "rolls",
+				extension = { id = "ergopti", name = "ergopti" } },
 			{ path = "/bundled/french/magickey.toml", category = "french_magickey" },
 			{ path = "/ext/ergopti/hotstrings/magicrepeat.toml", category = "magickey",
 				only_sections = { "repeat_corrections" } },
@@ -70,7 +71,8 @@ helpers.describe("extension geometry: routing bound files into bundled categorie
 				category = "sfbsreduction", feature_section = "hotstrings.sfbs_reduction", source = "common",
 			} } }),
 		})
-		helpers.assert_eq(routed, { "/bundled/magickey.toml", { path = "/ext/sfbs.toml", category = "sfbsreduction" } })
+		helpers.assert_eq(routed, { "/bundled/magickey.toml", { path = "/ext/sfbs.toml", category = "sfbsreduction",
+			extension = { id = "ergopti", name = "ergopti" } } })
 	end)
 
 	helpers.it("(layout-extension-binding) leaves a catalogue without bindings untouched", function()

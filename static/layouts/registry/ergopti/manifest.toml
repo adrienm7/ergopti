@@ -11,3 +11,24 @@ author = "Adrien Moyaux"
 # choice of key always wins over this declaration.
 [extension.magic_key]
 key = "KeyC"
+
+# The hotstrings written for Ergopti's key positions: SFB reduction, rolls and
+# the magic key's repeat corrections. Each keeps its historical category,
+# feature section and common priority tier, so every existing preference still
+# addresses it. They are available wherever this extension is installed, and
+# the drivers count the Ergopti they ship as installed.
+[extension.hotstring_bindings.sfbsreduction]
+category = "sfbsreduction"
+feature_section = "hotstrings.sfbs_reduction"
+source = "common"
+
+[extension.hotstring_bindings.rolls]
+category = "rolls"
+feature_section = "hotstrings.rolls"
+source = "common"
+
+[extension.hotstring_bindings.repeatcorrections]
+category = "magickey"
+feature_section = "hotstrings.magic_key"
+sections = ["repeat_corrections"]
+source = "common"

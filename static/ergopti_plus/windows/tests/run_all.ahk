@@ -583,6 +583,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_layout_extension_runtime.ahk
 #Include unit/test_layout_extension_menu.ahk
 #Include unit/test_layout_extension_refresh.ahk
+#Include unit/test_ergopti_extension_hotstrings.ahk
 #Include ../ui/layout_manager/init.ahk
 #Include unit/test_layout_manager_host.ahk
 #Include unit/test_ergopti_keylayout_tables.ahk

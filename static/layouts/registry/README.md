@@ -60,12 +60,20 @@ key = "KeyC"
 # sense on this layout's geometry. The rules keep their historical category,
 # feature section and common priority tier, so existing preferences still
 # address them; without `sections` the file replaces the whole category.
-[extension.hotstring_bindings.magicrepeat]
+[extension.hotstring_bindings.repeatcorrections]
 category = "magickey"
 feature_section = "hotstrings.magic_key"
 sections = ["repeat_corrections"]
 source = "common"
 ```
+
+The Ergopti extension (`ergopti/`) binds its SFB reduction, rolls and repeat
+corrections this way. A layout's extension is installed when the layout
+manager commits it (its generation under the configuration folder); the
+Ergopti family's extension also counts as installed wherever a driver ships
+this folder, because every driver types Ergopti from the shipped copy without
+an installation record. The shipped copy follows the installed generations in
+the discovery order, and the user's own `extensions` folder still overrides it.
 
 The index builder refuses a manifest the driver scanners would refuse, so a
 published layout can never make the drivers reject their extension catalogue.
