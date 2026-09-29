@@ -979,6 +979,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-extensions-path-resolves.cjs'
 	},
 	{
+		name: 'Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group',
+		cmd: 'node',
+		args: ['tools/test/test-windows-bundle-manifest.cjs'],
+		repro: 'npm run test:windows-bundle-manifest'
+	},
+	{
 		name: 'LLM logs carry no typed text (context length only, never a slice of the buffer)',
 		cmd: 'node',
 		args: ['tools/test/test-llm-no-prompt-content-in-logs.cjs'],

@@ -390,10 +390,25 @@ that module; `tests/fixtures/ergopti_emulation_golden.json` freezes what the
 emulation typed when the hand-written tables were retired, so an intended change
 to Windows output updates that file in the same commit, and a deviation the
 `.keylayout` catches up with must be deleted (a test fails while it lingers).
-The compiled driver needs the registry folder in its bundle
-(`build_static_bundle.py` REQUIRED_ASSETS), or boot fails.
+The compiled driver needs the registry folder in its bundle (the `required`
+list of `tools/build/windows_bundle_manifest.json`), or boot fails.
 
 ## Files, configuration, and UI hosts
+
+### project-windows-bundle-ships-only-the-manifest
+
+The compiled exe reads its data from the zip that
+`tools/build/windows_bundle_manifest.json` declares, while a source run reads the
+checkout: a file an exclude group drops breaks only the shipped exe, and first
+launch extracts every entry with Expand-Archive, so each shipped file costs
+startup time. `test-windows-bundle-manifest.cjs` proves that every AutoHotkey
+literal file name, root-anchored concatenation (`_SharedDir . "\x"`, runtime
+parts as patterns), listed directory, page src/href closure and data-file path
+ships. It cannot see a path assembled from data it does not model, such as a
+helper joining folder names read from JSON. Action: before a new Windows read
+of a file under an excluded group (`_shared/core`, `_shared/modules/**/*.js`,
+`_shared/assets`, documentation, test vectors), move it out of the exclusion;
+build such paths from a literal the gate can see.
 
 ### project-ahk-unreadable-config-persists-defaults
 

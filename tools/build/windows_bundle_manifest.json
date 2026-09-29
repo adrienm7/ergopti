@@ -1,0 +1,160 @@
+{
+	"$comment": "Single source of what the compiled ErgoptiPlus.exe embeds (tools/build/build_static_bundle.py resolves it; tools/test/test-windows-bundle-manifest.cjs proves every path the Windows sources and web pages read is shipped). Every file under an include source ships unless an exclude group matches its repository-relative path. Globs: ** spans directories, * and ? stay inside one path segment. First launch extracts every entry with Expand-Archive, whose cost grows with the file count, so a group that no Windows code reads stays out.",
+	"schema_version": 1,
+	"include": [
+		{
+			"source": "static/ergopti_plus/_shared",
+			"dest": "static/ergopti_plus/_shared",
+			"why": "Shared runtime data read through _SharedDir: locales, hotstring TOMLs, WebView pages, LLM, updater, diagnostics and action data, the metrics schema and the config migrations registry."
+		},
+		{
+			"source": "static/ergopti_plus/extensions",
+			"dest": "static/ergopti_plus/extensions",
+			"why": "Extension packs enumerated through _ExtensionsDir: manifest.toml, hotstring TOMLs and the shortcuts/menu.ahk whose presence adds the pack's tray submenu."
+		},
+		{
+			"source": "static/layouts/registry",
+			"dest": "static/layouts/registry",
+			"why": "Layout registry read through LayoutRegistry_BundledDir; the Ergopti emulation builds its tables from these .keylayout files."
+		},
+		{
+			"source": "static/img/logo",
+			"dest": "static/img/logo",
+			"why": "Tray icons (infra/boot.ahk IconPath and IconPathDisabled)."
+		},
+		{
+			"source": "static/img/flags",
+			"dest": "static/img/flags",
+			"why": "Language flags of the language menu and the onboarding wizard."
+		},
+		{
+			"source": "static/img/ergopti.jpg",
+			"dest": "static/img/ergopti.jpg",
+			"why": "Layout preview of the onboarding wizard's keyboard step."
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor",
+			"dest": "vendor",
+			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall and crash-report workers."
+		}
+	],
+	"exclude": [
+		{
+			"name": "shared-tests",
+			"globs": ["static/ergopti_plus/_shared/tests/**"],
+			"why": "Cross-driver corpora and fixtures read only by the JS, Lua and AutoHotkey test suites, which run from the checkout."
+		},
+		{
+			"name": "lua-sources",
+			"globs": ["static/ergopti_plus/_shared/lua/**", "**/*.lua"],
+			"why": "Modules of the macOS and Linux drivers and the Lua half of extension packs; AutoHotkey neither loads nor reads them."
+		},
+		{
+			"name": "documentation",
+			"globs": ["**/*.md"],
+			"except": ["static/ergopti_plus/_shared/ui/vendor/LICENSES.md"],
+			"why": "READMEs, specifications and migration notes for contributors. LICENSES.md ships because it carries the licence notices of the vendored chart libraries."
+		},
+		{
+			"name": "developer-scripts",
+			"globs": ["**/*.py", "**/*.sh"],
+			"why": "Data validators run by CI and the POSIX Ollama installer of macOS and Linux; Windows runs neither."
+		},
+		{
+			"name": "test-vectors",
+			"globs": ["**/*_vectors.json", "**/*_vectors.toml", "**/test_vectors.json"],
+			"why": "Shared vectors that pin each driver's port of an algorithm in its test suite."
+		},
+		{
+			"name": "core-specifications",
+			"globs": ["static/ergopti_plus/_shared/core/**"],
+			"except": ["static/ergopti_plus/_shared/core/config_schema/migrations.toml"],
+			"why": "Port and domain specifications, JSON schemas and config examples consumed by the JS suite and the code generators, whose output is compiled into the exe. The driver reads only the config migrations registry (infra/config_migrate.ahk)."
+		},
+		{
+			"name": "shared-js-algorithms",
+			"globs": ["static/ergopti_plus/_shared/modules/**/*.js"],
+			"why": "Canonical JavaScript of the tooltip and updater algorithms. Windows runs AutoHotkey ports of them (ui/tooltip, modules/updater) and no Windows page loads them."
+		},
+		{
+			"name": "other-driver-data",
+			"globs": [
+				"static/ergopti_plus/_shared/assets/**",
+				"static/ergopti_plus/_shared/data/keycodes/evdev.json",
+				"static/ergopti_plus/_shared/modules/features/linux_evidence.json"
+			],
+			"why": "The macOS and Linux tray PNGs, the Linux evdev key codes and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json."
+		},
+		{
+			"name": "website-logos",
+			"globs": ["static/img/logo/*"],
+			"except": ["static/img/logo/*.ico"],
+			"why": "PNG and SVG logos of the website and the other drivers; the Windows tray loads only the two .ico files."
+		},
+		{
+			"name": "build-provenance",
+			"globs": [
+				"static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json",
+				"static/ergopti_plus/_shared/ui/vendor/vendor-manifest.json"
+			],
+			"why": "Provenance records checked by build_windows_nav_owner.ps1 and the vendor audit tests, never read at run time."
+		},
+		{
+			"name": "compile-time-sources",
+			"globs": ["static/ergopti_plus/windows/vendor/*.ahk"],
+			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them."
+		},
+		{
+			"name": "runtime-caches",
+			"globs": ["**/prefetch.json", "**/*.tsv", "**/personal_shortcuts.ahk", "**/paths.toml"],
+			"may_be_empty": true,
+			"why": "Files a development run writes next to the sources: dashboard prefetch blobs, locale and hotstring caches, the machine-specific personal-shortcuts stub and paths override. A clean checkout has none; shipping one would bake a developer's machine state into every exe."
+		},
+		{
+			"name": "vcs-metadata",
+			"globs": ["**/.git*"],
+			"may_be_empty": true,
+			"why": "Version-control placeholders and ignore files."
+		}
+	],
+	"not_shipped": [
+		{
+			"path": "static/ergopti_plus/windows/_generated",
+			"why": "Its AutoHotkey files are #Included at compile time and config_template.toml has no Windows reader; personal_shortcuts.ahk and paths.toml there are machine-specific."
+		},
+		{
+			"path": "static/favicon.ico",
+			"why": "Ahk2Exe embeds it as the exe icon from the checkout (/icon in the Package job); nothing reads it at run time."
+		},
+		{
+			"path": "static/version.json",
+			"why": "Website build stamp, absent from CI checkouts; no Windows code reads it."
+		}
+	],
+	"required": [
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1",
+			"dest": "vendor/ergopti_uninstall.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll",
+			"dest": "vendor/ergopti_nav_owner.dll"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1",
+			"dest": "vendor/ergopti_crash_worker.ps1"
+		},
+		{
+			"source": "static/layouts/registry/index.json",
+			"dest": "static/layouts/registry/index.json"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/ergopti.keylayout",
+			"dest": "static/layouts/registry/ergopti/ergopti.keylayout"
+		},
+		{
+			"source": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+			"dest": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout"
+		}
+	]
+}
