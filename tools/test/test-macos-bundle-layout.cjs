@@ -96,8 +96,14 @@ const launcherSwift = fs
 const launcherTools = [
 	...launcherSwift.matchAll(/Contents\/Resources\/Tools\/([A-Za-z0-9_-]+)\//g)
 ].map((match) => match[1]);
-if (launcherTools.length === 0) {
-	errors.push('main.swift: no Contents/Resources/Tools path found; the tool scan went blind.');
+// The app now bundles no tool at all (Karabiner-Elements and Ollama are both
+// installed on demand), so an empty scan is proven rather than blind only while
+// the build creates no Tools folder either.
+if (launcherTools.length === 0 && /\$tools_dir\b|Resources\/Tools\/[A-Za-z]/.test(build)) {
+	errors.push(
+		'main.swift points at no Contents/Resources/Tools path while build_macos_app.sh still ' +
+			'bundles one; the tool scan went blind.'
+	);
 }
 for (const tool of new Set(launcherTools)) {
 	if (!build.includes(`"$tools_dir/${tool}/`)) {
