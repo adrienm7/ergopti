@@ -160,6 +160,23 @@ TestMasterGates_KeyCombinationsSubGate() {
 Test("master gates: the key-combinations switch gates only its families (key-combinations-gate)",
 	TestMasterGates_KeyCombinationsSubGate)
 
+; A config.toml written before the switch existed has Shortcuts on and no
+; [category_enabled] key_combinations: its families must stay as chosen. The
+; switch turned off must also reach the disk, which the sparse writer only does
+; for a value that differs from the manifest default.
+TestMasterGates_KeyCombinationsAbsentKeyKeepsFamilies() {
+	Upgraded := Map("Shortcuts", true)
+	Candidate := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(Candidate, Map(),
+		(Name) => _ConfigCandidateCategoryEnabled(Upgraded, Name))
+	for Family in _MGKC_Families()
+		AssertTrue(Candidate["shortcuts"][Family]["backspace"], Family . " survives an absent switch")
+	SwitchedOff := _ConfigSparseOperation("category_enabled", "key_combinations", false)
+	AssertFalse(SwitchedOff.HasOwnProp("Delete"), "the switch turned off is written, not dropped as neutral")
+}
+Test("master gates: an absent key-combinations switch keeps the families (key-combinations-gate)",
+	TestMasterGates_KeyCombinationsAbsentKeyKeepsFamilies)
+
 TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 	global _SharedDir, CategoryEnabled
 	FixtureRoot := A_Temp . "\ergopti_master_gates_invalid_" . A_TickCount
