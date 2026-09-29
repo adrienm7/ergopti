@@ -52,8 +52,8 @@ _Onboarding_Step2() {
 	; are agreeing to. AHK scales the JPG to the requested width while
 	; preserving aspect ratio (``h-1``). The picture is best-effort: if the
 	; static dir is unreachable (e.g. an unusual install), we log and skip so
-	; the rest of the step still renders. The build_static_bundle ASSET_FILES
-	; entry ships ``ergopti.jpg`` next to the EXE in compiled mode.
+	; the rest of the step still renders. tools/build/windows_bundle_manifest.json
+	; ships ``ergopti.jpg`` in the extracted bundle in compiled mode.
 	imgPath := _StaticDir . "\img\ergopti.jpg"
 	if FileExist(imgPath) {
 		try {

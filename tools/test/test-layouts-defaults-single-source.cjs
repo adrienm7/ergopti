@@ -241,24 +241,18 @@ check("every copy of the registry user agent is the shared client's", () => {
 // from the parent of the static folder), so the bundle must copy that folder to
 // the same path and refuse to build without the files the emulation reads.
 check('the compiled Windows driver ships the registry folder the Ergopti emulation reads', () => {
-	const bundler = fs.readFileSync(
-		path.join(ROOT, 'tools', 'build', 'build_static_bundle.py'),
-		'utf8'
+	const manifest = JSON.parse(
+		fs.readFileSync(path.join(ROOT, 'tools', 'build', 'windows_bundle_manifest.json'), 'utf8')
 	);
-	const trees = [...bundler.matchAll(/\(\s*"([^"]+)",\s*"([^"]+)",\s*\(/g)].map((m) => [
-		m[1],
-		m[2]
-	]);
-	assert.ok(trees.length >= 5, `found only ${trees.length} ASSET_TREES entries`);
+	const trees = manifest.include.map((entry) => [entry.source, entry.dest]);
+	assert.ok(trees.length >= 5, `found only ${trees.length} bundle include entries`);
 	assert.ok(
 		trees.some(([src, dst]) => src === registry.folder && dst === registry.folder),
-		`ASSET_TREES must copy ${registry.folder} to the same path`
+		`windows_bundle_manifest.json must copy ${registry.folder} to the same path`
 	);
-	const requiredBlock = /REQUIRED_ASSETS[^=]*=\s*\(([\s\S]*?)\n\)/.exec(bundler);
-	assert.ok(requiredBlock, 'build_static_bundle.py declares no REQUIRED_ASSETS');
-	const required = [...requiredBlock[1].matchAll(/\(\s*"([^"]+)",\s*"([^"]+)",?\s*\)/g)]
-		.filter(([, src, dst]) => src === dst)
-		.map((m) => m[1]);
+	const required = manifest.required
+		.filter((entry) => entry.source === entry.dest)
+		.map((entry) => entry.source);
 	const ergopti = fs.readFileSync(
 		path.join(SP, 'windows', 'modules', 'keymap', 'layout', 'layout_ergopti.ahk'),
 		'utf8'
@@ -274,7 +268,7 @@ check('the compiled Windows driver ships the registry folder the Ergopti emulati
 	for (const file of [registry.index_file, ...ids.map((id) => `${id}/${id}.keylayout`)]) {
 		assert.ok(
 			required.includes(`${registry.folder}/${file}`),
-			`REQUIRED_ASSETS must list ${registry.folder}/${file}`
+			`the bundle manifest's required list must name ${registry.folder}/${file}`
 		);
 	}
 });

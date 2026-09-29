@@ -315,24 +315,33 @@ if (macSitesSeen === 0) {
 // ─── 4. The Windows bundler ships the tree ───────────────────────────────────
 
 const bundler = read('tools/build/build_static_bundle.py');
-if (!bundler) {
-	errors.push('tools/build/build_static_bundle.py is unreadable.');
+const bundleManifest = read('tools/build/windows_bundle_manifest.json');
+if (!bundler || !bundleManifest) {
+	errors.push('tools/build/build_static_bundle.py or windows_bundle_manifest.json is unreadable.');
 } else {
-	const m = bundler.match(/\(\s*"([^"]*extensions[^"]*)"\s*,/);
-	if (!m) {
+	const trees = JSON.parse(bundleManifest).include.filter((entry) =>
+		/(?:^|\/)extensions$/.test(entry.source)
+	);
+	if (trees.length !== 1) {
 		errors.push(
-			'build_static_bundle.py: ASSET_TREES declares no extensions tree — the .exe would ship none.'
+			`windows_bundle_manifest.json declares ${trees.length} extensions trees — the .exe must ship exactly one.`
 		);
 	} else {
-		assertIsExtensionsTree('bundler ASSET_TREES entry', path.join(ROOT, m[1]));
+		assertIsExtensionsTree('bundle manifest include', path.join(ROOT, trees[0].source));
+		if (trees[0].dest !== trees[0].source) {
+			errors.push(
+				`windows_bundle_manifest.json ships the extensions tree at ${trees[0].dest}, ` +
+					`not at ${trees[0].source} where _ExtensionsDir resolves it.`
+			);
+		}
 	}
 
 	// The bundler must not silently skip a declared tree: that is what kept CI green.
-	if (/WARN: missing directory/.test(bundler)) {
+	if (/WARN: missing/.test(bundler) || !/include source '.*' does not exist/.test(bundler)) {
 		errors.push(
-			'build_static_bundle.py still warns-and-continues on a missing ASSET_TREES ' +
-				'directory. A declared tree is a runtime dependency of the compiled driver, ' +
-				'so a missing one must fail the build.'
+			'build_static_bundle.py must refuse a missing include source instead of ' +
+				'warning and continuing. A declared tree is a runtime dependency of the ' +
+				'compiled driver, so a missing one must fail the build.'
 		);
 	}
 }
