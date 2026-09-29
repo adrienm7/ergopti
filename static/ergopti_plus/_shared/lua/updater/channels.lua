@@ -7,7 +7,8 @@
 --- (_shared/modules/updater/channels.json) for the macOS and Linux drivers:
 --- which channel a release tag belongs to, how a persisted value maps to a
 --- channel, which releases a channel's Versions view lists, whether an update
---- check offers a candidate, and which release is a channel's latest.
+--- check offers a candidate, which release is a channel's latest, and which
+--- other channels published a newer release than the installed build.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Port of the canonical JavaScript matcher (_shared/ui/update_channels.js);
@@ -25,6 +26,9 @@ local M = {}
 
 local SCHEMA_VERSION = 1
 local CORE_SEMVER = "semver"
+-- A publish time exactly as GitHub writes it (UTC, whole seconds), so text
+-- order is time order in every runtime without a date parser.
+local PUBLISHED_AT = "^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$"
 
 
 
@@ -329,6 +333,49 @@ function M.load(decoded)
 			end
 		end
 		return best
+	end
+
+	--- Lists, in registry order, every channel other than the checked one whose
+	--- latest release was published strictly after the installed build. The
+	--- installed build's time is that of the first listed release of the same
+	--- version; a build that is not listed (older than the list, or a source
+	--- checkout), or listed without a valid time, predates the list.
+	--- @param releases table Array of { tag, published_at }, in list order.
+	--- @param selected string The checked channel.
+	--- @param installed string The installed build's version.
+	--- @return table found Array of { channel, tag }.
+	function R.newer_elsewhere(releases, selected, installed)
+		local found = {}
+		if type(releases) ~= "table" or not (type(selected) == "string" and by_id[selected]) then
+			return found
+		end
+		local tags = {}
+		for index, release in ipairs(releases) do
+			tags[index] = type(release) == "table" and type(release.tag) == "string" and release.tag or ""
+		end
+		local function valid_time(value)
+			return type(value) == "string" and value:match(PUBLISHED_AT) ~= nil
+		end
+		local installed_at = nil
+		if R.channel_for_tag(installed) ~= nil then
+			for index, tag in ipairs(tags) do
+				if R.channel_for_tag(tag) ~= nil and Version.compare_versions(tag, installed) == 0 then
+					local own = releases[index].published_at
+					installed_at = valid_time(own) and own or nil
+					break
+				end
+			end
+		end
+		for _, record in ipairs(order) do
+			if record.id ~= selected then
+				local index = R.pick_latest(tags, record.id)
+				local at = index and releases[index].published_at or nil
+				if index and valid_time(at) and (installed_at == nil or at > installed_at) then
+					found[#found + 1] = { channel = record.id, tag = tags[index] }
+				end
+			end
+		end
+		return found
 	end
 
 	return R

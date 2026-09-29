@@ -88,6 +88,14 @@ helpers.describe("updater.channels — shared vectors (macOS)", function()
 		end
 	end)
 
+	helpers.it("lists the other channels published after the installed build", function()
+		helpers.assert_true(#vectors.newer_elsewhere >= 10, "the newer_elsewhere vectors must be present")
+		for _, v in ipairs(vectors.newer_elsewhere) do
+			helpers.assert_eq(registry.newer_elsewhere(v.releases, v.selected, v.installed), v.expect,
+				"newer_elsewhere vector " .. v.id)
+		end
+	end)
+
 	helpers.it("refuses a registry where two channels claim the same tags", function()
 		local decoded = read_json("channels.json")
 		decoded.channels[2].tag = decoded.channels[1].tag
