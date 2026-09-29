@@ -29,11 +29,12 @@ end
 --- fresh override file with a no-op TOML resolver (no package defaults).
 --- @param path string The override file path.
 --- @return table The freshly-initialised module.
-local function fresh_module(path)
+--- @param toml_resolver function|nil Category to TOML path; none by default.
+local function fresh_module(path, toml_resolver)
 	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
-	mod.init({ override_path = path, toml_resolver = function() return nil end })
+	mod.init({ override_path = path, toml_resolver = toml_resolver or function() return nil end })
 	return mod
 end
 
@@ -135,6 +136,36 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 		helpers.assert_eq(mod.resolve_ext("demo", extension_path, nil).priority, 41,
 			"without a section, extension file metadata must outrank the package source tier")
 
+		os.remove(override_path)
+		os.remove(extension_path)
+	end)
+
+	helpers.it("(layout-extension-macos) resolves a registered pack group from its own file and ext owner", function()
+		local override_path = temp_path("ext_group_override")
+		local extension_path = temp_path("ext_group_source")
+		os.remove(override_path)
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			'color = "#1e88e5"',
+			"show_tooltip = false",
+			"sections_order = []",
+			"",
+		}, "\n"))
+		local mod = fresh_module(override_path, function(category)
+			return category == "ext:demo:phrases" and extension_path or nil
+		end)
+		local Logger = require("infra.logger")
+		local saved, errors = Logger.error, 0
+		Logger.error = function() errors = errors + 1 end
+		local ok, resolved = pcall(mod.resolve, "ext:demo:phrases", "greetings")
+		Logger.error = saved
+		helpers.assert_true(ok, tostring(resolved))
+		helpers.assert_eq(resolved.color, "#1e88e5", "the preview and WPM colour come from the pack's _meta")
+		helpers.assert_eq(resolved.show_tooltip, false)
+		helpers.assert_eq(errors, 0, "the typing path must not log an error per candidate")
+		helpers.assert_eq(mod.set_override("ext.demo", nil, "color", "#000000"), true)
+		helpers.assert_eq(mod.resolve("ext:demo:phrases", nil).color, "#000000",
+			"the user's ext.<id> override applies to every file of the pack")
 		os.remove(override_path)
 		os.remove(extension_path)
 	end)
