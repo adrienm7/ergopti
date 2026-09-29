@@ -122,3 +122,9 @@ out there. Never count the complete Hotstrings scope as implemented.
 
 `ARTIFACTS.json` records hashes of the preserved source material. The checklist
 and final checkpoint own current state; copied lane notes remain historical.
+
+`workflow-context-2026-09-24.zip` is the former `D:/ewt/_context` directory,
+kept whole before that directory was deleted: resume prompts, task status,
+the R1–R35 feature map, the workflow script with its `DECISIONS`, the analysis
+reports under `map/` and the paused run's journal. It is historical input;
+`PRODUCT_SPECIFICATION.txt` and the checklist remain authoritative.
