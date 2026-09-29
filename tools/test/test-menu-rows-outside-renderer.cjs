@@ -576,7 +576,13 @@ const DRIVER_SPEC = {
 		// sits with an action, a checkmark, or a nested menu.
 		patterns: [/\btitle\s*=\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
-		renderers: new Set(['infra/manifest_menu.lua', 'ui/menu/builder.lua'])
+		// Like Linux, this driver now renders through _shared/lua/menu/renderer.lua
+		// alone. builder.lua kept one tree in the driver dialect — the extension
+		// packs' read-only counts — and that tree is provider rows since the packs
+		// became real, switchable groups, so the files below draw no row of their
+		// own and the empty count is the definition, not a stale path.
+		renderers: new Set(['infra/manifest_menu.lua', 'ui/menu/builder.lua']),
+		sharedRenderer: true
 	},
 	linux: {
 		exts: ['.lua'],

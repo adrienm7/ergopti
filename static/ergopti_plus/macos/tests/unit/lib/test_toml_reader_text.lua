@@ -7,12 +7,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_counter = require("tests.support.hotstring_counter_fixture")
+local with_virtual_file = require("tests.support.virtual_toml_file_fixture")
 
 helpers.describe("TOML reader text snapshots", function()
 	for _, newline in ipairs({ "\n", "\r\n" }) do
 		helpers.it("(hs-271-text) matches file parsing with newline width " .. #newline, function()
-			with_counter(function(_, state)
+			with_virtual_file(function(state)
 				helpers.with_fresh_modules({ "toml_codec.reader" }, function()
 					local reader = require("toml_codec.reader")
 					state.content = table.concat({ '[_meta]', 'sections_order = ["arrows"]',
