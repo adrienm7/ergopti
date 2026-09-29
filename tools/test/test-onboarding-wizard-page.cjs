@@ -642,6 +642,27 @@ function cataloguePaths(driver) {
 	);
 })();
 
+(function tapHoldsAreSwitchedOnlyWhereConfigTomlHoldsTheSwitch() {
+	// macOS reads the switch from config_karabiner.toml and Linux from
+	// tap_hold.toml: a config.toml answer there was saved and never read.
+	for (const driver of ['macos', 'linux']) {
+		const described = CATALOGUE.platforms[driver].pages.find((p) => p.id === 'tap_holds');
+		assert.equal(described.master, undefined, `${driver}: no config.toml tap-hold switch`);
+		assert.ok(!cataloguePaths(driver).has('tap_holds.enabled'), `${driver}: nothing to write`);
+		assert.equal(described.note_key, 'onboarding.page.tap_holds.menu_note');
+		const page = openWizard({ platform: driver });
+		next(page, 2);
+		assert.equal(page.el('page-question').classList.contains('hidden'), true, driver);
+		assert.equal(
+			page.el('page-note').textContent,
+			locale('en')['onboarding.page.tap_holds.menu_note'],
+			`${driver}: the page says where tap-holds are switched on`
+		);
+	}
+	const windows = CATALOGUE.platforms.windows.pages.find((p) => p.id === 'tap_holds');
+	assert.equal(windows.master.path, 'category_enabled.tap_holds', 'Windows reads its switch there');
+})();
+
 (function triggerLengthMatchesTheConfigurationSchema() {
 	// config.schema.json is what the Windows boot validator enforces: a longer
 	// wizard answer is saved, then stops the driver at every start.
@@ -756,8 +777,9 @@ function cataloguePaths(driver) {
 })();
 
 (function aFolderWithItsOwnConfigurationRestartsThePages() {
-	const page = openWizard({ platform: 'macos' });
-	page.platform = 'macos';
+	// Windows: its first page asks through a config.toml switch.
+	const page = openWizard({ platform: 'windows' });
+	page.platform = 'windows';
 	page.click('btn-next');
 	page.window.setConfigDir('/Volumes/Other/');
 	page.messages.splice(0);
@@ -768,9 +790,9 @@ function cataloguePaths(driver) {
 		config_dir: '/Volumes/Other/',
 		request: 1
 	});
-	page.window.applyCurrentValues({ request: 0, values: { 'tap_holds.enabled': true } });
+	page.window.applyCurrentValues({ request: 0, values: { 'category_enabled.tap_holds': true } });
 	assert.equal(page.el('page-no').checked, true, 'a stale reply is dropped');
-	page.window.applyCurrentValues({ request: 1, values: { 'tap_holds.enabled': true } });
+	page.window.applyCurrentValues({ request: 1, values: { 'category_enabled.tap_holds': true } });
 	assert.equal(page.el('page-yes').checked, true, 'the chosen folder answers for its pages');
 	// Returning to the same folder does not reload it over the user's answers.
 	answer(page, false);

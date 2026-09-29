@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "La previsione con IA suggerisce la fine della frase mentre scrivi. I modelli si scaricano più tardi dal menu Intelligenza artificiale; ora non viene scaricato nulla.",
 	"onboarding.page.shortcuts.description": "Scorciatoie da tastiera che eseguono azioni di Ergopti: cambiare maiuscole e minuscole della selezione, racchiuderla, catturare lo schermo, cambiare finestra e altro. L’elenco qui sotto contiene le scorciatoie consigliate da Ergopti.",
 	"onboarding.page.tap_holds.description": "Un tap-hold dà due ruoli a un tasto: premuto, produce una cosa; tenuto premuto, agisce come un altro tasto. Ad esempio, Bloc Maiusc può digitare Invio quando viene premuto e fare da modificatore quando viene tenuto. Una volta attivati, scegli i tasti nel menu Tap-Hold, che può anche importare i tasti consigliati da Ergopti.",
+	"onboarding.page.tap_holds.menu_note": "Su questo sistema i tap-hold si attivano dal menu Tap-Hold, dove si scelgono anche i tasti, quindi qui non c’è nulla da attivare.",
 	"onboarding.warning_label": "Attenzione",
 	"onboarding.welcome.heading": "Lingua",
 	"onboarding.welcome.title": "ErgoptiPlus — Configurazione",

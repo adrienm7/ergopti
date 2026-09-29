@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "חיזוי הבינה המלאכותית מציע את סוף המשפט בזמן ההקלדה. המודלים יורדים מאוחר יותר מתפריט בינה מלאכותית; דבר אינו יורד כעת.",
 	"onboarding.page.shortcuts.description": "קיצורי מקלדת שמפעילים פעולות של Ergopti: שינוי רישיות הבחירה, עטיפתה, צילומי מסך, מעבר בין חלונות ועוד. הרשימה למטה מכילה את הקיצורים ש-Ergopti ממליצה עליהם.",
 	"onboarding.page.tap_holds.description": "Tap-hold מעניק למקש שני תפקידים: בהקשה הוא מקליד דבר אחד, ובהחזקה הוא פועל כמקש אחר. לדוגמה, Caps Lock יכול להקליד Enter בהקשה ולשמש כמקש צירוף בהחזקה. לאחר ההפעלה, בחרו את המקשים בתפריט Tap-Holds, שיכול גם לייבא את המקשים ש-Ergopti ממליצה עליהם.",
+	"onboarding.page.tap_holds.menu_note": "במערכת זו מפעילים Tap-Holds מתפריט Tap-Holds, שבו גם בוחרים את המקשים, כך שאין כאן מה להפעיל.",
 	"onboarding.warning_label": "אזהרה",
 	"onboarding.welcome.heading": "שפה",
 	"onboarding.welcome.title": "ErgoptiPlus — התקנה",

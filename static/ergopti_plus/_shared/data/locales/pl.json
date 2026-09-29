@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "Predykcja AI podpowiada zakończenie zdania podczas pisania. Modele pobiera się później z menu Sztuczna inteligencja; teraz nic nie jest pobierane.",
 	"onboarding.page.shortcuts.description": "Skróty klawiszowe uruchamiające akcje Ergopti: zmiana wielkości liter zaznaczenia, otaczanie go, zrzuty ekranu, przełączanie okien i nie tylko. Poniższa lista zawiera skróty zalecane przez Ergopti.",
 	"onboarding.page.tap_holds.description": "Tap-hold nadaje klawiszowi dwie role: po stuknięciu wpisuje jedno, a przytrzymany działa jak inny klawisz. Na przykład Caps Lock może po stuknięciu wpisać Enter, a przytrzymany działać jako modyfikator. Po włączeniu wybierz klawisze w menu Dotknięcie-Przytrzymanie, które może też zaimportować klawisze zalecane przez Ergopti.",
+	"onboarding.page.tap_holds.menu_note": "W tym systemie dotknięcie-przytrzymanie włącza się w menu Dotknięcie-Przytrzymanie, w którym wybiera się też klawisze, więc nie ma tu nic do włączenia.",
 	"onboarding.warning_label": "Uwaga",
 	"onboarding.welcome.heading": "Język",
 	"onboarding.welcome.title": "ErgoptiPlus — Konfiguracja",

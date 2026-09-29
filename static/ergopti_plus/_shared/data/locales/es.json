@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "La predicción por IA sugiere el final de su frase mientras escribe. Los modelos se descargan más tarde desde el menú Inteligencia Artificial; ahora no se descarga nada.",
 	"onboarding.page.shortcuts.description": "Atajos de teclado que ejecutan acciones de Ergopti: cambiar las mayúsculas de la selección, rodearla, capturas de pantalla, cambiar de ventana y más. La lista de abajo contiene los atajos que Ergopti recomienda.",
 	"onboarding.page.tap_holds.description": "Un tap-hold da dos funciones a una tecla: pulsada, produce una cosa; mantenida, actúa como otra tecla. Por ejemplo, Bloq Mayús puede escribir Intro al pulsarla y servir de modificador al mantenerla. Una vez activados, elija las teclas en el menú Tap-Holds, que también puede importar las teclas que recomienda Ergopti.",
+	"onboarding.page.tap_holds.menu_note": "En este sistema, los tap-holds se activan desde el menú Tap-Holds, donde también se eligen las teclas, así que aquí no hay nada que activar.",
 	"onboarding.warning_label": "Atención",
 	"onboarding.welcome.heading": "Idioma",
 	"onboarding.welcome.title": "ErgoptiPlus — Configuración",

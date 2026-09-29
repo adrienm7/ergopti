@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "AI prediction suggests the end of your sentence as you type. Models are downloaded later from the Artificial Intelligence menu; nothing is downloaded now.",
 	"onboarding.page.shortcuts.description": "Keyboard shortcuts that run Ergopti actions: changing the case of the selection, wrapping it, screenshots, switching windows and more. The list below holds the shortcuts Ergopti recommends.",
 	"onboarding.page.tap_holds.description": "A tap-hold gives a key two roles: tapped, it types one thing; held, it acts as another key. For example, Caps Lock can type Enter when tapped and act as a modifier when held. Once enabled, choose the keys in the Tap-Holds menu, which can also import the keys Ergopti recommends.",
+	"onboarding.page.tap_holds.menu_note": "On this system, tap-holds are switched on from the Tap-Holds menu, where you also choose the keys, so there is nothing to enable here.",
 	"onboarding.warning_label": "Warning",
 	"onboarding.welcome.heading": "Language",
 	"onboarding.welcome.title": "ErgoptiPlus — Setup",

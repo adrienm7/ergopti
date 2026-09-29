@@ -1799,6 +1799,7 @@
 	"onboarding.page.llm.description": "A previsão por IA sugere o fim da sua frase enquanto escreve. Os modelos são transferidos mais tarde a partir do menu Inteligência Artificial; nada é transferido agora.",
 	"onboarding.page.shortcuts.description": "Atalhos de teclado que executam ações do Ergopti: alterar maiúsculas e minúsculas da seleção, envolvê-la, capturas de ecrã, mudar de janela e mais. A lista abaixo contém os atalhos que o Ergopti recomenda.",
 	"onboarding.page.tap_holds.description": "Um tap-hold dá duas funções a uma tecla: premida, produz uma coisa; mantida, age como outra tecla. Por exemplo, Caps Lock pode escrever Enter quando premida e servir de modificador quando mantida. Depois de ativados, escolha as teclas no menu Tap-Holds, que também pode importar as teclas que o Ergopti recomenda.",
+	"onboarding.page.tap_holds.menu_note": "Neste sistema, os tap-holds são ativados no menu Tap-Holds, onde também escolhe as teclas, por isso não há nada a ativar aqui.",
 	"onboarding.warning_label": "Atenção",
 	"onboarding.welcome.heading": "Idioma",
 	"onboarding.welcome.title": "ErgoptiPlus — Configuração",
