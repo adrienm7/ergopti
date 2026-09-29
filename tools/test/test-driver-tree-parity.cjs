@@ -208,7 +208,12 @@ const BASELINE_SHARED = 34;
 //   55 → 56 — ui/update_check, the host of the shared update-check window,
 //   landed on macOS first; the Linux and Windows hosts made it a shared path
 //   (BASELINE_SHARED 34).
-const BASELINE_UNION = 56;
+//   56 → 57 on 2026-09-29 — ui/permission_dialog, macOS only. It walks the
+//   user through a macOS privacy grant (System Settings > Privacy & Security,
+//   the TCC entry of the embedded runtime), which neither Windows nor Linux
+//   has: a counterpart folder there would host nothing. The geometry gate
+//   records the same exemption for Windows.
+const BASELINE_UNION = 57;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
