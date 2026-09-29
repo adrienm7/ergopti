@@ -52,6 +52,12 @@ local function with_dialog(body)
 				return { width = 560, height = 400 }
 			end,
 			get_centered_frame = function(w, height) return { x = 440, y = 250, w = w, h = height } end,
+			-- The shared present helper: raises and focuses, never sets a level.
+			force_focus = function(wv, is_new)
+				h.focuses = (h.focuses or 0) + 1
+				h.focus_is_new = is_new
+				return wv ~= nil
+			end,
 			show_webview = function(opts)
 				if h.factory_error then error(h.factory_error) end
 				local wv = { opts = opts, raised = 0, deleted = false }
@@ -341,6 +347,74 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 		end)
 	end)
 
+	-- Tap-holds stayed off until the remap guardian was allowed in the
+	-- background, and nothing said where: the same dialog now has those steps.
+	helpers.it("shows the Login Items steps as an ordinary focused window (guardian-approval-steps)", function()
+		with_dialog(function(h)
+			local opened = 0
+			helpers.assert_eq(h.dialog.show({
+				kind = "login_items", open_settings = function() opened = opened + 1; return true end,
+			}), true, "the Login Items kind quotes no path")
+			helpers.assert_eq(#h.windows, 1)
+			local opts = h.windows[1].opts
+			helpers.assert_true(opts.focus ~= false, "a trusted process presents it focused (ui-focus-not-topmost)")
+			helpers.assert_nil(opts.chrome, "only the Accessibility dialog floats above other apps")
+			helpers.assert_eq(opts.title, h.fr["permission_dialog.window_title"])
+			local html = opts.html_string
+			helpers.assert_contains(html, "<h1>Autoriser ErgoptiPlus en arrière-plan</h1>")
+			helpers.assert_contains(html, "Cliquez sur « Ouvrir les Réglages » : Réglages Système s’ouvre sur "
+				.. "Général &gt; Ouverture et extensions", "step 1 names the pane and the button that opens it")
+			helpers.assert_contains(html, "« Autoriser en arrière-plan »", "step 2 names the list macOS shows")
+			helpers.assert_contains(html, "Activez l’interrupteur à côté d’ErgoptiPlus.")
+			local _, items = html:gsub("<li>", "")
+			helpers.assert_eq(items, 3, "three numbered steps")
+			helpers.assert_true(html:find("<code", 1, true) == nil, "no path to paste in Login Items")
+			helpers.assert_true(html:find("Hammerspoon", 1, true) == nil,
+				"macOS lists the guardian under the app's name")
+			h.click("open_settings")
+			helpers.assert_eq(opened, 1, "Open Settings runs the Login Items opener")
+		end)
+	end)
+
+	helpers.it("raises an open Login Items dialog through the focus helper", function()
+		with_dialog(function(h)
+			local spec = { kind = "login_items", open_settings = function() return true end }
+			h.dialog.show(spec)
+			h.dialog.show(spec)
+			helpers.assert_eq(#h.windows, 1, "one owner, one window")
+			helpers.assert_eq(h.focuses, 1, "presented again like any window")
+			helpers.assert_eq(h.focus_is_new, false)
+			helpers.assert_eq(h.windows[1].raised, 0, "the floating raise is the Accessibility one only")
+		end)
+	end)
+
+	helpers.it("tells its owner once, whoever closes the dialog", function()
+		with_dialog(function(h)
+			local closes = 0
+			local function show()
+				return h.dialog.show({
+					kind = "login_items",
+					open_settings = function() return true end,
+					on_closed = function() closes = closes + 1 end,
+				})
+			end
+			show()
+			h.click("later")
+			helpers.assert_eq(closes, 1, "Later")
+			show()
+			h.windows[#h.windows]:delete()
+			helpers.assert_eq(closes, 2, "the close button")
+			show()
+			helpers.assert_eq(h.dialog.close("login_items"), true)
+			helpers.assert_eq(closes, 3, "the owner's own close")
+			show()
+			h.dialog.guide_accessibility(h.permission)
+			helpers.assert_eq(closes, 4, "another permission taking the dialog")
+			helpers.assert_eq(h.dialog.close("accessibility"), true)
+			helpers.assert_eq(closes, 4, "each close is reported once")
+		end)
+	end)
+
 	helpers.it("reads right to left in Hebrew and Arabic", function()
 		for _, code in ipairs({ "he", "ar" }) do
 			with_dialog(function(h)
@@ -356,6 +430,9 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 				local lead = title:byte(1)
 				helpers.assert_true(lead >= 0xD6 and lead <= 0xDB,
 					"the " .. code .. " title must open with a right-to-left letter for dir=auto")
+				local login_lead = h.dialog.content("login_items").title:byte(1)
+				helpers.assert_true(login_lead >= 0xD6 and login_lead <= 0xDB,
+					"the " .. code .. " Login Items title must open with a right-to-left letter too")
 				helpers.assert_true(html:find("80px;padding:0 0 0", 1, true) == nil
 					and html:find("margin-inline-start:80px", 1, true) ~= nil,
 					"a left margin would keep the steps on the left of a right-to-left page")
