@@ -152,6 +152,20 @@ the menu. A new reset or clear row takes one of the two keys, never a per-menu
 label; `test-menu-reset-terminology.cjs` holds the manifest rows, the rows
 drivers build by hand and the retired keys.
 
+### project-a-composite-scope-composes-revertible-owners
+
+The global restore/clear never writes category keys itself. On the Lua
+drivers `config_scope_composition` runs each category's own scope owner in
+the manifest's `[scopes.global]` order and reverts the committed ones, newest
+first, when a later one refuses; a category with no registered owner is
+skipped and reported. An owner joins by exposing apply/revert/release/pending/
+retry_restore: build it on `config_scope_transaction` (its `revert()` puts
+the runtime snapshot back, then each published file while it still holds our
+bytes) and wrap it with `config_scope_participant.synchronous`, then register
+it in `linux/infra/global_scope.lua` or the macOS `apply_global_scope` owners.
+A scope whose manifest declares a `preset` owns that file through the
+transaction's `presets` port; rows under its prefixes never reach config.toml.
+
 ### project-tray-root-is-the-manifest-top-level
 
 Each of the three drivers builds its tray root with one loop over the manifest
