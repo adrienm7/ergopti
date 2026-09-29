@@ -39,11 +39,15 @@
 const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
-const { shared, sharedRel } = require('../lib/paths.cjs');
+const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
 const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
 
 const MANIFEST_PATH = shared('modules', 'features', 'manifest.toml');
 const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
+// The Ergopti layout extension every driver ships and counts as installed. Its
+// manifest binds the Ergopti-only hotstring files (SFB reduction, rolls, the
+// magic key's repeat corrections) to their historical categories and sections.
+const ERGOPTI_EXTENSION_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti');
 const LOCALE_DIR = shared('data', 'locales');
 const LOCALE_NAMES_PATH = shared('data', 'locale_names.json');
 const PAGE_OUTPUT = shared('ui', '_generated', 'onboarding_catalogue.js');
@@ -504,7 +508,14 @@ function loadHotstringLanguages() {
 	const root = index.menu && index.menu.categories_order;
 	if (!Array.isArray(root) || root.length === 0)
 		throw new Error('_index.toml needs [menu] categories_order');
-	const languages = [{ id: null, locale: null, files: root.map((stem) => ({ stem, dir: '' })) }];
+	const neutral = root.map((stem) => ({ stem, dir: '' }));
+	// A whole file bound to its own category is still that language-neutral
+	// category, read from the extension instead of the bundled folder.
+	for (const [stem, binding] of Object.entries(loadExtensionBindings())) {
+		if (binding.sections === undefined && binding.category === stem)
+			neutral.push({ stem, dir: '', extension: true });
+	}
+	const languages = [{ id: null, locale: null, files: neutral }];
 	const packs = index.languages || { order: [] };
 	for (const id of packs.order) {
 		const pack = packs[id];
@@ -525,6 +536,52 @@ function loadHotstringLanguages() {
 }
 
 /**
+ * The hotstring bindings of the shipped Ergopti extension, keyed by file stem.
+ * @returns {object} stem → { category, sections? }.
+ */
+function loadExtensionBindings() {
+	const text = fs.readFileSync(path.join(ERGOPTI_EXTENSION_DIR, 'manifest.toml'), 'utf8');
+	const extension = TOML.parse(text).extension;
+	const bindings = (isPlainObject(extension) && extension.hotstring_bindings) || {};
+	for (const [stem, binding] of Object.entries(bindings)) {
+		if (
+			!isPlainObject(binding) ||
+			typeof binding.category !== 'string' ||
+			(binding.sections !== undefined && !Array.isArray(binding.sections))
+		) {
+			throw new Error(
+				`the Ergopti extension binding ${stem} needs a category and optional sections`
+			);
+		}
+	}
+	return bindings;
+}
+
+/**
+ * Reads one hotstring file's _meta, from the bundled folder or the extension.
+ * @param {string} relative Path under the bundled hotstrings folder.
+ * @param {boolean} extension True for a file the Ergopti extension carries.
+ * @returns {{meta: object, origin: string}} Its _meta and a label origin.
+ */
+function readHotstringMeta(relative, extension) {
+	const file = extension
+		? path.join(ERGOPTI_EXTENSION_DIR, 'hotstrings', relative)
+		: path.join(HOTSTRINGS_DIR, relative);
+	const meta = TOML.parse(fs.readFileSync(file, 'utf8'))._meta;
+	if (
+		!isPlainObject(meta) ||
+		!Array.isArray(meta.sections_order) ||
+		!isPlainObject(meta.sections)
+	) {
+		throw new Error(`${relative} needs _meta.sections_order and _meta.sections`);
+	}
+	return {
+		meta,
+		origin: extension ? `layouts/registry/ergopti/hotstrings/${relative}` : `hotstrings/${relative}`
+	};
+}
+
+/**
  * The hotstring checklist: language → file → section, each file gated by its
  * category switch and each section by its own manifest path.
  * @returns {object[]} Language groups.
@@ -538,6 +595,15 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 	const localeNames = JSON.parse(fs.readFileSync(LOCALE_NAMES_PATH, 'utf8')).locales;
 	const flatten = (value) => value.split('_').join('');
 	const manifestGroups = manifest.sections.hotstrings.subsections;
+	// A section a category keeps in its order but whose rules the Ergopti
+	// extension carries (repeat_corrections of magickey) takes its description
+	// from the bound file.
+	const boundSections = new Map();
+	for (const [stem, binding] of Object.entries(loadExtensionBindings())) {
+		for (const section of binding.sections || []) {
+			boundSections.set(`${binding.category}.${section}`, readHotstringMeta(`${stem}.toml`, true));
+		}
+	}
 	const groups = [];
 	for (const language of loadHotstringLanguages()) {
 		const languageGroup = { select_all: true, groups: [] };
@@ -557,15 +623,7 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 			if (!group) throw new Error(`hotstring file ${stem} has no manifest section`);
 			const relative =
 				language.id === null ? `${file.stem}.toml` : `${language.id}/${file.stem}.toml`;
-			const source = TOML.parse(fs.readFileSync(path.join(HOTSTRINGS_DIR, relative), 'utf8'));
-			const meta = source._meta;
-			if (
-				!isPlainObject(meta) ||
-				!Array.isArray(meta.sections_order) ||
-				!isPlainObject(meta.sections)
-			) {
-				throw new Error(`${relative} needs _meta.sections_order and _meta.sections`);
-			}
+			const { meta, origin } = readHotstringMeta(relative, file.extension === true);
 			const fill = (pattern, section) =>
 				pattern
 					.replace('{group}', group)
@@ -578,12 +636,15 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 				path: gatePath,
 				value: true,
 				default: false,
-				label: [labels.localizedText(meta.description, `hotstrings/${relative}`)],
+				label: [labels.localizedText(meta.description, origin)],
 				items: []
 			};
 			for (const section of meta.sections_order) {
 				if (section === SECTION_SEPARATOR) continue;
-				if (!Object.hasOwn(meta.sections, section))
+				let described = { meta, origin };
+				if (!Object.hasOwn(meta.sections, section) && boundSections.has(`${stem}.${section}`))
+					described = boundSections.get(`${stem}.${section}`);
+				if (!Object.hasOwn(described.meta.sections, section))
 					throw new Error(`${relative} has no description for ${section}`);
 				const sectionPath = fill(sectionPattern, section);
 				const values = projection.project(sectionPath, platform);
@@ -596,7 +657,9 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 					value: true,
 					default: false,
 					recommended: canonical.recommended === true,
-					label: [labels.localizedText(meta.sections[section], `hotstrings/${relative}#${section}`)]
+					label: [
+						labels.localizedText(described.meta.sections[section], `${described.origin}#${section}`)
+					]
 				});
 			}
 			languageGroup.groups.push(fileGroup);

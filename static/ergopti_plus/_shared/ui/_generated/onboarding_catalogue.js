@@ -184,167 +184,6 @@
 				"uk": "Додати пробіл до і після символів перекатів та після клавіші [où]",
 				"zh": "在连击产生的符号前后添加空格，以及在 [où] 键后添加空格"
 			},
-			"hotstrings/sfbsreduction.toml": {
-				"ar": "تقليل SFBs",
-				"cs": "Redukce SFBs",
-				"da": "SFB-reduktion",
-				"de": "SFB-Reduktion",
-				"en": "SFB reduction",
-				"es": "Reducción de SFBs",
-				"fr": "Réduction des SFBs",
-				"he": "הפחתת SFBs",
-				"hi": "SFB कमी",
-				"it": "Riduzione SFBs",
-				"ja": "SFB削減",
-				"ko": "SFB 감소",
-				"nl": "SFB-reductie",
-				"no": "SFB-reduksjon",
-				"pl": "Redukcja SFBs",
-				"pt": "Redução de SFBs",
-				"ru": "Снижение SFBs",
-				"sv": "SFB-reduktion",
-				"tr": "SFB azaltma",
-				"uk": "Зменшення SFBs",
-				"zh": "SFB 减少"
-			},
-			"hotstrings/sfbsreduction.toml#comma": {
-				"ar": "فاصلة + صامت يصحح SFBs كثيرة: ,t = pt، ,d = ds، ,p = xp، …",
-				"cs": "Čárka + Souhláska opravuje mnoho SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"da": "Komma + Konsonant retter mange SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"de": "Komma + Konsonant korrigiert viele SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"en": "Comma + Consonant fixes many SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"es": "Coma + Consonante corrige muchos SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"fr": "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …",
-				"he": "פסיק + עיצור מתקן SFBs רבים: ,t = pt, ,d = ds, ,p = xp, …",
-				"hi": "अल्पविराम + व्यंजन कई SFBs ठीक करता है: ,t = pt, ,d = ds, ,p = xp, …",
-				"it": "Virgola + Consonante corregge molti SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"ja": "カンマ + 子音が多くのSFBを修正：,t = pt, ,d = ds, ,p = xp, …",
-				"ko": "쉼표 + 자음이 많은 SFB를 수정: ,t = pt, ,d = ds, ,p = xp, …",
-				"nl": "Komma + Medeklinker corrigeert veel SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"no": "Komma + Konsonant retter mange SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"pl": "Przecinek + Spółgłoska poprawia wiele SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"pt": "Vírgula + Consoante corrige muitos SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"ru": "Запятая + Согласная исправляет многие SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"sv": "Komma + Konsonant rättar många SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"tr": "Virgül + Ünsüz çok sayıda SFBs düzeltir: ,t = pt, ,d = ds, ,p = xp, …",
-				"uk": "Кома + Приголосна виправляє багато SFBs: ,t = pt, ,d = ds, ,p = xp, …",
-				"zh": "逗号 + 辅音修正大量 SFB：,t = pt，,d = ds，,p = xp，…"
-			},
-			"hotstrings/sfbsreduction.toml#e_circ": {
-				"ar": "Ê + مفتاح اليد اليسرى يصحح 4 SFBs: êé = oe, éê = eo, ê, = u, وê. = u.",
-				"cs": "Ê + klávesa levé ruky opravuje 4 SFBs: êé = oe, éê = eo, ê, = u, a ê. = u.",
-				"da": "Ê + venstrehåndstast retter 4 SFBs: êé = oe, éê = eo, ê, = u, og ê. = u.",
-				"de": "Ê + Linke-Hand-Taste korrigiert 4 SFBs: êé = oe, éê = eo, ê, = u, und ê. = u.",
-				"en": "Ê + left-hand key fixes 4 SFBs: êé = oe, éê = eo, ê, = u, and ê. = u.",
-				"es": "Ê + tecla de la mano izquierda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, y ê. = u.",
-				"fr": "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.",
-				"he": "Ê + מקש יד שמאל מתקן 4 SFBs: êé = oe, éê = eo, ê, = u, ו-ê. = u.",
-				"hi": "Ê + बाएं हाथ की कुंजी 4 SFBs ठीक करती है: êé = oe, éê = eo, ê, = u, और ê. = u.",
-				"it": "Ê + tasto della mano sinistra corregge 4 SFBs: êé = oe, éê = eo, ê, = u, e ê. = u.",
-				"ja": "Ê + 左手キーが4つのSFBを修正：êé = oe, éê = eo, ê, = u, ê. = u",
-				"ko": "Ê + 왼손 키가 4개의 SFB를 수정: êé = oe, éê = eo, ê, = u, ê. = u",
-				"nl": "Ê + linkerhandtoets corrigeert 4 SFBs: êé = oe, éê = eo, ê, = u, en ê. = u.",
-				"no": "Ê + venstrehandstast retter 4 SFBs: êé = oe, éê = eo, ê, = u, og ê. = u.",
-				"pl": "Ê + klawisz lewej ręki poprawia 4 SFBs: êé = oe, éê = eo, ê, = u, i ê. = u.",
-				"pt": "Ê + tecla da mão esquerda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, e ê. = u.",
-				"ru": "Ê + клавиша левой руки исправляет 4 SFBs: êé = oe, éê = eo, ê, = u, и ê. = u.",
-				"sv": "Ê + vänsterhandstangent rättar 4 SFBs: êé = oe, éê = eo, ê, = u, och ê. = u.",
-				"tr": "Ê + sol el tuşu 4 SFBs düzeltir: êé = oe, éê = eo, ê, = u, ve ê. = u.",
-				"uk": "Ê + клавіша лівої руки виправляє 4 SFBs: êé = oe, éê = eo, ê, = u, та ê. = u.",
-				"zh": "Ê + 左手键修正 4 个 SFB：êé = oe，éê = eo，ê, = u，ê. = u"
-			},
-			"hotstrings/sfbsreduction.toml#e_grave": {
-				"ar": "È + مفتاح Y يصحح 2 SFBs: èy = aî و yè = â",
-				"cs": "È + klávesa Y opravuje 2 SFBs: èy = aî a yè = â",
-				"da": "È + Y-tast retter 2 SFBs: èy = aî og yè = â",
-				"de": "È + Y-Taste korrigiert 2 SFBs: èy = aî und yè = â",
-				"en": "È + Y key fixes 2 SFBs: èy = aî and yè = â",
-				"es": "È + tecla Y corrige 2 SFBs: èy = aî y yè = â",
-				"fr": "È + touche Y corrige 2 SFBs : èy = aî et yè = â",
-				"he": "È + מקש Y מתקן 2 SFBs: èy = aî ו-yè = â",
-				"hi": "È + Y कुंजी 2 SFBs ठीक करती है: èy = aî और yè = â",
-				"it": "È + tasto Y corregge 2 SFBs: èy = aî e yè = â",
-				"ja": "È + Yキーが2つのSFBを修正：èy = aî、yè = â",
-				"ko": "È + Y키가 2개의 SFB를 수정: èy = aî 및 yè = â",
-				"nl": "È + Y-toets corrigeert 2 SFBs: èy = aî en yè = â",
-				"no": "È + Y-tast retter 2 SFBs: èy = aî og yè = â",
-				"pl": "È + klawisz Y poprawia 2 SFBs: èy = aî i yè = â",
-				"pt": "È + tecla Y corrige 2 SFBs: èy = aî e yè = â",
-				"ru": "È + клавиша Y исправляет 2 SFBs: èy = aî и yè = â",
-				"sv": "È + Y-tangent rättar 2 SFBs: èy = aî och yè = â",
-				"tr": "È + Y tuşu 2 SFBs düzeltir: èy = aî ve yè = â",
-				"uk": "È + клавіша Y виправляє 2 SFBs: èy = aî та yè = â",
-				"zh": "È + Y 键修正 2 个 SFB：èy = aî 和 yè = â"
-			},
-			"hotstrings/sfbsreduction.toml#bu": {
-				"ar": "À + ★/U يصحح 2 SFBs: à★ = bu و àu = ub",
-				"cs": "À + ★/U opravuje 2 SFBs: à★ = bu a àu = ub",
-				"da": "À + ★/U retter 2 SFBs: à★ = bu og àu = ub",
-				"de": "À + ★/U korrigiert 2 SFBs: à★ = bu und àu = ub",
-				"en": "À + ★/U fixes 2 SFBs: à★ = bu and àu = ub",
-				"es": "À + ★/U corrige 2 SFBs: à★ = bu y àu = ub",
-				"fr": "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub",
-				"he": "À + ★/U מתקן 2 SFBs: à★ = bu ו-àu = ub",
-				"hi": "À + ★/U 2 SFBs ठीक करता है: à★ = bu और àu = ub",
-				"it": "À + ★/U corregge 2 SFBs: à★ = bu e àu = ub",
-				"ja": "À + ★/U が2つのSFBを修正：à★ = bu、àu = ub",
-				"ko": "À + ★/U가 2개의 SFB를 수정: à★ = bu 및 àu = ub",
-				"nl": "À + ★/U corrigeert 2 SFBs: à★ = bu en àu = ub",
-				"no": "À + ★/U retter 2 SFBs: à★ = bu og àu = ub",
-				"pl": "À + ★/U poprawia 2 SFBs: à★ = bu i àu = ub",
-				"pt": "À + ★/U corrige 2 SFBs: à★ = bu e àu = ub",
-				"ru": "À + ★/U исправляет 2 SFBs: à★ = bu и àu = ub",
-				"sv": "À + ★/U rättar 2 SFBs: à★ = bu och àu = ub",
-				"tr": "À + ★/U 2 SFBs düzeltir: à★ = bu ve àu = ub",
-				"uk": "À + ★/U виправляє 2 SFBs: à★ = bu та àu = ub",
-				"zh": "À + ★/U 修正 2 个 SFB：à★ = bu 和 àu = ub"
-			},
-			"hotstrings/sfbsreduction.toml#i_e_acute": {
-				"ar": "À + É يصحح 2 SFBs: éà = ié و àé = éi",
-				"cs": "À + É opravuje 2 SFBs: éà = ié a àé = éi",
-				"da": "À + É retter 2 SFBs: éà = ié og àé = éi",
-				"de": "À + É korrigiert 2 SFBs: éà = ié und àé = éi",
-				"en": "À + É fixes 2 SFBs: éà = ié and àé = éi",
-				"es": "À + É corrige 2 SFBs: éà = ié y àé = éi",
-				"fr": "À + É corrige 2 SFBs : éà = ié et àé = éi",
-				"he": "À + É מתקן 2 SFBs: éà = ié ו-àé = éi",
-				"hi": "À + É 2 SFBs ठीक करता है: éà = ié और àé = éi",
-				"it": "À + É corregge 2 SFBs: éà = ié e àé = éi",
-				"ja": "À + É が2つのSFBを修正：éà = ié、àé = éi",
-				"ko": "À + É가 2개의 SFB를 수정: éà = ié 및 àé = éi",
-				"nl": "À + É corrigeert 2 SFBs: éà = ié en àé = éi",
-				"no": "À + É retter 2 SFBs: éà = ié og àé = éi",
-				"pl": "À + É poprawia 2 SFBs: éà = ié i àé = éi",
-				"pt": "À + É corrige 2 SFBs: éà = ié e àé = éi",
-				"ru": "À + É исправляет 2 SFBs: éà = ié и àé = éi",
-				"sv": "À + É rättar 2 SFBs: éà = ié och àé = éi",
-				"tr": "À + É 2 SFBs düzeltir: éà = ié ve àé = éi",
-				"uk": "À + É виправляє 2 SFBs: éà = ié та àé = éi",
-				"zh": "À + É 修正 2 个 SFB：éà = ié 和 àé = éi"
-			},
-			"hotstrings/rolls.toml": {
-				"ar": "تداول",
-				"cs": "Rolování",
-				"da": "Rolls",
-				"de": "Läufe",
-				"en": "Rolls",
-				"es": "Rodamientos",
-				"fr": "Roulements",
-				"he": "גלגולים",
-				"hi": "रोल्स",
-				"it": "Rollate",
-				"ja": "ロール",
-				"ko": "롤",
-				"nl": "Rolls",
-				"no": "Rolls",
-				"pl": "Rolady",
-				"pt": "Rolagens",
-				"ru": "Перекаты",
-				"sv": "Rolls",
-				"tr": "Yuvarlamalar",
-				"uk": "Перекати",
-				"zh": "连击"
-			},
 			"hotstrings/autocorrection.toml": {
 				"ar": "تصحيح تلقائي",
 				"cs": "Automatická oprava",
@@ -437,7 +276,7 @@
 				"uk": "Перетворити клавішу на клавішу ★",
 				"zh": "将一个键转换为 ★ 键"
 			},
-			"hotstrings/magickey.toml#repeat_corrections": {
+			"layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections": {
 				"ar": "تصحيح الإيجابيات الكاذبة لمفتاح ★ التكرار (ê→u)",
 				"cs": "Opravy falešných pozitiv opakované klávesy ★ (ê→u)",
 				"da": "★ gentast falsk positiv rettelser (ê→u)",
@@ -505,6 +344,167 @@
 				"tr": "Typst sembol metin genişletme: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …",
 				"uk": "Розширення тексту символами Typst: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …",
 				"zh": "Typst 符号文本扩展：$eq.not$ = ≠，$PP$ = ℙ，$integral$ = ∫ …"
+			},
+			"layouts/registry/ergopti/hotstrings/sfbsreduction.toml": {
+				"ar": "تقليل SFBs",
+				"cs": "Redukce SFBs",
+				"da": "SFB-reduktion",
+				"de": "SFB-Reduktion",
+				"en": "SFB reduction",
+				"es": "Reducción de SFBs",
+				"fr": "Réduction des SFBs",
+				"he": "הפחתת SFBs",
+				"hi": "SFB कमी",
+				"it": "Riduzione SFBs",
+				"ja": "SFB削減",
+				"ko": "SFB 감소",
+				"nl": "SFB-reductie",
+				"no": "SFB-reduksjon",
+				"pl": "Redukcja SFBs",
+				"pt": "Redução de SFBs",
+				"ru": "Снижение SFBs",
+				"sv": "SFB-reduktion",
+				"tr": "SFB azaltma",
+				"uk": "Зменшення SFBs",
+				"zh": "SFB 减少"
+			},
+			"layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma": {
+				"ar": "فاصلة + صامت يصحح SFBs كثيرة: ,t = pt، ,d = ds، ,p = xp، …",
+				"cs": "Čárka + Souhláska opravuje mnoho SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"da": "Komma + Konsonant retter mange SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"de": "Komma + Konsonant korrigiert viele SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"en": "Comma + Consonant fixes many SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"es": "Coma + Consonante corrige muchos SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"fr": "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …",
+				"he": "פסיק + עיצור מתקן SFBs רבים: ,t = pt, ,d = ds, ,p = xp, …",
+				"hi": "अल्पविराम + व्यंजन कई SFBs ठीक करता है: ,t = pt, ,d = ds, ,p = xp, …",
+				"it": "Virgola + Consonante corregge molti SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"ja": "カンマ + 子音が多くのSFBを修正：,t = pt, ,d = ds, ,p = xp, …",
+				"ko": "쉼표 + 자음이 많은 SFB를 수정: ,t = pt, ,d = ds, ,p = xp, …",
+				"nl": "Komma + Medeklinker corrigeert veel SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"no": "Komma + Konsonant retter mange SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"pl": "Przecinek + Spółgłoska poprawia wiele SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"pt": "Vírgula + Consoante corrige muitos SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"ru": "Запятая + Согласная исправляет многие SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"sv": "Komma + Konsonant rättar många SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"tr": "Virgül + Ünsüz çok sayıda SFBs düzeltir: ,t = pt, ,d = ds, ,p = xp, …",
+				"uk": "Кома + Приголосна виправляє багато SFBs: ,t = pt, ,d = ds, ,p = xp, …",
+				"zh": "逗号 + 辅音修正大量 SFB：,t = pt，,d = ds，,p = xp，…"
+			},
+			"layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ": {
+				"ar": "Ê + مفتاح اليد اليسرى يصحح 4 SFBs: êé = oe, éê = eo, ê, = u, وê. = u.",
+				"cs": "Ê + klávesa levé ruky opravuje 4 SFBs: êé = oe, éê = eo, ê, = u, a ê. = u.",
+				"da": "Ê + venstrehåndstast retter 4 SFBs: êé = oe, éê = eo, ê, = u, og ê. = u.",
+				"de": "Ê + Linke-Hand-Taste korrigiert 4 SFBs: êé = oe, éê = eo, ê, = u, und ê. = u.",
+				"en": "Ê + left-hand key fixes 4 SFBs: êé = oe, éê = eo, ê, = u, and ê. = u.",
+				"es": "Ê + tecla de la mano izquierda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, y ê. = u.",
+				"fr": "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.",
+				"he": "Ê + מקש יד שמאל מתקן 4 SFBs: êé = oe, éê = eo, ê, = u, ו-ê. = u.",
+				"hi": "Ê + बाएं हाथ की कुंजी 4 SFBs ठीक करती है: êé = oe, éê = eo, ê, = u, और ê. = u.",
+				"it": "Ê + tasto della mano sinistra corregge 4 SFBs: êé = oe, éê = eo, ê, = u, e ê. = u.",
+				"ja": "Ê + 左手キーが4つのSFBを修正：êé = oe, éê = eo, ê, = u, ê. = u",
+				"ko": "Ê + 왼손 키가 4개의 SFB를 수정: êé = oe, éê = eo, ê, = u, ê. = u",
+				"nl": "Ê + linkerhandtoets corrigeert 4 SFBs: êé = oe, éê = eo, ê, = u, en ê. = u.",
+				"no": "Ê + venstrehandstast retter 4 SFBs: êé = oe, éê = eo, ê, = u, og ê. = u.",
+				"pl": "Ê + klawisz lewej ręki poprawia 4 SFBs: êé = oe, éê = eo, ê, = u, i ê. = u.",
+				"pt": "Ê + tecla da mão esquerda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, e ê. = u.",
+				"ru": "Ê + клавиша левой руки исправляет 4 SFBs: êé = oe, éê = eo, ê, = u, и ê. = u.",
+				"sv": "Ê + vänsterhandstangent rättar 4 SFBs: êé = oe, éê = eo, ê, = u, och ê. = u.",
+				"tr": "Ê + sol el tuşu 4 SFBs düzeltir: êé = oe, éê = eo, ê, = u, ve ê. = u.",
+				"uk": "Ê + клавіша лівої руки виправляє 4 SFBs: êé = oe, éê = eo, ê, = u, та ê. = u.",
+				"zh": "Ê + 左手键修正 4 个 SFB：êé = oe，éê = eo，ê, = u，ê. = u"
+			},
+			"layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave": {
+				"ar": "È + مفتاح Y يصحح 2 SFBs: èy = aî و yè = â",
+				"cs": "È + klávesa Y opravuje 2 SFBs: èy = aî a yè = â",
+				"da": "È + Y-tast retter 2 SFBs: èy = aî og yè = â",
+				"de": "È + Y-Taste korrigiert 2 SFBs: èy = aî und yè = â",
+				"en": "È + Y key fixes 2 SFBs: èy = aî and yè = â",
+				"es": "È + tecla Y corrige 2 SFBs: èy = aî y yè = â",
+				"fr": "È + touche Y corrige 2 SFBs : èy = aî et yè = â",
+				"he": "È + מקש Y מתקן 2 SFBs: èy = aî ו-yè = â",
+				"hi": "È + Y कुंजी 2 SFBs ठीक करती है: èy = aî और yè = â",
+				"it": "È + tasto Y corregge 2 SFBs: èy = aî e yè = â",
+				"ja": "È + Yキーが2つのSFBを修正：èy = aî、yè = â",
+				"ko": "È + Y키가 2개의 SFB를 수정: èy = aî 및 yè = â",
+				"nl": "È + Y-toets corrigeert 2 SFBs: èy = aî en yè = â",
+				"no": "È + Y-tast retter 2 SFBs: èy = aî og yè = â",
+				"pl": "È + klawisz Y poprawia 2 SFBs: èy = aî i yè = â",
+				"pt": "È + tecla Y corrige 2 SFBs: èy = aî e yè = â",
+				"ru": "È + клавиша Y исправляет 2 SFBs: èy = aî и yè = â",
+				"sv": "È + Y-tangent rättar 2 SFBs: èy = aî och yè = â",
+				"tr": "È + Y tuşu 2 SFBs düzeltir: èy = aî ve yè = â",
+				"uk": "È + клавіша Y виправляє 2 SFBs: èy = aî та yè = â",
+				"zh": "È + Y 键修正 2 个 SFB：èy = aî 和 yè = â"
+			},
+			"layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu": {
+				"ar": "À + ★/U يصحح 2 SFBs: à★ = bu و àu = ub",
+				"cs": "À + ★/U opravuje 2 SFBs: à★ = bu a àu = ub",
+				"da": "À + ★/U retter 2 SFBs: à★ = bu og àu = ub",
+				"de": "À + ★/U korrigiert 2 SFBs: à★ = bu und àu = ub",
+				"en": "À + ★/U fixes 2 SFBs: à★ = bu and àu = ub",
+				"es": "À + ★/U corrige 2 SFBs: à★ = bu y àu = ub",
+				"fr": "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub",
+				"he": "À + ★/U מתקן 2 SFBs: à★ = bu ו-àu = ub",
+				"hi": "À + ★/U 2 SFBs ठीक करता है: à★ = bu और àu = ub",
+				"it": "À + ★/U corregge 2 SFBs: à★ = bu e àu = ub",
+				"ja": "À + ★/U が2つのSFBを修正：à★ = bu、àu = ub",
+				"ko": "À + ★/U가 2개의 SFB를 수정: à★ = bu 및 àu = ub",
+				"nl": "À + ★/U corrigeert 2 SFBs: à★ = bu en àu = ub",
+				"no": "À + ★/U retter 2 SFBs: à★ = bu og àu = ub",
+				"pl": "À + ★/U poprawia 2 SFBs: à★ = bu i àu = ub",
+				"pt": "À + ★/U corrige 2 SFBs: à★ = bu e àu = ub",
+				"ru": "À + ★/U исправляет 2 SFBs: à★ = bu и àu = ub",
+				"sv": "À + ★/U rättar 2 SFBs: à★ = bu och àu = ub",
+				"tr": "À + ★/U 2 SFBs düzeltir: à★ = bu ve àu = ub",
+				"uk": "À + ★/U виправляє 2 SFBs: à★ = bu та àu = ub",
+				"zh": "À + ★/U 修正 2 个 SFB：à★ = bu 和 àu = ub"
+			},
+			"layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute": {
+				"ar": "À + É يصحح 2 SFBs: éà = ié و àé = éi",
+				"cs": "À + É opravuje 2 SFBs: éà = ié a àé = éi",
+				"da": "À + É retter 2 SFBs: éà = ié og àé = éi",
+				"de": "À + É korrigiert 2 SFBs: éà = ié und àé = éi",
+				"en": "À + É fixes 2 SFBs: éà = ié and àé = éi",
+				"es": "À + É corrige 2 SFBs: éà = ié y àé = éi",
+				"fr": "À + É corrige 2 SFBs : éà = ié et àé = éi",
+				"he": "À + É מתקן 2 SFBs: éà = ié ו-àé = éi",
+				"hi": "À + É 2 SFBs ठीक करता है: éà = ié और àé = éi",
+				"it": "À + É corregge 2 SFBs: éà = ié e àé = éi",
+				"ja": "À + É が2つのSFBを修正：éà = ié、àé = éi",
+				"ko": "À + É가 2개의 SFB를 수정: éà = ié 및 àé = éi",
+				"nl": "À + É corrigeert 2 SFBs: éà = ié en àé = éi",
+				"no": "À + É retter 2 SFBs: éà = ié og àé = éi",
+				"pl": "À + É poprawia 2 SFBs: éà = ié i àé = éi",
+				"pt": "À + É corrige 2 SFBs: éà = ié e àé = éi",
+				"ru": "À + É исправляет 2 SFBs: éà = ié и àé = éi",
+				"sv": "À + É rättar 2 SFBs: éà = ié och àé = éi",
+				"tr": "À + É 2 SFBs düzeltir: éà = ié ve àé = éi",
+				"uk": "À + É виправляє 2 SFBs: éà = ié та àé = éi",
+				"zh": "À + É 修正 2 个 SFB：éà = ié 和 àé = éi"
+			},
+			"layouts/registry/ergopti/hotstrings/rolls.toml": {
+				"ar": "تداول",
+				"cs": "Rolování",
+				"da": "Rolls",
+				"de": "Läufe",
+				"en": "Rolls",
+				"es": "Rodamientos",
+				"fr": "Roulements",
+				"he": "גלגולים",
+				"hi": "रोल्स",
+				"it": "Rollate",
+				"ja": "ロール",
+				"ko": "롤",
+				"nl": "Rolls",
+				"no": "Rolls",
+				"pl": "Rolady",
+				"pt": "Rolagens",
+				"ru": "Перекаты",
+				"sv": "Rolls",
+				"tr": "Yuvarlamalar",
+				"uk": "Перекати",
+				"zh": "连击"
 			},
 			"hotstrings/french/distancesreduction.toml": {
 				"ar": "تقليل المسافات",
@@ -1765,12 +1765,91 @@
 										]
 									},
 									{
+										"path": "category_enabled.autocorrection",
+										"value": true,
+										"default": false,
+										"label": [
+											{
+												"text_ref": "hotstrings/autocorrection.toml"
+											}
+										],
+										"items": [
+											{
+												"path": "hotstrings.autocorrection.caps.enabled",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/autocorrection.toml#caps"
+													}
+												]
+											}
+										]
+									},
+									{
+										"path": "category_enabled.magic_key",
+										"value": true,
+										"default": false,
+										"label": [
+											{
+												"text_ref": "hotstrings/magickey.toml"
+											}
+										],
+										"items": [
+											{
+												"path": "hotstrings.magic_key.replace.enabled",
+												"value": true,
+												"default": false,
+												"recommended": true,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#replace"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.magic_key.repeat_corrections.enabled",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.magic_key.text_expansion_symbols.enabled",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.magic_key.text_expansion_symbols_typst.enabled",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
+													}
+												]
+											}
+										]
+									},
+									{
 										"path": "category_enabled.sfbs_reduction",
 										"value": true,
 										"default": false,
 										"label": [
 											{
-												"text_ref": "hotstrings/sfbsreduction.toml"
+												"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml"
 											}
 										],
 										"items": [
@@ -1781,7 +1860,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#comma"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
 													}
 												]
 											},
@@ -1792,7 +1871,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#e_circ"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
 													}
 												]
 											},
@@ -1803,7 +1882,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#e_grave"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
 													}
 												]
 											},
@@ -1814,7 +1893,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#bu"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
 													}
 												]
 											},
@@ -1825,7 +1904,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#i_e_acute"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
 													}
 												]
 											}
@@ -1837,7 +1916,7 @@
 										"default": false,
 										"label": [
 											{
-												"text_ref": "hotstrings/rolls.toml"
+												"text_ref": "layouts/registry/ergopti/hotstrings/rolls.toml"
 											}
 										],
 										"items": [
@@ -2102,85 +2181,6 @@
 												"label": [
 													{
 														"text": "?+ ➜ <-"
-													}
-												]
-											}
-										]
-									},
-									{
-										"path": "category_enabled.autocorrection",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/autocorrection.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.autocorrection.caps.enabled",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/autocorrection.toml#caps"
-													}
-												]
-											}
-										]
-									},
-									{
-										"path": "category_enabled.magic_key",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/magickey.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.magic_key.replace.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#replace"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.magic_key.repeat_corrections.enabled",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#repeat_corrections"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.magic_key.text_expansion_symbols.enabled",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.magic_key.text_expansion_symbols_typst.enabled",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
 													}
 												]
 											}
@@ -3045,12 +3045,91 @@
 										]
 									},
 									{
+										"path": "hotstrings.groups.autocorrection",
+										"value": true,
+										"default": false,
+										"label": [
+											{
+												"text_ref": "hotstrings/autocorrection.toml"
+											}
+										],
+										"items": [
+											{
+												"path": "hotstrings.modules.autocorrection.caps",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/autocorrection.toml#caps"
+													}
+												]
+											}
+										]
+									},
+									{
+										"path": "hotstrings.groups.magickey",
+										"value": true,
+										"default": false,
+										"label": [
+											{
+												"text_ref": "hotstrings/magickey.toml"
+											}
+										],
+										"items": [
+											{
+												"path": "hotstrings.modules.magickey.replace",
+												"value": true,
+												"default": false,
+												"recommended": true,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#replace"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.modules.magickey.repeat_corrections",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.modules.magickey.text_expansion_symbols",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
+													}
+												]
+											}
+										]
+									},
+									{
 										"path": "hotstrings.groups.sfbsreduction",
 										"value": true,
 										"default": false,
 										"label": [
 											{
-												"text_ref": "hotstrings/sfbsreduction.toml"
+												"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml"
 											}
 										],
 										"items": [
@@ -3061,7 +3140,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#comma"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
 													}
 												]
 											},
@@ -3072,7 +3151,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#e_circ"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
 													}
 												]
 											},
@@ -3083,7 +3162,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#e_grave"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
 													}
 												]
 											},
@@ -3094,7 +3173,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#bu"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
 													}
 												]
 											},
@@ -3105,7 +3184,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#i_e_acute"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
 													}
 												]
 											}
@@ -3117,7 +3196,7 @@
 										"default": false,
 										"label": [
 											{
-												"text_ref": "hotstrings/rolls.toml"
+												"text_ref": "layouts/registry/ergopti/hotstrings/rolls.toml"
 											}
 										],
 										"items": [
@@ -3382,85 +3461,6 @@
 												"label": [
 													{
 														"text": "?+ ➜ <-"
-													}
-												]
-											}
-										]
-									},
-									{
-										"path": "hotstrings.groups.autocorrection",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/autocorrection.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.modules.autocorrection.caps",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/autocorrection.toml#caps"
-													}
-												]
-											}
-										]
-									},
-									{
-										"path": "hotstrings.groups.magickey",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/magickey.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.modules.magickey.replace",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#replace"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.magickey.repeat_corrections",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#repeat_corrections"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.magickey.text_expansion_symbols",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
 													}
 												]
 											}
@@ -3910,12 +3910,91 @@
 										]
 									},
 									{
+										"path": "hotstrings.groups.autocorrection",
+										"value": true,
+										"default": false,
+										"label": [
+											{
+												"text_ref": "hotstrings/autocorrection.toml"
+											}
+										],
+										"items": [
+											{
+												"path": "hotstrings.modules.autocorrection.caps",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/autocorrection.toml#caps"
+													}
+												]
+											}
+										]
+									},
+									{
+										"path": "hotstrings.groups.magickey",
+										"value": true,
+										"default": false,
+										"label": [
+											{
+												"text_ref": "hotstrings/magickey.toml"
+											}
+										],
+										"items": [
+											{
+												"path": "hotstrings.modules.magickey.replace",
+												"value": true,
+												"default": false,
+												"recommended": true,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#replace"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.modules.magickey.repeat_corrections",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.modules.magickey.text_expansion_symbols",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
+													}
+												]
+											},
+											{
+												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
+												"value": true,
+												"default": false,
+												"recommended": false,
+												"label": [
+													{
+														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
+													}
+												]
+											}
+										]
+									},
+									{
 										"path": "hotstrings.groups.sfbsreduction",
 										"value": true,
 										"default": false,
 										"label": [
 											{
-												"text_ref": "hotstrings/sfbsreduction.toml"
+												"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml"
 											}
 										],
 										"items": [
@@ -3926,7 +4005,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#comma"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
 													}
 												]
 											},
@@ -3937,7 +4016,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#e_circ"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
 													}
 												]
 											},
@@ -3948,7 +4027,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#e_grave"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
 													}
 												]
 											},
@@ -3959,7 +4038,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#bu"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
 													}
 												]
 											},
@@ -3970,7 +4049,7 @@
 												"recommended": false,
 												"label": [
 													{
-														"text_ref": "hotstrings/sfbsreduction.toml#i_e_acute"
+														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
 													}
 												]
 											}
@@ -3982,7 +4061,7 @@
 										"default": false,
 										"label": [
 											{
-												"text_ref": "hotstrings/rolls.toml"
+												"text_ref": "layouts/registry/ergopti/hotstrings/rolls.toml"
 											}
 										],
 										"items": [
@@ -4247,85 +4326,6 @@
 												"label": [
 													{
 														"text": "?+ ➜ <-"
-													}
-												]
-											}
-										]
-									},
-									{
-										"path": "hotstrings.groups.autocorrection",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/autocorrection.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.modules.autocorrection.caps",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/autocorrection.toml#caps"
-													}
-												]
-											}
-										]
-									},
-									{
-										"path": "hotstrings.groups.magickey",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/magickey.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.modules.magickey.replace",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#replace"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.magickey.repeat_corrections",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#repeat_corrections"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.magickey.text_expansion_symbols",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
 													}
 												]
 											}
