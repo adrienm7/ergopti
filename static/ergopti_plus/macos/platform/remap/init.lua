@@ -3656,7 +3656,8 @@ end
 --- @param mutate function Receives a detached candidate and returns a count.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
---- @return boolean accepted True only when candidate regeneration was accepted.
+--- @return boolean accepted True when candidate regeneration was accepted, or
+---   when the candidate persisted while « Ergopti uses Karabiner » is off.
 local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt)
 	if not require_state(label) then
 		invoke_public_callback(label, on_done, false, "not-initialized", 0)
@@ -3721,6 +3722,17 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		_bulk_settings_transaction = nil
 		finish_bulk_settings_callback(transaction, false, "candidate-persistence-failed")
 		return false
+	end
+
+	-- With « Ergopti uses Karabiner » off there is nothing to deploy and the
+	-- regeneration would be refused, turning a plain edit into a compensation
+	-- that can never settle and that locks the switch. The next enable builds
+	-- its rules from the settings persisted here.
+	if _state.enabled ~= true then
+		_bulk_settings_transaction = nil
+		Logger.info(LOG, "%s persisted; it deploys when Ergopti uses Karabiner again.", label)
+		finish_bulk_settings_callback(transaction, true, "persisted-integration-off")
+		return true
 	end
 
 	transaction.phase = "candidate-regeneration-pending"
