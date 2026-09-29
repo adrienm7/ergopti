@@ -95,7 +95,7 @@ function shellFunction(source, name) {
  * @returns {{status: number|null, stderr: string, calls: string[][], leftovers: string[], imported: Buffer|null}}
  */
 function replay(source, options) {
-	const signing = sliceBetween(source, '======= 9/ Codesign + zip', '======= 10/ Entrypoint');
+	const signing = sliceBetween(source, '======= 8/ Codesign + zip', '======= 9/ Entrypoint');
 	const entry = shellFunction(source, options.entry === 'main' ? 'main' : 'build_native_helper');
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-signing-'));
 	const posix = tmp.replaceAll('\\', '/');
@@ -135,7 +135,7 @@ REPO_ROOT="$T/repo"
 LAUNCHER_DIR="$T/launcher"
 BUNDLE_ID="com.ergoptiplus.app"
 ERGOPTI_VERSION=0.0.0-dev ERGOPTI_BUILD=1 ERGOPTI_CHANNEL=main
-HAMMERSPOON_VERSION=1.1.1 OLLAMA_VERSION=0.0.0
+HAMMERSPOON_VERSION=1.1.1
 BUILD_DIR="$T/build"
 APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
@@ -152,7 +152,6 @@ ${entry}
 clean_build_dir() { :; }
 download_hammerspoon() { record download; }
 build_launcher() { printf '%s\\n' "$T/launcher.bin"; }
-download_ollama() { :; }
 assemble_native_runtime() {
 	mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 	: > "$APP_PATH/Contents/MacOS/ErgoptiPlus"

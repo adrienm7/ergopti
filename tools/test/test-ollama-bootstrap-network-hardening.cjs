@@ -345,12 +345,13 @@ test(
 		mlxSource.includes('network-retry.sh')
 );
 test(
-	'runtime and bundle build source one pinned Ollama release',
+	'only the on-demand install sources the pinned Ollama release; the app build no longer bundles it',
 	releaseSource.includes('OLLAMA_RELEASE_VERSION="0.24.0"') &&
 		releaseSource.includes('OLLAMA_DARWIN_TGZ_SHA256=') &&
 		releaseSource.includes('OLLAMA_DARWIN_TGZ_BYTES=') &&
 		ollamaSource.includes('ollama-release.sh') &&
-		buildSource.includes('ollama-release.sh')
+		!buildSource.includes('ollama-release.sh') &&
+		!buildSource.includes('Tools/Ollama')
 );
 test(
 	'the install script leaves detection to the Lua resolver',
