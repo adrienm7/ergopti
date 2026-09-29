@@ -90,6 +90,14 @@ const KEY_CODE_RE = /^[A-Z][A-Za-z0-9]*$/;
 const PHYSICAL_KEYS = JSON.parse(
 	fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
 ).keys;
+// The keys a .keylayout defines, the table the Windows emulation and the Linux
+// converter resolve a layout's keys through: a declared magic key outside it
+// could never be turned into a scan code or an XKB key.
+const LAYOUT_KEY_CODES = new Set(
+	JSON.parse(fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')).keys.map(
+		(key) => key.code
+	)
+);
 const KEYSYM_RE = /^[A-Za-z0-9_]+$/;
 
 // =============================
@@ -398,6 +406,8 @@ function validateExtensionManifest(extension, hotstringStems) {
 				errors.push('magic_key.key must be a KeyboardEvent.code');
 			} else if (!Object.hasOwn(PHYSICAL_KEYS, code) || PHYSICAL_KEYS[code].kind !== 'key') {
 				errors.push(`magic_key.key ${code} is no key of the physical-key registry`);
+			} else if (!LAYOUT_KEY_CODES.has(code)) {
+				errors.push(`magic_key.key ${code} is no key a keyboard layout defines`);
 			}
 		}
 	}

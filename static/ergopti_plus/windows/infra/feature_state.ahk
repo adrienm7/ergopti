@@ -29,6 +29,12 @@ global ScriptInformation := Map(
 			"hotstrings.magic_key_source_scan"),
 		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
 			"hotstrings.magic_key_source_char"),
+		; Whether config.toml names the source scan code: the user's choice then
+		; wins over the active layout's declared key and over any detection.
+		"MagicKeySourceScanChosen", false,
+		; Whether the boot took the source key from the OS layout, so a switch of
+		; OS layout can move it (LayoutRemapSignature); decided at boot.
+		"MagicKeySourceFollowsOsLayout", false,
 		; Manual override for the AltGr-as-Kana / custom-remap detection. Default
 		; false here is overwritten by HotstringEngineInit() which auto-detects via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
@@ -189,6 +195,7 @@ ReadScriptConfig(Cache) {
 		if RawScan != "_"
 				ScriptInformation["MagicKeySourceScan"] :=
 					_FeatureStateValidateSourceScan(RawScan)
+		ScriptInformation["MagicKeySourceScanChosen"] := RawScan != "_"
 		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
 		if RawChar != "_"
 				ScriptInformation["MagicKeySourceChar"] :=

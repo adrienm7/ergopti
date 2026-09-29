@@ -24,6 +24,9 @@
 ; 4. The transfer runs in a curl child (CurlAsyncRequest) polled from a timer,
 ;    so the keyboard thread never waits on the network. Every collaborator is
 ;    injectable so tests replay a download without a network.
+; 5. The physical magic key follows one order: the user's configured key, the
+;    key the active layout's extension declares, then — with no layout
+;    emulated — the key typing the source character on the OS layout.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -346,4 +349,135 @@ _LayoutRegistryPoll(Job, Req, Polls) {
 	Status := Req.Status
 	_LayoutRegistrySettle(Job, Status, (Status == 0) ? "" : Req.GetResponseHeader("ETag"),
 		(Status == 0) ? "no HTTP response for " . Job.Url . " (network, proxy or timeout)" : "")
+}
+
+
+
+
+
+; ============================
+; ============================
+; ======= 6/ Magic key =======
+; ============================
+; ============================
+
+/**
+ * The AutoHotkey scan code of a key registry layouts define.
+ * @param {String} Code - W3C KeyboardEvent.code.
+ * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @returns {String} "SCnnn".
+ * @throws {ValueError} When no layout key has that code.
+ */
+LayoutRegistry_KeyScan(Code, KeycodeTable) {
+	for Key in KeycodeTable["keys"] {
+		if Key["code"] == Code
+			return Key["ahk"]
+	}
+	throw ValueError("No registry layout key has the code '" . Code . "'.")
+}
+
+/**
+ * The physical magic key the active layout's extension declares.
+ * The discovered packs win, as they do for its hotstrings: an installed
+ * generation or the user's own copy. A layout nobody installed, such as the
+ * built-in Ergopti emulation, is read from the registry the driver ships.
+ * @param {String} ExtensionId - Extension of the active layout, "" for none.
+ * @param {Array} Packs - Discovered extension packs.
+ * @param {String} BundledDir - Shipped registry folder, with its trailing backslash.
+ * @returns {String} KeyboardEvent.code, or "" when the layout declares none.
+ */
+LayoutRegistry_DeclaredMagicKey(ExtensionId, Packs, BundledDir) {
+	if ExtensionId == ""
+		return ""
+	for Pack in Packs {
+		if Pack.id == ExtensionId
+			return Pack.magic_key
+	}
+	Path := BundledDir . ExtensionId . "\manifest.toml"
+	if !FileExist(Path)
+		throw Error("The '" . ExtensionId . "' layout extension ships no manifest: " . Path)
+	Manifest := ParseTomlFile(Path)
+	if TOML_UnreadableFile(Path)
+		throw Error("The '" . ExtensionId . "' layout extension manifest cannot be read: " . Path)
+	return HotstringExtensions_MagicKey(Manifest)
+}
+
+/**
+ * The extension of the layout that types, whose declaration names the magic key.
+ * An emulated registry layout is the one it installed; with none, the built-in
+ * Ergopti emulation when it is on; with neither, the user's own OS layout,
+ * which declares nothing. A damaged installed record is logged and declares
+ * nothing: the emulation reports the same record on its own boot path.
+ * @param {String} SelectedId - Emulated registry layout id, "" for none.
+ * @param {Boolean} ErgoptiBase - Whether the built-in Ergopti emulation is on.
+ * @param {String} ErgoptiId - Registry id of the built-in Ergopti layout.
+ * @param {Func} ReadInstalled - Returns the installed-layouts record.
+ * @returns {String} Extension id, or "" when no layout extension types.
+ */
+LayoutRegistry_ActiveLayoutExtension(SelectedId, ErgoptiBase, ErgoptiId, ReadInstalled) {
+	if SelectedId == ""
+		return ErgoptiBase ? ErgoptiId : ""
+	try {
+		Installed := ReadInstalled.Call()
+	} catch as Err {
+		LoggerError("LayoutRegistry", "The magic key of the '{1}' layout is unknown: {2}", SelectedId, Err.Message)
+		return ""
+	}
+	if !Installed.Has(SelectedId) || !Installed[SelectedId].Has("extension")
+		return ""
+	return Installed[SelectedId]["extension"]["id"]
+}
+
+/**
+ * The scan code of the key that types a character on the OS layout, probed with
+ * no modifier through ToUnicodeEx (adapters/key_state.ahk). VkKeyScanExW is not
+ * used: it fails on layouts such as bépo where the character sits behind a
+ * driver-level remapping the API cannot see.
+ * @param {Integer} Hkl - Keyboard layout handle, 0 when none could be read.
+ * @param {String} Char - Source character.
+ * @param {Func} ScanFn - KS_ScanScancodeForChar implementation.
+ * @returns {String} "SCnnn", or "" when the layout or the character is not found.
+ */
+LayoutRegistry_DetectMagicKeyScan(Hkl, Char, ScanFn := KS_ScanScancodeForChar) {
+	if Hkl == 0 {
+		LoggerWarn("LayoutRegistry", "Magic-key source detection skipped: no keyboard layout could be read.")
+		return ""
+	}
+	Found := ScanFn.Call(Hkl, Char)
+	if Found["scan"] == 0 {
+		LoggerWarn("LayoutRegistry", "Magic-key source: '{1}' is on no base key of layout HKL=0x{2:X}.", Char, Hkl)
+		return ""
+	}
+	Scan := Format("SC{:03X}", Found["scan"])
+	LoggerInfo("LayoutRegistry", "Magic-key source detected on the OS layout: '{1}' at {2} (VK=0x{3:X}, HKL=0x{4:X}).",
+		Char, Scan, Found["vk"], Hkl)
+	return Scan
+}
+
+/**
+ * Chooses the physical key that types the magic key. The key the user
+ * configured always wins; then the key the active layout declares; then, with
+ * no layout emulated, the key that types the source character on the OS
+ * layout; then the shipped default. A detection never replaces a choice, and
+ * an emulated layout is never probed through the OS layout it replaces.
+ * @param {Map} Inputs - "chosen" (whether the user configured a key),
+ *   "configured" (that scan code, or the shipped default), "declared"
+ *   (KeyboardEvent.code or ""), "emulated" (whether a layout is emulated),
+ *   "keycodes" (parsed mac_keycodes.json) and "detect" (callable returning the
+ *   scan code probed on the OS layout, or "").
+ * @returns {Map} "scan", "origin" (user, layout, detected or default) and
+ *   "follows_os_layout", whether an OS layout switch can move the key.
+ */
+LayoutRegistry_MagicKeySource(Inputs) {
+	if Inputs["chosen"]
+		return Map("scan", Inputs["configured"], "origin", "user", "follows_os_layout", false)
+	if Inputs["declared"] != ""
+		return Map("scan", LayoutRegistry_KeyScan(Inputs["declared"], Inputs["keycodes"]),
+			"origin", "layout", "follows_os_layout", false)
+	if Inputs["emulated"]
+		return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", false)
+	Detected := Inputs["detect"].Call()
+	if Detected != ""
+		return Map("scan", Detected, "origin", "detected", "follows_os_layout", true)
+	return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", true)
 }
