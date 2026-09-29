@@ -1833,6 +1833,53 @@ local function cancel_guardian_regeneration_wait(reason)
 	return all_clean
 end
 
+--- Commits an enable retained by one guardian wait as saved for later. The wait
+--- polls without a deadline, so an enable left in it kept « Ergopti uses
+--- Karabiner » off yet impossible to switch back, and refused every remap edit,
+--- for as long as the helper stayed unapproved or unregistered. The switch is
+--- persisted on, the state a boot with the switch on is in, and its retained
+--- regeneration becomes that boot's public one: readiness still deploys and
+--- provisions the lease, from the settings persisted at that moment.
+--- @param wait table Exact bundled regeneration wait.
+--- @param wait_status string Non-ready guardian status or probe failure.
+local function release_enable_guardian_waiter(wait, wait_status)
+	local transaction = _enabled_transition
+	if not transaction or transaction.kind ~= "enabling" then return end
+	local retained = nil
+	for _, context in ipairs(wait.contexts or {}) do
+		if not context.settled and context.intent == "enable"
+			and context.capability == transaction then
+			retained = context
+			break
+		end
+	end
+	if not retained then return end
+	local committed, commit_reason = commit_enable_transition(transaction)
+	if not committed then
+		-- The ordinary enable failure path revokes and reports it.
+		retained:settle(false, commit_reason or "persistence-failed")
+		-- That path may already have replaced or cancelled this wait.
+		if _guardian_regeneration_wait ~= wait then return end
+		for _, context in ipairs(wait.contexts) do
+			if not context.settled then return end
+		end
+		cancel_guardian_regeneration_wait("no-retained-regeneration")
+		return
+	end
+	-- Its terminal belongs to the transaction settled below, and a public
+	-- regeneration carries no capability.
+	retained.capability = nil
+	retained.enabled_transaction = nil
+	retained.intent = "public"
+	retained.callbacks = {}
+	_enabled_transition = nil
+	replay_pending_layout_refresh()
+	Logger.info(LOG,
+		"Karabiner integration enabled; its rules deploy once the remap guardian is ready (%s).",
+		tostring(wait_status))
+	settle_enabled_callbacks(transaction, true, "persisted-guardian-" .. tostring(wait_status))
+end
+
 --- Replays retained regenerations through their ordinary state/layout gates.
 --- The module-private proof is valid only for this synchronous callback chain.
 --- @param wait table Exact bundled regeneration wait.
@@ -1960,6 +2007,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 		schedule_guardian_regeneration_poll(wait, status or probe_error or reason)
 		release_lease_less_resume_waiters(wait, wait_status)
 		release_bulk_guardian_waiters(wait, wait_status)
+		release_enable_guardian_waiter(wait, wait_status)
 	end
 
 	local observation_timeout_sec = LEASE_GUARDIAN_PROBE_TIMEOUT_SEC
