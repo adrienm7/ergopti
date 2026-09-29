@@ -452,6 +452,15 @@ requires_linux = ["session:x11"]
 emit_ahk_key = "Right"
 emit_ahk_mods = ["ctrl", "super"]
 
+# The same step, wrapping at the edges: from the last desktop to the first and
+# from the first to the last. Windows reads the position from the registry
+# Explorer keeps and presses Ctrl+Win+Arrow once per desktop.
+[sg_actions.desktop_prev_wrap]
+platform = "ahk"
+
+[sg_actions.desktop_next_wrap]
+platform = "ahk"
+
 [sg_actions.desktop_new]
 platform = "ahk"
 emit_ahk_key = "d"
@@ -1415,6 +1424,8 @@ items = [
     "app_expose",
     "desktop_prev",
     "desktop_next",
+    "desktop_prev_wrap",
+    "desktop_next_wrap",
     "desktop_new",
     "desktop_close",
     "task_view",
