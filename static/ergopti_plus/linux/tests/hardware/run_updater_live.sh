@@ -32,6 +32,10 @@ tar -xzf "${WORK}/old.tar.gz" -C "${WORK}/unpacked"
 
 export HOME="${WORK}/home"
 export XDG_CONFIG_HOME="${HOME}/.config" XDG_DATA_HOME="${HOME}/.local/share" XDG_CACHE_HOME="${HOME}/.cache"
+export XDG_STATE_HOME="${HOME}/.local/state"
+# Where the daemon writes its logs: state, not data (infra/config_paths.lua).
+# The check read the data folder, which only builds before v0.0.0-dev.140 used.
+LOGS="${XDG_STATE_HOME}/ergopti_plus/logs"
 ( cd "${WORK}/unpacked" && bash install.sh --no-deps --no-service ) > "${WORK}/install.log" 2>&1 \
 	|| { tail -20 "${WORK}/install.log"; echo "FAIL install.sh failed"; exit 1; }
 
@@ -47,14 +51,14 @@ STATUS=$?
 # from the installed launcher, it must report the version just installed.
 NEW="$(sed -n 's/^version=//p' "${LIB}/_shared/build_stamp.txt")"
 for _ in $(seq 1 40); do
-	grep -qs "daemon starting (version ${NEW}," "${XDG_DATA_HOME}/ergopti/logs/"*.log && break
+	grep -qs "daemon starting (version ${NEW}," "${LOGS}/"*.log && break
 	sleep 0.5
 done
 pkill -f "${LIB}/linux/ergopti_hotstrings.lua" 2>/dev/null
-if grep -qs "daemon starting (version ${NEW}," "${XDG_DATA_HOME}/ergopti/logs/"*.log; then
+if grep -qs "daemon starting (version ${NEW}," "${LOGS}/"*.log; then
 	echo "  ok   the daemon restarted on ${NEW}"
 	exit 0
 fi
 echo "  FAIL the daemon did not restart on ${NEW}"
-tail -20 "${XDG_DATA_HOME}/ergopti/logs/"*.log 2>/dev/null
+tail -20 "${LOGS}/"*.log 2>/dev/null
 exit 1
