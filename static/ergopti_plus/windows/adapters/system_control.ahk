@@ -14,9 +14,11 @@
 ; 1. Thin on purpose: each method is one native call with the arguments the
 ;    module chose, so the module's suite pins the exact message numbers,
 ;    command lines and paths through a recording double of this class.
-; 2. Nothing here blocks the keyboard hook: Launch() does not wait for the
-;    program, and Defer() moves a slower action (COM, a broadcast) out of the
-;    hotkey thread that dispatched it.
+; 2. Launch() does not wait for the program. Defer() only lets the hotkey or
+;    gesture thread that dispatched an action return first: the deferred
+;    action still runs on the script's one OS thread, so while a COM call or
+;    BroadcastSettingChange waits (at most its timeout per window), remapped
+;    keys queue behind it. Anything that can wait longer belongs in a process.
 ; 3. Failures are reported, never swallowed: a method either returns its
 ;    documented failure value or throws, and the module logs it.
 ; ==============================================================================

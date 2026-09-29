@@ -17,7 +17,8 @@
 ;    exact command line, window message and path with a recording double.
 ; 2. Registered deferred: the hotkey or gesture thread only schedules the
 ;    action (Sys.Defer) and returns; COM, broadcasts and Explorer queries run
-;    in their own thread afterwards.
+;    in a timer thread afterwards. That is still the script's one OS thread:
+;    they must stay bounded, and slow work (emptying the bin) is a process.
 ; 3. Explorer's selection is read from the Shell.Application window whose HWND
 ;    is the active window and, on Windows 11, whose tab is the frame's active
 ;    tab (every tab shares the frame's HWND). A virtual item (This PC, a
