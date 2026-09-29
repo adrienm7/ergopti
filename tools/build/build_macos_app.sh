@@ -32,12 +32,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OLLAMA_RELEASE_FILE="$REPO_ROOT/static/ergopti_plus/macos/modules/llm/ollama-release.sh"
-if [ ! -f "$OLLAMA_RELEASE_FILE" ]; then
-	printf '[macos-build] ERROR: missing pinned Ollama release source: %s\n' "$OLLAMA_RELEASE_FILE" >&2
-	exit 1
-fi
-. "$OLLAMA_RELEASE_FILE"
 
 
 
@@ -73,11 +67,11 @@ ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 # frameworks it hosts (Sparkle's remaining windows) stay English.
 LAUNCHER_LOCALIZATIONS="$(python3 "$REPO_ROOT/tools/build/launcher_localizations.py")"
 
-# Ollama CLI version bundled for local LLM inference. The universal binary is
-# downloaded at build time and stored in Resources/Tools/ so the app can run
-# local models on first launch without any manual install step. Users still
-# need to pull a model the first time (models are multi-GB, not bundled).
-OLLAMA_VERSION="$OLLAMA_RELEASE_VERSION"
+# Ollama is not bundled either: modules/llm/ollama_binary.lua reuses an
+# installed Ollama.app, Homebrew or PATH copy, and the first selection of the
+# Ollama backend offers to download the pinned official release into
+# Application Support (modules/llm/ensure-ollama-deps.sh). The 79.6 MB binary
+# this build used to copy under Resources/Tools/ weighed 29.4 MB of the zip.
 
 # Sparkle EdDSA public key (base64). Empty string means "Sparkle will refuse
 # to install updates"; CI must inject the real value from a secret.
@@ -199,47 +193,9 @@ download_hammerspoon() {
 
 
 
-# ==================================================
-# ==================================================
-# ======= 4/ Ollama download =======================
-# ==================================================
-# ==================================================
-
-# Download the pinned Ollama universal binary (amd64 + arm64) for macOS.
-# Vendoring the binary inside Resources/Tools/ means local LLM inference works
-# out-of-the-box; models are still pulled on demand by the user (they are
-# multi-GB and cannot be bundled).
-download_ollama() {
-	local cache_dir="$BUILD_DIR/cache"
-	local tgz_name="ollama-darwin-$OLLAMA_VERSION.tgz"
-	local tgz_path="$cache_dir/$tgz_name"
-	local bin_path="$cache_dir/ollama-darwin-$OLLAMA_VERSION"
-	local url="https://github.com/ollama/ollama/releases/download/v$OLLAMA_VERSION/ollama-darwin.tgz"
-	mkdir -p "$cache_dir"
-	if [ ! -f "$bin_path" ]; then
-		log "Downloading Ollama $OLLAMA_VERSION from $url"
-		curl -sSfL "$url" -o "$tgz_path" || fail "Ollama download failed."
-		local actual_sha
-		actual_sha="$(shasum -a 256 "$tgz_path" | awk '{print $1}')"
-		[ "$actual_sha" = "$OLLAMA_DARWIN_TGZ_SHA256" ] \
-			|| fail "Ollama archive checksum mismatch."
-		tar -xzf "$tgz_path" -C "$cache_dir" --strip-components=0 2>/dev/null || true
-		# The tgz contains a single binary named "ollama"
-		[ -f "$cache_dir/ollama" ] && mv "$cache_dir/ollama" "$bin_path"
-		chmod +x "$bin_path"
-	else
-		log "Using cached $bin_path"
-	fi
-	[ -f "$bin_path" ] || fail "Ollama binary not found after download."
-	echo "$bin_path"
-}
-
-
-
-
 # =====================================================
 # =====================================================
-# ======= 5/ Swift launcher compilation ==============
+# ======= 4/ Swift launcher compilation ==============
 # =====================================================
 # =====================================================
 
@@ -272,7 +228,7 @@ build_launcher() {
 
 # ====================================================
 # ====================================================
-# ======= 6/ App bundle assembly =====================
+# ======= 5/ App bundle assembly =====================
 # ====================================================
 # ====================================================
 
@@ -366,12 +322,11 @@ bundle_layout_registry() {
 	[ -f "$dest_dir/index.json" ] || fail "Keyboard-layout registry was not packaged at $dest_dir"
 }
 
-# Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, stage the
-# driver payload under Resources/static/, and bundle Ollama. The embedded
-# Hammerspoon's bundle id is rewritten so its preferences land under our id.
+# Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon and stage
+# the driver payload under Resources/static/. The embedded Hammerspoon's
+# bundle id is rewritten so its preferences land under our id.
 assemble_app() {
 	local launcher_bin="$1"
-	local ollama_bin_path="$2"
 	log "Assembling $APP_PATH"
 	mkdir -p "$APP_PATH/Contents/MacOS"
 	mkdir -p "$APP_PATH/Contents/Resources/config"
@@ -422,16 +377,6 @@ assemble_app() {
 
 	bundle_keyboard_layout "$static_root"
 	bundle_layout_registry "$static_root"
-
-	# Bundle the Ollama CLI server so local inference needs no separate install;
-	# models are still pulled on demand. The launcher exports this path as
-	# ERGOPTI_OLLAMA_BIN, which modules/llm/ollama_binary.lua treats as
-	# authoritative.
-	local tools_dir="$APP_PATH/Contents/Resources/Tools"
-	mkdir -p "$tools_dir/Ollama"
-	log "Bundling Ollama $OLLAMA_VERSION"
-	cp "$ollama_bin_path" "$tools_dir/Ollama/ollama"
-	chmod +x "$tools_dir/Ollama/ollama"
 }
 
 
@@ -439,7 +384,7 @@ assemble_app() {
 
 # ===========================================
 # ===========================================
-# ======= 7/ Icon generation ================
+# ======= 6/ Icon generation ================
 # ===========================================
 # ===========================================
 
@@ -467,7 +412,7 @@ build_icon() {
 
 # =====================================================
 # =====================================================
-# ======= 8/ Info.plist generation ====================
+# ======= 7/ Info.plist generation ====================
 # =====================================================
 # =====================================================
 
@@ -528,7 +473,7 @@ generate_info_plist() {
 
 # ===============================================
 # ===============================================
-# ======= 9/ Codesign + zip =====================
+# ======= 8/ Codesign + zip =====================
 # ===============================================
 # ===============================================
 
@@ -735,7 +680,7 @@ zip_app() {
 
 # ==========================================
 # ==========================================
-# ======= 10/ Entrypoint ===================
+# ======= 9/ Entrypoint ===================
 # ==========================================
 # ==========================================
 
@@ -787,9 +732,7 @@ main() {
 	launcher_bin="${launcher_bin%%$'\n'*}"
 	log "launcher_bin resolved: '$launcher_bin'"
 	[ -f "$launcher_bin" ] || fail "launcher_bin does not exist: $launcher_bin"
-	local ollama_bin_path
-	ollama_bin_path="$(download_ollama)"
-	assemble_app "$launcher_bin" "$ollama_bin_path"
+	assemble_app "$launcher_bin"
 	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
 	build_icon
 	generate_info_plist
@@ -805,7 +748,6 @@ main() {
 	log "  version    : $ERGOPTI_VERSION ($ERGOPTI_BUILD)"
 	log "  channel    : $ERGOPTI_CHANNEL"
 	log "  hammerspoon: $HAMMERSPOON_VERSION"
-	log "  ollama     : $OLLAMA_VERSION"
 }
 
 main "$@"

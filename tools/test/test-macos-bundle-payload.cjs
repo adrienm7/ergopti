@@ -33,8 +33,8 @@
  * 4. Excluded groups are judged independently of the manifest (tests,
  *    documentation, debug symbols, developer tooling, launcher sources,
  *    duplicate top-level copies, a checkout's own state, the Karabiner
- *    installer), so deleting a manifest exclusion cannot quietly bring its
- *    files back.
+ *    installer, the Ollama binary), so deleting a manifest exclusion cannot
+ *    quietly bring its files back.
  * 5. A self-check removes one runtime file per reference kind and injects one
  *    forbidden file per group: the guard must report each, or it could not
  *    fail for the regression it exists to catch.
@@ -506,6 +506,16 @@ function buildScriptProblems(source, externals) {
 			`${BUILD_REL}: the Karabiner-Elements installer is back in the bundle; onboarding downloads its own pinned DMG (platform/remap/onboarding.lua)`
 		);
 	}
+	// The 79.6 MB Ollama binary is downloaded on the first Ollama selection
+	if (
+		/Tools\/Ollama|download_ollama|ollama-darwin\.tgz|OLLAMA_RELEASE_FILE|ERGOPTI_OLLAMA_BIN/.test(
+			source
+		)
+	) {
+		problems.push(
+			`${BUILD_REL}: the Ollama binary is back in the bundle; the first Ollama selection downloads it (modules/llm/ensure-ollama-deps.sh)`
+		);
+	}
 	// Maximum deflate is still the plain zip ditto, Sparkle and Homebrew read
 	if (!/^\t\(cd "\$BUILD_DIR" && zip -qry -9 /m.test(shellFunction(source, 'zip_app'))) {
 		problems.push(`${BUILD_REL}: zip_app() must compress the release archive with zip -9`);
@@ -561,6 +571,13 @@ const bypasses = [
 		BUILD.replace(
 			stageLine,
 			`${stageLine}\tmkdir -p "$APP_PATH/Contents/Resources/Tools/Karabiner"\n`
+		)
+	],
+	[
+		'the Ollama binary bundled again',
+		BUILD.replace(
+			stageLine,
+			`${stageLine}\tcp "$ollama_bin_path" "$APP_PATH/Contents/Resources/Tools/Ollama/ollama"\n`
 		)
 	],
 	['the archive back at default compression', BUILD.replace('zip -qry -9 ', 'zip -qry ')]
