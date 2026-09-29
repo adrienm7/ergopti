@@ -116,10 +116,21 @@ report_download_progress() {
 	emit_marker "OLLAMA_DOWNLOAD_PROGRESS $percent"
 }
 
-# Runs one bounded curl while the foreground reports progress every second.
+# Runs one stall-bounded curl while the foreground reports progress every
+# second. Each attempt resumes the bytes earlier ones wrote, so a slow link
+# keeps its progress; the SHA-256 gate below judges only the complete file.
 download_archive() {
-	rm -f "$archive_path"
-	curl_resilient -o "$archive_path" "$archive_url" &
+	local size=0
+	if [ -f "$archive_path" ]; then
+		size="$(wc -c < "$archive_path" | tr -d ' ')"
+	fi
+	if [ "$size" -gt "$OLLAMA_DARWIN_TGZ_BYTES" ]; then
+		# Longer than the pinned asset: nothing in it can be trusted to resume.
+		rm -f "$archive_path"
+	elif [ "$size" -eq "$OLLAMA_DARWIN_TGZ_BYTES" ]; then
+		return 0
+	fi
+	curl_resumable -o "$archive_path" "$archive_url" &
 	DOWNLOAD_PID=$!
 	while kill -0 "$DOWNLOAD_PID" 2>/dev/null; do
 		report_download_progress

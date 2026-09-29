@@ -39,6 +39,12 @@ retry_network() {
 	return 1
 }
 
+# A large archive on a slow link needs longer than CURL_MAX_TIME_SEC, and a
+# restart from zero after each timeout never finishes: an attempt ends only
+# when the transfer stalls below this rate for this long.
+CURL_STALL_BYTES_PER_SEC=1024
+CURL_STALL_SEC=60
+
 # Applies one canonical bounded curl policy before caller-specific arguments.
 curl_resilient() {
 	curl -LsSf \
@@ -48,5 +54,20 @@ curl_resilient() {
 		--retry-delay "$CURL_RETRY_DELAY_SEC" \
 		--retry-max-time "$CURL_RETRY_MAX_TIME_SEC" \
 		--retry-all-errors \
+		"$@"
+}
+
+# Downloads a large archive into the file named by "-o", resuming the bytes a
+# previous attempt already wrote. The caller verifies the complete file.
+curl_resumable() {
+	curl -LsSf \
+		--connect-timeout "$CURL_CONNECT_TIMEOUT_SEC" \
+		--speed-limit "$CURL_STALL_BYTES_PER_SEC" \
+		--speed-time "$CURL_STALL_SEC" \
+		--retry "$CURL_RETRY_COUNT" \
+		--retry-delay "$CURL_RETRY_DELAY_SEC" \
+		--retry-max-time "$CURL_RETRY_MAX_TIME_SEC" \
+		--retry-all-errors \
+		--continue-at - \
 		"$@"
 }
