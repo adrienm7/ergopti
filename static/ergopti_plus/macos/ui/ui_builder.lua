@@ -482,9 +482,14 @@ function M.force_focus(wv, is_new, lifecycle)
 				if ok_active and active_space then
 					local ok_move, moved = pcall(function() return hs_spaces.moveWindowToSpace(win, active_space) end)
 					if not current() then return false end
-					if not ok_move or moved ~= true then return fail("space move") end
-					if ok_move then
+					if not ok_move then return fail("space move") end
+					if moved == true then
 						Logger.debug(LOG, "Window teleported via hs.spaces.")
+					else
+						-- A documented refusal, e.g. the active Space belongs to a
+						-- full-screen app. Presenting still has to happen: raising and
+						-- focusing below switch the user to the window's own Space.
+						Logger.warn(LOG, "The Space refused the window; presenting it on its own Space.")
 					end
 				end
 			end
