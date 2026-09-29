@@ -71,16 +71,23 @@ TestHsCache_BuildExtractsKnownEntry() {
 	Rows := _HotstringsCacheBuildRows()
 
 	Assert(Rows.Count > 0, "cache build must yield at least one section")
-	Assert(Rows.Has("rolls.assign"), "cache build must contain the stable rolls.assign section")
+	; rolls.assign, the section this test pinned first, left the cache with the
+	; rest of rolls for the Ergopti extension; a small bundled section with a
+	; spaced output takes its place.
+	Key := "distancesreduction.comma_far_letters"
+	Assert(Rows.Has(Key), "cache build must contain the stable " . Key . " section")
 
-	AssignRows := Rows["rolls.assign"]
-	Assert(AssignRows.Length == 4, "rolls.assign must register exactly 4 entries (got " . AssignRows.Length . ")")
-	; First TOML entry is  ' #!' = { output = ' := ', is_word=false, auto_expand=true,
-	; is_case_sensitive=true, final_result=true }  -> flags *? and caseSens true.
+	FarRows := Rows[Key]
+	Assert(FarRows.Length == 5, Key . " must register exactly 5 entries (got " . FarRows.Length . ")")
+	; First TOML entry is  ',c' = { output = c-cedilla, is_word=false, auto_expand=true,
+	; is_case_sensitive=false, final_result=false }  -> flags *? and caseSens false.
 	; The 7th element is the per-entry priority override, empty here (no `priority =`).
-	Expected := ["*?", " #!", " := ", true, false, true, ""]
-	Assert(_HsCacheRowsEqual(AssignRows[1], Expected),
-		"rolls.assign first row must extract as [*?, ' #!', ' := ', final, !repeat, caseSens, no-priority-override]")
+	Expected := ["*?", ",c", Chr(0xE7), false, false, false, ""]
+	Assert(_HsCacheRowsEqual(FarRows[1], Expected),
+		Key . " first row must extract as [*?, ',c', c-cedilla, !final, !repeat, !caseSens, no-priority-override]")
+	; Its fourth entry keeps the trailing space of its output.
+	Assert(FarRows[4][2] == ",x" && FarRows[4][3] == ("o" . Chr(0xF9) . " "),
+		Key . " fourth row must extract ',x' with its spaced output whole")
 }
 
 TestHsCache_BuildCoversEveryBundledCategory() {
@@ -116,17 +123,19 @@ TestHsCache_TsvRoundTripIsLossless() {
 
 	Assert(Back.Count == Rows.Count,
 		"round-trip must preserve every section (" . Back.Count . " vs " . Rows.Count . ")")
-	; Deep-check rolls.assign survived byte-for-byte (its outputs contain spaces).
-	Assert(Back.Has("rolls.assign"), "round-trip must keep rolls.assign")
-	Orig := Rows["rolls.assign"]
-	RT := Back["rolls.assign"]
-	Assert(RT.Length == Orig.Length, "rolls.assign row count must survive round-trip")
+	; Deep-check a section survived byte-for-byte: its outputs carry a trailing
+	; space and non-ASCII letters.
+	Key := "distancesreduction.comma_far_letters"
+	Assert(Back.Has(Key), "round-trip must keep " . Key)
+	Orig := Rows[Key]
+	RT := Back[Key]
+	Assert(RT.Length == Orig.Length, Key . " row count must survive round-trip")
 	AllEqual := true
 	for Idx, Row in Orig {
 		if !_HsCacheRowsEqual(Row, RT[Idx])
 			AllEqual := false
 	}
-	Assert(AllEqual, "every rolls.assign row must be identical after a write/read round-trip")
+	Assert(AllEqual, "every " . Key . " row must be identical after a write/read round-trip")
 }
 
 TestHsCache_EscapeUnescapeHandlesSpecials() {
