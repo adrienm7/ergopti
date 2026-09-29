@@ -714,6 +714,8 @@ local function main()
 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
 			-- modifier held through the pause is released.
 			TapHold.set_paused(paused)
+			-- A pause turns the AI's live mode off; resuming leaves it off.
+			if prediction_engine then prediction_engine.on_pause_change(paused) end
 			if rebuild_tray_menu then rebuild_tray_menu() end
 		end,
 	})
@@ -1127,6 +1129,11 @@ local function main()
 			capture_screen = function(mode, max_edge, on_done)
 				if opts.dry_run then return nil, "dry run" end
 				return require("adapters.screen_capture").capture(mode, max_edge, on_done)
+			end,
+			-- The tray's live submenu checks the live prompt: redrawn when a
+			-- binding turns live mode on or off.
+			on_live_change = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			on_offer = function(context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id

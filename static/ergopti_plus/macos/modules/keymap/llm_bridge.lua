@@ -1496,6 +1496,8 @@ end
 --- and a timer scheduled here would remain natively deliverable after PAUSED.
 --- @return boolean committed True only after the full engine reset settles.
 function M.reset_predictions_for_pause()
+	-- A pause ends live mode: resuming must not redraw a translation unannounced
+	engine.stop_live_prompt("pause", true)
 	local deferred_settled = settle_prediction_deferred_handles()
 	local reset_committed = reset_predictions_impl(true, true, true)
 	return deferred_settled and reset_committed
@@ -1883,6 +1885,36 @@ function M.request_prompt_prediction(value)
 		return false
 	end
 	return engine.request_prompt_prediction(value)
+end
+
+--- Turns live mode on with the binding's prompt, or off when it is on (the
+--- llm_live_prompt_toggle action). The engine owns the live state and shows
+--- every transition and refusal.
+--- @param value string The binding's parameter: "<profile_id>" or "<profile_id>|<count>".
+--- @return boolean handled True when live mode changed state.
+function M.toggle_live_prompt(value)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Live mode toggle skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return engine.toggle_live_prompt(value)
+end
+
+--- Turns live mode on with a prompt, or off with nil (the AI menu's live-mode
+--- submenu). Same engine state as the action.
+--- @param value string|nil "<profile_id>" (the menu's count), or nil for off.
+--- @return boolean committed True when live mode is in the requested state.
+function M.set_live_prompt(value)
+	if value == nil then
+		engine.stop_live_prompt("menu", false)
+		return engine.get_live_prompt() == nil
+	end
+	return engine.start_live_prompt(value)
+end
+
+--- @return table|nil live The engine's live prompt { profile_id, num_predictions }, or nil when off.
+function M.get_live_prompt()
+	return engine.get_live_prompt()
 end
 
 --- Rewrites the selection one step along the tone ladder (the llm_tone_*

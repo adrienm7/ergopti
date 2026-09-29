@@ -320,7 +320,8 @@ _LPP_PresetsRunTheirProfile() {
 					"a continuation preset keeps the continuation request shape")
 			Checked += 1
 		}
-		AssertEqual(9, Checked, "one preset per built-in, rewrite and the tone ladder included")
+		AssertEqual(11, Checked,
+			"one preset per built-in, rewrite, the tone ladder and the translations included")
 		AssertEqual("advanced", _LLM_Menu["profile_id"], "no preset changes the active profile")
 	}
 }

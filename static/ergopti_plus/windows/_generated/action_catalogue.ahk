@@ -114,10 +114,13 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "llm_predict_tone_neutral" })
 	Items.Push({ Kind: "action", Id: "llm_predict_tone_formal" })
 	Items.Push({ Kind: "action", Id: "llm_predict_tone_very_formal" })
+	Items.Push({ Kind: "action", Id: "llm_predict_translate_en" })
+	Items.Push({ Kind: "action", Id: "llm_predict_translate_ja" })
 	Items.Push({ Kind: "action", Id: "llm_tone_more_formal" })
 	Items.Push({ Kind: "action", Id: "llm_tone_more_familiar" })
 	Items.Push({ Kind: "action", Id: "llm_tone_more_formal_cycle" })
 	Items.Push({ Kind: "action", Id: "llm_tone_more_familiar_cycle" })
+	Items.Push({ Kind: "action", Id: "llm_live_prompt_toggle" })
 	Items.Push({ Kind: "action", Id: "llm_screen_region" })
 	Items.Push({ Kind: "action", Id: "llm_screen_full" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.modifier_chords" })
@@ -230,6 +233,7 @@ GestureActionCatalogueData() {
 	Actions["line_start"] := { Family: "sg", LabelKey: "sg_actions.line_start", Parameter: "", Confirm: false }
 	Actions["line_up"] := { Family: "sg", LabelKey: "sg_actions.line_up", Parameter: "", Confirm: false }
 	Actions["llm_generate_prediction"] := { Family: "sg", LabelKey: "sg_actions.llm_generate_prediction", Parameter: "", Confirm: false }
+	Actions["llm_live_prompt_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_live_prompt_toggle", Parameter: "llm_prompt", Confirm: false }
 	Actions["llm_predict_advanced"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_advanced", Parameter: "", Confirm: false }
 	Actions["llm_predict_basic"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_basic", Parameter: "", Confirm: false }
 	Actions["llm_predict_batch_advanced"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_batch_advanced", Parameter: "", Confirm: false }
@@ -239,6 +243,8 @@ GestureActionCatalogueData() {
 	Actions["llm_predict_tone_formal"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_tone_formal", Parameter: "", Confirm: false }
 	Actions["llm_predict_tone_neutral"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_tone_neutral", Parameter: "", Confirm: false }
 	Actions["llm_predict_tone_very_formal"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_tone_very_formal", Parameter: "", Confirm: false }
+	Actions["llm_predict_translate_en"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_translate_en", Parameter: "", Confirm: false }
+	Actions["llm_predict_translate_ja"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_translate_ja", Parameter: "", Confirm: false }
 	Actions["llm_prompt_prediction"] := { Family: "sg", LabelKey: "sg_actions.llm_prompt_prediction", Parameter: "llm_prompt", Confirm: false }
 	Actions["llm_screen_full"] := { Family: "sg", LabelKey: "sg_actions.llm_screen_full", Parameter: "llm_vision", Confirm: false }
 	Actions["llm_screen_region"] := { Family: "sg", LabelKey: "sg_actions.llm_screen_region", Parameter: "llm_vision", Confirm: false }

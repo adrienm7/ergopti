@@ -240,6 +240,10 @@ global GESTURE_ACTIONS := Map(
 		"llm_prompt_prediction", {
 				Fn: (BindingId := "") => GesturePromptPrediction(BindingId),
 		},
+		; Live mode on with the prompt (and count) the binding names, or off.
+		"llm_live_prompt_toggle", {
+				Fn: (BindingId := "") => GestureLivePromptToggle(BindingId),
+		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
 		; when the action is triggered via a gesture slot instead.
@@ -412,6 +416,24 @@ GesturePromptPrediction(BindingId := "", FireFn := 0) {
 		}
 		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
 				Parsed.Get("num_predictions", 0), FireFn)
+}
+
+; Runs the llm_live_prompt_toggle action of one binding. While live mode is on,
+; any toggle binding turns it off, whatever it names, even a value no longer
+; valid: the user must always be able to leave. Otherwise the stored value is
+; re-validated like llm_prompt_prediction's and names the prompt and count.
+; @param {String} BindingId The binding whose parameter to read.
+; @returns {Boolean} True when live mode changed state.
+GestureLivePromptToggle(BindingId := "") {
+		if LLM_Engine_LiveIsActive()
+				return LLM_Menu_StopLiveMode()
+		Value := GestureGetActionParameter(BindingId, "llm_live_prompt_toggle")
+		Parsed := LLM_PromptAction_Parse(Value, &Reason)
+		if !(Parsed is Map) {
+				LoggerWarn("gestures", "llm_live_prompt_toggle ignored for binding '{1}': {2}.", BindingId, Reason)
+				return false
+		}
+		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get("num_predictions", 0))
 }
 
 ; Runs a screen action of one binding: its stored value names the vision

@@ -36,6 +36,9 @@ local Logger           = require("infra.logger")
 local Timings          = require("infra.timings")
 local TimerScheduler   = require("adapters.timer_scheduler")
 local Storage          = require("adapters.storage")
+local FileSystem       = require("adapters.file_system")
+local JsonCodec        = require("adapters.json_codec")
+local Paths            = require("infra.paths")
 local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
@@ -113,6 +116,30 @@ local OLLAMA_RECOVERY_RETRY_SEC = Timings.sec("llm", "warmup_retry_base_ms")
 -- Reference to the LLM engine defaults, used once at module load to seed Section 2
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
+-- ── Live mode ─────────────────────────────────────────────────────────────────
+
+--- Reads the live-mode timing shared by the three drivers. A missing or
+--- malformed file stops the engine from loading: live mode would otherwise run
+--- with made-up numbers that no other driver uses.
+--- @return table { debounce_sec = number, min_words = number }
+local function load_live_config()
+	local path = Paths.shared("modules/llm/live.json")
+	local raw = path and FileSystem.read(path) or nil
+	local decoded = raw and JsonCodec.decode(raw) or nil
+	local debounce_ms = type(decoded) == "table" and tonumber(decoded.debounce_ms) or nil
+	local live_min_words = type(decoded) == "table" and tonumber(decoded.min_words) or nil
+	if not debounce_ms or debounce_ms < 0 or not live_min_words or live_min_words < 0 then
+		error("prediction_engine: " .. tostring(path)
+			.. " is unreadable or lacks a non-negative debounce_ms and min_words.")
+	end
+	return { debounce_sec = debounce_ms / 1000, min_words = math.floor(live_min_words) }
+end
+local LIVE_CONFIG = load_live_config()
+
+-- The notices of the live-mode transitions a user asked for
+local LIVE_ON_KEY  = "llm.live.on"
+local LIVE_OFF_KEY = "llm.live.off"
+
 
 
 
@@ -128,6 +155,11 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
 -- Predictions currently loaded in the tooltip (empty when nothing is shown)
 local pending_predictions = {}
+
+-- Live mode: nil when off, else { profile_id = string, num_predictions = number|nil }
+-- (nil count = the AI menu's). While on, the automatic typing trigger runs this
+-- prompt instead of the menu's profile. Never persisted: off at every start.
+local _live = nil
 
 -- True while predictions are on screen and waiting for user interaction
 local predictions_visible = false
@@ -643,6 +675,9 @@ function M.set_llm_enabled(enabled)
 	settle("runtime gate", core_llm.set_runtime_llm_enabled, is_llm_enabled)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then
+		-- Turning the AI off ends live mode too: turning it back on must not
+		-- resume a translation the user no longer sees announced
+		M.stop_live_prompt("AI disabled", true)
 		settle("Ollama daemon recovery retirement", retire_ollama_daemon_recovery,
 			"prediction runtime disabled")
 		settle("prediction reset", M.reset)
@@ -1047,6 +1082,9 @@ end
 --- keep the full configured delay to avoid sending a broken intermediate state.
 --- @return number The debounce delay in seconds to use for this timer start.
 local function compute_adaptive_debounce()
+	-- Live mode redraws at every keystroke: its own short, fixed debounce only
+	-- coalesces a burst, whatever the typing speed
+	if _live then return LIVE_CONFIG.debounce_sec end
 	-- Correction guard: never reduce delay while the user is still deleting
 	local active_buffer = _state and _state.llm_buffer
 	if type(active_buffer) ~= "string" and _state then active_buffer = _state.buffer end
@@ -1070,7 +1108,9 @@ end
 --- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
 local function start_inactivity_timer(delay_override)
 	if not runtime_available() then return false end
-	if not is_llm_enabled or inactivity_debounce_sec < 0 then return false end
+	-- A negative menu debounce turns the automatic trigger off; live mode is an
+	-- explicit request for it, so it keeps its own
+	if not is_llm_enabled or (inactivity_debounce_sec < 0 and not _live) then return false end
 	if stop_inactivity_timer() ~= true then return false end
 	local delay = delay_override
 	if delay == nil then delay = compute_adaptive_debounce() end
@@ -1500,6 +1540,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	end
 	local request_profile = request and request.profile or nil
 	local request_count   = request and request.num_predictions or num_predictions
+	local request_min_words = min_words
+	-- Live mode redirects the automatic typing trigger only: a forced request is
+	-- an explicit action (or the chain it owns) and keeps its own profile
+	local live = (request == nil and force_trigger ~= true) and _live or nil
 	local entry_request_counter = llm_request_counter
 	local entry_fetch_counter = fetch_request_counter
 
@@ -1513,6 +1557,26 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			return false
 		end
 		return current == true
+	end
+
+	--- Re-arms the shared debounce timer so this unforced check runs again later.
+	--- A running one-shot owner publishes its successor itself once its callback
+	--- returns; any other caller replaces the timer now.
+	--- @param delay number Seconds to wait.
+	--- @param label string What deferred the check, for the log.
+	local function defer_check(delay, label)
+		local callback_owner = _inactivity_timer
+		if callback_owner and callback_owner.callback_running == true
+			and owner_is_current() then
+			callback_owner.rearm_delay = delay
+			callback_owner.rearm_profile = profile_name
+			return
+		end
+		_deferred_profile_name = profile_name
+		if stop_inactivity_timer() ~= true or start_inactivity_timer(delay) ~= true then
+			_deferred_profile_name = nil
+			Logger.error(LOG, "%s timer did not commit; request abandoned.", label)
+		end
 	end
 
 	--- Detects reset or supersession before this check publishes its request ID.
@@ -1545,6 +1609,38 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	if not is_ai_preview_enabled then
 		Logger.debug(LOG, "AI preview disabled — request skipped.")
 		return
+	end
+	if live then
+		-- Hotstrings win: a live tooltip never covers a hotstring preview. Wait
+		-- for it to go, then redraw the sentence as it is by then.
+		local hs_ok, hotstring_visible = pcall(function()
+			return type(tooltip.is_hotstring_visible) == "function" and tooltip.is_hotstring_visible()
+		end)
+		if not hs_ok then
+			Logger.error(LOG, "Hotstring tooltip probe raised — live request skipped: %s", tostring(hotstring_visible))
+			return
+		end
+		if hotstring_visible == true then
+			Logger.debug(LOG, "Hotstring tooltip shown — live request waits for it.")
+			defer_check(LIVE_CONFIG.debounce_sec, "Live hotstring wait")
+			return
+		end
+		-- Looked up again at every request: the prompt may have been edited or deleted
+		local lookup_ok, live_profile = xpcall(core_llm.find_profile, debug.traceback, live.profile_id)
+		if not lookup_ok then
+			Logger.error(LOG, "Live prompt lookup raised — request aborted: %s", tostring(live_profile))
+			return
+		end
+		if not predispatch_is_current() then return end
+		if type(live_profile) ~= "table" then
+			Logger.warn(LOG, "Live prompt '%s' no longer exists — live mode turned off.", live.profile_id)
+			M.stop_live_prompt("prompt deleted", true)
+			live = nil
+		else
+			request_profile   = live_profile
+			request_count     = live.num_predictions or num_predictions
+			request_min_words = LIVE_CONFIG.min_words
+		end
 	end
 	local model_ok, model_to_use = xpcall(function()
 		return core_llm.get_current_model()
@@ -1597,7 +1693,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local build_ok, params, skip_reason, signature = pcall(PromptBuilder.build, buffer, {
 		temperature             = temperature,
 		max_words               = max_words,
-		min_words               = min_words,
+		min_words               = request_min_words,
 		num_predictions         = request_count,
 		auto_raise_temperature  = auto_raise_temperature,
 		context_window_chars    = context_window_chars,
@@ -1653,20 +1749,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
 			-- Reuse the single canonical timer instead of creating an orphan;
 			-- store profile_name so the callback can forward it when it fires
-			local callback_owner = _inactivity_timer
-			if callback_owner and callback_owner.callback_running == true
-				and owner_is_current() then
-				-- A natural one-shot remains the logical owner until its business
-				-- callback returns, so publish its successor only after that boundary
-				callback_owner.rearm_delay = remaining
-				callback_owner.rearm_profile = profile_name
-			else
-				_deferred_profile_name = profile_name
-				if stop_inactivity_timer() ~= true or start_inactivity_timer(remaining) ~= true then
-					_deferred_profile_name = nil
-					Logger.error(LOG, "Rate-limit deferral timer did not commit; request abandoned.")
-				end
-			end
+			defer_check(remaining, "Rate-limit deferral")
 			return
 		end
 	end
@@ -1687,10 +1770,16 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local my_fetch_id     = fetch_request_counter
 	local superseded_log_id = retire_request_log(_request_log_id)
 
+	-- The initiating timer owns this check only while its callback runs: its
+	-- guard reads false as soon as the callback returns, so an answer arriving
+	-- later was discarded and no typing prediction ever showed. Once the backend
+	-- call is committed, the request id alone says whether the answer is current.
+	local dispatch_committed = false
+
 	--- Reports whether this exact request still owns the pipeline.
 	--- @return boolean current True while no reset or newer dispatch superseded it.
 	local function is_current_fetch()
-		return owner_is_current()
+		return (dispatch_committed or owner_is_current())
 			and runtime_available()
 			and fetch_request_counter == my_fetch_id
 	end
@@ -1915,6 +2004,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		return
 	end
 	if not is_current_fetch() then return end
+	dispatch_committed = true
 
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
 	-- never a loading paint or failed watchdog construction.
@@ -2238,6 +2328,95 @@ function M.close_screen_answers(session)
 	end
 end
 
+--- Shows the notice of a live-mode transition the user asked for.
+--- @param text string The localised notice.
+local function show_live_notice(text)
+	local ok_show, shown = pcall(tooltip.show, text, true, true)
+	if not ok_show or shown ~= true then
+		Logger.warn(LOG, "Live mode notice was not shown: %s.", tostring(shown))
+	end
+end
+
+--- Turns live mode on with a prompt profile, replacing the one it had. The menu's
+--- active profile and settings are left untouched; the automatic typing trigger
+--- runs this prompt until live mode is turned off. Refused with the notice of
+--- request_prompt_prediction when the value is invalid, the prompt no longer
+--- exists, or the AI cannot answer (paused, off, backend not ready).
+--- @param value string "<profile_id>" or "<profile_id>|<count>" (no count = the menu's).
+--- @return boolean started True when live mode is on with that prompt.
+function M.start_live_prompt(value)
+	if not require_state("start_live_prompt") then return false end
+	local parsed, parse_err = PromptAction.parse(value)
+	if not parsed then
+		Logger.warn(LOG, "Live mode refused: invalid prompt parameter '%s' (%s).",
+			tostring(value), tostring(parse_err))
+		show_refusal_notice("unknown_prompt", UNKNOWN_PROMPT_KEY)
+		return false
+	end
+	-- An empty buffer is no reason to refuse: live mode waits for the typing
+	local reason = manual_refusal()
+	if reason and reason ~= "empty_context" then
+		Logger.info(LOG, "Live mode refused (%s).", reason)
+		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
+		return false
+	end
+	local lookup_ok, profile = xpcall(core_llm.find_profile, debug.traceback, parsed.profile_id)
+	if not lookup_ok then
+		Logger.error(LOG, "Live prompt lookup raised: %s.", tostring(profile))
+		return false
+	end
+	if type(profile) ~= "table" then
+		Logger.warn(LOG, "Live mode refused: the prompt '%s' no longer exists.", parsed.profile_id)
+		show_refusal_notice("unknown_prompt", UNKNOWN_PROMPT_KEY)
+		return false
+	end
+	-- Predictions of the previous mode would stay acceptable under the notice
+	if M.reset() ~= true then
+		Logger.error(LOG, "Live mode not started: the visible predictions could not be cleared.")
+		return false
+	end
+	_live = { profile_id = parsed.profile_id, num_predictions = parsed.num_predictions }
+	local count = parsed.num_predictions or num_predictions
+	Logger.info(LOG, "Live mode on with '%s' (%d prediction(s), debounce %dms).",
+		parsed.profile_id, count, math.floor(LIVE_CONFIG.debounce_sec * 1000 + 0.5))
+	local ProfileLabel = require("ui.menu.menu_llm.profile_label")
+	show_live_notice(i18n.format(LIVE_ON_KEY, ProfileLabel.format(profile.label or profile.id, count)))
+	return true
+end
+
+--- Turns live mode off; the automatic typing trigger runs the menu's profile again.
+--- @param reason string Why, for the log.
+--- @param silent boolean True to skip the notice (pause, AI off, deleted prompt).
+--- @return boolean stopped True when live mode was on.
+function M.stop_live_prompt(reason, silent)
+	if not _live then return false end
+	local profile_id = _live.profile_id
+	_live = nil
+	Logger.info(LOG, "Live mode off (%s; prompt was '%s').", tostring(reason), profile_id)
+	if silent == true then return true end
+	-- The live tooltip must not stay acceptable once the mode is announced off
+	if require_state("stop_live_prompt") and M.reset() ~= true then
+		Logger.error(LOG, "Live mode off, but its visible predictions could not be cleared.")
+	end
+	show_live_notice(i18n.get(LIVE_OFF_KEY))
+	return true
+end
+
+--- The llm_live_prompt_toggle action: turns live mode on with the binding's
+--- prompt, or off when it is on, whatever prompt this binding names.
+--- @param value string The binding's parameter.
+--- @return boolean handled True when live mode changed state.
+function M.toggle_live_prompt(value)
+	if _live then return M.stop_live_prompt("toggled off", false) end
+	return M.start_live_prompt(value)
+end
+
+--- @return table|nil live { profile_id, num_predictions } (nil count = the menu's), or nil when off.
+function M.get_live_prompt()
+	if not _live then return nil end
+	return { profile_id = _live.profile_id, num_predictions = _live.num_predictions }
+end
+
 --- Clears all active predictions and fully resets the prediction pipeline state.
 --- Emits a keylogger dismissal event when predictions were visible before the reset,
 --- except at a global pause boundary where no deferred capability may survive.
@@ -2396,6 +2575,19 @@ function M.consume(idx)
 	return pred, all_preds
 end
 
+--- Runs the request chained to an accepted prediction. In live mode the
+--- accepted text is not asked for again until the user types: the next
+--- keystroke redraws the sentence, and a continuation from the menu's profile
+--- would be a second AI tooltip.
+--- @param continuation_guard function Exact-owner predicate of the chain timer.
+local function run_chain_check(continuation_guard)
+	if _live then
+		Logger.debug(LOG, "Live mode — no chained request after an acceptance.")
+		return
+	end
+	M.perform_check(true, nil, continuation_guard)
+end
+
 --- Arms the chain trigger after a prediction is accepted.
 --- Sets chain_pending and starts a fallback timer in case the F16 signal is missed.
 --- Must be called BEFORE hs.eventtap.keyStroke({}, "f16", 0) is sent by the bridge.
@@ -2420,7 +2612,7 @@ function M.arm_chain()
 			end
 			chain_pending = false
 			Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
-			M.perform_check(true, nil, continuation_guard)
+			run_chain_check(continuation_guard)
 		end)
 	if timer_committed ~= true then
 		Logger.error(LOG, "Chain fallback timer did not commit; exact cleanup is retained.")
@@ -2610,7 +2802,7 @@ function M.handle_chain_signal(keyCode)
 	local generation = _chain_generation
 	local descriptor, dispatch_committed = acquire_chain_timer("dispatch", 0, generation,
 		function(continuation_guard)
-			if runtime_available() then M.perform_check(true, nil, continuation_guard) end
+			if runtime_available() then run_chain_check(continuation_guard) end
 		end)
 	if dispatch_committed ~= true then
 		Logger.error(LOG, "F16 dispatch deferral did not commit; fallback retained.")

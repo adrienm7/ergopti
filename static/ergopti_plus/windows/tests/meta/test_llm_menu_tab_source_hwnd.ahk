@@ -136,9 +136,10 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"source capture must produce one fail-closed HWND/focused-control snapshot")
 	Assert(InStr(CaptureBody, "WIGetFocusedControlToken()") > 0,
 		"source capture must use focused-control identity, not top-level HWND alone")
-	Assert(InStr(OnKeyBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)") > 0,
+	; The third bound argument is live mode's prompt override (or 0)
+	Assert(InStr(OnKeyBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,") > 0,
 		"per-keystroke debounce must bind the source snapshot into its timer closure")
-	Assert(InStr(StartBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)") > 0,
+	Assert(InStr(StartBody, "LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,") > 0,
 		"hotstring-chain timer must bind its own source snapshot too")
 	Assert(InStr(FireBody, '"request_accept_source"') > 0,
 		"FirePrediction must attach the bound source to the current request id")

@@ -23,6 +23,7 @@ local function load_fixture(render_result, previews_enabled, options)
 	helpers.load_with_stubs("infra.logger")
 	local fixture = {
 		scheduled = {},
+		live_stops = {},
 		drained = 0,
 		renders = 0,
 		resets = 0,
@@ -163,6 +164,11 @@ local function load_fixture(render_result, previews_enabled, options)
 		set_runtime_guard = function() end,
 		init = function() return true end,
 		get_llm_enabled = function() return true end,
+		-- A pause ends live mode, silently, before the reset
+		stop_live_prompt = function(reason, silent)
+			fixture.live_stops[#fixture.live_stops + 1] = { reason = reason, silent = silent, resets = fixture.resets }
+			return false
+		end,
 		stop_timer = function()
 			fixture.stops = fixture.stops + 1
 			if type(options.stop_result) == "function" then return options.stop_result() end
@@ -320,6 +326,9 @@ helpers.describe("llm_bridge: deferred preview render owns downstream state", fu
 
 		helpers.assert_true(fixture.bridge.reset_predictions_for_pause())
 		helpers.assert_eq(fixture.resets, resets_before + 1)
+		helpers.assert_eq(#fixture.live_stops, 1, "a pause turns live mode off")
+		helpers.assert_eq(fixture.live_stops[1].silent, true, "without a notice")
+		helpers.assert_eq(fixture.live_stops[1].resets, resets_before, "before the prediction reset")
 		helpers.assert_eq(#fixture.scheduled, scheduled_before,
 			"global pause reset may not leave a telemetry timer capability")
 		helpers.assert_eq(fixture.dismissed, 0,

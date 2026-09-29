@@ -98,9 +98,10 @@ helpers.describe("the shipped rewrite profile is a rewrite prompt", function()
 		helpers.assert_eq(found.batch, false, "a rewrite is one request per prediction")
 	end)
 
-	-- The tone ladder (llm/tone.lua) rewrites a selection into a register: its
-	-- four rungs are rewrite prompts too, and nothing else may be one
-	helpers.it("no other built-in profile than the tone ladder is a rewrite profile", function()
+	-- The tone ladder (llm/tone.lua) rewrites a selection into a register, and
+	-- the live translations (translate_<language>) rewrite the current sentence
+	-- into another language: they are rewrite prompts too, and nothing else may be one
+	helpers.it("no other built-in profile than the tone ladder and the translations is a rewrite profile", function()
 		local fh = assert(io.open(helpers.shared("modules/llm/profiles.json"), "r"))
 		local profiles = json.decode(fh:read("*a"))
 		fh:close()
@@ -111,6 +112,8 @@ helpers.describe("the shipped rewrite profile is a rewrite prompt", function()
 			if ladder[profile.id] then
 				helpers.assert_eq(Rewrite.is_rewrite_profile(profile), true, profile.id)
 				rungs = rungs + 1
+			elseif profile.id:match("^translate_%l%l$") then
+				helpers.assert_eq(Rewrite.is_rewrite_profile(profile), true, profile.id)
 			elseif profile.id ~= "rewrite" then
 				helpers.assert_eq(Rewrite.is_rewrite_profile(profile), false, profile.id)
 			end

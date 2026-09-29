@@ -28,6 +28,9 @@
  *    replays the shared vision corpus, the llm_vision parameter kind is
  *    validated, prompted and sent to the picker, and the capture and request
  *    seams they run through exist.
+ * 7. Live mode (modules/llm/prediction_live.ahk) is included by the prediction
+ *    engine, its action is registered, the automatic trigger and the hotstring
+ *    chain arm its override, pausing ends it and the AI menu draws its row.
  *
  * ROOT CAUSE ENCODED:
  * A module that no runner includes, or a list restated by hand, fails silently
@@ -127,7 +130,8 @@ const TESTS = {
 	'unit/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
 	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json',
 	'unit/test_llm_tone.ahk': 'tone_vectors.json',
-	'unit/test_llm_vision.ahk': 'vision_vectors.json'
+	'unit/test_llm_vision.ahk': 'vision_vectors.json',
+	'unit/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
 	check(runAll.includes(test), `tests/run_all.ahk must #Include ${test}`);
@@ -306,6 +310,47 @@ check(
 check(
 	bodyOf(screenshots, 'GestureRegionCaptureFinish').includes('_GestureRegionNotify(State.Get("callback", 0)'),
 	'a region capture must report its end to the owner that asked for it'
+);
+
+// 7. Live mode: one owner, the automatic trigger's override, pause and menu.
+check(
+	includesOf(read('modules/llm/prediction_engine.ahk')).includes('prediction_live.ahk'),
+	'the prediction engine must include prediction_live.ahk, the owner of live mode'
+);
+check(
+	actions.includes('"llm_live_prompt_toggle", {') &&
+		bodyOf(actions, 'GestureLivePromptToggle').includes('LLM_Menu_ToggleLiveMode('),
+	'llm_live_prompt_toggle must be a registered action running the live toggle'
+);
+const keystrokes = read('modules/llm/prediction_keylogger.ahk');
+// StartTimer's signature spans two lines, which bodyOf does not follow.
+const bodyFrom = (source, name) => {
+	const start = source.search(new RegExp(`^${name}\\(`, 'm'));
+	const end = start < 0 ? -1 : source.indexOf('\n}', start);
+	return end < 0 ? '' : source.slice(start, end);
+};
+for (const name of ['LLM_Engine_OnKeystroke', 'LLM_Engine_StartTimer']) {
+	const body = bodyFrom(keystrokes, name);
+	check(
+		body.includes('LLM_Engine_LiveOverride()') && body.includes('LLM_Engine_LiveDebounceMs()'),
+		`${name} must arm live mode's override and debounce`
+	);
+}
+check(
+	bodyOf(read('infra/lifecycle.ahk'), 'Ergopti_OnSuspendEnter').includes('"llm-live-mode"'),
+	'pausing must turn live mode off'
+);
+check(
+	bodyOf(read('ui/menu/menu_llm/menu_main.ahk'), '_LLM_Menu_EmitRow').includes(
+		'case "llm_live_mode":'
+	),
+	'the AI menu must draw the llm_live_mode row'
+);
+check(
+	bodyOf(read('infra/hotstrings/hotstring_dispatch.ahk'), '_HSE_MirrorCanonicalEffectToLlm').includes(
+		'LLM_Bridge_ReissueLiveAfterExpansion()'
+	),
+	'a hotstring expansion must re-issue the live request on the expanded text'
 );
 
 if (errors.length > 0) {

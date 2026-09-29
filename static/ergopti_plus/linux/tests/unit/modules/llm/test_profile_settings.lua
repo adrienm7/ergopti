@@ -295,7 +295,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 		local ids = {}
 		for index, profile in ipairs(settings.list_built_in()) do ids[index] = profile.id end
 		helpers.assert_eq(table.concat(ids, ","),
-			"raw,basic,advanced,batch_advanced,rewrite,tone_familiar,tone_neutral,tone_formal,tone_very_formal")
+			"raw,basic,advanced,batch_advanced,rewrite,tone_familiar,tone_neutral,tone_formal,tone_very_formal,translate_en,translate_ja")
 		helpers.assert_true(require("llm.rewrite").is_rewrite_profile(settings.resolve_id("rewrite")),
 			"the rewrite built-in is recognised by its prompt")
 		helpers.assert_true(settings.set("active", "rewrite", "small"), "and selectable like the others")

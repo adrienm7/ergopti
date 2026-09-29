@@ -234,6 +234,7 @@ return {
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.test_prediction_trigger_now",
 	"tests.unit.modules.llm.test_prompt_prediction",
+	"tests.unit.modules.llm.test_live_mode",
 	"tests.unit.modules.llm.test_tone_selection",
 	"tests.unit.modules.llm.test_screen_answers",
 	"tests.unit.modules.llm.test_prediction_triggers",
