@@ -32,10 +32,9 @@
 --- 5. Non-blocking: full check + install runs in a background hs.task so
 ---    the Hammerspoon main loop is never frozen, even on a fresh clone
 ---    where bootstrapping uv + Python + the MLX wheels takes minutes.
---- 6. Tri-state lifecycle: callers branch on get_state() ("pending" /
----    "ready" / "failed"). The IA menu stays usable while bootstrap is
----    "pending" and only flips to "failed" if a real IA attempt occurs
----    after a definitive failure.
+--- 6. Explicit lifecycle: callers branch on get_state() ("pending" /
+---    "ready" / "missing" / "failed"). "missing" means no runtime and no
+---    selection asked for one; the IA menu stays usable in every state.
 --- ==============================================================================
 
 local M = {}
@@ -88,7 +87,8 @@ local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_m
 -- Module-level state so callers can branch on the bootstrap outcome without
 -- re-running the script. The values are:
 --   "pending" — bootstrap not finished yet (initial state).
---   "ready"   — venv is provisioned and pyproject.toml hash matches.
+--   "ready"   — venv is provisioned (interpreter plus sync fingerprint).
+--   "missing" — no runtime, and no MLX selection authorized an install.
 --   "failed"  — bootstrap failed; IA features must stay disabled.
 local _bootstrap_state = "pending"
 
@@ -1374,7 +1374,7 @@ end
 --- ==================================
 --- ==================================
 
---- @return string The current bootstrap state ("pending" / "ready" / "failed").
+--- @return string The current bootstrap state ("pending" / "ready" / "missing" / "failed").
 function M.get_state() return _bootstrap_state end
 
 --- @return boolean True only when the venv is fully provisioned and matches

@@ -1091,7 +1091,7 @@ end
 --- ==================================
 --- ==================================
 
---- @return string The dependency provisioning state ("pending" / "ready" / "failed").
+--- @return string The dependency provisioning state ("pending" / "ready" / "missing" / "failed").
 function M.get_state() return _bootstrap_state end
 
 --- @return boolean True only when binary provisioning committed.
