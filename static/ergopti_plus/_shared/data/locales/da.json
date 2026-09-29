@@ -934,6 +934,7 @@
 	"magickey.textexpansionsymbols": "Symboludvidelse: -->★ = ➜, (v)★ = ✓…",
 	"magickey.textexpansionsymbolstypst": "Typst-symboler: $eq.not$★ = ≠, $PP$★ = ℙ…",
 	"menu.about.changelog": "Versioner",
+	"menu.about.channel_menu": "Opdateringskanal: {channel}",
 	"menu.about.check_for_updates": "Søg efter opdateringer",
 	"menu.about.frequency.12h": "Hver 12. time",
 	"menu.about.frequency.1d": "Hver dag",

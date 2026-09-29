@@ -47,6 +47,9 @@ local function fake_updater(subscribed)
 	return up, calls
 end
 
+-- Where the channel submenu sits: after the version row and its separator.
+local CHANNEL_AT = 3
+
 local function build(up, changed)
 	local mb = helpers.load_module("ui.menu.menu_builder")
 	return mb.build({
@@ -66,35 +69,67 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		end
 	end)
 
-	helpers.it("lists one ticked row per registry channel right before the check row", function()
-		local up = fake_updater("dev")
-		local rows = submenu_of(build(up), "menu.about.title")
-		helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
+	helpers.it("one channel submenu, titled with the subscribed channel, right before the check row", function()
 		local i18n = require("infra.i18n")
-		helpers.assert_eq(rows[1].title, "ErgoptiPlus 0.0.0-dev.140", "the version row comes first")
-		helpers.assert_eq(rows[2].title, "-", "a separator follows the version")
-		local ids = up.CHANNELS.ids()
+		local template = i18n.get("menu.about.channel_menu")
+		helpers.assert_true(template:find("{channel}", 1, true) ~= nil,
+			"the title template must carry its placeholder, got '" .. template .. "'")
+		local ids = fake_updater("dev").CHANNELS.ids()
 		helpers.assert_true(#ids >= 2, "the registry must declare the channels")
-		for index, id in ipairs(ids) do
-			local row = rows[2 + index]
-			helpers.assert_eq(row.title, i18n.get(up.CHANNELS.channel(id).menu_label_key),
-				"channel row " .. index .. " reads its registry label")
-			helpers.assert_eq(row.checked == true, id == "dev", "only the subscribed channel is ticked")
+		for _, subscribed in ipairs(ids) do
+			local up = fake_updater(subscribed)
+			local rows = submenu_of(build(up), "menu.about.title")
+			helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
+			helpers.assert_eq(rows[1].title, "ErgoptiPlus 0.0.0-dev.140", "the version row comes first")
+			helpers.assert_eq(rows[2].title, "-", "a separator follows the version")
+			local picker = rows[CHANNEL_AT]
+			helpers.assert_eq(picker.title,
+				(template:gsub("{channel}", i18n.get(up.CHANNELS.channel(subscribed).label_key))),
+				"the title names the subscribed channel " .. subscribed)
+			helpers.assert_eq(#picker.menu, #ids, "one row per registry channel")
+			local ticked = 0
+			for index, id in ipairs(ids) do
+				helpers.assert_eq(picker.menu[index].title, i18n.get(up.CHANNELS.channel(id).menu_label_key),
+					"channel row " .. index .. " reads its registry label, in registry order")
+				if picker.menu[index].checked == true then
+					ticked = ticked + 1
+					helpers.assert_eq(id, subscribed, "only the subscribed channel is ticked")
+				end
+			end
+			helpers.assert_eq(ticked, 1, "exactly one channel is ticked")
+			helpers.assert_eq(rows[CHANNEL_AT + 1].title, i18n.get("menu.about.check_for_updates"),
+				"the check row comes right after the channel submenu")
+			helpers.assert_true(type(rows[CHANNEL_AT + 2].menu) == "table" and #rows[CHANNEL_AT + 2].menu > 0,
+				"the check-frequency picker follows the check row")
 		end
-		helpers.assert_eq(rows[3 + #ids].title, i18n.get("menu.about.check_for_updates"),
-			"the check row comes right after the channel rows")
-		helpers.assert_true(type(rows[4 + #ids].menu) == "table" and #rows[4 + #ids].menu > 0,
-			"the check-frequency picker follows the check row")
 	end)
 
-	helpers.it("a channel row subscribes to its own channel and redraws the tray", function()
+	helpers.it("no channel is a flat row of the About submenu any more", function()
+		local up = fake_updater("dev")
+		local rows = submenu_of(build(up), "menu.about.title")
+		local i18n = require("infra.i18n")
+		for _, row in ipairs(rows) do
+			for _, id in ipairs(up.CHANNELS.ids()) do
+				helpers.assert_true(row.title ~= i18n.get(up.CHANNELS.channel(id).menu_label_key),
+					"the channel " .. id .. " must be listed inside the channel submenu only")
+			end
+		end
+	end)
+
+	helpers.it("a channel row subscribes to its own channel, redraws the tray and retitles it", function()
 		local up, calls = fake_updater("dev")
 		local changed = { count = 0 }
-		local rows = submenu_of(build(up, changed), "menu.about.title")
 		local ids = up.CHANNELS.ids()
-		for index = 1, #ids do rows[2 + index].fn() end
+		for index = 1, #ids do
+			submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT].menu[index].fn()
+		end
 		helpers.assert_eq(calls.set, ids, "each row must subscribe to its own channel, in registry order")
 		helpers.assert_eq(changed.count, #ids, "the tray is redrawn so the tick follows the channel")
+		local i18n = require("infra.i18n")
+		local rows = submenu_of(build(up), "menu.about.title")
+		helpers.assert_eq(rows[CHANNEL_AT].title, (i18n.get("menu.about.channel_menu"):gsub("{channel}",
+			i18n.get(up.CHANNELS.channel(ids[#ids]).label_key))),
+			"the redrawn title names the channel chosen last")
 	end)
 
 	helpers.it("keeps checking separate from consent to the displayed release", function()
@@ -105,7 +140,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		up.get_cached_release = function() return release end
 		up.download_update = function(url) downloads[#downloads + 1] = url return true end
 		local rows = submenu_of(build(up), "menu.about.title")
-		local check_index = 3 + #up.CHANNELS.ids()
+		local check_index = CHANNEL_AT + 1
 		rows[check_index].fn()
 		helpers.assert_eq(calls.checks, 1, "checking must still check after a release was found")
 		helpers.assert_eq(#downloads, 0, "checking never authorizes a download")
@@ -130,7 +165,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			local up = fake_updater("dev")
 			up.get_check_interval = function() return pair[1] end
 			local rows = submenu_of(build(up), "menu.about.title")
-			local picker = rows[4 + #up.CHANNELS.ids()]
+			local picker = rows[CHANNEL_AT + 2]
 			helpers.assert_eq(picker.title,
 				i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. pair[2]),
 				"the parent row names the preset in force for " .. pair[1] .. " s")
@@ -159,7 +194,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local ok, err = pcall(function()
 			local rows = submenu_of(build(up), "menu.about.title")
 			local ids = up.CHANNELS.ids()
-			rows[3].fn()
+			rows[CHANNEL_AT].menu[1].fn()
 			helpers.assert_eq(#pushed, 1, "the page must hear of the change once")
 			helpers.assert_eq(pushed[1].action, "channel_changed")
 			helpers.assert_eq(pushed[1].channel, ids[1])

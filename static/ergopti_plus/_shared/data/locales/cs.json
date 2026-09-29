@@ -934,6 +934,7 @@
 	"magickey.textexpansionsymbols": "Rozvinutí symbolů: -->★ = ➜, (v)★ = ✓…",
 	"magickey.textexpansionsymbolstypst": "Symboly Typst: $eq.not$★ = ≠, $PP$★ = ℙ…",
 	"menu.about.changelog": "Verze",
+	"menu.about.channel_menu": "Kanál aktualizací: {channel}",
 	"menu.about.check_for_updates": "Zkontrolovat aktualizace",
 	"menu.about.frequency.12h": "Každých 12 hodin",
 	"menu.about.frequency.1d": "Každý den",

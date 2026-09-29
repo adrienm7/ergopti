@@ -934,6 +934,7 @@
 	"magickey.textexpansionsymbols": "기호 확장: -->★ = ➜, (v)★ = ✓…",
 	"magickey.textexpansionsymbolstypst": "Typst 기호: $eq.not$★ = ≠, $PP$★ = ℙ…",
 	"menu.about.changelog": "릴리스",
+	"menu.about.channel_menu": "업데이트 채널: {channel}",
 	"menu.about.check_for_updates": "업데이트 확인",
 	"menu.about.frequency.12h": "12시간마다",
 	"menu.about.frequency.1d": "매일",

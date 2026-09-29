@@ -461,11 +461,7 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	}
 	Rows.Push(Map("separator", true))
 
-	for _, Id in UpdateChannels_Ids()
-		Rows.Push(Map(
-			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
-			"action",  _MI_ChannelSetter(Id, SetChannelFn),
-			"checked", (Id == UPDATER_CHANNEL)))
+	Rows.Push(_MI_ChannelPickerRow(SetChannelFn))
 
 	if IsLocal {
 		return Rows
@@ -491,6 +487,24 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		"label", t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode),
 		"items", FreqRows))
 	return Rows
+}
+
+; The channel picker: one submenu titled with the subscribed channel's registry
+; name, one row per registry channel in registry order, ticked on the subscribed
+; one. A click subscribes through the injected setter (Updater_SetChannel in
+; production), which persists the choice and rebuilds the tray, so the title
+; follows.
+_MI_ChannelPickerRow(SetChannelFn) {
+	global UPDATER_CHANNEL
+	ChannelRows := []
+	for _, Id in UpdateChannels_Ids()
+		ChannelRows.Push(Map(
+			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
+			"action",  _MI_ChannelSetter(Id, SetChannelFn),
+			"checked", (Id == UPDATER_CHANNEL)))
+	return Map(
+		"label", StrReplace(t("menu.about.channel_menu"), "{channel}", _Updater_ChannelLabel(UPDATER_CHANNEL)),
+		"items", ChannelRows)
 }
 
 ; Binds one channel id per row. A fat arrow written in the loop above would
