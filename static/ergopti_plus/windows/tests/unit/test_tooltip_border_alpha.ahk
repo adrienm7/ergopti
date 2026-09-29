@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Tooltip Border Alpha-Fixup Tests
 ; DESCRIPTION:
-; Pins the correctness of _TooltipFixBorderAlpha (infra/tooltip.ahk), the optimized
-; per-pixel pass that rewrites GDI RoundRect output to premultiplied border alpha
-; for the layered border window. The production scan only visits the two
+; Pins the correctness of _TooltipFixBorderAlpha (ui/tooltip/helpers.ahk), the
+; optimized per-pixel pass that rewrites GDI outline output to premultiplied
+; border alpha for the layered border window. The production scan only visits the two
 ; horizontal edge rows, the corner-column zones of the top/bottom bands, and the
 ; vertical edge columns of the middle rows -- a deliberate departure from a naive
 ; full-bitmap scan, taken because the BorderPixelLoop hot-path warnings clustered
@@ -15,9 +15,11 @@
 ; RATIONALE:
 ; The optimization is only safe if the visited zones cover EXACTLY the pixels GDI
 ; actually paints. Rather than trust geometric reasoning, each test paints a real
-; GDI RoundRect into a 32-bpp DIB (mirroring _TooltipShowBorder), runs the
-; production fixup on one copy and a full O(Wp*Hp) reference scan on a second
-; identical copy, and asserts the two buffers are byte-identical. Any pixel GDI
+; GDI outline into a 32-bpp DIB, runs the production fixup on one copy and a full
+; O(Wp*Hp) reference scan on a second identical copy, and asserts the two buffers
+; are byte-identical. The "ring" cases paint with the production rasterizer
+; (_TooltipRasterizeBorderRing, a frame of the content window's region); the
+; RoundRect cases keep covering any other 1 px rounded outline. Any pixel GDI
 ; paints outside the optimized scan's zones -- for any geometry, present or future
 ; -- makes the buffers diverge and fails the test. This is the root-cause guard:
 ; the invariant is "optimized scan == rewrite-every-nonzero-pixel", verified
@@ -30,17 +32,16 @@
 
 
 
-; =====================================================
-; =====================================================
-; ======= 1/ GDI RoundRect DIB Painting Helpers =======
-; =====================================================
-; =====================================================
+; ===================================================
+; ===================================================
+; ======= 1/ GDI Outline DIB Painting Helpers =======
+; ===================================================
+; ===================================================
 
-; Paint a 1 px white rounded-rect outline into a fresh top-down 32-bpp DIB,
-; mirroring the DIB build in _TooltipShowBorder so the test exercises the exact
-; pixel layout the production rasterizer produces. Returns a record carrying the
-; handles (for cleanup) and the base pixel pointer. Caller must call _TtbFreeDib.
-_TtbPaintRoundRect(Wp, Hp, Diam) {
+; Create a fresh top-down 32-bpp DIB cleared to transparent black, mirroring the
+; DIB build in _TooltipBuildBorder. Returns a record carrying the handles (for
+; cleanup) and the base pixel pointer. Caller must call _TtbFreeDib.
+_TtbNewClearDib(Wp, Hp) {
 	BmpInfo := Buffer(40, 0)
 	NumPut("UInt", 40, BmpInfo, 0)    ; biSize
 	NumPut("Int", Wp, BmpInfo, 4)     ; biWidth
@@ -57,11 +58,16 @@ _TtbPaintRoundRect(Wp, Hp, Diam) {
 	MemDC := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
 	DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
 	OldBmp := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HBmp, "Ptr")
-
-	; Clear to transparent black, then stroke the rounded-rect outline with a
-	; 1 px white pen and a null brush -- identical to the production border build.
 	DllCall("Gdi32\PatBlt", "Ptr", MemDC,
 		"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)  ; BLACKNESS
+	return { HBmp: HBmp, MemDC: MemDC, OldBmp: OldBmp, PixPtr: PixPtr }
+}
+
+; Stroke a 1 px white rounded-rect outline with a null brush, the rasterizer the
+; border used before it framed the content region.
+_TtbPaintRoundRect(Wp, Hp, Diam) {
+	D := _TtbNewClearDib(Wp, Hp)
+	MemDC := D.MemDC
 	HPen := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1, "UInt", 0xFFFFFF, "Ptr")
 	HNull := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH = 5
 	OldPen := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HPen, "Ptr")
@@ -72,11 +78,17 @@ _TtbPaintRoundRect(Wp, Hp, Diam) {
 	DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldPen)
 	DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBr)
 	DllCall("Gdi32\DeleteObject", "Ptr", HPen)
-
-	return { HBmp: HBmp, MemDC: MemDC, OldBmp: OldBmp, PixPtr: PixPtr }
+	return D
 }
 
-; Release the GDI objects backing a DIB returned by _TtbPaintRoundRect.
+; Paint the ring exactly as _TooltipBuildBorder does before its alpha fixup.
+_TtbPaintProductionRing(Wp, Hp, Diam) {
+	D := _TtbNewClearDib(Wp, Hp)
+	_TooltipRasterizeBorderRing(D.MemDC, { W: Wp, H: Hp, Diam: Diam })
+	return D
+}
+
+; Release the GDI objects backing a DIB returned by _TtbNewClearDib.
 _TtbFreeDib(D) {
 	DllCall("Gdi32\SelectObject", "Ptr", D.MemDC, "Ptr", D.OldBmp)
 	DllCall("Gdi32\DeleteDC", "Ptr", D.MemDC)
@@ -103,7 +115,7 @@ _TtbRefFixAlpha(PixPtr, Wp, Hp, PremulPx) {
 	}
 }
 
-; Count non-zero pixels (sanity that RoundRect actually painted an outline).
+; Count non-zero pixels (sanity that GDI actually painted an outline).
 _TtbCountNonZero(PixPtr, Wp, Hp) {
 	N := 0
 	loop (Wp * Hp) {
@@ -148,35 +160,44 @@ _RunTooltipBorderAlphaTests() {
 	Cases.Push({ Id: "diam_equals_dims",   Wp: 14,  Hp: 14,  Diam: 14 })
 
 	for C in Cases {
-		_RunOne(Cid, Cw, Ch, Cd, Premul) {
-			Opt := _TtbPaintRoundRect(Cw, Ch, Cd)
-			Ref := _TtbPaintRoundRect(Cw, Ch, Cd)
-			Assert(Opt.PixPtr and Ref.PixPtr,
-				"border alpha [" . Cid . "]: DIB creation failed")
-
-			; RoundRect must have painted something, otherwise the byte-equality
-			; check below would trivially pass on two all-zero buffers.
-			Painted := _TtbCountNonZero(Opt.PixPtr, Cw, Ch)
-			Assert(Painted > 0,
-				"border alpha [" . Cid . "]: RoundRect painted no pixels")
-
-			_TooltipFixBorderAlpha(Opt.PixPtr, Cw, Ch, Cd, Premul)
-			_TtbRefFixAlpha(Ref.PixPtr, Cw, Ch, Premul)
-
-			Assert(_TtbBuffersEqual(Opt.PixPtr, Ref.PixPtr, Cw, Ch),
-				"border alpha [" . Cid . "]: optimized scan diverged from full-scan reference")
-
-			; The same set of pixels must be non-zero after the fixup -- every
-			; painted pixel is now PremulPx (non-zero), none were missed or zeroed.
-			Assert(_TtbCountNonZero(Opt.PixPtr, Cw, Ch) == Painted,
-				"border alpha [" . Cid . "]: painted-pixel count changed after fixup")
-
-			_TtbFreeDib(Opt)
-			_TtbFreeDib(Ref)
-		}
 		Test("tooltip border alpha: " . C.Id,
-			_RunOne.Bind(C.Id, C.Wp, C.Hp, C.Diam, PremulPx))
+			_TtbRunAlphaCase.Bind(_TtbPaintRoundRect, C.Id, C.Wp, C.Hp,
+				C.Diam, PremulPx))
+		; Production never frames a diameter larger than the surface: raster and
+		; fixup share the value _TooltipSurfaceGeometry clamps the same way. The
+		; headless harness never loads the TOML corner radius, so the case keeps
+		; its own diameter instead of reading the unloaded style global.
+		Test("tooltip border alpha: ring " . C.Id . " (tooltip-border-ring-region)",
+			_TtbRunAlphaCase.Bind(_TtbPaintProductionRing, "ring " . C.Id,
+				C.Wp, C.Hp, Min(C.Diam, C.Wp, C.Hp), PremulPx))
 	}
+}
+
+_TtbRunAlphaCase(Paint, Cid, Cw, Ch, Cd, Premul) {
+	Opt := Paint(Cw, Ch, Cd)
+	Ref := Paint(Cw, Ch, Cd)
+	Assert(Opt.PixPtr and Ref.PixPtr,
+		"border alpha [" . Cid . "]: DIB creation failed")
+
+	; The outline must have painted something, otherwise the byte-equality
+	; check below would trivially pass on two all-zero buffers.
+	Painted := _TtbCountNonZero(Opt.PixPtr, Cw, Ch)
+	Assert(Painted > 0,
+		"border alpha [" . Cid . "]: the outline painted no pixels")
+
+	_TooltipFixBorderAlpha(Opt.PixPtr, Cw, Ch, Cd, Premul)
+	_TtbRefFixAlpha(Ref.PixPtr, Cw, Ch, Premul)
+
+	Assert(_TtbBuffersEqual(Opt.PixPtr, Ref.PixPtr, Cw, Ch),
+		"border alpha [" . Cid . "]: optimized scan diverged from full-scan reference")
+
+	; The same set of pixels must be non-zero after the fixup -- every
+	; painted pixel is now PremulPx (non-zero), none were missed or zeroed.
+	Assert(_TtbCountNonZero(Opt.PixPtr, Cw, Ch) == Painted,
+		"border alpha [" . Cid . "]: painted-pixel count changed after fixup")
+
+	_TtbFreeDib(Opt)
+	_TtbFreeDib(Ref)
 }
 
 _RunTooltipBorderAlphaTests()
