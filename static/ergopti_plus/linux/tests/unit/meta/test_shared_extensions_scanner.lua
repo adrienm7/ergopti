@@ -33,6 +33,7 @@ local Extensions = helpers.load_module("hotstrings.extensions")
 -- Shared with the macOS suite and the Windows scanner, so the three readers of a
 -- manifest's historical bindings are pinned to one set of decisions.
 local BINDING_VECTORS_PATH = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/extension_binding_vectors.json"
+local MAGIC_KEY_VECTORS_PATH = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/extension_magic_key_vectors.json"
 
 
 --- Builds an injected filesystem from a plain description.
@@ -246,4 +247,11 @@ do
 	local text = fh:read("*a")
 	fh:close()
 	require("test.extension_binding_contract")(helpers, Extensions, Json.decode(text))
+end
+
+do
+	local fh = assert(io.open(MAGIC_KEY_VECTORS_PATH, "r"))
+	local text = fh:read("*a")
+	fh:close()
+	require("test.extension_magic_key_contract")(helpers, Extensions, Json.decode(text))
 end

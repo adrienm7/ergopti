@@ -74,6 +74,22 @@ const REQUIRED_KEYS = [
 ];
 const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb', 'extension_source'];
 const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
+
+// The rules the extension scanners apply to a manifest's historical hotstring
+// bindings and declared magic key (_shared/lua/hotstrings/extensions.lua and
+// windows/infra/hotstrings/extension_packs.ahk). A published manifest that
+// breaks them would make every driver refuse its whole extension catalogue, so
+// the build refuses it first; all three replay the same shared vectors.
+const BINDING_FIELDS = ['category', 'feature_section', 'sections', 'source'];
+const BINDING_SOURCES = ['common'];
+const STEM_RE = /^[a-z][a-z0-9_-]*$/;
+const IDENTIFIER_RE = /^[a-z][a-z0-9_]*$/;
+const FEATURE_SECTION_RE = /^hotstrings\.[a-z][a-z0-9_]*$/;
+const MAGIC_KEY_FIELDS = ['key'];
+const KEY_CODE_RE = /^[A-Z][A-Za-z0-9]*$/;
+const PHYSICAL_KEYS = JSON.parse(
+	fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+).keys;
 const KEYSYM_RE = /^[A-Za-z0-9_]+$/;
 
 // =============================
@@ -318,6 +334,76 @@ function keyboardName(text) {
  * @param {object} meta - Layout metadata, including an optional licence file.
  * @returns {object} Extension metadata and verified file descriptors.
  */
+function isPlainObject(value) {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Validates the historical hotstring bindings and the magic key of one manifest.
+ * @param {object} extension - The parsed [extension] table.
+ * @param {string[]} hotstringStems - Stems of the pack's hotstrings/*.toml files.
+ * @returns {string[]} Every problem found; empty when the manifest is valid.
+ */
+function validateExtensionManifest(extension, hotstringStems) {
+	const errors = [];
+	const bindings = extension.hotstring_bindings;
+	if (bindings !== undefined) {
+		if (!isPlainObject(bindings)) errors.push('hotstring_bindings must be a table');
+		else {
+			for (const [stem, binding] of Object.entries(bindings)) {
+				if (!STEM_RE.test(stem) || !isPlainObject(binding)) {
+					errors.push(`hotstring binding ${stem} is malformed`);
+					continue;
+				}
+				for (const key of Object.keys(binding)) {
+					if (!BINDING_FIELDS.includes(key))
+						errors.push(`hotstring binding ${stem} has unknown field ${key}`);
+				}
+				if (
+					typeof binding.category !== 'string' ||
+					!IDENTIFIER_RE.test(binding.category) ||
+					typeof binding.feature_section !== 'string' ||
+					!FEATURE_SECTION_RE.test(binding.feature_section) ||
+					!BINDING_SOURCES.includes(binding.source)
+				) {
+					errors.push(
+						`hotstring binding ${stem} does not name a historical category, section and source`
+					);
+				}
+				if (binding.sections !== undefined) {
+					const sections = binding.sections;
+					if (
+						!Array.isArray(sections) ||
+						sections.length === 0 ||
+						new Set(sections).size !== sections.length ||
+						sections.some((section) => typeof section !== 'string' || !IDENTIFIER_RE.test(section))
+					) {
+						errors.push(`hotstring binding ${stem} has an invalid section selection`);
+					}
+				}
+				if (!hotstringStems.includes(stem))
+					errors.push(`hotstring binding ${stem} names no hotstrings file`);
+			}
+		}
+	}
+	const magicKey = extension.magic_key;
+	if (magicKey !== undefined) {
+		if (!isPlainObject(magicKey)) errors.push('magic_key must be a table');
+		else {
+			for (const key of Object.keys(magicKey)) {
+				if (!MAGIC_KEY_FIELDS.includes(key)) errors.push(`magic_key has unknown field ${key}`);
+			}
+			const code = magicKey.key;
+			if (typeof code !== 'string' || !KEY_CODE_RE.test(code)) {
+				errors.push('magic_key.key must be a KeyboardEvent.code');
+			} else if (!Object.hasOwn(PHYSICAL_KEYS, code) || PHYSICAL_KEYS[code].kind !== 'key') {
+				errors.push(`magic_key.key ${code} is no key of the physical-key registry`);
+			}
+		}
+	}
+	return errors;
+}
+
 function buildExtension(folder, id, meta) {
 	const sourceId = meta.extension_source || id;
 	if (!ID_RE.test(sourceId)) throw new Error(`${id}: invalid extension source`);
@@ -363,6 +449,13 @@ function buildExtension(folder, id, meta) {
 				throw new Error(`${id}: unsupported extension file ${category}/${item.name}`);
 			relativePaths.push(`${category}/${item.name}`);
 		}
+	}
+	const hotstringStems = relativePaths
+		.filter((relative) => relative.startsWith('hotstrings/'))
+		.map((relative) => relative.slice('hotstrings/'.length, -'.toml'.length));
+	const manifestErrors = validateExtensionManifest(extension, hotstringStems);
+	if (manifestErrors.length > 0) {
+		throw new Error(`${id}: manifest.toml ${manifestErrors.join('; ')}`);
 	}
 	const files = relativePaths.sort().map((relative) => {
 		const ownFile = relative === `${id}.keylayout` || relative === meta.licence_file;
@@ -516,5 +609,6 @@ module.exports = {
 	validateMeta,
 	validateRegistry,
 	validateKeylayout,
+	validateExtensionManifest,
 	keyboardName
 };

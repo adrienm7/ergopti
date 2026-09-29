@@ -37,7 +37,8 @@ const {
 	buildIndex,
 	validateMeta,
 	validateRegistry,
-	validateKeylayout
+	validateKeylayout,
+	validateExtensionManifest
 } = require('../build/build-layouts-index.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -418,6 +419,49 @@ check('layout extensions inventory existing-format files and reject incomplete p
 		fs.rmSync(fixture, { recursive: true, force: true });
 	}
 });
+
+check('the builder refuses the manifests the extension scanners refuse (shared vectors)', () => {
+	const { parse: parseToml } = require('smol-toml');
+	const corpus = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'tests', 'corpus', 'layouts');
+	const read = (name) => JSON.parse(fs.readFileSync(path.join(corpus, name), 'utf8'));
+	const bindings = read('extension_binding_vectors.json').cases;
+	assert.ok(bindings.length >= 8, 'the binding vectors lost their coverage');
+	for (const scenario of bindings) {
+		const refused = scenario.packs.some(
+			(pack) =>
+				validateExtensionManifest(parseToml(pack.manifest).extension || {}, pack.files).length > 0
+		);
+		assert.strictEqual(refused, !scenario.valid, scenario.name);
+	}
+	const magicKeys = read('extension_magic_key_vectors.json').cases;
+	assert.ok(magicKeys.length >= 8, 'the magic-key vectors lost their coverage');
+	for (const scenario of magicKeys) {
+		const errors = validateExtensionManifest(parseToml(scenario.manifest).extension || {}, []);
+		assert.strictEqual(errors.length === 0, scenario.valid && scenario.published, scenario.name);
+	}
+});
+
+check(
+	'every published manifest passes the scanner rules and Ergopti declares its magic key',
+	() => {
+		const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
+		const { parse: parseToml } = require('smol-toml');
+		const ergopti = parseToml(
+			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti', 'manifest.toml'), 'utf8')
+		).extension;
+		assert.deepStrictEqual(
+			ergopti.magic_key,
+			{ key: 'KeyC' },
+			'Ergopti declares the key its layout places the magic key on'
+		);
+		for (const entry of index.layouts) {
+			const manifest = parseToml(
+				fs.readFileSync(path.join(REGISTRY_DIR, entry.extension.id, 'manifest.toml'), 'utf8')
+			).extension;
+			assert.deepStrictEqual(validateExtensionManifest(manifest, []), [], entry.id);
+		}
+	}
+);
 
 console.log(`\n${passes} passed, ${failures} failed`);
 if (failures > 0) process.exit(1);

@@ -437,6 +437,35 @@ _LCT_ExtensionBindingVectorsCase() {
 	AssertTrue(Valid >= 3 && Invalid >= 5, "the shared vectors lost their coverage")
 }
 
+Test("layout extensions: the shared magic-key vectors read the same declaration on Windows (layout-magic-key)",
+	_LCT_ExtensionMagicKeyVectorsCase)
+
+; Replays _shared/tests/corpus/layouts/extension_magic_key_vectors.json through
+; the real scanner on a real manifest, as the macOS and Linux suites do.
+_LCT_ExtensionMagicKeyVectorsCase() {
+	Doc := JsonParse(_LCT_Read(_SharedDir . "\tests\corpus\layouts\extension_magic_key_vectors.json"))
+	Declared := 0, Refused := 0
+	for Scenario in Doc["cases"] {
+		Dir := _LCT_TempDir()
+		try {
+			Root := Dir . "ext"
+			DirCreate(Root . "\geometry\hotstrings")
+			_LCT_WriteRaw(Root . "\geometry\manifest.toml", Scenario["manifest"])
+			if !Scenario["valid"] {
+				Refused += 1
+				AssertThrows(() => HotstringExtensions_Scan([Root]), Scenario["name"])
+				continue
+			}
+			Packs := HotstringExtensions_Scan([Root])
+			AssertEqual(1, Packs.Length, Scenario["name"])
+			AssertEqual(Scenario["magic_key"], Packs[1].magic_key, Scenario["name"])
+			if Scenario["magic_key"] != ""
+				Declared += 1
+		} finally DirDelete(Dir, true)
+	}
+	AssertTrue(Declared >= 2 && Refused >= 4, "the shared vectors lost their coverage")
+}
+
 _LCT_ExtensionDesiredCase() {
 	Category := "ext:ergopti:rolls"
 	Packs := [{ id: "ergopti", name: "Ergopti", toml_files: [

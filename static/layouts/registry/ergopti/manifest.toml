@@ -5,3 +5,9 @@ id = "ergopti"
 name = "Ergopti"
 version = "2.2.2"
 author = "Adrien Moyaux"
+
+# The physical key (W3C KeyboardEvent.code) the Ergopti layouts turn into the
+# magic key: the one that types j at the QWERTY C position. The user's own
+# choice of key always wins over this declaration.
+[extension.magic_key]
+key = "KeyC"

@@ -59,6 +59,14 @@ local STEM_PATTERN = "^[a-z][a-z0-9_-]*$"
 local IDENTIFIER_PATTERN = "^[a-z][a-z0-9_]*$"
 local FEATURE_SECTION_PATTERN = "^hotstrings%.[a-z][a-z0-9_]*$"
 
+-- The one field of [extension.magic_key]: the physical key, named by its W3C
+-- KeyboardEvent.code as in _shared/data/keycodes/physical_keys.json, that types
+-- the magic key on the extension's layout. The shape is checked here; whether
+-- the registry knows the code is checked where a driver resolves it to its own
+-- key identifier, and by the registry index builder for published layouts.
+local MAGIC_KEY_FIELDS = { key = true }
+local KEY_CODE_PATTERN = "^[A-Z][A-Za-z0-9]*$"
+
 
 
 
@@ -84,6 +92,21 @@ local function validate_binding_sections(sections)
 		seen[section], count = true, count + 1
 	end
 	if count ~= #sections then error("Invalid extension section selection (content withheld)", 0) end
+end
+
+--- Validates the physical magic key a layout extension declares.
+--- @param magic_key any The [extension.magic_key] table, or nil.
+--- @return string|nil The declared KeyboardEvent.code; nil when none is declared.
+local function validate_magic_key(magic_key)
+	if magic_key == nil then return nil end
+	if type(magic_key) ~= "table" then error("Invalid extension magic key (content withheld)", 0) end
+	for field in pairs(magic_key) do
+		if not MAGIC_KEY_FIELDS[field] then error("Unknown extension magic key field (content withheld)", 0) end
+	end
+	if type(magic_key.key) ~= "string" or not magic_key.key:match(KEY_CODE_PATTERN) then
+		error("Invalid extension magic key code (content withheld)", 0)
+	end
+	return magic_key.key
 end
 
 --- Validates the historical source bindings of a manifest.
@@ -119,13 +142,14 @@ end
 --- @return string|nil name Declared display name.
 --- @return table descriptions Localized descriptions.
 --- @return table bindings Historical source bindings keyed by file stem.
+--- @return string|nil magic_key Declared physical magic key (KeyboardEvent.code).
 local function parse_manifest(text)
-	if text == nil then return nil, {}, {} end
+	if text == nil then return nil, {}, {}, nil end
 	if type(text) ~= "string" then error("Invalid extension manifest input (content withheld)", 0) end
 	local document = TomlCodec.decode(text)
 	if type(document) ~= "table" then error("Invalid extension manifest TOML (content withheld)", 0) end
 	local extension = document.extension
-	if extension == nil then return nil, {}, {} end
+	if extension == nil then return nil, {}, {}, nil end
 	if type(extension) ~= "table" then error("Invalid extension metadata (content withheld)", 0) end
 	for key in pairs(extension) do
 		if type(key) ~= "string" then error("Invalid extension metadata (content withheld)", 0) end
@@ -140,7 +164,8 @@ local function parse_manifest(text)
 			error("Invalid localized extension description (content withheld)", 0)
 		end
 	end
-	return name ~= "" and name or nil, descriptions, validate_bindings(extension.hotstring_bindings)
+	return name ~= "" and name or nil, descriptions, validate_bindings(extension.hotstring_bindings),
+		validate_magic_key(extension.magic_key)
 end
 
 --- Extracts the canonical display name from the extension section.
@@ -181,8 +206,9 @@ end
 --- offers `toml_files` as `ext:` categories leaves it out without knowing why.
 --- @param roots table Array of absolute directory paths, in precedence order.
 --- @param io_fns table { list_dirs, list_files, read_file } — injected I/O.
---- @return table Array of { id, name, dir, descriptions, toml_files, bound_files };
----   toml_files entries are { path, stem }, bound_files entries { path, stem, binding }.
+--- @return table Array of { id, name, dir, descriptions, toml_files, bound_files, magic_key };
+---   toml_files entries are { path, stem }, bound_files entries { path, stem, binding },
+---   magic_key the declared physical key code or nil.
 function M.scan(roots, io_fns)
 	if type(roots) ~= "table" or type(io_fns) ~= "table" then return {} end
 	local list_dirs = io_fns.list_dirs
@@ -202,7 +228,7 @@ function M.scan(roots, io_fns)
 						manifest_text = read_file(dir .. "/" .. MANIFEST_NAME)
 					end
 
-					local name, descriptions, bindings = parse_manifest(manifest_text)
+					local name, descriptions, bindings, magic_key = parse_manifest(manifest_text)
 					local toml_files, bound_files = {}, {}
 					local bound_found = {}
 					for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
@@ -237,6 +263,7 @@ function M.scan(roots, io_fns)
 						descriptions = descriptions,
 						toml_files   = toml_files,
 						bound_files  = bound_files,
+						magic_key    = magic_key,
 					}
 				end
 			end
