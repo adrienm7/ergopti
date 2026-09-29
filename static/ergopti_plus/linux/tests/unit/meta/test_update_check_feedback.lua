@@ -96,6 +96,9 @@ helpers.describe("updater: a manual check answers the update-check window (Linux
 		helpers.assert_eq(offline.detail, "Could not resolve host")
 		local garbled = check(nil, "dev", "0.0.0-dev.140", "invalid release page JSON", "parse_failed")[4]
 		helpers.assert_eq(garbled.reason_key, "updater.parse_failed")
+		local unclassified = check(nil, "dev", "0.0.0-dev.140", "empty body", nil)[4]
+		helpers.assert_eq(unclassified.reason_key, "update_check.error_unexpected",
+			"a failure without a reason is not shown as a connection failure")
 	end)
 
 	helpers.it("tags every transport failure with a reason the window knows", function()
