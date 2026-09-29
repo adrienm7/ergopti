@@ -534,12 +534,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _apps_time_hk_box = {}
 
 	--- Delegates an open dashboard close to the module that owns its full runtime.
+	--- Only a dashboard the user is looking at is closed: a covered one answers
+	--- nil, so the caller opens it and the module presents the open window.
 	--- @param module_name string Canonical loaded-module name.
 	--- @param label string Diagnostic dashboard label.
-	--- @return boolean|nil settled False on refused close, nil when not open.
+	--- @return boolean|nil settled False on refused close, nil when not open or covered.
 	local function close_loaded_dashboard(module_name, label)
 		local dashboard = package.loaded[module_name]
 		if not dashboard or not dashboard._wv then return nil end
+		if not require("ui.ui_builder").is_window_focused(dashboard._wv) then return nil end
 		if type(dashboard.close) ~= "function" then
 			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
 			return false
@@ -556,8 +559,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key, persist)
 		local committed, next_owner = replace_managed_hotkey(_metrics_hk, mods, key, function()
-				-- Toggle: close the dashboard if already open, otherwise open it.
-				-- Using package.loaded so we don't accidentally trigger require() on close.
+				-- Toggle: close the dashboard if it is open and focused, otherwise
+				-- open or present it. Using package.loaded so we don't accidentally
+				-- trigger require() on close.
 				local closed = close_loaded_dashboard(
 					"ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
@@ -583,7 +587,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _apps_time_hk = nil
 	local function apply_apps_time_shortcut(mods, key, persist)
 		local committed, next_owner = replace_managed_hotkey(_apps_time_hk, mods, key, function()
-				-- Toggle behaviour: close if open, else open
+				-- Toggle behaviour: close if open and focused, else open or present
 				local closed = close_loaded_dashboard(
 					"ui.metrics_apps", "Apps dashboard")
 				if closed ~= nil then return closed end
@@ -1069,9 +1073,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end, "menu.open_personal_toml")
 			end,
 			add_hotstring = function()
-				-- Toggle: close if already open, otherwise open
+				-- Toggle: close if open and focused, otherwise open or present it.
+				-- A covered editor may hold typed text: bring it back, never close it.
 				if hotstring_editor then
-					if type(hotstring_editor.is_open) == "function" and hotstring_editor.is_open() then
+					if type(hotstring_editor.is_open) == "function" and hotstring_editor.is_open()
+						and type(hotstring_editor.is_editor_focused) == "function"
+						and hotstring_editor.is_editor_focused()
+					then
 						if type(hotstring_editor.close) == "function" then pcall(hotstring_editor.close) end
 						return
 					end
@@ -1079,14 +1087,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 			end,
 			show_metrics = function()
-				-- Toggle: close if already open, otherwise open
+				-- Toggle: close if open and focused, otherwise open or present it
 				local closed = close_loaded_dashboard(
 					"ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
 				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
 			end,
 			show_apps_time = function()
-				-- Toggle: close if already open, otherwise open
+				-- Toggle: close if open and focused, otherwise open or present it
 				local closed = close_loaded_dashboard(
 					"ui.metrics_apps", "Apps dashboard")
 				if closed ~= nil then return closed end

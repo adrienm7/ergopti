@@ -348,3 +348,76 @@ helpers.describe("ui-focus-not-topmost: error window (macOS)", function()
 	end)
 
 end)
+
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 4/ A toggle closes only a window in front =======
+-- =========================================================
+-- =========================================================
+
+--- Loads the real ui_builder with a focused-window double.
+--- @param focused function Returns the focused window, or raises.
+--- @return table Builder
+local function load_builder_focus(focused)
+	return helpers.load_with_stubs("ui.ui_builder", {
+		webview = { windowMasks = {}, new = function() return {} end },
+		drawing = { windowLevels = LEVELS },
+		window = { focusedWindow = focused },
+	})
+end
+
+--- A webview double whose native window has the given id.
+--- @param id number|nil Window id, or nil when no window exists yet.
+--- @return table
+local function view_with_window(id)
+	return { hswindow = function() return id and { id = function() return id end } or nil end }
+end
+
+helpers.describe("ui-focus-not-topmost: toggles present a covered window (macOS)", function()
+
+	helpers.it("reads the dashboard as focused only when it is the focused window (ui-focus-not-topmost)",
+		function()
+			local front = { id = function() return 7 end }
+			local Builder = load_builder_focus(function() return front end)
+			helpers.assert_true(Builder.is_window_focused(view_with_window(7)),
+				"the window the user is looking at is closed by its toggle")
+			helpers.assert_true(not Builder.is_window_focused(view_with_window(9)),
+				"a window covered by another app must be presented, not closed")
+			helpers.assert_true(not Builder.is_window_focused(view_with_window(nil)),
+				"a window without a native handle is not in front")
+			helpers.assert_true(not Builder.is_window_focused(nil))
+			local Failing = load_builder_focus(function() error("private native error") end)
+			helpers.assert_true(not Failing.is_window_focused(view_with_window(7)),
+				"a failed lookup must present rather than close a window the user may not see")
+		end)
+
+	helpers.it("every toggle closes only a focused window (ui-focus-not-topmost)", function()
+		local menu = helpers.read_driver_unit("local function close_loaded_dashboard(")
+		helpers.assert_true(menu ~= nil, "the menu's dashboard toggle must exist")
+		local toggle = menu:match("local function close_loaded_dashboard%(.-\nend")
+			or menu:match("local function close_loaded_dashboard%(.-\n\tend")
+		helpers.assert_true(toggle ~= nil, "close_loaded_dashboard must be readable")
+		local focus_at = toggle:find("is_window_focused(dashboard._wv)", 1, true)
+		local close_at = toggle:find("dashboard.close", 1, true)
+		helpers.assert_true(focus_at ~= nil and close_at ~= nil and focus_at < close_at,
+			"a dashboard shortcut or menu entry must check focus before closing the dashboard")
+
+		local add = menu:match("add_hotstring = function%(%).-\n\t\t\tend,")
+		helpers.assert_true(add ~= nil, "the add-hotstring entry must exist")
+		local focused_at = add:find("is_editor_focused()", 1, true)
+		local editor_close_at = add:find("hotstring_editor.close", 1, true)
+		helpers.assert_true(focused_at ~= nil and editor_close_at ~= nil and focused_at < editor_close_at,
+			"the add-hotstring entry must not close a covered editor that may hold typed text")
+
+		local editor = helpers.read_driver_unit("function M.is_editor_focused()")
+		helpers.assert_true(editor ~= nil, "the hotstring editor must exist")
+		helpers.assert_true(editor:find("if _webview and _is_focused then M.close() else M.open(\"shortcut\") end",
+			1, true) ~= nil, "the editor shortcut must present a covered editor instead of closing it")
+	end)
+
+end)
