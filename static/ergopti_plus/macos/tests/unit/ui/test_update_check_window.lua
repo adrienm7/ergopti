@@ -20,7 +20,7 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 
-local STUBS = { "adapters.update_launcher", "ui.changelog", "ui.error_dialog", "ui.log_openers" }
+local STUBS = { "adapters.update_launcher", "ui.changelog", "ui.error_dialog", "ui.log_openers", "ui.ui_builder" }
 
 --- Loads the host with recording doubles of the launcher, the Versions window,
 --- the error window and the log opener. ctx: Host, requests, reports, changelogs.
@@ -37,6 +37,7 @@ local function load_host()
 		report = function(record) ctx.reports[#ctx.reports + 1] = record; return true end,
 	}
 	package.loaded["ui.log_openers"] = { open_today_log = function() return true end }
+	package.loaded["ui.ui_builder"] = { force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end }
 	ctx.Host = helpers.load_with_stubs("ui.update_check")
 	return ctx
 end
@@ -156,6 +157,31 @@ helpers.describe("update-check window (macOS host)", function()
 			helpers.assert_eq(ctx.reports[1].module, "updater")
 			helpers.assert_contains(ctx.reports[1].message, "HTTP 503")
 			helpers.assert_contains(ctx.reports[1].message, "dev")
+		end)
+	end)
+
+	helpers.it("a second open checks again over the owners of the menu session that asked", function()
+		scenario(function(ctx)
+			local first = fake_owners(available)
+			local late = nil
+			first.checks.check_now = function(channel, on_result)
+				first.checked[#first.checked + 1] = channel
+				late = on_result
+				return true
+			end
+			local view = fake_view()
+			local session = ctx.Host._session_for(view, first)
+			ctx.Host._set_window(view, session)
+			session.start()
+			local second = fake_owners(available)
+			helpers.assert_true(ctx.Host.open(second))
+			helpers.assert_eq(ctx.focused, 1, "the open window is focused")
+			helpers.assert_eq(second.checked, { "dev" }, "the new menu session's owner checks")
+			local shown = #view.messages
+			late(available("dev"))
+			helpers.assert_eq(#view.messages, shown, "the replaced session's late answer is not shown")
+			helpers.assert_true(ctx.Host._session() ~= session, "the window has a new session")
+			ctx.Host._set_window(nil, nil)
 		end)
 	end)
 

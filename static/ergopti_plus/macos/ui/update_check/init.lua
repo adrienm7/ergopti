@@ -16,9 +16,10 @@
 --- 2. The page's actions and phases are the shared session's
 ---    (_shared/lua/updater/check_session.lua), identical on Linux; this module
 ---    only creates the window, forwards messages and wires the driver's owners.
---- 3. Singleton: a second click focuses the open window and checks again. Only
----    the exact window this module created receives pushes, so a late callback
----    of a closed window never writes into its successor.
+--- 3. Singleton: a second click focuses the open window and checks again, over
+---    the owners of the menu session that asked. Only the exact window this
+---    module created receives pushes, so a late callback of a closed window
+---    never writes into its successor.
 --- 4. Nothing here runs on the typing path; the check is asynchronous.
 --- ==============================================================================
 
@@ -71,10 +72,17 @@ local function push_to(view, message)
 	return submitted
 end
 
+--- Forgets the window's session: a late answer of its check shows nothing.
+local function retire_session()
+	if _session ~= nil then _session.retire() end
+	_session = nil
+end
+
 --- Closes the window this module created.
 local function close_window()
 	local view = _webview
-	_webview, _session = nil, nil
+	retire_session()
+	_webview = nil
 	if view ~= nil then
 		local ok, err = pcall(function() view:delete() end)
 		if not ok then Logger.error(LOG, "The update-check window did not close: %s.", tostring(err)) end
@@ -167,6 +175,8 @@ function M.open(ctx)
 	end
 	if _webview ~= nil and _session ~= nil then
 		ui_builder.force_focus(_webview, false)
+		retire_session()
+		_session = session_for(_webview, ctx)
 		_session.start()
 		return true
 	end
@@ -196,7 +206,10 @@ function M.open(ctx)
 		allow_new_windows = false,
 		assets_dir = (Paths.shared("ui/update_check") or "") .. "/",
 		on_close = function()
-			if candidate ~= nil and candidate == _webview then _webview, _session = nil, nil end
+			if candidate ~= nil and candidate == _webview then
+				retire_session()
+				_webview = nil
+			end
 		end,
 		on_webview_created = function(owned)
 			if _webview ~= nil then return false end
@@ -211,7 +224,8 @@ function M.open(ctx)
 		is_current = function() return candidate ~= nil and candidate == _webview end,
 	})
 	if view == nil or view ~= candidate or _session == nil then
-		_webview, _session = nil, nil
+		retire_session()
+		_webview = nil
 		Logger.error(LOG, "The update-check window could not be created.")
 		return false
 	end
@@ -220,9 +234,10 @@ function M.open(ctx)
 	return true
 end
 
--- Test seams: the session factory and the exact-window push.
+-- Test seams: the session factory, the exact-window push and the open window.
 M._session_for = session_for
 M._push_to = push_to
 function M._set_window(view, session) _webview, _session = view, session end
+function M._session() return _session end
 
 return M

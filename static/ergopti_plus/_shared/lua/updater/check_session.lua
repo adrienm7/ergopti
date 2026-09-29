@@ -17,7 +17,8 @@
 ---    last answer offered, and a switch only to a channel that answer listed.
 --- 3. Generations: a new check (a switch, or the menu row clicked again) makes
 ---    the answer of an older one inert, so a late result never replaces the
----    window's current phase.
+---    window's current phase; a retired session (its window closed, or
+---    replaced by a new one) shows and does nothing more.
 --- 4. PURE Lua (LuaJIT and 5.4): no driver imports, no io, no OS calls.
 --- ==============================================================================
 
@@ -69,12 +70,13 @@ function M.new(opts)
 	end
 	local session = {}
 	local generation = 0
+	local retired = false
 	local result = nil     -- the last answer, nil while checking
 	local message = nil    -- the page's current state message
 
 	--- Sends the current phase to the page.
 	local function publish()
-		if message == nil then return false end
+		if retired or message == nil then return false end
 		local ok, sent = pcall(opts.push, message)
 		if not ok or sent ~= true then
 			opts.log("error", "The update-check window could not be updated: %s.", tostring(sent))
@@ -85,6 +87,7 @@ function M.new(opts)
 
 	--- Sends the outcome of one action to the page.
 	local function acknowledge(action, ok, missing)
+		if retired then return end
 		local pushed_ok, pushed = pcall(opts.push, {
 			type = "action", action = action, ok = ok == true, missing = missing == true,
 		})
@@ -114,7 +117,7 @@ function M.new(opts)
 	--- Receives the answer of one check.
 	local function answer_of(expected)
 		return function(answer)
-			if expected ~= generation then
+			if retired or expected ~= generation then
 				opts.log("debug", "Discarded the answer of a superseded update check.")
 				return
 			end
@@ -133,6 +136,10 @@ function M.new(opts)
 	--- Starts a check of the subscribed channel and shows "checking".
 	--- @return boolean dispatched
 	function session.start()
+		if retired then
+			opts.log("warn", "Refused to start a check in a retired update-check session.")
+			return false
+		end
 		generation = generation + 1
 		local expected = generation
 		result = nil
@@ -191,6 +198,10 @@ function M.new(opts)
 	--- Handles one message of the page: "ready", or { action, channel? }.
 	--- @param body any The message body the page posted.
 	function session.on_message(body)
+		if retired then
+			opts.log("warn", "Refused a message for a retired update-check session.")
+			return
+		end
 		if body == "ready" then
 			publish()
 			return
@@ -212,6 +223,12 @@ function M.new(opts)
 			opts.log("error", "The update-check action '%s' failed: %s.", name, tostring(err))
 			acknowledge(name, false)
 		end
+	end
+
+	--- Retires the session: its pending answer and its page are ignored from now.
+	function session.retire()
+		retired = true
+		generation = generation + 1
 	end
 
 	--- The page's current state message (nil before start).
