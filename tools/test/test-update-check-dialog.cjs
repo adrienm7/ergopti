@@ -20,7 +20,8 @@
  *    the Linux bridge response reaches the same entry point;
  * 5. every label the page asks for exists in every locale with the English
  *    placeholders, and the French wording is the approved one;
- * 6. everything is centered: the text, the answer's column and the buttons.
+ * 6. everything is centered: the text, the answer's column and the buttons;
+ * 7. the hosts' phases, failure reasons and action rules agree with the page's.
  * ==============================================================================
  */
 
@@ -474,6 +475,94 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 	expect(main['text-align'] === 'center', 'the answer text is not centered');
 	expect(buttons['justify-content'] === 'center', 'the buttons are not centered');
 	expect(others['justify-content'] === 'center', 'the other-channel lines are not centered');
+}
+
+// 7. The phases, the failure reasons and the action rules are declared once per
+//    host: the Lua session (macOS and Linux), the Windows host and the page
+//    must agree, or a host sends a reason key or a phase the page cannot show
+{
+	const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8');
+	const block = (source, pattern, label) => {
+		const match = source.match(pattern);
+		expect(match !== null, `${label} is not found`);
+		return match ? match[1] : '';
+	};
+	const pairs = (text, pattern) => [...text.matchAll(pattern)].map((m) => [m[1], m[2]]);
+	const sorted = (values) => JSON.stringify([...values].sort());
+
+	const lua = read('static', 'ergopti_plus', '_shared', 'lua', 'updater', 'check_result.lua');
+	const session = read('static', 'ergopti_plus', '_shared', 'lua', 'updater', 'check_session.lua');
+	const ahk = read('static', 'ergopti_plus', 'windows', 'ui', 'update_check', 'init.ahk');
+	const page = read('static', 'ergopti_plus', '_shared', 'ui', 'update_check', 'script.js');
+
+	const luaReasons = new Map(
+		pairs(
+			block(lua, /M\.REASONS\s*=\s*\{([\s\S]*?)\n\}/, 'check_result.REASONS'),
+			/(\w+)\s*=\s*"([^"]+)"/g
+		)
+	);
+	const ahkReasons = new Map(
+		pairs(
+			block(ahk, /global UC_REASONS := Map\(([\s\S]*?)\)\n/, 'UC_REASONS'),
+			/"(\w+)",\s*"([^"]+)"/g
+		)
+	);
+	expect(luaReasons.size >= 3 && ahkReasons.size >= 3, 'the reason tables could not be read');
+	for (const [reason, key] of ahkReasons) {
+		expect(
+			luaReasons.get(reason) === key,
+			`UC_REASONS maps '${reason}' to ${key}, check_result.REASONS to ${luaReasons.get(reason)}`
+		);
+	}
+	expect(
+		sorted(luaReasons.values()) === sorted(REASON_KEYS),
+		'REASON_KEYS must list exactly the locale keys of check_result.REASONS'
+	);
+
+	const luaStates = [
+		...block(lua, /M\.STATES\s*=\s*\{([^}]*)\}/, 'check_result.STATES').matchAll(
+			/(\w+)\s*=\s*true/g
+		)
+	].map((m) => m[1]);
+	const ahkStates = [
+		...block(ahk, /global UC_ANSWER_STATES := Map\(([^)]*)\)/, 'UC_ANSWER_STATES').matchAll(
+			/"(\w+)",\s*true/g
+		)
+	].map((m) => m[1]);
+	const pageStates = [
+		...block(page, /var STATES = \{([^}]*)\}/, 'the page STATES').matchAll(/(\w+):\s*true/g)
+	]
+		.map((m) => m[1])
+		.filter((phase) => phase !== 'checking');
+	expect(
+		luaStates.length === 4,
+		`check_result.STATES lists ${luaStates.length} phases, expected 4`
+	);
+	expect(
+		sorted(ahkStates) === sorted(luaStates),
+		'UC_ANSWER_STATES and check_result.STATES differ'
+	);
+	expect(
+		sorted(pageStates) === sorted(luaStates),
+		"the page's answer phases and check_result.STATES differ"
+	);
+
+	const luaActions = pairs(
+		block(session, /local ACTIONS = \{([\s\S]*?)\n\}/, 'check_session ACTIONS'),
+		/(\w+)\s*=\s*(true|"\w+")/g
+	).map(([name, needs]) => `${name}:${needs === 'true' ? '' : needs.replace(/"/g, '')}`);
+	const ahkActions = pairs(
+		block(ahk, /global UC_PAGE_ACTIONS := Map\(([\s\S]*?)\)\n/, 'UC_PAGE_ACTIONS'),
+		/"(\w+)",\s*"(\w*)"/g
+	).map(([name, needs]) => `${name}:${needs}`);
+	expect(
+		luaActions.length === 6,
+		`check_session ACTIONS lists ${luaActions.length} actions, expected 6`
+	);
+	expect(
+		sorted(ahkActions) === sorted(luaActions),
+		`UC_PAGE_ACTIONS ${sorted(ahkActions)} and check_session ACTIONS ${sorted(luaActions)} differ`
+	);
 }
 
 if (failures.length) {
