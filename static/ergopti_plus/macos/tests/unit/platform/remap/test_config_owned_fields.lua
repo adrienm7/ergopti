@@ -115,8 +115,20 @@ helpers.describe("Remap configuration owned fields", function()
 	helpers.it("does not seed any setting when saving neutral intent", function()
 		with_source("", function(save, state, captured, codec)
 			state.tap_hold_config.escape = { tap = "none", hold = "none" }
+			-- A settings-only candidate carries no « Ergopti uses Karabiner »
+			-- decision; the switch is the remap owner's explicit write.
+			state.enabled = nil
 			helpers.assert_true(save())
 			helpers.assert_eq(codec.decode(captured.content), {})
+		end)
+	end)
+
+	helpers.it("writes only the carried Karabiner switch beside neutral settings", function()
+		with_source("", function(save, state, captured, codec)
+			state.tap_hold_config.escape = { tap = "none", hold = "none" }
+			state.enabled = true
+			helpers.assert_true(save())
+			helpers.assert_eq(codec.decode(captured.content), { karabiner = { integration_enabled = true } })
 		end)
 	end)
 
