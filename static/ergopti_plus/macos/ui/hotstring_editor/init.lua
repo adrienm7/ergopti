@@ -768,8 +768,10 @@ function M.set_shortcut(mods, key)
 
 	-- Bind the candidate before releasing the acknowledged handle. Native bind
 	-- refusal must leave the previous shortcut fully live.
+	-- Toggle: close only an editor the user is looking at. A covered editor
+	-- may hold typed text, so the shortcut presents it instead.
 	local candidate = Hotkeys.bind(chord, function()
-		if _webview then M.close() else M.open("shortcut") end
+		if _webview and _is_focused then M.close() else M.open("shortcut") end
 	end)
 	if not candidate then return false end
 

@@ -551,6 +551,23 @@ function M.force_focus(wv, is_new, lifecycle)
 	return try_focus()
 end
 
+--- True when the webview's window is the focused window. A shortcut or menu
+--- entry that toggles a window closes it only when the user is looking at it;
+--- a covered window is presented instead, since no window floats any more. A
+--- failed lookup reads as not focused, so the toggle presents rather than
+--- closing a window the user may not see.
+--- @param wv userdata|nil The hs.webview object.
+--- @return boolean
+function M.is_window_focused(wv)
+	if not wv then return false end
+	local ok_win, win = pcall(function() return wv:hswindow() end)
+	if not ok_win or not win then return false end
+	local ok_focused, focused = pcall(function() return hs.window.focusedWindow() end)
+	if not ok_focused or not focused then return false end
+	local ok_same, same = pcall(function() return win:id() == focused:id() end)
+	return ok_same and same == true
+end
+
 --- Composes a native window title. The product name is added here and only
 --- here, so callers pass a brand-less *.window_title string: passing a string
 --- that already carried the brand produced "ErgoptiPlus — ErgoptiPlus — Setup".
