@@ -665,8 +665,38 @@ end
 -- ====================================
 -- ====================================
 
+--- The sections of a category that other files supply: a layout extension binds
+--- some sections of a bundled category (the magic key's repeat corrections on
+--- Ergopti) to its own file, which carries their entries and their metadata.
+--- @param category string Category name.
+--- @param toml_path string The category's own file.
+--- @return table Array of { name, section, meta } in binding order; section and
+---   meta are the bound file's records for that section, nil when it has none.
+local function bound_sections(category, toml_path)
+	local resolver = _state.section_sources_resolver
+	local sources = resolver and resolver(category, toml_path) or nil
+	local out = {}
+	for _, source in ipairs(type(sources) == "table" and sources or {}) do
+		local ok, parsed, committed = pcall(TomlReader.parse, source.path)
+		if not ok or committed ~= true or type(parsed) ~= "table" then
+			Logger.error(LOG, "Bound section TOML read did not commit: '%s'.", tostring(source.path))
+		else
+			local meta_sections = type(parsed.meta) == "table" and parsed.meta.sections or nil
+			for _, name in ipairs(source.sections) do
+				out[#out + 1] = {
+					name    = name,
+					section = type(parsed.sections) == "table" and parsed.sections[name] or nil,
+					meta    = type(meta_sections) == "table" and meta_sections[name] or nil,
+				}
+			end
+		end
+	end
+	return out
+end
+
 --- Returns the meta block for a category, parsing the TOML on first access.
 --- Result shape: { delay = n?, color = s?, sections = { [name] = { delay, color, description } } }
+--- A section another file supplies takes its metadata from that file.
 --- @param category string Category name (lowercase, e.g. "rolls").
 --- @return table The meta block (always a table, fields may be nil).
 local function get_toml_meta(category)
@@ -684,12 +714,16 @@ local function get_toml_meta(category)
 		Logger.error(LOG, "Category TOML read did not commit: '%s'.", toml_path)
 		return { sections = {} }
 	end
+	-- Copied before merging: the reader may hand back a snapshot other readers share.
+	local sections = {}
+	for name, meta in pairs(parsed.meta.sections or {}) do sections[name] = meta end
+	for _, bound in ipairs(bound_sections(category, toml_path)) do sections[bound.name] = bound.meta end
 	cache[category] = {
 		delay        = parsed.meta.delay,
 		color        = parsed.meta.color,
 		show_tooltip = parsed.meta.show_tooltip,
 		priority     = parsed.meta.priority,
-		sections     = parsed.meta.sections or {},
+		sections     = sections,
 	}
 	return cache[category]
 end
@@ -705,13 +739,16 @@ end
 --- =============================
 
 --- Initializes the module. Must be called before any resolve/setter.
---- @param opts table { override_path = string, toml_resolver = function(category) -> path }
+--- @param opts table { override_path = string, toml_resolver = function(category) -> path,
+---   section_sources_resolver = function(category, path) -> { { path, sections } }|nil (optional):
+---   the sections other files supply for a category, as the keymap loads them }
 function M.init(opts)
 	Logger.start(LOG, "Initializing…")
 	if type(opts) ~= "table"
 		or type(opts.override_path) ~= "string" or opts.override_path == ""
 		or type(opts.toml_resolver) ~= "function"
 		or (opts.delay_transaction ~= nil and type(opts.delay_transaction) ~= "function")
+		or (opts.section_sources_resolver ~= nil and type(opts.section_sources_resolver) ~= "function")
 	then
 		Logger.error(LOG, "M.init(): opts.override_path and opts.toml_resolver are required.")
 		return
@@ -726,6 +763,7 @@ function M.init(opts)
 	_state = {
 		path            = opts.override_path,
 		toml_resolver   = opts.toml_resolver,
+		section_sources_resolver = opts.section_sources_resolver,
 		delay_transaction = opts.delay_transaction,
 		overrides       = overrides,
 		word_delimiters = word_delimiters,
@@ -1163,7 +1201,10 @@ end
 --- Returns the ordered list of sections defined in a category TOML.
 --- Each entry is { name = string, description = string }; separators ("-")
 --- are filtered out. Used by the configuration window to render the section
---- list under each category.
+--- list under each category, and by « reset all » to clear their overrides.
+--- A section another file supplies (the magic key's repeat corrections, bound
+--- by the Ergopti extension) is listed with that file's description, at the
+--- place the category's declared order gives it, or last when it names none.
 --- @param category string Category name (lowercase).
 --- @return table List of section descriptors in TOML declaration order.
 function M.get_sections(category)
@@ -1175,14 +1216,22 @@ function M.get_sections(category)
 		Logger.error(LOG, "Section-list TOML read did not commit: '%s'.", toml_path)
 		return {}
 	end
-	local out = {}
-	for _, name in ipairs(parsed.sections_order or {}) do
-		if name ~= "-" then
-			local section = parsed.sections[name]
-			local desc = (section and section.description) or name
-			table.insert(out, { name = name, description = desc })
-		end
+	local bound_list, bound = bound_sections(category, toml_path), {}
+	for _, entry in ipairs(bound_list) do bound[entry.name] = entry end
+	local out, listed = {}, {}
+	local function list(name)
+		if name == "-" or listed[name] then return end
+		local section = bound[name] and bound[name].section or parsed.sections[name]
+		if section == nil and bound[name] == nil then return end
+		listed[name] = true
+		table.insert(out, { name = name, description = (section and section.description) or name })
 	end
+	-- The declared order first: the reader drops from its own order a name that
+	-- neither this file's sections nor its metadata carry, which a bound section is.
+	local declared = type(parsed.meta) == "table" and parsed.meta.sections_order or nil
+	for _, name in ipairs(type(declared) == "table" and declared or {}) do list(name) end
+	for _, name in ipairs(parsed.sections_order or {}) do list(name) end
+	for _, entry in ipairs(bound_list) do list(entry.name) end
 	return out
 end
 

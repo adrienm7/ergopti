@@ -1483,6 +1483,12 @@ do
 			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
+		-- The sections a layout extension supplies for a category, exactly as the
+		-- keymap loads them, so the settings window lists and resets them too.
+		section_sources_resolver = function(category, path)
+			local _, sources = ExtensionPacks.route(category, path, is_user_hotstrings_copy(path))
+			return sources
+		end,
 	})
 
 	if hotstring_config_ready ~= true then error("hotstring override owner did not initialize") end

@@ -147,3 +147,33 @@ _EHX_NoExtensionCategoryRowsWithoutRoutes() {
 }
 Test("ergopti extension: without the extension its submenu lists no category (ergopti-hotstrings-ext)",
 	_EHX_NoExtensionCategoryRowsWithoutRoutes)
+
+; The settings window and its « reset all » scope list a category's sections
+; from its files: the repeat corrections now live in the extension's file, and
+; a per-section delay, colour or priority saved for them must stay reachable.
+_EHX_SettingsWindowKeepsTheBoundSection() {
+	_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	Check(Packs) {
+		Entry := { Key: "magickey", Path: "", IsPersonal: false, IsExtension: false }
+		Names := []
+		Titles := Map()
+		for _, Section in _HCW_GetSections(Entry) {
+			Names.Push(Section.Name)
+			Titles[Section.Name] := Section.Title
+		}
+		Assert(Titles.Has("repeat_corrections"),
+			"the settings window lists the repeat corrections the extension binds into the magic key")
+		Assert(InStr(Titles["repeat_corrections"], "(" . Chr(0xEA) . Chr(0x2192) . "u)") > 0,
+			"with the localized description the extension's file gives it, not its raw id")
+		; « replace » is a module placeholder with no [[section]], so the magic
+		; key's order puts the repeat corrections first, as before they moved.
+		AssertEqual("repeat_corrections", Names[1], "at the place the magic key's own order gives it")
+		Assert(Titles.Has("text_expansion_symbols"), "the bundled sections are still listed")
+		Scope := Map()
+		for _, Section in _HotstringsScopeSections(Entry)
+			Scope[Section.Name] := true
+		Assert(Scope.Has("repeat_corrections"), "and « reset all » clears the overrides saved for it")
+	}
+}
+Test("ergopti extension: the settings window keeps the repeat corrections row (ergopti-hotstrings-ext)",
+	_EHX_SettingsWindowKeepsTheBoundSection)

@@ -160,6 +160,50 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 			"the metadata resolver reads the user's copy of a bound category, which is what loads")
 	end)
 
+	helpers.it("(ergopti-hotstrings-ext) keeps the repeat corrections row in the settings window", function()
+		Packs._reset()
+		Packs.discover(roots(true), real_io())
+		local magickey = static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/magickey.toml"
+		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		local function sections_of(with_resolver)
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			local Config = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+			local override = helpers.temp_dir() .. "/hcfg_ergopti_" .. tostring(with_resolver) .. ".toml"
+			os.remove(override)
+			Config.init({
+				override_path = override,
+				toml_resolver = function() return magickey end,
+				section_sources_resolver = with_resolver and function(category, path)
+					local _, sources = Packs.route(category, path, false)
+					return sources
+				end or nil,
+			})
+			local names, descriptions = {}, {}
+			for _, section in ipairs(Config.get_sections("magickey")) do
+				names[#names + 1] = section.name
+				descriptions[section.name] = section.description
+			end
+			os.remove(override)
+			return names, descriptions
+		end
+		local names, descriptions = sections_of(true)
+		local without = sections_of(false)
+		Packs._reset()
+
+		helpers.assert_eq(names, { "replace", "repeat_corrections", "text_expansion_symbols", "text_expansion_symbols_typst" },
+			"the section the extension binds keeps the place the magic key's order gives it")
+		helpers.assert_eq(type(descriptions.repeat_corrections), "table",
+			"with the localized description of the extension's file, not its raw id")
+		helpers.assert_true(tostring(descriptions.repeat_corrections.en):find("(ê→u)", 1, true) ~= nil)
+		helpers.assert_eq(without, { "replace", "text_expansion_symbols", "text_expansion_symbols_typst" },
+			"the magic key's own file no longer carries it")
+
+		local boot = helpers.read_driver_source("local function is_user_hotstrings_copy(path)")
+		helpers.assert_true(boot ~= nil and boot:find(
+			"local _, sources = ExtensionPacks.route(category, path, is_user_hotstrings_copy(path))", 1, true) ~= nil,
+			"the boot hands the settings window the sections the keymap loads from the extension")
+	end)
+
 	helpers.it("(ergopti-hotstrings-ext) routes nothing when Ergopti is not installed", function()
 		Packs._reset()
 		Packs.discover(roots(false), real_io())
