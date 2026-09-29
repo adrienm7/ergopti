@@ -25,6 +25,47 @@
 ; budget identically.
 global LLM_PRED_TOKEN_OVERHEAD := 5
 
+; Network boundary of the remote backend: the function a request hands its
+; prompt to (LLM_RemoteGenerate_Async's signature). 0 selects the real curl
+; transport; the test suite installs a recorder here to capture the outgoing
+; request and answer it without a network, everything else staying real.
+global _LLM_Engine_RemoteTransport := 0
+
+/**
+ * Returns the remote transport the next request dispatches through.
+ * @returns {Func} LLM_RemoteGenerate_Async, or the installed test transport.
+ */
+_LLM_Engine_ResolveRemoteTransport() {
+	global _LLM_Engine_RemoteTransport
+	if HasMethod(_LLM_Engine_RemoteTransport, "Call")
+		return _LLM_Engine_RemoteTransport
+	return LLM_RemoteGenerate_Async
+}
+
+/**
+ * Validates the prompt override a request may carry: the profile a
+ * llm_prompt_prediction binding names, and its own prediction count.
+ * @param {Map|Integer} Override 0 for an ordinary request, else
+ *     Map("profile_id", Id[, "num_predictions", 1..10]).
+ * @returns {Map|Integer} A detached, validated copy, or 0 for none.
+ */
+_LLM_Engine_NormalizePromptOverride(Override) {
+	global LLM_PROMPT_ACTION_MIN_PREDICTIONS, LLM_PROMPT_ACTION_MAX_PREDICTIONS
+	if (Override is Integer && Override == 0)
+		return 0
+	if !(Override is Map)
+		throw TypeError("A prompt override must be a Map, got " . Type(Override) . ".")
+	ProfileId := Override.Get("profile_id", "")
+	if !(ProfileId is String) || ProfileId == ""
+		throw ValueError("A prompt override must name a profile.")
+	Count := Override.Get("num_predictions", 0)
+	if !(Count is Integer) || (Count != 0
+			&& (Count < LLM_PROMPT_ACTION_MIN_PREDICTIONS
+				|| Count > LLM_PROMPT_ACTION_MAX_PREDICTIONS))
+		throw ValueError("A prompt override's prediction count is out of range: " . String(Count) . ".")
+	return Map("profile_id", ProfileId, "num_predictions", Count)
+}
+
 /**
  * Per-call output-token budget for a backend request, given the shared
  * PromptBuilder per-prediction budget and how many predictions THIS call yields
@@ -165,8 +206,12 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
  * Skips the call if context is identical to the last result's context.
  * @param {string} buffer - Full typed buffer captured at debounce arm time.
  * @param {Map} AcceptSource - HWND/control snapshot captured when armed.
+ * @param {Map} Override - A prompt of this request's own (the
+ *     llm_prompt_prediction action): Map("profile_id", Id, "num_predictions",
+ *     Count or 0 for the menu's). It wins over the active and per-app profiles
+ *     and never changes them. 0 for an ordinary request.
  */
-LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
+LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	global _LLM_Engine
 
 	; A debounce timer outlives whatever armed it: it is scheduled with SetTimer
@@ -194,6 +239,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	if !_LLM_Engine["enabled"] || buffer == ""
 		return
 
+	Override := _LLM_Engine_NormalizePromptOverride(Override)
 	AcceptSource := _LLM_Engine_NormalizeAcceptSource(AcceptSource?)
 
 	; Honour the disable_password_fields user preference: skip prediction in
@@ -236,6 +282,10 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	RequestAcceptSource["app_name"] :=
 		_LLM_Engine_AppNameForAcceptSource(RequestAcceptSource)
 	_LLM_Engine["request_accept_source"] := RequestAcceptSource
+	; The info bar names the prompt that answers THIS request. Keyed by the
+	; request id so a later ordinary request never inherits an override's label.
+	_LLM_Engine["request_prompt_override"] := (Override is Map)
+		? Map("request_id", this_request_id, "profile_id", Override["profile_id"]) : ""
 
 	; Honour the disabled_apps user preference: skip prediction entirely when the focused
 	; app is on the user's exclusion list, so typed context never leaves an app the user
@@ -257,7 +307,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		if IsSet(LLM_OllamaScheduleWarmupRetry)
 			LLM_OllamaScheduleWarmupRetry(_LLM_Engine["model"])
 		retry_ms := Max(500, Min(_LLM_Engine["debounce_ms"], 2000))
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
 		SetTimer(_LLM_Engine["pending_timer"], -retry_ms)
 		_LLM_Engine["timer_active"] := true
 		return
@@ -271,11 +321,15 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		}
 	}
 
+	; A binding's own count replaces the menu's for this request only, and feeds
+	; every consumer of the global one below: temperature, dispatch, budget.
+	request_n_predictions := (Override is Map && Override["num_predictions"] > 0)
+		? Override["num_predictions"] : _LLM_Engine["n_predictions"]
 	pb := PromptBuilder()
 	pb_cfg := Map(
 		"max_words",            _LLM_Engine["max_words"],
 		"min_words",            _LLM_Engine["min_words"],
-		"num_predictions",      _LLM_Engine["n_predictions"],
+		"num_predictions",      request_n_predictions,
 		"temperature",          _LLM_Engine["temperature"] + 0.0,
 		"auto_raise_temp",      _LLM_Engine["auto_raise_temp"],
 		"language",             _LLM_Engine["language"],
@@ -291,18 +345,47 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	; The focused application can select a different prompt without changing the
 	; configuration Map. Resolve it before both cache probes and bind it into the
 	; request signature so identical text in two overridden apps cannot share an
-	; answer generated from different instructions.
-	effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
-	profile := LLM_GetActiveProfile(effective_profile_id,
-		_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+	; answer generated from different instructions. A request naming its own
+	; prompt outranks both, and resolves it strictly: running another prompt
+	; than the one the user bound would be a silent substitution.
+	if (Override is Map) {
+		effective_profile_id := Override["profile_id"]
+		profile := LLM_FindProfile(effective_profile_id,
+			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+		if !(profile is Map) {
+			try LoggerWarn("LLM", "Prompt prediction dropped: the prompt '{1}' no longer exists.",
+				effective_profile_id)
+			return
+		}
+	} else {
+		effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
+		profile := LLM_GetActiveProfile(effective_profile_id,
+			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+	}
 	request_semantic_signature := _LLM_Engine_RequestSemanticSignature(
-		effective_profile_id, profile)
+		effective_profile_id, profile,
+		(Override is Map) ? Override["num_predictions"] : 0)
 	_LLM_Engine["active_request_signature"] := request_semantic_signature
 	; Per-prediction output-token budget computed once by the shared PromptBuilder
 	; (max(15, max_words*6+10), default 150) — the single cross-driver source.
 	; Threaded to every backend below so AHK no longer re-derives its own cap
 	; (Ollama's mw*4 / remote's hardcoded 256), matching the macOS driver.
 	max_tokens := Integer(params["max_tokens"])
+
+	; A rewrite prompt rewrites the current sentence instead of continuing it,
+	; whatever triggered the request. Its tail is that sentence, an exact suffix
+	; of the context the model receives and the parser aligns against; a sentence
+	; longer than the capped context extends the context to hold all of it. Its
+	; budget grows with the sentence, since a truncated rewrite would erase text
+	; it cannot retype.
+	is_rewrite := LLM_Rewrite_IsRewriteProfile(profile)
+	if is_rewrite {
+		buffer_span := LLM_Rewrite_SentenceSpan(buffer)
+		if (StrLen(buffer_span) > StrLen(ctx))
+			ctx := buffer_span
+		tail := LLM_Rewrite_SentenceSpan(ctx)
+		max_tokens := LLM_Rewrite_MaxTokens(tail)
+	}
 
 	if (tail == "" or StrLen(tail) < 2) {
 		try LoggerInfo("LLM", "Context too short — prediction skipped.")
@@ -324,7 +407,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	; that's still in flight will bail (its ``state["request_id"] != current``
 	; check kicks in). Without this, a late async response from the previous
 	; ctx could land AFTER the cache hit rendered and clobber the tooltip.
-	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
+	; A rewrite is never replayed from the cache: the cache holds slot text
+	; without the erasure each rewrite needs, and a rewrite is asked for once.
+	if (!is_rewrite && ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0
 			and _LLM_Engine_CacheOwnsRequest(request_semantic_signature)) {
@@ -347,7 +432,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	; and we can re-display it (sliced to whatever remains). Mirrors the
 	; "soft cache" some IDE completions use: avoid a request when the
 	; previous answer was correct, just consumed partially.
-	if (_LLM_Engine.Has("last_ctx") and _LLM_Engine["last_ctx"] != ""
+	if (!is_rewrite and _LLM_Engine.Has("last_ctx") and _LLM_Engine["last_ctx"] != ""
 			and _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0
@@ -397,7 +482,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		remaining := min_interval - elapsed_since_last
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
 		SetTimer(_LLM_Engine["pending_timer"], -remaining)
 		_LLM_Engine["timer_active"] := true
 		return
@@ -419,7 +504,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	; over the global profile id — same context, different prompt.
 	; Falls back to the global profile when the active app has no
 	; override or the override id is unknown.
-	n_predictions := Max(1, Integer(_LLM_Engine["n_predictions"]))
+	n_predictions := Max(1, Integer(request_n_predictions))
 	; Inline auto-type mode forces a single variant: typing N
 	; alternatives sequentially into the active document would produce
 	; chaos. The user-facing n_predictions setting is left untouched so
@@ -452,7 +537,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	log_model := ""
 	dispatch_fn := ""
 	dispatch_stream_fn := ""
-	streaming_enabled := LLM_EffectiveStreaming(backend,
+	; A rewrite is shown whole or not at all: a streamed partial is the raw
+	; "REWRITE: …" text, which carries no erasure and would be typed as is.
+	streaming_enabled := is_rewrite ? false : LLM_EffectiveStreaming(backend,
 		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
@@ -464,8 +551,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		}
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
+		remote_transport := _LLM_Engine_ResolveRemoteTransport()
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
+			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -502,6 +590,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 			"requested",     n_predictions,
 			"base_temp",     req_temp,
 			"dedup_stats",   LLM_ApiCommon_NewDedupStats(),
+			"rewrite_edits", Map(),
 			"dispatch_fn",   dispatch_fn,
 			"request_start", A_TickCount
 		)
@@ -535,6 +624,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		"max_attempts",      _LLM_Engine_MaxAttempts(n_predictions),
 		"base_temp",         req_temp,
 		"dedup_stats",       LLM_ApiCommon_NewDedupStats(),
+		; Slot text → the erasure each rewrite slot needs (LLM_Parser_ParseResponse)
+		"rewrite_edits",     Map(),
 		"dispatch_fn",       dispatch_fn,
 		"dispatch_stream_fn",dispatch_stream_fn,
 		"streaming",         streaming_enabled,
@@ -553,11 +644,25 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 	global _LLM_Engine
 	profile_label := ""
 	try {
-		prof := LLM_GetActiveProfile(
-			_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),
-			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
-		if (prof is Map and prof.Has("label"))
-			profile_label := prof["label"]
+		; A request that named its own prompt shows that prompt, not the active one
+		Override := _LLM_Engine.Get("request_prompt_override", "")
+		if (Override is Map
+				&& Override["request_id"] == _LLM_Engine.Get("request_id", -1)) {
+			prof := LLM_FindProfile(Override["profile_id"],
+				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+			; A built-in record carries no label of its own; the menu's names it,
+			; so the user sees which of their prompts answered.
+			if (prof is Map and prof.Has("label"))
+				profile_label := prof["label"]
+			else if IsSet(LLM_Menu_GetProfileLabel)
+				profile_label := LLM_Menu_GetProfileLabel(Override["profile_id"])
+		} else {
+			prof := LLM_GetActiveProfile(
+				_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),
+				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+			if (prof is Map and prof.Has("label"))
+				profile_label := prof["label"]
+		}
 	}
 	info_model := ""
 	if (_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"])
@@ -751,7 +856,8 @@ _LLM_Engine_DispatchVariant(state) {
 			}
 		}
 		LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false,
-			state["request_id"], state["semantic_signature"])
+			state["request_id"], state["semantic_signature"],
+			state.Get("rewrite_edits", ""))
 	}
 
 	state_ref := state
@@ -856,7 +962,8 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	}
 	if !(state.Has("show_all_at_once") and state["show_all_at_once"])
 		LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false,
-			state["request_id"], state["semantic_signature"])
+			state["request_id"], state["semantic_signature"],
+			state.Get("rewrite_edits", ""))
 	_LLM_Engine_DispatchVariant(state)
 }
 
@@ -1012,7 +1119,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	; own side: LLM_Diff_Compute and the display-opts resolution run between here
 	; and the paint, and both can yield.
 	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true,
-		state["request_id"], state["semantic_signature"])
+		state["request_id"], state["semantic_signature"],
+		state.Get("rewrite_edits", ""))
 }
 
 ; Returns the max number of attempts for ``n`` requested predictions,
@@ -1061,6 +1169,7 @@ _LLM_Engine_ParseSlots(raw, state) {
 	; fall back to a fresh stats object so a missing key never throws in the
 	; async callback (which swallows exceptions silently).
 	dedup_ref := state.Has("dedup_stats") ? state["dedup_stats"] : LLM_ApiCommon_NewDedupStats()
+	edits     := Map()
 	result    := LLM_Parser_ParseResponse(
 		raw,
 		state["ctx"],
@@ -1069,9 +1178,18 @@ _LLM_Engine_ParseSlots(raw, state) {
 		state.Has("max_words") ? state["max_words"] : 15,
 		is_batch,
 		state["requested"],
-		&dedup_ref
+		&dedup_ref,
+		&edits
 	)
 	state["dedup_stats"] := dedup_ref
+	; The first erasure recorded for a slot text wins, like the slot itself: a
+	; later duplicate is dropped by the dedup and must not replace its edit.
+	if !state.Has("rewrite_edits")
+		state["rewrite_edits"] := Map()
+	for text, edit in edits {
+		if !state["rewrite_edits"].Has(text)
+			state["rewrite_edits"][text] := edit
+	}
 	return result
 }
 
@@ -1115,9 +1233,12 @@ _LLM_Engine_GetActiveApiEntry() {
  * @param {boolean}  is_final   - True only on the last update of a request.
  * @param {string}   request_id - Monotonic request identity that owns this render.
  * @param {string}   semantic_signature - Generation configuration that owns it.
+ * @param {Map}      rewrite_edits - Slot text → erasure of the slots that are
+ *     rewrites (LLM_Parser_ParseResponse); "" or empty when none are.
  */
-LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "", semantic_signature := "") {
+LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "", semantic_signature := "", rewrite_edits := "") {
 	global _LLM_Engine, _LLM_Bridge_Buffer
+	HasRewrites := (rewrite_edits is Map and rewrite_edits.Count > 0)
 	; Inline auto-type mode (Copilot-style): the prediction is typed
 	; directly into the active app instead of being shown in a tooltip.
 	; We only auto-type on the FINAL render — typing per-token from
@@ -1128,6 +1249,12 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 		if (slots.Length > 0) {
 			idx := Max(1, Min(active, slots.Length))
 			text := slots[idx]
+			; A rewrite erases what the user typed, so it is never applied without
+			; the user's own accept: it goes to the tooltip like any other mode.
+			if (HasRewrites and rewrite_edits.Has(text)) {
+				try LoggerInfo("LLM", "Inline auto-type leaves a rewrite to the tooltip: it erases typed text.")
+				text := ""
+			}
 			if (text != "") {
 				; The request may have finished while the driver was suspended. Do
 				; not turn a stale final result into synthetic foreground input.
@@ -1169,7 +1296,21 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; (orange). Streaming / intermediate renders pass plain strings — diff
 	; against a partial token would be meaningless.
 	display_slots := slots
-	if (is_final and IsSet(LLM_Diff_Compute)) {
+	if HasRewrites {
+		; A rewrite slot is shown as the rewritten sentence and carries the
+		; erasure its accept performs, on every render: an intermediate slot is
+		; as acceptable as a final one.
+		display_slots := []
+		for _, s in slots {
+			if (s != "" and rewrite_edits.Has(s))
+				display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, rewrite_edits[s]))
+			else if (is_final and s != "" and IsSet(LLM_Diff_Compute))
+				display_slots.Push(LLM_Diff_Compute(
+					(StrLen(ctx) > 200) ? SubStr(ctx, -199) : ctx, s))
+			else
+				display_slots.Push(s)
+		}
+	} else if (is_final and IsSet(LLM_Diff_Compute)) {
 		; Use the context that produced THIS prediction as the diff anchor,
 		; not last_ctx — which is only updated on success and would be stale
 		; after a failed request, causing the diff to compute against the
@@ -1223,6 +1364,34 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; acceptance target and lifecycle metrics as one owner. A refused/stale render
 	; therefore cannot emit llm_suggested or replace the source of visible A.
 	LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)
+}
+
+/**
+ * Builds the tooltip slot of a rewrite: the rewritten sentence (the part of the
+ * span it keeps, then the replacement), plus the erasure accepting it performs.
+ * Text stays the typed replacement alone, as for every slot the bridge accepts.
+ * @param {String} Text The slot text (to_type).
+ * @param {Map} Edit Map("deletes", Codepoints, "deleted_text", Text, "span", Span).
+ * @returns {Object} { Text, Chunks, NextWords, HasCorrections, Deletes,
+ *     DeletedText, RewriteSpan }.
+ */
+_LLM_Engine_RewriteDisplaySlot(Text, Edit) {
+	Span := Edit["span"]
+	DeletedText := Edit["deleted_text"]
+	Kept := SubStr(Span, 1, StrLen(Span) - StrLen(DeletedText))
+	Chunks := []
+	if (Kept != "")
+		Chunks.Push({ type: "equal", text: Kept })
+	Chunks.Push({ type: "insert", text: Text })
+	return {
+		Text: Text,
+		Chunks: Chunks,
+		NextWords: "",
+		HasCorrections: true,
+		Deletes: Edit["deletes"],
+		DeletedText: DeletedText,
+		RewriteSpan: Span
+	}
 }
 
 LLM_Engine_OnInlineInjectComplete(Transaction, Ok := true, ErrorMessage := "") {

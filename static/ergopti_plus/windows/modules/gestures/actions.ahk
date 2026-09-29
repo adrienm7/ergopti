@@ -235,6 +235,11 @@ global GESTURE_ACTIONS := Map(
 		"llm_generate_prediction", {
 				Fn: (*) => LLM_Menu_TriggerPrediction(),
 		},
+		; The same request with the prompt (and count) the binding names; the
+		; llm_predict_<profile> presets are registered below the Map.
+		"llm_prompt_prediction", {
+				Fn: (BindingId := "") => GesturePromptPrediction(BindingId),
+		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
 		; when the action is triggered via a gesture slot instead.
@@ -277,6 +282,17 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 		}
 }
 
+; ── One ready-made prompt action per built-in profile ──────────────────────
+;
+; llm_predict_<id> is llm_prompt_prediction with that built-in profile and the
+; AI menu's count. Registered from LLM_PROFILE_BUILTIN_ORDER, the driver's list
+; of the built-ins in _shared/modules/llm/profiles.json, so a new built-in gets
+; its action with no second list to update; the catalogue parity test fails if
+; the generated catalogue and this registry ever disagree.
+for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER {
+		GESTURE_ACTIONS["llm_predict_" . _PresetProfileId] := { Fn: _GestureMakePromptPresetRunner(_PresetProfileId) }
+}
+
 ; Every persisted gesture action must name the live catalogue.  The empty
 ; sentinel is exclusive to tap-hold, where it means native key passthrough.
 GestureActionIsAssignable(ActionName, AllowNative := false) {
@@ -298,6 +314,11 @@ _GestureMakeKeyEmitter(Key, Mods) {
 
 _GestureMakeSeqEmitter(Seq) {
 		return (*) => SendFinalResult(Seq)
+}
+
+; Same reason: the profile id arrives as a parameter, so each preset keeps its own.
+_GestureMakePromptPresetRunner(ProfileId) {
+		return (*) => LLM_Menu_TriggerPredictionWith(ProfileId, 0)
 }
 
 
@@ -346,6 +367,24 @@ GestureScreenshotInstant() {
 				LoggerError("gestures", "GestureScreenshotInstant launch failed: {1}", Err.Message)
 				try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
 		}
+}
+
+; Runs the llm_prompt_prediction action of one binding: its stored value names
+; the prompt and, optionally, the count. The value is re-validated here, since
+; the configuration file can be edited by hand; the prompt's existence is the
+; trigger's check, which shows the unknown-prompt notice.
+; @param {String} BindingId The binding whose parameter to read.
+; @param {Func} FireFn Test seam forwarded to LLM_Menu_TriggerPredictionWith.
+; @returns {Boolean} True when a prediction was requested.
+GesturePromptPrediction(BindingId := "", FireFn := 0) {
+		Value := GestureGetActionParameter(BindingId, "llm_prompt_prediction")
+		Parsed := LLM_PromptAction_Parse(Value, &Reason)
+		if !(Parsed is Map) {
+				LoggerWarn("gestures", "llm_prompt_prediction ignored for binding '{1}': {2}.", BindingId, Reason)
+				return false
+		}
+		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
+				Parsed.Get("num_predictions", 0), FireFn)
 }
 
 GestureOpenConfiguredURL(BindingId := "") {

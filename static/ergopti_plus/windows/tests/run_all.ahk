@@ -546,6 +546,8 @@ _LogBootProgress("loading LLM modules")
 ; Remote catalogue load must fall back gracefully when api_providers.json is missing/malformed.
 #Include meta/test_remote_catalog_load_graceful.ahk
 #Include ../modules/llm/option_validation.ahk
+#Include ../modules/llm/rewrite.ahk
+#Include ../modules/llm/prompt_action.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_semantic_config_identity.ahk
@@ -671,6 +673,9 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_gestures.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
+#Include unit/test_llm_rewrite.ahk
+#Include unit/test_llm_prompt_action.ahk
+#Include unit/test_llm_prompt_prediction.ahk
 #Include unit/test_send_input_actions.ahk
 #Include unit/test_tap_keys.ahk
 #Include unit/test_gesture_cycle_candidates.ahk

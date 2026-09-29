@@ -353,18 +353,27 @@ _LLM_Engine_RefreshSemanticConfig() {
  * Binds the base configuration to the profile effective for the focused app.
  * @param {string} EffectiveProfileId - Profile selected for this request.
  * @param {Map|Object} EffectiveProfile - Optional already-resolved profile.
+ * @param {Integer} NumPredictionsOverride - The request's own prediction count
+ *     (a llm_prompt_prediction binding), 0 when it uses the configured one. The
+ *     configured count is already part of the base signature; an override is
+ *     framed apart so two counts can never share a cache entry or a callback.
  * @returns {string} Request/cache semantic signature.
  */
-_LLM_Engine_RequestSemanticSignature(EffectiveProfileId, EffectiveProfile := unset) {
+_LLM_Engine_RequestSemanticSignature(EffectiveProfileId, EffectiveProfile := unset,
+		NumPredictionsOverride := 0) {
 	global _LLM_Engine
 	Base := _LLM_Engine.Get("semantic_config_signature", "")
 	Profile := IsSet(EffectiveProfile)
 		? EffectiveProfile
 		: LLM_GetActiveProfile(EffectiveProfileId,
 			_LLM_Engine.Get("user_profiles", []))
-	return _LLM_Engine_FrameSignaturePart(Base)
+	Signature := _LLM_Engine_FrameSignaturePart(Base)
 		. _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(EffectiveProfileId))
 		. _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(Profile))
+	if (NumPredictionsOverride != 0)
+		Signature .= _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(
+			Map("num_predictions_override", NumPredictionsOverride)))
+	return Signature
 }
 
 /**

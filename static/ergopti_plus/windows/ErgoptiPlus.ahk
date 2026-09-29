@@ -552,6 +552,7 @@ KLPF_InitializeCleanup()
 #Include modules/llm/api_common.ahk
 #Include modules/llm/api_token_crypto.ahk
 #Include modules/llm/api_ollama.ahk
+#Include modules/llm/rewrite.ahk
 #Include modules/llm/parser.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
@@ -561,6 +562,7 @@ LLM_Defaults_Load()
 #Include _generated/llm_profiles_data.ahk
 #Include modules/llm/profiles.ahk
 #Include modules/llm/option_validation.ahk
+#Include modules/llm/prompt_action.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk
