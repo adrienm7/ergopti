@@ -139,6 +139,13 @@
 			"min_width": 720,
 			"min_height": 155,
 			"vhost": "ergopti.tokenprompt"
+		},
+		"update_check": {
+			"width": 480,
+			"height": 320,
+			"min_width": 400,
+			"min_height": 260,
+			"vhost": "ergopti.updatecheck"
 		}
 	}
 }

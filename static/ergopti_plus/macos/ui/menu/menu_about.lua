@@ -4,9 +4,10 @@
 --- MODULE: Menu About / Update
 --- DESCRIPTION:
 --- Builds the "About / Update" sub-menu for the macOS menubar. The automatic
---- checks are the Lua driver's (modules/updater/auto_check.lua); the check row
---- crosses the narrow launcher adapter so Sparkle verifies, downloads, installs,
---- and relaunches the outer application bundle only when the user clicks it.
+--- checks are the Lua driver's (modules/updater/auto_check.lua); "Check for
+--- updates" opens the shared update-check window (ui/update_check), and only an
+--- install crosses the narrow launcher adapter, so Sparkle verifies, downloads,
+--- installs and relaunches the outer application bundle when the user asks.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Native ownership: Sparkle's standard controller provides authenticated
@@ -202,14 +203,27 @@ function M.build(ctx, actions)
 		-- the automatic checks name the release they found here.
 		local checks = type(ctx) == "table" and ctx.update_checks or nil
 		local latest = type(checks) == "table" and checks.latest() or nil
+		-- "Check for updates" asks the Lua driver and answers in the shared
+		-- update-check window; a row that already names a release is the user's
+		-- consent to install it, so it goes straight to Sparkle.
 		local check_row = {
 			label = i18n.get("menu.about.check_for_updates"),
 			action = function()
-				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
-				UpdateLauncher.request_check(channel)
+				Logger.info(LOG, "User asked for an update check (channel: %s).", channel)
+				require("ui.update_check").open({
+					checks = checks,
+					channel_owner = owner,
+					on_change = type(ctx) == "table" and ctx.updateMenu or nil,
+				})
 			end,
 		}
-		if latest then check_row.label = update_now_label(latest.tag) end
+		if latest then
+			check_row.label = update_now_label(latest.tag)
+			check_row.action = function()
+				Logger.info(LOG, "User triggered one-click update to %s (channel: %s).", latest.tag, latest.channel)
+				UpdateLauncher.request_check(latest.channel)
+			end
+		end
 		table.insert(menu_items, check_row)
 		if type(checks) == "table" then
 			table.insert(menu_items, frequency_picker(checks))
