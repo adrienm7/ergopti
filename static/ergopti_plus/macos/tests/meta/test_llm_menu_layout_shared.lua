@@ -39,7 +39,6 @@ local CANON = {
 	{ id = "llm_backend",             greys_off = false, dot = false },
 	{ id = "llm_model",               greys_off = false, dot = true  },
 	{ id = "llm_profile",             greys_off = true,  dot = false },
-	{ id = "llm_num_predictions",     greys_off = true,  dot = false },
 	{ id = "llm_trigger",             greys_off = true,  dot = false },
 	{ id = "llm_live_mode",           greys_off = true,  dot = false },
 	{ id = "llm_generation_settings", greys_off = true,  dot = false },

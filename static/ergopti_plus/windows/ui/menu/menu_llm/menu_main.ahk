@@ -319,7 +319,6 @@ _LLM_MenuLayout_Fallback() {
 		Map("id", "llm_backend",             "disabled_when_off", false, "health_dot", false),
 		Map("id", "llm_model",               "disabled_when_off", false, "health_dot", true),
 		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_num_predictions",     "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_live_mode",           "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_generation_settings", "disabled_when_off", true,  "health_dot", false),
@@ -333,8 +332,8 @@ _LLM_MenuLayout_Fallback() {
  * owns the ORDER and the `disabled` flag; this dispatch owns the platform-native
  * label formatting and submenu construction (which read Win32/tray state and so
  * cannot live in shared data). Conditional native-only rows that have no shared
- * entry — the thinking-model info row, the num-predictions reset row, and the
- * inner separator — are emitted here at their anchor row to preserve menu order.
+ * entry — the thinking-model info row and the separator after the profile row —
+ * are emitted here at their anchor row to preserve menu order.
  * @param {String}  id                  Row id from the manifest's llm_menu.
  * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
  * @param {Boolean} llm_is_operational  Enabled AND deps ready — gates the health dot.
@@ -383,14 +382,9 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 		}
 	case "llm_profile":
 		_LLM_Menu_AddRow(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])), LLM_Menu_BuildProfileMenu(), disabled)
-	case "llm_num_predictions":
-		_LLM_Menu_AddRow(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]), LLM_Menu_BuildNMenu(), disabled)
-		; Conditional reset row (native), then the separator before the trigger block.
-		_LLM_MaybeAddReset(_LLM_Menu_Handle,
-			_LLM_Menu["n_predictions"],
-			_LLM_DefaultFor("llm_num_predictions", 3),
-			(*) => _LLM_AssignAndRebuild("n_predictions", _LLM_DefaultFor("llm_num_predictions", 3)))
-		_LLM_Menu_Handle.Add()  ; separator
+		; The separator before the trigger block. The suggestion count that sat
+		; between them is the first row of the generation submenu.
+		_LLM_Menu_Handle.Add()
 	case "llm_trigger":
 		_LLM_Menu_AddRow(t("menu.llm.trigger_menu_title"), LLM_Menu_BuildTriggerMenu(), disabled)
 	case "llm_live_mode":

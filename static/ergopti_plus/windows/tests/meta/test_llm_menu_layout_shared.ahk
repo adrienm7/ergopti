@@ -48,7 +48,6 @@ _LMLS_Canonical() {
 		Map("id", "llm_backend",             "off", false, "dot", false),
 		Map("id", "llm_model",               "off", false, "dot", true),
 		Map("id", "llm_profile",             "off", true,  "dot", false),
-		Map("id", "llm_num_predictions",     "off", true,  "dot", false),
 		Map("id", "llm_trigger",             "off", true,  "dot", false),
 		Map("id", "llm_live_mode",           "off", true,  "dot", false),
 		Map("id", "llm_generation_settings", "off", true,  "dot", false),
