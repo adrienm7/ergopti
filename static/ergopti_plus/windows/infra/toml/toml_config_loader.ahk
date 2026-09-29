@@ -237,6 +237,52 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	return ForeignOwner != "" ? "" : "leaf"
 }
 
+; Why the loader leaves a manifest-known ``[Section].Key`` value unapplied as
+; outdated configuration, or "" when it applies. An older build or a hand edit
+; can leave a value this build no longer accepts (a narrowed enum, a boolean
+; spelled "yes", a scalar where a table now lives). Such an entry is never an
+; ERROR and never blocks a save: the loader warns about it and keeps the
+; manifest value, and the configuration cleanup offers it. Both call this, so
+; what boot warns about is exactly what the cleanup lists. RawValue is the TOML
+; literal, so legacy spellings are judged exactly as at boot.
+TomlConfigOutdatedReason(Features, Section, Key, Value, RawValue, ForeignOwner := "") {
+	if !TomlConfigValueMatchesManifest(Section, Key, Value, &ExpectedType, RawValue)
+		return "its '" . ExpectedType . "' setting no longer accepts this value"
+	; A key another module owns is not assigned into the Features tree.
+	if (ForeignOwner != "")
+		return ""
+	return TomlConfigShapeReason(Features, Section, Key, Value)
+}
+
+; Why assigning Value at ``[Section].Key`` would break the manifest-seeded
+; shape of the Features tree, or "" when it fits. The walk never mutates
+; Features; a missing segment of a dynamic personal namespace is created at
+; load, so it never conflicts.
+TomlConfigShapeReason(Features, Section, Key, Value) {
+	Parts := TomlConfigSectionParts(Section)
+	if !(Parts is Array)
+		return ""
+	Node := Features
+	for _, Part in Parts {
+		if (Part == "")
+			continue
+		if (Type(Node) == "Map" and Node.Has(Part))
+			Node := Node[Part]
+		else if (IsObject(Node) and Node.HasOwnProp(Part))
+			Node := Node.%Part%
+		else if (TomlSectionIsDynamicPersonalNamespace(Section) and Type(Node) == "Map")
+			return ""
+		else
+			return "its section crosses a setting that is not a table"
+	}
+	; A flat-form key must never flatten a seeded {enabled:...} Map node, nor
+	; the reverse (toml-loader-shape-mismatch).
+	if (Type(Node) == "Map")
+		return (Node.Has(Key) and (Node[Key] is Map) != (Value is Map))
+			? "it would change the shape of a table setting" : ""
+	return IsObject(Node) ? "" : "its section is a setting, not a table"
+}
+
 ; Logger.Format cannot coerce Array/Map values. Emit a bounded structural
 ; description instead of producing a secondary "log format failed" diagnostic.
 TomlConfigLogValue(Value) {
@@ -414,17 +460,24 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 ; ``Features``; tests pass their isolated Map fixture.
 ; Only the boot owner converts a local load diagnostic into session authority.
 ; Later reads of candidates must neither poison nor clear that authority.
+; Outdated entries are not rejections: the boot records them so a full save
+; keeps them on disk for the cleanup instead of erasing them silently.
 ApplyBootConfigToml(Features, FilePath) {
-	global _ConfigBootRejectedOverrides
-	Applied := ApplyConfigToml(Features, FilePath, &RejectedOverrides)
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Applied := ApplyConfigToml(Features, FilePath, &RejectedOverrides, , &OutdatedEntries)
 	_ConfigBootRejectedOverrides += RejectedOverrides
+	for Id, Detail in OutdatedEntries
+		_ConfigBootOutdatedEntries[Id] := Detail
 	return Applied
 }
 
+; OutdatedEntries receives a Map from "Section`nKey" to the reason each
+; outdated entry was left unapplied (see TomlConfigOutdatedReason).
 ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
-		&MigratedOverrides := 0) {
+		&MigratedOverrides := 0, &OutdatedEntries := 0) {
 	RejectedOverrides := 0
 	MigratedOverrides := 0
+	OutdatedEntries := Map()
 	Applied := 0
 	if !FileExist(FilePath) {
 		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
@@ -450,8 +503,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	CurrentSection := ""
 	SkippingForeign := false
 	ObsoleteDriverSections := 0
-	; Unknown entries share one warning and one post-ready cleanup proposal.
+	; Unknown and outdated entries each share one warning that names them, and
+	; the post-ready cleanup proposal lists them.
 	UnknownKeys := 0
+	UnknownNames := ""
+	OutdatedNames := ""
 	ForeignOwnedKeys := 0
 	IgnoredSectionKeys := 0
 
@@ -515,10 +571,10 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		Value := TomlCoerceValueExt(RawValue)
 		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
 				&ExpectedType, RawValue) {
-			RejectedOverrides += 1
-			try LoggerError("TomlConfigLoader",
-				"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
-				CurrentSection, Key, ExpectedType)
+			OutdatedReason := TomlConfigOutdatedReason(Features, CurrentSection, Key,
+				Value, RawValue)
+			OutdatedEntries[CurrentSection . "`n" . Key] := OutdatedReason
+			OutdatedNames .= (OutdatedNames == "" ? "" : ", ") . "[" . CurrentSection . "]." . Key
 			continue
 		}
 
@@ -531,6 +587,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			&ForeignOwner)
 		if (UnknownKind != "") {
 			UnknownKeys += 1
+			UnknownNames .= (UnknownNames == "" ? "" : ", ") . "[" . CurrentSection . "]." . Key
 			continue
 		}
 		if (ForeignOwner != "") {
@@ -538,6 +595,15 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			try LoggerDebug("TomlConfigLoader",
 				"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
 				CurrentSection, Key, ForeignOwner, TomlConfigLogValue(Value))
+			continue
+		}
+
+		; An old-shape value (a scalar where the manifest seeds a table, or the
+		; reverse) is outdated configuration, decided by the rule the cleanup uses.
+		OutdatedReason := TomlConfigShapeReason(Features, CurrentSection, Key, Value)
+		if (OutdatedReason != "") {
+			OutdatedEntries[CurrentSection . "`n" . Key] := OutdatedReason
+			OutdatedNames .= (OutdatedNames == "" ? "" : ", ") . "[" . CurrentSection . "]." . Key
 			continue
 		}
 
@@ -620,8 +686,13 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	}
 	if UnknownKeys > 0 {
 		try LoggerWarn("TomlConfigLoader",
-			"Ignored {1} unused configuration key(s) in '{2}'; the configuration cleanup tool is available.",
-			UnknownKeys, FilePath)
+			"Ignored {1} unused configuration key(s) in '{2}' ({3}); they are offered for cleanup.",
+			UnknownKeys, FilePath, UnknownNames)
+	}
+	if OutdatedEntries.Count > 0 {
+		try LoggerWarn("TomlConfigLoader",
+			"Ignored {1} outdated configuration value(s) in '{2}' ({3}): this build no longer accepts them, so their settings keep the manifest value; they are offered for cleanup.",
+			OutdatedEntries.Count, FilePath, OutdatedNames)
 	}
 	if RejectedOverrides {
 		try LoggerError("TomlConfigLoader",
@@ -636,8 +707,8 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			MigratedOverrides)
 	}
 	try LoggerInfo("TomlConfigLoader",
-		"Config summary for '{1}': {2} applied, {3} rejected, {4} unknown key(s) ignored, {5} owned by another module, {6} key(s) in skipped sections, {7} obsolete section(s).",
+		"Config summary for '{1}': {2} applied, {3} rejected, {4} unknown key(s) ignored, {5} owned by another module, {6} key(s) in skipped sections, {7} obsolete section(s), {8} outdated value(s) ignored.",
 		FilePath, Applied, RejectedOverrides, UnknownKeys, ForeignOwnedKeys,
-		IgnoredSectionKeys, ObsoleteDriverSections)
+		IgnoredSectionKeys, ObsoleteDriverSections, OutdatedEntries.Count)
 	return Applied
 }
