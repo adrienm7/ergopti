@@ -18,6 +18,7 @@ local OWNERS = {
 	"adapters.key_state",
 	"adapters.synthetic_input",
 	"adapters.timer_scheduler",
+	"desktop_navigation",
 	"infra.i18n",
 	"infra.logger",
 	"infra.manifest_reader",
