@@ -2,3 +2,4 @@
 
 require("test.config_scope_transaction_contract")(require("tests.helpers"))
 require("test.config_scope_plan_contract")(require("tests.helpers"))
+require("test.config_scope_file_contract")(require("tests.helpers"))
