@@ -22,13 +22,20 @@ local MODULES = {
 	"adapters.accessibility_permission", "adapters.shell_runner",
 }
 
---- Reads the French locale, the maintainer's language.
+--- Reads one shipped locale.
+--- @param code string Locale code.
 --- @return table strings
-local function french()
-	local handle = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+local function locale_strings(code)
+	local handle = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
+end
+
+--- Reads the French locale, the maintainer's language.
+--- @return table strings
+local function french()
+	return locale_strings("fr")
 end
 
 --- Runs one case against a fresh dialog, a recording window factory and the
@@ -75,16 +82,22 @@ local function with_dialog(body)
 		})
 		-- load_with_stubs installs its key-echo i18n baseline; the dialog captures
 		-- i18n at require time, so the French fake goes in and the dialog reloads.
+		local active = { code = "fr", strings = fr }
 		package.loaded["infra.i18n"] = {
-			get = function(key) return fr[key] or key end,
+			get_locale = function() return active.code end,
+			get = function(key) return active.strings[key] or key end,
 			format = function(key, ...)
-				local text = fr[key] or key
+				local text = active.strings[key] or key
 				for n, value in ipairs({ ... }) do
 					text = text:gsub("{" .. n .. "}", (tostring(value):gsub("%%", "%%%%")))
 				end
 				return text
 			end,
 		}
+		--- Switches the UI language the dialog reads.
+		function h.use_locale(code)
+			active.code, active.strings = code, locale_strings(code)
+		end
 		package.loaded["ui.permission_dialog"] = nil
 		h.dialog = require("ui.permission_dialog")
 		h.permission = require("adapters.accessibility_permission")
@@ -194,7 +207,8 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_contains(html, "rouvrez ErgoptiPlus pour revoir ces étapes",
 				"Later must say how to get the steps back")
 			helpers.assert_contains(html, "Activez « Hammerspoon » dans la liste")
-			helpers.assert_contains(html, "<code>" .. BUNDLE_PATH .. "</code>")
+			helpers.assert_contains(html, '<html lang="fr" dir="auto">')
+			helpers.assert_contains(html, '<code dir="ltr">' .. BUNDLE_PATH .. "</code>")
 			helpers.assert_contains(html, ">Ouvrir les Réglages</button>")
 			helpers.assert_contains(html, ">" .. h.fr["common.later"] .. "</button>")
 			helpers.assert_contains(html, "data:image/png;base64,AAAA")
@@ -302,13 +316,37 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 	helpers.it("escapes translated text and the path in the page", function()
 		with_dialog(function(h)
 			local html = h.dialog.render({
-				title = "<b>&", body = "\"x\"", steps = { "a", "b", "c /p<q" },
+				locale = "fr", title = "<b>&", body = "\"x\"", steps = { "a", "b", "c /p<q" },
 				open_label = "O", later_label = "L",
 			}, "/p<q", nil)
 			helpers.assert_contains(html, "&lt;b&gt;&amp;")
 			helpers.assert_contains(html, "&quot;x&quot;")
-			helpers.assert_contains(html, "<code>/p&lt;q</code>")
+			helpers.assert_contains(html, "<code dir=\"ltr\">/p&lt;q</code>")
 			helpers.assert_true(html:find("<b>&", 1, true) == nil)
 		end)
+	end)
+
+	helpers.it("reads right to left in Hebrew and Arabic", function()
+		for _, code in ipairs({ "he", "ar" }) do
+			with_dialog(function(h)
+				h.use_locale(code)
+				h.dialog.guide_accessibility(h.permission)
+				local html = h.windows[1].opts.html_string
+				helpers.assert_contains(html, '<html lang="' .. code .. '" dir="auto">',
+					"the page direction follows the translated text")
+				local title = h.dialog.content("accessibility", BUNDLE_PATH).title
+				helpers.assert_contains(html, "<h1>" .. title)
+				-- dir="auto" takes the first strong letter of the page, the title's:
+				-- U+0590..U+06FF (Hebrew, Arabic) start with UTF-8 bytes 0xD6..0xDB.
+				local lead = title:byte(1)
+				helpers.assert_true(lead >= 0xD6 and lead <= 0xDB,
+					"the " .. code .. " title must open with a right-to-left letter for dir=auto")
+				helpers.assert_true(html:find("80px;padding:0 0 0", 1, true) == nil
+					and html:find("margin-inline-start:80px", 1, true) ~= nil,
+					"a left margin would keep the steps on the left of a right-to-left page")
+				helpers.assert_contains(html, '<code dir="ltr">' .. BUNDLE_PATH .. "</code>",
+					"the path reads left to right inside a right-to-left step")
+			end)
+		end
 	end)
 end)

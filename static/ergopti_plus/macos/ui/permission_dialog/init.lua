@@ -106,10 +106,11 @@ end
 --- Resolves every translated string of one dialog.
 --- @param kind string Permission kind.
 --- @param bundle_path string Path of the runtime the grant belongs to.
---- @return table content { window_title, title, body, steps, open_label, later_label }
+--- @return table content { locale, window_title, title, body, steps, open_label, later_label }
 function M.content(kind, bundle_path)
 	local prefix = M.KINDS[kind].prefix
 	return {
+		locale       = i18n.get_locale(),
 		window_title = i18n.get("permission_dialog.window_title"),
 		title        = i18n.get(prefix .. ".title"),
 		body         = i18n.get(prefix .. ".body"),
@@ -124,7 +125,8 @@ function M.content(kind, bundle_path)
 end
 
 -- Page style: system font and colours, light and dark, buttons laid out as in
--- a native alert (default action on the right).
+-- a native alert (default action at the end of the row). Offsets are logical
+-- (inline-start), so a right-to-left page mirrors like a native alert does.
 local STYLE = table.concat({
 	":root{color-scheme:light dark}",
 	"html,body{margin:0;height:100%}",
@@ -134,7 +136,7 @@ local STYLE = table.concat({
 	".icon{width:64px;height:64px;flex:none}",
 	"h1{font-size:14px;font-weight:600;margin:4px 0 6px}",
 	"p{margin:0;line-height:1.45;opacity:.85}",
-	"ol{margin:14px 0 0 80px;padding:0 0 0 18px;line-height:1.45}",
+	"ol{margin:14px 0 0;margin-inline-start:80px;padding:0;padding-inline-start:18px;line-height:1.45}",
 	"li{margin:0 0 8px}",
 	"code{font:12px ui-monospace,Menlo,monospace;-webkit-user-select:text;word-break:break-all}",
 	".buttons{margin-top:auto;display:flex;justify-content:flex-end;gap:10px;padding-top:14px}",
@@ -143,7 +145,9 @@ local STYLE = table.concat({
 	"button.default{background:AccentColor;color:AccentColorText;border-color:transparent}",
 }, "")
 
---- Builds the page of one dialog.
+--- Builds the page of one dialog. The page carries the UI language, and its
+--- direction follows the translated text (dir="auto"): Arabic and Hebrew read
+--- right to left, and the bundle path stays left to right inside them.
 --- @param content table Translated strings from M.content.
 --- @param bundle_path string Path quoted in the + step.
 --- @param icon_url string|nil Data URL of the app icon.
@@ -157,14 +161,15 @@ function M.render(content, bundle_path, icon_url)
 			local quoted = escape_html(bundle_path)
 			local at = text:find(quoted, 1, true)
 			if at ~= nil then
-				text = text:sub(1, at - 1) .. "<code>" .. quoted .. "</code>" .. text:sub(at + #quoted)
+				text = text:sub(1, at - 1) .. "<code dir=\"ltr\">" .. quoted .. "</code>" .. text:sub(at + #quoted)
 			end
 		end
 		steps[#steps + 1] = "<li>" .. text .. "</li>"
 	end
 	local icon = icon_url and ('<img class="icon" alt="" src="' .. escape_html(icon_url) .. '">') or ""
 	return table.concat({
-		"<!doctype html><html><head><meta charset=\"utf-8\"><style>", STYLE, "</style></head><body>",
+		"<!doctype html><html lang=\"", escape_html(content.locale), "\" dir=\"auto\"><head>",
+		"<meta charset=\"utf-8\"><style>", STYLE, "</style></head><body>",
 		"<div class=\"head\">", icon, "<div><h1>", escape_html(content.title), "</h1><p>",
 		escape_html(content.body), "</p></div></div>",
 		"<ol>", table.concat(steps), "</ol>",
