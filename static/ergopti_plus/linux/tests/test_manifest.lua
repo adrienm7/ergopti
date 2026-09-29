@@ -35,6 +35,7 @@ return {
 	"tests.unit.adapters.test_xkb_capture",
 	"tests.unit.infra.test_build_commit",
 	"tests.unit.infra.test_config_migrate",
+	"tests.unit.infra.test_config_scope_composition",
 	"tests.unit.infra.test_config_scope_transaction",
 	"tests.unit.infra.test_gesture_scope",
 	"tests.unit.infra.test_diagnostic_snapshot",
