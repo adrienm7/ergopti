@@ -10,7 +10,8 @@
 ; 2. the page's state message carries every field the shared page reads;
 ; 3. the actions act on the answer the window holds: Update installs only an
 ;    offered release and closes, a switch goes only to a listed channel, Report
-;    names the updater and the cause, the log opens only for a failure;
+;    names the updater and the cause, the log opens only for a failure; a
+;    click while the driver is paused drives no updater action;
 ; 4. the native window composes the page's sentences, placeholders filled;
 ; 5. a manual check keeps the other channels with a newer release on its
 ;    request; a background check does not.
@@ -181,6 +182,39 @@ _TUCD_ActionsCase() {
 }
 Test("update check: the actions act only on the answer the window holds (update-check-window)",
 	_TUCD_Actions)
+
+; A page message and a native click bypass native Suspend: a click that arrives
+; while the driver is paused drives no updater action, and says so.
+_TUCD_PausedClicks() {
+	_TUCD_Run(_TUCD_PausedClicksCase)
+}
+_TUCD_PausedClicksCase() {
+	global _TUCD_Effects
+	Request := _TUCD_Request()
+	Refusals := []
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}" }
+	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
+		"latest", Release.Tag, "others", [Map("channel", "main", "tag", "v1.0.0")], "release", Release))
+	Effects := _TUCD_NewEffects()
+	Effects["refuse_paused"] := () => Refusals.Push(true)
+	for Name, Channel in Map("update", "", "whats_new", "", "switch_channel", "main")
+		AssertFalse(UpdateCheck_Perform(Name, Channel, Effects, true)["ok"], Name . " is refused while paused")
+	AssertEqual(3, Refusals.Length, "each refusal tells the user the driver is paused")
+	AssertEqual(0, _TUCD_Effects.Installs.Length, "nothing installs while paused")
+	AssertEqual(0, _TUCD_Effects.Changelogs.Length, "the Versions window stays closed while paused")
+	AssertEqual(0, _TUCD_Effects.Switches.Length, "the channel stays while paused")
+	AssertTrue(UpdateCheck_Perform("close", "", Effects, true)["closed"], "the window still closes while paused")
+
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	UpdateCheck_ShowResult(Request, Map("state", "error", "current", "v0.0.0-dev.144",
+		"reason", "no_connection", "detail", "GitHub could not be reached"))
+	AssertTrue(UpdateCheck_Perform("report", "", Effects, true)["ok"], "a failure is still reported while paused")
+	AssertTrue(UpdateCheck_Perform("open_log", "", Effects, true)["ok"], "the log still opens while paused")
+	AssertEqual(3, Refusals.Length, "the error window's actions are not refused")
+}
+Test("update check: a click while paused drives no updater action (update-check-window)",
+	_TUCD_PausedClicks)
 
 _TUCD_NativeTexts() {
 	Label := _Updater_ChannelLabel("dev")
