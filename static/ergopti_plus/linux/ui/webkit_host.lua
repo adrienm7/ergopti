@@ -298,13 +298,29 @@ end
 --- Builds the i18n bootstrap <script> tag to inject before the closing </head>.
 --- Injects window.__i18n_base and window._i18n_locale so the browser-side
 --- i18n.js fetch() resolves locale JSON files correctly even when the HTML
---- is loaded inline (no file:// base URL).
+--- is loaded inline (no file:// base URL), and seeds window._i18n_strings with
+--- the page's strings when the host supplies them. The seed is what the page
+--- shows: WebKitGTK refuses a file:// fetch from the page unless a setting this
+--- driver never enables, and a page left to that fetch alone showed its keys.
 --- @param locales_dir string Path returned by resolve_locales_dir().
 --- @param active_locale string Locale code (e.g. "fr", "en").
+--- @param strings table|nil Flat key → string catalogue to seed, or nil.
 --- @return string Script tag to inject into <head>.
-function M.build_i18n_boot_script(locales_dir, active_locale)
+function M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	locales_dir = locales_dir or ""
 	active_locale = active_locale or "fr"
+
+	local seed = ""
+	if strings ~= nil then
+		-- Required here, like the CSP module: tooling loads this module before
+		-- _shared/lua is on the path, and never seeds strings
+		local statement, seed_err = require("webview.i18n_seed").statement(strings)
+		if statement then
+			seed = statement
+		else
+			Logger.error(LOG, "The page is built without its strings: %s.", tostring(seed_err))
+		end
+	end
 
 	-- Build a file:// URL for the locales directory
 	local base = locales_dir:gsub("\\", "/")
@@ -315,8 +331,8 @@ function M.build_i18n_boot_script(locales_dir, active_locale)
 	end
 
 	return string.format(
-		'<script>window.__i18n_base="%s";window._i18n_locale="%s";</script>',
-		base, active_locale
+		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
+		base, active_locale, seed
 	)
 end
 
@@ -342,8 +358,9 @@ end
 --- @param driver_root string Absolute path to the linux driver root.
 --- @param app_name string App directory name under _shared/ui/.
 --- @param active_locale string|nil Locale code (default: "fr").
+--- @param strings table|nil Catalogue seeded into the page (see build_i18n_boot_script).
 --- @return string Complete HTML string ready for webkit_web_view_load_html().
-function M.build_app_html(driver_root, app_name, active_locale)
+function M.build_app_html(driver_root, app_name, active_locale, strings)
 	active_locale = active_locale or "fr"
 
 	local ui_root    = M.resolve_ui_root(driver_root)
@@ -359,7 +376,7 @@ function M.build_app_html(driver_root, app_name, active_locale)
 	local html = M.build_injected_html(app_dir, "index.html")
 
 	local locales_dir = M.resolve_locales_dir(driver_root)
-	local i18n_script = M.build_i18n_boot_script(locales_dir, active_locale)
+	local i18n_script = M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	html = M.inject_i18n_boot(html, i18n_script)
 	html = html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. '<script>window.__ergopti_host="linux";</script>'

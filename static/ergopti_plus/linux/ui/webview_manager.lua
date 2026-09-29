@@ -242,9 +242,16 @@ function M.show(app_name, active_locale)
 		return true
 	end
 
-	-- Build the HTML.
+	-- Build the HTML, with the page's strings: active locale over English over
+	-- French, so a key the active locale lacks reads as English, not as a key.
 	local root = _driver_root()
-	local html = webkit_host.build_app_html(root, app_name, active_locale)
+	local ok_catalogue, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	if not ok_catalogue or type(catalogue) ~= "table" or next(catalogue) == nil then
+		Logger.error(LOG, "show(): '%s' opens without its strings: the locale catalogue is unavailable (%s).",
+			app_name, tostring(catalogue))
+		catalogue = nil
+	end
+	local html = webkit_host.build_app_html(root, app_name, active_locale, catalogue)
 	if not html or html == "" then
 		Logger.error(LOG, "show(): failed to build HTML for '%s'.", app_name)
 		return false

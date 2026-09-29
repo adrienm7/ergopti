@@ -364,6 +364,41 @@ helpers.describe("ui.webkit_host", function()
       helpers.assert_true(html:find('window.__ergopti_host="linux"', 1, true) ~= nil,
         "metrics pages must select the Linux bridge instead of a file fetch")
     end)
+
+    -- (page-carries-strings) WebKitGTK refuses the page's file:// locale fetch
+    -- unless a setting this driver never enables; the page must not depend on it
+    helpers.it("seeds the page's strings before any of its scripts (page-carries-strings)", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "healthcheck", "en",
+        { ["healthcheck.section.summary"] = "Summary", ["probe.unsafe"] = "a </script> b" })
+      local seed_at = html:find("window._i18n_strings=", 1, true)
+      local i18n_at = html:find("function resolve_locale_url", 1, true)
+      helpers.assert_true(seed_at ~= nil, "the healthcheck page must carry its strings")
+      helpers.assert_true(i18n_at ~= nil and seed_at < i18n_at,
+        "the strings must be in place before i18n.js runs")
+      helpers.assert_true(html:find('"healthcheck.section.summary":"Summary"', 1, true) ~= nil,
+        "the seed holds the catalogue")
+      helpers.assert_true(html:find("a </script> b", 1, true) == nil,
+        "a '<' inside a translation must be escaped so it cannot end the boot script")
+    end)
+
+    helpers.it("seeds nothing when the host supplies no strings", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "healthcheck", "en")
+      helpers.assert_true(html:find("window._i18n_strings=", 1, true) == nil,
+        "the tooling path builds pages without a catalogue")
+    end)
+  end)
+
+  helpers.describe("webview_manager.show()", function()
+    helpers.it("hands the page builder the locale catalogue (host-delivers-catalogue)", function()
+      local handle = io.open(DRIVER_ROOT .. "/ui/webview_manager.lua", "r")
+      local source = handle and handle:read("*a") or nil
+      if handle then handle:close() end
+      helpers.assert_true(type(source) == "string" and source ~= "", "webview_manager.lua must be readable")
+      helpers.assert_true(source:find('require("infra.locale").catalogue()', 1, true) ~= nil,
+        "show() must read the full catalogue, active over English over French")
+      helpers.assert_true(source:find("build_app_html(root, app_name, active_locale, catalogue)", 1, true) ~= nil,
+        "show() must pass that catalogue to the page builder")
+    end)
   end)
 
 end)

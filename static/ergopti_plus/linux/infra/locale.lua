@@ -66,5 +66,6 @@ function M.get(key)                  return Core.get(key) end
 function M.set_trigger_provider(fn)  Core.set_trigger_provider(fn) end
 function M.set_locale(code)          Core.set_locale(code) end
 function M.all()                     return Core.all() end
+function M.catalogue()               return Core.catalogue() end
 
 return M
