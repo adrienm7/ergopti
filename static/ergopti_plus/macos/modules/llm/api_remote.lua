@@ -2479,19 +2479,23 @@ function M.test_request(entry, spec, on_ok, on_fail)
 			(type(entry.model) == "string" and entry.model ~= "") and entry.model or nil,
 			spec.system_prompt, spec.user_text, "",
 			spec.temperature, spec.max_tokens, 1, false,
-			function(results)
-				local text = results and results[1] and tostring(results[1].to_type or "") or ""
+			-- The probe judges the raw reply: the prediction parser applies the
+			-- menu's minimum word count, which refused the one-word "OK" the probe
+			-- asks for, so every real key failed its test.
+			nil,
+			function(detail)
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
+			end,
+			ApiCommon.new_dedup_stats(),
+			function(raw)
+				local text = type(raw) == "string" and raw:match("^%s*(.-)%s*$") or ""
 				if text == "" then
 					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
 					return
 				end
 				local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
 				if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
-			end,
-			function(detail)
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
-			end,
-			ApiCommon.new_dedup_stats())
+			end)
 	end, debug.traceback)
 	if not ok_send then return fail("dispatch_raised: " .. tostring(send_err)) end
 	return true
