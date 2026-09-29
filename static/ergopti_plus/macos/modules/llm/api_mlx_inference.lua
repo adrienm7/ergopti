@@ -201,9 +201,11 @@ end
 --- @param on_fail function Failure callback.
 --- @param dedup_stats table Dedup stats object.
 --- @param force_line_mode boolean Force line completion parsing.
+--- @param on_raw function|nil Receives the model's answer unparsed instead of on_success
+---        (api_mlx.request_raw): a caller that reads its own answer format.
 function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats, force_line_mode)
+                               on_success, on_fail, dedup_stats, force_line_mode, on_raw)
     if not require_ctx("post_and_parse") then
         if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
         return
@@ -399,6 +401,10 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
             local raw     = Parser.strip_thinking(content)
             local ms_req  = math.floor((TimerScheduler.now() - t0_req) * 1000)
             Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
+            if type(on_raw) == "function" then
+                ApiCommon.protected_call(on_raw, "on_raw", raw)
+                return
+            end
             local results = {}
 
             if not is_batch then

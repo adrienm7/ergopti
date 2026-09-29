@@ -27,6 +27,10 @@ accept path applies. `rewrite.ahk` ports `_shared/lua/llm/rewrite.lua` (the
 sentence a rewrite prompt rewrites, its token budget) and `prompt_action.ahk`
 ports `_shared/lua/llm/prompt_action.lua` (the `llm_prompt` value of the
 `llm_prompt_prediction` action), each pinned to its shared corpus.
+`tone.ahk` ports `_shared/lua/llm/tone.lua` (the tone ladder, pinned to
+`tone_vectors.json`) and `tone_action.ahk` runs the `llm_tone_*` actions on it:
+the selection is rewritten one register up or down, typed over itself and
+selected again.
 
 ## Public API
 

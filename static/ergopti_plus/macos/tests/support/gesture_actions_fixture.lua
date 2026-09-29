@@ -31,6 +31,7 @@ local OWNERS = {
 	"json",
 	"llm.profile_selector",
 	"llm.prompt_action",
+	"llm.tone",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.actions_aux_owner",

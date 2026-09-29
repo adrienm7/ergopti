@@ -28,6 +28,7 @@ local notifications = require("infra.notifications")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Tone          = require("llm.tone")
 
 local LOG = "model_switcher"
 
@@ -51,6 +52,9 @@ local PROFILE_POWER_LEVELS = {
 	batch         = PROFILE_POWER_ADVANCED,
 	parallel      = PROFILE_POWER_BASIC,
 }
+-- The tone rungs rewrite a selection into a register: the same
+-- instruction-following as the rewrite profile
+for _, rung in ipairs(Tone.LADDER) do PROFILE_POWER_LEVELS[rung] = PROFILE_POWER_ADVANCED end
 
 
 
@@ -353,6 +357,9 @@ function M.new(ctx)
 		if profile_id == "advanced" then return "advanced" end
 		if profile_id == "batch_advanced" then return "batch_advanced" end
 		if profile_id == "rewrite" then return "rewrite" end
+		for _, rung in ipairs(Tone.LADDER) do
+			if profile_id == rung then return rung end
+		end
 		if profile_id:match("^batch_") or profile_id == "batch" then return "batch" end
 		if profile_id:match("^parallel_") or profile_id == "parallel" then return "parallel" end
 		return "basic"

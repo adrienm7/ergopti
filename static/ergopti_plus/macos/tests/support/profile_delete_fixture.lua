@@ -19,6 +19,7 @@ local MODULES = {
 	"infra.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
+	"llm.tone",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",

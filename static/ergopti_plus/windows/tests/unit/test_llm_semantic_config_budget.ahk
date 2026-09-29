@@ -134,7 +134,7 @@ Test("AHK2-18 semantic config: exact count and string boundaries remain accepted
 
 _LSCB_UserProfilesCannotShadowBuiltinIds() {
 	global LLM_PROFILE_BUILTIN_ORDER
-	AssertEqual(5, LLM_PROFILE_BUILTIN_ORDER.Length, "the five built-ins, rewrite included")
+	AssertEqual(9, LLM_PROFILE_BUILTIN_ORDER.Length, "the nine built-ins, rewrite and the tone ladder included")
 	for Id in LLM_PROFILE_BUILTIN_ORDER {
 		Profiles := [Map(
 			"id", Id, "label", "Shadow",

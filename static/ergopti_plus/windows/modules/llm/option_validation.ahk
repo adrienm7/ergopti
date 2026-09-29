@@ -15,10 +15,12 @@ global LLM_OPTION_MAX_STOP_SEQUENCES := 64
 global LLM_OPTION_MAX_AGGREGATE_CHARS := 1048576
 ; Canonical built-in profile ids, those of _shared/modules/llm/profiles.json in
 ; menu order. Validation must reject custom records which would shadow
-; resolution, while menu hotkeys preserve this exact order: "rewrite" comes last
-; so the Ctrl+1…4 hotkeys of the four older built-ins keep their digits.
+; resolution, while menu hotkeys preserve this exact order: "rewrite" and the
+; tone ladder come last so the Ctrl+1…4 hotkeys of the four older built-ins keep
+; their digits.
 global LLM_PROFILE_BUILTIN_ORDER := [
-	"raw", "basic", "advanced", "batch_advanced", "rewrite"
+	"raw", "basic", "advanced", "batch_advanced", "rewrite",
+	"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal"
 ]
 
 _LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {

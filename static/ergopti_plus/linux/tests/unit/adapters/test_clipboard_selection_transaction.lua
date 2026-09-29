@@ -5,6 +5,8 @@
 --- DESCRIPTION:
 --- Proves that selection transforms use the session clipboard backend, emit copy
 --- and paste through uinput, and restore the user's clipboard on every exit.
+--- The read-only probe (the tone actions read the selection, then replace it
+--- once the model answers) copies the same way and pastes nothing.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -115,6 +117,29 @@ helpers.describe("clipboard selection transaction", function()
 			helpers.assert_eq(reason, "copy_settle_failed")
 			helpers.assert_eq(shell.writes[#shell.writes].text, "saved",
 				"all post-snapshot failures must restore the clipboard")
+		end)
+	end)
+
+	helpers.it("reads the selection without pasting and restores the clipboard", function()
+		with_session("x11", "merci pour ton aide", function(clipboard, shell, combos, _, emit, sleep_ms)
+			local ok, text, reason = clipboard.read_selection(emit, sleep_ms)
+
+			helpers.assert_true(ok, "a published selection is read: " .. tostring(reason))
+			helpers.assert_eq(text, "merci pour ton aide")
+			helpers.assert_eq(combos, { "ctrl+c" }, "the read copies and pastes nothing")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the clipboard is put back")
+		end)
+	end)
+
+	helpers.it("reports no selection from the read probe and restores the clipboard", function()
+		with_session("wayland", nil, function(clipboard, shell, _, _, emit, sleep_ms)
+			local ok, text, reason = clipboard.read_selection(emit, sleep_ms)
+
+			helpers.assert_true(not ok, "an unchanged probe means there was no selection")
+			helpers.assert_eq(text, "")
+			helpers.assert_eq(reason, "no_selection")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved",
+				"the probe must never remain in the user's clipboard")
 		end)
 	end)
 end)

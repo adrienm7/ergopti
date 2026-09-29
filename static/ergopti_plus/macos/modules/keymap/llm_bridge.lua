@@ -35,6 +35,7 @@ local Keycodes         = require("infra.keycodes")
 local keylogger        = require("modules.keylogger")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
+local ToneRewrite      = require("modules.llm.tone_rewrite")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
@@ -1879,6 +1880,20 @@ function M.request_prompt_prediction(value)
 		return false
 	end
 	return engine.request_prompt_prediction(value)
+end
+
+--- Rewrites the selection one step along the tone ladder (the llm_tone_*
+--- actions). The tone module logs and shows every refusal.
+--- @param direction number Tone.MORE_FORMAL or Tone.MORE_FAMILIAR.
+--- @param cycle boolean Whether to wrap around at the ends of the ladder.
+--- @param parent string|nil Stable action parent of the text actions.
+--- @return boolean started True when the selection is being read.
+function M.request_tone_step(direction, cycle, parent)
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Tone step skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return ToneRewrite.step(direction, cycle, parent)
 end
 
 --- Re-arms the LLM inactivity timer.

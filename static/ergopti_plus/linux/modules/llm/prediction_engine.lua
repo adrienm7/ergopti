@@ -5,7 +5,9 @@
 --- DESCRIPTION:
 --- Debounces ordinary typing, handles explicit and word-end triggers, applies
 --- privacy gates, and presents parsed Ollama completions for an explicit user
---- commit. Model output never reaches the focused application before acceptance.
+--- commit. Model output never reaches the focused application before acceptance,
+--- except for the tone actions, which the user fires on a selection precisely
+--- to have it replaced (llm/tone.lua).
 --- ==============================================================================
 
 local M = {}
@@ -17,6 +19,7 @@ local ProfileSelector = require("llm.profile_selector")
 local Parser = require("llm.parser")
 local Rewrite = require("llm.rewrite")
 local PromptAction = require("llm.prompt_action")
+local Tone = require("llm.tone")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
@@ -53,6 +56,19 @@ local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _notify = nil
 
+-- Injected by init() for the tone actions: how the selection is read, how it is
+-- replaced (typed over, then selected back), and which window has the focus.
+local _read_selection = nil
+local _replace_selection = nil
+local _focus_id = nil
+
+-- The tone actions' state. The generation drops a stale answer: a newer tone
+-- step, typing, a cancel or a pause make the one in flight obsolete. The memory
+-- ties the rewrite left selected to its original text (llm/tone.lua).
+local _tone_generation = 0
+local _tone_memory = nil
+local _tone_timer = nil
+
 -- The reasons a manual request is refused, each with the locale key of the
 -- notice that tells the user. manual_refusal checks them in this order: a pause
 -- outranks everything, then the AI switch, then the backend, then the typed
@@ -73,6 +89,16 @@ local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
 -- The ready-made prompt actions: one per built-in profile, named after it
 -- (tools/test/test-llm-prompt-actions-single-source.cjs pins the catalogue side).
 local PRESET_ACTION_PREFIX = "llm_predict_"
+
+-- The tone actions, one per direction and flavour: llm_tone_more_formal,
+-- llm_tone_more_familiar and their _cycle variants, which wrap around at the
+-- ends of the ladder instead of stopping with the direction's notice.
+local TONE_ACTION_PREFIX = "llm_tone_"
+local TONE_CYCLE_SUFFIX = "_cycle"
+local TONE_DIRECTIONS = {
+	{ name = "more_formal", direction = Tone.MORE_FORMAL, end_key = "llm.tone.most_formal" },
+	{ name = "more_familiar", direction = Tone.MORE_FAMILIAR, end_key = "llm.tone.most_familiar" },
+}
 
 local function get_ollama()
 	local ok, module = pcall(require, "modules.llm.api_ollama")
@@ -232,6 +258,13 @@ function M.init(opts)
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
+	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
+	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
+	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
+	if _tone_timer then _scheduler.cancel(_tone_timer) end
+	_tone_timer = nil
+	_tone_generation = _tone_generation + 1
+	_tone_memory = nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
@@ -259,6 +292,8 @@ function M.on_char(ch, buffer, output_context)
 	if _scope_owner then return false end
 	if not _enabled then return end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
+	-- Typing replaced the selection a tone step was about to rewrite.
+	M.drop_tone("typing")
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	for _, trigger in ipairs(_triggers) do
@@ -623,7 +658,202 @@ function M.action_handlers()
 		local value = PromptAction.format(profile.id)
 		handlers[PRESET_ACTION_PREFIX .. profile.id] = function() return M.trigger_prompt(value) end
 	end
+	for _, step in ipairs(TONE_DIRECTIONS) do
+		for _, cycle in ipairs({ false, true }) do
+			handlers[TONE_ACTION_PREFIX .. step.name .. (cycle and TONE_CYCLE_SUFFIX or "")] = function()
+				return M.shift_tone(step.direction, cycle)
+			end
+		end
+	end
 	return handlers
+end
+
+--- Drops the tone step in flight, if any: its answer will be ignored. For an
+--- event after which the selection it would replace may be gone (typing, a
+--- click, Backspace, Escape). Called on every keystroke, so it logs only when a
+--- step was actually waiting for its pacing timer.
+--- @param reason string What the log names the cause.
+function M.drop_tone(reason)
+	if _tone_timer then
+		_scheduler.cancel(_tone_timer)
+		_tone_timer = nil
+		Logger.debug(LOG, "Paced tone step dropped (%s).", tostring(reason))
+	end
+	_tone_generation = _tone_generation + 1
+end
+
+--- The focused window's identity, "" when unknown.
+--- @return string
+local function current_focus()
+	if not _focus_id then return "" end
+	local ok, id = pcall(_focus_id)
+	return (ok and type(id) == "string") and id or ""
+end
+
+--- Replaces the selection with a tone step's rewrite, when that is still safe.
+--- @param generation integer The step's generation.
+--- @param plan table The tone.plan() result.
+--- @param focus string The focused window's identity when the step was sent.
+--- @param full_text string|nil The model's answer.
+--- @param err string|nil The backend's error.
+local function finish_tone(generation, plan, focus, full_text, err)
+	if _scope_owner then return end
+	if generation ~= _tone_generation then
+		Logger.debug(LOG, "Tone answer ignored: a newer step or an edit superseded it.")
+		return
+	end
+	-- The step is settled: a late second callback finds no current generation.
+	_tone_generation = _tone_generation + 1
+	if _is_paused() or not _enabled then
+		Logger.info(LOG, "Tone answer dropped: the AI was paused or switched off while it ran.")
+		return
+	end
+	if err then
+		if err ~= "cancelled" then Logger.warn(LOG, "Tone rewrite failed: %s", tostring(err)) end
+		return
+	end
+	local text = Tone.extract(Parser.strip_thinking(full_text or ""))
+	if not text then
+		Logger.warn(LOG, "Tone rewrite dropped: the answer holds no REWRITE line (%d chars).", #(full_text or ""))
+		return
+	end
+	-- Compared, not trusted: typing into another window would put the rewrite
+	-- where the user never selected anything. An identity the desktop cannot
+	-- tell (GNOME and KDE under Wayland) reads "" on both ends; typing, clicks
+	-- and Escape still drop the step there.
+	-- The identities hold window titles, which are private: never logged.
+	if current_focus() ~= focus then
+		Logger.info(LOG, "Tone rewrite dropped: another window took the focus while it ran.")
+		return
+	end
+	local ok, replaced = pcall(_replace_selection, text)
+	if not ok or replaced ~= true then
+		Logger.error(LOG, "Tone rewrite could not replace the selection: %s",
+			ok and "injection refused" or tostring(replaced))
+		return
+	end
+	_tone_memory = Tone.remember(plan, text)
+	Logger.info(LOG, "Selection rewritten to %s (%d byte(s)).", plan.profile_id, #text)
+	if _on_output then
+		-- No context: the daemon attributes the output to the focused application.
+		local observed, observe_err = pcall(_on_output, text, nil)
+		if not observed then Logger.warn(LOG, "Tone output observer failed: %s", tostring(observe_err)) end
+	end
+end
+
+--- Rewrites the selection one register along the tone ladder and replaces it,
+--- leaving the rewrite selected: the llm_tone_more_formal / _familiar actions
+--- and their _cycle variants. One request, never shown as a suggestion. A new
+--- step while one is waiting supersedes it.
+--- @param direction number Tone.MORE_FORMAL or Tone.MORE_FAMILIAR.
+--- @param cycle boolean Wrap around at the ends of the ladder.
+--- @return boolean requested True when the rewrite request was started.
+function M.shift_tone(direction, cycle)
+	if _scope_owner then return false end
+	local step = nil
+	for _, candidate in ipairs(TONE_DIRECTIONS) do
+		if candidate.direction == direction then step = candidate end
+	end
+	if not step then error("shift_tone: direction must be Tone.MORE_FORMAL or Tone.MORE_FAMILIAR") end
+	if not _read_selection or not _replace_selection then
+		Logger.error(LOG, "Tone step refused: no selection surface was injected.")
+		return false
+	end
+	-- Checked before the selection is read: a refused step sends no copy chord.
+	-- The selection is the text, so an empty typing buffer refuses nothing; it
+	-- is checked last, after every reason that does.
+	local reason = manual_refusal()
+	if reason == "empty_context" then reason = nil end
+	if reason then
+		Logger.info(LOG, "Tone step refused (%s).", reason)
+		show_notice(MANUAL_REFUSAL_KEYS[reason], reason)
+		return false
+	end
+	if _is_secure_context() then
+		Logger.debug(LOG, "Tone step suppressed: secure field or excluded context.")
+		return false
+	end
+	M.drop_tone("superseded")
+	local read_ok, selection, read_err = _read_selection()
+	if not read_ok then
+		if read_err == "no_selection" then
+			Logger.info(LOG, "Tone step ignored: nothing is selected.")
+		else
+			Logger.warn(LOG, "Tone step ignored: the selection could not be read (%s).", tostring(read_err))
+		end
+		return false
+	end
+	local plan, why = Tone.plan(selection, _tone_memory, direction, cycle == true)
+	if not plan then
+		if why == "end_of_ladder" then
+			Logger.info(LOG, "Tone step refused: already at the end of the ladder.")
+			show_notice(step.end_key, why)
+		else
+			Logger.info(LOG, "Tone step ignored: the selection is blank.")
+		end
+		return false
+	end
+	-- By exact id, like a prompt action: a missing ladder profile is a broken
+	-- catalogue, never replaced by another prompt.
+	local profile = ProfileSettings.resolve_id(plan.profile_id)
+	if not profile then
+		Logger.error(LOG, "Tone step refused: the built-in prompt '%s' is missing.", plan.profile_id)
+		return false
+	end
+	local backend, target, model = M.resolve_backend()
+	if not backend then return false end
+	local system_prompt = resolve_system_prompt(profile, {
+		min_words = Settings.get("min_words"),
+		max_words = Settings.get("max_words"),
+		language = prompt_language(),
+	}, 1)
+	if type(system_prompt) ~= "string" or system_prompt == "" then
+		Logger.error(LOG, "Tone prompt '%s' has no usable system prompt.", plan.profile_id)
+		return false
+	end
+	-- The backends serve one request at a time: a prediction in flight or on
+	-- offer is withdrawn, or its callback would never come and block the next.
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+
+	local messages = PromptBuilder.build_messages(system_prompt, plan.source, plan.source)
+	local generation = _tone_generation
+	local focus = current_focus()
+	local request_opts = {
+		stream = false,
+		temperature = Settings.get("temperature"),
+		max_tokens = Rewrite.max_tokens(plan.source),
+		line_mode = true,
+	}
+	Logger.info(LOG, "Sending tone rewrite (backend=%s, model=%s, profile=%s, %d byte(s)).",
+		M.get_backend(), model, plan.profile_id, #plan.source)
+
+	local send
+	send = function()
+		if _scope_owner or generation ~= _tone_generation then return end
+		local kind = M.get_backend()
+		local now = _clock_ms()
+		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
+		if wait_ms > 0 then
+			_tone_timer = _scheduler.after(wait_ms / 1000, function()
+				_tone_timer = nil
+				send()
+			end)
+			if type(_tone_timer) ~= "table" or _tone_timer.armed ~= true then
+				_tone_timer = nil
+				Logger.error(LOG, "Tone rewrite could not be paced: timer unavailable.")
+			end
+			return
+		end
+		_last_request_ms[kind] = now
+		-- Not the prediction's _inflight_backend: a dropped step is left to finish
+		-- and ignored, and the next request on that backend cancels it anyway.
+		backend.chat(target, model, messages, request_opts, nil, function(full_text, err)
+			finish_tone(generation, plan, focus, full_text, err)
+		end)
+	end
+	send()
+	return true
 end
 
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring
@@ -632,6 +862,9 @@ end
 function M.withdraw()
 	if _scope_owner then return false end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	-- Backspace, Escape, a desync or a blocked capture: the selection a tone
+	-- step was about to rewrite may be gone.
+	M.drop_tone("withdrawn")
 	M.dismiss()
 end
 
@@ -945,6 +1178,11 @@ function M.quiesce_configuration(owner)
 		if _scheduler.cancel(_rate_timer) ~= true then return false end
 		_rate_timer = nil
 	end
+	if _tone_timer then
+		if _scheduler.cancel(_tone_timer) ~= true then return false end
+		_tone_timer = nil
+	end
+	_tone_generation = _tone_generation + 1
 	-- Backend connectivity probes share these owners, even when the prediction
 	-- engine did not start them. Model downloads have a separate HTTP owner.
 	local backends = { get_ollama(), get_remote() }
@@ -962,7 +1200,8 @@ end
 --- @param owner table Admission identity.
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
-	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _inflight_backend then return nil end
+	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
+		or _inflight_backend then return nil end
 	return { enabled = _enabled }
 end
 

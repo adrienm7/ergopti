@@ -233,6 +233,7 @@ return {
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.test_prediction_trigger_now",
 	"tests.unit.modules.llm.test_prompt_prediction",
+	"tests.unit.modules.llm.test_tone_selection",
 	"tests.unit.modules.llm.test_prediction_triggers",
 	"tests.unit.modules.llm.test_profile_settings",
 	"tests.unit.modules.llm.test_profile_preferences_canonical",

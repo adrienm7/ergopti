@@ -2057,6 +2057,55 @@ function M.request_prompt_prediction(value)
 	return true
 end
 
+--- Sends one rewrite of a selected text with a tone ladder profile: the tone
+--- actions (modules/llm/tone_rewrite.lua). Refuses like a manual prediction,
+--- except that the typed context is irrelevant: the text is the selection. The
+--- answer comes back unparsed, with no tooltip and no streaming. The profile is
+--- looked up strictly: a missing built-in rung is a broken install, never
+--- replaced by another prompt.
+--- @param profile_id string Ladder profile to run.
+--- @param source string The text to rewrite, sent as PREFIX and TAIL.
+--- @param on_raw function Receives the model's answer.
+--- @param on_fail function Called when no answer came back.
+--- @return boolean requested True when the request was sent.
+function M.request_selection_rewrite(profile_id, source, on_raw, on_fail)
+	if not require_state("request_selection_rewrite") then return false end
+	if type(source) ~= "string" or source == "" or type(on_raw) ~= "function" then
+		error("request_selection_rewrite: a source text and an answer callback are required")
+	end
+	local reason = manual_refusal()
+	if reason and reason ~= "empty_context" then
+		Logger.info(LOG, "Tone rewrite refused (%s).", reason)
+		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
+		return false
+	end
+	if AppFilter.is_blocked(_state, excluded_apps, url_bar_filter_enabled, secure_field_filter_enabled) then
+		Logger.info(LOG, "Tone rewrite refused: the AI is excluded in this application or field.")
+		return false
+	end
+	local lookup_ok, profile = xpcall(core_llm.find_profile, debug.traceback, profile_id)
+	if not lookup_ok or type(profile) ~= "table" then
+		Logger.error(LOG, "Tone rewrite refused: the built-in profile '%s' is missing (%s).",
+			tostring(profile_id), tostring(profile))
+		return false
+	end
+	local model_ok, model = xpcall(core_llm.get_current_model, debug.traceback)
+	if not model_ok or type(model) ~= "string" or model == "" then
+		Logger.error(LOG, "Tone rewrite refused: no current model (%s).", tostring(model))
+		return false
+	end
+	local max_tokens = Rewrite.max_tokens(source)
+	Logger.info(LOG, "Tone rewrite requested with '%s' (%d byte(s), max tokens: %d).",
+		profile.id, #source, max_tokens)
+	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_completion, debug.traceback,
+		profile, source, source, model, temperature, max_tokens, on_raw, on_fail)
+	if not dispatch_ok then
+		Logger.error(LOG, "Tone rewrite dispatch raised: %s.", tostring(dispatch_err))
+		return false
+	end
+	return true
+end
+
 --- Clears all active predictions and fully resets the prediction pipeline state.
 --- Emits a keylogger dismissal event when predictions were visible before the reset,
 --- except at a global pause boundary where no deferred capability may survive.
