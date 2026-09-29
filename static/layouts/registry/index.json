@@ -89,7 +89,7 @@
 				"name": "Ergopti",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "ae326152e1c620cf46a29f58c994e6f79bd8eadff162ce2b6ff8ac3f48b58cb5",
+				"sha256": "44a63f35924b9c4196c50e084bf6a552fab434cf5a4bde84b516d3285116a29a",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
@@ -100,8 +100,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 136,
-						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+						"size": 376,
+						"sha256": "3d665840bc534926a3984189c7e5d5b5ed97538987a85243e8e3de2f05b5d71a"
 					}
 				]
 			},
@@ -170,7 +170,7 @@
 				"name": "Ergopti",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "2dd9d9aa0affc1937d4bd8194e46187c70d37e070468438f19b3dc042fc1d540",
+				"sha256": "1cbf105083b3f54ac6c1e523bdcf8afb471391f4a0fa82e71c35b1e44cca394b",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
@@ -181,8 +181,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 136,
-						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+						"size": 376,
+						"sha256": "3d665840bc534926a3984189c7e5d5b5ed97538987a85243e8e3de2f05b5d71a"
 					}
 				]
 			},
@@ -251,7 +251,7 @@
 				"name": "Ergopti",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "746d0571f72bdf1613f4ceeedcd399a41ce2bde3fefecb8f045e3e2f5f369ac3",
+				"sha256": "2055f5581a90bdf71153c7ec115b692cad7be4aceda8c11df944d8c8864dae47",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
@@ -262,8 +262,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 136,
-						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+						"size": 376,
+						"sha256": "3d665840bc534926a3984189c7e5d5b5ed97538987a85243e8e3de2f05b5d71a"
 					}
 				]
 			},
@@ -332,7 +332,7 @@
 				"name": "Ergopti",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "9233f11c99552cfa2e376a46567cdc1151658b358264e45012e267102fb30481",
+				"sha256": "2549fb95a468ddec36db4c73771dd6992aef2ca5447d245414b2b1af8ab58070",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
@@ -343,8 +343,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 136,
-						"sha256": "95f19c6ced0833c73a9dc3fa018b1a3d6578e2329810e114bf0109d9d6df4b1c"
+						"size": 376,
+						"sha256": "3d665840bc534926a3984189c7e5d5b5ed97538987a85243e8e3de2f05b5d71a"
 					}
 				]
 			},

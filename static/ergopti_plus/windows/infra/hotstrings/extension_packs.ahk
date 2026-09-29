@@ -10,9 +10,11 @@
 ; A manifest may bind one of its files to a historical category
 ; ([extension.hotstring_bindings.<stem>]): the file then supplies that bundled
 ; category, or some of its sections, and is listed in bound_files instead of
-; toml_files, so it never becomes an ext: category. The Lua scanner
-; (_shared/lua/hotstrings/extensions.lua) applies the same rules; both replay
-; _shared/tests/corpus/layouts/extension_binding_vectors.json.
+; toml_files, so it never becomes an ext: category. A layout extension may also
+; declare the physical key that types its magic key ([extension.magic_key]).
+; The Lua scanner (_shared/lua/hotstrings/extensions.lua) applies the same
+; rules; both replay the extension_binding_vectors.json and
+; extension_magic_key_vectors.json corpora of _shared/tests/corpus/layouts.
 ; ==============================================================================
 
 global _HotstringExtensionPacks := []
@@ -28,6 +30,12 @@ global HOTSTRING_BINDING_TABLE := "extension.hotstring_bindings"
 global HOTSTRING_BINDING_STEM_PATTERN := "^[a-z][a-z0-9_-]*$"
 global HOTSTRING_BINDING_ID_PATTERN := "^[a-z][a-z0-9_]*$"
 global HOTSTRING_BINDING_FEATURE_PATTERN := "^hotstrings\.[a-z][a-z0-9_]*$"
+; [extension.magic_key] carries one field: the physical key, named by its
+; KeyboardEvent.code as in _shared/data/keycodes/physical_keys.json, that types
+; the magic key on the extension's layout. Replayed with the Lua scanner from
+; _shared/tests/corpus/layouts/extension_magic_key_vectors.json.
+global EXTENSION_MAGIC_KEY_FIELDS := Map("key", true)
+global EXTENSION_KEY_CODE_PATTERN := "^[A-Z][A-Za-z0-9]*$"
 
 /**
  * Reads the existing roots in bundled, installed, then user precedence order.
@@ -91,6 +99,7 @@ HotstringExtensions_Scan(Roots) {
 			if !(Name is String)
 				throw TypeError("Extension name must be a string.")
 			Bindings := HotstringExtensions_Bindings(Manifest)
+			MagicKey := HotstringExtensions_MagicKey(Manifest)
 			Files := [], BoundFiles := []
 			for FilePath in FSListDirectoryStrict(PackDir . "\hotstrings") {
 				if !RegExMatch(FilePath, "i)\.toml$")
@@ -122,7 +131,8 @@ HotstringExtensions_Scan(Roots) {
 			; section would read as rules the user lost, not as a broken install.
 			if Bindings.Count
 				throw Error("Bound extension hotstring file is missing.")
-			ById[Id] := { id: Id, name: Name, dir: PackDir, toml_files: Files, bound_files: BoundFiles }
+			ById[Id] := { id: Id, name: Name, dir: PackDir, toml_files: Files, bound_files: BoundFiles,
+				magic_key: MagicKey }
 		}
 	}
 	Packs := []
@@ -163,6 +173,37 @@ HotstringExtensions_Bindings(Manifest) {
 		}
 	}
 	return Bindings
+}
+
+/**
+ * Reads the physical magic key a layout extension declares.
+ * The [extension.magic_key] table and the inline magic_key key of [extension]
+ * are the spellings the Lua decoder accepts; declaring both is refused.
+ * @param {Map} Manifest - ParseTomlFile result, one Map per section header.
+ * @returns {String} The declared KeyboardEvent.code, or "" when none is declared.
+ */
+HotstringExtensions_MagicKey(Manifest) {
+	global EXTENSION_MAGIC_KEY_FIELDS, EXTENSION_KEY_CODE_PATTERN
+	Declared := []
+	if Manifest.Has("extension") && Manifest["extension"].Has("magic_key")
+		Declared.Push(Manifest["extension"]["magic_key"])
+	if Manifest.Has("extension.magic_key")
+		Declared.Push(Manifest["extension.magic_key"])
+	if Declared.Length == 0
+		return ""
+	if Declared.Length > 1
+		throw ValueError("The extension magic key is declared twice.")
+	Table := Declared[1]
+	if !(Table is Map)
+		throw ValueError("Invalid extension magic key.")
+	for Field in Table {
+		if !EXTENSION_MAGIC_KEY_FIELDS.Has(Field)
+			throw ValueError("Unknown extension magic key field.")
+	}
+	Key := Table.Get("key", 0)
+	if !(Key is String) || !RegExMatch(Key, EXTENSION_KEY_CODE_PATTERN)
+		throw ValueError("Invalid extension magic key code.")
+	return Key
 }
 
 ; One binding, checked field by field against the shapes the Lua scanner uses.
