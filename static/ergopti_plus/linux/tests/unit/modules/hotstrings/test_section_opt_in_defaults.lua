@@ -21,7 +21,7 @@ local function fresh_config()
 	local Storage = require("adapters.storage")
 	Storage.set("hotstrings.disabled_categories", "")
 	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-	Config.init({ load_mappings = function() end }, os.tmpname() .. "_absent.toml", nil)
+	Config.init({ load_mappings = function() return true end }, os.tmpname() .. "_absent.toml", nil)
 	Config._set_categories_for_test({
 		french_autocorrection = { id = "french_autocorrection", sections = { accents = { count = 1 }, minus = { count = 1 } } },
 		french_magickey = { id = "french_magickey", sections = { text_expansion = { count = 1 } } },

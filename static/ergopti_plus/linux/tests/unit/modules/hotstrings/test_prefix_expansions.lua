@@ -253,18 +253,23 @@ helpers.describe("prefix expansions: reaching the engine", function()
 	--- @return table Array of mappings the engine was given.
 	local function loaded_with(provider)
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
-		local given = {}
+		local given, publications = {}, 0
 		local fake_engine = {
-			load_mappings = function(_, mappings) given = mappings end,
+			load_mappings = function(_, mappings)
+				given = mappings
+				publications = publications + 1
+				return true
+			end,
 		}
 		config.init(fake_engine, nil, nil)
 		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
 			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
 		end
 		config.set_extra_mappings_provider(provider)
-		config.load_all()
+		local previous_publications = publications
+		local _, committed, reason = config.load_all()
 		config.set_extra_mappings_provider(nil)
-		return given
+		return given, committed, reason, publications - previous_publications
 	end
 
 	helpers.it("hands the provider's mappings to the engine", function()
@@ -282,11 +287,14 @@ helpers.describe("prefix expansions: reaching the engine", function()
 				.. "same as no feature at all — which is what this driver had")
 	end)
 
-	helpers.it("survives a provider that raises", function()
-		local given = loaded_with(function() error("personal_info.toml is unreadable") end)
-		helpers.assert_true(type(given) == "table",
-			"the catalogue must still load: a broken personal_info.toml costs the "
-				.. "user their prefix expansions, never their whole hotstring set")
+	helpers.it("refuses replacement when the personal provider raises", function()
+		local _, committed, reason, publications = loaded_with(function()
+			error("personal_info.toml is unreadable")
+		end)
+		helpers.assert_eq(committed, false, "an incomplete replacement must be refused")
+		helpers.assert_eq(publications, 0, "a failed personal source cannot replace the healthy engine")
+		helpers.assert_true(reason:find("personal_info.toml is unreadable", 1, true) ~= nil,
+			"the exact source failure must reach the caller")
 	end)
 
 	helpers.it("still registers them when the catalogue is empty", function()
@@ -297,7 +305,7 @@ helpers.describe("prefix expansions: reaching the engine", function()
 		-- its phone, SSN and IBAN completions as well.
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local given = nil
-		config.init({ load_mappings = function(_, mappings) given = mappings end }, nil, nil)
+		config.init({ load_mappings = function(_, mappings) given = mappings; return true end }, nil, nil)
 		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
 			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
 		end
