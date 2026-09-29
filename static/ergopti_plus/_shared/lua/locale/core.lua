@@ -246,6 +246,29 @@ function M.all()
 	return _state.strings or {}
 end
 
+--- Returns every string a webview page may display, as one flat table that
+--- follows the same precedence as get(): the active locale over English over
+--- French, an empty translation counting as missing. all() holds the active
+--- locale alone, so a page fed from it shows the raw key for anything that
+--- locale lacks; an inline macOS page cannot fetch en.json to fill the gap.
+--- The ★ placeholder is left as is, like the locale files a page fetches.
+--- @return table
+function M.catalogue()
+	if not require_init("catalogue") then return {} end
+	ensure_loaded()
+	local merged = {}
+	for _, layer in ipairs({ _state.strings_fr, _state.strings_en, _state.strings }) do
+		if type(layer) == "table" then
+			for key, value in pairs(layer) do
+				if type(value) == "string" and (value ~= "" or merged[key] == nil) then
+					merged[key] = value
+				end
+			end
+		end
+	end
+	return merged
+end
+
 --- Returns true if the module has been initialised (for testing).
 --- @return boolean
 function M.is_initialised()

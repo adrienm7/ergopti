@@ -395,7 +395,7 @@ local function open_window(record)
 	pcall(function()
 		webview:navigationCallback(function(action)
 			if _session ~= session or action ~= "didFinishNavigation" then return end
-			local ok_strings, strings = pcall(function() return require("infra.locale").all() end)
+			local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
 			local ok_enc, json = pcall(hs.json.encode, ok_strings and strings or {})
 			if not ok_strings or not ok_enc then
 				Logger.error(LOG, "The error window's strings could not be prepared.")

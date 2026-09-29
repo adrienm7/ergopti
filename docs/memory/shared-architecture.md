@@ -58,6 +58,17 @@ editor's keys, actions and picker) has nothing to read until the locale fetch
 lands. Draw again on the `i18n:applied` DOM event i18n.js fires after every
 apply; a page drawn once at `init()` keeps raw keys on screen.
 
+### project-inline-webviews-cannot-fetch-their-locale
+
+macOS loads every shared page inline (`wv:html`, about:blank origin) and
+WKWebView refuses its `file://` locale fetch; WebKitGTK refuses it too unless
+`allow-file-access-from-file-urls`, which the Linux driver never sets. Only
+Windows' virtual host serves the fetch. The page's strings therefore come from
+the host: the macOS and Linux builders seed `window._i18n_strings` (the
+`catalogue()` of the locale core: active over en over fr) in the boot script.
+The store in i18n.js only merges; a replacing `apply()` let the always-failing
+fetch wipe the host's strings and the diagnostics page showed raw keys.
+
 ### project-shared-ui-logic-is-a-classic-script
 
 `package.json` declares `"type": "module"`, so Node loads any `.js` under

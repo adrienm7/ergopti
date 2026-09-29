@@ -18,6 +18,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
+local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -140,6 +141,22 @@ end)()
 -- ===================================
 -- ===================================
 
+--- Builds the boot-script statement that hands a page its strings: the whole
+--- catalogue, active locale over English over French, so a key the active
+--- locale lacks shows English rather than its name.
+--- @param html_path string Page being built, named in the error log.
+--- @return string The statement, or "" when the strings are unavailable.
+local function strings_seed(html_path)
+	local ok_cat, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	local statement, seed_err = nil, catalogue
+	if ok_cat then statement, seed_err = I18nSeed.statement(catalogue) end
+	if not statement then
+		Logger.error(LOG, "Page '%s' is built without its strings: %s.", html_path, tostring(seed_err))
+		return ""
+	end
+	return statement
+end
+
 --- Reads a file from disk and returns its raw content.
 --- Drops a cache-busting query or fragment from an asset reference.
 ---
@@ -173,7 +190,11 @@ end
 --- @return string The complete self-contained HTML string.
 function M.build_injected_html(assets_dir, html_name)
 	html_name = html_name or "index.html"
-	local cache_key = assets_dir .. "|" .. html_name
+	-- The locale is part of the key: the page carries its strings, so a page
+	-- built before a language switch must not be served after it.
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
+	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale
 	if _html_cache[cache_key] then
 		Logger.debug(LOG, "Injected HTML cache hit for '%s'.", html_name)
 		return _html_cache[cache_key]
@@ -190,15 +211,13 @@ function M.build_injected_html(assets_dir, html_name)
 	local html = fh:read("*a")
 	fh:close()
 
-	-- Inject window.__i18n_base and window._i18n_locale right after <head> so
-	-- that i18n.js fetch() resolves locale JSON files correctly even when HTML
-	-- is loaded inline (no file:// base URL).  The locale is read at build time
-	-- from lib.i18n so the page renders in the user's active language.
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
-	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
+	-- Inject window.__i18n_base, window._i18n_locale and the page's strings
+	-- right after <head>, before any page script runs. The page is inline, so
+	-- its own fetch of a file:// locale is refused: the seeded strings are what
+	-- it shows, from its first render, whatever state the boot is in.
 	local i18n_boot = string.format(
-		'<script>window.__i18n_base="%s";window._i18n_locale="%s";</script>',
-		_locales_base_url, active_locale
+		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
+		_locales_base_url, active_locale, strings_seed(html_path)
 	)
 	-- Use a function replacement to avoid gsub interpreting % in the boot script
 	html = html:gsub("(<head[^>]*>)", function(tag) return tag .. i18n_boot end, 1)
@@ -767,7 +786,7 @@ function M.show_webview(opts)
 					if not wv or not wv2 or not webview_current() then return end
 					local ok_mod, locale_mod = pcall(require, "infra.locale")
 					if not ok_mod or not locale_mod then return end
-					local all_strings = locale_mod.all()
+					local all_strings = locale_mod.catalogue()
 					if type(all_strings) ~= "table" then return end
 					local ok_enc, json = pcall(hs.json.encode, all_strings)
 					if not ok_enc or not json then

@@ -721,7 +721,7 @@ end
 --- an inline page.
 --- @param webview table
 local function inject_strings(webview)
-	local ok_strings, strings = pcall(function() return require("infra.locale").all() end)
+	local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
 	if not ok_strings or type(strings) ~= "table" then
 		Logger.error(LOG, "The diagnostics page's strings could not be read: %s.", tostring(strings))
 		return
