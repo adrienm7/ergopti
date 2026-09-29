@@ -4141,11 +4141,33 @@ function M.clear_combo_binding(combo_id, on_done)
 	end, on_done)
 end
 
---- Clears every tap/hold and modifier-combo binding as one exact transaction.
+-- The bulk scope of the Tap-Hold submenu. The key combinations are drawn in
+-- the Shortcuts group with a switch of their own, so the Tap-Hold restore and
+-- clear rows must leave them, and that switch, as the user set them.
+local BULK_SCOPE_TAP_HOLDS = "tap_holds"
+
+--- Resolves a bulk command's scope, refusing an unknown one through its callback.
+--- @param label string Stable operation label.
+--- @param scope string|nil nil for every Karabiner setting, or BULK_SCOPE_TAP_HOLDS.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean|nil includes_combos nil when the scope was refused.
+local function bulk_scope_includes_combos(label, scope, on_done)
+	if scope == nil then return true end
+	if scope == BULK_SCOPE_TAP_HOLDS then return false end
+	Logger.error(LOG, "%s refused the unknown scope '%s'.", label, tostring(scope))
+	invoke_public_callback(label, on_done, false, "invalid-scope", 0)
+	return nil
+end
+
+--- Clears every tap/hold binding, and every modifier-combo binding unless
+--- the scope is the Tap-Hold submenu's, as one exact transaction.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @param scope string|nil nil for every binding, or BULK_SCOPE_TAP_HOLDS.
 --- @return boolean accepted True only when exact regeneration was accepted.
-function M.clear_all_bindings(on_done)
+function M.clear_all_bindings(on_done, scope)
 	Logger.debug(LOG, "Clear-all bindings transaction requested.")
+	local includes_combos = bulk_scope_includes_combos("Clear-all bindings", scope, on_done)
+	if includes_combos == nil then return false end
 	return apply_bulk_settings_transaction("Clear-all bindings", function(candidate)
 		local changed = 0
 		for _, key_def in ipairs(M.TAP_HOLD_KEYS) do
@@ -4159,6 +4181,7 @@ function M.clear_all_bindings(on_done)
 				timeout_ms = cfg.timeout_ms,
 			}
 		end
+		if not includes_combos then return changed end
 		for _, combo_def in ipairs(M.MOD_COMBOS) do
 			local cfg = candidate.mod_combos_config[combo_def.id] or {}
 			local tap = cfg.tap or "none"
@@ -4177,24 +4200,43 @@ function M.clear_all_bindings(on_done)
 	end, on_done)
 end
 
---- Restores all settings to defaults as one exact transaction.
+--- Restores the settings to defaults as one exact transaction: every setting,
+--- or only the Tap-Hold submenu's when scoped, keeping the key combinations.
 --- This remains the sole mutation allowed to overwrite an unparseable config.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @param scope string|nil nil for every setting, or BULK_SCOPE_TAP_HOLDS.
 --- @return boolean accepted True only when exact regeneration was accepted.
-function M.reset_to_defaults(on_done)
+function M.reset_to_defaults(on_done, scope)
 	Logger.debug(LOG, "Reset-to-defaults transaction requested.")
+	local includes_combos = bulk_scope_includes_combos("Reset-to-defaults", scope, on_done)
+	if includes_combos == nil then return false end
 	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
 		local defaults = Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
-		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
-		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
+		if not includes_combos then return #M.TAP_HOLD_KEYS end
+		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
+		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
 		candidate.combo_symmetric           = defaults.combo_symmetric
 		return #M.TAP_HOLD_KEYS + #M.MOD_COMBOS
 	end, on_done, true)
+end
+
+--- Clears the Tap-Hold submenu's bindings; the key combinations stay as set.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.clear_tap_hold_bindings(on_done)
+	return M.clear_all_bindings(on_done, BULK_SCOPE_TAP_HOLDS)
+end
+
+--- Restores the Tap-Hold submenu's settings; the key combinations stay as set.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.reset_tap_holds_to_defaults(on_done)
+	return M.reset_to_defaults(on_done, BULK_SCOPE_TAP_HOLDS)
 end
 
 --- Copies every combo tap binding into its chord slot as one exact transaction.

@@ -38,7 +38,7 @@ local function remap_double(observed)
 		end,
 		set_tap_action = function() error("the switch must not rewrite an assignment") end,
 		set_hold_action = function() error("the switch must not rewrite an assignment") end,
-		clear_all_bindings = function() error("the switch must not clear the bindings") end,
+		clear_tap_hold_bindings = function() error("the switch must not clear the bindings") end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "tab" end,
 		get_hold_action = function() return "none" end,

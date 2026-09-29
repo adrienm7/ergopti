@@ -869,6 +869,7 @@ function M.build(ctx)
 
 	-- The two bulk commands are the ids Windows declares for its own tap-holds:
 	-- the same row, the same label, this engine's implementation behind it.
+	-- Like there, they leave the key combinations of the Shortcuts group alone.
 	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
 		and karabiner.get_tap_holds_enabled() == true
 
@@ -879,9 +880,9 @@ function M.build(ctx)
 		["disable_all"] = function()
 			return run_bulk_menu_command(
 				karabiner,
-				"clear_all_bindings",
-				"Clearing every tap/hold and combo slot…",
-				"Cleared %d changed entry/entries — all slots are now 'none'.",
+				"clear_tap_hold_bindings",
+				"Clearing every tap/hold slot…",
+				"Cleared %d changed entry/entries — all tap/hold slots are now 'none'.",
 				true,
 				update_menu
 			)
@@ -889,7 +890,7 @@ function M.build(ctx)
 		["reset_defaults"] = function()
 			return run_bulk_menu_command(
 				karabiner,
-				"reset_to_defaults",
+				"reset_tap_holds_to_defaults",
 				"Restoring every tap-hold setting to defaults…",
 				"All tap-hold settings restored to defaults.",
 				false,

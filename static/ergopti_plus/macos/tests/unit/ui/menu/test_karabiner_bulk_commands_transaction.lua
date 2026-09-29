@@ -15,12 +15,12 @@ local COMMAND_CASES = {
 	{
 		id = "disable_all",
 		label = "common.clear_to_system",
-		method = "clear_all_bindings",
+		method = "clear_tap_hold_bindings",
 	},
 	{
 		id = "reset_defaults",
 		label = "common.restore_recommended",
-		method = "reset_to_defaults",
+		method = "reset_tap_holds_to_defaults",
 	},
 	{
 		id = "copy_tap_to_combo",
@@ -278,8 +278,8 @@ end
 local function build_menu(mode, configure)
 	local observations = {
 		calls = {
-			clear_all_bindings = 0,
-			reset_to_defaults = 0,
+			clear_tap_hold_bindings = 0,
+			reset_tap_holds_to_defaults = 0,
 			copy_tap_actions_to_combos = 0,
 			clear_tap_hold_binding = 0,
 			clear_combo_binding = 0,
