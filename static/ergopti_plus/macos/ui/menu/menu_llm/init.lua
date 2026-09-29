@@ -172,7 +172,6 @@ M.DEFAULT_STATE = {
 		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
-		llm_trigger_shortcut  = Manifest.default_for("llm.trigger.shortcut"),
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
 		llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
 		llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
@@ -804,13 +803,12 @@ local function create_menu(deps)
 		-- ===== 2.3) Hotkeys & Triggers =======
 		-- =====================================
 
-		local _llm_trigger_hk  = nil
+		-- Profile shortcuts only: a prediction on demand is the
+		-- llm_generate_prediction action, bound in a keyboard slot.
 		local _llm_profile_hks = {}
 		local _startup_silence = false
 		local function get_startup_silence() return _startup_silence end
 		local function set_startup_silence(v) _startup_silence = v end
-		local function get_trigger_hk() return _llm_trigger_hk end
-		local function set_trigger_hk(v) _llm_trigger_hk = v end
 		local function get_profile_hks() return _llm_profile_hks end
 		local function set_profile_hk(id, v) _llm_profile_hks[id] = v end
 
@@ -819,16 +817,11 @@ local function create_menu(deps)
 				keymap             = keymap,
 				save_prefs         = save_prefs,
 				update_menu        = update_menu,
-				get_startup_silence = get_startup_silence,
-				set_startup_silence = set_startup_silence,
-				get_trigger_hk     = get_trigger_hk,
-				set_trigger_hk     = set_trigger_hk,
 				get_profile_hks    = get_profile_hks,
 				set_profile_hk     = set_profile_hk,
 		})
 		local bind_hotkey                  = trigger_orch.bind_hotkey
 		local activate_hotkey              = trigger_orch.activate_hotkey
-		local apply_llm_shortcut           = trigger_orch.apply_llm_shortcut
 		local apply_llm_profile_shortcut   = trigger_orch.apply_llm_profile_shortcut
 
 		deps.apply_llm_profile_shortcut = apply_llm_profile_shortcut
@@ -1125,7 +1118,6 @@ local function create_menu(deps)
 						save_prefs         = save_prefs,
 						update_menu        = update_menu,
 						settings_mgr       = settings_mgr,
-						apply_llm_shortcut = apply_llm_shortcut,
 				})
 
 				row_for("llm_trigger", { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
@@ -1650,7 +1642,6 @@ local function create_menu(deps)
 				guarded_check_requirements = guarded_check_requirements,
 				save_prefs                 = save_prefs,
 				update_menu                = update_menu,
-				apply_llm_shortcut         = apply_llm_shortcut,
 				apply_llm_profile_shortcut = apply_llm_profile_shortcut,
 				activate_hotkey            = activate_hotkey,
 				mlx_deps_checker           = mlx_deps_checker,
@@ -1658,7 +1649,6 @@ local function create_menu(deps)
 				prediction_locks           = prediction_locks,
 				get_startup_silence        = get_startup_silence,
 				set_startup_silence        = set_startup_silence,
-				get_trigger_hk             = get_trigger_hk,
 				get_profile_hks            = get_profile_hks,
 		})
 

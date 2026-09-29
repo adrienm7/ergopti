@@ -63,7 +63,7 @@ local function fixture(demoted)
 		end end
 	end
 	keymap.set_llm_configuration_model = keymap.set_llm_model
-	local hotkeys = { llm_trigger_shortcut = false, llm_profile_shortcuts = { basic = { mods = { "ctrl" }, key = "B", enabled = false } } }
+	local hotkeys = { llm_profile_shortcuts = { basic = { mods = { "ctrl" }, key = "B", enabled = false } } }
 	local runtime = require("ui.menu.menu_llm.scope_runtime").new({
 		state = state, core = core, keymap = keymap, idle = function() return control.busy ~= true end,
 		shortcuts = { configuration_snapshot = function() return clone(hotkeys) end,

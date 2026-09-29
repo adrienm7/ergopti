@@ -106,7 +106,6 @@ local function with_fixture(options, callback)
 		llm_model_ollama = "",
 		llm_active_profile = "basic",
 		llm_profile_shortcuts = {},
-		llm_trigger_shortcut = false,
 		llm_debounce = 0.5,
 		llm_max_words = 7,
 		llm_min_words = 2,
@@ -409,7 +408,6 @@ local function with_fixture(options, callback)
 				return {
 					bind_hotkey = noop,
 					activate_hotkey = noop,
-					apply_llm_shortcut = noop,
 					apply_llm_profile_shortcut = noop,
 					restore_shortcuts = function() return true end,
 				}
@@ -497,7 +495,6 @@ local function with_fixture(options, callback)
 				save_prefs = save_prefs,
 				update_menu = update_menu,
 				settings_mgr = manager,
-				apply_llm_shortcut = function() return true end,
 			})
 		end,
 		app_change = function(value) return app_change(value) end,

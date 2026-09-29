@@ -59,9 +59,6 @@ local function with_fixture(body)
 			},
 			save_prefs = function() return true end,
 			update_menu = function() return true end,
-			get_startup_silence = function() return false end,
-			get_trigger_hk = function() return nil end,
-			set_trigger_hk = function() end,
 			get_profile_hks = function() return {} end,
 			set_profile_hk = function() end,
 		})

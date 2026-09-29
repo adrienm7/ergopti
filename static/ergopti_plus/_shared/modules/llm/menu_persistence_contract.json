@@ -425,13 +425,7 @@
 				"key": "trigger_shortcut",
 				"sample": "Ctrl+Alt+P"
 			},
-			"hs": {
-				"flat_key": "llm_trigger_shortcut",
-				"section": "llm",
-				"path": "trigger",
-				"key": "shortcut",
-				"sample": { "mods": ["ctrl", "alt"], "key": "p" }
-			}
+			"hs": null
 		}
 	]
 }

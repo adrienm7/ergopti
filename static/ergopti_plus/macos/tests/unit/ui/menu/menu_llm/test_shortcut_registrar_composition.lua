@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: LLM Shortcut Registrar Composition
 --- DESCRIPTION:
---- Exercises the primary/profile shortcut owner and the real confirmed profile
---- Delete action through refusal-capable registrar seams. Real Hammerspoon-shaped
+--- Exercises the profile shortcut owner (the primary trigger shortcut is retired)
+--- and the real confirmed profile Delete action through refusal-capable
+--- registrar seams. Real Hammerspoon-shaped
 --- doubles keep enable=self|nil, disable=self, and delete=void|throw contracts.
 --- Tests preserve handle identity and invoke retained callbacks so a
 --- bookkeeping-only rollback cannot pass.
@@ -19,7 +20,7 @@ local seed_family = Seeds.seed_family
 local seed_inactive_family = Seeds.seed_inactive_family
 
 helpers.describe("HS-033 real hotkey registrar composition", function()
-	for _, family in ipairs({"primary", "profile"}) do
+	for _, family in ipairs({"profile"}) do
 		helpers.it("HS-033 " .. family .. " retains and retries after native enable returns nil", function()
 			with_trigger_fixture({real_registrar = true}, function(fixture)
 				local slot = seed_inactive_family(fixture, family)

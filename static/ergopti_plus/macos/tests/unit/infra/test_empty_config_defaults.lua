@@ -9,7 +9,11 @@ helpers.describe("empty configuration boot projection", function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_llm")
 		local manifest = require("infra.manifest_reader")
 		helpers.assert_eq(menu.DEFAULT_STATE.llm_enabled, false)
-		helpers.assert_eq(menu.DEFAULT_STATE.llm_trigger_shortcut, manifest.default_for("llm.trigger.shortcut"))
+		-- The dedicated trigger shortcut is retired: a prediction on demand is the
+		-- llm_generate_prediction action in a keyboard slot, never an AI-menu hotkey.
+		helpers.assert_eq(menu.DEFAULT_STATE.llm_trigger_shortcut, nil)
+		helpers.assert_true(not pcall(manifest.default_for, "llm.trigger.shortcut"),
+			"the manifest must no longer declare llm.trigger.shortcut")
 		helpers.assert_eq(menu.DEFAULT_STATE.llm_url_bar_filter_enabled, manifest.default_for("llm.trigger.url_bar_filter_enabled"))
 		helpers.assert_eq(menu.DEFAULT_STATE.llm_secure_field_filter_enabled, manifest.default_for("llm.trigger.secure_filter_enabled"))
 		end)

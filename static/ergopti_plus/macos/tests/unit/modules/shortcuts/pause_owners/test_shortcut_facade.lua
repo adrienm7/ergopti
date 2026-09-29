@@ -258,14 +258,12 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			guarded_check_requirements = function() return true end,
 			save_prefs = function() return true end,
 			update_menu = function() return true end,
-			apply_llm_shortcut = function() return true end,
 			apply_llm_profile_shortcut = function() return true end,
 			activate_hotkey = function() return true end,
 			mlx_deps_checker = {},
 			deps = { script_control = shortcuts },
 			get_startup_silence = function() return false end,
 			set_startup_silence = function() return true end,
-			get_trigger_hk = function() return nil end,
 			get_profile_hks = function() return {} end,
 		})
 
@@ -383,7 +381,6 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				return {
 					bind_hotkey = noop,
 					activate_hotkey = noop,
-					apply_llm_shortcut = noop,
 					apply_llm_profile_shortcut = noop,
 					restore_shortcuts = noop,
 				}

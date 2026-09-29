@@ -275,7 +275,6 @@ local function with_trigger_fixture(options, body)
 
 		local state = {
 			llm_active_profile = options.active_profile or "basic",
-			llm_trigger_shortcut = options.primary_shortcut or false,
 			llm_profile_shortcuts = clone(options.profile_shortcuts or {}),
 			llm_user_profiles = runtime_profiles,
 			llm_num_predictions = 1,
@@ -286,9 +285,7 @@ local function with_trigger_fixture(options, body)
 		local save_count = 0
 		local menu_plan = {}
 		local menu_count = 0
-		local trigger_hk = nil
 		local profile_hks = {}
-		local startup_silence = false
 		local keymap = {
 			trigger_prediction = function()
 				prediction_count = prediction_count + 1
@@ -338,10 +335,6 @@ local function with_trigger_fixture(options, body)
 			keymap = keymap,
 			save_prefs = save_prefs,
 			update_menu = update_menu,
-			get_startup_silence = function() return startup_silence end,
-			set_startup_silence = function(value) startup_silence = value end,
-			get_trigger_hk = function() return trigger_hk end,
-			set_trigger_hk = function(value) trigger_hk = value end,
 			get_profile_hks = function() return profile_hks end,
 			set_profile_hk = function(profile_id, value) profile_hks[profile_id] = value end,
 		})
@@ -363,7 +356,6 @@ local function with_trigger_fixture(options, body)
 			get_runtime_profiles = function() return runtime_profiles end,
 			get_save_count = function() return save_count end,
 			get_set_profiles_calls = function() return set_profiles_calls end,
-			get_trigger_hk = function() return trigger_hk end,
 			orchestrator = orchestrator,
 			plan_profiles = function(outcomes) set_profiles_plan = clone(outcomes) end,
 			plan_menu = function(outcomes) menu_plan = clone(outcomes) end,
@@ -377,7 +369,6 @@ local function with_trigger_fixture(options, body)
 				set_profiles_calls = {}
 			end,
 			set_runtime_profile = function(profile_id) runtime_profile = profile_id end,
-			set_startup_silence = function(value) startup_silence = value == true end,
 			state = state,
 			update_menu = update_menu,
 		})

@@ -1387,14 +1387,9 @@ input_altering = false
 type = "boolean"
 description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
-[[features.llm.trigger]]
-id = "shortcut"
-default = false
-recommended = false
-input_altering = false
-type = "boolean"
-description_key = "menu.llm.trigger.shortcut"
-platforms = ["hs"]
+# No dedicated trigger shortcut: a prediction on demand is the
+# llm_generate_prediction action, recommended on each OS's keyboard slot
+# (shortcuts.keyboard.hs_ctrl_space, win_space, super_space).
 
 
 
@@ -2396,10 +2391,8 @@ description_key = "menu.shortcuts.keyboard.win_x"
 # "Generate an AI prediction" on the chord each OS leaves for it; the key is
 # swallowed so the OS never sees it (Win+Space no longer switches the input
 # language on Windows; macOS warns when its own input-source shortcut still
-# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut.
-# TODO(recommended-defaults): these are Ergopti's recommended bindings; once the
-# manifest carries a separate recommended value per entry, move them there and
-# leave the default neutral ("none").
+# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut. The
+# binding is Ergopti's recommendation only: the default stays neutral ("none").
 [[features.shortcuts.keyboard]]
 id = "win_space"
 platforms = ["ahk"]

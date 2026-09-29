@@ -590,9 +590,6 @@ M.unavailable = {
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "llm.trigger.shortcut", section = "llm.trigger", reason_key = "", platforms = { "hs" },
-	},
-	{
 		path = "llm.navigation.nav_modifiers", section = "llm.navigation", reason_key = "", platforms = { "hs" },
 	},
 	{
