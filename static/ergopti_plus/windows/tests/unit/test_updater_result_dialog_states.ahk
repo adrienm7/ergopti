@@ -7,7 +7,9 @@
 ; (_UC_PresentFn captures what it would show):
 ; 1. "checking" names the checked channel; an answer of another check is
 ;    ignored; a failure names its reason's locale key and today's log;
-; 2. the page's state message carries every field the shared page reads;
+; 2. the page's state message carries every field the shared page reads, and
+;    the page's messages act only for the open window, as actions; a cancelled
+;    check closes only the window that still shows it;
 ; 3. the actions act on the answer the window holds: Update installs only an
 ;    offered release and closes, a switch goes only to a listed channel, Report
 ;    names the updater and the cause, the log opens only for a failure; a
@@ -258,6 +260,52 @@ _TUCD_WebViewFailureCase() {
 }
 Test("update check: a WebView2 failure falls back to the native window (update-check-window)",
 	_TUCD_WebViewFailure)
+
+; The page's messages reach the actions only for the open window, as actions,
+; and a paused click is refused there too; a cancelled check closes only the
+; window that still shows it.
+_TUCD_PageMessages() {
+	_TUCD_Run(_TUCD_PageMessagesCase)
+}
+_TUCD_PageMessagesCase() {
+	global _UC_ResetDone, _UC_WindowEpoch, _TUCD_Effects
+	Request := _TUCD_Request()
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", "v0.0.0-dev.144",
+		"latest", "v0.0.0-dev.144", "others", [Map("channel", "main", "tag", "v1.0.0")]))
+	Effects := _TUCD_NewEffects()
+	Refusals := []
+	Effects["refuse_paused"] := () => Refusals.Push(true)
+	SwitchMessage := '{"action":"switch_channel","channel":"main"}'
+	_UC_WindowEpoch += 1
+	Epoch := _UC_WindowEpoch
+	_UC_ResetDone := false
+	try {
+		_UpdateCheck_HandleMessage(Epoch - 1, SwitchMessage, false, Effects)
+		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message of a closed window does nothing")
+		_UpdateCheck_HandleMessage(Epoch, "not json", false, Effects)
+		_UpdateCheck_HandleMessage(Epoch, '{"action":"run"}', false, Effects)
+		_UpdateCheck_HandleMessage(Epoch, '{"action":"switch_channel","channel":1}', false, Effects)
+		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message that is not an action does nothing")
+		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, true, Effects)
+		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message that arrived while paused switches nothing")
+		AssertEqual(1, Refusals.Length, "the paused switch is refused visibly")
+		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, false, Effects)
+		AssertEqual(1, _TUCD_Effects.Switches.Length, "the page's switch reaches the channel owner")
+		AssertEqual("main", _TUCD_Effects.Switches[1])
+
+		UpdateCheck_Abandon(_TUCD_Request())
+		AssertFalse(_UC_ResetDone, "another check's cancellation leaves the window open")
+		UpdateCheck_Abandon(Request)
+		AssertTrue(_UC_ResetDone, "the check's cancellation closes its window")
+		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, false, Effects)
+		AssertEqual(1, _TUCD_Effects.Switches.Length, "a closed window's message does nothing")
+	} finally {
+		_UC_ResetDone := true
+	}
+}
+Test("update check: the page's messages act only for the open window (update-check-window)",
+	_TUCD_PageMessages)
 
 _TUCD_NativeTexts() {
 	Label := _Updater_ChannelLabel("dev")
