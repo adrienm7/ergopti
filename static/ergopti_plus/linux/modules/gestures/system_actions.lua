@@ -18,7 +18,9 @@
 --- 3. A catalogue action with `confirm = true` gets its question from
 ---    confirmed_command(): zenity or kdialog in the same background shell,
 ---    chained to the command with &&, so Cancel (or no dialog tool at all)
----    runs nothing.
+---    runs nothing. The window an action targets (TARGETS) is read before the
+---    question, so a confirmed force quit kills the application the user acted
+---    from, never the one focused once the dialog is gone.
 --- ==============================================================================
 
 local M = {}
@@ -42,7 +44,10 @@ local quote = ShellRunner.quote
 -- ==================================
 -- ==================================
 
---- The shell command that signals the process owning the active X11 window.
+--- Reads the active X11 window into `$win`.
+local ACTIVE_WINDOW = "win=$(xdotool getactivewindow 2>/dev/null)"
+
+--- The shell command that signals the process owning the window `$win`.
 --- `$PPID` is the daemon (the shell that runs this is its child): its own
 --- windows are refused, as are pid 0 and 1, so the action can neither kill the
 --- driver nor init. The desktop and the panels (EWMH DESKTOP and DOCK windows)
@@ -50,9 +55,8 @@ local quote = ShellRunner.quote
 --- xfdesktop…), which a clean SIGTERM exit leaves gone for the session.
 --- @param signal string "TERM" or "KILL".
 --- @return string
-local function active_window_signal(signal)
-	return "win=$(xdotool getactivewindow 2>/dev/null)"
-		.. ' && kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
+local function window_signal(signal)
+	return 'kind=$(xprop -id "$win" _NET_WM_WINDOW_TYPE 2>/dev/null)'
 		.. ' && case "$kind" in *_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*) false;; esac'
 		.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 		.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ] && kill -' .. signal .. ' "$pid"'
@@ -73,8 +77,16 @@ M.COMMANDS = {
 		.. " *) gsettings set " .. COLOR_SCHEME .. " prefer-dark;; esac",
 	mic_mute_toggle = "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
 	empty_trash = "gio trash --empty",
-	quit_frontmost_app = active_window_signal("TERM"),
-	force_quit_frontmost = active_window_signal("KILL"),
+	quit_frontmost_app = window_signal("TERM"),
+	force_quit_frontmost = window_signal("KILL"),
+}
+
+--- What an action of COMMANDS reads before it runs, by action id: the state
+--- the user acted on. A confirmation reads it before its question, whose own
+--- window would otherwise be what a force quit finds active.
+M.TARGETS = {
+	quit_frontmost_app = ACTIVE_WINDOW,
+	force_quit_frontmost = ACTIVE_WINDOW,
 }
 
 --- The notification daemons whose client can dismiss every notification.
@@ -124,13 +136,17 @@ end
 function M.command_for(action_name, action_label, confirm, has_command)
 	local command = M.COMMANDS[action_name]
 	if not command then error("system_actions: no command for '" .. tostring(action_name) .. "'", 2) end
-	if not confirm then return "{ " .. command .. "; }" end
+	local target = M.TARGETS[action_name]
+	local read_target = target and (target .. " && ") or ""
+	if not confirm then return "{ " .. read_target .. command .. "; }" end
 	local confirmed = M.confirmed_command(action_label, command, has_command)
 	if not confirmed then
 		Logger.error(LOG, "'%s' needs a confirmation, and neither zenity nor kdialog is installed — not run.",
 			action_name)
+		return nil
 	end
-	return confirmed
+	if not target then return confirmed end
+	return "{ " .. read_target .. confirmed .. "; }"
 end
 
 

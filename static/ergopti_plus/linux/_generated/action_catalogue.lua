@@ -225,7 +225,7 @@ return {
 		["enter"] = { family = "sg", label_key = "sg_actions.enter" },
 		["escape"] = { family = "sg", label_key = "sg_actions.escape" },
 		["find"] = { family = "sg", label_key = "sg_actions.find" },
-		["force_quit_frontmost"] = { family = "sg", label_key = "sg_actions.force_quit_frontmost", requires = { "session:x11", "tool:xdotool", "tool:xprop" } },
+		["force_quit_frontmost"] = { family = "sg", label_key = "sg_actions.force_quit_frontmost", confirm = true, requires = { "session:x11", "tool:xdotool", "tool:xprop" } },
 		["fullscreen"] = { family = "sg", label_key = "sg_actions.fullscreen" },
 		["home"] = { family = "sg", label_key = "sg_actions.home" },
 		["left_click_toggle"] = { family = "sg", label_key = "sg_actions.left_click_toggle", requires = { "session:x11", "tool:xdotool" } },

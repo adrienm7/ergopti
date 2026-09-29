@@ -801,9 +801,12 @@ requires_linux = ["session:x11", "tool:xdotool", "tool:xprop"]
 
 [sg_actions.force_quit_frontmost]
 # Kills the active application at once (SIGKILL, TerminateProcess), with the
-# same refusals as quit_frontmost_app.
+# same refusals as quit_frontmost_app. Unsaved work is lost, so it asks first
+# (decision of 2026-09-29); the application it kills is the one active when it
+# was asked, not the question's own window.
 platform = "all"
 requires_linux = ["session:x11", "tool:xdotool", "tool:xprop"]
+confirm = true
 
 [sg_actions.empty_trash]
 platform = "all"

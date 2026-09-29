@@ -15,6 +15,9 @@
 ; 2. The approved system actions did not exist on Windows.
 ; 3. The catalogue's `confirm` field was read by no driver: emptying the
 ;    Recycle Bin or unblocking files from a stray gesture ran unasked.
+; 4. force_quit_frontmost killed unasked (decision of 2026-09-29); once asked,
+;    a window that could not get its focus back left another one active, which
+;    the confirmed kill would then have terminated.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -27,6 +30,7 @@ class _SysActionsFake {
 		this.Deferred := []
 		this.DeferDelays := []
 		this.Answer := "Cancel"
+		this.ActivateResult := true
 		this.Active := ""
 		this.OwnPidValue := 4000
 		this.ShellPidValue := 0
@@ -64,7 +68,7 @@ class _SysActionsFake {
 	FramedAppPid(FrameHwnd) => (this._Log("FramedAppPid", FrameHwnd), this.FramedApp)
 	ActiveWindow() => this.Active
 	WindowsOfProcess(Pid) => (this._Log("WindowsOfProcess", Pid), this.Windows)
-	Activate(Hwnd) => this._Log("Activate", Hwnd)
+	Activate(Hwnd) => (this._Log("Activate", Hwnd), this.ActivateResult)
 	ShellApplication() => this.Shell
 	ActiveExplorerTab(FrameHwnd) => this.ActiveTab
 	ExplorerTabOf(Window) => Window.Tab
@@ -137,12 +141,14 @@ _SysActions_ConfirmedSet() {
 		if Meta.Confirm
 			Confirmed.Push(Id)
 	}
-	AssertEqual(2, Confirmed.Length, "exactly two confirmed actions on Windows")
+	AssertEqual(3, Confirmed.Length, "exactly three confirmed actions on Windows")
 	AssertTrue(GestureActionNeedsConfirm("empty_trash"), "empty_trash asks first")
 	AssertTrue(GestureActionNeedsConfirm("unblock_file_selection"), "unblocking asks first")
+	AssertTrue(GestureActionNeedsConfirm("force_quit_frontmost"), "force quitting asks first")
 	AssertFalse(GestureActionNeedsConfirm("sleep_displays"), "sleep_displays does not ask")
 }
-Test("system actions: the catalogue confirms empty_trash and unblock_file_selection", _SysActions_ConfirmedSet)
+Test("system actions: the catalogue confirms empty_trash, unblock_file_selection and force_quit_frontmost",
+	_SysActions_ConfirmedSet)
 
 
 
@@ -485,7 +491,7 @@ _SysActions_ConfirmGateCase(Id) {
 
 _SysActions_ConfirmGate() {
 	global GESTURE_ACTIONS
-	for Id in ["empty_trash", "unblock_file_selection"]
+	for Id in ["empty_trash", "unblock_file_selection", "force_quit_frontmost"]
 		_SysActions_ConfirmGateCase(Id)
 	Saved := GESTURE_ACTIONS["sleep_displays"]
 	Ran := 0
@@ -500,6 +506,51 @@ _SysActions_ConfirmGate() {
 	}
 }
 Test("system actions: GestureInvokeAction asks before every confirm action", _SysActions_ConfirmGate)
+
+; The real force quit behind the gate: Cancel kills nothing, OK kills the
+; process of the window the question was asked from, and a window that cannot
+; get its focus back leaves the one active instead alive.
+_SysActions_ForceQuitConfirm() {
+	global GESTURE_ACTIONS
+	Saved := GESTURE_ACTIONS["force_quit_frontmost"]
+	try {
+		for Answer in ["Cancel", "OK"] {
+			Fake := _SysActionsFake()
+			Fake.Active := { Hwnd: 0x100, Pid: 812, Class: "Notepad" }
+			Fake.Answer := Answer
+			GESTURE_ACTIONS["force_quit_frontmost"] := { Fn: _SysActions_ForceQuitWith.Bind(Fake) }
+			GestureInvokeAction("force_quit_frontmost", "", Fake)
+			AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length, "nothing is killed before the answer")
+			Fake.Deferred[1].Call()
+			Killed := _SysActions_CallsNamed(Fake, "CloseProcess")
+			if (Answer = "OK") {
+				AssertEqual(1, Killed.Length, "OK kills once")
+				AssertEqual(812, Killed[1][2], "the process of the window it was asked from")
+			} else {
+				AssertEqual(0, Killed.Length, "Cancel kills nothing")
+			}
+		}
+		Fake := _SysActionsFake()
+		Fake.Active := { Hwnd: 0x100, Pid: 812, Class: "Notepad" }
+		Fake.Answer := "OK"
+		Fake.ActivateResult := false
+		GESTURE_ACTIONS["force_quit_frontmost"] := { Fn: _SysActions_ForceQuitWith.Bind(Fake) }
+		GestureInvokeAction("force_quit_frontmost", "", Fake)
+		Fake.Active := { Hwnd: 0x200, Pid: 913, Class: "Notepad" }
+		Fake.Deferred[1].Call()
+		AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length,
+			"the window active instead of the one it was asked from is not killed")
+	} finally {
+		GESTURE_ACTIONS["force_quit_frontmost"] := Saved
+	}
+}
+Test("system actions: force_quit_frontmost kills only on OK, the window it was asked from (force-quit-confirm)",
+	_SysActions_ForceQuitConfirm)
+
+; Runs the real force quit against the recording double.
+_SysActions_ForceQuitWith(Fake, *) {
+	GestureSysForceQuitFrontmost(Fake)
+}
 
 _SysActions_Throw(*) {
 	throw Error("probe failure")

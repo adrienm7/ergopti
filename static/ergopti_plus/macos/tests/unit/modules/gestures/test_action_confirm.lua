@@ -8,10 +8,15 @@
 --- declares `confirm = true` only asks when dispatched, and runs from the
 --- answer under the parent that dispatched it.
 ---
---- ROOT CAUSE ENCODED:
---- The catalogue carried a `confirm` field that no driver read, so emptying
---- the trash or stripping a quarantine from a gesture would have run at once
---- on a stray swipe, against the approved decision that both ask first.
+--- ROOT CAUSES ENCODED:
+--- 1. The catalogue carried a `confirm` field that no driver read, so emptying
+---    the trash or stripping a quarantine from a gesture would have run at once
+---    on a stray swipe, against the approved decision that both ask first.
+--- 2. force_quit_frontmost killed the frontmost application unasked, against
+---    the decision of 2026-09-29 that it asks like the other destructive ones.
+--- 3. The alert brings the driver to the front: a confirmed force quit then
+---    found the driver frontmost, unless the window the user acted from got
+---    its focus back first.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,16 +25,30 @@ local CONFIRM_OWNED = {
 	"modules.gestures.action_confirm",
 	"infra.dialog_util",
 	"adapters.mouse_control",
+	"adapters.window_info",
+	"adapters.window_manager",
 	"infra.i18n",
 	"infra.logger",
 }
 
 --- Loads the confirmation module over a recording alert.
---- @param body function fn(Confirm, alerts)
+--- @param body function fn(Confirm, alerts, focus)
 --- @param frame table|nil The screen frame under the pointer.
-local function with_confirm(body, frame)
+--- @param focus table|nil { window = focused window id, activates = true|false }.
+local function with_confirm(body, frame, focus)
+	focus = focus or { window = nil, activates = true }
+	focus.activated = {}
 	helpers.with_fresh_modules(CONFIRM_OWNED, function()
 		local alerts = {}
+		package.loaded["adapters.window_info"] = {
+			focused_window_id = function() return focus.window end,
+		}
+		package.loaded["adapters.window_manager"] = {
+			activate = function(window_id)
+				focus.activated[#focus.activated + 1] = window_id
+				return focus.activates
+			end,
+		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = {
 			get = function(key) return key end,
@@ -44,7 +63,7 @@ local function with_confirm(body, frame)
 				return true
 			end,
 		}
-		body(require("modules.gestures.action_confirm"), alerts)
+		body(require("modules.gestures.action_confirm"), alerts, focus)
 	end)
 end
 
@@ -83,6 +102,40 @@ helpers.describe("action confirmation (macOS)", function()
 			helpers.assert_eq(Confirm.is_pending(), false)
 			helpers.assert_eq(Confirm.ask("y", function() end), true)
 		end, FRAME)
+	end)
+
+	helpers.it("gives the window it was asked from its focus back, then runs (confirm-focus-back)", function()
+		local order = {}
+		local focus = { window = 4242, activates = true }
+		with_confirm(function(Confirm, alerts)
+			Confirm.ask("x", function() order[#order + 1] = "run:" .. tostring(focus.activated[1]) end)
+			helpers.assert_eq(#focus.activated, 0, "the focus stays with the alert while it asks")
+			alerts[1][3]("dialog.confirm_action.confirm")
+			helpers.assert_eq(focus.activated, { 4242 })
+			helpers.assert_eq(order, { "run:4242" }, "the action runs after the focus is given back")
+		end, FRAME, focus)
+	end)
+
+	helpers.it("runs nothing when that window cannot get its focus back (confirm-focus-back)", function()
+		local focus = { window = 4242, activates = false }
+		with_confirm(function(Confirm, alerts)
+			local ran = false
+			Confirm.ask("x", function() ran = true end)
+			alerts[1][3]("dialog.confirm_action.confirm")
+			helpers.assert_eq(ran, false, "the action must not target whatever is in front instead")
+			helpers.assert_eq(Confirm.is_pending(), false)
+		end, FRAME, focus)
+	end)
+
+	helpers.it("with no focused window there is no focus to give back (confirm-focus-back)", function()
+		local focus = { window = nil, activates = false }
+		with_confirm(function(Confirm, alerts)
+			local ran = false
+			Confirm.ask("x", function() ran = true end)
+			alerts[1][3]("dialog.confirm_action.confirm")
+			helpers.assert_eq(ran, true)
+			helpers.assert_eq(#focus.activated, 0)
+		end, FRAME, focus)
 	end)
 
 	helpers.it("refuses to run when no screen can show the question", function()
@@ -148,12 +201,12 @@ helpers.describe("the macOS dispatcher confirms before destructive actions", fun
 			if meta.confirm == true then confirmed[#confirmed + 1] = id end
 		end
 		table.sort(confirmed)
-		helpers.assert_eq(confirmed, { "empty_trash", "remove_quarantine_selection" })
+		helpers.assert_eq(confirmed, { "empty_trash", "force_quit_frontmost", "remove_quarantine_selection" })
 	end)
 
 	helpers.it("every confirm action asks, and runs only from the answer, under its parent", function()
 		with_recorded_system(function(calls)
-			for _, id in ipairs({ "empty_trash", "remove_quarantine_selection" }) do
+			for _, id in ipairs({ "empty_trash", "remove_quarantine_selection", "force_quit_frontmost" }) do
 				questions = {}
 				local before = #calls
 				helpers.assert_eq(Actions.execute_single(id, "keyboard__cmd_1"), true)

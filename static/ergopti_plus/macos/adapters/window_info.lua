@@ -92,6 +92,23 @@ function M.getFocused()
 	return result or empty_info()
 end
 
+--- Returns the id of the focused window. Not part of the WindowInfo port: a
+--- caller hands it to WindowManager.activate to give that window its focus back
+--- after a dialog of the driver took it.
+--- @return number|nil window_id Nil when no window is focused or it is unreadable.
+function M.focused_window_id()
+	local ok, result = pcall(function()
+		local win = hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
+		if not win then return nil end
+		return win:id()
+	end)
+	if not ok then
+		Logger.error(LOG, "focused_window_id(): unexpected error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
 --- Returns an identity of the focused window that changes whenever focus moves
 --- to another window or application: its application's process id and its
 --- window id. Not part of the WindowInfo port: a caller compares two readings to

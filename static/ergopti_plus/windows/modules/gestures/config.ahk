@@ -377,8 +377,8 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 ; Preserve the zero-argument contract for ordinary actions (including user
 ; extensions) while passing binding context only to actions that declare it.
 ; An action the catalogue declares `confirm = true` (empty_trash,
-; unblock_file_selection) only asks here, off the hotkey thread; it runs from
-; the answer. Sys is the SystemControl adapter, a recording double in tests.
+; unblock_file_selection, force_quit_frontmost) only asks here, off the hotkey
+; thread; it runs from the answer. Sys is the SystemControl adapter, a recording double in tests.
 GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
 		global GESTURE_ACTIONS
 		if !GESTURE_ACTIONS.Has(ActionName)
@@ -402,6 +402,8 @@ GestureActionNeedsConfirm(ActionName) {
 ; Asks whether a destructive action may run (Cancel is the default button),
 ; then gives the window the user acted on its focus back and runs it. The
 ; question can outlive a Suspend, which disarms hotkeys and not this thread.
+; When that window cannot get its focus back, the action does not run: the
+; active window is then another one, which force_quit_frontmost would kill.
 _GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
 		Label := _GestureActionLabel(ActionName)
 		Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
@@ -414,8 +416,10 @@ _GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
 				return
 		}
 		LoggerInfo("gestures", "'{1}' was confirmed.", ActionName)
-		if (PriorHwnd && !Sys.Activate(PriorHwnd))
-				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
+		if (PriorHwnd && !Sys.Activate(PriorHwnd)) {
+				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
+				return
+		}
 		_GestureRunAction(ActionName, BindingId)
 }
 

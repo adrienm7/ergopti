@@ -254,7 +254,7 @@ GestureActionCatalogueData() {
 	Actions["enter"] := { Family: "sg", LabelKey: "sg_actions.enter", Parameter: "", Confirm: false }
 	Actions["escape"] := { Family: "sg", LabelKey: "sg_actions.escape", Parameter: "", Confirm: false }
 	Actions["find"] := { Family: "sg", LabelKey: "sg_actions.find", Parameter: "", Confirm: false }
-	Actions["force_quit_frontmost"] := { Family: "sg", LabelKey: "sg_actions.force_quit_frontmost", Parameter: "", Confirm: false }
+	Actions["force_quit_frontmost"] := { Family: "sg", LabelKey: "sg_actions.force_quit_frontmost", Parameter: "", Confirm: true }
 	Actions["fullscreen"] := { Family: "sg", LabelKey: "sg_actions.fullscreen", Parameter: "", Confirm: false }
 	Actions["left_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.left_click_toggle", Parameter: "", Confirm: false }
 	Actions["line_down"] := { Family: "sg", LabelKey: "sg_actions.line_down", Parameter: "", Confirm: false }
