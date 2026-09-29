@@ -46,12 +46,7 @@ _TooltipBorderNewGdiReceipt() {
 		"bitmap", 0,
 		"memory_dc", 0,
 		"old_bitmap", 0,
-		"bitmap_selected", false,
-		"pen", 0,
-		"old_pen", 0,
-		"pen_selected", false,
-		"old_brush", 0,
-		"brush_selected", false)
+		"bitmap_selected", false)
 }
 
 _TooltipGdiSelectSucceeded(Handle) {
@@ -64,25 +59,6 @@ _TooltipBorderGdiRelease(Receipt, Native := _TooltipBorderGdiNative) {
 	if !(Receipt is Map)
 		return true
 	try {
-		if Receipt.Get("brush_selected", false) {
-			Restored := Native.SelectObject(Receipt["memory_dc"],
-				Receipt["old_brush"])
-			if !_TooltipGdiSelectSucceeded(Restored)
-				return false
-			Receipt["brush_selected"] := false
-		}
-		if Receipt.Get("pen_selected", false) {
-			Restored := Native.SelectObject(Receipt["memory_dc"],
-				Receipt["old_pen"])
-			if !_TooltipGdiSelectSucceeded(Restored)
-				return false
-			Receipt["pen_selected"] := false
-		}
-		if Receipt.Get("pen", 0) {
-			if Native.DeleteObject(Receipt["pen"]) != true
-				return false
-			Receipt["pen"] := 0
-		}
 		if Receipt.Get("bitmap_selected", false) {
 			Restored := Native.SelectObject(Receipt["memory_dc"],
 				Receipt["old_bitmap"])
@@ -147,6 +123,21 @@ class _TooltipRegionNative {
 
 	static DeleteRegion(Region) {
 		return DllCall("Gdi32\DeleteObject", "Ptr", Region, "Int") != 0
+	}
+
+	; WHITE_BRUSH: the painted colour is only a coverage mask, because the border
+	; build rewrites every painted pixel to the premultiplied border colour.
+	static MaskBrush := 0
+	; _TooltipFixBorderAlpha rewrites exactly one edge row and column.
+	static RingWidthPx := 1
+
+	static FrameRegion(DeviceContext, Region) {
+		Brush := DllCall("Gdi32\GetStockObject", "Int", this.MaskBrush, "Ptr")
+		if !Brush
+			return false
+		return DllCall("Gdi32\FrameRgn", "Ptr", DeviceContext, "Ptr", Region,
+			"Ptr", Brush, "Int", this.RingWidthPx, "Int", this.RingWidthPx,
+			"Int") != 0
 	}
 }
 
@@ -217,4 +208,34 @@ _TooltipApplyOwnedRegion(Hwnd, W, H, Diameter,
 		Released := _TooltipRegionSettle(Receipt, Native)
 	}
 	return Applied == true and Released
+}
+
+; Rasterize the border ring as the one-pixel inner frame of the same region the
+; content window is clipped to. A separately stroked RoundRect follows its own
+; arc rasterization, so corner pixels could fall outside the clipped content
+; (pale specks over the desktop) or leave region pixels unframed. Framing the
+; shared region makes every ring pixel a boundary pixel of the content.
+; @param DeviceContext {Ptr} Memory DC holding the cleared 32-bpp border DIB.
+; @param Geometry {Object} Physical { W, H, Diam } from _TooltipSurfaceGeometry.
+_TooltipRasterizeBorderRing(DeviceContext, Geometry,
+		Native := _TooltipRegionNative) {
+	if !_TooltipRegionDrainDebt(Native)
+		throw Error("Previous tooltip region cleanup is still pending")
+	Receipt := Map("region", 0)
+	Framed := false
+	Released := false
+	try {
+		Receipt["region"] := Native.CreateRegion(Geometry.W, Geometry.H,
+			Geometry.Diam)
+		if !Receipt["region"]
+			throw Error("CreateRoundRectRgn failed for the tooltip border ring")
+		Framed := Native.FrameRegion(DeviceContext, Receipt["region"])
+	} finally {
+		Released := _TooltipRegionSettle(Receipt, Native)
+	}
+	if (Framed != true)
+		throw Error("FrameRgn failed for the tooltip border ring")
+	if !Released
+		throw Error("Tooltip border ring region cleanup was refused")
+	return true
 }

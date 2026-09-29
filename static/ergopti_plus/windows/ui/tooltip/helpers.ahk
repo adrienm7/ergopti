@@ -998,32 +998,36 @@ _TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
 		}
 }
 
+; Physical geometry shared by the content window region and the layered border.
+; Tooltip sizes are layout units while SetWindowRgn and UpdateLayeredWindow take
+; physical pixels; the two surfaces only coincide when both derive from this one
+; conversion. UI_CORNER_RADIUS is the GDI ellipse *diameter* (nWidth/nHeight):
+; Hammerspoon uses xRadius=7 (radius), so diameter = 14 → 7 px arc per corner.
+; @param W {Number} Tooltip width in layout units.
+; @param H {Number} Tooltip height in layout units.
+; @param DpiScale {Number} Physical pixels per layout unit.
+; @returns {Object} { W, H, Diam } in physical pixels.
+_TooltipSurfaceGeometry(W, H, DpiScale) {
+		global _TOOLTIP_CORNER_RADIUS
+		Wp := Round(W * DpiScale)
+		Hp := Round(H * DpiScale)
+		return { W: Wp, H: Hp, Diam: Min(_TOOLTIP_CORNER_RADIUS, Wp, Hp) }
+}
+
 ; Apply a fully-rounded region to the single unified tooltip Gui.
 ; Since the stack is now a single window, all four corners are always
 ; rounded — no top/middle/bottom split needed.
 _TooltipApplyStackedCorners(Row) {
-		global _TOOLTIP_CORNER_RADIUS
 		if !IsObject(Row)
 				return
 		if (Row.HasOwnProp("CornersApplied") && Row.CornersApplied)
 				return
 		G := Row.Gui
 
-		; SetWindowRgn operates in physical pixels.
-		DpiScale := A_ScreenDPI / 96
-		W := Round(Row.W * DpiScale)
-		H := Round(Row.H * DpiScale)
-		if (W <= 0 or H <= 0)
+		Geometry := _TooltipSurfaceGeometry(Row.W, Row.H, _TooltipDpiScale())
+		if (Geometry.W <= 0 or Geometry.H <= 0)
 				return
-
-		; UI_CORNER_RADIUS is the GDI ellipse *diameter* (nWidth/nHeight).
-		; Hammerspoon uses xRadius=7 (radius), so diameter = 14 → 7 px arc per corner.
-		Diam := _TOOLTIP_CORNER_RADIUS
-		if (Diam > W)
-				Diam := W
-		if (Diam > H)
-				Diam := H
-		if _TooltipApplyOwnedRegion(G.Hwnd, W, H, Diam)
+		if _TooltipApplyOwnedRegion(G.Hwnd, Geometry.W, Geometry.H, Geometry.Diam)
 				Row.CornersApplied := true
 }
 
@@ -1057,9 +1061,9 @@ _TooltipPositionPreparedContent(Row, X, Y) {
 }
 
 ; Rewrite every pixel GDI painted into the 32-bpp DIB to the premultiplied border
-; color. GDI RoundRect writes opaque white (alpha byte 0); the layered window needs
+; color. GDI FrameRgn writes opaque white (alpha byte 0); the layered window needs
 ; premultiplied alpha, so each painted pixel must be overwritten. The outline is a
-; 1 px rounded rect, so the ONLY painted pixels are:
+; 1 px rounded-region frame, so the ONLY painted pixels are:
 ;   - the two horizontal straight edges (rows y=0 and y=Hp-1), spanning the width;
 ;   - the corner arcs, confined to the left/right corner-column zones of the rows
 ;     within Diam of the top or bottom edge;
@@ -1070,11 +1074,12 @@ _TooltipPositionPreparedContent(Row, X, Y) {
 ; almost the entire height and the old scan re-read the transparent interior of
 ; nearly every row (the BorderPixelLoop hot-path warnings clustered there).
 ; Correctness is pinned by test_tooltip_border_alpha.ahk, which compares this
-; against a full O(Wp*Hp) reference scan over real GDI RoundRect output.
+; against a full O(Wp*Hp) reference scan over real GDI outline output, including
+; the production ring from _TooltipRasterizeBorderRing.
 ; @param PixPtr {Ptr} Base pointer of the top-down 32-bpp BGRA DIB.
 ; @param Wp {Integer} Bitmap width in physical pixels.
 ; @param Hp {Integer} Bitmap height in physical pixels.
-; @param Diam {Integer} Corner diameter passed to RoundRect (0 = square corners).
+; @param Diam {Integer} Corner diameter of the framed region (0 = square corners).
 ; @param PremulPx {Integer} Premultiplied BGRA value to write into painted pixels.
 _TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
 		if (Wp <= 0 or Hp <= 0)
@@ -1275,12 +1280,12 @@ TooltipReleaseRenderResources() {
 
 ; Show a 1 px semi-transparent border ring that exactly overlays the tooltip.
 ; Strategy: create a WS_EX_LAYERED window and call UpdateLayeredWindow with a
-; 32-bpp pre-multiplied-alpha DIB.  The DIB is painted via GDI RoundRect (which
-; writes opaque pixels), then every non-zero pixel's alpha channel is set to the
-; desired opacity (0x40 = 25 %).  No DWM rounding can affect the result because
-; the window has zero client area — it is just a bitmap handed to the compositor.
+; 32-bpp pre-multiplied-alpha DIB.  The DIB is painted by framing the content
+; window's own rounded region (GDI writes opaque pixels), then every non-zero
+; pixel is rewritten to the desired opacity (0x40 = 25 %).  No DWM rounding can
+; affect the result because the window has zero client area — it is just a
+; bitmap handed to the compositor.
 _TooltipBuildBorder(X, Y, W, H) {
-		global _TOOLTIP_CORNER_RADIUS
 		global _TooltipBorderGdiCleanupDebt
 
 		if !_TooltipBorderGdiTryBegin()
@@ -1294,17 +1299,13 @@ _TooltipBuildBorder(X, Y, W, H) {
 						throw Error("Previous tooltip border GDI cleanup is still pending")
 				_TooltipBorderGdiCleanupDebt := 0
 		}
-		DpiScale := A_ScreenDPI / 96
-		Wp := Round(W * DpiScale)
-		Hp := Round(H * DpiScale)
+		Geometry := _TooltipSurfaceGeometry(W, H, _TooltipDpiScale())
+		Wp := Geometry.W
+		Hp := Geometry.H
 		if (Wp <= 0 or Hp <= 0)
 				return
 
-		Diam := _TOOLTIP_CORNER_RADIUS
-		if (Diam > Wp)
-				Diam := Wp
-		if (Diam > Hp)
-			Diam := Hp
+		Diam := Geometry.Diam
 		AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
 		PoolKey := _TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte)
 		PooledBorder := _TooltipTakePooledBorder(PoolKey, X, Y)
@@ -1353,35 +1354,12 @@ _TooltipBuildBorder(X, Y, W, H) {
 				"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)
 				throw Error("PatBlt failed for the tooltip border")
 
-		; Draw the ring with GDI: white pen, null brush, RoundRect.
+		; Frame the content window's own region: the transparent corner pixels in the
+		; bitmap are what makes the border appear rounded (SetWindowRgn on a layered
+		; window is unreliable; per-pixel alpha is the authoritative shape), and they
+		; now coincide pixel for pixel with the clipped content underneath.
 		; GDI writes opaque (alpha=0) pixels into the DIB — we fix alpha below.
-		GdiReceipt["pen"] := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1,
-				"UInt", 0xFFFFFF, "Ptr")
-		HPen := GdiReceipt["pen"]
-		if !HPen
-				throw Error("CreatePen failed for the tooltip border")
-		HNull := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH=5
-		if !HNull
-				throw Error("GetStockObject failed for the tooltip border")
-		GdiReceipt["old_pen"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
-				"Ptr", HPen, "Ptr")
-		OldPen := GdiReceipt["old_pen"]
-		if !_TooltipGdiSelectSucceeded(OldPen)
-				throw Error("SelectObject refused the tooltip border pen")
-		GdiReceipt["pen_selected"] := true
-		GdiReceipt["old_brush"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
-				"Ptr", HNull, "Ptr")
-		OldBr := GdiReceipt["old_brush"]
-		if !_TooltipGdiSelectSucceeded(OldBr)
-				throw Error("SelectObject refused the tooltip border brush")
-		GdiReceipt["brush_selected"] := true
-		; RoundRect with the same Diam as CreateRoundRectRgn — the transparent corner
-		; pixels in the bitmap are what makes the border appear rounded (SetWindowRgn
-		; on a layered window is unreliable; per-pixel alpha is the authoritative shape).
-		if !DllCall("Gdi32\RoundRect",
-				"Ptr", MemDC, "Int", 0, "Int", 0, "Int", Wp, "Int", Hp,
-				"Int", Diam, "Int", Diam)
-				throw Error("RoundRect failed for the tooltip border")
+		_TooltipRasterizeBorderRing(MemDC, Geometry)
 		; Fix pre-multiplied alpha for every pixel GDI painted (non-zero blue channel).
 		; Hammerspoon: strokeColor white alpha=0.25 → alpha_byte = Round(255*0.25)=64=0x40.
 		; Pre-multiplied: R=G=B = Round(255 * 0.25) = 64 = 0x40.

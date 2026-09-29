@@ -531,3 +531,13 @@ the content they are reused for. Place every tooltip surface explicitly at
 reveal (`SetWindowPos` with `HWND_TOPMOST`, `SWP_SHOWWINDOW | SWP_NOACTIVATE`),
 content first and border last. Check stacking with `GetWindow(GW_HWNDNEXT)` on
 real windows, as in the tooltip border z-order test.
+
+### project-tooltip-ring-shares-region
+
+The tooltip border ring must be the `FrameRgn` of the same
+`CreateRoundRectRgn` shape that clips the content window. A separately stroked
+`RoundRect` uses its own arc rasterizer, so corner pixels can land outside the
+clipped content or leave its edge unframed. `CreateRoundRectRgn` excludes one
+extra right and bottom pixel, hence the `W + 1, H + 1` in the region owner.
+Derive both surfaces from `_TooltipSurfaceGeometry`. The headless test harness
+never loads the TOML corner radius, so tests that need arcs set it themselves.
