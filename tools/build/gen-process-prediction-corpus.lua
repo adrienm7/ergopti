@@ -210,6 +210,43 @@ local VECTORS = {
 		full_text = "je ", tail_text = "je ",
 		block = "TAIL_CORRECTED: je\nNEXT_WORDS: suis tres content", min_words = 1, max_words = 1,
 	},
+	{
+		id = "rewrite_whole_sentence",
+		description = "A rewrite replaces its span, from its first word, and appends nothing.",
+		full_text = "Bonjour Marc. ok pr jd 14h, jenv le doc av",
+		tail_text = "ok pr jd 14h, jenv le doc av",
+		block = "REWRITE: Ok pour jeudi 14 h, je t'envoie le document avant.", min_words = 1, max_words = 5,
+	},
+	{
+		id = "rewrite_minimal_suffix",
+		description = "A rewrite that keeps the sentence start erases only from its first change.",
+		full_text = "je sui la", tail_text = "je sui la",
+		block = "REWRITE: je suis là", min_words = 1, max_words = 5,
+	},
+	{
+		id = "rewrite_keeps_trailing_space",
+		description = "A rewrite of a finished sentence keeps the typed trailing space.",
+		full_text = "Salut. ok pr jd. ", tail_text = "ok pr jd. ",
+		block = "REWRITE: Ok pour jeudi.", min_words = 1, max_words = 5,
+	},
+	{
+		id = "rewrite_bracket_tag_lowercase",
+		description = "A lower-case or bracketed rewrite tag is normalised; next words are ignored.",
+		full_text = "Hi\nthx 4 ur help", tail_text = "thx 4 ur help",
+		block = "[rewrite] Thanks for your help!\nNEXT_WORDS: see you", min_words = 1, max_words = 5,
+	},
+	{
+		id = "rewrite_unchanged_is_nil",
+		description = "A rewrite identical to its span offers nothing.",
+		full_text = "tout va bien", tail_text = "tout va bien",
+		block = "REWRITE: tout va bien", min_words = 1, max_words = 5,
+	},
+	{
+		id = "rewrite_span_not_suffix_is_nil",
+		description = "A span that is not the end of the context is refused, never guessed.",
+		full_text = "ok pr jd 14h", tail_text = "ok pr",
+		block = "REWRITE: Ok pour", min_words = 1, max_words = 5,
+	},
 }
 
 
