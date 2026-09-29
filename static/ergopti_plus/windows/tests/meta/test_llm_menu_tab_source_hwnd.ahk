@@ -156,13 +156,13 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"the prefix-cache render must carry the request and semantic identities that own its captured source")
 	ExpectedCallbackCalls := Map(
 		"_LLM_Engine_DispatchVariant",
-			'LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"])',
+			'LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_OnStreamPartial",
 			'LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false, state["request_id"], state["semantic_signature"])',
 		"_LLM_Engine_OnVariantSuccess",
-			'LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"])',
+			'LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_FinalizeRequest",
-			'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"])'
+			'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))'
 	)
 	for CallbackName, ExpectedCall in ExpectedCallbackCalls {
 		CallbackBody := _DriverFuncBody(CallbackName)
