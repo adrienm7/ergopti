@@ -80,9 +80,24 @@ whose name is joined at run time (the logos, the onboarding preview, the MLX
 vendored: `platform/remap/onboarding.lua` downloads the pinned DMG, and the
 49 MB installer the app carried until v0.0.0-dev.146 had no reader. Do not
 strip `docs.json`/`lua.json` from the embedded Hammerspoon: `_coresetup.lua`
-requires `hs.doc` at startup, which registers both files. Dropping the bundled
-Ollama (29 MB) needs the launcher to stop exporting `ERGOPTI_OLLAMA_BIN` and
-the resolver to find the `~/.local/bin` copy `ensure-ollama-deps.sh` installs.
+requires `hs.doc` at startup, which registers both files. Ollama is not
+bundled either (the guard rejects `Tools/Ollama` in the build script).
+
+### project-macos-ai-runtimes-install-on-selection
+
+Neither AI runtime ships in the app or downloads at boot, on AI enable with
+another backend, or after an update: only `install_for_selection()` of
+`ollama_deps_checker`/`mlx_deps_checker` grants a download, its sole caller is
+`ui/menu/menu_llm/runtime_install_offer.lua`, and any other check settles
+`missing` without a task. An installed runtime is reused by stat alone
+(Ollama: `ollama_binary.resolve()`; MLX: venv `bin/python` plus
+`.last_sync_hash`), so a new `uv.lock` in an update never re-syncs the venv.
+The Ollama installer publishes the whole release archive (CLI plus the
+ggml/MLX libraries it loads from its own folder, as in
+`Ollama.app/Contents/Resources`) into the folder
+`ollama_binary.managed_install_dir()` names; never copy the lone binary. Add a
+new runtime trigger through the router, and extend
+`test_ai_runtime_selection_install.lua` (`ai-runtime-*`).
 
 ## Native HID element qualification
 
