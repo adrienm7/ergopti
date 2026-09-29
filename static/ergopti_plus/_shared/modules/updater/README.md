@@ -10,14 +10,15 @@ at runtime; the Windows driver reads generated AHK copies.
 
 ## Key files
 
-| File                    | Description                                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| `defaults.json`         | Owner and repo, release list URL, automatic-check timing and presets, check-record key |
-| `channels.json`         | Update-channel registry, most stable first; tag rule as structured data                |
-| `channel_vectors.json`  | Vectors every channel port replays                                                     |
-| `schedule.js`           | Canonical automatic-check schedule: due time, snap to a preset, jitter, check record   |
-| `schedule_vectors.json` | Vectors the JavaScript, Lua (`_shared/lua/updater/schedule.lua`) and AHK ports replay  |
-| `version.js`            | Canonical semver order, replayed through `version_vectors.json`                        |
+| File                         | Description                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------- |
+| `defaults.json`              | Owner and repo, release list URL, automatic-check timing and presets, check-record key |
+| `channels.json`              | Update-channel registry, most stable first; tag rule as structured data                |
+| `channel_vectors.json`       | Vectors every channel port replays                                                     |
+| `schedule.js`                | Canonical automatic-check schedule: due time, snap to a preset, jitter, check record   |
+| `schedule_vectors.json`      | Vectors the JavaScript, Lua (`_shared/lua/updater/schedule.lua`) and AHK ports replay  |
+| `version.js`                 | Canonical semver order, replayed through `version_vectors.json`                        |
+| `version_label_vectors.json` | About version row: locale keys, placeholders and vectors the Lua and AHK ports replay  |
 
 ## Generated consumers
 

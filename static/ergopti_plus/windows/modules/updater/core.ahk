@@ -24,6 +24,16 @@ global UPDATER_CHANNEL   := UpdateChannels_Ids()[1]
 global UPDATER_INI_KEY   := "channel"
 global UPDATER_INI_SECTION := "updater"
 
+; Locale key of the About version row for each build kind, and of the text
+; shown for a commit that cannot be determined (Updater_VersionRowLabel). The
+; AHK port of _shared/lua/updater/version_label.lua; both are pinned to
+; _shared/modules/updater/version_label_vectors.json.
+global UPDATER_VERSION_ROW_KEYS := Map(
+	"release", "menu.about.version_release",
+	"local",   "menu.about.version_local",
+	"unknown", "menu.about.version_unknown")
+global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
+
 ; Every channel reads the same release list and keeps its own latest release
 ; through the shared registry (_Updater_SelectChannelRelease). GitHub's
 ; /releases/latest ignores prereleases and answers 404 while no stable release
@@ -1581,6 +1591,73 @@ Updater_DisplayVersion(Stamp, IsLocal) {
 		return "local"
 	Version := RegExReplace(Stamp, "\+.*$")
 	return (Version == "") ? "local" : Version
+}
+
+; The About version row: « Version 0.0.0-dev.144 (c3005e0b9) » for a stamped
+; release, « Version locale (c3005e0b9) » for a build that is not one. An
+; unknown commit is spelled by its own key, never guessed. The placeholders are
+; substituted once, left to right, so a value is never read again as one.
+; @param Kind {String} "release", "local" or "unknown".
+; @param Version {String} Release version; read only for a release.
+; @param Commit {String} Abbreviated commit id, "" when unknown.
+; @param TranslateFn {Func} Locale lookup, t() in production.
+; @returns {String}
+Updater_VersionRowLabel(Kind, Version, Commit, TranslateFn := t) {
+	global UPDATER_VERSION_ROW_KEYS, UPDATER_UNKNOWN_COMMIT_KEY
+	if !UPDATER_VERSION_ROW_KEYS.Has(Kind)
+		throw ValueError("Unknown build kind: " . Kind)
+	if (Kind == "release" && Version == "")
+		throw ValueError("A release row needs its version")
+	Values := Map(
+		"version", Version,
+		"commit", (Commit == "") ? TranslateFn.Call(UPDATER_UNKNOWN_COMMIT_KEY) : Commit)
+	Template := TranslateFn.Call(UPDATER_VERSION_ROW_KEYS[Kind])
+	Out := ""
+	Pos := 1
+	while (Found := RegExMatch(Template, "\{(\w+)\}", &Token, Pos)) {
+		Out .= SubStr(Template, Pos, Found - Pos) . (Values.Has(Token[1]) ? Values[Token[1]] : Token[0])
+		Pos := Found + Token.Len
+	}
+	return Out . SubStr(Template, Pos)
+}
+
+; Resolves the build identity the About version row names: a stamped release
+; or a local build (a source run or an unstamped exe, as Updater_DisplayVersion
+; says), and the commit it was built from. The commit comes from the one
+; resolver behind the diagnostics (DiagSnapshot_ResolveCommit): the
+; BUNDLE_COMMIT stamp, else the checkout's .git read as files, never a spawned
+; git. When neither tells, that resolver logs a WARNING with the reason and the
+; commit stays empty; a resolver that throws is logged as an ERROR and read the
+; same way, so the About submenu it heads is still drawn.
+; @param Version {String} Updater_CurrentVersion() in production.
+; @param StartDir {String} Directory the git lookup starts from.
+; @param Stamp {String} Raw BUNDLE_COMMIT override, for tests.
+; @returns {Map} { kind, version, commit }: commit is "" when unknown.
+Updater_ResolveBuildIdentity(Version, StartDir, Stamp?) {
+	Kind := (Version == "local") ? "local" : "release"
+	try {
+		Resolved := IsSet(Stamp) ? DiagSnapshot_ResolveCommit(StartDir, Stamp) : DiagSnapshot_ResolveCommit(StartDir)
+		Commit := (Resolved["source"] == "unknown") ? "" : Resolved["commit"]
+		Source := Resolved["source"]
+	} catch as Err {
+		try LoggerError("Updater", "Build commit resolution raised: {1}.", Err.Message)
+		Commit := ""
+		Source := "unknown"
+	}
+	try LoggerInfo("Updater", "Build identity: {1} build {2}, commit {3} (source {4}).",
+		Kind, (Kind == "local") ? "from source" : Version, (Commit == "") ? "unknown" : Commit, Source)
+	return Map("kind", Kind, "version", (Kind == "release") ? Version : "", "commit", Commit)
+}
+
+; The build identity, resolved on first use (the boot-time tray build): the
+; commit a running script was built from cannot change under it, and the tray
+; reads it on every rebuild.
+; @returns {Map} { kind, version, commit }
+Updater_BuildIdentity() {
+	static Identity := 0
+	if !IsObject(Identity)
+		Identity := Updater_ResolveBuildIdentity(Updater_CurrentVersion(), A_ScriptDir)
+	return Identity
 }
 
 ; Strips a leading "v" so "v2.1.2" and "2.1.2" compare equal.

@@ -457,6 +457,7 @@ InstallSendNoOps()
 #Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_channel_registry.ahk
 #Include unit/test_updater_schedule_vectors.ahk
+#Include unit/test_version_label_vectors.ahk
 #Include unit/test_updater_check_interval_snap.ahk
 #Include unit/test_updater_check_schedule.ahk
 #Include unit/test_updater_balloon_click_ownership.ahk
@@ -464,6 +465,7 @@ InstallSendNoOps()
 ; The About row actions; menu_init.ahk is included with the tray root below.
 #Include ../ui/menu/menu_actions.ahk
 #Include unit/test_about_menu_channel_rows.ahk
+#Include unit/test_about_menu_version_row.ahk
 #Include unit/test_changelog_subscribe_channel.ahk
 #Include unit/test_updater_release_notes.ahk
 #Include unit/test_updater_staging_transport.ahk

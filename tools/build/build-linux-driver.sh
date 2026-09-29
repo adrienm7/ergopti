@@ -181,6 +181,8 @@ REQUIRED_FILES=(
 	"_shared/lua/updater/release_sources.lua"
 	"_shared/lua/updater/channels.lua"
 	"_shared/lua/updater/schedule.lua"
+	# The About submenu's version row: the tray cannot build without it.
+	"_shared/lua/updater/version_label.lua"
 	# Registry layouts: the client, its settings and keycode table, and the
 	# converter with every data file it reads (tools/test/
 	# test-linux-ships-keylayout-converter.cjs keeps this list complete).

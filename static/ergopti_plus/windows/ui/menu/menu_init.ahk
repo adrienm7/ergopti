@@ -444,15 +444,21 @@ _MI_BuildAboutMenu() {
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
 }
 
-; List provider: the version row, one row per channel of the shared registry
-; (ticked on the subscribed one) right before the check row, then the
-; update-frequency picker. A local checkout has neither the check row nor the
-; frequency picker: it has no release to update from.
-_MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel) {
+; List provider: the version row (the build and its commit), the channel picker
+; right before the check row, then the update-frequency picker. A local
+; checkout has neither the check row nor the frequency picker: it has no release
+; to update from.
+_MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel,
+		IdentityFn := Updater_BuildIdentity) {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 	Rows := []
 
-	VerLabel := "ErgoptiPlus " . Updater_CurrentVersion()
+	; The build and the commit it was built from, in the shared wording:
+	; « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	; (c3005e0b9) » for a source run. The identity is resolved once per script
+	; by Updater_BuildIdentity, so a rebuild reads no file.
+	Identity := IdentityFn.Call()
+	VerLabel := Updater_VersionRowLabel(Identity["kind"], Identity["version"], Identity["commit"])
 	if IsLocal {
 		; A local checkout has no release to open, so the version reads as a label.
 		Rows.Push(Map("label", VerLabel, "disabled", true))

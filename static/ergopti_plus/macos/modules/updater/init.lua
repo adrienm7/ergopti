@@ -3,11 +3,12 @@
 --- ==============================================================================
 --- MODULE: Packaged Update Identity
 --- DESCRIPTION:
---- Exposes the installed build's channel, the launcher version, the releases
---- page and the shared update-channel registry used by the About menu. The
---- automatic checks are modules/updater/auto_check.lua's; the outer launcher's
---- Sparkle controller owns download progress, signature verification,
---- installation, and relaunch. This identity facade performs no update I/O.
+--- Exposes the installed build's channel, the launcher version, the build
+--- identity (kind, version and commit), the releases page and the shared
+--- update-channel registry used by the About menu. The automatic checks are
+--- modules/updater/auto_check.lua's; the outer launcher's Sparkle controller
+--- owns download progress, signature verification, installation, and
+--- relaunch. This identity facade performs no update I/O.
 --- ==============================================================================
 
 local M = {}
@@ -18,6 +19,8 @@ local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 local Channels   = require("updater.channels")
+local VersionLabel = require("updater.version_label")
+local Snapshot   = require("diagnostics.snapshot")
 
 local LOG = "updater"
 local BUNDLED_ID = "com.ergoptiplus.app.hammerspoon"
@@ -108,6 +111,44 @@ end
 --- @return string url
 function M.releases_page_url()
 	return string.format("https://github.com/%s/%s/releases", M.GH_OWNER, M.GH_REPO)
+end
+
+--- Resolves the build identity the About menu's version row names: a stamped
+--- release (a launcher version) or a local build, and the commit it was built
+--- from. The commit comes from the one resolver behind the diagnostics
+--- (infra/diagnostic_snapshot.resolve_commit): the package build stamp, else
+--- the checkout's .git read as files, never a spawned git. When neither tells,
+--- that resolver logs a WARNING with the reason and the commit stays empty; a
+--- resolver that raises is logged as an ERROR and read the same way, so the
+--- About submenu it heads is still drawn.
+--- @param commit_opts table|nil Forwarded to resolve_commit, for tests.
+--- @return table identity { kind, version, commit }: commit is "" when unknown.
+function M.resolve_build_identity(commit_opts)
+	local version = M.current_version()
+	local is_local = M.is_local_source() or version == "local"
+	local kind = is_local and VersionLabel.KIND_LOCAL or VersionLabel.KIND_RELEASE
+	local ok, commit, source = pcall(function()
+		return require("infra.diagnostic_snapshot").resolve_commit(commit_opts)
+	end)
+	if not ok then
+		Logger.error(LOG, "Build commit resolution raised: %s.", tostring(commit))
+		commit, source = "", Snapshot.COMMIT_SOURCE_UNKNOWN
+	end
+	if source == Snapshot.COMMIT_SOURCE_UNKNOWN then commit = "" end
+	Logger.info(LOG, "Build identity: %s build %s, commit %s (source %s).", kind,
+		is_local and "from source" or version, commit ~= "" and commit or Snapshot.UNKNOWN, source)
+	return { kind = kind, version = is_local and "" or version, commit = commit }
+end
+
+-- Resolved once per Lua state: the commit a running driver was built from
+-- cannot change under it, and the menu reads it on every rebuild.
+local _build_identity = nil
+
+--- The build identity, resolved on first use (the boot-time menu build).
+--- @return table identity { kind, version, commit }
+function M.build_identity()
+	if _build_identity == nil then _build_identity = M.resolve_build_identity() end
+	return _build_identity
 end
 
 return M
