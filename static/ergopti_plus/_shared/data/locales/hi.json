@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "व्यक्तिगत जानकारी",
 	"notify.quit_refused": "अभी बंद नहीं किया जा सकता, एक अन्य प्रक्रिया अभी चल रही है। कुछ क्षण बाद फिर से प्रयास करें।",
 	"notify.karabiner.removed": "Ergopti के नियम Karabiner से हटा दिए गए। आपके अपने नियम अपरिवर्तित हैं।",
+	"notify.touchpad.restored": "आपके Windows टचपैड जेस्चर पुनर्स्थापित कर दिए गए।",
+	"notify.touchpad.no_backup": "पुनर्स्थापित करने के लिए कुछ नहीं: Ergopti ने आपके Windows टचपैड जेस्चर कभी नहीं बदले।",
 	"notify.report_bug_body": "GitHub फ़ॉर्म खुला है और उसमें निदान पहले से भरा है (क्लिपबोर्ड में भी कॉपी किया गया है, अगर उसे छोटा किया गया हो)।",
 	"notify.screenshot_copied": "स्क्रीनशॉट कॉपी किया गया",
 	"notify.screenshot_saved": "स्क्रीनशॉट सहेजा गया",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "लॉगिन पर शुरू करें",
 	"menu.global.karabiner_integration": "Ergopti, Karabiner का उपयोग करता है",
 	"menu.global.remove_from_karabiner": "Karabiner से Ergopti हटाएँ",
+	"menu.global.restore_touchpad_gestures": "Windows टचपैड जेस्चर पुनर्स्थापित करें",
 	"dialog.start_at_login.failed": "स्वचालित स्टार्टअप नहीं बदला जा सका। सिस्टम की स्टार्टअप सेटिंग जाँचें।",
 	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।"
 }

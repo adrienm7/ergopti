@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "מידע אישי",
 	"notify.quit_refused": "לא ניתן לצאת כעת, פעולה אחרת עדיין מתבצעת. נסו שוב בעוד רגע.",
 	"notify.karabiner.removed": "הכללים של Ergopti הוסרו מ-Karabiner. הכללים שלכם לא השתנו.",
+	"notify.touchpad.restored": "מחוות משטח המגע של Windows שוחזרו.",
+	"notify.touchpad.no_backup": "אין מה לשחזר: Ergopti מעולם לא שינה את מחוות משטח המגע של Windows.",
 	"notify.report_bug_body": "טופס GitHub פתוח ומולא מראש באבחון (שהועתק גם ללוח, למקרה שקוצר).",
 	"notify.screenshot_copied": "צילום מסך הועתק",
 	"notify.screenshot_saved": "צילום מסך נשמר",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "הפעלה בעת הכניסה למערכת",
 	"menu.global.karabiner_integration": "Ergopti משתמש ב-Karabiner",
 	"menu.global.remove_from_karabiner": "הסרת Ergopti מ-Karabiner",
+	"menu.global.restore_touchpad_gestures": "שחזור מחוות משטח המגע של Windows",
 	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
 	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט."
 }

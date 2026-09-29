@@ -58,11 +58,12 @@ _MLG_Order(MenuName) {
 }
 
 ; The Configuration submenu: the two rows that rewrite the configuration, a
-; separator, then configuration windows, login startup and the macOS-only
-; Karabiner rows, with no separator left dangling at its end.
+; separator, then configuration windows, login startup, the macOS-only
+; Karabiner rows and the Windows-only touchpad restore, with no separator left
+; dangling at its end.
 _MLG_ConfigurationRowsInOrder() {
 	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard, start_at_login, "
-		. "karabiner_integration, remove_from_karabiner",
+		. "karabiner_integration, remove_from_karabiner, restore_touchpad_gestures",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")
@@ -75,7 +76,8 @@ _MLG_ConfigurationRowsInOrder() {
 	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
-			["start_at_login", "ToggleStartAtLogin"]]
+			["start_at_login", "ToggleStartAtLogin"],
+			["restore_touchpad_gestures", "TouchpadRegistryRestoreFromMenu"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
 	AssertEqual(0, InStr(Body, "ShowUninstallErgopti"), "Configuration no longer offers Uninstall")

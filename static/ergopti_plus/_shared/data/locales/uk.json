@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Особиста інформація",
 	"notify.quit_refused": "Зараз неможливо вийти: інша операція ще виконується. Спробуйте ще раз за мить.",
 	"notify.karabiner.removed": "Правила Ergopti вилучено з Karabiner. Ваші власні правила не змінено.",
+	"notify.touchpad.restored": "Жести сенсорної панелі Windows відновлено.",
+	"notify.touchpad.no_backup": "Нічого відновлювати: Ergopti ніколи не змінював жести сенсорної панелі Windows.",
 	"notify.report_bug_body": "Форму GitHub відкрито й заповнено діагностикою (її також скопійовано до буфера обміну на випадок, якщо її скорочено).",
 	"notify.screenshot_copied": "Знімок скопійовано",
 	"notify.screenshot_saved": "Знімок збережено",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Запускати під час входу в систему",
 	"menu.global.karabiner_integration": "Ergopti використовує Karabiner",
 	"menu.global.remove_from_karabiner": "Вилучити Ergopti з Karabiner",
+	"menu.global.restore_touchpad_gestures": "Відновити жести сенсорної панелі Windows",
 	"dialog.start_at_login.failed": "Не вдалося змінити автозапуск. Перевірте налаштування автозапуску системи.",
 	"onboarding.error.open_failed": "Не вдалося відкрити майстер налаштування. Перевірте журнали та повторіть спробу через меню."
 }

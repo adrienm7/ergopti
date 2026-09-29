@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "个人信息",
 	"notify.quit_refused": "暂时无法退出，另一项操作仍在进行中。请稍后再试。",
 	"notify.karabiner.removed": "已从 Karabiner 中移除 Ergopti 的规则。你自己的规则保持不变。",
+	"notify.touchpad.restored": "已恢复你的 Windows 触摸板手势。",
+	"notify.touchpad.no_backup": "没有可恢复的内容：Ergopti 从未更改过你的 Windows 触摸板手势。",
 	"notify.report_bug_body": "GitHub 表单已打开并预填了诊断信息（也已复制到剪贴板，以防内容被截短）。",
 	"notify.screenshot_copied": "截图已复制",
 	"notify.screenshot_saved": "截图已保存",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "登录时启动",
 	"menu.global.karabiner_integration": "Ergopti 使用 Karabiner",
 	"menu.global.remove_from_karabiner": "从 Karabiner 中移除 Ergopti",
+	"menu.global.restore_touchpad_gestures": "恢复 Windows 触摸板手势",
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
 	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。"
 }

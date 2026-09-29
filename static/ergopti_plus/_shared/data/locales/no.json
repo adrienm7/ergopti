@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Personlig informasjon",
 	"notify.quit_refused": "Kan ikke avslutte akkurat nå, en annen operasjon pågår fortsatt. Prøv igjen om et øyeblikk.",
 	"notify.karabiner.removed": "Ergoptis regler er fjernet fra Karabiner. Dine egne regler er uendret.",
+	"notify.touchpad.restored": "Windows-styreflatebevegelsene dine er gjenopprettet.",
+	"notify.touchpad.no_backup": "Ingenting å gjenopprette: Ergopti har aldri endret Windows-styreflatebevegelsene dine.",
 	"notify.report_bug_body": "GitHub-skjemaet er åpent og forhåndsutfylt med diagnosen (også kopiert til utklippstavlen, i tilfelle den ble forkortet).",
 	"notify.screenshot_copied": "Skjermbilde kopiert",
 	"notify.screenshot_saved": "Skjermbilde lagret",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Start ved innlogging",
 	"menu.global.karabiner_integration": "Ergopti bruker Karabiner",
 	"menu.global.remove_from_karabiner": "Fjern Ergopti fra Karabiner",
+	"menu.global.restore_touchpad_gestures": "Gjenopprett Windows-styreflatebevegelser",
 	"dialog.start_at_login.failed": "Kunne ikke endre automatisk oppstart. Kontroller systemets oppstartsinnstillinger.",
 	"onboarding.error.open_failed": "Kunne ikke åpne oppsettsveiviseren. Se loggene, og prøv igjen fra menyen."
 }

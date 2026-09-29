@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Dane osobowe",
 	"notify.quit_refused": "Nie można teraz zakończyć, inna operacja jest wciąż w toku. Spróbuj ponownie za chwilę.",
 	"notify.karabiner.removed": "Reguły Ergopti zostały usunięte z Karabinera. Twoje własne reguły pozostały bez zmian.",
+	"notify.touchpad.restored": "Gesty touchpada Windows zostały przywrócone.",
+	"notify.touchpad.no_backup": "Nie ma czego przywracać: Ergopti nigdy nie zmienił gestów touchpada Windows.",
 	"notify.report_bug_body": "Formularz GitHub jest otwarty i wstępnie wypełniony diagnostyką (skopiowaną też do schowka na wypadek, gdyby została skrócona).",
 	"notify.screenshot_copied": "Zrzut ekranu skopiowany",
 	"notify.screenshot_saved": "Zrzut ekranu zapisany",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Uruchamiaj po zalogowaniu",
 	"menu.global.karabiner_integration": "Ergopti używa Karabinera",
 	"menu.global.remove_from_karabiner": "Usuń Ergopti z Karabinera",
+	"menu.global.restore_touchpad_gestures": "Przywróć gesty touchpada Windows",
 	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu.",
 	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu."
 }

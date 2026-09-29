@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Personlig information",
 	"notify.quit_refused": "Det går inte att avsluta just nu, en annan åtgärd pågår fortfarande. Försök igen om en stund.",
 	"notify.karabiner.removed": "Ergoptis regler har tagits bort från Karabiner. Dina egna regler är oförändrade.",
+	"notify.touchpad.restored": "Dina Windows pekplattegester har återställts.",
+	"notify.touchpad.no_backup": "Inget att återställa: Ergopti har aldrig ändrat dina Windows pekplattegester.",
 	"notify.report_bug_body": "GitHub-formuläret är öppet och förifyllt med diagnostiken (även kopierad till urklipp, ifall den har kortats).",
 	"notify.screenshot_copied": "Skärmbild kopierad",
 	"notify.screenshot_saved": "Skärmbild sparad",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Starta vid inloggning",
 	"menu.global.karabiner_integration": "Ergopti använder Karabiner",
 	"menu.global.remove_from_karabiner": "Ta bort Ergopti från Karabiner",
+	"menu.global.restore_touchpad_gestures": "Återställ Windows pekplattegester",
 	"dialog.start_at_login.failed": "Kunde inte ändra automatisk start. Kontrollera systemets startinställningar.",
 	"onboarding.error.open_failed": "Kunde inte öppna installationsguiden. Kontrollera loggarna och försök igen från menyn."
 }

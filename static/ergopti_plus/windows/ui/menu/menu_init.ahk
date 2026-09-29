@@ -417,7 +417,8 @@ _MI_BuildConfigurationMenu() {
 		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
 		"config_folder",       FilePathsEditor,
 		"setup_wizard",        Onboarding_ShowFromMenu,
-		"start_at_login",      ToggleStartAtLogin
+		"start_at_login",      ToggleStartAtLogin,
+		"restore_touchpad_gestures", TouchpadRegistryRestoreFromMenu
 	)
 		Commands[Id] := Callback
 	StateGetters := Map("start_at_login_enabled", StartAtLoginEnabled)

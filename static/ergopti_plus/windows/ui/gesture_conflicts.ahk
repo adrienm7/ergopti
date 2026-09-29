@@ -23,13 +23,11 @@ GestureSystemGroup(Slot) {
 ; Read is injectable and returns an empty string for absent registry values.
 GestureSystemSlotConfigured(Slot, Read) {
 	global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS_NAMES, GESTURE_REG_KEY_PARAMS
-	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
+	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES, GESTURE_REG_FAMILY_ENABLES
 	global GESTURE_REG_CUSTOM_VALUE, GESTURE_REG_CUSTOM_TAP_VALUE
 	if !GESTURE_REG_ACTIONS.Has(Slot)
 		return false
-	Family := InStr(Slot, "_3") ? "ThreeFinger" : "FourFinger"
-	Family .= SubStr(Slot, 1, 3) == "tap" ? "TapEnabled" : "SlideEnabled"
-	Expected := Map(Family, GESTURE_REG_CUSTOM_VALUE,
+	Expected := Map(GESTURE_REG_FAMILY_ENABLES[Slot], GESTURE_REG_CUSTOM_VALUE,
 		GESTURE_REG_ACTIONS[Slot], GESTURE_REG_CUSTOM_VALUE,
 		GESTURE_REG_KEY_PARAMS_NAMES[Slot], GESTURE_REG_KEY_PARAMS[Slot])
 	if GESTURE_REG_ENABLE_NAMES.Has(Slot)

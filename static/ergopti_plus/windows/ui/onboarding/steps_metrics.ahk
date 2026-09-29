@@ -273,6 +273,12 @@ _Onboarding_StartGestureAuto(OnDone) {
         if _OnboardingGestureJob["pid"]
             return false
     }
+    ; The elevated script overwrites the touchpad values: the one registry owner
+    ; backs up the user's own first, or nothing is written at all.
+    if !TouchpadRegistryEnsureBackup() {
+        try LoggerError("Onboarding", "Gesture auto-config refused: the touchpad values could not be backed up.")
+        return false
+    }
     Epoch := _OnboardingGestureJob["epoch"] + 1
     JobStem := A_Temp . "\ergopti_gesture_config_" . DriverPid . "_" . Epoch
     ScriptPath := JobStem . ".ps1"
@@ -435,19 +441,19 @@ _Step5_ShowGestureStatus(statusLbl, ok) {
 
 ; Builds a self-contained PowerShell script that writes every PrecisionTouchPad
 ; registry value AND restarts the touchpad PnP device so the new gesture map
-; takes effect without a logout. Values are hardcoded inline — they mirror the
-; ``GESTURE_REG_*`` maps in modules/gestures.ahk but live here so the wizard
-; can call them before that module's auto-execute runs. Keep both copies in
-; sync when adding / changing gesture slots.
+; takes effect without a logout. The key and the values come from the generated
+; touchpad table through its one owner (modules/gestures/touchpad_registry.ahk),
+; the same table the in-process writer uses; the caller has already backed up
+; the values it replaces. Functions, not globals, so the wizard can build it
+; before modules/gestures/init.ahk runs.
 ;
 ; The returned text is a full .ps1 script (multi-line, comments allowed)
 ; written to a temp file by the caller — running it via ``-File`` avoids the
 ; argv-quoting issues that plagued the previous ``-Command`` inline variant.
 _Onboarding_BuildGesturePsScript(ResultPath) {
-	; KeyParams encoding: (VK << 16) | 0x07 where 0x07 = Ctrl|Shift|Win.
-	; F1..F10 = 0x70..0x79. The script is assembled line-by-line instead of
-	; via a multi-line continuation section because the latter — combined
-	; with embedded ``foreach (...)`` lines — triggers a fail-fast crash
+	; The script is assembled line-by-line instead of via a multi-line
+	; continuation section because the latter — combined with embedded
+	; ``foreach (...)`` lines — triggers a fail-fast crash
 	; (STATUS_STACK_BUFFER_OVERRUN, 0xC0000409) during AHK v2's continuation-
 	; section parser. Concatenating with explicit ``\`r\`n`` separators keeps
 	; the parser happy AND yields identical .ps1 content on disk.
@@ -458,53 +464,15 @@ _Onboarding_BuildGesturePsScript(ResultPath) {
 	S .= "$ResultPath = '" . ResultLiteral . "'" . CRLF
 	S .= "$ResultStage = $ResultPath + '.stage'" . CRLF
 	S .= "$ErgoptiExitCode = 1" . CRLF
-	S .= "$Reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'" . CRLF
+	S .= "$Reg = '" . TouchpadRegistryPowerShellKey() . "'" . CRLF
 	; Create the PrecisionTouchPad key if missing (machines that never had a
 	; precision touchpad driver loaded won't have it). Without this guard,
 	; Set-ItemProperty -Force still fails with "Cannot find path" and the
 	; whole script bails out before any value is written. -Force on New-Item
 	; makes the call idempotent so it's safe when the key already exists.
 	S .= "if (-not (Test-Path $Reg)) { New-Item -Path $Reg -Force | Out-Null }" . CRLF
-	S .= "$V = @{" . CRLF
-	; Master enables — turn the gesture families on
-	S .= "  'ThreeFingerSlideEnabled' = 65535" . CRLF
-	S .= "  'ThreeFingerTapEnabled'   = 65535" . CRLF
-	S .= "  'FourFingerSlideEnabled'  = 65535" . CRLF
-	S .= "  'FourFingerTapEnabled'    = 65535" . CRLF
-	; Per-direction enables (swipe slots only)
-	S .= "  'ThreeFingerUp'    = 65535" . CRLF
-	S .= "  'ThreeFingerDown'  = 65535" . CRLF
-	S .= "  'ThreeFingerLeft'  = 65535" . CRLF
-	S .= "  'ThreeFingerRight' = 65535" . CRLF
-	S .= "  'FourFingerUp'     = 65535" . CRLF
-	S .= "  'FourFingerDown'   = 65535" . CRLF
-	S .= "  'FourFingerLeft'   = 65535" . CRLF
-	S .= "  'FourFingerRight'  = 65535" . CRLF
-	; CustomXFingerTap = 7 sentinel (user-defined shortcut)
-	S .= "  'CustomThreeFingerTap' = 7" . CRLF
-	S .= "  'CustomFourFingerTap'  = 7" . CRLF
-	; KeyParams — Fn key encoding for each slot (Ctrl+Win+Shift+Fn)
-	S .= "  'CustomThreeFingerTapKeyParams' = 7340039"  . CRLF  ; F1
-	S .= "  'ThreeFingerUpKeyParams'        = 7405575"  . CRLF  ; F2
-	S .= "  'ThreeFingerDownKeyParams'      = 7471111"  . CRLF  ; F3
-	S .= "  'ThreeFingerLeftKeyParams'      = 7536647"  . CRLF  ; F4
-	S .= "  'ThreeFingerRightKeyParams'     = 7602183"  . CRLF  ; F5
-	S .= "  'CustomFourFingerTapKeyParams'  = 7667719"  . CRLF  ; F6
-	S .= "  'FourFingerUpKeyParams'         = 7733255"  . CRLF  ; F7
-	S .= "  'FourFingerDownKeyParams'       = 7798791"  . CRLF  ; F8
-	S .= "  'FourFingerLeftKeyParams'       = 7864327"  . CRLF  ; F9
-	S .= "  'FourFingerRightKeyParams'      = 7929863"  . CRLF  ; F10
-	; *Action = 65535 disables the new-system actions so KeyParams wins
-	S .= "  'ThreeFingerTapAction'        = 65535" . CRLF
-	S .= "  'ThreeFingerSlideUpAction'    = 65535" . CRLF
-	S .= "  'ThreeFingerSlideDownAction'  = 65535" . CRLF
-	S .= "  'ThreeFingerSlideLeftAction'  = 65535" . CRLF
-	S .= "  'ThreeFingerSlideRightAction' = 65535" . CRLF
-	S .= "  'FourFingerTapAction'         = 65535" . CRLF
-	S .= "  'FourFingerSlideUpAction'     = 65535" . CRLF
-	S .= "  'FourFingerSlideDownAction'   = 65535" . CRLF
-	S .= "  'FourFingerSlideLeftAction'   = 65535" . CRLF
-	S .= "  'FourFingerSlideRightAction'  = 65535" . CRLF
+	S .= "$V = [ordered]@{" . CRLF
+	S .= TouchpadRegistryPowerShellValues()
 	S .= "}" . CRLF
 	S .= "try {" . CRLF
 	S .= "  foreach ($n in $V.Keys) {" . CRLF
