@@ -38,6 +38,14 @@ local function with_permissions(states, body)
 				return "starting", { phase = "starting", guardian_status = states.guardian }
 			end,
 		}
+		-- The remap owner's diagnostic state: it alone knows whether Ergopti
+		-- uses Karabiner at all, which the lease controller cannot tell.
+		package.loaded["platform.remap"] = {
+			guardian_state = function()
+				if states.guardian == "raise" then error("not initialised") end
+				return states.guardian
+			end,
+		}
 		package.loaded["ui.healthcheck.helpers"] = nil
 		body(require("ui.healthcheck.helpers"), prompts)
 	end, debug.traceback)
@@ -111,6 +119,21 @@ helpers.describe("healthcheck: remap approval state", function()
 		with_permissions({ accessibility = { true }, screen_recording = { true }, guardian = "ready" }, function(H)
 			helpers.assert_eq(states_of(H.collect_permissions(IDS)).login_items, "granted")
 		end)
+	end)
+
+	helpers.it("reports an unavailable helper as unavailable, not as unknown", function()
+		with_permissions({ accessibility = { true }, screen_recording = { true }, guardian = "unavailable" },
+			function(H)
+				helpers.assert_eq(states_of(H.collect_permissions(IDS)).login_items, "unavailable",
+					"inert remaps need the Login Items action, not a shrug")
+			end)
+	end)
+
+	helpers.it("reports the helper as not used while Ergopti does not use Karabiner", function()
+		with_permissions({ accessibility = { true }, screen_recording = { true }, guardian = "not_used" },
+			function(H)
+				helpers.assert_eq(states_of(H.collect_permissions(IDS)).login_items, "not_used")
+			end)
 	end)
 
 	helpers.it("degrades to unknown when the lease cannot be read", function()

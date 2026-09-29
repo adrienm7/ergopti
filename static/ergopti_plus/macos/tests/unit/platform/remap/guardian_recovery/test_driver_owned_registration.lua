@@ -70,6 +70,36 @@ helpers.describe("guardian registration is owned by the switch-aware remap owner
 		end)
 	end)
 
+	helpers.it("reports the guardian state for diagnostics without observing anything", function()
+		with_remap({
+			initial_phase = "idle",
+			guardian_status = "not_requested",
+			guardian_registration_due = true,
+			guardian_probe_deferred = true,
+		}, function(remap, calls)
+			helpers.assert_eq(remap.guardian_state(), "unknown",
+				"nothing was observed yet in this lifecycle")
+			helpers.assert_true(remap.regenerate(function() end))
+			calls.deliver_guardian_probe("unavailable", nil, 1)
+			local probes_before = calls.guardian_probe_count
+			helpers.assert_eq(remap.guardian_state(), "unavailable")
+			helpers.assert_eq(calls.guardian_probe_count, probes_before,
+				"reading the state must not start an observation by itself")
+			calls.recovery_timers[#calls.recovery_timers]:fire()
+			calls.deliver_guardian_probe("requires_approval", nil)
+			helpers.assert_eq(remap.guardian_state(), "requires_approval")
+		end)
+	end)
+
+	helpers.it("reports « not used » while Ergopti does not use Karabiner", function()
+		with_remap({ initial_phase = "idle", guardian_status = "ready", enabled = false }, function(remap, calls)
+			calls.guardian_cached_status = "ready"
+			helpers.assert_eq(remap.guardian_state(), "not_used",
+				"a guardian registered by an earlier session is not this session's concern")
+			helpers.assert_eq(calls.guardian_probe_count, 0)
+		end)
+	end)
+
 	helpers.it("registers when the switch is turned on during the session", function()
 		with_remap({
 			initial_phase = "idle",
