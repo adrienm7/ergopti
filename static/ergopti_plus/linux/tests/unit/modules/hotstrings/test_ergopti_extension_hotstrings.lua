@@ -99,6 +99,9 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.count, 14,
 			"the repeat corrections stay a section of the magic key category")
 		helpers.assert_nil(catalogue.categories.magickey.extension, "the magic key category stays bundled")
+		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.extension,
+			{ id = "ergopti", name = "Ergopti" }, "its bound section names the extension the menu lists it under")
+		helpers.assert_nil(catalogue.categories.magickey.sections.text_expansion_symbols.extension)
 	end)
 
 	helpers.it("(ergopti-hotstrings-ext) replays one historical expansion per moved group", function()

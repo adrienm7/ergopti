@@ -730,6 +730,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			for _, name in ipairs(sections) do
 				local section = (category.sections or {})[name]
+				-- A section an extension binds is drawn in that extension's submenu.
+				if section and section.extension then goto continue_section end
 				-- CHECKED, not ENABLED. The two are different questions and answering
 				-- both with the effective state made a switched-off category untick
 				-- every section it holds — so the information "here is what comes back
@@ -752,6 +754,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						if config.toggle_section then config.toggle_section(id, name) end
 					end,
 				}
+				::continue_section::
 			end
 		end
 
@@ -1459,6 +1462,27 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
+			-- The sections an extension binds inside a bundled category (Ergopti's
+			-- repeat corrections in the magic key): a row each in its submenu.
+			local bound_sections = {}
+			for _, name in ipairs(groups) do
+				local category = type(config.get_category) == "function" and config.get_category(name) or nil
+				for _, section in ipairs(category and category.sections_order or {}) do
+					local record = (category.sections or {})[section]
+					local extension = record and record.extension or nil
+					if type(extension) == "table" and type(extension.id) == "string" then
+						if not by_extension[extension.id] then
+							by_extension[extension.id] = {}
+							order[#order + 1] = extension.id
+						end
+						names[extension.id] = names[extension.id] or extension.name
+						local list = bound_sections[extension.id] or {}
+						bound_sections[extension.id] = list
+						list[#list + 1] = { category = name, section = section, count = record.count or 0 }
+					end
+				end
+			end
+
 			if #order == 0 then
 				rows[#rows + 1] = {
 					label    = i18n_safe("menu.extensions.none_installed"),
@@ -1499,6 +1523,22 @@ local function _manifest_hotstring_rows(ctx, config)
 
 				for _, name in ipairs(packs) do
 					sub[#sub + 1] = group_row(name)
+				end
+				if bound_sections[extension_id] and #packs > 0 then sub[#sub + 1] = { separator = true } end
+				for _, bound in ipairs(bound_sections[extension_id] or {}) do
+					local category_on = config.is_group_enabled and config.is_group_enabled(bound.category)
+					local checked = config.is_section_checked
+						and config.is_section_checked(bound.category, bound.section)
+						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
+					sub[#sub + 1] = {
+						label    = string.format("%s (%d)", bound.section, bound.count),
+						checked  = checked and true or false,
+						-- Greyed while its category is off, like a section row there.
+						disabled = not category_on,
+						action   = function()
+							if config.toggle_section then config.toggle_section(bound.category, bound.section) end
+						end,
+					}
 				end
 
 				local name = names[extension_id] or extension_label(extension_id)

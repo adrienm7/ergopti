@@ -878,6 +878,7 @@ function M.route_bound_sources(paths, found)
 				end
 				section_files[#section_files + 1] = {
 					path = file.path, category = binding.category, only_sections = binding.sections,
+					extension = { id = extension.id, name = extension.name },
 				}
 			end
 		end

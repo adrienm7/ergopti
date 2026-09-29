@@ -540,9 +540,11 @@ _HS_CategoryRowsDynamic() {
 }
 
 ; The rows of the bundled categories one extension binds whole (Ergopti's SFB
-; reduction and rolls). They keep their historical ids, gates and SubMenus, so
-; each row is built like a standard category's, under the extension that
-; supplies it (_HotstringBoundSources, committed at boot).
+; reduction and rolls), then of the sections it binds inside a bundled category
+; (Ergopti's repeat corrections in the magic key). They keep their historical
+; ids, gates and SubMenus, so each row is built like a standard category's or
+; section's, under the extension that supplies it (_HotstringBoundSources,
+; committed at boot).
 ; @param {String} ExtensionId - Discovered pack id.
 ; @returns {Object} { rows: Array of menu rows, total: active hotstring count }.
 _HS_BoundCategoryRows(ExtensionId) {
@@ -568,7 +570,39 @@ _HS_BoundCategoryRows(ExtensionId) {
 			Result.total += Total
 		}
 	}
+	_HS_BoundSectionRows(ExtensionId, Result)
 	return Result
+}
+
+; Appends one row per section the extension binds inside a bundled category,
+; built from the section's manifest entry exactly as its category submenu did.
+_HS_BoundSectionRows(ExtensionId, Result) {
+	global HotstringCategoriesStd, HotstringCategoriesErgopti, _HotstringBoundSources, _LegacyTopCategoryMap
+	IsGated := IsCategoryGated("Hotstrings")
+	First := true
+	for _, Categories in [HotstringCategoriesStd, HotstringCategoriesErgopti] {
+		for _, Category in Categories {
+			Key := StrLower(StrReplace(Category, "_"))
+			if !_HotstringBoundSources.Has(Key) || !_LegacyTopCategoryMap.Has(Category)
+				continue
+			Owners := _HotstringBoundSources[Key]["section_extensions"]
+			for _, Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Category]) {
+				Parts := StrSplit(Entry["path"], ".")
+				Section := Parts[Parts.Length]
+				if !Owners.Has(StrLower(Section)) || Owners[StrLower(Section)] != ExtensionId
+					continue
+				Row := MenuRowFromManifest(Entry, Category)
+				if (Row == "")
+					continue
+				if (First && Result.rows.Length > 0)
+					Result.rows.Push(Map("separator", true))
+				First := false
+				Result.rows.Push(Row)
+				if (IsGated && IsCategoryGated(Category) && ReadFeatureStateV2(Entry["path"])["enabled"])
+					Result.total += CountTomlSection(Category, Section)
+			}
+		}
+	}
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).

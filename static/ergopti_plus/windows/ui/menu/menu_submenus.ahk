@@ -70,6 +70,11 @@ InitSubMenus() {
 					if (V1Cat == "MagicKey" and SecId == "replace") {
 						continue
 					}
+					; A section an extension binds (Ergopti's repeat corrections) is
+					; drawn in that extension's « Hotstrings <name> » submenu instead.
+					if HotstringsBoundSections(V1Cat).Has(StrLower(SecId)) {
+						continue
+					}
 					if EntryBySectionId.Has(SecId) {
 						Row := MenuRowFromManifest(EntryBySectionId[SecId], V1Cat)
 						if (Row != "") {

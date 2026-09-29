@@ -18,9 +18,13 @@ local helpers = require("tests.helpers")
 local function fake_config(with_ergopti)
 	local ergopti = { id = "ergopti", name = "Ergopti" }
 	local categories = {
-		magickey = { id = "magickey", count = 3, sections_order = {}, sections = {} },
+		magickey = { id = "magickey", count = 3, sections_order = { "symbols" },
+			sections = { symbols = { count = 3 } } },
 	}
 	if with_ergopti then
+		categories.magickey.count = 17
+		categories.magickey.sections_order = { "repeat_corrections", "symbols" }
+		categories.magickey.sections.repeat_corrections = { count = 14, extension = ergopti }
 		categories.sfbsreduction = { id = "sfbsreduction", count = 5, extension = ergopti,
 			sections_order = { "comma" }, sections = { comma = { count = 5 } } }
 		categories.rolls = { id = "rolls", count = 7, extension = ergopti,
@@ -83,6 +87,21 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 		-- The rows are the categories' own submenus, labelled by their category.
 		helpers.assert_true(text:find(" (7)", 1, true) ~= nil, "rolls: " .. text)
 		helpers.assert_true(text:find(" (5)", 1, true) ~= nil, "SFB reduction: " .. text)
+		helpers.assert_true(text:find("repeat_corrections (14)", 1, true) ~= nil, "repeat corrections: " .. text)
+	end)
+
+	helpers.it("(ergopti-hotstrings-ext) takes the repeat corrections out of the magic key submenu", function()
+		local mb = helpers.load_module("ui.menu.menu_builder")
+		local built = mb.build({ config = fake_config(true), _version = "9.9.9" })
+		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local seen = 0
+		for _, row in ipairs(titles(built)) do
+			if row.title:find("repeat_corrections", 1, true) then seen = seen + 1 end
+		end
+		helpers.assert_eq(seen, 1, "the section is drawn once, in the Ergopti submenu")
+		helpers.assert_true(row_starting(built, label) ~= nil)
+		local symbols = row_starting(built, "symbols (3)")
+		helpers.assert_true(symbols ~= nil, "the magic key keeps its own sections")
 	end)
 
 	helpers.it("(ergopti-hotstrings-ext) draws no Ergopti submenu when the extension is not installed", function()

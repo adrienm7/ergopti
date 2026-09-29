@@ -321,6 +321,9 @@ function M.load_catalogue(paths, options)
 						count    = entry_count,
 						delay    = tonumber((meta.section_delays or {})[sec_name]),
 						priority = section_priorities[sec_name],
+						-- The extension a bound section comes from (Ergopti's repeat
+						-- corrections): the menu lists it under that extension.
+						extension = only_sections and extension or nil,
 					}
 					category.count = category.count + entry_count
 				end
