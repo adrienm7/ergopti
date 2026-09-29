@@ -17,8 +17,11 @@
 ---    session, at most max_dialogs per window_sec, errors logged while a
 ---    window is open are counted in it, nothing while the Debug menu's "Show a
 ---    window for every error" is unticked.
---- 3. The window never takes the keyboard: it floats above other windows
----    without becoming the key window, since it can appear mid-sentence.
+--- 3. The window is presented like every Ergopti window (ui_builder.force_focus):
+---    raised and focused when it opens, never given a level (maintainer rule,
+---    2026-09-29). AppKit keeps a window of the inactive Hammerspoon app behind
+---    the user's key window, so show() alone left the error invisible. The page
+---    still never takes text entry (allowTextEntry is off).
 --- 4. The report is diagnostics.error_report's, built from the diagnostics
 ---    snapshot and redacted before the page sees it; copy, report and open go
 ---    through the diagnostics window's own actions (ui.healthcheck.report),
@@ -312,7 +315,7 @@ local function build_report(record)
 	}
 end
 
---- Opens the window for one error. Never takes the keyboard.
+--- Opens the window for one error and presents it (raised and focused once).
 --- @param record table { kind, module, message, time }
 --- @return boolean opened
 local function open_window(record)
@@ -407,15 +410,18 @@ local function open_window(record)
 		close(session)
 		return false
 	end
-	-- show() without a focus request: the window is ordered front at the normal
-	-- level and waits; the keyboard stays where the user was typing, and the
-	-- next window the user opens covers it
 	local ok_show, show_err = xpcall(function() return webview:show() end, debug.traceback)
 	if not ok_show or show_err == nil or show_err == false then
 		Logger.error(LOG, "The error window could not be shown: %s.", tostring(show_err))
 		close(session)
 		return false
 	end
+	-- show() only orders the window front inside Hammerspoon, which is not the
+	-- active app while the user types elsewhere, so AppKit keeps it behind the
+	-- user's key window. Present it through the shared helper: raised and
+	-- focused once, at the normal level, so the next window the user opens
+	-- covers it. The helper logs its own failure; the window stays open.
+	ui_builder.force_focus(webview, true, { is_current = function() return _session == session end })
 	Logger.success(LOG, "Error window opened.")
 	return true
 end
