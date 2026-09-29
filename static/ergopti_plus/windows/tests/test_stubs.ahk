@@ -81,6 +81,7 @@ global ScriptInformation := Map(
     "MagicKeySourceChar", "j",
     "MagicKeySourceScanChosen", false,
     "MagicKeySourceFollowsOsLayout", false,
+    "MagicKeySourceOverridesEmulation", false,
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",

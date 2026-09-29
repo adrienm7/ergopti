@@ -859,6 +859,7 @@ _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
 	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"])))
 ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
 ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
+ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]
 LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 

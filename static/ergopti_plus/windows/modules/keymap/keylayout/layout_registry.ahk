@@ -469,19 +469,27 @@ LayoutRegistry_DetectMagicKeyScan(Hkl, Char, ScanFn := KS_ScanScancodeForChar) {
  *   (KeyboardEvent.code or ""), "emulated" (whether a layout is emulated),
  *   "keycodes" (parsed mac_keycodes.json) and "detect" (callable returning the
  *   scan code probed on the OS layout, or "").
- * @returns {Map} "scan", "origin" (user, layout, detected or default) and
- *   "follows_os_layout", whether an OS layout switch can move the key.
+ * @returns {Map} "scan", "origin" (user, layout, detected or default),
+ *   "follows_os_layout", whether an OS layout switch can move the key, and
+ *   "overrides_emulation", whether an emulated layout yields that key's
+ *   unshifted level to the magic key: only for a key the user chose or the
+ *   active layout declares. An emulated layout that declares none (Ergo-L)
+ *   keeps its own character there, the magic key being an Ergopti feature.
  */
 LayoutRegistry_MagicKeySource(Inputs) {
 	if Inputs["chosen"]
-		return Map("scan", Inputs["configured"], "origin", "user", "follows_os_layout", false)
+		return Map("scan", Inputs["configured"], "origin", "user", "follows_os_layout", false,
+			"overrides_emulation", true)
 	if Inputs["declared"] != ""
 		return Map("scan", LayoutRegistry_KeyScan(Inputs["declared"], Inputs["keycodes"]),
-			"origin", "layout", "follows_os_layout", false)
+			"origin", "layout", "follows_os_layout", false, "overrides_emulation", true)
 	if Inputs["emulated"]
-		return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", false)
+		return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", false,
+			"overrides_emulation", false)
 	Detected := Inputs["detect"].Call()
 	if Detected != ""
-		return Map("scan", Detected, "origin", "detected", "follows_os_layout", true)
-	return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", true)
+		return Map("scan", Detected, "origin", "detected", "follows_os_layout", true,
+			"overrides_emulation", false)
+	return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", true,
+		"overrides_emulation", false)
 }
