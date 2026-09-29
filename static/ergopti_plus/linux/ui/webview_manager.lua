@@ -782,7 +782,7 @@ function M._create_gtk_window(app_name, html, handler)
 
 	-- ── Assemble and show ──
 	window:add(webview)
-	window:show_all()
+	M._present_gtk_window(window, not UNFOCUSED_APPS[app_name])
 
 	-- ── Track native references ──
 	_gtk_windows[app_name] = {
@@ -833,6 +833,18 @@ function M._destroy_gtk_window(app_name, expected_epoch)
 	return true
 end
 
+--- Presents a native window, the driver's one "present window" step for a
+--- window that opens or is requested again: maps it, then raises and focuses
+--- it with present() unless it must leave the keyboard where the user types.
+--- It never sets keep-above or a floating type hint: an Ergopti window is
+--- focused, never kept above the windows the user opens afterwards.
+--- @param window userdata The Gtk.Window.
+--- @param take_focus boolean False for a window that must not take the keyboard.
+function M._present_gtk_window(window, take_focus)
+	if not window.visible then window:show_all() end
+	if take_focus then window:present() end
+end
+
 --- Focuses a GTK window, bringing it to the front (Linux only).
 --- @param app_name string The app name.
 function M._focus_gtk_window(app_name)
@@ -842,12 +854,11 @@ function M._focus_gtk_window(app_name)
 		Logger.debug(LOG, "GTK window '%s' not found — cannot focus.", app_name)
 		return
 	end
-	pcall(function()
-		wref.window:present()
-		if not wref.window.visible then
-			wref.window:show_all()
-		end
-	end)
+	local ok, err = pcall(M._present_gtk_window, wref.window, true)
+	if not ok then
+		Logger.error(LOG, "GTK window '%s' could not be presented: %s.", app_name, tostring(err))
+		return
+	end
 	Logger.debug(LOG, "GTK window '%s' focused.", app_name)
 end
 

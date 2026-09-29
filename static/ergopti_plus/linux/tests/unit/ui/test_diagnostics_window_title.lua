@@ -23,7 +23,7 @@ helpers.describe("diagnostics native window title", function()
 					Window = function(properties)
 						captured = properties.title
 						return { set_size_request = function() end, add = function() end,
-							show_all = function() end, destroy = function() end }
+							show_all = function() end, present = function() end, destroy = function() end }
 					end,
 				},
 				WebKit2 = {

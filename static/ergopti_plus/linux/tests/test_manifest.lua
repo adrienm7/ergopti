@@ -332,4 +332,5 @@ return {
 	"tests.unit.ui.test_config_cleanup_bridge",
 	"tests.unit.ui.test_config_cleanup_session",
 	"tests.unit.ui.test_wpm_readouts",
+	"tests.unit.ui.test_windows_focused_not_topmost",
 }
