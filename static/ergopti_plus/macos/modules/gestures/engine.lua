@@ -17,6 +17,7 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
+local AccessibilityPermission = require("adapters.accessibility_permission")
 local LOG      = "gestures.engine"
 
 local _state      = nil
@@ -1063,8 +1064,16 @@ function M.init(core_state, actions_mod)
 		return candidate:isEnabled()
 	end, debug.traceback)
 	if not started or start_result ~= candidate or not probe_ok or enabled_or_error ~= true then
-		Logger.error(LOG, "Gesture scroll-blocker start did not commit (start=%s, enabled=%s).",
-			tostring(start_result), tostring(enabled_or_error))
+		-- An untrusted process gets a tap that never enables. Before onboarding
+		-- grants Accessibility that is the expected state, and gestures start()
+		-- initializes the engine again once boot has checked the permission.
+		if started and probe_ok and enabled_or_error == false
+			and AccessibilityPermission.is_trusted() == false then
+			Logger.warn(LOG, "Gesture scroll-blocker deferred: Accessibility is not granted yet.")
+		else
+			Logger.error(LOG, "Gesture scroll-blocker start did not commit (start=%s, enabled=%s).",
+				tostring(start_result), tostring(enabled_or_error))
+		end
 		stop_scroll_blocker("Gesture scroll-blocker rollback")
 		return false
 	end
