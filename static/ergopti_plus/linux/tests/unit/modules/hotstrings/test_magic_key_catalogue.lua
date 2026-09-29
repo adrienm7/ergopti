@@ -65,7 +65,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 		local ok, err = pcall(function()
 			local loaded = nil
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-			Config.init({ load_mappings = function(_, mappings) loaded = mappings end }, path, nil)
+			Config.init({ load_mappings = function(_, mappings) loaded = mappings; return true end }, path, nil)
 			helpers.assert_true(Config.set_magic_key("§", "★"))
 			Config.load_all()
 			for category in pairs(Config.get_categories()) do
@@ -82,7 +82,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 
 			loaded = nil
 			Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-			Config.init({ load_mappings = function(_, mappings) loaded = mappings end }, path, nil)
+			Config.init({ load_mappings = function(_, mappings) loaded = mappings; return true end }, path, nil)
 			helpers.assert_true(Config.set_magic_key("§", "★"))
 			Config.load_all()
 			helpers.assert_eq(loaded[1].trigger, "alpha§",

@@ -64,7 +64,7 @@ local corpus, corpus_error = read_corpus()
 --- @return table module
 local function module_for(vector)
 	local mod = helpers.load_module("modules.hotstrings.hotstrings_config")
-	mod.init({ load_mappings = function() end }, nil)
+	mod.init({ load_mappings = function() return true end }, nil)
 
 	-- The shape the loader produces: the category's own values at the top level,
 	-- its sections under `sections`, keyed by name.

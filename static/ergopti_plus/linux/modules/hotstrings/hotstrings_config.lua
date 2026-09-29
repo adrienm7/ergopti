@@ -861,23 +861,27 @@ local function resolve_paths()
 	return paths
 end
 
+--- Loads one complete catalogue and reports whether runtime publication succeeded.
+--- @return number Retained or newly accepted mapping count.
+--- @return boolean True only after the engine acknowledges publication.
+--- @return string|nil Refusal reason.
 function M.load_all()
 	if not _engine then
 		Logger.error(LOG, "load_all(): engine not initialised.")
-		return 0
+		return 0, false, "engine-not-initialized"
 	end
 
-	_toml_paths = resolve_paths()
+	local staged_paths = resolve_paths()
 
 	-- An empty catalogue is not an empty load. This used to return here, which
 	-- meant a machine whose hotstring TOMLs were missing or unreadable also lost
 	-- the prefix expansions built from personal_info.toml — two unrelated files,
 	-- one of which was punishing the other.
-	if #_toml_paths == 0 then
+	if #staged_paths == 0 then
 		Logger.warn(LOG, "load_all(): no TOML files found.")
 	end
 
-	local catalogue = Loader.load_catalogue(_toml_paths, {
+	local catalogue = Loader.load_catalogue(staged_paths, {
 		magic_key = _magic_key,
 		canonical_magic_key = _canonical_magic_key,
 	})
@@ -886,7 +890,7 @@ function M.load_all()
 		Logger.error(LOG,
 			"Catalogue reload refused: %d source(s) failed without a healthy snapshot; keeping %d mapping(s).",
 			_parse_errors, #_mappings)
-		return #_mappings
+		return #_mappings, false, "catalogue-not-committed"
 	end
 	local staged_mappings = catalogue.mappings
 	local staged_categories = catalogue.categories
@@ -899,13 +903,17 @@ function M.load_all()
 	if _extra_mappings_provider then
 		local ok, extra = pcall(_extra_mappings_provider)
 		if not ok then
-			Logger.error(LOG, "The extra mappings provider raised — those mappings are absent: %s.",
+			Logger.error(LOG, "The extra mappings provider refused the catalogue: %s.",
 				tostring(extra))
+			return #_mappings, false, tostring(extra)
 		elseif type(extra) == "table" then
 			for _, mapping in ipairs(extra) do
 				staged_mappings[#staged_mappings + 1] = mapping
 			end
 			Logger.debug(LOG, "Appended %d mapping(s) from the provider.", #extra)
+		else
+			Logger.error(LOG, "The extra mappings provider must return a table.")
+			return #_mappings, false, "invalid-extra-mappings"
 		end
 	end
 
@@ -943,19 +951,24 @@ function M.load_all()
 
 	-- Exact-trigger collisions are intentional engine input: equal-length
 	-- candidates are ordered by effective priority, then registration order.
-	_engine:load_mappings(filtered)
+	local ok, committed = pcall(_engine.load_mappings, _engine, filtered)
+	if not ok or committed ~= true then
+		local reason = ok and "engine-publication-refused" or tostring(committed)
+		Logger.error(LOG, "Catalogue publication refused: %s.", reason)
+		return #_mappings, false, reason
+	end
+	_toml_paths = staged_paths
 	_mappings = staged_mappings
 	_categories = staged_categories
 	_resolve_cache = {}
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 		#filtered, _count_groups(filtered), _parse_errors)
-	return #filtered
+	return #filtered, true
 end
 
 function M.reload()
 	Logger.info(LOG, "Reload requested — re-scanning…")
-	_toml_paths = {}
 	return M.load_all()
 end
 

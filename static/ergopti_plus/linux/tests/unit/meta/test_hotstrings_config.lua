@@ -19,7 +19,7 @@ helpers.describe("hotstrings_config", function()
     local orig = e.load_mappings
     e.load_mappings = function(self, mappings)
       e._loaded = mappings
-      if orig then orig(self, mappings) end
+      if orig then return orig(self, mappings) end
     end
     return e
   end
