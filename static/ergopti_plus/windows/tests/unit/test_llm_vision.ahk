@@ -369,7 +369,7 @@ _LVS_RegionEndToEnd() {
 			Vision["url"]), "Authorization: Bearer secret", "with the entry's key as a bearer token")
 		Expected := JsonParse(LLM_Vision_BuildRequest("openai", Map(
 			"model", "gpt-4.1-mini", "system", Config["read_prompt"], "text", LLM_VISION_READ_USER_TEXT,
-			"image", "QUJD", "mime", Config["image_mime"], "max_tokens", Config["read_max_tokens"]))))
+			"image", "QUJD", "mime", Config["image_mime"], "max_tokens", Config["read_max_tokens"])))
 		AssertEqual("", _LVS_DeepEqual(Expected, JsonParse(Vision["body"])), "the body carries the image")
 		AssertContains(Vision["body"], '"url":"data:image/png;base64,QUJD"', "as a data URL")
 		AssertEqual(0, Calls.Length, "no answer is asked before the screen is read")
