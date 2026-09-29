@@ -228,6 +228,18 @@ helpers.with_stub_scope(MODULES, function()
 			end)
 		end)
 
+		helpers.it("unused keys: a numeric-string sensitivity is the owner's value, not outdated (config-outdated-owner-rule)", function()
+			-- set_sensitivity coerces "4.5" with tonumber; a strict Lua type check
+			-- dropped it, reset the swipe to the default and offered to delete it.
+			local source = "[gestures.sensitivities]\nswipe_3_left = \"4.5\"\nswipe_3_right = \"fast\"\n"
+			local flat = Preferences.flatten_document(TomlCodec.decode(source))
+			helpers.assert_eq(flat.gesture_sensitivities, { swipe_3_left = "4.5" })
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key },
+				{ "gestures.sensitivities", "swipe_3_right" })
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)

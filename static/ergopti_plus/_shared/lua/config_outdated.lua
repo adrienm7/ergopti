@@ -149,9 +149,13 @@ end
 --- @param entry table|nil Manifest feature entry.
 --- @param value any Persisted value.
 --- @param platform string|nil Manifest platform tag of the reading driver.
+--- @param accepts function|nil The owning module's own value rule,
+---   `accepts(value) -> boolean, detail?`, used instead of the manifest type
+---   when the owner applies more (a coerced number) or knows more (whether an
+---   action still exists) than the declared Lua type says.
 --- @return boolean known
 --- @return string|nil detail Why the value is outdated.
-function M.manifest_value_fits(entry, value, platform)
+function M.manifest_value_fits(entry, value, platform, accepts)
 	if type(entry) ~= "table" then return false, "no setting of this build declares it" end
 	if platform and type(entry.platforms) == "table" then
 		local listed = false
@@ -160,6 +164,7 @@ function M.manifest_value_fits(entry, value, platform)
 		end
 		if not listed then return false, "this driver has no such setting" end
 	end
+	if accepts ~= nil then return accepts(value) end
 	if entry.type == "boolean" and type(value) ~= "boolean" then
 		return false, "the value is not a boolean"
 	end

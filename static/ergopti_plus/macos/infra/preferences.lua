@@ -192,14 +192,28 @@ local MANIFEST_CHILD_TABLES = {
 	gesture_sensitivities    = true,
 }
 
+--- Value rules of owners that accept more than the manifest's Lua type. The
+--- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
+--- edit or an AHK migration can persist "4.5"), so a numeric string is a value
+--- it applies, not an outdated one.
+local OWNER_VALUE_RULES = {
+	gesture_sensitivities = function(value)
+		local number = tonumber(value)
+		if type(number) == "number" and number > 0 then return true end
+		return false, "the value is not a positive number"
+	end,
+}
+
 --- Whether a manifest-declared child of a nested table still holds a value
 --- this build accepts.
+--- @param nested_fk string Flat key of the nested table.
 --- @param path string Canonical dotted path of the child.
 --- @param value any Persisted value.
 --- @return boolean known
 --- @return string|nil detail Why the child is outdated.
-local function manifest_child_fits(path, value)
-	return ConfigOutdated.manifest_value_fits(Manifest.find_entry_by_path(path), value, "hs")
+local function manifest_child_fits(nested_fk, path, value)
+	return ConfigOutdated.manifest_value_fits(Manifest.find_entry_by_path(path), value, "hs",
+		OWNER_VALUE_RULES[nested_fk])
 end
 
 -- Built-in terminator keys, from the generated catalogue the registry loads.
@@ -447,7 +461,7 @@ local function flatten_from_disk(grouped, mark)
 						if MANIFEST_CHILD_TABLES[nested_fk] then
 							local prefix = sec_name .. "." .. disk_key .. "."
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
-								function(id, value) return manifest_child_fits(prefix .. id, value) end, mark)
+								function(id, value) return manifest_child_fits(nested_fk, prefix .. id, value) end, mark)
 						elseif nested_fk == "terminator_states" then
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
 								terminator_state_owner(grouped), mark)
