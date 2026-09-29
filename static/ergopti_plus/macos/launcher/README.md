@@ -120,6 +120,43 @@ The release generator accepts `sign_update -f` output only in its complete
 requires the signed length to equal the archive size before emitting XML; the
 fragment is inserted once, without wrapping it in a second signature attribute.
 
+## Code-signing identity
+
+macOS stores each Accessibility, Screen Recording, Automation and Login Items
+grant against the app's designated requirement. An ad hoc signature
+(`codesign --sign -`) makes that requirement the code hash, which every build
+changes, so each update used to cost users every permission. A stable
+self-signed certificate (free, no Apple Developer ID) makes it
+`identifier "com.ergoptiplus.app" and certificate leaf = H"…"`, which every
+later build signed with the same certificate satisfies.
+
+Create the certificate once, on your own machine (never in CI):
+
+```sh
+bash tools/build/create_macos_signing_identity.sh   # writes ~/ErgoptiPlus-signing/
+```
+
+It prints the two repository secrets to add under GitHub > Settings > Secrets
+and variables > Actions: `MACOS_SIGNING_CERTIFICATE_BASE64` (the password-
+protected `.p12`, base64) and `MACOS_SIGNING_CERTIFICATE_PASSWORD`. Keep the
+`.p12` and its password in a password manager: a lost certificate means a new
+identity and one more re-grant for every user. The script refuses to
+overwrite an existing identity.
+
+`tools/build/build_macos_app.sh` imports the `.p12` into a temporary keychain
+when both variables are set, signs every nested code object with it (LuaSocket,
+Hammerspoon, Karabiner when bundled as an app, Sparkle, the launcher, then the
+app), verifies the seal and logs the designated requirement, then deletes the
+keychain. `ci.yml` passes the secrets to release runs only. Without them the
+build still signs ad hoc, logs a warning, and a release run shows a
+`::warning::`. Setting only one of the two fails the build.
+
+The first update signed with the certificate still needs one last re-grant:
+the grants recorded for the previous ad hoc build name its code hash, which
+the new signature cannot match. Remove and re-add ErgoptiPlus in each privacy
+list once; from then on grants survive updates. Replacing the certificate
+later (it is valid ten years) costs the same single re-grant.
+
 ## Bundle id
 
 The embedded Hammerspoon's `CFBundleIdentifier` is rewritten to

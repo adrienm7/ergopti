@@ -79,6 +79,15 @@ OLLAMA_VERSION="$OLLAMA_RELEASE_VERSION"
 # to install updates"; CI must inject the real value from a secret.
 SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
 
+# Stable code-signing identity: a base64 .p12 and its password, both produced
+# once by tools/build/create_macos_signing_identity.sh. Set both to sign every
+# nested code object with that certificate; set neither to sign ad hoc. An ad
+# hoc signature is a new code identity on every build, so macOS forgets the
+# Accessibility, Screen Recording, Automation and Login Items grants at each
+# update; a stable certificate keeps them.
+MACOS_SIGNING_CERTIFICATE_BASE64="${MACOS_SIGNING_CERTIFICATE_BASE64:-}"
+MACOS_SIGNING_CERTIFICATE_PASSWORD="${MACOS_SIGNING_CERTIFICATE_PASSWORD:-}"
+
 # GitHub repo coordinates so the appcast URL can be derived. Override via env.
 GH_OWNER="${GH_OWNER:-Ergopti}"
 GH_REPO="${GH_REPO:-Ergopti}"
@@ -602,42 +611,194 @@ generate_info_plist() {
 # ===============================================
 # ===============================================
 
+# "-" signs ad hoc. setup_signing_identity() replaces it with the SHA-1 of the
+# imported certificate, which codesign reads as an exact identity and not as a
+# name that could match another certificate of the search list.
+SIGN_IDENTITY="-"
+# Temporary keychain holding the imported identity; empty while signing ad hoc.
+SIGNING_KEYCHAIN=""
+SIGNING_WORK_DIR=""
+
+# Reject half a signing configuration before the long build starts: one
+# variable without the other is a secret that failed to reach this run, and
+# signing ad hoc there would silently cost every user their permissions.
+check_signing_configuration() {
+	if [ -n "$MACOS_SIGNING_CERTIFICATE_BASE64" ] && [ -z "$MACOS_SIGNING_CERTIFICATE_PASSWORD" ]; then
+		fail "MACOS_SIGNING_CERTIFICATE_BASE64 is set without MACOS_SIGNING_CERTIFICATE_PASSWORD; set both or neither."
+	fi
+	if [ -z "$MACOS_SIGNING_CERTIFICATE_BASE64" ] && [ -n "$MACOS_SIGNING_CERTIFICATE_PASSWORD" ]; then
+		fail "MACOS_SIGNING_CERTIFICATE_PASSWORD is set without MACOS_SIGNING_CERTIFICATE_BASE64; set both or neither."
+	fi
+}
+
+# Delete the temporary keychain, which also removes it from the search list.
+# Runs from the EXIT trap: a keychain that survives would leave the private key
+# on the build host, so a failed deletion fails the build.
+cleanup_signing_identity() {
+	[ -n "$SIGNING_KEYCHAIN" ] || return 0
+	local keychain="$SIGNING_KEYCHAIN"
+	SIGNING_KEYCHAIN=""
+	if ! security delete-keychain "$keychain"; then
+		printf '[macos-build] ERROR: could not delete the signing keychain %s\n' "$keychain" >&2
+		rm -rf "$SIGNING_WORK_DIR"
+		exit 1
+	fi
+	rm -rf "$SIGNING_WORK_DIR"
+	log "Signing keychain deleted"
+}
+
+# Say, loudly, what an ad hoc build costs the people who install it.
+warn_ad_hoc_signing() {
+	log "WARNING: ================================================================"
+	log "WARNING: No MACOS_SIGNING_CERTIFICATE_BASE64 / _PASSWORD: signing AD HOC."
+	log "WARNING: An ad hoc signature is a new code identity on every build: macOS"
+	log "WARNING: will NOT carry the Accessibility, Screen Recording, Automation and"
+	log "WARNING: Login Items grants over to this build; users re-grant each one."
+	log "WARNING: Create a stable identity once with"
+	log "WARNING: tools/build/create_macos_signing_identity.sh and set both variables."
+	log "WARNING: ================================================================"
+}
+
+# Import the .p12 into a temporary keychain that codesign may use without a
+# prompt, and select its one code-signing identity by certificate SHA-1.
+setup_signing_identity() {
+	[ "$SIGN_IDENTITY" = "-" ] && [ -z "$SIGNING_KEYCHAIN" ] \
+		|| fail "The signing identity is already initialized."
+	check_signing_configuration
+	if [ -z "$MACOS_SIGNING_CERTIFICATE_BASE64" ]; then
+		warn_ad_hoc_signing
+		return 0
+	fi
+	require_cmd security
+	SIGNING_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-signing.XXXXXX")"
+	SIGNING_KEYCHAIN="$SIGNING_WORK_DIR/ergopti-signing.keychain-db"
+	trap cleanup_signing_identity EXIT
+	log "Signing keychain created: $SIGNING_KEYCHAIN"
+
+	local keychain_password
+	keychain_password="$(od -An -tx1 -N24 /dev/urandom | tr -d ' \n')"
+	[ "${#keychain_password}" -eq 48 ] || fail "Could not generate the signing keychain password."
+	local p12="$SIGNING_WORK_DIR/identity.p12"
+	(umask 077 && printf '%s' "$MACOS_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$p12") \
+		|| fail "MACOS_SIGNING_CERTIFICATE_BASE64 is not valid base64."
+	[ -s "$p12" ] || fail "MACOS_SIGNING_CERTIFICATE_BASE64 decoded to an empty file."
+
+	security create-keychain -p "$keychain_password" "$SIGNING_KEYCHAIN" \
+		|| fail "security create-keychain failed."
+	# No automatic lock during the build: a locked keychain fails codesign
+	# with errSecInternalComponent halfway through the bundle.
+	security set-keychain-settings -lut 21600 "$SIGNING_KEYCHAIN" \
+		|| fail "security set-keychain-settings failed."
+	security unlock-keychain -p "$keychain_password" "$SIGNING_KEYCHAIN" \
+		|| fail "security unlock-keychain failed."
+	local search_list=("$SIGNING_KEYCHAIN") existing line
+	existing="$(security list-keychains -d user)" || fail "security list-keychains failed."
+	while IFS= read -r line; do
+		line="${line#"${line%%[![:space:]]*}"}"
+		line="${line#\"}"
+		line="${line%\"}"
+		[ -n "$line" ] && search_list+=("$line")
+	done <<< "$existing"
+	security list-keychains -d user -s "${search_list[@]}" \
+		|| fail "security list-keychains could not add the signing keychain."
+	security import "$p12" -k "$SIGNING_KEYCHAIN" -f pkcs12 \
+		-P "$MACOS_SIGNING_CERTIFICATE_PASSWORD" -T /usr/bin/codesign >/dev/null \
+		|| fail "security import rejected the certificate: check MACOS_SIGNING_CERTIFICATE_PASSWORD and that the .p12 came from create_macos_signing_identity.sh."
+	rm -f "$p12"
+	security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+		-k "$keychain_password" "$SIGNING_KEYCHAIN" >/dev/null \
+		|| fail "security set-key-partition-list failed."
+
+	# Without -v: a self-signed certificate is not trusted, and -v lists only
+	# trusted identities. codesign signs with it all the same.
+	local identities hashes count
+	identities="$(security find-identity -p codesigning "$SIGNING_KEYCHAIN")" \
+		|| fail "security find-identity failed."
+	hashes="$(printf '%s\n' "$identities" \
+		| sed -nE 's/^[[:space:]]*[0-9]+\)[[:space:]]+([0-9A-Fa-f]{40})[[:space:]].*$/\1/p' \
+		| sort -u)"
+	count="$(printf '%s' "$hashes" | grep -c . || true)"
+	[ "$count" -eq 1 ] \
+		|| fail "Expected exactly one code-signing identity in the imported .p12, found $count."
+	SIGN_IDENTITY="$hashes"
+	log "Signing with the stable certificate SHA-1 $SIGN_IDENTITY"
+}
+
+# Every signature of the bundle goes through here, so no object can be left
+# ad hoc once a certificate is imported. A self-signed certificate gets no
+# secure timestamp: Apple's timestamp service only serves its own chains.
+sign_code() {
+	if [ "$SIGN_IDENTITY" = "-" ]; then
+		codesign --force --sign - "$@"
+	else
+		codesign --force --sign "$SIGN_IDENTITY" --keychain "$SIGNING_KEYCHAIN" --timestamp=none "$@"
+	fi
+}
+
+# Prove the seal, then print the designated requirement: it is what TCC and
+# Login Items store, so the CI log shows whether the next build will match it.
+verify_app_signature() {
+	local bundle="$1"
+	codesign --verify --strict --deep --verbose=2 "$bundle" || fail "codesign --verify failed for $bundle"
+	local requirement
+	requirement="$(codesign -d -r- "$bundle" 2>&1)" || fail "codesign could not read the requirement of $bundle"
+	log "Designated requirement of $bundle:"
+	while IFS= read -r line; do log "  $line"; done <<< "$requirement"
+	if [ "$SIGN_IDENTITY" = "-" ]; then
+		log "WARNING: ad hoc requirement (cdhash): the next build will not match it."
+		return 0
+	fi
+	# A self-signed leaf is also its root, so codesign may name either.
+	local anchored
+	anchored="$(printf '%s\n' "$requirement" | grep -Eic "certificate (leaf|root) = H\"$SIGN_IDENTITY\"" || true)"
+	[ "$anchored" -ge 1 ] \
+		|| fail "The designated requirement of $bundle does not name the certificate $SIGN_IDENTITY."
+}
+
 # Seal the shared runtime without depending on an embedded Hammerspoon bundle.
 codesign_native_runtime() {
 	local entitlements="$LAUNCHER_DIR/ErgoptiPlus.entitlements"
 	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
-	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+	sign_code --deep "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 	# Sign the launcher binary with a stable identifier and entitlements.
-	codesign --force \
-		--sign - \
+	sign_code \
 		--identifier "$BUNDLE_ID" \
 		--entitlements "$entitlements" \
 		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
 
 	# Sign the outer bundle. --identifier here pins the bundle's own identity.
-	codesign --force \
-		--sign - \
+	sign_code \
 		--identifier "$BUNDLE_ID" \
 		"$APP_PATH"
 }
 
-# Sign the app ad-hoc but with an explicit --identifier anchored to the bundle
-# ID. Without --identifier, ad-hoc signing uses the binary hash as the
-# identity — a hash that changes on every build — which causes macOS TCC to
-# treat each new build as an unknown app and re-prompt for Accessibility /
-# Input Monitoring permissions. Pinning the identifier to the stable bundle ID
-# makes TCC recognise every build as the same app, so granted permissions
-# survive updates (as long as the user installs over the same path).
+# Sign the app with an explicit --identifier anchored to the bundle ID. The
+# identifier alone does not make TCC recognise the next build: an ad hoc
+# designated requirement is the code hash (cdhash), which changes on every
+# build. Only a stable certificate (setup_signing_identity) turns the
+# requirement into identifier + certificate hash, which every later build
+# signed with that certificate satisfies.
 #
 # The entitlements file is included so the launcher binary carries an explicit
 # com.apple.security.automation.apple-events claim. Without it some macOS
 # versions pop an extra automation-permission dialog on first use.
 codesign_app() {
-	log "Codesigning ErgoptiPlus.app (ad-hoc, identifier: $BUNDLE_ID)"
-	# Sign nested bundles first so the host-level pass finds them already valid.
-	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+	if [ "$SIGN_IDENTITY" = "-" ]; then
+		log "Codesigning ErgoptiPlus.app (ad hoc, identifier: $BUNDLE_ID)"
+	else
+		log "Codesigning ErgoptiPlus.app (certificate $SIGN_IDENTITY, identifier: $BUNDLE_ID)"
+	fi
+	# Sign nested code first so the host-level pass finds it already valid.
+	# bundle-macos-luasocket.sh builds it into the bundled driver tree.
+	local driver_root="$APP_PATH/Contents/Resources/static/ergopti_plus/macos"
+	local luasocket="$driver_root/socket/core.so"
+	[ -f "$luasocket" ] || fail "Bundled LuaSocket extension missing: $luasocket"
+	sign_code "$luasocket"
+	sign_code --deep "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
 	local ke_app="$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
-	[ -d "$ke_app" ] && codesign --force --deep --sign - "$ke_app" || true
+	if [ -d "$ke_app" ]; then
+		sign_code --deep "$ke_app"
+	fi
 
 	codesign_native_runtime
 
@@ -664,6 +825,7 @@ zip_app() {
 # the full application's bundled drivers, language runtimes or model engines.
 build_native_helper() {
 	for cmd in swift lipo codesign plutil zip find; do require_cmd "$cmd"; done
+	check_signing_configuration
 	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
 	APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 	ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
@@ -682,8 +844,9 @@ build_native_helper() {
 	plutil -replace LSUIElement -bool true "$plist"
 	disarm_bundle_sparkle "$plist"
 	plutil -lint "$plist"
+	setup_signing_identity
 	codesign_native_runtime
-	codesign --verify --strict --deep "$APP_PATH"
+	verify_app_signature "$APP_PATH"
 	zip_app
 	log "Native helper ready: $ZIP_PATH"
 }
@@ -697,6 +860,7 @@ main() {
 	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil rsync hdiutil shasum; do
 		require_cmd "$cmd"
 	done
+	check_signing_configuration
 
 	clean_build_dir
 	download_hammerspoon
@@ -713,7 +877,10 @@ main() {
 	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
 	build_icon
 	generate_info_plist
+	setup_signing_identity
 	codesign_app
+	verify_app_signature "$APP_PATH"
+	verify_app_signature "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
 	zip_app
 
 	log "Done."
