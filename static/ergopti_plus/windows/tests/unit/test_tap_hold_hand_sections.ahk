@@ -52,13 +52,12 @@ _THHS_PositionOf(TargetMenu, Label) {
 ; Renders the real tap_holds_menu declaration with one inert row per key,
 ; labelled by the key's id, under the provider of its hand.
 _THHS_Render() {
-	Noop := (*) => ""
-	Rows := (Hand) => _THHS_KeyIdRows(Hand, Noop)
+	Inert := (*) => ""
 	Providers := Map(
-		"tap_hold_keys_left", (*) => Rows("left"),
-		"tap_hold_keys_right", (*) => Rows("right"))
-	Commands := Map("tapholds_toggle", Noop, "reset_defaults", Noop,
-		"disable_all", Noop, "edit_nav_layer", Noop)
+		"tap_hold_keys_left", (*) => _THHS_KeyIdRows("left", Inert),
+		"tap_hold_keys_right", (*) => _THHS_KeyIdRows("right", Inert))
+	Commands := Map("tapholds_toggle", Inert, "reset_defaults", Inert,
+		"disable_all", Inert, "edit_nav_layer", Inert)
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", Providers, Commands,
 		Map("tapholds_enabled", () => false))
 }
@@ -82,12 +81,12 @@ _THHS_KeyIdRows(Hand, Action) {
 ; ===========================================
 
 _THHS_CatalogueSplitsTheHands() {
-	Left := TapHoldKeyDefsOfHand("left")
-	Right := TapHoldKeyDefsOfHand("right")
+	LeftKeys := TapHoldKeyDefsOfHand("left")
+	RightKeys := TapHoldKeyDefsOfHand("right")
 	AssertEqual(14, TapHoldKeyDefs().Length, "the Windows column of [tap_hold.catalog]")
-	AssertEqual(TapHoldKeyDefs().Length, Left.Length + Right.Length, "every key has a hand")
-	AssertEqual("space", Left[Left.Length]["id"], "Space ends the left hand")
-	AssertEqual("alt_gr", Right[1]["id"], "AltGr opens the right hand")
+	AssertEqual(TapHoldKeyDefs().Length, LeftKeys.Length + RightKeys.Length, "every key has a hand")
+	AssertEqual("space", LeftKeys[LeftKeys.Length]["id"], "Space ends the left hand")
+	AssertEqual("alt_gr", RightKeys[1]["id"], "AltGr opens the right hand")
 	for _, KeyDef in TapHoldKeyDefs()
 		Assert(InStr(KeyDef["i18n"], "tap_hold.group.") == 1, "key '" . KeyDef["id"] . "' is labelled from the catalogue")
 }
@@ -101,11 +100,11 @@ _THHS_MenuSeparatesTheHands() {
 		RightHeader := _THHS_PositionOf(Rendered, MenuSectionTitle(t("menu.tapholds.right_hand_tap_hold")))
 		Assert(LeftHeader >= 0, "the « Main gauche — Tap / Hold » header is drawn")
 		Assert(RightHeader > LeftHeader, "the « Main droite — Tap / Hold » header follows it")
-		Space := _THHS_PositionOf(Rendered, "space")
-		Assert(Space > LeftHeader && Space < RightHeader, "Space is listed under the left hand")
-		Assert(TrayMenuIsSeparatorAt(Rendered, Space + 1),
+		SpaceRow := _THHS_PositionOf(Rendered, "space")
+		Assert(SpaceRow > LeftHeader && SpaceRow < RightHeader, "Space is listed under the left hand")
+		Assert(TrayMenuIsSeparatorAt(Rendered, SpaceRow + 1),
 			"the row after the last left-hand key (Space) is a separator")
-		AssertEqual(RightHeader, Space + 2, "the right-hand header follows that separator")
+		AssertEqual(RightHeader, SpaceRow + 2, "the right-hand header follows that separator")
 		AssertEqual("alt_gr", _THHS_LabelAt(Rendered, RightHeader + 1),
 			"the first right-hand key row is AltGr")
 		Assert(_THHS_PositionOf(Rendered, MenuSectionTitle("Tap / Hold")) < 0,
