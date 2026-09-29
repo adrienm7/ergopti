@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-09-29. Integration branch: `dev`. This ordered checklist is the
+Updated: 2026-09-29 (overnight). Integration branch: `integration-2` → `dev`. This ordered checklist is the
 current handoff; older workflow task-status files are historical evidence.
 Update the completed item and its verification before moving to the next item.
 
@@ -23,11 +23,22 @@ workflow context (prompts, task status, feature map, analysis reports and
 journal) is in the handoff package's `workflow-context-2026-09-24.zip`.
 
 The user authorizes publishing `dev` and necessary CI repairs, forbids force
-pushes and new feature branches, and wants a cloneable GitHub handoff. Preserve
-unrelated changes and stage exact paths.
-After CI and a verified new release, continue one TODO item at a time without
-parallel agents. Update this file after each finished unit and reserve enough
-quota to commit, publish and document the final clean checkpoint.
+pushes to `dev`/`main`, and wants a cloneable GitHub handoff. Preserve
+unrelated changes and stage exact paths. Every push to `dev` cuts a release,
+so push rarely: run the full CI on a temporary `backup/*` branch through
+`workflow_dispatch` (a non-dev ref runs the CI profile and publishes nothing),
+and push `dev` only once that run is green. Temporary `backup/*` branches are
+authorized and must be deleted after the final push.
+
+**Overnight session of 2026-09-29 (supersedes the "one item at a time"
+instruction: the maintainer asked for maximum parallelism).** Items 5 to 13
+were implemented in parallel on `wip/*` branches, adversarially reviewed, fixed
+on `wip/*-fix` branches and integrated in order on the local branch
+`integration-2` (pushed as `backup/integration-2b`). Nothing is on `dev` yet.
+The maintainer demos Ergopti on 2026-09-30 in the afternoon. Read
+[the overnight handoff](handovers/2026-09-29-overnight/README.md) first: it
+lists every branch, the in-flight fixes, the maintainer's decisions and the
+exact release procedure.
 
 ## Already integrated functionality
 
@@ -83,55 +94,111 @@ These are software implementations; final hardware verification remains below.
 4. [x] Finish publication: every Windows, Linux, shared and macOS job passed
        and CI published `v0.0.0-dev.144`. Verify the CI verdict of the two
        later local macOS corrections before starting item 5.
-5. [ ] Complete W1 neutral configuration and recommended/clear scopes. Finish
-       macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
-       composition. Keep unknown fields, verified backups, exact runtime
-       acknowledgement, external-write conflict detection and retryable rollback.
-       Recommended delay values must match effective runtime inheritance: deleting
-       `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
-       0.5 s. Do not assume deletion implements the recommendation.
-       Hotstrings progress (`wip/w1-hotstrings`, unpublished): Linux
-       categories, sections and scalar settings are canonical config.toml
-       leaves, with a one-shot import of legacy storage.json choices; both OSes
-       have a two-file recommended/clear owner whose planner writes explicit
-       delays where inheritance differs; Configuration's Linux « restore
-       recommended » row runs it. Still open: no `scope_restore`/`scope_clear`
-       row is declared in `hotstrings_menu`, the macOS owner
-       (`ui/menu/hotstrings_scope.lua`) is neither constructed nor registered as
-       menu commands, and Linux terminators remain in storage.json.
-6. [ ] Complete L4 extension layout geometry and physical magic-key behavior.
-       Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
-7. [ ] Complete W2: seven-page first-run opt-in wizard, per-category recommended
-       choices, consistent WebView behavior and genuine translations in 21 locales.
-       Still open: the tap-holds page has no per-key checklist, so a Yes imports
-       no key (Windows sets only `category_enabled.tap_holds`; macOS and Linux
-       show a note). Import keys through each driver's tap-hold writer. Until W1
-       moves them into config.toml, Linux applies its hotstring sections through
-       hotstrings_config (storage.json) and leaves the trigger to its tray.
-8. [ ] Complete A4: TapHold menu grouped by hand, shared catalogue, key
+5. [~] Complete W1 neutral configuration and recommended/clear scopes. Finish
+   macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
+   composition. Keep unknown fields, verified backups, exact runtime
+   acknowledgement, external-write conflict detection and retryable rollback.
+   Recommended delay values must match effective runtime inheritance: deleting
+   `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
+   0.5 s. Do not assume deletion implements the recommendation.
+   Hotstrings progress (`wip/w1-hotstrings`, unpublished): Linux
+   categories, sections and scalar settings are canonical config.toml
+   leaves, with a one-shot import of legacy storage.json choices; both OSes
+   have a two-file recommended/clear owner whose planner writes explicit
+   delays where inheritance differs; Configuration's Linux « restore
+   recommended » row runs it. Still open: no `scope_restore`/`scope_clear`
+   row is declared in `hotstrings_menu`, the macOS owner
+   (`ui/menu/hotstrings_scope.lua`) is neither constructed nor registered as
+   menu commands, and Linux terminators remain in storage.json.
+6. [~] Complete L4 extension layout geometry and physical magic-key behavior.
+   Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
+7. [~] Complete W2: seven-page first-run opt-in wizard, per-category recommended
+   choices, consistent WebView behavior and genuine translations in 21 locales.
+   Still open: the tap-holds page has no per-key checklist, so a Yes imports
+   no key (Windows sets only `category_enabled.tap_holds`; macOS and Linux
+   show a note). Import keys through each driver's tap-hold writer. Until W1
+   moves them into config.toml, Linux applies its hotstring sections through
+   hotstrings_config (storage.json) and leaves the trigger to its tray.
+8. [x] Complete A4: TapHold menu grouped by hand, shared catalogue, key
        combinations under Shortcuts, with the actual configuration/runtime owners.
-9. [ ] Complete C4: shared centered update-check WebView, checking/current/new
+9. [x] Complete C4: shared centered update-check WebView, checking/current/new
        release/error states, other-channel notices and explicit install action.
-10. [ ] Complete D3: separate previous/next desktop actions with and without
+10. [x] Complete D3: separate previous/next desktop actions with and without
         wrapping on each OS; retire the global wrapping toggle.
-11. [ ] Complete D4: explicit AI prediction action, recommended slots, removal of
+11. [x] Complete D4: explicit AI prediction action, recommended slots, removal of
         duplicate trigger paths, Windows feedback and model/suggestion/menu labels.
-12. [ ] Complete D5: remaining approved system actions, including required
+12. [x] Complete D5: remaining approved system actions, including required
         confirmation for quarantine/trash; exclude the rejected quit-all-apps action.
-13. [ ] Complete F2: honor the Karabiner integration switch before leases and
-        guardians; preserve personal rules; back up and restore Windows touchpad
-        registry values through one owner. Remaining: turning the switch off or
-        « Retirer Ergopti de Karabiner » does not unregister a guardian
-        LaunchAgent registered while it was on (needs a headless unregister
-        role in the launcher, verified on a Mac).
+13. [~] Complete F2: honor the Karabiner integration switch before leases and
+    guardians; preserve personal rules; back up and restore Windows touchpad
+    registry values through one owner. Remaining: turning the switch off or
+    « Retirer Ergopti de Karabiner » does not unregister a guardian
+    LaunchAgent registered while it was on (needs a headless unregister
+    role in the launcher, verified on a Mac).
+    Legend: `[x]` implemented, reviewed and integrated on `integration-2`
+    (published only once `dev` is pushed); `[~]` integrated with the precise
+    remainder recorded in the item or in the overnight handoff.
 14. [ ] Run final cross-driver, shared, encoding, convention and 21-locale gates;
         record real-device checks still unavailable on this Windows host.
+        Local gates on `integration-2` @85708c92: JS 316/317 (the only red is the
+        container-only "Linux install.sh … sandboxed real run", which refuses
+        root), macOS Lua 12044/12044, Linux 4249/4249, macOS E2E 67/67, Linux
+        E2E 115/115, gen:check, strict conventions, AHK encoding, false-green
+        ratchet, Windows bundle and macOS payload guards. Windows AHK suites
+        only run in CI.
 15. [x] Finish storage cleanup after all useful work is recoverable from GitHub.
         `C:/ewt`, `C:/ewtb` and `D:/ewt` are deleted. Their unique commits,
         pending patches and specifications are in the handoff package; their
         full-tree exports differed from `dev` only by formatting.
 16. [ ] Publish final corrective commits, verify CI and release assets, and write
         the final report with completed scope, limitations and manual test results.
+
+## Maintainer requests added on 2026-09-29 (see the overnight handoff)
+
+17. [~] About/Version submenu: one titled release-channel submenu, version row
+    with the short commit hash ("Version locale (hash)" for a source
+    checkout), Uninstall moved to its bottom. Integrated.
+18. [~] Configuration › « Chemins » (was « Dossiers ») in 21 locales. Integrated.
+19. [~] Windows tooltip border hidden under its content and white corner pixels
+    (pooled border z-order + ring drawn from the content region). Integrated;
+    verify visually on Windows 10/11.
+20. [~] Windows launch smoke test: detect a real startup dialog instead of a 20 s
+    extraction deadline. Integrated.
+21. [~] Lighter bundles: Windows bundle 556 → 228 files; macOS zip 99.3 → 46.6 MB
+    (unused Karabiner-Elements.pkg dropped, payload manifest, zip -9).
+    Integrated. In flight: no bundled Ollama; Ollama and MLX runtimes
+    installed only the first time each is selected as AI backend
+    (`wip/macos-lazy-ai-runtimes`). After the demo: `.tar.xz` archive.
+22. [ ] Delta updates: macOS Sparkle deltas ready on `wip/delta-updates`
+        (held until after the demo because its CI step only runs on real
+        releases); then Windows and Linux per ADR 010.
+23. [ ] Ergopti-only hotstring groups (SFB reduction, rolls, repeat corrections)
+        moved into the Ergopti extension, shown under « Hotstrings Ergopti »,
+        available when the extension/layout is installed
+        (`wip/ergopti-hotstrings-ext`, in flight).
+24. [ ] macOS tap-hold outage: a not-ready remap guardian held every Karabiner
+        regeneration forever and pinned the first bulk edit (Restore defaults),
+        refusing later edits and Reload (`wip/remap-guardian-bulk-fix`, in
+        flight). Then guardian approval UX: register automatically, and when
+        macOS requires approval open the Login Items pane and show the native
+        permission dialog at boot.
+25. [ ] Config policy: an unknown/retired key or a value naming something that
+        no longer exists is one WARNING, ignored, and offered by the config
+        cleanup — never an ERROR (fixes the dev.146 startup ERROR
+        « M.enable(): unknown hotkey 'at_hash' »). `wip/config-unknown-keys-warn`.
+26. [ ] Diagnostics window showed raw translation keys (possibly because boot
+        failed first); it must show real text even in a degraded boot.
+        `wip/diag-ui-i18n`.
+27. [ ] Every Ergopti window is only focused when opened, never always-on-top
+        (overlays exempt), with a guard test. `wip/ui-focus-not-topmost`.
+28. [ ] macOS permission instructions in a native dialog, never a one-line
+        hs.alert banner. `wip/macos-permission-dialog`.
+29. [ ] force_quit_frontmost asks for confirmation; key combinations governed only
+        by their own switch on every OS. `wip/forcequit-confirm-combos-switch`.
+30. [ ] Physical magic-key setting on all three OSes (after the demo).
+31. [ ] HS-274 exact physical key accounting with an Ergopti-owned background
+        Karabiner runtime (no Karabiner-Elements app). Plan and decisions in the
+        overnight handoff; ~32–42 agent-days; not in the demo release.
 
 ## Time estimate
 
