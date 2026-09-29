@@ -278,12 +278,10 @@ if (catalogueRouteErrors(catalogue).length === 0)
 
 // ─── 3. macOS: base_dir is the driver root, so exactly one ".." ──────────────
 
-// hotstring_counter.lua left this list when it stopped walking the tree: it
-// counts the packs the boot catalogue registered (section 3b).
-const MAC_SITES = [
-	'static/ergopti_plus/macos/init.lua',
-	'static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua'
-];
+// hotstring_counter.lua and menu_shortcuts.lua left this list when they
+// stopped walking the tree: both read the packs the boot catalogue discovered
+// (section 3b), so the bundled tree has one resolver there too.
+const MAC_SITES = ['static/ergopti_plus/macos/init.lua'];
 
 const MAC_DRIVER_ROOT = path.join(DRIVERS, 'macos');
 let macSitesSeen = 0;
