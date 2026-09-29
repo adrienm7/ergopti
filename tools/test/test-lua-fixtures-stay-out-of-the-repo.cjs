@@ -34,14 +34,12 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
-const TEST_TREES = [
-	'static/ergopti_plus/macos/tests',
-	'static/ergopti_plus/linux/tests',
-];
+const TEST_TREES = ['static/ergopti_plus/macos/tests', 'static/ergopti_plus/linux/tests'];
 
 // A scratch-directory expression that can resolve to the working directory.
 // Matches `or "."` and `or './…'` used as the last resort of a getenv chain.
-const RELATIVE_FALLBACK_RE = /os\.getenv\(\s*"(?:TEMP|TMP|TMPDIR)"\s*\)[^\n]*\bor\s*"\.(?:\/[^"]*)?"/;
+const RELATIVE_FALLBACK_RE =
+	/os\.getenv\(\s*"(?:TEMP|TMP|TMPDIR)"\s*\)[^\n]*\bor\s*"\.(?:\/[^"]*)?"/;
 
 // Any absolute-path answer is fine; these are the shapes already in use.
 const HELPER_USE_RE = /helpers\.temp_dir\(\)/;
@@ -95,20 +93,30 @@ for (const tree of TEST_TREES) {
 }
 
 if (scanned === 0) {
-	console.error('\x1b[31m[ERROR] no Lua test files were scanned — the guard is looking at the wrong tree.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] no Lua test files were scanned — the guard is looking at the wrong tree.\x1b[0m'
+	);
 	process.exit(1);
 }
 
 if (helperUsers === 0) {
-	console.error('\x1b[31m[ERROR] no test uses helpers.temp_dir() — the isolated scratch helper was deleted, so this guard proves nothing.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] no test uses helpers.temp_dir() — the isolated scratch helper was deleted, so this guard proves nothing.\x1b[0m'
+	);
 	process.exit(1);
 }
 
 if (violations.length > 0) {
-	console.error('\x1b[31m[ERROR] a test fixture can resolve to the working directory, which is the checkout.\x1b[0m');
-	console.error('  Use helpers.temp_dir(): it resolves TMPDIR first and raises rather than falling back to ".".');
+	console.error(
+		'\x1b[31m[ERROR] a test fixture can resolve to the working directory, which is the checkout.\x1b[0m'
+	);
+	console.error(
+		'  Use helpers.temp_dir(): it resolves TMPDIR first and raises rather than falling back to ".".'
+	);
 	for (const v of violations) console.error('    ' + v);
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] No Lua test fixture can land in the checkout — ${scanned} file(s) scanned, ${helperUsers} using helpers.temp_dir().\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] No Lua test fixture can land in the checkout — ${scanned} file(s) scanned, ${helperUsers} using helpers.temp_dir().\x1b[0m`
+);

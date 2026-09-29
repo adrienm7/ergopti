@@ -22,15 +22,15 @@ startup, full-suite duration, or end-to-end gate time.
 
 ## Results
 
-| Case | Sample 1 (ms) | Sample 2 (ms) | Sample 3 (ms) |
-| --- | ---: | ---: | ---: |
-| Direct OS calls, modules/infra/platform | 566.416 | 551.963 | 580.598 |
-| Direct OS calls, UI | 231.643 | 231.852 | 225.847 |
-| Direct OS calls, entry point | 9.772 | 8.876 | 8.109 |
-| Platform families, modules/infra/platform | 1118.176 | 1132.827 | 1080.921 |
-| Platform families, UI | 438.944 | 464.520 | 441.126 |
-| Platform families, entry point | 15.564 | 14.961 | 13.555 |
-| Sum of six callbacks | 2380.515 | 2404.999 | 2350.156 |
+| Case                                      | Sample 1 (ms) | Sample 2 (ms) | Sample 3 (ms) |
+| ----------------------------------------- | ------------: | ------------: | ------------: |
+| Direct OS calls, modules/infra/platform   |       566.416 |       551.963 |       580.598 |
+| Direct OS calls, UI                       |       231.643 |       231.852 |       225.847 |
+| Direct OS calls, entry point              |         9.772 |         8.876 |         8.109 |
+| Platform families, modules/infra/platform |      1118.176 |      1132.827 |      1080.921 |
+| Platform families, UI                     |       438.944 |       464.520 |       441.126 |
+| Platform families, entry point            |        15.564 |        14.961 |        13.555 |
+| Sum of six callbacks                      |      2380.515 |      2404.999 |      2350.156 |
 
 The median sample total is 2380.515 ms; the maximum is 2404.999 ms.
 The largest individual callback is 1132.827 ms. Three samples do not establish

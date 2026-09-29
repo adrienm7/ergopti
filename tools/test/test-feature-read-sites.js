@@ -49,9 +49,6 @@ const META_KEYS = new Set(['section_order']);
 // looks exactly like a driver with no unread features.
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 
-
-
-
 // =================================================
 // =================================================
 // ======= 1/ Manifest loading (mirrors build-features-manifest.js) =======
@@ -135,9 +132,6 @@ function buildAhkFeaturesMap(features) {
 	}
 	return map;
 }
-
-
-
 
 // =================================================
 // =================================================
@@ -228,9 +222,6 @@ function validate(keys, map) {
 	return null;
 }
 
-
-
-
 // =================================================
 // =================================================
 // ======= 3/ Runner =======
@@ -244,7 +235,11 @@ const map = buildAhkFeaturesMap(features);
 // the buggy section-prefixed form must be rejected and the correct stripped form
 // accepted. Encodes the exact crash so it can never silently return.
 const SELF_TESTS = [
-	{ keys: ['ahk.layout', 'ctrl_magic_save'], expectMissing: true, why: 'section-prefixed crash form' },
+	{
+		keys: ['ahk.layout', 'ctrl_magic_save'],
+		expectMissing: true,
+		why: 'section-prefixed crash form'
+	},
 	{ keys: ['layout', 'ctrl_magic_save'], expectMissing: false, why: 'correct stripped form' },
 	{ keys: ['layout', '__definitely_not_a_feature__'], expectMissing: true, why: 'unknown key' }
 ];
@@ -292,9 +287,15 @@ if (failures.length === 0) {
 console.log(`\n  ✗  ${failures.length} read site(s) with no backing manifest entry:\n`);
 for (const f of failures) {
 	console.log(`     ${f.file}:${f.line}`);
-	console.log(`        Features["${f.path.split('.').join('"]["')}"]  — key "${f.missing}" not in manifest`);
+	console.log(
+		`        Features["${f.path.split('.').join('"]["')}"]  — key "${f.missing}" not in manifest`
+	);
 }
-console.log(`\n  Fix: add the feature to _shared/modules/features/manifest.toml and run "npm run codegen",`);
-console.log(`       or correct the read path. (This is the layout.ahk ctrl_magic_save crash class.)`);
+console.log(
+	`\n  Fix: add the feature to _shared/modules/features/manifest.toml and run "npm run codegen",`
+);
+console.log(
+	`       or correct the read path. (This is the layout.ahk ctrl_magic_save crash class.)`
+);
 console.log('');
 process.exit(1);

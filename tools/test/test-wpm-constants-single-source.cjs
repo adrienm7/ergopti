@@ -27,7 +27,9 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
 
-function read(rel) { return fs.readFileSync(path.join(SP, rel), 'utf8'); }
+function read(rel) {
+	return fs.readFileSync(path.join(SP, rel), 'utf8');
+}
 
 /**
  * The canon's keys as "section.key", from a flat TOML file of [section] tables.
@@ -41,7 +43,10 @@ function tomlKeys(text) {
 		const line = raw.trim();
 		if (!line || line.startsWith('#')) continue;
 		const header = line.match(/^\[([a-z_]+)\]$/);
-		if (header) { section = header[1]; continue; }
+		if (header) {
+			section = header[1];
+			continue;
+		}
 		const kv = line.match(/^([a-z_]+)\s*=/);
 		if (kv && section) keys.add(`${section}.${kv[1]}`);
 	}
@@ -68,15 +73,20 @@ const errors = [];
 const canon = tomlKeys(read('_shared/modules/wpm_widget/constants.toml'));
 const model = modelKeys(read('_shared/lua/wpm_widget/model.lua'));
 const ahkConfig = read('windows/ui/wpm/wpm_config.ahk');
-const ahk = new Set([...ahkConfig.matchAll(/_WPMWidget_Need\(wpm_c, "([a-z_]+)", "([a-z_]+)"/g)]
-	.map((m) => `${m[1]}.${m[2]}`));
+const ahk = new Set(
+	[...ahkConfig.matchAll(/_WPMWidget_Need\(wpm_c, "([a-z_]+)", "([a-z_]+)"/g)].map(
+		(m) => `${m[1]}.${m[2]}`
+	)
+);
 
 if (model.size < 20) errors.push(`the model's REQUIRED table parsed to only ${model.size} key(s)`);
 if (ahk.size < 20) errors.push(`the AHK loader's reads parsed to only ${ahk.size} key(s)`);
 
 // 1. Every key read exists.
-for (const key of model) if (!canon.has(key)) errors.push(`the shared model requires ${key}, absent from the canon`);
-for (const key of ahk) if (!canon.has(key)) errors.push(`the AHK loader reads ${key}, absent from the canon`);
+for (const key of model)
+	if (!canon.has(key)) errors.push(`the shared model requires ${key}, absent from the canon`);
+for (const key of ahk)
+	if (!canon.has(key)) errors.push(`the AHK loader reads ${key}, absent from the canon`);
 
 // 2. Every canon key is read. The neutral sources are read as a table.
 for (const key of canon) {
@@ -88,11 +98,20 @@ for (const key of canon) {
 if (/IniCacheGet\((wpm_c|tim_c),[^)]*,[^)]*,[^)]*\)/.test(ahkConfig)) {
 	errors.push('the AHK loader passes a default to a canon or timings read — a copy of the value');
 }
-for (const rel of ['macos/ui/wpm/shared.lua', 'macos/ui/wpm/wpm_widget.lua', 'macos/ui/wpm/wpm_menubar.lua',
-	'linux/ui/wpm/widget.lua', 'linux/ui/wpm/tray_readout.lua']) {
-	const src = read(rel).split('\n').filter((line) => !line.trim().startsWith('--')).join('\n');
+for (const rel of [
+	'macos/ui/wpm/shared.lua',
+	'macos/ui/wpm/wpm_widget.lua',
+	'macos/ui/wpm/wpm_menubar.lua',
+	'linux/ui/wpm/widget.lua',
+	'linux/ui/wpm/tray_readout.lua'
+]) {
+	const src = read(rel)
+		.split('\n')
+		.filter((line) => !line.trim().startsWith('--'))
+		.join('\n');
 	const literal = src.match(/["']#?[0-9a-fA-F]{6}["']/);
-	if (literal) errors.push(`${rel} holds the colour literal ${literal[0]} — the canon owns colours`);
+	if (literal)
+		errors.push(`${rel} holds the colour literal ${literal[0]} — the canon owns colours`);
 	// Directly, or through ui/wpm/shared.lua, which is itself checked here.
 	if (!src.includes('require("wpm_widget.model")') && !src.includes('require("ui.wpm.shared")')) {
 		errors.push(`${rel} does not draw through the shared model`);
@@ -105,10 +124,11 @@ const pins = [
 	['macos/ui/wpm/wpm_menubar.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
 	['linux/ui/wpm/widget.lua', 'Timings.sec("ui", "wpm_widget_update_ms")'],
 	['linux/ui/wpm/tray_readout.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
-	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_widget_update_ms"'],
+	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_widget_update_ms"']
 ];
 for (const [rel, needle] of pins) {
-	if (!read(rel).includes(needle)) errors.push(`${rel} must take its refresh from the timings registry (${needle})`);
+	if (!read(rel).includes(needle))
+		errors.push(`${rel} must take its refresh from the timings registry (${needle})`);
 }
 
 if (errors.length > 0) {
@@ -117,4 +137,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] WPM readouts: ${canon.size} canon key(s), each read by a driver, none restated.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] WPM readouts: ${canon.size} canon key(s), each read by a driver, none restated.\x1b[0m`
+);

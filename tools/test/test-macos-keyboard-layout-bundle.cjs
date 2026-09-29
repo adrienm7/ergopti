@@ -51,7 +51,9 @@ if (!relMatch) {
 } else {
 	resolvedRel = path.posix.normalize(DRIVER_REL + relMatch[1]).replace(/\/$/, '');
 	if (resolvedRel !== SOURCE_BUNDLES_REL) {
-		errors.push(`${MENU_REL}: BUNDLES_RELDIR resolves to ${resolvedRel}, expected ${SOURCE_BUNDLES_REL}.`);
+		errors.push(
+			`${MENU_REL}: BUNDLES_RELDIR resolves to ${resolvedRel}, expected ${SOURCE_BUNDLES_REL}.`
+		);
 	}
 }
 
@@ -68,8 +70,13 @@ if (!assembleMatch || !/^\tbundle_keyboard_layout "\$static_root"$/m.test(assemb
 // 3. The repository must hold something to ship.
 const sourceDir = path.join(ROOT, SOURCE_BUNDLES_REL);
 const shipped = fs.existsSync(sourceDir)
-	? fs.readdirSync(sourceDir).filter((name) => /^Ergopti_v[\d.]+\.bundle$/.test(name)
-		&& fs.existsSync(path.join(sourceDir, name, 'Contents', 'Info.plist')))
+	? fs
+			.readdirSync(sourceDir)
+			.filter(
+				(name) =>
+					/^Ergopti_v[\d.]+\.bundle$/.test(name) &&
+					fs.existsSync(path.join(sourceDir, name, 'Contents', 'Info.plist'))
+			)
 	: [];
 if (shipped.length === 0) {
 	errors.push(`${SOURCE_BUNDLES_REL}: no Ergopti_v*.bundle with an Info.plist to package.`);
@@ -96,12 +103,16 @@ function runPackaging(versions) {
 		'log() { :; }',
 		'fail() { printf "FAIL: %s\\n" "$*" >&2; exit 1; }',
 		fnMatch[0],
-		'bundle_keyboard_layout "$1"',
+		'bundle_keyboard_layout "$1"'
 	].join('\n');
-	const result = spawnSync(bashExecutable(), ['-c', script, 'fixture', staticRoot.replace(/\\/g, '/')], {
-		encoding: 'utf8',
-		env: { ...process.env, REPO_ROOT: path.join(fixture, 'repo').replace(/\\/g, '/') },
-	});
+	const result = spawnSync(
+		bashExecutable(),
+		['-c', script, 'fixture', staticRoot.replace(/\\/g, '/')],
+		{
+			encoding: 'utf8',
+			env: { ...process.env, REPO_ROOT: path.join(fixture, 'repo').replace(/\\/g, '/') }
+		}
+	);
 	if (result.error) throw result.error;
 	return { status: result.status, staticRoot, output: `${result.stdout}${result.stderr}`, fixture };
 }
@@ -113,8 +124,12 @@ if (fnMatch && resolvedRel) {
 	if (packaged.status !== 0) {
 		errors.push(`bundle_keyboard_layout failed on a valid fixture: ${packaged.output.trim()}`);
 	} else if (copied.join(',') !== 'Ergopti_v2.2.10.bundle') {
-		errors.push(`bundle_keyboard_layout must package only the highest version (2.2.10), packaged: [${copied.join(', ')}].`);
-	} else if (!fs.existsSync(path.join(destination, 'Ergopti_v2.2.10.bundle', 'Contents', 'Info.plist'))) {
+		errors.push(
+			`bundle_keyboard_layout must package only the highest version (2.2.10), packaged: [${copied.join(', ')}].`
+		);
+	} else if (
+		!fs.existsSync(path.join(destination, 'Ergopti_v2.2.10.bundle', 'Contents', 'Info.plist'))
+	) {
 		errors.push('bundle_keyboard_layout packaged the bundle without its Info.plist.');
 	}
 	fs.rmSync(packaged.fixture, { recursive: true, force: true });
@@ -127,8 +142,12 @@ if (fnMatch && resolvedRel) {
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] The packaged app does not ship the keyboard layout bundle its menu needs:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] The packaged app does not ship the keyboard layout bundle its menu needs:\x1b[0m'
+	);
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }
-console.log('\x1b[32m[OK] build_macos_app.sh packages the newest keyboard layout bundle where the menu resolves it.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] build_macos_app.sh packages the newest keyboard layout bundle where the menu resolves it.\x1b[0m'
+);

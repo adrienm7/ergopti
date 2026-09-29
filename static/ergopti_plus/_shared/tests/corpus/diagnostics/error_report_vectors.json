@@ -67,9 +67,7 @@
 				"module": "hotstrings",
 				"message": "Unexpected ``` in « %s »",
 				"time": "2026-09-24 11:30:00:001",
-				"recent": [
-					"2026-09-24 11:30:00:001 [ERROR] [hotstrings] Unexpected ``` in « %s »"
-				]
+				"recent": ["2026-09-24 11:30:00:001 [ERROR] [hotstrings] Unexpected ``` in « %s »"]
 			},
 			"identity": {
 				"version": "2.2.0-beta.1",

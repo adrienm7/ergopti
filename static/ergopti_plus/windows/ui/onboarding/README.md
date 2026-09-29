@@ -6,10 +6,10 @@ Multi-step first-run wizard shown automatically when `config.toml` is absent. Bu
 
 ## Key files
 
-| File       | Description                                                             |
-| ---------- | ----------------------------------------------------------------------- |
-| `init.ahk` | Entry: `Onboarding_Start()` — detects absence of config, opens wizard   |
-| `steps.ahk`| Step definitions and per-step validation / mutation logic               |
+| File        | Description                                                           |
+| ----------- | --------------------------------------------------------------------- |
+| `init.ahk`  | Entry: `Onboarding_Start()` — detects absence of config, opens wizard |
+| `steps.ahk` | Step definitions and per-step validation / mutation logic             |
 
 ## Usage
 

@@ -71,7 +71,8 @@ function resolved(text, os) {
 	const result = loadLayers(text, os, ctx);
 	const out = {};
 	for (const [layerId, bindings] of Object.entries(result.layers)) {
-		for (const [code, r] of Object.entries(bindings)) out[`${layerId}.${code}`] = formatResolution(r);
+		for (const [code, r] of Object.entries(bindings))
+			out[`${layerId}.${code}`] = formatResolution(r);
 	}
 	return { ok: result.ok, errors: result.errors, bindings: out };
 }
@@ -89,10 +90,6 @@ function canonical(value) {
 const same = (a, b) => canonical(a) === canonical(b);
 const copy = (v) => JSON.parse(JSON.stringify(v));
 
-
-
-
-
 // =========================
 // =========================
 // ======= 1/ Reader =======
@@ -100,35 +97,46 @@ const copy = (v) => JSON.parse(JSON.stringify(v));
 // =========================
 
 const corpus = JSON.parse(fs.readFileSync(CORPUS_PATH, 'utf8')).vectors;
-if (corpus.length < MIN_CORPUS_VECTORS) fail(`only ${corpus.length} corpus vectors read (floor ${MIN_CORPUS_VECTORS})`);
+if (corpus.length < MIN_CORPUS_VECTORS)
+	fail(`only ${corpus.length} corpus vectors read (floor ${MIN_CORPUS_VECTORS})`);
 let tomlInvalid = 0;
 for (const vector of corpus) {
 	// `file` names a shipped layer file under _shared/keymap/ in place of `toml`.
-	const text = vector.file !== undefined ? fs.readFileSync(shared('keymap', vector.file), 'utf8') : vector.toml;
+	const text =
+		vector.file !== undefined
+			? fs.readFileSync(shared('keymap', vector.file), 'utf8')
+			: vector.toml;
 	if (text === null) continue;
 	const refused = vector.expected.errors.some((sig) => sig.startsWith('toml_invalid|'));
 	const parsed = Model.parseToml(text);
 	if (refused) {
 		tomlInvalid += 1;
-		if (parsed.problem === null) fail(`corpus "${vector.id}": every loader refuses the file as toml_invalid, the page reads it`);
+		if (parsed.problem === null)
+			fail(
+				`corpus "${vector.id}": every loader refuses the file as toml_invalid, the page reads it`
+			);
 		continue;
 	}
 	if (parsed.problem !== null) {
-		fail(`corpus "${vector.id}": the loaders read the file, the page refuses it (${parsed.problem})`);
+		fail(
+			`corpus "${vector.id}": the loaders read the file, the page refuses it (${parsed.problem})`
+		);
 		continue;
 	}
 	const reference = TOML.parse(text.replace(/^﻿/, ''));
-	if (!same(parsed.root, reference)) fail(`corpus "${vector.id}": the page reads ${JSON.stringify(parsed.root)}, a TOML parser ${JSON.stringify(reference)}`);
+	if (!same(parsed.root, reference))
+		fail(
+			`corpus "${vector.id}": the page reads ${JSON.stringify(parsed.root)}, a TOML parser ${JSON.stringify(reference)}`
+		);
 }
-if (tomlInvalid < MIN_TOML_INVALID_VECTORS) fail(`only ${tomlInvalid} toml_invalid vectors compared (floor ${MIN_TOML_INVALID_VECTORS})`);
+if (tomlInvalid < MIN_TOML_INVALID_VECTORS)
+	fail(`only ${tomlInvalid} toml_invalid vectors compared (floor ${MIN_TOML_INVALID_VECTORS})`);
 
 const wrongVersion = Model.readLayerFile('[_meta]\nschema_version = 2\n', DATA);
-if (wrongVersion.problem === null || Object.keys(wrongVersion.doc.layers).length !== 0) fail('a file of another schema version must be refused with an empty document');
-if (Model.readLayerFile(null, DATA).problem !== null) fail('an absent file is an empty layer set, not a problem');
-
-
-
-
+if (wrongVersion.problem === null || Object.keys(wrongVersion.doc.layers).length !== 0)
+	fail('a file of another schema version must be refused with an empty document');
+if (Model.readLayerFile(null, DATA).problem !== null)
+	fail('an absent file is an empty layer set, not a problem');
 
 // =========================
 // =========================
@@ -137,30 +145,34 @@ if (Model.readLayerFile(null, DATA).problem !== null) fail('an absent file is an
 // =========================
 
 const recommendedRead = Model.readLayerFile(RECOMMENDED_TEXT, DATA);
-if (recommendedRead.problem !== null) fail(`the page cannot read layers.recommended.toml: ${recommendedRead.problem}`);
+if (recommendedRead.problem !== null)
+	fail(`the page cannot read layers.recommended.toml: ${recommendedRead.problem}`);
 const rewritten = Model.serialize(recommendedRead.doc, DATA);
 for (const os of OSES) {
 	const original = resolved(RECOMMENDED_TEXT, os);
 	const written = resolved(rewritten, os);
-	if (!written.ok) fail(`the rewritten recommended layer does not load on ${os}: ${JSON.stringify(written.errors)}`);
-	if (!same(original.bindings, written.bindings)) fail(`the rewritten recommended layer resolves differently on ${os}`);
+	if (!written.ok)
+		fail(
+			`the rewritten recommended layer does not load on ${os}: ${JSON.stringify(written.errors)}`
+		);
+	if (!same(original.bindings, written.bindings))
+		fail(`the rewritten recommended layer resolves differently on ${os}`);
 }
 if (Model.parseToml(rewritten).problem !== null) fail('the writer leaves the layer-file format');
-if (!same(Model.readLayerFile(rewritten, DATA).doc, recommendedRead.doc)) fail('writing then reading the recommended layer does not give it back');
+if (!same(Model.readLayerFile(rewritten, DATA).doc, recommendedRead.doc))
+	fail('writing then reading the recommended layer does not give it back');
 
 const restored = { layers: {} };
 Model.restoreRecommended(restored, LAYER, DATA.recommended);
-if (Model.serialize(restored, DATA) !== rewritten) fail('Restore recommended does not write the recommended layer');
+if (Model.serialize(restored, DATA) !== rewritten)
+	fail('Restore recommended does not write the recommended layer');
 const cleared = copy(restored);
 Model.clearLayer(cleared, LAYER);
 for (const os of OSES) {
 	const r = resolved(Model.serialize(cleared, DATA), os);
-	if (!r.ok || Object.keys(r.bindings).length !== 0) fail(`Clear all leaves bindings on ${os}: ${JSON.stringify(r.bindings)}`);
+	if (!r.ok || Object.keys(r.bindings).length !== 0)
+		fail(`Clear all leaves bindings on ${os}: ${JSON.stringify(r.bindings)}`);
 }
-
-
-
-
 
 // ======================================
 // ======================================
@@ -171,7 +183,9 @@ for (const os of OSES) {
 const inputs = DATA.keys.filter((k) => k.geometry || k.kind !== 'key').map((k) => k.code);
 let edits = 0;
 for (const os of OSES) {
-	const values = [null, 'keystroke:primary+shift+KeyZ'].concat(Object.keys(DATA.actions).filter((id) => DATA.actions[id].platforms.includes(os)));
+	const values = [null, 'keystroke:primary+shift+KeyZ'].concat(
+		Object.keys(DATA.actions).filter((id) => DATA.actions[id].platforms.includes(os))
+	);
 	if (DATA.repeat_count.platforms.includes(os)) values.push('repeat_count:3');
 	for (const code of inputs) {
 		if (!Model.inputAvailability(code, os, DATA).ok) continue;
@@ -188,30 +202,38 @@ for (const os of OSES) {
 				if (other === os) {
 					const got = after[code] ? after[code].value : null;
 					if (got !== value) fail(`${os}: binding ${code} to ${value} leaves it ${got}`);
-					const rest = (m) => Object.fromEntries(Object.entries(m).filter(([c]) => c !== code).map(([c, e]) => [c, e.value]));
-					if (!same(rest(before[os]), rest(after))) fail(`${os}: binding ${code} changed another key on ${os}`);
+					const rest = (m) =>
+						Object.fromEntries(
+							Object.entries(m)
+								.filter(([c]) => c !== code)
+								.map(([c, e]) => [c, e.value])
+						);
+					if (!same(rest(before[os]), rest(after)))
+						fail(`${os}: binding ${code} changed another key on ${os}`);
 				} else {
 					const plain = (m) => Object.fromEntries(Object.entries(m).map(([c, e]) => [c, e.value]));
-					if (!same(plain(before[other]), plain(after))) fail(`binding ${code} to ${value} on ${os} changed ${other}`);
+					if (!same(plain(before[other]), plain(after)))
+						fail(`binding ${code} to ${value} on ${os} changed ${other}`);
 				}
 			}
 			for (const target of OSES) {
 				const r = resolved(Model.serialize(doc, DATA), target);
-				if (!r.ok) fail(`binding ${code} to ${value} on ${os} writes a file ${target} refuses: ${JSON.stringify(r.errors)}`);
+				if (!r.ok)
+					fail(
+						`binding ${code} to ${value} on ${os} writes a file ${target} refuses: ${JSON.stringify(r.errors)}`
+					);
 			}
 		}
 	}
 }
-if (edits < MIN_ISOLATION_EDITS) fail(`only ${edits} isolated edits checked (floor ${MIN_ISOLATION_EDITS})`);
+if (edits < MIN_ISOLATION_EDITS)
+	fail(`only ${edits} isolated edits checked (floor ${MIN_ISOLATION_EDITS})`);
 
 const redundant = copy(recommendedRead.doc);
 Model.setBinding(redundant, LAYER, 'windows', 'KeyT', 'keystroke:F3');
 Model.setBinding(redundant, LAYER, 'windows', 'KeyT', redundant.layers[LAYER].all.KeyT);
-if (redundant.layers[LAYER].windows && 'KeyT' in redundant.layers[LAYER].windows) fail('an OS entry equal to the `all` entry must be dropped, not kept as a copy');
-
-
-
-
+if (redundant.layers[LAYER].windows && 'KeyT' in redundant.layers[LAYER].windows)
+	fail('an OS entry equal to the `all` entry must be dropped, not kept as a copy');
 
 // ===============================
 // ===============================
@@ -220,31 +242,43 @@ if (redundant.layers[LAYER].windows && 'KeyT' in redundant.layers[LAYER].windows
 // ===============================
 
 let probes = 0;
-const probeFile = (value) => `[_meta]\nschema_version = ${DATA.schema_version}\n[layers.${LAYER}.all]\n"KeyA" = "${value}"\n`;
+const probeFile = (value) =>
+	`[_meta]\nschema_version = ${DATA.schema_version}\n[layers.${LAYER}.all]\n"KeyA" = "${value}"\n`;
 const probeValues = Object.keys(DATA.actions)
 	.concat(DATA.modifier_order.map((m) => `keystroke:${m}+KeyB`))
-	.concat(['keystroke:primary+KeyB', `repeat_count:${DATA.repeat_count.min}`, 'unknown_action_id', 'keystroke:KeyA+NotAKey']);
+	.concat([
+		'keystroke:primary+KeyB',
+		`repeat_count:${DATA.repeat_count.min}`,
+		'unknown_action_id',
+		'keystroke:KeyA+NotAKey'
+	]);
 for (const value of probeValues) {
 	for (const os of OSES) {
 		probes += 1;
 		const loader = loadLayers(probeFile(value), os, ctx);
 		const model = Model.bindingAvailability(value, os, DATA);
-		if (model.ok !== loader.ok) fail(`"${value}" on ${os}: the page says ${model.ok ? 'available' : 'unavailable'}, the loader ${loader.ok ? 'resolves it' : JSON.stringify(loader.errors)}`);
+		if (model.ok !== loader.ok)
+			fail(
+				`"${value}" on ${os}: the page says ${model.ok ? 'available' : 'unavailable'}, the loader ${loader.ok ? 'resolves it' : JSON.stringify(loader.errors)}`
+			);
 		const reason = loader.errors.length === 1 ? loader.errors[0].reason_key || null : null;
-		if (!model.ok && model.reason_key !== reason) fail(`"${value}" on ${os}: the page gives reason ${model.reason_key}, the loader ${reason}`);
+		if (!model.ok && model.reason_key !== reason)
+			fail(`"${value}" on ${os}: the page gives reason ${model.reason_key}, the loader ${reason}`);
 	}
 }
-if (probes < MIN_AVAILABILITY_PROBES) fail(`only ${probes} availability probes (floor ${MIN_AVAILABILITY_PROBES})`);
+if (probes < MIN_AVAILABILITY_PROBES)
+	fail(`only ${probes} availability probes (floor ${MIN_AVAILABILITY_PROBES})`);
 for (const os of OSES) {
 	for (const code of inputs) {
-		const loader = loadLayers(`[_meta]\nschema_version = ${DATA.schema_version}\n[layers.${LAYER}.all]\n"${code}" = "none"\n`, os, ctx);
-		if (Model.inputAvailability(code, os, DATA).ok !== loader.ok) fail(`${code} on ${os}: the page and the loader disagree whether it can be a layer key`);
+		const loader = loadLayers(
+			`[_meta]\nschema_version = ${DATA.schema_version}\n[layers.${LAYER}.all]\n"${code}" = "none"\n`,
+			os,
+			ctx
+		);
+		if (Model.inputAvailability(code, os, DATA).ok !== loader.ok)
+			fail(`${code} on ${os}: the page and the loader disagree whether it can be a layer key`);
 	}
 }
-
-
-
-
 
 // =============================
 // =============================
@@ -269,18 +303,23 @@ function editingSession() {
 
 const sessionText = editingSession();
 if (!fs.existsSync(FIXTURE_TOML) || !fs.existsSync(FIXTURE_EXPECTED)) {
-	fail(`${path.relative(ROOT, FIXTURE_DIR)} lacks edited_layers.toml or expected.json — the drivers' bridge tests have nothing to save`);
+	fail(
+		`${path.relative(ROOT, FIXTURE_DIR)} lacks edited_layers.toml or expected.json — the drivers' bridge tests have nothing to save`
+	);
 } else {
-	if (fs.readFileSync(FIXTURE_TOML, 'utf8') !== sessionText) fail('edited_layers.toml is not what the scripted editing session writes');
+	if (fs.readFileSync(FIXTURE_TOML, 'utf8') !== sessionText)
+		fail('edited_layers.toml is not what the scripted editing session writes');
 	const expected = JSON.parse(fs.readFileSync(FIXTURE_EXPECTED, 'utf8'));
 	for (const os of OSES) {
 		const r = resolved(sessionText, os);
 		if (!r.ok) fail(`edited_layers.toml does not load on ${os}: ${JSON.stringify(r.errors)}`);
 		for (const [code, text] of Object.entries(expected[os] || {})) {
 			const got = r.bindings[`${LAYER}.${code}`];
-			if ((got === undefined ? null : got) !== text) fail(`edited_layers.toml on ${os}: ${code} resolves to ${got}, expected.json says ${text}`);
+			if ((got === undefined ? null : got) !== text)
+				fail(`edited_layers.toml on ${os}: ${code} resolves to ${got}, expected.json says ${text}`);
 		}
-		if (Object.keys(expected[os] || {}).length < 2) fail(`expected.json pins fewer than two keys on ${os}`);
+		if (Object.keys(expected[os] || {}).length < 2)
+			fail(`expected.json pins fewer than two keys on ${os}`);
 	}
 }
 

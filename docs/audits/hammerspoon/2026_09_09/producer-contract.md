@@ -314,11 +314,12 @@ an explicit monitor-interruption notification.
 The next observation preserves that successful stream, opens idle lease 3 in
 the same producer before releasing the fixture, then requires exactly its opened
 frame followed by `lost/interrupted`, the coverage-loss diagnostic and CLI exit
+
 1. The fixture's bounded hold allows the additional observer startup. Portable
-tests reject missing, truncated, duplicate, wrong-session and wrong-reason loss
-receipts, including a Boolean substituted for the numeric protocol version.
-This intentional native interruption remains unverified; it reuses the same
-producer archive and does not require recompilation of Karabiner.
+   tests reject missing, truncated, duplicate, wrong-session and wrong-reason loss
+   receipts, including a Boolean substituted for the numeric protocol version.
+   This intentional native interruption remains unverified; it reuses the same
+   producer archive and does not require recompilation of Karabiner.
 
 That [interruption observation](https://github.com/adrienm7/ergopti/actions/runs/34454746577)
 failed before lease 3 opened: its stdout was empty and stderr reported

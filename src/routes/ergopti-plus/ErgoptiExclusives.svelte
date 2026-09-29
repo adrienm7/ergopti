@@ -96,7 +96,8 @@ FEATURES & RATIONALE:
 				fonctionnalités ci-dessous, elles, exploitent les positions exactes des touches d’<a
 					href="./"
 					class="ergo-link">Ergopti</a
-				> : adoptez la disposition et <ErgoptiPlus></ErgoptiPlus> les active automatiquement.
+				>
+				: adoptez la disposition et <ErgoptiPlus></ErgoptiPlus> les active automatiquement.
 			</p>
 		</header>
 

@@ -68,7 +68,11 @@ competes with the final call-to-action. OS-aware, like the hero button.
 <style>
 	.sticky-cta {
 		align-items: center;
-		background: linear-gradient(135deg, var(--accent-blue-deep, #1f6feb), var(--accent-cyan, #02c9db));
+		background: linear-gradient(
+			135deg,
+			var(--accent-blue-deep, #1f6feb),
+			var(--accent-cyan, #02c9db)
+		);
 		border-radius: 999px;
 		bottom: 22px;
 		box-shadow: 0 12px 34px -10px rgba(2, 201, 219, 0.7);

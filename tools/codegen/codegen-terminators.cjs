@@ -32,10 +32,7 @@ const ROOT = path.resolve(__dirname, '../..');
 // Load the spec by reading and eval-ing it as CommonJS, since the file uses
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
-const specSource = fs.readFileSync(
-	shared('core/domain/Terminators.spec.js'),
-	'utf8'
-);
+const specSource = fs.readFileSync(shared('core/domain/Terminators.spec.js'), 'utf8');
 const specModule = { exports: {} };
 // eslint-disable-next-line no-new-func
 new Function('require', 'module', 'exports', '__dirname', '__filename', specSource)(
@@ -91,10 +88,10 @@ function luaEscape(s) {
 function writeFile(filePath, content) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	if (filePath.endsWith('.ahk')) {
-             // Enforce LF and prepend UTF-8 BOM (EF BB BF)
-             const lf = content.replace(/\r\n?/g, '\n');
-             const bom = Buffer.from([0xef, 0xbb, 0xbf]);
-             const body = Buffer.from(lf, 'utf8');
+		// Enforce LF and prepend UTF-8 BOM (EF BB BF)
+		const lf = content.replace(/\r\n?/g, '\n');
+		const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+		const body = Buffer.from(lf, 'utf8');
 		fs.writeFileSync(filePath, Buffer.concat([bom, body]));
 	} else {
 		fs.writeFileSync(filePath, content, 'utf8');

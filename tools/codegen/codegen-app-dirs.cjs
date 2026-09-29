@@ -43,14 +43,16 @@ function fail(message) {
 /** Returns a required non-empty string field. */
 function requireString(table, key, where) {
 	const value = table ? table[key] : undefined;
-	if (typeof value !== 'string' || value === '') fail(`${where}.${key} must be a non-empty string.`);
+	if (typeof value !== 'string' || value === '')
+		fail(`${where}.${key} must be a non-empty string.`);
 	return value;
 }
 
 /** Returns a required non-empty array of non-empty strings. */
 function requireSegments(table, key, where) {
 	const value = table ? table[key] : undefined;
-	if (!Array.isArray(value) || value.length === 0) fail(`${where}.${key} must be a non-empty array.`);
+	if (!Array.isArray(value) || value.length === 0)
+		fail(`${where}.${key} must be a non-empty array.`);
 	for (const segment of value) {
 		if (typeof segment !== 'string' || segment === '' || /[\\/]/.test(segment)) {
 			fail(`${where}.${key} holds an invalid segment ${JSON.stringify(segment)}.`);
@@ -105,7 +107,9 @@ const linux = {
 	relative: relative('linux', '/')
 };
 if (!macos.relative.endsWith(folderName)) {
-	fail('logs.macos.segments must end with the application folder: the launcher restricts only that folder.');
+	fail(
+		'logs.macos.segments must end with the application folder: the launcher restricts only that folder.'
+	);
 }
 
 /** A Lua double-quoted string literal. */
@@ -189,21 +193,49 @@ function emitAhk() {
 		'\n' +
 		fn('AppDirsFolderName', data.folderName, 'Folder named after the application, on every OS.') +
 		'\n' +
-		fn('AppDirsLogsOverrideKey', data.overrideKey, 'paths.toml key of the optional logs-folder override.') +
+		fn(
+			'AppDirsLogsOverrideKey',
+			data.overrideKey,
+			'paths.toml key of the optional logs-folder override.'
+		) +
 		'\n' +
-		fn('AppDirsCrashReportsDir', data.crashReportsDir, 'Subfolder of the logs folder receiving crash reports.') +
+		fn(
+			'AppDirsCrashReportsDir',
+			data.crashReportsDir,
+			'Subfolder of the logs folder receiving crash reports.'
+		) +
 		'\n' +
-		fn('AppDirsLogUnifiedPrefix', data.unifiedPrefix, 'Daily unified log: <prefix>yyyy-MM-dd<extension>.') +
+		fn(
+			'AppDirsLogUnifiedPrefix',
+			data.unifiedPrefix,
+			'Daily unified log: <prefix>yyyy-MM-dd<extension>.'
+		) +
 		'\n' +
-		fn('AppDirsLogErrorsPrefix', data.errorsPrefix, 'Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.') +
+		fn(
+			'AppDirsLogErrorsPrefix',
+			data.errorsPrefix,
+			'Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.'
+		) +
 		'\n' +
-		fn('AppDirsLogTopicalPrefix', data.topicalPrefix, 'Topical sub-files: <prefix><name><extension>.') +
+		fn(
+			'AppDirsLogTopicalPrefix',
+			data.topicalPrefix,
+			'Topical sub-files: <prefix><name><extension>.'
+		) +
 		'\n' +
 		fn('AppDirsLogExtension', data.extension, 'Extension of every log file.') +
 		'\n' +
-		fn('AppDirsWindowsLogsBaseEnv', windows.base, 'Environment variable holding the default logs root.') +
+		fn(
+			'AppDirsWindowsLogsBaseEnv',
+			windows.base,
+			'Environment variable holding the default logs root.'
+		) +
 		'\n' +
-		fn('AppDirsWindowsLogsRelative', windows.relative, 'Default logs folder, relative to that root.')
+		fn(
+			'AppDirsWindowsLogsRelative',
+			windows.relative,
+			'Default logs folder, relative to that root.'
+		)
 	);
 }
 
@@ -225,21 +257,49 @@ function emitSwift() {
 		'// keeps the native side from becoming a second source for any of them.\n' +
 		'// ==============================================================================\n' +
 		'\n' +
-		constant('kAppFolderName', data.folderName, 'Folder named after the application, on every OS.') +
+		constant(
+			'kAppFolderName',
+			data.folderName,
+			'Folder named after the application, on every OS.'
+		) +
 		'\n' +
-		constant('kLogUnifiedPrefix', data.unifiedPrefix, 'Daily unified log: <prefix>yyyy-MM-dd<extension>.') +
+		constant(
+			'kLogUnifiedPrefix',
+			data.unifiedPrefix,
+			'Daily unified log: <prefix>yyyy-MM-dd<extension>.'
+		) +
 		'\n' +
-		constant('kLogErrorsPrefix', data.errorsPrefix, 'Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.') +
+		constant(
+			'kLogErrorsPrefix',
+			data.errorsPrefix,
+			'Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.'
+		) +
 		'\n' +
-		constant('kLogTopicalPrefix', data.topicalPrefix, 'Topical sub-files: <prefix><name><extension>.') +
+		constant(
+			'kLogTopicalPrefix',
+			data.topicalPrefix,
+			'Topical sub-files: <prefix><name><extension>.'
+		) +
 		'\n' +
 		constant('kLogFileExtension', data.extension, 'Extension of every log file.') +
 		'\n' +
-		constant('kMacOSLogsHomeRelativePath', macos.relative, 'Default logs folder, relative to the home folder.') +
+		constant(
+			'kMacOSLogsHomeRelativePath',
+			macos.relative,
+			'Default logs folder, relative to the home folder.'
+		) +
 		'\n' +
-		constant('kLauncherLogFileName', macos.launcherLog, 'Launcher diagnostic log, always in the default logs folder.') +
+		constant(
+			'kLauncherLogFileName',
+			macos.launcherLog,
+			'Launcher diagnostic log, always in the default logs folder.'
+		) +
 		'\n' +
-		constant('kFatalReportFileName', macos.fatalReport, 'Per-launch fatal report, beside launcher.log.')
+		constant(
+			'kFatalReportFileName',
+			macos.fatalReport,
+			'Per-launch fatal report, beside launcher.log.'
+		)
 	);
 }
 

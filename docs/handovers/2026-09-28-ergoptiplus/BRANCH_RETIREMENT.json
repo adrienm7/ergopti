@@ -1,47 +1,44 @@
 {
-  "finished": "2026-09-28T21:23:43.479Z",
-  "dev": "eaa06eeba32fd15ca3e2e72814fac2fc379975aa",
-  "recoveryPackage": "docs/handovers/2026-09-28-ergoptiplus",
-  "retired": [
-    {
-      "branch": "feat/ovh2-console",
-      "originalHead": "a96a9e84e18fb3d81637435365686bd9878b3568"
-    },
-    {
-      "branch": "feat/ovh2-diag-integration",
-      "originalHead": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73"
-    },
-    {
-      "branch": "feat/ovh2-linux-harness",
-      "originalHead": "4929aa3b9b97790038d4ef9581da43ceeec3e2f9"
-    },
-    {
-      "branch": "feat/ovh2-neutral-config",
-      "originalHead": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27"
-    },
-    {
-      "branch": "feat/ovh2-shortcut-refusals",
-      "originalHead": "1835a2ba8f69d6dd5ba8450304acb07b4902427e"
-    },
-    {
-      "branch": "feat/ovh2-state-refusals",
-      "originalHead": "6c68ec1c8b7f4e7797b07b0766d2aa743ab71c1d"
-    },
-    {
-      "branch": "feat/ovh2-windows-master-state",
-      "originalHead": "335e06aa1f2b868e225da798269b03edcdf7dcae"
-    },
-    {
-      "branch": "worktree-wf_f8423464-54e-1",
-      "originalHead": "c4f59734352ab442daad6309f5ec57854f4511a3"
-    },
-    {
-      "branch": "worktree-wf_f8423464-54e-2",
-      "originalHead": "c4f59734352ab442daad6309f5ec57854f4511a3"
-    }
-  ],
-  "remainingBranches": [
-    "dev",
-    "main"
-  ]
+	"finished": "2026-09-28T21:23:43.479Z",
+	"dev": "eaa06eeba32fd15ca3e2e72814fac2fc379975aa",
+	"recoveryPackage": "docs/handovers/2026-09-28-ergoptiplus",
+	"retired": [
+		{
+			"branch": "feat/ovh2-console",
+			"originalHead": "a96a9e84e18fb3d81637435365686bd9878b3568"
+		},
+		{
+			"branch": "feat/ovh2-diag-integration",
+			"originalHead": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73"
+		},
+		{
+			"branch": "feat/ovh2-linux-harness",
+			"originalHead": "4929aa3b9b97790038d4ef9581da43ceeec3e2f9"
+		},
+		{
+			"branch": "feat/ovh2-neutral-config",
+			"originalHead": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27"
+		},
+		{
+			"branch": "feat/ovh2-shortcut-refusals",
+			"originalHead": "1835a2ba8f69d6dd5ba8450304acb07b4902427e"
+		},
+		{
+			"branch": "feat/ovh2-state-refusals",
+			"originalHead": "6c68ec1c8b7f4e7797b07b0766d2aa743ab71c1d"
+		},
+		{
+			"branch": "feat/ovh2-windows-master-state",
+			"originalHead": "335e06aa1f2b868e225da798269b03edcdf7dcae"
+		},
+		{
+			"branch": "worktree-wf_f8423464-54e-1",
+			"originalHead": "c4f59734352ab442daad6309f5ec57854f4511a3"
+		},
+		{
+			"branch": "worktree-wf_f8423464-54e-2",
+			"originalHead": "c4f59734352ab442daad6309f5ec57854f4511a3"
+		}
+	],
+	"remainingBranches": ["dev", "main"]
 }

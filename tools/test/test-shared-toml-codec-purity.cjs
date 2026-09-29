@@ -36,7 +36,10 @@ const HARD_REQUIRE = /require\(\s*["'](lib\.[\w.]+|hs(?:\.[\w.]+)?)["']\s*\)/g;
 
 let failures = 0;
 const pass = (m) => console.log(`  ✓ ${m}`);
-const fail = (m) => { console.log(`  ✗ ${m}`); failures++; };
+const fail = (m) => {
+	console.log(`  ✗ ${m}`);
+	failures++;
+};
 
 console.log('\n=== Shared TOML codec purity (audit SS-2) ===');
 
@@ -55,7 +58,9 @@ for (const f of FILES) {
 	const code = src.replace(/--[^\n]*/g, '');
 	const hits = code.match(HARD_REQUIRE);
 	if (hits) {
-		fail(`${f}: hard require of a driver-only module would break non-macOS loads: ${[...new Set(hits)].join(', ')}`);
+		fail(
+			`${f}: hard require of a driver-only module would break non-macOS loads: ${[...new Set(hits)].join(', ')}`
+		);
 	} else {
 		pass(`${f}: no hard require of a driver-only module`);
 	}

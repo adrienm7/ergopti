@@ -43,7 +43,9 @@ const rows = [];
 for (const [id, entry] of Object.entries(sg)) {
 	if (!entry || typeof entry !== 'object' || typeof entry.emit_linux !== 'string') continue;
 	if (entry.emit_linux === '') {
-		console.error(`[ERROR] ${id}: emit_linux is empty — that would run "xdotool key " with no key.`);
+		console.error(
+			`[ERROR] ${id}: emit_linux is empty — that would run "xdotool key " with no key.`
+		);
 		process.exit(1);
 	}
 	// A quote or shell metacharacter would be interpolated into a command line.
@@ -58,7 +60,9 @@ for (const [id, entry] of Object.entries(sg)) {
 }
 
 if (rows.length === 0) {
-	console.error('[ERROR] the catalogue declares no emit_linux rows — refusing to generate an empty table.');
+	console.error(
+		'[ERROR] the catalogue declares no emit_linux rows — refusing to generate an empty table.'
+	);
 	process.exit(1);
 }
 rows.sort((a, b) => a.id.localeCompare(b.id));
@@ -68,7 +72,9 @@ const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '
 const lines = [];
 lines.push('--- _generated/gesture_emit_actions.lua');
 lines.push('--- AUTO-GENERATED from _shared/modules/actions/actions.toml.');
-lines.push('--- DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions:linux` to refresh.');
+lines.push(
+	'--- DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions:linux` to refresh.'
+);
 lines.push('');
 lines.push('--- ==============================================================================');
 lines.push('--- MODULE: Gesture Emit Actions (Linux)');
@@ -77,8 +83,8 @@ lines.push('--- Every action Linux performs as a single xdotool key combo, as');
 lines.push('--- action id -> combo. modules/gestures/manager.lua looks the action up here');
 lines.push('--- instead of carrying one elseif branch per action.');
 lines.push('---');
-lines.push('--- The combos are X11 keysym syntax and are Linux\'s own: `Return`, not AHK\'s');
-lines.push('--- `Enter` or Hammerspoon\'s `return`. Linux and Windows agree far more often');
+lines.push("--- The combos are X11 keysym syntax and are Linux's own: `Return`, not AHK's");
+lines.push("--- `Enter` or Hammerspoon's `return`. Linux and Windows agree far more often");
 lines.push('--- than either agrees with macOS — alt+F4 and ctrl+Right on both, against');
 lines.push('--- cmd+w and alt+right — so the divergence is macOS-versus-the-rest.');
 lines.push('--- ==============================================================================');

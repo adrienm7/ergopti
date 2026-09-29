@@ -41,7 +41,7 @@ def read_capture(output, device):
     lines = [line for line in output.splitlines(keepends=True) if line.startswith(MARKER)]
     if len(lines) != 1 or not lines[0].endswith("\n"):
         raise ValueError("Expected one complete native capture receipt")
-    capture = json.loads(lines[0][len(MARKER):], object_pairs_hook=unique_object)
+    capture = json.loads(lines[0][len(MARKER) :], object_pairs_hook=unique_object)
     if not isinstance(capture, dict) or capture.get("coverage") != "fixture_only":
         raise ValueError("Unexpected physical capture coverage")
     records = capture.get("records")

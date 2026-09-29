@@ -44,7 +44,14 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const P = (...parts) => path.join(ROOT, ...parts);
 
 const MANIFEST = P('static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml');
-const AHK_FILTERS = P('static', 'ergopti_plus', 'windows', 'infra', 'metrics', 'metrics_filters.ahk');
+const AHK_FILTERS = P(
+	'static',
+	'ergopti_plus',
+	'windows',
+	'infra',
+	'metrics',
+	'metrics_filters.ahk'
+);
 const AHK_LOADER = P('static', 'ergopti_plus', 'windows', 'infra', 'config_shortcuts.ahk');
 const AHK_WRITER = P('static', 'ergopti_plus', 'windows', 'infra', 'config_io.ahk');
 const HS_KEYLOGGER = P('static', 'ergopti_plus', 'macos', 'modules', 'keylogger', 'init.lua');
@@ -201,7 +208,11 @@ for (const retired of RETIRED_IDS) {
 // macOS names the encryption toggle differently in its own state, so only the
 // three filters are asserted here — they are the ones that decide whether a
 // keystroke is recorded at all.
-for (const id of ['private_filter_enabled', 'secure_filter_enabled', 'system_auth_filter_enabled']) {
+for (const id of [
+	'private_filter_enabled',
+	'secure_filter_enabled',
+	'system_auth_filter_enabled'
+]) {
 	if (hsKeylogger && !hsKeylogger.includes(`Manifest.default_for("metrics.${id}")`)) {
 		errors.push(
 			`macos/modules/keylogger/init.lua does not resolve metrics.${id} from the manifest — ` +

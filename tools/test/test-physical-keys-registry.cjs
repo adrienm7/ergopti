@@ -71,15 +71,13 @@ function usLegend(code) {
 
 function report() {
 	if (errors.length > 0) {
-		console.error('\x1b[31m[FAIL] the physical-key registry is incomplete or disagrees with a hand copy:\x1b[0m');
+		console.error(
+			'\x1b[31m[FAIL] the physical-key registry is incomplete or disagrees with a hand copy:\x1b[0m'
+		);
 		for (const e of errors) console.error('    - ' + e);
 		process.exit(1);
 	}
 }
-
-
-
-
 
 // =====================================
 // =====================================
@@ -88,7 +86,9 @@ function report() {
 // =====================================
 
 if (!fs.existsSync(REGISTRY)) {
-	fail(`${path.relative(ROOT, REGISTRY)} is missing — there is no canonical physical-key registry.`);
+	fail(
+		`${path.relative(ROOT, REGISTRY)} is missing — there is no canonical physical-key registry.`
+	);
 	report();
 }
 
@@ -96,8 +96,10 @@ const registry = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
 const keys = registry.keys || {};
 const codes = Object.keys(keys);
 
-if (registry.schema_version !== 1) fail(`schema_version must be 1, found ${JSON.stringify(registry.schema_version)}`);
-if (JSON.stringify(registry.forms) !== JSON.stringify(['ansi', 'iso'])) fail('forms must be ["ansi", "iso"]');
+if (registry.schema_version !== 1)
+	fail(`schema_version must be 1, found ${JSON.stringify(registry.schema_version)}`);
+if (JSON.stringify(registry.forms) !== JSON.stringify(['ansi', 'iso']))
+	fail('forms must be ["ansi", "iso"]');
 
 const byKind = { key: [], mouse_button: [], wheel: [] };
 for (const code of codes) {
@@ -111,7 +113,8 @@ for (const code of codes) {
 // Floors: a main block, a navigation cluster and a keypad are ~100 keys; five
 // mouse buttons and four wheel directions are the pseudo-keys the editor offers.
 if (byKind.key.length < 100) fail(`only ${byKind.key.length} keyboard keys (floor 100)`);
-if (byKind.mouse_button.length !== 5) fail(`expected 5 mouse buttons, found ${byKind.mouse_button.length}`);
+if (byKind.mouse_button.length !== 5)
+	fail(`expected 5 mouse buttons, found ${byKind.mouse_button.length}`);
 if (byKind.wheel.length !== 4) fail(`expected 4 wheel directions, found ${byKind.wheel.length}`);
 
 const GROUPS = {
@@ -123,38 +126,62 @@ const KEYBOARD_GROUPS = new Set(['function', 'alphanumeric', 'navigation', 'nump
 
 const isInt = (v) => Number.isInteger(v);
 const karabinerEvent = (v, allowed) =>
-	v && typeof v === 'object' && Object.keys(v).length === 1 && allowed.includes(Object.keys(v)[0]) &&
-	typeof Object.values(v)[0] === 'string' && Object.values(v)[0] !== '';
+	v &&
+	typeof v === 'object' &&
+	Object.keys(v).length === 1 &&
+	allowed.includes(Object.keys(v)[0]) &&
+	typeof Object.values(v)[0] === 'string' &&
+	Object.values(v)[0] !== '';
 
 for (const code of codes) {
 	const k = keys[code];
-	if (!/^[A-Z][A-Za-z0-9]*$/.test(code)) fail(`${code}: not a KeyboardEvent.code-shaped identifier`);
-	if (!GROUPS[k.kind] || !GROUPS[k.kind].includes(k.group)) fail(`${code}: group ${JSON.stringify(k.group)} is not valid for kind ${k.kind}`);
-	if (typeof k.kanata !== 'string' || k.kanata === '' || /[\s()@]/.test(k.kanata)) fail(`${code}: kanata name ${JSON.stringify(k.kanata)} is not a bare kanata key name`);
+	if (!/^[A-Z][A-Za-z0-9]*$/.test(code))
+		fail(`${code}: not a KeyboardEvent.code-shaped identifier`);
+	if (!GROUPS[k.kind] || !GROUPS[k.kind].includes(k.group))
+		fail(`${code}: group ${JSON.stringify(k.group)} is not valid for kind ${k.kind}`);
+	if (typeof k.kanata !== 'string' || k.kanata === '' || /[\s()@]/.test(k.kanata))
+		fail(`${code}: kanata name ${JSON.stringify(k.kanata)} is not a bare kanata key name`);
 	if (k.kind === 'key') {
-		if (!/^SC[0-9A-F]{3}$/.test(k.ahk)) fail(`${code}: ahk must be an SCnnn scan code, found ${JSON.stringify(k.ahk)}`);
-		if (!(k.ahk_send === null || (typeof k.ahk_send === 'string' && /^[A-Za-z_0-9]+$/.test(k.ahk_send))))
+		if (!/^SC[0-9A-F]{3}$/.test(k.ahk))
+			fail(`${code}: ahk must be an SCnnn scan code, found ${JSON.stringify(k.ahk)}`);
+		if (
+			!(
+				k.ahk_send === null ||
+				(typeof k.ahk_send === 'string' && /^[A-Za-z_0-9]+$/.test(k.ahk_send))
+			)
+		)
 			fail(`${code}: ahk_send must be null or an AutoHotkey key name`);
-		if (!isInt(k.evdev) || k.evdev < 1 || k.evdev > 255) fail(`${code}: evdev must be a KEY_* code, found ${k.evdev}`);
-		if (!isInt(k.hs) || k.hs < 0 || k.hs > 127) fail(`${code}: hs must be a kVK_* keycode, found ${k.hs}`);
-		if (!karabinerEvent(k.karabiner, ['key_code', 'consumer_key_code'])) fail(`${code}: karabiner must be one {key_code} or {consumer_key_code} event`);
+		if (!isInt(k.evdev) || k.evdev < 1 || k.evdev > 255)
+			fail(`${code}: evdev must be a KEY_* code, found ${k.evdev}`);
+		if (!isInt(k.hs) || k.hs < 0 || k.hs > 127)
+			fail(`${code}: hs must be a kVK_* keycode, found ${k.hs}`);
+		if (!karabinerEvent(k.karabiner, ['key_code', 'consumer_key_code']))
+			fail(`${code}: karabiner must be one {key_code} or {consumer_key_code} event`);
 		// A character key sent by name would press whatever the active layout puts
 		// under that character — the whole point of a physical registry.
 		if (usLegend(code) !== undefined && code !== 'Space' && k.ahk_send !== null)
 			fail(`${code}: a character key must not carry an ahk_send name (Send it by scan code)`);
 	} else if (k.kind === 'mouse_button') {
-		if (!/^(L|R|M|X)Button[12]?$/.test(k.ahk)) fail(`${code}: ahk must be an AutoHotkey mouse button name`);
-		if (!isInt(k.evdev) || k.evdev < 272 || k.evdev > 276) fail(`${code}: evdev must be a BTN_* code`);
+		if (!/^(L|R|M|X)Button[12]?$/.test(k.ahk))
+			fail(`${code}: ahk must be an AutoHotkey mouse button name`);
+		if (!isInt(k.evdev) || k.evdev < 272 || k.evdev > 276)
+			fail(`${code}: evdev must be a BTN_* code`);
 		if (!isInt(k.hs) || k.hs < 0 || k.hs > 4) fail(`${code}: hs must be an NSEvent button number`);
-		if (!karabinerEvent(k.karabiner, ['pointing_button'])) fail(`${code}: karabiner must be one {pointing_button} event`);
+		if (!karabinerEvent(k.karabiner, ['pointing_button']))
+			fail(`${code}: karabiner must be one {pointing_button} event`);
 	} else if (k.kind === 'wheel') {
-		if (!/^Wheel(Up|Down|Left|Right)$/.test(k.ahk)) fail(`${code}: ahk must be an AutoHotkey wheel name`);
-		if (k.evdev !== null || k.hs !== null || k.karabiner !== null) fail(`${code}: a wheel direction has no evdev, hs or karabiner key code`);
-		if (!['vertical', 'horizontal'].includes(k.axis) || ![1, -1].includes(k.direction)) fail(`${code}: axis/direction malformed`);
+		if (!/^Wheel(Up|Down|Left|Right)$/.test(k.ahk))
+			fail(`${code}: ahk must be an AutoHotkey wheel name`);
+		if (k.evdev !== null || k.hs !== null || k.karabiner !== null)
+			fail(`${code}: a wheel direction has no evdev, hs or karabiner key code`);
+		if (!['vertical', 'horizontal'].includes(k.axis) || ![1, -1].includes(k.direction))
+			fail(`${code}: axis/direction malformed`);
 	}
 	const hasGeometry = k.geometry !== undefined;
 	if (KEYBOARD_GROUPS.has(k.group) !== hasGeometry)
-		fail(`${code}: ${hasGeometry ? 'has' : 'lacks'} geometry, but group ${k.group} ${hasGeometry ? 'draws none' : 'is drawn on the board'}`);
+		fail(
+			`${code}: ${hasGeometry ? 'has' : 'lacks'} geometry, but group ${k.group} ${hasGeometry ? 'draws none' : 'is drawn on the board'}`
+		);
 	if (hasGeometry) {
 		for (const [form, g] of Object.entries(k.geometry)) {
 			if (!registry.forms.includes(form)) fail(`${code}: geometry for unknown form ${form}`);
@@ -164,13 +191,11 @@ for (const code of codes) {
 		// Only IntlBackslash is absent from an ANSI board.
 		const expected = code === 'IntlBackslash' ? ['iso'] : ['ansi', 'iso'];
 		if (JSON.stringify(Object.keys(k.geometry).sort()) !== JSON.stringify(expected))
-			fail(`${code}: geometry forms ${JSON.stringify(Object.keys(k.geometry))}, expected ${JSON.stringify(expected)}`);
+			fail(
+				`${code}: geometry forms ${JSON.stringify(Object.keys(k.geometry))}, expected ${JSON.stringify(expected)}`
+			);
 	}
 }
-
-
-
-
 
 // =====================================
 // =====================================
@@ -182,19 +207,26 @@ for (const code of codes) {
 // The override must be exactly that swap, on exactly those two keys.
 const isoOverrides = codes.filter((c) => keys[c].macos_iso !== undefined).sort();
 if (JSON.stringify(isoOverrides) !== JSON.stringify(['Backquote', 'IntlBackslash'])) {
-	fail(`macos_iso overrides must exist on Backquote and IntlBackslash only, found ${JSON.stringify(isoOverrides)}`);
+	fail(
+		`macos_iso overrides must exist on Backquote and IntlBackslash only, found ${JSON.stringify(isoOverrides)}`
+	);
 } else {
 	const bq = keys.Backquote;
 	const ib = keys.IntlBackslash;
-	if (bq.macos_iso.hs !== ib.hs || ib.macos_iso.hs !== bq.hs) fail('macos_iso.hs is not a swap of Backquote and IntlBackslash');
-	if (JSON.stringify(bq.macos_iso.karabiner) !== JSON.stringify(ib.karabiner) || JSON.stringify(ib.macos_iso.karabiner) !== JSON.stringify(bq.karabiner))
+	if (bq.macos_iso.hs !== ib.hs || ib.macos_iso.hs !== bq.hs)
+		fail('macos_iso.hs is not a swap of Backquote and IntlBackslash');
+	if (
+		JSON.stringify(bq.macos_iso.karabiner) !== JSON.stringify(ib.karabiner) ||
+		JSON.stringify(ib.macos_iso.karabiner) !== JSON.stringify(bq.karabiner)
+	)
 		fail('macos_iso.karabiner is not a swap of Backquote and IntlBackslash');
 }
 
 /** The value a driver column resolves to on one form factor. */
 function resolved(code, driver, form) {
 	const k = keys[code];
-	if (form === 'iso' && k.macos_iso && k.macos_iso[driver] !== undefined) return k.macos_iso[driver];
+	if (form === 'iso' && k.macos_iso && k.macos_iso[driver] !== undefined)
+		return k.macos_iso[driver];
 	return k[driver];
 }
 /** True when the key exists on that form (keys without geometry exist on every form). */
@@ -213,15 +245,12 @@ for (const form of registry.forms) {
 			// Mouse-button numbers share a small integer range with keycodes; they are
 			// a different event type, so uniqueness is per kind.
 			const id = keys[code].kind + ':' + JSON.stringify(value);
-			if (seen.has(id)) fail(`${form}/${driver}: ${code} and ${seen.get(id)} share ${JSON.stringify(value)}`);
+			if (seen.has(id))
+				fail(`${form}/${driver}: ${code} and ${seen.get(id)} share ${JSON.stringify(value)}`);
 			else seen.set(id, code);
 		}
 	}
 }
-
-
-
-
 
 // =====================================
 // =====================================
@@ -247,24 +276,23 @@ for (const form of registry.forms) {
 	for (const [row, spans] of rows) {
 		spans.sort((a, b) => a[0] - b[0]);
 		for (let i = 1; i < spans.length; i++) {
-			if (spans[i][0] < spans[i - 1][1] - 1e-9) fail(`${form} row ${row}: ${spans[i - 1][2]} overlaps ${spans[i][2]}`);
+			if (spans[i][0] < spans[i - 1][1] - 1e-9)
+				fail(`${form} row ${row}: ${spans[i - 1][2]} overlaps ${spans[i][2]}`);
 		}
 		// The main block is 15 units wide on both boards and has no gap in it.
 		if (row >= 1 && row <= 5) {
 			const main = spans.filter((s) => s[3] === 'alphanumeric');
 			let edge = 0;
 			for (const s of main) {
-				if (Math.abs(s[0] - edge) > 1e-9) fail(`${form} row ${row}: gap or overlap before ${s[2]} (at ${s[0]}, expected ${edge})`);
+				if (Math.abs(s[0] - edge) > 1e-9)
+					fail(`${form} row ${row}: gap or overlap before ${s[2]} (at ${s[0]}, expected ${edge})`);
 				edge = s[1];
 			}
-			if (Math.abs(edge - 15) > 1e-9) fail(`${form} row ${row}: the main block ends at ${edge}, expected 15`);
+			if (Math.abs(edge - 15) > 1e-9)
+				fail(`${form} row ${row}: the main block ends at ${edge}, expected 15`);
 		}
 	}
 }
-
-
-
-
 
 // =====================================
 // =====================================
@@ -281,7 +309,8 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	let n = 0;
 	for (const [num, ch] of Object.entries(evdev.layouts.qwerty.unshifted)) {
 		const hit = find((k) => k.kind === 'key' && k.evdev === Number(num));
-		if (hit.length !== 1 || usLegend(hit[0]) !== ch) fail(`evdev.json: code ${num} is "${ch}" but the registry says ${JSON.stringify(hit)}`);
+		if (hit.length !== 1 || usLegend(hit[0]) !== ch)
+			fail(`evdev.json: code ${num} is "${ch}" but the registry says ${JSON.stringify(hit)}`);
 		n++;
 	}
 	if (n < 45) fail(`evdev.json: only ${n} codes compared (floor 45)`);
@@ -291,24 +320,50 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 {
 	const src = read('linux/infra/evdev_codes.lua');
 	const NAMED = {
-		LEFTSHIFT: 'ShiftLeft', RIGHTSHIFT: 'ShiftRight', LEFTCTRL: 'ControlLeft', RIGHTCTRL: 'ControlRight',
-		LEFTALT: 'AltLeft', RIGHTALT: 'AltRight', LEFTMETA: 'MetaLeft', RIGHTMETA: 'MetaRight',
-		CAPSLOCK: 'CapsLock', BACKSPACE: 'Backspace', TAB: 'Tab', ENTER: 'Enter', ESC: 'Escape',
-		UP: 'ArrowUp', DOWN: 'ArrowDown'
+		LEFTSHIFT: 'ShiftLeft',
+		RIGHTSHIFT: 'ShiftRight',
+		LEFTCTRL: 'ControlLeft',
+		RIGHTCTRL: 'ControlRight',
+		LEFTALT: 'AltLeft',
+		RIGHTALT: 'AltRight',
+		LEFTMETA: 'MetaLeft',
+		RIGHTMETA: 'MetaRight',
+		CAPSLOCK: 'CapsLock',
+		BACKSPACE: 'Backspace',
+		TAB: 'Tab',
+		ENTER: 'Enter',
+		ESC: 'Escape',
+		UP: 'ArrowUp',
+		DOWN: 'ArrowDown'
 	};
 	const consts = {};
 	for (const m of src.matchAll(/^M\.KEY_([A-Z]+)\s*=\s*(\d+)/gm)) consts[m[1]] = Number(m[2]);
 	let n = 0;
 	for (const [name, num] of Object.entries(consts)) {
 		const code = NAMED[name];
-		if (!code) fail(`evdev_codes.lua: KEY_${name} has no expected registry key — extend this test's table`);
-		else if (keys[code].evdev !== num) fail(`evdev_codes.lua: KEY_${name} = ${num} but registry ${code}.evdev = ${keys[code].evdev}`);
+		if (!code)
+			fail(`evdev_codes.lua: KEY_${name} has no expected registry key — extend this test's table`);
+		else if (keys[code].evdev !== num)
+			fail(
+				`evdev_codes.lua: KEY_${name} = ${num} but registry ${code}.evdev = ${keys[code].evdev}`
+			);
 		n++;
 	}
 	const CONTROL = {
-		enter: ['Enter', 'NumpadEnter'], escape: ['Escape'], backspace: ['Backspace'], tab: ['Tab'],
-		up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], home: ['Home'], end: ['End'],
-		pageup: ['PageUp'], pagedown: ['PageDown'], insert: ['Insert'], delete: ['Delete']
+		enter: ['Enter', 'NumpadEnter'],
+		escape: ['Escape'],
+		backspace: ['Backspace'],
+		tab: ['Tab'],
+		up: ['ArrowUp'],
+		down: ['ArrowDown'],
+		left: ['ArrowLeft'],
+		right: ['ArrowRight'],
+		home: ['Home'],
+		end: ['End'],
+		pageup: ['PageUp'],
+		pagedown: ['PageDown'],
+		insert: ['Insert'],
+		delete: ['Delete']
 	};
 	for (let i = 1; i <= 12; i++) CONTROL['f' + i] = ['F' + i];
 	const block = (src.match(/M\.CONTROL_NAME_OF = \{([\s\S]*?)\n\}/) || [])[1] || '';
@@ -316,7 +371,8 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 		const num = m[1] !== undefined ? Number(m[1]) : consts[m[2]];
 		const hit = find((k) => k.kind === 'key' && k.evdev === num);
 		const allowed = CONTROL[m[3]] || [];
-		if (hit.length !== 1 || !allowed.includes(hit[0])) fail(`evdev_codes.lua: [${num}] = "${m[3]}" but the registry says ${JSON.stringify(hit)}`);
+		if (hit.length !== 1 || !allowed.includes(hit[0]))
+			fail(`evdev_codes.lua: [${num}] = "${m[3]}" but the registry says ${JSON.stringify(hit)}`);
 		n++;
 	}
 	if (n < 35) fail(`evdev_codes.lua: only ${n} codes compared (floor 35)`);
@@ -326,26 +382,50 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 {
 	const src = read('_shared/lua/keycodes/init.lua');
 	const NAMED = {
-		BACKSPACE: 'Backspace', RETURN: 'Enter', ESCAPE: 'Escape', TAB: 'Tab', ENTER: 'NumpadEnter',
-		LEFT_ARROW: 'ArrowLeft', RIGHT_ARROW: 'ArrowRight', DOWN_ARROW: 'ArrowDown', UP_ARROW: 'ArrowUp'
+		BACKSPACE: 'Backspace',
+		RETURN: 'Enter',
+		ESCAPE: 'Escape',
+		TAB: 'Tab',
+		ENTER: 'NumpadEnter',
+		LEFT_ARROW: 'ArrowLeft',
+		RIGHT_ARROW: 'ArrowRight',
+		DOWN_ARROW: 'ArrowDown',
+		UP_ARROW: 'ArrowUp'
 	};
 	let n = 0;
 	for (const m of src.matchAll(/^M\.([A-Z_]+)\s*=\s*(\d+)/gm)) {
 		if (!NAMED[m[1]]) continue;
-		if (keys[NAMED[m[1]]].hs !== Number(m[2])) fail(`keycodes/init.lua: ${m[1]} = ${m[2]} but registry ${NAMED[m[1]]}.hs = ${keys[NAMED[m[1]]].hs}`);
+		if (keys[NAMED[m[1]]].hs !== Number(m[2]))
+			fail(
+				`keycodes/init.lua: ${m[1]} = ${m[2]} but registry ${NAMED[m[1]]}.hs = ${keys[NAMED[m[1]]].hs}`
+			);
 		n++;
 	}
-	if (n !== Object.keys(NAMED).length) fail(`keycodes/init.lua: compared ${n} of ${Object.keys(NAMED).length} named keycodes`);
+	if (n !== Object.keys(NAMED).length)
+		fail(`keycodes/init.lua: compared ${n} of ${Object.keys(NAMED).length} named keycodes`);
 }
 
 // --- 4.4 azerty.json: the heatmap's Apple ISO keycodes.
 {
 	const azerty = JSON.parse(read('_shared/data/keycodes/azerty.json'));
 	const NAMED = {
-		return: 'Enter', space: 'Space', iso_extra: 'IntlBackslash', backspace: 'Backspace', escape: 'Escape',
-		cmd_r: 'MetaRight', cmd_l: 'MetaLeft', shift_l: 'ShiftLeft', shift_r: 'ShiftRight', capslock: 'CapsLock',
-		alt_l: 'AltLeft', alt_r: 'AltRight', ctrl_l: 'ControlLeft', left: 'ArrowLeft', right: 'ArrowRight',
-		up: 'ArrowUp', down: 'ArrowDown'
+		return: 'Enter',
+		space: 'Space',
+		iso_extra: 'IntlBackslash',
+		backspace: 'Backspace',
+		escape: 'Escape',
+		cmd_r: 'MetaRight',
+		cmd_l: 'MetaLeft',
+		shift_l: 'ShiftLeft',
+		shift_r: 'ShiftRight',
+		capslock: 'CapsLock',
+		alt_l: 'AltLeft',
+		alt_r: 'AltRight',
+		ctrl_l: 'ControlLeft',
+		left: 'ArrowLeft',
+		right: 'ArrowRight',
+		up: 'ArrowUp',
+		down: 'ArrowDown'
 	};
 	for (let i = 1; i <= 12; i++) NAMED['f' + i] = 'F' + i;
 	// fn is a macOS-only modifier the OS sees; it has no KeyboardEvent.code a
@@ -359,7 +439,10 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 			fail(`azerty.json: kc ${entry.kc} (${entry.qwerty}) matches no registry key`);
 			continue;
 		}
-		if (resolved(code, 'hs', 'iso') !== entry.kc) fail(`azerty.json: kc ${entry.kc} is ${entry.qwerty} but registry ${code} resolves to ${resolved(code, 'hs', 'iso')} on ISO`);
+		if (resolved(code, 'hs', 'iso') !== entry.kc)
+			fail(
+				`azerty.json: kc ${entry.kc} is ${entry.qwerty} but registry ${code} resolves to ${resolved(code, 'hs', 'iso')} on ISO`
+			);
 		n++;
 	}
 	if (n < 70) fail(`azerty.json: only ${n} keycodes compared (floor 70)`);
@@ -386,11 +469,19 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 			continue;
 		}
 		if (DELIBERATE.has(sc)) continue;
-		if (resolved(hit[0], 'hs', 'iso') !== kc) fail(`heatmap_win.js: SC ${sc} -> kc ${kc} but registry ${hit[0]} resolves to ${resolved(hit[0], 'hs', 'iso')} on ISO`);
+		if (resolved(hit[0], 'hs', 'iso') !== kc)
+			fail(
+				`heatmap_win.js: SC ${sc} -> kc ${kc} but registry ${hit[0]} resolves to ${resolved(hit[0], 'hs', 'iso')} on ISO`
+			);
 		n++;
 	}
-	if (JSON.stringify(unmatched.sort((a, b) => a - b)) !== JSON.stringify([...ALIASES].sort((a, b) => a - b)))
-		fail(`heatmap_win.js: scan codes with no registry key ${JSON.stringify(unmatched)}, expected exactly the aliases ${JSON.stringify([...ALIASES])}`);
+	if (
+		JSON.stringify(unmatched.sort((a, b) => a - b)) !==
+		JSON.stringify([...ALIASES].sort((a, b) => a - b))
+	)
+		fail(
+			`heatmap_win.js: scan codes with no registry key ${JSON.stringify(unmatched)}, expected exactly the aliases ${JSON.stringify([...ALIASES])}`
+		);
 	if (n < 55) fail(`heatmap_win.js: only ${n} scan codes compared (floor 55)`);
 }
 
@@ -402,16 +493,19 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	const names = new Set();
 	for (const m of layer.manipulators) {
 		names.add(m.from.key_code);
-		for (const field of ['to', 'to_if_alone', 'to_after_key_up']) for (const ev of m[field] || []) if (ev.key_code) names.add(ev.key_code);
+		for (const field of ['to', 'to_if_alone', 'to_after_key_up'])
+			for (const ev of m[field] || []) if (ev.key_code) names.add(ev.key_code);
 	}
 	for (const name of names) {
 		const hit = codes.filter((c) => {
 			const ev = resolved(c, 'karabiner', 'iso');
 			return ev && ev.key_code === name;
 		});
-		if (hit.length !== 1) fail(`legacy_layer_keys.json: key_code "${name}" resolves to ${JSON.stringify(hit)} on ISO`);
+		if (hit.length !== 1)
+			fail(`legacy_layer_keys.json: key_code "${name}" resolves to ${JSON.stringify(hit)} on ISO`);
 	}
-	if (names.size < 40) fail(`legacy_layer_keys.json: only ${names.size} key codes compared (floor 40)`);
+	if (names.size < 40)
+		fail(`legacy_layer_keys.json: only ${names.size} key codes compared (floor 40)`);
 }
 
 // --- 4.7 The daemon's tap-hold input keys use the same physical identities.
@@ -420,19 +514,31 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	const block = (src.match(/M\.KEY_CODES\s*=\s*\{([\s\S]*?)\}/) || [])[1];
 	if (!block) fail('native tap-hold engine: KEY_CODES table is missing');
 	const physical = {
-		escape: 'Escape', tab: 'Tab', caps_lock: 'CapsLock', left_shift: 'ShiftLeft',
-		left_ctrl: 'ControlLeft', win: 'MetaLeft', left_alt: 'AltLeft', space: 'Space',
-		alt_gr: 'AltRight', right_ctrl: 'ControlRight', right_shift: 'ShiftRight',
-		enter: 'Enter', backspace: 'Backspace', delete: 'Delete'
+		escape: 'Escape',
+		tab: 'Tab',
+		caps_lock: 'CapsLock',
+		left_shift: 'ShiftLeft',
+		left_ctrl: 'ControlLeft',
+		win: 'MetaLeft',
+		left_alt: 'AltLeft',
+		space: 'Space',
+		alt_gr: 'AltRight',
+		right_ctrl: 'ControlRight',
+		right_shift: 'ShiftRight',
+		enter: 'Enter',
+		backspace: 'Backspace',
+		delete: 'Delete'
 	};
 	const seen = new Set();
 	for (const [, id, raw] of (block || '').matchAll(/(\w+)\s*=\s*(\d+)/g)) {
 		const code = physical[id];
-		if (!code || registry.keys[code]?.evdev !== Number(raw)) fail('native tap-hold key disagrees with registry: ' + id);
+		if (!code || registry.keys[code]?.evdev !== Number(raw))
+			fail('native tap-hold key disagrees with registry: ' + id);
 		if (seen.has(id)) fail('duplicate native tap-hold key: ' + id);
 		seen.add(id);
 	}
-	for (const id of Object.keys(physical)) if (!seen.has(id)) fail('native tap-hold key was not compared: ' + id);
+	for (const id of Object.keys(physical))
+		if (!seen.has(id)) fail('native tap-hold key was not compared: ' + id);
 }
 
 report();

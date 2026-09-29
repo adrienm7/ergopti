@@ -51,10 +51,6 @@ const SOURCES = [
 const PROBE_KEY = 'KeyA';
 const PROBE_LAYER = 'probe';
 
-
-
-
-
 // =====================================
 // =====================================
 // ======= 1/ Availability probes =======
@@ -80,19 +76,18 @@ function probe(ctx, code, binding, what) {
 			continue;
 		}
 		for (const e of result.errors) {
-			if (e.code !== 'unavailable_on_os') throw new Error(`${what}: the probe binding is invalid (${e.code}: ${e.detail})`);
-			if (typeof e.reason_key !== 'string') throw new Error(`${what}: unavailable on ${os} without a reason_key`);
+			if (e.code !== 'unavailable_on_os')
+				throw new Error(`${what}: the probe binding is invalid (${e.code}: ${e.detail})`);
+			if (typeof e.reason_key !== 'string')
+				throw new Error(`${what}: unavailable on ${os} without a reason_key`);
 			reasons.add(e.reason_key);
 		}
 	}
 	if (platforms.length === 0) throw new Error(`${what}: resolves on no OS`);
-	if (reasons.size > 1) throw new Error(`${what}: ${reasons.size} different reasons for the OSes it leaves out`);
+	if (reasons.size > 1)
+		throw new Error(`${what}: ${reasons.size} different reasons for the OSes it leaves out`);
 	return { platforms, reason_key: reasons.size === 1 ? [...reasons][0] : null };
 }
-
-
-
-
 
 // ================================
 // ================================
@@ -110,23 +105,36 @@ function buildData() {
 	const registry = ctx.registry;
 	const english = JSON.parse(fs.readFileSync(EN_LOCALE_PATH, 'utf8').replace(/^﻿/, ''));
 	const requireLabel = (key, what) => {
-		if (typeof english[key] !== 'string' || english[key].trim() === '') throw new Error(`${what}: en.json has no "${key}"`);
+		if (typeof english[key] !== 'string' || english[key].trim() === '')
+			throw new Error(`${what}: en.json has no "${key}"`);
 		return key;
 	};
 
 	const recommendedDoc = TOML.parse(fs.readFileSync(RECOMMENDED_PATH, 'utf8'));
 	const layerIds = Object.keys(recommendedDoc.layers || {});
-	if (layerIds.length !== 1) throw new Error(`${sharedRel('keymap/layers.recommended.toml')} must define exactly one layer, found ${layerIds.length}`);
+	if (layerIds.length !== 1)
+		throw new Error(
+			`${sharedRel('keymap/layers.recommended.toml')} must define exactly one layer, found ${layerIds.length}`
+		);
 	const layer = layerIds[0];
-	const holdLayers = ((TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS_PATH, 'utf8')).tap_hold || {}).hold_picker || {}).layers || [];
-	if (!holdLayers.includes(layer)) throw new Error(`layer "${layer}" is not one a hold key can enter ([tap_hold.hold_picker].layers)`);
+	const holdLayers =
+		((TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS_PATH, 'utf8')).tap_hold || {}).hold_picker || {})
+			.layers || [];
+	if (!holdLayers.includes(layer))
+		throw new Error(
+			`layer "${layer}" is not one a hold key can enter ([tap_hold.hold_picker].layers)`
+		);
 
 	const groups = (vocabulary.editor || {}).groups;
-	if (!Array.isArray(groups) || groups.length === 0) throw new Error('[editor].groups is missing from the layer vocabulary');
+	if (!Array.isArray(groups) || groups.length === 0)
+		throw new Error('[editor].groups is missing from the layer vocabulary');
 	const actions = {};
 	const grouped = Object.fromEntries(groups.map((g) => [g, []]));
 	for (const [id, action] of Object.entries(vocabulary.actions)) {
-		if (!grouped[action.group]) throw new Error(`[actions.${id}].group = ${JSON.stringify(action.group)} is not one of [editor].groups`);
+		if (!grouped[action.group])
+			throw new Error(
+				`[actions.${id}].group = ${JSON.stringify(action.group)} is not one of [editor].groups`
+			);
 		grouped[action.group].push(id);
 		const labelKey = action.catalogue === true ? `sg_actions.${id}` : `layer_actions.${id}`;
 		const availability = probe(ctx, PROBE_KEY, id, `action "${id}"`);
@@ -139,7 +147,8 @@ function buildData() {
 	}
 
 	const modifiers = {};
-	for (const mod of vocabulary._meta.modifier_order) modifiers[mod] = probe(ctx, PROBE_KEY, `keystroke:${mod}+${PROBE_KEY}`, `modifier "${mod}"`);
+	for (const mod of vocabulary._meta.modifier_order)
+		modifiers[mod] = probe(ctx, PROBE_KEY, `keystroke:${mod}+${PROBE_KEY}`, `modifier "${mod}"`);
 
 	const sourceKinds = {};
 	for (const [code, entry] of Object.entries(registry.keys)) {
@@ -165,20 +174,26 @@ function buildData() {
 		primary_modifier: vocabulary.primary_modifier,
 		modifiers,
 		source_kinds: sourceKinds,
-		repeat_count: { platforms: repeatAvailability.platforms, reason_key: repeatAvailability.reason_key, min: repeat.min, max: repeat.max },
+		repeat_count: {
+			platforms: repeatAvailability.platforms,
+			reason_key: repeatAvailability.reason_key,
+			min: repeat.min,
+			max: repeat.max
+		},
 		groups: groups.map((id) => {
-			if (grouped[id].length === 0) throw new Error(`[editor].groups lists "${id}" and no action belongs to it`);
-			return { id, label_key: requireLabel(`layer_editor.group.${id}`, `group "${id}"`), actions: grouped[id] };
+			if (grouped[id].length === 0)
+				throw new Error(`[editor].groups lists "${id}" and no action belongs to it`);
+			return {
+				id,
+				label_key: requireLabel(`layer_editor.group.${id}`, `group "${id}"`),
+				actions: grouped[id]
+			};
 		}),
 		actions,
 		keys,
 		recommended: recommendedDoc.layers[layer]
 	};
 }
-
-
-
-
 
 // =============================
 // =============================
@@ -200,7 +215,9 @@ function formatJson(value, depth, indent) {
 	const inner = indent + '\t';
 	const entries = Array.isArray(value)
 		? value.map((item) => inner + formatJson(item, depth - 1, inner))
-		: Object.entries(value).map(([k, v]) => `${inner}${JSON.stringify(k)}: ${formatJson(v, depth - 1, inner)}`);
+		: Object.entries(value).map(
+				([k, v]) => `${inner}${JSON.stringify(k)}: ${formatJson(v, depth - 1, inner)}`
+			);
 	if (entries.length === 0) return JSON.stringify(value);
 	const [open, close] = Array.isArray(value) ? ['[', ']'] : ['{', '}'];
 	return `${open}\n${entries.join(',\n')}\n${indent}${close}`;

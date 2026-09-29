@@ -46,10 +46,10 @@ Canonical comparison is outside timing. Three comparisons pass, each manifest
 1925898 UTF-8 bytes. Receipt `manifest-encoded-titles-production-01.log` exited 0.
 
 | Sample | First path | Baseline (ms) | Candidate (ms) | Reduction (ms) |
-| --- | --- | --- | --- | --- |
-| 1 | Baseline | 5047.152 | 3714.814 | 1332.338 |
-| 2 | Candidate | 3315.683 | 2812.930 | 502.753 |
-| 3 | Baseline | 3038.278 | 2543.628 | 494.650 |
+| ------ | ---------- | ------------- | -------------- | -------------- |
+| 1      | Baseline   | 5047.152      | 3714.814       | 1332.338       |
+| 2      | Candidate  | 3315.683      | 2812.930       | 502.753        |
+| 3      | Baseline   | 3038.278      | 2543.628       | 494.650        |
 
 Candidate median/max: 2812.930/3714.814 ms. Pair reductions span approximately
 15–26 percent. Desktop load and filesystem residency were uncontrolled, and
@@ -63,14 +63,14 @@ warmup or canonical parsing. GetProcessMemoryInfo was sampled immediately after
 generation, before receipt serialization. Receipts
 `manifest-encoded-titles-memory-01-1.log` through `-6.log` all exited 0.
 
-| Run | Mode | Elapsed (ms) | Peak working set (bytes) | Private bytes after generation |
-| --- | --- | --- | --- | --- |
-| 1 | Baseline | 2771.810 | 39645184 | 11415552 |
-| 2 | Candidate | 2581.123 | 37371904 | 12431360 |
-| 3 | Candidate | 2137.166 | 37154816 | 12070912 |
-| 4 | Baseline | 2688.949 | 39714816 | 12890112 |
-| 5 | Baseline | 3204.564 | 39759872 | 11952128 |
-| 6 | Candidate | 2318.683 | 37019648 | 11415552 |
+| Run | Mode      | Elapsed (ms) | Peak working set (bytes) | Private bytes after generation |
+| --- | --------- | ------------ | ------------------------ | ------------------------------ |
+| 1   | Baseline  | 2771.810     | 39645184                 | 11415552                       |
+| 2   | Candidate | 2581.123     | 37371904                 | 12431360                       |
+| 3   | Candidate | 2137.166     | 37154816                 | 12070912                       |
+| 4   | Baseline  | 2688.949     | 39714816                 | 12890112                       |
+| 5   | Baseline  | 3204.564     | 39759872                 | 11952128                       |
+| 6   | Candidate | 2318.683     | 37019648                 | 11415552                       |
 
 Median peak working set drops from 39714816 to 37154816 bytes: 2560000 bytes,
 about 2.44 MiB. Median private bytes after generation instead rises by 118784

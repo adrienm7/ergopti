@@ -53,9 +53,14 @@ expect(
 );
 // Behavioural coverage of the renderer lives in test-changelog-markdown.cjs;
 // this pins the absence of every HTML-parsing sink in both scripts.
-for (const [name, source] of [['script.js', script], ['markdown.js', markdown]]) {
+for (const [name, source] of [
+	['script.js', script],
+	['markdown.js', markdown]
+]) {
 	expect(
-		!/\binnerHTML\b|\bouterHTML\b|insertAdjacentHTML|DOMParser|document\.write|\beval\s*\(|new Function/.test(source),
+		!/\binnerHTML\b|\bouterHTML\b|insertAdjacentHTML|DOMParser|document\.write|\beval\s*\(|new Function/.test(
+			source
+		),
 		`${name} must never hand remote release text to an HTML parser or evaluator`
 	);
 }
@@ -97,7 +102,8 @@ const STUBBED_SCRIPTS = new Set(['host_bridge.js', 'i18n.js']);
 /** Returns the local scripts index.html loads, in document order. */
 function pageScripts() {
 	const scripts = [...index.matchAll(/<script\s+src="([^"]+)"/g)].map((match) => match[1]);
-	if (scripts.length < 5) throw new Error(`index.html loads ${scripts.length} script(s); the scan is broken`);
+	if (scripts.length < 5)
+		throw new Error(`index.html loads ${scripts.length} script(s); the scan is broken`);
 	return scripts;
 }
 
@@ -120,10 +126,19 @@ function checkLinuxProtocol() {
 			attributes: {},
 			classList: { toggle() {} },
 			addEventListener() {},
-			appendChild(child) { this.children.push(child); return child; },
-			replaceChildren(...children) { this.children = children; },
-			setAttribute(name, value) { this.attributes[name] = String(value); },
-			getAttribute(name) { return this.attributes[name] || null; },
+			appendChild(child) {
+				this.children.push(child);
+				return child;
+			},
+			replaceChildren(...children) {
+				this.children = children;
+			},
+			setAttribute(name, value) {
+				this.attributes[name] = String(value);
+			},
+			getAttribute(name) {
+				return this.attributes[name] || null;
+			}
 		};
 		elements.set(id, value);
 		return value;
@@ -136,15 +151,15 @@ function checkLinuxProtocol() {
 		Date,
 		document: {
 			readyState: 'complete',
-			getElementById: id => element(id),
+			getElementById: (id) => element(id),
 			querySelectorAll: () => [],
-			createElement: tag => element(`created-${tag}-${elements.size}`),
-			createTextNode: text => ({ textContent: String(text), children: [] }),
+			createElement: (tag) => element(`created-${tag}-${elements.size}`),
+			createTextNode: (text) => ({ textContent: String(text), children: [] })
 		},
-		makeHostBridge: name => payload => posted.push({ name, payload }),
+		makeHostBridge: (name) => (payload) => posted.push({ name, payload }),
 		decodeHostBridgeResponse: (_isBase64, payload) => JSON.parse(payload),
 		setTimeout: () => 1,
-		clearTimeout() {},
+		clearTimeout() {}
 	};
 	sandbox.window = sandbox;
 	sandbox.__ergopti_host = 'linux';
@@ -153,7 +168,9 @@ function checkLinuxProtocol() {
 	// to load would otherwise surface as a ReferenceError unrelated to Linux.
 	for (const src of pageScripts()) {
 		if (STUBBED_SCRIPTS.has(path.basename(src))) continue;
-		vm.runInContext(fs.readFileSync(path.resolve(SHARED_CHANGELOG, src), 'utf8'), sandbox, { filename: src });
+		vm.runInContext(fs.readFileSync(path.resolve(SHARED_CHANGELOG, src), 'utf8'), sandbox, {
+			filename: src
+		});
 	}
 
 	expect(
@@ -165,14 +182,21 @@ function checkLinuxProtocol() {
 		body: 'Native cache marker',
 		html_url: 'https://github.com/adrienm7/ergopti/releases/tag/v9.8.7',
 		published_at: '2026-08-31T12:00:00Z',
-		prerelease: false,
+		prerelease: false
 	};
-	sandbox.__hostBridgeResponse('changelog_bridge', false, JSON.stringify({
-		action: 'releases', channel: 'main', cache_miss: false, releases: [release],
-	}));
+	sandbox.__hostBridgeResponse(
+		'changelog_bridge',
+		false,
+		JSON.stringify({
+			action: 'releases',
+			channel: 'main',
+			cache_miss: false,
+			releases: [release]
+		})
+	);
 	expect(
-		element('release-tag').textContent === 'v9.8.7'
-			&& renderedText(element('release-body')) === 'Native cache marker',
+		element('release-tag').textContent === 'v9.8.7' &&
+			renderedText(element('release-body')) === 'Native cache marker',
 		'the Linux native response must render the canonical release schema into the DOM'
 	);
 
@@ -182,12 +206,18 @@ function checkLinuxProtocol() {
 		open.action === 'open_url' && open.url === release.html_url,
 		'the selected Linux release must use the canonical open_url action'
 	);
-	sandbox.__hostBridgeResponse('changelog_bridge', false, JSON.stringify({
-		action: 'open_url', opened: false, error: 'Native opener marker',
-	}));
+	sandbox.__hostBridgeResponse(
+		'changelog_bridge',
+		false,
+		JSON.stringify({
+			action: 'open_url',
+			opened: false,
+			error: 'Native opener marker'
+		})
+	);
 	expect(
-		element('error-text').textContent === 'Native opener marker'
-			&& element('error-overlay').style.display === 'flex',
+		element('error-text').textContent === 'Native opener marker' &&
+			element('error-overlay').style.display === 'flex',
 		'a refused Linux opener must become a visible page error'
 	);
 

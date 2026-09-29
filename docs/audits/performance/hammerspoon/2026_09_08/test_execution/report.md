@@ -30,13 +30,13 @@ checks concurrently with each other or with driver readers.
 
 ## Observations
 
-| Workload | Before (seconds) | After (seconds) |
-| --- | ---: | ---: |
-| Complete JS suite | 470.712 | 259.536 |
-| `node tools/test/test-drift-guard-covers-every-output.cjs` | 169.461 | 26.727 |
-| `node tools/test/test-features-manifest-no-drift.cjs` | 28.097 | 4.266 |
-| `node tools/build/gen-all.cjs` | 28.728 | 3.947 |
-| `npm run --silent build:domain` | 28.139 | 25.769 |
+| Workload                                                   | Before (seconds) | After (seconds) |
+| ---------------------------------------------------------- | ---------------: | --------------: |
+| Complete JS suite                                          |          470.712 |         259.536 |
+| `node tools/test/test-drift-guard-covers-every-output.cjs` |          169.461 |          26.727 |
+| `node tools/test/test-features-manifest-no-drift.cjs`      |           28.097 |           4.266 |
+| `node tools/build/gen-all.cjs`                             |           28.728 |           3.947 |
+| `npm run --silent build:domain`                            |           28.139 |          25.769 |
 
 Observed complete-suite reduction: 211.176 seconds, or 44.9%. The unchanged
 domain build also varied, so do not attribute every millisecond to this change.

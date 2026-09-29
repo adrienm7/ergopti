@@ -15,7 +15,15 @@ on:
         required: true
         default: current_build
         type: choice
-        options: [current_build, published, published_with_dependency, native_helper, helper_environment, helper_registration]
+        options:
+          [
+            current_build,
+            published,
+            published_with_dependency,
+            native_helper,
+            helper_environment,
+            helper_registration
+          ]
       tag:
         description: Existing release tag to reproduce
         required: true

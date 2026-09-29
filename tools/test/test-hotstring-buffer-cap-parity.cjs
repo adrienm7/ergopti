@@ -45,12 +45,24 @@ let canon = null;
 
 try {
 	// Shared canonical (macOS + Linux require this engine, so they inherit it).
-	canon = extract('_shared/lua/hotstring_engine/init.lua', /BUFFER_MAX_CHARS\s*=\s*(\d+)/, 'BUFFER_MAX_CHARS');
+	canon = extract(
+		'_shared/lua/hotstring_engine/init.lua',
+		/BUFFER_MAX_CHARS\s*=\s*(\d+)/,
+		'BUFFER_MAX_CHARS'
+	);
 
 	// Windows mirrors — AHK cannot require the shared Lua, so the two literals
 	// must equal the canon (and each other).
-	const winInputhook = extract('windows/infra/hotstrings/hotstring_inputhook.ahk', /_MAX_BUFFER_LEN\s*:=\s*(\d+)/, '_MAX_BUFFER_LEN');
-	const winEngine = extract('windows/infra/hotstrings/hotstring_engine_main.ahk', /HSE_MAX_BUFFER_LEN\s*:=\s*(\d+)/, 'HSE_MAX_BUFFER_LEN');
+	const winInputhook = extract(
+		'windows/infra/hotstrings/hotstring_inputhook.ahk',
+		/_MAX_BUFFER_LEN\s*:=\s*(\d+)/,
+		'_MAX_BUFFER_LEN'
+	);
+	const winEngine = extract(
+		'windows/infra/hotstrings/hotstring_engine_main.ahk',
+		/HSE_MAX_BUFFER_LEN\s*:=\s*(\d+)/,
+		'HSE_MAX_BUFFER_LEN'
+	);
 
 	if (winInputhook !== canon) {
 		errors.push(`windows _MAX_BUFFER_LEN (${winInputhook}) != shared BUFFER_MAX_CHARS (${canon})`);
@@ -59,14 +71,18 @@ try {
 		errors.push(`windows HSE_MAX_BUFFER_LEN (${winEngine}) != shared BUFFER_MAX_CHARS (${canon})`);
 	}
 	if (winInputhook !== winEngine) {
-		errors.push(`intra-Windows drift: _MAX_BUFFER_LEN (${winInputhook}) != HSE_MAX_BUFFER_LEN (${winEngine})`);
+		errors.push(
+			`intra-Windows drift: _MAX_BUFFER_LEN (${winInputhook}) != HSE_MAX_BUFFER_LEN (${winEngine})`
+		);
 	}
 } catch (e) {
 	errors.push(e.message);
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] Hotstring buffer cap is not single-sourced across drivers:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Hotstring buffer cap is not single-sourced across drivers:\x1b[0m'
+	);
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }

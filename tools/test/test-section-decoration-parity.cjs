@@ -70,9 +70,6 @@ function collectLua(dir, acc) {
 	return acc;
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Scan =================================
@@ -118,9 +115,13 @@ if (offenders.length === 0) {
 	console.log(`  ${PASS_SYMBOL}  Ratchet: no macOS file re-inlines "— " .. (single source upheld)`);
 } else {
 	total_fail++;
-	console.log(`  ${FAIL_SYMBOL}  Ratchet: ${offenders.length} macOS file(s) re-inline the decoration`);
+	console.log(
+		`  ${FAIL_SYMBOL}  Ratchet: ${offenders.length} macOS file(s) re-inline the decoration`
+	);
 	for (const f of offenders) {
-		console.log(`       - ${path.relative(REPO_ROOT, f)} (route through i18n.decorate_section / M.section)`);
+		console.log(
+			`       - ${path.relative(REPO_ROOT, f)} (route through i18n.decorate_section / M.section)`
+		);
 	}
 }
 

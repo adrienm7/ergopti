@@ -56,68 +56,68 @@ These are software implementations; final hardware verification remains below.
 ## Ordered TODO
 
 1. [x] Finish the current verification and repair its failures. Windows:
-   7,239/7,239 unit checks and 5/5 E2E passed. Linux native: 3,576/3,576 passed
-   in the fresh complete run after the Lua 5.4 test-loader correction.
-   Linux E2E: 115/115. macOS full: 11412 passed and one old test-oracle failure; the corrected
-   module passes 15/15 (11426 distinct cases in the composite).
-   macOS E2E: 67/67 plus one platform-specific skip. JavaScript's five
-   failures are resolved: four corrected guards/evidence checks pass in the
-   real checkout; generation passes on the byte-identical export. Windows
-   production compilation and strict conventions also pass. The Mac full run
-   found a stale boot-boundary test; its strengthened replacement passes 15/15
-   and rejects removal of each of 12 mandatory startup failure gates.
+       7,239/7,239 unit checks and 5/5 E2E passed. Linux native: 3,576/3,576 passed
+       in the fresh complete run after the Lua 5.4 test-loader correction.
+       Linux E2E: 115/115. macOS full: 11412 passed and one old test-oracle failure; the corrected
+       module passes 15/15 (11426 distinct cases in the composite).
+       macOS E2E: 67/67 plus one platform-specific skip. JavaScript's five
+       failures are resolved: four corrected guards/evidence checks pass in the
+       real checkout; generation passes on the byte-identical export. Windows
+       production compilation and strict conventions also pass. The Mac full run
+       found a stale boot-boundary test; its strengthened replacement passes 15/15
+       and rejects removal of each of 12 mandatory startup failure gates.
 2. [x] Commit the eight reviewed integration units atomically: macOS canonical
-   hotstring caches, personal-info boot gate, delay publication, remap field
-   preservation; Linux shortcut scopes; shared AI/metrics scope commands;
-   canonical Ctrl+G; configuration-surface verification.
+       hotstring caches, personal-info boot gate, delay publication, remap field
+       preservation; Linux shortcut scopes; shared AI/metrics scope commands;
+       canonical Ctrl+G; configuration-surface verification.
 3. [x] Account for every local branch and unfinished proposal. Preserve useful
-   unapplied patches, full product specifications, proof summaries and precise
-   continuation instructions inside this repository. Distinguish executable
-   code from untested design fragments. Remove branches only after proof that
-   their work is integrated or preserved. The cloneable package now exists at
-   [the handoff directory](handovers/2026-09-28-ergoptiplus/README.md), including
-   four pending patches and eleven exact original commits. Branch audit found
-   two missing L4 contributions (`f35930ec2`, `e58cadf95`) and one dependency
-   update (`c4f5973`) to review. These are preserved, not silently merged.
-   The retired-worktree audit also recovered unapplied D4 model labels/21
-   locales and L4 boot/test changes; their exact deltas are in the same package.
+       unapplied patches, full product specifications, proof summaries and precise
+       continuation instructions inside this repository. Distinguish executable
+       code from untested design fragments. Remove branches only after proof that
+       their work is integrated or preserved. The cloneable package now exists at
+       [the handoff directory](handovers/2026-09-28-ergoptiplus/README.md), including
+       four pending patches and eleven exact original commits. Branch audit found
+       two missing L4 contributions (`f35930ec2`, `e58cadf95`) and one dependency
+       update (`c4f5973`) to review. These are preserved, not silently merged.
+       The retired-worktree audit also recovered unapplied D4 model labels/21
+       locales and L4 boot/test changes; their exact deltas are in the same package.
 4. [ ] Finish publication: `ffb8a80d1` is on GitHub. The first Linux unit,
-   encoding and native Swift failures are resolved. Correct the remaining
-   Windows mixed-spelling case, macOS Python fixtures and Linux live tests
-   (opt-in setup, updater response size, release UI); publish, then verify
-   all workflow verdicts and release assets. A clean tree is not a release.
+       encoding and native Swift failures are resolved. Correct the remaining
+       Windows mixed-spelling case, macOS Python fixtures and Linux live tests
+       (opt-in setup, updater response size, release UI); publish, then verify
+       all workflow verdicts and release assets. A clean tree is not a release.
 5. [ ] Complete W1 neutral configuration and recommended/clear scopes. Finish
-   macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
-   composition. Keep unknown fields, verified backups, exact runtime
-   acknowledgement, external-write conflict detection and retryable rollback.
-   Recommended delay values must match effective runtime inheritance: deleting
-   `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
-   0.5 s. Do not assume deletion implements the recommendation.
+       macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
+       composition. Keep unknown fields, verified backups, exact runtime
+       acknowledgement, external-write conflict detection and retryable rollback.
+       Recommended delay values must match effective runtime inheritance: deleting
+       `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
+       0.5 s. Do not assume deletion implements the recommendation.
 6. [ ] Complete L4 extension layout geometry and physical magic-key behavior.
-   Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
+       Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
 7. [ ] Complete W2: seven-page first-run opt-in wizard, per-category recommended
-   choices, consistent WebView behavior and genuine translations in 21 locales.
+       choices, consistent WebView behavior and genuine translations in 21 locales.
 8. [ ] Complete A4: TapHold menu grouped by hand, shared catalogue, key
-   combinations under Shortcuts, with the actual configuration/runtime owners.
+       combinations under Shortcuts, with the actual configuration/runtime owners.
 9. [ ] Complete C4: shared centered update-check WebView, checking/current/new
-   release/error states, other-channel notices and explicit install action.
+       release/error states, other-channel notices and explicit install action.
 10. [ ] Complete D3: separate previous/next desktop actions with and without
-    wrapping on each OS; retire the global wrapping toggle.
+        wrapping on each OS; retire the global wrapping toggle.
 11. [ ] Complete D4: explicit AI prediction action, recommended slots, removal of
-    duplicate trigger paths, Windows feedback and model/suggestion/menu labels.
+        duplicate trigger paths, Windows feedback and model/suggestion/menu labels.
 12. [ ] Complete D5: remaining approved system actions, including required
-    confirmation for quarantine/trash; exclude the rejected quit-all-apps action.
+        confirmation for quarantine/trash; exclude the rejected quit-all-apps action.
 13. [ ] Complete F2: honor the Karabiner integration switch before leases and
-    guardians; preserve personal rules; back up and restore Windows touchpad
-    registry values through one owner.
+        guardians; preserve personal rules; back up and restore Windows touchpad
+        registry values through one owner.
 14. [ ] Run final cross-driver, shared, encoding, convention and 21-locale gates;
-    record real-device checks still unavailable on this Windows host.
+        record real-device checks still unavailable on this Windows host.
 15. [ ] Finish storage cleanup after all useful work is recoverable from GitHub.
-    `C:/ewt` and `C:/ewtb` were removed earlier. `D:/ewt` still contains active
-    test/runtime material and recovery data. An earlier automatic approval
-    review rejected baseline deletion; do not bypass that rejection.
+        `C:/ewt` and `C:/ewtb` were removed earlier. `D:/ewt` still contains active
+        test/runtime material and recovery data. An earlier automatic approval
+        review rejected baseline deletion; do not bypass that rejection.
 16. [ ] Publish final corrective commits, verify CI and release assets, and write
-    the final report with completed scope, limitations and manual test results.
+        the final report with completed scope, limitations and manual test results.
 
 ## Time estimate
 

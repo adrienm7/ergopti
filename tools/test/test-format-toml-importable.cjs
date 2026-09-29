@@ -110,41 +110,59 @@ const fixturePath = path.join(fixtureDir, 'fixture.toml');
 try {
 	// 1) Bare invocation is a usage error — exit 1 and print the usage banner.
 	const bare = spawnSync(PYTHON, [SCRIPT], { cwd: ROOT, encoding: 'utf8' });
-	test('bare invocation exits 1 (usage), not 0', bare.status === 1,
-		`status=${bare.status}\n${bare.stdout}${bare.stderr}`);
-	test('bare invocation prints the usage banner',
+	test(
+		'bare invocation exits 1 (usage), not 0',
+		bare.status === 1,
+		`status=${bare.status}\n${bare.stdout}${bare.stderr}`
+	);
+	test(
+		'bare invocation prints the usage banner',
 		/Usage:\s*format_toml\.py/.test(bare.stdout + bare.stderr),
-		bare.stdout + bare.stderr);
+		bare.stdout + bare.stderr
+	);
 
 	// 2) --preview on a real file: deterministic sort + styled headers, no write.
 	fs.writeFileSync(fixturePath, FIXTURE_CONTENT, 'utf8');
-	const prev = spawnSync(PYTHON, [SCRIPT, fixturePath, '--preview'],
-		{ cwd: ROOT, encoding: 'utf8' });
+	const prev = spawnSync(PYTHON, [SCRIPT, fixturePath, '--preview'], {
+		cwd: ROOT,
+		encoding: 'utf8'
+	});
 	const out = prev.stdout || '';
 
-	test('--preview exits 0 on a valid file', prev.status === 0,
-		`status=${prev.status}\n${out}${prev.stderr}`);
+	test(
+		'--preview exits 0 on a valid file',
+		prev.status === 0,
+		`status=${prev.status}\n${out}${prev.stderr}`
+	);
 
 	const idxApple = out.indexOf('[apple]');
 	const idxBanana = out.indexOf('[banana]');
-	test('sections sorted alphabetically ([apple] before [banana])',
+	test(
+		'sections sorted alphabetically ([apple] before [banana])',
 		idxApple !== -1 && idxBanana !== -1 && idxApple < idxBanana,
-		`idxApple=${idxApple} idxBanana=${idxBanana}\n${out}`);
+		`idxApple=${idxApple} idxBanana=${idxBanana}\n${out}`
+	);
 
 	const bananaBody = idxBanana === -1 ? '' : out.slice(idxBanana);
 	const idxKeyApple = bananaBody.indexOf('apple = "2"');
 	const idxKeyZebra = bananaBody.indexOf('zebra = "1"');
-	test('keys sorted within a section (apple before zebra under [banana])',
+	test(
+		'keys sorted within a section (apple before zebra under [banana])',
 		idxKeyApple !== -1 && idxKeyZebra !== -1 && idxKeyApple < idxKeyZebra,
-		`idxKeyApple=${idxKeyApple} idxKeyZebra=${idxKeyZebra}\n${bananaBody}`);
+		`idxKeyApple=${idxKeyApple} idxKeyZebra=${idxKeyZebra}\n${bananaBody}`
+	);
 
-	test('styled section headers are emitted for both sections',
+	test(
+		'styled section headers are emitted for both sections',
 		out.includes('# ======= Apple =======') && out.includes('# ======= Banana ======='),
-		out);
+		out
+	);
 
-	test('--preview writes nothing to disk (file byte-identical)',
+	test(
+		'--preview writes nothing to disk (file byte-identical)',
 		fs.readFileSync(fixturePath, 'utf8') === FIXTURE_CONTENT,
-		fs.readFileSync(fixturePath, 'utf8'));
+		fs.readFileSync(fixturePath, 'utf8')
+	);
 } finally {
 	fs.rmSync(fixtureDir, { recursive: true, force: true });
 }

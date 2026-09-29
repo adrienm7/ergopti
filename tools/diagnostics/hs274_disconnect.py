@@ -15,7 +15,9 @@ def disconnected_capture(command, output, report, timeout=20):
             process = subprocess.Popen(command, stdout=writer, stderr=diagnostics)
         finally:
             os.close(writer)
-        state = report.setdefault("processes", {}).setdefault("disconnected-stream", {"pid": process.pid})
+        state = report.setdefault("processes", {}).setdefault(
+            "disconnected-stream", {"pid": process.pid}
+        )
         try:
             process.wait(timeout=timeout)
         finally:
@@ -27,5 +29,8 @@ def disconnected_capture(command, output, report, timeout=20):
             state["reaped"] = process.poll() is not None
     diagnostic = path.read_text(encoding="utf-8")
     report["stream_disconnect"] = {"stderr": diagnostic}
-    if process.returncode != 1 or "Physical capture failed: Capture output disconnected" not in diagnostic:
+    if (
+        process.returncode != 1
+        or "Physical capture failed: Capture output disconnected" not in diagnostic
+    ):
         raise RuntimeError("Capture did not report the expected disconnected output failure")

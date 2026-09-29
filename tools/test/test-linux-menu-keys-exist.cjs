@@ -104,7 +104,9 @@ if (calls.length < MIN_CALLS) {
 	);
 }
 for (const k of missing) {
-	failures.push(`menu_builder.lua asks for "${k}", which en.json does not define — it would render as the raw key`);
+	failures.push(
+		`menu_builder.lua asks for "${k}", which en.json does not define — it would render as the raw key`
+	);
 }
 if (frenchLiterals.length > FRENCH_LITERAL_BASELINE) {
 	failures.push(

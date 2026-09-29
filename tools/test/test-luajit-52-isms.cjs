@@ -65,7 +65,7 @@ const FORBIDDEN = [
 	{
 		pattern: /\bstring\.pack\s*\(|\bstring\.unpack\s*\(/g,
 		name: 'string.pack / string.unpack',
-		instead: 'infra/input_event.lua\'s byte helpers, which exist for exactly this'
+		instead: "infra/input_event.lua's byte helpers, which exist for exactly this"
 	}
 ];
 
@@ -90,8 +90,9 @@ const SHARED_ONLY = {
 	// so the gate went green and the E2E job kept crashing on the same line.
 	pattern: /\butf8\.(char|codepoint|len|offset|codes)\b/g,
 	name: 'a bare utf8.* in shared code',
-	instead: 'a module-local `local utf8_lib = ... or require("compat.utf8")`, '
-		+ 'as _shared/lua/keymap/terminators.lua does',
+	instead:
+		'a module-local `local utf8_lib = ... or require("compat.utf8")`, ' +
+		'as _shared/lua/keymap/terminators.lua does',
 	// The shim necessarily names the functions it provides.
 	skip: (file) => file.endsWith(path.join('compat', 'utf8.lua'))
 };
@@ -135,9 +136,7 @@ for (const root of ROOTS) {
 		const relative = path.relative(SP, file).replace(/\\/g, '/');
 
 		// The shared-only rule applies to _shared/lua and nothing else.
-		const rules = relative.startsWith('_shared/lua/')
-			? FORBIDDEN.concat([SHARED_ONLY])
-			: FORBIDDEN;
+		const rules = relative.startsWith('_shared/lua/') ? FORBIDDEN.concat([SHARED_ONLY]) : FORBIDDEN;
 
 		for (const rule of rules) {
 			if (rule.skip && rule.skip(file)) continue;
@@ -145,9 +144,13 @@ for (const root of ROOTS) {
 			// The shim's own declaration line probes the global to decide whether it
 			// is needed, so it names utf8.* legitimately. Blanked rather than dropped
 			// so the reported line numbers still match the file.
-			const subject = rule === SHARED_ONLY
-				? src.split('\n').map((l) => (l.includes('local utf8_lib =') ? '' : l)).join('\n')
-				: src;
+			const subject =
+				rule === SHARED_ONLY
+					? src
+							.split('\n')
+							.map((l) => (l.includes('local utf8_lib =') ? '' : l))
+							.join('\n')
+					: src;
 			const hits = [...subject.matchAll(rule.pattern)];
 			if (hits.length === 0) continue;
 

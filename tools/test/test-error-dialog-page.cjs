@@ -57,7 +57,7 @@ function element(id, tag) {
 		},
 		dispatch(type) {
 			for (const handler of this.listeners[type] || []) handler({ target: this });
-		},
+		}
 	};
 }
 
@@ -81,7 +81,7 @@ function makeDocument() {
 		},
 		querySelectorAll() {
 			return [];
-		},
+		}
 	};
 }
 
@@ -91,7 +91,9 @@ function loadPage() {
 	const document = makeDocument();
 	const sandbox = { document, console, posted };
 	sandbox.window = sandbox;
-	sandbox.window.webkit = { messageHandlers: { error_dialog: { postMessage: (payload) => posted.push(payload) } } };
+	sandbox.window.webkit = {
+		messageHandlers: { error_dialog: { postMessage: (payload) => posted.push(payload) } }
+	};
 	sandbox.__i18n_base = 'https://ergopti.errordialog/data/locales/';
 	sandbox._i18n_locale = 'en';
 	sandbox.atob = (text) => Buffer.from(text, 'base64').toString('binary');
@@ -100,7 +102,10 @@ function loadPage() {
 	vm.createContext(sandbox);
 	const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
 	const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-	if (scripts.length < 3) fail(`index.html loads ${scripts.length} script(s); the page needs its bridge, i18n and script`);
+	if (scripts.length < 3)
+		fail(
+			`index.html loads ${scripts.length} script(s); the page needs its bridge, i18n and script`
+		);
 	for (const rel of scripts) {
 		const file = path.join(PAGE, rel);
 		vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
@@ -115,7 +120,8 @@ function label(key, ...args) {
 	return String(en[key]).replace(/%s/g, () => String(args[index++]));
 }
 
-const REPORT = '# ErgoptiPlus diagnostics\n\n| Field | Value |\n```text\nerror:\n  module: keylogger\n```\n';
+const REPORT =
+	'# ErgoptiPlus diagnostics\n\n| Field | Value |\n```text\nerror:\n  module: keylogger\n```\n';
 const ERROR = {
 	type: 'init',
 	kind: 'error',
@@ -123,7 +129,7 @@ const ERROR = {
 	message: 'Flush failed: disk full\nstack traceback:\n\tkeylogger.lua:12',
 	log_path: '~/.local/state/ergopti_plus/logs/ErgoptiPlus_errors_2026-09-24.log',
 	text: REPORT,
-	more: 0,
+	more: 0
 };
 
 // =============================
@@ -135,7 +141,8 @@ const ERROR = {
 {
 	const page = loadPage();
 	const el = page.elements;
-	if (page.posted[0] !== 'ready') fail(`the page's first message is ${JSON.stringify(page.posted[0])}, not "ready"`);
+	if (page.posted[0] !== 'ready')
+		fail(`the page's first message is ${JSON.stringify(page.posted[0])}, not "ready"`);
 	for (const id of ['btn-report', 'btn-copy', 'btn-open-log']) {
 		if (!el[id].disabled) fail(`${id} is enabled before the host sent an error`);
 	}
@@ -145,37 +152,57 @@ const ERROR = {
 	for (const id of ['btn-report', 'btn-copy', 'btn-open-log']) {
 		if (el[id].disabled) fail(`${id} stays disabled after the init message`);
 	}
-	if (el.heading.textContent !== en['error_dialog.heading']) fail(`the heading reads "${el.heading.textContent}"`);
+	if (el.heading.textContent !== en['error_dialog.heading'])
+		fail(`the heading reads "${el.heading.textContent}"`);
 	if (el.module.textContent !== 'keylogger') fail('the module is not shown');
 	if (el.message.textContent !== ERROR.message) fail('the message is not shown whole');
-	if (el['details-text'].textContent !== REPORT) fail('the details block is not the report the host sent');
-	if (el.logged.textContent !== label('error_dialog.logged_in', ERROR.log_path)) fail('the errors file is not named');
-	if (el['btn-open-log'].textContent !== en['error_dialog.open_log']) fail('the open button does not name the errors file');
+	if (el['details-text'].textContent !== REPORT)
+		fail('the details block is not the report the host sent');
+	if (el.logged.textContent !== label('error_dialog.logged_in', ERROR.log_path))
+		fail('the errors file is not named');
+	if (el['btn-open-log'].textContent !== en['error_dialog.open_log'])
+		fail('the open button does not name the errors file');
 	if (!el.more.hidden) fail('the folded-errors line shows while nothing was folded');
-	const hint = label('error_dialog.disable_hint', en['menu.debug.title'], en['menu.debug.show_error_dialog']);
+	const hint = label(
+		'error_dialog.disable_hint',
+		en['menu.debug.title'],
+		en['menu.debug.show_error_dialog']
+	);
 	if (el['disable-hint'].textContent !== hint) fail('the window does not say where to turn it off');
 
 	// Buttons send action names only
-	for (const [id, action] of [['btn-report', 'report'], ['btn-copy', 'copy'], ['btn-open-log', 'open_log'], ['btn-close', 'close']]) {
+	for (const [id, action] of [
+		['btn-report', 'report'],
+		['btn-copy', 'copy'],
+		['btn-open-log', 'open_log'],
+		['btn-close', 'close']
+	]) {
 		el[id].dispatch('click');
 		const sent = page.posted[page.posted.length - 1];
 		if (!sent || sent.action !== action) fail(`${id} did not post ${action}`);
-		else if (Object.keys(sent).length !== 1) fail(`${id} sends more than its action name: ${JSON.stringify(sent)}`);
+		else if (Object.keys(sent).length !== 1)
+			fail(`${id} sends more than its action name: ${JSON.stringify(sent)}`);
 	}
 
 	// Errors folded into the window are counted
 	page.sandbox.window.receiveErrorDialog({ type: 'more', count: 2 });
-	if (el.more.hidden || el.more.textContent !== label('error_dialog.more', 2)) fail('folded errors are not counted');
+	if (el.more.hidden || el.more.textContent !== label('error_dialog.more', 2))
+		fail('folded errors are not counted');
 
 	// Action results; AHK sends 1 for true
 	page.sandbox.window.receiveErrorDialog({ type: 'action', action: 'copy', ok: 1 });
-	if (el.status.textContent !== en['healthcheck.status.copied'] || !/ok/.test(el.status.className)) fail('a copy is not confirmed');
+	if (el.status.textContent !== en['healthcheck.status.copied'] || !/ok/.test(el.status.className))
+		fail('a copy is not confirmed');
 	page.sandbox.window.receiveErrorDialog({ type: 'action', action: 'report', ok: true });
-	if (el.status.textContent !== en['notify.report_bug_body']) fail('a report does not say what happened');
+	if (el.status.textContent !== en['notify.report_bug_body'])
+		fail('a report does not say what happened');
 	page.sandbox.window.receiveErrorDialog({ type: 'action', action: 'report', ok: false });
 	if (!/fail/.test(el.status.className)) fail('a failed action is not shown as a failure');
 	page.sandbox.window.receiveErrorDialog({ type: 'action', action: 'open_log', ok: 0, missing: 1 });
-	if (el.status.textContent !== en['healthcheck.status.missing'] || /fail/.test(el.status.className)) {
+	if (
+		el.status.textContent !== en['healthcheck.status.missing'] ||
+		/fail/.test(el.status.className)
+	) {
 		fail('a log file not created yet is shown as a failure');
 	}
 }
@@ -184,24 +211,47 @@ const ERROR = {
 	// A crash notice, delivered as Linux does: through the bridge response hook
 	const page = loadPage();
 	const el = page.elements;
-	const crash = Object.assign({}, ERROR, { kind: 'crash', log_path: '~/crash_reports/2026-09-23T21-04-11Z.json', more: 1 });
-	page.sandbox.window.__hostBridgeResponse('error_dialog', true, Buffer.from(JSON.stringify(crash)).toString('base64'));
+	const crash = Object.assign({}, ERROR, {
+		kind: 'crash',
+		log_path: '~/crash_reports/2026-09-23T21-04-11Z.json',
+		more: 1
+	});
+	page.sandbox.window.__hostBridgeResponse(
+		'error_dialog',
+		true,
+		Buffer.from(JSON.stringify(crash)).toString('base64')
+	);
 	if (el['btn-copy'].disabled) fail('the Linux bridge response did not initialise the page');
-	if (el.heading.textContent !== en['error_dialog.heading_crash']) fail('a crash notice does not read as one');
-	if (el.intro.textContent !== en['error_dialog.intro_crash']) fail('a crash notice keeps the error introduction');
-	if (el.logged.textContent !== label('error_dialog.crash_saved_in', crash.log_path)) fail('the crash report is not named');
-	if (el['btn-open-log'].textContent !== en['error_dialog.open_crash_report']) fail('the open button does not name the crash report');
+	if (el.heading.textContent !== en['error_dialog.heading_crash'])
+		fail('a crash notice does not read as one');
+	if (el.intro.textContent !== en['error_dialog.intro_crash'])
+		fail('a crash notice keeps the error introduction');
+	if (el.logged.textContent !== label('error_dialog.crash_saved_in', crash.log_path))
+		fail('the crash report is not named');
+	if (el['btn-open-log'].textContent !== en['error_dialog.open_crash_report'])
+		fail('the open button does not name the crash report');
 	if (el.more.hidden) fail('an initial fold count is not shown');
-	page.sandbox.window.__hostBridgeResponse('healthcheck', true, Buffer.from(JSON.stringify(ERROR)).toString('base64'));
-	if (el.heading.textContent !== en['error_dialog.heading_crash']) fail('another bridge reached the error window');
+	page.sandbox.window.__hostBridgeResponse(
+		'healthcheck',
+		true,
+		Buffer.from(JSON.stringify(ERROR)).toString('base64')
+	);
+	if (el.heading.textContent !== en['error_dialog.heading_crash'])
+		fail('another bridge reached the error window');
 }
 
 {
 	// Every label the page asks for exists in every locale, as a string
-	const sources = ['index.html', 'script.js'].map((file) => fs.readFileSync(path.join(PAGE, file), 'utf8')).join('\n');
+	const sources = ['index.html', 'script.js']
+		.map((file) => fs.readFileSync(path.join(PAGE, file), 'utf8'))
+		.join('\n');
 	const keys = new Set();
-	for (const match of sources.matchAll(/data-i18n="([^"]+)"|\bt\('([a-z0-9_.]+)'/g)) keys.add(match[1] || match[2]);
-	for (const match of sources.matchAll(/'((?:error_dialog|healthcheck|notify|common|menu)\.[a-z0-9_.]+)'/g)) keys.add(match[1]);
+	for (const match of sources.matchAll(/data-i18n="([^"]+)"|\bt\('([a-z0-9_.]+)'/g))
+		keys.add(match[1] || match[2]);
+	for (const match of sources.matchAll(
+		/'((?:error_dialog|healthcheck|notify|common|menu)\.[a-z0-9_.]+)'/g
+	))
+		keys.add(match[1]);
 	if (keys.size < 15) fail(`only ${keys.size} label keys found in the page; the scan is broken`);
 	const locales = fs.readdirSync(LOCALES).filter((file) => file.endsWith('.json'));
 	if (locales.length !== 21) fail(`${locales.length} locales found, 21 expected`);
@@ -218,4 +268,6 @@ if (failures.length > 0) {
 	for (const failure of failures) console.error(`  - ${failure}`);
 	process.exit(1);
 }
-console.log('[OK] error window page behaviour: ready, report shown as sent, crash notice, buttons by name, folds, results.');
+console.log(
+	'[OK] error window page behaviour: ready, report shown as sent, crash notice, buttons by name, folds, results.'
+);

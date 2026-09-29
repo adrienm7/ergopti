@@ -49,22 +49,39 @@ const RETIRED_KEYS = [
 const RETIRED_SYMBOLS = {
 	windows: {
 		ext: '.ahk',
-		names: ['ToggleAllFeaturesOn', 'ToggleAllFeaturesOff', 'ToggleAllFeatures(', '_CollectFeatureFlipUpdates', '_FeatureFlipLeafIsSwitch']
+		names: [
+			'ToggleAllFeaturesOn',
+			'ToggleAllFeaturesOff',
+			'ToggleAllFeatures(',
+			'_CollectFeatureFlipUpdates',
+			'_FeatureFlipLeafIsSwitch'
+		]
 	},
 	macos: {
 		ext: '.lua',
-		names: ['actions.enable_all', 'actions.disable_all', 'set_all_enabled', 'owner.enable_all', 'owner.disable_all', 'request("enable")', 'request("disable")']
+		names: [
+			'actions.enable_all',
+			'actions.disable_all',
+			'set_all_enabled',
+			'owner.enable_all',
+			'owner.disable_all',
+			'request("enable")',
+			'request("disable")'
+		]
 	},
 	linux: {
 		ext: '.lua',
-		names: ['on_enable_all', 'on_disable_all', 'global_feature_switch', 'closed_category_gates', 'restore_category_gates']
+		names: [
+			'on_enable_all',
+			'on_disable_all',
+			'global_feature_switch',
+			'closed_category_gates',
+			'restore_category_gates'
+		]
 	}
 };
 
 const errors = [];
-
-
-
 
 // ==================================================
 // ==================================================
@@ -83,11 +100,10 @@ for (const menu of GLOBAL_MENUS) {
 	}
 }
 if (globalRows === 0) {
-	errors.push(`none of ${GLOBAL_MENUS.join(', ')} declares a row — the manifest scan read nothing.`);
+	errors.push(
+		`none of ${GLOBAL_MENUS.join(', ')} declares a row — the manifest scan read nothing.`
+	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -103,9 +119,6 @@ for (const file of localeFiles) {
 		if (table[key] !== undefined) errors.push(`${file} still carries the retired key "${key}".`);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -130,7 +143,10 @@ function productionSource(driver, ext) {
 				if (!['tests', 'vendor', '_generated', 'node_modules'].includes(entry.name)) walk(full);
 			} else if (entry.name.endsWith(ext)) {
 				files += 1;
-				const lines = fs.readFileSync(full, 'utf8').split('\n').filter((line) => !comment.test(line));
+				const lines = fs
+					.readFileSync(full, 'utf8')
+					.split('\n')
+					.filter((line) => !comment.test(line));
 				parts.push(lines.join('\n'));
 			}
 		}
@@ -141,16 +157,16 @@ function productionSource(driver, ext) {
 for (const [driver, { ext, names }] of Object.entries(RETIRED_SYMBOLS)) {
 	const { files, text } = productionSource(driver, ext);
 	if (files < 20) {
-		errors.push(`${driver}: read ${files} production file(s) — the scan is broken and proves nothing.`);
+		errors.push(
+			`${driver}: read ${files} production file(s) — the scan is broken and proves nothing.`
+		);
 		continue;
 	}
 	for (const name of names) {
-		if (text.includes(name)) errors.push(`${driver} production source still uses the retired "${name}".`);
+		if (text.includes(name))
+			errors.push(`${driver} production source still uses the retired "${name}".`);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================

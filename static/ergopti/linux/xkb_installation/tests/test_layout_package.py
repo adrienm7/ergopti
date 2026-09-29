@@ -85,9 +85,7 @@ class RegistryAndRulesTests(unittest.TestCase):
         self.assertEqual(text.count("ergopti\t=\t+ergopti"), 5)
 
     def test_registry_xml_lists_variants_and_parses(self):
-        xml_text = build_registry_xml(
-            "ergopti", "Français — Ergopti", [("plus", "Ergopti+")]
-        )
+        xml_text = build_registry_xml("ergopti", "Français — Ergopti", [("plus", "Ergopti+")])
         root = ET.fromstring(xml_text)
         names = [node.text for node in root.iter("name")]
         self.assertIn("ergopti", names)
@@ -146,7 +144,9 @@ class InsertTypeSectionsTests(unittest.TestCase):
 
     def test_existing_type_is_replaced_in_place(self):
         once, _ = insert_type_sections(EXTRA_SAMPLE, TYPES_SAMPLE)
-        updated_source = TYPES_SAMPLE.replace("map[LevelThree] = Level3;", "map[LevelThree] = Level3;\n        map[Lock] = Level2;")
+        updated_source = TYPES_SAMPLE.replace(
+            "map[LevelThree] = Level3;", "map[LevelThree] = Level3;\n        map[Lock] = Level2;"
+        )
         twice, _ = insert_type_sections(once, updated_source)
         self.assertEqual(twice.count('type "ERGOPTI_SEVEN_LEVEL"'), 1)
         self.assertIn("map[Lock] = Level2;", twice)
@@ -158,7 +158,7 @@ class InsertTypeSectionsTests(unittest.TestCase):
 
     def test_rejects_a_source_without_type(self):
         with self.assertRaises(ValueError):
-            insert_type_sections(EXTRA_SAMPLE, "xkb_types { include \"complete\" };")
+            insert_type_sections(EXTRA_SAMPLE, 'xkb_types { include "complete" };')
 
 
 class LayoutSpecTests(unittest.TestCase):

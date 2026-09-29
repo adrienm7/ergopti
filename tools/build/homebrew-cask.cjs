@@ -79,7 +79,7 @@ function caskChannels() {
 	return registry.channels.map((channel, index) => ({
 		id: channel.id,
 		token: index === 0 ? TOKEN_BASE : `${TOKEN_BASE}@${channel.id}`,
-		feed: channel.sparkle_feed,
+		feed: channel.sparkle_feed
 	}));
 }
 
@@ -169,9 +169,13 @@ function renderCask(tag, sha256) {
 		`    "~/Library/Preferences/${BUNDLE_ID}.plist",`,
 		'  ]',
 		'end',
-		'',
+		''
 	];
-	return { token: channel.token, file: path.join('Casks', `${channel.token}.rb`), text: lines.join('\n') };
+	return {
+		token: channel.token,
+		file: path.join('Casks', `${channel.token}.rb`),
+		text: lines.join('\n')
+	};
 }
 
 function main(args) {
@@ -180,7 +184,9 @@ function main(args) {
 		return 0;
 	}
 	if (args.length !== 3 || args.some((arg) => arg === '')) {
-		console.error('usage: node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> | --token <channel>');
+		console.error(
+			'usage: node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> | --token <channel>'
+		);
 		return 1;
 	}
 	const [tag, sha256, tapDir] = args;
@@ -207,5 +213,5 @@ module.exports = {
 	APP_NAME,
 	BUNDLE_ID,
 	MINIMUM_MACOS,
-	RELAUNCH_MARKER,
+	RELAUNCH_MARKER
 };

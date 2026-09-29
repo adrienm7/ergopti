@@ -41,10 +41,15 @@ const FAIL = '✗';
 let pass = 0;
 let fail = 0;
 
-const src = JSON.parse(fs.readFileSync(path.join(ROOT, '_shared/modules/hotstrings/priority.json'), 'utf8'));
+const src = JSON.parse(
+	fs.readFileSync(path.join(ROOT, '_shared/modules/hotstrings/priority.json'), 'utf8')
+);
 const expected = { common: src.common, package: src.package, personal: src.personal };
 
-const AHK = fs.readFileSync(path.join(ROOT, 'windows/infra/hotstrings/hotstring_engine_main.ahk'), 'utf8');
+const AHK = fs.readFileSync(
+	path.join(ROOT, 'windows/infra/hotstrings/hotstring_engine_main.ahk'),
+	'utf8'
+);
 const LUA = fs.readFileSync(path.join(ROOT, 'macos/modules/keymap/registry.lua'), 'utf8');
 
 // AHK: `global HSE_PRIORITY_COMMON := 10`. Lua: `local PRIORITY_COMMON = 10`.
@@ -56,9 +61,6 @@ function luaConst(key) {
 	const m = LUA.match(new RegExp('local\\s+PRIORITY_' + key.toUpperCase() + '\\s*=\\s*(\\d+)'));
 	return m ? Number(m[1]) : null;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -82,10 +84,6 @@ for (const key of ['common', 'package', 'personal']) {
 		fail++;
 	}
 }
-
-
-
-
 
 // ==================================================
 // ==================================================
@@ -121,7 +119,9 @@ function walk(dir, acc = []) {
 const DRIVER_DIRS = ['windows', 'macos', 'linux'].map((d) => path.join(ROOT, d));
 const driverFiles = DRIVER_DIRS.flatMap((d) => walk(d));
 if (driverFiles.length < 300) {
-	console.log(`  ${FAIL}  walk found only ${driverFiles.length} driver source file(s) — the scan is broken`);
+	console.log(
+		`  ${FAIL}  walk found only ${driverFiles.length} driver source file(s) — the scan is broken`
+	);
 	fail++;
 }
 
@@ -172,15 +172,17 @@ for (const abs of driverFiles) {
 }
 
 if (bareLiterals.length === 0) {
-	console.log(`  ${PASS}  no bare priority literal at any use site (${driverFiles.length} driver file(s) scanned)`);
+	console.log(
+		`  ${PASS}  no bare priority literal at any use site (${driverFiles.length} driver file(s) scanned)`
+	);
 	pass++;
 } else {
-	console.log(`  ${FAIL}  ${bareLiterals.length} bare priority literal(s) at a use site — use the named constant:`);
+	console.log(
+		`  ${FAIL}  ${bareLiterals.length} bare priority literal(s) at a use site — use the named constant:`
+	);
 	for (const b of bareLiterals) console.log('       - ' + b);
 	fail++;
 }
-
-
 
 // ==================================================
 // ==================================================
@@ -197,7 +199,9 @@ for (const abs of walk(path.join(ROOT, 'linux'))) {
 	for (const m of src.matchAll(/PRIORITY_(COMMON|PACKAGE|PERSONAL)\s*=\s*(\d+)/g)) {
 		const key = m[1].toLowerCase();
 		if (Number(m[2]) !== expected[key]) {
-			linuxConsts.push(`${path.relative(ROOT, abs).replace(/\\/g, '/')}: PRIORITY_${m[1]}=${m[2]} != shared ${expected[key]}`);
+			linuxConsts.push(
+				`${path.relative(ROOT, abs).replace(/\\/g, '/')}: PRIORITY_${m[1]}=${m[2]} != shared ${expected[key]}`
+			);
 		}
 	}
 }
@@ -209,8 +213,6 @@ if (linuxConsts.length === 0) {
 	for (const c of linuxConsts) console.log('       - ' + c);
 	fail++;
 }
-
-
 
 // ==================================================
 // ==================================================
@@ -241,10 +243,14 @@ if (!luaResolver) {
 	const pos = cascadePositions(luaResolver[0]);
 	const ordered = pos.every((v, i) => v >= 0 && (i === 0 || v > pos[i - 1]));
 	if (ordered) {
-		console.log(`  ${PASS}  macos resolve_priority() tests ${CASCADE.join(' > ')} > source, in order`);
+		console.log(
+			`  ${PASS}  macos resolve_priority() tests ${CASCADE.join(' > ')} > source, in order`
+		);
 		pass++;
 	} else {
-		console.log(`  ${FAIL}  macos resolve_priority() does not test ${CASCADE.join(' > ')} in the documented order`);
+		console.log(
+			`  ${FAIL}  macos resolve_priority() does not test ${CASCADE.join(' > ')} in the documented order`
+		);
 		fail++;
 	}
 }
@@ -252,12 +258,17 @@ if (!luaResolver) {
 // AHK resolves the same cascade across the cache builder rather than in one
 // function, so the contract is asserted where it is written down: the comment
 // naming the order must still match the shared JSON's description.
-const CACHE = fs.readFileSync(path.join(ROOT, 'windows/infra/hotstrings/hotstrings_cache.ahk'), 'utf8');
+const CACHE = fs.readFileSync(
+	path.join(ROOT, 'windows/infra/hotstrings/hotstrings_cache.ahk'),
+	'utf8'
+);
 if (/individual\s*>\s*section\s*>\s*file\s*>\s*source/.test(CACHE)) {
 	console.log(`  ${PASS}  windows cache builder documents the same cascade order`);
 	pass++;
 } else {
-	console.log(`  ${FAIL}  windows/infra/hotstrings/hotstrings_cache.ahk no longer states the cascade individual > section > file > source`);
+	console.log(
+		`  ${FAIL}  windows/infra/hotstrings/hotstrings_cache.ahk no longer states the cascade individual > section > file > source`
+	);
 	fail++;
 }
 

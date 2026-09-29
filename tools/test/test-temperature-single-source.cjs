@@ -30,7 +30,15 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 
 // The single source of truth for the default generation temperature.
-const SSOT_FILE = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'llm', 'defaults.json');
+const SSOT_FILE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'llm',
+	'defaults.json'
+);
 
 const ADAPTERS = [
 	'static/ergopti_plus/macos/modules/llm/api_common.lua',
@@ -56,7 +64,9 @@ const ssotTemp = (() => {
 	return m ? Number(m[1]) : null;
 })();
 if (ssotTemp === null) {
-	console.error('\x1b[31m[ERROR] Could not read llm_temperature from the shared defaults.json.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Could not read llm_temperature from the shared defaults.json.\x1b[0m'
+	);
 	process.exit(1);
 }
 
@@ -75,7 +85,9 @@ for (const rel of ADAPTERS) {
 }
 
 if (violations.length > 0 || missingRef.length > 0) {
-	console.error(`\x1b[31m[ERROR] Default temperature must come from the single shared source (llm_temperature = ${ssotTemp}).\x1b[0m`);
+	console.error(
+		`\x1b[31m[ERROR] Default temperature must come from the single shared source (llm_temperature = ${ssotTemp}).\x1b[0m`
+	);
 	if (violations.length > 0) {
 		console.error('  Literal "or 0.1" temperature fallback found in a backend adapter:');
 		for (const v of violations) console.error('    ' + v);
@@ -88,4 +100,6 @@ if (violations.length > 0 || missingRef.length > 0) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] No literal temperature fallbacks — all ${ADAPTERS.length} macOS adapters defer to the shared DEFAULT_TEMPERATURE (${ssotTemp}).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] No literal temperature fallbacks — all ${ADAPTERS.length} macOS adapters defer to the shared DEFAULT_TEMPERATURE (${ssotTemp}).\x1b[0m`
+);

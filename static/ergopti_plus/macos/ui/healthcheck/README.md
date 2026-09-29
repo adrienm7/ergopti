@@ -18,13 +18,13 @@ timeouts, and pushes each answer into the open page.
 
 ## Key files
 
-| File          | Description                                                                       |
-| ------------- | --------------------------------------------------------------------------------- |
-| `init.lua`    | Entry point: re-exports `core.lua`                                                |
-| `core.lua`    | `M.run()` (phase A), `M.show_window()`, the `healthcheck` message handler        |
-| `helpers.lua` | One synchronous collector per section                                             |
-| `probes.lua`  | The asynchronous probes, each answering once: its result, a timeout or an error   |
-| `report.lua`  | The page's actions (copy, save, report, open) and the Debug menu's reports        |
+| File          | Description                                                                     |
+| ------------- | ------------------------------------------------------------------------------- |
+| `init.lua`    | Entry point: re-exports `core.lua`                                              |
+| `core.lua`    | `M.run()` (phase A), `M.show_window()`, the `healthcheck` message handler       |
+| `helpers.lua` | One synchronous collector per section                                           |
+| `probes.lua`  | The asynchronous probes, each answering once: its result, a timeout or an error |
+| `report.lua`  | The page's actions (copy, save, report, open) and the Debug menu's reports      |
 
 ## Usage
 

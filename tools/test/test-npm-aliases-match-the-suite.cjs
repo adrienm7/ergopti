@@ -49,8 +49,8 @@ const PKG = path.join(ROOT, 'package.json');
 // runners and the developer helper. An entry here is a decision; anything else
 // unlisted is a gate going dark.
 const NOT_SUITE_ENTRIES = new Set([
-	'tools/test/run-js-suite.cjs',   // the suite itself
-	'tools/test/verify-change.cjs',  // derives which gates a change needs
+	'tools/test/run-js-suite.cjs', // the suite itself
+	'tools/test/verify-change.cjs', // derives which gates a change needs
 	'tools/test/test-properties.cjs', // property + mutation pass, run under --full
 	// Python suites: verify-change's xkb-python gate and linux-layout.yml run
 	// them; the JS suite stays free of a Python dependency.
@@ -85,11 +85,10 @@ for (const [name, cmd] of Object.entries(scripts)) {
 	if (m) aliasPaths.set(m[1], name);
 }
 if (aliasPaths.size < 20) {
-	errors.push(`parsed ${aliasPaths.size} single-gate npm alias(es) — expected at least 20; the parser drifted`);
+	errors.push(
+		`parsed ${aliasPaths.size} single-gate npm alias(es) — expected at least 20; the parser drifted`
+	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -114,9 +113,6 @@ if (dark.length > 0) {
 	);
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Every Suite Gate Has An Alias =========
@@ -128,15 +124,16 @@ if (aliasless.length > BASELINE_ALIASLESS) {
 	errors.push(
 		`${aliasless.length} gate(s) the suite runs have no npm alias (allowed: ${BASELINE_ALIASLESS}). ` +
 			'A gate with no alias cannot be run alone, so the first thing anyone does when it fails is ' +
-			're-run all ' + suitePaths.size + ' — a two-second check becomes a two-minute one, every ' +
+			're-run all ' +
+			suitePaths.size +
+			' — a two-second check becomes a two-minute one, every ' +
 			'time. The name is mechanical, not a decision: tools/test/test-foo.cjs → "test:foo": ' +
 			'"node ./tools/test/test-foo.cjs".\n' +
-			aliasless.map((p) => `      · ${p} → "test:${path.basename(p, '.cjs').replace(/^test-/, '')}"`).join('\n')
+			aliasless
+				.map((p) => `      · ${p} → "test:${path.basename(p, '.cjs').replace(/^test-/, '')}"`)
+				.join('\n')
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================

@@ -146,7 +146,9 @@ function emitAhk(registry) {
 		`\t\t"schema_version", ${Number(registry.schema_version)},\n` +
 		`\t\t"unreleased_build_channel", ${ahkStr(registry.unreleased_build_channel)},\n` +
 		'\t\t"channels", [\n' +
-		registry.channels.map((channel) => '\t' + emitAhkChannel(channel).replace(/\n/g, '\n\t')).join(',\n') +
+		registry.channels
+			.map((channel) => '\t' + emitAhkChannel(channel).replace(/\n/g, '\n\t'))
+			.join(',\n') +
 		'\n\t\t])\n' +
 		'}\n'
 	);

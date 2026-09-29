@@ -31,14 +31,14 @@ payloads for all 20,000 rows, with derived tables cleared before timing. All
 counts and payloads were checked after each run. Payloads were empty arrays;
 this excludes encryption cost and realistic per-event JSON complexity.
 
-| Scope | Pair | Baseline ms | Candidate ms |
-| --- | --- | ---: | ---: |
-| All dates | 1 | 3348.195 | 3220.478 |
-| All dates | 2 | 3576.944 | 3300.132 |
-| All dates | 3 | 3603.098 | 3358.731 |
-| One date | 1 | 6219.679 | 6157.337 |
-| One date | 2 | 6477.611 | 6307.528 |
-| One date | 3 | 6644.361 | 6276.837 |
+| Scope     | Pair | Baseline ms | Candidate ms |
+| --------- | ---- | ----------: | -----------: |
+| All dates | 1    |    3348.195 |     3220.478 |
+| All dates | 2    |    3576.944 |     3300.132 |
+| All dates | 3    |    3603.098 |     3358.731 |
+| One date  | 1    |    6219.679 |     6157.337 |
+| One date  | 2    |    6477.611 |     6307.528 |
+| One date  | 3    |    6644.361 |     6276.837 |
 
 Candidate ran first in the second pair of each scope. The unscoped projection
 saved 128–277 ms in these samples; the date-scoped projection saved 62–368 ms.

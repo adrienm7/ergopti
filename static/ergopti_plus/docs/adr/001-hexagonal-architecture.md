@@ -1,10 +1,10 @@
 # 001 — Hexagonal architecture with ports and adapters
 
-| Field        | Value      |
-| ------------ | ---------- |
-| **Date**     | 2025-09-01 |
+| Field        | Value                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| **Date**     | 2025-09-01                                                                                                          |
 | **Status**   | Accepted; the "twenty adapters" clause below is superseded by [ADR-008](008-ports-are-contracts-not-a-checklist.md) |
-| **Deciders** | Core team  |
+| **Deciders** | Core team                                                                                                           |
 
 ---
 

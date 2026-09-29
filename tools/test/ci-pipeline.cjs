@@ -111,12 +111,16 @@ function trimTrailing(lines, maxIndent) {
  * @returns {string|null}
  */
 function readKey(lines, marker, keyIndent, what) {
-	const at = lines.map((line, index) => (!isComment(line) && marker.test(line) ? index : -1))
+	const at = lines
+		.map((line, index) => (!isComment(line) && marker.test(line) ? index : -1))
 		.filter((index) => index >= 0);
 	if (at.length === 0) return null;
 	if (at.length > 1) fail(`${what} appears ${at.length} times`);
 	const match = marker.exec(lines[at[0]]);
-	const inline = match.slice(1).find((group) => group !== undefined).trim();
+	const inline = match
+		.slice(1)
+		.find((group) => group !== undefined)
+		.trim();
 	if (inline !== '' && !BLOCK_SCALAR.test(inline)) return inline;
 	const folded = [];
 	for (let index = at[0] + 1; index < lines.length; index++) {
@@ -127,9 +131,6 @@ function readKey(lines, marker, keyIndent, what) {
 	}
 	return folded.join(' ');
 }
-
-
-
 
 // ===============================
 // ===============================
@@ -153,7 +154,8 @@ function jobsOfText(source, rel) {
 	let current = null;
 	const close = (end) => {
 		if (!current) return;
-		if (current.properties === 0) fail(`${rel}:${current.line}: job '${current.id}' has no job-level key`);
+		if (current.properties === 0)
+			fail(`${rel}:${current.line}: job '${current.id}' has no job-level key`);
 		current.body = trimTrailing(lines.slice(current.start, end), 2).join('\n');
 		delete current.start;
 		delete current.properties;
@@ -169,7 +171,8 @@ function jobsOfText(source, rel) {
 		const where = `${rel}:${index + 1}`;
 		if (ind < 4) {
 			const key = JOB_KEY.exec(line);
-			if (ind !== 2 || !key) fail(`${where}: expected a job key at two spaces, got '${line.trim()}'`);
+			if (ind !== 2 || !key)
+				fail(`${where}: expected a job key at two spaces, got '${line.trim()}'`);
 			close(index);
 			current = { id: key[1], file: rel, line: index + 1, start: index + 1, properties: 0 };
 			continue;
@@ -178,12 +181,16 @@ function jobsOfText(source, rel) {
 		// YAML takes the first key's column for the whole job; the checks read
 		// job keys at four spaces only, so any other column would hide them.
 		if (current.properties === 0 && ind !== 4) {
-			fail(`${where}: job '${current.id}' starts its keys at ${ind} spaces; job keys must sit at exactly 4`);
+			fail(
+				`${where}: job '${current.id}' starts its keys at ${ind} spaces; job keys must sit at exactly 4`
+			);
 		}
 		if (ind === 4) {
 			if (!JOB_PROPERTY.test(line)) {
-				fail(`${where}: job '${current.id}' has a job-level line the checks cannot read: '${line.trim()}'; ` +
-					'write each job key plain and on its own line');
+				fail(
+					`${where}: job '${current.id}' has a job-level line the checks cannot read: '${line.trim()}'; ` +
+						'write each job key plain and on its own line'
+				);
 			}
 			current.properties++;
 		}
@@ -217,7 +224,11 @@ function needsOf(body) {
 	const inline = lines[at].replace(/^ {4}needs:/, '').trim();
 	if (inline.startsWith('[')) {
 		if (!inline.endsWith(']')) fail(`multi-line flow list in needs: ${inline}`);
-		return inline.slice(1, -1).split(',').map((entry) => entry.trim()).filter(Boolean);
+		return inline
+			.slice(1, -1)
+			.split(',')
+			.map((entry) => entry.trim())
+			.filter(Boolean);
 	}
 	if (inline !== '') return [inline];
 	const listed = [];
@@ -231,9 +242,6 @@ function needsOf(body) {
 	}
 	return listed;
 }
-
-
-
 
 // ================================
 // ================================
@@ -265,9 +273,13 @@ function steps(body) {
 		if (start < 0) return;
 		const stepLines = trimTrailing(lines.slice(start, stop), 6);
 		const named = stepLines.find((line, index) =>
-			index === 0 ? /^ {6}-\s+name:/.test(line) : /^ {8}name:/.test(line));
+			index === 0 ? /^ {6}-\s+name:/.test(line) : /^ {8}name:/.test(line)
+		);
 		const name = named
-			? named.replace(/^\s*-?\s*name:\s*/, '').trim().replace(/^(['"])(.*)\1$/, '$2')
+			? named
+					.replace(/^\s*-?\s*name:\s*/, '')
+					.trim()
+					.replace(/^(['"])(.*)\1$/, '$2')
 			: '';
 		found.push({ name, body: stepLines.join('\n') });
 	};
@@ -278,7 +290,8 @@ function steps(body) {
 		// A step's first key fixes the column of all its keys: `- key:` at six
 		// spaces puts them at eight, the only column stepField() reads.
 		if (ind === 6) {
-			if (!STEP_HEAD.test(line)) fail(`a step must start as '- key:' at six spaces, got '${line.trim()}'`);
+			if (!STEP_HEAD.test(line))
+				fail(`a step must start as '- key:' at six spaces, got '${line.trim()}'`);
 			close(index);
 			start = index;
 			continue;
@@ -286,7 +299,9 @@ function steps(body) {
 		if (ind < 8) fail(`a steps line at ${ind} spaces: '${line.trim()}'`);
 		if (start < 0) fail(`'${line.trim()}' sits under steps: before the first step`);
 		if (ind === 8 && !STEP_PROPERTY.test(line)) {
-			fail(`a step line the checks cannot read: '${line.trim()}'; write each step key plain and on its own line`);
+			fail(
+				`a step line the checks cannot read: '${line.trim()}'; write each step key plain and on its own line`
+			);
 		}
 	}
 	close(end);
@@ -340,11 +355,11 @@ function runOf(body) {
 	const first = block.find((line) => line.trim() !== '');
 	if (!first) fail(`step '${lines[0].trim()}' has an empty run: script`);
 	const indent = indentOf(first);
-	return trimTrailing(block.map((line) => line.slice(indent)), -1);
+	return trimTrailing(
+		block.map((line) => line.slice(indent)),
+		-1
+	);
 }
-
-
-
 
 // ======================================
 // ======================================
@@ -361,14 +376,17 @@ function runOf(body) {
  * @returns {string[]}
  */
 function scriptBlock(lines, opener) {
-	const at = lines.map((line, index) => (line.trimStart().startsWith(opener) ? index : -1))
+	const at = lines
+		.map((line, index) => (line.trimStart().startsWith(opener) ? index : -1))
 		.filter((index) => index >= 0);
-	if (at.length !== 1) fail(`expected one script line starting with '${opener}', found ${at.length}`);
+	if (at.length !== 1)
+		fail(`expected one script line starting with '${opener}', found ${at.length}`);
 	const start = at[0];
 	if (lines[start].trimEnd().endsWith('}')) return [lines[start]];
 	const indent = indentOf(lines[start]);
 	for (let index = start + 1; index < lines.length; index++) {
-		if (indentOf(lines[index]) === indent && lines[index].trim() === '}') return lines.slice(start, index + 1);
+		if (indentOf(lines[index]) === indent && lines[index].trim() === '}')
+			return lines.slice(start, index + 1);
 	}
 	fail(`the block opened by '${opener}' never closes at its own column`);
 }
@@ -381,14 +399,15 @@ function scriptBlock(lines, opener) {
  * @returns {boolean}
  */
 function blockExits(block, code) {
-	const last = block.length === 1
-		? block[0].replace(/^[^{]*\{/, '').replace(/\}\s*$/, '')
-		: block.slice(1, -1).filter((line) => line.trim() !== '' && !isComment(line)).at(-1) ?? '';
+	const last =
+		block.length === 1
+			? block[0].replace(/^[^{]*\{/, '').replace(/\}\s*$/, '')
+			: (block
+					.slice(1, -1)
+					.filter((line) => line.trim() !== '' && !isComment(line))
+					.at(-1) ?? '');
 	return new RegExp(`(?:^|;)\\s*exit ${escapeRegExp(code)}$`).test(last.trim());
 }
-
-
-
 
 // ======================================
 // ======================================
@@ -428,7 +447,8 @@ function open(root) {
 			for (const match of text.matchAll(LOCAL_CALL)) visit(match[1], rel);
 		};
 		visit(ENTRY_REL, 'the repository');
-		if (loaded.length < 2) fail(`${ENTRY_REL} calls no reusable workflow; the pipeline layout changed`);
+		if (loaded.length < 2)
+			fail(`${ENTRY_REL} calls no reusable workflow; the pipeline layout changed`);
 		cache = loaded;
 		return loaded;
 	};
@@ -447,7 +467,11 @@ function open(root) {
 	const file = (rel) => {
 		const entry = load().find((candidate) => candidate.rel === rel);
 		if (!entry) {
-			fail(`${rel} is not part of the pipeline (${load().map((candidate) => candidate.rel).join(', ')})`);
+			fail(
+				`${rel} is not part of the pipeline (${load()
+					.map((candidate) => candidate.rel)
+					.join(', ')})`
+			);
 		}
 		return entry.text;
 	};
@@ -456,7 +480,10 @@ function open(root) {
 	 * Returns the whole pipeline as one text, in call order.
 	 * @returns {string}
 	 */
-	const text = () => load().map((entry) => entry.text).join('\n');
+	const text = () =>
+		load()
+			.map((entry) => entry.text)
+			.join('\n');
 
 	/**
 	 * Splits one pipeline file into its jobs.
@@ -471,10 +498,14 @@ function open(root) {
 	 * @returns {{id: string, file: string, line: number, body: string}}
 	 */
 	const locate = (id) => {
-		const matches = load().flatMap((entry) => jobs(entry.rel)).filter((candidate) => candidate.id === id);
+		const matches = load()
+			.flatMap((entry) => jobs(entry.rel))
+			.filter((candidate) => candidate.id === id);
 		if (matches.length === 0) fail(`no job '${id}' in the pipeline`);
 		if (matches.length > 1) {
-			fail(`job '${id}' is defined ${matches.length} times: ${matches.map((m) => `${m.file}:${m.line}`).join(', ')}`);
+			fail(
+				`job '${id}' is defined ${matches.length} times: ${matches.map((m) => `${m.file}:${m.line}`).join(', ')}`
+			);
 		}
 		return matches[0];
 	};
@@ -494,7 +525,9 @@ function open(root) {
 	const textWithout = (id) => {
 		const target = locate(id);
 		return load()
-			.map((entry) => (entry.rel === target.file ? entry.text.replace(target.body, '') : entry.text))
+			.map((entry) =>
+				entry.rel === target.file ? entry.text.replace(target.body, '') : entry.text
+			)
 			.join('\n');
 	};
 
@@ -508,13 +541,16 @@ function open(root) {
 		for (const entry of load()) {
 			for (const candidate of jobs(entry.rel)) {
 				for (const found of steps(candidate.body)) {
-					if (found.name === name) matches.push({ file: entry.rel, job: candidate.id, body: found.body });
+					if (found.name === name)
+						matches.push({ file: entry.rel, job: candidate.id, body: found.body });
 				}
 			}
 		}
 		if (matches.length === 0) fail(`no step named '${name}' in the pipeline`);
 		if (matches.length > 1) {
-			fail(`step '${name}' appears ${matches.length} times: ${matches.map((m) => `${m.file} ${m.job}`).join(', ')}`);
+			fail(
+				`step '${name}' appears ${matches.length} times: ${matches.map((m) => `${m.file} ${m.job}`).join(', ')}`
+			);
 		}
 		return matches[0];
 	};
@@ -524,9 +560,10 @@ function open(root) {
 	 * @param {string} rel Repository-relative path, ci.yml by default.
 	 * @returns {Array<{id: string, uses: string}>}
 	 */
-	const calls = (rel = ENTRY_REL) => jobs(rel)
-		.map((candidate) => ({ id: candidate.id, uses: field(candidate.body, 'uses') }))
-		.filter((candidate) => candidate.uses !== null);
+	const calls = (rel = ENTRY_REL) =>
+		jobs(rel)
+			.map((candidate) => ({ id: candidate.id, uses: field(candidate.body, 'uses') }))
+			.filter((candidate) => candidate.uses !== null);
 
 	return { files, file, text, jobs, locate, job, textWithout, findStep, calls };
 }
@@ -544,5 +581,5 @@ module.exports = {
 	runOf,
 	scriptBlock,
 	blockExits,
-	...open(ROOT),
+	...open(ROOT)
 };

@@ -17,10 +17,10 @@ through `manifest-current-3.out` and `manifest-cached-ready-1.out` through
 not private payloads. The probe also times a historical encoder candidate;
 that candidate was not changed or shipped in this pass.
 
-| Phase | Before median / maximum | After median / maximum |
-| --- | --- | --- |
-| Manifest projection | 1256.47 / 1338.41 ms | 1228.48 / 1233.80 ms |
-| JSON encoding | 888.45 / 890.35 ms | 890.45 / 897.24 ms |
+| Phase               | Before median / maximum | After median / maximum |
+| ------------------- | ----------------------- | ---------------------- |
+| Manifest projection | 1256.47 / 1338.41 ms    | 1228.48 / 1233.80 ms   |
+| JSON encoding       | 888.45 / 890.35 ms      | 890.45 / 897.24 ms     |
 
 The backend is unchanged. These small sample differences are not evidence of
 faster projection. Three samples do not establish a useful p95 or p99.

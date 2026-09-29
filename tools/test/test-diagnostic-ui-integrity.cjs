@@ -100,14 +100,29 @@ const html = read('_shared/ui/healthcheck/index.html');
 const script = read('_shared/ui/healthcheck/script.js');
 const style = read('_shared/ui/healthcheck/style.css');
 const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-const needed = ['../dom_utils.js', '../host_bridge.js', '../i18n.js', '../redact.js', 'model.js', 'script.js'];
-report('Shared: the page loads its helpers, the model and the redactor before its script',
-	JSON.stringify(scripts) === JSON.stringify(needed), `scripts are ${JSON.stringify(scripts)}`);
-report('Shared: the page has one host entry point, window.receiveDiagnostics',
+const needed = [
+	'../dom_utils.js',
+	'../host_bridge.js',
+	'../i18n.js',
+	'../redact.js',
+	'model.js',
+	'script.js'
+];
+report(
+	'Shared: the page loads its helpers, the model and the redactor before its script',
+	JSON.stringify(scripts) === JSON.stringify(needed),
+	`scripts are ${JSON.stringify(scripts)}`
+);
+report(
+	'Shared: the page has one host entry point, window.receiveDiagnostics',
 	/window\.receiveDiagnostics\s*=\s*function/.test(script) && !/renderHealthcheck/.test(script),
-	'script.js must define receiveDiagnostics and drop renderHealthcheck');
-report('Shared: the page follows a dark system appearance',
-	/@media \(prefers-color-scheme: dark\)/.test(style), 'style.css has no dark appearance');
+	'script.js must define receiveDiagnostics and drop renderHealthcheck'
+);
+report(
+	'Shared: the page follows a dark system appearance',
+	/@media \(prefers-color-scheme: dark\)/.test(style),
+	'style.css has no dark appearance'
+);
 
 // ===================================
 // ===================================
@@ -123,7 +138,9 @@ const Model = (() => {
 	}
 	return sandbox.window.ErgoptiDiagnostics;
 })();
-const schema = JSON.parse(fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8'));
+const schema = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+);
 const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
 const t = (key, ...args) => {
 	let index = 0;
@@ -137,8 +154,18 @@ const t = (key, ...args) => {
  * @returns {string}
  */
 function render(driver, sections) {
-	return Model.renderHtml({ schema_version: 2, driver, generated_at: '2026-09-24T10:00:00Z', detailed: false,
-		sections, probes: {} }, schema, t);
+	return Model.renderHtml(
+		{
+			schema_version: 2,
+			driver,
+			generated_at: '2026-09-24T10:00:00Z',
+			detailed: false,
+			sections,
+			probes: {}
+		},
+		schema,
+		t
+	);
 }
 
 /** The escaped text of a table row: its label cell, then its value. */
@@ -147,10 +174,14 @@ function rowPattern(label, value) {
 }
 
 {
-	const html = render('macos', { developer: { event_tap_telemetry: 'unavailable — native contract marker' } });
-	report('macOS: the native tap telemetry status is rendered in the developer details',
+	const html = render('macos', {
+		developer: { event_tap_telemetry: 'unavailable — native contract marker' }
+	});
+	report(
+		'macOS: the native tap telemetry status is rendered in the developer details',
 		html.includes('unavailable — native contract marker') && /id="section-developer"/.test(html),
-		'the telemetry did not reach the collapsed developer section');
+		'the telemetry did not reach the collapsed developer section'
+	);
 }
 
 {
@@ -158,58 +189,89 @@ function rowPattern(label, value) {
 		versions: { commit: 'f58d15798 (build)' },
 		paths: {
 			config_dir: '/Volumes/Fixture/alice/Chosen/ergopti_plus',
-			app_dir: '/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos',
-		},
+			app_dir: '/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos'
+		}
 	});
-	report('Shared: commit origin, config dir and app dir render under their own labels',
-		rowPattern(t('healthcheck.field.commit'), 'f58d15798 \\(build\\)').test(html)
-			&& html.includes('/Volumes/Fixture/alice/Chosen/ergopti_plus')
-			&& rowPattern(t('healthcheck.field.app_dir'),
-				'/Applications/ErgoptiPlus\\.app/Contents/Resources/static/ergopti_plus/macos').test(html),
-		'a commit, config or app folder row is missing');
+	report(
+		'Shared: commit origin, config dir and app dir render under their own labels',
+		rowPattern(t('healthcheck.field.commit'), 'f58d15798 \\(build\\)').test(html) &&
+			html.includes('/Volumes/Fixture/alice/Chosen/ergopti_plus') &&
+			rowPattern(
+				t('healthcheck.field.app_dir'),
+				'/Applications/ErgoptiPlus\\.app/Contents/Resources/static/ergopti_plus/macos'
+			).test(html),
+		'a commit, config or app folder row is missing'
+	);
 }
 
 {
-	const html = render('macos', { permissions: { items: [
-		{ id: 'accessibility', state: 'granted' }, { id: 'screen_recording', state: 'missing' },
-	] } });
-	report('macOS: a missing permission renders as a failure with its settings button',
-		/<tr class="fail"><td>Screen Recording<\/td>/.test(html)
-			&& /<tr class="ok"><td>Accessibility<\/td>/.test(html)
-			&& html.includes('data-action="open_settings" data-id="screen_recording"'),
-		'the permission rows lack their state class or the settings button');
+	const html = render('macos', {
+		permissions: {
+			items: [
+				{ id: 'accessibility', state: 'granted' },
+				{ id: 'screen_recording', state: 'missing' }
+			]
+		}
+	});
+	report(
+		'macOS: a missing permission renders as a failure with its settings button',
+		/<tr class="fail"><td>Screen Recording<\/td>/.test(html) &&
+			/<tr class="ok"><td>Accessibility<\/td>/.test(html) &&
+			html.includes('data-action="open_settings" data-id="screen_recording"'),
+		'the permission rows lack their state class or the settings button'
+	);
 }
 
 {
 	const html = render('linux', {
-		system: { os: 'Fedora Linux 41', kernel: '6.11.4', display_server: 'wayland', desktop: 'GNOME' },
-		hardware: { cpu: 'AMD Ryzen 7', cpu_cores: 16, ram_total: 33285996544, arch: 'x86_64' },
+		system: {
+			os: 'Fedora Linux 41',
+			kernel: '6.11.4',
+			display_server: 'wayland',
+			desktop: 'GNOME'
+		},
+		hardware: { cpu: 'AMD Ryzen 7', cpu_cores: 16, ram_total: 33285996544, arch: 'x86_64' }
 	});
 	const missing = [
 		rowPattern(t('healthcheck.field.os'), 'Fedora Linux 41'),
 		rowPattern(t('healthcheck.field.kernel'), '6\\.11\\.4'),
 		rowPattern(t('healthcheck.field.cpu'), 'AMD Ryzen 7'),
 		rowPattern(t('healthcheck.field.ram_total'), '31\\.0 GB'),
-		rowPattern(t('healthcheck.field.display_server'), 'wayland'),
+		rowPattern(t('healthcheck.field.display_server'), 'wayland')
 	].filter((pattern) => !pattern.test(html));
-	report('Linux: the system rows render their values', missing.length === 0, `missing ${missing.join(', ')}`);
+	report(
+		'Linux: the system rows render their values',
+		missing.length === 0,
+		`missing ${missing.join(', ')}`
+	);
 }
 
 {
-	const html = render('windows', { issues: { recent_source: 'ring', recent: ['2026-09-23 10:00:01:002 [ERROR] [Probe] boom'] } });
-	report('Shared: recent issues name their source (errors-file-issues)',
+	const html = render('windows', {
+		issues: { recent_source: 'ring', recent: ['2026-09-23 10:00:01:002 [ERROR] [Probe] boom'] }
+	});
+	report(
+		'Shared: recent issues name their source (errors-file-issues)',
 		html.includes(t('healthcheck.recent_source.ring')) && html.includes('[ERROR] [Probe] boom'),
-		'the ring fallback is not named or the entry is missing');
+		'the ring fallback is not named or the entry is missing'
+	);
 }
 
 {
-	const html = render('linux', { developer: { modules_ok: ['engine'], modules_failed: ['keylogger (not wired)'],
-		modules_disabled: ['llm'] } });
-	report('Shared: module checks sit in collapsed developer details and a failure reaches the summary',
-		/<details class="section" id="section-developer">/.test(html)
-			&& html.includes(t('healthcheck.problem.modules', 1))
-			&& html.includes('keylogger (not wired)'),
-		'the developer section is not collapsed or its failure is not summarised');
+	const html = render('linux', {
+		developer: {
+			modules_ok: ['engine'],
+			modules_failed: ['keylogger (not wired)'],
+			modules_disabled: ['llm']
+		}
+	});
+	report(
+		'Shared: module checks sit in collapsed developer details and a failure reaches the summary',
+		/<details class="section" id="section-developer">/.test(html) &&
+			html.includes(t('healthcheck.problem.modules', 1)) &&
+			html.includes('keylogger (not wired)'),
+		'the developer section is not collapsed or its failure is not summarised'
+	);
 }
 
 // =================================
@@ -219,60 +281,90 @@ function rowPattern(label, value) {
 // =================================
 
 const macCore = withoutComments(readFolder('macos/ui/healthcheck'));
-report('macOS: the window registers the "healthcheck" message handler the page posts to',
-	/hs\.webview\.usercontent\.new,\s*BRIDGE/.test(macCore) && /local BRIDGE = "healthcheck"/.test(macCore),
-	'no usercontent controller named healthcheck');
-report('macOS: nothing polls the page for a copy flag',
+report(
+	'macOS: the window registers the "healthcheck" message handler the page posts to',
+	/hs\.webview\.usercontent\.new,\s*BRIDGE/.test(macCore) &&
+		/local BRIDGE = "healthcheck"/.test(macCore),
+	'no usercontent controller named healthcheck'
+);
+report(
+	'macOS: nothing polls the page for a copy flag',
 	!/__hs_copy_requested/.test(macCore) && !/TimerScheduler\.every\(/.test(macCore),
-	'the injected copy button or its 200 ms poll is back');
+	'the injected copy button or its 200 ms poll is back'
+);
 // Any reference, not only a call: the old collectors ran pcall(hs.execute, "sysctl …"),
 // which a pattern requiring "hs.execute(" never saw. The behaviour is pinned by
 // macos/tests/unit/ui/test_healthcheck_phase_a_no_subprocess.lua.
-report('macOS: no synchronous subprocess in the diagnostics window',
+report(
+	'macOS: no synchronous subprocess in the diagnostics window',
 	!/\bhs\.execute\b|\bio\.popen\b|\bos\.execute\b/.test(macCore) && macCore.length > 1000,
-	'an hs.execute, io.popen or os.execute runs on the run loop that dispatches the event taps');
+	'an hs.execute, io.popen or os.execute runs on the run loop that dispatches the event taps'
+);
 
 const winCore = withoutComments(readFolder('windows/ui/healthcheck'));
-report('Windows: the window subscribes to the page\'s messages, bound to its epoch',
-	/WebMessageReceived\(_HC_OnWebMessage\.Bind\(WindowEpoch\)\)/.test(winCore), 'no epoch-bound subscription');
-report('Windows: the native copy button is gone',
+report(
+	"Windows: the window subscribes to the page's messages, bound to its epoch",
+	/WebMessageReceived\(_HC_OnWebMessage\.Bind\(WindowEpoch\)\)/.test(winCore),
+	'no epoch-bound subscription'
+);
+report(
+	'Windows: the native copy button is gone',
 	!/healthcheck\.copy_and_close/.test(winCore) && !/_HealthCheck_CopyAndClose/.test(winCore),
-	'the native copy-and-close button is back');
-report('Windows: no WMI or blocking child on the thread that serves the keyboard hook',
+	'the native copy-and-close button is back'
+);
+report(
+	'Windows: no WMI or blocking child on the thread that serves the keyboard hook',
 	!/WbemScripting|winmgmts|\bRunWait\b/i.test(winCore) && winCore.length > 1000,
-	'a WMI query or a RunWait runs on the AHK thread');
-report('Windows: the plain-text report stays for a machine without WebView2',
+	'a WMI query or a RunWait runs on the AHK thread'
+);
+report(
+	'Windows: the plain-text report stays for a machine without WebView2',
 	/"Edit"[^\n]*ReadOnly[\s\S]{0,120}HealthCheck_FormatPlain\(Snapshot\)/.test(winCore),
-	'no read-only fallback field');
+	'no read-only fallback field'
+);
 
 const linuxBridge = withoutComments(read('linux/ui/healthcheck/bridge.lua'));
-report('Linux: every page message goes through the shared action allowlist',
-	/Actions\.validate\(payload/.test(linuxBridge), 'the bridge does not validate page messages');
+report(
+	'Linux: every page message goes through the shared action allowlist',
+	/Actions\.validate\(payload/.test(linuxBridge),
+	'the bridge does not validate page messages'
+);
 const linuxCollect = linuxBridge + withoutComments(read('linux/ui/healthcheck/probes.lua'));
-report('Linux: no blocking child in the collection or the probes',
+report(
+	'Linux: no blocking child in the collection or the probes',
 	!/io\.popen\s*\(|os\.execute\s*\(|Shell\.(run|exec[a-z_]*)\s*\(/.test(linuxCollect),
-	'a synchronous child runs on the event loop that reads the grabbed keyboard');
+	'a synchronous child runs on the event loop that reads the grabbed keyboard'
+);
 
 // A field filled by a probe reads "checking…" until its driver answers that
 // probe: every probe the schema declares for a driver must be started by the
 // driver's probe module, which names it when it starts and finishes it
 {
-	const schema = JSON.parse(fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8'));
+	const schema = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+	);
 	const probeModules = {
 		windows: withoutComments(read('windows/ui/healthcheck/probes.ahk')),
 		macos: withoutComments(read('macos/ui/healthcheck/probes.lua')),
-		linux: withoutComments(read('linux/ui/healthcheck/probes.lua')),
+		linux: withoutComments(read('linux/ui/healthcheck/probes.lua'))
 	};
 	let declared = 0;
 	for (const [driver, source] of Object.entries(probeModules)) {
 		for (const [id, probe] of Object.entries(schema.probes || {})) {
 			if (Array.isArray(probe.platforms) && !probe.platforms.includes(driver)) continue;
 			declared++;
-			report(`${driver}: the ${id} probe is started`, source.includes(`"${id}"`),
-				`${driver}/ui/healthcheck/probes never names the ${id} probe the schema declares for it`);
+			report(
+				`${driver}: the ${id} probe is started`,
+				source.includes(`"${id}"`),
+				`${driver}/ui/healthcheck/probes never names the ${id} probe the schema declares for it`
+			);
 		}
 	}
-	report('Shared: the probe check sees every driver\'s probes', declared >= 9, `only ${declared} probe(s) declared`);
+	report(
+		"Shared: the probe check sees every driver's probes",
+		declared >= 9,
+		`only ${declared} probe(s) declared`
+	);
 }
 
 console.log(`\nResults: ${totalPass} passed, ${totalFail} failed.`);

@@ -44,7 +44,7 @@ const CONSUMERS = ['static/ergopti_plus/linux/ui/model_browser/bridge.lua'];
 const DRIVER_TREES = [
 	'static/ergopti_plus/linux',
 	'static/ergopti_plus/macos',
-	'static/ergopti_plus/_shared/lua',
+	'static/ergopti_plus/_shared/lua'
 ];
 
 /**
@@ -98,7 +98,9 @@ for (const tree of DRIVER_TREES) {
 		if (rel.includes('/tests/')) continue;
 		const source = read(rel);
 		if (DECLARATION_RE.test(source)) {
-			errors.push(`${rel}: declares its own normalise_name — borrow ModelCatalogue.normalise_name instead`);
+			errors.push(
+				`${rel}: declares its own normalise_name — borrow ModelCatalogue.normalise_name instead`
+			);
 		}
 	}
 }
@@ -118,4 +120,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] One model-identity normaliser, borrowed by ${CONSUMERS.length} consumer(s).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] One model-identity normaliser, borrowed by ${CONSUMERS.length} consumer(s).\x1b[0m`
+);

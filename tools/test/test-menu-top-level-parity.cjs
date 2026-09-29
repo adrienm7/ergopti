@@ -92,9 +92,6 @@ const KNOWN_ORDER_DIVERGENCES = {
 
 const errors = [];
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ The manifest projection ===============
@@ -125,7 +122,11 @@ function projectionFor(driver) {
 
 // A projection identical for all three drivers would mean the platforms fields
 // stopped being read — the exact state this gate was written to end.
-const projections = { hs: projectionFor('hs'), ahk: projectionFor('ahk'), linux: projectionFor('linux') };
+const projections = {
+	hs: projectionFor('hs'),
+	ahk: projectionFor('ahk'),
+	linux: projectionFor('linux')
+};
 const shapes = new Set(Object.values(projections).map((p) => p.join(',')));
 if (shapes.size === 1) {
 	errors.push(
@@ -144,12 +145,11 @@ for (const [driver, ids] of Object.entries(projections)) {
 		errors.push(`the manifest no longer projects the shared tap_holds row for ${driver}`);
 	}
 	if (ids.includes('kanata')) {
-		errors.push(`the manifest projects a kanata row for ${driver}; kanata was retired on 2026-09-24`);
+		errors.push(
+			`the manifest projects a kanata row for ${driver}; kanata was retired on 2026-09-24`
+		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -170,7 +170,9 @@ const linuxSrc = fs.readFileSync(LINUX_BUILDER, 'utf8');
 // pinned to a spelling rather than to a shape.
 const buildBody = linuxSrc.match(/function M\.build\(ctx\)([\s\S]*?)\nend\n/);
 if (!buildBody) {
-	errors.push('could not find M.build(ctx) in the Linux menu builder — the parse below reads nothing');
+	errors.push(
+		'could not find M.build(ctx) in the Linux menu builder — the parse below reads nothing'
+	);
 }
 
 // Read from the `builders` map that M.build dispatches through, not from a
@@ -182,7 +184,9 @@ if (!buildBody) {
 // construction rather than by comparison.
 const buildersBlock = (buildBody ? buildBody[1] : '').match(/local builders = \{([\s\S]*?)\n\t\}/);
 const linuxBuilt = [];
-for (const m of (buildersBlock ? buildersBlock[1] : '').matchAll(/\["(\w+)"\]\s*=\s*_build_(\w+)/g)) {
+for (const m of (buildersBlock ? buildersBlock[1] : '').matchAll(
+	/\["(\w+)"\]\s*=\s*_build_(\w+)/g
+)) {
 	const id = m[1];
 	if (LINUX_NON_ROWS.has(id)) continue;
 	linuxBuilt.push(LINUX_BUILDER_ALIASES[id] || id);
@@ -194,9 +198,6 @@ if (linuxBuilt.length < 10) {
 			'comparison below would report the manifest as wholly unimplemented'
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -244,9 +245,8 @@ if (!HOLDS_QUIT_LAST && KNOWN_ORDER_DIVERGENCES.linux) {
 }
 
 const declaredOrder = projections.linux.join(',');
-const builtOrder = (HOLDS_QUIT_LAST
-	? [...linuxBuilt.filter((id) => id !== 'quit'), 'quit']
-	: linuxBuilt
+const builtOrder = (
+	HOLDS_QUIT_LAST ? [...linuxBuilt.filter((id) => id !== 'quit'), 'quit'] : linuxBuilt
 ).join(',');
 if (declaredOrder === builtOrder && KNOWN_ORDER_DIVERGENCES.linux) {
 	errors.push(
@@ -260,9 +260,6 @@ if (declaredOrder !== builtOrder && !KNOWN_ORDER_DIVERGENCES.linux) {
 			`      manifest: ${declaredOrder}\n      built:    ${builtOrder}`
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -371,9 +368,6 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 5/ The approved order ====================
@@ -388,11 +382,26 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // held to the decision rather than silently shipped. Changing the order means
 // changing this list, in the same commit and on purpose.
 const APPROVED_TOP_LEVEL = [
-	'tap_holds', 'shortcuts', 'gestures', SEPARATOR,
-	'keyboard_layout', 'hotstrings', 'llm', 'agent', SEPARATOR,
-	'metrics', 'apps', SEPARATOR,
-	'configuration', 'language', 'about', SEPARATOR,
-	'suspend', 'reload', 'quit', 'debug'
+	'tap_holds',
+	'shortcuts',
+	'gestures',
+	SEPARATOR,
+	'keyboard_layout',
+	'hotstrings',
+	'llm',
+	'agent',
+	SEPARATOR,
+	'metrics',
+	'apps',
+	SEPARATOR,
+	'configuration',
+	'language',
+	'about',
+	SEPARATOR,
+	'suspend',
+	'reload',
+	'quit',
+	'debug'
 ];
 
 const declaredTopLevel = (topLevel || []).map((row) => row.id);
@@ -422,19 +431,26 @@ let pauseMarked = 0;
 (topLevel || []).forEach((row, index) => {
 	const mark = row[PAUSE_MARK];
 	if (mark !== undefined && mark !== true) {
-		errors.push(`top_level "${row.id}": ${PAUSE_MARK} is ${JSON.stringify(mark)}; only true is a mark.`);
+		errors.push(
+			`top_level "${row.id}": ${PAUSE_MARK} is ${JSON.stringify(mark)}; only true is a mark.`
+		);
 	}
 	if (row.id === SEPARATOR) {
-		if (mark !== undefined) errors.push(`a top_level separator carries ${PAUSE_MARK}; it has no row to grey.`);
+		if (mark !== undefined)
+			errors.push(`a top_level separator carries ${PAUSE_MARK}; it has no row to grey.`);
 		return;
 	}
 	if (mark === true) pauseMarked += 1;
 	const isFeature = tailAt >= 0 && index < tailAt;
 	if (isFeature && mark !== true) {
-		errors.push(`the feature row "${row.id}" lacks ${PAUSE_MARK} = true: a pause would leave it live.`);
+		errors.push(
+			`the feature row "${row.id}" lacks ${PAUSE_MARK} = true: a pause would leave it live.`
+		);
 	}
 	if (!isFeature && mark === true) {
-		errors.push(`the tail row "${row.id}" carries ${PAUSE_MARK}: a pause would grey a row the user resumes or leaves with.`);
+		errors.push(
+			`the tail row "${row.id}" carries ${PAUSE_MARK}: a pause would grey a row the user resumes or leaves with.`
+		);
 	}
 });
 if (tailAt < 0 || pauseMarked < 7) {
@@ -443,9 +459,6 @@ if (tailAt < 0 || pauseMarked < 7) {
 			'row — the pause-mark check compared nothing'
 	);
 }
-
-
-
 
 // ==================================================
 // ==================================================

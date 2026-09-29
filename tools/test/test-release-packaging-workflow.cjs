@@ -47,16 +47,14 @@ const windowsToolchainContractPath = path.join(
 	'updater',
 	'windows_release_toolchain.json'
 );
-const windowsToolchainContract = JSON.parse(
-	fs.readFileSync(windowsToolchainContractPath, 'utf8')
-);
+const windowsToolchainContract = JSON.parse(fs.readFileSync(windowsToolchainContractPath, 'utf8'));
 const errors = [];
 
 // The one job of each box that builds its release artifact.
 const PACKAGE_JOB = {
 	[WINDOWS_BOX]: 'package-windows',
 	[LINUX_BOX]: 'package-linux',
-	[MACOS_BOX]: 'package-macos',
+	[MACOS_BOX]: 'package-macos'
 };
 const releaseSteps = new Map();
 
@@ -70,14 +68,19 @@ const releaseSteps = new Map();
  */
 function releaseStep(name, rel) {
 	if (releaseSteps.has(name)) return releaseSteps.get(name);
-	const job = name === 'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)' ? 'launch-windows' : PACKAGE_JOB[rel];
+	const job =
+		name === 'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)'
+			? 'launch-windows'
+			: PACKAGE_JOB[rel];
 	let body = null;
 	try {
 		const found = pipeline.findStep(name);
 		if (found.file === rel && found.job === job) {
 			body = found.body;
 		} else {
-			errors.push(`step '${name}' runs in ${found.file} (job ${found.job}); it belongs in job ${job} of ${rel}`);
+			errors.push(
+				`step '${name}' runs in ${found.file} (job ${found.job}); it belongs in job ${job} of ${rel}`
+			);
 		}
 	} catch (error) {
 		errors.push(`${error.message}; job ${job} of ${rel} must run it exactly once`);
@@ -99,19 +102,27 @@ for (const name of [
 	'Compile ErgoptiPlus.ahk',
 	'Sign and verify ErgoptiPlus.exe',
 	'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)',
-	'Rename the keyboard layout for upload',
+	'Rename the keyboard layout for upload'
 ]) {
 	releaseStep(name, WINDOWS_BOX);
 }
 const windowsUpload = releaseStep('Upload the application and layout', WINDOWS_BOX);
 if (windowsUpload !== null && !/^\s+name:\s*assets-windows\s*$/m.test(windowsUpload)) {
-	errors.push('the Windows release exe must be uploaded as assets-windows, the artifact release attaches');
+	errors.push(
+		'the Windows release exe must be uploaded as assets-windows, the artifact release attaches'
+	);
 }
 const packageWindows = pipeline.job(PACKAGE_JOB[WINDOWS_BOX]);
 if (!pipeline.needsOf(packageWindows).includes('e2e-ahk')) {
-	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must need e2e-ahk: a release exe is built only after the suites passed`);
+	errors.push(
+		`${PACKAGE_JOB[WINDOWS_BOX]} must need e2e-ahk: a release exe is built only after the suites passed`
+	);
 }
-const codeOf = (body) => body.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
+const codeOf = (body) =>
+	body
+		.split('\n')
+		.filter((line) => !line.trimStart().startsWith('#'))
+		.join('\n');
 const testAhkCode = codeOf(pipeline.job('test-ahk')) + codeOf(pipeline.job('e2e-ahk'));
 for (const token of ['run_all.ahk', 'run_e2e.ahk', 'MpPreference']) {
 	// The token must still exist where it belongs, so the ban reads live text.
@@ -119,7 +130,9 @@ for (const token of ['run_all.ahk', 'run_e2e.ahk', 'MpPreference']) {
 		errors.push(`test-ahk no longer mentions ${token}; re-derive the B1 separation check`);
 	}
 	if (codeOf(packageWindows).includes(token)) {
-		errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must not run ${token}: the release exe job neither tests nor touches Defender`);
+		errors.push(
+			`${PACKAGE_JOB[WINDOWS_BOX]} must not run ${token}: the release exe job neither tests nor touches Defender`
+		);
 	}
 }
 
@@ -135,26 +148,40 @@ const WINDOWS_ORDER = [
 	'Compile ErgoptiPlus.ahk',
 	'Sign and verify ErgoptiPlus.exe',
 	'Rename the keyboard layout for upload',
-	'Upload the application and layout',
+	'Upload the application and layout'
 ];
 const packageWindowsSteps = pipeline.steps(packageWindows).map((candidate) => candidate.name);
 const windowsOrder = WINDOWS_ORDER.map((name) => packageWindowsSteps.indexOf(name));
 if (windowsOrder.some((at, index) => at < 0 || (index > 0 && at <= windowsOrder[index - 1]))) {
-	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must run ${WINDOWS_ORDER.join(' < ')}; got: ${packageWindowsSteps.join(' | ')}`);
+	errors.push(
+		`${PACKAGE_JOB[WINDOWS_BOX]} must run ${WINDOWS_ORDER.join(' < ')}; got: ${packageWindowsSteps.join(' | ')}`
+	);
 }
-if (!(packageWindowsSteps.indexOf('Download the authenticated compiler toolchain') >= 0 &&
-	packageWindowsSteps.indexOf('Download the authenticated compiler toolchain') <
-		packageWindowsSteps.indexOf('Compile ErgoptiPlus.ahk'))) {
-	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must download the authenticated toolchain before it compiles`);
+if (
+	!(
+		packageWindowsSteps.indexOf('Download the authenticated compiler toolchain') >= 0 &&
+		packageWindowsSteps.indexOf('Download the authenticated compiler toolchain') <
+			packageWindowsSteps.indexOf('Compile ErgoptiPlus.ahk')
+	)
+) {
+	errors.push(
+		`${PACKAGE_JOB[WINDOWS_BOX]} must download the authenticated toolchain before it compiles`
+	);
 }
 
 // The smoke's verdict is behavioural (the runtime bundle extracted, no early
 // exit): its failure branch must end the step with a failing exit, or a
 // crashing exe only prints an error.
-const windowsSmokeStep = releaseStep('Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)', WINDOWS_BOX);
+const windowsSmokeStep = releaseStep(
+	'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)',
+	WINDOWS_BOX
+);
 if (windowsSmokeStep !== null) {
 	try {
-		const verdict = pipeline.scriptBlock(pipeline.runOf(windowsSmokeStep) ?? [], 'if ($crashedEarly -or -not $markerSeen) {');
+		const verdict = pipeline.scriptBlock(
+			pipeline.runOf(windowsSmokeStep) ?? [],
+			'if ($crashedEarly -or -not $markerSeen) {'
+		);
 		if (!pipeline.blockExits(verdict, '1')) {
 			errors.push('the Windows exe smoke must end its crash branch with exit 1');
 		}
@@ -163,7 +190,10 @@ if (windowsSmokeStep !== null) {
 	}
 }
 
-const stampStep = releaseStep('Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL', WINDOWS_BOX);
+const stampStep = releaseStep(
+	'Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL',
+	WINDOWS_BOX
+);
 if (stampStep !== null) {
 	if (!/windows\\infra\\bundle\.ahk/.test(stampStep)) {
 		errors.push('the Windows release must stamp the live infra/bundle.ahk implementation');
@@ -173,13 +203,13 @@ if (stampStep !== null) {
 	}
 }
 
-const windowsToolchainStep = releaseStep('Download the authenticated compiler toolchain', WINDOWS_BOX);
+const windowsToolchainStep = releaseStep(
+	'Download the authenticated compiler toolchain',
+	WINDOWS_BOX
+);
 if (windowsToolchainStep !== null) {
 	const body = windowsToolchainStep;
-	if (
-		!body.includes('windows_release_toolchain.json') ||
-		!body.includes('ConvertFrom-Json')
-	) {
+	if (!body.includes('windows_release_toolchain.json') || !body.includes('ConvertFrom-Json')) {
 		errors.push('the Windows compiler toolchain must consume its shared authenticated contract');
 	}
 	for (const token of [
@@ -187,7 +217,7 @@ if (windowsToolchainStep !== null) {
 		'$contract.runtime.sha256',
 		'$contract.compiler.url',
 		'$contract.compiler.sha256',
-		'Get-FileHash',
+		'Get-FileHash'
 	]) {
 		if (!body.includes(token)) {
 			errors.push(`the Windows compiler toolchain is missing pinned token ${token}`);
@@ -209,17 +239,31 @@ try {
 	const downloadStep = pipeline.findStep('Download AutoHotkey v2 runtime');
 	for (const found of [contractStep, cacheStep, downloadStep]) {
 		if (found.file !== WINDOWS_BOX || found.job !== 'test-ahk') {
-			errors.push(`the AHK test runtime step runs in ${found.file} (job ${found.job}); it belongs in test-ahk of ${WINDOWS_BOX}`);
+			errors.push(
+				`the AHK test runtime step runs in ${found.file} (job ${found.job}); it belongs in test-ahk of ${WINDOWS_BOX}`
+			);
 		}
 	}
-	if (!contractStep.body.includes('windows_release_toolchain.json') || !contractStep.body.includes('ConvertFrom-Json')) {
+	if (
+		!contractStep.body.includes('windows_release_toolchain.json') ||
+		!contractStep.body.includes('ConvertFrom-Json')
+	) {
 		errors.push('the AHK test job must read its runtime from the shared release contract');
 	}
 	const cacheKey = (/^\s+key:\s*(.*)$/m.exec(cacheStep.body) ?? [])[1] ?? '';
-	if (!cacheKey.includes('steps.ahk-contract.outputs.version') || !cacheKey.includes('steps.ahk-contract.outputs.sha256')) {
-		errors.push(`the AHK test runtime cache must be keyed on the contract version and digest, got: ${cacheKey}`);
+	if (
+		!cacheKey.includes('steps.ahk-contract.outputs.version') ||
+		!cacheKey.includes('steps.ahk-contract.outputs.sha256')
+	) {
+		errors.push(
+			`the AHK test runtime cache must be keyed on the contract version and digest, got: ${cacheKey}`
+		);
 	}
-	for (const token of ['steps.ahk-contract.outputs.url', 'steps.ahk-contract.outputs.sha256', 'Get-FileHash']) {
+	for (const token of [
+		'steps.ahk-contract.outputs.url',
+		'steps.ahk-contract.outputs.sha256',
+		'Get-FileHash'
+	]) {
 		if (!downloadStep.body.includes(token)) {
 			errors.push(`the AHK test runtime download is missing contract token ${token}`);
 		}
@@ -239,17 +283,35 @@ try {
 try {
 	const suiteStep = pipeline.findStep('Run AHK test suite');
 	if (suiteStep.file !== WINDOWS_BOX || suiteStep.job !== 'test-ahk') {
-		errors.push(`the AHK suite runs in ${suiteStep.file} (job ${suiteStep.job}); it belongs in test-ahk of ${WINDOWS_BOX}`);
+		errors.push(
+			`the AHK suite runs in ${suiteStep.file} (job ${suiteStep.job}); it belongs in test-ahk of ${WINDOWS_BOX}`
+		);
 	}
 	if (/GITHUB_ACTIONS/.test(pipeline.file(WINDOWS_BOX))) {
-		errors.push(`${WINDOWS_BOX} must not set GITHUB_ACTIONS: the AHK runtime-contract test enforces the pinned runtime only when GitHub's own value ("true") reaches it`);
+		errors.push(
+			`${WINDOWS_BOX} must not set GITHUB_ACTIONS: the AHK runtime-contract test enforces the pinned runtime only when GitHub's own value ("true") reaches it`
+		);
 	}
 	const testsDir = path.join(root, 'static', 'ergopti_plus', 'windows', 'tests');
-	const runtimeTest = fs.readFileSync(path.join(testsDir, 'unit', 'test_runtime_contract_version.ahk'), 'utf8');
-	if (!runtimeTest.includes('EnvGet("GITHUB_ACTIONS") = "true"') || !runtimeTest.includes('_RCV_CheckRuntime(_RCV_ContractRuntimeVersion(), A_AhkVersion, _RCV_IsCi())')) {
-		errors.push('the AHK runtime-contract test must hold the suite to the contract runtime whenever GITHUB_ACTIONS is "true"');
+	const runtimeTest = fs.readFileSync(
+		path.join(testsDir, 'unit', 'test_runtime_contract_version.ahk'),
+		'utf8'
+	);
+	if (
+		!runtimeTest.includes('EnvGet("GITHUB_ACTIONS") = "true"') ||
+		!runtimeTest.includes(
+			'_RCV_CheckRuntime(_RCV_ContractRuntimeVersion(), A_AhkVersion, _RCV_IsCi())'
+		)
+	) {
+		errors.push(
+			'the AHK runtime-contract test must hold the suite to the contract runtime whenever GITHUB_ACTIONS is "true"'
+		);
 	}
-	if (!/^#Include unit\/test_runtime_contract_version\.ahk$/m.test(fs.readFileSync(path.join(testsDir, 'run_all.ahk'), 'utf8'))) {
+	if (
+		!/^#Include unit\/test_runtime_contract_version\.ahk$/m.test(
+			fs.readFileSync(path.join(testsDir, 'run_all.ahk'), 'utf8')
+		)
+	) {
 		errors.push('run_all.ahk must include the AHK runtime-contract test');
 	}
 } catch (error) {
@@ -260,13 +322,13 @@ for (const [component, expected] of Object.entries({
 	runtime: {
 		version: '2.0.26',
 		asset: 'AutoHotkey_2.0.26.zip',
-		sha256: '43522aa3122a57784ac5db30abf85c2244475c36acd7796e2c993355f9e926ae',
+		sha256: '43522aa3122a57784ac5db30abf85c2244475c36acd7796e2c993355f9e926ae'
 	},
 	compiler: {
 		tag: 'Ahk2Exe1.1.37.02a2',
 		asset: 'Ahk2Exe1.1.37.02a2.zip',
-		sha256: 'c29b8c3a5124850d79fc9e66e2ca79677c377d7f31631ad3022ba159c5d9e3be',
-	},
+		sha256: 'c29b8c3a5124850d79fc9e66e2ca79677c377d7f31631ad3022ba159c5d9e3be'
+	}
 })) {
 	for (const [field, value] of Object.entries(expected)) {
 		if (windowsToolchainContract[component]?.[field] !== value) {
@@ -285,7 +347,7 @@ const PRE_FIX_COMPILE_RUN = [
 	'          if (-not (Test-Path $out)) {',
 	'              Write-Error "Ahk2Exe reported success but $out was not created."',
 	'              exit 1',
-	'          }',
+	'          }'
 ].join('\n');
 
 /**
@@ -297,18 +359,25 @@ const PRE_FIX_COMPILE_RUN = [
 function compileStepProblems(stepBody) {
 	const problems = [];
 	// Comments may name the forbidden forms to explain them; only code counts.
-	const body = stepBody.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
+	const body = stepBody
+		.split('\n')
+		.filter((line) => !line.trimStart().startsWith('#'))
+		.join('\n');
 	if (/^ {8}(?:if|continue-on-error):/m.test(body)) {
 		problems.push('the compile step must be neither skippable nor allowed to fail');
 	}
 	if (/&\s*\$ahk2exe\b/.test(body)) {
-		problems.push('Ahk2Exe must not run through the call operator, which does not wait for a GUI binary');
+		problems.push(
+			'Ahk2Exe must not run through the call operator, which does not wait for a GUI binary'
+		);
 	}
 	if (body.includes('$LASTEXITCODE')) {
 		problems.push('the compile step must not read $LASTEXITCODE, which a GUI binary never sets');
 	}
 	const lines = body.split('\n');
-	const launchAt = lines.findIndex((line) => /\$\w+\s*=\s*Start-Process\s+-FilePath\s+\$ahk2exe\b/.test(line));
+	const launchAt = lines.findIndex((line) =>
+		/\$\w+\s*=\s*Start-Process\s+-FilePath\s+\$ahk2exe\b/.test(line)
+	);
 	if (launchAt < 0) {
 		problems.push('Ahk2Exe must run through `$proc = Start-Process -FilePath $ahk2exe`');
 		return problems;
@@ -318,16 +387,20 @@ function compileStepProblems(stepBody) {
 	const launch = lines.slice(launchAt, launchEnd + 1).join('\n');
 	for (const flag of ['-Wait', '-PassThru']) {
 		if (!new RegExp(`\\s${flag}\\b`).test(launch)) {
-			problems.push(`Start-Process must pass ${flag} so the step reads the compiler's real exit code`);
+			problems.push(
+				`Start-Process must pass ${flag} so the step reads the compiler's real exit code`
+			);
 		}
 	}
 	const proc = /\$(\w+)\s*=\s*Start-Process/.exec(launch)[1];
 	const after = lines.slice(launchEnd + 1).join('\n');
 	const exitAt = after.search(
-		new RegExp(`if\\s*\\(\\s*\\$${proc}\\.ExitCode\\s+-ne\\s+0\\s*\\)\\s*\\{[^}]*\\bexit\\s+[1-9]`));
+		new RegExp(`if\\s*\\(\\s*\\$${proc}\\.ExitCode\\s+-ne\\s+0\\s*\\)\\s*\\{[^}]*\\bexit\\s+[1-9]`)
+	);
 	if (exitAt < 0) problems.push(`a non-zero $${proc}.ExitCode must exit the step non-zero`);
 	const outputAt = after.search(
-		/if\s*\([^\n]*Test-Path\b[^\n]*\$out\b[^\n]*\.Length\s+-(?:eq\s+0|le\s+0|lt\s+1)[^\n]*\{[^}]*\bexit\s+[1-9]/);
+		/if\s*\([^\n]*Test-Path\b[^\n]*\$out\b[^\n]*\.Length\s+-(?:eq\s+0|le\s+0|lt\s+1)[^\n]*\{[^}]*\bexit\s+[1-9]/
+	);
 	if (outputAt < 0) {
 		problems.push('a missing or empty ErgoptiPlus.exe must exit the step non-zero');
 	} else if (exitAt >= 0 && outputAt < exitAt) {
@@ -363,9 +436,14 @@ if (compileStep !== null) {
 			['the pre-fix call-operator step', PRE_FIX_COMPILE_RUN],
 			['dropping -Wait', mutateCode(compileStep, /\s-Wait\b/, '')],
 			['dropping -PassThru', mutateCode(compileStep, /\s-PassThru\b/, '')],
-			['dropping the exit-code check', mutateCode(compileStep, /\.ExitCode\s+-ne\s+0/, '.ExitCode -lt 0')],
-			['dropping the empty-output check',
-				mutateCode(compileStep, /\.Length\s+-(?:eq\s+0|le\s+0|lt\s+1)/, '.Length -lt 0')],
+			[
+				'dropping the exit-code check',
+				mutateCode(compileStep, /\.ExitCode\s+-ne\s+0/, '.ExitCode -lt 0')
+			],
+			[
+				'dropping the empty-output check',
+				mutateCode(compileStep, /\.Length\s+-(?:eq\s+0|le\s+0|lt\s+1)/, '.Length -lt 0')
+			]
 		]) {
 			if (mutated === compileStep) {
 				errors.push(`self-check: ${what} changed nothing, so the compile step drifted`);
@@ -392,7 +470,7 @@ if (windowsSigningStep !== null) {
 		'signtool',
 		'Get-AuthenticodeSignature',
 		"Status -ne 'Valid'",
-		'SignerCertificate.Subject',
+		'SignerCertificate.Subject'
 	]) {
 		if (!body.includes(token)) {
 			errors.push(`the Windows signing gate is missing ${token}`);
@@ -410,7 +488,9 @@ if (windowsSigningStep !== null) {
 
 const linuxBundleStep = releaseStep('Package the installable bundle', LINUX_BOX);
 if (linuxBundleStep !== null && /tar -tzf[^\n|]*\|\s*head(?:\s|$)/.test(linuxBundleStep)) {
-	errors.push('the Linux release must not pipe tar into head under pipefail (tar exits on SIGPIPE)');
+	errors.push(
+		'the Linux release must not pipe tar into head under pipefail (tar exits on SIGPIPE)'
+	);
 }
 
 // The package metadata used to be logged by the per-format CI jobs, so a wrong
@@ -428,12 +508,15 @@ if (linuxMetadataStep !== null) {
 	}
 }
 
-const macosSmokeStep = releaseStep('Smoke test built ErgoptiPlus.app (crash-on-launch guard)', MACOS_BOX);
+const macosSmokeStep = releaseStep(
+	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
+	MACOS_BOX
+);
 if (macosSmokeStep !== null) {
 	for (const token of [
 		'python3 tools/diagnostics/macos_release_launch_test.py',
 		'ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications',
-		'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app',
+		'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app'
 	]) {
 		if (!macosSmokeStep.includes(token)) {
 			errors.push(`the macOS smoke test must exercise the extracted package: ${token}`);
@@ -451,16 +534,27 @@ const MACOS_ORDER = [
 	'Install Sparkle signing tool',
 	'Sign zip with Sparkle EdDSA key',
 	'Generate Sparkle appcast',
-	'Upload the package',
+	'Upload the package'
 ];
-const packageMacosSteps = pipeline.steps(pipeline.job(PACKAGE_JOB[MACOS_BOX])).map((candidate) => candidate.name);
+const packageMacosSteps = pipeline
+	.steps(pipeline.job(PACKAGE_JOB[MACOS_BOX]))
+	.map((candidate) => candidate.name);
 const macosOrder = MACOS_ORDER.map((name) => packageMacosSteps.indexOf(name));
 if (macosOrder.some((at, index) => at < 0 || (index > 0 && at <= macosOrder[index - 1]))) {
-	errors.push(`${PACKAGE_JOB[MACOS_BOX]} must run ${MACOS_ORDER.join(' < ')}; got: ${packageMacosSteps.join(' | ')}`);
+	errors.push(
+		`${PACKAGE_JOB[MACOS_BOX]} must run ${MACOS_ORDER.join(' < ')}; got: ${packageMacosSteps.join(' | ')}`
+	);
 }
-if (!(packageMacosSteps.indexOf('Package latest keylayout bundle') >= 0 &&
-	packageMacosSteps.indexOf('Package latest keylayout bundle') < packageMacosSteps.indexOf('Upload the package'))) {
-	errors.push(`${PACKAGE_JOB[MACOS_BOX]} must package the keylayout bundle before it uploads the macOS package`);
+if (
+	!(
+		packageMacosSteps.indexOf('Package latest keylayout bundle') >= 0 &&
+		packageMacosSteps.indexOf('Package latest keylayout bundle') <
+			packageMacosSteps.indexOf('Upload the package')
+	)
+) {
+	errors.push(
+		`${PACKAGE_JOB[MACOS_BOX]} must package the keylayout bundle before it uploads the macOS package`
+	);
 }
 
 // package-macos builds on every run and adds these steps on a release. Each
@@ -473,13 +567,15 @@ for (const [name, condition] of [
 	['Install Sparkle signing tool', 'inputs.release'],
 	['Sign zip with Sparkle EdDSA key', 'inputs.release'],
 	['Generate Sparkle appcast', 'inputs.release'],
-	['Package latest keylayout bundle', 'inputs.release'],
+	['Package latest keylayout bundle', 'inputs.release']
 ]) {
 	const body = releaseStep(name, MACOS_BOX);
 	if (body === null) continue;
 	const actual = pipeline.stepField(body, 'if');
 	if (actual !== condition) {
-		errors.push(`the macOS release step '${name}' must run exactly if: ${condition}, got: ${actual}`);
+		errors.push(
+			`the macOS release step '${name}' must run exactly if: ${condition}, got: ${actual}`
+		);
 	}
 	if (pipeline.stepField(body, 'continue-on-error') !== null) {
 		errors.push(`the macOS release step '${name}' must not set continue-on-error`);

@@ -10,7 +10,9 @@ import sys
 import tempfile
 import unittest
 
-spec = importlib.util.spec_from_file_location("launch_gate", Path(__file__).with_name("macos_launch_gate.py"))
+spec = importlib.util.spec_from_file_location(
+    "launch_gate", Path(__file__).with_name("macos_launch_gate.py")
+)
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 
@@ -42,9 +44,15 @@ class VerdictTests(unittest.TestCase):
 
     def test_published_symlink_failure_is_rejected(self):
         # The exact launcher.log of the reported dev.127 failure.
-        failures = gate.evaluate("symlink_logs", observe(
-            launcher_log="[t] FATAL: Embedded Hammerspoon stopped unexpectedly with exit code 0.\n",
-            driver_log="", alive_after_window=False, quit_seconds=None))
+        failures = gate.evaluate(
+            "symlink_logs",
+            observe(
+                launcher_log="[t] FATAL: Embedded Hammerspoon stopped unexpectedly with exit code 0.\n",
+                driver_log="",
+                alive_after_window=False,
+                quit_seconds=None,
+            ),
+        )
         self.assertTrue(any("acknowledged" in failure for failure in failures))
         self.assertTrue(any("FATAL" in failure for failure in failures))
         self.assertTrue(any("no driver log" in failure for failure in failures))
@@ -52,9 +60,14 @@ class VerdictTests(unittest.TestCase):
     def test_environment_key_named_fatal_is_not_a_fatal_line(self):
         # The boot log lists the launcher environment, which has ERGOPTI_FATAL_REPORT_FILE.
         healthy = observe()
-        failures = gate.evaluate("clean", observe(launcher_log=healthy["launcher_log"]
-            + "[t] embedded Hammerspoon boot INFO: Launcher environment keys present: "
-            "ERGOPTI_CONFIG_DIR, ERGOPTI_FATAL_REPORT_FILE.\n"))
+        failures = gate.evaluate(
+            "clean",
+            observe(
+                launcher_log=healthy["launcher_log"]
+                + "[t] embedded Hammerspoon boot INFO: Launcher environment keys present: "
+                "ERGOPTI_CONFIG_DIR, ERGOPTI_FATAL_REPORT_FILE.\n"
+            ),
+        )
         self.assertEqual(failures, [])
 
     def test_early_log_without_marker_is_not_startup(self):
@@ -62,8 +75,9 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(failures, ["the driver log has no completed startup marker"])
 
     def test_driver_error_invalidates_marker(self):
-        failures = gate.evaluate("clean", observe(
-            driver_log="Onboarding wizard opened.\n[ERROR] [x] later failure\n"))
+        failures = gate.evaluate(
+            "clean", observe(driver_log="Onboarding wizard opened.\n[ERROR] [x] later failure\n")
+        )
         self.assertEqual(len(failures), 1)
         self.assertIn("ERROR", failures[0])
 
@@ -73,50 +87,73 @@ class VerdictTests(unittest.TestCase):
 
     def test_hanging_quit_is_rejected(self):
         failures = gate.evaluate("clean", observe(quit_seconds=None))
-        self.assertEqual(failures, [f"Quit did not end both processes within {gate.QUIT_TIMEOUT_SECONDS} s"])
+        self.assertEqual(
+            failures, [f"Quit did not end both processes within {gate.QUIT_TIMEOUT_SECONDS} s"]
+        )
 
     def test_refused_state_needs_a_named_reason(self):
         generic = observe(
             launcher_log="[t] FATAL: Embedded Hammerspoon stopped unexpectedly with exit code 0.\n",
-            boot_log=REFUSED_BOOT_LOG, alive_after_window=False)
+            boot_log=REFUSED_BOOT_LOG,
+            alive_after_window=False,
+        )
         self.assertEqual(len(gate.evaluate("dangling_logs", generic)), 1)
         named = observe(
             launcher_log="[t] FATAL: log folder /u/gitcfg/ergopti_plus is a "
-                         "symbolic link whose target does not exist\n",
-            boot_log=REFUSED_BOOT_LOG, alive_after_window=False)
+            "symbolic link whose target does not exist\n",
+            boot_log=REFUSED_BOOT_LOG,
+            alive_after_window=False,
+        )
         self.assertEqual(gate.evaluate("dangling_logs", named), [])
 
     def test_refused_state_must_not_keep_running(self):
         observation = observe(
             launcher_log="FATAL: gitcfg/ergopti_plus is a symbolic link to nothing\n",
-            boot_log=REFUSED_BOOT_LOG)
+            boot_log=REFUSED_BOOT_LOG,
+        )
         self.assertEqual(len(gate.evaluate("dangling_logs", observation)), 1)
 
     def test_published_silent_configured_exit_is_rejected(self):
         # The exact dev.128 shape: logger configured, child gone, no FATAL, no dialog.
-        failures = gate.evaluate("configured_symlink", observe(
-            launcher_log="[t] embedded Hammerspoon bootstrap logger configured\n"
-                         "[t] embedded Hammerspoon terminated\n"
-                         "[t] applicationWillTerminate; stopping embedded Hammerspoon\n",
-            boot_log="[SUCCESS] [config_paths] Config paths initialized\n",
-            driver_log="", alive_after_window=False, quit_seconds=None))
+        failures = gate.evaluate(
+            "configured_symlink",
+            observe(
+                launcher_log="[t] embedded Hammerspoon bootstrap logger configured\n"
+                "[t] embedded Hammerspoon terminated\n"
+                "[t] applicationWillTerminate; stopping embedded Hammerspoon\n",
+                boot_log="[SUCCESS] [config_paths] Config paths initialized\n",
+                driver_log="",
+                alive_after_window=False,
+                quit_seconds=None,
+            ),
+        )
         self.assertIn("no driver log appeared under the configured logs folder", failures)
-        self.assertIn("the launcher and embedded Hammerspoon did not both survive the observation window",
-            failures)
+        self.assertIn(
+            "the launcher and embedded Hammerspoon did not both survive the observation window",
+            failures,
+        )
 
     def test_configured_boot_waits_for_accessibility(self):
-        waiting = observe(driver_log="[INFO] [accessibility_wait] Waiting for the Accessibility "
-                                     "permission (up to 600 s)…\n")
+        waiting = observe(
+            driver_log="[INFO] [accessibility_wait] Waiting for the Accessibility "
+            "permission (up to 600 s)…\n"
+        )
         self.assertEqual(gate.evaluate("configured_symlink", waiting), [])
         self.assertEqual(gate.ready_marker("clean"), gate.READY_MARKER)
 
     def test_configured_accessibility_exit_is_rejected(self):
         # The dev.141 shape: a named FATAL exit that sent the user to relaunch.
-        failures = gate.evaluate("configured_symlink", observe(
-            launcher_log="[t] embedded Hammerspoon bootstrap logger configured\n"
-                         "[t] FATAL: Embedded Hammerspoon stopped at boot stage 'accessibility': untrusted\n",
-            boot_log="t [ERROR] [init] FATAL at boot stage 'accessibility': untrusted\n",
-            driver_log="", alive_after_window=False, quit_seconds=None))
+        failures = gate.evaluate(
+            "configured_symlink",
+            observe(
+                launcher_log="[t] embedded Hammerspoon bootstrap logger configured\n"
+                "[t] FATAL: Embedded Hammerspoon stopped at boot stage 'accessibility': untrusted\n",
+                boot_log="t [ERROR] [init] FATAL at boot stage 'accessibility': untrusted\n",
+                driver_log="",
+                alive_after_window=False,
+                quit_seconds=None,
+            ),
+        )
         self.assertTrue(any("FATAL" in failure for failure in failures))
         self.assertTrue(any("survive" in failure for failure in failures))
 
@@ -156,10 +193,14 @@ class StateTests(unittest.TestCase):
                 self.skipTest(f"symbolic links unavailable here: {error}")
             self.assertNotEqual(synced["paths_toml"], dangling["paths_toml"])
             self.assertEqual(synced["logs_dir"], synced_home / "SyncedLogs/ergopti_plus")
-            self.assertIn(f'LogsDirPath = "{synced_home}/SyncedLogs"',
-                synced["paths_toml"].read_text(encoding="utf-8"))
-            self.assertIn(f'LogsDirPath = "{dangling_home}/gitcfg/ergopti_plus"',
-                dangling["paths_toml"].read_text(encoding="utf-8"))
+            self.assertIn(
+                f'LogsDirPath = "{synced_home}/SyncedLogs"',
+                synced["paths_toml"].read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                f'LogsDirPath = "{dangling_home}/gitcfg/ergopti_plus"',
+                dangling["paths_toml"].read_text(encoding="utf-8"),
+            )
             self.assertTrue((synced_home / "SyncedLogs").is_symlink())
             self.assertTrue((dangling_home / "gitcfg/ergopti_plus").is_symlink())
             self.assertFalse((dangling_home / "gitcfg/ergopti_plus").exists())
@@ -205,13 +246,30 @@ class StateTests(unittest.TestCase):
 # Keep independent oracles for every approved scenario, including the picked
 # logs-directory link added when launcher and driver log ownership converged.
 CI_PROFILE = [
-    "clean", "upgraded", "symlink_config", "symlink_hammerspoon", "symlink_logs",
-    "symlink_logs_dir", "tilde_paths", "dangling_logs", "configured_symlink", "plain_open",
+    "clean",
+    "upgraded",
+    "symlink_config",
+    "symlink_hammerspoon",
+    "symlink_logs",
+    "symlink_logs_dir",
+    "tilde_paths",
+    "dangling_logs",
+    "configured_symlink",
+    "plain_open",
 ]
 RELEASE_PROFILE = [
-    "clean", "upgraded", "source_logs", "symlink_config", "symlink_config_documents",
-    "symlink_hammerspoon", "symlink_logs", "symlink_logs_dir", "tilde_paths",
-    "dangling_logs", "configured_symlink", "plain_open",
+    "clean",
+    "upgraded",
+    "source_logs",
+    "symlink_config",
+    "symlink_config_documents",
+    "symlink_hammerspoon",
+    "symlink_logs",
+    "symlink_logs_dir",
+    "tilde_paths",
+    "dangling_logs",
+    "configured_symlink",
+    "plain_open",
 ]
 SCRIPT = Path(__file__).with_name("macos_launch_gate.py")
 
@@ -219,21 +277,32 @@ SCRIPT = Path(__file__).with_name("macos_launch_gate.py")
 def print_matrix(*arguments):
     """Run the matrix mode the way the workflow does, outside GitHub Actions."""
     env = {key: value for key, value in os.environ.items() if key != "GITHUB_ACTIONS"}
-    return subprocess.run([sys.executable, str(SCRIPT), *arguments], capture_output=True, text=True,
-        env=env, timeout=60)
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *arguments],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
 
 
 class ProfileTests(unittest.TestCase):
     """The workflow's launch matrix comes from these profiles alone, so they must not drift."""
 
     def test_ci_profile_keeps_the_approved_gated_scenarios(self):
-        self.assertEqual(list(gate.PROFILES["ci"]), CI_PROFILE,
-            "the CI launch profile changed; update CI_PROFILE only for a deliberate change")
+        self.assertEqual(
+            list(gate.PROFILES["ci"]),
+            CI_PROFILE,
+            "the CI launch profile changed; update CI_PROFILE only for a deliberate change",
+        )
 
     def test_release_profile_launches_every_scenario(self):
         self.assertEqual(gate.PROFILES["release"], gate.SCENARIOS)
-        self.assertEqual(list(gate.SCENARIOS), RELEASE_PROFILE,
-            "the release scenarios changed; update this oracle only for a deliberate change")
+        self.assertEqual(
+            list(gate.SCENARIOS),
+            RELEASE_PROFILE,
+            "the release scenarios changed; update this oracle only for a deliberate change",
+        )
 
     def test_ci_profile_is_a_strict_subset_of_release(self):
         self.assertLess(set(gate.PROFILES["ci"]), set(gate.PROFILES["release"]))
@@ -252,8 +321,11 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(json.loads(value), list(gate.PROFILES[profile]))
 
     def test_print_matrix_rejects_unknown_profiles_and_launch_arguments(self):
-        for arguments in (("--print-matrix", "nightly"), ("--print-matrix", "ci", "/Applications/ErgoptiPlus.app"),
-                ("--print-matrix", "release", "--seed-tag", "v0.0.0-dev.24")):
+        for arguments in (
+            ("--print-matrix", "nightly"),
+            ("--print-matrix", "ci", "/Applications/ErgoptiPlus.app"),
+            ("--print-matrix", "release", "--seed-tag", "v0.0.0-dev.24"),
+        ):
             result = print_matrix(*arguments)
             self.assertEqual(result.returncode, 2, arguments)
             self.assertEqual(result.stdout, "", arguments)

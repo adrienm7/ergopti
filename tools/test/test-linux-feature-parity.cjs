@@ -18,8 +18,23 @@ const path = require('path');
 const { buildParityRows, summarize } = require('./linux-feature-parity.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MANIFEST_PATH = path.join(ROOT, 'static', 'ergopti_plus', 'linux', '_generated', 'features_manifest.lua');
-const EVIDENCE_PATH = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'linux_evidence.json');
+const MANIFEST_PATH = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'linux',
+	'_generated',
+	'features_manifest.lua'
+);
+const EVIDENCE_PATH = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'features',
+	'linux_evidence.json'
+);
 const manifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
 const evidenceConfig = JSON.parse(fs.readFileSync(EVIDENCE_PATH, 'utf8'));
 
@@ -29,40 +44,76 @@ function build(config = evidenceConfig) {
 
 const rows = build();
 const summary = summarize(rows);
-const canonical = fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', '_shared',
-	'modules', 'features', 'manifest.toml'), 'utf8');
+const canonical = fs.readFileSync(
+	path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml'),
+	'utf8'
+);
 const declaredCount = [...canonical.matchAll(/^\[\[features\.[^\]]+\]\]$/gm)].length;
 assert.ok(declaredCount >= 326, 'canonical registry must retain its audited feature coverage');
-assert.strictEqual(summary.total, declaredCount, 'the Linux projection must classify every canonical feature');
-assert.ok(summary.claimed_supported >= 126, 'supported feature count may only increase from the audited 126');
+assert.strictEqual(
+	summary.total,
+	declaredCount,
+	'the Linux projection must classify every canonical feature'
+);
+assert.ok(
+	summary.claimed_supported >= 126,
+	'supported feature count may only increase from the audited 126'
+);
 const provenPaths = new Set([
 	...Object.values(evidenceConfig.evidence_groups).flatMap((group) => group.members),
-	...Object.keys(evidenceConfig.overrides),
+	...Object.keys(evidenceConfig.overrides)
 ]);
 assert.ok(provenPaths.size >= 126, 'the audited supported paths must retain explicit evidence');
 for (const featurePath of provenPaths) {
-	assert.strictEqual(rows.find((row) => row.path === featurePath)?.status, 'claimed_supported',
-		`adding platform-specific defaults must not remove Linux support for ${featurePath}`);
+	assert.strictEqual(
+		rows.find((row) => row.path === featurePath)?.status,
+		'claimed_supported',
+		`adding platform-specific defaults must not remove Linux support for ${featurePath}`
+	);
 }
 // Only macOS draws a menubar icon whose variant the user picks.
 const menubarIcon = rows.find((row) => row.path === 'ui.menubar_icon');
-assert.ok(menubarIcon && menubarIcon.status === 'unavailable'
-	&& menubarIcon.reason.kind === 'macos_specific',
-	'ui.menubar_icon must stay a macOS-specific setting, not a Linux gap');
+assert.ok(
+	menubarIcon &&
+		menubarIcon.status === 'unavailable' &&
+		menubarIcon.reason.kind === 'macos_specific',
+	'ui.menubar_icon must stay a macOS-specific setting, not a Linux gap'
+);
 // layout.emulated_layout is unavailable on Linux: layout.emulated_layout, Windows-specific by design: Windows
 // emulates a registry layout, Linux converts the same .keylayout to XKB.
 const emulatedLayout = rows.find((row) => row.path === 'layout.emulated_layout');
-assert.ok(emulatedLayout && emulatedLayout.status === 'unavailable'
-	&& emulatedLayout.reason.kind === 'windows_specific',
-	'layout.emulated_layout must stay a Windows-specific setting, not a Linux gap');
+assert.ok(
+	emulatedLayout &&
+		emulatedLayout.status === 'unavailable' &&
+		emulatedLayout.reason.kind === 'windows_specific',
+	'layout.emulated_layout must stay a Windows-specific setting, not a Linux gap'
+);
 assert.strictEqual(summary.claimed_supported + summary.unavailable, summary.total);
-assert.strictEqual(rows.filter((row) => !row.reason?.kind).length, 0, 'every row needs a reason classification');
+assert.strictEqual(
+	rows.filter((row) => !row.reason?.kind).length,
+	0,
+	'every row needs a reason classification'
+);
 assert.strictEqual(rows.filter((row) => !row.owner).length, 0, 'every row needs an owner');
-assert.strictEqual(rows.filter((row) => row.status === 'unavailable' && row.intentional === false && row.reason.kind !== 'linux_parity_gap').length, 0);
-assert.strictEqual(summary.unverified_supported, 0,
-	'every supported Linux feature needs software evidence instead of inheriting a declaration');
-assert.strictEqual(summary.proven_above_declaration, summary.claimed_supported,
-	'every supported Linux feature needs proof above the declaration tier');
+assert.strictEqual(
+	rows.filter(
+		(row) =>
+			row.status === 'unavailable' &&
+			row.intentional === false &&
+			row.reason.kind !== 'linux_parity_gap'
+	).length,
+	0
+);
+assert.strictEqual(
+	summary.unverified_supported,
+	0,
+	'every supported Linux feature needs software evidence instead of inheriting a declaration'
+);
+assert.strictEqual(
+	summary.proven_above_declaration,
+	summary.claimed_supported,
+	'every supported Linux feature needs proof above the declaration tier'
+);
 
 const mutation = JSON.parse(JSON.stringify(evidenceConfig));
 mutation.supported_defaults.proof_tier = 'unit';
@@ -79,22 +130,24 @@ assert.throws(() => build(unknown), /unknown path/);
 const unknownGroupMember = JSON.parse(JSON.stringify(evidenceConfig));
 unknownGroupMember.evidence_groups.unknown = {
 	...unknownGroupMember.evidence_groups.gestures,
-	members: ['does.not.exist'],
+	members: ['does.not.exist']
 };
 assert.throws(() => build(unknownGroupMember), /names unknown path/);
 
 const duplicateGroupMember = JSON.parse(JSON.stringify(evidenceConfig));
 duplicateGroupMember.evidence_groups.duplicate = {
 	...duplicateGroupMember.evidence_groups.gestures,
-	members: [duplicateGroupMember.evidence_groups.gestures.members[0]],
+	members: [duplicateGroupMember.evidence_groups.gestures.members[0]]
 };
 assert.throws(() => build(duplicateGroupMember), /belongs to more than one evidence group/);
 
 if (process.argv.includes('--report')) {
 	process.stdout.write(`${JSON.stringify({ summary, features: rows }, null, 2)}\n`);
 } else {
-	process.stdout.write(`PASS: ${summary.total} Linux features classified; ` +
-		`${summary.claimed_supported} claimed supported, ${summary.unavailable} unavailable, ` +
-		`${summary.parity_gaps} parity gaps, ${summary.unverified_supported} software claims unverified, ` +
-		`${summary.hardware_pending} supported claims awaiting hardware proof.\n`);
+	process.stdout.write(
+		`PASS: ${summary.total} Linux features classified; ` +
+			`${summary.claimed_supported} claimed supported, ${summary.unavailable} unavailable, ` +
+			`${summary.parity_gaps} parity gaps, ${summary.unverified_supported} software claims unverified, ` +
+			`${summary.hardware_pending} supported claims awaiting hardware proof.\n`
+	);
 }

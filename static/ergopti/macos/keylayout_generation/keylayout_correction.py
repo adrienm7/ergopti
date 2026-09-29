@@ -39,9 +39,7 @@ KEYMAPSELECT_MAPINDEX_4 = (
 
 
 KEYMAPSELECT_MAPINDEX_5 = (
-    '<keyMapSelect mapIndex="5">\n'
-    '\t\t\t<modifier keys="anyOption caps?"/>\n'
-    "\t\t</keyMapSelect>"
+    '<keyMapSelect mapIndex="5">\n\t\t\t<modifier keys="anyOption caps?"/>\n\t\t</keyMapSelect>'
 )
 
 
@@ -62,9 +60,7 @@ def correct_keylayout(content: str, variant_number: int) -> str:
     logger.info("%s🔹 Removing XML comments…", LOGS_INDENTATION + "\t")
     content = re.sub(r"<!--.*?-->\n", "", content, flags=re.DOTALL)
 
-    logger.info(
-        "%s🔹 Removing empty lines at start and end…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Removing empty lines at start and end…", LOGS_INDENTATION + "\t")
     content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
 
     content = replace_keymapselect(content, 4, KEYMAPSELECT_MAPINDEX_4)
@@ -82,9 +78,7 @@ def correct_keylayout(content: str, variant_number: int) -> str:
     content = replace_layer_names_in_file(content)
     content = swap_keys(content, 10, 50)
 
-    logger.info(
-        "%s➕ Modifying keymap 4 (Ctrl/Command/etc.)…", LOGS_INDENTATION
-    )
+    logger.info("%s➕ Modifying keymap 4 (Ctrl/Command/etc.)…", LOGS_INDENTATION)
     keymap_0_content = extract_keymap_body(content, 0)
     keymap_content = modify_accented_letters_shortcuts(keymap_0_content)
     keymap_content = fix_ctrl_symbols(keymap_content)

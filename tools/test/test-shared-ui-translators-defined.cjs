@@ -37,12 +37,16 @@ function sources(dir) {
 // Line and block comments removed: prose that names a function is not a call.
 const files = sources(UI_ROOT).map((file) => ({
 	file,
-	text: fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''),
+	text: fs
+		.readFileSync(file, 'utf8')
+		.replace(/\/\*[\s\S]*?\*\//g, '')
+		.replace(/^\s*\/\/.*$/gm, '')
 }));
 const defined = new Set();
 for (const { text } of files) {
 	for (const match of text.matchAll(/window\.([A-Za-z_$][\w$]*)\s*=/g)) defined.add(match[1]);
-	for (const match of text.matchAll(/window\[['"]([A-Za-z_$][\w$]*)['"]\]\s*=/g)) defined.add(match[1]);
+	for (const match of text.matchAll(/window\[['"]([A-Za-z_$][\w$]*)['"]\]\s*=/g))
+		defined.add(match[1]);
 }
 
 const missing = [];

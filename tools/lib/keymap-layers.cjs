@@ -48,7 +48,8 @@ const SECTION_ALL = 'all';
 // and the AHK reader implement the same rules; the corpus holds them together.
 const BOM = '﻿';
 const CONTROL_CHARACTER = /[\u0000-\u0008\u000A-\u001F\u007F]/;
-const TABLE_HEADER = /^\[[ \t]*[A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*[ \t]*\][ \t]*(?:#.*)?$/;
+const TABLE_HEADER =
+	/^\[[ \t]*[A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*[ \t]*\][ \t]*(?:#.*)?$/;
 const KEY_VALUE = /^(?:[A-Za-z0-9_-]+|"((?:[^"\\]|\\.)*)"|'[^']*')[ \t]*=[ \t]*(.*)$/;
 const BASIC_STRING_VALUE = /^"((?:[^"\\]|\\.)*)"[ \t]*(?:#.*)?$/;
 const LITERAL_STRING_VALUE = /^'[^']*'[ \t]*(?:#.*)?$/;
@@ -78,9 +79,14 @@ function escapeProblem(contents) {
 		}
 		const width = next === 'u' ? 4 : next === 'U' ? 8 : 0;
 		const hex = contents.slice(i + 2, i + 2 + width);
-		if (width === 0 || hex.length !== width || /[^0-9A-Fa-f]/.test(hex)) return `"\\${next}" is not a TOML escape`;
+		if (width === 0 || hex.length !== width || /[^0-9A-Fa-f]/.test(hex))
+			return `"\\${next}" is not a TOML escape`;
 		const code = parseInt(hex, 16);
-		if (code === 0 || code > MAX_UNICODE_SCALAR || (code >= SURROGATE_FIRST && code <= SURROGATE_LAST))
+		if (
+			code === 0 ||
+			code > MAX_UNICODE_SCALAR ||
+			(code >= SURROGATE_FIRST && code <= SURROGATE_LAST)
+		)
 			return `"\\${next}${hex}" is not a character a layer file can hold`;
 		i += 1 + width;
 	}
@@ -100,15 +106,18 @@ function formatProblem(text) {
 		// A CRLF line end is one line end; any other carriage return is a
 		// control character.
 		if (line.endsWith('\r')) line = line.slice(0, -1);
-		if (CONTROL_CHARACTER.test(line)) return `${where}: control characters other than tab are not allowed`;
+		if (CONTROL_CHARACTER.test(line))
+			return `${where}: control characters other than tab are not allowed`;
 		line = line.replace(/^[ \t]+|[ \t]+$/g, '');
 		if (line === '' || line.startsWith('#')) continue;
 		if (line.startsWith('[')) {
-			if (!TABLE_HEADER.test(line)) return `${where}: a table header names bare keys only, like [layers.nav.all]`;
+			if (!TABLE_HEADER.test(line))
+				return `${where}: a table header names bare keys only, like [layers.nav.all]`;
 			continue;
 		}
 		const pair = KEY_VALUE.exec(line);
-		if (!pair) return `${where}: expected a table header or one key = value pair (dotted keys are not part of the format)`;
+		if (!pair)
+			return `${where}: expected a table header or one key = value pair (dotted keys are not part of the format)`;
 		if (pair[1] !== undefined) {
 			const problem = escapeProblem(pair[1]);
 			if (problem) return `${where}: ${problem}`;
@@ -125,7 +134,8 @@ function formatProblem(text) {
 		// through to the float form, whatever its length.
 		const integer = INTEGER_VALUE.exec(value);
 		if (integer) {
-			if (integer[1].replace(/_/g, '').length > MAX_INTEGER_DIGITS) return `${where}: an integer has at most ${MAX_INTEGER_DIGITS} digits`;
+			if (integer[1].replace(/_/g, '').length > MAX_INTEGER_DIGITS)
+				return `${where}: an integer has at most ${MAX_INTEGER_DIGITS} digits`;
 			continue;
 		}
 		if (FLOAT_VALUE.test(value)) continue;
@@ -160,10 +170,12 @@ function parseChords(text, ctx) {
 		const key = tokens.pop();
 		if (!key) return { problem: `empty chord in "${text}"` };
 		const entry = ctx.registry.keys[key];
-		if (!entry || entry.kind !== 'key') return { problem: `"${key}" is not a keyboard key in the physical-key registry` };
+		if (!entry || entry.kind !== 'key')
+			return { problem: `"${key}" is not a keyboard key in the physical-key registry` };
 		const seen = new Set();
 		for (const mod of tokens) {
-			if (mod !== 'primary' && !order.includes(mod)) return { problem: `unknown modifier "${mod}"` };
+			if (mod !== 'primary' && !order.includes(mod))
+				return { problem: `unknown modifier "${mod}"` };
 			if (seen.has(mod)) return { problem: `modifier "${mod}" named twice` };
 			seen.add(mod);
 		}
@@ -177,10 +189,12 @@ function parseChords(text, ctx) {
  * @returns {{binding?: object, error?: {code: string, detail: string}}}
  */
 function parseBinding(value, ctx) {
-	if (typeof value !== 'string') return { error: { code: 'invalid_value_type', detail: 'a binding must be a string' } };
+	if (typeof value !== 'string')
+		return { error: { code: 'invalid_value_type', detail: 'a binding must be a string' } };
 	const colon = value.indexOf(':');
 	if (colon < 0) {
-		if (!ACTION_ID.test(value) || !ctx.vocabulary.actions[value]) return { error: { code: 'unknown_action', detail: `"${value}" is not a layer action` } };
+		if (!ACTION_ID.test(value) || !ctx.vocabulary.actions[value])
+			return { error: { code: 'unknown_action', detail: `"${value}" is not a layer action` } };
 		return { binding: { type: 'action', id: value } };
 	}
 	const head = value.slice(0, colon);
@@ -188,7 +202,12 @@ function parseBinding(value, ctx) {
 	if (head === 'repeat_count') {
 		const p = ctx.vocabulary.parameters.repeat_count;
 		if (!/^[0-9]+$/.test(rest) || Number(rest) < p.min || Number(rest) > p.max)
-			return { error: { code: 'invalid_parameter', detail: `repeat_count takes an integer from ${p.min} to ${p.max}` } };
+			return {
+				error: {
+					code: 'invalid_parameter',
+					detail: `repeat_count takes an integer from ${p.min} to ${p.max}`
+				}
+			};
 		return { binding: { type: 'repeat_count', count: Number(rest) } };
 	}
 	if (head === 'keystroke') {
@@ -209,7 +228,13 @@ function resolveChords(chords, os, ctx) {
 		for (const raw of chord.mods) {
 			const mod = raw === 'primary' ? ctx.vocabulary.primary_modifier[os] : raw;
 			const rule = restricted[mod];
-			if (rule && !rule.platforms.includes(os)) return { unavailable: { detail: `modifier "${mod}" does not exist on ${os}`, reason_key: rule.reason_key } };
+			if (rule && !rule.platforms.includes(os))
+				return {
+					unavailable: {
+						detail: `modifier "${mod}" does not exist on ${os}`,
+						reason_key: rule.reason_key
+					}
+				};
 			mods.add(mod);
 		}
 		out.push({ mods: order.filter((m) => mods.has(m)), key: chord.key });
@@ -222,7 +247,8 @@ function parseResolution(text, os, ctx) {
 	if (text === 'none') return { kind: 'none' };
 	if (text.startsWith('call:')) {
 		const handler = text.slice(5);
-		if (!(ctx.vocabulary.call_handlers[os] || []).includes(handler)) throw new Error(`call:${handler} is not declared for ${os}`);
+		if (!(ctx.vocabulary.call_handlers[os] || []).includes(handler))
+			throw new Error(`call:${handler} is not declared for ${os}`);
 		return { kind: 'call', handler };
 	}
 	if (text.startsWith('keystroke:')) {
@@ -241,7 +267,11 @@ function parseResolution(text, os, ctx) {
 function sourceUnavailable(code, os, ctx) {
 	const kind = ctx.registry.keys[code].kind;
 	const rule = (ctx.vocabulary.source_kinds || {})[kind];
-	if (rule && !rule.platforms.includes(os)) return { detail: `a ${kind} input cannot be a layer key on ${os}`, reason_key: rule.reason_key };
+	if (rule && !rule.platforms.includes(os))
+		return {
+			detail: `a ${kind} input cannot be a layer key on ${os}`,
+			reason_key: rule.reason_key
+		};
 	return null;
 }
 
@@ -252,7 +282,10 @@ function sourceUnavailable(code, os, ctx) {
 function resolveBinding(binding, os, ctx) {
 	if (binding.type === 'repeat_count') {
 		const p = ctx.vocabulary.parameters.repeat_count;
-		if (!p.platforms.includes(os)) return { unavailable: { detail: `repeat_count does not exist on ${os}`, reason_key: p.reason_key } };
+		if (!p.platforms.includes(os))
+			return {
+				unavailable: { detail: `repeat_count does not exist on ${os}`, reason_key: p.reason_key }
+			};
 		return { resolved: { kind: 'repeat_count', count: binding.count } };
 	}
 	if (binding.type === 'keystroke') {
@@ -262,11 +295,18 @@ function resolveBinding(binding, os, ctx) {
 	}
 	const action = ctx.vocabulary.actions[binding.id];
 	const text = action[os] !== undefined ? action[os] : action[SECTION_ALL];
-	if (text === undefined) return { unavailable: { detail: `action "${binding.id}" has no resolution on ${os}`, reason_key: action.reason_key } };
+	if (text === undefined)
+		return {
+			unavailable: {
+				detail: `action "${binding.id}" has no resolution on ${os}`,
+				reason_key: action.reason_key
+			}
+		};
 	const res = parseResolution(text, os, ctx);
 	if (res.kind === 'keystroke') {
 		const r = resolveChords(res.chords, os, ctx);
-		if (r.unavailable) throw new Error(`vocabulary action "${binding.id}" uses an unavailable modifier on ${os}`);
+		if (r.unavailable)
+			throw new Error(`vocabulary action "${binding.id}" uses an unavailable modifier on ${os}`);
 		res.chords = r.chords;
 	}
 	res.repeatable = res.kind !== 'none' && action.repeatable === true;
@@ -302,22 +342,45 @@ function loadLayers(text, os, ctx) {
 	if (Object.keys(doc).length === 0) return result;
 	const meta = doc._meta;
 	if (meta === null || typeof meta !== 'object' || meta.schema_version === undefined)
-		return reject(error('schema_version_missing', null, null, null, '[_meta].schema_version is required'));
+		return reject(
+			error('schema_version_missing', null, null, null, '[_meta].schema_version is required')
+		);
 	if (meta.schema_version !== ctx.vocabulary._meta.layers_schema_version)
-		return reject(error('schema_version_unsupported', null, null, null, `schema_version ${meta.schema_version} is not ${ctx.vocabulary._meta.layers_schema_version}`));
+		return reject(
+			error(
+				'schema_version_unsupported',
+				null,
+				null,
+				null,
+				`schema_version ${meta.schema_version} is not ${ctx.vocabulary._meta.layers_schema_version}`
+			)
+		);
 	const report = (e) => {
 		result.errors.push(e);
 		result.ok = false;
 	};
-	for (const key of Object.keys(meta).sort()) if (key !== 'schema_version') report(error('unknown_field', null, '_meta', key, `[_meta].${key} is not a field`));
-	for (const key of Object.keys(doc).sort()) if (key !== '_meta' && key !== 'layers') report(error('unknown_field', null, null, key, `top-level "${key}" is not a field`));
+	for (const key of Object.keys(meta).sort())
+		if (key !== 'schema_version')
+			report(error('unknown_field', null, '_meta', key, `[_meta].${key} is not a field`));
+	for (const key of Object.keys(doc).sort())
+		if (key !== '_meta' && key !== 'layers')
+			report(error('unknown_field', null, null, key, `top-level "${key}" is not a field`));
 	const layers = doc.layers === undefined ? {} : doc.layers;
-	if (layers === null || typeof layers !== 'object' || Array.isArray(layers)) return reject(error('invalid_value_type', null, null, 'layers', '"layers" must be a table'));
+	if (layers === null || typeof layers !== 'object' || Array.isArray(layers))
+		return reject(error('invalid_value_type', null, null, 'layers', '"layers" must be a table'));
 
 	const sections = [SECTION_ALL, ...ctx.platforms];
 	for (const layerId of Object.keys(layers).sort()) {
 		if (!LAYER_ID.test(layerId)) {
-			report(error('invalid_layer_id', layerId, null, null, `layer id "${layerId}" must match ${LAYER_ID}`));
+			report(
+				error(
+					'invalid_layer_id',
+					layerId,
+					null,
+					null,
+					`layer id "${layerId}" must match ${LAYER_ID}`
+				)
+			);
 			continue;
 		}
 		const layer = layers[layerId];
@@ -328,18 +391,36 @@ function loadLayers(text, os, ctx) {
 		const parsed = {};
 		for (const section of Object.keys(layer).sort()) {
 			if (!sections.includes(section)) {
-				report(error('unknown_layer_section', layerId, section, null, `"${section}" is not one of ${sections.join(', ')}`));
+				report(
+					error(
+						'unknown_layer_section',
+						layerId,
+						section,
+						null,
+						`"${section}" is not one of ${sections.join(', ')}`
+					)
+				);
 				continue;
 			}
 			const table = layer[section];
 			if (table === null || typeof table !== 'object' || Array.isArray(table)) {
-				report(error('invalid_value_type', layerId, section, null, 'a layer section must be a table'));
+				report(
+					error('invalid_value_type', layerId, section, null, 'a layer section must be a table')
+				);
 				continue;
 			}
 			parsed[section] = {};
 			for (const code of Object.keys(table).sort()) {
 				if (!ctx.registry.keys[code]) {
-					report(error('unknown_key', layerId, section, code, `"${code}" is not in the physical-key registry`));
+					report(
+						error(
+							'unknown_key',
+							layerId,
+							section,
+							code,
+							`"${code}" is not in the physical-key registry`
+						)
+					);
 					continue;
 				}
 				const p = parseBinding(table[code], ctx);
@@ -353,7 +434,8 @@ function loadLayers(text, os, ctx) {
 		for (const section of [SECTION_ALL, os]) {
 			const raw = layer[section];
 			if (raw === null || typeof raw !== 'object') continue;
-			for (const code of Object.keys(raw)) effective[code] = { section, binding: parsed[section] && parsed[section][code] };
+			for (const code of Object.keys(raw))
+				effective[code] = { section, binding: parsed[section] && parsed[section][code] };
 		}
 		const out = {};
 		for (const code of Object.keys(effective).sort()) {
@@ -361,7 +443,12 @@ function loadLayers(text, os, ctx) {
 			if (!binding) continue;
 			const source = sourceUnavailable(code, os, ctx);
 			const r = source ? { unavailable: source } : resolveBinding(binding, os, ctx);
-			if (r.unavailable) report(error('unavailable_on_os', layerId, section, code, r.unavailable.detail, { reason_key: r.unavailable.reason_key }));
+			if (r.unavailable)
+				report(
+					error('unavailable_on_os', layerId, section, code, r.unavailable.detail, {
+						reason_key: r.unavailable.reason_key
+					})
+				);
 			else out[code] = r.resolved;
 		}
 		result.layers[layerId] = out;
@@ -388,7 +475,9 @@ function formatResolution(r) {
  * for humans and is not compared.
  */
 function errorSignature(e) {
-	return [e.code, e.layer, e.section, e.key, e.reason_key].map((part) => (part === null || part === undefined ? '' : String(part))).join('|');
+	return [e.code, e.layer, e.section, e.key, e.reason_key]
+		.map((part) => (part === null || part === undefined ? '' : String(part)))
+		.join('|');
 }
 
 module.exports = {

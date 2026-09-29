@@ -22,10 +22,10 @@ The 8 variants are organised on two axes — importance (`DEBUG`/`INFO`/`WARNING
 
 ## Key files
 
-| File               | Description                                                                  |
-| ------------------ | ---------------------------------------------------------------------------- |
-| `SPEC.md`          | Normative specification for all 8 variants, lifecycle pairing rule, and punctuation conventions |
-| `test_vectors.json`| Golden input/output pairs for the formatting contract, consumed by the JS suite |
+| File                | Description                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `SPEC.md`           | Normative specification for all 8 variants, lifecycle pairing rule, and punctuation conventions |
+| `test_vectors.json` | Golden input/output pairs for the formatting contract, consumed by the JS suite                 |
 
 ## Lifecycle pairing rule
 

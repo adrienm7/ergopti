@@ -79,7 +79,8 @@ const drivers = {
 	linux: sources('linux', '.lua')
 };
 for (const [d, files] of Object.entries(drivers)) {
-	if (files.length < 20) errors.push(`walked only ${files.length} ${d} file(s) — the scan is broken`);
+	if (files.length < 20)
+		errors.push(`walked only ${files.length} ${d} file(s) — the scan is broken`);
 }
 
 const reads = (driver, key) => drivers[driver].some((s) => new RegExp(`\\b${key}\\b`).test(s));
@@ -128,7 +129,9 @@ for (const key of keys) {
 
 for (const key of Object.keys(RECORD)) {
 	if (!keys.includes(key)) {
-		errors.push(`${key}: recorded here but no longer declared in [positioning] — the record is stale`);
+		errors.push(
+			`${key}: recorded here but no longer declared in [positioning] — the record is stale`
+		);
 	}
 }
 

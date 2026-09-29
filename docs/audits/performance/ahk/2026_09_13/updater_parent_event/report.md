@@ -33,13 +33,13 @@ Times below are sums of the runner's per-case durations, excluding harness
 startup. Baseline samples: 10187.156, 10309.478, 10320.242 ms.
 Candidate samples: 8183.642, 7538.996, 7984.343 ms.
 
-| Case | Before median / max (ms) | After median / max (ms) |
-| --- | ---: | ---: |
-| Successful replacement | 2913.598 / 2921.282 | 2367.610 / 2431.942 |
-| Missing replacement rollback | 2849.347 / 2865.976 | 2294.442 / 2447.764 |
-| Interrupted backup recovery | 2870.475 / 2877.338 | 2259.917 / 2353.164 |
-| Parent exit before FinalExit | 1216.817 / 1231.538 | 473.520 / 477.560 |
-| All seven cases combined | 10309.478 / 10320.242 | 7984.343 / 8183.642 |
+| Case                         | Before median / max (ms) | After median / max (ms) |
+| ---------------------------- | -----------------------: | ----------------------: |
+| Successful replacement       |      2913.598 / 2921.282 |     2367.610 / 2431.942 |
+| Missing replacement rollback |      2849.347 / 2865.976 |     2294.442 / 2447.764 |
+| Interrupted backup recovery  |      2870.475 / 2877.338 |     2259.917 / 2353.164 |
+| Parent exit before FinalExit |      1216.817 / 1231.538 |       473.520 / 477.560 |
+| All seven cases combined     |    10309.478 / 10320.242 |     7984.343 / 8183.642 |
 
 The combined median decreased by 2325.135 ms (22.6%). Three other cases in the
 selection do not use this parent helper; no speedup is attributed to them.

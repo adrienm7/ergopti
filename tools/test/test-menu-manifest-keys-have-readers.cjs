@@ -57,9 +57,6 @@ const MIN_SECTIONS = 10; // 15 today.
 
 const errors = [];
 
-
-
-
 // =======================================
 // =======================================
 // ======= 1/ Reading the manifest =======
@@ -114,9 +111,6 @@ if (sections.length < MIN_SECTIONS) {
 if (fields.size < MIN_FIELDS) {
 	errors.push(`parsed only ${fields.size} manifest field(s) — the parse is broken`);
 }
-
-
-
 
 // =======================================
 // =======================================
@@ -201,9 +195,6 @@ const groupIds = new Set();
 	}
 })(manifest);
 
-
-
-
 // ======================================
 // ======================================
 // ======= 3/ Fields and sections =======
@@ -241,9 +232,6 @@ for (const section of [...sections].sort()) {
 			'else, and adding a row here changes nothing.'
 	);
 }
-
-
-
 
 // ==========================
 // ==========================

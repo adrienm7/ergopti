@@ -6,9 +6,9 @@ WKWebView-based LLM prompt-profile editor. The shared frontend renders the `{con
 
 ## Key files
 
-| File      | Description                                                              |
-| --------- | ------------------------------------------------------------------------ |
-| `init.lua`| `M.show(profile)` — singleton host; bridge handler for save/cancel        |
+| File       | Description                                                        |
+| ---------- | ------------------------------------------------------------------ |
+| `init.lua` | `M.show(profile)` — singleton host; bridge handler for save/cancel |
 
 ## Shared frontend
 

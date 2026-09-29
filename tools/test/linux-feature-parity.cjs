@@ -25,7 +25,7 @@ const EVIDENCE_FIELDS = [
 	'hardware_proven',
 	'proof_tier',
 	'intentional',
-	'evidence',
+	'evidence'
 ];
 
 function fail(message) {
@@ -44,13 +44,16 @@ function parseLinuxManifest(source) {
 	}
 
 	const supported = [];
-	for (const match of source.slice(featureStart, unavailableStart).matchAll(/path\s*=\s*"([^"]+)"/g)) {
+	for (const match of source
+		.slice(featureStart, unavailableStart)
+		.matchAll(/path\s*=\s*"([^"]+)"/g)) {
 		supported.push({ path: match[1] });
 	}
 
 	const unavailable = [];
 	const unavailableSource = source.slice(unavailableStart);
-	const row = /path\s*=\s*"([^"]+)"[^\n]*reason_key\s*=\s*"([^"]*)"[^\n]*platforms\s*=\s*\{([^}]*)\}/g;
+	const row =
+		/path\s*=\s*"([^"]+)"[^\n]*reason_key\s*=\s*"([^"]*)"[^\n]*platforms\s*=\s*\{([^}]*)\}/g;
 	for (const match of unavailableSource.matchAll(row)) {
 		unavailable.push({ path: match[1], reason_key: match[2], platforms: parsePlatforms(match[3]) });
 	}
@@ -73,17 +76,26 @@ function validateSupportedEvidence(featurePath, evidence, rootDirectory) {
 	for (const field of EVIDENCE_FIELDS) {
 		if (!Object.hasOwn(evidence, field)) fail(`${featurePath} is missing evidence field ${field}`);
 	}
-	for (const field of ['registered', 'production_caller', 'persisted', 'applied', 'hardware_proven']) {
-		if (!STATES.has(evidence[field])) fail(`${featurePath}.${field} has invalid state ${evidence[field]}`);
+	for (const field of [
+		'registered',
+		'production_caller',
+		'persisted',
+		'applied',
+		'hardware_proven'
+	]) {
+		if (!STATES.has(evidence[field]))
+			fail(`${featurePath}.${field} has invalid state ${evidence[field]}`);
 	}
 	if (!PROOF_TIERS.has(evidence.proof_tier)) {
 		fail(`${featurePath}.proof_tier has invalid value ${evidence.proof_tier}`);
 	}
 	if (typeof evidence.intentional !== 'boolean') fail(`${featurePath}.intentional must be boolean`);
 	if (!Array.isArray(evidence.evidence)) fail(`${featurePath}.evidence must be an array`);
-	const upgraded = evidence.proof_tier !== 'declaration' ||
-		['registered', 'production_caller', 'persisted', 'applied', 'hardware_proven']
-			.some((field) => evidence[field] === 'yes');
+	const upgraded =
+		evidence.proof_tier !== 'declaration' ||
+		['registered', 'production_caller', 'persisted', 'applied', 'hardware_proven'].some(
+			(field) => evidence[field] === 'yes'
+		);
 	if (upgraded && evidence.evidence.length === 0) {
 		fail(`${featurePath} claims proof without a tracked evidence path`);
 	}
@@ -102,7 +114,11 @@ function buildParityRows({ manifest, evidenceConfig, rootDirectory }) {
 	if (typeof evidenceConfig.owner !== 'string' || evidenceConfig.owner === '') {
 		fail('Linux evidence owner must be non-empty');
 	}
-	if (!evidenceConfig.supported_defaults || !evidenceConfig.evidence_groups || !evidenceConfig.overrides) {
+	if (
+		!evidenceConfig.supported_defaults ||
+		!evidenceConfig.evidence_groups ||
+		!evidenceConfig.overrides
+	) {
 		fail('Linux evidence must define supported_defaults, evidence_groups, and overrides');
 	}
 	validateSupportedEvidence('supported_defaults', evidenceConfig.supported_defaults, rootDirectory);
@@ -141,7 +157,7 @@ function buildParityRows({ manifest, evidenceConfig, rootDirectory }) {
 		const implementation = {
 			...evidenceConfig.supported_defaults,
 			...(groupedEvidence.get(feature.path) || {}),
-			...override,
+			...override
 		};
 		validateSupportedEvidence(feature.path, implementation, rootDirectory);
 		rows.push({
@@ -150,11 +166,12 @@ function buildParityRows({ manifest, evidenceConfig, rootDirectory }) {
 			owner: evidenceConfig.owner,
 			declared: true,
 			reason: { kind: 'declared_for_linux', key: '' },
-			...implementation,
+			...implementation
 		});
 	}
 	for (const feature of parsed.unavailable) {
-		if (paths.has(feature.path)) fail(`Linux path is both supported and unavailable: ${feature.path}`);
+		if (paths.has(feature.path))
+			fail(`Linux path is both supported and unavailable: ${feature.path}`);
 		paths.add(feature.path);
 		const reason = inferredReason(feature);
 		rows.push({
@@ -170,7 +187,7 @@ function buildParityRows({ manifest, evidenceConfig, rootDirectory }) {
 			hardware_proven: 'no',
 			proof_tier: 'declaration',
 			intentional: reason.kind !== 'linux_parity_gap',
-			evidence: [],
+			evidence: []
 		});
 	}
 	for (const featurePath of Object.keys(evidenceConfig.overrides)) {
@@ -190,12 +207,20 @@ function summarize(rows) {
 		unavailable: count((row) => row.status === 'unavailable'),
 		parity_gaps: count((row) => row.reason.kind === 'linux_parity_gap'),
 		proven_above_declaration: count((row) => row.proof_tier !== 'declaration'),
-		hardware_proven: count((row) => row.status === 'claimed_supported' && row.hardware_proven === 'yes'),
-		hardware_pending: count((row) => row.status === 'claimed_supported' &&
-			['no', 'unverified'].includes(row.hardware_proven)),
-		unverified_supported: count((row) => row.status === 'claimed_supported' &&
-			[row.registered, row.production_caller, row.persisted, row.applied]
-				.some((state) => state === 'unverified')),
+		hardware_proven: count(
+			(row) => row.status === 'claimed_supported' && row.hardware_proven === 'yes'
+		),
+		hardware_pending: count(
+			(row) =>
+				row.status === 'claimed_supported' && ['no', 'unverified'].includes(row.hardware_proven)
+		),
+		unverified_supported: count(
+			(row) =>
+				row.status === 'claimed_supported' &&
+				[row.registered, row.production_caller, row.persisted, row.applied].some(
+					(state) => state === 'unverified'
+				)
+		)
 	};
 }
 

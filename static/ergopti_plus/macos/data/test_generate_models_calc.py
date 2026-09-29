@@ -26,13 +26,17 @@ def _run() -> None:
     assert gm.estimate_download_gb(None) is None, "None params → no estimate"
     # MoE shorthand: 8x7B ≈ 8 * 7 * 0.85 billions.
     moe = gm.estimate_download_gb("8x7B")
-    assert moe is not None and abs(moe - round(8 * 7 * 0.85 * 0.55, 2)) < 0.01, "MoE download estimate"
+    assert moe is not None and abs(moe - round(8 * 7 * 0.85 * 0.55, 2)) < 0.01, (
+        "MoE download estimate"
+    )
 
     # ── RAM is derived from the download and is always >= it ─────────────────
     assert gm.estimate_ram_gb(None) is None, "no download → no RAM"
     assert gm.estimate_ram_gb(0) is None, "zero download → no RAM"
     ram_19 = gm.estimate_ram_gb(19.0)
-    assert ram_19 is not None and ram_19 >= 19.0, "RAM must be >= download (regression: was < for MoE)"
+    assert ram_19 is not None and ram_19 >= 19.0, (
+        "RAM must be >= download (regression: was < for MoE)"
+    )
 
     # ── Unified requirements: real download preferred, RAM consistent ────────
     real = gm.calculate_hardware_requirements(19.0, "30.53B")
@@ -42,11 +46,15 @@ def _run() -> None:
     # ── A failed lookup (download None) no longer leaves a blank ─────────────
     filled = gm.calculate_hardware_requirements(None, "7B")
     assert filled["download_gb"] is not None, "missing download is estimated, not blank"
-    assert filled["ram_gb"] is not None and filled["ram_gb"] >= filled["download_gb"], "estimated RAM >= estimated download"
+    assert filled["ram_gb"] is not None and filled["ram_gb"] >= filled["download_gb"], (
+        "estimated RAM >= estimated download"
+    )
 
     # ── Genuinely unknown params: both stay None (nothing to invent) ─────────
     unknown = gm.calculate_hardware_requirements(None, "N/A")
-    assert unknown["download_gb"] is None and unknown["ram_gb"] is None, "unknown params → both None"
+    assert unknown["download_gb"] is None and unknown["ram_gb"] is None, (
+        "unknown params → both None"
+    )
 
     print("OK — model hardware-requirement calculation invariants hold.")
 

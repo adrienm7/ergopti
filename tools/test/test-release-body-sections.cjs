@@ -82,9 +82,12 @@ function loadModules() {
 	sandbox.window = sandbox;
 	vm.createContext(sandbox);
 	for (const file of ['release_body.js', 'atom_feed.js']) {
-		vm.runInContext(fs.readFileSync(path.join(CHANGELOG_UI, file), 'utf8'), sandbox, { filename: file });
+		vm.runInContext(fs.readFileSync(path.join(CHANGELOG_UI, file), 'utf8'), sandbox, {
+			filename: file
+		});
 	}
-	if (typeof sandbox.splitReleaseBody !== 'function') throw new Error('release_body.js exports no splitReleaseBody');
+	if (typeof sandbox.splitReleaseBody !== 'function')
+		throw new Error('release_body.js exports no splitReleaseBody');
 	return sandbox;
 }
 
@@ -151,7 +154,8 @@ function expand(text, env, escapable) {
 			const m = /^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))/.exec(text.slice(i));
 			if (!m) throw new Error(`unsupported expansion in: ${text}`);
 			const name = m[1] || m[2];
-			if (!Object.prototype.hasOwnProperty.call(env, name)) throw new Error(`unknown variable $${name}`);
+			if (!Object.prototype.hasOwnProperty.call(env, name))
+				throw new Error(`unknown variable $${name}`);
 			out += env[name];
 			i += m[0].length - 1;
 			continue;
@@ -211,12 +215,17 @@ function buildCiBody(inputs, changelog) {
 		if (sed) {
 			if (!inGroup) throw new Error('the changelog sed writes outside the body group');
 			const drop = new RegExp(sed[1].replace(/\[\[:space:\]\]/g, '[ \\t]'));
-			body += changelog.split('\n').filter((l) => !drop.test(l)).join('\n');
+			body += changelog
+				.split('\n')
+				.filter((l) => !drop.test(l))
+				.join('\n');
 			continue;
 		}
 		// The cask token comes from the real generator the step runs.
 		if (trimmed === 'cask="$(node tools/build/homebrew-cask.cjs --token "$CHANNEL")"') {
-			env.cask = require(path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs')).tokenForChannel(env.CHANNEL);
+			env.cask = require(path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs')).tokenForChannel(
+				env.CHANNEL
+			);
 			continue;
 		}
 		if (
@@ -237,15 +246,28 @@ function checkCiBody(modules) {
 	const body = buildCiBody(env, CHANGELOG_MD);
 	const parts = modules.splitReleaseBody(body);
 
-	expect(parts.format === 'marked', `the CI body must carry valid section markers (format: ${parts.format})`);
-	expect(parts.title === 'Ergopti 1.2.3', `the title must be the version heading (got "${parts.title}")`);
+	expect(
+		parts.format === 'marked',
+		`the CI body must carry valid section markers (format: ${parts.format})`
+	);
+	expect(
+		parts.title === 'Ergopti 1.2.3',
+		`the title must be the version heading (got "${parts.title}")`
+	);
 	expect(
 		parts.changelog.startsWith('> Timestamps are in **Paris time**') &&
 			parts.changelog.includes('### Features') &&
 			parts.changelog.includes('- **Ci: Mark the release body sections**'),
 		'the changelog section must hold the timestamp note and every changelog group'
 	);
-	for (const token of ['<details', '<summary', '</details>', 'ergopti:section', '## Downloads', 'Ergopti_windows.exe']) {
+	for (const token of [
+		'<details',
+		'<summary',
+		'</details>',
+		'ergopti:section',
+		'## Downloads',
+		'Ergopti_windows.exe'
+	]) {
 		expect(
 			!parts.changelog.split('\n').some((line) => line.startsWith(token)),
 			`the changelog section must not start a line with ${token}`
@@ -267,13 +289,17 @@ function checkCiBody(modules) {
 	);
 	const markers = body.match(/^<!-- ergopti:section=[a-z]+ -->$/gm) || [];
 	expect(
-		JSON.stringify(markers.map((m) => /=([a-z]+)/.exec(m)[1])) === JSON.stringify(modules.RELEASE_BODY_SECTIONS),
+		JSON.stringify(markers.map((m) => /=([a-z]+)/.exec(m)[1])) ===
+			JSON.stringify(modules.RELEASE_BODY_SECTIONS),
 		`CI must emit every section the splitter knows, in order (got ${markers.join(', ')})`
 	);
 
 	// Without a changelog file the step still writes a marked, valid body.
 	const bare = modules.splitReleaseBody(buildCiBody(env, ''));
-	expect(bare.format === 'marked' && bare.changelog === '', 'an empty changelog must still split as marked');
+	expect(
+		bare.format === 'marked' && bare.changelog === '',
+		'an empty changelog must still split as marked'
+	);
 }
 
 // ==========================================
@@ -285,17 +311,26 @@ function checkCiBody(modules) {
 function checkVectors(modules) {
 	const data = JSON.parse(fs.readFileSync(path.join(CORPUS, 'release_body_vectors.json'), 'utf8'));
 	const vectors = data.vectors || [];
-	expect(vectors.length >= MIN_VECTORS, `expected at least ${MIN_VECTORS} vectors, found ${vectors.length}`);
+	expect(
+		vectors.length >= MIN_VECTORS,
+		`expected at least ${MIN_VECTORS} vectors, found ${vectors.length}`
+	);
 	for (const vector of vectors) {
 		const parts = modules.splitReleaseBody(vector.body.join('\n'));
 		const expected = vector.changelog.join('\n');
-		expect(parts.format === vector.format, `[${vector.id}] format ${parts.format}, expected ${vector.format}`);
+		expect(
+			parts.format === vector.format,
+			`[${vector.id}] format ${parts.format}, expected ${vector.format}`
+		);
 		expect(
 			parts.changelog === expected,
 			`[${vector.id}] changelog mismatch:\n--- got\n${parts.changelog}\n--- expected\n${expected}`
 		);
 		const all = [parts.intro, parts.changelog, parts.downloads, parts.footer].join('\n');
-		expect(!/Skip to downloads/.test(all), `[${vector.id}] the github.com jump link must be dropped`);
+		expect(
+			!/Skip to downloads/.test(all),
+			`[${vector.id}] the github.com jump link must be dropped`
+		);
 		expect(!/^<a id=/m.test(all), `[${vector.id}] empty anchors must be dropped`);
 	}
 	const legacy = vectors.find((v) => v.id === 'changelog-first-with-jump-link');
@@ -315,10 +350,25 @@ function checkVectors(modules) {
 	// shown in the footer, never dropped with the fold's surroundings.
 	const note = 'Full Changelog: https://github.com/adrienm7/ergopti/compare/v1.2.2...v1.2.3';
 	const trailing = modules.splitReleaseBody(
-		['## Downloads', '', 'Files.', '', '<details>', '<summary>Changelog</summary>', '', '- **Ci: Fold**', '', '</details>', '', note].join('\n')
+		[
+			'## Downloads',
+			'',
+			'Files.',
+			'',
+			'<details>',
+			'<summary>Changelog</summary>',
+			'',
+			'- **Ci: Fold**',
+			'',
+			'</details>',
+			'',
+			note
+		].join('\n')
 	);
 	expect(
-		trailing.format === 'legacy' && trailing.changelog === '- **Ci: Fold**' && trailing.footer === note,
+		trailing.format === 'legacy' &&
+			trailing.changelog === '- **Ci: Fold**' &&
+			trailing.footer === note,
 		`a note after the changelog fold must move to the footer (changelog "${trailing.changelog}", footer "${trailing.footer}")`
 	);
 }
@@ -358,7 +408,10 @@ function checkAtomBodies(modules) {
 			parts.downloads.includes('keyboard layout only'),
 			`[${release.tag_name}] the feed downloads must be their own section`
 		);
-		expect(/Generated by/.test(parts.footer), `[${release.tag_name}] the feed footer must be split off`);
+		expect(
+			/Generated by/.test(parts.footer),
+			`[${release.tag_name}] the feed footer must be split off`
+		);
 		// The jump link only works on github.com. The feed renders older bodies'
 		// in-page "#user-content-downloads" href, which must be dropped like the
 		// API body's, not left behind as a dead bold label.
@@ -377,7 +430,8 @@ function checkAtomBodies(modules) {
 // ==========================================
 
 // A text node that IS a structural line means the fold or anchor leaked as text.
-const STRUCTURAL_TEXT = /^(?:<details( open)?>|<\/details>|<summary>.*|<a (?:id|name)=.*|<!-- \/?ergopti:section.*)$/;
+const STRUCTURAL_TEXT =
+	/^(?:<details( open)?>|<\/details>|<summary>.*|<a (?:id|name)=.*|<!-- \/?ergopti:section.*)$/;
 
 /** Renders one release through the real page and returns its body element. */
 function renderInPage(body) {
@@ -406,8 +460,14 @@ function checkPageOrder(label, body, entry) {
 	const root = renderInPage(body);
 	const changelog = section(root, 'release-section-changelog');
 	const downloads = section(root, 'release-section-downloads');
-	expect(Boolean(changelog) && changelog.tagName === 'details', `[${label}] the changelog must be a page section`);
-	expect(Boolean(downloads) && downloads.tagName === 'details', `[${label}] the downloads must be a page section`);
+	expect(
+		Boolean(changelog) && changelog.tagName === 'details',
+		`[${label}] the changelog must be a page section`
+	);
+	expect(
+		Boolean(downloads) && downloads.tagName === 'details',
+		`[${label}] the downloads must be a page section`
+	);
 	if (!changelog || !downloads) return;
 	expect(
 		root.children.indexOf(changelog) === 0 && root.children.indexOf(downloads) > 0,
@@ -424,11 +484,13 @@ function checkPageOrder(label, body, entry) {
 		`[${label}] each section must be titled from its locale key`
 	);
 	expect(
-		changelog.textContent.includes(entry) && !changelog.textContent.includes('keyboard layout only'),
+		changelog.textContent.includes(entry) &&
+			!changelog.textContent.includes('keyboard layout only'),
 		`[${label}] the changelog section must hold the entries and nothing of the downloads`
 	);
 	expect(
-		downloads.textContent.includes('keyboard layout only') && !downloads.textContent.includes(entry),
+		downloads.textContent.includes('keyboard layout only') &&
+			!downloads.textContent.includes(entry),
 		`[${label}] the downloads section must hold the download tables`
 	);
 	const leaked = textNodes(root)
@@ -440,9 +502,15 @@ function checkPageOrder(label, body, entry) {
 function checkVersionsPage(modules) {
 	const ciBody = buildCiBody(CI_ENV, CHANGELOG_MD);
 	checkPageOrder('CI body', ciBody, 'Ci: Mark the release body sections');
-	const vectors = JSON.parse(fs.readFileSync(path.join(CORPUS, 'release_body_vectors.json'), 'utf8')).vectors;
+	const vectors = JSON.parse(
+		fs.readFileSync(path.join(CORPUS, 'release_body_vectors.json'), 'utf8')
+	).vectors;
 	const byId = (id) => vectors.find((v) => v.id === id).body.join('\n');
-	checkPageOrder('legacy body', byId('changelog-first-with-jump-link'), 'Make Disable All switch features off');
+	checkPageOrder(
+		'legacy body',
+		byId('changelog-first-with-jump-link'),
+		'Make Disable All switch features off'
+	);
 	checkPageOrder('folded body', byId('folded-after-downloads'), 'Keep the daemon');
 	const feed = modules.parseReleasesAtom(
 		fs.readFileSync(path.join(CORPUS, 'release_body_feed.atom'), 'utf8'),
@@ -468,7 +536,8 @@ function checkVersionsPage(modules) {
 	// A body with no recognisable section renders verbatim, without section chrome.
 	const unknown = renderInPage(byId('unknown-body-is-its-own-changelog'));
 	expect(
-		!section(unknown, 'release-section-changelog') && unknown.textContent.includes('Hand-written notes'),
+		!section(unknown, 'release-section-changelog') &&
+			unknown.textContent.includes('Hand-written notes'),
 		'an unrecognised body must render as written'
 	);
 }
@@ -497,14 +566,17 @@ function checkNotesPane() {
 		'the prompt pane must render the changelog entries'
 	);
 	expect(
-		!notes.textContent.includes('keyboard layout only') && !notes.textContent.includes('Generated by'),
+		!notes.textContent.includes('keyboard layout only') &&
+			!notes.textContent.includes('Generated by'),
 		'the prompt pane must show the changelog only, not the downloads or the footer'
 	);
 	const leaked = textNodes(notes)
 		.map((node) => node.textContent.trim())
 		.filter((text) => STRUCTURAL_TEXT.test(text));
 	expect(leaked.length === 0, `the prompt pane leaked structural lines: ${leaked.join(' | ')}`);
-	const link = byTag(notes, 'a').find((a) => a.getAttribute('data-url') === 'https://github.com/adrienm7/ergopti/releases/tag/v1.2.2');
+	const link = byTag(notes, 'a').find(
+		(a) => a.getAttribute('data-url') === 'https://github.com/adrienm7/ergopti/releases/tag/v1.2.2'
+	);
 	expect(Boolean(link), 'a repository link in the changelog must be clickable in the pane');
 	if (link) {
 		link.dispatch('click', { preventDefault() {} });
@@ -520,7 +592,10 @@ function checkNotesPane() {
 	}
 
 	const blank = renderPane('');
-	expect(blank.empty.hidden === false && blank.notes.children.length === 0, 'an empty body must show the empty-notes line');
+	expect(
+		blank.empty.hidden === false && blank.notes.children.length === 0,
+		'an empty body must show the empty-notes line'
+	);
 
 	let refused = false;
 	try {

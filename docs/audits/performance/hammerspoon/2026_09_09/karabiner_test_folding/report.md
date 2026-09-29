@@ -27,12 +27,12 @@ It expects the original nine cases, before the new regression is added.
 
 ## Measurements and limitations
 
-| Phase | Elapsed-clock seconds | End-of-phase Lua heap, KiB |
-| --- | ---: | ---: |
-| Baseline 1 | 22.184 | 36300.895 |
-| Candidate 1 | 19.968 | 40232.039 |
-| Candidate 2 | 19.215 | 40232.039 |
-| Baseline 2 | 20.078 | 36301.596 |
+| Phase       | Elapsed-clock seconds | End-of-phase Lua heap, KiB |
+| ----------- | --------------------: | -------------------------: |
+| Baseline 1  |                22.184 |                  36300.895 |
+| Candidate 1 |                19.968 |                  40232.039 |
+| Candidate 2 |                19.215 |                  40232.039 |
+| Baseline 2  |                20.078 |                  36301.596 |
 
 Mean module time changes from 21.131 to 19.592 seconds, about 7.3 percent.
 Observed maxima are 22.184 and 19.968 seconds respectively. Two samples per

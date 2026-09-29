@@ -73,7 +73,9 @@ for (const [id, entry] of Object.entries(sg)) {
 }
 
 if (keyRows.length + seqRows.length === 0) {
-	console.error('[ERROR] the catalogue declares no emit rows — refusing to generate an empty registry.');
+	console.error(
+		'[ERROR] the catalogue declares no emit rows — refusing to generate an empty registry.'
+	);
 	process.exit(1);
 }
 
@@ -123,4 +125,6 @@ lines.push('');
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, lines.join('\n'), 'utf8');
 console.log(`  wrote ${path.relative(ROOT, OUT).split(path.sep).join('/')}`);
-console.log(`[OK] ${keyRows.length} key action(s) and ${seqRows.length} raw sequence(s) generated.`);
+console.log(
+	`[OK] ${keyRows.length} key action(s) and ${seqRows.length} raw sequence(s) generated.`
+);

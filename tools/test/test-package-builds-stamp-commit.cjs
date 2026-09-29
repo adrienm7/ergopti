@@ -56,12 +56,15 @@ const WINDOWS_BUNDLE_REL = 'static/ergopti_plus/windows/infra/bundle.ahk';
 
 // The scripts that assemble a shipped tree and therefore write the stamp.
 const STAMPING_BUILDS = {
-	'tools/build/build_macos_app.sh': /bash\s+tools\/build\/build_macos_app\.sh(?!\s+--native-helper-only)/,
-	'tools/build/build-linux-driver.sh': /bash\s+tools\/build\/build-linux-driver\.sh/,
+	'tools/build/build_macos_app.sh':
+		/bash\s+tools\/build\/build_macos_app\.sh(?!\s+--native-helper-only)/,
+	'tools/build/build-linux-driver.sh': /bash\s+tools\/build\/build-linux-driver\.sh/
 };
 
 // The Linux packagers, which package build/linux/_shared and must verify it.
-const PACKAGERS = ['deb', 'rpm', 'appimage', 'flatpak'].map((kind) => `tools/build/build-linux-${kind}.sh`);
+const PACKAGERS = ['deb', 'rpm', 'appimage', 'flatpak'].map(
+	(kind) => `tools/build/build-linux-${kind}.sh`
+);
 const PKGBUILD_REL = 'tools/build/PKGBUILD';
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
@@ -88,9 +91,6 @@ function indentOf(line) {
 function read(rel) {
 	return fs.readFileSync(path.join(ROOT, rel), 'utf8');
 }
-
-
-
 
 // ================================
 // ================================
@@ -171,7 +171,8 @@ function parseJobs(text) {
 				}
 			}
 			if (/^env:\s*$/.test(body[k])) {
-				for (let m = k + 1; m < body.length && /^\s/.test(body[m]); m++) step.env.push(body[m].trim());
+				for (let m = k + 1; m < body.length && /^\s/.test(body[m]); m++)
+					step.env.push(body[m].trim());
 			}
 		}
 		job.steps.push(step);
@@ -179,9 +180,6 @@ function parseJobs(text) {
 	}
 	return jobs;
 }
-
-
-
 
 // =================================
 // =================================
@@ -211,20 +209,29 @@ function checkWorkflow(text, rel) {
 				stamping++;
 				const hasCommit = env.some((entry) => COMMIT_ENV.test(entry));
 				if (!hasCommit) {
-					errors.push(`${where} runs ${script} without ERGOPTI_BUILD_COMMIT: \${{ github.sha }} — ` +
-						'the package it builds could not name the commit it was built from');
+					errors.push(
+						`${where} runs ${script} without ERGOPTI_BUILD_COMMIT: \${{ github.sha }} — ` +
+							'the package it builds could not name the commit it was built from'
+					);
 				}
-				if (script.endsWith('build_macos_app.sh') && !env.some((entry) => MACOS_VERSION_ENV.test(entry))) {
-					errors.push(`${where} builds the macOS app without ERGOPTI_VERSION: \${{ inputs.version }} — ` +
-						'a release app would report the 0.0.0-dev placeholder');
+				if (
+					script.endsWith('build_macos_app.sh') &&
+					!env.some((entry) => MACOS_VERSION_ENV.test(entry))
+				) {
+					errors.push(
+						`${where} builds the macOS app without ERGOPTI_VERSION: \${{ inputs.version }} — ` +
+							'a release app would report the 0.0.0-dev placeholder'
+					);
 				}
 				if (script.endsWith('build-linux-driver.sh')) {
 					assembledLinux = true;
 					// The one assembly serves CI and release alike.
 					releaseLinux++;
 					if (!env.some((entry) => VERSION_ENV.test(entry))) {
-						errors.push(`${where} assembles the Linux tree without ERGOPTI_BUILD_VERSION: ` +
-							'${{ inputs.version }} — a release driver would report no release version');
+						errors.push(
+							`${where} assembles the Linux tree without ERGOPTI_BUILD_VERSION: ` +
+								'${{ inputs.version }} — a release driver would report no release version'
+						);
 					}
 				}
 			}
@@ -232,8 +239,10 @@ function checkWorkflow(text, rel) {
 				if (!step.run.includes(`bash ${packager}`)) continue;
 				packagers++;
 				if (!assembledLinux) {
-					errors.push(`${where} runs ${packager} before any build-linux-driver.sh in its job — ` +
-						'it would package a tree nobody stamped');
+					errors.push(
+						`${where} runs ${packager} before any build-linux-driver.sh in its job — ` +
+							'it would package a tree nobody stamped'
+					);
 				}
 			}
 			// A tar command may continue over backslash-ended lines.
@@ -242,8 +251,10 @@ function checkWorkflow(text, rel) {
 				const verify = step.run.indexOf('write_build_stamp.sh verify build/linux/_shared');
 				const tar = step.run.search(/\btar\s+-czf\b/);
 				if (verify < 0 || verify > tar) {
-					errors.push(`${where} packs a tarball without first running ` +
-						'`bash tools/build/write_build_stamp.sh verify build/linux/_shared`');
+					errors.push(
+						`${where} packs a tarball without first running ` +
+							'`bash tools/build/write_build_stamp.sh verify build/linux/_shared`'
+					);
 				}
 			}
 		}
@@ -264,15 +275,14 @@ function checkVersionChain(text) {
 		if (!caller || pipeline.field(caller.body, 'uses') === null) {
 			errors.push(`${pipeline.ENTRY_REL} no longer calls the ${box} box as job \`${box}\``);
 		} else if (!CALLER_VERSION.test(caller.body)) {
-			errors.push(`${pipeline.ENTRY_REL}:${caller.line} (job ${box}) must pass ` +
-				'version: ${{ needs.validate.outputs.version }} — the lane would stamp no release version');
+			errors.push(
+				`${pipeline.ENTRY_REL}:${caller.line} (job ${box}) must pass ` +
+					'version: ${{ needs.validate.outputs.version }} — the lane would stamp no release version'
+			);
 		}
 	}
 	return errors;
 }
-
-
-
 
 // =================================
 // =================================
@@ -286,30 +296,45 @@ const result = { errors: [], stamping: 0, packagers: 0, tarballs: 0, releaseLinu
 for (const { rel, text } of workflows) {
 	const found = checkWorkflow(text, rel);
 	result.errors.push(...found.errors);
-	for (const key of ['stamping', 'packagers', 'tarballs', 'releaseLinux']) result[key] += found[key];
+	for (const key of ['stamping', 'packagers', 'tarballs', 'releaseLinux'])
+		result[key] += found[key];
 }
 errors.push(...result.errors);
 errors.push(...checkVersionChain(pipeline.file(pipeline.ENTRY_REL)));
 
 // validate's plan is where the version comes from; the callers only forward it.
 const planMeta = pipeline.step(pipeline.job('validate'), 'Compute tag and version');
-if (!/^\s+version:\s*\$\{\{\s*steps\.meta\.outputs\.version\s*\}\}\s*$/m.test(pipeline.job('validate')) ||
-	!planMeta.includes('emit version "$version"')) {
-	errors.push(`${pipeline.ENTRY_REL}: validate's plan no longer emits the release version its callers forward`);
+if (
+	!/^\s+version:\s*\$\{\{\s*steps\.meta\.outputs\.version\s*\}\}\s*$/m.test(
+		pipeline.job('validate')
+	) ||
+	!planMeta.includes('emit version "$version"')
+) {
+	errors.push(
+		`${pipeline.ENTRY_REL}: validate's plan no longer emits the release version its callers forward`
+	);
 }
 
 if (result.stamping < MIN_STAMPING_STEPS) {
-	errors.push(`found only ${result.stamping} build step(s) (floor ${MIN_STAMPING_STEPS}) — the step parse drifted`);
+	errors.push(
+		`found only ${result.stamping} build step(s) (floor ${MIN_STAMPING_STEPS}) — the step parse drifted`
+	);
 }
 if (result.packagers < MIN_PACKAGER_STEPS) {
-	errors.push(`found only ${result.packagers} packager run(s) (floor ${MIN_PACKAGER_STEPS}) — the step parse drifted`);
+	errors.push(
+		`found only ${result.packagers} packager run(s) (floor ${MIN_PACKAGER_STEPS}) — the step parse drifted`
+	);
 }
 if (result.releaseLinux < MIN_RELEASE_LINUX_STEPS) {
-	errors.push(`found only ${result.releaseLinux} release Linux assembly step(s) ` +
-		`(floor ${MIN_RELEASE_LINUX_STEPS}) — the job parse drifted`);
+	errors.push(
+		`found only ${result.releaseLinux} release Linux assembly step(s) ` +
+			`(floor ${MIN_RELEASE_LINUX_STEPS}) — the job parse drifted`
+	);
 }
 if (result.tarballs < MIN_TARBALL_STEPS) {
-	errors.push(`found only ${result.tarballs} tarball step(s) (floor ${MIN_TARBALL_STEPS}) — the step parse drifted`);
+	errors.push(
+		`found only ${result.tarballs} tarball step(s) (floor ${MIN_TARBALL_STEPS}) — the step parse drifted`
+	);
 }
 
 // The guard must be able to fail: dropping one stamp or one version, in every
@@ -317,16 +342,20 @@ if (result.tarballs < MIN_TARBALL_STEPS) {
 for (const [key, owners] of [
 	['ERGOPTI_BUILD_COMMIT', 2],
 	['ERGOPTI_BUILD_VERSION', 1],
-	['ERGOPTI_VERSION', 1],
+	['ERGOPTI_VERSION', 1]
 ]) {
 	const entry = new RegExp(`^\\s*${key}:.*\\r?\\n`, 'm');
 	const carriers = workflows.filter(({ text }) => entry.test(text));
 	if (carriers.length < owners) {
-		errors.push(`only ${carriers.length} pipeline workflow(s) set ${key} (floor ${owners}) — the build steps moved`);
+		errors.push(
+			`only ${carriers.length} pipeline workflow(s) set ${key} (floor ${owners}) — the build steps moved`
+		);
 	}
 	for (const { rel, text } of carriers) {
 		if (checkWorkflow(text.replace(entry, ''), rel).errors.length === 0) {
-			errors.push(`self-check: removing the first ${key} entry of ${rel} went unnoticed — this guard cannot fail`);
+			errors.push(
+				`self-check: removing the first ${key} entry of ${rel} went unnoticed — this guard cannot fail`
+			);
 		}
 	}
 }
@@ -335,13 +364,17 @@ const chainMutated = ciText.replace(CALLER_VERSION, "      version: ''");
 if (chainMutated === ciText) {
 	errors.push(`${pipeline.ENTRY_REL} passes the plan's version to no lane at all`);
 } else if (checkVersionChain(chainMutated).length === 0) {
-	errors.push('self-check: dropping the plan\'s version from an OS caller went unnoticed — this guard cannot fail');
+	errors.push(
+		"self-check: dropping the plan's version from an OS caller went unnoticed — this guard cannot fail"
+	);
 }
 
 // Each build entry point writes the stamp; each packager verifies its copy.
 for (const script of Object.keys(STAMPING_BUILDS)) {
 	if (!/write_build_stamp\.sh"?\s+write\s/.test(read(script))) {
-		errors.push(`${script} no longer calls write_build_stamp.sh write — its packages would ship no commit`);
+		errors.push(
+			`${script} no longer calls write_build_stamp.sh write — its packages would ship no commit`
+		);
 	}
 }
 for (const packager of PACKAGERS) {
@@ -355,7 +388,9 @@ for (const packager of PACKAGERS) {
 // builder and verify the tree it installs.
 const pkgbuild = read(PKGBUILD_REL);
 if (!STAMPING_BUILDS['tools/build/build-linux-driver.sh'].test(pkgbuild)) {
-	errors.push(`${PKGBUILD_REL} no longer assembles through build-linux-driver.sh, which writes the stamp`);
+	errors.push(
+		`${PKGBUILD_REL} no longer assembles through build-linux-driver.sh, which writes the stamp`
+	);
 }
 if (!/write_build_stamp\.sh\s+verify\s+"\$pkgdir\/usr\/lib\/ergopti\/_shared"/.test(pkgbuild)) {
 	errors.push(`${PKGBUILD_REL} no longer verifies the build stamp in the tree it installs`);
@@ -367,14 +402,16 @@ const reader = read(READER_REL);
 for (const [shellName, luaName] of [
 	['BUILD_STAMP_FILE', 'BUILD_STAMP_FILE'],
 	['BUILD_STAMP_COMMIT_KEY', 'BUILD_STAMP_COMMIT_KEY'],
-	['BUILD_STAMP_VERSION_KEY', 'BUILD_STAMP_VERSION_KEY'],
+	['BUILD_STAMP_VERSION_KEY', 'BUILD_STAMP_VERSION_KEY']
 ]) {
 	const shell = writer.match(new RegExp(`^${shellName}="([^"]+)"$`, 'm'));
 	const lua = reader.match(new RegExp(`^M\\.${luaName} = "([^"]+)"$`, 'm'));
 	if (!shell || !lua) {
 		errors.push(`${shellName} is no longer declared in ${WRITER_REL} and ${READER_REL}`);
 	} else if (shell[1] !== lua[1]) {
-		errors.push(`${shellName} differs: ${WRITER_REL} writes "${shell[1]}", ${READER_REL} reads "${lua[1]}"`);
+		errors.push(
+			`${shellName} differs: ${WRITER_REL} writes "${shell[1]}", ${READER_REL} reads "${lua[1]}"`
+		);
 	}
 }
 
@@ -382,16 +419,26 @@ for (const [shellName, luaName] of [
 if (!/BUNDLE_COMMIT := "__BUNDLE_COMMIT__"/.test(read(WINDOWS_BUNDLE_REL))) {
 	errors.push(`${WINDOWS_BUNDLE_REL} no longer declares the __BUNDLE_COMMIT__ placeholder`);
 }
-if (!/Replace\("__BUNDLE_COMMIT__",\s*"\$\{\{ github\.sha \}\}"\)/.test(
-	pipeline.step(pipeline.job('package-windows'), 'Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL'))) {
-	errors.push(`${WINDOWS_WORKFLOW_REL} no longer stamps BUNDLE_COMMIT with github.sha in the Windows build`);
+if (
+	!/Replace\("__BUNDLE_COMMIT__",\s*"\$\{\{ github\.sha \}\}"\)/.test(
+		pipeline.step(
+			pipeline.job('package-windows'),
+			'Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL'
+		)
+	)
+) {
+	errors.push(
+		`${WINDOWS_WORKFLOW_REL} no longer stamps BUNDLE_COMMIT with github.sha in the Windows build`
+	);
 }
 if (pipeline.locate('package-windows').file !== WINDOWS_WORKFLOW_REL) {
 	errors.push(`the Windows release build must live in ${WINDOWS_WORKFLOW_REL}`);
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] a package build does not stamp the commit it was built from:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] a package build does not stamp the commit it was built from:\x1b[0m'
+	);
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }

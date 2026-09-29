@@ -3,17 +3,17 @@
 Committed dev: 2d065e7c808fb3006fa23dfa3e2584e1747d3b9e
 Committed main: 3b8811be72745d158bc24dfb41580bb695005081
 
-| Branch | Merge base | + | - |
-|---|---|---:|---:|
-| feat/ovh2-console | ab7412933a69c79669142b48614c35c83c1224da | 1 | 2 |
-| feat/ovh2-diag-integration | 51563a9ad3d8e615fbfbf51bc6d6c44101b0755b | 6 | 37 |
-| feat/ovh2-linux-harness | ab7412933a69c79669142b48614c35c83c1224da | 0 | 1 |
-| feat/ovh2-neutral-config | 437f490243c7a63d32e25a6920ce60c0e958ad82 | 2 | 1 |
-| feat/ovh2-shortcut-refusals | d409787a526c46298ab5370b89988c40b3a5e618 | 0 | 1 |
-| feat/ovh2-state-refusals | d409787a526c46298ab5370b89988c40b3a5e618 | 0 | 1 |
-| feat/ovh2-windows-master-state | e77324b6785ca29627d1b8c1e0ef689fa69fdabe | 1 | 0 |
-| worktree-wf_f8423464-54e-1 | f31e85e1154b912ddea286280331d82f7fe2fa0a | 14 | 0 |
-| worktree-wf_f8423464-54e-2 | f31e85e1154b912ddea286280331d82f7fe2fa0a | 14 | 0 |
+| Branch                         | Merge base                               |   + |   - |
+| ------------------------------ | ---------------------------------------- | --: | --: |
+| feat/ovh2-console              | ab7412933a69c79669142b48614c35c83c1224da |   1 |   2 |
+| feat/ovh2-diag-integration     | 51563a9ad3d8e615fbfbf51bc6d6c44101b0755b |   6 |  37 |
+| feat/ovh2-linux-harness        | ab7412933a69c79669142b48614c35c83c1224da |   0 |   1 |
+| feat/ovh2-neutral-config       | 437f490243c7a63d32e25a6920ce60c0e958ad82 |   2 |   1 |
+| feat/ovh2-shortcut-refusals    | d409787a526c46298ab5370b89988c40b3a5e618 |   0 |   1 |
+| feat/ovh2-state-refusals       | d409787a526c46298ab5370b89988c40b3a5e618 |   0 |   1 |
+| feat/ovh2-windows-master-state | e77324b6785ca29627d1b8c1e0ef689fa69fdabe |   1 |   0 |
+| worktree-wf_f8423464-54e-1     | f31e85e1154b912ddea286280331d82f7fe2fa0a |  14 |   0 |
+| worktree-wf_f8423464-54e-2     | f31e85e1154b912ddea286280331d82f7fe2fa0a |  14 |   0 |
 
 ## Interpretation
 

@@ -151,9 +151,11 @@ if (unmet.length > 0) {
 	);
 }
 
-const packageRows = [...installerCode.matchAll(
-	/^\s*(apt|dnf|zypper|pacman|xbps|apk):([A-Za-z0-9_.-]+)\)\s+echo "([A-Za-z0-9_.+-]+)" ;;/gm
-)];
+const packageRows = [
+	...installerCode.matchAll(
+		/^\s*(apt|dnf|zypper|pacman|xbps|apk):([A-Za-z0-9_.-]+)\)\s+echo "([A-Za-z0-9_.+-]+)" ;;/gm
+	)
+];
 const packageTable = new Map(packageRows.map((match) => [`${match[1]}:${match[2]}`, match[3]]));
 const packageManagers = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
 const requiredCapabilities = ['luajit', 'notify-send', 'sha256sum', 'xkbcli', 'libatspi.so.0'];
@@ -210,14 +212,17 @@ for (const [dependency, expectedPackage] of expectedPackages) {
 }
 
 const dependencyFunctions =
-	(installerSrc.match(/(_required_dependency_package\(\)\s*\{[\s\S]*?)(?=\nif \$SKIP_DEPS; then)/) ||
-		[])[1] || '';
+	(installerSrc.match(
+		/(_required_dependency_package\(\)\s*\{[\s\S]*?)(?=\nif \$SKIP_DEPS; then)/
+	) || [])[1] || '';
 if (
 	!dependencyFunctions.includes('_required_dependency_package()') ||
 	!dependencyFunctions.includes('_install_required_package()') ||
 	!dependencyFunctions.includes('_check_or_install()')
 ) {
-	errors.push('the dependency function fixture is incomplete; behavioral postcondition proof did not run');
+	errors.push(
+		'the dependency function fixture is incomplete; behavioral postcondition proof did not run'
+	);
 } else {
 	const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-linux-deps-'));
 	const fakeManager = path.join(fixtureRoot, 'apk');
@@ -241,19 +246,22 @@ if (
 			'sudo() { "$@"; }\n' +
 			dependencyFunctions +
 			'\n_check_or_install xkbcli\n';
-		const runFixture = (provide) => spawnSync(bash, ['-s'], {
-			input: harness,
-			encoding: 'utf8',
-			env: {
-				...process.env,
-				ERGOPTI_FAKE_BIN: toPosix(fixtureRoot),
-				ERGOPTI_FAKE_PROVIDE: provide ? '1' : '0',
-				PATH: toPosix(fixtureRoot)
-			}
-		});
+		const runFixture = (provide) =>
+			spawnSync(bash, ['-s'], {
+				input: harness,
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					ERGOPTI_FAKE_BIN: toPosix(fixtureRoot),
+					ERGOPTI_FAKE_PROVIDE: provide ? '1' : '0',
+					PATH: toPosix(fixtureRoot)
+				}
+			});
 		const falseSuccess = runFixture(false);
 		if (falseSuccess.status === 0) {
-			errors.push('a package manager that exits 0 without providing xkbcli still passes the installer');
+			errors.push(
+				'a package manager that exits 0 without providing xkbcli still passes the installer'
+			);
 		}
 		const realSuccess = runFixture(true);
 		if (realSuccess.status !== 0) {

@@ -17,11 +17,20 @@ def replace_once(source, before, after):
 
 def instrument_monitor(source):
     """Capture only the renamed owned device before timestamp normalization."""
-    source = replace_once(source, "#pragma once\n", '#pragma once\n\n#include "hs274-raw-capture.hpp"\n')
-    source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_probe_device_id_(type_safe::get(device_properties.get_device_id())),
+    source = replace_once(
+        source, "#pragma once\n", '#pragma once\n\n#include "hs274-raw-capture.hpp"\n'
+    )
+    source = replace_once(
+        source,
+        "        last_time_stamp_(0) {",
+        """        hs274_probe_device_id_(type_safe::get(device_properties.get_device_id())),
         hs274_probe_owned_(type_safe::get(device_properties.get_product()) == "HS274 CI Keyboard"),
-        last_time_stamp_(0) {""")
-    source = replace_once(source, "      input_values_arrived(hid_values);\n    });", """      if (hs274_probe_owned_) {
+        last_time_stamp_(0) {""",
+    )
+    source = replace_once(
+        source,
+        "      input_values_arrived(hid_values);\n    });",
+        """      if (hs274_probe_owned_) {
         for (std::size_t index = 0; index < hid_values->size(); ++index) {
           const auto& value = hid_values->at(index);
           // The wrapper drops element identity; use the corresponding native value.
@@ -37,22 +46,31 @@ def instrument_monitor(source):
         }
       }
       input_values_arrived(hid_values);
-    });""")
-    return replace_once(source, "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;", """  std::uint64_t hs274_probe_device_id_;
+    });""",
+    )
+    return replace_once(
+        source,
+        "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
+        """  std::uint64_t hs274_probe_device_id_;
   bool hs274_probe_owned_;
-  pqrs::osx::chrono::absolute_time_point last_time_stamp_;""")
+  pqrs::osx::chrono::absolute_time_point last_time_stamp_;""",
+    )
 
 
 def instrument_shutdown(source):
     """Publish a finite committed-prefix snapshot outside input callbacks."""
-    source = replace_once(source, "#pragma once\n", '#pragma once\n\n#include "hs274-raw-capture.hpp"\n')
+    source = replace_once(
+        source, "#pragma once\n", '#pragma once\n\n#include "hs274-raw-capture.hpp"\n'
+    )
     return replace_once(source, "  return 0;", "  return hs274_raw_capture::finish() ? 0 : 1;")
 
 
 def main(root, stream=False):
     """Preflight every owned target before writing any instrumentation."""
     root = root.resolve()
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    revision = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
     if revision != REVISION:
         raise RuntimeError("Raw capture requires the inspected upstream revision")
     headers = ["hs274-raw-capture.hpp"]
@@ -61,17 +79,44 @@ def main(root, stream=False):
         ("src/apps/CoreService/include/core_service/main/daemon.hpp", instrument_shutdown),
     ]
     if stream:
-        from hs274_stream_patch import stream_monitor, stream_operations, stream_receiver, stream_client, stream_cli, stream_server, stream_entry, stream_socket_ops
-        headers += ["hs274-stream-clock.hpp", "hs274-stream-session.hpp", "hs274-stream-protocol.hpp", "hs274-stream-ack.hpp", "hs274-stream-baseline-probe.hpp", "hs274-key-element.hpp",
-                    "hs274-stream-inventory.hpp", "hs274-key-state.hpp", "hs274-stream-baseline-pages.hpp", "hs274-stream-baseline-client.hpp",
-                    "hs274-stream-source.hpp", "hs274-stream-input.hpp", "hs274-stream-readiness.hpp", "hs274-stream-runtime.hpp", "hs274-stream-cli.hpp"]
+        from hs274_stream_patch import (
+            stream_monitor,
+            stream_operations,
+            stream_receiver,
+            stream_client,
+            stream_cli,
+            stream_server,
+            stream_entry,
+            stream_socket_ops,
+        )
+
+        headers += [
+            "hs274-stream-clock.hpp",
+            "hs274-stream-session.hpp",
+            "hs274-stream-protocol.hpp",
+            "hs274-stream-ack.hpp",
+            "hs274-stream-baseline-probe.hpp",
+            "hs274-key-element.hpp",
+            "hs274-stream-inventory.hpp",
+            "hs274-key-state.hpp",
+            "hs274-stream-baseline-pages.hpp",
+            "hs274-stream-baseline-client.hpp",
+            "hs274-stream-source.hpp",
+            "hs274-stream-input.hpp",
+            "hs274-stream-readiness.hpp",
+            "hs274-stream-runtime.hpp",
+            "hs274-stream-cli.hpp",
+        ]
         transforms[0] = ("src/share/hid_device_events_monitor.hpp", stream_monitor)
         transforms += [
             ("vendor/vendor/include/asio/detail/impl/socket_ops.ipp", stream_socket_ops),
             ("vendor/vendor/include/pqrs/unix_domain_stream/server.hpp", stream_server),
             ("src/share/types/operation_type.hpp", stream_operations),
             ("src/apps/CoreService/include/core_service/daemon/receiver.hpp", stream_receiver),
-            ("src/apps/CoreService/include/core_service/daemon/device_grabber_details/entry.hpp", stream_entry),
+            (
+                "src/apps/CoreService/include/core_service/daemon/device_grabber_details/entry.hpp",
+                stream_entry,
+            ),
             ("src/share/core_service_daemon_client.hpp", stream_client),
             ("src/bin/cli/src/main.cpp", stream_cli),
         ]

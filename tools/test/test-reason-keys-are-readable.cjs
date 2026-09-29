@@ -44,9 +44,24 @@ const LOCALES = path.join(SP, '_shared', 'data', 'locales');
 
 // The generated manifests, and the shape each one spells the table in.
 const GENERATED = [
-	{ label: 'macOS', file: path.join(SP, 'macos', '_generated', 'features_manifest.lua'), re: /M\.unavailable = \{([\s\S]*?)\n\}/, entry: /path = /g },
-	{ label: 'Linux', file: path.join(SP, 'linux', '_generated', 'features_manifest.lua'), re: /M\.unavailable = \{([\s\S]*?)\n\}/, entry: /path = /g },
-	{ label: 'Windows', file: path.join(SP, 'windows', '_generated', 'features_manifest.ahk'), re: /"unavailable", \[([\s\S]*?)\n {4}\]/, entry: /"path"/g }
+	{
+		label: 'macOS',
+		file: path.join(SP, 'macos', '_generated', 'features_manifest.lua'),
+		re: /M\.unavailable = \{([\s\S]*?)\n\}/,
+		entry: /path = /g
+	},
+	{
+		label: 'Linux',
+		file: path.join(SP, 'linux', '_generated', 'features_manifest.lua'),
+		re: /M\.unavailable = \{([\s\S]*?)\n\}/,
+		entry: /path = /g
+	},
+	{
+		label: 'Windows',
+		file: path.join(SP, 'windows', '_generated', 'features_manifest.ahk'),
+		re: /"unavailable", \[([\s\S]*?)\n {4}\]/,
+		entry: /"path"/g
+	}
 ];
 
 // Floor per driver. Each is missing ~100 features today; a table that collapsed
@@ -62,9 +77,6 @@ const READERS = [
 ];
 
 const errors = [];
-
-
-
 
 // ==================================================
 // ======= 1/ The absences are shipped ==============
@@ -93,9 +105,6 @@ for (const g of GENERATED) {
 		);
 	}
 }
-
-
-
 
 // ==================================================
 // ======= 2/ Every reason translates ===============
@@ -133,9 +142,6 @@ for (const key of reasonKeys) {
 	}
 }
 
-
-
-
 // ==================================================
 // ======= 3/ Something reads it ====================
 // ==================================================
@@ -160,9 +166,6 @@ for (const r of READERS) {
 		);
 	}
 }
-
-
-
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] platform-restriction reasons:\x1b[0m');

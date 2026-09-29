@@ -41,10 +41,10 @@ Readonly open took 2.614 ms. Available physical memory at admission was
 headroom threshold of 1.5 image sizes plus 128 MiB.
 
 | Sample | Clone (ms) | Live build (ms) | Compose (ms) | Combined (ms) | Lifetime peak working set (bytes) |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 2613.435 | 4485.190 | 16.880 | 7115.532 | 881967104 |
-| 2 | 2772.597 | 5171.459 | 9.658 | 7953.738 | 898654208 |
-| 3 | 3144.928 | 4592.045 | 10.257 | 7747.257 | 900034560 |
+| ------ | ---------- | --------------- | ------------ | ------------- | --------------------------------- |
+| 1      | 2613.435   | 4485.190        | 16.880       | 7115.532      | 881967104                         |
+| 2      | 2772.597   | 5171.459        | 9.658        | 7953.738      | 898654208                         |
+| 3      | 3144.928   | 4592.045        | 10.257       | 7747.257      | 900034560                         |
 
 Combined median: 7747.257 ms; maximum: 7953.738 ms. Each payload is 1,951,775
 UTF-8 bytes. Memory comes from `GetProcessMemoryInfo` after equality checks:
@@ -59,10 +59,10 @@ application-filter and today functions separately. Raw outputs equal the
 corresponding fields from `KLPF_BuildTyping` in every sample.
 
 | Sample | Manifest (ms) | Application filter (ms) | Today n-grams (ms) |
-| --- | --- | --- | --- |
-| 1 | 5046.222 | 4.464 | 31.847 |
-| 2 | 5554.575 | 5.371 | 27.698 |
-| 3 | 5398.676 | 3.970 | 27.156 |
+| ------ | ------------- | ----------------------- | ------------------ |
+| 1      | 5046.222      | 4.464                   | 31.847             |
+| 2      | 5554.575      | 5.371                   | 27.698             |
+| 3      | 5398.676      | 3.970                   | 27.156             |
 
 Manifest median/max: 5398.676/5554.575 ms. Today median/max: 27.698/31.847 ms.
 Manifest output is 1,925,898 UTF-8 bytes; today output is 25,290 bytes.

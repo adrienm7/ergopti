@@ -41,20 +41,20 @@ Three independent passes covered runtime/input, parity/UI, and verification/pack
 
 ## Reproduced baseline
 
-| Check | Result at audited SHA | What it proves | What it does not prove |
-|---|---:|---|---|
-| `npm run test:linux` under `/usr/bin/lua5.4` | 150 modules, 1,976 passed, 0 failed | Broad Lua behavior under the available interpreter | LuaJIT/FFI, hardware, and non-empty selection integrity |
-| `npm run test:linux:e2e` | 34 corpus vectors, 43/43 passed | Current model-based corpus agrees with its permissive runner | Exact Linux backspace behavior or corpus presence |
-| `npm run build:linux` | exit 0; 46 required files, 488 total files | Bundle construction completes | Installed operation; the green bundle omits every shared WebView app directory (LNX-054) |
-| `npm run test:luajit-52-isms` | pass across 314 files | No forbidden Lua 5.2+ constructs found | Runtime FFI/ABI correctness |
-| `npm run test:menu-parity` | 19 menus; 103 Windows rows; 149 labels in 21 locales; 0 unexplained hidden rows | Shared menu declarations are internally consistent | Linux callbacks and effects work |
-| `npm run test:linux-package-layout` | pass for four packagers and service root | Static paths share the expected boot root | Fresh-user permissions, service startup, GUI, or input |
-| `npm run test:adapter-reachability` | Linux 19 adapters, none unreferenced | Every adapter has at least one reference | Production callers or semantic correctness |
-| `npm run test:find-false-greens` | current baseline 0 tautologies / 0 pcall-only patterns | The narrow detector's patterns are clean | Runner-level false greens described below |
-| `npm run test:tree-parity` | 28/51 directories shared; 19/25 canonical features present in all three trees | Structural convergence | Behavioral parity |
-| `npm run test:manifest-parity` | 523/523 | Windows/macOS manifest projection parity | Linux; the command does not compare Linux |
-| `lua5.4 tests/run.lua --only __NO_SUCH_TEST_CASE__` | 0 modules, 0 tests, exit 0 | Reproduces LNX-037 | Nothing was tested |
-| Full `npm run test:js` | 14/199 failed in this checkout | The local JS environment is incomplete | This is not attributed to Linux code: 20 npm dependencies and `build/static_bundle.zip` were absent, plus an unrelated Windows structural failure |
+| Check                                               |                                                           Result at audited SHA | What it proves                                               | What it does not prove                                                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------: | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:linux` under `/usr/bin/lua5.4`        |                                             150 modules, 1,976 passed, 0 failed | Broad Lua behavior under the available interpreter           | LuaJIT/FFI, hardware, and non-empty selection integrity                                                                                           |
+| `npm run test:linux:e2e`                            |                                                 34 corpus vectors, 43/43 passed | Current model-based corpus agrees with its permissive runner | Exact Linux backspace behavior or corpus presence                                                                                                 |
+| `npm run build:linux`                               |                                      exit 0; 46 required files, 488 total files | Bundle construction completes                                | Installed operation; the green bundle omits every shared WebView app directory (LNX-054)                                                          |
+| `npm run test:luajit-52-isms`                       |                                                           pass across 314 files | No forbidden Lua 5.2+ constructs found                       | Runtime FFI/ABI correctness                                                                                                                       |
+| `npm run test:menu-parity`                          | 19 menus; 103 Windows rows; 149 labels in 21 locales; 0 unexplained hidden rows | Shared menu declarations are internally consistent           | Linux callbacks and effects work                                                                                                                  |
+| `npm run test:linux-package-layout`                 |                                        pass for four packagers and service root | Static paths share the expected boot root                    | Fresh-user permissions, service startup, GUI, or input                                                                                            |
+| `npm run test:adapter-reachability`                 |                                            Linux 19 adapters, none unreferenced | Every adapter has at least one reference                     | Production callers or semantic correctness                                                                                                        |
+| `npm run test:find-false-greens`                    |                          current baseline 0 tautologies / 0 pcall-only patterns | The narrow detector's patterns are clean                     | Runner-level false greens described below                                                                                                         |
+| `npm run test:tree-parity`                          |   28/51 directories shared; 19/25 canonical features present in all three trees | Structural convergence                                       | Behavioral parity                                                                                                                                 |
+| `npm run test:manifest-parity`                      |                                                                         523/523 | Windows/macOS manifest projection parity                     | Linux; the command does not compare Linux                                                                                                         |
+| `lua5.4 tests/run.lua --only __NO_SUCH_TEST_CASE__` |                                                      0 modules, 0 tests, exit 0 | Reproduces LNX-037                                           | Nothing was tested                                                                                                                                |
+| Full `npm run test:js`                              |                                                  14/199 failed in this checkout | The local JS environment is incomplete                       | This is not attributed to Linux code: 20 npm dependencies and `build/static_bundle.zip` were absent, plus an unrelated Windows structural failure |
 
 The historical ledger that claimed 29 tautologies and 219 pcall-only tests is stale at this SHA. It is explicitly rejected rather than repeated as a current result.
 
@@ -62,33 +62,33 @@ The historical ledger that claimed 29 tautologies and 219 pcall-only tests is st
 
 `runtime-proven` below means that a production caller and an application path exist in source. It does **not** mean real Linux hardware was exercised.
 
-| Canonical feature | Windows | macOS | Linux | Linux disposition |
-|---|---|---|---|---|
-| `action_picker` | runtime-proven | runtime-proven | **test-only** | No production opener; bridge imports a nonexistent Linux module and silently returns an empty catalogue (LNX-031) |
-| `apps` | runtime-proven | runtime-proven | runtime-proven, unsafe | App tracking runs, but the metrics page trusts remote scripts with native metrics capabilities and polls while hidden; per-app configuration opens only generic configuration (LNX-035, LNX-057, LNX-058) |
-| `changelog` | runtime-proven | runtime-proven | runtime-proven, broken | Its CSP blocks Linux-inlined scripts, and its page/bridge actions, response channel, and release schema disagree (LNX-055, LNX-056) |
-| `diagnostics` | runtime-proven | runtime-proven | runtime-proven | Crash reporter is owned by the daemon |
-| `download_window` | intentional omission | runtime-proven | **test-only** | No opener and incompatible JS/host messages (LNX-032) |
-| `dynamic_hotstrings` | runtime-proven | runtime-proven | runtime-proven, broken | Trigger, privacy, reload, counter, and UTF-8 alias defects (LNX-005 to LNX-010, LNX-059) |
-| `gestures` | runtime-proven | runtime-proven | runtime-proven, broken/unqualified | Enabling after boot does not start the reader, and failed binding persistence publishes memory-only state; no physical trace (LNX-007, LNX-043) |
-| `healthcheck` | runtime-proven | runtime-proven | runtime-proven, broken | Production caller exists, but the page never requests or receives its Linux snapshot and renders empty (LNX-053) |
-| `hotstring_editor` | runtime-proven | runtime-proven | runtime-proven, unsafe | Production caller exists, but its focus flag never inhibits the global engine, so active triggers can expand inside the editor (LNX-050) |
-| `hotstrings` | runtime-proven | runtime-proven | runtime-proven, unsafe | Core capture/injection findings LNX-001 to LNX-004, lifecycle findings LNX-012 to LNX-019, stale standalone packs (LNX-061), clipboard loss on read failure (LNX-062), and non-atomic Kanata configuration writes (LNX-063) |
-| `hotstrings_config_window` | runtime-proven | runtime-proven | runtime-proven, broken | Production callers exist, but priority has no collision effect and is not serialized; the page's Close button is disconnected (LNX-047, LNX-052) |
-| `layout` | runtime-proven | runtime-proven | runtime-proven, unqualified | Apply path exists; real XKB capture does not follow the active layout (LNX-003) |
-| `llm` | runtime-proven | runtime-proven | runtime-proven, broken | Local Ollama URL/transport is unusable and safety-critical; the custom numeric prompt opens without its host-supplied label, value, or bounds (LNX-021 to LNX-024, LNX-051) |
-| `menu` | runtime-proven | runtime-proven | runtime-proven | Builder runs; shared-manifest migration remains later cleanup |
-| `keylogger` | runtime-proven | runtime-proven | runtime-proven, unsafe | Physical modifier/lock events are omitted; secure-field failures and same-window control changes are fail-open; ordinary characters also enter DEBUG logs in plaintext (LNX-017, LNX-020, LNX-045, LNX-060) |
-| `model_browser` | runtime-proven | runtime-proven | **test-only** | No opener; frontend/bridge contract mismatch (LNX-032) |
-| `onboarding` | runtime-proven | runtime-proven | runtime-proven, broken | A production opener exists, but the shared page and Linux bridge implement disjoint protocols, so completion is neither applied nor persisted (LNX-049) |
-| `paths` | runtime-proven | runtime-proven | runtime-proven, editor test-only | Path infrastructure is used; the shared editor has no caller and an incompatible bridge (LNX-032) |
-| `personal_info_editor` | runtime-proven | runtime-proven | **test-only** | No opener; calls nonexistent methods and can claim success (LNX-032) |
-| `prompt_editor` | runtime-proven | runtime-proven | **test-only** | No opener; payload schema is incompatible and save writes the wrong field (LNX-032) |
-| `shortcuts` | runtime-proven | runtime-proven | runtime-proven, partial | Master toggle neither gates configured slots nor persists; selection transforms are X11-only (LNX-033, LNX-034) |
-| `spotlight` | runtime-proven | runtime-proven | **absent** | Action remains declared `platform="all"` (LNX-036) |
-| `tooltip` | runtime-proven | runtime-proven | runtime-proven, partial | Hotstring preview has a caller; AI preview renderer is declared but not called |
-| `updater` | runtime-proven | runtime-proven | runtime-proven, unsafe | Asset selection, staging, exit status, integrity, and blocking defects (LNX-025 to LNX-027) |
-| `wpm` | runtime-proven | runtime-proven | runtime-proven, unsafe | Runtime restore/flush paths exist, but metrics WebViews trust remote scripts with native data capabilities and poll while hidden (LNX-057, LNX-058) |
+| Canonical feature          | Windows              | macOS          | Linux                              | Linux disposition                                                                                                                                                                                                           |
+| -------------------------- | -------------------- | -------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action_picker`            | runtime-proven       | runtime-proven | **test-only**                      | No production opener; bridge imports a nonexistent Linux module and silently returns an empty catalogue (LNX-031)                                                                                                           |
+| `apps`                     | runtime-proven       | runtime-proven | runtime-proven, unsafe             | App tracking runs, but the metrics page trusts remote scripts with native metrics capabilities and polls while hidden; per-app configuration opens only generic configuration (LNX-035, LNX-057, LNX-058)                   |
+| `changelog`                | runtime-proven       | runtime-proven | runtime-proven, broken             | Its CSP blocks Linux-inlined scripts, and its page/bridge actions, response channel, and release schema disagree (LNX-055, LNX-056)                                                                                         |
+| `diagnostics`              | runtime-proven       | runtime-proven | runtime-proven                     | Crash reporter is owned by the daemon                                                                                                                                                                                       |
+| `download_window`          | intentional omission | runtime-proven | **test-only**                      | No opener and incompatible JS/host messages (LNX-032)                                                                                                                                                                       |
+| `dynamic_hotstrings`       | runtime-proven       | runtime-proven | runtime-proven, broken             | Trigger, privacy, reload, counter, and UTF-8 alias defects (LNX-005 to LNX-010, LNX-059)                                                                                                                                    |
+| `gestures`                 | runtime-proven       | runtime-proven | runtime-proven, broken/unqualified | Enabling after boot does not start the reader, and failed binding persistence publishes memory-only state; no physical trace (LNX-007, LNX-043)                                                                             |
+| `healthcheck`              | runtime-proven       | runtime-proven | runtime-proven, broken             | Production caller exists, but the page never requests or receives its Linux snapshot and renders empty (LNX-053)                                                                                                            |
+| `hotstring_editor`         | runtime-proven       | runtime-proven | runtime-proven, unsafe             | Production caller exists, but its focus flag never inhibits the global engine, so active triggers can expand inside the editor (LNX-050)                                                                                    |
+| `hotstrings`               | runtime-proven       | runtime-proven | runtime-proven, unsafe             | Core capture/injection findings LNX-001 to LNX-004, lifecycle findings LNX-012 to LNX-019, stale standalone packs (LNX-061), clipboard loss on read failure (LNX-062), and non-atomic Kanata configuration writes (LNX-063) |
+| `hotstrings_config_window` | runtime-proven       | runtime-proven | runtime-proven, broken             | Production callers exist, but priority has no collision effect and is not serialized; the page's Close button is disconnected (LNX-047, LNX-052)                                                                            |
+| `layout`                   | runtime-proven       | runtime-proven | runtime-proven, unqualified        | Apply path exists; real XKB capture does not follow the active layout (LNX-003)                                                                                                                                             |
+| `llm`                      | runtime-proven       | runtime-proven | runtime-proven, broken             | Local Ollama URL/transport is unusable and safety-critical; the custom numeric prompt opens without its host-supplied label, value, or bounds (LNX-021 to LNX-024, LNX-051)                                                 |
+| `menu`                     | runtime-proven       | runtime-proven | runtime-proven                     | Builder runs; shared-manifest migration remains later cleanup                                                                                                                                                               |
+| `keylogger`                | runtime-proven       | runtime-proven | runtime-proven, unsafe             | Physical modifier/lock events are omitted; secure-field failures and same-window control changes are fail-open; ordinary characters also enter DEBUG logs in plaintext (LNX-017, LNX-020, LNX-045, LNX-060)                 |
+| `model_browser`            | runtime-proven       | runtime-proven | **test-only**                      | No opener; frontend/bridge contract mismatch (LNX-032)                                                                                                                                                                      |
+| `onboarding`               | runtime-proven       | runtime-proven | runtime-proven, broken             | A production opener exists, but the shared page and Linux bridge implement disjoint protocols, so completion is neither applied nor persisted (LNX-049)                                                                     |
+| `paths`                    | runtime-proven       | runtime-proven | runtime-proven, editor test-only   | Path infrastructure is used; the shared editor has no caller and an incompatible bridge (LNX-032)                                                                                                                           |
+| `personal_info_editor`     | runtime-proven       | runtime-proven | **test-only**                      | No opener; calls nonexistent methods and can claim success (LNX-032)                                                                                                                                                        |
+| `prompt_editor`            | runtime-proven       | runtime-proven | **test-only**                      | No opener; payload schema is incompatible and save writes the wrong field (LNX-032)                                                                                                                                         |
+| `shortcuts`                | runtime-proven       | runtime-proven | runtime-proven, partial            | Master toggle neither gates configured slots nor persists; selection transforms are X11-only (LNX-033, LNX-034)                                                                                                             |
+| `spotlight`                | runtime-proven       | runtime-proven | **absent**                         | Action remains declared `platform="all"` (LNX-036)                                                                                                                                                                          |
+| `tooltip`                  | runtime-proven       | runtime-proven | runtime-proven, partial            | Hotstring preview has a caller; AI preview renderer is declared but not called                                                                                                                                              |
+| `updater`                  | runtime-proven       | runtime-proven | runtime-proven, unsafe             | Asset selection, staging, exit status, integrity, and blocking defects (LNX-025 to LNX-027)                                                                                                                                 |
+| `wpm`                      | runtime-proven       | runtime-proven | runtime-proven, unsafe             | Runtime restore/flush paths exist, but metrics WebViews trust remote scripts with native data capabilities and poll while hidden (LNX-057, LNX-058)                                                                         |
 
 Exact canonical totals:
 
@@ -644,20 +644,20 @@ Dependencies: all prior milestones. Exit criterion: every canonical row is `runt
 
 ## Physical/package qualification matrix
 
-| Surface | Current evidence | Required acceptance proof |
-|---|---|---|
-| Lua runtime | Local Lua 5.4; CI config includes LuaJIT | Actual LuaJIT/FFI unit and integration artifacts at release SHA |
-| evdev/uinput | Source/unit plus CI virtual-kernel tests | Real keyboard capture/pass-through/injection, permission failure, emit failure, balanced keys |
-| XKB | Static/codegen checks | `us`, `fr`, AltGr, CapsLock, compose/dead keys, multi-group and live switching |
-| Multi-device/hotplug | No real proof | Two keyboards, pointer interleaving, same-path reconnect, suspend/resume |
-| Touchpad | Decoder/unit and virtual traces | Physical 2–5 finger traces across at least two families and semi-MT characterization |
-| X11 | Xvfb-style checks | Real desktop typing, selection, focus/caret, tray, WebKit, clipboard |
-| Wayland | CI path can skip | Mandatory GNOME/KDE/wlroots proof with no X11 tool dependency |
-| deb/rpm | Static layout and limited container install | Fresh normal user, deps, permissions, service, GUI/input, upgrade/remove |
-| AppImage/Flatpak | Build/layout smoke | Real host execution and explicit privilege/update model |
-| PKGBUILD/Nix | No CI build proof | Native package build/check on supported architectures |
-| Updater | Unit/source path only | Exact release artifact N→N+1 plus injected rollback failures |
-| Privacy | Mocked role/config paths | Secure fields across desktops, unavailable accessibility bus, no payload in logs |
+| Surface              | Current evidence                            | Required acceptance proof                                                                     |
+| -------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Lua runtime          | Local Lua 5.4; CI config includes LuaJIT    | Actual LuaJIT/FFI unit and integration artifacts at release SHA                               |
+| evdev/uinput         | Source/unit plus CI virtual-kernel tests    | Real keyboard capture/pass-through/injection, permission failure, emit failure, balanced keys |
+| XKB                  | Static/codegen checks                       | `us`, `fr`, AltGr, CapsLock, compose/dead keys, multi-group and live switching                |
+| Multi-device/hotplug | No real proof                               | Two keyboards, pointer interleaving, same-path reconnect, suspend/resume                      |
+| Touchpad             | Decoder/unit and virtual traces             | Physical 2–5 finger traces across at least two families and semi-MT characterization          |
+| X11                  | Xvfb-style checks                           | Real desktop typing, selection, focus/caret, tray, WebKit, clipboard                          |
+| Wayland              | CI path can skip                            | Mandatory GNOME/KDE/wlroots proof with no X11 tool dependency                                 |
+| deb/rpm              | Static layout and limited container install | Fresh normal user, deps, permissions, service, GUI/input, upgrade/remove                      |
+| AppImage/Flatpak     | Build/layout smoke                          | Real host execution and explicit privilege/update model                                       |
+| PKGBUILD/Nix         | No CI build proof                           | Native package build/check on supported architectures                                         |
+| Updater              | Unit/source path only                       | Exact release artifact N→N+1 plus injected rollback failures                                  |
+| Privacy              | Mocked role/config paths                    | Secure fields across desktops, unavailable accessibility bus, no payload in logs              |
 
 ## Unconfirmed risks requiring targeted reproduction
 

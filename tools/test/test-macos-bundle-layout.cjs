@@ -38,10 +38,14 @@ const errors = [];
 
 // 1. The build script must not bundle under the legacy drivers/ prefix...
 if (/drivers\/hammerspoon/.test(build)) {
-	errors.push('build_macos_app.sh: still bundles the driver under drivers/hammerspoon — must be ergopti_plus/macos.');
+	errors.push(
+		'build_macos_app.sh: still bundles the driver under drivers/hammerspoon — must be ergopti_plus/macos.'
+	);
 }
 if (/drivers\/_shared/.test(build)) {
-	errors.push('build_macos_app.sh: still bundles _shared under drivers/_shared — must be ergopti_plus/_shared.');
+	errors.push(
+		'build_macos_app.sh: still bundles _shared under drivers/_shared — must be ergopti_plus/_shared.'
+	);
 }
 // ...and must place both at the repo-mirroring location.
 if (!/ergopti_plus\/macos\//.test(build)) {
@@ -53,7 +57,9 @@ if (!/ergopti_plus\/_shared/.test(build)) {
 
 // 2. The Swift launcher's MJConfigDir must agree with that layout.
 if (/static\/drivers\/hammerspoon/.test(swift)) {
-	errors.push('main.swift: still points the bundled config dir at static/drivers/hammerspoon — must be static/ergopti_plus/macos.');
+	errors.push(
+		'main.swift: still points the bundled config dir at static/drivers/hammerspoon — must be static/ergopti_plus/macos.'
+	);
 }
 if (!/static\/ergopti_plus\/macos/.test(swift)) {
 	errors.push('main.swift: must point the bundled config dir at static/ergopti_plus/macos.');
@@ -64,4 +70,6 @@ if (errors.length > 0) {
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }
-console.log('\x1b[32m[OK] macOS .app bundle mirrors the static/ergopti_plus layout (build script + launcher agree).\x1b[0m');
+console.log(
+	'\x1b[32m[OK] macOS .app bundle mirrors the static/ergopti_plus layout (build script + launcher agree).\x1b[0m'
+);

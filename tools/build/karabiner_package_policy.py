@@ -11,7 +11,10 @@ ICON_CALL = "'/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner
 
 def postinstall_policy(source):
     """Change only the pinned post-signing custom-icon mutation."""
-    if hashlib.sha256(source).hexdigest() != POSTINSTALL_SHA256 or source.count(ICON_CALL.encode()) != 1:
+    if (
+        hashlib.sha256(source).hexdigest() != POSTINSTALL_SHA256
+        or source.count(ICON_CALL.encode()) != 1
+    ):
         raise ValueError("Unexpected pinned postinstall source")
     return source.replace(ICON_CALL.encode(), b"# Keep the signed bundle resources immutable.", 1)
 

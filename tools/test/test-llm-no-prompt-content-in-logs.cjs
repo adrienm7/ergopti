@@ -53,7 +53,8 @@ const EXTS = new Set(['.ahk', '.lua']);
 const COMMENT = { '.ahk': ';', '.lua': '--' };
 
 // A logger call in any of the three dialects.
-const LOGGER_CALL = /\b(?:Logger(?:Info|Debug|Warn|Error|Start|Success|Trace|Done)|Logger\.(?:info|debug|warn|error|start|success|trace|done))\s*\(/;
+const LOGGER_CALL =
+	/\b(?:Logger(?:Info|Debug|Warn|Error|Start|Success|Trace|Done)|Logger\.(?:info|debug|warn|error|start|success|trace|done))\s*\(/;
 
 // Substring extraction — the shape that turns user text into a log argument.
 const SUBSTRING_EXPR = /\b(?:SubStr|string\.sub)\s*\(/;
@@ -99,8 +100,8 @@ for (const dir of SCAN_DIRS) {
 			if (SUBSTRING_EXPR.test(code)) {
 				errors.push(
 					`${rel}:${i + 1}: a logger call carries a substring expression. ` +
-					'Log the length of the context, never a slice of it — the LLM path ' +
-					'sees everything the user types.'
+						'Log the length of the context, never a slice of it — the LLM path ' +
+						'sees everything the user types.'
 				);
 			}
 		}
@@ -122,5 +123,5 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] No LLM logger call slices the typed context ` +
-	`(${loggerLinesSeen} logger line(s) across ${filesScanned} file(s)).\x1b[0m`
+		`(${loggerLinesSeen} logger line(s) across ${filesScanned} file(s)).\x1b[0m`
 );

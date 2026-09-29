@@ -40,24 +40,24 @@ shared reader image writable.
 
 ## Results
 
-| Process order | Mode | Three clone samples (ms) | Median (ms) |
-| --- | --- | --- | --- |
-| 1 | Memory-01 | 5144.489, 1900.091, 1941.152 | 1941.152 |
-| 2 | File-01 | 4466.884, 3712.597, 4035.324 | 4035.324 |
-| 3 | File-02 | 3254.342, 3087.450, 3293.812 | 3254.342 |
-| 4 | Memory-02 | 1271.928, 1369.571, 1520.062 | 1369.571 |
+| Process order | Mode      | Three clone samples (ms)     | Median (ms) |
+| ------------- | --------- | ---------------------------- | ----------- |
+| 1             | Memory-01 | 5144.489, 1900.091, 1941.152 | 1941.152    |
+| 2             | File-01   | 4466.884, 3712.597, 4035.324 | 4035.324    |
+| 3             | File-02   | 3254.342, 3087.450, 3293.812 | 3254.342    |
+| 4             | Memory-02 | 1271.928, 1369.571, 1520.062 | 1369.571    |
 
 Across the six samples per mode, the medians are 1710.077 ms for memory and
 3503.205 ms for file. The maximum memory sample is 5144.489 ms; the maximum
 file sample is 4466.884 ms. Six samples cannot establish tail percentiles or
 attribute the first memory outlier to a specific cause.
 
-| Process | Peak working set (bytes) | Peak commit (bytes) |
-| --- | --- | --- |
-| Memory-01 | 822857728 | 852127744 |
-| File-01 | 20111360 | 8024064 |
-| File-02 | 19677184 | 8093696 |
-| Memory-02 | 823037952 | 852418560 |
+| Process   | Peak working set (bytes) | Peak commit (bytes) |
+| --------- | ------------------------ | ------------------- |
+| Memory-01 | 822857728                | 852127744           |
+| File-01   | 20111360                 | 8024064             |
+| File-02   | 19677184                 | 8093696             |
+| Memory-02 | 823037952                | 852418560           |
 
 These are process counters from `GetProcessMemoryInfo`, not total system memory
 or filesystem-cache accounting. They establish a process-memory tradeoff, not

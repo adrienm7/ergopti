@@ -17,8 +17,17 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CLONE_SCRIPT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'apps',
-	'App Cloner.app', 'Contents', 'Resources', 'clone_app.sh');
+const CLONE_SCRIPT = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'apps',
+	'App Cloner.app',
+	'Contents',
+	'Resources',
+	'clone_app.sh'
+);
 const PY_CANDIDATES = ['python3', 'python'];
 const results = [];
 
@@ -41,8 +50,7 @@ if (!python) {
 }
 
 const source = fs.readFileSync(CLONE_SCRIPT, 'utf8');
-const dockBody = source.match(
-	/python3 - "\$DEST"[^\n]*<<'DOCKEOF'\n([\s\S]*?)\nDOCKEOF/);
+const dockBody = source.match(/python3 - "\$DEST"[^\n]*<<'DOCKEOF'\n([\s\S]*?)\nDOCKEOF/);
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-dock-url-'));
 
 try {
@@ -53,20 +61,35 @@ try {
 	const bundleId = 'fr.ergopti.hostile-dock-url';
 	fs.mkdirSync(preferences, { recursive: true });
 
-	const oracle = spawnSync(python, ['-c',
-		'from urllib.parse import quote; import sys; '
-		+ 'print("file://" + quote(sys.argv[1].rstrip("/"), safe="/") + "/")',
-		appPath], { encoding: 'utf8' });
+	const oracle = spawnSync(
+		python,
+		[
+			'-c',
+			'from urllib.parse import quote; import sys; ' +
+				'print("file://" + quote(sys.argv[1].rstrip("/"), safe="/") + "/")',
+			appPath
+		],
+		{ encoding: 'utf8' }
+	);
 	const expectedUrl = (oracle.stdout || '').trim();
 
-	const seed = spawnSync(python, ['-c',
-		'import os,plistlib,sys; os.makedirs(os.path.dirname(sys.argv[1]), exist_ok=True); '
-		+ 'entry={"GUID":1,"tile-data":{"bundle-identifier":"old",'
-		+ '"file-data":{"_CFURLString":sys.argv[2]}},"tile-type":"file-tile"}; '
-		+ 'plistlib.dump({"persistent-apps":[entry]}, open(sys.argv[1], "wb"))',
-		dockPlist, expectedUrl], { encoding: 'utf8' });
+	const seed = spawnSync(
+		python,
+		[
+			'-c',
+			'import os,plistlib,sys; os.makedirs(os.path.dirname(sys.argv[1]), exist_ok=True); ' +
+				'entry={"GUID":1,"tile-data":{"bundle-identifier":"old",' +
+				'"file-data":{"_CFURLString":sys.argv[2]}},"tile-type":"file-tile"}; ' +
+				'plistlib.dump({"persistent-apps":[entry]}, open(sys.argv[1], "wb"))',
+			dockPlist,
+			expectedUrl
+		],
+		{ encoding: 'utf8' }
+	);
 
-	fs.writeFileSync(path.join(fixtureRoot, 'subprocess.py'), `
+	fs.writeFileSync(
+		path.join(fixtureRoot, 'subprocess.py'),
+		`
 class Result:
     returncode = 1
     stdout = ""
@@ -74,42 +97,71 @@ class Result:
 
 def run(*args, **kwargs):
     return Result()
-`, 'utf8');
+`,
+		'utf8'
+	);
 	const runner = path.join(fixtureRoot, 'dock_body.py');
-	fs.writeFileSync(runner, 'import time\ntime.sleep = lambda _seconds: None\n'
-		+ (dockBody ? dockBody[1] : ''), 'utf8');
-	const executed = spawnSync(python,
-		[runner, appPath, bundleId, '/Applications/Source.app', ''], {
-			cwd: fixtureRoot,
-			encoding: 'utf8',
-			env: { ...process.env, HOME: home, USERPROFILE: home,
-				PYTHONPATH: fixtureRoot },
-		});
-	const inspected = spawnSync(python, ['-c',
-		'import json,plistlib,sys; '
-		+ 'print(json.dumps(plistlib.load(open(sys.argv[1], "rb")), ensure_ascii=False))',
-		dockPlist], { encoding: 'utf8' });
+	fs.writeFileSync(
+		runner,
+		'import time\ntime.sleep = lambda _seconds: None\n' + (dockBody ? dockBody[1] : ''),
+		'utf8'
+	);
+	const executed = spawnSync(python, [runner, appPath, bundleId, '/Applications/Source.app', ''], {
+		cwd: fixtureRoot,
+		encoding: 'utf8',
+		env: { ...process.env, HOME: home, USERPROFILE: home, PYTHONPATH: fixtureRoot }
+	});
+	const inspected = spawnSync(
+		python,
+		[
+			'-c',
+			'import json,plistlib,sys; ' +
+				'print(json.dumps(plistlib.load(open(sys.argv[1], "rb")), ensure_ascii=False))',
+			dockPlist
+		],
+		{ encoding: 'utf8' }
+	);
 	let dock = {};
-	try { dock = JSON.parse(inspected.stdout || '{}'); } catch { /* reported below */ }
+	try {
+		dock = JSON.parse(inspected.stdout || '{}');
+	} catch {
+		/* reported below */
+	}
 	const apps = dock['persistent-apps'] || [];
 	const newTile = apps.find((entry) => entry['tile-data']?.['bundle-identifier'] === bundleId);
 	const actualUrl = newTile?.['tile-data']?.['file-data']?._CFURLString;
 
-	test('the production Dock body is extracted and executes successfully',
-		dockBody !== null && oracle.status === 0 && seed.status === 0
-			&& executed.status === 0 && inspected.status === 0,
-		JSON.stringify({ oracle: oracle.stderr, seed: seed.stderr,
-			executed: executed.stderr, inspected: inspected.stderr }));
-	test('the Dock tile URL matches urllib RFC 3986 quoting byte-exact',
+	test(
+		'the production Dock body is extracted and executes successfully',
+		dockBody !== null &&
+			oracle.status === 0 &&
+			seed.status === 0 &&
+			executed.status === 0 &&
+			inspected.status === 0,
+		JSON.stringify({
+			oracle: oracle.stderr,
+			seed: seed.stderr,
+			executed: executed.stderr,
+			inspected: inspected.stderr
+		})
+	);
+	test(
+		'the Dock tile URL matches urllib RFC 3986 quoting byte-exact',
 		actualUrl === expectedUrl,
-		JSON.stringify({ expectedUrl, actualUrl }));
-	test('hostile UTF-8 and reserved bytes are percent-encoded',
-		expectedUrl === 'file:///Users/%C3%89lodie%20%23100%25/Apps/'
-			+ 'Dock%20%26%20Tile%20%28test%29.app/' && actualUrl === expectedUrl,
-		JSON.stringify({ expectedUrl, actualUrl }));
-	test('recreating the same encoded path replaces rather than duplicates its tile',
+		JSON.stringify({ expectedUrl, actualUrl })
+	);
+	test(
+		'hostile UTF-8 and reserved bytes are percent-encoded',
+		expectedUrl ===
+			'file:///Users/%C3%89lodie%20%23100%25/Apps/' + 'Dock%20%26%20Tile%20%28test%29.app/' &&
+			actualUrl === expectedUrl,
+		JSON.stringify({ expectedUrl, actualUrl })
+	);
+	test(
+		'recreating the same encoded path replaces rather than duplicates its tile',
 		apps.length === 1 && actualUrl === expectedUrl,
-		JSON.stringify({ appCount: apps.length, actualUrl }));
+		JSON.stringify({ appCount: apps.length, actualUrl })
+	);
 } finally {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }

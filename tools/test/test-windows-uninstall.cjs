@@ -17,7 +17,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const worker = path.resolve(__dirname, '../../static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1');
+const worker = path.resolve(
+	__dirname,
+	'../../static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1'
+);
 assert.ok(fs.existsSync(worker), 'the compiled application must ship its removal worker');
 if (process.platform !== 'win32') {
 	console.log('[SKIP] Windows portable uninstall execution requires PowerShell on Windows.');
@@ -27,7 +30,9 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-uninstall-test-')
 const ps = (value) => `'${value.replaceAll("'", "''")}'`;
 try {
 	const script = path.join(scratch, 'test.ps1');
-	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'
+	fs.writeFileSync(
+		script,
+		`$ErrorActionPreference = 'Stop'
 . ${ps(worker)} -LibraryOnly
 $target = ${ps(path.join(scratch, 'application.exe'))}
 [IO.File]::WriteAllText($target, 'original')
@@ -81,9 +86,12 @@ try { Invoke-ErgoptiRemoval $target $hash { throw 'Checkout reached authorizatio
 if (-not $failed -or $script:recycled.Count -ne 1) { throw 'Source checkout was not preserved' }
 if ([IO.File]::ReadAllText($target) -ne 'original') { throw 'The test touched the recycle boundary' }
 Write-Output '[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable.'
-`);
+`
+	);
 	const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
-		encoding: 'utf8', timeout: 30000, windowsHide: true,
+		encoding: 'utf8',
+		timeout: 30000,
+		windowsHide: true
 	});
 	assert.equal(result.status, 0, result.stderr || result.error?.message || result.stdout);
 	assert.match(result.stdout, /\[OK\]/);

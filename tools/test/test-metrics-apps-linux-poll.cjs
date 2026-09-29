@@ -18,7 +18,10 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const PAGE = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/metrics_apps/index.html');
+const PAGE = path.resolve(
+	__dirname,
+	'../../static/ergopti_plus/_shared/ui/metrics_apps/index.html'
+);
 const html = fs.readFileSync(PAGE, 'utf8');
 const start = html.indexOf('(function () {\n\t\t\t\tfunction apply_prefetch');
 const end = html.indexOf('})();', start);
@@ -32,27 +35,36 @@ const calls = { bootstrap: 0, live: 0 };
 const window = {
 	__ergopti_host: 'linux',
 	webkit: { messageHandlers: { metrics_apps_bridge: { postMessage() {} } } },
-	bootstrapMetricsAppsData() { calls.bootstrap += 1; },
-	receive_live_update() { calls.live += 1; },
+	bootstrapMetricsAppsData() {
+		calls.bootstrap += 1;
+	},
+	receive_live_update() {
+		calls.live += 1;
+	}
 };
 const sandbox = {
 	window,
 	decodeHostBridgeResponse: (_isBase64, payload) => payload,
 	createVisibilityPoller() {},
-	JSON,
+	JSON
 };
 vm.runInNewContext(script, sandbox);
 
-const answer = (manifest) => window.__hostBridgeResponse('metrics_apps_bridge', false, { metrics_manifest: manifest });
+const answer = (manifest) =>
+	window.__hostBridgeResponse('metrics_apps_bridge', false, { metrics_manifest: manifest });
 answer({ '2026-09-24': { firefox: { chars: 10 } } });
 answer({ '2026-09-24': { firefox: { chars: 10 } } });
 answer({ '2026-09-24': { firefox: { chars: 10 } } });
 const failures = [];
-if (calls.bootstrap !== 1) failures.push(`three identical answers bootstrapped ${calls.bootstrap} time(s), expected 1`);
-if (calls.live !== 0) failures.push(`identical answers triggered ${calls.live} live update(s), expected 0`);
+if (calls.bootstrap !== 1)
+	failures.push(`three identical answers bootstrapped ${calls.bootstrap} time(s), expected 1`);
+if (calls.live !== 0)
+	failures.push(`identical answers triggered ${calls.live} live update(s), expected 0`);
 answer({ '2026-09-24': { firefox: { chars: 25 } } });
 if (calls.bootstrap !== 1 || calls.live !== 1) {
-	failures.push(`a changed answer must merge once without re-bootstrapping (bootstrap ${calls.bootstrap}, live ${calls.live})`);
+	failures.push(
+		`a changed answer must merge once without re-bootstrapping (bootstrap ${calls.bootstrap}, live ${calls.live})`
+	);
 }
 
 if (failures.length) {

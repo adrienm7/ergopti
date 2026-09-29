@@ -47,11 +47,11 @@ function runMigration(sourceDir, installedDir, configDir) {
 	const command = [
 		'set -euo pipefail',
 		`source ${shellQuote(bashPath(MIGRATOR))}`,
-		`migrate_canonical_packs ${shellQuote(bashPath(sourceDir))} ${shellQuote(bashPath(installedDir))} ${shellQuote(bashPath(configDir))}`,
+		`migrate_canonical_packs ${shellQuote(bashPath(sourceDir))} ${shellQuote(bashPath(installedDir))} ${shellQuote(bashPath(configDir))}`
 	].join('; ');
 	const result = childProcess.spawnSync(bashExecutable(), ['-lc', command], {
 		cwd: ROOT,
-		encoding: 'utf8',
+		encoding: 'utf8'
 	});
 	if (result.status !== 0) {
 		fail(`canonical-pack migration failed (${result.status}): ${result.stderr || result.stdout}`);
@@ -61,7 +61,8 @@ function runMigration(sourceDir, installedDir, configDir) {
 function copyBundle(sourceDir, installedDir) {
 	fs.mkdirSync(installedDir, { recursive: true });
 	for (const name of fs.readdirSync(sourceDir)) {
-		if (name.endsWith('.toml')) fs.copyFileSync(path.join(sourceDir, name), path.join(installedDir, name));
+		if (name.endsWith('.toml'))
+			fs.copyFileSync(path.join(sourceDir, name), path.join(installedDir, name));
 	}
 }
 
@@ -69,7 +70,9 @@ const installer = fs.readFileSync(INSTALLER, 'utf8');
 const migrationCall = installer.indexOf('migrate_canonical_packs');
 const sharedCopy = installer.indexOf('cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"');
 if (migrationCall < 0 || sharedCopy < 0 || migrationCall >= sharedCopy) {
-	fail('install.sh must classify legacy seeds against the old installed bundle before replacing it');
+	fail(
+		'install.sh must classify legacy seeds against the old installed bundle before replacing it'
+	);
 }
 if (installer.includes('install -m 0644 "${toml}" "${dest}"')) {
 	fail('install.sh must not seed complete canonical packs into the user override directory');
@@ -78,7 +81,9 @@ const configManager = fs.readFileSync(CONFIG_MANAGER, 'utf8');
 const bundledResolution = configManager.indexOf('Loader.find_toml_files(bundled)');
 const userResolution = configManager.indexOf('Loader.find_toml_files(_config_dir)');
 if (bundledResolution < 0 || userResolution < 0 || bundledResolution >= userResolution) {
-	fail('fresh runtime resolution must load the bundle first and overlay explicit user packs second');
+	fail(
+		'fresh runtime resolution must load the bundle first and overlay explicit user packs second'
+	);
 }
 
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-canonical-upgrade-'));
@@ -103,20 +108,31 @@ try {
 	runMigration(sourceN2, installed, config);
 
 	const marker = path.join(config, '.ergopti-canonical-packs-v2');
-	const backup = path.join(config, '.ergopti-migrations', 'canonical-seeds', 'canonical.toml.legacy-seed');
-	if (fs.existsSync(path.join(config, 'canonical.toml'))) fail('an intact legacy seed still masks the bundle');
-	if (fs.readFileSync(backup, 'utf8') !== oldCanonical) fail('the retired legacy seed was not retained byte-for-byte');
-	if (fs.readFileSync(marker, 'utf8') !== '2\n') fail('the one-time migration marker was not committed');
+	const backup = path.join(
+		config,
+		'.ergopti-migrations',
+		'canonical-seeds',
+		'canonical.toml.legacy-seed'
+	);
+	if (fs.existsSync(path.join(config, 'canonical.toml')))
+		fail('an intact legacy seed still masks the bundle');
+	if (fs.readFileSync(backup, 'utf8') !== oldCanonical)
+		fail('the retired legacy seed was not retained byte-for-byte');
+	if (fs.readFileSync(marker, 'utf8') !== '2\n')
+		fail('the one-time migration marker was not committed');
 	if (fs.readFileSync(path.join(config, 'customized.toml'), 'utf8') !== userCustomized) {
 		fail('a modified user pack was not preserved as an explicit override');
 	}
-	if (fs.existsSync(path.join(config, 'fresh.toml'))) fail('a fresh install still seeded a canonical user copy');
+	if (fs.existsSync(path.join(config, 'fresh.toml')))
+		fail('a fresh install still seeded a canonical user copy');
 
 	copyBundle(sourceN2, installed);
 	const resolvedCanonical = fs.readFileSync(path.join(installed, 'canonical.toml'), 'utf8');
-	if (!resolvedCanonical.includes('corrected = "new"')) fail('N+1 correction did not become active');
+	if (!resolvedCanonical.includes('corrected = "new"'))
+		fail('N+1 correction did not become active');
 	if (!resolvedCanonical.includes('added = true')) fail('N+1 addition did not become active');
-	if (resolvedCanonical.includes('removed = true')) fail('removed N content remained active after upgrade');
+	if (resolvedCanonical.includes('removed = true'))
+		fail('removed N content remained active after upgrade');
 	if (fs.readFileSync(path.join(config, 'customized.toml'), 'utf8') !== userCustomized) {
 		fail('fresh resolution no longer gives the explicit user override precedence');
 	}
@@ -140,9 +156,13 @@ try {
 		}
 		process.stdout.write(JSON.stringify(byStem));
 	`;
-	const freshProcess = childProcess.spawnSync(process.execPath, ['-e', freshResolver, installed, config], {
-		encoding: 'utf8',
-	});
+	const freshProcess = childProcess.spawnSync(
+		process.execPath,
+		['-e', freshResolver, installed, config],
+		{
+			encoding: 'utf8'
+		}
+	);
 	if (freshProcess.status !== 0) fail(`fresh resolver process failed: ${freshProcess.stderr}`);
 	const resolved = JSON.parse(freshProcess.stdout);
 	if (path.resolve(resolved.canonical) !== path.resolve(installed, 'canonical.toml')) {
@@ -164,7 +184,9 @@ try {
 		fail('a post-migration explicit override was reclassified as an installer seed');
 	}
 
-	console.log('ok - intact N seed retired, N+1 delta active, modified and future overrides preserved');
+	console.log(
+		'ok - intact N seed retired, N+1 delta active, modified and future overrides preserved'
+	);
 } finally {
 	const resolvedSandbox = path.resolve(sandbox);
 	const resolvedTemp = path.resolve(os.tmpdir());

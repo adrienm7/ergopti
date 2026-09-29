@@ -303,7 +303,9 @@ function checkDetailsFolds() {
 	);
 	const prose = textOutside(root, 'pre');
 	expect(
-		!prose.includes('<summary><b>') && !prose.includes('</details>') && !prose.includes('<details>\n'),
+		!prose.includes('<summary><b>') &&
+			!prose.includes('</details>') &&
+			!prose.includes('<details>\n'),
 		'structural fold lines must not leak as text outside code'
 	);
 	expect(
@@ -343,7 +345,10 @@ function checkFenceInsideFold() {
 	const root = document.createElement('div');
 	sandbox.renderMarkdownInto(root, FENCED_FOLD_BODY, {});
 	const folds = byTag(root, 'details');
-	expect(folds.length === 1, `a fold quoting </details> in code must stay one fold (got ${folds.length})`);
+	expect(
+		folds.length === 1,
+		`a fold quoting </details> in code must stay one fold (got ${folds.length})`
+	);
 	if (folds.length !== 1) return;
 	const fold = folds[0];
 	expect(
@@ -351,7 +356,8 @@ function checkFenceInsideFold() {
 		'a </details> line quoted in a fenced block inside a fold must stay code in that fold'
 	);
 	expect(
-		fold.textContent.includes('After the fence.') && !fold.textContent.includes('Outside the fold.'),
+		fold.textContent.includes('After the fence.') &&
+			!fold.textContent.includes('Outside the fold.'),
 		'the fold must close on its own </details>, after the fenced code'
 	);
 	expect(

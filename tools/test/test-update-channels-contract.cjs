@@ -59,7 +59,14 @@ const GENERATOR_PATH = path.join(ROOT, 'tools', 'codegen', 'codegen-update-chann
 const VERSION_PATH = path.join(SHARED, 'modules', 'updater', 'version.js');
 const PAGE_DATA_PATH = path.join(SHARED, 'ui', '_generated', 'update_channel_registry.js');
 const SWIFT_FEEDS_PATH = path.join(
-	ROOT, 'static', 'ergopti_plus', 'macos', 'launcher', 'Sources', 'ErgoptiPlus', 'UpdateChannels.generated.swift'
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'launcher',
+	'Sources',
+	'ErgoptiPlus',
+	'UpdateChannels.generated.swift'
 );
 const LOCALE_COUNT = 21;
 const MIN_VECTORS = { tag: 20, resolve: 5, visible: 5, offer: 8, pick: 5 };
@@ -115,7 +122,10 @@ function checkVectors(channels, vectors, compareVersions) {
 	}
 	for (const v of vectors.tag || []) {
 		const got = channels.channelForTag(v.tag);
-		expect(got === none(v.channel), `tag ${v.id}: channelForTag(${JSON.stringify(v.tag)}) = ${JSON.stringify(got)}, expected ${JSON.stringify(v.channel)}`);
+		expect(
+			got === none(v.channel),
+			`tag ${v.id}: channelForTag(${JSON.stringify(v.tag)}) = ${JSON.stringify(got)}, expected ${JSON.stringify(v.channel)}`
+		);
 		for (const id of channels.ids) {
 			expect(
 				channels.matches(id, v.tag) === (id === none(v.channel)),
@@ -125,7 +135,10 @@ function checkVectors(channels, vectors, compareVersions) {
 	}
 	for (const v of vectors.resolve || []) {
 		const got = channels.resolve(v.value);
-		expect(got === none(v.expect), `resolve ${v.id}: resolve(${JSON.stringify(v.value)}) = ${JSON.stringify(got)}, expected ${JSON.stringify(v.expect)}`);
+		expect(
+			got === none(v.expect),
+			`resolve ${v.id}: resolve(${JSON.stringify(v.value)}) = ${JSON.stringify(got)}, expected ${JSON.stringify(v.expect)}`
+		);
 	}
 	for (const v of vectors.visible || []) {
 		const got = channels.visibleIn(v.view, v.tag);
@@ -138,7 +151,10 @@ function checkVectors(channels, vectors, compareVersions) {
 	for (const v of vectors.pick || []) {
 		const index = channels.pickLatest(v.tags, v.channel, compareVersions);
 		const got = index === -1 ? null : v.tags[index];
-		expect(got === none(v.expect), `pick ${v.id}: pickLatest = ${JSON.stringify(got)}, expected ${JSON.stringify(v.expect)}`);
+		expect(
+			got === none(v.expect),
+			`pick ${v.id}: pickLatest = ${JSON.stringify(got)}, expected ${JSON.stringify(v.expect)}`
+		);
 	}
 }
 
@@ -151,18 +167,78 @@ function checkVectors(channels, vectors, compareVersions) {
 function checkMalformedRegistries(create, registry) {
 	const clone = () => JSON.parse(JSON.stringify(registry));
 	const cases = [
-		['no channels', (r) => { r.channels = []; }],
-		['a duplicate id', (r) => { r.channels[1].id = r.channels[0].id; }],
-		['an alias equal to an id', (r) => { r.channels[1].aliases = [r.channels[0].id]; }],
-		['an alias used twice', (r) => { r.channels[1].aliases = r.channels[0].aliases.slice(); }],
-		['an unknown tag core', (r) => { r.channels[0].tag.core = '1.x'; }],
-		['a core with a leading zero', (r) => { r.channels[1].tag.core = '0.00.0'; }],
-		['a prerelease without a label', (r) => { r.channels[1].tag.prerelease = { counter: true }; }],
-		['an unreleased channel that does not exist', (r) => { r.unreleased_build_channel = 'beta'; }],
-		['a missing label key', (r) => { delete r.channels[0].label_key; }],
-		['a feed outside the appcast naming', (r) => { r.channels[0].sparkle_feed = '../appcast.xml'; }],
-		['an unsupported schema version', (r) => { r.schema_version = 2; }],
-		['two channels owning the same tags', (r) => { r.channels[1].tag = JSON.parse(JSON.stringify(r.channels[0].tag)); }]
+		[
+			'no channels',
+			(r) => {
+				r.channels = [];
+			}
+		],
+		[
+			'a duplicate id',
+			(r) => {
+				r.channels[1].id = r.channels[0].id;
+			}
+		],
+		[
+			'an alias equal to an id',
+			(r) => {
+				r.channels[1].aliases = [r.channels[0].id];
+			}
+		],
+		[
+			'an alias used twice',
+			(r) => {
+				r.channels[1].aliases = r.channels[0].aliases.slice();
+			}
+		],
+		[
+			'an unknown tag core',
+			(r) => {
+				r.channels[0].tag.core = '1.x';
+			}
+		],
+		[
+			'a core with a leading zero',
+			(r) => {
+				r.channels[1].tag.core = '0.00.0';
+			}
+		],
+		[
+			'a prerelease without a label',
+			(r) => {
+				r.channels[1].tag.prerelease = { counter: true };
+			}
+		],
+		[
+			'an unreleased channel that does not exist',
+			(r) => {
+				r.unreleased_build_channel = 'beta';
+			}
+		],
+		[
+			'a missing label key',
+			(r) => {
+				delete r.channels[0].label_key;
+			}
+		],
+		[
+			'a feed outside the appcast naming',
+			(r) => {
+				r.channels[0].sparkle_feed = '../appcast.xml';
+			}
+		],
+		[
+			'an unsupported schema version',
+			(r) => {
+				r.schema_version = 2;
+			}
+		],
+		[
+			'two channels owning the same tags',
+			(r) => {
+				r.channels[1].tag = JSON.parse(JSON.stringify(r.channels[0].tag));
+			}
+		]
 	];
 	for (const [name, mutate] of cases) {
 		const candidate = clone();
@@ -185,7 +261,10 @@ function checkMalformedRegistries(create, registry) {
 
 function checkLocales(registry) {
 	const files = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
-	expect(files.length === LOCALE_COUNT, `expected ${LOCALE_COUNT} locale files, found ${files.length}`);
+	expect(
+		files.length === LOCALE_COUNT,
+		`expected ${LOCALE_COUNT} locale files, found ${files.length}`
+	);
 	const keys = [];
 	for (const channel of registry.channels) keys.push(channel.label_key, channel.menu_label_key);
 	for (const file of files) {
@@ -243,10 +322,16 @@ function checkSwiftFeeds(registry) {
 function checkGeneratedArtifacts(registry) {
 	// eslint-disable-next-line global-require
 	const generator = require(GENERATOR_PATH);
-	expect(typeof generator.renderOutputs === 'function', 'the generator must export renderOutputs(registry)');
+	expect(
+		typeof generator.renderOutputs === 'function',
+		'the generator must export renderOutputs(registry)'
+	);
 	if (typeof generator.renderOutputs !== 'function') return;
 	const outputs = generator.renderOutputs(registry);
-	expect(outputs.length >= 3, 'the generator must render the page data, the AHK data and the Swift feeds');
+	expect(
+		outputs.length >= 3,
+		'the generator must render the page data, the AHK data and the Swift feeds'
+	);
 	for (const output of outputs) {
 		const committed = fs.existsSync(output.path) ? fs.readFileSync(output.path, 'utf8') : null;
 		expect(
@@ -268,21 +353,39 @@ function checkGeneratedArtifacts(registry) {
  */
 function workflowTagFamilies() {
 	const text = fs.readFileSync(WORKFLOW_PATH, 'utf8');
-	const stable = /tag="v\$\{maj\}\.\$\{min\}\.\$\{pat\}"\s*\n\s*prerelease="(true|false)"/.exec(text);
+	const stable = /tag="v\$\{maj\}\.\$\{min\}\.\$\{pat\}"\s*\n\s*prerelease="(true|false)"/.exec(
+		text
+	);
 	const dev = /tag="v0\.0\.0-dev\.\$\{next_n\}"\s*\n\s*prerelease="(true|false)"/.exec(text);
 	const families = [];
-	if (stable) families.push({ name: 'main branch', samples: ['v1.4.2', 'v0.0.1', 'v12.0.0'], prerelease: stable[1] === 'true' });
-	if (dev) families.push({ name: 'dev branch', samples: ['v0.0.0-dev.1', 'v0.0.0-dev.134'], prerelease: dev[1] === 'true' });
+	if (stable)
+		families.push({
+			name: 'main branch',
+			samples: ['v1.4.2', 'v0.0.1', 'v12.0.0'],
+			prerelease: stable[1] === 'true'
+		});
+	if (dev)
+		families.push({
+			name: 'dev branch',
+			samples: ['v0.0.0-dev.1', 'v0.0.0-dev.134'],
+			prerelease: dev[1] === 'true'
+		});
 	return families;
 }
 
 function checkWorkflowFamilies(channels) {
 	const families = workflowTagFamilies();
-	expect(families.length === 2, 'the release workflow must still publish one stable and one dev tag family');
+	expect(
+		families.length === 2,
+		'the release workflow must still publish one stable and one dev tag family'
+	);
 	for (const family of families) {
 		for (const tag of family.samples) {
 			const owners = channels.ids.filter((id) => channels.matches(id, tag));
-			expect(owners.length === 1, `${family.name} tag ${tag} must belong to exactly one channel, got [${owners}]`);
+			expect(
+				owners.length === 1,
+				`${family.name} tag ${tag} must belong to exactly one channel, got [${owners}]`
+			);
 			if (owners.length === 1) {
 				expect(
 					channels.channel(owners[0]).githubPrerelease === family.prerelease,
@@ -305,31 +408,55 @@ function checkWorkflowChannelSource() {
 	const text = pipeline.text();
 	const plan = pipeline.job('validate');
 	const meta = pipeline.step(plan, 'Compute tag and version');
-	expect(plan.includes('channel: ${{ steps.meta.outputs.channel }}'), 'validate must publish its channel');
-	expect(meta.includes('channel="$(node tools/build/release-channel.cjs "$tag")"'),
-		'validate must resolve the release tag through the registry');
-	expect(meta.includes('emit channel "$channel"'), 'the release path must publish the resolved channel');
-	expect(/uses: actions\/setup-node@v4\s*\n\s*with:\s*\n\s*node-version-file: '\.node-version'/.test(plan),
-		'validate must install the pinned Node before running the registry tool');
+	expect(
+		plan.includes('channel: ${{ steps.meta.outputs.channel }}'),
+		'validate must publish its channel'
+	);
+	expect(
+		meta.includes('channel="$(node tools/build/release-channel.cjs "$tag")"'),
+		'validate must resolve the release tag through the registry'
+	);
+	expect(
+		meta.includes('emit channel "$channel"'),
+		'the release path must publish the resolved channel'
+	);
+	expect(
+		/uses: actions\/setup-node@v4\s*\n\s*with:\s*\n\s*node-version-file: '\.node-version'/.test(
+			plan
+		),
+		'validate must install the pinned Node before running the registry tool'
+	);
 	for (const caller of ['windows', 'macos']) {
-		expect(pipeline.job(caller).includes('channel: ' + RELEASE_CHANNEL_OUTPUT),
-			caller + ' must receive the resolved channel');
+		expect(
+			pipeline.job(caller).includes('channel: ' + RELEASE_CHANNEL_OUTPUT),
+			caller + ' must receive the resolved channel'
+		);
 	}
 	const macos = pipeline.job('package-macos');
 	const feed = pipeline.step(pipeline.job('release'), 'Publish channel feed for Sparkle');
-	const stamps = [...macos.matchAll(/ERGOPTI_CHANNEL:\s*(.+)/g)].map(match => match[1].trim());
-	expect(stamps.length === 2 && stamps.every(value => value === '${{ inputs.channel }}'),
-		'the macOS bundle and appcast must stamp their input channel');
-	expect(feed.includes('ERGOPTI_CHANNEL: ' + RELEASE_CHANNEL_OUTPUT),
-		'the published feed must use the resolved channel');
-	expect(macos.includes('OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml'),
-		'the appcast basename must use the lane input channel');
-	expect(pipeline.job('package-windows').includes('$channel = "${{ inputs.channel }}"'),
-		'the Windows bundle must stamp the lane input channel');
-	expect(!/outputs\.prerelease\s*==\s*'true'\s*&&/.test(text)
-		&& !/-eq\s+'true'\)\s*\{\s*'/.test(text)
-		&& !/if \[ "\$prerelease" = "true" \]; then channel=/.test(text),
-		'no pipeline step may turn the prerelease flag into a channel id');
+	const stamps = [...macos.matchAll(/ERGOPTI_CHANNEL:\s*(.+)/g)].map((match) => match[1].trim());
+	expect(
+		stamps.length === 2 && stamps.every((value) => value === '${{ inputs.channel }}'),
+		'the macOS bundle and appcast must stamp their input channel'
+	);
+	expect(
+		feed.includes('ERGOPTI_CHANNEL: ' + RELEASE_CHANNEL_OUTPUT),
+		'the published feed must use the resolved channel'
+	);
+	expect(
+		macos.includes('OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml'),
+		'the appcast basename must use the lane input channel'
+	);
+	expect(
+		pipeline.job('package-windows').includes('$channel = "${{ inputs.channel }}"'),
+		'the Windows bundle must stamp the lane input channel'
+	);
+	expect(
+		!/outputs\.prerelease\s*==\s*'true'\s*&&/.test(text) &&
+			!/-eq\s+'true'\)\s*\{\s*'/.test(text) &&
+			!/if \[ "\$prerelease" = "true" \]; then channel=/.test(text),
+		'no pipeline step may turn the prerelease flag into a channel id'
+	);
 }
 
 /**
@@ -337,7 +464,8 @@ function checkWorkflowChannelSource() {
  * channel the registry gives it, and a tag no channel owns fails the release.
  */
 function checkReleaseChannelTool(channels) {
-	const run = (args) => spawnSync(process.execPath, [RELEASE_CHANNEL_TOOL, ...args], { encoding: 'utf8' });
+	const run = (args) =>
+		spawnSync(process.execPath, [RELEASE_CHANNEL_TOOL, ...args], { encoding: 'utf8' });
 	expect(fs.existsSync(RELEASE_CHANNEL_TOOL), 'tools/build/release-channel.cjs must exist');
 	if (!fs.existsSync(RELEASE_CHANNEL_TOOL)) return;
 	const families = workflowTagFamilies();
@@ -429,7 +557,8 @@ function hardcodedChannelsIn(text, names) {
 	text.split('\n').forEach((line, index) => {
 		if (isCommentLine(line)) return;
 		for (const name of names) {
-			if (line.includes(`"${name}"`) || line.includes(`'${name}'`)) hits.push({ line: index + 1, name });
+			if (line.includes(`"${name}"`) || line.includes(`'${name}'`))
+				hits.push({ line: index + 1, name });
 		}
 	});
 	return hits;
@@ -441,7 +570,10 @@ function checkNoHardcodedChannels(registry) {
 		names.add(channel.id);
 		for (const alias of channel.aliases) names.add(alias);
 	}
-	expect(names.size > registry.channels.length, 'the ratchet must look for every channel id and alias');
+	expect(
+		names.size > registry.channels.length,
+		'the ratchet must look for every channel id and alias'
+	);
 	// The scan must be able to fail: a quoted id in code is found, a comment is not.
 	const probe = `x = 1\nif (channel === '${registry.channels[0].id}') {}\n// "${registry.channels[0].id}" in prose\n`;
 	const probeHits = hardcodedChannelsIn(probe, names);
@@ -452,10 +584,16 @@ function checkNoHardcodedChannels(registry) {
 	const plus = path.join(ROOT, 'static', 'ergopti_plus');
 	for (const relative of CHANNEL_CONSUMERS) {
 		const file = path.join(plus, relative);
-		expect(fs.existsSync(file), `channel consumer ${relative} is missing; update CHANNEL_CONSUMERS`);
+		expect(
+			fs.existsSync(file),
+			`channel consumer ${relative} is missing; update CHANNEL_CONSUMERS`
+		);
 		if (!fs.existsSync(file)) continue;
 		for (const hit of hardcodedChannelsIn(fs.readFileSync(file, 'utf8'), names)) {
-			expect(false, `${relative}:${hit.line} spells the channel "${hit.name}" by hand; read it from the registry`);
+			expect(
+				false,
+				`${relative}:${hit.line} spells the channel "${hit.name}" by hand; read it from the registry`
+			);
 		}
 	}
 }
@@ -473,7 +611,8 @@ function checkNoHardcodedChannels(registry) {
 		const registry = readJson(REGISTRY_PATH);
 		const channels = create(registry);
 		expect(
-			JSON.stringify(Array.from(channels.ids)) === JSON.stringify(registry.channels.map((c) => c.id)),
+			JSON.stringify(Array.from(channels.ids)) ===
+				JSON.stringify(registry.channels.map((c) => c.id)),
 			'the matcher must keep the registry order (the stability rank)'
 		);
 		checkVectors(channels, readJson(VECTORS_PATH), compareVersions);
@@ -491,9 +630,13 @@ function checkNoHardcodedChannels(registry) {
 		failures.push(`the contract could not run: ${error && error.stack ? error.stack : error}`);
 	}
 	if (failures.length > 0) {
-		console.error(`\x1b[31m[ERROR] update channel contract: ${failures.length} failure(s) in ${checks} check(s):\x1b[0m`);
+		console.error(
+			`\x1b[31m[ERROR] update channel contract: ${failures.length} failure(s) in ${checks} check(s):\x1b[0m`
+		);
 		for (const failure of failures) console.error('  - ' + failure);
 		process.exit(1);
 	}
-	console.log(`\x1b[32m[OK] update channel registry, vectors, locales, generated artifacts and release tags agree (${checks} checks).\x1b[0m`);
+	console.log(
+		`\x1b[32m[OK] update channel registry, vectors, locales, generated artifacts and release tags agree (${checks} checks).\x1b[0m`
+	);
 })();

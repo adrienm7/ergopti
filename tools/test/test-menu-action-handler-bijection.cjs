@@ -165,7 +165,9 @@ const PLATFORMS = [
 ];
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const sections = Object.entries(manifest).filter(([k, v]) => !k.startsWith('_') && Array.isArray(v));
+const sections = Object.entries(manifest).filter(
+	([k, v]) => !k.startsWith('_') && Array.isArray(v)
+);
 
 /** A row with no `platforms` list is visible everywhere — that is the documented default. */
 function visibleOn(entry, platform) {
@@ -230,7 +232,9 @@ for (const { key, driver, ext } of PLATFORMS) {
 		continue;
 	}
 
-	const unresolved = declared.filter(({ id }) => !corpus.includes(`"${id}"`) && !corpus.includes(`'${id}'`));
+	const unresolved = declared.filter(
+		({ id }) => !corpus.includes(`"${id}"`) && !corpus.includes(`'${id}'`)
+	);
 	summary.push(`${key} ${unresolved.length}/${BASELINE[key]}`);
 
 	if (unresolved.length > BASELINE[key]) {

@@ -60,10 +60,15 @@ for (const file of ahkSources(windowsDir)) {
 }
 // Floor: a regex that stopped matching would pass over nothing.
 if (calls.length < 10) {
-	errors.push(`expected the Windows driver's Format(t("key"), ...) calls, found only ${calls.length}`);
+	errors.push(
+		`expected the Windows driver's Format(t("key"), ...) calls, found only ${calls.length}`
+	);
 }
 
-const locales = fs.readdirSync(localesDir).filter((name) => name.endsWith('.json')).sort();
+const locales = fs
+	.readdirSync(localesDir)
+	.filter((name) => name.endsWith('.json'))
+	.sort();
 if (locales.length !== 21) errors.push(`expected 21 locale catalogues, found ${locales.length}`);
 for (const name of locales) {
 	const catalog = JSON.parse(fs.readFileSync(path.join(localesDir, name), 'utf8'));
@@ -72,7 +77,9 @@ for (const name of locales) {
 		if (typeof text !== 'string') continue; // key parity belongs to the catalogue gates
 		const named = (text.match(PLACEHOLDER) ?? []).filter((token) => !NUMBERED.test(token));
 		if (named.length > 0) {
-			errors.push(`${file}: Format(t("${key}")) leaves ${named.join(', ')} verbatim in ${name}: ${text}`);
+			errors.push(
+				`${file}: Format(t("${key}")) leaves ${named.join(', ')} verbatim in ${name}: ${text}`
+			);
 		}
 	}
 }
@@ -82,4 +89,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log(`[OK] ${calls.length} Windows Format(t(...)) calls read numbered placeholders only, in ${locales.length} locales.`);
+console.log(
+	`[OK] ${calls.length} Windows Format(t(...)) calls read numbered placeholders only, in ${locales.length} locales.`
+);

@@ -37,8 +37,9 @@ def verify_disabled(report):
         domain, label = target.rsplit("/", 1)
         output = require_success(["sudo", "-n", "launchctl", "print-disabled", domain])
         outputs[target] = output
-        states[target] = bool(re.search(r'^\s*"' + re.escape(label) + r'"\s*=>\s*disabled\s*$',
-                                        output, re.MULTILINE))
+        states[target] = bool(
+            re.search(r'^\s*"' + re.escape(label) + r'"\s*=>\s*disabled\s*$', output, re.MULTILINE)
+        )
     report.setdefault("service_fence_checks", []).append(states)
     report.setdefault("service_fence_output", []).append(outputs)
     if not all(states.values()):
@@ -84,8 +85,16 @@ def check_runtime_processes(runtime, report, phase, active):
         details = {"pids": [row["pid"] for row in rows]}
         report.setdefault("runtime_process_details", {})[phase] = details
         try:
-            result = command(["ps", "-ww", "-p", ",".join(str(pid) for pid in details["pids"]),
-                              "-o", "pid=,ppid=,args="])
+            result = command(
+                [
+                    "ps",
+                    "-ww",
+                    "-p",
+                    ",".join(str(pid) for pid in details["pids"]),
+                    "-o",
+                    "pid=,ppid=,args=",
+                ]
+            )
             details.update(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)
         except (OSError, subprocess.TimeoutExpired) as error:
             details["error"] = f"{type(error).__name__}: {error}"

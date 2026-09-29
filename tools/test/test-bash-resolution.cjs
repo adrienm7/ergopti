@@ -126,7 +126,7 @@ const COMMAND_LINE_CASES = [
 	['sh ./tools/dev/install.sh', true],
 	['node ./tools/lib/git-bash.cjs tools/build/build-linux-driver.sh --skip-smoke', false],
 	['node ./tools/test/run-linux-lua.cjs tests/run.lua', false],
-	['shx rm -rf build && node ./tools/x.cjs', false],
+	['shx rm -rf build && node ./tools/x.cjs', false]
 ];
 const JS_SPAWN_CASES = [
 	["spawnSync('bash', ['-c', 'true'])", true],
@@ -137,14 +137,14 @@ const JS_SPAWN_CASES = [
 	["spawnSync('sh -c true', { shell: true })", true],
 	["spawnSync(bashExecutable(), ['-c', 'true'])", false],
 	["execSync('git ls-files', { cwd: ROOT })", false],
-	["execSync('shasum -a 256 file')", false],
+	["execSync('shasum -a 256 file')", false]
 ];
 const PY_SPAWN_CASES = [
 	['subprocess.run(["bash", "-c", script])', true],
 	["subprocess.check_output(['sh', path])", true],
 	['subprocess.run("bash x.sh", shell=True)', true],
 	['subprocess.run([bash_executable(), "-c", script])', false],
-	['subprocess.run(["git", "--exec-path"])', false],
+	['subprocess.run(["git", "--exec-path"])', false]
 ];
 for (const [commandLine, bare] of COMMAND_LINE_CASES) {
 	if (runsBareShell(commandLine) !== bare)
@@ -154,7 +154,7 @@ for (const [commandLine, bare] of COMMAND_LINE_CASES) {
 }
 for (const [cases, pattern] of [
 	[JS_SPAWN_CASES, JS_SPAWN_ARGUMENT],
-	[PY_SPAWN_CASES, PY_SPAWN_ARGUMENT],
+	[PY_SPAWN_CASES, PY_SPAWN_ARGUMENT]
 ]) {
 	for (const [source, bare] of cases) {
 		if (spawnsBareShell(source, pattern) !== bare)

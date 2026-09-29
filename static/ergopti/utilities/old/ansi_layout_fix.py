@@ -56,13 +56,9 @@ def add_ansi_keymapset_with_10_50(content: str) -> str:
     )
 
     # 2. Find the <keyMapSet id="ISO"> block
-    iso_block_match = re.search(
-        r'(<keyMapSet id="ISO">)(.*?)(</keyMapSet>)', content, re.DOTALL
-    )
+    iso_block_match = re.search(r'(<keyMapSet id="ISO">)(.*?)(</keyMapSet>)', content, re.DOTALL)
     if not iso_block_match:
-        logger.warning(
-            "%sNo <keyMapSet id='ISO'> block found.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <keyMapSet id='ISO'> block found.", LOGS_INDENTATION + "\t")
         return content
     _, iso_body, _ = iso_block_match.groups()
 
@@ -77,9 +73,7 @@ def add_ansi_keymapset_with_10_50(content: str) -> str:
     )
     ansi_keymaps = []
     for index, keymap_body in keymaps:
-        filtered = "\n\t\t\t".join(
-            re.findall(r'<key(?=[^>]*code="(?:10|50)")[^>]*/>', keymap_body)
-        )
+        filtered = "\n\t\t\t".join(re.findall(r'<key(?=[^>]*code="(?:10|50)")[^>]*/>', keymap_body))
         ansi_keymaps.append(
             f'<keyMap index="{index}" baseMapSet="ISO" baseIndex="{index}">\n\t\t\t{filtered}\n\t\t</keyMap>'
         )

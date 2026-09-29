@@ -1,12 +1,6 @@
 {
 	"_comment": "The AI agent (_shared/lua/llm/agent.lua, windows/modules/llm/agent.ahk). System 1 is fast and cheap: it only tells whether what the user types implies one of `intents`, with a probability (an LLM with system1.prompt, or Jev through its choice question). System 2 is slow and smart: it turns a text into at most system2.max_actions actions of the closed `actions` schema, as a JSON array after system2.tag. Nothing the model writes is ever executed as is: every action is validated field by field, and a shortcut must name one of the user's own tools. Dates are local wall-clock times written YYYY-MM-DDTHH:MM. learning bounds how accepting or dismissing a suggestion moves the per-app threshold of its intent. system1 and system2 settings (llm.agent_system1 / llm.agent_system2) name a backend like the vision actions: \"local\" (Ollama) or a provider of api_providers.json, optionally followed by |model; without a model, the local backend uses default_models.local and a provider its default_model in api_providers.json (the one source of provider defaults); a backend with neither needs the model.",
-	"intents": [
-		"none",
-		"calendar",
-		"reminder",
-		"mail",
-		"shortcut"
-	],
+	"intents": ["none", "calendar", "reminder", "mail", "shortcut"],
 	"default_models": {
 		"local": "qwen2.5:7b"
 	},

@@ -23,11 +23,17 @@ from hs274_target import owned_target
 
 def read_clock(information):
     """Require the native rational scale; never infer it from the architecture."""
-    if (not isinstance(information, dict) or set(information) != {"version", "domain", "numer", "denom"}
-            or type(information["version"]) is not int or information["version"] != 1
-            or information["domain"] != "mach_absolute_time"
-            or any(type(information[key]) is not int or not 1 <= information[key] <= (1 << 32) - 1
-                   for key in ("numer", "denom"))):
+    if (
+        not isinstance(information, dict)
+        or set(information) != {"version", "domain", "numer", "denom"}
+        or type(information["version"]) is not int
+        or information["version"] != 1
+        or information["domain"] != "mach_absolute_time"
+        or any(
+            type(information[key]) is not int or not 1 <= information[key] <= (1 << 32) - 1
+            for key in ("numer", "denom")
+        )
+    ):
         raise ValueError("Invalid native physical clock timebase")
     return information
 
@@ -44,33 +50,50 @@ def validate_clock(result, downs):
             raise ValueError("Invalid original physical clock sample")
         original = decimal(sample["original_ns"], maximum=(1 << 63) - 1)
         observed = decimal(sample["observed_ns"], maximum=(1 << 63) - 1)
-        if original != row["timestamp"] * scale["numer"] // scale["denom"] or not start <= original <= observed:
+        if (
+            original != row["timestamp"] * scale["numer"] // scale["denom"]
+            or not start <= original <= observed
+        ):
             raise ValueError("Physical timestamp is not in the native capture clock domain")
 
 
 def validate_context(result, downs):
     """Compare credits to the retained native observation that preceded each input."""
     observations = result.get("context_observations")
-    if (result.get("context_source") != "native app/window/AX" or result.get("context_stopped") is not True
-            or not isinstance(observations, list) or not observations):
+    if (
+        result.get("context_source") != "native app/window/AX"
+        or result.get("context_stopped") is not True
+        or not isinstance(observations, list)
+        or not observations
+    ):
         raise ValueError("Missing native context ownership evidence")
     previous = -1
     for observation in observations:
         if not isinstance(observation, dict) or type(observation.get("allowed")) is not bool:
             raise ValueError("Invalid native privacy observation")
         observed = decimal(observation.get("observed_ns"), maximum=(1 << 63) - 1)
-        fields = {"observed_ns", "allowed"} | ({"app", "epoch"} if observation["allowed"] else set())
+        fields = {"observed_ns", "allowed"} | (
+            {"app", "epoch"} if observation["allowed"] else set()
+        )
         if set(observation) != fields or observed <= previous:
             raise ValueError("Native privacy observations are unordered or retain private context")
         previous = observed
-        if observation["allowed"] and (not isinstance(observation["app"], str) or not observation["app"]
-                or type(observation["epoch"]) not in (int, float) or not math.isfinite(observation["epoch"])):
+        if observation["allowed"] and (
+            not isinstance(observation["app"], str)
+            or not observation["app"]
+            or type(observation["epoch"]) not in (int, float)
+            or not math.isfinite(observation["epoch"])
+        ):
             raise ValueError("Incomplete native application observation")
     scale = read_clock(result.get("clock"))
     expected = []
     for row in downs:
         original = row["timestamp"] * scale["numer"] // scale["denom"]
-        candidates = [observation for observation in observations if int(observation["observed_ns"]) <= original]
+        candidates = [
+            observation
+            for observation in observations
+            if int(observation["observed_ns"]) <= original
+        ]
         if not candidates:
             raise ValueError("Physical input predates native context history")
         selected = candidates[-1]
@@ -80,7 +103,9 @@ def validate_context(result, downs):
             expected.append((selected["app"], formatted + f".{math.floor((epoch % 1) * 1000):03d}"))
     actual = [(press.get("app"), press.get("timestamp")) for press in result["presses"]]
     if actual != expected:
-        raise ValueError("Physical credits do not match retained native application/privacy context")
+        raise ValueError(
+            "Physical credits do not match retained native application/privacy context"
+        )
 
 
 def validate_context_probe(result):
@@ -91,14 +116,20 @@ def validate_context_probe(result):
         raise ValueError("Missing native context probe transitions")
     previous = 1
     for row, (phase, allowed) in zip(probe, phases):
-        if (not isinstance(row, dict) or set(row) != {"phase", "observation"}
-                or row["phase"] != phase or type(row["observation"]) is not int
-                or not previous < row["observation"] <= len(observations)):
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"phase", "observation"}
+            or row["phase"] != phase
+            or type(row["observation"]) is not int
+            or not previous < row["observation"] <= len(observations)
+        ):
             raise ValueError("Invalid native context probe transition")
         previous = row["observation"]
         if observations[previous - 1]["allowed"] is not allowed:
             raise ValueError("Native context probe did not observe its privacy decision")
-    if int(observations[previous - 1]["observed_ns"]) >= int(result["clock_samples"][0]["original_ns"]):
+    if int(observations[previous - 1]["observed_ns"]) >= int(
+        result["clock_samples"][0]["original_ns"]
+    ):
         raise ValueError("Native context probe did not settle before physical input")
 
 
@@ -128,8 +159,12 @@ class CaptureReceipt:
                 receipt = json.loads(self.path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 return None
-            if (not isinstance(receipt, dict) or type(receipt.get("error_count")) is not int
-                    or receipt["error_count"] != 0 or receipt.get("errors") not in ([], {})):
+            if (
+                not isinstance(receipt, dict)
+                or type(receipt.get("error_count")) is not int
+                or receipt["error_count"] != 0
+                or receipt.get("errors") not in ([], {})
+            ):
                 raise RuntimeError("Native Hammerspoon consumer failed: " + str(receipt))
             if receipt.get("settled") is not True or type(receipt.get("exit")) is not int:
                 raise RuntimeError("Native Hammerspoon receipt does not prove task settlement")
@@ -162,7 +197,9 @@ def owned_capture(app, cli, output, report):
 @contextmanager
 def capture_consumer(app, cli, output, report, target):
     """Launch one isolated app and keep both application and CLI evidence."""
-    clock = subprocess.run([str(cli), "--hs274-clock"], check=True, capture_output=True, text=True, timeout=5)
+    clock = subprocess.run(
+        [str(cli), "--hs274-clock"], check=True, capture_output=True, text=True, timeout=5
+    )
     timebase = read_clock(json.loads(clock.stdout, object_pairs_hook=unique_object))
     lifecycle = native_lifecycle()
     native = lifecycle.NativeProcesses()
@@ -182,20 +219,39 @@ def capture_consumer(app, cli, output, report, target):
     stop = scratch / "stop"
     permission_request = scratch / "permission-request.json"
     permission_ready = scratch / "permission-ready"
-    configuration = {"repo": str(here.parents[1]), "cli": str(cli), "result": str(result),
-                     "stream": str(output / "hs274-remap-physical-stream.log"),
-                     "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
-                     "stop": str(stop), "permission_request": str(permission_request), "permission_ready": str(permission_ready),
-                     "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
+    configuration = {
+        "repo": str(here.parents[1]),
+        "cli": str(cli),
+        "result": str(result),
+        "stream": str(output / "hs274-remap-physical-stream.log"),
+        "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
+        "stop": str(stop),
+        "permission_request": str(permission_request),
+        "permission_ready": str(permission_ready),
+        "batch_limit": 64,
+        "context_limit": 64,
+        "frame_limit": 65536,
+        "clock": timebase,
+    }
     configuration["keycodes"] = {**{41: 53, 44: 49}, **MODIFIER_KEYCODES}
     configuration.update(target)
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
-        launch_command = ["/usr/bin/open", "-n", "-g", "-W", str(copied),
-                          "--args", "-MJConfigFile", str(scratch / "init.lua")]
+        launch_command = [
+            "/usr/bin/open",
+            "-n",
+            "-g",
+            "-W",
+            str(copied),
+            "--args",
+            "-MJConfigFile",
+            str(scratch / "init.lua"),
+        ]
         launcher = subprocess.Popen(launch_command, stdout=log, stderr=subprocess.STDOUT)
         client = CaptureReceipt(result, native, executable)
-        state = report.setdefault("processes", {}).setdefault("physical-stream", {"runtime": "native Hammerspoon"})
+        state = report.setdefault("processes", {}).setdefault(
+            "physical-stream", {"runtime": "native Hammerspoon"}
+        )
         primary_error = None
         try:
             deadline = time.monotonic() + 15
@@ -203,18 +259,27 @@ def capture_consumer(app, cli, output, report, target):
             while not native.matching(executable) or not Path(configuration["stream"]).is_file():
                 if permission_request.exists() and not approval_attempted:
                     if len(native.matching(executable)) != 1:
-                        raise RuntimeError("Accessibility request has no unique owned Hammerspoon process")
+                        raise RuntimeError(
+                            "Accessibility request has no unique owned Hammerspoon process"
+                        )
                     approval_attempted = True
                     approve_accessibility(report, copied)
                     owners = native.matching(executable)
                     if len(owners) != 1 or result.exists():
-                        raise RuntimeError("Permission restart has no unique waiting Hammerspoon owner")
-                    restart = report["hammerspoon_permission_restart"] = {"previous_pid": owners[0], "settled": False}
+                        raise RuntimeError(
+                            "Permission restart has no unique waiting Hammerspoon owner"
+                        )
+                    restart = report["hammerspoon_permission_restart"] = {
+                        "previous_pid": owners[0],
+                        "settled": False,
+                    }
                     lifecycle.cleanup(native, executable, launcher)
                     if native.matching(executable):
                         raise RuntimeError("Previous Hammerspoon permission owner is still running")
                     restart["settled"] = True
-                    launcher = subprocess.Popen(launch_command, stdout=log, stderr=subprocess.STDOUT)
+                    launcher = subprocess.Popen(
+                        launch_command, stdout=log, stderr=subprocess.STDOUT
+                    )
                     permission_ready.write_text("approved\n", encoding="utf-8")
                     deadline = time.monotonic() + 15
                 if result.exists():
@@ -229,9 +294,13 @@ def capture_consumer(app, cli, output, report, target):
             report["hammerspoon_primary_error"] = f"{type(error).__name__}: {error}"
             if "hammerspoon_admission_diagnostics" not in report:
                 try:
-                    hs274_accessibility_diagnostics.retain_failure(report, copied, native.matching(executable))
+                    hs274_accessibility_diagnostics.retain_failure(
+                        report, copied, native.matching(executable)
+                    )
                 except Exception as diagnostic_error:
-                    report["hammerspoon_diagnostic_error"] = f"{type(diagnostic_error).__name__}: {diagnostic_error}"
+                    report["hammerspoon_diagnostic_error"] = (
+                        f"{type(diagnostic_error).__name__}: {diagnostic_error}"
+                    )
             raise
         finally:
             cleanup_error = None
@@ -254,46 +323,85 @@ def capture_consumer(app, cli, output, report, target):
                 raise cleanup_error
 
 
-def validate_consumer(result, capture, *, held=False, modifiers=False, overlap=False, combinations=False):
+def validate_consumer(
+    result, capture, *, held=False, modifiers=False, overlap=False, combinations=False
+):
     """Match real Lua credits and exact original context keys against native input."""
-    if (held and modifiers) or ((overlap or combinations) and not modifiers) or (overlap and combinations):
+    if (
+        (held and modifiers)
+        or ((overlap or combinations) and not modifiers)
+        or (overlap and combinations)
+    ):
         raise ValueError("Held and modifier consumer scenarios are distinct")
     mapping = {41: 53, 44: 49}
     expected_usages = [44] if held else [41, 44]
     if modifiers:
         mapping.update(MODIFIER_KEYCODES)
-        expected_usages = list(MODIFIER_KEYCODES) + ([225, 229] if overlap else [225, 41, 225, 44] if combinations else []) + expected_usages
+        expected_usages = (
+            list(MODIFIER_KEYCODES)
+            + ([225, 229] if overlap else [225, 41, 225, 44] if combinations else [])
+            + expected_usages
+        )
     expected_counts = {}
     for usage in expected_usages:
         key = str(mapping[usage])
         expected_counts[key] = expected_counts.get(key, 0) + 1
     focus = result.get("field_focus") if isinstance(result, dict) else None
-    if (not isinstance(focus, dict) or focus.get("source") != "native AX"
-            or focus.get("accessibility") is not True or focus.get("value") is not True
-            or type(focus.get("fixture_id")) is not int or focus["fixture_id"] <= 0
-            or type(focus.get("focused_id")) is not int or focus["focused_id"] != focus["fixture_id"]
-            or focus.get("role") != "AXTextField"):
+    if (
+        not isinstance(focus, dict)
+        or focus.get("source") != "native AX"
+        or focus.get("accessibility") is not True
+        or focus.get("value") is not True
+        or type(focus.get("fixture_id")) is not int
+        or focus["fixture_id"] <= 0
+        or type(focus.get("focused_id")) is not int
+        or focus["focused_id"] != focus["fixture_id"]
+        or focus.get("role") != "AXTextField"
+    ):
         raise ValueError("Native field focus is not trusted and exact")
-    if (not isinstance(result, dict) or result.get("runtime") != "native Hammerspoon" or result.get("coverage") != "fixture_only"
-            or result.get("settled") is not True or result.get("stop_requested") is not True
-            or type(result.get("error_count")) is not int or result["error_count"] != 0
-            or result.get("errors") not in ([], {})
-            or type(result.get("exit")) is not int or result["exit"] != 143
-            or result.get("counts") != expected_counts
-            or any(type(value) is not int for value in result["counts"].values())):
+    if (
+        not isinstance(result, dict)
+        or result.get("runtime") != "native Hammerspoon"
+        or result.get("coverage") != "fixture_only"
+        or result.get("settled") is not True
+        or result.get("stop_requested") is not True
+        or type(result.get("error_count")) is not int
+        or result["error_count"] != 0
+        or result.get("errors") not in ([], {})
+        or type(result.get("exit")) is not int
+        or result["exit"] != 143
+        or result.get("counts") != expected_counts
+        or any(type(value) is not int for value in result["counts"].values())
+    ):
         raise ValueError("Native Hammerspoon did not prove complete fixture delivery")
-    downs = [row for row in capture["records"] if row["has_page"] and row["has_usage"]
-             and row["page"] == 7 and row["usage"] in mapping and row["value"] == 1]
+    downs = [
+        row
+        for row in capture["records"]
+        if row["has_page"]
+        and row["has_usage"]
+        and row["page"] == 7
+        and row["usage"] in mapping
+        and row["value"] == 1
+    ]
     if [row["usage"] for row in downs] != expected_usages:
         raise ValueError("Independent fixture does not contain the expected physical pair")
     validate_clock(result, downs)
     validate_context(result, downs)
     validate_context_probe(result)
-    expected_contexts = [{"device": str(row["device"]), "timestamp": str(row["timestamp"])} for row in downs]
-    if (result.get("contexts") != expected_contexts or not isinstance(result.get("presses"), list)
-            or len(result["presses"]) != len(downs)):
+    expected_contexts = [
+        {"device": str(row["device"]), "timestamp": str(row["timestamp"])} for row in downs
+    ]
+    if (
+        result.get("contexts") != expected_contexts
+        or not isinstance(result.get("presses"), list)
+        or len(result["presses"]) != len(downs)
+    ):
         raise ValueError("Native Hammerspoon changed physical timestamps or device identities")
     for press, row in zip(result["presses"], downs):
-        if (not isinstance(press, dict) or type(press.get("keycode")) is not int
-                or press["keycode"] != mapping[row["usage"]] or press.get("device") != str(row["device"])):
+        if (
+            not isinstance(press, dict)
+            or type(press.get("keycode")) is not int
+            or press["keycode"] != mapping[row["usage"]]
+            or press.get("device") != str(row["device"])
+        ):
             raise ValueError("Native Hammerspoon lost or changed a physical press")

@@ -23,8 +23,10 @@ def archive_inventory(directory):
     """Account for the entire expanded archive, including scripts and empty folders."""
     root = Path(directory)
     result = {}
+
     def unreadable(error):
         raise error
+
     for parent, directories, files in os.walk(root, onerror=unreadable, followlinks=False):
         for name in directories + files:
             path = Path(parent) / name
@@ -34,8 +36,11 @@ def archive_inventory(directory):
             if path.is_dir():
                 result[key] = {"kind": "directory"}
             elif path.is_file():
-                result[key] = {"kind": "file", "sha256": digest(path),
-                               "mode": stat.S_IMODE(path.stat().st_mode)}
+                result[key] = {
+                    "kind": "file",
+                    "sha256": digest(path),
+                    "mode": stat.S_IMODE(path.stat().st_mode),
+                }
             else:
                 raise ValueError("Unexpected special expanded package entry")
     if POSTINSTALL not in result or not any(name.endswith("/Payload") for name in result):
@@ -61,8 +66,17 @@ def repair_expanded(directory):
 @contextmanager
 def mounted_image(image, mount):
     """Release the exact read-only mount before temporary files can be removed."""
-    native(["/usr/bin/hdiutil", "attach", str(image), "-nobrowse", "-readonly",
-            "-mountpoint", str(mount)])
+    native(
+        [
+            "/usr/bin/hdiutil",
+            "attach",
+            str(image),
+            "-nobrowse",
+            "-readonly",
+            "-mountpoint",
+            str(mount),
+        ]
+    )
     try:
         yield mount / "Karabiner-Elements.pkg"
     finally:
@@ -96,15 +110,34 @@ def repack(directory, output):
             raise ValueError("Repackaging altered the preserved installer archive")
         output.mkdir(parents=True)
         image = output / "Ergopti-Karabiner-candidate-immutable.dmg"
-        native(["/usr/bin/hdiutil", "create", "-srcfolder", str(image_contents), "-format", "UDZO",
-                "-volname", "Ergopti Karabiner", str(image)])
+        native(
+            [
+                "/usr/bin/hdiutil",
+                "create",
+                "-srcfolder",
+                str(image_contents),
+                "-format",
+                "UDZO",
+                "-volname",
+                "Ergopti Karabiner",
+                str(image),
+            ]
+        )
         identity = copy.deepcopy(selected["identity"])
         identity["package"] = {"file_name": image.name, "sha256": digest(image)}
-        receipt = {"kind": "installer-policy-repackage", "source_run": selected["run_id"],
-                   "source_package_sha256": selected["identity"]["package"]["sha256"],
-                   "unchanged_archive": expected, "identity": identity}
-        (output / "identity.json").write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8", newline="\n")
-        (output / "repackage.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n")
+        receipt = {
+            "kind": "installer-policy-repackage",
+            "source_run": selected["run_id"],
+            "source_package_sha256": selected["identity"]["package"]["sha256"],
+            "unchanged_archive": expected,
+            "identity": identity,
+        }
+        (output / "identity.json").write_text(
+            json.dumps(identity, indent=2) + "\n", encoding="utf-8", newline="\n"
+        )
+        (output / "repackage.json").write_text(
+            json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n"
+        )
         return image
 
 

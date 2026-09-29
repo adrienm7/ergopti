@@ -6,9 +6,9 @@ Standalone WKWebView form for editing personal information (name, phone, IBAN, S
 
 ## Key files
 
-| File      | Description                                                               |
-| --------- | ------------------------------------------------------------------------- |
-| `init.lua`| `M.show()` — singleton host; `hsPersonalInfo` bridge handler               |
+| File       | Description                                                  |
+| ---------- | ------------------------------------------------------------ |
+| `init.lua` | `M.show()` — singleton host; `hsPersonalInfo` bridge handler |
 
 ## Shared frontend
 

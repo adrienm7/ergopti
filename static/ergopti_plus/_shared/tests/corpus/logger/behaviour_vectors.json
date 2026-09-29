@@ -197,12 +197,30 @@
 				"id": "periodic_line_collapses_to_first_plus_summary",
 				"description": "The gestures health check logs every 30 s. Twenty ticks inside one window become the first line plus one summary, not twenty lines, and the summary is emitted by the periodic flush once the window has elapsed.",
 				"steps": [
-					{ "at": 0, "every": 30, "times": 20, "variant": "debug", "module": "gestures", "template": "Health-check tick (watchers=<arg>)", "arg": "1" },
+					{
+						"at": 0,
+						"every": 30,
+						"times": 20,
+						"variant": "debug",
+						"module": "gestures",
+						"template": "Health-check tick (watchers=<arg>)",
+						"arg": "1"
+					},
 					{ "at": 600, "flush": "tick" }
 				],
 				"expect": [
-					{ "variant": "debug", "module": "gestures", "body": "Health-check tick (watchers=1)", "stamp": "2026-01-15 10:00:00:000" },
-					{ "variant": "debug", "module": "gestures", "body": "↑ \"Health-check tick (watchers=<arg>)\" repeated 19 more times between 2026-01-15 10:00:30:000 and 2026-01-15 10:09:30:000 (last: Health-check tick (watchers=1)).", "stamp": "2026-01-15 10:10:00:000" }
+					{
+						"variant": "debug",
+						"module": "gestures",
+						"body": "Health-check tick (watchers=1)",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "debug",
+						"module": "gestures",
+						"body": "↑ \"Health-check tick (watchers=<arg>)\" repeated 19 more times between 2026-01-15 10:00:30:000 and 2026-01-15 10:09:30:000 (last: Health-check tick (watchers=1)).",
+						"stamp": "2026-01-15 10:10:00:000"
+					}
 				],
 				"expect_ring": 2
 			},
@@ -210,28 +228,73 @@
 				"id": "a_tick_inside_the_window_emits_nothing",
 				"description": "The periodic flush closes a streak only once its window has fully elapsed: a tick one second early must leave it open, or a streak would be summarised on whatever tick happened to follow it.",
 				"steps": [
-					{ "at": 0, "variant": "debug", "module": "gestures", "template": "Poll (queue=<arg>).", "arg": "0" },
-					{ "at": 30, "variant": "debug", "module": "gestures", "template": "Poll (queue=<arg>).", "arg": "0" },
+					{
+						"at": 0,
+						"variant": "debug",
+						"module": "gestures",
+						"template": "Poll (queue=<arg>).",
+						"arg": "0"
+					},
+					{
+						"at": 30,
+						"variant": "debug",
+						"module": "gestures",
+						"template": "Poll (queue=<arg>).",
+						"arg": "0"
+					},
 					{ "at": 599, "flush": "tick" },
 					{ "at": 600, "flush": "tick" }
 				],
 				"expect": [
-					{ "variant": "debug", "module": "gestures", "body": "Poll (queue=0).", "stamp": "2026-01-15 10:00:00:000" },
-					{ "variant": "debug", "module": "gestures", "body": "↑ \"Poll (queue=<arg>).\" repeated 1 more time between 2026-01-15 10:00:30:000 and 2026-01-15 10:00:30:000 (last: Poll (queue=0).).", "stamp": "2026-01-15 10:10:00:000" }
+					{
+						"variant": "debug",
+						"module": "gestures",
+						"body": "Poll (queue=0).",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "debug",
+						"module": "gestures",
+						"body": "↑ \"Poll (queue=<arg>).\" repeated 1 more time between 2026-01-15 10:00:30:000 and 2026-01-15 10:00:30:000 (last: Poll (queue=0).).",
+						"stamp": "2026-01-15 10:10:00:000"
+					}
 				]
 			},
 			{
 				"id": "changing_arguments_are_one_streak_keyed_by_template",
 				"description": "A counter in the arguments must not defeat collapsing, which is exactly what defeated the old consecutive dedup. The value change stays visible through the summary's last value.",
 				"steps": [
-					{ "at": 0, "variant": "info", "module": "watchers", "template": "Watcher count is <arg>.", "arg": "1" },
-					{ "at": 10, "variant": "info", "module": "watchers", "template": "Watcher count is <arg>.", "arg": "2" },
-					{ "at": 20, "variant": "info", "module": "watchers", "template": "Watcher count is <arg>.", "arg": "3" },
+					{
+						"at": 0,
+						"variant": "info",
+						"module": "watchers",
+						"template": "Watcher count is <arg>.",
+						"arg": "1"
+					},
+					{
+						"at": 10,
+						"variant": "info",
+						"module": "watchers",
+						"template": "Watcher count is <arg>.",
+						"arg": "2"
+					},
+					{
+						"at": 20,
+						"variant": "info",
+						"module": "watchers",
+						"template": "Watcher count is <arg>.",
+						"arg": "3"
+					},
 					{ "at": 30, "flush": "terminal" }
 				],
 				"expect": [
 					{ "variant": "info", "module": "watchers", "body": "Watcher count is 1." },
-					{ "variant": "info", "module": "watchers", "body": "↑ \"Watcher count is <arg>.\" repeated 2 more times between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:20:000 (last: Watcher count is 3.).", "stamp": "2026-01-15 10:00:30:000" }
+					{
+						"variant": "info",
+						"module": "watchers",
+						"body": "↑ \"Watcher count is <arg>.\" repeated 2 more times between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:20:000 (last: Watcher count is 3.).",
+						"stamp": "2026-01-15 10:00:30:000"
+					}
 				]
 			},
 			{
@@ -249,8 +312,16 @@
 				"expect": [
 					{ "variant": "debug", "module": "gestures", "body": "Tick." },
 					{ "variant": "debug", "module": "lease", "body": "Tick." },
-					{ "variant": "debug", "module": "gestures", "body": "↑ \"Tick.\" repeated 2 more times between 2026-01-15 10:00:30:000 and 2026-01-15 10:01:00:000." },
-					{ "variant": "debug", "module": "lease", "body": "↑ \"Tick.\" repeated 2 more times between 2026-01-15 10:00:31:000 and 2026-01-15 10:01:01:000." }
+					{
+						"variant": "debug",
+						"module": "gestures",
+						"body": "↑ \"Tick.\" repeated 2 more times between 2026-01-15 10:00:30:000 and 2026-01-15 10:01:00:000."
+					},
+					{
+						"variant": "debug",
+						"module": "lease",
+						"body": "↑ \"Tick.\" repeated 2 more times between 2026-01-15 10:00:31:000 and 2026-01-15 10:01:01:000."
+					}
 				]
 			},
 			{
@@ -265,26 +336,68 @@
 				"expect": [
 					{ "variant": "info", "module": "corpus", "body": "Alpha." },
 					{ "variant": "info", "module": "corpus", "body": "Beta." },
-					{ "variant": "info", "module": "corpus", "body": "↑ \"Alpha.\" repeated 1 more time between 2026-01-15 10:00:02:000 and 2026-01-15 10:00:02:000." }
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "↑ \"Alpha.\" repeated 1 more time between 2026-01-15 10:00:02:000 and 2026-01-15 10:00:02:000."
+					}
 				]
 			},
 			{
 				"id": "warn_and_error_are_keyed_by_formatted_body",
 				"description": "Each distinct failure is still recorded: a warning or an error collapses only onto the same formatted text, and its summary keeps the variant so it still reaches the errors-only file.",
 				"steps": [
-					{ "at": 0, "variant": "warn", "module": "probe", "template": "Probe failed: <arg>.", "arg": "timeout" },
-					{ "at": 10, "variant": "warn", "module": "probe", "template": "Probe failed: <arg>.", "arg": "timeout" },
-					{ "at": 20, "variant": "warn", "module": "probe", "template": "Probe failed: <arg>.", "arg": "refused" },
-					{ "at": 30, "variant": "error", "module": "writer", "template": "Write failed: <arg>.", "arg": "disk full" },
-					{ "at": 40, "variant": "error", "module": "writer", "template": "Write failed: <arg>.", "arg": "disk full" },
+					{
+						"at": 0,
+						"variant": "warn",
+						"module": "probe",
+						"template": "Probe failed: <arg>.",
+						"arg": "timeout"
+					},
+					{
+						"at": 10,
+						"variant": "warn",
+						"module": "probe",
+						"template": "Probe failed: <arg>.",
+						"arg": "timeout"
+					},
+					{
+						"at": 20,
+						"variant": "warn",
+						"module": "probe",
+						"template": "Probe failed: <arg>.",
+						"arg": "refused"
+					},
+					{
+						"at": 30,
+						"variant": "error",
+						"module": "writer",
+						"template": "Write failed: <arg>.",
+						"arg": "disk full"
+					},
+					{
+						"at": 40,
+						"variant": "error",
+						"module": "writer",
+						"template": "Write failed: <arg>.",
+						"arg": "disk full"
+					},
 					{ "at": 50, "flush": "terminal" }
 				],
 				"expect": [
 					{ "variant": "warn", "module": "probe", "body": "Probe failed: timeout." },
 					{ "variant": "warn", "module": "probe", "body": "Probe failed: refused." },
 					{ "variant": "error", "module": "writer", "body": "Write failed: disk full." },
-					{ "variant": "warn", "module": "probe", "body": "↑ \"Probe failed: timeout.\" repeated 1 more time between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:10:000." },
-					{ "variant": "error", "module": "writer", "body": "↑ \"Write failed: disk full.\" repeated 1 more time between 2026-01-15 10:00:40:000 and 2026-01-15 10:00:40:000." }
+					{
+						"variant": "warn",
+						"module": "probe",
+						"body": "↑ \"Probe failed: timeout.\" repeated 1 more time between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:10:000."
+					},
+					{
+						"variant": "error",
+						"module": "writer",
+						"body": "↑ \"Write failed: disk full.\" repeated 1 more time between 2026-01-15 10:00:40:000 and 2026-01-15 10:00:40:000."
+					}
 				]
 			},
 			{
@@ -314,9 +427,24 @@
 					{ "at": 710, "flush": "terminal" }
 				],
 				"expect": [
-					{ "variant": "info", "module": "poller", "body": "Poll.", "stamp": "2026-01-15 10:00:00:000" },
-					{ "variant": "info", "module": "poller", "body": "↑ \"Poll.\" repeated 1 more time between 2026-01-15 10:01:00:000 and 2026-01-15 10:01:00:000.", "stamp": "2026-01-15 10:11:40:000" },
-					{ "variant": "info", "module": "poller", "body": "Poll.", "stamp": "2026-01-15 10:11:40:000" }
+					{
+						"variant": "info",
+						"module": "poller",
+						"body": "Poll.",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "poller",
+						"body": "↑ \"Poll.\" repeated 1 more time between 2026-01-15 10:01:00:000 and 2026-01-15 10:01:00:000.",
+						"stamp": "2026-01-15 10:11:40:000"
+					},
+					{
+						"variant": "info",
+						"module": "poller",
+						"body": "Poll.",
+						"stamp": "2026-01-15 10:11:40:000"
+					}
 				]
 			},
 			{
@@ -333,14 +461,25 @@
 					{ "variant": "debug", "module": "corpus", "body": "Tick." },
 					{ "variant": "info", "module": "corpus", "body": "Burst." },
 					{ "variant": "info", "module": "logger", "body": "↑ 1 identical line suppressed" },
-					{ "variant": "debug", "module": "corpus", "body": "↑ \"Tick.\" repeated 1 more time between 2026-01-15 10:00:30:000 and 2026-01-15 10:00:30:000." }
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "↑ \"Tick.\" repeated 1 more time between 2026-01-15 10:00:30:000 and 2026-01-15 10:00:30:000."
+					}
 				]
 			},
 			{
 				"id": "dedup_runs_before_the_repeat_layer",
 				"description": "A burst of identical consecutive lines is still reported by the prompt dedup summary; the repeat layer only sees lines the dedup let through, so the burst is not counted twice.",
 				"steps": [
-					{ "at": 0, "every": 0, "times": 3, "variant": "info", "module": "corpus", "template": "Burst." },
+					{
+						"at": 0,
+						"every": 0,
+						"times": 3,
+						"variant": "info",
+						"module": "corpus",
+						"template": "Burst."
+					},
 					{ "at": 1, "variant": "info", "module": "corpus", "template": "Other." },
 					{ "at": 2, "flush": "terminal" }
 				],
@@ -356,12 +495,24 @@
 				"steps": [
 					{ "at": 0, "variant": "debug", "module": "corpus", "template": "Streak A." },
 					{ "at": 10, "variant": "debug", "module": "corpus", "template": "Streak A." },
-					{ "at": 11, "every": 1, "range": [1, 64], "variant": "debug", "module": "corpus", "template": "Filler <n>." },
+					{
+						"at": 11,
+						"every": 1,
+						"range": [1, 64],
+						"variant": "debug",
+						"module": "corpus",
+						"template": "Filler <n>."
+					},
 					{ "at": 80, "flush": "terminal" }
 				],
 				"expect_line_count": 65,
 				"expect_summaries": [
-					{ "variant": "debug", "module": "corpus", "body": "↑ \"Streak A.\" repeated 1 more time between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:10:000.", "followed_by": "Filler 64." }
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "↑ \"Streak A.\" repeated 1 more time between 2026-01-15 10:00:10:000 and 2026-01-15 10:00:10:000.",
+						"followed_by": "Filler 64."
+					}
 				]
 			},
 			{
@@ -375,9 +526,24 @@
 					{ "at": 100, "flush": "terminal" }
 				],
 				"expect": [
-					{ "variant": "debug", "module": "corpus", "body": "Midnight tick.", "stamp": "2026-01-15 23:59:00:000" },
-					{ "variant": "debug", "module": "corpus", "body": "↑ \"Midnight tick.\" repeated 1 more time between 2026-01-15 23:59:30:000 and 2026-01-15 23:59:30:000.", "stamp": "2026-01-16 00:00:30:000" },
-					{ "variant": "debug", "module": "corpus", "body": "Midnight tick.", "stamp": "2026-01-16 00:00:30:000" }
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "Midnight tick.",
+						"stamp": "2026-01-15 23:59:00:000"
+					},
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "↑ \"Midnight tick.\" repeated 1 more time between 2026-01-15 23:59:30:000 and 2026-01-15 23:59:30:000.",
+						"stamp": "2026-01-16 00:00:30:000"
+					},
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "Midnight tick.",
+						"stamp": "2026-01-16 00:00:30:000"
+					}
 				]
 			},
 			{
@@ -390,8 +556,18 @@
 					{ "at": 70, "flush": "tick" }
 				],
 				"expect": [
-					{ "variant": "debug", "module": "corpus", "body": "Midnight tick.", "stamp": "2026-01-15 23:59:00:000" },
-					{ "variant": "debug", "module": "corpus", "body": "↑ \"Midnight tick.\" repeated 1 more time between 2026-01-15 23:59:30:000 and 2026-01-15 23:59:30:000.", "stamp": "2026-01-16 00:00:10:000" }
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "Midnight tick.",
+						"stamp": "2026-01-15 23:59:00:000"
+					},
+					{
+						"variant": "debug",
+						"module": "corpus",
+						"body": "↑ \"Midnight tick.\" repeated 1 more time between 2026-01-15 23:59:30:000 and 2026-01-15 23:59:30:000.",
+						"stamp": "2026-01-16 00:00:10:000"
+					}
 				]
 			}
 		]

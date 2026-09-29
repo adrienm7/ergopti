@@ -18,13 +18,19 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const UI_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui');
 const VENDOR_ROOT = path.join(UI_ROOT, 'vendor');
-const MANIFEST = JSON.parse(fs.readFileSync(path.join(VENDOR_ROOT, 'vendor-manifest.json'), 'utf8'));
+const MANIFEST = JSON.parse(
+	fs.readFileSync(path.join(VENDOR_ROOT, 'vendor-manifest.json'), 'utf8')
+);
 
 function fail(message) {
 	throw new Error(message);
 }
 
-if (MANIFEST.schema_version !== 1 || !Array.isArray(MANIFEST.assets) || MANIFEST.assets.length !== 4) {
+if (
+	MANIFEST.schema_version !== 1 ||
+	!Array.isArray(MANIFEST.assets) ||
+	MANIFEST.assets.length !== 4
+) {
 	fail('vendor-manifest.json must declare the four reviewed browser bundles');
 }
 
@@ -39,8 +45,10 @@ for (const asset of MANIFEST.assets) {
 	}
 }
 
-const remoteExecutable = /<(?:script\b[^>]*\bsrc|link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref)=["'](?:https?:)?\/\//i;
-const htmlFiles = fs.readdirSync(UI_ROOT, { withFileTypes: true })
+const remoteExecutable =
+	/<(?:script\b[^>]*\bsrc|link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref)=["'](?:https?:)?\/\//i;
+const htmlFiles = fs
+	.readdirSync(UI_ROOT, { withFileTypes: true })
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => path.join(UI_ROOT, entry.name, 'index.html'))
 	.filter((file) => fs.existsSync(file));
@@ -53,25 +61,26 @@ for (const file of htmlFiles) {
 
 const host = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'webkit_host.lua'),
-	'utf8',
+	'utf8'
 );
 // The document policy is shared with macOS; Linux must publish it, not its own.
 const documentCsp = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'webview', 'document_csp.lua'),
-	'utf8',
+	'utf8'
 );
 for (const required of [
 	"default-src 'none'",
 	"connect-src 'self' file:;",
 	"object-src 'none'",
-	"frame-src 'none'",
+	"frame-src 'none'"
 ]) {
-	if (!documentCsp.includes(required)) fail(`document_csp.lua is missing security invariant: ${required}`);
+	if (!documentCsp.includes(required))
+		fail(`document_csp.lua is missing security invariant: ${required}`);
 }
 for (const required of [
 	'require("webview.document_csp")',
 	'DocumentCsp.apply(html, nonce)',
-	'function M.bridge_for_app(app_name)',
+	'function M.bridge_for_app(app_name)'
 ]) {
 	if (!host.includes(required)) fail(`webkit_host.lua is missing security invariant: ${required}`);
 }
@@ -81,7 +90,7 @@ if (/https:\/\/api\.github\.com/.test(host) || /connect-src[^;]*https?:/.test(do
 
 const manager = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'webview_manager.lua'),
-	'utf8',
+	'utf8'
 );
 const registrations = manager.match(/register_script_message_handler\(/g) || [];
 if (registrations.length !== 1 || manager.includes('for _, bridge_name in ipairs(bridge_names)')) {
@@ -91,4 +100,6 @@ if (!/M\.route_message\(app_name,\s*bridge_name,\s*payload,\s*window_epoch\)/.te
 	fail('bridge routing must carry the trusted app identity and page epoch');
 }
 
-console.log(`ok - ${MANIFEST.assets.length} pinned vendors, ${htmlFiles.length} offline pages, one bridge per app`);
+console.log(
+	`ok - ${MANIFEST.assets.length} pinned vendors, ${htmlFiles.length} offline pages, one bridge per app`
+);

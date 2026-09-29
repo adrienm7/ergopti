@@ -35,7 +35,10 @@ function collect(relative) {
 collect(PREFIX);
 assert(files.length > 0, 'shared Lua source discovery must not be empty');
 for (const gate of CONSUMER_GATES) {
-	assert(Object.hasOwn(GATE_COMMANDS, gate), `consumer gate ${gate} must have an executable command`);
+	assert(
+		Object.hasOwn(GATE_COMMANDS, gate),
+		`consumer gate ${gate} must have an executable command`
+	);
 }
 
 for (const file of [...files, PREFIX + 'removed_module.lua']) {
@@ -50,12 +53,17 @@ for (const file of [...files, PREFIX + 'removed_module.lua']) {
 }
 
 for (const file of [
-	PREFIX + 'README.md', PREFIX + 'codec.json', PREFIX + 'codec.lua.bak',
-	'static/ergopti_plus/_shared/lua_backup/codec.lua',
+	PREFIX + 'README.md',
+	PREFIX + 'codec.json',
+	PREFIX + 'codec.lua.bak',
+	'static/ergopti_plus/_shared/lua_backup/codec.lua'
 ]) {
 	const gates = selectGates([file]);
 	for (const gate of CONSUMER_GATES) {
-		assert(!gates.has(gate), `${file}: documentation and neighboring paths are not runtime changes`);
+		assert(
+			!gates.has(gate),
+			`${file}: documentation and neighboring paths are not runtime changes`
+		);
 	}
 }
 
@@ -64,8 +72,13 @@ for (const tree of ['core', 'tests']) {
 	for (const gate of ['ahk-suite', 'hs', 'linux']) {
 		assert(gates.has(gate), 'shared contracts retain every driver unit gate');
 	}
-	assert(!gates.has('hs-e2e') && !gates.has('linux-e2e'), 'contract changes retain unit-only policy');
+	assert(
+		!gates.has('hs-e2e') && !gates.has('linux-e2e'),
+		'contract changes retain unit-only policy'
+	);
 }
 
-console.log(`Shared Lua coverage: ${files.length} real sources; ${missing.length} missing selections.`);
+console.log(
+	`Shared Lua coverage: ${files.length} real sources; ${missing.length} missing selections.`
+);
 assert.equal(missing.length, 0, missing.slice(0, 4).join('\n'));

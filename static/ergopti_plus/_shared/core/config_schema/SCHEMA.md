@@ -194,11 +194,11 @@ output is thereafter complete — "the shared file is never read again at runtim
 — and that was wrong in three separate places. The three loaders do not even
 agree with each other, and each one's own comments claim it matches the others:
 
-| Driver | Sections read | Lifecycle |
-| --- | --- | --- |
-| Windows | `[tap_hold.*]` | Parses the shared defaults **first**, then merges the user file **on top, per key**. A key absent from the user file inherits the shared default, so editing `defaults.toml` changes existing installs on the next reload. `lib/tap_hold/tap_hold_loader.ahk` says so explicitly: "editing `defaults.toml` takes effect on every reload even when the user file exists". |
-| Linux | `[tap_hold.*]` | The user file, **when present, fully replaces** the defaults — no per-key merge. Editing `defaults.toml` has **no** effect on an install that has a user file. `platform/remap/manager.lua` describes this as "mirroring the other drivers", which is the opposite of what Windows does. |
-| macOS | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `platform/remap/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies. |
+| Driver  | Sections read                                   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                |
+| ------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Windows | `[tap_hold.*]`                                  | Parses the shared defaults **first**, then merges the user file **on top, per key**. A key absent from the user file inherits the shared default, so editing `defaults.toml` changes existing installs on the next reload. `lib/tap_hold/tap_hold_loader.ahk` says so explicitly: "editing `defaults.toml` takes effect on every reload even when the user file exists". |
+| Linux   | `[tap_hold.*]`                                  | The user file, **when present, fully replaces** the defaults — no per-key merge. Editing `defaults.toml` has **no** effect on an install that has a user file. `platform/remap/manager.lua` describes this as "mirroring the other drivers", which is the opposite of what Windows does.                                                                                 |
+| macOS   | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `platform/remap/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies.                                                                                                                                                                               |
 
 The two namespaces in that one file describe the **same seven physical keys**
 under different ids (`left_ctrl`/`left_control`, `left_alt`/`left_option`), with
@@ -254,4 +254,4 @@ Since we're going clean-state with no backward compatibility, this mapping is **
 - [JSON Schema draft 2020-12](https://json-schema.org/draft/2020-12)
 - [TOML 1.0 spec](https://toml.io/en/v1.0.0)
 - [examples/](./examples/) — Concrete AHK and HS examples
-- [_shared/tap_hold/defaults.toml](../../tap_hold/defaults.toml) — AHK driver tap-hold seed template
+- [\_shared/tap_hold/defaults.toml](../../tap_hold/defaults.toml) — AHK driver tap-hold seed template

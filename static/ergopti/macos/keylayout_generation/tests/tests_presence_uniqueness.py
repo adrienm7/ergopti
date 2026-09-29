@@ -18,16 +18,12 @@ def check_each_key_has_a_code(body: str) -> None:
     missing_code_found = {}
 
     # Iterate over each <keyMap> block
-    for keymap_match in re.finditer(
-        r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL
-    ):
+    for keymap_match in re.finditer(r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL):
         keymap_block = keymap_match.group(0)
 
         # Extract index for logging
         index_match = re.search(r'index=["\']([^"\']+)["\']', keymap_block)
-        keymap_label = (
-            f'index="{index_match.group(1)}"' if index_match else "<unknown>"
-        )
+        keymap_label = f'index="{index_match.group(1)}"' if index_match else "<unknown>"
 
         # Find all <key> elements in this keyMap
         key_tags = re.findall(r"(<key\b[^>]*>)", keymap_block)
@@ -40,22 +36,14 @@ def check_each_key_has_a_code(body: str) -> None:
                 missing_code_found[keymap_label].append(key_tag)
 
     if missing_code_found:
-        logger.error(
-            "%s<key> elements missing code detected:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%s<key> elements missing code detected:", LOGS_INDENTATION + "\t")
         for keymap_name, tags in missing_code_found.items():
-            logger.error(
-                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
-            )
+            logger.error("%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name)
             for tag in tags:
                 logger.error("%s— %s", LOGS_INDENTATION + "\t\t\t", tag.strip())
-        raise ValueError(
-            "Some <key> elements are missing their code attribute."
-        )
+        raise ValueError("Some <key> elements are missing their code attribute.")
     else:
-        logger.success(
-            "%sAll <key> elements have a code.", LOGS_INDENTATION + "\t"
-        )
+        logger.success("%sAll <key> elements have a code.", LOGS_INDENTATION + "\t")
 
 
 def check_each_action_has_id(body: str) -> None:
@@ -64,26 +52,20 @@ def check_each_action_has_id(body: str) -> None:
     Raises ValueError if any <action> is missing its ID.
     Displays all <action> elements without an ID.
     """
-    logger.info(
-        "%s🔹 Checking that every <action> has an ID…", LOGS_INDENTATION
-    )
+    logger.info("%s🔹 Checking that every <action> has an ID…", LOGS_INDENTATION)
 
     missing_id_found = {}
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
-        logger.warning(
-            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t")
         return
 
     _, actions_body, _ = match.groups()
 
     # Find all <action> elements in the <actions> block
-    action_tags = re.findall(
-        r"(<action\b.*?>.*?</action>)", actions_body, flags=re.DOTALL
-    )
+    action_tags = re.findall(r"(<action\b.*?>.*?</action>)", actions_body, flags=re.DOTALL)
 
     # Check each <action> for an ID attribute
     for action_tag in action_tags:
@@ -91,19 +73,13 @@ def check_each_action_has_id(body: str) -> None:
             missing_id_found.setdefault("<actions>", []).append(action_tag)
 
     if missing_id_found:
-        logger.error(
-            "%s<action> elements missing ID detected:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%s<action> elements missing ID detected:", LOGS_INDENTATION + "\t")
         for _, tags in missing_id_found.items():
             for tag in tags:
                 logger.error("%s— %s", LOGS_INDENTATION + "\t\t", tag.strip())
-        raise ValueError(
-            "Some <action> elements are missing their ID attribute."
-        )
+        raise ValueError("Some <action> elements are missing their ID attribute.")
     else:
-        logger.success(
-            "%sAll <action> elements have an ID.", LOGS_INDENTATION + "\t"
-        )
+        logger.success("%sAll <action> elements have an ID.", LOGS_INDENTATION + "\t")
 
 
 def check_unique_keymap_indices(body: str) -> None:
@@ -114,9 +90,7 @@ def check_unique_keymap_indices(body: str) -> None:
         "%s🔹 Checking unique <keyMap> indices in each <keyMapSet>…",
         LOGS_INDENTATION,
     )
-    keymapset_blocks = re.findall(
-        r"<keyMapSet[^>]*>(.*?)</keyMapSet>", body, flags=re.DOTALL
-    )
+    keymapset_blocks = re.findall(r"<keyMapSet[^>]*>(.*?)</keyMapSet>", body, flags=re.DOTALL)
     all_ok = True
     for idx, keymapset_body in enumerate(keymapset_blocks):
         indices = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', keymapset_body)
@@ -130,13 +104,9 @@ def check_unique_keymap_indices(body: str) -> None:
             )
             all_ok = False
     if not keymapset_blocks:
-        logger.warning(
-            "%sNo <keyMapSet> blocks found.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <keyMapSet> blocks found.", LOGS_INDENTATION + "\t")
     if not all_ok:
-        raise ValueError(
-            "Duplicate <keyMap> indices found in one or more <keyMapSet> blocks."
-        )
+        raise ValueError("Duplicate <keyMap> indices found in one or more <keyMapSet> blocks.")
     else:
         logger.success(
             "%sAll <keyMap> indices are unique in each <keyMapSet>.",
@@ -158,21 +128,15 @@ def check_unique_codes_in_keymaps(body: str) -> None:
     duplicates_found = {}
 
     # Iterate over each <keyMap> block
-    for keymap_match in re.finditer(
-        r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL
-    ):
+    for keymap_match in re.finditer(r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL):
         keymap_block = keymap_match.group(0)
 
         # Extract index
         index_match = re.search(r'index=["\']([^"\']+)["\']', keymap_block)
-        keymap_label = (
-            f'index="{index_match.group(1)}"' if index_match else "<unknown>"
-        )
+        keymap_label = f'index="{index_match.group(1)}"' if index_match else "<unknown>"
 
         # Find all <key> elements and their code attributes
-        key_matches = re.findall(
-            r'(<key[^>]*code=["\']([^"\']+)["\'][^>]*/>)', keymap_block
-        )
+        key_matches = re.findall(r'(<key[^>]*code=["\']([^"\']+)["\'][^>]*/>)', keymap_block)
         key_codes_dict = {}
 
         # Iterate over all matches of <key> elements and their code attributes
@@ -198,14 +162,10 @@ def check_unique_codes_in_keymaps(body: str) -> None:
     if duplicates_found:
         logger.error("%sDuplicate key codes detected:", LOGS_INDENTATION + "\t")
         for keymap_name, code_tags in duplicates_found.items():
-            logger.error(
-                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
-            )
+            logger.error("%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name)
             for key_code, duplicated_tags in code_tags.items():
                 for key_code_tag in duplicated_tags:
-                    logger.error(
-                        "%s— %s", LOGS_INDENTATION + "\t\t\t", key_code_tag
-                    )
+                    logger.error("%s— %s", LOGS_INDENTATION + "\t\t\t", key_code_tag)
         raise ValueError("Duplicate key codes found in <keyMap> blocks.")
     else:
         logger.success(
@@ -228,17 +188,13 @@ def check_unique_action_ids(body: str) -> None:
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
-        logger.warning(
-            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t"
-        )
+        logger.warning("%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t")
         return body
 
     _, actions_body, _ = match.groups()
 
     # Find all <action>...</action> blocks (including nested content)
-    action_blocks = re.findall(
-        r"(\s*<action\b.*?>.*?</action>)", actions_body, flags=re.DOTALL
-    )
+    action_blocks = re.findall(r"(\s*<action\b.*?>.*?</action>)", actions_body, flags=re.DOTALL)
     ids_dict = {}
 
     # Iterate over all <action> blocks and map by ID
@@ -250,21 +206,15 @@ def check_unique_action_ids(body: str) -> None:
         ids_dict[action_id].append(action_block)
 
     duplicates_found = {
-        action_id: blocks
-        for action_id, blocks in ids_dict.items()
-        if len(blocks) > 1
+        action_id: blocks for action_id, blocks in ids_dict.items() if len(blocks) > 1
     }
 
     if duplicates_found:
-        logger.error(
-            "%sDuplicate action IDs detected:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%sDuplicate action IDs detected:", LOGS_INDENTATION + "\t")
         for action_id, blocks in duplicates_found.items():
             logger.error("%s• ID « %s »:", LOGS_INDENTATION + "\t\t", action_id)
             for block in blocks:
-                logger.error(
-                    "%s— %s", LOGS_INDENTATION + "\t\t\t", block.strip()
-                )
+                logger.error("%s— %s", LOGS_INDENTATION + "\t\t\t", block.strip())
         raise ValueError("Duplicate action IDs found in <actions> block.")
     else:
         logger.success("%sNo duplicate action IDs.", LOGS_INDENTATION + "\t")
@@ -285,14 +235,10 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
     violations = {}
 
     # Iterate over each <keyMap> block
-    for keymap_match in re.finditer(
-        r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL
-    ):
+    for keymap_match in re.finditer(r"<keyMap[^>]*>(.*?)</keyMap>", body, flags=re.DOTALL):
         keymap_block = keymap_match.group(0)
         index_match = re.search(r'index=["\']([^"\']+)["\']', keymap_block)
-        keymap_label = (
-            f'index="{index_match.group(1)}"' if index_match else "<unknown>"
-        )
+        keymap_label = f'index="{index_match.group(1)}"' if index_match else "<unknown>"
 
         # Find all <key> elements
         key_tags = re.findall(r"(<key[^>]+/>)", keymap_block)
@@ -313,18 +259,12 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
                 )
 
     if violations:
-        logger.error(
-            "%sViolations detected in <key> elements:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%sViolations detected in <key> elements:", LOGS_INDENTATION + "\t")
         for keymap_name, tags in violations.items():
-            logger.error(
-                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
-            )
+            logger.error("%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name)
             for tag in tags:
                 logger.error("%s— %s", LOGS_INDENTATION + "\t\t\t", tag)
-        raise ValueError(
-            "Some <key> elements have invalid output/action configuration."
-        )
+        raise ValueError("Some <key> elements have invalid output/action configuration.")
     else:
         logger.success(
             "%sAll <key> elements have valid output/action configuration.",

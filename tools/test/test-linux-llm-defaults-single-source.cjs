@@ -26,7 +26,9 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
-const DEFAULTS = JSON.parse(fs.readFileSync(path.join(SP, '_shared/modules/llm/defaults.json'), 'utf8'));
+const DEFAULTS = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared/modules/llm/defaults.json'), 'utf8')
+);
 
 // Strip Lua line comments (`-- …` to EOL) so explanatory comments that mention a
 // value (e.g. "was a divergent 0.3") are never mistaken for live code.
@@ -53,7 +55,11 @@ const bridge = stripLua(read('linux/infra/llm_bridge.lua'));
 const bridgeChecks = [
 	['OLLAMA_DEFAULT_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
 	['DEFAULT_TEMPERATURE', DEFAULTS.llm_temperature, 'defaults.json llm_temperature'],
-	['DEFAULT_KEEP_ALIVE', `"${DEFAULTS.llm_ollama_keep_alive}"`, 'defaults.json llm_ollama_keep_alive'],
+	[
+		'DEFAULT_KEEP_ALIVE',
+		`"${DEFAULTS.llm_ollama_keep_alive}"`,
+		'defaults.json llm_ollama_keep_alive'
+	],
 	['DEFAULT_CONTEXT_LENGTH', DEFAULTS.llm_context_length, 'defaults.json llm_context_length'],
 	// Privacy posture. Pinned here because the same two keys previously shipped
 	// with opposite values on Windows and macOS: macOS hardcoded true while the
@@ -63,11 +69,7 @@ const bridgeChecks = [
 		DEFAULTS.llm_disable_password_fields,
 		'defaults.json llm_disable_password_fields'
 	],
-	[
-		'DEFAULT_DISABLE_URL_BARS',
-		DEFAULTS.llm_disable_url_bars,
-		'defaults.json llm_disable_url_bars'
-	]
+	['DEFAULT_DISABLE_URL_BARS', DEFAULTS.llm_disable_url_bars, 'defaults.json llm_disable_url_bars']
 ];
 for (const [name, value, source] of bridgeChecks) {
 	const re = new RegExp(`M\\.${name}\\s*=\\s*${esc(value)}(?!\\d)`);
@@ -84,7 +86,9 @@ for (const ref of ['PromptBuilder.CONTEXT_TAIL_WORDS', 'PromptBuilder.DEFAULT_MA
 	}
 }
 if (/M\.CONTEXT_TAIL_WORDS\s*=\s*\d/.test(bridge)) {
-	errors.push('linux_bridge.lua: CONTEXT_TAIL_WORDS re-typed as a literal — read PromptBuilder.CONTEXT_TAIL_WORDS');
+	errors.push(
+		'linux_bridge.lua: CONTEXT_TAIL_WORDS re-typed as a literal — read PromptBuilder.CONTEXT_TAIL_WORDS'
+	);
 }
 
 // ── 2. prediction_engine must not re-type the old divergent literals ──────
@@ -100,13 +104,16 @@ for (const [re, desc] of predForbidden) {
 	if (re.test(pred)) errors.push(`prediction_engine.lua: forbidden divergent literal — ${desc}`);
 }
 for (const ref of ['HttpBridge', 'PromptBuilder']) {
-	if (!pred.includes(ref)) errors.push(`prediction_engine.lua: must reference ${ref} (defer to shared canonicals)`);
+	if (!pred.includes(ref))
+		errors.push(`prediction_engine.lua: must reference ${ref} (defer to shared canonicals)`);
 }
 
 // ── 3. model browser must not own or re-type the Ollama endpoint ─────────
 const modelBrowser = stripLua(read('linux/ui/model_browser/bridge.lua'));
 if (/localhost:11434/.test(modelBrowser)) {
-	errors.push('model_browser_bridge.lua: forbidden hardcoded URL — the prediction engine owns endpoint resolution');
+	errors.push(
+		'model_browser_bridge.lua: forbidden hardcoded URL — the prediction engine owns endpoint resolution'
+	);
 }
 
 // ── 4. profiles must resolve port/host from the shared bridge ─────────────
@@ -118,10 +125,14 @@ for (const ref of ['HttpBridge.OLLAMA_DEFAULT_PORT', 'HttpBridge.OLLAMA_DEFAULT_
 // ── 4. macOS Ollama backend must read keep_alive from the shared default ──
 const macOllama = stripLua(read('macos/modules/llm/api_ollama.lua'));
 if (/keep_alive\s*=\s*"30m"/.test(macOllama)) {
-	errors.push('macos/modules/llm/api_ollama.lua: keep_alive "30m" literal — use ApiCommon.OLLAMA_KEEP_ALIVE');
+	errors.push(
+		'macos/modules/llm/api_ollama.lua: keep_alive "30m" literal — use ApiCommon.OLLAMA_KEEP_ALIVE'
+	);
 }
 if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
-	errors.push('macos/modules/llm/api_ollama.lua: must read keep_alive from ApiCommon.OLLAMA_KEEP_ALIVE');
+	errors.push(
+		'macos/modules/llm/api_ollama.lua: must read keep_alive from ApiCommon.OLLAMA_KEEP_ALIVE'
+	);
 }
 
 // ── 5. Linux Ollama request timeout must come from the timings registry
@@ -129,14 +140,20 @@ if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
 // Lua's "--" comment marker would otherwise clip the max-time token.
 const linuxOllamaRaw = read('linux/modules/llm/api_ollama.lua');
 if (/--max-time 30\b/.test(linuxOllamaRaw)) {
-	errors.push('linux/modules/llm/api_ollama.lua: magic curl timeout literal — use Timings.sec("llm", "request_timeout_ms")');
+	errors.push(
+		'linux/modules/llm/api_ollama.lua: magic curl timeout literal — use Timings.sec("llm", "request_timeout_ms")'
+	);
 }
 if (!linuxOllamaRaw.includes('Timings.sec("llm", "request_timeout_ms")')) {
-	errors.push('linux/modules/llm/api_ollama.lua: must read the LLM request timeout from Timings.sec("llm", "request_timeout_ms")');
+	errors.push(
+		'linux/modules/llm/api_ollama.lua: must read the LLM request timeout from Timings.sec("llm", "request_timeout_ms")'
+	);
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] Linux LLM defaults are not single-sourced from the shared canonicals:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Linux LLM defaults are not single-sourced from the shared canonicals:\x1b[0m'
+	);
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }

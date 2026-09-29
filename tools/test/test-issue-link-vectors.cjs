@@ -25,11 +25,15 @@ const IssueLink = (() => {
 	const file = path.join(SHARED, 'ui', 'issue_link.js');
 	const sandbox = { window: {} };
 	vm.runInNewContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
-	if (!sandbox.window.ErgoptiIssueLink) throw new Error('issue_link.js did not define window.ErgoptiIssueLink');
+	if (!sandbox.window.ErgoptiIssueLink)
+		throw new Error('issue_link.js did not define window.ErgoptiIssueLink');
 	return sandbox.window.ErgoptiIssueLink;
 })();
 const corpus = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'tests', 'corpus', 'diagnostics', 'issue_link_vectors.json'), 'utf8')
+	fs.readFileSync(
+		path.join(SHARED, 'tests', 'corpus', 'diagnostics', 'issue_link_vectors.json'),
+		'utf8'
+	)
 );
 
 const failures = [];
@@ -44,7 +48,8 @@ if (!Array.isArray(corpus.url_vectors) || corpus.url_vectors.length < 5) {
 
 for (const vector of corpus.encode_vectors || []) {
 	const got = IssueLink.percentEncode(vector.input);
-	if (got !== vector.expected) failures.push(`encode ${vector.id}: got ${got}, expected ${vector.expected}`);
+	if (got !== vector.expected)
+		failures.push(`encode ${vector.id}: got ${got}, expected ${vector.expected}`);
 }
 
 for (const vector of corpus.url_vectors || []) {
@@ -61,14 +66,16 @@ for (const vector of corpus.url_vectors || []) {
 		continue;
 	}
 	if (error) failures.push(`url ${vector.id}: threw ${error.message}`);
-	else if (got !== vector.expected) failures.push(`url ${vector.id}: got ${got}, expected ${vector.expected}`);
+	else if (got !== vector.expected)
+		failures.push(`url ${vector.id}: got ${got}, expected ${vector.expected}`);
 	else if (got.length > vector.max_url_bytes) failures.push(`url ${vector.id}: over its budget`);
 }
 
 // A lone surrogate has no UTF-8 form: it is encoded as U+FFFD, as the AHK port
 // does. JSON cannot carry one to the Lua port, so it is pinned here only.
 const lone = IssueLink.percentEncode('a\ud800b');
-if (lone !== 'a%EF%BF%BDb') failures.push(`a lone surrogate encoded as ${lone}, expected a%EF%BF%BDb`);
+if (lone !== 'a%EF%BF%BDb')
+	failures.push(`a lone surrogate encoded as ${lone}, expected a%EF%BF%BDb`);
 
 if (failures.length > 0) {
 	console.error(`[FAIL] issue link vectors: ${failures.length} failure(s)`);

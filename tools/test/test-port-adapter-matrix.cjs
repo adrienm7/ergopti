@@ -50,12 +50,15 @@ const EXT = { windows: '.ahk', macos: '.lua', linux: '.lua' };
 const DECLARED_ABSENT = {
 	linux: {
 		AppLauncher: 'deleted under ADR-008 — zero production callers; the daemon launches nothing',
-		HotkeyRegistrar: 'no global keyboard-grab API in userland; the evdev keyboard hook and its in-daemon tap-hold engine own the key path',
+		HotkeyRegistrar:
+			'no global keyboard-grab API in userland; the evdev keyboard hook and its in-daemon tap-hold engine own the key path',
 		KeyState: 'deleted under ADR-008 — zero production callers',
 		MouseControl: 'deleted under ADR-008 — zero production callers; no gesture layer',
 		NetworkInfo: 'deleted under ADR-008 — zero production callers',
-		TextSender: 'deleted under ADR-008 — zero production callers; the transactional injector owns Linux output',
-		TooltipRenderer: 'ui/tooltip uses the live GraphicsRenderer adapter for both preview families; no second rendering port',
+		TextSender:
+			'deleted under ADR-008 — zero production callers; the transactional injector owns Linux output',
+		TooltipRenderer:
+			'ui/tooltip uses the live GraphicsRenderer adapter for both preview families; no second rendering port',
 		WindowManager: 'deleted under ADR-008 — zero production callers'
 	},
 	windows: {},
@@ -78,11 +81,10 @@ const ports = Object.keys(contracts);
 // Floor: an empty or truncated contracts.json would make every loop below run
 // zero times and report success over nothing.
 if (ports.length < 15) {
-	errors.push(`contracts.json declares ${ports.length} port(s) — expected at least 15; the file is truncated or the parse is wrong`);
+	errors.push(
+		`contracts.json declares ${ports.length} port(s) — expected at least 15; the file is truncated or the parse is wrong`
+	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -95,19 +97,20 @@ for (const driver of Object.keys(EXT)) {
 	present[driver] = new Set();
 	const dir = path.join(DRIVERS, driver, 'adapters');
 	if (!fs.existsSync(dir)) {
-		errors.push(`${driver}/adapters/ does not exist — the tree moved and this gate measures nothing`);
+		errors.push(
+			`${driver}/adapters/ does not exist — the tree moved and this gate measures nothing`
+		);
 		continue;
 	}
 	for (const port of ports) {
 		if (fs.existsSync(path.join(dir, stemOf(port) + EXT[driver]))) present[driver].add(port);
 	}
 	if (present[driver].size === 0) {
-		errors.push(`${driver} ships an adapter for none of the ${ports.length} ports — the stem mapping drifted`);
+		errors.push(
+			`${driver} ships an adapter for none of the ${ports.length} ports — the stem mapping drifted`
+		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -139,13 +142,12 @@ for (const driver of Object.keys(EXT)) {
 
 	for (const port of Object.keys(declared)) {
 		if (!ports.includes(port)) {
-			errors.push(`${driver} records an absence for "${port}", which is not a port in contracts.json — the note is stale`);
+			errors.push(
+				`${driver} records an absence for "${port}", which is not a port in contracts.json — the note is stale`
+			);
 		}
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -163,9 +165,6 @@ for (const port of ports) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 4/ Report ================================
@@ -178,7 +177,9 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-const counts = Object.keys(EXT).map((d) => `${d} ${present[d].size}`).join(', ');
+const counts = Object.keys(EXT)
+	.map((d) => `${d} ${present[d].size}`)
+	.join(', ');
 const everywhere = ports.filter((p) => Object.keys(EXT).every((d) => present[d].has(p))).length;
 console.log(
 	`\x1b[32m[OK] ${ports.length} port(s): ${counts}; ${everywhere} on all three, every absence declared with ` +

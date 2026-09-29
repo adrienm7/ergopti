@@ -92,9 +92,17 @@ function runInstaller(scenario) {
 			(scenario.busybox ? 'case "$1" in usermod|groupadd) exit 127 ;; esac\n' : '') +
 			'exit 0'
 	);
-	stub(stubs, 'systemctl', `${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`);
+	stub(
+		stubs,
+		'systemctl',
+		`${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
+	);
 	if (process.platform === 'win32') {
-		stub(stubs, 'install', 'if [ "$1 $2 $3" = "-d -m 700" ]; then shift 3; exec mkdir -p -- "$@"; fi\nexec /usr/bin/install "$@"');
+		stub(
+			stubs,
+			'install',
+			'if [ "$1 $2 $3" = "-d -m 700" ]; then shift 3; exec mkdir -p -- "$@"; fi\nexec /usr/bin/install "$@"'
+		);
 	}
 	// The package manager "installs" by dropping a marker the probes read.
 	// A package named in scenario.absentPackages is not in the archive: the
@@ -107,7 +115,8 @@ function runInstaller(scenario) {
 			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`
 	);
 	// Every command a real system would provide.
-	for (const name of ['notify-send', 'zenity', 'sqlite3', 'xkbcli', 'sha256sum']) stub(stubs, name, 'exit 0');
+	for (const name of ['notify-send', 'zenity', 'sqlite3', 'xkbcli', 'sha256sum'])
+		stub(stubs, name, 'exit 0');
 	// luajit: library probes answer from the markers, so the desktop backends
 	// are "missing" until the package manager was asked for them.
 	stub(
@@ -150,9 +159,17 @@ function runInstaller(scenario) {
 	fs.writeFileSync(bashEnvironment, 'export PATH="$TEST_STUBS:/usr/bin:/bin"\n');
 	env.TEST_STUBS = bashPath(stubs);
 	env.BASH_ENV = bashPath(bashEnvironment);
-	const installArgs = scenario.prefixName ? ['--prefix', bashPath(path.join(home, scenario.prefixName))] : [];
-	const result = spawnSync(bashExecutable(), [bashPath(INSTALLER), ...installArgs], { env, encoding: 'utf8', timeout: 60000 });
-	const calls = fs.existsSync(callLog) ? fs.readFileSync(callLog, 'utf8').split('\n').filter(Boolean) : [];
+	const installArgs = scenario.prefixName
+		? ['--prefix', bashPath(path.join(home, scenario.prefixName))]
+		: [];
+	const result = spawnSync(bashExecutable(), [bashPath(INSTALLER), ...installArgs], {
+		env,
+		encoding: 'utf8',
+		timeout: 60000
+	});
+	const calls = fs.existsSync(callLog)
+		? fs.readFileSync(callLog, 'utf8').split('\n').filter(Boolean)
+		: [];
 	return {
 		status: result.status,
 		output: `${result.stdout || ''}${result.stderr || ''}`,
@@ -172,11 +189,21 @@ const errors = [];
 	try {
 		if (run.status !== 0) errors.push(`install with spaces failed: ${run.output.slice(-1800)}`);
 		const wrapper = `${bashPath(run.home)}/Applications Ergopti/bin/ergopti-hotstrings`;
-		const unit = fs.readFileSync(path.join(run.home, '.config/systemd/user/ergopti-hotstrings.service'), 'utf8');
-		const desktop = fs.readFileSync(path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop'), 'utf8');
-		if (!unit.includes(`ExecStart=/bin/bash "${wrapper}" --tray\n`)) errors.push('unit does not quote the installed wrapper');
-		if (!desktop.includes(`Exec=/bin/bash "${wrapper}" --session-start --tray\n`)) errors.push('Desktop entry does not quote the installed wrapper');
-	} finally { run.cleanup(); }
+		const unit = fs.readFileSync(
+			path.join(run.home, '.config/systemd/user/ergopti-hotstrings.service'),
+			'utf8'
+		);
+		const desktop = fs.readFileSync(
+			path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop'),
+			'utf8'
+		);
+		if (!unit.includes(`ExecStart=/bin/bash "${wrapper}" --tray\n`))
+			errors.push('unit does not quote the installed wrapper');
+		if (!desktop.includes(`Exec=/bin/bash "${wrapper}" --session-start --tray\n`))
+			errors.push('Desktop entry does not quote the installed wrapper');
+	} finally {
+		run.cleanup();
+	}
 }
 
 // ── A first install, with no remapper to fetch ─────────────────────────────
@@ -191,14 +218,25 @@ const errors = [];
 		}
 		const launcher = path.join(run.home, '.local', 'bin', 'ergopti-hotstrings');
 		if (!fs.existsSync(launcher)) errors.push('no launcher was installed');
-		const daemon = path.join(run.home, '.local', 'lib', 'ergopti', 'linux', 'ergopti_hotstrings.lua');
+		const daemon = path.join(
+			run.home,
+			'.local',
+			'lib',
+			'ergopti',
+			'linux',
+			'ergopti_hotstrings.lua'
+		);
 		if (!fs.existsSync(daemon)) errors.push('the driver tree was not copied');
 		// Root cause 1: the tap-holds run in the daemon; nothing kanata is installed.
 		if (fs.existsSync(path.join(run.home, '.config', 'systemd', 'user', 'kanata.service'))) {
-			errors.push('install.sh still writes a kanata.service although the daemon runs the tap-holds');
+			errors.push(
+				'install.sh still writes a kanata.service although the daemon runs the tap-holds'
+			);
 		}
 		if (fs.existsSync(path.join(run.home, '.config', 'kanata'))) {
-			errors.push('install.sh still writes a kanata configuration although the daemon runs the tap-holds');
+			errors.push(
+				'install.sh still writes a kanata configuration although the daemon runs the tap-holds'
+			);
 		}
 		if (run.calls.some((call) => call.startsWith('curl') || /kanata/.test(call))) {
 			errors.push(
@@ -207,11 +245,15 @@ const errors = [];
 		}
 		// Root cause 2: both desktop backends were requested and re-probed.
 		for (const pkg of ['libayatana-appindicator3-1', 'gir1.2-webkit2-4.1']) {
-			if (!run.calls.some((call) => call.startsWith('sudo apt-get install') && call.includes(pkg))) {
+			if (
+				!run.calls.some((call) => call.startsWith('sudo apt-get install') && call.includes(pkg))
+			) {
 				errors.push(`install.sh never asked the package manager for ${pkg}`);
 			}
 		}
-		if (!/icône de la barre système \(libayatana-appindicator\) — capacité vérifiée/.test(run.output)) {
+		if (
+			!/icône de la barre système \(libayatana-appindicator\) — capacité vérifiée/.test(run.output)
+		) {
 			errors.push('the tray backend was not re-probed after its package was installed');
 		}
 	} finally {
@@ -257,8 +299,14 @@ const errors = [];
 		// The shared privileged helper now owns BusyBox enrollment; its actual
 		// addgroup branch runs in test-linux-package-setup.cjs. This sandbox
 		// refuses elevation, and verifies the delegation rather than faking it.
-		if (!run.calls.some((call) => /^sudo bash .*\/install\/setup_permissions\.sh --user \d+$/.test(call))) {
-			errors.push('the installer did not delegate account enrollment to the shared permission owner');
+		if (
+			!run.calls.some((call) =>
+				/^sudo bash .*\/install\/setup_permissions\.sh --user \d+$/.test(call)
+			)
+		) {
+			errors.push(
+				'the installer did not delegate account enrollment to the shared permission owner'
+			);
 		}
 	} finally {
 		run.cleanup();
@@ -271,7 +319,9 @@ const errors = [];
 	// system directories are pointed at fixtures. PATH is empty, as an ordinary
 	// Alpine user's PATH is for /sbin.
 	const source = fs.readFileSync(INSTALLER, 'utf8');
-	const functions = (source.match(/_has_manager\(\) \{[\s\S]*?\n\}\n\n_detect_pkg_manager\(\) \{[\s\S]*?\n\}/) || [])[0];
+	const functions = (source.match(
+		/_has_manager\(\) \{[\s\S]*?\n\}\n\n_detect_pkg_manager\(\) \{[\s\S]*?\n\}/
+	) || [])[0];
 	if (!functions) {
 		errors.push('_has_manager/_detect_pkg_manager not found — the detection fixture did not run');
 	} else {
@@ -280,12 +330,16 @@ const errors = [];
 			fs.mkdirSync(path.join(fixture, 'sbin'));
 			fs.mkdirSync(path.join(fixture, 'usr-sbin'));
 			stub(path.join(fixture, 'sbin'), 'apk', 'exit 0');
-			const harness = functions
-				.replaceAll('"/sbin/$1"', `"${bashPath(fixture)}/sbin/$1"`)
-				.replaceAll('"/usr/sbin/$1"', `"${bashPath(fixture)}/usr-sbin/$1"`) + '\n_detect_pkg_manager\n';
+			const harness =
+				functions
+					.replaceAll('"/sbin/$1"', `"${bashPath(fixture)}/sbin/$1"`)
+					.replaceAll('"/usr/sbin/$1"', `"${bashPath(fixture)}/usr-sbin/$1"`) +
+				'\n_detect_pkg_manager\n';
 			// The interpreter is resolved with the caller's PATH; the script then
 			// runs with an empty one, which is the point.
-			const detected = spawnSync(bashExecutable(), ['-c', `PATH=\n${harness}`], { encoding: 'utf8' });
+			const detected = spawnSync(bashExecutable(), ['-c', `PATH=\n${harness}`], {
+				encoding: 'utf8'
+			});
 			if ((detected.stdout || '').trim() !== 'apk') {
 				errors.push(
 					`with apk only in /sbin, the installer detected '${(detected.stdout || '').trim()}' — ` +
@@ -303,11 +357,20 @@ const errors = [];
 	const run = runInstaller({ desktopProvided: true, gnome: true });
 	try {
 		if (run.status !== 0) errors.push(`install.sh exited ${run.status} on GNOME`);
-		if (!run.calls.some((call) => call.startsWith('sudo apt-get install') && call.includes('gnome-shell-extension-appindicator'))) {
+		if (
+			!run.calls.some(
+				(call) =>
+					call.startsWith('sudo apt-get install') &&
+					call.includes('gnome-shell-extension-appindicator')
+			)
+		) {
 			errors.push('GNOME without an AppIndicator extension: the extension was not installed');
 		}
-		const set = run.calls.find((call) => call.startsWith('gsettings set org.gnome.shell enabled-extensions'));
-		const expected = "['user-theme@gnome-shell-extensions.gcampax.github.com', 'appindicatorsupport@rgcjonas.gmail.com']";
+		const set = run.calls.find((call) =>
+			call.startsWith('gsettings set org.gnome.shell enabled-extensions')
+		);
+		const expected =
+			"['user-theme@gnome-shell-extensions.gcampax.github.com', 'appindicatorsupport@rgcjonas.gmail.com']";
 		if (!set || !set.endsWith(expected)) {
 			errors.push(
 				`the extension must be enabled for the next login, merged into the user's list; got ${set || '<no gsettings set>'}`
@@ -330,22 +393,38 @@ const errors = [];
 
 // An update must preserve a choice already made through the startup menu.
 {
-	const run = runInstaller({ desktopProvided: true, seed(home) {
-		const directory = path.join(home, '.config/autostart');
-		fs.mkdirSync(directory, { recursive: true });
-		fs.writeFileSync(path.join(directory, 'ergopti-hotstrings.desktop'),
-			`[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`);
-	} });
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home) {
+			const directory = path.join(home, '.config/autostart');
+			fs.mkdirSync(directory, { recursive: true });
+			fs.writeFileSync(
+				path.join(directory, 'ergopti-hotstrings.desktop'),
+				`[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`
+			);
+		}
+	});
 	try {
-		if (run.status !== 0) errors.push(`install with disabled startup failed: ${run.output.slice(-1800)}`);
-		const desktop = fs.readFileSync(path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop'), 'utf8');
-		if (!/^Hidden=true$/m.test(desktop)) errors.push('installation re-enabled an explicit startup refusal');
+		if (run.status !== 0)
+			errors.push(`install with disabled startup failed: ${run.output.slice(-1800)}`);
+		const desktop = fs.readFileSync(
+			path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop'),
+			'utf8'
+		);
+		if (!/^Hidden=true$/m.test(desktop))
+			errors.push('installation re-enabled an explicit startup refusal');
 		if (run.calls.some((call) => /systemctl .* (enable|restart|start) /.test(call))) {
 			errors.push('installation activated a service despite the disabled startup choice');
 		}
-		const receipt = fs.readFileSync(path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'), 'utf8');
-		if ((receipt.match(/\t@autostart\n/g) || []).length !== 1) errors.push('startup receipt must have exactly one owner row');
-	} finally { run.cleanup(); }
+		const receipt = fs.readFileSync(
+			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
+			'utf8'
+		);
+		if ((receipt.match(/\t@autostart\n/g) || []).length !== 1)
+			errors.push('startup receipt must have exactly one owner row');
+	} finally {
+		run.cleanup();
+	}
 }
 
 if (errors.length > 0) {

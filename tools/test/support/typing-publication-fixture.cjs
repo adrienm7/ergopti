@@ -15,7 +15,10 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../../../static/ergopti_plus');
 
 function actualLuaPublications(empty = false) {
-	const lua = spawnSync('lua', ['-'], { cwd: path.join(root, 'macos'), encoding: 'utf8', input: `
+	const lua = spawnSync('lua', ['-'], {
+		cwd: path.join(root, 'macos'),
+		encoding: 'utf8',
+		input: `
 package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
 local json=require('json')
 local empty=${empty ? 'true' : 'false'}
@@ -70,7 +73,8 @@ assert(#publications==1)
 fire(3);complete_pending_probes()
 assert(#publications==2)
 print('PUBLICATIONS='..json.encode(publications))
-` });
+`
+	});
 	assert.equal(lua.status, 0, lua.stderr + lua.stdout);
 	const line = lua.stdout.split(/\r?\n/).find((value) => value.startsWith('PUBLICATIONS='));
 	assert.ok(line, lua.stdout);
@@ -78,7 +82,10 @@ print('PUBLICATIONS='..json.encode(publications))
 }
 
 function actualLuaFallback() {
-	const lua = spawnSync('lua', ['-'], { cwd: path.join(root, 'macos'), encoding: 'utf8', input: `
+	const lua = spawnSync('lua', ['-'], {
+		cwd: path.join(root, 'macos'),
+		encoding: 'utf8',
+		input: `
 package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
 local json=require('json')
 local now=0
@@ -113,7 +120,8 @@ fire(2);evaluations[2].done('function')
 fire(3);evaluations[#evaluations].done('function')
 assert(#publications==2 and not publications[1].admitted and publications[2].admitted)
 print('PUBLICATIONS='..json.encode(publications))
-` });
+`
+	});
 	assert.equal(lua.status, 0, lua.stderr + lua.stdout);
 	const line = lua.stdout.split(/\r?\n/).find((value) => value.startsWith('PUBLICATIONS='));
 	assert.ok(line, lua.stdout);

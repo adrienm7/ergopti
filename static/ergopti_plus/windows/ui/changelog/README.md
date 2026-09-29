@@ -6,9 +6,9 @@ WebView2 window that fetches GitHub release notes for the configured repository 
 
 ## Key files
 
-| File      | Description                                                             |
-| --------- | ----------------------------------------------------------------------- |
-| `init.ahk`| Singleton host: opens / focuses the window; owns the WinHTTP fetch loop  |
+| File       | Description                                                             |
+| ---------- | ----------------------------------------------------------------------- |
+| `init.ahk` | Singleton host: opens / focuses the window; owns the WinHTTP fetch loop |
 
 ## Shared frontend
 

@@ -53,7 +53,8 @@ try {
 
 if (order.length > 0) {
 	const dupes = order.filter((c, i) => order.indexOf(c) !== i);
-	if (dupes.length) errors.push(`locale_order.json has duplicate codes: ${[...new Set(dupes)].join(', ')}`);
+	if (dupes.length)
+		errors.push(`locale_order.json has duplicate codes: ${[...new Set(dupes)].join(', ')}`);
 
 	// ── 2. Exact coverage of the shipped locale files ───────────────────────
 	const shipped = fs
@@ -64,14 +65,18 @@ if (order.length > 0) {
 	const ordered = [...order].sort();
 	const missing = shipped.filter((c) => !order.includes(c));
 	const extra = order.filter((c) => !shipped.includes(c));
-	if (missing.length) errors.push(`Locales shipped but absent from locale_order.json: ${missing.join(', ')}`);
-	if (extra.length) errors.push(`Codes in locale_order.json with no locale file: ${extra.join(', ')}`);
+	if (missing.length)
+		errors.push(`Locales shipped but absent from locale_order.json: ${missing.join(', ')}`);
+	if (extra.length)
+		errors.push(`Codes in locale_order.json with no locale file: ${extra.join(', ')}`);
 	void ordered;
 
 	// ── 3. macOS table declared in canonical order ──────────────────────────
-	const luaCodes = [...read('static/ergopti_plus/macos/_generated/locale_table.lua').matchAll(/code\s*=\s*"([a-z]+)"/g)].map(
-		(m) => m[1]
-	);
+	const luaCodes = [
+		...read('static/ergopti_plus/macos/_generated/locale_table.lua').matchAll(
+			/code\s*=\s*"([a-z]+)"/g
+		)
+	].map((m) => m[1]);
 	if (luaCodes.join(',') !== order.join(',')) {
 		errors.push(
 			`macOS locale table order != locale_order.json.\n    order.json: ${order.join(' ')}\n    generated : ${luaCodes.join(' ')}`
@@ -80,7 +85,9 @@ if (order.length > 0) {
 
 	// ── 4. Windows table declared in canonical order ────────────────────────
 	const ahkCodes = [
-		...read('static/ergopti_plus/windows/_generated/locale_table.ahk').matchAll(/Code:\s*"([a-z]+)"/g)
+		...read('static/ergopti_plus/windows/_generated/locale_table.ahk').matchAll(
+			/Code:\s*"([a-z]+)"/g
+		)
 	].map((m) => m[1]);
 	if (ahkCodes.join(',') !== order.join(',')) {
 		errors.push(
@@ -96,7 +103,9 @@ if (!/locale_order\.json/.test(site)) {
 }
 const linux = read('static/ergopti_plus/linux/infra/i18n.lua');
 if (!/locale_order\.json/.test(linux)) {
-	errors.push('linux/infra/i18n.lua does not read locale_order.json — it must single-source the order.');
+	errors.push(
+		'linux/infra/i18n.lua does not read locale_order.json — it must single-source the order.'
+	);
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────
@@ -105,4 +114,6 @@ if (errors.length) {
 	for (const e of errors) console.error('  • ' + e);
 	process.exit(1);
 }
-console.log(`✓ locale display order single-sourced from locale_order.json (${order.length} locales, 4 surfaces pinned).`);
+console.log(
+	`✓ locale display order single-sourced from locale_order.json (${order.length} locales, 4 surfaces pinned).`
+);

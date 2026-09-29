@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
 # `unittest.mock` is a submodule: `import unittest` alone does not bind it. This
 # file used `unittest.mock.patch` and only worked when some other test module
 # imported it first, so running this one on its own raised AttributeError.
@@ -51,7 +52,9 @@ def xkbcli_version() -> tuple[int, ...]:
     if not XKBCLI:
         return ()
     try:
-        output = subprocess.run([XKBCLI, "--version"], capture_output=True, text=True, timeout=15).stdout
+        output = subprocess.run(
+            [XKBCLI, "--version"], capture_output=True, text=True, timeout=15
+        ).stdout
     except (OSError, subprocess.TimeoutExpired):
         return ()
     match = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?", output)
@@ -69,7 +72,9 @@ def has_type(result) -> bool:
 
 def usable(result, group: int = 1) -> bool:
     """The strong form of ``has_type``: the probe key really binds the type."""
-    return result.succeeded and not activation.inspect_keymap(result.keymap, ERGOPTI_TYPE_NAME, group=group)
+    return result.succeeded and not activation.inspect_keymap(
+        result.keymap, ERGOPTI_TYPE_NAME, group=group
+    )
 
 
 @unittest.skipUnless(HAVE_EXTENSIONS, "xkbcli >= 1.13 (XKB extensions directories) not installed")
@@ -186,17 +191,27 @@ class CleanPackageCompilationTests(unittest.TestCase):
                 installed = self.install(variant)
                 self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
                 listing = subprocess.run(
-                    [XKBCLI, "list"], capture_output=True, text=True, timeout=30,
-                    env={**os.environ,
-                         "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(self.extensions_root),
-                         "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": ""},
+                    [XKBCLI, "list"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env={
+                        **os.environ,
+                        "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(self.extensions_root),
+                        "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": "",
+                    },
                 )
                 self.assertEqual(listing.returncode, 0, listing.stderr)
                 entries = re.split(r"(?m)^- layout:", listing.stdout)
-                self.assertTrue(any(
-                    re.match(r"\s*'fr'\s*$", entry.splitlines()[0])
-                    and f"variant: '{variant}'" in entry for entry in entries if entry.strip()
-                ), listing.stdout)
+                self.assertTrue(
+                    any(
+                        re.match(r"\s*'fr'\s*$", entry.splitlines()[0])
+                        and f"variant: '{variant}'" in entry
+                        for entry in entries
+                        if entry.strip()
+                    ),
+                    listing.stdout,
+                )
 
     def test_issue_84_both_variants_match_the_canonical_keys_in_every_group(self):
         for variant in ("ergopti", "ergopti_plus"):
@@ -214,7 +229,8 @@ class CleanPackageCompilationTests(unittest.TestCase):
                     for key in keys:
                         self.assertEqual(
                             activation.keymap_key_block(canonical.keymap, key),
-                            activation.keymap_key_block(french.keymap, key), key,
+                            activation.keymap_key_block(french.keymap, key),
+                            key,
                         )
 
     def test_issue_84_missing_french_types_is_detected_even_when_compilation_succeeds(self):
@@ -223,7 +239,8 @@ class CleanPackageCompilationTests(unittest.TestCase):
         installed = self.install()
         self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
         (self.extensions_root / "ergopti/rules/evdev.post").write_text(
-            build_evdev_post("ergopti"), encoding="utf-8",
+            build_evdev_post("ergopti"),
+            encoding="utf-8",
         )
         for layouts in ([LayoutSpec("fr", "ergopti")], [US, LayoutSpec("fr", "ergopti")]):
             compiled = self.compile(layouts)
@@ -242,8 +259,11 @@ class CleanPackageCompilationTests(unittest.TestCase):
                 keys = re.findall(r"key\s+(<[^>]+>)", canonical.keymap)
                 self.assertGreater(len(keys), 30)
                 for key in keys:
-                    self.assertEqual(activation.keymap_key_block(canonical.keymap, key),
-                                     activation.keymap_key_block(french.keymap, key), key)
+                    self.assertEqual(
+                        activation.keymap_key_block(canonical.keymap, key),
+                        activation.keymap_key_block(french.keymap, key),
+                        key,
+                    )
 
     def test_issue_84_reinstall_replaces_the_variant_and_uninstall_restores_discovery(self):
         # Fedora containers can expose gsettings without desktop schemas. This
@@ -263,13 +283,23 @@ class CleanPackageCompilationTests(unittest.TestCase):
             retired = "ergopti_plus" if variant == "ergopti" else "ergopti"
             self.assertFalse(self.compile([LayoutSpec("fr", retired)]).succeeded)
         uninstalled = subprocess.run(
-            [sys.executable, str(INSTALLER_DIR / "xkb_files_installer_clean.py"),
-             "--uninstall", "--skip-activation"],
-            env=self.env, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            [
+                sys.executable,
+                str(INSTALLER_DIR / "xkb_files_installer_clean.py"),
+                "--uninstall",
+                "--skip-activation",
+            ],
+            env=self.env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
         )
         self.assertEqual(uninstalled.returncode, 0, uninstalled.stdout + uninstalled.stderr)
-        self.assertFalse(gsettings.with_name("gsettings.called").exists(),
-                         "a package-only round trip must not contact the host desktop")
+        self.assertFalse(
+            gsettings.with_name("gsettings.called").exists(),
+            "a package-only round trip must not contact the host desktop",
+        )
         self.assertFalse((self.extensions_root / "ergopti").exists())
         self.assertEqual(original.keymap, self.compile([LayoutSpec("fr")]).keymap)
         self.assertFalse(self.compile([LayoutSpec("fr", "ergopti")]).succeeded)
@@ -280,24 +310,39 @@ class CleanPackageCompilationTests(unittest.TestCase):
         installed = self.install()
         self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
         package = self.extensions_root / "ergopti"
-        before = {path.relative_to(package): path.read_bytes()
-                  for path in package.rglob("*") if path.is_file()}
+        before = {
+            path.relative_to(package): path.read_bytes()
+            for path in package.rglob("*")
+            if path.is_file()
+        }
         roots = InstallerRoots(
-            extensions_root=self.extensions_root, system_root=self.system_root,
-            cache_dir=self.sandbox / "cache", sandboxed=True,
+            extensions_root=self.extensions_root,
+            system_root=self.system_root,
+            cache_dir=self.sandbox / "cache",
+            sandboxed=True,
         )
-        with unittest.mock.patch.object(clean, "build_french_variant_symbols", return_value=(
-            'default xkb_symbols "default" { include "%S/fr" };\n'
-        )), unittest.mock.patch("builtins.print"):
+        with (
+            unittest.mock.patch.object(
+                clean,
+                "build_french_variant_symbols",
+                return_value=('default xkb_symbols "default" { include "%S/fr" };\n'),
+            ),
+            unittest.mock.patch("builtins.print"),
+        ):
             with self.assertRaises(SystemExit) as failure:
                 clean.install_clean(
                     symbols_path=LAYOUT_VERSION_DIR / "Ergopti_v2_2_1_plus.xkb",
                     types_path=LAYOUT_VERSION_DIR / "xkb_types.txt",
-                    xcompose_path=None, variant="ergopti_plus", roots=roots,
+                    xcompose_path=None,
+                    variant="ergopti_plus",
+                    roots=roots,
                 )
         self.assertEqual(failure.exception.code, 3)
-        after = {path.relative_to(package): path.read_bytes()
-                 for path in package.rglob("*") if path.is_file()}
+        after = {
+            path.relative_to(package): path.read_bytes()
+            for path in package.rglob("*")
+            if path.is_file()
+        }
         self.assertEqual(before, after)
         self.assertTrue(usable(self.compile([LayoutSpec("fr", "ergopti")])))
 
@@ -319,8 +364,11 @@ class CleanPackageCompilationTests(unittest.TestCase):
         # spelling it was built from, so the two differ by their own name and
         # nothing else. The key rows are what the user actually types on.
         def key_rows(compiled):
-            rows = [line.strip() for line in compiled.keymap.splitlines()
-                    if line.strip().startswith("key ")]
+            rows = [
+                line.strip()
+                for line in compiled.keymap.splitlines()
+                if line.strip().startswith("key ")
+            ]
             self.assertGreater(len(rows), 30, "the keymap parse produced almost nothing")
             return rows
 
@@ -352,7 +400,9 @@ class CleanPackageCompilationTests(unittest.TestCase):
         post.write_text("! layout\t=\ttypes\n  ergopti\t=\t+ergopti\n", encoding="utf-8")
         with unittest.mock.patch("builtins.print"):
             self.assertFalse(
-                activation.verify_keymap(ERGOPTI, ERGOPTI_TYPE_NAME, extensions_root=self.extensions_root)
+                activation.verify_keymap(
+                    ERGOPTI, ERGOPTI_TYPE_NAME, extensions_root=self.extensions_root
+                )
             )
 
 
@@ -429,9 +479,13 @@ class LegacyTreeCompilationTests(unittest.TestCase):
         extra = self.system_root / "types" / "extra"
         source = (LAYOUT_VERSION_DIR / "xkb_types.txt").read_text(encoding="utf-8")
         block = re.search(r'type ".*?" \{.*?\};', source, re.DOTALL).group(0)
-        extra.write_text(extra.read_text(encoding="utf-8").rstrip() + "\n\n" + block + "\n", encoding="utf-8")
+        extra.write_text(
+            extra.read_text(encoding="utf-8").rstrip() + "\n\n" + block + "\n", encoding="utf-8"
+        )
         legacy.update_xkb_symbols_file(
-            LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb", "Ergopti_v2_2_1", self.system_root / "symbols" / "fr"
+            LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
+            "Ergopti_v2_2_1",
+            self.system_root / "symbols" / "fr",
         )
         self.assertFalse(has_type(self.compile([LEGACY])))
         if XKBCOMP:

@@ -10,10 +10,7 @@
 			"title": "Refused legacy termination loses its cleanup owner",
 			"severity": "high",
 			"confidence": "high",
-			"guarantees": [
-				"G2",
-				"G3"
-			],
+			"guarantees": ["G2", "G3"],
 			"reproduction": "Publish a real native child's PID into the legacy state machine. Claim a published start failure. Inject refusal into both termination operations without changing the finalizer's state transitions. Observe true cleanup receipt and Finished=true with no registry entry while a zero-time wait on an independently retained process handle proves the child alive. The isolated repro.patch safely supervises and cleans up its own child.",
 			"root_cause": "Legacy failure/termination removes registry ownership before physical teardown. _SR_LegacyBeginFinalize consumes the claim before fallible cleanup; _SR_LegacyTerminateClaim logs refusal but returns true and leaves no retry owner. The native creator already closed its process capability and retained only a PID.",
 			"silent_failure": "Errors may be logged, but the caller receives successful cleanup and cannot retry the consumed terminal claim. Existing state-machine tests prove callback retirement without checking process exit or retained cleanup debt.",
@@ -24,9 +21,7 @@
 			"title": "Legacy native child failure is reported as success",
 			"severity": "high",
 			"confidence": "high",
-			"guarantees": [
-				"G2"
-			],
+			"guarantees": ["G2"],
 			"reproduction": "Through the unchanged public ShellRunner_Spawn path, launch the attached native AHK child that writes legacy-exit-37 and exits with code 37. Observe the intended marker in OnDone but exit code zero. The exit_code_repro.patch adds only test fixtures and registration; it changes no production operation.",
 			"root_cause": "_SR_LegacyCreateDirect closes the original process handle immediately after resuming the child. _SR_Poll waits for ProcessExist(Pid) to become false, then _SR_GetExitCode attempts to reopen the already collected process and silently returns zero when it cannot.",
 			"silent_failure": "The completion callback receives a success-shaped zero rather than the child's actual failure, and the unavailable process handle is deliberately mapped to zero. Existing native argv tests can pass with a successful child without testing failure propagation.",

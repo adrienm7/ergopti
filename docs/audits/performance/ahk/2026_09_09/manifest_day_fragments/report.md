@@ -35,14 +35,14 @@ SQL replay, cache publication latency, or a system memory benchmark.
 
 ## Samples
 
-| Selection | Sample | Complete manifest ms | Selected day ms | Assembly ms |
-| --- | ---: | ---: | ---: | ---: |
-| Latest day | 1 | 2564.525 | 14.523 | 32.597 |
-| Latest day | 2 | 1938.985 | 17.125 | 1.404 |
-| Latest day | 3 | 2057.128 | 17.740 | 1.930 |
-| Most application cells | 1 | 2114.632 | 58.746 | 37.274 |
-| Most application cells | 2 | 2123.035 | 65.601 | 1.379 |
-| Most application cells | 3 | 2272.607 | 64.400 | 1.669 |
+| Selection              | Sample | Complete manifest ms | Selected day ms | Assembly ms |
+| ---------------------- | -----: | -------------------: | --------------: | ----------: |
+| Latest day             |      1 |             2564.525 |          14.523 |      32.597 |
+| Latest day             |      2 |             1938.985 |          17.125 |       1.404 |
+| Latest day             |      3 |             2057.128 |          17.740 |       1.930 |
+| Most application cells |      1 |             2114.632 |          58.746 |      37.274 |
+| Most application cells |      2 |             2123.035 |          65.601 |       1.379 |
+| Most application cells |      3 |             2272.607 |          64.400 |       1.669 |
 
 The first assembly in both processes was slower than subsequent assemblies.
 Retain these values; three samples cannot characterize tails or establish a
@@ -124,14 +124,14 @@ decoder. Full time-series payloads remain encoded. The paired experiment adds
 quoted and accented synthetic application names and verifies every membership
 key/value against the decoded payload outside the timed region.
 
-| Mode | Sample | Fragment publication ms | Open/read/index/assemble/close ms |
-| --- | ---: | ---: | ---: |
-| Without membership index | 1 | 6.232 | 46.284 |
-| Without membership index | 2 | 4.952 | 8.988 |
-| Without membership index | 3 | 6.950 | 8.291 |
-| With membership index | 1 | 6.350 | 69.297 |
-| With membership index | 2 | 19.705 | 26.050 |
-| With membership index | 3 | 5.868 | 28.206 |
+| Mode                     | Sample | Fragment publication ms | Open/read/index/assemble/close ms |
+| ------------------------ | -----: | ----------------------: | --------------------------------: |
+| Without membership index |      1 |                   6.232 |                            46.284 |
+| Without membership index |      2 |                   4.952 |                             8.988 |
+| Without membership index |      3 |                   6.950 |                             8.291 |
+| With membership index    |      1 |                   6.350 |                            69.297 |
+| With membership index    |      2 |                  19.705 |                            26.050 |
+| With membership index    |      3 |                   5.868 |                            28.206 |
 
 Both modes ran sequentially in fresh hidden processes. Each sample opens a fresh
 read-only handle in that process; DLL loading and initial fixture preparation

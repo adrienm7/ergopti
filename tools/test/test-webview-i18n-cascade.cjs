@@ -78,7 +78,8 @@ function make_context(elements, locale_files, active) {
 		addEventListener() {},
 		querySelectorAll(sel) {
 			// The four selectors i18n.js uses, matched by the attribute they name.
-			if (sel === '[data-i18n]') return elements.filter((e) => e.getAttribute('data-i18n') !== null);
+			if (sel === '[data-i18n]')
+				return elements.filter((e) => e.getAttribute('data-i18n') !== null);
 			if (sel === '[data-i18n-title]')
 				return elements.filter((e) => e.getAttribute('data-i18n-title') !== null);
 			if (sel === '[data-i18n-placeholder]')
@@ -92,10 +93,13 @@ function make_context(elements, locale_files, active) {
 	const win = { _i18n_locale: active, __i18n_base: 'https://stub/locales/' };
 
 	function fetch_stub(url) {
-		const code = String(url).replace(/^.*\//, '').replace(/\.json$/, '');
+		const code = String(url)
+			.replace(/^.*\//, '')
+			.replace(/\.json$/, '');
 		fetched.push(code);
 		const body = locale_files[code];
-		if (body === undefined) return Promise.resolve({ ok: false, json: () => Promise.resolve(null) });
+		if (body === undefined)
+			return Promise.resolve({ ok: false, json: () => Promise.resolve(null) });
 		return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 	}
 
@@ -261,7 +265,10 @@ function check(label, cond, detail) {
 		);
 		check(
 			'applied-event-after-strings',
-			heard.length === 1 && heard[0].strings && heard[0].strings['k.one'] === 'One' && heard[0].text === 'One',
+			heard.length === 1 &&
+				heard[0].strings &&
+				heard[0].strings['k.one'] === 'One' &&
+				heard[0].text === 'One',
 			'i18n:applied must fire after the strings are stored and applied, or a page redraws with none'
 		);
 	}

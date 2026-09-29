@@ -37,7 +37,7 @@ const DRIVERS_ROOT = path.join(REPO_ROOT, 'static', 'ergopti_plus');
 const TREES = [
 	{ name: 'windows', dir: path.join(DRIVERS_ROOT, 'windows', 'tests'), ext: '.ahk' },
 	{ name: 'macos', dir: path.join(DRIVERS_ROOT, 'macos', 'tests'), ext: '.lua' },
-	{ name: 'linux', dir: path.join(DRIVERS_ROOT, 'linux', 'tests'), ext: '.lua' },
+	{ name: 'linux', dir: path.join(DRIVERS_ROOT, 'linux', 'tests'), ext: '.lua' }
 ];
 
 // Baseline: the highest count each pattern is allowed to reach. Regenerate with
@@ -53,7 +53,18 @@ const DELEGATION_DEPTH = 1;
 // function definition. Without this list every `if` block is mistaken for a
 // function, and a test registered inside a top-level `if` is reported as dead.
 const AHK_CONTROL_KEYWORDS = new Set([
-	'if', 'else', 'while', 'for', 'loop', 'try', 'catch', 'finally', 'switch', 'case', 'until', 'return',
+	'if',
+	'else',
+	'while',
+	'for',
+	'loop',
+	'try',
+	'catch',
+	'finally',
+	'switch',
+	'case',
+	'until',
+	'return'
 ]);
 
 /** True when `name` opens a control block rather than a function definition. */
@@ -133,13 +144,21 @@ function ahkFunctionBlocks(src) {
 		current.body.push(line);
 		// Ignore braces inside strings and trailing comments: a `"{"` literal would
 		// otherwise unbalance the whole file and swallow every later function.
-		const code = line.replace(/"(?:[^"`]|`.)*"/g, '""').replace(/'[^']*'/g, "''").replace(/;.*$/, '');
+		const code = line
+			.replace(/"(?:[^"`]|`.)*"/g, '""')
+			.replace(/'[^']*'/g, "''")
+			.replace(/;.*$/, '');
 		for (const ch of code) {
 			if (ch === '{') depth++;
 			else if (ch === '}') depth--;
 		}
 		if (depth <= 0) {
-			blocks.push({ name: current.name, start: current.start, end: i + 1, text: current.body.join('\n') });
+			blocks.push({
+				name: current.name,
+				start: current.start,
+				end: i + 1,
+				text: current.body.join('\n')
+			});
 			current = null;
 		}
 	}
@@ -213,7 +232,10 @@ function ahkEnclosingFunction(src) {
 		}
 		const raw = line.match(/^[ \t]*([A-Za-z_]\w*)\s*\([^()]*\)\s*\{/);
 		const def = raw && !isControlKeyword(raw[1]) ? raw : null;
-		const code = line.replace(/"(?:[^"`]|`.)*"/g, '""').replace(/'[^']*'/g, "''").replace(/;.*$/, '');
+		const code = line
+			.replace(/"(?:[^"`]|`.)*"/g, '""')
+			.replace(/'[^']*'/g, "''")
+			.replace(/;.*$/, '');
 		let first = true;
 		for (const ch of code) {
 			if (ch === '{') {
@@ -243,14 +265,15 @@ const TAUTOLOGY = [
 	/\bAssertTrue\s*\(\s*(?:true|1)\s*[,)]/,
 	/\bAssert\s*\(\s*(?:true|1)\s*[,)]/,
 	/\bassert_true\s*\(\s*true\s*[,)]/,
-	/\bassert\s*\(\s*true\s*[,)]/,
+	/\bassert\s*\(\s*true\s*[,)]/
 ];
 
 function findTautologies(file, src, ext) {
 	const out = [];
 	src.split(/\r?\n/).forEach((line, i) => {
 		if (isComment(line, ext)) return;
-		if (TAUTOLOGY.some((re) => re.test(line))) out.push({ file: rel(file), line: i + 1, text: line.trim() });
+		if (TAUTOLOGY.some((re) => re.test(line)))
+			out.push({ file: rel(file), line: i + 1, text: line.trim() });
 	});
 	return out;
 }
@@ -279,12 +302,15 @@ function findVacuousAbsence(file, src) {
 	const out = [];
 	for (const block of ahkFunctionBlocks(src)) {
 		const vars = new Set();
-		for (const m of block.text.matchAll(/(\w+)\s*:=\s*_DriverFuncBodyOrEmpty\s*\(/g)) vars.add(m[1]);
+		for (const m of block.text.matchAll(/(\w+)\s*:=\s*_DriverFuncBodyOrEmpty\s*\(/g))
+			vars.add(m[1]);
 		if (vars.size === 0) continue;
 
 		const proven = new Set();
 		for (const v of vars) {
-			const explicit = new RegExp(`Assert\\w*\\(\\s*(?:!\\s*)?(?:${v}\\s*!==?\\s*""|StrLen\\(\\s*${v}\\s*\\)\\s*>|${v}\\s*==?\\s*"")`);
+			const explicit = new RegExp(
+				`Assert\\w*\\(\\s*(?:!\\s*)?(?:${v}\\s*!==?\\s*""|StrLen\\(\\s*${v}\\s*\\)\\s*>|${v}\\s*==?\\s*"")`
+			);
 			const presence = new RegExp(`InStr\\(\\s*${v}\\b[^\\r\\n]*?\\)\\s*(?:>\\s*0|>=\\s*1)`);
 			if (explicit.test(block.text) || presence.test(block.text)) proven.add(v);
 		}
@@ -293,9 +319,16 @@ function findVacuousAbsence(file, src) {
 			if (isComment(line, '.ahk') || !/Assert/.test(line)) return;
 			for (const v of vars) {
 				if (proven.has(v)) continue;
-				const absence = new RegExp(`(?:InStr\\(\\s*${v}\\b[^\\r\\n]*?\\)\\s*(?:==?|<)\\s*(?:0|1)\\b|!\\s*InStr\\(\\s*${v}\\b)`);
+				const absence = new RegExp(
+					`(?:InStr\\(\\s*${v}\\b[^\\r\\n]*?\\)\\s*(?:==?|<)\\s*(?:0|1)\\b|!\\s*InStr\\(\\s*${v}\\b)`
+				);
 				if (absence.test(line)) {
-					out.push({ file: rel(file), line: block.start + idx, text: line.trim(), detail: `"${v}" is never proven non-empty` });
+					out.push({
+						file: rel(file),
+						line: block.start + idx,
+						text: line.trim(),
+						detail: `"${v}" is never proven non-empty`
+					});
 					break;
 				}
 			}
@@ -364,7 +397,12 @@ function findDeadTests(file, src, ext) {
 		const block = byName.get(m[1]);
 		if (!block) continue;
 		if (!proves(block, DELEGATION_DEPTH, new Set())) {
-			out.push({ file: rel(file), line: block.start, text: `${m[1]}()`, detail: 'registered test body asserts nothing' });
+			out.push({
+				file: rel(file),
+				line: block.start,
+				text: `${m[1]}()`,
+				detail: 'registered test body asserts nothing'
+			});
 		}
 	}
 
@@ -386,7 +424,7 @@ function findDeadTests(file, src, ext) {
 			file: rel(file),
 			line: i + 1,
 			text: line.trim(),
-			detail: `Test() sits in ${owners[i]}(), which the file never calls at top level`,
+			detail: `Test() sits in ${owners[i]}(), which the file never calls at top level`
 		});
 	});
 	return out;
@@ -409,7 +447,12 @@ function findPcallOnly(file, src) {
 		if (isComment(line, '.lua')) return;
 		for (const match of line.matchAll(/(assert\w*)\s*\(\s*pcall\s*\(/g)) {
 			if (match[1] !== 'assert_false') {
-				out.push({ file: rel(file), line: i + 1, text: line.trim(), detail: 'asserts only that the call returned' });
+				out.push({
+					file: rel(file),
+					line: i + 1,
+					text: line.trim(),
+					detail: 'asserts only that the call returned'
+				});
 				break;
 			}
 		}
@@ -423,22 +466,39 @@ function findPcallOnly(file, src) {
 		// A test that ALSO asserts on the pcall's returned value is doing real
 		// work — the status check is just a precondition. Only flag the case
 		// where the status is the sole thing ever asserted.
-		const resultVars = (m[2] || '').split(',').map((s) => s.trim()).filter(Boolean);
-		const window = lines.slice(i + 1, Math.min(i + 12, lines.length)).filter((l) => !isComment(l, '.lua')).join('\n');
-		if (resultVars.some((v) => new RegExp(`assert\\w*\\s*\\([^)\\n]*\\b${v}\\b`).test(window))) continue;
+		const resultVars = (m[2] || '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
+		const window = lines
+			.slice(i + 1, Math.min(i + 12, lines.length))
+			.filter((l) => !isComment(l, '.lua'))
+			.join('\n');
+		if (resultVars.some((v) => new RegExp(`assert\\w*\\s*\\([^)\\n]*\\b${v}\\b`).test(window)))
+			continue;
 
 		for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
 			if (isComment(lines[j], '.lua')) continue;
-			const assertions = lines[j].matchAll(new RegExp(`(assert\\w*)\\s*\\(\\s*${statusVar}\\s*([,)])`, 'g'));
+			const assertions = lines[j].matchAll(
+				new RegExp(`(assert\\w*)\\s*\\(\\s*${statusVar}\\s*([,)])`, 'g')
+			);
 			const weak = [...assertions].some((match) => {
 				// Expecting failure proves rejection; it is not a mere no-crash check.
 				if (match[1] === 'assert_false') return false;
 				const rest = lines[j].slice(match.index + match[0].length);
-				return !(['assert_eq', 'assert_equal'].includes(match[1])
-					&& match[2] === ',' && /^\s*false\s*[,)]/.test(rest));
+				return !(
+					['assert_eq', 'assert_equal'].includes(match[1]) &&
+					match[2] === ',' &&
+					/^\s*false\s*[,)]/.test(rest)
+				);
 			});
 			if (weak) {
-				out.push({ file: rel(file), line: j + 1, text: lines[j].trim(), detail: `"${statusVar}" is a pcall status, not a result` });
+				out.push({
+					file: rel(file),
+					line: j + 1,
+					text: lines[j].trim(),
+					detail: `"${statusVar}" is a pcall status, not a result`
+				});
 				break;
 			}
 		}
@@ -487,7 +547,7 @@ function findCorpusSkips(file, src, ext) {
 					file: rel(file),
 					line: j + 1,
 					text: lines[j].trim(),
-					detail: `"${v}" came from a corpus loader — skipping makes a missing contract pass`,
+					detail: `"${v}" came from a corpus loader — skipping makes a missing contract pass`
 				});
 			}
 			break;
@@ -667,7 +727,12 @@ function findUnflooredScans(file, src, ext) {
 		// over a file list is floored by `#files > 0` — no files, nothing scanned —
 		// even though the collector the loop fills is `offenders`. A block that
 		// asserts some collection is non-empty has thought about vacuity.
-		if (!floored && /(?:Assert\w*|assert_\w+)\s*\([^\n]*(?:#\s*\w+|\.\s*(?:Length|Count))\s*(?:>|>=|~=|!=)\s*0/.test(block.text)) {
+		if (
+			!floored &&
+			/(?:Assert\w*|assert_\w+)\s*\([^\n]*(?:#\s*\w+|\.\s*(?:Length|Count))\s*(?:>|>=|~=|!=)\s*0/.test(
+				block.text
+			)
+		) {
 			floored = true;
 		}
 
@@ -690,7 +755,9 @@ function findUnflooredScans(file, src, ext) {
 		// locate worked, then scan) was rated as no floor at all, while a bare
 		// `#lines > 0` on an unchecked read was rated as one.
 		if (!floored) {
-			const subject = (rows[idx] || '').match(/\bfor\b[^\n]*?\b(\w+)\s*[:.]\s*(?:gmatch|gfind)\s*\(/);
+			const subject = (rows[idx] || '').match(
+				/\bfor\b[^\n]*?\b(\w+)\s*[:.]\s*(?:gmatch|gfind)\s*\(/
+			);
 			if (subject && /read_driver_source\s*\(|read_file\s*\(/.test(src)) {
 				const nilFloor = new RegExp(
 					`(?:Assert\\w*|assert_\\w+)\\s*\\([\\s\\S]{0,120}?\\b${subject[1]}\\b\\s*(?:~=|!=)\\s*nil`
@@ -708,7 +775,7 @@ function findUnflooredScans(file, src, ext) {
 			file: rel(file),
 			line: block.start + idx,
 			text: (rows[idx] || '').trim(),
-			detail: 'scan loop never asserts it matched anything — a broken pattern passes',
+			detail: 'scan loop never asserts it matched anything — a broken pattern passes'
 		});
 	}
 	return out;
@@ -720,11 +787,18 @@ const PATTERNS = {
 	'dead-test': 'Test body that asserts nothing, or a Test() never registered',
 	'pcall-only': 'Assertion on a pcall status — proves "did not crash", nothing else',
 	'corpus-skip': 'Early return when a corpus could not be loaded — a missing contract passes',
-	'unfloored-scan': 'Source-scan loop that never asserts it matched anything',
+	'unfloored-scan': 'Source-scan loop that never asserts it matched anything'
 };
 
 function scan() {
-	const findings = { tautology: [], 'vacuous-absence': [], 'dead-test': [], 'pcall-only': [], 'corpus-skip': [], 'unfloored-scan': [] };
+	const findings = {
+		tautology: [],
+		'vacuous-absence': [],
+		'dead-test': [],
+		'pcall-only': [],
+		'corpus-skip': [],
+		'unfloored-scan': []
+	};
 	for (const tree of TREES) {
 		for (const file of walk(tree.dir, tree.ext)) {
 			const src = fs.readFileSync(file, 'utf8');
@@ -777,7 +851,9 @@ function main() {
 		if (over) regressions += list.length - max;
 
 		const budget = max === null || max === undefined ? '(no baseline)' : `baseline ${max}`;
-		console.log(`  ${over ? 'OVER  ' : 'ok    '} ${String(list.length).padStart(4)}  ${key.padEnd(16)} ${budget}`);
+		console.log(
+			`  ${over ? 'OVER  ' : 'ok    '} ${String(list.length).padStart(4)}  ${key.padEnd(16)} ${budget}`
+		);
 		console.log(`         ${label}`);
 
 		if (verbose || over) {
@@ -797,18 +873,27 @@ function main() {
 	console.log('   - a source-grep pinning the current SPELLING of the code, not the invariant\n');
 
 	if (!baseline) {
-		console.log('No baseline recorded. Run with --update-baseline to freeze these counts as the ceiling.');
+		console.log(
+			'No baseline recorded. Run with --update-baseline to freeze these counts as the ceiling.'
+		);
 		return 0;
 	}
 	if (regressions > 0) {
-		console.error(`find-false-greens: ${regressions} new occurrence(s) above baseline — the ratchet only turns down.`);
-		console.error('If an occurrence is genuinely justified, say why in the test and re-run with --update-baseline.');
+		console.error(
+			`find-false-greens: ${regressions} new occurrence(s) above baseline — the ratchet only turns down.`
+		);
+		console.error(
+			'If an occurrence is genuinely justified, say why in the test and re-run with --update-baseline.'
+		);
 		return 1;
 	}
 	const total = Object.values(counts).reduce((a, b) => a + b, 0);
 	const baseTotal = Object.values(baseline).reduce((a, b) => a + b, 0);
 	console.log(`find-false-greens: within baseline (${total} vs ${baseTotal}).`);
-	if (total < baseTotal) console.log('Some patterns dropped — re-run with --update-baseline to lock the improvement in.');
+	if (total < baseTotal)
+		console.log(
+			'Some patterns dropped — re-run with --update-baseline to lock the improvement in.'
+		);
 	return 0;
 }
 

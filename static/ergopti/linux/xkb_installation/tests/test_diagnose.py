@@ -29,7 +29,12 @@ class DiagnoseReportTests(unittest.TestCase):
         self.extensions_root = self.sandbox / "xkeyboard-config.d"
         self.system_root = self.sandbox / "X11" / "xkb"
         self.home = self.sandbox / "home"
-        for directory in (self.extensions_root, self.system_root / "symbols", self.system_root / "rules", self.home):
+        for directory in (
+            self.extensions_root,
+            self.system_root / "symbols",
+            self.system_root / "rules",
+            self.home,
+        ):
             directory.mkdir(parents=True)
         self.env = {
             **os.environ,
@@ -84,12 +89,21 @@ class DiagnoseReportTests(unittest.TestCase):
         (package / "rules").mkdir(parents=True)
         (package / "symbols").mkdir()
         (package / "symbols" / "ergopti").write_text("symbols", encoding="utf-8")
-        (package / "rules" / "evdev.post").write_text("! layout = types\n  ergopti = +ergopti\n", encoding="utf-8")
+        (package / "rules" / "evdev.post").write_text(
+            "! layout = types\n  ergopti = +ergopti\n", encoding="utf-8"
+        )
         symbols_fr = self.system_root / "symbols" / "fr"
-        symbols_fr.write_text('xkb_symbols "basic" { };\nxkb_symbols "Ergopti_v2_2_1" { };\n', encoding="utf-8")
+        symbols_fr.write_text(
+            'xkb_symbols "basic" { };\nxkb_symbols "Ergopti_v2_2_1" { };\n', encoding="utf-8"
+        )
         symbols_fr.with_name("fr.1").write_text("pristine", encoding="utf-8")
-        (self.system_root / "symbols" / "Ergopti_v2_0_0").write_text("stale bridge", encoding="utf-8")
-        (self.home / ".XCompose").write_text('include "%L"\n# Ergopti managed XCompose\ninclude "/pkg/ergopti.XCompose"\n', encoding="utf-8")
+        (self.system_root / "symbols" / "Ergopti_v2_0_0").write_text(
+            "stale bridge", encoding="utf-8"
+        )
+        (self.home / ".XCompose").write_text(
+            'include "%L"\n# Ergopti managed XCompose\ninclude "/pkg/ergopti.XCompose"\n',
+            encoding="utf-8",
+        )
 
         result = self.run_report()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -106,7 +120,10 @@ class DiagnoseReportTests(unittest.TestCase):
         def explode():
             raise RuntimeError("probe failure")
 
-        with mock.patch("builtins.print", side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a))):
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a)),
+        ):
             diagnose.guarded("Section test", explode)
         output = "\n".join(printed)
         self.assertIn("Section test", output)
@@ -114,8 +131,13 @@ class DiagnoseReportTests(unittest.TestCase):
 
     def test_legacy_variants_are_read_from_the_symbols_file(self):
         symbols_fr = self.system_root / "symbols" / "fr"
-        symbols_fr.write_text('xkb_symbols "Ergopti_v2_2_1" {\n};\nxkb_symbols "Ergopti_v2_2_1_plus" {\n};\n', encoding="utf-8")
-        self.assertEqual(diagnose.legacy_variants(self.system_root), ["Ergopti_v2_2_1", "Ergopti_v2_2_1_plus"])
+        symbols_fr.write_text(
+            'xkb_symbols "Ergopti_v2_2_1" {\n};\nxkb_symbols "Ergopti_v2_2_1_plus" {\n};\n',
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            diagnose.legacy_variants(self.system_root), ["Ergopti_v2_2_1", "Ergopti_v2_2_1_plus"]
+        )
         self.assertEqual(diagnose.legacy_variants(self.sandbox / "missing"), [])
 
 

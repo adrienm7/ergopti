@@ -210,7 +210,9 @@ function validate(value, sch, p, errors) {
 		}
 		for (const [key, sub] of Object.entries(value)) {
 			const kp = p ? `${p}.${key}` : key;
-			const patternMatch = Object.entries(sch.patternProperties || {}).find(([re]) => new RegExp(re).test(key));
+			const patternMatch = Object.entries(sch.patternProperties || {}).find(([re]) =>
+				new RegExp(re).test(key)
+			);
 			if (props[key]) {
 				validate(sub, props[key], kp, errors);
 			} else if (patternMatch) {
@@ -240,11 +242,19 @@ for (const [section, key, valid, invalid] of [
 	['models', 'user_models', [{ backend: 'ollama', name: 'example' }], [true]],
 	['profiles', 'user_profiles', [{ id: 'custom', name: 'Custom' }], ['wrong-shape']],
 	['trigger', 'disabled_apps', ['com.example.Editor'], [17]],
-	['navigation', 'nav_modifiers', ['ctrl', 'alt'], ['unknown-modifier']],
+	['navigation', 'nav_modifiers', ['ctrl', 'alt'], ['unknown-modifier']]
 ]) {
-	const llm = schema.properties.llm.$ref ? resolveRef(schema.properties.llm.$ref) : schema.properties.llm;
+	const llm = schema.properties.llm.$ref
+		? resolveRef(schema.properties.llm.$ref)
+		: schema.properties.llm;
 	const leaf = llm.properties[section].properties[key];
-	for (const [value, accepted] of [[[], true], [valid, true], [{}, false], [false, false], [invalid, false]]) {
+	for (const [value, accepted] of [
+		[[], true],
+		[valid, true],
+		[{}, false],
+		[false, false],
+		[invalid, false]
+	]) {
 		const errors = [];
 		validate(value, leaf, `llm.${section}.${key}`, errors);
 		if ((errors.length === 0) !== accepted) {
@@ -255,10 +265,17 @@ for (const [section, key, valid, invalid] of [
 }
 
 const unicodeLengthErrors = [];
-validate('🙂', { type: 'string', minLength: 1, maxLength: 1 }, 'unicodeLength', unicodeLengthErrors);
+validate(
+	'🙂',
+	{ type: 'string', minLength: 1, maxLength: 1 },
+	'unicodeLength',
+	unicodeLengthErrors
+);
 validate('ab', { type: 'string', maxLength: 1 }, 'multiLength', unicodeLengthErrors);
 if (unicodeLengthErrors.length !== 1 || !unicodeLengthErrors[0].startsWith('multiLength:')) {
-	console.log('  ✗  validator self-check — string lengths are not measured in Unicode code points.');
+	console.log(
+		'  ✗  validator self-check — string lengths are not measured in Unicode code points.'
+	);
 	totalFail++;
 }
 
@@ -266,7 +283,9 @@ for (const driver of DRIVERS) {
 	const rel = `static/ergopti_plus/${driver}/_generated/config_template.toml`;
 	const abs = path.join(ROOT, rel);
 	if (!fs.existsSync(abs)) {
-		console.log(`  ✗  ${rel} — missing. Every driver ships a default config; run \`npm run build:manifest\`.`);
+		console.log(
+			`  ✗  ${rel} — missing. Every driver ships a default config; run \`npm run build:manifest\`.`
+		);
 		totalFail++;
 		continue;
 	}
@@ -315,7 +334,9 @@ for (const driver of DRIVERS) {
 	// A gap that no longer occurs means the schema and the template agree again;
 	// the entry must go, or it will hide the next real violation of that shape.
 	for (const g of closed) {
-		console.log(`  ✗  ${rel} — KNOWN_GAPS still lists "${g}", but it no longer occurs. Delete the entry.`);
+		console.log(
+			`  ✗  ${rel} — KNOWN_GAPS still lists "${g}", but it no longer occurs. Delete the entry.`
+		);
 		totalFail++;
 	}
 }

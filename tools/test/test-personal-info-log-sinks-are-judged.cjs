@@ -45,9 +45,17 @@ const DRIVER = path.join(SHARED_ROOT, 'windows');
 
 // Everything that writes somewhere durable: the rotating log, or today.log.
 const SINKS = [
-	'LoggerDebug', 'LoggerInfo', 'LoggerWarn', 'LoggerError',
-	'LoggerTrace', 'LoggerDone', 'LoggerStart', 'LoggerSuccess',
-	'HotPath_LogIfSlow', 'KL_AppendLog', 'OutputDebug'
+	'LoggerDebug',
+	'LoggerInfo',
+	'LoggerWarn',
+	'LoggerError',
+	'LoggerTrace',
+	'LoggerDone',
+	'LoggerStart',
+	'LoggerSuccess',
+	'HotPath_LogIfSlow',
+	'KL_AppendLog',
+	'OutputDebug'
 ];
 
 // The names a hotstring's two secret-bearing columns travel under.
@@ -78,8 +86,14 @@ const LUA_TREES = [
 ];
 
 const LUA_SINKS = [
-	'Logger.debug', 'Logger.info', 'Logger.warn', 'Logger.error',
-	'Logger.trace', 'Logger.done', 'Logger.start', 'Logger.success'
+	'Logger.debug',
+	'Logger.info',
+	'Logger.warn',
+	'Logger.error',
+	'Logger.trace',
+	'Logger.done',
+	'Logger.start',
+	'Logger.success'
 ];
 
 const LUA_CARRIERS = /\b(?:result|parts|values|replacement|expansion|value)\b|_info\[/;
@@ -88,8 +102,13 @@ const LUA_CARRIERS = /\b(?:result|parts|values|replacement|expansion|value)\b|_i
 // or through a redactor. `content withheld` is the phrase the redacted lines
 // use, and matching it keeps the check readable in both directions.
 const LUA_REDACTORS = [
-	'#result', '#match.result', '#value', '#text',
-	'for_log(', 'redact_for_log(', 'content withheld'
+	'#result',
+	'#match.result',
+	'#value',
+	'#text',
+	'for_log(',
+	'redact_for_log(',
+	'content withheld'
 ];
 
 /**
@@ -184,7 +203,7 @@ const JUDGED = [
 	},
 	{
 		file: 'ui/menu/menu_llm/actions.ahk',
-		match: "is not installed — switched to",
+		match: 'is not installed — switched to',
 		verdict: 'not-personal',
 		why: 'replacement is the fallback LLM model name; all interpolations are model identifiers and fixed backend tags.'
 	},
@@ -649,7 +668,7 @@ for (const file of walk(DRIVER)) {
 if (sites.length === 0) {
 	errors.push(
 		'the scan found no trigger-carrying sink at all — the driver has a dozen, so this ' +
-		'gate is broken rather than the tree clean. A scanner that matches nothing reports green forever.'
+			'gate is broken rather than the tree clean. A scanner that matches nothing reports green forever.'
 	);
 }
 
@@ -676,7 +695,7 @@ for (const tree of LUA_TREES) {
 if (luaSites.length === 0) {
 	errors.push(
 		'the Lua scan matched nothing across the dynamic-hotstrings modules of both Lua drivers. ' +
-		'Those modules exist and they log; a scan that finds none of it has lost its trees, not found a clean repo.'
+			'Those modules exist and they log; a scan that finds none of it has lost its trees, not found a clean repo.'
 	);
 }
 
@@ -705,16 +724,24 @@ const LUA_JUDGED = [
 const luaUsed = new Set();
 let luaSafe = 0;
 for (const site of luaSites) {
-	if (LUA_REDACTORS.some((r) => site.call.includes(r))) { luaSafe++; continue; }
-	const idx = LUA_JUDGED.findIndex((j) => j.file === site.file && site.call.replace(/\s+/g, ' ').includes(j.match));
-	if (idx !== -1) { luaUsed.add(idx); continue; }
+	if (LUA_REDACTORS.some((r) => site.call.includes(r))) {
+		luaSafe++;
+		continue;
+	}
+	const idx = LUA_JUDGED.findIndex(
+		(j) => j.file === site.file && site.call.replace(/\s+/g, ' ').includes(j.match)
+	);
+	if (idx !== -1) {
+		luaUsed.add(idx);
+		continue;
+	}
 	errors.push(
 		`${site.file}:${site.line} — ${site.sink} interpolates a resolved value without reducing it ` +
-		'to a length or passing it through a redactor.\n' +
-		`      ${site.call.replace(/\s+/g, ' ').slice(0, 160)}\n` +
-		'      Every resolver registered against the dynamic engine can return personal_info data: ' +
-		'for "@i" it is the user\'s IBAN. Print `#value` and say "content withheld", as the sibling ' +
-		'sites do — and remember the shared logger\'s default level is 10, so DEBUG is not a safeguard.'
+			'to a length or passing it through a redactor.\n' +
+			`      ${site.call.replace(/\s+/g, ' ').slice(0, 160)}\n` +
+			'      Every resolver registered against the dynamic engine can return personal_info data: ' +
+			'for "@i" it is the user\'s IBAN. Print `#value` and say "content withheld", as the sibling ' +
+			"sites do — and remember the shared logger's default level is 10, so DEBUG is not a safeguard."
 	);
 }
 
@@ -731,10 +758,10 @@ for (const site of sites) {
 	if (idx === -1) {
 		errors.push(
 			`${site.file}:${site.line} — ${site.sink} interpolates a hotstring trigger or replacement ` +
-			'without redacting it, and no judgement covers it.\n' +
-			`      ${site.call.replace(/\s+/g, ' ').slice(0, 150)}\n` +
-			'      Either redact with PersonalInfoRedactForLog when the mapping is private, or add an ' +
-			'entry to JUDGED in this file saying which caller already withheld it — and say why.'
+				'without redacting it, and no judgement covers it.\n' +
+				`      ${site.call.replace(/\s+/g, ' ').slice(0, 150)}\n` +
+				'      Either redact with PersonalInfoRedactForLog when the mapping is private, or add an ' +
+				'entry to JUDGED in this file saying which caller already withheld it — and say why.'
 		);
 		continue;
 	}
@@ -753,14 +780,18 @@ JUDGED.forEach((j, i) => {
 	if (!used.has(i)) {
 		errors.push(
 			`the judgement for ${j.file} ("${j.match}") matches no site any more. ` +
-			'Delete it: a verdict kept past the code it described is what lets the next unguarded ' +
-			'sink look accounted for.'
+				'Delete it: a verdict kept past the code it described is what lets the next unguarded ' +
+				'sink look accounted for.'
 		);
 	}
 });
 
-notes.push(`windows: ${sites.length} trigger-carrying sink(s) — ${redactedCount} redact in place, ${used.size} judged safe upstream`);
-notes.push(`lua: ${luaSites.length} value-carrying sink(s) across both Lua drivers, ${luaSafe} reduced to a length or redacted`);
+notes.push(
+	`windows: ${sites.length} trigger-carrying sink(s) — ${redactedCount} redact in place, ${used.size} judged safe upstream`
+);
+notes.push(
+	`lua: ${luaSites.length} value-carrying sink(s) across both Lua drivers, ${luaSafe} reduced to a length or redacted`
+);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] personal-info log sinks are judged:\x1b[0m');
@@ -770,6 +801,6 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] every one of the ${sites.length} sink(s) that can carry a hotstring trigger ` +
-	'either redacts it or is withheld by its caller.\x1b[0m'
+		'either redacts it or is withheld by its caller.\x1b[0m'
 );
 for (const n of notes) console.log('     ' + n);

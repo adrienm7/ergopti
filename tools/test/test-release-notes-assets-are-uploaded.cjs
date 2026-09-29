@@ -80,7 +80,8 @@ const IS_GLOB = /[*?[\]]/;
 // stops being true, the upload lists stop being the asset inventory and this
 // guard is measuring the wrong thing.
 const ATTACHES_DOWNLOADED_ARTIFACTS = /find\s+release-assets\s+-type\s+f/;
-const DOWNLOADS_RELEASE_ARTIFACTS = /uses:\s*actions\/download-artifact[\s\S]*?pattern:\s*assets-\*/;
+const DOWNLOADS_RELEASE_ARTIFACTS =
+	/uses:\s*actions\/download-artifact[\s\S]*?pattern:\s*assets-\*/;
 
 // Floors — today: 10 linked assets across 3 assets-* upload steps naming 13
 // files (macOS 4, Windows 2, Linux 7).
@@ -95,9 +96,6 @@ function indentOf(line) {
 	if (line.trim() === '') return -1;
 	return line.length - line.trimStart().length;
 }
-
-
-
 
 // ====================================
 // ====================================
@@ -131,7 +129,10 @@ const release = pipeline.locate('release');
 const releaseLines = expand(release.body).split('\n');
 const releaseText = releaseLines.join('\n');
 
-if (!DOWNLOADS_RELEASE_ARTIFACTS.test(releaseText) || !ATTACHES_DOWNLOADED_ARTIFACTS.test(releaseText)) {
+if (
+	!DOWNLOADS_RELEASE_ARTIFACTS.test(releaseText) ||
+	!ATTACHES_DOWNLOADED_ARTIFACTS.test(releaseText)
+) {
 	errors.push(
 		'the release job no longer downloads the assets-* artifacts and attaches every file it finds ' +
 			'(`actions/download-artifact` with `pattern: assets-*` + `find release-assets -type f`). That ' +
@@ -139,9 +140,6 @@ if (!DOWNLOADS_RELEASE_ARTIFACTS.test(releaseText) || !ATTACHES_DOWNLOADED_ARTIF
 			'assets, which is the premise of this whole check — re-derive the upload side before trusting it again.'
 	);
 }
-
-
-
 
 // ====================================================
 // ====================================================
@@ -166,9 +164,6 @@ if (linked.size < MIN_LINKED_ASSETS) {
 			'then approve download tables it never read.'
 	);
 }
-
-
-
 
 // =====================================================
 // =====================================================
@@ -205,7 +200,13 @@ for (const { rel, text } of pipeline.files()) {
 
 			// `path: build/foo.zip` — a single inline value rather than a block.
 			const inline = pathMatch[2].trim();
-			if (inline !== '' && inline !== '|' && inline !== '>' && !inline.startsWith('|-') && !inline.startsWith('>-')) {
+			if (
+				inline !== '' &&
+				inline !== '|' &&
+				inline !== '>' &&
+				!inline.startsWith('|-') &&
+				!inline.startsWith('>-')
+			) {
 				files.push(inline);
 				continue;
 			}
@@ -240,7 +241,10 @@ for (const step of uploads) {
 			// `build/linux/*.kbd` cannot be compared by equality, so it becomes a
 			// matcher — otherwise a legitimate wildcard upload would read as a
 			// missing asset and this guard would cry wolf until someone deleted it.
-			const pattern = base.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+			const pattern = base
+				.replace(/[.+^${}()|\\]/g, '\\$&')
+				.replace(/\*/g, '.*')
+				.replace(/\?/g, '.');
 			uploadedGlobs.push(new RegExp(`^${pattern}$`));
 		} else {
 			uploadedNames.add(base);
@@ -262,9 +266,6 @@ if (uploadedPathCount < MIN_UPLOAD_PATHS) {
 			'block parse drifted and the inventory is incomplete.'
 	);
 }
-
-
-
 
 // ==============================================
 // ==============================================
@@ -298,9 +299,6 @@ for (const [name, where] of linked) {
 	);
 }
 
-
-
-
 // ======================================================
 // ======================================================
 // ======= 5/ The Preflight Requires Every Asset ========
@@ -314,30 +312,47 @@ for (const [name, where] of linked) {
 // Sparkle signature and appcast the feed step publishes, and the checksum the
 // Linux updater verifies the bundle against must be in its list.
 const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
-const UNLINKED_REQUIRED = ['_ErgoptiPlus.app.zip.sig', 'appcast-${CHANNEL}.xml', `${linuxBundleAsset}.sha256`];
+const UNLINKED_REQUIRED = [
+	'_ErgoptiPlus.app.zip.sig',
+	'appcast-${CHANNEL}.xml',
+	`${linuxBundleAsset}.sha256`
+];
 const preflight = expand(pipeline.step(release.body, PREFLIGHT));
-const assetLoop = /^\s*for asset in ([^\n;]*(?:\\\n[^\n;]*)*); do\n([\s\S]*?)\n\s*done$/m.exec(preflight);
+const assetLoop = /^\s*for asset in ([^\n;]*(?:\\\n[^\n;]*)*); do\n([\s\S]*?)\n\s*done$/m.exec(
+	preflight
+);
 const required = assetLoop
-	? assetLoop[1].split(/\s+/).filter((token) => token !== '' && token !== '\\').map((token) => token.replace(/^"(.*)"$/, '$1'))
+	? assetLoop[1]
+			.split(/\s+/)
+			.filter((token) => token !== '' && token !== '\\')
+			.map((token) => token.replace(/^"(.*)"$/, '$1'))
 	: [];
 if (!assetLoop || !/if \[ ! -s "release-assets\/\$asset" \]; then/.test(assetLoop[2])) {
-	errors.push(`"${PREFLIGHT}" no longer loops over the required assets with [ ! -s "release-assets/$asset" ]`);
+	errors.push(
+		`"${PREFLIGHT}" no longer loops over the required assets with [ ! -s "release-assets/$asset" ]`
+	);
 } else if (!/if \[ "\$missing" -gt 0 \]; then\n[^\n]*\n\s*exit 1/.test(preflight)) {
 	errors.push(`"${PREFLIGHT}" must exit 1 when any required asset is missing`);
 }
 if (required.length < linked.size + UNLINKED_REQUIRED.length) {
-	errors.push(`"${PREFLIGHT}" requires ${required.length} asset(s), fewer than the ${linked.size} linked plus ` +
-		`${UNLINKED_REQUIRED.length} feed and checksum files; the list parse drifted or entries were dropped`);
+	errors.push(
+		`"${PREFLIGHT}" requires ${required.length} asset(s), fewer than the ${linked.size} linked plus ` +
+			`${UNLINKED_REQUIRED.length} feed and checksum files; the list parse drifted or entries were dropped`
+	);
 }
 for (const name of [...linked.keys(), ...UNLINKED_REQUIRED]) {
 	if (!required.includes(name)) {
-		errors.push(`"${name}" is not in the asset list of "${PREFLIGHT}" (${release.file}): a run whose box ` +
-			'skipped it would publish anyway. Add it to the loop.');
+		errors.push(
+			`"${name}" is not in the asset list of "${PREFLIGHT}" (${release.file}): a run whose box ` +
+				'skipped it would publish anyway. Add it to the loop.'
+		);
 	}
 }
 for (const name of required) {
 	if (!uploadedNames.has(name) && !uploadedGlobs.some((re) => re.test(name))) {
-		errors.push(`"${PREFLIGHT}" requires "${name}", which no assets-* upload step names: every release would stop there`);
+		errors.push(
+			`"${PREFLIGHT}" requires "${name}", which no assets-* upload step names: every release would stop there`
+		);
 	}
 }
 
@@ -350,11 +365,20 @@ const releaseBody = releaseText;
 const downloadsAt = releaseBody.indexOf('## Downloads');
 const foldAt = releaseBody.indexOf('<details>');
 const changelogAt = releaseBody.search(/sed [^\n]*\$RUNNER_TEMP\/changelog\.md/);
-if (downloadsAt < 0 || foldAt < 0 || changelogAt < 0 || !(downloadsAt < foldAt && foldAt < changelogAt)) {
-	errors.push('the release downloads must come before the changelog, and the changelog must be folded in <details>');
+if (
+	downloadsAt < 0 ||
+	foldAt < 0 ||
+	changelogAt < 0 ||
+	!(downloadsAt < foldAt && foldAt < changelogAt)
+) {
+	errors.push(
+		'the release downloads must come before the changelog, and the changelog must be folded in <details>'
+	);
 }
 if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(pipeline.text())) {
-	errors.push('release notes must not rely on a jump link to the downloads (it cannot scroll on the first click)');
+	errors.push(
+		'release notes must not rely on a jump link to the downloads (it cannot scroll on the first click)'
+	);
 }
 // The in-app Versions pages show the changelog first; they find it through the
 // invisible section markers, which the page splitter reads before the Markdown
@@ -362,17 +386,27 @@ if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(pipeline.text())) {
 const splitterSandbox = { window: {} };
 vm.createContext(splitterSandbox);
 vm.runInContext(
-	fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'changelog', 'release_body.js'), 'utf8'),
+	fs.readFileSync(
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'changelog', 'release_body.js'),
+		'utf8'
+	),
 	splitterSandbox,
 	{ filename: 'release_body.js' }
 );
 const sectionNames = splitterSandbox.window.RELEASE_BODY_SECTIONS || [];
 if (sectionNames.length < 4) {
-	errors.push(`release_body.js exports ${sectionNames.length} section name(s); the marker pin would check nothing`);
+	errors.push(
+		`release_body.js exports ${sectionNames.length} section name(s); the marker pin would check nothing`
+	);
 }
-const openMarkers = [...releaseBody.matchAll(/<!-- ergopti:section=([a-z]+) -->/g)].map((m) => m[1]);
+const openMarkers = [...releaseBody.matchAll(/<!-- ergopti:section=([a-z]+) -->/g)].map(
+	(m) => m[1]
+);
 const closeMarkers = releaseBody.match(/<!-- \/ergopti:section -->/g) || [];
-if (JSON.stringify(openMarkers) !== JSON.stringify(sectionNames) || closeMarkers.length !== sectionNames.length) {
+if (
+	JSON.stringify(openMarkers) !== JSON.stringify(sectionNames) ||
+	closeMarkers.length !== sectionNames.length
+) {
 	errors.push(
 		`the release body must open each section once, in the splitter's order (${sectionNames.join(', ')}), and ` +
 			`close each one: found ${openMarkers.join(', ') || 'none'} with ${closeMarkers.length} close marker(s)`
@@ -380,22 +414,30 @@ if (JSON.stringify(openMarkers) !== JSON.stringify(sectionNames) || closeMarkers
 }
 const changelogOpen = releaseBody.indexOf('<!-- ergopti:section=changelog -->');
 if (!(changelogOpen >= 0 && changelogOpen < foldAt && foldAt < changelogAt)) {
-	errors.push('the changelog marker must open before its <details> fold and the changelog it wraps');
+	errors.push(
+		'the changelog marker must open before its <details> fold and the changelog it wraps'
+	);
 }
 // The repository sidebar truncates long release titles, which hid the version.
 // The title is computed in shell once, in validate's plan; later steps only forward it via ${{ }}.
 const titles = pipeline.text().match(/^\s*title="(?!\$\{\{)[^"\n]*"/gm) || [];
-if (titles.length === 0 || titles.some(line => line.trim() !== 'title="Ergopti ${tag}"')) {
-	errors.push(`every release title must be exactly "Ergopti \${tag}", got: ${titles.map(t => t.trim()).join(' | ')}`);
+if (titles.length === 0 || titles.some((line) => line.trim() !== 'title="Ergopti ${tag}"')) {
+	errors.push(
+		`every release title must be exactly "Ergopti \${tag}", got: ${titles.map((t) => t.trim()).join(' | ')}`
+	);
 }
 const layoutSection = releaseBody.indexOf('### Ergopti — keyboard layout only');
-const applicationSection = releaseBody.indexOf('### Ergopti Plus — application with advanced typing tools');
+const applicationSection = releaseBody.indexOf(
+	'### Ergopti Plus — application with advanced typing tools'
+);
 if (layoutSection < 0 || applicationSection <= layoutSection) {
 	errors.push('release notes must explain keyboard layouts before the companion application');
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the release notes link to files the release does not contain:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the release notes link to files the release does not contain:\x1b[0m'
+	);
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
@@ -403,12 +445,17 @@ if (errors.length > 0) {
 /** Names the assets-* artifacts whose upload list holds `name`. */
 function providersOf(name) {
 	return uploads
-		.filter((u) => u.files.some((file) => {
-			const base = file.split('/').pop();
-			if (!IS_GLOB.test(base)) return base === name;
-			const pattern = base.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
-			return new RegExp(`^${pattern}$`).test(name);
-		}))
+		.filter((u) =>
+			u.files.some((file) => {
+				const base = file.split('/').pop();
+				if (!IS_GLOB.test(base)) return base === name;
+				const pattern = base
+					.replace(/[.+^${}()|\\]/g, '\\$&')
+					.replace(/\*/g, '.*')
+					.replace(/\?/g, '.');
+				return new RegExp(`^${pattern}$`).test(name);
+			})
+		)
 		.map((u) => u.artifact);
 }
 

@@ -300,6 +300,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.4 libxml2-utils
 
+      # One style per language: Prettier (JavaScript, Svelte, CSS, HTML, JSON,
+      # Markdown, YAML) and Ruff (Python), at the version format.cjs pins.
+      - name: Check formatting
+        run: |
+          python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"
+          node tools/lint/format.cjs --check
+
       - name: Run shared validation suite
         run: npm run test:${{ matrix.suite }}
 

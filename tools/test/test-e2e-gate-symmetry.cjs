@@ -52,7 +52,7 @@ function check(condition, message) {
 const REPRESENTATIVE_SOURCE = {
 	windows: 'static/ergopti_plus/windows/modules/hotstrings.ahk',
 	macos: 'static/ergopti_plus/macos/modules/keymap/expander.lua',
-	linux: 'static/ergopti_plus/linux/modules/hotstrings/injector.lua',
+	linux: 'static/ergopti_plus/linux/modules/hotstrings/injector.lua'
 };
 
 /**
@@ -69,9 +69,7 @@ function discoverE2eRunners() {
 			if (/^run_e2e\.(lua|ahk)$/.test(file)) {
 				found.push({
 					driver: entry.name,
-					runner: path
-						.relative(ROOT, path.join(e2eDir, file))
-						.replace(/\\/g, '/'),
+					runner: path.relative(ROOT, path.join(e2eDir, file)).replace(/\\/g, '/')
 				});
 			}
 		}
@@ -113,7 +111,10 @@ for (const [gate, spec] of Object.entries(GATE_COMMANDS)) {
 // ==============================================
 
 const runners = discoverE2eRunners();
-check(runners.length > 0, 'no e2e runner found at all — the discovery walk is broken, not the wiring');
+check(
+	runners.length > 0,
+	'no e2e runner found at all — the discovery walk is broken, not the wiring'
+);
 
 for (const { driver, runner } of runners) {
 	const source = REPRESENTATIVE_SOURCE[driver];
@@ -143,7 +144,10 @@ for (const { driver, runner } of runners) {
 	const reaches = e2eGates.some((gate) => {
 		const spec = GATE_COMMANDS[gate] || {};
 		if (spec.ahk) return spec.ahk.endsWith(runnerFile);
-		if (spec.npm) return (PKG.scripts[spec.npm] || '').includes(runner.replace(/^static\/ergopti_plus\/[^/]+\//, ''));
+		if (spec.npm)
+			return (PKG.scripts[spec.npm] || '').includes(
+				runner.replace(/^static\/ergopti_plus\/[^/]+\//, '')
+			);
 		return false;
 	});
 	check(

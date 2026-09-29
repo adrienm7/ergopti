@@ -10,9 +10,7 @@
 			"title": "Physical and remapped keycode credits lack exact ownership",
 			"severity": "medium",
 			"confidence": "high",
-			"guarantees": [
-				"G2"
-			],
+			"guarantees": ["G2"],
 			"reproduction": "Run proofs/duplicate-count.lua from the macOS driver root: a real key callback plus physical bridge event aggregates keycode 0 and 36 once each for one remapped press. Preserve the passing physical-collision.lua control; explicit global nil suppression makes it lose physical Space.",
 			"root_cause": "The callback's nil-valued conditional always retains the output keycode. The intended global output-code set cannot distinguish remapped output from ordinary physical input sharing that code; the separate physical ledger has no common output-event identity.",
 			"silent_failure": "Independent set-membership and aggregation tests do not exercise their combined ownership contract; a duplicate-only fix passes them while losing unjournaled passthrough keys.",

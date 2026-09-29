@@ -10,10 +10,7 @@
 			"title": "Capture paths are not exclusively owned",
 			"severity": "high",
 			"confidence": "high",
-			"guarantees": [
-				"G2",
-				"G3"
-			],
+			"guarantees": ["G2", "G3"],
 			"reproduction": "Two legacy parent AHK processes allocate their first task against the same TEMP. Keep the first capture open; the second capture redirection is refused and produces empty output. Reproduction artifacts were recorded during the native argv investigation.",
 			"root_cause": "Sync names use TickCount, legacy names use a per-process counter, and tree names use PID plus counter without exclusive reservation.",
 			"silent_failure": "Legacy completion can report exit zero and empty output despite the child never producing its receipt.",
@@ -24,9 +21,7 @@
 			"title": "CMD expands supposedly literal percent arguments",
 			"severity": "high",
 			"confidence": "high",
-			"guarantees": [
-				"G2"
-			],
+			"guarantees": ["G2"],
 			"reproduction": "Set synthetic ERGOPTI_AUDIT_LITERAL_20260907=synthetic-expanded; launch argv_echo through the real TreeOwned adapter with literal %ERGOPTI_AUDIT_LITERAL_20260907%. Its hex receipt decodes to synthetic-expanded.",
 			"root_cause": "cmd.exe /c expands environment references even inside the composed quoted argument.",
 			"silent_failure": "Existing native vectors cover empty, Unicode and trailing-slash arguments but not percent expansion.",
@@ -37,9 +32,7 @@
 			"title": "Caught metrics worker exceptions lose diagnostic evidence",
 			"severity": "high",
 			"confidence": "high",
-			"guarantees": [
-				"G2"
-			],
+			"guarantees": ["G2"],
 			"reproduction": "Cause a deterministic timing conversion failure inside KLPF_WorkerMain. Its catch exits one without output. Live cache UnsetError previously produced the same exit=1 no-output warning.",
 			"root_cause": "The catch discards the exception, deletes staging output and exits without emitting a diagnostic.",
 			"silent_failure": "ErrorStdOut does not report already caught exceptions; the parent only sees an exit number.",
@@ -50,10 +43,7 @@
 			"title": "Logger drops failed append compensation ownership",
 			"severity": "high",
 			"confidence": "high",
-			"guarantees": [
-				"G2",
-				"G3"
-			],
+			"guarantees": ["G2", "G3"],
 			"reproduction": "Code-derived sequence: actually append a prefix, refuse ResolvedTruncate, then retry the retained logical batch. Native fault-injection execution remains required.",
 			"root_cause": "_LoggerAppendComplete ignores ResolvedTruncate's result and closes the handle without retaining the original boundary.",
 			"silent_failure": "Returning false preserves the queue but loses the repair debt, allowing later bytes to follow a surviving prefix.",
@@ -64,9 +54,7 @@
 			"title": "SQL checkpoint guard accepts missing or earlier subjects",
 			"severity": "medium",
 			"confidence": "high",
-			"guarantees": [
-				"G2"
-			],
+			"guarantees": ["G2"],
 			"reproduction": "Mutate the scanned helper by removing failure-message subjects, or add a SQL-path checkpoint before the append while retaining a later one. Current position logic does not encode these failures.",
 			"root_cause": "Zero positions satisfy rollback ordering; checkpoint search begins after the append.",
 			"silent_failure": "The test asserts spelling and a later match instead of the complete checkpoint guarantee.",
@@ -77,9 +65,7 @@
 			"title": "Cache test cleanup assumes ownership of a fixed TEMP directory",
 			"severity": "medium",
 			"confidence": "high",
-			"guarantees": [
-				"G3"
-			],
+			"guarantees": ["G3"],
 			"reproduction": "Code-derived sequence: another actor occupies A_Temp/ergopti_klr_durable_cache; _KLRDC_Reset recursively deletes it without acquisition. Do not execute this against a real shared directory.",
 			"root_cause": "The fixture has a fixed process-independent root and no exclusive acquisition token.",
 			"silent_failure": "Silent try cleanup makes setup appear successful and erases evidence of ownership failure.",

@@ -57,10 +57,10 @@ written. All three manifest comparisons pass, each output 1925898 UTF-8 bytes.
 The receipt `manifest-histogram-production-01.log` terminated with exit 0.
 
 | Sample | First path | Baseline (ms) | Candidate (ms) | Reduction (ms) |
-| --- | --- | --- | --- | --- |
-| 1 | Baseline | 6014.674 | 5088.443 | 926.231 |
-| 2 | Candidate | 7774.548 | 4872.555 | 2901.993 |
-| 3 | Baseline | 6473.099 | 5608.357 | 864.742 |
+| ------ | ---------- | ------------- | -------------- | -------------- |
+| 1      | Baseline   | 6014.674      | 5088.443       | 926.231        |
+| 2      | Candidate  | 7774.548      | 4872.555       | 2901.993       |
+| 3      | Baseline   | 6473.099      | 5608.357       | 864.742        |
 
 Candidate median/max: 5088.443/5608.357 ms. Pair reductions span 13.4–37.3
 percent, with a much larger second-pair difference. Desktop load, memory

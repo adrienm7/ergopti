@@ -35,12 +35,12 @@ cache is introduced. Native geometry assertions run outside measured intervals
 for changing positions and complete preparation. Between-sample assertions can
 affect scheduling, so older reports are not matched controls for this run.
 
-| Run | Variant | UTC start, 2026-09-08 | PID | Exit | Prefix result |
-| --- | --- | --- | ---: | ---: | --- |
-| 1 | baseline | 18:07:26.3873104 | 16128 | 0 | 359/359 |
-| 2 | candidate | 18:07:59.5012150 | 15896 | 0 | 359/359 |
-| 3 | candidate | 18:08:33.1283630 | 17024 | 1 | 357/359 |
-| 4 | baseline | 18:09:10.1902118 | 5640 | 0 | 359/359 |
+| Run | Variant   | UTC start, 2026-09-08 |   PID | Exit | Prefix result |
+| --- | --------- | --------------------- | ----: | ---: | ------------- |
+| 1   | baseline  | 18:07:26.3873104      | 16128 |    0 | 359/359       |
+| 2   | candidate | 18:07:59.5012150      | 15896 |    0 | 359/359       |
+| 3   | candidate | 18:08:33.1283630      | 17024 |    1 | 357/359       |
+| 4   | baseline  | 18:09:10.1902118      |  5640 |    0 | 359/359       |
 
 TEMP/TMP used `D:/Documents/GitHub/ergopti-ahk-verification-temp-2026-09-08`.
 Raw local receipts are `border-position-perf-run1.out` through `run4.out`, with
@@ -63,12 +63,12 @@ is median / p95 / maximum. Median averages the two middle sorted samples;
 p95 is nearest-rank sample 95 of 100. Separate segment percentiles need not
 belong to the same sample and must not be added.
 
-| Run | Changing-position total | Changing-position build | Complete preparation | Complete border segment |
-| --- | --- | --- | --- | --- |
-| 1 baseline | 0.789 / 1.828 / 3.395 | 0.709 / 1.474 / 3.242 | 1.782 / 4.712 / 11.917 | 0.211 / 0.871 / 3.885 |
-| 2 candidate | 1.073 / 3.134 / 5.470 | 0.936 / 3.044 / 5.389 | 1.690 / 4.741 / 13.729 | 0.148 / 0.259 / 3.538 |
-| 3 candidate | 1.111 / 5.803 / 12.481 | 0.970 / 5.226 / 12.398 | 1.836 / 6.222 / 27.226 | 0.157 / 0.517 / 5.294 |
-| 4 baseline | 0.877 / 3.354 / 13.054 | 0.770 / 3.262 / 12.817 | 1.684 / 4.954 / 10.666 | 0.192 / 0.701 / 6.351 |
+| Run         | Changing-position total | Changing-position build | Complete preparation   | Complete border segment |
+| ----------- | ----------------------- | ----------------------- | ---------------------- | ----------------------- |
+| 1 baseline  | 0.789 / 1.828 / 3.395   | 0.709 / 1.474 / 3.242   | 1.782 / 4.712 / 11.917 | 0.211 / 0.871 / 3.885   |
+| 2 candidate | 1.073 / 3.134 / 5.470   | 0.936 / 3.044 / 5.389   | 1.690 / 4.741 / 13.729 | 0.148 / 0.259 / 3.538   |
+| 3 candidate | 1.111 / 5.803 / 12.481  | 0.970 / 5.226 / 12.398  | 1.836 / 6.222 / 27.226 | 0.157 / 0.517 / 5.294   |
+| 4 baseline  | 0.877 / 3.354 / 13.054  | 0.770 / 3.262 / 12.817  | 1.684 / 4.954 / 10.666 | 0.192 / 0.701 / 6.351   |
 
 Complete preparation excludes content GUI construction and retired-surface
 disposal; it is not end-to-end keystroke latency. Its same-position border

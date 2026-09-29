@@ -268,7 +268,10 @@ function checkBannerAlignment(file) {
 		// zero violations.
 		const above = runFrom(i - 1, -1);
 		const below = runFrom(i + 1, 1);
-		for (const [side, run] of [['above', above], ['below', below]]) {
+		for (const [side, run] of [
+			['above', above],
+			['below', below]
+		]) {
 			if (run.length !== expectedRules) {
 				warn(
 					file,
@@ -279,7 +282,11 @@ function checkBannerAlignment(file) {
 			for (const adj of run) {
 				const adjMatch = lines[adj].match(/^(;|---?) (=+)$/);
 				if (adjMatch[1] !== m[1]) {
-					warn(file, adj + 1, `Banner marker '${adjMatch[1]}' does not match title line marker '${m[1]}'`);
+					warn(
+						file,
+						adj + 1,
+						`Banner marker '${adjMatch[1]}' does not match title line marker '${m[1]}'`
+					);
 					continue;
 				}
 				if (lines[adj].length !== expectedBannerLen) {
@@ -472,11 +479,11 @@ function checkAhkAntiPatterns(file) {
 	const raw = readFileSync(file, 'utf8');
 	// Strip comments to check for code anti-patterns
 	const codeOnly = raw.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-	
+
 	if (codeOnly.includes('JSON.parse(')) {
 		warn(file, null, `JSON.parse() is not valid AHK. Use JsonParse() instead.`);
 	}
-	
+
 	// Check for UIA wrapper guard in hotstring_prefix_watcher.ahk.
 	// The guard was originally _UIA_WRAP_PAIRS.Has; after the refactor to
 	// WrapSymbols_GetActivePairs() the equivalent check is .Has(Char) on that call.
@@ -484,7 +491,7 @@ function checkAhkAntiPatterns(file) {
 	// then `X.Has(Char)` — which is the preferred form (one lookup, consistent
 	// membership-vs-value read), so that pattern counts as a valid guard too.
 	if (file.includes('hotstring_prefix_watcher.ahk')) {
-		const hasUiaCall  = codeOnly.includes('GetUIASelection');
+		const hasUiaCall = codeOnly.includes('GetUIASelection');
 		const hasOldGuard = codeOnly.includes('_UIA_WRAP_PAIRS.Has');
 		const hasNewGuard = codeOnly.includes('WrapSymbols_GetActivePairs().Has');
 		// Snapshot form: any var assigned from WrapSymbols_GetActivePairs() whose .Has is checked.
@@ -492,10 +499,17 @@ function checkAhkAntiPatterns(file) {
 		const snapRe = /(\w+)\s*:=\s*WrapSymbols_GetActivePairs\(\)/g;
 		let snap;
 		while ((snap = snapRe.exec(codeOnly)) !== null) {
-			if (codeOnly.includes(`${snap[1]}.Has`)) { hasSnapshotGuard = true; break; }
+			if (codeOnly.includes(`${snap[1]}.Has`)) {
+				hasSnapshotGuard = true;
+				break;
+			}
 		}
 		if (hasUiaCall && !hasOldGuard && !hasNewGuard && !hasSnapshotGuard) {
-			warn(file, null, `GetUIASelection used without an active-pairs .Has guard. This causes severe lag.`);
+			warn(
+				file,
+				null,
+				`GetUIASelection used without an active-pairs .Has guard. This causes severe lag.`
+			);
 		}
 	}
 
@@ -514,9 +528,12 @@ function checkAhkAntiPatterns(file) {
 
 function checkLuaAntiPatterns(file) {
 	const raw = readFileSync(file, 'utf8');
-	
+
 	if (file.includes('healthcheck.lua')) {
-		if (!raw.includes('title = "ErgoptiPlus — " .. title') && !raw.includes('title = "ErgoptiPlus ??? " .. title')) {
+		if (
+			!raw.includes('title = "ErgoptiPlus — " .. title') &&
+			!raw.includes('title = "ErgoptiPlus ??? " .. title')
+		) {
 			warn(file, null, `Healthcheck window title does not enforce ErgoptiPlus prefix.`);
 		}
 	}
@@ -532,17 +549,24 @@ function checkWebUiAntiPatterns() {
 
 	try {
 		const script = readFileSync(scriptPath, 'utf8');
-		if (!script.includes('btnGh.style.display = "none"') && !script.includes("btnGh.style.display = 'none'")) {
+		if (
+			!script.includes('btnGh.style.display = "none"') &&
+			!script.includes("btnGh.style.display = 'none'")
+		) {
 			warn(scriptPath, null, `Does not hide GitHub button on clearContent().`);
 		}
-	} catch (e) { /* ignore if missing */ }
+	} catch (e) {
+		/* ignore if missing */
+	}
 
 	try {
 		const style = readFileSync(stylePath, 'utf8');
 		if (!style.match(/#btn-github\s*\{[^}]*display:\s*none;/)) {
 			warn(stylePath, null, `Does not hide #btn-github by default.`);
 		}
-	} catch (e) { /* ignore if missing */ }
+	} catch (e) {
+		/* ignore if missing */
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -554,18 +578,35 @@ function checkMacOsGestureDefaults() {
 	try {
 		const content = readFileSync(manifestPath, 'utf8');
 		// Only look at the hs.gestures section
-		const hsBlock = content.split('# ===== 5.1 hs.gestures =====')[1].split('# =================================')[0];
-		
-		const ids = ['swipe_4_up', 'swipe_4_down', 'swipe_4_left', 'swipe_4_right', 'swipe_5_up', 'swipe_5_down', 'swipe_5_left', 'swipe_5_right'];
-		
+		const hsBlock = content
+			.split('# ===== 5.1 hs.gestures =====')[1]
+			.split('# =================================')[0];
+
+		const ids = [
+			'swipe_4_up',
+			'swipe_4_down',
+			'swipe_4_left',
+			'swipe_4_right',
+			'swipe_5_up',
+			'swipe_5_down',
+			'swipe_5_left',
+			'swipe_5_right'
+		];
+
 		for (const id of ids) {
 			const regex = new RegExp(`id\\s*=\\s*"${id}"\\s*default\\s*=\\s*"([^"]+)"`, 'm');
 			const match = hsBlock.match(regex);
 			if (match && match[1] !== 'none') {
-				warn(manifestPath, null, `macOS gesture default for ${id} is "${match[1]}", expected "none".`);
+				warn(
+					manifestPath,
+					null,
+					`macOS gesture default for ${id} is "${match[1]}", expected "none".`
+				);
 			}
 		}
-	} catch (e) { /* ignore */ }
+	} catch (e) {
+		/* ignore */
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -606,9 +647,15 @@ function checkMacOsPathIntegrity() {
 	try {
 		const content = readFileSync(kbdMenu, 'utf8');
 		if (content.includes('local BUNDLES_RELDIR = "../macos/bundles/"')) {
-			warn(kbdMenu, null, `BUNDLES_RELDIR is incorrect (relative to static/ergopti_plus/macos/). Use "../../ergopti/macos/bundles/".`);
+			warn(
+				kbdMenu,
+				null,
+				`BUNDLES_RELDIR is incorrect (relative to static/ergopti_plus/macos/). Use "../../ergopti/macos/bundles/".`
+			);
 		}
-	} catch (e) { /* ignore */ }
+	} catch (e) {
+		/* ignore */
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -670,7 +717,7 @@ for (const dir of luaDirs) {
 	if (walkFiles(dir, ['.lua']).length === 0) {
 		console.error(
 			`lint-conventions: FATAL — no .lua found under ${dir}. ` +
-			'The scan path is stale; fix it rather than letting the Lua checks pass on an empty set.'
+				'The scan path is stale; fix it rather than letting the Lua checks pass on an empty set.'
 		);
 		process.exit(1);
 	}
@@ -708,11 +755,13 @@ const tomlAll = tomlDirs
 // Guard against the exact regression above: a stale path makes walkFiles() return
 // [] and the whole TOML check pass vacuously. The shared tree always has TOMLs, so
 // finding none means the selector is wrong, not the tree.
-const sharedTomlCount = walkFiles(join(REPO_ROOT, 'static', 'ergopti_plus', '_shared'), ['.toml']).length;
+const sharedTomlCount = walkFiles(join(REPO_ROOT, 'static', 'ergopti_plus', '_shared'), [
+	'.toml'
+]).length;
 if (sharedTomlCount === 0) {
 	console.error(
 		'lint-conventions: FATAL — no .toml found under static/ergopti_plus/_shared. ' +
-		'The scan path is stale; fix it rather than letting the TOML checks pass on an empty set.'
+			'The scan path is stale; fix it rather than letting the TOML checks pass on an empty set.'
 	);
 	process.exit(1);
 }

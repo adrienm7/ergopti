@@ -109,7 +109,9 @@ body {
 	font-size: 15px;
 	line-height: 1;
 	padding: 7px 10px;
-	transition: border-color 0.12s, background 0.12s;
+	transition:
+		border-color 0.12s,
+		background 0.12s;
 }
 #toc-btn:hover {
 	border-color: var(--accent);
@@ -125,7 +127,9 @@ body {
 	gap: 8px;
 	margin: 0 20px 10px;
 	padding: 0 12px;
-	transition: border-color 0.12s, box-shadow 0.12s;
+	transition:
+		border-color 0.12s,
+		box-shadow 0.12s;
 }
 #search-bar:focus-within {
 	border-color: var(--accent);
@@ -134,8 +138,8 @@ body {
 
 .search-ico {
 	color: var(--sub);
-	font-size: 16px;
 	flex-shrink: 0;
+	font-size: 16px;
 }
 
 #search {
@@ -165,6 +169,7 @@ body {
 
 .heading {
 	align-items: center;
+	background: var(--bg);
 	color: var(--sub);
 	cursor: pointer;
 	display: flex;
@@ -172,9 +177,8 @@ body {
 	padding: 8px;
 	position: sticky;
 	top: 0;
-	z-index: 1;
-	background: var(--bg);
 	user-select: none;
+	z-index: 1;
 }
 .heading.static {
 	cursor: default;
@@ -217,8 +221,8 @@ body {
 .heading.lvl3,
 .heading.lvl4 {
 	font-size: 11px;
-	font-weight: 600;
 	font-style: italic;
+	font-weight: 600;
 	text-transform: none;
 }
 
@@ -291,12 +295,12 @@ body {
 }
 
 #empty {
-	color: var(--sub);
-	flex: 1;
-	display: flex;
 	align-items: center;
-	justify-content: center;
+	color: var(--sub);
+	display: flex;
+	flex: 1;
 	font-size: 13px;
+	justify-content: center;
 	padding: 20px;
 	text-align: center;
 }

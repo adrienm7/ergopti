@@ -34,16 +34,15 @@ const path = require('path');
 const { parse: parseToml } = require('smol-toml');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
-
-
-
 // ================================
 // ================================
 // ======= 1/ Configuration =======
 // ================================
 // ================================
 
-const LAYOUT_DEFAULTS = JSON.parse(fs.readFileSync(shared('modules', 'layouts', 'defaults.json'), 'utf8'));
+const LAYOUT_DEFAULTS = JSON.parse(
+	fs.readFileSync(shared('modules', 'layouts', 'defaults.json'), 'utf8')
+);
 const REGISTRY_DIR = path.join(REPO_ROOT, ...LAYOUT_DEFAULTS.registry.folder.split('/'));
 const INDEX_PATH = path.join(REGISTRY_DIR, LAYOUT_DEFAULTS.registry.index_file);
 
@@ -76,9 +75,6 @@ const REQUIRED_KEYS = [
 const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb', 'extension_source'];
 const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
 const KEYSYM_RE = /^[A-Za-z0-9_]+$/;
-
-
-
 
 // =============================
 // =============================
@@ -122,13 +118,15 @@ function validateMeta(id, meta, fileExists) {
 	const errors = [];
 	if (!ID_RE.test(id)) errors.push(`${id}: the folder name is not a registry id (${ID_RE})`);
 	for (const key of Object.keys(meta)) {
-		if (!REQUIRED_KEYS.includes(key) && !OPTIONAL_KEYS.includes(key)) errors.push(`${id}: unknown key ${key}`);
+		if (!REQUIRED_KEYS.includes(key) && !OPTIONAL_KEYS.includes(key))
+			errors.push(`${id}: unknown key ${key}`);
 	}
 	for (const key of REQUIRED_KEYS) {
 		if (!(key in meta)) errors.push(`${id}: missing key ${key}`);
 	}
 	for (const key of ['name', 'author']) {
-		if (key in meta && !isNonEmptyString(meta[key])) errors.push(`${id}: ${key} must be a non-empty string`);
+		if (key in meta && !isNonEmptyString(meta[key]))
+			errors.push(`${id}: ${key} must be a non-empty string`);
 	}
 	// The family groups a layout with its variants; the drivers compare it with
 	// registry.ergopti_family of the shared defaults to tell Ergopti layouts apart.
@@ -145,21 +143,48 @@ function validateMeta(id, meta, fileExists) {
 		if (key in meta && !isHttpsUrl(meta[key])) errors.push(`${id}: ${key} must be an https URL`);
 	}
 	if ('languages' in meta) {
-		validateUniqueList(errors, id, 'languages', meta.languages, (v) => typeof v === 'string' && LANGUAGE_RE.test(v), false);
+		validateUniqueList(
+			errors,
+			id,
+			'languages',
+			meta.languages,
+			(v) => typeof v === 'string' && LANGUAGE_RE.test(v),
+			false
+		);
 	}
 	if ('variants' in meta) {
-		validateUniqueList(errors, id, 'variants', meta.variants, (v) => typeof v === 'string' && ID_RE.test(v), true);
+		validateUniqueList(
+			errors,
+			id,
+			'variants',
+			meta.variants,
+			(v) => typeof v === 'string' && ID_RE.test(v),
+			true
+		);
 	}
 	if ('platforms' in meta) {
-		validateUniqueList(errors, id, 'platforms', meta.platforms, (v) => PLATFORMS.includes(v), false);
+		validateUniqueList(
+			errors,
+			id,
+			'platforms',
+			meta.platforms,
+			(v) => PLATFORMS.includes(v),
+			false
+		);
 	}
 	if ('keycode_convention' in meta && !KEYCODE_CONVENTIONS.includes(meta.keycode_convention)) {
 		errors.push(`${id}: keycode_convention must be one of ${KEYCODE_CONVENTIONS.join(', ')}`);
 	}
-	if ('source_sha256' in meta && !(typeof meta.source_sha256 === 'string' && SHA256_RE.test(meta.source_sha256))) {
+	if (
+		'source_sha256' in meta &&
+		!(typeof meta.source_sha256 === 'string' && SHA256_RE.test(meta.source_sha256))
+	) {
 		errors.push(`${id}: source_sha256 must be 64 lowercase hex digits`);
 	}
-	if ('extension_source' in meta && !(typeof meta.extension_source === 'string' && ID_RE.test(meta.extension_source))) {
+	if (
+		'extension_source' in meta &&
+		!(typeof meta.extension_source === 'string' && ID_RE.test(meta.extension_source))
+	) {
 		errors.push(`${id}: extension_source must identify a registry folder`);
 	}
 	if ('xkb' in meta) validateXkb(errors, id, meta.xkb);
@@ -191,7 +216,14 @@ function validateXkb(errors, id, xkb) {
 		if (!XKB_KEYS.includes(key)) errors.push(`${id}: unknown key xkb.${key}`);
 	}
 	if ('base_level_only' in xkb) {
-		validateUniqueList(errors, id, 'xkb.base_level_only', xkb.base_level_only, isNonEmptyString, false);
+		validateUniqueList(
+			errors,
+			id,
+			'xkb.base_level_only',
+			xkb.base_level_only,
+			isNonEmptyString,
+			false
+		);
 	}
 	const pairs = xkb.keysym_overrides;
 	if (pairs === undefined) return;
@@ -211,7 +243,8 @@ function validateXkb(errors, id, xkb) {
 			errors.push(`${id}: xkb.keysym_overrides has an invalid pair ${JSON.stringify(pair)}`);
 			continue;
 		}
-		if (texts.has(pair[0])) errors.push(`${id}: xkb.keysym_overrides maps ${JSON.stringify(pair[0])} twice`);
+		if (texts.has(pair[0]))
+			errors.push(`${id}: xkb.keysym_overrides maps ${JSON.stringify(pair[0])} twice`);
 		texts.add(pair[0]);
 	}
 }
@@ -250,7 +283,8 @@ function validateRegistry(metas) {
 function validateKeylayout(id, bytes) {
 	const errors = [];
 	if (bytes.includes(0x0d)) errors.push(`${id}: the .keylayout contains CR bytes (store it as LF)`);
-	if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) errors.push(`${id}: the .keylayout starts with a BOM`);
+	if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf)
+		errors.push(`${id}: the .keylayout starts with a BOM`);
 	const text = bytes.toString('utf8');
 	for (const tag of ['<keyboard', '<layouts>', '<modifierMap', '<keyMapSet', '<keyMap ']) {
 		if (!text.includes(tag)) errors.push(`${id}: the .keylayout has no ${tag} element`);
@@ -269,9 +303,6 @@ function keyboardName(text) {
 	const match = /<keyboard\b[^>]*\sname\s*=\s*"([^"]+)"/.exec(text);
 	return match ? match[1] : null;
 }
-
-
-
 
 // ==========================
 // ==========================
@@ -294,13 +325,20 @@ function buildExtension(folder, id, meta) {
 	const manifestPath = path.join(sourceFolder, 'manifest.toml');
 	const manifest = parseToml(fs.readFileSync(manifestPath, 'utf8'));
 	const extension = manifest.extension;
-	if (!extension || extension.id !== sourceId ||
-		!isNonEmptyString(extension.name) || !VERSION_RE.test(extension.version || '')) {
+	if (
+		!extension ||
+		extension.id !== sourceId ||
+		!isNonEmptyString(extension.name) ||
+		!VERSION_RE.test(extension.version || '')
+	) {
 		throw new Error(`${id}: manifest.toml requires an extension id, name and semantic version`);
 	}
 	const description = extension.description || {};
-	if (typeof description !== 'object' || Array.isArray(description) ||
-		Object.values(description).some((text) => typeof text !== 'string')) {
+	if (
+		typeof description !== 'object' ||
+		Array.isArray(description) ||
+		Object.values(description).some((text) => typeof text !== 'string')
+	) {
 		throw new Error(`${id}: invalid extension descriptions in manifest.toml`);
 	}
 	const relativePaths = ['manifest.toml', `${id}.keylayout`];
@@ -317,10 +355,12 @@ function buildExtension(folder, id, meta) {
 			throw new Error(`${id}: ${category} must be a real extension directory`);
 		}
 		for (const item of fs.readdirSync(directory, { withFileTypes: true })) {
-			const supported = category === 'hotstrings'
-				? /^[a-z][a-z0-9_-]*\.toml$/.test(item.name)
-				: /^menu\.(ahk|lua)$/.test(item.name);
-			if (!item.isFile() || !supported) throw new Error(`${id}: unsupported extension file ${category}/${item.name}`);
+			const supported =
+				category === 'hotstrings'
+					? /^[a-z][a-z0-9_-]*\.toml$/.test(item.name)
+					: /^menu\.(ahk|lua)$/.test(item.name);
+			if (!item.isFile() || !supported)
+				throw new Error(`${id}: unsupported extension file ${category}/${item.name}`);
 			relativePaths.push(`${category}/${item.name}`);
 		}
 	}
@@ -331,14 +371,24 @@ function buildExtension(folder, id, meta) {
 			throw new Error(`${id}: extension files must be regular files: ${relative}`);
 		}
 		const bytes = fs.readFileSync(filename);
-		return { path: relative, file: `${ownFile ? id : sourceId}/${relative}`, size: bytes.length,
-			sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+		return {
+			path: relative,
+			file: `${ownFile ? id : sourceId}/${relative}`,
+			size: bytes.length,
+			sha256: crypto.createHash('sha256').update(bytes).digest('hex')
+		};
 	});
 	if (files.reduce((sum, file) => sum + file.size, 0) > LAYOUT_DEFAULTS.registry.max_file_bytes) {
 		throw new Error(`${id}: extension exceeds the registry download bound`);
 	}
-	return { id: extension.id, name: extension.name, version: extension.version, description,
-		sha256: crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex'), files };
+	return {
+		id: extension.id,
+		name: extension.name,
+		version: extension.version,
+		description,
+		sha256: crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex'),
+		files
+	};
 }
 
 /**
@@ -418,7 +468,8 @@ function buildIndex(registryDir) {
 		if (meta.licence_file) entry.licence_file = meta.licence_file;
 		if (meta.xkb) {
 			entry.xkb = {};
-			if (meta.xkb.keysym_overrides) entry.xkb.keysym_overrides = meta.xkb.keysym_overrides.map((pair) => [...pair]);
+			if (meta.xkb.keysym_overrides)
+				entry.xkb.keysym_overrides = meta.xkb.keysym_overrides.map((pair) => [...pair]);
 			if (meta.xkb.base_level_only) entry.xkb.base_level_only = [...meta.xkb.base_level_only];
 		}
 		return entry;
@@ -431,9 +482,6 @@ function buildIndex(registryDir) {
 	};
 	return { index, text: `${JSON.stringify(index, null, '\t')}\n` };
 }
-
-
-
 
 // ======================
 // ======================

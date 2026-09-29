@@ -247,8 +247,9 @@ FEATURES & RATIONALE:
 			<h3>
 				<span class="step-badge">2</span>
 				<span class="step-title"
-				>Choisissez votre modèle parmi <span use:countup={totals.models}>{totals.models}</span></span
-			>
+					>Choisissez votre modèle parmi <span use:countup={totals.models}>{totals.models}</span
+					></span
+				>
 			</h3>
 			<p class="step-lead">
 				Un catalogue curé de <strong>{totals.models} modèles open-weights</strong> issus de

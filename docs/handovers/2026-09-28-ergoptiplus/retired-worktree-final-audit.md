@@ -15,18 +15,18 @@ Committed comparison: dev@2d065e7c808fb3006fa23dfa3e2584e1747d3b9e. Current dirt
 
 Directory: `D:/ewt/_scratch/retired-worktree-originals/`. Byte-exact copies with hashes in the adjacent JSON report.
 
-| Artifact | Bytes | SHA256 |
-|---|---:|---|
-| actions-D4-staged.patch | 30572 | 2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937 |
-| diag-integration-unstaged.patch | 3457 | 03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f |
-| windows-master-state-unstaged.patch | 511775 | 693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6 |
-| actions-D4-history.bundle | 483526 | 917cd6218564fb48e398384e32844707b9d0bbd384eb3b7945250c07121a6a79 |
-| windows-master-state-test_neutral_config_manifest.ahk | 4552 | 32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba |
+| Artifact                                              |  Bytes | SHA256                                                           |
+| ----------------------------------------------------- | -----: | ---------------------------------------------------------------- |
+| actions-D4-staged.patch                               |  30572 | 2eb7fbf20259524e64d9e38896896ceec914747b176557ce75fcfbb592532937 |
+| diag-integration-unstaged.patch                       |   3457 | 03124e7aa042449c3f6f580e92e69e7349f4a0ed6233e0da266cfb790b98902f |
+| windows-master-state-unstaged.patch                   | 511775 | 693d5509b76fa6279742923d8b9599120599969faa04abbef14d942f5cb32de6 |
+| actions-D4-history.bundle                             | 483526 | 917cd6218564fb48e398384e32844707b9d0bbd384eb3b7945250c07121a6a79 |
+| windows-master-state-test_neutral_config_manifest.ahk |   4552 | 32447ec7b4d0b4932ca735e21fca9079ae866c6fb99ff92a978e57861cee06ba |
 
 ## Ignored ZIPs
 
 - Generated build output, locale/hotstring TSV and Python bytecode are reconstructible.
-- Both personal_shortcuts.ahk files are generated forwarding stubs pointing only at Temp/ergopti-full-startup-*/suspend-marker/config/autohotkey/personal_shortcuts.ahk. No user shortcut bodies.
+- Both personal_shortcuts.ahk files are generated forwarding stubs pointing only at Temp/ergopti-full-startup-\*/suspend-marker/config/autohotkey/personal_shortcuts.ahk. No user shortcut bodies.
 - today.log is a 68-byte synthetic typing record containing text x and a test UUID; test_results.txt is an old 5/5 E2E receipt.
 - The only other entries outside generated/fixture classifications are .claude/settings.local.json, tests/test_config.ini, and one zero-byte fixture write lock; all byte-identical current root.
 - No missing implementation or user-authored config found; do not include these ignored ZIPs in GitHub handoff. Local machine settings were not exported.

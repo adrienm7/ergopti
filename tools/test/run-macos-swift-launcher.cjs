@@ -23,17 +23,17 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PACKAGE_PATH = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher');
-const PLIST_PATH = path.join(
-	PACKAGE_PATH,
-	'com.ergoptiplus.remap-guardian.plist'
-);
+const PLIST_PATH = path.join(PACKAGE_PATH, 'com.ergoptiplus.remap-guardian.plist');
 
 /** Returns the exact ordered native verification command plan. */
 function commandPlan() {
 	return [
 		['plutil', ['-lint', PLIST_PATH]],
-		['swift', ['build', '-c', 'release', '--product', 'ErgoptiPlus', '--package-path', PACKAGE_PATH]],
-		['swift', ['test', '--package-path', PACKAGE_PATH]],
+		[
+			'swift',
+			['build', '-c', 'release', '--product', 'ErgoptiPlus', '--package-path', PACKAGE_PATH]
+		],
+		['swift', ['test', '--package-path', PACKAGE_PATH]]
 	];
 }
 
@@ -42,7 +42,7 @@ function run({
 	platform = process.platform,
 	spawn = spawnSync,
 	log = console.log,
-	error = console.error,
+	error = console.error
 } = {}) {
 	if (platform !== 'darwin') {
 		log('[DEFERRED] Swift launcher compilation requires macOS; gating CI runs it on macos-latest.');
@@ -52,7 +52,7 @@ function run({
 	for (const [command, arguments_] of commandPlan()) {
 		const result = spawn(command, arguments_, {
 			cwd: ROOT,
-			stdio: 'inherit',
+			stdio: 'inherit'
 		});
 		if (result.error) {
 			error(`[FAIL] ${command} could not start: ${result.error.message}`);

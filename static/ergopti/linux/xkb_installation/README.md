@@ -11,10 +11,10 @@ Two installation methods are available:
 
 | Aspect                        | Clean method                             | Legacy method                             |
 | ----------------------------- | ---------------------------------------- | ----------------------------------------- |
-| Python script                 | `xkb_files_installer_clean.py`            | `xkb_files_installer_legacy.py`            |
-| Installation command          | `install.sh --installation-method clean`  | `install.sh --installation-method legacy`  |
-| Requirements                  | libxkbcommon >= 1.13.0, Wayland session    | X11 or Wayland                            |
-| Location                      | `/usr/share/xkeyboard-config.d/ergopti/`  | `/usr/share/X11/xkb/`                      |
+| Python script                 | `xkb_files_installer_clean.py`           | `xkb_files_installer_legacy.py`           |
+| Installation command          | `install.sh --installation-method clean` | `install.sh --installation-method legacy` |
+| Requirements                  | libxkbcommon >= 1.13.0, Wayland session  | X11 or Wayland                            |
+| Location                      | `/usr/share/xkeyboard-config.d/ergopti/` | `/usr/share/X11/xkb/`                     |
 | Patches system files          | No                                       | Yes                                       |
 | Conflicts with system updates | No                                       | Possible                                  |
 | Uninstallation                | Removes the extension package            | Restores managed backups                  |
@@ -130,12 +130,12 @@ Implementation contracts:
 Environment overrides take precedence over default paths. Tests use them to run the real CLI
 inside temporary directories without root privileges:
 
-| Variable                      | Default                         | Purpose                                         |
-| ----------------------------- | ------------------------------- | ----------------------------------------------- |
-| `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | XKB extensions root                            |
-| `ERGOPTI_XKB_SYSTEM_ROOT`     | `/usr/share/X11/xkb`            | Legacy X11 tree, including cleanup targets      |
-| `ERGOPTI_XKB_CACHE_DIR`       | `/var/lib/xkb`                  | XKB cache cleared after installation           |
-| `ERGOPTI_XKB_USER_HOME`       | Calling user's home            | Isolated home for XCompose tests               |
+| Variable                      | Default                         | Purpose                                    |
+| ----------------------------- | ------------------------------- | ------------------------------------------ |
+| `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | XKB extensions root                        |
+| `ERGOPTI_XKB_SYSTEM_ROOT`     | `/usr/share/X11/xkb`            | Legacy X11 tree, including cleanup targets |
+| `ERGOPTI_XKB_CACHE_DIR`       | `/var/lib/xkb`                  | XKB cache cleared after installation       |
+| `ERGOPTI_XKB_USER_HOME`       | Calling user's home             | Isolated home for XCompose tests           |
 
 Clean Python installer exit codes: `0` success, `2` invalid arguments, `3` inconsistent
 package or invalid keymap, `4` installation aborted.
@@ -154,7 +154,7 @@ for the desktop pickers, and an owned block of includes in `~/.XCompose`.
 - It never writes a file it did not create: a manifest
   (`.ergopti_plus_layouts.json`) lists its layouts and the rules files carry an
   owner marker; any other existing file is a conflict (exit 3, `"code":
-  "conflict"` in the JSON report) and nothing is written.
+"conflict"` in the JSON report) and nothing is written.
 - Only libxkbcommon reads this tree, so it serves Wayland sessions; an X11
   session needs the system installer above.
 - `install` compiles the layout with `xkbcli` when it is installed and reports

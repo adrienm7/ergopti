@@ -21,14 +21,14 @@ These repaired issues are context, not newly open findings.
 
 ## Evidence and provenance
 
-| Finding | Basis | Independent verification |
-| --- | --- | --- |
-| AHK-901 | legacy collision reproduced during argv investigation | current naming/cleanup code re-read; PID-reuse tree consequence remains unmeasured |
-| AHK-902 | new actual TreeOwned child probe | parent scratch source and byte receipt opened by primary auditor |
-| AHK-903 | current catch and live no-output failures | source re-read; cache UnsetError reproduced in a synthetic direct call |
-| AHK-904 | current unchecked compensation return | source re-read; native combined-failure reproduction required before implementation |
-| AHK-905 | current position assertions | source re-read; mutation execution is an implementation prerequisite |
-| AHK-906 | current fixed-root recursive reset | source re-read; no foreign directory was deleted to prove the issue |
+| Finding | Basis                                                 | Independent verification                                                            |
+| ------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| AHK-901 | legacy collision reproduced during argv investigation | current naming/cleanup code re-read; PID-reuse tree consequence remains unmeasured  |
+| AHK-902 | new actual TreeOwned child probe                      | parent scratch source and byte receipt opened by primary auditor                    |
+| AHK-903 | current catch and live no-output failures             | source re-read; cache UnsetError reproduced in a synthetic direct call              |
+| AHK-904 | current unchecked compensation return                 | source re-read; native combined-failure reproduction required before implementation |
+| AHK-905 | current position assertions                           | source re-read; mutation execution is an implementation prerequisite                |
+| AHK-906 | current fixed-root recursive reset                    | source re-read; no foreign directory was deleted to prove the issue                 |
 
 Local evidence files, not portable dependencies:
 

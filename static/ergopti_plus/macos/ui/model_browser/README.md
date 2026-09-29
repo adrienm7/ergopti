@@ -6,9 +6,9 @@ Floating WKWebView window rendering the curated LLM model catalogue as a sortabl
 
 ## Key files
 
-| File      | Description                                                           |
-| --------- | --------------------------------------------------------------------- |
-| `init.lua`| `M.show()` — singleton host; reads model catalogue and injects data    |
+| File       | Description                                                         |
+| ---------- | ------------------------------------------------------------------- |
+| `init.lua` | `M.show()` — singleton host; reads model catalogue and injects data |
 
 ## Shared frontend
 

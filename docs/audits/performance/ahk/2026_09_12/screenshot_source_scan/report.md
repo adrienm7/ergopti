@@ -11,10 +11,10 @@ TEMP and TMP pointed to the campaign scratch on D:. No concurrent verification
 process was present at launch, and no screenshot, clipboard operation or input
 injection was performed: the callback only inspects source text.
 
-| Version | Callback time | Samples |
-| --- | ---: | ---: |
-| Original private recursive scanner | 2378.598 ms | 1 |
-| Shared indexed extractor | 611.333 ms | 1 |
+| Version                            | Callback time | Samples |
+| ---------------------------------- | ------------: | ------: |
+| Original private recursive scanner |   2378.598 ms |       1 |
+| Shared indexed extractor           |    611.333 ms |       1 |
 
 Receipts in the campaign scratch are `screenshot-cost-before-01.out` and
 `screenshot-cost-after-01.out`, both exit 0. An earlier complete-suite receipt,

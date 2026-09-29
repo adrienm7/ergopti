@@ -51,7 +51,9 @@ const JS_LITERAL = /\/\s*5\s*(?:\/|\)|;|$)/;
 const errors = [];
 
 if (!fs.existsSync(CANON)) {
-	console.error('\x1b[31m[ERROR] the shared metrics module is missing — there is no canonical divisor.\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] the shared metrics module is missing — there is no canonical divisor.\x1b[0m'
+	);
 	process.exit(1);
 }
 
@@ -104,7 +106,9 @@ for (const rel of ['macos', 'linux', '_shared/lua']) {
 }
 
 if (luaScanned < 200) {
-	errors.push(`scanned only ${luaScanned} Lua file(s) — the walk is broken and would report nothing`);
+	errors.push(
+		`scanned only ${luaScanned} Lua file(s) — the walk is broken and would report nothing`
+	);
 }
 
 // ── JavaScript: the WebView copies, frozen ──────────────────────────────────

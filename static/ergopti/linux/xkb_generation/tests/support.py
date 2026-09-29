@@ -16,7 +16,9 @@ STATIC_DIR = GENERATION_DIR.parents[2]
 LINUX_DIR = GENERATION_DIR.parent
 REGISTRY_DIR = STATIC_DIR / "layouts" / "registry"
 INDEX_PATH = REGISTRY_DIR / "index.json"
-KEYCODES_PATH = STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
+KEYCODES_PATH = (
+    STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
+)
 
 
 def registry_entries() -> list:

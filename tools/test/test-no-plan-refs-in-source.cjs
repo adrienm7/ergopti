@@ -46,7 +46,7 @@ const PHASE_ALLOWLIST = new Set([
 	'static/ergopti_plus/windows/platform/remap/enter.ahk',
 	'static/ergopti_plus/windows/platform/remap/escape.ahk',
 	'static/ergopti_plus/windows/platform/remap/space.ahk',
-	'tools/compact_data_sql.py',
+	'tools/compact_data_sql.py'
 ]);
 
 // Tokens that are never legitimate in source, matched everywhere.
@@ -62,10 +62,13 @@ const FORBIDDEN = [
 	// was supposed to remove them. The plan they point at was consolidated and
 	// deleted, so the token is not a reference a reader can follow — it is noise
 	// that looks like one. Say what the change WAS instead.
-	{ re: /\bP\d+(?:-[A-Z])?\s+(?:refactor|entrypoint|split|SSoT|SSOT|decomposition)\b/i, label: 'bare plan token (P# <word>)' },
+	{
+		re: /\bP\d+(?:-[A-Z])?\s+(?:refactor|entrypoint|split|SSoT|SSOT|decomposition)\b/i,
+		label: 'bare plan token (P# <word>)'
+	},
 	{ re: /\(\s*P\d+(?:-[A-Z])?\s*\)/, label: 'bare plan token ((P#))' },
 	{ re: /\(\s*P\d+\/P\d+\s*\)/, label: 'bare plan token ((P#/P#))' },
-	{ re: /\bthe P\d+ split\b/i, label: 'bare plan token (the P# split)' },
+	{ re: /\bthe P\d+ split\b/i, label: 'bare plan token (the P# split)' }
 ];
 // A bare "Phase <n>" — allowed only in the CAT-B files above.
 const BARE_PHASE = /\bPhase \d/;
@@ -95,13 +98,20 @@ for (const f of files) {
 			if (re.test(line)) hits.push({ f, ln: i + 1, label, text: line.trim() });
 		}
 		if (BARE_PHASE.test(line) && !PHASE_ALLOWLIST.has(f)) {
-			hits.push({ f, ln: i + 1, label: 'bare "Phase N" (file not on CAT-B allowlist)', text: line.trim() });
+			hits.push({
+				f,
+				ln: i + 1,
+				label: 'bare "Phase N" (file not on CAT-B allowlist)',
+				text: line.trim()
+			});
 		}
 	});
 }
 
 if (hits.length > 0) {
-	console.error(`\x1b[31m[ERROR] ${hits.length} plan-item reference(s) found in tracked source (forbidden by convention):\x1b[0m`);
+	console.error(
+		`\x1b[31m[ERROR] ${hits.length} plan-item reference(s) found in tracked source (forbidden by convention):\x1b[0m`
+	);
 	for (const h of hits) {
 		console.error(`    ${h.f}:${h.ln}  [${h.label}]`);
 		console.error(`        ${h.text}`);
@@ -111,4 +121,8 @@ if (hits.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] No plan-item references in tracked source (' + files.length + ' files scanned).\x1b[0m');
+console.log(
+	'\x1b[32m[OK] No plan-item references in tracked source (' +
+		files.length +
+		' files scanned).\x1b[0m'
+);

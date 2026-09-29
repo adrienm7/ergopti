@@ -21,18 +21,42 @@ function frontend(host = 'macos') {
 	let nextTimer = 0;
 	const requests = [];
 	const renders = [];
-	const element = () => ({ value: '', innerHTML: 'last-good', classList: { add() {}, toggle() {}, contains: () => true } });
-	const elements = Object.fromEntries(['date_start', 'date_end', 'metrics_table_body', 'btn_case_sensitive',
-		'pause_threshold', 'quick_range'].map((id) => [id, element()]));
-	const context = vm.createContext({ console, document: { getElementById: (id) => elements[id] || null,
-		addEventListener() {} }, addEventListener() {},
-		setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
-		clearTimeout(id) { timers.delete(id); } });
+	const element = () => ({
+		value: '',
+		innerHTML: 'last-good',
+		classList: { add() {}, toggle() {}, contains: () => true }
+	});
+	const elements = Object.fromEntries(
+		[
+			'date_start',
+			'date_end',
+			'metrics_table_body',
+			'btn_case_sensitive',
+			'pause_threshold',
+			'quick_range'
+		].map((id) => [id, element()])
+	);
+	const context = vm.createContext({
+		console,
+		document: { getElementById: (id) => elements[id] || null, addEventListener() {} },
+		addEventListener() {},
+		setTimeout(fn, delay) {
+			const id = ++nextTimer;
+			timers.set(id, { fn, delay });
+			return id;
+		},
+		clearTimeout(id) {
+			timers.delete(id);
+		}
+	});
 	context.window = context;
-	if (host === 'windows') context.chrome = { webview: { postMessage: (raw) => requests.push(JSON.parse(raw)) } };
+	if (host === 'windows')
+		context.chrome = { webview: { postMessage: (raw) => requests.push(JSON.parse(raw)) } };
 	if (host === 'linux') {
 		context.__ergopti_host = host;
-		context.webkit = { messageHandlers: { metrics_typing_bridge: { postMessage: (req) => requests.push(req) } } };
+		context.webkit = {
+			messageHandlers: { metrics_typing_bridge: { postMessage: (req) => requests.push(req) } }
+		};
 	}
 	for (const file of ['_generated/keycode_data.js', 'state.js', 'data.js', 'filters.js']) {
 		vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context);
@@ -50,7 +74,10 @@ function frontend(host = 'macos') {
 	state.available_apps = ['Editor'];
 	function dispatch() {
 		for (const [id, timer] of Array.from(timers)) {
-			if (timer.delay === 50) { timers.delete(id); timer.fn(); }
+			if (timer.delay === 50) {
+				timers.delete(id);
+				timer.fn();
+			}
 		}
 	}
 	function select(date) {
@@ -61,7 +88,10 @@ function frontend(host = 'macos') {
 }
 
 function actualPurge(request, success) {
-	const result = spawnSync('lua', ['-'], { cwd: path.resolve(root, '../../../macos'), encoding: 'utf8', input: `
+	const result = spawnSync('lua', ['-'], {
+		cwd: path.resolve(root, '../../../macos'),
+		encoding: 'utf8',
+		input: `
 package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
 local json=require('json')
 require('tests.support.typing_delivery_fixture')(function(dashboard,context,_,errors,_,evaluations)
@@ -81,7 +111,8 @@ require('tests.support.typing_delivery_fixture')(function(dashboard,context,_,er
  assert(removes==1 and #evaluations==3)
  print('PURGE='..json.encode({ack=evaluations[2].code,terminal=evaluations[3].code,removes=removes,errors=#errors}))
 end)
-` });
+`
+	});
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	const line = result.stdout.split(/\r?\n/).find((value) => value.startsWith('PURGE='));
 	assert.ok(line, result.stdout);

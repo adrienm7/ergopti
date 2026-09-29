@@ -96,7 +96,10 @@ if (process.argv.includes('--measure')) {
 	console.log('port'.padEnd(22) + 'vectors  traceable');
 	for (const p of perPort) {
 		console.log(
-			p.port.padEnd(22) + String(p.n).padStart(7) + String(p.hit).padStart(11) + (p.hit < p.n ? '  <-- gap' : '')
+			p.port.padEnd(22) +
+				String(p.n).padStart(7) +
+				String(p.hit).padStart(11) +
+				(p.hit < p.n ? '  <-- gap' : '')
 		);
 	}
 	console.log(`\nTOTAL ${traceable}/${total} (baseline ${BASELINE_TRACEABLE})`);

@@ -1361,7 +1361,9 @@
 				if (window.__ergopti_host === 'linux') {
 					const request_linux_refresh = () => {
 						try {
-							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'refresh' });
+							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({
+								action: 'refresh'
+							});
 						} catch (_) {}
 					};
 					window.__hostBridgeResponse = (bridge, isBase64, payload) => {

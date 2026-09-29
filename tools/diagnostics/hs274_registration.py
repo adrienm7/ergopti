@@ -13,14 +13,17 @@ from hs274_services import command, require_success
 def helper_paths():
     """Fence registration and the agent's independent installed permission probe."""
     base = Path("/Library/Application Support/org.pqrs/Karabiner-Elements")
-    return tuple((base / (name + ".app/Contents/MacOS") / name, query) for name, query in (
-        ("Karabiner-Elements Privileged Daemons v2", "core-daemons-enabled"),
-        ("Karabiner-Elements Non-Privileged Agents v2", "core-agents-enabled"),
-        # The development agent launches this bundle directly, bypassing launchd
-        # service overrides and both registration helpers. Leave the development
-        # binaries and signed virtual HID provider executable throughout input.
-        ("Karabiner-Core-Service", "permission-check"),
-    ))
+    return tuple(
+        (base / (name + ".app/Contents/MacOS") / name, query)
+        for name, query in (
+            ("Karabiner-Elements Privileged Daemons v2", "core-daemons-enabled"),
+            ("Karabiner-Elements Non-Privileged Agents v2", "core-agents-enabled"),
+            # The development agent launches this bundle directly, bypassing launchd
+            # service overrides and both registration helpers. Leave the development
+            # binaries and signed virtual HID provider executable throughout input.
+            ("Karabiner-Core-Service", "permission-check"),
+        )
+    )
 
 
 def inspect_owned(record):
@@ -52,7 +55,9 @@ def suspended_registration(report):
 
     def restore(record):
         inspect_owned(record)
-        require_success(["sudo", "-n", "chmod", format(record["original_mode"], "o"), record["path"]])
+        require_success(
+            ["sudo", "-n", "chmod", format(record["original_mode"], "o"), record["path"]]
+        )
         record["restored"] = inspect_owned(record) == record["original_mode"]
         if not record["restored"]:
             raise RuntimeError("Registration helper permissions were not restored")
@@ -61,8 +66,14 @@ def suspended_registration(report):
         for path, query in helper_paths():
             acquired = path.lstat()
             original = stat.S_IMODE(acquired.st_mode)
-            record = {"path": str(path), "device": acquired.st_dev, "inode": acquired.st_ino,
-                      "original_mode": original, "blocked_mode": original & ~0o111, "restored": False}
+            record = {
+                "path": str(path),
+                "device": acquired.st_dev,
+                "inode": acquired.st_ino,
+                "original_mode": original,
+                "blocked_mode": original & ~0o111,
+                "restored": False,
+            }
             inspect_owned(record)
             if not original & 0o111:
                 raise RuntimeError("Installed registration helper was already non-executable")
@@ -73,8 +84,13 @@ def suspended_registration(report):
             # sudo's own lookup hides EACCES as "command not found". Let the
             # native exec attempt report its errno in a deterministic locale.
             refusal = command(["sudo", "-n", "/usr/bin/env", "LC_ALL=C", str(path), query])
-            record["execution_refusal"] = {"exit": refusal.returncode, "stdout": refusal.stdout,
-                                           "stderr": refusal.stderr}
+            record["execution_refusal"] = {
+                "exit": refusal.returncode,
+                "stdout": refusal.stdout,
+                "stderr": refusal.stderr,
+            }
             if refusal.returncode != 126 or "Permission denied" not in refusal.stderr:
-                raise RuntimeError("Native registration helper execution was not explicitly refused")
+                raise RuntimeError(
+                    "Native registration helper execution was not explicitly refused"
+                )
         yield

@@ -115,11 +115,11 @@ feature branch was published for this purpose; neither dev nor main was pushed.
 The experimental commits below have not been integrated into dev at this
 snapshot. They contain no HS-274 production correction.
 
-| Commit | Native run | Outcome |
-| --- | --- | --- |
-| `faae7627c` | [34393307118](https://github.com/adrienm7/ergopti/actions/runs/34393307118) | Swift compilation failed; no native observation. |
-| `f6b4037cc` | [34393997495](https://github.com/adrienm7/ergopti/actions/runs/34393997495) | Correct initializer compiled; marker assertion failed before detailed receipts. |
-| `60ee54168` | [34394901173](https://github.com/adrienm7/ergopti/actions/runs/34394901173) | Detailed Quartz observations saved; serialization assertions failed. |
+| Commit      | Native run                                                                  | Outcome                                                                                 |
+| ----------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `faae7627c` | [34393307118](https://github.com/adrienm7/ergopti/actions/runs/34393307118) | Swift compilation failed; no native observation.                                        |
+| `f6b4037cc` | [34393997495](https://github.com/adrienm7/ergopti/actions/runs/34393997495) | Correct initializer compiled; marker assertion failed before detailed receipts.         |
+| `60ee54168` | [34394901173](https://github.com/adrienm7/ergopti/actions/runs/34394901173) | Detailed Quartz observations saved; serialization assertions failed.                    |
 | `137bfbf2a` | [34396530965](https://github.com/adrienm7/ergopti/actions/runs/34396530965) | C probe compiled and HID refusal diagnosed; Quartz assertions kept the overall job red. |
 
 The tracked owners are `.github/workflows/hs274-native.yml`,
@@ -550,21 +550,21 @@ All fixes through `1a59e23f0` had been integrated locally into dev before the
 native capability experiments. Full receipts remain in their commits and local
 `.rtk/` files; no claim of complete module correctness follows from them.
 
-| Commit | Area and regression evidence |
-| --- | --- |
-| `1a59e23f0` | Tooltip publication callback ownership; 72 cases, 66 failed before fix; HS 9931/1151, E2E 67/67 with one skip. |
-| `e53a4686b` | Retry failed tooltip dependency acquisition; 10 cases, five failed before fix; HS 9859/1150 plus JS/E2E. |
-| `d48756426` | Isolated native tooltip renderer fixture; two actual scope guards fail when restoration is removed; HS 9849/1149. |
-| `9fdd4773d` | Canonical tooltip facade shared with adapter; three original failures; HS 9847/1148 plus JS/E2E. |
+| Commit      | Area and regression evidence                                                                                               |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `1a59e23f0` | Tooltip publication callback ownership; 72 cases, 66 failed before fix; HS 9931/1151, E2E 67/67 with one skip.             |
+| `e53a4686b` | Retry failed tooltip dependency acquisition; 10 cases, five failed before fix; HS 9859/1150 plus JS/E2E.                   |
+| `d48756426` | Isolated native tooltip renderer fixture; two actual scope guards fail when restoration is removed; HS 9849/1149.          |
+| `9fdd4773d` | Canonical tooltip facade shared with adapter; three original failures; HS 9847/1148 plus JS/E2E.                           |
 | `31a280073` | Typing cache/publication scopes including real transitive modules, io.open and os.remove; old guards failed; HS 9844/1147. |
-| `0dabfd0b6` | Shared typing dashboard scenario scope; 16 timer/delivery scenarios preserved; HS 9844/1147. |
-| `8fe011be1` | Canonical typing dashboard runtime across restore/keylogger/menu; four regressions; HS 9842/1146 plus E2E. |
-| `e59b7129e` | Exact UI-restore storage read/delete committed before reopen; five cases; HS 9838/1145. |
-| `1c8830d0b` | UI-restore fixture construction/native/window cache isolation; 15 cases; HS 9833/1144. |
-| `7153c5a0d` | Exact menu watcher paths instead of substring matching; eight cases; HS 9818. |
-| `8427e4821` | Ignored directory exact/descendant boundary; two cases; HS 9810. |
-| `38a5cefcc` | Menu config watcher fixture; nine scope guards and 12 preserved scenarios; HS 9808. |
-| `b74daa2a4` | Git/bulk watcher fixture isolation; HS 9799. |
+| `0dabfd0b6` | Shared typing dashboard scenario scope; 16 timer/delivery scenarios preserved; HS 9844/1147.                               |
+| `8fe011be1` | Canonical typing dashboard runtime across restore/keylogger/menu; four regressions; HS 9842/1146 plus E2E.                 |
+| `e59b7129e` | Exact UI-restore storage read/delete committed before reopen; five cases; HS 9838/1145.                                    |
+| `1c8830d0b` | UI-restore fixture construction/native/window cache isolation; 15 cases; HS 9833/1144.                                     |
+| `7153c5a0d` | Exact menu watcher paths instead of substring matching; eight cases; HS 9818.                                              |
+| `8427e4821` | Ignored directory exact/descendant boundary; two cases; HS 9810.                                                           |
+| `38a5cefcc` | Menu config watcher fixture; nine scope guards and 12 preserved scenarios; HS 9808.                                        |
+| `b74daa2a4` | Git/bulk watcher fixture isolation; HS 9799.                                                                               |
 
 Earlier delivered work includes boot watcher `b9ec0eb99`, self-write watcher
 `9a7b220f8`, pause fixture `e92bfd83c`, profile shortcuts `53a1ade52`, profile

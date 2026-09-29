@@ -268,7 +268,10 @@ function checkSharedBudgets() {
 		path.join(PLUS, 'windows', 'ui', 'changelog', 'init.ahk'),
 		'utf8'
 	);
-	const ahkHttp = fs.readFileSync(path.join(PLUS, 'windows', 'adapters', 'http_client.ahk'), 'utf8');
+	const ahkHttp = fs.readFileSync(
+		path.join(PLUS, 'windows', 'adapters', 'http_client.ahk'),
+		'utf8'
+	);
 	const ahkLiteral = (source, name) => {
 		const match = new RegExp(`global ${name}\\s*:=\\s*("([^"]*)"|(\\d+))`).exec(source);
 		return match ? (match[2] !== undefined ? match[2] : Number(match[3])) : undefined;
@@ -290,7 +293,8 @@ function checkSharedBudgets() {
 		'the Windows connect budget must leave time for the transfer'
 	);
 	expect(
-		ahkLiteral(ahkHttp, 'SYSTEM_PROXY_RESOLVE_TIMEOUT_MS') === sources.proxy_resolve_timeout_sec * 1000,
+		ahkLiteral(ahkHttp, 'SYSTEM_PROXY_RESOLVE_TIMEOUT_MS') ===
+			sources.proxy_resolve_timeout_sec * 1000,
 		'the Windows PAC budget must mirror release_sources.proxy_resolve_timeout_sec'
 	);
 	const index = fs.readFileSync(path.join(CHANGELOG, 'index.html'), 'utf8');

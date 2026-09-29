@@ -71,12 +71,16 @@ function corpusFiles() {
 
 const modules = walk(SHARED).filter((f) => f.endsWith('.js'));
 if (modules.length < 3) {
-	errors.push(`found ${modules.length} shared JS module(s) — expected at least 3; the scan is broken`);
+	errors.push(
+		`found ${modules.length} shared JS module(s) — expected at least 3; the scan is broken`
+	);
 }
 
 const files = corpusFiles();
 if (files.length < 100) {
-	errors.push(`scanned ${files.length} consumer file(s) — expected at least 100; the scan is broken`);
+	errors.push(
+		`scanned ${files.length} consumer file(s) — expected at least 100; the scan is broken`
+	);
 }
 const blobs = files.map((f) => {
 	try {

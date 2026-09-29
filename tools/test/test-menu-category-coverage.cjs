@@ -40,7 +40,9 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const manifest = JSON.parse(fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8'));
+const manifest = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8')
+);
 
 const EXT = { ahk: '.ahk', hs: '.lua', linux: '.lua' };
 const DIR = { ahk: 'windows', hs: 'macos', linux: 'linux' };
@@ -82,12 +84,15 @@ console.log(pad('menu', 30) + pad('windows', 12) + pad('macos', 12) + 'linux');
 console.log('-'.repeat(66));
 let unanswered = 0;
 for (const { key, cell } of rows.sort((a, b) => a.key.localeCompare(b.key))) {
-	const fmt = (c) => (c.shown === 0 ? '—' : c.missing.length ? `${c.shown} (${c.missing.length}!)` : `${c.shown}`);
+	const fmt = (c) =>
+		c.shown === 0 ? '—' : c.missing.length ? `${c.shown} (${c.missing.length}!)` : `${c.shown}`;
 	console.log(pad(key, 30) + pad(fmt(cell.ahk), 12) + pad(fmt(cell.hs), 12) + fmt(cell.linux));
 	for (const p of PLATFORMS) unanswered += cell[p].missing.length;
 }
 console.log('-'.repeat(66));
-console.log(`${rows.length} menus declared; ${unanswered} declared id(s) not named by the driver that shows them`);
+console.log(
+	`${rows.length} menus declared; ${unanswered} declared id(s) not named by the driver that shows them`
+);
 if (unanswered > 0) {
 	console.error('[31m[FAIL] a declared menu row is not answered by a driver that shows it:[0m');
 	for (const { key, cell } of rows) {

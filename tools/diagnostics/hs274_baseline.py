@@ -19,8 +19,14 @@ def read_baseline(output, device, *, source="forced"):
     lines = [line for line in output.splitlines(keepends=True) if line.startswith(MARKER)]
     if len(lines) != 1 or not lines[0].endswith("\n"):
         raise ValueError("Expected one complete native baseline probe")
-    probe = json.loads(lines[0][len(MARKER):], object_pairs_hook=unique_object)
-    if not isinstance(probe, dict) or set(probe) != {"device", "coverage", "enumerated", "exhausted", "elements"}:
+    probe = json.loads(lines[0][len(MARKER) :], object_pairs_hook=unique_object)
+    if not isinstance(probe, dict) or set(probe) != {
+        "device",
+        "coverage",
+        "enumerated",
+        "exhausted",
+        "elements",
+    }:
         raise ValueError("Unexpected baseline probe fields")
     if decimal(probe["device"], minimum=1) != device or probe["coverage"] != "fixture_only":
         raise ValueError("Unexpected baseline device or coverage")
@@ -32,7 +38,13 @@ def read_baseline(output, device, *, source="forced"):
     acquired = probe["enumerated"] and not probe["exhausted"]
     previous_finish = 0
     for element in probe["elements"]:
-        if not isinstance(element, dict) or set(element) != {"page", "usage", "cookie", "cached", "updated"}:
+        if not isinstance(element, dict) or set(element) != {
+            "page",
+            "usage",
+            "cookie",
+            "cached",
+            "updated",
+        }:
             raise ValueError("Invalid baseline element fields")
         page = integer(element["page"], "baseline page", maximum=(1 << 32) - 1)
         usage = integer(element["usage"], "baseline usage", maximum=(1 << 32) - 1)
@@ -57,7 +69,10 @@ def read_baseline(output, device, *, source="forced"):
                 raise ValueError("Baseline query timestamps are reversed")
             previous_finish = finished
             if valid:
-                if integer(sample["value_cookie"], "baseline value cookie", maximum=(1 << 32) - 1) != cookie:
+                if (
+                    integer(sample["value_cookie"], "baseline value cookie", maximum=(1 << 32) - 1)
+                    != cookie
+                ):
                     raise ValueError("Baseline value belongs to another element")
                 if decimal(sample["timestamp"]) > finished:
                     raise ValueError("Baseline value timestamp is in the future")
@@ -67,7 +82,12 @@ def read_baseline(output, device, *, source="forced"):
             elif mode == selected:
                 acquired = False
     acquired = acquired and set(values) == {41, 44}
-    return {"probe": probe, "source": source, "acquired": acquired, "held": values if acquired else None}
+    return {
+        "probe": probe,
+        "source": source,
+        "acquired": acquired,
+        "held": values if acquired else None,
+    }
 
 
 def read_observation_baselines(output, device, *, source="forced"):
@@ -80,8 +100,11 @@ def read_observation_baselines(output, device, *, source="forced"):
 
 def require_held_baseline(output, device, expected, *, source="forced"):
     """Require the explicitly controlled fixture state, not merely successful I/O."""
-    if type(expected) is not dict or set(expected) != {41, 44} or any(
-            type(value) is not int or value not in (0, 1) for value in expected.values()):
+    if (
+        type(expected) is not dict
+        or set(expected) != {41, 44}
+        or any(type(value) is not int or value not in (0, 1) for value in expected.values())
+    ):
         raise ValueError("Invalid expected fixture baseline")
     result = read_baseline(output, device, source=source)
     if not result["acquired"] or result["held"] != expected:
@@ -96,7 +119,10 @@ def wait_baseline(path, process, device, seconds, *, source="forced"):
         if process.poll() is not None:
             raise RuntimeError("Core exited before the baseline probe completed")
         output = path.read_text(encoding="utf-8") if path.is_file() else ""
-        if any(line.startswith(MARKER) and line.endswith("\n") for line in output.splitlines(keepends=True)):
+        if any(
+            line.startswith(MARKER) and line.endswith("\n")
+            for line in output.splitlines(keepends=True)
+        ):
             return read_baseline(output, device, source=source)
         time.sleep(0.1)
     raise RuntimeError("Native baseline probe timed out")
@@ -118,22 +144,41 @@ def require_stream_held_baseline(stream, device):
 
 def validate_baseline_native(native, probe):
     """Keep inherited observations separate from the explicitly new Space pair."""
-    if any(native.get(field) is not True for field in (
-            "baseline_mode", "baseline_down_observed", "space_pair_observed", "metadata_restored", "metadata_work_completed")):
+    if any(
+        native.get(field) is not True
+        for field in (
+            "baseline_mode",
+            "baseline_down_observed",
+            "space_pair_observed",
+            "metadata_restored",
+            "metadata_work_completed",
+        )
+    ):
         raise ValueError("Native held fixture did not complete its owned lifecycle")
-    if native.get("transport_error") is not False or integer(native.get("reports_queued"), "baseline reports") != 4:
+    if (
+        native.get("transport_error") is not False
+        or integer(native.get("reports_queued"), "baseline reports") != 4
+    ):
         raise ValueError("Held fixture report delivery failed")
     inherited = native.get("baseline_events")
     if not isinstance(inherited, list) or not any(
-            row.get("type") == 10 and row.get("keycode") == 49 for row in inherited if isinstance(row, dict)):
+        row.get("type") == 10 and row.get("keycode") == 49
+        for row in inherited
+        if isinstance(row, dict)
+    ):
         raise ValueError("Missing independently observed initial held Space")
     fresh = native.get("events")
-    if not isinstance(fresh, list) or [(row["type"], row["keycode"]) for row in fresh] != [(10, 49), (11, 49)]:
+    if not isinstance(fresh, list) or [(row["type"], row["keycode"]) for row in fresh] != [
+        (10, 49),
+        (11, 49),
+    ]:
         raise ValueError("Fresh Space pair was lost or mixed with inherited output")
     released = decimal(native.get("baseline_release_at"), minimum=1)
     if not probe["acquired"] or probe["held"] != {41: 0, 44: 1}:
         raise ValueError("Probe did not acquire the controlled held Space")
-    if any(decimal(element["updated"]["finished"]) > released for element in probe["probe"]["elements"]):
+    if any(
+        decimal(element["updated"]["finished"]) > released for element in probe["probe"]["elements"]
+    ):
         raise ValueError("Fixture released Space before the acquisition completed")
     return released
 

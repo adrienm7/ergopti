@@ -44,15 +44,19 @@ const OVERRIDE_SLASH = 'static/ergopti_plus/windows/.local_ahk_path';
 // Dead path signatures — matched in BOTH `path.join('a', 'b')` segment form and
 // 'a/b' slash-literal form so a regression in either style is caught.
 const DEAD = [
-	{ label: "static/drivers", re: /['"]static['"]\s*,\s*['"]drivers['"]|static\/drivers/ },
-	{ label: "static/hotstrings", re: /['"]static['"]\s*,\s*['"]hotstrings['"]|static\/hotstrings/ },
-	{ label: "scripts/ dir for a tool script", re: /['"]scripts['"]\s*,\s*['"][\w.-]+\.js['"]|scripts\/[\w.-]+\.js/ },
-	{ label: "removed 0_generate_hotstrings.py", re: /0_generate_hotstrings/ },
-	{ label: "removed update-ahk-date.js", re: /update-ahk-date/ }
+	{ label: 'static/drivers', re: /['"]static['"]\s*,\s*['"]drivers['"]|static\/drivers/ },
+	{ label: 'static/hotstrings', re: /['"]static['"]\s*,\s*['"]hotstrings['"]|static\/hotstrings/ },
+	{
+		label: 'scripts/ dir for a tool script',
+		re: /['"]scripts['"]\s*,\s*['"][\w.-]+\.js['"]|scripts\/[\w.-]+\.js/
+	},
+	{ label: 'removed 0_generate_hotstrings.py', re: /0_generate_hotstrings/ },
+	{ label: 'removed update-ahk-date.js', re: /update-ahk-date/ }
 ];
 
 // path.join segment form of the canonical override: 'ergopti_plus', 'windows', '.local_ahk_path'.
-const OVERRIDE_JOIN_RE = /['"]ergopti_plus['"]\s*,\s*['"]windows['"]\s*,\s*['"]\.local_ahk_path['"]/;
+const OVERRIDE_JOIN_RE =
+	/['"]ergopti_plus['"]\s*,\s*['"]windows['"]\s*,\s*['"]\.local_ahk_path['"]/;
 const PUBLIC_JOIN_RE = /['"]ergopti_plus['"]\s*,\s*['"]windows['"]\s*,\s*['"]ErgoptiPlus\.ahk['"]/;
 
 const errors = [];
@@ -74,19 +78,25 @@ for (const s of SCRIPTS) {
 // 2. The tools that read the override must agree on the canonical location.
 for (const s of ['sync-private-ahk.js', 'watch-ahk.js', 'install-ahk-watcher.js']) {
 	if (!OVERRIDE_JOIN_RE.test(read(s))) {
-		errors.push(`${s}: must read .local_ahk_path from static/ergopti_plus/windows/.local_ahk_path.`);
+		errors.push(
+			`${s}: must read .local_ahk_path from static/ergopti_plus/windows/.local_ahk_path.`
+		);
 	}
 }
 
 // 3. The sync tool must write the public file to its live location.
 if (!PUBLIC_JOIN_RE.test(read('sync-private-ahk.js'))) {
-	errors.push('sync-private-ahk.js: public file must be static/ergopti_plus/windows/ErgoptiPlus.ahk.');
+	errors.push(
+		'sync-private-ahk.js: public file must be static/ergopti_plus/windows/ErgoptiPlus.ahk.'
+	);
 }
 
 // 4. .gitignore must actually protect that override location.
 const gitignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
 if (!gitignore.split(/\r?\n/).some((l) => l.trim() === OVERRIDE_SLASH)) {
-	errors.push(`.gitignore: must ignore "${OVERRIDE_SLASH}" so the private override pointer is never tracked.`);
+	errors.push(
+		`.gitignore: must ignore "${OVERRIDE_SLASH}" so the private override pointer is never tracked.`
+	);
 }
 
 // 5. NO tool anywhere under tools/ may hardcode one machine's checkout.
@@ -98,8 +108,11 @@ if (!gitignore.split(/\r?\n/).some((l) => l.trim() === OVERRIDE_SLASH)) {
 // or write its corpus to a directory that does not exist. A path a contributor
 // cannot use is a path that quietly makes a tool single-user.
 const ABSOLUTE_HOME = [
-	{ label: 'a Windows drive-letter checkout', re: /["'][A-Za-z]:[/\\](?:Users|Documents|Dev|Projects|src)[/\\]/i },
-	{ label: 'a Unix home checkout', re: /["']\/(?:Users|home)\/[A-Za-z][\w.-]*\// },
+	{
+		label: 'a Windows drive-letter checkout',
+		re: /["'][A-Za-z]:[/\\](?:Users|Documents|Dev|Projects|src)[/\\]/i
+	},
+	{ label: 'a Unix home checkout', re: /["']\/(?:Users|home)\/[A-Za-z][\w.-]*\// }
 ];
 
 /** Every tracked file under tools/, minus this guard itself. */
@@ -121,10 +134,12 @@ for (const abs of toolFiles(path.join(ROOT, 'tools'))) {
 	const text = fs.readFileSync(abs, 'utf8');
 	const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
 	text.split(/\r?\n/).forEach((line, i) => {
-		if (/^\s*(\/\/|#|--|;)/.test(line)) return;   // prose may cite a path
+		if (/^\s*(\/\/|#|--|;)/.test(line)) return; // prose may cite a path
 		for (const { label, re } of ABSOLUTE_HOME) {
 			if (re.test(line)) {
-				errors.push(`${rel}:${i + 1}: hardcodes ${label} — derive the repo root from the script's own location instead.`);
+				errors.push(
+					`${rel}:${i + 1}: hardcodes ${label} — derive the repo root from the script's own location instead.`
+				);
 			}
 		}
 	});

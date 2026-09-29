@@ -70,7 +70,10 @@ const generatedJs = fs.readFileSync(GENERATED_JS, 'utf8');
 const stateJs = fs.readFileSync(STATE_JS, 'utf8');
 const indexHtml = fs.readFileSync(INDEX_HTML, 'utf8');
 
-test('azerty.json has a non-empty "keys" array', Array.isArray(azerty.keys) && azerty.keys.length > 0);
+test(
+	'azerty.json has a non-empty "keys" array',
+	Array.isArray(azerty.keys) && azerty.keys.length > 0
+);
 
 // --- generated keycode_data.js carries every azerty.json entry, in order ---
 {
@@ -101,7 +104,10 @@ test(
 	!/const\s+KEYCODE_DATA\s*=\s*\[/.test(stateJs),
 	'found "const KEYCODE_DATA = [" in state.js — the map must come from _generated/keycode_data.js'
 );
-test('state.js still references KEYCODE_DATA (consumes the generated global)', /KEYCODE_DATA/.test(stateJs));
+test(
+	'state.js still references KEYCODE_DATA (consumes the generated global)',
+	/KEYCODE_DATA/.test(stateJs)
+);
 
 // --- index.html loads the generated script before state.js ---
 {

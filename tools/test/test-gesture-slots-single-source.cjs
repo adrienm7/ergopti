@@ -23,7 +23,9 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
-function read(rel) { return fs.readFileSync(path.join(SP, rel), 'utf8'); }
+function read(rel) {
+	return fs.readFileSync(path.join(SP, rel), 'utf8');
+}
 
 // Ordered string list from the [slots] section's `key = [ "a", "b", … ]` array.
 function tomlSlotArray(src, key) {
@@ -41,7 +43,9 @@ function luaSlotArray(src, name, file) {
 	return [...m[1].matchAll(/"([a-z0-9_]+)"/g)].map((x) => x[1]);
 }
 
-function eqOrdered(a, b) { return a.length === b.length && a.every((v, i) => v === b[i]); }
+function eqOrdered(a, b) {
+	return a.length === b.length && a.every((v, i) => v === b[i]);
+}
 
 const errors = [];
 try {
@@ -64,8 +68,10 @@ try {
 		if (!eqOrdered(luaSlotArray(src, 'AXIS_SLOTS', file), axis)) {
 			errors.push('macos AXIS_SLOTS != actions.toml [slots].axis');
 		}
-		if (!/for _, slots in ipairs\(\{ M\.SINGLE_SLOTS, M\.AXIS_SLOTS \}\) do/.test(src)
-			|| !src.includes('M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)')) {
+		if (
+			!/for _, slots in ipairs\(\{ M\.SINGLE_SLOTS, M\.AXIS_SLOTS \}\) do/.test(src) ||
+			!src.includes('M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)')
+		) {
 			errors.push('macos must project both complete slot lists through the manifest');
 		}
 		for (const driver of ['macos', 'linux']) {
@@ -84,18 +90,24 @@ try {
 	// them and never re-hardcodes the lists.
 	{
 		const generated = read('linux/_generated/action_catalogue.lua');
-		const slots = generated.match(/\n\tslots = \{\n\t\tsingle = \{([^}]*)\},\n\t\taxis = \{([^}]*)\},/);
+		const slots = generated.match(
+			/\n\tslots = \{\n\t\tsingle = \{([^}]*)\},\n\t\taxis = \{([^}]*)\},/
+		);
 		if (!slots) {
 			errors.push('linux/_generated/action_catalogue.lua carries no slots table');
 		} else {
 			const names = (body) => [...body.matchAll(/"([a-z0-9_]+)"/g)].map((x) => x[1]);
-			if (!eqOrdered(names(slots[1]), single)) errors.push('generated Linux slots.single != actions.toml [slots].single');
-			if (!eqOrdered(names(slots[2]), axis)) errors.push('generated Linux slots.axis != actions.toml [slots].axis');
+			if (!eqOrdered(names(slots[1]), single))
+				errors.push('generated Linux slots.single != actions.toml [slots].single');
+			if (!eqOrdered(names(slots[2]), axis))
+				errors.push('generated Linux slots.axis != actions.toml [slots].axis');
 		}
 		const file = 'linux/modules/gestures/manager.lua';
 		const src = read(file);
-		if (!src.includes('M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)')
-			|| !src.includes('M.AXIS_SLOTS = copy_list(Catalogue.slots.axis)')) {
+		if (
+			!src.includes('M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)') ||
+			!src.includes('M.AXIS_SLOTS = copy_list(Catalogue.slots.axis)')
+		) {
 			errors.push('linux manager must take SINGLE_SLOTS/AXIS_SLOTS from the generated catalogue');
 		}
 		if (!src.includes('require, "_generated.action_catalogue"')) {
@@ -115,4 +127,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] Gesture slot-space single source — Linux takes the generated [slots]; macOS literals + DEFAULT_GESTURES key-space match it.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] Gesture slot-space single source — Linux takes the generated [slots]; macOS literals + DEFAULT_GESTURES key-space match it.\x1b[0m'
+);

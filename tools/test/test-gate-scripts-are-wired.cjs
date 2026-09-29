@@ -92,12 +92,18 @@ const workflowSrc = fs.existsSync(workflowDir)
 			.map((f) => fs.readFileSync(path.join(workflowDir, f), 'utf8'))
 			.join('\n')
 	: '';
-check('at least one CI workflow is readable', workflowSrc.length > 500, 'no workflow files found under .github/workflows');
+check(
+	'at least one CI workflow is readable',
+	workflowSrc.length > 500,
+	'no workflow files found under .github/workflows'
+);
 
 const hookSrc = readIfPresent(HOOK);
 
 // npm script names each runner invokes.
-const suiteScripts = new Set([...suiteSrc.matchAll(/['"](test:[a-z0-9:_-]+)['"]/g)].map((m) => m[1]));
+const suiteScripts = new Set(
+	[...suiteSrc.matchAll(/['"](test:[a-z0-9:_-]+)['"]/g)].map((m) => m[1])
+);
 const ciScripts = new Set([...workflowSrc.matchAll(/npm run ([a-z0-9:_-]+)/g)].map((m) => m[1]));
 const hookScripts = new Set([...hookSrc.matchAll(/npm run ([a-z0-9:_-]+)/g)].map((m) => m[1]));
 

@@ -21,13 +21,13 @@ AutoHotkey v2 process. Each sample called `_HPX_BurnTicks(25)`, retained the
 `A_TickCount` delta and sampled QPC immediately before logging the inner segment.
 It then called the actual profiler and inspected the actual logger test sink.
 
-| Observation | Result |
-| --- | --- |
-| Samples | 100 |
-| Missing inner lines | 0 |
-| Minimum pre-log QPC duration | 17.475 ms |
+| Observation                  | Result     |
+| ---------------------------- | ---------- |
+| Samples                      | 100        |
+| Missing inner lines          | 0          |
+| Minimum pre-log QPC duration | 17.475 ms  |
 | Maximum pre-log QPC duration | 43.8607 ms |
-| Configured slow threshold | 5 ms |
+| Configured slow threshold    | 5 ms       |
 
 The first probe failed because it divided by the profiler frequency before
 the profiler's lazy initialization. That was a probe error, not driver evidence.

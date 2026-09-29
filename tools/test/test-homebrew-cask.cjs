@@ -37,14 +37,26 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const Cask = require(path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs'));
 
-const BUILD_SCRIPT = fs.readFileSync(path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+const BUILD_SCRIPT = fs.readFileSync(
+	path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'),
+	'utf8'
+);
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
-const MACOS_README = fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'README.md'), 'utf8');
+const MACOS_README = fs.readFileSync(
+	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'README.md'),
+	'utf8'
+);
 
 const SHA = 'a'.repeat(64);
 
 // macOS release names Homebrew accepts in depends_on, by major version
-const MACOS_SYMBOLS = { 11: ':big_sur', 12: ':monterey', 13: ':ventura', 14: ':sonoma', 15: ':sequoia' };
+const MACOS_SYMBOLS = {
+	11: ':big_sur',
+	12: ':monterey',
+	13: ':ventura',
+	14: ':sonoma',
+	15: ':sequoia'
+};
 
 let failures = 0;
 
@@ -82,53 +94,95 @@ check('each channel cask conflicts with every other channel cask', () => {
 
 check('the cask downloads the tagged release asset with its checksum', () => {
 	assert.match(dev.text, new RegExp(`^  sha256 "${SHA}"$`, 'm'));
-	assert.ok(dev.text.includes(
-		`url "https://github.com/${Cask.SOURCE_REPOSITORY}/releases/download/v#{version}/${Cask.ASSET_NAME}"`));
+	assert.ok(
+		dev.text.includes(
+			`url "https://github.com/${Cask.SOURCE_REPOSITORY}/releases/download/v#{version}/${Cask.ASSET_NAME}"`
+		)
+	);
 });
 
-check('brew upgrade quits, replaces and relaunches the app, and livecheck reads the channel appcast', () => {
-	for (const cask of [dev, stable]) {
-		assert.doesNotMatch(cask.text, /auto_updates/, 'auto_updates would make brew upgrade skip the app');
-		assert.ok(cask.text.includes(`uninstall quit: ["${Cask.BUNDLE_ID}.hammerspoon", "${Cask.BUNDLE_ID}"]`));
-		const marker = `"${Cask.RELAUNCH_MARKER}"`;
-		const preflight = cask.text.slice(cask.text.indexOf('uninstall_preflight do'), cask.text.indexOf('uninstall quit:'));
-		assert.ok(preflight.includes(`FileUtils.touch(${marker})`) && preflight.includes('if running'),
-			'the marker is left only when the app was running');
-		const postflight = cask.text.slice(cask.text.indexOf('postflight do'));
-		assert.ok(postflight.includes(`if File.exist?(${marker})`) && postflight.includes(`FileUtils.rm_f(${marker})`)
-			&& postflight.includes(`"/usr/bin/open", args: ["#{appdir}/${Cask.APP_NAME}"]`),
-			'postflight relaunches only on the marker, and consumes it');
-		assert.ok(Cask.RELAUNCH_MARKER.includes(`/Library/Caches/${Cask.BUNDLE_ID}/`), 'zap must remove the marker');
+check(
+	'brew upgrade quits, replaces and relaunches the app, and livecheck reads the channel appcast',
+	() => {
+		for (const cask of [dev, stable]) {
+			assert.doesNotMatch(
+				cask.text,
+				/auto_updates/,
+				'auto_updates would make brew upgrade skip the app'
+			);
+			assert.ok(
+				cask.text.includes(`uninstall quit: ["${Cask.BUNDLE_ID}.hammerspoon", "${Cask.BUNDLE_ID}"]`)
+			);
+			const marker = `"${Cask.RELAUNCH_MARKER}"`;
+			const preflight = cask.text.slice(
+				cask.text.indexOf('uninstall_preflight do'),
+				cask.text.indexOf('uninstall quit:')
+			);
+			assert.ok(
+				preflight.includes(`FileUtils.touch(${marker})`) && preflight.includes('if running'),
+				'the marker is left only when the app was running'
+			);
+			const postflight = cask.text.slice(cask.text.indexOf('postflight do'));
+			assert.ok(
+				postflight.includes(`if File.exist?(${marker})`) &&
+					postflight.includes(`FileUtils.rm_f(${marker})`) &&
+					postflight.includes(`"/usr/bin/open", args: ["#{appdir}/${Cask.APP_NAME}"]`),
+				'postflight relaunches only on the marker, and consumes it'
+			);
+			assert.ok(
+				Cask.RELAUNCH_MARKER.includes(`/Library/Caches/${Cask.BUNDLE_ID}/`),
+				'zap must remove the marker'
+			);
+		}
+		const base = `https://raw.githubusercontent.com/${Cask.SOURCE_REPOSITORY}/${Cask.APPCAST_BRANCH}/`;
+		assert.ok(dev.text.includes(`url "${base}appcast-dev.xml"`));
+		assert.ok(stable.text.includes(`url "${base}appcast-main.xml"`));
+		assert.ok(
+			WORKFLOW.includes(`branch="${Cask.APPCAST_BRANCH}"`),
+			'ci.yml publishes the appcasts on another branch'
+		);
 	}
-	const base = `https://raw.githubusercontent.com/${Cask.SOURCE_REPOSITORY}/${Cask.APPCAST_BRANCH}/`;
-	assert.ok(dev.text.includes(`url "${base}appcast-dev.xml"`));
-	assert.ok(stable.text.includes(`url "${base}appcast-main.xml"`));
-	assert.ok(WORKFLOW.includes(`branch="${Cask.APPCAST_BRANCH}"`), 'ci.yml publishes the appcasts on another branch');
-});
+);
 
 check('bundle names match build_macos_app.sh', () => {
 	assert.ok(BUILD_SCRIPT.includes(`BUNDLE_ID="${Cask.BUNDLE_ID}"`));
 	assert.ok(BUILD_SCRIPT.includes(`APP_PATH="$BUILD_DIR/${Cask.APP_NAME}"`));
 	assert.ok(BUILD_SCRIPT.includes(`ZIP_PATH="$BUILD_DIR/${Cask.ASSET_NAME}"`));
-	const minimum = BUILD_SCRIPT.match(/<key>LSMinimumSystemVersion<\/key>\s*<string>(\d+)\.\d+<\/string>/);
+	const minimum = BUILD_SCRIPT.match(
+		/<key>LSMinimumSystemVersion<\/key>\s*<string>(\d+)\.\d+<\/string>/
+	);
 	assert.ok(minimum, 'LSMinimumSystemVersion not found');
 	assert.strictEqual(Cask.MINIMUM_MACOS, MACOS_SYMBOLS[minimum[1]]);
 	assert.ok(dev.text.includes(`app "${Cask.APP_NAME}"`));
-	assert.ok(dev.text.includes(`"#{appdir}/${Cask.APP_NAME}"`), 'the quarantine flag is cleared on the installed app');
+	assert.ok(
+		dev.text.includes(`"#{appdir}/${Cask.APP_NAME}"`),
+		'the quarantine flag is cleared on the installed app'
+	);
 });
 
-check('the release workflow runs the generator on the published asset and the docs name its tap', () => {
-	assert.ok(WORKFLOW.includes('node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap"'));
-	assert.ok(WORKFLOW.includes(`--pattern ${Cask.ASSET_NAME}`));
-	const tap = WORKFLOW.match(/TAP_REPOSITORY: \$\{\{ github\.repository_owner \}\}\/(homebrew-[a-z-]+)/);
-	assert.ok(tap, 'ci.yml names no tap repository');
-	const owner = Cask.SOURCE_REPOSITORY.split('/')[0];
-	const shortTap = `${owner}/${tap[1].replace(/^homebrew-/, '')}`;
-	assert.ok(MACOS_README.includes(`brew tap ${shortTap}`), `the macOS README does not tap ${shortTap}`);
-	for (const entry of Cask.caskChannels()) {
-		assert.ok(MACOS_README.includes(`brew install --cask ${entry.token}`), `the macOS README does not install ${entry.token}`);
+check(
+	'the release workflow runs the generator on the published asset and the docs name its tap',
+	() => {
+		assert.ok(WORKFLOW.includes('node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap"'));
+		assert.ok(WORKFLOW.includes(`--pattern ${Cask.ASSET_NAME}`));
+		const tap = WORKFLOW.match(
+			/TAP_REPOSITORY: \$\{\{ github\.repository_owner \}\}\/(homebrew-[a-z-]+)/
+		);
+		assert.ok(tap, 'ci.yml names no tap repository');
+		const owner = Cask.SOURCE_REPOSITORY.split('/')[0];
+		const shortTap = `${owner}/${tap[1].replace(/^homebrew-/, '')}`;
+		assert.ok(
+			MACOS_README.includes(`brew tap ${shortTap}`),
+			`the macOS README does not tap ${shortTap}`
+		);
+		for (const entry of Cask.caskChannels()) {
+			assert.ok(
+				MACOS_README.includes(`brew install --cask ${entry.token}`),
+				`the macOS README does not install ${entry.token}`
+			);
+		}
 	}
-});
+);
 
 check('the release notes name the released channel cask and every channel token', () => {
 	assert.ok(WORKFLOW.includes('cask="$(node tools/build/homebrew-cask.cjs --token "$CHANNEL")"'));
@@ -136,7 +190,10 @@ check('the release notes name the released channel cask and every channel token'
 	assert.ok(WORKFLOW.includes('brew tap ${GITHUB_REPOSITORY_OWNER}/ergopti'));
 	for (const entry of Cask.caskChannels()) {
 		assert.strictEqual(Cask.tokenForChannel(entry.id), entry.token);
-		assert.ok(WORKFLOW.includes(`\\\`${entry.token}\\\``), `the release notes do not name ${entry.token}`);
+		assert.ok(
+			WORKFLOW.includes(`\\\`${entry.token}\\\``),
+			`the release notes do not name ${entry.token}`
+		);
 	}
 	assert.throws(() => Cask.tokenForChannel('nightly'), /not a registry channel/);
 });
@@ -150,8 +207,11 @@ check('invalid input fails instead of rendering', () => {
 check('the CLI writes the cask into the tap checkout', () => {
 	const tap = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-tap-'));
 	try {
-		const run = spawnSync(process.execPath,
-			[path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs'), 'v0.0.0-dev.142', SHA, tap], { encoding: 'utf8' });
+		const run = spawnSync(
+			process.execPath,
+			[path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs'), 'v0.0.0-dev.142', SHA, tap],
+			{ encoding: 'utf8' }
+		);
 		assert.strictEqual(run.status, 0, run.stderr);
 		assert.strictEqual(run.stdout, `${dev.file}\n`);
 		assert.strictEqual(fs.readFileSync(path.join(tap, dev.file), 'utf8'), dev.text);

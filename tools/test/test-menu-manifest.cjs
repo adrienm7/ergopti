@@ -131,7 +131,9 @@ function main() {
 					violations.push(`${where}: toggle carries i18n_on/i18n_off — a checkbox has one label`);
 				}
 				if (idx !== 0) {
-					violations.push(`${where}: a toggle is its menu's master switch and must be its first row`);
+					violations.push(
+						`${where}: a toggle is its menu's master switch and must be its first row`
+					);
 				}
 			}
 
@@ -186,7 +188,7 @@ function main() {
 
 	console.log(
 		`menu manifest drift gate: OK — ${featurePaths.size} feature paths, ` +
-		`all menu feature paths + i18n keys + platforms valid.`
+			`all menu feature paths + i18n keys + platforms valid.`
 	);
 }
 

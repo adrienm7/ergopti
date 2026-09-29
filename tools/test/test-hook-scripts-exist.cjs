@@ -35,7 +35,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const HUSKY = path.join(ROOT, '.husky');
 
 // An interpreter followed by a repo-relative script path.
-const INVOCATION = /\b(?:node|python3?|sh|bash)\s+((?:tools|scripts|bin)\/[A-Za-z0-9_./-]+\.(?:js|cjs|mjs|py|sh))/g;
+const INVOCATION =
+	/\b(?:node|python3?|sh|bash)\s+((?:tools|scripts|bin)\/[A-Za-z0-9_./-]+\.(?:js|cjs|mjs|py|sh))/g;
 
 // Floor: the hooks do real work, so finding nothing means the scan broke.
 const MIN_INVOCATIONS = 3;

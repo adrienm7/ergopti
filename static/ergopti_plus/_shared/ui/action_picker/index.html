@@ -13,18 +13,20 @@
 				<h1 id="title"></h1>
 				<p id="subtitle"></p>
 			</div>
-			<button id="toc-btn" type="button" title="" onclick="toggleToc()" aria-label="Table of contents">☰</button>
+			<button
+				id="toc-btn"
+				type="button"
+				title=""
+				onclick="toggleToc()"
+				aria-label="Table of contents"
+			>
+				☰
+			</button>
 		</header>
 
 		<div id="search-bar">
 			<span class="search-ico" aria-hidden="true">⌕</span>
-			<input
-				id="search"
-				type="text"
-				autocomplete="off"
-				autocorrect="off"
-				spellcheck="false"
-			/>
+			<input id="search" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
 		</div>
 
 		<main id="list" tabindex="-1"></main>
@@ -48,7 +50,13 @@
 				<label id="param-vision-provider-label" for="param-vision-provider"></label>
 				<select id="param-vision-provider"></select>
 				<label id="param-vision-model-label" for="param-vision-model"></label>
-				<input id="param-vision-model" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+				<input
+					id="param-vision-model"
+					type="text"
+					autocomplete="off"
+					autocorrect="off"
+					spellcheck="false"
+				/>
 			</div>
 			<div id="param-language" hidden>
 				<label id="param-language-label" for="param-language-select"></label>

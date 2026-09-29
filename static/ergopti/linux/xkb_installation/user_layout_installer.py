@@ -175,7 +175,8 @@ def build_registry(layouts: Dict[str, dict]) -> str:
         )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        + REGISTRY_MARKER + "\n"
+        + REGISTRY_MARKER
+        + "\n"
         + '<!DOCTYPE xkbConfigRegistry SYSTEM "xkb.dtd">\n'
         + '<xkbConfigRegistry version="1.1">\n'
         + "  <layoutList>\n"
@@ -243,9 +244,14 @@ def read_manifest(root: Path) -> Dict[str, dict]:
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
-        raise InstallError(EXIT_VALIDATION, "the layout manifest %s is unreadable: %s" % (path, error))
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != MANIFEST_SCHEMA \
-            or not isinstance(manifest.get("layouts"), dict):
+        raise InstallError(
+            EXIT_VALIDATION, "the layout manifest %s is unreadable: %s" % (path, error)
+        )
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != MANIFEST_SCHEMA
+        or not isinstance(manifest.get("layouts"), dict)
+    ):
         raise InstallError(EXIT_VALIDATION, "the layout manifest %s has an unknown shape" % path)
     return manifest["layouts"]
 
@@ -253,7 +259,10 @@ def read_manifest(root: Path) -> Dict[str, dict]:
 def write_manifest(root: Path, layouts: Dict[str, dict]) -> None:
     """Records the installed layouts."""
     body = {"schema_version": MANIFEST_SCHEMA, "layouts": layouts}
-    write_text(root / MANIFEST_NAME, json.dumps(body, indent="\t", sort_keys=True, ensure_ascii=False) + "\n")
+    write_text(
+        root / MANIFEST_NAME,
+        json.dumps(body, indent="\t", sort_keys=True, ensure_ascii=False) + "\n",
+    )
 
 
 def owned_by_us(path: Path, marker: str) -> bool:
@@ -297,10 +306,21 @@ def check_conflicts(root: Path, layout_id: str, installed: Dict[str, dict]) -> N
     if layout_id not in installed:
         for path in layout_paths(root, layout_id).values():
             if path.exists():
-                raise InstallError(EXIT_VALIDATION, "%s exists and was not installed by ErgoptiPlus" % path, "conflict")
-    for path, marker in ((root / "rules" / "evdev", RULES_MARKER), (root / "rules" / "evdev.xml", REGISTRY_MARKER)):
+                raise InstallError(
+                    EXIT_VALIDATION,
+                    "%s exists and was not installed by ErgoptiPlus" % path,
+                    "conflict",
+                )
+    for path, marker in (
+        (root / "rules" / "evdev", RULES_MARKER),
+        (root / "rules" / "evdev.xml", REGISTRY_MARKER),
+    ):
         if path.exists() and not owned_by_us(path, marker):
-            raise InstallError(EXIT_VALIDATION, "%s is your own file; ErgoptiPlus will not replace it" % path, "conflict")
+            raise InstallError(
+                EXIT_VALIDATION,
+                "%s is your own file; ErgoptiPlus will not replace it" % path,
+                "conflict",
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -319,20 +339,30 @@ def verify(root: Path, layout_id: str) -> Optional[bool]:
     return result.keymap is not None and keymap_has_type(result.keymap, ERGOPTI_TYPE_NAME)
 
 
-def install(layout_id: str, display_name: str, source_dir: Path, languages: List[str],
-            root: Path, home: Path) -> dict:
+def install(
+    layout_id: str,
+    display_name: str,
+    source_dir: Path,
+    languages: List[str],
+    root: Path,
+    home: Path,
+) -> dict:
     """Installs one converted layout into the user tree."""
     symbols = (source_dir / (layout_id + ".xkb")).read_text(encoding="utf-8")
     types = (source_dir / "xkb_types.txt").read_text(encoding="utf-8")
     compose_source = source_dir / (layout_id + ".XCompose")
     problems = validate_layout_files(symbols, types)
     if problems:
-        raise InstallError(EXIT_VALIDATION, "the converted layout is inconsistent: " + "; ".join(problems))
+        raise InstallError(
+            EXIT_VALIDATION, "the converted layout is inconsistent: " + "; ".join(problems)
+        )
     installed = read_manifest(root)
     check_conflicts(root, layout_id, installed)
     paths = layout_paths(root, layout_id)
     # What this layout owned before, so a failed installation puts it back.
-    previous = {name: path.read_text(encoding="utf-8") for name, path in paths.items() if path.exists()}
+    previous = {
+        name: path.read_text(encoding="utf-8") for name, path in paths.items() if path.exists()
+    }
     try:
         write_text(paths["symbols"], with_file_marker(patch_symbols_default(symbols), layout_id))
         write_text(paths["types"], with_file_marker(types, layout_id))
@@ -351,13 +381,21 @@ def install(layout_id: str, display_name: str, source_dir: Path, languages: List
         # The desktop pickers read this tree: a layout that does not compile
         # must not stay registered there while the daemon reports a failure.
         restore_layout(root, home, paths, previous, installed)
-        return {"ok": False, "verified": False,
-                "detail": "the converted layout does not compile with its key types; the tree is unchanged"}
+        return {
+            "ok": False,
+            "verified": False,
+            "detail": "the converted layout does not compile with its key types; the tree is unchanged",
+        }
     return {"ok": True, "verified": verified, "detail": "installed in %s" % root}
 
 
-def restore_layout(root: Path, home: Path, paths: Dict[str, Path], previous: Dict[str, str],
-                   installed: Dict[str, dict]) -> None:
+def restore_layout(
+    root: Path,
+    home: Path,
+    paths: Dict[str, Path],
+    previous: Dict[str, str],
+    installed: Dict[str, dict],
+) -> None:
     """Puts back the files one layout owned before a failed installation
     (none for a new layout) and the shared files of the installed layouts."""
     try:
@@ -368,15 +406,19 @@ def restore_layout(root: Path, home: Path, paths: Dict[str, Path], previous: Dic
                 path.unlink()
         publish_shared_files(root, home, installed)
     except OSError as error:
-        raise InstallError(EXIT_INSTALL_ABORTED,
-                           "cannot restore the user XKB tree after a failed installation: %s" % error)
+        raise InstallError(
+            EXIT_INSTALL_ABORTED,
+            "cannot restore the user XKB tree after a failed installation: %s" % error,
+        )
 
 
 def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -> dict:
     """Removes one layout this module installed."""
     installed = read_manifest(root)
     if layout_id not in installed:
-        raise InstallError(EXIT_VALIDATION, "the layout %s was not installed by ErgoptiPlus" % layout_id)
+        raise InstallError(
+            EXIT_VALIDATION, "the layout %s was not installed by ErgoptiPlus" % layout_id
+        )
     try:
         for path in layout_paths(root, layout_id).values():
             if path.exists():
@@ -388,7 +430,11 @@ def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -
     status = CleanupStatus.ABSENT
     if deactivate:
         status = deactivate_layouts(lambda spec: spec.layout == layout_id)
-    return {"ok": True, "verified": None, "detail": "uninstalled (desktop sources: %s)" % status.name.lower()}
+    return {
+        "ok": True,
+        "verified": None,
+        "detail": "uninstalled (desktop sources: %s)" % status.name.lower(),
+    }
 
 
 def activate(layout_id: str, root: Path) -> dict:
@@ -396,8 +442,11 @@ def activate(layout_id: str, root: Path) -> dict:
     if layout_id not in read_manifest(root):
         raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
     applied = activate_layout([LayoutSpec(layout_id)])
-    return {"ok": bool(applied), "verified": None,
-            "detail": "activated" if applied else "the desktop did not accept the layout"}
+    return {
+        "ok": bool(applied),
+        "verified": None,
+        "detail": "activated" if applied else "the desktop did not accept the layout",
+    }
 
 
 def parse_arguments(argv: List[str]) -> argparse.Namespace:
@@ -422,13 +471,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     root, home = user_root(), user_home()
     try:
         if args.command == "install":
-            report = install(args.layout_id, args.display_name, args.source_dir, args.language, root, home)
+            report = install(
+                args.layout_id, args.display_name, args.source_dir, args.language, root, home
+            )
         elif args.command == "uninstall":
             report = uninstall(args.layout_id, root, home)
         else:
             report = activate(args.layout_id, root)
     except InstallError as error:
-        print(json.dumps({"ok": False, "verified": None, "detail": error.detail, "code": error.kind}))
+        print(
+            json.dumps({"ok": False, "verified": None, "detail": error.detail, "code": error.kind})
+        )
         return error.code
     except OSError as error:
         print(json.dumps({"ok": False, "verified": None, "detail": str(error)}))

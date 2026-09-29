@@ -20,15 +20,27 @@ const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui');
 const messages = [];
 const context = vm.createContext({
 	console,
-	window: { webkit: { messageHandlers: { model_browser_bridge: {
-		postMessage: message => messages.push(JSON.parse(JSON.stringify(message)))
-	} } } },
+	window: {
+		webkit: {
+			messageHandlers: {
+				model_browser_bridge: {
+					postMessage: (message) => messages.push(JSON.parse(JSON.stringify(message)))
+				}
+			}
+		}
+	},
 	document: {
 		readyState: 'complete',
-		getElementById() { return null; },
-		querySelectorAll() { return []; },
+		getElementById() {
+			return null;
+		},
+		querySelectorAll() {
+			return [];
+		},
 		addEventListener() {},
-		createElement() { return {}; }
+		createElement() {
+			return {};
+		}
 	}
 });
 vm.runInContext(fs.readFileSync(path.join(shared, 'host_bridge.js'), 'utf8'), context);
@@ -59,7 +71,10 @@ const legacy = [
 inject(1);
 const oldRow = context.buildRow({ name: 'model-A', url: 'https://huggingface.co/model-A' });
 const oldMessages = actions();
-assert.deepEqual(oldMessages, legacy.map(action => ({ ...action, session: 1 })));
+assert.deepEqual(
+	oldMessages,
+	legacy.map((action) => ({ ...action, session: 1 }))
+);
 inject(2);
 oldRow.onclick({ target: {}, stopPropagation() {} });
 context.useSelected();
@@ -68,17 +83,35 @@ oldRow.onclick({
 	target: { closest: () => ({ getAttribute: () => 'https://huggingface.co/model-A' }) },
 	stopPropagation() {}
 });
-assert.deepEqual(messages.splice(0), [], 'retired DOM row callbacks must not acquire the successor session');
-assert.deepEqual(actions(), legacy.map(action => ({ ...action, session: 2 })));
+assert.deepEqual(
+	messages.splice(0),
+	[],
+	'retired DOM row callbacks must not acquire the successor session'
+);
+assert.deepEqual(
+	actions(),
+	legacy.map((action) => ({ ...action, session: 2 }))
+);
 assert.equal(oldMessages[0].session, 1);
 for (const invalid of [null, undefined, 0, -1, 1.5, NaN, Infinity, '2', {}, 9007199254740992]) {
 	assert.throws(() => inject(invalid), /session/);
-	assert.deepEqual(actions(), legacy.map(action => ({ ...action, session: 2 })),
-		'invalid injection must not replace the current operation identity');
+	assert.deepEqual(
+		actions(),
+		legacy.map((action) => ({ ...action, session: 2 })),
+		'invalid injection must not replace the current operation identity'
+	);
 }
 
-const luaBodies = oldMessages.map(message => '{ ' + Object.entries(message)
-	.map(([key, value]) => `${key} = ${JSON.stringify(value)}`).join(', ') + ' }').join(',');
+const luaBodies = oldMessages
+	.map(
+		(message) =>
+			'{ ' +
+			Object.entries(message)
+				.map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
+				.join(', ') +
+			' }'
+	)
+	.join(',');
 const lua = spawnSync('lua', ['-'], {
 	cwd: path.resolve(__dirname, '../../static/ergopti_plus/macos'),
 	encoding: 'utf8',
@@ -132,8 +165,11 @@ assert.equal(lua.status, 0, lua.stdout + lua.stderr);
 
 inject();
 assert.deepEqual(actions(), legacy, 'legacy WebKit hosts retain untagged objects');
-context.window.chrome = { webview: { postMessage: message => messages.push(message) } };
+context.window.chrome = { webview: { postMessage: (message) => messages.push(message) } };
 inject();
-assert.deepEqual(actions(), legacy.map(message => JSON.stringify(message)),
-	'legacy Windows hosts retain their original JSON strings');
+assert.deepEqual(
+	actions(),
+	legacy.map((message) => JSON.stringify(message)),
+	'legacy Windows hosts retain their original JSON strings'
+);
 console.log('Model browser session bridge: native reuse, validation and legacy hosts passed.');

@@ -5,82 +5,82 @@
 ## Resource-conscious test execution
 
 - [x] Measure the complete sequential JS suite before optimization: 219 checks
-  passed on Windows / Node 22.22.2 in 470.712 seconds. Drift coverage took
-  169.461 seconds; generation and drift checks each took about 28 seconds.
-  Captured successful output totaled 191,882 bytes, so retaining it is not the
-  priority. Parent CPU/RSS measurements do not represent the child process tree.
+      passed on Windows / Node 22.22.2 in 470.712 seconds. Drift coverage took
+      169.461 seconds; generation and drift checks each took about 28 seconds.
+      Captured successful output totaled 191,882 bytes, so retaining it is not the
+      priority. Parent CPU/RSS measurements do not represent the child process tree.
 - [x] Remove the aggregate build from the leaf generator registry. Its twelve
-  declared outputs were already owned by individual generators, causing repeated
-  generation and build validation inside every drift probe. The regression fails
-  for duplicate ownership before the change and passes afterward. All 25 output
-  paths remain identical; the full domain pipeline remains a separate JS check.
-  Keep all four independent dirty probes and both clean controls unchanged;
-  the existing hostile-receipt and cleanup oracle still passes.
+      declared outputs were already owned by individual generators, causing repeated
+      generation and build validation inside every drift probe. The regression fails
+      for duplicate ownership before the change and passes afterward. All 25 output
+      paths remain identical; the full domain pipeline remains a separate JS check.
+      Keep all four independent dirty probes and both clean controls unchanged;
+      the existing hostile-receipt and cleanup oracle still passes.
 - [x] Complete the post-change measurement and selected JS gate: all 220 checks
-  passed in 259.536 seconds, versus 470.712 seconds before (44.9% shorter).
-  The unchanged six-run drift coverage fell from 169.461 to 26.727 seconds.
-  These are single-run Windows wall-time observations, not child-tree CPU/RAM
-  or native macOS performance claims. See the
-  [test execution measurement](../../../performance/hammerspoon/2026_09_08/test_execution/report.md).
+      passed in 259.536 seconds, versus 470.712 seconds before (44.9% shorter).
+      The unchanged six-run drift coverage fell from 169.461 to 26.727 seconds.
+      These are single-run Windows wall-time observations, not child-tree CPU/RAM
+      or native macOS performance claims. See the
+      [test execution measurement](../../../performance/hammerspoon/2026_09_08/test_execution/report.md).
 - [ ] Profile child-tree CPU/RAM and HS module costs before further optimization.
 - [ ] Finish responsibility-based test splits and fixture consolidation; remove
-  only behaviorally redundant tests, retaining root-cause regression coverage.
+      only behaviorally redundant tests, retaining root-cause regression coverage.
 
 ## Shared Lua verification coverage follow-up
 
 - [x] Select both Lua consumer unit and E2E suites for shared runtime changes.
-  The previous planner selected JS alone for an isolated shared Lua edit.
-  The permanent regression exercises all 52 current sources and a deleted-path
-  control: 212 missing selections before the rule fix, zero afterward.
+      The previous planner selected JS alone for an isolated shared Lua edit.
+      The permanent regression exercises all 52 current sources and a deleted-path
+      control: 212 missing selections before the rule fix, zero afterward.
 - [x] Preserve existing selection policy: shared contracts retain all-driver
-  unit coverage, shared Lua does not select AHK implementation gates, and
-  documentation/neighbor prefixes do not select new runtime gates. Existing
-  E2E symmetry and shared-contract selection guards both pass.
+      unit coverage, shared Lua does not select AHK implementation gates, and
+      documentation/neighbor prefixes do not select new runtime gates. Existing
+      E2E symmetry and shared-contract selection guards both pass.
 - [x] Complete the selected JS validation: all 219 checks passed, including
-  standalone npm alias parity and the registered shared Lua coverage guard.
+      standalone npm alias parity and the registered shared Lua coverage guard.
 - [ ] Separately repair Git path framing: a real untracked Lua file containing
-  a space is quoted by Git status; the current parser retains those quotes and
-  selects no gates. Consume NUL-delimited paths and cover both status/range
-  modes, deleted paths and rename endpoints with real Git-backed regressions.
+      a space is quoted by Git status; the current parser retains those quotes and
+      selects no gates. Consume NUL-delimited paths and cover both status/range
+      modes, deleted paths and rename endpoints with real Git-backed regressions.
 
 ## Nested preference list restoration follow-up
 
 - [x] Restore nonempty arrays through both reverse preference maps. The loader
-  previously consulted only the scalar map for arrays below grouped keys,
-  dropping navigation modifiers, disabled applications, user models and user
-  profiles. Fifteen real save/load/merge cases cover empty, one-entry and
-  two-entry lists plus neighboring values. Before the fix: seven pass and
-  eight fail at missing restored values; after the fix: all fifteen pass.
+      previously consulted only the scalar map for arrays below grouped keys,
+      dropping navigation modifiers, disabled applications, user models and user
+      profiles. Fifteen real save/load/merge cases cover empty, one-entry and
+      two-entry lists plus neighboring values. Before the fix: seven pass and
+      eight fail at missing restored values; after the fix: all fifteen pass.
 - [x] Remove the existing persistence test's explicit acceptance of missing
-  nested values. The strengthened real corpus fails two of 26 cases before
-  the mapper fix and passes all 26 afterward. An isolated mutation removing
-  two successfully restored values was accepted by the original test and
-  rejected by the strengthened test; all probe fixtures were cleaned.
+      nested values. The strengthened real corpus fails two of 26 cases before
+      the mapper fix and passes all 26 afterward. An isolated mutation removing
+      two successfully restored values was accepted by the original test and
+      rejected by the strengthened test; all probe fixtures were cleaned.
 - [x] Exercise the real loader and profile registry together: all eight
-  primitive-entry/prefix refusal cases preserve the prior usable registry
-  and emit content-free diagnostics after the new mapper restores the input.
+      primitive-entry/prefix refusal cases preserve the prior usable registry
+      and emit content-free diagnostics after the new mapper restores the input.
 - [x] Both neighboring-module orders pass 43 tests with zero probe cleanup
-  errors. Independent read-only review reports no blocker.
+      errors. Independent read-only review reports no blocker.
 - [x] Full validation passes: 9,672 Lua tests across 1,097 modules, 217 JS
-  checks and the required HS E2E gate. Native macOS behavior remains unverified.
+      checks and the required HS E2E gate. Native macOS behavior remains unverified.
 
 ## Profile registry input validation follow-up
 
 - [x] Reject primitive profile entries before publishing a registry or retiring
-  queued warmup. Eight permanent cases failed before the guard and pass after
-  it; they cover boolean, number and string entries with and without a valid
-  prefix, prior registry usability and content-free diagnostics.
+      queued warmup. Eight permanent cases failed before the guard and pass after
+      it; they cover boolean, number and string entries with and without a valid
+      prefix, prior registry usability and content-free diagnostics.
 - [x] Reject NaN profile identifiers at the same boundary. The real TOML codec
-  accepts `user_profiles = [{ id = nan }]`; the formerly successful setter let
-  `get_all_profiles` crash with `table index is NaN`. Two decoded-input cases
-  plus queued-warmup preservation failed before this additional guard.
+      accepts `user_profiles = [{ id = nan }]`; the formerly successful setter let
+      `get_all_profiles` crash with `table index is NaN`. Two decoded-input cases
+      plus queued-warmup preservation failed before this additional guard.
 - [x] Preserve valid registry identity and legacy empty records. The focused
-  modules pass 110 tests; the warmup regression also rejects an in-memory
-  mutation that validates only after canceling the previous timer.
+      modules pass 110 tests; the warmup regression also rejects an in-memory
+      mutation that validates only after canceling the previous timer.
 - [x] Complete post-NaN validation: 9,657 Lua tests across 1,096 modules,
-  217 JS checks and the required HS E2E gate pass. Both focused module orders
-  pass 110 tests. Independent review reports no blocker. These results are
-  Windows-host harness evidence, not native macOS validation.
+      217 JS checks and the required HS E2E gate pass. Both focused module orders
+      pass 110 tests. Independent review reports no blocker. These results are
+      Windows-host harness evidence, not native macOS validation.
 
 This is the mutable checklist requested for handoff to the next implementing
 model. Developer documentation and identifiers intentionally remain in English.
@@ -126,15 +126,15 @@ gaps are separately labelled and must not be advertised as extra bugs.
 ### H-00 — reconcile the existing candidate before new work
 
 - [ ] Read `git status`, the current branch and `git worktree list` in both
-  main and HS. Do not trust the old SHA after another agent has worked.
+      main and HS. Do not trust the old SHA after another agent has worked.
 - [ ] Inspect the existing HS-273 candidate rather than implementing it twice.
 - [ ] Confirm the only expected candidate paths are:
   - `static/ergopti_plus/macos/ui/menu/hotstring_counter.lua`;
   - `static/ergopti_plus/macos/tests/unit/ui/menu/test_hotstring_counter_metadata_boundaries.lua`.
 - [ ] Preserve any additional user/agent edits. Never stash/reset/clean them.
 - [ ] Read the relevant skills: `ship-fix`, `hammerspoon-driver`,
-  `verify-change`, `commit-and-push`, `windows-toolchain`; use `logger` when
-  changing diagnostics and `cross-driver-parity` for shared code.
+      `verify-change`, `commit-and-push`, `windows-toolchain`; use `logger` when
+      changing diagnostics and `cross-driver-parity` for shared code.
 
 The candidate was implemented before the user switched to audit-only work.
 Its six new cases failed on old code and passed on the candidate. The existing
@@ -171,7 +171,7 @@ after recording the commit and verification; writing code is not completion.
 - [ ] Stage exact owned paths; use an English Conventional Commit message file.
 - [ ] Record commit, test counts, exit codes and native verification limits here.
 - [ ] Rebase current `dev`, inspect intervening paths, revalidate affected scope,
-  and perform the requested fast-forward integration without push.
+      and perform the requested fast-forward integration without push.
 
 Use the project RTK launcher for terminal output. Invoke commands directly if
 stdout feeds a file, parser, hash, generator or test assertion. On this machine
@@ -211,15 +211,15 @@ virtual; the relevant controller, reader, registry or builder is real.
 
 ## 3. Confirmed bugs: priority and dependency order
 
-| ID | Priority | Surface | State at handoff |
-| --- | --- | --- | --- |
-| HS-273 | Finish existing candidate | Metadata boundaries | Implemented/tested locally, not committed |
-| HS-267 | P1 | Application-picker request ownership | Proven, not implemented |
-| HS-268 | P1 | Partial application discovery cache | Proven, not implemented |
-| HS-271 | P2, parser design first | Entry versus section-property semantics | Proven, not implemented |
-| HS-269 | P2 | Repeated-section detail aggregation | Proven, not implemented |
-| HS-270 | P2 | Initial BOM handling | Proven, not implemented |
-| HS-272 | P2, coordinate shared behavior | Escaped manifest names | Proven, not implemented |
+| ID     | Priority                       | Surface                                 | State at handoff                          |
+| ------ | ------------------------------ | --------------------------------------- | ----------------------------------------- |
+| HS-273 | Finish existing candidate      | Metadata boundaries                     | Implemented/tested locally, not committed |
+| HS-267 | P1                             | Application-picker request ownership    | Proven, not implemented                   |
+| HS-268 | P1                             | Partial application discovery cache     | Proven, not implemented                   |
+| HS-271 | P2, parser design first        | Entry versus section-property semantics | Proven, not implemented                   |
+| HS-269 | P2                             | Repeated-section detail aggregation     | Proven, not implemented                   |
+| HS-270 | P2                             | Initial BOM handling                    | Proven, not implemented                   |
+| HS-272 | P2, coordinate shared behavior | Escaped manifest names                  | Proven, not implemented                   |
 
 P1/P2 are execution priorities within this handoff, not severity inflation.
 No critical or high-severity defect was established in this final pass.
@@ -231,8 +231,8 @@ several more independent regular-expression parsers.
 - [x] Reproduce and implement.
 - [x] Add all ownership regressions below.
 - [x] Verify, commit and integrate. Runtime commits: `04b193289`, `ca603dd86`,
-  `c6739a195`, `f43734e14`; final diagnostic regression coverage is delivered
-  with `test(hs): cover picker authority across diagnostic reentry`.
+      `c6739a195`, `f43734e14`; final diagnostic regression coverage is delivered
+      with `test(hs): cover picker authority across diagnostic reentry`.
 
 **Severity:** medium. **Confidence:** high. **Guarantee:** G3.
 
@@ -313,8 +313,8 @@ B's current UI. Adding a check only before `show()` is likewise too late.
 - [x] Define absence/error outcomes and implement publication rules.
 - [x] Cover recovery and cache semantics.
 - [x] Verify, commit and integrate. Runtime fixes: `2f4a770a8`, `c3c7a95ca`,
-  `1756c7143`; final integration coverage:
-  `test(hs): exercise picker process and presentation integration`.
+      `1756c7143`; final integration coverage:
+      `test(hs): exercise picker process and presentation integration`.
 
 **Severity:** medium. **Confidence:** high. **Guarantees:** G2, G5.
 
@@ -466,7 +466,7 @@ bytes; a BOM sequence inside a quoted value or trigger is content.
 - [x] Embedded BOM bytes in a string remain unchanged.
 - [x] A genuinely empty file still counts zero.
 - [x] A successful second count performs no additional read; closure remains
-  mandatory and failed reads never publish cache entries.
+      mandatory and failed reads never publish cache entries.
 
 This is compatibility with an explicitly supported runtime input, not a claim
 that every arbitrary BOM placement is valid TOML.
@@ -522,7 +522,7 @@ and correct header modes cannot make this lexical shortcut semantically true.
 - [x] Invalid semantic input fails without publishing aggregate/per-file cache.
 - [x] Empty, LF, CRLF and missing-final-newline cases remain covered.
 - [x] Open/read/close refusal and file identity changes keep their existing
-  failure and retry semantics; do not weaken transaction tests to adopt parsing.
+      failure and retry semantics; do not weaken transaction tests to adopt parsing.
 
 **Do not** add a special `if key == "description" then skip` workaround. It
 leaves the false classification in place and would lose a legitimate trigger.
@@ -532,7 +532,7 @@ leaves the false classification in place and would lose a legitimate trigger.
 - [x] Decode the actual manifest field using canonical string semantics.
 - [x] Decide and coordinate the shared-scanner sibling correction.
 - [x] Verify, commit and integrate. Commit:
-  `fix(extensions): decode manifest metadata through the canonical parser`.
+      `fix(extensions): decode manifest metadata through the canonical parser`.
 
 **Severity:** low. **Confidence:** high. **Guarantee:** G5.
 
@@ -563,7 +563,7 @@ do not silently reinterpret a malformed manifest as a successful empty one.
 - [x] A same-named field in another section does not win.
 - [x] Missing name follows the documented id fallback.
 - [x] Malformed/truncated string has explicit failure behavior and no success
-  cache; test the chosen contract rather than swallowing parse errors.
+      cache; test the chosen contract rather than swallowing parse errors.
 - [x] Counter details and every changed discovery consumer agree.
 
 Regression evidence: the focused manifest-metadata module passes 20 cases. The
@@ -636,7 +636,7 @@ problem; an independently failing assertion is still useful coverage.
 - [x] Run each module alone, combined, and in reversed order.
 - [x] Prove restoration after a deliberately raised assertion.
 - [x] Commit separately from a runtime behavior change:
-  `fix(tests): isolate LLM activation fixtures across transaction suites`.
+      `fix(tests): isolate LLM activation fixtures across transaction suites`.
 
 Source: `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua` under
 the macOS driver. Detailed review found 998 lines and **44 actual
@@ -672,12 +672,12 @@ and all 216 JavaScript checks, both exit zero. The final planner selects HS and
 JS only; a transient lint safety fixture observed during the JS run is not part
 of the delivered change. Native macOS execution remains unverified.
 
-| Destination in the same test directory | Current responsibility | Cases |
-| --- | --- | ---: |
-| `test_llm_factory_identity_transaction.lua` | Backend/model/No Model setter receipts, compensation, reentrant construction; original 465–581 | 14 |
-| `test_llm_factory_recovery_wiring.lua` | Exact recovery owners, deferred continuation, recommended profile, restored No Model; 582–701 | 6 |
-| `test_llm_activation_save_gate.lua` | Persistence refusals, bootstrap compensation, synchronous/double callbacks and dispatch receipts; 702–866 | 16 |
-| `test_llm_activation_pause_transaction.lua` | Real ScriptControl resume/rollback, pause failure replay, Disable All supersession; 867–995 | 8 |
+| Destination in the same test directory      | Current responsibility                                                                                    | Cases |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----: |
+| `test_llm_factory_identity_transaction.lua` | Backend/model/No Model setter receipts, compensation, reentrant construction; original 465–581            |    14 |
+| `test_llm_factory_recovery_wiring.lua`      | Exact recovery owners, deferred continuation, recommended profile, restored No Model; 582–701             |     6 |
+| `test_llm_activation_save_gate.lua`         | Persistence refusals, bootstrap compensation, synchronous/double callbacks and dispatch receipts; 702–866 |    16 |
+| `test_llm_activation_pause_transaction.lua` | Real ScriptControl resume/rollback, pause failure replay, Disable All supersession; 867–995               |     8 |
 
 Proposed fixture: `tests/support/llm_activation_fixture.lua`, exposing
 `with_activation(backend, save_results, options, callback)`. All actions and
@@ -803,18 +803,18 @@ their expanded name multisets before moving them rather than inferring counts:
 
 - Dispatch/terminal settlement: from `HS-265 quotes the exact fresh download log`
   through `HS-024 success and duplicate callbacks settle once without child
-  publication`. Retain the current filename for this group.
+publication`. Retain the current filename for this group.
 - Parent transaction/acquisition rollback: from `HS-024 releases the real
-  switcher gate when the logical slot is busy` through the `HS-024 latches
-  synchronous tail completion before` matrix. Include the later `HS-024 handles
-  tail construction` and `HS-024 buffers synchronous server` matrices here.
+switcher gate when the logical slot is busy` through the `HS-024 latches
+synchronous tail completion before` matrix. Include the later `HS-024 handles
+tail construction` and `HS-024 buffers synchronous server` matrices here.
 - Pause/reentry native ownership: from `HS-012 retains launcher construction
-  debt after PAUSE` through `HS-012 retains a poll timer published before
-  reentrant PAUSE`. Keep embedded reattachment variants beside their equivalent
+debt after PAUSE` through `HS-012 retains a poll timer published before
+reentrant PAUSE`. Keep embedded reattachment variants beside their equivalent
   regular-operation guarantees.
 - Reattachment: from `HS-024 reattach reports an interrupted download when its
-  PID is gone` through `HS-024 reattach async success releases after the exact
-  tail retires`. Keep freshness, PID probes and exact-tail retirement together.
+PID is gone` through `HS-024 reattach async success releases after the exact
+tail retires`. Keep freshness, PID probes and exact-tail retirement together.
 
 Shared support owns `with_fixture`, `launch_detached_download` and
 `assert_cancelled`; `result_value` is fixture-private. Keep
@@ -830,16 +830,16 @@ Extraction from `87728f410`, delivered with
 `tests/support/mlx_download_fixture.lua`, retaining all 19 owned modules and the
 same protected native/io/os restoration. The following modules pass alone:
 
-| Module relative to `tests/unit/ui/menu/menu_llm/` | Executed cases |
-| --- | ---: |
-| `test_mlx_download_terminal_contract.lua` | 30 |
-| `download/test_parent_transaction.lua` | 75 |
-| `download/test_pause_reentry.lua` | 42 |
-| `download/test_reattachment.lua` | 13 |
-| `download/test_presentation_owner.lua` | 11 |
-| `download/test_process_identity.lua` | 6 |
-| `download/test_repository_identifier_validation.lua` | 7 |
-| `download/test_fixture_scope.lua` | 3 |
+| Module relative to `tests/unit/ui/menu/menu_llm/`    | Executed cases |
+| ---------------------------------------------------- | -------------: |
+| `test_mlx_download_terminal_contract.lua`            |             30 |
+| `download/test_parent_transaction.lua`               |             75 |
+| `download/test_pause_reentry.lua`                    |             42 |
+| `download/test_reattachment.lua`                     |             13 |
+| `download/test_presentation_owner.lua`               |             11 |
+| `download/test_process_identity.lua`                 |              6 |
+| `download/test_repository_identifier_validation.lua` |              7 |
+| `download/test_fixture_scope.lua`                    |              3 |
 
 Forward and reverse module orders both pass all 187 cases, with exact expanded
 names matching the pre-extraction baseline. All 426 assertion-start lines and
@@ -899,7 +899,6 @@ No filesystem runtime behavior changes. Native macOS validation remains deferred
 
 ### T-05 — split tooltip watcher tests without losing facade integration
 
-
 - [x] Preserve the distinction between watcher unit tests and facade tests.
 - [x] Extract a scoped fixture, not a process-global fake tooltip singleton.
 - [x] Replay stale callback and cross-owner transitions after the move.
@@ -936,11 +935,11 @@ are not reused or changed, and native macOS execution remains unverified.
 
 - [x] Retain `tests/support/hotstring_counter_fixture.lua` as the native I/O owner.
 - [x] Reuse the existing fixture's canonical-reader ownership; another scoped
-  helper is unnecessary after removing the redundant nested reader scopes.
+      helper is unnecessary after removing the redundant nested reader scopes.
 - [ ] Consider moving the two older transaction modules into `ui/menu/` beside
-  the new semantic tests; keep each filename/slug discoverable during the move.
+      the new semantic tests; keep each filename/slug discoverable during the move.
 - [ ] Keep file transactions, listing transactions, attribute transactions,
-  whitespace and section semantics as separate focused modules.
+      whitespace and section semantics as separate focused modules.
 
 Current responsibilities:
 
@@ -961,13 +960,13 @@ canonical parsing, the whitespace facade import, explicit entries, section
 counts and I/O/cache observations remain observable. No extra helper or test
 deletion was needed. Directory reorganization remains separate optional work.
 
-| Module suffix | What must remain observable |
-| --- | --- |
-| `file_transaction` | Required close, read/close refusal, privacy of returned errors, retry/cache |
-| `listing_transaction` | Native iterator state, failed enumeration versus authoritative empty |
-| `attribute_transaction` | stat versus proven absence, dangling links, recovery |
-| `whitespace` | Canonical parsing of indentation and display names |
-| `metadata_boundaries` | Active entry mode ends and resumes at the right headers |
+| Module suffix           | What must remain observable                                                 |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `file_transaction`      | Required close, read/close refusal, privacy of returned errors, retry/cache |
+| `listing_transaction`   | Native iterator state, failed enumeration versus authoritative empty        |
+| `attribute_transaction` | stat versus proven absence, dangling links, recovery                        |
+| `whitespace`            | Canonical parsing of indentation and display names                          |
+| `metadata_boundaries`   | Active entry mode ends and resumes at the right headers                     |
 
 A table-driven helper may emit repeated native refusal cases, but every case
 must have a stable descriptive name. Do not build a giant configurable fixture
@@ -977,15 +976,15 @@ that silently decides what count the production code should return.
 
 These are inventory targets, not proven duplicate sets:
 
-| Relative to `macos/tests/unit/` | Lines | Bytes | Static test sites |
-| --- | ---: | ---: | ---: |
-| `platform/remap/test_lease_controller.lua` | 2,298 | 89,828 | 80 |
-| `platform/remap/test_guardian_auto_recovery.lua` | 2,066 | 75,016 | 55 |
-| `platform/remap/test_generator_managed_lease.lua` | 2,053 | 78,410 | 40 |
-| `adapters/test_log_transport.lua` | 1,794 | 75,198 | 50 |
-| `modules/shortcuts/test_actions_system.lua` | 1,712 | 74,660 | 43 |
-| `platform/remap/test_activation_layout_barrier.lua` | 1,684 | 63,717 | 29 |
-| `modules/shortcuts/test_pause_transaction.lua` | 1,560 | 64,121 | 31 |
+| Relative to `macos/tests/unit/`                     | Lines |  Bytes | Static test sites |
+| --------------------------------------------------- | ----: | -----: | ----------------: |
+| `platform/remap/test_lease_controller.lua`          | 2,298 | 89,828 |                80 |
+| `platform/remap/test_guardian_auto_recovery.lua`    | 2,066 | 75,016 |                55 |
+| `platform/remap/test_generator_managed_lease.lua`   | 2,053 | 78,410 |                40 |
+| `adapters/test_log_transport.lua`                   | 1,794 | 75,198 |                50 |
+| `modules/shortcuts/test_actions_system.lua`         | 1,712 | 74,660 |                43 |
+| `platform/remap/test_activation_layout_barrier.lua` | 1,684 | 63,717 |                29 |
+| `modules/shortcuts/test_pause_transaction.lua`      | 1,560 | 64,121 |                31 |
 
 Lease-controller fixture follow-up completed: all 80 baseline cases and 464
 assertion-start lines remain across activation identity (32), acknowledged
@@ -1273,7 +1272,7 @@ and therefore excluded from this baseline inventory.
 - [ ] Identify a surviving test that executes the same production boundary.
 - [ ] Mutate that boundary and show the survivor fails for the intended reason.
 - [ ] Check the removed case has no additional cleanup, privacy, order or retry
-  assertion. If it does, preserve those assertions in a suitable surviving case.
+      assertion. If it does, preserve those assertions in a suitable surviving case.
 - [ ] Review the diff as a separate maintenance change, with before/after names.
 
 Never classify these as duplicates merely by visual similarity:
@@ -1293,13 +1292,13 @@ Do **not** merge them without retaining those distinct exercised dependencies.
 ### T-09 — strengthen semantic tests before cosmetic file moves
 
 - [ ] Run the mechanical false-green ratchet, but separately inspect copied
-  algorithms, source-grep tests and stubs that implement missing production APIs.
+      algorithms, source-grep tests and stubs that implement missing production APIs.
 - [ ] For source checks, prove the source body exists and strip comments/strings
-  where relevant. Prefer an observable guarantee to a spelling assertion.
+      where relevant. Prefer an observable guarantee to a spelling assertion.
 - [ ] In callback tests, assert the effect, receipt, cleanup and retry state,
-  not only that `pcall` returned successfully.
+      not only that `pcall` returned successfully.
 - [ ] In failure tests, assert the actual intended error outcome so a setup
-  exception cannot masquerade as the tested refusal.
+      exception cannot masquerade as the tested refusal.
 - [ ] Keep real controller/parser calls; stub only external boundaries.
 
 Recent examples already corrected, not new tasks to redo: real group-name
@@ -1315,7 +1314,7 @@ gone. No new redundant/false-green case was established in the activation review
 - [ ] Identify repeated expensive fixture initialization with measurements.
 - [ ] Optimize only after a causal before/after comparison with equal assertions.
 - [ ] Preserve integration coverage; do not turn real modules into stubs just
-  to make the suite faster.
+      to make the suite faster.
 
 The long Windows-hosted full-suite runs are not native macOS latency evidence.
 Do not label a test split as a performance improvement without measurement.
@@ -1331,9 +1330,9 @@ Do not reduce randomized repetitions or erase refusal matrices for quota savings
 - [ ] Never emit success for a partial scan, stale callback or refused write.
 - [ ] Pair start/success and trace/done, with a failure terminal on aborted paths.
 - [ ] Do not add raw typed text, credentials, clipboard data or full private
-  application paths to new logs by default.
+      application paths to new logs by default.
 - [ ] Keep error signals observable in tests without asserting incidental prose
-  unless that fixed sanitized error is part of the contract.
+      unless that fixed sanitized error is part of the contract.
 
 Existing `infra.fs_dir` parent-enumeration diagnostics can contain a path and
 native detail. Prior counter fixes sanitize their own messages, not all logs
@@ -1342,24 +1341,24 @@ throughout the adapter stack. A repository-wide privacy claim would be false.
 ## 6. Remaining audit coverage — not confirmed bugs
 
 - [ ] Input: ignored/private applications, pause/resume and layout transitions,
-  selection replacement, exact synthetic provenance and terminator settlement.
+      selection replacement, exact synthetic provenance and terminator settlement.
 - [ ] Clipboard: multi-format snapshot, observed paste dispatch, restoration
-  failure debt, caller cancellation and subsequent operation ownership.
+      failure debt, caller cancellation and subsequent operation ownership.
 - [ ] Native lifecycle: each timer/task/watcher construction, start refusal,
-  duplicate callback, stop refusal and retained cleanup owner.
+      duplicate callback, stop refusal and retained cleanup owner.
 - [ ] All shutdown paths: Hammerspoon shutdown callback and explicit quit routes.
 - [ ] WebViews: request epoch versus window epoch, exact bridge recipient,
-  callback result versus JS dispatch admission, error visibility.
+      callback result versus JS dispatch admission, error visibility.
 - [ ] Files: permissions, symlinks, atomic publication, partial reads/writes,
-  cache identity changes and optional-path absence classification.
+      cache identity changes and optional-path absence classification.
 - [ ] Configuration: actual supported schemas, malformed input and old snapshots;
-  distinguish invalid input from a valid empty configuration.
+      distinguish invalid input from a valid empty configuration.
 - [ ] Menu truthfulness: disabled groups/sections, runtime overrides, preview
-  counts and feature-state changes. No new disabled-extension finding was proven.
+      counts and feature-state changes. No new disabled-extension finding was proven.
 - [ ] Native macOS profiling: real typing paths, startup, idle CPU, repeated
-  open/close cycles and memory growth. Resolve actual config/log paths first.
+      open/close cycles and memory growth. Resolve actual config/log paths first.
 - [ ] Repeat complete scoped audits until two consecutive passes find no new
-  actionable defect; still report native or environmental coverage gaps.
+      actionable defect; still report native or environmental coverage gaps.
 
 The audit did not establish a new `search_web` clipboard bug. That flow was
 briefly read before test-organization work took priority. Do not turn this
@@ -1396,317 +1395,317 @@ These are current-code findings, not additions to the immutable seven-item
 manifest. Keep separate atomic commits and record completion evidence here.
 
 - [x] **Picker cleanup reentrancy:** `infra/app_picker.lua`,
-  `delete_active_chooser()` clears `_active_chooser` after external deletion.
-  Reproduce by opening A, then B, and starting C from A's injected `delete()`.
-  C appears but its callback applies no settings because outer cleanup clears
-  C's ownership. Detach the exact old owner before calling native teardown;
-  preserve failed cleanup independently. Test one successful C selection, zero
-  stale selections, and no deletion of C by the superseded B request.
-  Fixed and integrated in `ca603dd86`; HS e2e and 9222 unit tests passed.
+      `delete_active_chooser()` clears `_active_chooser` after external deletion.
+      Reproduce by opening A, then B, and starting C from A's injected `delete()`.
+      C appears but its callback applies no settings because outer cleanup clears
+      C's ownership. Detach the exact old owner before calling native teardown;
+      preserve failed cleanup independently. Test one successful C selection, zero
+      stale selections, and no deletion of C by the superseded B request.
+      Fixed and integrated in `ca603dd86`; HS e2e and 9222 unit tests passed.
 - [x] **Picker cleanup debt release/retry:** `_chooser_cleanup_debt` only gains
-  keys. Fail the first delete and succeed the next: the deleted owner remains
-  strongly retained. Remove the exact debt on successful settlement and provide
-  a bounded retry path for detached failed candidates. Use weak observers plus
-  forced collection after fixture references are removed. Replace the current
-  source-spelling assertion with observable retention, retry and release tests;
-  also prove retries never destroy a successor. Fixed and integrated in
-  `ca603dd86`, including stale-candidate retry and reentrant retry coverage.
+      keys. Fail the first delete and succeed the next: the deleted owner remains
+      strongly retained. Remove the exact debt on successful settlement and provide
+      a bounded retry path for detached failed candidates. Use weak observers plus
+      forced collection after fixture references are removed. Replace the current
+      source-spelling assertion with observable retention, retry and release tests;
+      also prove retries never destroy a successor. Fixed and integrated in
+      `ca603dd86`, including stale-candidate retry and reentrant retry coverage.
 - [x] **Picker stale cache publication:** complete scan B with `New.app`, then
-  A with `Old.app`; a third discovery currently reads Old. Give each cold scan
-  publication authority before external calls; only the newest scan may publish
-  cache. Preserve each caller's own result. Test newer success and newer failure
-  separately: failure must remain retryable, not be hidden by A's late success.
-  Candidate focused evidence: both cases failed before the correction; the
-  ownership module then passed 9/9. Committed as
-  `fix(hs): fence application cache publication by discovery ownership`.
+      A with `Old.app`; a third discovery currently reads Old. Give each cold scan
+      publication authority before external calls; only the newest scan may publish
+      cache. Preserve each caller's own result. Test newer success and newer failure
+      separately: failure must remain retryable, not be hidden by A's late success.
+      Candidate focused evidence: both cases failed before the correction; the
+      ownership module then passed 9/9. Committed as
+      `fix(hs): fence application cache publication by discovery ownership`.
 - [x] **Ollama refusal fixture:** in
-  `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua`, the expression
-  `mode == "false" and false or "nil"` simulates nil for both cases. Record the
-  actual stub return type/value and assert it independently of the requested
-  mode, then use explicit branches for false/nil/throw. The strengthened old
-  fixture failed 1/44 (expected Boolean, observed nil); the correction passed
-  44/44. No production change is needed. Committed as
-  `test(hs): exercise boolean refusal in Ollama activation coverage`.
+      `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua`, the expression
+      `mode == "false" and false or "nil"` simulates nil for both cases. Record the
+      actual stub return type/value and assert it independently of the requested
+      mode, then use explicit branches for false/nil/throw. The strengthened old
+      fixture failed 1/44 (expected Boolean, observed nil); the correction passed
+      44/44. No production change is needed. Committed as
+      `test(hs): exercise boolean refusal in Ollama activation coverage`.
 - [x] **Canonical malformed-string rejection:** `toml_codec/reader.lua`
-  recognizes a quoted token but several callers treat failed decoding as an
-  absent property instead of a semantic failure. Confirmed at `parse_entry`
-  (trigger), `parse_kv_string`, `parse_kv_value`, `parse_inline_table` and
-  `parse_string_array`. Fourteen malformed-string probes committed successfully;
-  malformed entry output already rejects and is a control. Propagate the
-  existing `PARSE_ERROR` sentinel at recognized quoted-token boundaries; move
-  its declaration before array parsing and reject partial `sections_order`.
-  Cover invalid escapes, malformed Unicode, unterminated strings, quoted keys,
-  all metadata modes, localized inline values and first/later array elements.
-  Preserve valid empty strings. Prove empty result plus false status, one file
-  close, no cache store, and counter retry after rejection. Do not expand this
-  fix into a new full-TOML grammar or unsupported bare-value policy.
-  Regression module `test_toml_reader_string_failures.lua` passes
-  41 cases after 37 baseline failures and four valid/already-rejected controls.
-  It covers three malformed-string classes across 13 recognized contexts,
-  file/cache/preview transactions and valid empty values. Recognized quoted keys
-  missing their assignment separator also reject: a truncated key may otherwise
-  consume the next value's opening quote and be silently ignored. The counter
-  and explicit file reader have independently scoped instances; the fixture
-  restores the reader captured with its logger. A Linux shared-entry regression
-  preserves the same rejection and empty-value contracts. Committed as
-  `fix(toml): reject malformed quoted values throughout the reader`.
-  Verification: 9,324 Hammerspoon tests across 1,015 modules, 216 JS checks,
-  and 67 Hammerspoon E2E vectors passed (one driver-specific vector skipped).
-  Linux on Windows: 2,187 passes and 35 failures versus 2,186 passes and the
-  exact same 35 failure lines with the original reader and test injected from
-  `1b276bc76`. This proves no additional Linux failure in this environment,
-  not a green native Linux run. Native macOS validation remains outstanding.
+      recognizes a quoted token but several callers treat failed decoding as an
+      absent property instead of a semantic failure. Confirmed at `parse_entry`
+      (trigger), `parse_kv_string`, `parse_kv_value`, `parse_inline_table` and
+      `parse_string_array`. Fourteen malformed-string probes committed successfully;
+      malformed entry output already rejects and is a control. Propagate the
+      existing `PARSE_ERROR` sentinel at recognized quoted-token boundaries; move
+      its declaration before array parsing and reject partial `sections_order`.
+      Cover invalid escapes, malformed Unicode, unterminated strings, quoted keys,
+      all metadata modes, localized inline values and first/later array elements.
+      Preserve valid empty strings. Prove empty result plus false status, one file
+      close, no cache store, and counter retry after rejection. Do not expand this
+      fix into a new full-TOML grammar or unsupported bare-value policy.
+      Regression module `test_toml_reader_string_failures.lua` passes
+      41 cases after 37 baseline failures and four valid/already-rejected controls.
+      It covers three malformed-string classes across 13 recognized contexts,
+      file/cache/preview transactions and valid empty values. Recognized quoted keys
+      missing their assignment separator also reject: a truncated key may otherwise
+      consume the next value's opening quote and be silently ignored. The counter
+      and explicit file reader have independently scoped instances; the fixture
+      restores the reader captured with its logger. A Linux shared-entry regression
+      preserves the same rejection and empty-value contracts. Committed as
+      `fix(toml): reject malformed quoted values throughout the reader`.
+      Verification: 9,324 Hammerspoon tests across 1,015 modules, 216 JS checks,
+      and 67 Hammerspoon E2E vectors passed (one driver-specific vector skipped).
+      Linux on Windows: 2,187 passes and 35 failures versus 2,186 passes and the
+      exact same 35 failure lines with the original reader and test injected from
+      `1b276bc76`. This proves no additional Linux failure in this environment,
+      not a green native Linux run. Native macOS validation remains outstanding.
 
 - [x] **Multiline continuation escape ownership:**
-  `toml_codec/codec.lua`, `collapse_multiline_continuations()` examines the
-  second byte of an escaped backslash pair as a new continuation introducer.
-  Two backslashes followed by LF and `b` can become a backspace instead of a
-  literal backslash, LF and `b`. Consume non-continuation escape pairs together;
-  recognize spaces/tabs before the required LF and trim following whitespace.
-  Keep invalid escapes invalid and literal strings untouched. The focused
-  `test_toml_multiline_continuations.lua` passes 13 cases, including CRLF;
-  injecting the codec from `ddde4d031` produces six root-cause failures and seven controls.
-  Linux shared-entry coverage was added. Committed as
-  `fix(toml): preserve escape ownership across multiline continuations`.
-  Full gates: 9,337 Hammerspoon tests across 1,016 modules and 216 JS checks
-  passed. Linux under Windows: 2,188 passes versus 2,187 with the original codec
-  and test injected from `ddde4d031`; all 35 failure lines match exactly.
-  Independent review found no blocker. No native macOS/Linux runtime claim.
+      `toml_codec/codec.lua`, `collapse_multiline_continuations()` examines the
+      second byte of an escaped backslash pair as a new continuation introducer.
+      Two backslashes followed by LF and `b` can become a backspace instead of a
+      literal backslash, LF and `b`. Consume non-continuation escape pairs together;
+      recognize spaces/tabs before the required LF and trim following whitespace.
+      Keep invalid escapes invalid and literal strings untouched. The focused
+      `test_toml_multiline_continuations.lua` passes 13 cases, including CRLF;
+      injecting the codec from `ddde4d031` produces six root-cause failures and seven controls.
+      Linux shared-entry coverage was added. Committed as
+      `fix(toml): preserve escape ownership across multiline continuations`.
+      Full gates: 9,337 Hammerspoon tests across 1,016 modules and 216 JS checks
+      passed. Linux under Windows: 2,188 passes versus 2,187 with the original codec
+      and test injected from `ddde4d031`; all 35 failure lines match exactly.
+      Independent review found no blocker. No native macOS/Linux runtime claim.
 - [x] **Multiline first-line whitespace loss:** the general codec trims the
-  assignment line before seeding `pending.parts`, losing spaces and tabs before
-  the first physical LF inside a basic or literal multiline string. Reproduced
-  with literal content `a`, backslash, space, LF, space, `b`: the space before LF
-  disappears. Preserve the original value fragment once lexical scanning proves
-  the string remains open, without retaining comments outside strings. Cover
-  both quote types, trailing spaces/tabs, blank first lines and ordinary scalar
-  comments. This is separate from continuation escape ownership: that focused
-  module starts content on the next physical line to isolate its root cause.
-  Read-only proposed patch passed six probes: have `split_kv` return an
-  additional original RHS, call it on `strip_comments(line)` rather than the
-  trimmed assignment, and seed `pending.parts` with that RHS only when
-  `multiline_quote` is non-nil. Document the extra return and remove
-  `strip_inline_comment` only if no caller remains. Regress basic/literal values
-  both standalone and inside arrays, internal `#`, external array comments and
-  a following assignment. Four probes differ from current code.
-  Implementation passes 14 focused behavioral cases in
-  `test_toml_multiline_first_line.lua`, after 12 failures and two controls with
-  unchanged production. A Linux public-entrypoint regression covers the same
-  value preservation. Independent review found no blocker. Committed as
-  `fix(toml): preserve whitespace inside the first multiline fragment`.
-  Full gates passed: 9,351 Hammerspoon tests across 1,017 modules and 216 JS
-  checks. Linux under Windows: 2,189 passes versus 2,188 with original codec and
-  test injected from `8dafc1729`; the exact same 35 failure lines remain.
-  Native macOS/Linux execution is not covered by these results.
+      assignment line before seeding `pending.parts`, losing spaces and tabs before
+      the first physical LF inside a basic or literal multiline string. Reproduced
+      with literal content `a`, backslash, space, LF, space, `b`: the space before LF
+      disappears. Preserve the original value fragment once lexical scanning proves
+      the string remains open, without retaining comments outside strings. Cover
+      both quote types, trailing spaces/tabs, blank first lines and ordinary scalar
+      comments. This is separate from continuation escape ownership: that focused
+      module starts content on the next physical line to isolate its root cause.
+      Read-only proposed patch passed six probes: have `split_kv` return an
+      additional original RHS, call it on `strip_comments(line)` rather than the
+      trimmed assignment, and seed `pending.parts` with that RHS only when
+      `multiline_quote` is non-nil. Document the extra return and remove
+      `strip_inline_comment` only if no caller remains. Regress basic/literal values
+      both standalone and inside arrays, internal `#`, external array comments and
+      a following assignment. Four probes differ from current code.
+      Implementation passes 14 focused behavioral cases in
+      `test_toml_multiline_first_line.lua`, after 12 failures and two controls with
+      unchanged production. A Linux public-entrypoint regression covers the same
+      value preservation. Independent review found no blocker. Committed as
+      `fix(toml): preserve whitespace inside the first multiline fragment`.
+      Full gates passed: 9,351 Hammerspoon tests across 1,017 modules and 216 JS
+      checks. Linux under Windows: 2,189 passes versus 2,188 with original codec and
+      test injected from `8dafc1729`; the exact same 35 failure lines remain.
+      Native macOS/Linux execution is not covered by these results.
 - [x] **Application discovery root completeness:** missing/empty HOME allows
-  a cached system-only result; repairing HOME immediately does not retry.
-  A user Applications root classified as a file is also accepted as a search
-  root. Validate completeness and directory type before authorizing cache
-  publication; distinguish proven absence from classification failure. Preserve
-  valid directory symlinks according to the filesystem adapter contract.
-  Isolated probes measured one spawn and zero classifications for missing/empty
-  HOME, including a subsequent repaired HOME served from cache. Regress absent,
-  empty, directory, proven missing and file roots plus immediate repair retry.
-  Contract review: `FileSystem.path_status` returns lstat-style attributes via
-  `inspect_path` and `symlink_attributes`; checking only `mode == "directory"`
-  would wrongly reject directory symlinks. A followed-directory classification
-  belongs in the filesystem adapter, whose existing followed attributes wrapper
-  is private. Also verify root-link traversal: current `find` arguments lack
-  `-H`, so accepting `mode == "link"` alone does not prove enumeration. A
-  root-only follow policy needs native command-contract evidence, not a blanket
-  descendant-follow switch. Test dangling/file/inaccessible link targets and
-  valid directory links. The existing ownership fixture forces absence and
-  ignores spawn arguments; it cannot prove these invariants without extension.
-  Implementation validates an absolute HOME and both root roles via
-  the new adapter `directory_status`: lstat-based absence proof is preserved,
-  while final links require successful followed directory attributes. Required
-  system-root failure refuses; proven optional user-root absence still permits
-  system-only discovery. `find -H` follows command-line roots only, as specified
-  by the [Apple find manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/find/find.1).
-  Native execution remains unverified. Cache entries carry their HOME, and
-  refused validation supersedes older publication authority. Cached choices are
-  captured before logging to survive reentrant discovery for another HOME.
-  Twelve root tests pass after nine original failures and a separately observed
-  logger-reentry A-to-B cache substitution failure. Twelve adapter tests cover
-  directories, followed links, wrong types, dangling/inaccessible targets,
-  contradictory stat results, missing APIs and proven/unknown absence.
-  Existing ownership 18/18 and receipt 12/12 pass with explicit scoped HOME
-  fixtures. Committed as
-  `fix(hs): validate application directory roots before discovery`.
-  Full gates pass: 9,432 Hammerspoon tests across 1,022 modules, 216 JS checks
-  and 67 E2E scenarios (one driver-specific vector intentionally skipped).
-  Independent review found no remaining blocker. Native symlink traversal
-  remains a platform-validation requirement, not a claim made by mocked tests.
+      a cached system-only result; repairing HOME immediately does not retry.
+      A user Applications root classified as a file is also accepted as a search
+      root. Validate completeness and directory type before authorizing cache
+      publication; distinguish proven absence from classification failure. Preserve
+      valid directory symlinks according to the filesystem adapter contract.
+      Isolated probes measured one spawn and zero classifications for missing/empty
+      HOME, including a subsequent repaired HOME served from cache. Regress absent,
+      empty, directory, proven missing and file roots plus immediate repair retry.
+      Contract review: `FileSystem.path_status` returns lstat-style attributes via
+      `inspect_path` and `symlink_attributes`; checking only `mode == "directory"`
+      would wrongly reject directory symlinks. A followed-directory classification
+      belongs in the filesystem adapter, whose existing followed attributes wrapper
+      is private. Also verify root-link traversal: current `find` arguments lack
+      `-H`, so accepting `mode == "link"` alone does not prove enumeration. A
+      root-only follow policy needs native command-contract evidence, not a blanket
+      descendant-follow switch. Test dangling/file/inaccessible link targets and
+      valid directory links. The existing ownership fixture forces absence and
+      ignores spawn arguments; it cannot prove these invariants without extension.
+      Implementation validates an absolute HOME and both root roles via
+      the new adapter `directory_status`: lstat-based absence proof is preserved,
+      while final links require successful followed directory attributes. Required
+      system-root failure refuses; proven optional user-root absence still permits
+      system-only discovery. `find -H` follows command-line roots only, as specified
+      by the [Apple find manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/find/find.1).
+      Native execution remains unverified. Cache entries carry their HOME, and
+      refused validation supersedes older publication authority. Cached choices are
+      captured before logging to survive reentrant discovery for another HOME.
+      Twelve root tests pass after nine original failures and a separately observed
+      logger-reentry A-to-B cache substitution failure. Twelve adapter tests cover
+      directories, followed links, wrong types, dangling/inaccessible targets,
+      contradictory stat results, missing APIs and proven/unknown absence.
+      Existing ownership 18/18 and receipt 12/12 pass with explicit scoped HOME
+      fixtures. Committed as
+      `fix(hs): validate application directory roots before discovery`.
+      Full gates pass: 9,432 Hammerspoon tests across 1,022 modules, 216 JS checks
+      and 67 E2E scenarios (one driver-specific vector intentionally skipped).
+      Independent review found no remaining blocker. Native symlink traversal
+      remains a platform-validation requirement, not a claim made by mocked tests.
 - [x] **Application paths containing newlines are split and cached incorrectly:**
-  a scoped probe of the real `discover_apps` with successful output for
-  `/Applications/Line<LF>Break.app` produces the relative choice `Break.app`,
-  reports success and reuses that corrupted snapshot without another scan.
-  `build_choices` treats every LF as a record separator although LF is legal
-  inside a POSIX pathname. Append `-print0` to `FIND_EXPRESSION`, parse NUL
-  records without trimming paths, and reject nonempty output lacking a terminal
-  NUL before hydration or cache publication. Do not retain an ambiguous LF
-  fallback. Regress LF in both basename and parent, mixed ordinary/control/
-  Unicode names, exact cached bytes, malformed framing refusal and repair,
-  while retaining successful empty discovery. Migrate discovery fixture output
-  framing without weakening its existing ownership and failure assertions.
-  The [Apple find manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/find/find.1)
-  specifies `-print0`. Source inspection of Hammerspoon `libtask.m`'s termination
-  handler and LuaSkin `pushNSObject:withOptions:alreadySeenObjects:` confirms
-  that UTF-8 stdout reaches `lua_pushlstring` with an explicit byte length, so
-  embedded NUL survives. This is source evidence, not native execution; invalid
-  UTF-8 byte sequences remain a separate transport limitation.
-  Independent local probes against the unchanged picker reproduce three failing
-  assertions (LF basename, LF parent, unterminated stream) and one passing
-  empty-output control. The framing probe chooses LF or NUL from the actual
-  spawn arguments, so it models the producer protocol rather than injecting
-  NUL output before the command requests it. Formal regressions and source
-  implementation followed the bundled-root commit. Six registered behavioral
-  cases in `test_app_picker_path_framing.lua` failed on the original production
-  code and now pass: LF basename/parent with exact cache reuse, mixed byte-exact
-  hydration, and three incomplete/legacy framing refusals with diagnostics and
-  recovery. The command now requests NUL-delimited records; nonempty output
-  lacking the final delimiter is refused before native metadata lookup. Existing
-  ownership 18/18, roots 12/12, receipts 12/12 and bundled-root 5/5 pass after
-  migrating only simulated record separators and exact argv expectations.
-  Independent review found no blocker; it verified pre-hydration refusal and
-  scoped fixture migration, not native macOS execution. Full gates pass:
-  9,443 Hammerspoon tests across 1,024 modules, 216 JS checks and 67 E2E
-  scenarios (one driver-specific vector intentionally skipped). Commit:
-  `fix(hs): preserve application paths with NUL-framed discovery`.
+      a scoped probe of the real `discover_apps` with successful output for
+      `/Applications/Line<LF>Break.app` produces the relative choice `Break.app`,
+      reports success and reuses that corrupted snapshot without another scan.
+      `build_choices` treats every LF as a record separator although LF is legal
+      inside a POSIX pathname. Append `-print0` to `FIND_EXPRESSION`, parse NUL
+      records without trimming paths, and reject nonempty output lacking a terminal
+      NUL before hydration or cache publication. Do not retain an ambiguous LF
+      fallback. Regress LF in both basename and parent, mixed ordinary/control/
+      Unicode names, exact cached bytes, malformed framing refusal and repair,
+      while retaining successful empty discovery. Migrate discovery fixture output
+      framing without weakening its existing ownership and failure assertions.
+      The [Apple find manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/find/find.1)
+      specifies `-print0`. Source inspection of Hammerspoon `libtask.m`'s termination
+      handler and LuaSkin `pushNSObject:withOptions:alreadySeenObjects:` confirms
+      that UTF-8 stdout reaches `lua_pushlstring` with an explicit byte length, so
+      embedded NUL survives. This is source evidence, not native execution; invalid
+      UTF-8 byte sequences remain a separate transport limitation.
+      Independent local probes against the unchanged picker reproduce three failing
+      assertions (LF basename, LF parent, unterminated stream) and one passing
+      empty-output control. The framing probe chooses LF or NUL from the actual
+      spawn arguments, so it models the producer protocol rather than injecting
+      NUL output before the command requests it. Formal regressions and source
+      implementation followed the bundled-root commit. Six registered behavioral
+      cases in `test_app_picker_path_framing.lua` failed on the original production
+      code and now pass: LF basename/parent with exact cache reuse, mixed byte-exact
+      hydration, and three incomplete/legacy framing refusals with diagnostics and
+      recovery. The command now requests NUL-delimited records; nonempty output
+      lacking the final delimiter is refused before native metadata lookup. Existing
+      ownership 18/18, roots 12/12, receipts 12/12 and bundled-root 5/5 pass after
+      migrating only simulated record separators and exact argv expectations.
+      Independent review found no blocker; it verified pre-hydration refusal and
+      scoped fixture migration, not native macOS execution. Full gates pass:
+      9,443 Hammerspoon tests across 1,024 modules, 216 JS checks and 67 E2E
+      scenarios (one driver-specific vector intentionally skipped). Commit:
+      `fix(hs): preserve application paths with NUL-framed discovery`.
 - [x] **Bundled system applications omitted:** `infra/app_picker.lua` supplies
-  only `/Applications` and the user Applications directory to `find`; applications
-  residing solely in `/System/Applications` never reach either picker consumer.
-  This is not a third-party-only API: exclusion menus and the metrics category
-  picker advertise installed applications. `macos/launcher/Package.swift` targets
-  macOS 11+, while Apple documents the separate system-app location since 10.15:
-  [APFS architecture](https://support.apple.com/en-md/guide/security/seca6147599e/1/web/1)
-  and [TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
-  Add the bundled root through the same directory classifier and root-only link
-  traversal. Do not justify optional absence by unsupported pre-Catalina macOS;
-  explicitly derive required/optional policy from the supported platform contract.
-  Regress an app present only there, a nested Utilities app at depth two, wrong
-  type/inaccessible root refusal, retry, exact root arguments and cached complete
-  results. The active-app exclusion action is only a partial workaround.
-  Evidence is code plus primary platform documentation, not native execution.
-  Implementation defines both required standard roots once and passes
-  them through directory classification before appending the optional user root
-  and shared find expression. Required bundled-root absence refuses discovery:
-  supported macOS starts at version 11, not pre-Catalina. Five new behavioral
-  cases pass after four baseline failures and one control; argv-sensitive output
-  exercises TextEdit and a Utilities app, complete cache identity, failed-root
-  repair and duplicate-root avoidance. Existing root 12/12, ownership 18/18 and
-  receipt 12/12 suites remain green. Full gates pass: 9,437 Hammerspoon tests
-  across 1,023 modules, 216 JS checks and 67 E2E scenarios (one driver-specific
-  vector intentionally skipped). Independent review found no blocker. Commit:
-  `fix(hs): include bundled macOS applications in discovery`.
-  Native macOS enumeration remains unverified.
+      only `/Applications` and the user Applications directory to `find`; applications
+      residing solely in `/System/Applications` never reach either picker consumer.
+      This is not a third-party-only API: exclusion menus and the metrics category
+      picker advertise installed applications. `macos/launcher/Package.swift` targets
+      macOS 11+, while Apple documents the separate system-app location since 10.15:
+      [APFS architecture](https://support.apple.com/en-md/guide/security/seca6147599e/1/web/1)
+      and [TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+      Add the bundled root through the same directory classifier and root-only link
+      traversal. Do not justify optional absence by unsupported pre-Catalina macOS;
+      explicitly derive required/optional policy from the supported platform contract.
+      Regress an app present only there, a nested Utilities app at depth two, wrong
+      type/inaccessible root refusal, retry, exact root arguments and cached complete
+      results. The active-app exclusion action is only a partial workaround.
+      Evidence is code plus primary platform documentation, not native execution.
+      Implementation defines both required standard roots once and passes
+      them through directory classification before appending the optional user root
+      and shared find expression. Required bundled-root absence refuses discovery:
+      supported macOS starts at version 11, not pre-Catalina. Five new behavioral
+      cases pass after four baseline failures and one control; argv-sensitive output
+      exercises TextEdit and a Utilities app, complete cache identity, failed-root
+      repair and duplicate-root avoidance. Existing root 12/12, ownership 18/18 and
+      receipt 12/12 suites remain green. Full gates pass: 9,437 Hammerspoon tests
+      across 1,023 modules, 216 JS checks and 67 E2E scenarios (one driver-specific
+      vector intentionally skipped). Independent review found no blocker. Commit:
+      `fix(hs): include bundled macOS applications in discovery`.
+      Native macOS enumeration remains unverified.
 
 - [x] **Application discovery completion receipt:** failed subprocess exit and
-  successful empty output both call `on_ready({}, nil)` in current probes.
-  Failure is logged and does not cache, but the chooser presents the same
-  success-shaped empty UI. Add an explicit completion status, propagate it on
-  every terminal branch/cache hit, and retire failed request authority without
-  presenting a chooser. Regress classification/start/exit/stdout failures,
-  successful empty caching, successful retry, chooser count and zero settings
-  writes on failure. Preserve exact-owner cleanup and reentrancy invariants.
-  Implementation uses `(choices, true)` on success/cache hits and `(nil, false)`
-  on classification, start, exit and stdout failure. Both consumers honor the
-  receipt: the exclusion picker retires failed authority and its exact visible
-  predecessor; metrics stops without claiming that no applications exist.
-  The scoped discovery fixture covers twelve cases (eight original receipt/UI
-  failures, two predecessor cleanup/reentry failures and two exact restoration
-  controls), all now passing. It directly requires the subject with narrow
-  native doubles, avoiding the broad reset performed by `load_with_stubs`.
-  Three metrics bridge cases pass after two false-empty-alert failures and one
-  valid empty-scan control. Existing ownership 18/18 and native GC 5/5 pass.
-  Committed as `fix(hs): distinguish failed discovery from empty application lists`.
-  Full gates pass: 9,408 Hammerspoon tests across 1,020 modules, 216 JS checks
-  and 67 E2E scenarios (one driver-specific vector intentionally skipped).
-  Independent review found no blocker. Native macOS chooser validation remains
-  outstanding; mocked native reentry is not a live application run.
+      successful empty output both call `on_ready({}, nil)` in current probes.
+      Failure is logged and does not cache, but the chooser presents the same
+      success-shaped empty UI. Add an explicit completion status, propagate it on
+      every terminal branch/cache hit, and retire failed request authority without
+      presenting a chooser. Regress classification/start/exit/stdout failures,
+      successful empty caching, successful retry, chooser count and zero settings
+      writes on failure. Preserve exact-owner cleanup and reentrancy invariants.
+      Implementation uses `(choices, true)` on success/cache hits and `(nil, false)`
+      on classification, start, exit and stdout failure. Both consumers honor the
+      receipt: the exclusion picker retires failed authority and its exact visible
+      predecessor; metrics stops without claiming that no applications exist.
+      The scoped discovery fixture covers twelve cases (eight original receipt/UI
+      failures, two predecessor cleanup/reentry failures and two exact restoration
+      controls), all now passing. It directly requires the subject with narrow
+      native doubles, avoiding the broad reset performed by `load_with_stubs`.
+      Three metrics bridge cases pass after two false-empty-alert failures and one
+      valid empty-scan control. Existing ownership 18/18 and native GC 5/5 pass.
+      Committed as `fix(hs): distinguish failed discovery from empty application lists`.
+      Full gates pass: 9,408 Hammerspoon tests across 1,020 modules, 216 JS checks
+      and 67 E2E scenarios (one driver-specific vector intentionally skipped).
+      Independent review found no blocker. Native macOS chooser validation remains
+      outstanding; mocked native reentry is not a live application run.
 
 - [x] **General decoder interior quotes:** `toml_codec/codec.lua`,
-  `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because
-  it checks endpoint quotes while `BasicString.unescape_body()` does not own
-  string delimiters. Reject unescaped interior quotes at the canonical string
-  token boundary; retain escaped quotes. Add direct codec regression tests,
-  not a manifest-specific filter. This is distinct from reader propagation.
-  Read-only probes also reproduce the acceptance in literal strings, quoted
-  keys, arrays and inline tables. For single-line basic strings, reject raw
-  quote bytes in `BasicString.unescape_body()` only when `allow_newlines` is
-  false; the escape branch must still accept escaped quotes. Literal string
-  bodies must reject interior apostrophes. Multiline strings require source
-  delimiter validation before continuation collapsing: retain one/two content
-  quotes and valid four/five-quote endings. Do not reject a triple quote formed
-  only by removing a valid escaped newline. Extend existing codec edge-case and
-  shared Linux decode tests with invalid tokens plus these valid controls.
-  Single-line value/key/container cases are fixed in `f3911f02c`; all seven new
-  rejection cases failed before the fix and the 59-case focused module passed
-  afterward. Multiline delimiter termination is fixed separately below.
-  A read-only candidate passed 32 real decode probes with codec and record
-  scanner loaded in memory: 24 valid basic/literal combinations (3/4/5 closing
-  quotes, scalar/array, single/multiple lines and trailing comments), four
-  trailing-token refusals, two six-quote refusals, escaped content quotes and
-  a triple quote formed only after continuation removal. Proposed owner helper:
-  scan from byte four, skip basic-string escape pairs, recognize the first
-  unescaped run of three or more delimiter quotes, require a run of at most
-  five ending exactly at the token boundary, and retain the preceding one/two
-  content quotes. Validate before continuation collapsing. Also consume entire
-  closing quote runs in `strip_comments`, `split_top_level_commas` and
-  `RecordScanner.advance`; otherwise a fourth quote spuriously opens a new
-  string and hides array delimiters/comments. These scanners only delimit;
-  the value owner rejects oversized runs. Implementation shares
-  closing-run traversal through `RecordScanner.closing_quote_end` and passes
-  42 focused cases in `test_toml_multiline_delimiters.lua`. The original codec
-  and scanner injected from `2489a59db` fail 14 cases, with 28 controls passing.
-  Empty/quote-only bodies and direct record-depth settlement are covered in
-  addition to the preceding matrix. A Linux shared-entry regression verifies
-  rejection and valid array suffix preservation. Independent review found no
-  blocker. Committed as `fix(toml): enforce lexical multiline closing boundaries`.
-  Full gates: 9,393 Hammerspoon tests across 1,018 modules and 216 JS checks pass.
-  Linux under Windows: 2,190 passes versus 2,189 with original codec, scanner and
-  test injected from `2489a59db`; all 35 failure lines are identical. Native
-  macOS/Linux runtime behavior remains unverified by these automated results.
+      `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because
+      it checks endpoint quotes while `BasicString.unescape_body()` does not own
+      string delimiters. Reject unescaped interior quotes at the canonical string
+      token boundary; retain escaped quotes. Add direct codec regression tests,
+      not a manifest-specific filter. This is distinct from reader propagation.
+      Read-only probes also reproduce the acceptance in literal strings, quoted
+      keys, arrays and inline tables. For single-line basic strings, reject raw
+      quote bytes in `BasicString.unescape_body()` only when `allow_newlines` is
+      false; the escape branch must still accept escaped quotes. Literal string
+      bodies must reject interior apostrophes. Multiline strings require source
+      delimiter validation before continuation collapsing: retain one/two content
+      quotes and valid four/five-quote endings. Do not reject a triple quote formed
+      only by removing a valid escaped newline. Extend existing codec edge-case and
+      shared Linux decode tests with invalid tokens plus these valid controls.
+      Single-line value/key/container cases are fixed in `f3911f02c`; all seven new
+      rejection cases failed before the fix and the 59-case focused module passed
+      afterward. Multiline delimiter termination is fixed separately below.
+      A read-only candidate passed 32 real decode probes with codec and record
+      scanner loaded in memory: 24 valid basic/literal combinations (3/4/5 closing
+      quotes, scalar/array, single/multiple lines and trailing comments), four
+      trailing-token refusals, two six-quote refusals, escaped content quotes and
+      a triple quote formed only after continuation removal. Proposed owner helper:
+      scan from byte four, skip basic-string escape pairs, recognize the first
+      unescaped run of three or more delimiter quotes, require a run of at most
+      five ending exactly at the token boundary, and retain the preceding one/two
+      content quotes. Validate before continuation collapsing. Also consume entire
+      closing quote runs in `strip_comments`, `split_top_level_commas` and
+      `RecordScanner.advance`; otherwise a fourth quote spuriously opens a new
+      string and hides array delimiters/comments. These scanners only delimit;
+      the value owner rejects oversized runs. Implementation shares
+      closing-run traversal through `RecordScanner.closing_quote_end` and passes
+      42 focused cases in `test_toml_multiline_delimiters.lua`. The original codec
+      and scanner injected from `2489a59db` fail 14 cases, with 28 controls passing.
+      Empty/quote-only bodies and direct record-depth settlement are covered in
+      addition to the preceding matrix. A Linux shared-entry regression verifies
+      rejection and valid array suffix preservation. Independent review found no
+      blocker. Committed as `fix(toml): enforce lexical multiline closing boundaries`.
+      Full gates: 9,393 Hammerspoon tests across 1,018 modules and 216 JS checks pass.
+      Linux under Windows: 2,190 passes versus 2,189 with original codec, scanner and
+      test injected from `2489a59db`; all 35 failure lines are identical. Native
+      macOS/Linux runtime behavior remains unverified by these automated results.
 
 - [x] **Delimiter decoding ownership:**
-  `modules/hotstrings/hotstrings_config.lua`, `parse_overrides()` claims
-  `word_delimiters` before `BasicString.unescape_body()` succeeds. An unknown
-  escape or surrogate escape is then dropped by an unrelated category save.
-  Claim the record only after successful decoding; otherwise retain the raw
-  assignment and emit the existing unsupported-representation warning. Extend
-  `test_hotstrings_config_preserves_global.lua` to prove a real category commit,
-  exact malformed-record preservation and explicit replacement without duplicate
-  keys. Fixed in `610b94168` after reproducing the lost-record failure. All three
-  focused tests also pass with the preceding decoder injected, proving this
-  commit is independent of the subsequent token-validation change.
+      `modules/hotstrings/hotstrings_config.lua`, `parse_overrides()` claims
+      `word_delimiters` before `BasicString.unescape_body()` succeeds. An unknown
+      escape or surrogate escape is then dropped by an unrelated category save.
+      Claim the record only after successful decoding; otherwise retain the raw
+      assignment and emit the existing unsupported-representation warning. Extend
+      `test_hotstrings_config_preserves_global.lua` to prove a real category commit,
+      exact malformed-record preservation and explicit replacement without duplicate
+      keys. Fixed in `610b94168` after reproducing the lost-record failure. All three
+      focused tests also pass with the preceding decoder injected, proving this
+      commit is independent of the subsequent token-validation change.
 
 - [x] **Personal-info parsed absence is not source absence:**
-  `modules/dynamic_hotstrings/personal_info.lua`, `parse_toml_section()` silently
-  skips literal strings, trailing comments and failed basic-string decoding.
-  `load_config()` substitutes defaults and publishes the original source snapshot
-  as if interpretation succeeded. Real `start()` plus an unrelated
-  `save_info({ last_name = "Updated" })` then erases the ignored first name.
-  Read-only reproduction covered `first_name = 'Alice'`, a double-quoted name
-  with a trailing comment, and an unknown escape. Decode the complete document
-  through the shared codec and validate declared known fields/section shapes
-  before publishing a source snapshot. Distinguish missing fields from invalid
-  fields; retain defaults only for genuine absence. Reuse startup rollback and
-  external-winner refusal on parse failure; never log personal field content.
-  Test valid literal/comment/multiline values surviving an unrelated save,
-  malformed/typed-invalid input causing zero writes and no active owner, and
-  invalid external content not replacing live runtime state.
-  Regression coverage is registered in the focused
-  `test_personal_info_config_transaction.lua` module. Its 13 cases pass with the
-  fix; injecting the original personal-info module from `7bf7cea1b` gives
-  11 expected failures and two valid escaped-quote/empty-value control passes.
-  The fixture keeps real schema/default semantics and scopes filesystem/logging
-  boundaries, including real manifest/field readers that capture the logger.
-  It covers malformed external-winner refusal, repaired-winner adoption and a
-  successful retry, preserving live table identity and withholding private data
-  from logs. The existing ten-case save-transaction module also passes.
-  Fixed in `fix(hs): reject invalid personal-info data before publication`.
-  Full validation passed: 9263 HS tests across 1013 modules, HS e2e and all
-  216 JS checks (exit 0). The subsequent audit-only evidence update passed the
-  handoff and documentation-path validators. Native macOS remains unverified.
+      `modules/dynamic_hotstrings/personal_info.lua`, `parse_toml_section()` silently
+      skips literal strings, trailing comments and failed basic-string decoding.
+      `load_config()` substitutes defaults and publishes the original source snapshot
+      as if interpretation succeeded. Real `start()` plus an unrelated
+      `save_info({ last_name = "Updated" })` then erases the ignored first name.
+      Read-only reproduction covered `first_name = 'Alice'`, a double-quoted name
+      with a trailing comment, and an unknown escape. Decode the complete document
+      through the shared codec and validate declared known fields/section shapes
+      before publishing a source snapshot. Distinguish missing fields from invalid
+      fields; retain defaults only for genuine absence. Reuse startup rollback and
+      external-winner refusal on parse failure; never log personal field content.
+      Test valid literal/comment/multiline values surviving an unrelated save,
+      malformed/typed-invalid input causing zero writes and no active owner, and
+      invalid external content not replacing live runtime state.
+      Regression coverage is registered in the focused
+      `test_personal_info_config_transaction.lua` module. Its 13 cases pass with the
+      fix; injecting the original personal-info module from `7bf7cea1b` gives
+      11 expected failures and two valid escaped-quote/empty-value control passes.
+      The fixture keeps real schema/default semantics and scopes filesystem/logging
+      boundaries, including real manifest/field readers that capture the logger.
+      It covers malformed external-winner refusal, repaired-winner adoption and a
+      successful retry, preserving live table identity and withholding private data
+      from logs. The existing ten-case save-transaction module also passes.
+      Fixed in `fix(hs): reject invalid personal-info data before publication`.
+      Full validation passed: 9263 HS tests across 1013 modules, HS e2e and all
+      216 JS checks (exit 0). The subsequent audit-only evidence update passed the
+      handoff and documentation-path validators. Native macOS remains unverified.
 
 The delimiter and single-line-token fixes passed 9250 HS unit tests, HS e2e and
 all 216 JS checks. The Linux run under Windows Lua 5.4.6 passed 2184 tests and
@@ -1755,70 +1754,70 @@ The same snapshot passed all 216 JS checks (exit 0); the subsequent audit-only
 evidence update passed the handoff and documentation-path validators.
 
 - [x] **Completed picker native callback root:** selection and cancellation
-  retire Lua authority but previously never delete the native chooser. The
-  Hammerspoon registry retains the callback, which captures the chooser, so
-  ordinary cycle collection cannot release it. Native evidence:
-  [chooser registry ownership and cleanup](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/chooser/libchooser.m#L810),
-  [selection/cancellation callbacks](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/chooser/HSChooser.m#L344).
-  Apply the selected settings before external teardown to preserve ordering,
-  then settle the exact owner even if settings application throws. Model a
-  separate strong native callback registry in tests; verify cancellation,
-  selection, thrown settings, failed native delete and retry, garbage collection,
-  duplicate callbacks, and reentrant selection order. Fixed in `c6739a1`; all
-  18 focused ownership tests, HS e2e and 9234 full-suite tests passed (exit 0).
+      retire Lua authority but previously never delete the native chooser. The
+      Hammerspoon registry retains the callback, which captures the chooser, so
+      ordinary cycle collection cannot release it. Native evidence:
+      [chooser registry ownership and cleanup](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/chooser/libchooser.m#L810),
+      [selection/cancellation callbacks](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/chooser/HSChooser.m#L344).
+      Apply the selected settings before external teardown to preserve ordering,
+      then settle the exact owner even if settings application throws. Model a
+      separate strong native callback registry in tests; verify cancellation,
+      selection, thrown settings, failed native delete and retry, garbage collection,
+      duplicate callbacks, and reentrant selection order. Fixed in `c6739a1`; all
+      18 focused ownership tests, HS e2e and 9234 full-suite tests passed (exit 0).
 
 - [x] **Picker native presentation reentry:** a custom Hammerspoon
-  `chooser.globalCallback` can start request B from A's `willOpen` callback.
-  Native `showWithHints` invokes that callback before showing/focusing A, then
-  continues without rechecking ownership. A can therefore resume after B opens,
-  steal focus and cancel B. The current test double records visibility before
-  its reentry hook, hiding this ordering. No Ergopti installer of this global
-  callback was found: this is an extension/configuration boundary, not a proven
-  stock-configuration failure. Reproduce with native-order visibility and
-  focus-loss cancellation, then consider serializing presentation with a latest
-  successor continuation. Check repeated supersession, exact cleanup and failure
-  release; do not merely add checks between the non-callback setters.
-  Native-source refutation check: `showWithHints` pushes an additional chooser
-  userdata before `willOpen`; `pushHSChooser` increments `selfRefCount` and
-  retains the Objective-C object. Deleting the original userdata during that
-  callback therefore does not destroy the object held by the callback alias.
-  `chooserDelete` delegates to `userdata_gc`, which does not close, hide or nil
-  the window. The suspended presentation can resume through `showWindow` and
-  `makeKeyAndOrderFront`; the successor's `windowDidResignKey` cancels it.
-  See official [chooser bindings](https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/chooser/libchooser.m)
-  and [native presentation](https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/chooser/HSChooser.m).
-  This source-level review rejects the proposed deletion-based refutation, but
-  still does not establish an installed-binary or stock-configuration trigger.
-  A local real-picker probe with native-order `show` now fails explicitly:
-  two choosers are created and shown, the successor is deleted once by
-  focus-loss cancellation, and focus ends on the obsolete first chooser.
-  The injected `willOpen` action reenters through the real menu action and
-  warm discovery cache. The required invariant is that the latest chooser
-  retains focus and still accepts exactly one selection. This is a modeled
-  native-order reproduction, not execution of the native macOS implementation.
-  Implementation serializes cleanup, construction and presentation,
-  retaining only the latest authorized result during reentry. It hands pending
-  presentation to the existing retained deferred-work owner after the native
-  stack unwinds: one presentation per timer delivery, not an unbounded synchronous
-  drain. Refused or prematurely synchronous timers retire their exact queued
-  authority and fence late callbacks; unexpected presentation errors release the
-  running state and arrange successor progress before propagating.
-  Eight focused behavioral cases pass in `test_app_picker_presentation_handoff.lua`.
-  The first five failed before production changes; three added cases cover stale
-  scans, unexpected diagnostic errors and synchronous timer delivery. Existing
-  request ownership 18/18 and discovery receipts 12/12 pass with explicit timer
-  advancement; stale cleanup debt is asserted both before and after the deferred
-  retry. Root 12/12, bundled-root 5/5 and path-framing 6/6 remain green.
-  Independent final review found no blocker. An additional isolated probe passes
-  when ready C replaces queued B after A returns but before timer delivery:
-  exactly one handoff and one successor chooser remain, and only C applies a
-  selection. This ordering is now a registered ninth handoff case, delivered in
-  `test(hs): exercise picker process and presentation integration`.
-  A process-local mutation that drops ready
-  results only while a handoff timer exists fails this new case while the other
-  eight pass, distinguishing its coverage from reentry during native show.
-  Original fix gates pass: 9,451 Hammerspoon
-  tests across 1,025 modules, 216 JS checks and 67 E2E scenarios (one
-  driver-specific vector intentionally skipped). Commit:
-  `fix(hs): defer reentrant application picker presentations`.
-  No native macOS execution was performed.
+      `chooser.globalCallback` can start request B from A's `willOpen` callback.
+      Native `showWithHints` invokes that callback before showing/focusing A, then
+      continues without rechecking ownership. A can therefore resume after B opens,
+      steal focus and cancel B. The current test double records visibility before
+      its reentry hook, hiding this ordering. No Ergopti installer of this global
+      callback was found: this is an extension/configuration boundary, not a proven
+      stock-configuration failure. Reproduce with native-order visibility and
+      focus-loss cancellation, then consider serializing presentation with a latest
+      successor continuation. Check repeated supersession, exact cleanup and failure
+      release; do not merely add checks between the non-callback setters.
+      Native-source refutation check: `showWithHints` pushes an additional chooser
+      userdata before `willOpen`; `pushHSChooser` increments `selfRefCount` and
+      retains the Objective-C object. Deleting the original userdata during that
+      callback therefore does not destroy the object held by the callback alias.
+      `chooserDelete` delegates to `userdata_gc`, which does not close, hide or nil
+      the window. The suspended presentation can resume through `showWindow` and
+      `makeKeyAndOrderFront`; the successor's `windowDidResignKey` cancels it.
+      See official [chooser bindings](https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/chooser/libchooser.m)
+      and [native presentation](https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/chooser/HSChooser.m).
+      This source-level review rejects the proposed deletion-based refutation, but
+      still does not establish an installed-binary or stock-configuration trigger.
+      A local real-picker probe with native-order `show` now fails explicitly:
+      two choosers are created and shown, the successor is deleted once by
+      focus-loss cancellation, and focus ends on the obsolete first chooser.
+      The injected `willOpen` action reenters through the real menu action and
+      warm discovery cache. The required invariant is that the latest chooser
+      retains focus and still accepts exactly one selection. This is a modeled
+      native-order reproduction, not execution of the native macOS implementation.
+      Implementation serializes cleanup, construction and presentation,
+      retaining only the latest authorized result during reentry. It hands pending
+      presentation to the existing retained deferred-work owner after the native
+      stack unwinds: one presentation per timer delivery, not an unbounded synchronous
+      drain. Refused or prematurely synchronous timers retire their exact queued
+      authority and fence late callbacks; unexpected presentation errors release the
+      running state and arrange successor progress before propagating.
+      Eight focused behavioral cases pass in `test_app_picker_presentation_handoff.lua`.
+      The first five failed before production changes; three added cases cover stale
+      scans, unexpected diagnostic errors and synchronous timer delivery. Existing
+      request ownership 18/18 and discovery receipts 12/12 pass with explicit timer
+      advancement; stale cleanup debt is asserted both before and after the deferred
+      retry. Root 12/12, bundled-root 5/5 and path-framing 6/6 remain green.
+      Independent final review found no blocker. An additional isolated probe passes
+      when ready C replaces queued B after A returns but before timer delivery:
+      exactly one handoff and one successor chooser remain, and only C applies a
+      selection. This ordering is now a registered ninth handoff case, delivered in
+      `test(hs): exercise picker process and presentation integration`.
+      A process-local mutation that drops ready
+      results only while a handoff timer exists fails this new case while the other
+      eight pass, distinguishing its coverage from reentry during native show.
+      Original fix gates pass: 9,451 Hammerspoon
+      tests across 1,025 modules, 216 JS checks and 67 E2E scenarios (one
+      driver-specific vector intentionally skipped). Commit:
+      `fix(hs): defer reentrant application picker presentations`.
+      No native macOS execution was performed.

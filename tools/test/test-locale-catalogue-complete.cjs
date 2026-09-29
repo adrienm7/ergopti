@@ -53,9 +53,6 @@ const REFERENCE = 'en'; // The canonical key set every other catalogue mirrors.
 
 const errors = [];
 
-
-
-
 // =========================================
 // =========================================
 // ======= 1/ Loading the catalogues =======
@@ -103,16 +100,15 @@ if (catalogues.size < MIN_LOCALES) {
 
 const reference = catalogues.get(REFERENCE);
 if (!reference) {
-	errors.push(`${REFERENCE}.json is missing — it is the canonical key set every other locale mirrors`);
+	errors.push(
+		`${REFERENCE}.json is missing — it is the canonical key set every other locale mirrors`
+	);
 } else if (reference.size < MIN_KEYS) {
 	errors.push(
 		`${REFERENCE}.json has only ${reference.size} key(s), expected at least ${MIN_KEYS} — the parse ` +
 			'produced almost nothing and every comparison below would be vacuous'
 	);
 }
-
-
-
 
 // =============================================
 // =============================================
@@ -149,9 +145,6 @@ if (reference && reference.size >= MIN_KEYS) {
 	}
 }
 
-
-
-
 // ===========================================
 // ===========================================
 // ======= 3/ Values that render blank =======
@@ -177,24 +170,25 @@ for (const [code, kv] of [...catalogues].sort()) {
 for (const [code, kv] of [...catalogues].sort()) {
 	const declared = kv.get('_meta.locale');
 	if (declared === undefined) {
-		errors.push(`${code}.json has no "_meta.locale" — the catalogue does not say which locale it is`);
+		errors.push(
+			`${code}.json has no "_meta.locale" — the catalogue does not say which locale it is`
+		);
 	} else if (declared !== code) {
 		errors.push(
 			`${code}.json declares _meta.locale = "${declared}". A catalogue copied from a neighbour and ` +
-				'only half-edited keeps the source\'s identity, and the language menu then mislabels itself ' +
+				"only half-edited keeps the source's identity, and the language menu then mislabels itself " +
 				'while every key is present.'
 		);
 	}
 	for (const field of ['_meta.name', '_meta.flag']) {
 		const v = kv.get(field);
 		if (typeof v !== 'string' || v.trim() === '') {
-			errors.push(`${code}.json has no usable "${field}" — the language menu row would render bare`);
+			errors.push(
+				`${code}.json has no usable "${field}" — the language menu row would render bare`
+			);
 		}
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -237,9 +231,6 @@ if (reference && reference.size >= MIN_KEYS) {
 		}
 	}
 }
-
-
-
 
 // ==========================
 // ==========================

@@ -31,26 +31,18 @@ const path = require('path');
 
 const EXPECTED_UNICODE_VERSION = '17.0';
 const ROOT = path.resolve(__dirname, '..', '..');
-const OUT = path.join(
-	ROOT,
-	'static',
-	'ergopti_plus',
-	'_shared',
-	'lua',
-	'unicode_case',
-	'data.lua'
-);
+const OUT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'unicode_case', 'data.lua');
 
 if (process.versions.unicode !== EXPECTED_UNICODE_VERSION) {
 	throw new Error(
 		`Unicode ${EXPECTED_UNICODE_VERSION} is required; Node exposes ${process.versions.unicode}. ` +
-		'Update the pinned version and review the generated diff deliberately.'
+			'Update the pinned version and review the generated diff deliberately.'
 	);
 }
 
 const titlecaseByLower = new Map();
-for (let codepoint = 0; codepoint <= 0x10FFFF; codepoint++) {
-	if (codepoint >= 0xD800 && codepoint <= 0xDFFF) continue;
+for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
+	if (codepoint >= 0xd800 && codepoint <= 0xdfff) continue;
 	const character = String.fromCodePoint(codepoint);
 	if (/^\p{Lt}$/u.test(character)) titlecaseByLower.set(character.toLowerCase(), character);
 }
@@ -73,8 +65,8 @@ const title = [];
 const boundary = [];
 const wordSeparator = [];
 const caseIgnorable = [];
-for (let codepoint = 0; codepoint <= 0x10FFFF; codepoint++) {
-	if (codepoint >= 0xD800 && codepoint <= 0xDFFF) continue;
+for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
+	if (codepoint >= 0xd800 && codepoint <= 0xdfff) continue;
 	const character = String.fromCodePoint(codepoint);
 	const uppercase = character.toUpperCase();
 	const lowercase = character.toLowerCase();
@@ -89,16 +81,25 @@ for (let codepoint = 0; codepoint <= 0x10FFFF; codepoint++) {
 	if (lowercase !== character) lower.push([character, lowercase]);
 }
 
-if (upper.length < 1500 || lower.length < 1400 || title.length < 1500
-		|| boundary.length < 800 || wordSeparator.length < 45 || caseIgnorable.length < 2700) {
+if (
+	upper.length < 1500 ||
+	lower.length < 1400 ||
+	title.length < 1500 ||
+	boundary.length < 800 ||
+	wordSeparator.length < 45 ||
+	caseIgnorable.length < 2700
+) {
 	throw new Error(
 		`case data unexpectedly small: upper=${upper.length}, lower=${lower.length}, ` +
-		`title=${title.length}, boundary=${boundary.length}, wordSeparator=${wordSeparator.length}, ` +
-		`caseIgnorable=${caseIgnorable.length}`
+			`title=${title.length}, boundary=${boundary.length}, wordSeparator=${wordSeparator.length}, ` +
+			`caseIgnorable=${caseIgnorable.length}`
 	);
 }
-if ('straße'.toUpperCase() !== 'STRASSE' || titlecaseCharacter('ß') !== 'Ss'
-		|| titlecaseCharacter('ǆ') !== 'ǅ') {
+if (
+	'straße'.toUpperCase() !== 'STRASSE' ||
+	titlecaseCharacter('ß') !== 'Ss' ||
+	titlecaseCharacter('ǆ') !== 'ǅ'
+) {
 	throw new Error('the runtime does not expose the expected Unicode special casing');
 }
 
@@ -106,8 +107,10 @@ function quote(value) {
 	const escaped = value
 		.replace(/\\/g, '\\\\')
 		.replace(/"/g, '\\"')
-		.replace(/[\0-\x1F\x7F]/g, (character) =>
-			'\\' + String(character.codePointAt(0)).padStart(3, '0'));
+		.replace(
+			/[\0-\x1F\x7F]/g,
+			(character) => '\\' + String(character.codePointAt(0)).padStart(3, '0')
+		);
 	return '"' + escaped + '"';
 }
 
@@ -125,10 +128,14 @@ const lines = [
 	'--- ==============================================================================',
 	'',
 	'return {',
-	`\tunicode_version = ${quote(EXPECTED_UNICODE_VERSION)},`,
+	`\tunicode_version = ${quote(EXPECTED_UNICODE_VERSION)},`
 ];
 
-for (const [name, rows] of [['upper', upper], ['lower', lower], ['title', title]]) {
+for (const [name, rows] of [
+	['upper', upper],
+	['lower', lower],
+	['title', title]
+]) {
 	lines.push(`\t${name} = {`);
 	for (const [from, to] of rows) lines.push(`\t\t[${quote(from)}] = ${quote(to)},`);
 	lines.push('\t},');
@@ -149,7 +156,7 @@ fs.writeFileSync(OUT, lines.join('\n'), 'utf8');
 console.log(`  wrote ${path.relative(ROOT, OUT).split(path.sep).join('/')}`);
 console.log(
 	`[OK] Unicode ${EXPECTED_UNICODE_VERSION}: ${upper.length} upper, ${lower.length} lower, ` +
-	`${title.length} title mappings, ${boundary.length} word boundaries, ` +
-	`${wordSeparator.length} title-case word separators, ` +
-	`${caseIgnorable.length} case-ignorable characters.`
+		`${title.length} title mappings, ${boundary.length} word boundaries, ` +
+		`${wordSeparator.length} title-case word separators, ` +
+		`${caseIgnorable.length} case-ignorable characters.`
 );

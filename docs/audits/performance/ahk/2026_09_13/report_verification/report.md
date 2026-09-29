@@ -24,10 +24,10 @@ Windows on 2026-09-13, pinned Node 22.22.2, TEMP/TMP on campaign scratch D:.
 One suite at a time, resident AHK unchanged, uncontrolled other host activity.
 PowerShell Stopwatch surrounds the complete command including startup/output.
 
-| Command scope | Observed elapsed time |
-| --- | ---: |
-| Full selected JS gate for planner/skill edits | 305.029 s |
-| Report-only verification of `a77743380~1..a77743380` | 6.263 s |
+| Command scope                                        | Observed elapsed time |
+| ---------------------------------------------------- | --------------------: |
+| Full selected JS gate for planner/skill edits        |             305.029 s |
+| Report-only verification of `a77743380~1..a77743380` |               6.263 s |
 
 Both commands exited 0. The former passed all 225 JS checks; the latter executed
 strict conventions and the planner's prechecks. The old selector would have

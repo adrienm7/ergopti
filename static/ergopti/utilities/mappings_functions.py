@@ -113,26 +113,20 @@ def generate_case_variants_for_trigger_replacement(
         # Check if title case and uppercase are the same
         if title_trigger == upper_trigger:
             # For single character or cases where title == upper, use title case output
-            title_replacement = apply_case_to_replacement_text(
-                title_trigger, replacement
-            )
+            title_replacement = apply_case_to_replacement_text(title_trigger, replacement)
             if title_trigger not in seen_triggers:
                 variants.append((title_trigger, title_replacement))
                 seen_triggers.add(title_trigger)
         else:
             # Generate both title and uppercase variants
-            title_replacement = apply_case_to_replacement_text(
-                title_trigger, replacement
-            )
+            title_replacement = apply_case_to_replacement_text(title_trigger, replacement)
             if title_trigger not in seen_triggers:
                 variants.append((title_trigger, title_replacement))
                 seen_triggers.add(title_trigger)
 
             # Uppercase (only for multi-character triggers where upper != title)
             if len(trigger) > 1:
-                upper_replacement = apply_case_to_replacement_text(
-                    upper_trigger, replacement
-                )
+                upper_replacement = apply_case_to_replacement_text(upper_trigger, replacement)
                 if upper_trigger not in seen_triggers:
                     variants.append((upper_trigger, upper_replacement))
                     seen_triggers.add(upper_trigger)
@@ -141,9 +135,7 @@ def generate_case_variants_for_trigger_replacement(
     mixed_variants = generate_mixed_case_variants(trigger)
     for mixed_trigger in mixed_variants:
         if mixed_trigger not in seen_triggers:
-            mixed_replacement = apply_mixed_case_to_replacement(
-                mixed_trigger, replacement
-            )
+            mixed_replacement = apply_mixed_case_to_replacement(mixed_trigger, replacement)
             variants.append((mixed_trigger, mixed_replacement))
             seen_triggers.add(mixed_trigger)
 
@@ -153,11 +145,7 @@ def generate_case_variants_for_trigger_replacement(
         for i, char in enumerate(variant_trigger):
             special_variants = get_special_uppercase_variants(char)
             for special_char in special_variants:
-                special_trigger = (
-                    variant_trigger[:i]
-                    + special_char
-                    + variant_trigger[i + 1 :]
-                )
+                special_trigger = variant_trigger[:i] + special_char + variant_trigger[i + 1 :]
                 if special_trigger not in seen_triggers:
                     # For special characters like ; and ?, they always force at least title case
                     # Replace special chars with letters to determine if it's all-uppercase pattern
@@ -173,9 +161,7 @@ def generate_case_variants_for_trigger_replacement(
                     else:
                         # For mixed case with special chars, force title case by creating
                         # a trigger that has the first alphabetic char as uppercase
-                        alphabetic_chars = [
-                            c for c in test_trigger if c.isalpha()
-                        ]
+                        alphabetic_chars = [c for c in test_trigger if c.isalpha()]
                         if alphabetic_chars:
                             # Create a version where first alphabetic char is uppercase
                             title_trigger = ""
@@ -185,13 +171,9 @@ def generate_case_variants_for_trigger_replacement(
                                     title_trigger += c.upper()
                                     first_alpha_done = True
                                 else:
-                                    title_trigger += (
-                                        c.lower() if c.isalpha() else c
-                                    )
-                            special_replacement = (
-                                apply_case_to_replacement_text(
-                                    title_trigger, replacement
-                                )
+                                    title_trigger += c.lower() if c.isalpha() else c
+                            special_replacement = apply_case_to_replacement_text(
+                                title_trigger, replacement
                             )
                         else:
                             special_replacement = replacement
@@ -201,9 +183,7 @@ def generate_case_variants_for_trigger_replacement(
     return variants
 
 
-def apply_mixed_case_to_replacement(
-    mixed_trigger: str, target_text: str
-) -> str:
+def apply_mixed_case_to_replacement(mixed_trigger: str, target_text: str) -> str:
     """
     Apply mixed case pattern from trigger to replacement text.
     For patterns like aB -> Cd (first lower, second upper -> first upper, second lower)
@@ -224,9 +204,7 @@ def apply_mixed_case_to_replacement(
     return target_text.capitalize()
 
 
-def apply_case_to_replacement_text(
-    original_trigger: str, target_text: str
-) -> str:
+def apply_case_to_replacement_text(original_trigger: str, target_text: str) -> str:
     """
     Apply the case pattern from trigger to the target text.
 
@@ -300,9 +278,7 @@ def add_case_sensitive_mappings(mappings: dict) -> dict:
     return new_mappings
 
 
-def process_mapping(
-    new_mappings: dict, key: str, data: dict, used_triggers: set
-):
+def process_mapping(new_mappings: dict, key: str, data: dict, used_triggers: set):
     """Process a single mapping entry and add all case-sensitive variants, avoiding duplicate triggers."""
     trigger = data["trigger"]
     trigger_variants = get_trigger_variants(trigger)
@@ -322,9 +298,7 @@ def process_mapping(
             if is_trigger_upper or (trigger_val != actual_trigger):
                 if len(triggers_to_add) > 1:
                     # If multiple uppercase variants, add _2, _3, ...
-                    suffix = (
-                        f"_{uppercase_count}" if uppercase_count > 1 else ""
-                    )
+                    suffix = f"_{uppercase_count}" if uppercase_count > 1 else ""
                     new_key_name = f"{key}_uppercase{suffix}"
                     uppercase_count += 1
                 else:
@@ -343,9 +317,7 @@ def get_trigger_variants(trigger: str) -> list[tuple[str, bool]]:
     return [(trigger, False), (trigger.upper(), True)]
 
 
-def build_case_map(
-    mapping: list[tuple[str, str]], is_trigger_upper: bool
-) -> list[tuple[str, str]]:
+def build_case_map(mapping: list[tuple[str, str]], is_trigger_upper: bool) -> list[tuple[str, str]]:
     """
     Generate all key case combinations for a given trigger case.
     Applies output capitalisation rules.
@@ -374,9 +346,7 @@ def build_case_map(
     return list(new_map.items())
 
 
-def get_output_for_case(
-    trigger_upper: bool, key_upper: bool, value: str
-) -> str:
+def get_output_for_case(trigger_upper: bool, key_upper: bool, value: str) -> str:
     """
     Determine the output based on the case of trigger and key:
     - Lower + lower -> original

@@ -33,7 +33,9 @@ const { loadContext, loadLayers, formatResolution } = require('../lib/keymap-lay
 const UI = shared('ui');
 const APP = path.join(UI, 'layer_editor');
 const HTML = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
-const EN = JSON.parse(fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8').replace(/^\uFEFF/, ''));
+const EN = JSON.parse(
+	fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8').replace(/^\uFEFF/, '')
+);
 const RECOMMENDED_TEXT = fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8');
 const ctx = loadContext();
 
@@ -44,10 +46,6 @@ function check(condition, msg) {
 	checks += 1;
 	if (!condition) fail(msg);
 }
-
-
-
-
 
 // ======================================
 // ======================================
@@ -103,7 +101,9 @@ function loadPage() {
 				(listeners[type] = listeners[type] || []).push(fn);
 			},
 			dispatch(type, extra) {
-				(listeners[type] || []).slice().forEach((fn) => fn(Object.assign({ target: el, preventDefault() {} }, extra || {})));
+				(listeners[type] || [])
+					.slice()
+					.forEach((fn) => fn(Object.assign({ target: el, preventDefault() {} }, extra || {})));
 			},
 			click() {
 				el.dispatch('click');
@@ -176,10 +176,19 @@ function loadPage() {
 		},
 		// WebView2's channel: host_bridge.js posts a string as-is ("ready") and
 		// any other payload as its JSON text.
-		chrome: { webview: { postMessage: (message) => posts.push(message === 'ready' ? message : JSON.parse(message)) } }
+		chrome: {
+			webview: {
+				postMessage: (message) => posts.push(message === 'ready' ? message : JSON.parse(message))
+			}
+		}
 	});
 	vm.runInContext('var window = this; var self = this;', context);
-	for (const file of [path.join(UI, 'host_bridge.js'), path.join(APP, '_generated', 'layer_data.js'), path.join(APP, 'layer_model.js'), path.join(APP, 'script.js')]) {
+	for (const file of [
+		path.join(UI, 'host_bridge.js'),
+		path.join(APP, '_generated', 'layer_data.js'),
+		path.join(APP, 'layer_model.js'),
+		path.join(APP, 'script.js')
+	]) {
 		vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
 	}
 	(docListeners.DOMContentLoaded || []).forEach((fn) => fn({ type: 'DOMContentLoaded' }));
@@ -204,12 +213,26 @@ function loadPage() {
 			return out;
 		},
 		binding: (code) => {
-			const node = all().find((n) => n.classList.contains('key') && n.dataset.code === code && !n.classList.contains('enter-lower'));
+			const node = all().find(
+				(n) =>
+					n.classList.contains('key') &&
+					n.dataset.code === code &&
+					!n.classList.contains('enter-lower')
+			);
 			return node.children[0].children[1].textContent;
 		},
-		key: (code) => all().find((n) => n.classList.contains('key') && n.dataset.code === code && !n.classList.contains('enter-lower')),
+		key: (code) =>
+			all().find(
+				(n) =>
+					n.classList.contains('key') &&
+					n.dataset.code === code &&
+					!n.classList.contains('enter-lower')
+			),
 		rows: () => all().filter((n) => n.classList.contains('row')),
-		row: (label) => all().find((n) => n.classList.contains('row') && n.children.some((c) => c.textContent === label)),
+		row: (label) =>
+			all().find(
+				(n) => n.classList.contains('row') && n.children.some((c) => c.textContent === label)
+			),
 		call: (source) => vm.runInContext(source, context),
 		lastSave: () => posts.filter((p) => p && p.action === 'save').pop()
 	};
@@ -230,10 +253,6 @@ const DATA = (() => {
 	return vm.runInContext('LAYER_EDITOR_DATA', sandbox);
 })();
 
-
-
-
-
 // =================================
 // =================================
 // ======= 2/ Render ===============
@@ -243,39 +262,77 @@ const DATA = (() => {
 {
 	const page = loadPage();
 	check(page.posts[0] === 'ready', 'the page must post "ready" once its scripts are loaded');
-	check(page.el('btn-save').disabled === true, 'Save must stay disabled until the host has sent the file');
-	page.call(`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`);
+	check(
+		page.el('btn-save').disabled === true,
+		'Save must stay disabled until the host has sent the file'
+	);
+	page.call(
+		`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
+	);
 	const isoKeys = DATA.keys.filter((k) => k.geometry && k.geometry.iso);
 	const drawn = page.keys('board');
 	check(isoKeys.length > 90, `only ${isoKeys.length} ISO keys in the data`);
-	check(drawn.length === isoKeys.length + 1, `the ISO board draws ${drawn.length} blocks for ${isoKeys.length} keys (+1 for the Enter's lower row)`);
-	check(page.keys('mouse').length === DATA.keys.filter((k) => k.kind === 'mouse_button' || k.kind === 'wheel').length, 'every mouse button and wheel direction must be listed');
-	check(page.key('KeyQ').classList.contains('recommended'), 'KeyQ bound as recommended must show as recommended');
-	check(page.binding('KeyQ') === EN['layer_actions.sel_doc_start'], 'KeyQ must show its action label');
-	check(page.binding('Digit1') === EN['layer_editor.value.repeat_count'].replace('{1}', '1'), 'Digit1 must show its repeat count');
-	check(!page.key('WheelUp').classList.contains('unavailable'), 'the wheel is a layer key on Windows');
+	check(
+		drawn.length === isoKeys.length + 1,
+		`the ISO board draws ${drawn.length} blocks for ${isoKeys.length} keys (+1 for the Enter's lower row)`
+	);
+	check(
+		page.keys('mouse').length ===
+			DATA.keys.filter((k) => k.kind === 'mouse_button' || k.kind === 'wheel').length,
+		'every mouse button and wheel direction must be listed'
+	);
+	check(
+		page.key('KeyQ').classList.contains('recommended'),
+		'KeyQ bound as recommended must show as recommended'
+	);
+	check(
+		page.binding('KeyQ') === EN['layer_actions.sel_doc_start'],
+		'KeyQ must show its action label'
+	);
+	check(
+		page.binding('Digit1') === EN['layer_editor.value.repeat_count'].replace('{1}', '1'),
+		'Digit1 must show its repeat count'
+	);
+	check(
+		!page.key('WheelUp').classList.contains('unavailable'),
+		'the wheel is a layer key on Windows'
+	);
 
 	page.el('form').value = 'ansi';
 	page.el('form').dispatch('change');
 	const ansiKeys = DATA.keys.filter((k) => k.geometry && k.geometry.ansi);
-	check(page.keys('board').length === ansiKeys.length, `the ANSI board draws ${page.keys('board').length} blocks for ${ansiKeys.length} keys`);
+	check(
+		page.keys('board').length === ansiKeys.length,
+		`the ANSI board draws ${page.keys('board').length} blocks for ${ansiKeys.length} keys`
+	);
 	check(!page.key('IntlBackslash'), 'the ANSI board has no ISO key left of Z');
 }
 
 {
 	const page = loadPage();
-	page.call(`init(${JSON.stringify({ os: 'macos', path: '/cfg/layers.toml', text: null, errors: [] })})`);
-	check(page.key('WheelUp').classList.contains('unavailable'), 'the wheel cannot be a layer key on macOS');
-	check(page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_windows_only'], 'an unavailable input must say why');
-	check(page.key('KeyQ').classList.contains('custom'), 'a key the recommended layer binds and the empty file does not is custom');
+	page.call(
+		`init(${JSON.stringify({ os: 'macos', path: '/cfg/layers.toml', text: null, errors: [] })})`
+	);
+	check(
+		page.key('WheelUp').classList.contains('unavailable'),
+		'the wheel cannot be a layer key on macOS'
+	);
+	check(
+		page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_windows_only'],
+		'an unavailable input must say why'
+	);
+	check(
+		page.key('KeyQ').classList.contains('custom'),
+		'a key the recommended layer binds and the empty file does not is custom'
+	);
 	page.key('KeyA').click();
 	check(page.el('repeat-apply').disabled === true, 'the repeat count cannot be picked on macOS');
-	check(page.row(EN['sg_actions.spotlight']) && !page.row(EN['sg_actions.spotlight']).classList.contains('disabled'), 'Spotlight is offered on macOS');
+	check(
+		page.row(EN['sg_actions.spotlight']) &&
+			!page.row(EN['sg_actions.spotlight']).classList.contains('disabled'),
+		'Spotlight is offered on macOS'
+	);
 }
-
-
-
-
 
 // =================================
 // =================================
@@ -285,15 +342,29 @@ const DATA = (() => {
 
 {
 	const page = loadPage();
-	page.call(`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`);
+	page.call(
+		`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
+	);
 	page.key('KeyT').click();
-	check(page.el('current-value').textContent.includes('F2'), 'the panel must show what KeyT does now');
+	check(
+		page.el('current-value').textContent.includes('F2'),
+		'the panel must show what KeyT does now'
+	);
 	const spotlight = page.row(EN['sg_actions.spotlight']);
-	check(spotlight && spotlight.classList.contains('disabled'), 'Spotlight must be offered disabled on Windows');
+	check(
+		spotlight && spotlight.classList.contains('disabled'),
+		'Spotlight must be offered disabled on Windows'
+	);
 	spotlight.click();
 	page.row(EN['sg_actions.arrow_up']).click();
-	check(page.key('KeyT').classList.contains('custom'), 'KeyT bound to something else than recommended must show as custom');
-	check(page.el('status').textContent === EN['layer_editor.unsaved'], 'an edit must say it is not saved');
+	check(
+		page.key('KeyT').classList.contains('custom'),
+		'KeyT bound to something else than recommended must show as custom'
+	);
+	check(
+		page.el('status').textContent === EN['layer_editor.unsaved'],
+		'an edit must say it is not saved'
+	);
 
 	page.key('KeyY').click();
 	page.el('mod-primary').checked = true;
@@ -311,42 +382,76 @@ const DATA = (() => {
 	page.el('btn-save').click();
 	const saved = page.lastSave();
 	check(saved && typeof saved.text === 'string', 'Save must post {action: "save", text}');
-	check(page.el('btn-save').disabled === true, 'Save must wait for the host while a save is in flight');
+	check(
+		page.el('btn-save').disabled === true,
+		'Save must wait for the host while a save is in flight'
+	);
 	if (saved) {
 		const windows = bindingsOf(saved.text, 'windows');
 		check(windows.ok, `the saved file must load on Windows: ${JSON.stringify(windows.errors)}`);
-		check(windows.bindings.KeyT === 'keystroke:ArrowUp@repeat', `KeyT saved as ${windows.bindings.KeyT}`);
-		check(windows.bindings.KeyY === 'keystroke:ctrl+shift+KeyZ', `KeyY saved as ${windows.bindings.KeyY}`);
-		check(windows.bindings.Digit5 === 'repeat_count:7', `Digit5 saved as ${windows.bindings.Digit5}`);
+		check(
+			windows.bindings.KeyT === 'keystroke:ArrowUp@repeat',
+			`KeyT saved as ${windows.bindings.KeyT}`
+		);
+		check(
+			windows.bindings.KeyY === 'keystroke:ctrl+shift+KeyZ',
+			`KeyY saved as ${windows.bindings.KeyY}`
+		);
+		check(
+			windows.bindings.Digit5 === 'repeat_count:7',
+			`Digit5 saved as ${windows.bindings.Digit5}`
+		);
 		check(windows.bindings.KeyG === undefined, 'KeyG made native must not be bound on Windows');
 		for (const os of ['macos', 'linux']) {
 			const other = bindingsOf(saved.text, os);
 			const before = bindingsOf(RECOMMENDED_TEXT, os);
 			check(other.ok, `the saved file must load on ${os}: ${JSON.stringify(other.errors)}`);
-			check(JSON.stringify(other.bindings) === JSON.stringify(before.bindings), `edits made on Windows changed ${os}`);
+			check(
+				JSON.stringify(other.bindings) === JSON.stringify(before.bindings),
+				`edits made on Windows changed ${os}`
+			);
 		}
 	}
 
-	page.call(`saveResult(${JSON.stringify({ saved: false, errors: [{ code: 'write_failed', detail: 'disk full' }] })})`);
-	check(page.el('status').textContent === EN['layer_editor.save_refused'].replace('{1}', 'disk full'), 'a refused save must say why');
+	page.call(
+		`saveResult(${JSON.stringify({ saved: false, errors: [{ code: 'write_failed', detail: 'disk full' }] })})`
+	);
+	check(
+		page.el('status').textContent === EN['layer_editor.save_refused'].replace('{1}', 'disk full'),
+		'a refused save must say why'
+	);
 	check(page.el('btn-save').disabled === false, 'a refused save must let the user save again');
 	page.el('btn-close').click();
-	check(page.posts.every((p) => !p || p.action !== 'cancel'), 'the first Close with unsaved edits must warn, not close');
-	check(page.el('status').textContent === EN['layer_editor.unsaved_close'], 'the first Close must say the edits would be lost');
+	check(
+		page.posts.every((p) => !p || p.action !== 'cancel'),
+		'the first Close with unsaved edits must warn, not close'
+	);
+	check(
+		page.el('status').textContent === EN['layer_editor.unsaved_close'],
+		'the first Close must say the edits would be lost'
+	);
 	page.el('btn-close').click();
-	check(page.posts.some((p) => p && p.action === 'cancel'), 'the second Close must close');
+	check(
+		page.posts.some((p) => p && p.action === 'cancel'),
+		'the second Close must close'
+	);
 }
 
 {
 	const page = loadPage();
-	page.call(`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: null, errors: [] })})`);
+	page.call(
+		`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: null, errors: [] })})`
+	);
 	page.el('btn-restore').click();
 	page.el('btn-save').click();
 	const restored = page.lastSave();
 	for (const os of DATA.platforms) {
 		const got = bindingsOf(restored.text, os);
 		const want = bindingsOf(RECOMMENDED_TEXT, os);
-		check(got.ok && JSON.stringify(got.bindings) === JSON.stringify(want.bindings), `Restore recommended must save Ergopti's layer on ${os}`);
+		check(
+			got.ok && JSON.stringify(got.bindings) === JSON.stringify(want.bindings),
+			`Restore recommended must save Ergopti's layer on ${os}`
+		);
 	}
 	page.call('saveResult({ saved: true, applied: true, errors: [] })');
 	check(page.el('status').textContent === EN['common.saved'], 'a successful save must say so');
@@ -355,26 +460,53 @@ const DATA = (() => {
 	const clearedText = page.lastSave().text;
 	for (const os of DATA.platforms) {
 		const got = bindingsOf(clearedText, os);
-		check(got.ok && Object.keys(got.bindings).length === 0, `Clear all must save no binding on ${os}`);
+		check(
+			got.ok && Object.keys(got.bindings).length === 0,
+			`Clear all must save no binding on ${os}`
+		);
 	}
 }
 
 {
 	const page = loadPage();
-	page.call(`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: '[layers.nav.all\n', errors: [{ code: 'toml_invalid', detail: 'line 1' }] })})`);
+	page.call(
+		`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: '[layers.nav.all\n', errors: [{ code: 'toml_invalid', detail: 'line 1' }] })})`
+	);
 	check(page.el('banner').hidden === false, 'an unreadable file must be announced');
-	check(page.el('banner').children[0].textContent.endsWith(EN['layer_editor.file_problem'].split('{2}')[1]), 'the banner must say the file will be replaced');
-	check(page.key('KeyQ').classList.contains('custom'), 'an unreadable file edits from an empty layer');
-	page.call(`init(${JSON.stringify({ os: 'windows', path: 'x', text: RECOMMENDED_TEXT, errors: [] })})`);
-	check(page.key('KeyQ').classList.contains('custom'), 'a second init must not replace the document being edited');
+	check(
+		page
+			.el('banner')
+			.children[0].textContent.endsWith(EN['layer_editor.file_problem'].split('{2}')[1]),
+		'the banner must say the file will be replaced'
+	);
+	check(
+		page.key('KeyQ').classList.contains('custom'),
+		'an unreadable file edits from an empty layer'
+	);
+	page.call(
+		`init(${JSON.stringify({ os: 'windows', path: 'x', text: RECOMMENDED_TEXT, errors: [] })})`
+	);
+	check(
+		page.key('KeyQ').classList.contains('custom'),
+		'a second init must not replace the document being edited'
+	);
 }
 
 {
 	const page = loadPage();
-	page.call(`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: null, errors: [{ code: 'file_unreadable', detail: 'permission denied' }] })})`);
-	check(!page.el('banner').hidden && page.el('banner').children[0].textContent.includes('permission denied'), 'a file the host cannot read must be announced');
+	page.call(
+		`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: null, errors: [{ code: 'file_unreadable', detail: 'permission denied' }] })})`
+	);
+	check(
+		!page.el('banner').hidden &&
+			page.el('banner').children[0].textContent.includes('permission denied'),
+		'a file the host cannot read must be announced'
+	);
 	page.call('saveResult({ saved: false, errors: {} })');
-	check(page.el('status').textContent === EN['layer_editor.save_refused'].replace('{1}', '?'), 'an empty error object from a Lua host is read as no error list');
+	check(
+		page.el('status').textContent === EN['layer_editor.save_refused'].replace('{1}', '?'),
+		'an empty error object from a Lua host is read as no error list'
+	);
 }
 
 if (checks < 40) fail(`only ${checks} checks ran (floor 40)`);
@@ -383,4 +515,6 @@ if (errors.length > 0) {
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
-console.log(`\x1b[32m[OK] layer editor page: ${checks} checks — render, pick, save payload, presets and host replies.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] layer editor page: ${checks} checks — render, pick, save payload, presets and host replies.\x1b[0m`
+);

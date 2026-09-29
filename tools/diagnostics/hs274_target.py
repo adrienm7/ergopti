@@ -1,5 +1,6 @@
 # tools/diagnostics/hs274_target.py
 """Own the external Cocoa fixture independently of the Hammerspoon consumer."""
+
 from contextlib import contextmanager
 import os
 from pathlib import Path
@@ -19,11 +20,21 @@ def owned_target(output, report, lifecycle):
     if native.matching(executable):
         raise RuntimeError("Native target executable already has an owner")
     with (output / "hs274-target.log").open("xb") as log:
-        process = subprocess.Popen([str(executable), str(request), str(response)], stdout=log, stderr=subprocess.STDOUT)
-        state = report["context_target"] = {"pid": process.pid, "executable": str(executable), "settled": False}
+        process = subprocess.Popen(
+            [str(executable), str(request), str(response)], stdout=log, stderr=subprocess.STDOUT
+        )
+        state = report["context_target"] = {
+            "pid": process.pid,
+            "executable": str(executable),
+            "settled": False,
+        }
         primary = None
         try:
-            yield {"target_pid": process.pid, "target_request": str(request), "target_response": str(response)}
+            yield {
+                "target_pid": process.pid,
+                "target_request": str(request),
+                "target_response": str(response),
+            }
         except BaseException as error:
             primary = error
             raise

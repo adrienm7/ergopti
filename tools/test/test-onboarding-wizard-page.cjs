@@ -319,7 +319,11 @@ function advanceToMetrics(page) {
 
 	// A locale switch re-renders the step from the answers, not from the DOM.
 	page.window.applyStrings({ locale: 'en', strings: locale('en') });
-	assert.equal(input.value, '/Volumes/Fixture/me/Ergopti Data/', 'the chosen folder survives a re-render');
+	assert.equal(
+		input.value,
+		'/Volumes/Fixture/me/Ergopti Data/',
+		'the chosen folder survives a re-render'
+	);
 
 	advanceToMetrics(page);
 	page.click('s4-next');

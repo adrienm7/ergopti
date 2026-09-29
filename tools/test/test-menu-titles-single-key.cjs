@@ -48,7 +48,7 @@ const TITLES = [
 	{ key: 'menu.gestures.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.metrics.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.llm.title', on: ['windows', 'macos', 'linux'] },
-	{ key: 'menu.debug.title', on: ['windows', 'macos', 'linux'] },
+	{ key: 'menu.debug.title', on: ['windows', 'macos', 'linux'] }
 ];
 
 const EXT = { windows: '.ahk', macos: '.lua', linux: '.lua' };
@@ -74,14 +74,21 @@ const sources = Object.fromEntries(['windows', 'macos', 'linux'].map((d) => [d, 
 
 // The manifest names keys on the drivers' behalf: a row declared there is
 // rendered from the declaration, so the driver never spells the key out.
-const manifest = fs.readFileSync(path.join(SP, '_shared', 'modules', 'features', 'manifest.toml'), 'utf8');
-const menuManifest = fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8');
+const manifest = fs.readFileSync(
+	path.join(SP, '_shared', 'modules', 'features', 'manifest.toml'),
+	'utf8'
+);
+const menuManifest = fs.readFileSync(
+	path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'),
+	'utf8'
+);
 
 const errors = [];
 
 for (const { key, on } of TITLES) {
 	for (const driver of on) {
-		const named = sources[driver].includes(key) || manifest.includes(key) || menuManifest.includes(key);
+		const named =
+			sources[driver].includes(key) || manifest.includes(key) || menuManifest.includes(key);
 		if (!named) {
 			errors.push(
 				`${driver} has the "${key}" menu and names no key for it. Either it reads a SECOND key ` +

@@ -10,9 +10,7 @@
 			"title": "Older application discovery replaces the newest picker",
 			"severity": "medium",
 			"confidence": "high",
-			"guarantees": [
-				"G3"
-			],
+			"guarantees": ["G3"],
 			"reproduction": "Open exclusion picker A, then B with a cold cache. Complete B's discovery before A's and select from A's resulting panel.",
 			"root_cause": "Presentation authority is assigned after discovery rather than at user intent; old completions delete the active chooser and retain obsolete settings callbacks.",
 			"silent_failure": "No exception occurs; native chooser ownership is mistaken for current request ownership.",
@@ -23,10 +21,7 @@
 			"title": "Failed application discovery publishes a partial cache",
 			"severity": "medium",
 			"confidence": "high",
-			"guarantees": [
-				"G2",
-				"G5"
-			],
+			"guarantees": ["G2", "G5"],
 			"reproduction": "Complete discover_apps with exit code 1 and nonempty stdout containing Partial.app, then request discovery again.",
 			"root_cause": "The completion checks stdout but not process success; build_choices publishes a 60-second authoritative cache.",
 			"silent_failure": "A normal completion log is emitted and the next request does not retry.",
@@ -37,9 +32,7 @@
 			"title": "Repeated hotstring sections produce duplicate preview rows",
 			"severity": "low",
 			"confidence": "high",
-			"guarantees": [
-				"G5"
-			],
+			"guarantees": ["G5"],
 			"reproduction": "Load two valid [[arrows]] blocks containing one entry each and render the real menu.",
 			"root_cause": "The counter appends a new section detail for every declaration while the canonical reader merges by section name.",
 			"silent_failure": "The global total stays correct, masking duplicate disabled detail rows.",
@@ -50,9 +43,7 @@
 			"title": "A leading UTF-8 BOM hides loaded extension hotstrings",
 			"severity": "low",
 			"confidence": "high",
-			"guarantees": [
-				"G5"
-			],
+			"guarantees": ["G5"],
 			"reproduction": "Prefix a valid first [[arrows]] header with EF BB BF; the real reader and registry load one entry while the counter returns zero.",
 			"root_cause": "The counter does not strip the initial BOM as the canonical reader does.",
 			"silent_failure": "The omitted extension looks empty and no read error is reported.",
@@ -63,9 +54,7 @@
 			"title": "Quoted section descriptions are counted as hotstrings",
 			"severity": "low",
 			"confidence": "high",
-			"guarantees": [
-				"G5"
-			],
+			"guarantees": ["G5"],
 			"reproduction": "Use [[arrows]], a quoted description string and one actual inline-table hotstring; runtime count is one and preview count two.",
 			"root_cause": "The counter treats every quoted line in a hotstring section as an entry instead of using canonical entry semantics.",
 			"silent_failure": "Parsing and file reads succeed; the displayed count is plausible but incorrect.",
@@ -76,9 +65,7 @@
 			"title": "Escaped quotes truncate extension display names",
 			"severity": "low",
 			"confidence": "high",
-			"guarantees": [
-				"G5"
-			],
+			"guarantees": ["G5"],
 			"reproduction": "Use an [extension] name containing TOML-escaped quotes around Quoted. The canonical reader returns the complete decoded name but the counter stops at the first escaped quote; see the supplied parser-siblings probe.",
 			"root_cause": "The manifest name regex terminates at an escaped quote and does not decode TOML strings; shared extension discovery has a similar defect.",
 			"silent_failure": "A nonempty truncated name is accepted and cached instead of causing a parse failure.",
@@ -89,9 +76,7 @@
 			"title": "Metadata headers do not end hotstring counting",
 			"severity": "low",
 			"confidence": "high",
-			"guarantees": [
-				"G5"
-			],
+			"guarantees": ["G5"],
 			"reproduction": "Place [_meta.sections] and a quoted metadata value after a valid hotstring section; preview reports two and the real registry one.",
 			"root_cause": "The counter retains the previous section across non-hotstring headers; it also omits valid simple-table sections.",
 			"silent_failure": "All file operations succeed and metadata resembles a quoted trigger to the scanner.",

@@ -43,7 +43,10 @@ const {
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUNDLES_DIR = path.join(ROOT, 'static', 'ergopti', 'macos', 'bundles');
 const LAYOUT_DEFAULTS = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'layouts', 'defaults.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'layouts', 'defaults.json'),
+		'utf8'
+	)
 );
 
 let failures = 0;
@@ -112,21 +115,40 @@ check('the index build is deterministic and sorted by id', () => {
 check('every checksum and size matches the committed .keylayout bytes', () => {
 	for (const entry of entries) {
 		const file = path.join(REGISTRY_DIR, ...entry.file.split('/'));
-		assert.strictEqual(entry.file, `${entry.id}/${entry.id}.keylayout`, `${entry.id}: unexpected file path`);
+		assert.strictEqual(
+			entry.file,
+			`${entry.id}/${entry.id}.keylayout`,
+			`${entry.id}: unexpected file path`
+		);
 		const bytes = fs.readFileSync(file);
 		assert.strictEqual(sha256(bytes), entry.sha256, `${entry.id}: sha256 mismatch`);
 		assert.strictEqual(bytes.length, entry.size, `${entry.id}: size mismatch`);
-		assert.ok(!bytes.includes(0x0d), `${entry.id}: a CR byte would make the served file differ from the checkout`);
+		assert.ok(
+			!bytes.includes(0x0d),
+			`${entry.id}: a CR byte would make the served file differ from the checkout`
+		);
 		assert.ok(!(bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf), `${entry.id}: BOM`);
 	}
 });
 
 check('each registry folder holds exactly one .keylayout named after its id', () => {
-	const folders = fs.readdirSync(REGISTRY_DIR, { withFileTypes: true }).filter((d) => d.isDirectory());
-	assert.strictEqual(folders.length, entries.length, 'a folder is missing from the index or vice versa');
+	const folders = fs
+		.readdirSync(REGISTRY_DIR, { withFileTypes: true })
+		.filter((d) => d.isDirectory());
+	assert.strictEqual(
+		folders.length,
+		entries.length,
+		'a folder is missing from the index or vice versa'
+	);
 	for (const folder of folders) {
-		const layouts = fs.readdirSync(path.join(REGISTRY_DIR, folder.name)).filter((f) => f.endsWith('.keylayout'));
-		assert.deepStrictEqual(layouts, [`${folder.name}.keylayout`], `${folder.name}: one layout = one .keylayout`);
+		const layouts = fs
+			.readdirSync(path.join(REGISTRY_DIR, folder.name))
+			.filter((f) => f.endsWith('.keylayout'));
+		assert.deepStrictEqual(
+			layouts,
+			[`${folder.name}.keylayout`],
+			`${folder.name}: one layout = one .keylayout`
+		);
 	}
 });
 
@@ -134,15 +156,26 @@ check('each registry folder holds exactly one .keylayout named after its id', ()
 // active, so which layouts are Ergopti must be data every driver can read.
 check('every layout names its family and the Ergopti layouts are the Ergopti family', () => {
 	const ergoptiFamily = LAYOUT_DEFAULTS.registry.ergopti_family;
-	assert.match(String(ergoptiFamily), /^[a-z][a-z0-9_]*$/, 'defaults.json declares no ergopti_family');
+	assert.match(
+		String(ergoptiFamily),
+		/^[a-z][a-z0-9_]*$/,
+		'defaults.json declares no ergopti_family'
+	);
 	const byId = new Map(entries.map((e) => [e.id, e]));
 	for (const entry of entries) {
 		assert.match(String(entry.family), /^[a-z][a-z0-9_]*$/, `${entry.id} declares no family`);
 		for (const variant of entry.variants) {
-			assert.strictEqual(byId.get(variant).family, entry.family, `${entry.id} and its variant ${variant} disagree about their family`);
+			assert.strictEqual(
+				byId.get(variant).family,
+				entry.family,
+				`${entry.id} and its variant ${variant} disagree about their family`
+			);
 		}
 	}
-	const ergopti = entries.filter((e) => e.family === ergoptiFamily).map((e) => e.id).sort();
+	const ergopti = entries
+		.filter((e) => e.family === ergoptiFamily)
+		.map((e) => e.id)
+		.sort();
 	assert.deepStrictEqual(ergopti, ['ergopti', 'ergopti_ansi', 'ergopti_plus', 'ergopti_plus_ansi']);
 	assert.notStrictEqual(byId.get('ergol').family, ergoptiFamily, 'Ergo-L is not an Ergopti layout');
 });
@@ -154,19 +187,36 @@ check('every entry publishes the keyboard name its .keylayout declares', () => {
 		const text = fs.readFileSync(path.join(REGISTRY_DIR, ...entry.file.split('/')), 'utf8');
 		const declared = /<keyboard\b[^>]*\sname="([^"]+)"/.exec(text);
 		assert.ok(declared, `${entry.id}: the .keylayout declares no keyboard name`);
-		assert.strictEqual(entry.keyboard_name, declared[1], `${entry.id}: keyboard_name differs from the file`);
+		assert.strictEqual(
+			entry.keyboard_name,
+			declared[1],
+			`${entry.id}: keyboard_name differs from the file`
+		);
 	}
-	const unnamed = Buffer.from('<keyboard group="0" id="1"><layouts><modifierMap><keyMapSet><keyMap index="0">');
-	assert.ok(validateKeylayout('unnamed', unnamed).some((e) => e.includes('declares no name')), 'a nameless layout was accepted');
+	const unnamed = Buffer.from(
+		'<keyboard group="0" id="1"><layouts><modifierMap><keyMapSet><keyMap index="0">'
+	);
+	assert.ok(
+		validateKeylayout('unnamed', unnamed).some((e) => e.includes('declares no name')),
+		'a nameless layout was accepted'
+	);
 	const names = entries.map((e) => e.keyboard_name);
-	assert.strictEqual(new Set(names).size, names.length, 'two layouts would install under one input-source name');
+	assert.strictEqual(
+		new Set(names).size,
+		names.length,
+		'two layouts would install under one input-source name'
+	);
 });
 
 check('vendored layouts are byte-identical to their upstream release asset', () => {
 	const vendored = entries.filter((e) => e.source_sha256);
 	assert.ok(vendored.length >= 1, 'no vendored layout declares source_sha256');
 	for (const entry of vendored) {
-		assert.strictEqual(entry.sha256, entry.source_sha256, `${entry.id} was modified after vendoring`);
+		assert.strictEqual(
+			entry.sha256,
+			entry.source_sha256,
+			`${entry.id} was modified after vendoring`
+		);
 	}
 });
 
@@ -177,7 +227,10 @@ check('third-party licences ship next to their layout', () => {
 		assert.ok(entry.licence_file, `${entry.id} (${entry.licence}) names no licence_file`);
 		const licence = path.join(REGISTRY_DIR, entry.id, entry.licence_file);
 		assert.ok(fs.existsSync(licence), `${entry.id}: ${entry.licence_file} is missing`);
-		assert.ok(fs.readFileSync(licence, 'utf8').trim().length > 0, `${entry.id}: empty licence file`);
+		assert.ok(
+			fs.readFileSync(licence, 'utf8').trim().length > 0,
+			`${entry.id}: empty licence file`
+		);
 	}
 });
 
@@ -191,12 +244,23 @@ check('the Ergopti entries are the latest macOS bundle layouts', () => {
 	assert.ok(latest, 'no Ergopti bundle found');
 	const version = `${latest[1]}.${latest[2]}.${latest[3]}`;
 	const stem = `Ergopti_v${latest[1]}_${latest[2]}_${latest[3]}`;
-	const suffixes = { ergopti: '', ergopti_ansi: '_ansi', ergopti_plus: '_plus', ergopti_plus_ansi: '_plus_ansi' };
+	const suffixes = {
+		ergopti: '',
+		ergopti_ansi: '_ansi',
+		ergopti_plus: '_plus',
+		ergopti_plus_ansi: '_plus_ansi'
+	};
 	for (const [id, suffix] of Object.entries(suffixes)) {
 		const entry = entries.find((e) => e.id === id);
 		assert.ok(entry, `${id} is not registered`);
 		assert.strictEqual(entry.version, version, `${id} is not at the latest bundle version`);
-		const bundleFile = path.join(BUNDLES_DIR, latest[0], 'Contents', 'Resources', `${stem}${suffix}.keylayout`);
+		const bundleFile = path.join(
+			BUNDLES_DIR,
+			latest[0],
+			'Contents',
+			'Resources',
+			`${stem}${suffix}.keylayout`
+		);
 		const registryFile = path.join(REGISTRY_DIR, id, `${id}.keylayout`);
 		assert.ok(
 			fs.readFileSync(bundleFile).equals(fs.readFileSync(registryFile)),
@@ -222,7 +286,10 @@ check('a .keylayout-only change selects the registry and XKB conversion gates', 
 });
 
 check('the meta.toml validator accepts a complete record', () => {
-	assert.deepStrictEqual(validateMeta('sample', validMeta(), () => true), []);
+	assert.deepStrictEqual(
+		validateMeta('sample', validMeta(), () => true),
+		[]
+	);
 });
 
 check('the meta.toml validator rejects every malformed shape', () => {
@@ -244,8 +311,20 @@ check('the meta.toml validator rejects every malformed shape', () => {
 		['variant that is not an id', (m) => (m.variants = ['Not An Id'])],
 		['unknown xkb key', (m) => (m.xkb = { colour: 'blue' })],
 		['xkb override that is not a pair', (m) => (m.xkb = { keysym_overrides: [['a']] })],
-		['xkb override to a malformed keysym', (m) => (m.xkb = { keysym_overrides: [['a', 'not a keysym']] })],
-		['xkb override mapping one text twice', (m) => (m.xkb = { keysym_overrides: [['a', 'b'], ['a', 'c']] })],
+		[
+			'xkb override to a malformed keysym',
+			(m) => (m.xkb = { keysym_overrides: [['a', 'not a keysym']] })
+		],
+		[
+			'xkb override mapping one text twice',
+			(m) =>
+				(m.xkb = {
+					keysym_overrides: [
+						['a', 'b'],
+						['a', 'c']
+					]
+				})
+		],
 		['empty base_level_only', (m) => (m.xkb = { base_level_only: [] })]
 	];
 	for (const [label, mutate] of cases) {
@@ -259,15 +338,39 @@ check('the meta.toml validator rejects every malformed shape', () => {
 check('the registry validator rejects asymmetric and dangling variants', () => {
 	const a = { ...validMeta(), variants: ['b'] };
 	const b = { ...validMeta(), variants: [] };
-	assert.ok(validateRegistry(new Map([['a', a], ['b', b]])).length > 0, 'asymmetric variants accepted');
+	assert.ok(
+		validateRegistry(
+			new Map([
+				['a', a],
+				['b', b]
+			])
+		).length > 0,
+		'asymmetric variants accepted'
+	);
 	const c = { ...validMeta(), variants: ['ghost'] };
 	assert.ok(validateRegistry(new Map([['c', c]])).length > 0, 'dangling variant accepted');
 	const d = { ...validMeta(), variants: ['d'] };
 	assert.ok(validateRegistry(new Map([['d', d]])).length > 0, 'self variant accepted');
 	const e = { ...validMeta(), variants: ['f'] };
 	const f = { ...validMeta(), family: 'other', variants: ['e'] };
-	assert.ok(validateRegistry(new Map([['e', e], ['f', f]])).length > 0, 'variants of two families accepted');
-	assert.deepStrictEqual(validateRegistry(new Map([['e', e], ['f', { ...f, family: 'sample' }]])), []);
+	assert.ok(
+		validateRegistry(
+			new Map([
+				['e', e],
+				['f', f]
+			])
+		).length > 0,
+		'variants of two families accepted'
+	);
+	assert.deepStrictEqual(
+		validateRegistry(
+			new Map([
+				['e', e],
+				['f', { ...f, family: 'sample' }]
+			])
+		),
+		[]
+	);
 });
 
 check('layout extensions inventory existing-format files and reject incomplete packages', () => {
@@ -283,14 +386,19 @@ check('layout extensions inventory existing-format files and reject incomplete p
 		assert.ok(result.extension, 'every layout is an existing-format extension');
 		const file = result.extension.files.find((item) => item.path === 'hotstrings/sample.toml');
 		assert.deepStrictEqual(file, {
-			path: 'hotstrings/sample.toml', file: 'ergopti/hotstrings/sample.toml',
-			size: Buffer.byteLength(content), sha256: sha256(content)
+			path: 'hotstrings/sample.toml',
+			file: 'ergopti/hotstrings/sample.toml',
+			size: Buffer.byteLength(content),
+			sha256: sha256(content)
 		});
 		assert.ok(result.extension.files.some((item) => item.path === 'manifest.toml'));
 		assert.ok(result.extension.files.some((item) => item.path === 'ergopti.keylayout'));
 		const generation = result.extension.sha256;
 		fs.writeFileSync(path.join(hotstrings, 'sample.toml'), content + '# changed\n');
-		assert.notStrictEqual(buildIndex(fixture).index.layouts.find((entry) => entry.id === 'ergopti').extension.sha256, generation);
+		assert.notStrictEqual(
+			buildIndex(fixture).index.layouts.find((entry) => entry.id === 'ergopti').extension.sha256,
+			generation
+		);
 		fs.mkdirSync(path.join(hotstrings, 'nested'));
 		assert.throws(() => buildIndex(fixture), /unsupported extension file/);
 		fs.rmdirSync(path.join(hotstrings, 'nested'));
@@ -302,7 +410,11 @@ check('layout extensions inventory existing-format files and reject incomplete p
 		fs.rmSync(path.join(folder, 'manifest.toml'));
 		assert.throws(() => buildIndex(fixture), /manifest\.toml/);
 	} finally {
-		assert.ok(path.resolve(fixture).startsWith(path.resolve(os.tmpdir()) + path.sep + 'ergopti-layout-extension-'));
+		assert.ok(
+			path
+				.resolve(fixture)
+				.startsWith(path.resolve(os.tmpdir()) + path.sep + 'ergopti-layout-extension-')
+		);
 		fs.rmSync(fixture, { recursive: true, force: true });
 	}
 });

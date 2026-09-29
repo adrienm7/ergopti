@@ -37,14 +37,13 @@ def activation_owner(command, log, report):
 def provider_enabled(listing, bundle_id):
     """Require the exact provider's enabled state, not activation alone."""
     return any(
-        bundle_id in line.split() and "[activated enabled]" in line
-        for line in listing.splitlines()
+        bundle_id in line.split() and "[activated enabled]" in line for line in listing.splitlines()
     )
 
 
 def observe_approval_ui(output, credentials):
     """Inspect the normal approval UI using the runner's existing permissions."""
-    notification_script = '''
+    notification_script = """
 tell application "System Events"
     set observations to ""
     repeat with processName in {"UserNotificationCenter", "CoreServicesUIAgent"}
@@ -79,8 +78,8 @@ tell application "System Events"
     end repeat
     return "No uniquely identified provider notification" & linefeed & observations
 end tell
-'''
-    script = '''
+"""
+    script = """
 tell application "System Events"
     if not UI elements enabled then error "Accessibility is unavailable"
     repeat 20 times
@@ -169,8 +168,8 @@ tell application "System Events"
         return observationText
     end tell
 end tell
-'''
-    authentication_script = '''
+"""
+    authentication_script = """
 set approvalName to system attribute "HS274_APPROVAL_USER"
 set approvalPassword to system attribute "HS274_APPROVAL_PASSWORD"
 if approvalName is "" or approvalPassword is "" then error "Missing temporary approval credentials"
@@ -208,12 +207,22 @@ tell application "System Events"
         return "HS274_CLICK_TARGET " & (item 1 of controlPosition) & " " & (item 2 of controlPosition) & " " & (item 1 of controlSize) & " " & (item 2 of controlSize)
     end tell
 end tell
-'''
+"""
     results = {}
     commands = [
-        ("visible_processes", ["osascript", "-e", 'tell application "System Events" to get name of every process whose visible is true']),
+        (
+            "visible_processes",
+            [
+                "osascript",
+                "-e",
+                'tell application "System Events" to get name of every process whose visible is true',
+            ],
+        ),
         ("provider_notification", ["osascript", "-e", notification_script]),
-        ("open_settings", ["open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"]),
+        (
+            "open_settings",
+            ["open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"],
+        ),
         ("settings_tree", ["osascript", "-e", script]),
         ("quartz_click", None),
         ("authenticate", ["osascript", "-e", authentication_script]),
@@ -240,12 +249,22 @@ end tell
             x, y, width, height = map(float, target[1:])
             if not all(map(math.isfinite, (x, y, width, height))) or width <= 0 or height <= 0:
                 raise RuntimeError("Invalid control geometry")
-            command = [str(output / "hs274-provider-click"), str(x + width / 2), str(y + height / 2)]
+            command = [
+                str(output / "hs274-provider-click"),
+                str(x + width / 2),
+                str(y + height / 2),
+            ]
         try:
             environment = None
             if name == "authenticate":
-                environment = dict(os.environ, HS274_APPROVAL_USER=credentials[0], HS274_APPROVAL_PASSWORD=credentials[1])
-            result = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False, env=environment)
+                environment = dict(
+                    os.environ,
+                    HS274_APPROVAL_USER=credentials[0],
+                    HS274_APPROVAL_PASSWORD=credentials[1],
+                )
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=20, check=False, env=environment
+            )
             results[name] = {
                 "exit": result.returncode,
                 "stdout": result.stdout.replace(credentials[1], "<redacted>"),
@@ -261,7 +280,9 @@ def main():
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("This observation requires a disposable macOS Actions runner")
     output = Path(os.environ["RUNNER_TEMP"])
-    manager = Path("/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager")
+    manager = Path(
+        "/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager"
+    )
     bundle_id = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
     report = {
         "hs274_fixed": False,
@@ -274,8 +295,11 @@ def main():
     }
     try:
         before = subprocess.run(
-            ["systemextensionsctl", "list"], check=True, capture_output=True,
-            text=True, timeout=15,
+            ["systemextensionsctl", "list"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         report["extensions_before"] = before.stdout
         # The inspected manager awaits the activation delegate. Preserve that
@@ -287,12 +311,17 @@ def main():
                 except subprocess.TimeoutExpired:
                     report["activation_timed_out"] = True
                 after = subprocess.run(
-                    ["systemextensionsctl", "list"], check=True, capture_output=True,
-                    text=True, timeout=15,
+                    ["systemextensionsctl", "list"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                 )
                 report["extensions_after"] = after.stdout
                 # A zero manager exit can also mean completion after reboot.
-                report["extension_activated_and_enabled"] = provider_enabled(after.stdout, bundle_id)
+                report["extension_activated_and_enabled"] = provider_enabled(
+                    after.stdout, bundle_id
+                )
                 if not report["extension_activated_and_enabled"]:
                     report["activation_owner_alive_before_ui"] = process.poll() is None
                     if not report["activation_owner_alive_before_ui"]:
@@ -302,27 +331,39 @@ def main():
                         deadline = time.monotonic() + 10
                         while time.monotonic() < deadline:
                             after_ui = subprocess.run(
-                                ["systemextensionsctl", "list"], check=True, capture_output=True,
-                                text=True, timeout=min(3, max(0.01, deadline - time.monotonic())),
+                                ["systemextensionsctl", "list"],
+                                check=True,
+                                capture_output=True,
+                                text=True,
+                                timeout=min(3, max(0.01, deadline - time.monotonic())),
                             )
                             report["extensions_after_ui"] = after_ui.stdout
-                            report["extension_activated_and_enabled"] = provider_enabled(after_ui.stdout, bundle_id)
+                            report["extension_activated_and_enabled"] = provider_enabled(
+                                after_ui.stdout, bundle_id
+                            )
                             if report["extension_activated_and_enabled"]:
                                 break
                             time.sleep(0.5)
                     after_cleanup = subprocess.run(
-                        ["systemextensionsctl", "list"], check=True, capture_output=True,
-                        text=True, timeout=15,
+                        ["systemextensionsctl", "list"],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
                     )
                     report["extensions_after_account_cleanup"] = after_cleanup.stdout
-                    report["extension_activated_and_enabled"] = provider_enabled(after_cleanup.stdout, bundle_id)
+                    report["extension_activated_and_enabled"] = provider_enabled(
+                        after_cleanup.stdout, bundle_id
+                    )
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
         with (output / "hs274-provider.json").open("x", encoding="utf-8", newline="\n") as receipt:
             json.dump(report, receipt, indent=2)
             receipt.write("\n")
-    return 0 if report["extension_activated_and_enabled"] and "observation_error" not in report else 1
+    return (
+        0 if report["extension_activated_and_enabled"] and "observation_error" not in report else 1
+    )
 
 
 if __name__ == "__main__":

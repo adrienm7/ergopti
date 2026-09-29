@@ -53,33 +53,49 @@ const actions = registry.sg_actions || {};
 const expected = profileIds.map((id) => PRESET_PREFIX + id);
 const declared = Object.keys(actions).filter((id) => id.startsWith(PRESET_PREFIX));
 
-check(profileIds.length >= 5 && profileIds.includes('rewrite'), 'profiles.json must hold the built-ins, rewrite included');
+check(
+	profileIds.length >= 5 && profileIds.includes('rewrite'),
+	'profiles.json must hold the built-ins, rewrite included'
+);
 
 // 1. One preset per built-in profile, in both directions.
-for (const id of expected) check(declared.includes(id), `actions.toml lacks ${id} for a built-in profile`);
-for (const id of declared) check(expected.includes(id), `actions.toml declares ${id}, which names no built-in profile`);
+for (const id of expected)
+	check(declared.includes(id), `actions.toml lacks ${id} for a built-in profile`);
+for (const id of declared)
+	check(expected.includes(id), `actions.toml declares ${id}, which names no built-in profile`);
 
 // 2. The presets need no parameter and run everywhere the configurable action runs.
 const configurable = actions[CONFIGURABLE_ACTION];
-check(configurable && configurable.parameter === 'llm_prompt', `${CONFIGURABLE_ACTION} must take the llm_prompt parameter`);
+check(
+	configurable && configurable.parameter === 'llm_prompt',
+	`${CONFIGURABLE_ACTION} must take the llm_prompt parameter`
+);
 for (const id of expected) {
 	const row = actions[id] || {};
 	check(row.parameter === undefined, `${id} must not take a parameter`);
-	check(configurable && row.platform === configurable.platform, `${id} must run on ${configurable && configurable.platform}`);
+	check(
+		configurable && row.platform === configurable.platform,
+		`${id} must run on ${configurable && configurable.platform}`
+	);
 }
 
 // 3. The picker lists the presets right after the configurable action, in menu order.
 const order = registry.sg_order.items;
 const start = order.indexOf(CONFIGURABLE_ACTION);
 check(start !== -1, `${CONFIGURABLE_ACTION} must be in [sg_order]`);
-check(JSON.stringify(order.slice(start + 1, start + 1 + expected.length)) === JSON.stringify(expected),
-	`[sg_order] must list ${expected.join(', ')} right after ${CONFIGURABLE_ACTION}`);
+check(
+	JSON.stringify(order.slice(start + 1, start + 1 + expected.length)) === JSON.stringify(expected),
+	`[sg_order] must list ${expected.join(', ')} right after ${CONFIGURABLE_ACTION}`
+);
 
 // 4. Every generated catalogue carries them: a stale one means the generator was not run.
 for (const file of CATALOGUES) {
 	const source = fs.readFileSync(file, 'utf8');
 	for (const id of expected.concat([CONFIGURABLE_ACTION])) {
-		check(source.includes(`"${id}"`), `${path.relative(ROOT, file)} lacks ${id}: run npm run codegen:action-catalogue`);
+		check(
+			source.includes(`"${id}"`),
+			`${path.relative(ROOT, file)} lacks ${id}: run npm run codegen:action-catalogue`
+		);
 	}
 }
 
@@ -97,4 +113,6 @@ if (errors.length > 0) {
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
-console.log(`\x1b[32m[OK] one prompt action per built-in profile, ordered, generated and labelled (${checks} checks).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] one prompt action per built-in profile, ordered, generated and labelled (${checks} checks).\x1b[0m`
+);

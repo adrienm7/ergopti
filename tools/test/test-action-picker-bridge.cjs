@@ -89,25 +89,32 @@ const chromeIdx = bridge.indexOf('window.chrome.webview');
 const webkitIdx = bridge.indexOf('window.webkit');
 check('host_bridge.js probes window.chrome.webview (Windows channel)', chromeIdx !== -1);
 check('host_bridge.js still supports window.webkit (macOS channel)', webkitIdx !== -1);
-check('host_bridge.js JSON-stringifies the WebView2 payload',
-	/chrome\.webview\.postMessage\(/.test(bridge) && /JSON\.stringify\(/.test(bridge));
-check('chrome.webview is probed before webkit',
-	chromeIdx !== -1 && webkitIdx !== -1 && chromeIdx < webkitIdx);
+check(
+	'host_bridge.js JSON-stringifies the WebView2 payload',
+	/chrome\.webview\.postMessage\(/.test(bridge) && /JSON\.stringify\(/.test(bridge)
+);
+check(
+	'chrome.webview is probed before webkit',
+	chromeIdx !== -1 && webkitIdx !== -1 && chromeIdx < webkitIdx
+);
 
 // 2. index.html loads the shared i18n.js at the right depth and host_bridge.js.
-check('index.html loads ../i18n.js',
-	/src=["']\.\.\/i18n\.js["']/.test(index) && !/\.\.\/\.\.\//.test(index));
-check('index.html loads ../host_bridge.js',
-	/src=["']\.\.\/host_bridge\.js["']/.test(index));
+check(
+	'index.html loads ../i18n.js',
+	/src=["']\.\.\/i18n\.js["']/.test(index) && !/\.\.\/\.\.\//.test(index)
+);
+check('index.html loads ../host_bridge.js', /src=["']\.\.\/host_bridge\.js["']/.test(index));
 
 // 3. Action parity across both hosts.
 const actions = new Set();
 const re = /action:\s*'([a-z_]+)'/g;
 let m;
 while ((m = re.exec(script)) !== null) actions.add(m[1]);
-check('script.js posts ready + confirm + cancel',
+check(
+	'script.js posts ready + confirm + cancel',
 	actions.has('ready') && actions.has('confirm') && actions.has('cancel'),
-	`Found: ${[...actions].join(', ')}`);
+	`Found: ${[...actions].join(', ')}`
+);
 // Three hosts, not two. Linux was absent from this list, and its bridge had
 // drifted into a protocol of its own — execute/search, which the page has never
 // posted — so the picker did nothing there while both ends looked implemented.
@@ -129,8 +136,18 @@ for (const invented of ['execute', 'search']) {
 }
 
 // 4. initData-shape parity — both hosts emit every field the page reads.
-const FIELDS = ['title', 'label', 'current', 'allowNative', 'nativeLabel', 'noneLabel',
-	'searchPlaceholder', 'noResults', 'cancelLabel', 'items'];
+const FIELDS = [
+	'title',
+	'label',
+	'current',
+	'allowNative',
+	'nativeLabel',
+	'noneLabel',
+	'searchPlaceholder',
+	'noResults',
+	'cancelLabel',
+	'items'
+];
 for (const f of FIELDS) {
 	check(`page reads data.${f}`, script.includes(`data.${f}`) || script.includes(`.${f}`));
 	check(`Windows host emits "${f}"`, winHost.includes(`"${f}"`));
@@ -145,22 +162,34 @@ for (const k of ['type', 'level', 'text', 'id', 'label']) {
 for (const tok of ['"heading"', '"action"', '"level"', '"text"']) {
 	check(`Windows host serializes ${tok}`, winHost.includes(tok));
 }
-check('macOS host builds heading/action items',
-	/type\s*=\s*"heading"/.test(macMenu) && /type\s*=\s*"action"/.test(macMenu) && /level\s*=/.test(macMenu));
+check(
+	'macOS host builds heading/action items',
+	/type\s*=\s*"heading"/.test(macMenu) &&
+		/type\s*=\s*"action"/.test(macMenu) &&
+		/level\s*=/.test(macMenu)
+);
 
 // Linux sent a flat, alphabetical list with no heading at all; its items now
 // come from the gestures manager's catalogue walk, headings included.
-check('Linux host sends the catalogue picker items',
-	/Actions\.get_picker_items\(\)/.test(linuxHost) && !/get_action_names/.test(linuxHost));
-check('Linux manager builds heading/action items with levels',
-	/type = "heading", level = item\.level/.test(linuxActions) && /type = "action"/.test(linuxActions));
-check('Linux manager greys a row whose requirement is absent, with the reason',
-	/disabled = not available or nil/.test(linuxActions) && /hint = hint/.test(linuxActions));
+check(
+	'Linux host sends the catalogue picker items',
+	/Actions\.get_picker_items\(\)/.test(linuxHost) && !/get_action_names/.test(linuxHost)
+);
+check(
+	'Linux manager builds heading/action items with levels',
+	/type = "heading", level = item\.level/.test(linuxActions) && /type = "action"/.test(linuxActions)
+);
+check(
+	'Linux manager greys a row whose requirement is absent, with the reason',
+	/disabled = not available or nil/.test(linuxActions) && /hint = hint/.test(linuxActions)
+);
 
 // 4b'. A row the host proved unrunnable is greyed with its reason
 // (behaviour pinned by test-action-picker-disabled-rows.cjs).
-check('page reads item.disabled and item.hint',
-	/it\.disabled/.test(script) && /it\.hint/.test(script));
+check(
+	'page reads item.disabled and item.hint',
+	/it\.disabled/.test(script) && /it\.hint/.test(script)
+);
 
 // 4b''. The page's own editor for send_text / send_key / send_shortcut
 // (behaviour pinned by test-action-picker-parameter-editor.cjs): every host
@@ -173,48 +202,85 @@ for (const f of ['platform', 'sendVocabulary', 'parameterStrings']) {
 	check(`macOS host emits ${f}`, new RegExp(`\\b${f}\\b`).test(macHost));
 	check(`Linux host emits ${f}`, new RegExp(`\\b${f}\\b`).test(linuxHost));
 }
-check('macOS host names its platform "hs" (Command is the primary modifier)', /platform\s*=\s*"hs"/.test(macHost));
-check('page reads item.parameter and item.parameterValue',
-	/it\.parameter\b/.test(script) && /it\.parameterValue/.test(script));
-check('Windows host marks the send_* rows with their kind and value',
-	winHost.includes('"parameter"') && winHost.includes('"parameterValue"'));
-check('macOS marks the send_* rows with their kind and value', /item\.parameterValue\s*=/.test(macUtils));
-check('Linux marks the send_* rows with their kind and value', /item\.parameterValue\s*=/.test(linuxActions));
-check('page posts the collected value with the pick',
-	/action:\s*'confirm',\s*id:\s*editing\.id,\s*parameter:/.test(script));
-check('Windows host forwards the collected value to the parameter prompt',
-	/Payload\["parameter"\]/.test(winHost) && /GestureOfferPickedParameter\(/.test(winHost));
+check(
+	'macOS host names its platform "hs" (Command is the primary modifier)',
+	/platform\s*=\s*"hs"/.test(macHost)
+);
+check(
+	'page reads item.parameter and item.parameterValue',
+	/it\.parameter\b/.test(script) && /it\.parameterValue/.test(script)
+);
+check(
+	'Windows host marks the send_* rows with their kind and value',
+	winHost.includes('"parameter"') && winHost.includes('"parameterValue"')
+);
+check(
+	'macOS marks the send_* rows with their kind and value',
+	/item\.parameterValue\s*=/.test(macUtils)
+);
+check(
+	'Linux marks the send_* rows with their kind and value',
+	/item\.parameterValue\s*=/.test(linuxActions)
+);
+check(
+	'page posts the collected value with the pick',
+	/action:\s*'confirm',\s*id:\s*editing\.id,\s*parameter:/.test(script)
+);
+check(
+	'Windows host forwards the collected value to the parameter prompt',
+	/Payload\["parameter"\]/.test(winHost) && /GestureOfferPickedParameter\(/.test(winHost)
+);
 check('macOS host forwards the collected value', /body\.parameter/.test(macHost));
 check('Linux host forwards the collected value', /data\.parameter/.test(linuxHost));
 
 // 4c. Hierarchy / fold / TOC features present in the frontend.
-check('frontend folds headings (toggleFold)', /function toggleFold/.test(script) && /collapsed/.test(script));
+check(
+	'frontend folds headings (toggleFold)',
+	/function toggleFold/.test(script) && /collapsed/.test(script)
+);
 check('frontend renders heading levels', /lvl/.test(script) && /level/.test(script));
-check('frontend has a table of contents (toggleToc + buildToc)',
-	/function toggleToc/.test(script) && /function buildToc/.test(script));
-check('index.html exposes the TOC button + drawer',
-	/id="toc-btn"/.test(index) && /id="toc"/.test(index));
+check(
+	'frontend has a table of contents (toggleToc + buildToc)',
+	/function toggleToc/.test(script) && /function buildToc/.test(script)
+);
+check(
+	'index.html exposes the TOC button + drawer',
+	/id="toc-btn"/.test(index) && /id="toc"/.test(index)
+);
 
 // 4d. Catalogue is now multi-level (at least one "##" sub-header in sg_order).
 const catalogue = read('static/ergopti_plus/_shared/modules/actions/actions.toml');
-check('actions.toml sg_order has h1 group parents (grp_*) + h2 sub-headers (##)',
-	/"#grp_/.test(catalogue) && /"##/.test(catalogue));
+check(
+	'actions.toml sg_order has h1 group parents (grp_*) + h2 sub-headers (##)',
+	/"#grp_/.test(catalogue) && /"##/.test(catalogue)
+);
 
 // 5. Wiring + native fallback preserved.
-check('Windows ShowActionPicker tries the webview first',
-	/_ActPickWeb_TryOpen\(/.test(winNative));
-check('Windows keeps the native ListBox fallback',
-	winNative.includes('ListBox'));
-check('macOS open_action_chooser routes through the shared picker',
-	macMenu.includes('ActionPicker.open(') && /require\(["']ui\.action_picker["']\)/.test(macMenu));
+check('Windows ShowActionPicker tries the webview first', /_ActPickWeb_TryOpen\(/.test(winNative));
+check('Windows keeps the native ListBox fallback', winNative.includes('ListBox'));
+check(
+	'macOS open_action_chooser routes through the shared picker',
+	macMenu.includes('ActionPicker.open(') && /require\(["']ui\.action_picker["']\)/.test(macMenu)
+);
 
 // 6. Locale keys present.
 let locale = {};
-try { locale = JSON.parse(enLocale); } catch (err) { check('en.json parses', false, err.message); }
-for (const key of ['dialog.action_picker.search', 'dialog.action_picker.no_results',
-	'dialog.action_picker.requires_tool', 'dialog.action_picker.requires_x11',
-	'dialog.action_picker.back', 'dialog.action_picker.capture_key', 'dialog.action_picker.capture_shortcut',
-	'sg_actions.sg_order.header.grp_input', 'sg_actions.sg_order.header.grp_system']) {
+try {
+	locale = JSON.parse(enLocale);
+} catch (err) {
+	check('en.json parses', false, err.message);
+}
+for (const key of [
+	'dialog.action_picker.search',
+	'dialog.action_picker.no_results',
+	'dialog.action_picker.requires_tool',
+	'dialog.action_picker.requires_x11',
+	'dialog.action_picker.back',
+	'dialog.action_picker.capture_key',
+	'dialog.action_picker.capture_shortcut',
+	'sg_actions.sg_order.header.grp_input',
+	'sg_actions.sg_order.header.grp_system'
+]) {
 	check(`locale has "${key}"`, typeof locale[key] === 'string' && locale[key].length > 0);
 }
 

@@ -24,77 +24,107 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs   = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const ROOT        = path.resolve(__dirname, "..", "..");
-const SHARED_ROOT = path.join(ROOT, "static", "ergopti_plus", "_shared");
-const DEFAULTS    = path.join(SHARED_ROOT, "modules", "updater", "defaults.json");
-const AHK_CORE    = path.join(ROOT, "static", "ergopti_plus", "windows", "modules", "updater", "core.ahk");
-const LUA_UPDATER = path.join(ROOT, "static", "ergopti_plus", "macos", "modules", "updater", "init.lua");
-const LINUX_UPDATER = path.join(ROOT, "static", "ergopti_plus", "linux", "modules", "updater", "manager.lua");
+const ROOT = path.resolve(__dirname, '..', '..');
+const SHARED_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
+const DEFAULTS = path.join(SHARED_ROOT, 'modules', 'updater', 'defaults.json');
+const AHK_CORE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'windows',
+	'modules',
+	'updater',
+	'core.ahk'
+);
+const LUA_UPDATER = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'modules',
+	'updater',
+	'init.lua'
+);
+const LINUX_UPDATER = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'linux',
+	'modules',
+	'updater',
+	'manager.lua'
+);
 
 let exitCode = 0;
 
 function fail(msg) {
-	console.error("  FAIL  " + msg);
+	console.error('  FAIL  ' + msg);
 	exitCode = 1;
 }
 
 function pass(msg) {
-	console.log("  pass  " + msg);
+	console.log('  pass  ' + msg);
 }
 
 // ─── Load defaults.json ───────────────────────────────────────────────────────
 
 if (!fs.existsSync(DEFAULTS)) {
-	fail("_shared/modules/updater/defaults.json not found — file was deleted or moved");
+	fail('_shared/modules/updater/defaults.json not found — file was deleted or moved');
 	process.exit(1);
 }
 
 let defaults;
 try {
-	defaults = JSON.parse(fs.readFileSync(DEFAULTS, "utf8"));
+	defaults = JSON.parse(fs.readFileSync(DEFAULTS, 'utf8'));
 } catch (e) {
-	fail("_shared/modules/updater/defaults.json is not valid JSON: " + e.message);
+	fail('_shared/modules/updater/defaults.json is not valid JSON: ' + e.message);
 	process.exit(1);
 }
 
-const owner   = defaults.github && defaults.github.owner;
-const repo    = defaults.github && defaults.github.repo;
+const owner = defaults.github && defaults.github.owner;
+const repo = defaults.github && defaults.github.repo;
 const interval = defaults.timing && defaults.timing.default_check_interval_sec;
-const boot    = defaults.timing && defaults.timing.boot_check_delay_sec;
+const boot = defaults.timing && defaults.timing.boot_check_delay_sec;
 
 if (!owner || !repo || !interval || !boot) {
-	fail("defaults.json missing required fields: github.owner, github.repo, timing.default_check_interval_sec, timing.boot_check_delay_sec");
+	fail(
+		'defaults.json missing required fields: github.owner, github.repo, timing.default_check_interval_sec, timing.boot_check_delay_sec'
+	);
 	process.exit(1);
 }
-pass("defaults.json has all required scalar fields");
+pass('defaults.json has all required scalar fields');
 
 // ─── Check AHK core.ahk literals match defaults.json ────────────────────────
 
-const ahkSrc = fs.readFileSync(AHK_CORE, "utf8");
+const ahkSrc = fs.readFileSync(AHK_CORE, 'utf8');
 
-const ahkOwnerRe  = /UPDATER_GH_OWNER\s*:=\s*"([^"]+)"/;
-const ahkRepoRe   = /UPDATER_GH_REPO\s*:=\s*"([^"]+)"/;
+const ahkOwnerRe = /UPDATER_GH_OWNER\s*:=\s*"([^"]+)"/;
+const ahkRepoRe = /UPDATER_GH_REPO\s*:=\s*"([^"]+)"/;
 
-const ahkOwnerM   = ahkSrc.match(ahkOwnerRe);
-const ahkRepoM    = ahkSrc.match(ahkRepoRe);
+const ahkOwnerM = ahkSrc.match(ahkOwnerRe);
+const ahkRepoM = ahkSrc.match(ahkRepoRe);
 
 if (!ahkOwnerM) {
-	fail("core.ahk: could not find UPDATER_GH_OWNER literal");
+	fail('core.ahk: could not find UPDATER_GH_OWNER literal');
 } else if (ahkOwnerM[1] !== owner) {
-	fail(`core.ahk UPDATER_GH_OWNER="${ahkOwnerM[1]}" does not match defaults.json github.owner="${owner}"`);
+	fail(
+		`core.ahk UPDATER_GH_OWNER="${ahkOwnerM[1]}" does not match defaults.json github.owner="${owner}"`
+	);
 } else {
 	pass(`core.ahk UPDATER_GH_OWNER matches defaults.json ("${owner}")`);
 }
 
 if (!ahkRepoM) {
-	fail("core.ahk: could not find UPDATER_GH_REPO literal");
+	fail('core.ahk: could not find UPDATER_GH_REPO literal');
 } else if (ahkRepoM[1] !== repo) {
-	fail(`core.ahk UPDATER_GH_REPO="${ahkRepoM[1]}" does not match defaults.json github.repo="${repo}"`);
+	fail(
+		`core.ahk UPDATER_GH_REPO="${ahkRepoM[1]}" does not match defaults.json github.repo="${repo}"`
+	);
 } else {
 	pass(`core.ahk UPDATER_GH_REPO matches defaults.json ("${repo}")`);
 }
@@ -102,15 +132,32 @@ if (!ahkRepoM) {
 // The AHK default and presets come from the generated schedule data
 // (windows/_generated/update_schedule.ahk, kept fresh by
 // test-update-schedule-contract.cjs), never from a literal in the updater.
-const AHK_SCHEDULE_DATA = path.join(ROOT, "static", "ergopti_plus", "windows", "_generated", "update_schedule.ahk");
-if (!/UPDATER_DEFAULT_INTERVAL\s*:=\s*UpdateSchedule_Timing\(\)\["default_check_interval_sec"\]/.test(ahkSrc)) {
-	fail("core.ahk UPDATER_DEFAULT_INTERVAL must read the shared default through UpdateSchedule_Timing()");
+const AHK_SCHEDULE_DATA = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'windows',
+	'_generated',
+	'update_schedule.ahk'
+);
+if (
+	!/UPDATER_DEFAULT_INTERVAL\s*:=\s*UpdateSchedule_Timing\(\)\["default_check_interval_sec"\]/.test(
+		ahkSrc
+	)
+) {
+	fail(
+		'core.ahk UPDATER_DEFAULT_INTERVAL must read the shared default through UpdateSchedule_Timing()'
+	);
 } else if (!fs.existsSync(AHK_SCHEDULE_DATA)) {
-	fail("windows/_generated/update_schedule.ahk is missing; run npm run codegen:update-schedule");
+	fail('windows/_generated/update_schedule.ahk is missing; run npm run codegen:update-schedule');
 } else {
-	const generatedDefault = fs.readFileSync(AHK_SCHEDULE_DATA, "utf8").match(/"default_check_interval_sec",\s*(\d+)/);
+	const generatedDefault = fs
+		.readFileSync(AHK_SCHEDULE_DATA, 'utf8')
+		.match(/"default_check_interval_sec",\s*(\d+)/);
 	if (!generatedDefault || Number(generatedDefault[1]) !== interval) {
-		fail(`the generated AHK schedule data does not carry defaults.json timing.default_check_interval_sec=${interval}`);
+		fail(
+			`the generated AHK schedule data does not carry defaults.json timing.default_check_interval_sec=${interval}`
+		);
 	} else {
 		pass(`core.ahk UPDATER_DEFAULT_INTERVAL reads the generated shared default (${interval})`);
 	}
@@ -118,15 +165,28 @@ if (!/UPDATER_DEFAULT_INTERVAL\s*:=\s*UpdateSchedule_Timing\(\)\["default_check_
 
 // The first background check used to fire min(30000 ms, interval) after every
 // boot, a literal no gate pinned. The delay now comes from the shared schedule.
-const AHK_SELF_UPDATE = path.join(ROOT, "static", "ergopti_plus", "windows", "modules", "updater", "self_update.ahk");
-const selfUpdateSrc = fs.readFileSync(AHK_SELF_UPDATE, "utf8");
+const AHK_SELF_UPDATE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'windows',
+	'modules',
+	'updater',
+	'self_update.ahk'
+);
+const selfUpdateSrc = fs.readFileSync(AHK_SELF_UPDATE, 'utf8');
 const startBody = selfUpdateSrc.match(/\nUpdater_StartBackgroundChecks\([^)]*\) \{([\s\S]*?)\n\}/);
 if (!startBody) {
-	fail("self_update.ahk: could not find Updater_StartBackgroundChecks");
-} else if (/\b30000\b|boot_check_delay_sec\s*\*/.test(startBody[1]) || !startBody[1].includes("_Updater_ScheduleDecision()")) {
-	fail("Updater_StartBackgroundChecks must arm its first check from _Updater_ScheduleDecision(), not a boot-delay literal");
+	fail('self_update.ahk: could not find Updater_StartBackgroundChecks');
+} else if (
+	/\b30000\b|boot_check_delay_sec\s*\*/.test(startBody[1]) ||
+	!startBody[1].includes('_Updater_ScheduleDecision()')
+) {
+	fail(
+		'Updater_StartBackgroundChecks must arm its first check from _Updater_ScheduleDecision(), not a boot-delay literal'
+	);
 } else {
-	pass("Updater_StartBackgroundChecks arms its first check from the shared schedule");
+	pass('Updater_StartBackgroundChecks arms its first check from the shared schedule');
 }
 
 // A preset table spelled in a driver is the hand copy this gate retired: the
@@ -134,12 +194,20 @@ if (!startBody) {
 // defaults said the presets "stay driver-specific".
 const presetLiteral = /(?:Code:\s*"|code\s*=\s*")(?:1m|5m|10m|1h|24h|1d|7d|never)"/;
 for (const [label, source] of [
-	["windows/modules/updater/core.ahk", ahkSrc],
-	["windows/ui/menu/menu_init.ahk", fs.readFileSync(path.join(ROOT, "static", "ergopti_plus", "windows", "ui", "menu", "menu_init.ahk"), "utf8")],
-	["linux/modules/updater/manager.lua", fs.readFileSync(LINUX_UPDATER, "utf8")]
+	['windows/modules/updater/core.ahk', ahkSrc],
+	[
+		'windows/ui/menu/menu_init.ahk',
+		fs.readFileSync(
+			path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'ui', 'menu', 'menu_init.ahk'),
+			'utf8'
+		)
+	],
+	['linux/modules/updater/manager.lua', fs.readFileSync(LINUX_UPDATER, 'utf8')]
 ]) {
 	if (presetLiteral.test(source)) {
-		fail(`${label} spells a frequency preset by hand; read timing.check_interval_presets from defaults.json`);
+		fail(
+			`${label} spells a frequency preset by hand; read timing.check_interval_presets from defaults.json`
+		);
 	} else {
 		pass(`${label} spells no frequency preset`);
 	}
@@ -150,86 +218,118 @@ for (const [label, source] of [
 // time, so its template literal is pinned here.
 const checkUrl = defaults.update_check && defaults.update_check.releases_url;
 const ahkCheckUrlM = ahkSrc.match(/UPDATER_RELEASES_API_URL_TEMPLATE\s*:=\s*"([^"]+)"/);
-if (typeof checkUrl !== "string" || !checkUrl.includes("{owner}/{repo}") || checkUrl.includes("/releases/latest")) {
-	fail("defaults.json update_check.releases_url must be an {owner}/{repo} release-list template");
+if (
+	typeof checkUrl !== 'string' ||
+	!checkUrl.includes('{owner}/{repo}') ||
+	checkUrl.includes('/releases/latest')
+) {
+	fail('defaults.json update_check.releases_url must be an {owner}/{repo} release-list template');
 } else if (!ahkCheckUrlM) {
-	fail("core.ahk: could not find UPDATER_RELEASES_API_URL_TEMPLATE");
+	fail('core.ahk: could not find UPDATER_RELEASES_API_URL_TEMPLATE');
 } else if (ahkCheckUrlM[1] !== checkUrl) {
-	fail(`core.ahk UPDATER_RELEASES_API_URL_TEMPLATE="${ahkCheckUrlM[1]}" does not match defaults.json update_check.releases_url="${checkUrl}"`);
+	fail(
+		`core.ahk UPDATER_RELEASES_API_URL_TEMPLATE="${ahkCheckUrlM[1]}" does not match defaults.json update_check.releases_url="${checkUrl}"`
+	);
 } else {
-	pass("core.ahk UPDATER_RELEASES_API_URL_TEMPLATE matches defaults.json update_check.releases_url");
+	pass(
+		'core.ahk UPDATER_RELEASES_API_URL_TEMPLATE matches defaults.json update_check.releases_url'
+	);
 }
 const ahkApiLatest = ahkSrc
-	.split("\n")
+	.split('\n')
 	.filter((line) => !/^\s*;/.test(line))
-	.filter((line) => line.includes("api.github.com") && line.includes("/releases/latest"));
+	.filter((line) => line.includes('api.github.com') && line.includes('/releases/latest'));
 if (ahkApiLatest.length > 0) {
-	fail("core.ahk still requests the API's /releases/latest, which answers 404 while a channel has no release");
+	fail(
+		"core.ahk still requests the API's /releases/latest, which answers 404 while a channel has no release"
+	);
 } else {
-	pass("core.ahk requests no /releases/latest endpoint");
+	pass('core.ahk requests no /releases/latest endpoint');
 }
 
 // ─── Check Lua updater.lua no longer has bare literals ───────────────────────
 
-const luaSrc = fs.readFileSync(LUA_UPDATER, "utf8");
+const luaSrc = fs.readFileSync(LUA_UPDATER, 'utf8');
 
 // The Lua file must read from defaults.json — the old bare literals
 // ("adrienm7", "ergopti" as standalone local assignments) should be gone.
 // We look for the old pattern: `local GH_OWNER   = "adrienm7"` (not inside FALLBACK).
 const luaOldOwnerLiteral = /^local\s+GH_OWNER\s*=\s*"adrienm7"/m;
-const luaOldRepoLiteral  = /^local\s+GH_REPO\s*=\s*"ergopti"/m;
+const luaOldRepoLiteral = /^local\s+GH_REPO\s*=\s*"ergopti"/m;
 
 if (luaOldOwnerLiteral.test(luaSrc)) {
-	fail("updater.lua still has bare `local GH_OWNER = \"adrienm7\"` — should now read from defaults.json");
+	fail(
+		'updater.lua still has bare `local GH_OWNER = "adrienm7"` — should now read from defaults.json'
+	);
 } else {
-	pass("updater.lua no longer has bare GH_OWNER literal (reads from defaults.json)");
+	pass('updater.lua no longer has bare GH_OWNER literal (reads from defaults.json)');
 }
 
 if (luaOldRepoLiteral.test(luaSrc)) {
-	fail("updater.lua still has bare `local GH_REPO = \"ergopti\"` — should now read from defaults.json");
+	fail(
+		'updater.lua still has bare `local GH_REPO = "ergopti"` — should now read from defaults.json'
+	);
 } else {
-	pass("updater.lua no longer has bare GH_REPO literal (reads from defaults.json)");
+	pass('updater.lua no longer has bare GH_REPO literal (reads from defaults.json)');
 }
 
 // ─── Lua offline fallbacks must equal defaults.json ─────────────────────────
 
-const macFallback = luaSrc.match(/DEFAULT_GITHUB\s*=\s*\{\s*owner\s*=\s*"([^"]+)",\s*repo\s*=\s*"([^"]+)"\s*\}/);
+const macFallback = luaSrc.match(
+	/DEFAULT_GITHUB\s*=\s*\{\s*owner\s*=\s*"([^"]+)",\s*repo\s*=\s*"([^"]+)"\s*\}/
+);
 if (!macFallback) {
-	fail("macos/modules/updater/init.lua: could not find DEFAULT_GITHUB");
+	fail('macos/modules/updater/init.lua: could not find DEFAULT_GITHUB');
 } else {
-	if (macFallback[1] === owner) pass("macOS repository fallback owner matches defaults.json");
+	if (macFallback[1] === owner) pass('macOS repository fallback owner matches defaults.json');
 	else fail(`macOS repository fallback owner=${macFallback[1]} does not match defaults.json`);
-	if (macFallback[2] === repo) pass("macOS repository fallback repo matches defaults.json");
+	if (macFallback[2] === repo) pass('macOS repository fallback repo matches defaults.json');
 	else fail(`macOS repository fallback repo=${macFallback[2]} does not match defaults.json`);
 }
 // The macOS cadence is the Lua driver's (modules/updater/auto_check.lua), which
 // reads the shared timing through the shared schedule port; the identity facade
 // keeps no timing literal of its own.
-const MAC_AUTO_CHECK = path.join(ROOT, "static", "ergopti_plus", "macos", "modules", "updater", "auto_check.lua");
+const MAC_AUTO_CHECK = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'modules',
+	'updater',
+	'auto_check.lua'
+);
 if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.test(luaSrc)) {
-	fail("macOS identity facade must not carry update-check timing; auto_check.lua reads the shared schedule");
+	fail(
+		'macOS identity facade must not carry update-check timing; auto_check.lua reads the shared schedule'
+	);
 } else if (!fs.existsSync(MAC_AUTO_CHECK)) {
-	fail("macos/modules/updater/auto_check.lua is missing: nothing owns the macOS update-check cadence");
+	fail(
+		'macos/modules/updater/auto_check.lua is missing: nothing owns the macOS update-check cadence'
+	);
 } else {
-	const autoSrc = fs.readFileSync(MAC_AUTO_CHECK, "utf8");
-	if (!/defaults\.json/.test(autoSrc) || !autoSrc.includes('require("updater.schedule")') || /\b86400\b/.test(autoSrc)) {
-		fail("macOS auto_check.lua must read defaults.json through the shared schedule, without timing literals");
+	const autoSrc = fs.readFileSync(MAC_AUTO_CHECK, 'utf8');
+	if (
+		!/defaults\.json/.test(autoSrc) ||
+		!autoSrc.includes('require("updater.schedule")') ||
+		/\b86400\b/.test(autoSrc)
+	) {
+		fail(
+			'macOS auto_check.lua must read defaults.json through the shared schedule, without timing literals'
+		);
 	} else {
-		pass("macOS automatic checks read the shared timing through the shared schedule");
+		pass('macOS automatic checks read the shared timing through the shared schedule');
 	}
 }
 
 // Linux still owns its updater and therefore retains the complete fallback.
-const LUA_DRIVERS = [
-	{ label: "linux/modules/updater/manager.lua", file: LINUX_UPDATER }
-];
+const LUA_DRIVERS = [{ label: 'linux/modules/updater/manager.lua', file: LINUX_UPDATER }];
 
 for (const drv of LUA_DRIVERS) {
 	if (!fs.existsSync(drv.file)) {
 		fail(`${drv.label}: not found — the updater moved, or this gate's path is stale`);
 		continue;
 	}
-	const src = fs.readFileSync(drv.file, "utf8");
+	const src = fs.readFileSync(drv.file, 'utf8');
 
 	const block = src.match(/_DEFAULTS_FALLBACK\s*=\s*\{([\s\S]*?)\n\}/);
 	if (!block) {
@@ -239,10 +339,14 @@ for (const drv of LUA_DRIVERS) {
 	const body = block[1];
 
 	const expectations = [
-		{ name: "github.owner", re: /owner\s*=\s*"([^"]+)"/, want: owner },
-		{ name: "github.repo", re: /repo\s*=\s*"([^"]+)"/, want: repo },
-		{ name: "timing.default_check_interval_sec", re: /default_check_interval_sec\s*=\s*(\d+)/, want: interval },
-		{ name: "timing.boot_check_delay_sec", re: /boot_check_delay_sec\s*=\s*(\d+)/, want: boot }
+		{ name: 'github.owner', re: /owner\s*=\s*"([^"]+)"/, want: owner },
+		{ name: 'github.repo', re: /repo\s*=\s*"([^"]+)"/, want: repo },
+		{
+			name: 'timing.default_check_interval_sec',
+			re: /default_check_interval_sec\s*=\s*(\d+)/,
+			want: interval
+		},
+		{ name: 'timing.boot_check_delay_sec', re: /boot_check_delay_sec\s*=\s*(\d+)/, want: boot }
 	];
 
 	for (const exp of expectations) {
@@ -256,7 +360,7 @@ for (const drv of LUA_DRIVERS) {
 			fail(
 				`${drv.label}: _DEFAULTS_FALLBACK ${exp.name}=${JSON.stringify(got)} does not match ` +
 					`defaults.json ${exp.name}=${JSON.stringify(exp.want)} — on the offline path this driver ` +
-					"would silently use the wrong value"
+					'would silently use the wrong value'
 			);
 		} else {
 			pass(`${drv.label}: _DEFAULTS_FALLBACK ${exp.name} matches defaults.json`);
@@ -265,7 +369,9 @@ for (const drv of LUA_DRIVERS) {
 
 	// The live values must come from the JSON, not from the fallback directly.
 	if (!/defaults\.json/.test(src)) {
-		fail(`${drv.label}: does not reference _shared/modules/updater/defaults.json — it must read the canonical source`);
+		fail(
+			`${drv.label}: does not reference _shared/modules/updater/defaults.json — it must read the canonical source`
+		);
 	} else {
 		pass(`${drv.label}: reads _shared/modules/updater/defaults.json`);
 	}
@@ -291,25 +397,27 @@ for (const drv of LUA_DRIVERS) {
 // declaration is itself checked for staleness — an exemption nobody uses is how
 // an allow-list quietly becomes blanket permission.
 const THIRD_PARTY_SOURCES = new Map([
-	["LuaJIT/LuaJIT",
-		"build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream"]
+	[
+		'LuaJIT/LuaJIT',
+		'build-linux-flatpak.sh: the Flatpak runtime ships no LuaJIT, so the manifest builds it from upstream'
+	]
 ]);
 
-const PACKAGING_DIR = path.join(ROOT, "tools", "build");
+const PACKAGING_DIR = path.join(ROOT, 'tools', 'build');
 const GITHUB_URL_RE = /github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?=["'\s)#]|$)/g;
 
 const thirdPartySeen = new Set();
 
 let packagingFilesScanned = 0;
-let packagingUrlsChecked  = 0;
+let packagingUrlsChecked = 0;
 
 for (const entry of fs.readdirSync(PACKAGING_DIR, { withFileTypes: true })) {
 	if (!entry.isFile()) continue;
 	// Shell packagers plus the extensionless Arch recipe.
-	if (!/\.(sh|cjs|js|py)$/.test(entry.name) && entry.name !== "PKGBUILD") continue;
+	if (!/\.(sh|cjs|js|py)$/.test(entry.name) && entry.name !== 'PKGBUILD') continue;
 
 	const full = path.join(PACKAGING_DIR, entry.name);
-	const src  = fs.readFileSync(full, "utf8");
+	const src = fs.readFileSync(full, 'utf8');
 	packagingFilesScanned++;
 
 	for (const m of src.matchAll(GITHUB_URL_RE)) {
@@ -322,10 +430,10 @@ for (const entry of fs.readdirSync(PACKAGING_DIR, { withFileTypes: true })) {
 		}
 		fail(
 			`tools/build/${entry.name}: github.com/${slug} does not match ` +
-			`defaults.json github.owner/repo (${owner}/${repo}). If it identifies ` +
-			`this project, point it at ${owner}/${repo}; if it is a third-party ` +
-			`dependency the package builds from, declare it in THIRD_PARTY_SOURCES ` +
-			`with the reason.`
+				`defaults.json github.owner/repo (${owner}/${repo}). If it identifies ` +
+				`this project, point it at ${owner}/${repo}; if it is a third-party ` +
+				`dependency the package builds from, declare it in THIRD_PARTY_SOURCES ` +
+				`with the reason.`
 		);
 	}
 }
@@ -337,34 +445,40 @@ for (const [slug, reason] of THIRD_PARTY_SOURCES) {
 	if (!thirdPartySeen.has(slug)) {
 		fail(
 			`THIRD_PARTY_SOURCES declares github.com/${slug} but no recipe under ` +
-			`tools/build/ references it — remove the stale exemption (${reason})`
+				`tools/build/ references it — remove the stale exemption (${reason})`
 		);
 	}
 }
 
 if (packagingFilesScanned === 0) {
-	fail("tools/build/ scan matched no packaging file — the selector is wrong, not the tree");
+	fail('tools/build/ scan matched no packaging file — the selector is wrong, not the tree');
 } else if (packagingUrlsChecked === 0) {
-	fail("tools/build/ contains no github.com URL — expected at least the packaging Homepage/source lines");
+	fail(
+		'tools/build/ contains no github.com URL — expected at least the packaging Homepage/source lines'
+	);
 } else if (exitCode === 0) {
-	pass(`every github.com URL in tools/build/ matches defaults.json (${packagingUrlsChecked} URL(s) across ${packagingFilesScanned} file(s))`);
+	pass(
+		`every github.com URL in tools/build/ matches defaults.json (${packagingUrlsChecked} URL(s) across ${packagingFilesScanned} file(s))`
+	);
 }
 
 // ─── Verify dead constants.toml is gone ──────────────────────────────────────
 
-const deadToml = path.join(SHARED_ROOT, "modules", "updater", "constants.toml");
+const deadToml = path.join(SHARED_ROOT, 'modules', 'updater', 'constants.toml');
 if (fs.existsSync(deadToml)) {
-	fail("_shared/modules/updater/constants.toml still exists — should have been deleted (dead code, §5.6)");
+	fail(
+		'_shared/modules/updater/constants.toml still exists — should have been deleted (dead code, §5.6)'
+	);
 } else {
-	pass("dead constants.toml is absent");
+	pass('dead constants.toml is absent');
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 if (exitCode === 0) {
-	console.log("\n✅  updater-constants-single-source: all checks passed.");
+	console.log('\n✅  updater-constants-single-source: all checks passed.');
 } else {
-	console.error("\n❌  updater-constants-single-source: one or more checks FAILED.");
+	console.error('\n❌  updater-constants-single-source: one or more checks FAILED.');
 }
 
 process.exit(exitCode);

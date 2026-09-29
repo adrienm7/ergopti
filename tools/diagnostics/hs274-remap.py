@@ -16,23 +16,54 @@ from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
-from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption, validate_successor
+from hs274_stream import (
+    read_stream,
+    validate_stream,
+    fixture_drain,
+    validate_interruption,
+    validate_successor,
+)
 from hs274_disconnect import disconnected_capture
 from hs274_hammerspoon import owned_capture, validate_consumer
-from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture, require_stream_held_baseline
+from hs274_baseline import (
+    read_baseline,
+    read_observation_baselines,
+    wait_baseline,
+    validate_baseline_native,
+    validate_baseline_capture,
+    require_stream_held_baseline,
+)
 from hs274_inventory import read_inventories
 from hs274_repeat import validate_repeat_output
-from hs274_modifiers import modifier_drain, validate_modifier_capture, validate_modifier_output, KEYCODES as MODIFIER_KEYCODES
+from hs274_modifiers import (
+    modifier_drain,
+    validate_modifier_capture,
+    validate_modifier_output,
+    KEYCODES as MODIFIER_KEYCODES,
+)
 
 
 @contextmanager
 def owned_process(command, name, output, report, separate_stderr=False, stream_input=False):
     """Reap the exact process group while its owned leader remains alive."""
     with ExitStack() as handles:
-        log = handles.enter_context((output / ("hs274-remap-" + name + ".log")).open("x", encoding="utf-8"))
-        stderr = handles.enter_context((output / ("hs274-remap-" + name + "-stderr.log")).open("x", encoding="utf-8")) if separate_stderr else subprocess.STDOUT
-        process = subprocess.Popen(command, stdout=log, stderr=stderr, start_new_session=True,
-                                   stdin=subprocess.PIPE if stream_input else None)
+        log = handles.enter_context(
+            (output / ("hs274-remap-" + name + ".log")).open("x", encoding="utf-8")
+        )
+        stderr = (
+            handles.enter_context(
+                (output / ("hs274-remap-" + name + "-stderr.log")).open("x", encoding="utf-8")
+            )
+            if separate_stderr
+            else subprocess.STDOUT
+        )
+        process = subprocess.Popen(
+            command,
+            stdout=log,
+            stderr=stderr,
+            start_new_session=True,
+            stdin=subprocess.PIPE if stream_input else None,
+        )
         if stream_input:
             handles.callback(process.stdin.close)
         process.capture_ack = None
@@ -44,13 +75,17 @@ def owned_process(command, name, output, report, separate_stderr=False, stream_i
                 # sudo forwards TERM: signaling its whole group can terminate
                 # the child twice and interrupt its graceful capture flush.
                 target = str(process.pid) if command[0] == "sudo" else "-" + str(process.pid)
-                subprocess.run(["sudo", "-n", "/bin/kill", "-TERM", "--", target],
-                               check=True, timeout=3)
+                subprocess.run(
+                    ["sudo", "-n", "/bin/kill", "-TERM", "--", target], check=True, timeout=3
+                )
                 try:
                     process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    subprocess.run(["sudo", "-n", "/bin/kill", "-KILL", "--", "-" + str(process.pid)],
-                                   check=True, timeout=3)
+                    subprocess.run(
+                        ["sudo", "-n", "/bin/kill", "-KILL", "--", "-" + str(process.pid)],
+                        check=True,
+                        timeout=3,
+                    )
                     process.wait(timeout=3)
             state["reaped"] = process.poll() is not None
             state["exit"] = process.returncode
@@ -58,33 +93,72 @@ def owned_process(command, name, output, report, separate_stderr=False, stream_i
 
 def fixture_profile(device, ledger, ignored=False):
     """Mirror the Escape tap and none/none Space paths without foreign rules."""
+
     def physical_line(value):
-        return {"shell_command": "printf '%s\\n' " + shlex.quote(value) + " >> " + shlex.quote(str(ledger))}
+        return {
+            "shell_command": "printf '%s\\n' "
+            + shlex.quote(value)
+            + " >> "
+            + shlex.quote(str(ledger))
+        }
 
     def source(key):
         return {"key_code": key, "modifiers": {"optional": ["any"]}}
 
-    condition = {"type": "device_if", "identifiers": [{
-        "vendor_id": device["vendor_id"], "product_id": device["product_id"], "is_keyboard": True,
-    }]}
-    return {"global": {"check_for_updates_on_startup": False}, "profiles": [{
-        "name": "HS274 Native Fixture", "selected": True,
-        "devices": [{"identifiers": condition["identifiers"][0], "ignore": ignored}],
-        "complex_modifications": {"rules": [{
-            "description": "HS274 Native Fixture", "manipulators": [
-                {"type": "basic", "from": source("escape"), "conditions": [condition],
-                 "to": [physical_line("escape")], "to_if_alone": [{"key_code": "spacebar"}],
-                 "to_if_held_down": [{"key_code": "escape"}],
-                 "to_after_key_up": [physical_line("U:escape")],
-                 "parameters": {"basic.to_if_alone_timeout_milliseconds": 1000,
-                                "basic.to_if_held_down_threshold_milliseconds": 250}},
-                {"type": "basic", "from": source("spacebar"), "conditions": [condition],
-                 "to": [{"set_variable": {"name": "hs274_space_held", "value": 1}},
-                        {"key_code": "spacebar"}],
-                 "to_after_key_up": [{"set_variable": {"name": "hs274_space_held", "value": 0}}]},
-            ],
-        }]},
-    }]}
+    condition = {
+        "type": "device_if",
+        "identifiers": [
+            {
+                "vendor_id": device["vendor_id"],
+                "product_id": device["product_id"],
+                "is_keyboard": True,
+            }
+        ],
+    }
+    return {
+        "global": {"check_for_updates_on_startup": False},
+        "profiles": [
+            {
+                "name": "HS274 Native Fixture",
+                "selected": True,
+                "devices": [{"identifiers": condition["identifiers"][0], "ignore": ignored}],
+                "complex_modifications": {
+                    "rules": [
+                        {
+                            "description": "HS274 Native Fixture",
+                            "manipulators": [
+                                {
+                                    "type": "basic",
+                                    "from": source("escape"),
+                                    "conditions": [condition],
+                                    "to": [physical_line("escape")],
+                                    "to_if_alone": [{"key_code": "spacebar"}],
+                                    "to_if_held_down": [{"key_code": "escape"}],
+                                    "to_after_key_up": [physical_line("U:escape")],
+                                    "parameters": {
+                                        "basic.to_if_alone_timeout_milliseconds": 1000,
+                                        "basic.to_if_held_down_threshold_milliseconds": 250,
+                                    },
+                                },
+                                {
+                                    "type": "basic",
+                                    "from": source("spacebar"),
+                                    "conditions": [condition],
+                                    "to": [
+                                        {"set_variable": {"name": "hs274_space_held", "value": 1}},
+                                        {"key_code": "spacebar"},
+                                    ],
+                                    "to_after_key_up": [
+                                        {"set_variable": {"name": "hs274_space_held", "value": 0}}
+                                    ],
+                                },
+                            ],
+                        }
+                    ]
+                },
+            }
+        ],
+    }
 
 
 @contextmanager
@@ -138,7 +212,12 @@ def wait_stream(path, process, predicate, seconds, acknowledge=True):
         if stream is not None:
             opened = stream["opened"]
             sequence = str(stream["records"][-1]["sequence"]) if stream["records"] else "0"
-            receipt = {"version": 1, "incarnation": opened["incarnation"], "lease": opened["lease"], "ack": sequence}
+            receipt = {
+                "version": 1,
+                "incarnation": opened["incarnation"],
+                "lease": opened["lease"],
+                "ack": sequence,
+            }
             baseline = stream.get("baseline")
             if baseline and not stream["records"] and baseline["received_rows"]:
                 if baseline["complete"]:
@@ -147,7 +226,9 @@ def wait_stream(path, process, predicate, seconds, acknowledge=True):
                     receipt.pop("ack")
                     receipt["baseline_ack"] = str(baseline["received_rows"])
             if acknowledge and receipt is not None and process.capture_ack != receipt:
-                process.stdin.write((json.dumps(receipt, separators=(",", ":")) + "\n").encode("ascii"))
+                process.stdin.write(
+                    (json.dumps(receipt, separators=(",", ":")) + "\n").encode("ascii")
+                )
                 process.stdin.flush()
                 process.capture_ack = receipt
             if (baseline is None or baseline["complete"]) and predicate(stream):
@@ -156,9 +237,27 @@ def wait_stream(path, process, predicate, seconds, acknowledge=True):
     raise RuntimeError("Physical stream observation timed out")
 
 
-def finish_fixture_stream(stream_path, client, producer, scope, drained_path, device, before_release, acknowledge=True, *, held=False, modifiers=False, overlap=False, combinations=False):
+def finish_fixture_stream(
+    stream_path,
+    client,
+    producer,
+    scope,
+    drained_path,
+    device,
+    before_release,
+    acknowledge=True,
+    *,
+    held=False,
+    modifiers=False,
+    overlap=False,
+    combinations=False,
+):
     """Release the native fixture only after full delivery and owned client exit."""
-    drain = modifier_drain(device, overlap=overlap, combinations=combinations) if modifiers else fixture_drain(device, held=held)
+    drain = (
+        modifier_drain(device, overlap=overlap, combinations=combinations)
+        if modifiers
+        else fixture_drain(device, held=held)
+    )
     wait_stream(stream_path, client, drain, 10, acknowledge=acknowledge)
     if producer.poll() is not None:
         raise RuntimeError("Input fixture exited before stream drain")
@@ -171,7 +270,9 @@ def finish_fixture_stream(stream_path, client, producer, scope, drained_path, de
     return successor
 
 
-def validate_native_output(native, ignored, *, modifiers=False, overlap=False, combinations=False, repeat=False):
+def validate_native_output(
+    native, ignored, *, modifiers=False, overlap=False, combinations=False, repeat=False
+):
     """Require both real output pairs independently of the producer success flag."""
     expected_escape = 53 if ignored else 49
     expected = [(10, expected_escape), (11, expected_escape), (10, 49), (11, 49)]
@@ -180,7 +281,9 @@ def validate_native_output(native, ignored, *, modifiers=False, overlap=False, c
             expected = [(12, 56), (10, 49), (11, 49), (12, 56)] * 2 + expected
         if overlap:
             expected = [(12, code) for code in (56, 60, 56, 60)] + expected
-        expected = [(12, keycode) for keycode in MODIFIER_KEYCODES.values() for _ in range(2)] + expected
+        expected = [
+            (12, keycode) for keycode in MODIFIER_KEYCODES.values() for _ in range(2)
+        ] + expected
         validate_modifier_output(native, overlap=overlap, combinations=combinations)
     actual = [(row["type"], row["keycode"]) for row in native["events"]]
     if repeat:
@@ -189,7 +292,10 @@ def validate_native_output(native, ignored, *, modifiers=False, overlap=False, c
         raise ValueError("Native Escape/Space output differs from the selected fixture mode")
     if native.get("ignored_mode") is not ignored:
         raise ValueError("Native fixture did not acknowledge the ignored-device mode")
-    if native.get("escape_as_space") is not (not ignored) or native.get("escape_passthrough") is not ignored:
+    if (
+        native.get("escape_as_space") is not (not ignored)
+        or native.get("escape_passthrough") is not ignored
+    ):
         raise ValueError("Native Escape provenance contradicts the selected fixture mode")
 
 
@@ -217,7 +323,9 @@ def main():
         raise RuntimeError("Overlapping Shift requires the modifier fixture")
     overlap = overlap_mode == "true"
     combination_mode = os.environ.get("HS274_COMBINATION_FIXTURE", "false")
-    if combination_mode not in ("true", "false") or (combination_mode == "true" and (not modifiers or overlap)):
+    if combination_mode not in ("true", "false") or (
+        combination_mode == "true" and (not modifiers or overlap)
+    ):
         raise RuntimeError("Key combinations require a distinct modifier fixture")
     combinations = combination_mode == "true"
     report["combination_fixture"] = combinations
@@ -225,7 +333,9 @@ def main():
     if modifiers and (baseline or ignored or not hammerspoon):
         raise RuntimeError("Modifier fixture requires its own managed native consumer scenario")
     repeat_mode = os.environ.get("HS274_REPEAT_FIXTURE", "false")
-    if repeat_mode not in ("true", "false") or (repeat_mode == "true" and (modifiers or baseline or ignored or not hammerspoon)):
+    if repeat_mode not in ("true", "false") or (
+        repeat_mode == "true" and (modifiers or baseline or ignored or not hammerspoon)
+    ):
         raise RuntimeError("OS autorepeat requires its own managed native consumer scenario")
     repeat = repeat_mode == "true"
     report["repeat_fixture"] = repeat
@@ -233,7 +343,9 @@ def main():
     if hammerspoon and not os.environ.get("HS274_DEVELOPMENT_ROOT"):
         raise RuntimeError("Native Hammerspoon capture requires the development stream fixture")
     baseline_source = os.environ.get("HS274_BASELINE_SOURCE", "forced")
-    if baseline_source not in ("forced", "kernel") or (not baseline and baseline_source != "forced"):
+    if baseline_source not in ("forced", "kernel") or (
+        not baseline and baseline_source != "forced"
+    ):
         raise RuntimeError("Invalid explicit baseline acquisition source")
     if baseline and ignored:
         raise RuntimeError("Held baseline acquisition requires the managed fixture")
@@ -259,10 +371,15 @@ def main():
             raise RuntimeError("Ignored fixture capture requires the development stream")
         if baseline and not development:
             raise RuntimeError("Held baseline acquisition requires the development core")
-        permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
+        permissions = json.loads(
+            (output / "hs274-core-permissions.json").read_text(encoding="utf-8")
+        )
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
-        if any(path.exists() for path in (native_path, ready_path, start_path, abort_path, drained_path, ledger)):
+        if any(
+            path.exists()
+            for path in (native_path, ready_path, start_path, abort_path, drained_path, ledger)
+        ):
             raise RuntimeError("A remapping fixture artifact already exists")
         with ExitStack() as stack:
             if development:
@@ -270,11 +387,38 @@ def main():
                 disable_installed_peers(report)
                 check_runtime_processes(runtime, report, "before", False)
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
-            producer = stack.enter_context(owned_process(
-                ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path),
-                 "--repeat-hold" if repeat else "--combinations-hold" if combinations else "--overlap-hold" if overlap else "--modifiers-hold" if modifiers else "--baseline-held-drain" if baseline and hammerspoon else "--baseline-held" if baseline
-                 else "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
-                "input", output, report))
+            producer = stack.enter_context(
+                owned_process(
+                    [
+                        "sudo",
+                        "-n",
+                        "env",
+                        "GITHUB_ACTIONS=true",
+                        str(output / "hs274-hid-stream"),
+                        str(native_path),
+                        "--repeat-hold"
+                        if repeat
+                        else "--combinations-hold"
+                        if combinations
+                        else "--overlap-hold"
+                        if overlap
+                        else "--modifiers-hold"
+                        if modifiers
+                        else "--baseline-held-drain"
+                        if baseline and hammerspoon
+                        else "--baseline-held"
+                        if baseline
+                        else "--ignored-hold"
+                        if ignored
+                        else "--remap-hold"
+                        if development
+                        else "--remap",
+                    ],
+                    "input",
+                    output,
+                    report,
+                )
+            )
             device = wait_ready(ready_path, producer, 20)
             if device.get("renamed") is not True:
                 raise RuntimeError("Input fixture metadata was not renamed")
@@ -284,31 +428,55 @@ def main():
                 raise RuntimeError("Input fixture did not hold Space before core startup")
             report["input_fixture"] = device
             stack.enter_context(owned_configuration(device, ledger, report, ignored))
-            core_process = stack.enter_context(owned_process(["sudo", "-n", str(core)], "core-daemon", output, report))
-            stack.enter_context(owned_process([str(console)], "console-user-server", output, report))
+            core_process = stack.enter_context(
+                owned_process(["sudo", "-n", str(core)], "core-daemon", output, report)
+            )
+            stack.enter_context(
+                owned_process([str(console)], "console-user-server", output, report)
+            )
             stack.enter_context(owned_process([str(core)], "core-agent", output, report))
             try:
                 deadline = time.monotonic() + 25
                 recognized = False
                 while time.monotonic() < deadline:
                     try:
-                        result = subprocess.run([str(runtime["cli"]), "--list-connected-devices"],
-                                                capture_output=True, text=True,
-                                                timeout=min(3, max(0.01, deadline - time.monotonic())), check=False)
+                        result = subprocess.run(
+                            [str(runtime["cli"]), "--list-connected-devices"],
+                            capture_output=True,
+                            text=True,
+                            timeout=min(3, max(0.01, deadline - time.monotonic())),
+                            check=False,
+                        )
                     except subprocess.TimeoutExpired:
                         report["device_query"] = {"timed_out": True}
                         continue
-                    report["device_query"] = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+                    report["device_query"] = {
+                        "exit": result.returncode,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                    }
                     try:
                         devices = json.loads(result.stdout)
                     except json.JSONDecodeError:
                         devices = []
                     if isinstance(devices, list):
-                        matches = [row for row in devices if isinstance(row, dict) and all(
-                            row.get("device_identifiers", {}).get(key) == device[key]
-                            for key in ("vendor_id", "product_id"))]
+                        matches = [
+                            row
+                            for row in devices
+                            if isinstance(row, dict)
+                            and all(
+                                row.get("device_identifiers", {}).get(key) == device[key]
+                                for key in ("vendor_id", "product_id")
+                            )
+                        ]
                         # Upstream omits is_virtual_device when false.
-                        recognized = len(matches) == 1 and matches[0].get("device_identifiers", {}).get("is_virtual_device", False) is False
+                        recognized = (
+                            len(matches) == 1
+                            and matches[0]
+                            .get("device_identifiers", {})
+                            .get("is_virtual_device", False)
+                            is False
+                        )
                     if recognized:
                         break
                     time.sleep(0.2)
@@ -320,42 +488,87 @@ def main():
                     verify_disabled(report)
                     check_runtime_processes(runtime, report, "ready", True)
                     if baseline:
-                        report["baseline_probe"] = wait_baseline(output / "hs274-remap-core-daemon.log",
-                                                                   core_process, device["registry_entry_id"], 20,
-                                                                   source=baseline_source)
+                        report["baseline_probe"] = wait_baseline(
+                            output / "hs274-remap-core-daemon.log",
+                            core_process,
+                            device["registry_entry_id"],
+                            20,
+                            source=baseline_source,
+                        )
                         if report["baseline_probe"]["held"] != {41: 0, 44: 1}:
                             raise RuntimeError("Core could not acquire the deliberately held Space")
                     if stream_enabled:
-                        disconnected_capture([str(runtime["cli"]), "--hs274-capture", "25"], output, report)
+                        disconnected_capture(
+                            [str(runtime["cli"]), "--hs274-capture", "25"], output, report
+                        )
                         stream_scope = stack.enter_context(ExitStack())
                         if hammerspoon:
-                            stream_client = stream_scope.enter_context(owned_capture(Path(hammerspoon), runtime["cli"], output, report))
+                            stream_client = stream_scope.enter_context(
+                                owned_capture(Path(hammerspoon), runtime["cli"], output, report)
+                            )
                         else:
-                            stream_client = stream_scope.enter_context(owned_process(
-                                [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
-                                separate_stderr=True, stream_input=True))
-                        initial = wait_stream(stream_path, stream_client, lambda stream: True, 10,
-                                              acknowledge=not hammerspoon)
+                            stream_client = stream_scope.enter_context(
+                                owned_process(
+                                    [str(runtime["cli"]), "--hs274-capture", "25"],
+                                    "physical-stream",
+                                    output,
+                                    report,
+                                    separate_stderr=True,
+                                    stream_input=True,
+                                )
+                            )
+                        initial = wait_stream(
+                            stream_path,
+                            stream_client,
+                            lambda stream: True,
+                            10,
+                            acknowledge=not hammerspoon,
+                        )
                         report["stream_opened"] = initial["opened"]
                         if baseline:
-                            report["held_stream_boundary"] = require_stream_held_baseline(initial, device["registry_entry_id"])
+                            report["held_stream_boundary"] = require_stream_held_baseline(
+                                initial, device["registry_entry_id"]
+                            )
                         if report["stream_opened"]["lease"] != "2":
-                            raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
+                            raise RuntimeError(
+                                "Successor capture did not acquire the next lease in the isolated daemon"
+                            )
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
                 if stream_enabled:
+
                     def open_interruption():
-                        observer = stack.enter_context(owned_process(
-                            [str(runtime["cli"]), "--hs274-capture", "25"], "interrupted-stream", output, report,
-                            separate_stderr=True, stream_input=True))
-                        opened = wait_stream(interruption_path, observer, lambda stream: True, 10)["opened"]
+                        observer = stack.enter_context(
+                            owned_process(
+                                [str(runtime["cli"]), "--hs274-capture", "25"],
+                                "interrupted-stream",
+                                output,
+                                report,
+                                separate_stderr=True,
+                                stream_input=True,
+                            )
+                        )
+                        opened = wait_stream(interruption_path, observer, lambda stream: True, 10)[
+                            "opened"
+                        ]
                         validate_successor(report["stream_opened"], opened)
                         report["interruption_opened"] = opened
                         return observer
 
-                    interruption_client = finish_fixture_stream(stream_path, stream_client, producer, stream_scope,
-                                                                 drained_path, device["registry_entry_id"], open_interruption,
-                                                                 acknowledge=not hammerspoon, held=baseline, modifiers=modifiers, overlap=overlap, combinations=combinations)
+                    interruption_client = finish_fixture_stream(
+                        stream_path,
+                        stream_client,
+                        producer,
+                        stream_scope,
+                        drained_path,
+                        device["registry_entry_id"],
+                        open_interruption,
+                        acknowledge=not hammerspoon,
+                        held=baseline,
+                        modifiers=modifiers,
+                        overlap=overlap,
+                        combinations=combinations,
+                    )
                 producer.wait(timeout=12)
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
                 if producer.returncode != 0:
@@ -363,15 +576,27 @@ def main():
                 if baseline:
                     validate_baseline_native(report["native"], report["baseline_probe"])
                 else:
-                    validate_native_output(report["native"], ignored, modifiers=modifiers, overlap=overlap, combinations=combinations, repeat=repeat)
+                    validate_native_output(
+                        report["native"],
+                        ignored,
+                        modifiers=modifiers,
+                        overlap=overlap,
+                        combinations=combinations,
+                        repeat=repeat,
+                    )
                 if stream_enabled and report["native"].get("drain_released") is not True:
                     raise RuntimeError("Native fixture did not confirm stream drain release")
                 if stream_enabled:
                     if interruption_client.wait(timeout=10) != 1:
-                        raise RuntimeError("Interrupted capture did not exit with a reported failure")
+                        raise RuntimeError(
+                            "Interrupted capture did not exit with a reported failure"
+                        )
                     report["physical_interruption"] = validate_interruption(
-                        interruption_path.read_text(encoding="utf-8"), report["interruption_opened"])
-                    diagnostic = (output / "hs274-remap-interrupted-stream-stderr.log").read_text(encoding="utf-8")
+                        interruption_path.read_text(encoding="utf-8"), report["interruption_opened"]
+                    )
+                    diagnostic = (output / "hs274-remap-interrupted-stream-stderr.log").read_text(
+                        encoding="utf-8"
+                    )
                     if "Physical capture failed: Physical capture coverage lost" not in diagnostic:
                         raise RuntimeError("Interrupted capture diagnostic is missing")
             finally:
@@ -382,12 +607,23 @@ def main():
                     report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
             deadline = time.monotonic() + 3
             while True:
-                report["ledger_lines"] = ledger.read_text(encoding="utf-8").splitlines() if ledger.is_file() else []
-                if len(report["ledger_lines"]) >= (4 if combinations else 2) or time.monotonic() >= deadline:
+                report["ledger_lines"] = (
+                    ledger.read_text(encoding="utf-8").splitlines() if ledger.is_file() else []
+                )
+                if (
+                    len(report["ledger_lines"]) >= (4 if combinations else 2)
+                    or time.monotonic() >= deadline
+                ):
                     break
                 time.sleep(0.1)
-            if sorted(report["ledger_lines"]) != ([] if ignored or baseline else sorted(["U:escape", "escape"] * (2 if combinations else 1))):
-                raise RuntimeError("The owned physical ledger did not contain the expected Escape pair")
+            if sorted(report["ledger_lines"]) != (
+                []
+                if ignored or baseline
+                else sorted(["U:escape", "escape"] * (2 if combinations else 1))
+            ):
+                raise RuntimeError(
+                    "The owned physical ledger did not contain the expected Escape pair"
+                )
             if development:
                 verify_registration_block(report)
                 verify_disabled(report)
@@ -395,25 +631,50 @@ def main():
         if development:
             check_runtime_processes(runtime, report, "after-cleanup", False)
             core_output = (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8")
-            report["key_inventories"] = read_inventories(core_output, report["input_fixture"]["registry_entry_id"])
+            report["key_inventories"] = read_inventories(
+                core_output, report["input_fixture"]["registry_entry_id"]
+            )
             if baseline:
-                report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"],
-                                                         source=baseline_source)
+                report["baseline_probe"] = read_baseline(
+                    core_output,
+                    report["input_fixture"]["registry_entry_id"],
+                    source=baseline_source,
+                )
                 released = validate_baseline_native(report["native"], report["baseline_probe"])
-                report["physical_capture"] = validate_baseline_capture(core_output,
-                    report["input_fixture"]["registry_entry_id"], released)
+                report["physical_capture"] = validate_baseline_capture(
+                    core_output, report["input_fixture"]["registry_entry_id"], released
+                )
             else:
                 device_id = report["input_fixture"]["registry_entry_id"]
-                report["physical_capture"] = (validate_modifier_capture(core_output, device_id, overlap=overlap, combinations=combinations)
-                                              if modifiers else validate_capture(core_output, device_id))
-                report["baseline_probes"] = read_observation_baselines(core_output, report["input_fixture"]["registry_entry_id"])
+                report["physical_capture"] = (
+                    validate_modifier_capture(
+                        core_output, device_id, overlap=overlap, combinations=combinations
+                    )
+                    if modifiers
+                    else validate_capture(core_output, device_id)
+                )
+                report["baseline_probes"] = read_observation_baselines(
+                    core_output, report["input_fixture"]["registry_entry_id"]
+                )
             if stream_enabled:
                 if baseline and report["held_stream_boundary"] >= released:
                     raise ValueError("Held fixture released Space before stream acquisition")
-                report["physical_stream"] = validate_stream(stream_path.read_text(encoding="utf-8"), report["physical_capture"])
+                report["physical_stream"] = validate_stream(
+                    stream_path.read_text(encoding="utf-8"), report["physical_capture"]
+                )
                 if hammerspoon:
-                    validate_consumer(report["hammerspoon"], report["physical_capture"], held=baseline, modifiers=modifiers, overlap=overlap, combinations=combinations)
-            if stream_enabled and report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
+                    validate_consumer(
+                        report["hammerspoon"],
+                        report["physical_capture"],
+                        held=baseline,
+                        modifiers=modifiers,
+                        overlap=overlap,
+                        combinations=combinations,
+                    )
+            if (
+                stream_enabled
+                and report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM
+            ):
                 raise RuntimeError("Physical stream client did not stop gracefully")
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
@@ -431,7 +692,12 @@ def main():
         with (output / "hs274-remap.json").open("x", encoding="utf-8", newline="\n") as receipt:
             json.dump(report, receipt, indent=2)
             receipt.write("\n")
-    return 0 if "observation_error" not in report and report.get("native", {}).get("space_pair_observed") is True else 1
+    return (
+        0
+        if "observation_error" not in report
+        and report.get("native", {}).get("space_pair_observed") is True
+        else 1
+    )
 
 
 if __name__ == "__main__":

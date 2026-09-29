@@ -57,7 +57,8 @@
 	 * @returns {object[]}
 	 */
 	function sectionsFor(schema, driver) {
-		if (!schema || !Array.isArray(schema.sections)) throw new Error('diagnostics: the schema has no sections');
+		if (!schema || !Array.isArray(schema.sections))
+			throw new Error('diagnostics: the schema has no sections');
 		return schema.sections
 			.filter(function (section) {
 				return appliesTo(section, driver);
@@ -186,7 +187,10 @@
 			case 'pending':
 				return { text: t('healthcheck.probe.pending'), state: 'pending' };
 			case 'timeout':
-				return { text: t('healthcheck.probe.timeout', Math.round(Number(result.ms) || 0)), state: 'fail' };
+				return {
+					text: t('healthcheck.probe.timeout', Math.round(Number(result.ms) || 0)),
+					state: 'fail'
+				};
 			case 'error':
 				return { text: t('healthcheck.probe.error', String(result.detail || '')), state: 'fail' };
 			case 'disabled':
@@ -296,10 +300,14 @@
 			list.push({
 				key: 'healthcheck.problem.permission',
 				args: [{ key: 'healthcheck.permission.' + item.id }],
-				action: permissions[item.id] && permissions[item.id].settings ? { name: 'open_settings', id: item.id } : null
+				action:
+					permissions[item.id] && permissions[item.id].settings
+						? { name: 'open_settings', id: item.id }
+						: null
 			});
 		});
-		if (failed('github_api')) list.push({ key: 'healthcheck.problem.network', args: [], action: null });
+		if (failed('github_api'))
+			list.push({ key: 'healthcheck.problem.network', args: [], action: null });
 		if (isTrue(sectionData(snapshot, 'ai').ai_enabled) && failed('ai_health')) {
 			list.push({ key: 'healthcheck.problem.ai', args: [], action: null });
 		}
@@ -315,7 +323,10 @@
 		if (Array.isArray(failedModules) && failedModules.length > 0) {
 			list.push({ key: 'healthcheck.problem.modules', args: [failedModules.length], action: null });
 		}
-		if (sectionData(snapshot, 'input').keymap_resolved === false || sectionData(snapshot, 'input').keymap_resolved === 0) {
+		if (
+			sectionData(snapshot, 'input').keymap_resolved === false ||
+			sectionData(snapshot, 'input').keymap_resolved === 0
+		) {
 			list.push({ key: 'healthcheck.problem.keymap', args: [], action: null });
 		}
 		return list;
@@ -349,8 +360,13 @@
 	 */
 	function actionButton(action, id, label) {
 		return (
-			'<button type="button" class="row-action" data-action="' + escapeHtml(action) + '" data-id="' +
-			escapeHtml(id) + '">' + escapeHtml(label) + '</button>'
+			'<button type="button" class="row-action" data-action="' +
+			escapeHtml(action) +
+			'" data-id="' +
+			escapeHtml(id) +
+			'">' +
+			escapeHtml(label) +
+			'</button>'
 		);
 	}
 
@@ -383,7 +399,8 @@
 		if (section.id === 'features' && column === 'enabled') {
 			return t(isTrue(value) ? 'healthcheck.value.on' : 'healthcheck.value.off');
 		}
-		if (section.id === 'permissions' && column === 'id') return t('healthcheck.permission.' + value);
+		if (section.id === 'permissions' && column === 'id')
+			return t('healthcheck.permission.' + value);
 		if (section.id === 'permissions' && column === 'state') return t('healthcheck.state.' + value);
 		if (section.id === 'peripherals' && column === 'bus') return t('healthcheck.bus.' + value);
 		if (section.id === 'peripherals' && column === 'kind') return t('healthcheck.device.' + value);
@@ -437,7 +454,10 @@
 		var note = itemsProbeNote(section, snapshot, t);
 		var noteHtml = note ? '<p class="' + note.state + '">' + escapeHtml(note.text) + '</p>' : '';
 		if (items.length === 0) {
-			return (note ? '' : '<p class="empty">' + escapeHtml(t('healthcheck.value.none')) + '</p>') + noteHtml;
+			return (
+				(note ? '' : '<p class="empty">' + escapeHtml(t('healthcheck.value.none')) + '</p>') +
+				noteHtml
+			);
 		}
 		var permissions = (schema.permissions && schema.permissions[snapshot.driver]) || {};
 		var columns = section.columns.filter(function (column) {
@@ -454,10 +474,14 @@
 				var cell = escapeHtml(itemText(section, schema, column, item[column], t));
 				if (section.id === 'permissions' && index === columns.length - 1) {
 					if (item.state !== 'granted' && permissions[item.id] && permissions[item.id].settings) {
-						cell += ' ' + actionButton('open_settings', item.id, t('healthcheck.action.open_settings'));
+						cell +=
+							' ' + actionButton('open_settings', item.id, t('healthcheck.action.open_settings'));
 					}
 					if (item.state === 'missing' && permissions[item.id] && permissions[item.id].fix) {
-						cell += '<div class="fix">' + escapeHtml(t('healthcheck.permission_fix.' + item.id)) + '</div>';
+						cell +=
+							'<div class="fix">' +
+							escapeHtml(t('healthcheck.permission_fix.' + item.id)) +
+							'</div>';
 					}
 				}
 				html += '<td>' + cell + '</td>';
@@ -489,7 +513,8 @@
 				return;
 			}
 			var cell = '<span class="' + shown.state + '">' + escapeHtml(shown.text) + '</span>';
-			if (field.type === 'path' && shown.state === 'value') cell += ' ' + actionButton('open_path', field.id, t('healthcheck.action.open'));
+			if (field.type === 'path' && shown.state === 'value')
+				cell += ' ' + actionButton('open_path', field.id, t('healthcheck.action.open'));
 			rows += '<tr><th scope="row">' + escapeHtml(label) + '</th><td>' + cell + '</td></tr>';
 		});
 		return (rows ? '<table class="fields">' + rows + '</table>' : '') + blocks;
@@ -504,12 +529,15 @@
 	 */
 	function renderSummary(snapshot, schema, t) {
 		var list = problems(snapshot, schema);
-		if (list.length === 0) return '<p class="ok">' + escapeHtml(t('healthcheck.problem.none')) + '</p>';
+		if (list.length === 0)
+			return '<p class="ok">' + escapeHtml(t('healthcheck.problem.none')) + '</p>';
 		var html = '<ul class="problems">';
 		list.forEach(function (problem) {
 			html += '<li><span class="fail">' + escapeHtml(problemText(problem, t)) + '</span>';
 			if (problem.action && problem.action.name === 'open_settings') {
-				html += ' ' + actionButton('open_settings', problem.action.id, t('healthcheck.action.open_settings'));
+				html +=
+					' ' +
+					actionButton('open_settings', problem.action.id, t('healthcheck.action.open_settings'));
 			} else if (problem.action && problem.action.name === 'open_path') {
 				html += ' ' + actionButton('open_path', problem.action.id, t('healthcheck.action.open'));
 			}
@@ -532,13 +560,27 @@
 			var title = escapeHtml(t('healthcheck.section.' + section.id));
 			var body;
 			if (section.kind === 'summary') body = renderSummary(shown, schema, t);
-			else if (section.kind === 'items') body = renderItems(section, sectionData(shown, section.id), shown, schema, t);
+			else if (section.kind === 'items')
+				body = renderItems(section, sectionData(shown, section.id), shown, schema, t);
 			else body = renderFields(section, sectionData(shown, section.id), shown, t);
 			if (section.collapsed) {
-				html += '<details class="section" id="section-' + section.id + '"><summary><h2>' + title + '</h2></summary>' +
-					body + '</details>';
+				html +=
+					'<details class="section" id="section-' +
+					section.id +
+					'"><summary><h2>' +
+					title +
+					'</h2></summary>' +
+					body +
+					'</details>';
 			} else {
-				html += '<section class="section" id="section-' + section.id + '"><h2>' + title + '</h2>' + body + '</section>';
+				html +=
+					'<section class="section" id="section-' +
+					section.id +
+					'"><h2>' +
+					title +
+					'</h2>' +
+					body +
+					'</section>';
 			}
 		});
 		return html;
@@ -570,7 +612,9 @@
 	 * @returns {string}
 	 */
 	function cell(value) {
-		return String(isAbsent(value) ? '' : value).replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|');
+		return String(isAbsent(value) ? '' : value)
+			.replace(/[\r\n]+/g, ' ')
+			.replace(/\|/g, '\\|');
 	}
 
 	/**
@@ -603,16 +647,33 @@
 			var columns = section.columns.filter(function (column) {
 				return snapshot.detailed || (section.opt_in_columns || []).indexOf(column) < 0;
 			});
-			lines.push('| ' + columns.map(function (column) {
-				return cell(columnLabel(section.id, column, t));
-			}).join(' | ') + ' |');
-			lines.push('|' + columns.map(function () {
-				return ' --- |';
-			}).join(''));
+			lines.push(
+				'| ' +
+					columns
+						.map(function (column) {
+							return cell(columnLabel(section.id, column, t));
+						})
+						.join(' | ') +
+					' |'
+			);
+			lines.push(
+				'|' +
+					columns
+						.map(function () {
+							return ' --- |';
+						})
+						.join('')
+			);
 			items.forEach(function (item) {
-				lines.push('| ' + columns.map(function (column) {
-					return cell(itemText(section, schema, column, item[column], t));
-				}).join(' | ') + ' |');
+				lines.push(
+					'| ' +
+						columns
+							.map(function (column) {
+								return cell(itemText(section, schema, column, item[column], t));
+							})
+							.join(' | ') +
+						' |'
+				);
 			});
 			lines.push('');
 			if (note) lines.push(note.text, '');
@@ -627,8 +688,16 @@
 			if (field.type === 'log') {
 				if (shown.state === 'muted') return;
 				var fence = fenceFor(shown.text);
-				blocks.push('<details><summary>' + escapeHtml(label) + '</summary>', '', fence + 'text', shown.text, fence, '',
-					'</details>', '');
+				blocks.push(
+					'<details><summary>' + escapeHtml(label) + '</summary>',
+					'',
+					fence + 'text',
+					shown.text,
+					fence,
+					'',
+					'</details>',
+					''
+				);
 				return;
 			}
 			rows.push('| ' + cell(label) + ' | ' + cell(shown.text) + ' |');
@@ -660,14 +729,20 @@
 			'| ' + cell(t('healthcheck.export.driver')) + ' | ' + cell(info.driver) + ' |',
 			'| ' + cell(t('healthcheck.export.generated')) + ' | ' + cell(info.generated_utc) + ' |',
 			'| ' + cell(t('healthcheck.export.schema')) + ' | ' + cell(shown.schema_version) + ' |',
-			'| ' + cell(t('healthcheck.export.details')) + ' | ' +
-				cell(t(shown.detailed ? 'healthcheck.value.yes' : 'healthcheck.value.no')) + ' |',
+			'| ' +
+				cell(t('healthcheck.export.details')) +
+				' | ' +
+				cell(t(shown.detailed ? 'healthcheck.value.yes' : 'healthcheck.value.no')) +
+				' |',
 			''
 		];
 		sectionsFor(schema, shown.driver).forEach(function (section) {
 			var body = markdownSection(section, shown, schema, t);
 			if (section.collapsed) {
-				lines.push('<details><summary>' + escapeHtml(t('healthcheck.section.' + section.id)) + '</summary>', '');
+				lines.push(
+					'<details><summary>' + escapeHtml(t('healthcheck.section.' + section.id)) + '</summary>',
+					''
+				);
 				lines = lines.concat(body.slice(2), ['</details>', '']);
 			} else {
 				lines = lines.concat(body);
@@ -675,8 +750,16 @@
 		});
 		var json = JSON.stringify(shown, null, 2);
 		var fence = fenceFor(json);
-		lines.push('<details><summary>' + escapeHtml(t('healthcheck.export.json')) + '</summary>', '', fence + 'json', json,
-			fence, '', '</details>', '');
+		lines.push(
+			'<details><summary>' + escapeHtml(t('healthcheck.export.json')) + '</summary>',
+			'',
+			fence + 'json',
+			json,
+			fence,
+			'',
+			'</details>',
+			''
+		);
 		return lines.join('\n');
 	}
 
@@ -720,7 +803,15 @@
 				.join('')
 				.replace(/[^A-Za-z0-9._-]/g, '_');
 		};
-		return 'ergopti-diagnostics-' + safe(info.driver) + '-' + safe(info.version) + '-' + safe(info.file_stamp) + '.md';
+		return (
+			'ergopti-diagnostics-' +
+			safe(info.driver) +
+			'-' +
+			safe(info.version) +
+			'-' +
+			safe(info.file_stamp) +
+			'.md'
+		);
 	}
 
 	/**

@@ -63,7 +63,8 @@ const gateKeys = manifest.menu?.hotstring_category_keys ?? {};
 const sectionsOf = (doc) => (doc._meta?.sections_order ?? []).filter((s) => s !== '-');
 
 const languages = index.languages?.order ?? [];
-if (languages.length === 0) errors.push('_index.toml declares no [languages] — the French pack is not wired');
+if (languages.length === 0)
+	errors.push('_index.toml declares no [languages] — the French pack is not wired');
 
 for (const lang of languages) {
 	const pack = index.languages[lang];
@@ -78,7 +79,8 @@ for (const lang of languages) {
 	for (const stem of pack.categories_order ?? []) {
 		const group = `${lang}_${stem}`;
 		const file = path.join(HS, lang, `${stem}.toml`);
-		if (!neutralStems.has(stem)) errors.push(`${group}: '${stem}' is not a neutral category, so it has no title`);
+		if (!neutralStems.has(stem))
+			errors.push(`${group}: '${stem}' is not a neutral category, so it has no title`);
 		if (!fs.existsSync(file)) {
 			errors.push(`${group}: ${path.relative(ROOT, file)} does not exist`);
 			continue;
@@ -92,10 +94,14 @@ for (const lang of languages) {
 		const neutral = readToml(path.join(HS, `${stem}.toml`));
 		const neutralSections = new Set(sectionsOf(neutral));
 		for (const section of sectionsOf(doc)) {
-			if (!rows.has(section)) errors.push(`${group}.${section}: no [[features.hotstrings.${group}]] row`);
-			if (neutralSections.has(section)) errors.push(`${group}.${section}: also declared in the neutral ${stem}.toml`);
+			if (!rows.has(section))
+				errors.push(`${group}.${section}: no [[features.hotstrings.${group}]] row`);
+			if (neutralSections.has(section))
+				errors.push(`${group}.${section}: also declared in the neutral ${stem}.toml`);
 			if (!Array.isArray(doc[section]) && section !== 'replace') {
-				errors.push(`${group}.${section}: listed in sections_order but has no [[${section}]] entries`);
+				errors.push(
+					`${group}.${section}: listed in sections_order but has no [[${section}]] entries`
+				);
 			}
 		}
 	}
@@ -118,4 +124,6 @@ if (errors.length) {
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
-console.log(`\x1b[32m[OK] ${languages.length} hotstring language pack(s) are complete data and every section ships disabled.\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] ${languages.length} hotstring language pack(s) are complete data and every section ships disabled.\x1b[0m`
+);

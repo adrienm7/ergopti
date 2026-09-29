@@ -37,13 +37,13 @@ non-NUL UTF-16 code unit in both HTML modes, and measured 413.289 versus
 The image is a legacy projection: timings do not establish the correctness or
 freshness of its stored aggregates. The resulting JSON has 1,811,993 characters.
 
-| Measurement | Production encoding (ms) |
-| --- | ---: |
-| Before, sample 1 | 2570.643 |
-| Before, sample 2 | 2795.034 |
-| Before, sample 3 | 3486.944 |
-| After, sample 1 | 1259.205 |
-| After, sample 2 | 1262.503 |
+| Measurement      | Production encoding (ms) |
+| ---------------- | -----------------------: |
+| Before, sample 1 |                 2570.643 |
+| Before, sample 2 |                 2795.034 |
+| Before, sample 3 |                 3486.944 |
+| After, sample 1  |                 1259.205 |
+| After, sample 2  |                 1262.503 |
 
 Before receipts: `manifest-phases-1`, `manifest-phases-2`, `manifest-phases-3`.
 After receipts: `json-production-after-1`, `json-production-after-2`.

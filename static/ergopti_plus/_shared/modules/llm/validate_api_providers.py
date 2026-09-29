@@ -86,7 +86,9 @@ def main() -> int:
             continue
         body = path.read_text(encoding="utf-8")
         if "api_providers.json" not in body:
-            errors.append(f"{label} api_remote must load api_providers.json (found stale inline catalogue?)")
+            errors.append(
+                f"{label} api_remote must load api_providers.json (found stale inline catalogue?)"
+            )
 
     if errors:
         print("FAIL: api_providers validation:", file=sys.stderr)

@@ -38,9 +38,7 @@ def create_bundle(
     and its internal <keyboard name="..."> attribute is also rewritten.
     """
     if len(keylayout_paths) != len(logo_paths):
-        raise ValueError(
-            "keylayout_paths and logo_paths must have the same length"
-        )
+        raise ValueError("keylayout_paths and logo_paths must have the same length")
 
     if bundle_path.exists():
         shutil.rmtree(bundle_path)
@@ -138,9 +136,7 @@ def create_bundle(
 
         # Store variant, ANSI flag, and the canonical input source id used
         # later as the InfoPlist.strings key.
-        layout_localization_infos.append(
-            (new_name, variant, is_ansi, input_source_id)
-        )
+        layout_localization_infos.append((new_name, variant, is_ansi, input_source_id))
 
         # Copy logo file with matching base name
         icon_tag = ""

@@ -102,7 +102,9 @@ for (const file of files) {
 
 for (const name of Object.keys(ALLOWED)) {
 	if (!files.some((f) => path.basename(f) === name)) {
-		errors.push(`the clock exemption for "${name}" names a generator that no longer exists — remove it`);
+		errors.push(
+			`the clock exemption for "${name}" names a generator that no longer exists — remove it`
+		);
 	}
 }
 

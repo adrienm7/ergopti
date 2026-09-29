@@ -44,11 +44,17 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CATALOGUE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/modifier_chords.json');
+const CATALOGUE = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/modules/actions/modifier_chords.json'
+);
 const AHK_ADAPTER = path.join(ROOT, 'static/ergopti_plus/windows/adapters/hotkey_registrar.ahk');
 const AHK_SLOTS = path.join(ROOT, 'static/ergopti_plus/windows/infra/config_io.ahk');
 const LUA_CHORD = path.join(ROOT, 'static/ergopti_plus/_shared/lua/chord/init.lua');
-const HS_SLOTS = path.join(ROOT, 'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua');
+const HS_SLOTS = path.join(
+	ROOT,
+	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua'
+);
 
 // The catalogue's Windows vocabulary calls the Windows key "win"; the shared
 // notation calls the same physical modifier "cmd". This is the one rename, and
@@ -74,9 +80,6 @@ function fail(msg) {
 	errors.push(msg);
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Source Extraction =====================
@@ -93,12 +96,16 @@ function parseAhkMap(src, name) {
 	const re = new RegExp(`global\\s+${name}\\s*:=\\s*Map\\(([\\s\\S]*?)\\n?\\)`, 'm');
 	const m = src.match(re);
 	if (!m) {
-		fail(`could not find "global ${name} := Map(…)" — the parser drifted, and a gate over nothing passes forever`);
+		fail(
+			`could not find "global ${name} := Map(…)" — the parser drifted, and a gate over nothing passes forever`
+		);
 		return {};
 	}
 	const tokens = [...m[1].matchAll(/"((?:[^"`]|`.)*)"/g)].map((t) => t[1]);
 	if (tokens.length === 0 || tokens.length % 2 !== 0) {
-		fail(`${name}: parsed ${tokens.length} quoted token(s) — expected a non-zero even count of key/value pairs`);
+		fail(
+			`${name}: parsed ${tokens.length} quoted token(s) — expected a non-zero even count of key/value pairs`
+		);
 		return {};
 	}
 	const out = {};
@@ -178,13 +185,11 @@ function parseAliases(src) {
 		return {};
 	}
 	const out = {};
-	for (const pair of m[1].matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]+)"/g)) out[pair[1]] = pair[2];
+	for (const pair of m[1].matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]+)"/g))
+		out[pair[1]] = pair[2];
 	if (Object.keys(out).length === 0) fail('MOD_ALIASES parsed empty');
 	return out;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -208,7 +213,9 @@ const aliases = parseAliases(luaChordSrc);
 // Floor the catalogue itself: an empty or truncated file would satisfy every
 // "for each entry" loop below without checking a single fact.
 if (!Array.isArray(catalogue.keys) || catalogue.keys.length < 36) {
-	fail(`modifier_chords.json holds ${catalogue.keys ? catalogue.keys.length : 0} key(s) — expected at least the 36 alphanumerics`);
+	fail(
+		`modifier_chords.json holds ${catalogue.keys ? catalogue.keys.length : 0} key(s) — expected at least the 36 alphanumerics`
+	);
 }
 if (!catalogue.platforms || !catalogue.platforms.windows || !catalogue.platforms.macos) {
 	fail('modifier_chords.json has no windows/macos platform block — nothing below can be checked');
@@ -216,9 +223,6 @@ if (!catalogue.platforms || !catalogue.platforms.windows || !catalogue.platforms
 
 /** The chord key for a catalogue entry; absent chord_key means the id is it. */
 const chordKeyOf = (entry) => entry.chord_key || entry.id;
-
-
-
 
 // ==================================================
 // ==================================================
@@ -229,7 +233,9 @@ const chordKeyOf = (entry) => entry.chord_key || entry.id;
 for (const mod of (catalogue.platforms.windows || {}).modifiers || []) {
 	const canonical = CATALOGUE_MOD_TO_CANONICAL[mod.id];
 	if (!canonical) {
-		fail(`catalogue Windows modifier "${mod.id}" has no canonical counterpart — add it to CATALOGUE_MOD_TO_CANONICAL or to the notation`);
+		fail(
+			`catalogue Windows modifier "${mod.id}" has no canonical counterpart — add it to CATALOGUE_MOD_TO_CANONICAL or to the notation`
+		);
 		continue;
 	}
 	if (ahkPrefixes[canonical] !== mod.ahk_prefix) {
@@ -242,7 +248,9 @@ for (const mod of (catalogue.platforms.windows || {}).modifiers || []) {
 
 for (const mod of (catalogue.platforms.macos || {}).modifiers || []) {
 	if (!modOrder.includes(mod.hammerspoon)) {
-		fail(`catalogue macOS modifier "${mod.id}" maps to Hammerspoon "${mod.hammerspoon}", which is not a canonical modifier (${modOrder.join(', ')})`);
+		fail(
+			`catalogue macOS modifier "${mod.id}" maps to Hammerspoon "${mod.hammerspoon}", which is not a canonical modifier (${modOrder.join(', ')})`
+		);
 	}
 	if (aliases[mod.id] !== mod.hammerspoon) {
 		fail(
@@ -251,9 +259,6 @@ for (const mod of (catalogue.platforms.macos || {}).modifiers || []) {
 		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -306,9 +311,6 @@ for (const key of Object.keys(ahkNativeKeys)) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 5/ Slot Vocabulary Agreement =============
@@ -322,21 +324,32 @@ for (const key of Object.keys(ahkNativeKeys)) {
 for (const entry of catalogue.keys || []) {
 	if (!entry.chord_key) continue;
 	if (ahkSlotKeys[entry.id] !== undefined && ahkSlotKeys[entry.id] !== entry.chord_key) {
-		fail(`Windows slot vocabulary: "${entry.id}" resolves to "${ahkSlotKeys[entry.id]}", catalogue says "${entry.chord_key}"`);
+		fail(
+			`Windows slot vocabulary: "${entry.id}" resolves to "${ahkSlotKeys[entry.id]}", catalogue says "${entry.chord_key}"`
+		);
 	}
 	if (hsSlotKeys[entry.id] !== undefined && hsSlotKeys[entry.id] !== entry.chord_key) {
-		fail(`macOS slot vocabulary: "${entry.id}" resolves to "${hsSlotKeys[entry.id]}", catalogue says "${entry.chord_key}"`);
+		fail(
+			`macOS slot vocabulary: "${entry.id}" resolves to "${hsSlotKeys[entry.id]}", catalogue says "${entry.chord_key}"`
+		);
 	}
 }
 
 // The drivers may not invent a slot key the catalogue never declared: a suffix
 // that means something on one driver and nothing on the other is exactly the
 // divergence the shared catalogue was created to end.
-const declaredChordKeys = new Set((catalogue.keys || []).filter((e) => e.chord_key).map((e) => e.id));
-for (const [driver, table] of [['Windows', ahkSlotKeys], ['macOS', hsSlotKeys]]) {
+const declaredChordKeys = new Set(
+	(catalogue.keys || []).filter((e) => e.chord_key).map((e) => e.id)
+);
+for (const [driver, table] of [
+	['Windows', ahkSlotKeys],
+	['macOS', hsSlotKeys]
+]) {
 	for (const id of Object.keys(table)) {
 		if (!declaredChordKeys.has(id)) {
-			fail(`${driver} slot vocabulary declares "${id}", which modifier_chords.json does not — add it to the catalogue`);
+			fail(
+				`${driver} slot vocabulary declares "${id}", which modifier_chords.json does not — add it to the catalogue`
+			);
 		}
 	}
 }
@@ -346,9 +359,6 @@ for (const [driver, table] of [['Windows', ahkSlotKeys], ['macOS', hsSlotKeys]])
 if (Object.keys(ahkSlotKeys).length === 0) fail('the Windows slot vocabulary parsed empty');
 if (Object.keys(hsSlotKeys).length === 0) fail('the macOS slot vocabulary parsed empty');
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 6/ Report ================================
@@ -356,7 +366,9 @@ if (Object.keys(hsSlotKeys).length === 0) fail('the macOS slot vocabulary parsed
 // ==================================================
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the chord native mappings disagree with modifier_chords.json:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the chord native mappings disagree with modifier_chords.json:\x1b[0m'
+	);
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);
 }

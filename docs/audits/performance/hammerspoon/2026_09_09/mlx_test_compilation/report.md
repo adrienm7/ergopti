@@ -21,14 +21,14 @@ Two passes run exact modules through `lua tests/run.lua --only`, reversing
 the module order in pass two. Every run exits zero. Prefix each suffix below
 with `tests.unit.`. Values describe these modules, not the full suite.
 
-| Module suffix | Cases | Elapsed seconds, pass 1 / 2 | Lua CPU seconds, pass 1 / 2 |
-| --- | ---: | ---: | ---: |
-| `menu.test_llm_menu_persistence` | 26 | 17.118 / 15.328 | 3.313 / 3.094 |
-| `adapters.file_system.test_classified_read_and_create` | 15 | 13.214 / 11.982 | 1.375 / 1.156 |
-| `modules.llm.test_api_mlx_pause_ownership` | 49 | 11.434 / 12.223 | 10.609 / 11.484 |
-| `adapters.test_file_system_staging_isolation` | 13 | 9.171 / 9.113 | 0.953 / 0.859 |
-| `lib.test_toml_writer` | 20 | 10.029 / 10.058 | 1.250 / 1.266 |
-| `ui.test_preferences_nested_array_roundtrip` | 15 | 10.110 / 9.870 | 1.875 / 1.891 |
+| Module suffix                                          | Cases | Elapsed seconds, pass 1 / 2 | Lua CPU seconds, pass 1 / 2 |
+| ------------------------------------------------------ | ----: | --------------------------: | --------------------------: |
+| `menu.test_llm_menu_persistence`                       |    26 |             17.118 / 15.328 |               3.313 / 3.094 |
+| `adapters.file_system.test_classified_read_and_create` |    15 |             13.214 / 11.982 |               1.375 / 1.156 |
+| `modules.llm.test_api_mlx_pause_ownership`             |    49 |             11.434 / 12.223 |             10.609 / 11.484 |
+| `adapters.test_file_system_staging_isolation`          |    13 |               9.171 / 9.113 |               0.953 / 0.859 |
+| `lib.test_toml_writer`                                 |    20 |             10.029 / 10.058 |               1.250 / 1.266 |
+| `ui.test_preferences_nested_array_roundtrip`           |    15 |              10.110 / 9.870 |               1.875 / 1.891 |
 
 CPU comes from the retained Windows process object's `TotalProcessorTime`;
 elapsed time uses a .NET `Stopwatch` around launch and completion. CPU excludes
@@ -43,12 +43,12 @@ The candidate wraps each of five existing `helpers.describe` groups in
 source bytes and loads fresh functions, preserving module execution and state.
 All 49 callbacks and assertions execute; expanded names and order match exactly.
 
-| Run | Mode | Elapsed seconds | Lua CPU seconds | Sampled peak working set, bytes |
-| --- | --- | ---: | ---: | ---: |
-| 1 | Baseline | 6.861 | 6.219 | 9,129,984 |
-| 2 | Candidate | 6.375 | 6.078 | 15,302,656 |
-| 3 | Candidate | 5.771 | 5.469 | 15,577,088 |
-| 4 | Baseline | 6.035 | 5.797 | 9,334,784 |
+| Run | Mode      | Elapsed seconds | Lua CPU seconds | Sampled peak working set, bytes |
+| --- | --------- | --------------: | --------------: | ------------------------------: |
+| 1   | Baseline  |           6.861 |           6.219 |                       9,129,984 |
+| 2   | Candidate |           6.375 |           6.078 |                      15,302,656 |
+| 3   | Candidate |           5.771 |           5.469 |                      15,577,088 |
+| 4   | Baseline  |           6.035 |           5.797 |                       9,334,784 |
 
 The candidate maximum exceeds the faster baseline in elapsed time and CPU.
 Two observations per mode cannot establish tail percentiles or distinguish

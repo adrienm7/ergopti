@@ -160,11 +160,19 @@ try {
 	assert.deepEqual(status.open, ['AHK-002', 'AHK-003']);
 	assert.equal(typeof status.completed['AHK-001'], 'string');
 
-	git(auditWorktree, 'commit', '--allow-empty', '-m',
-		'fix(hs): integrated sibling audit\n\nAudit-Finding: HS-177');
+	git(
+		auditWorktree,
+		'commit',
+		'--allow-empty',
+		'-m',
+		'fix(hs): integrated sibling audit\n\nAudit-Finding: HS-177'
+	);
 	const mixedAhkStatus = json(workflow('status', '--report', `${dateDirectory}/findings.json`));
-	assert.deepEqual(mixedAhkStatus.completed, status.completed,
-		'an integrated Hammerspoon finding must not alter the AHK completion map');
+	assert.deepEqual(
+		mixedAhkStatus.completed,
+		status.completed,
+		'an integrated Hammerspoon finding must not alter the AHK completion map'
+	);
 	assert.deepEqual(mixedAhkStatus.open, status.open);
 
 	write(auditWorktree, 'tools/audit/unrelated.cjs', '// unrelated tooling\n');
@@ -192,7 +200,11 @@ try {
 	);
 
 	write(auditWorktree, 'static/ergopti_plus/windows/tests/run_all.ahk', '; adaptive runner\n');
-	write(auditWorktree, 'tools/test/validate-ahk-suite-manifest.cjs', '// exact manifest validator\n');
+	write(
+		auditWorktree,
+		'tools/test/validate-ahk-suite-manifest.cjs',
+		'// exact manifest validator\n'
+	);
 	write(auditWorktree, 'tools/test/test-ahk-suite-manifest.cjs', '// slow-tail regression\n');
 	git(
 		auditWorktree,
@@ -214,7 +226,9 @@ try {
 		)
 	);
 	assert.equal(infrastructureVerified.id, 'AHK-003');
-	assert.ok(infrastructureVerified.production.includes('static/ergopti_plus/windows/tests/run_all.ahk'));
+	assert.ok(
+		infrastructureVerified.production.includes('static/ergopti_plus/windows/tests/run_all.ahk')
+	);
 	assert.equal(infrastructureVerified.tests.length, 2);
 
 	result = workflow('status', '--report', `${dateDirectory}/findings.json`);
@@ -310,16 +324,18 @@ try {
 		'-m',
 		'fix(logger): bound receive loop\n\nAudit-Finding: HS-177'
 	);
-	const swiftVerified = json(workflowAt(
-		swiftRepository,
-		'verify-commit',
-		'--report',
-		`${swiftDateDirectory}/findings.json`,
-		'--id',
-		'HS-177',
-		'--commit',
-		'HEAD'
-	));
+	const swiftVerified = json(
+		workflowAt(
+			swiftRepository,
+			'verify-commit',
+			'--report',
+			`${swiftDateDirectory}/findings.json`,
+			'--id',
+			'HS-177',
+			'--commit',
+			'HEAD'
+		)
+	);
 	assert.deepEqual(swiftVerified.production, [
 		'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Worker.swift'
 	]);
@@ -327,19 +343,37 @@ try {
 		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/WorkerTests.swift'
 	]);
 
-	git(swiftAuditWorktree, 'commit', '--allow-empty', '-m',
-		'fix(ahk): integrated sibling audit\n\nAudit-Finding: AHK-001');
-	const mixedHsStatus = json(workflowAt(swiftRepository, 'status', '--report',
-		`${swiftDateDirectory}/findings.json`));
-	assert.deepEqual(mixedHsStatus.completed, { 'HS-177': swiftVerified.commit },
-		'an integrated AHK finding must not invalidate Hammerspoon status');
+	git(
+		swiftAuditWorktree,
+		'commit',
+		'--allow-empty',
+		'-m',
+		'fix(ahk): integrated sibling audit\n\nAudit-Finding: AHK-001'
+	);
+	const mixedHsStatus = json(
+		workflowAt(swiftRepository, 'status', '--report', `${swiftDateDirectory}/findings.json`)
+	);
+	assert.deepEqual(
+		mixedHsStatus.completed,
+		{ 'HS-177': swiftVerified.commit },
+		'an integrated AHK finding must not invalidate Hammerspoon status'
+	);
 	assert.deepEqual(mixedHsStatus.open, []);
 	assert.equal(mixedHsStatus.next_open, null);
 
-	git(swiftAuditWorktree, 'commit', '--allow-empty', '-m',
-		'fix(hs): unknown same-scope finding\n\nAudit-Finding: HS-999');
-	const unknownHsStatus = workflowAt(swiftRepository, 'status', '--report',
-		`${swiftDateDirectory}/findings.json`);
+	git(
+		swiftAuditWorktree,
+		'commit',
+		'--allow-empty',
+		'-m',
+		'fix(hs): unknown same-scope finding\n\nAudit-Finding: HS-999'
+	);
+	const unknownHsStatus = workflowAt(
+		swiftRepository,
+		'status',
+		'--report',
+		`${swiftDateDirectory}/findings.json`
+	);
 	assert.notEqual(unknownHsStatus.status, 0, 'unknown same-scope findings must still fail');
 	assert.match(unknownHsStatus.stderr, /unknown Audit-Finding trailer\(s\): HS-999/);
 

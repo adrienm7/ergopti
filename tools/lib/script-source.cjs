@@ -9,11 +9,16 @@ function scan(source, extension) {
 	const tokens = [];
 	let at = 0;
 	while (at < source.length) {
-		if (/\s/.test(source[at])) { at += 1; continue; }
+		if (/\s/.test(source[at])) {
+			at += 1;
+			continue;
+		}
 		const start = at;
 		const tail = source.slice(at);
-		if ((ahk && source[at] === ';' && (at === 0 || /\s/.test(source[at - 1])))
-			|| (!ahk && tail.startsWith('--'))) {
+		if (
+			(ahk && source[at] === ';' && (at === 0 || /\s/.test(source[at - 1]))) ||
+			(!ahk && tail.startsWith('--'))
+		) {
 			const long = !ahk && tail.match(/^--\[(=*)\[/);
 			if (long) {
 				const end = source.indexOf(']' + long[1] + ']', at + long[0].length);
@@ -35,7 +40,12 @@ function scan(source, extension) {
 		if (long) {
 			const end = source.indexOf(']' + long[1] + ']', at + long[0].length);
 			at = end < 0 ? source.length : end + long[1].length + 2;
-			tokens.push({ kind: 'string', value: source.slice(start + long[0].length, end), start, end: at });
+			tokens.push({
+				kind: 'string',
+				value: source.slice(start + long[0].length, end),
+				start,
+				end: at
+			});
 			continue;
 		}
 		if (source[at] === '"' || source[at] === "'") {
@@ -59,10 +69,13 @@ function scan(source, extension) {
 
 /** Removes comments without interpreting markers inside strings or other comments. */
 function stripComments(source, extension) {
-	let result = '', previous = 0;
+	let result = '',
+		previous = 0;
 	for (const token of scan(source, extension)) {
 		if (token.kind !== 'comment') continue;
-		result += source.slice(previous, token.start) + source.slice(token.start, token.end).replace(/[^\n]/g, ' ');
+		result +=
+			source.slice(previous, token.start) +
+			source.slice(token.start, token.end).replace(/[^\n]/g, ' ');
 		previous = token.end;
 	}
 	return result + source.slice(previous);

@@ -439,9 +439,9 @@ FEATURES & RATIONALE:
 	.hero-title .grad {
 		animation: grad-shift 7s linear infinite;
 		background: linear-gradient(92deg, #31beff, #02c9db, #7ee3ff, #31beff);
-		background-size: 200% auto;
 		-webkit-background-clip: text;
 		background-clip: text;
+		background-size: 200% auto;
 		display: inline-block;
 		padding-bottom: 0.1em;
 		-webkit-text-fill-color: transparent;

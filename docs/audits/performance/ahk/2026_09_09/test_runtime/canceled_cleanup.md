@@ -9,10 +9,10 @@ Desktop load was uncontrolled. QPC records callback wall time, not CPU time
 or total suite startup. No private metrics data was used.
 
 | Sample | Original callback (ms) | Checked cleanup (ms) |
-| --- | --- | --- |
-| 1 | 1518.982 | 83.887 |
-| 2 | 1498.842 | 93.610 |
-| 3 | 1478.315 | 82.480 |
+| ------ | ---------------------- | -------------------- |
+| 1      | 1518.982               | 83.887               |
+| 2      | 1498.842               | 93.610               |
+| 3      | 1478.315               | 82.480               |
 
 All six baseline selected cases passed on each run. All seven candidate
 selected cases passed on each run. The added locked-file regression takes

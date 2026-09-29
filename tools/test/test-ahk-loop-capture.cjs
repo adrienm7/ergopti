@@ -55,7 +55,7 @@ function walk(dir, acc = []) {
 const findings = [];
 for (const file of walk(TESTS)) {
 	const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
-	let depth = 0;      // brace depth inside the innermost for-loop, -1 when outside
+	let depth = 0; // brace depth inside the innermost for-loop, -1 when outside
 	let inLoop = false;
 	lines.forEach((raw, i) => {
 		const line = raw.replace(/;.*$/, '');
@@ -76,7 +76,7 @@ for (const file of walk(TESTS)) {
 				findings.push({
 					file: path.relative(ROOT, file).replace(/\\/g, '/'),
 					line: i + 1,
-					text: line.trim().slice(0, 110),
+					text: line.trim().slice(0, 110)
 				});
 			}
 			if (depth <= 0 && /\}/.test(line)) inLoop = false;
@@ -98,4 +98,6 @@ if (findings.length > BASELINE) {
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] No inline loop closures in test registrations (${findings.length}/${BASELINE}).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] No inline loop closures in test registrations (${findings.length}/${BASELINE}).\x1b[0m`
+);

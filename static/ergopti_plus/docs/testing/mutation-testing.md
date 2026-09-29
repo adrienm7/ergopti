@@ -50,15 +50,15 @@ threshold (currently **50%**).
 
 The configuration lives in `stryker.config.mjs` at the project root.
 
-| Setting          | Value                                                                                  |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| Test runner      | `command` (runs `node scripts/test-mutation-targets.cjs`)                              |
+| Setting          | Value                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| Test runner      | `command` (runs `node scripts/test-mutation-targets.cjs`)                                                  |
 | Mutated files    | `static/ergopti_plus/_shared/core/domain/**/*.js`<br>`static/ergopti_plus/_shared/core/ports/**/*.spec.js` |
-| Excluded         | `_generated/`, `node_modules/`                                                         |
-| Report output    | `reports/mutation/mutation.html`                                                       |
-| Threshold: break | 50% — run fails below this score                                                       |
-| Threshold: low   | 65% — score shown in orange in the report                                              |
-| Threshold: high  | 80% — score shown in green in the report                                               |
+| Excluded         | `_generated/`, `node_modules/`                                                                             |
+| Report output    | `reports/mutation/mutation.html`                                                                           |
+| Threshold: break | 50% — run fails below this score                                                                           |
+| Threshold: low   | 65% — score shown in orange in the report                                                                  |
+| Threshold: high  | 80% — score shown in green in the report                                                                   |
 
 ## Current Baseline
 

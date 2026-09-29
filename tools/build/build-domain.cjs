@@ -250,9 +250,7 @@ const PIPELINE = [
 			const { ok, stdout, stderr } = runNpmScript('test:config-schema');
 			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
 			// Surface every violation line, not just the summary, on failure.
-			const detail = lines
-				.filter((l) => l.includes('✗') || l.trim().startsWith('-'))
-				.join('\n');
+			const detail = lines.filter((l) => l.includes('✗') || l.trim().startsWith('-')).join('\n');
 			return { ok, detail: ok ? undefined : detail || lines[lines.length - 1] || '' };
 		}
 	},
@@ -284,22 +282,25 @@ const PIPELINE = [
 		run() {
 			// Git for Windows' bash on Windows: through a shell, a bare "bash"
 			// reached WSL, which ran the build against /mnt/<drive> paths.
-			const result = spawnSync(bashExecutable(), [
-				'tools/build/build-linux-driver.sh',
-				'--skip-smoke'
-			], {
-				cwd: ROOT,
-				encoding: 'utf8',
-				timeout: 60000
-			});
+			const result = spawnSync(
+				bashExecutable(),
+				['tools/build/build-linux-driver.sh', '--skip-smoke'],
+				{
+					cwd: ROOT,
+					encoding: 'utf8',
+					timeout: 60000
+				}
+			);
 			const combined = (result.stdout || '') + (result.stderr || '');
 			const lines = combined.trim().split('\n').filter(Boolean);
-			const detail = result.status === 0
-				? undefined
-				: lines.filter(l => l.includes('MISSING:') || l.includes('ERROR:')).join('\n') || combined.slice(-200);
+			const detail =
+				result.status === 0
+					? undefined
+					: lines.filter((l) => l.includes('MISSING:') || l.includes('ERROR:')).join('\n') ||
+						combined.slice(-200);
 			return { ok: result.status === 0, detail };
 		}
-	},
+	}
 
 	// -------------------------------------------------------
 	// Step 8: Validate .deb package structure (no dpkg-deb needed).

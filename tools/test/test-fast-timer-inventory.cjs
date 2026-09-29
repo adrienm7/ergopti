@@ -76,7 +76,7 @@ const INVENTORY = {
 	'modules/keymap/layout.ahk:_UIA_SelectionPollTimer':
 		'Polls the UIA selection so a layout remap knows whether text is selected. 500 ms, and ' +
 		'armed only in the apps that need it — the AX call is the expensive part, which is why ' +
-		'this is a poll rather than an event subscription.',
+		'this is a poll rather than an event subscription.'
 };
 
 /** Every production .ahk file, vendor and generated code excluded. */
@@ -145,7 +145,9 @@ for (const abs of walk(DRIVER)) {
 const errors = [];
 
 if (scanned < 100) {
-	errors.push(`walked only ${scanned} .ahk file(s) — the scan is broken, and an empty inventory proves nothing`);
+	errors.push(
+		`walked only ${scanned} .ahk file(s) — the scan is broken, and an empty inventory proves nothing`
+	);
 }
 
 for (const [key, site] of found) {

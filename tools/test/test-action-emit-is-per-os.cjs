@@ -42,10 +42,7 @@ const path = require('path');
 const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CATALOGUE = path.join(
-	ROOT,
-	'static/ergopti_plus/_shared/modules/actions/actions.toml'
-);
+const CATALOGUE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/actions.toml');
 
 const errors = [];
 const sg = toml.parse(fs.readFileSync(CATALOGUE, 'utf8')).sg_actions || {};

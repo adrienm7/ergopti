@@ -8,9 +8,7 @@ ENTITY_TO_ALIAS = {
 }
 # ALIAS_TO_ENTITY: character or named entity -> hex entity
 ALIAS_TO_ENTITY = {
-    alias: entity
-    for entity, aliases in ENTITY_TO_ALIAS.items()
-    for alias in aliases
+    alias: entity for entity, aliases in ENTITY_TO_ALIAS.items() for alias in aliases
 }
 
 SYMBOL_TO_NAME = {
@@ -39,7 +37,6 @@ SYMBOL_TO_NAME = {
     "-": "minus",
     " ": "nnbsp",
     " ": "nbsp",
-    " ": "nnbsp",
     "˛": "ogonek",
     "+": "plus",
     '"': "quote",

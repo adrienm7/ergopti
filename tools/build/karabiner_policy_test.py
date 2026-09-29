@@ -17,13 +17,18 @@ class PackagePolicyTests(unittest.TestCase):
         modified = postinstall_policy(original)
         self.assertNotIn(ICON_CALL.encode(), modified)
         self.assertEqual(original.count(ICON_CALL.encode()), 1)
-        self.assertEqual(original.replace(ICON_CALL.encode(), b""),
-                         modified.replace(b"# Keep the signed bundle resources immutable.", b""))
+        self.assertEqual(
+            original.replace(ICON_CALL.encode(), b""),
+            modified.replace(b"# Keep the signed bundle resources immutable.", b""),
+        )
 
     def test_changed_or_prepatched_upstream_installer_is_rejected(self):
         original = FIXTURE.read_bytes()
         for source in (original + b"exit 1\n", postinstall_policy(original), b"exit 0\n"):
-            with self.subTest(source=source), self.assertRaisesRegex(ValueError, "pinned postinstall"):
+            with (
+                self.subTest(source=source),
+                self.assertRaisesRegex(ValueError, "pinned postinstall"),
+            ):
                 postinstall_policy(source)
 
     def test_repackage_changes_only_postinstall_and_preserves_both_native_payloads(self):
@@ -39,7 +44,9 @@ class PackagePolicyTests(unittest.TestCase):
             before = archive_inventory(root)
             after = repair_expanded(root)
             self.assertEqual(set(before), set(after))
-            self.assertEqual([name for name in before if before[name] != after[name]], [POSTINSTALL])
+            self.assertEqual(
+                [name for name in before if before[name] != after[name]], [POSTINSTALL]
+            )
             self.assertNotIn(ICON_CALL.encode(), postinstall.read_bytes())
             self.assertEqual(after, archive_inventory(root))
             postinstall.write_bytes(b"unexpected installer")

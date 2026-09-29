@@ -99,7 +99,12 @@ function parseManifest() {
 		}
 		if (!table) continue;
 		const p = line.match(/^platforms\s*=\s*\[(.*)\]/);
-		const plats = p ? p[1].replace(/["'\s]/g, '').split(',').filter(Boolean) : null;
+		const plats = p
+			? p[1]
+					.replace(/["'\s]/g, '')
+					.split(',')
+					.filter(Boolean)
+			: null;
 		if (table.kind === 'section' && plats && !sectionPlatforms.has(table.name)) {
 			sectionPlatforms.set(table.name, new Set(plats));
 		}
@@ -135,8 +140,11 @@ function parseManifest() {
  * @returns {string[]} Literal paths or dynamic namespace patterns.
  */
 function configReadSurfaces(source) {
-	return [...source.matchAll(/(?:storage\.(?:get|set)|default_for|find_entry_by_path)\(\s*"([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)"(\s*\.\.)?/g)]
-		.map((match) => match[2] && match[1].endsWith('.') ? match[1] + '*' : match[1]);
+	return [
+		...source.matchAll(
+			/(?:storage\.(?:get|set)|default_for|find_entry_by_path)\(\s*"([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)"(\s*\.\.)?/g
+		)
+	].map((match) => (match[2] && match[1].endsWith('.') ? match[1] + '*' : match[1]));
 }
 
 /**
@@ -161,31 +169,47 @@ function isDeclaredSurface(surface, known, dynamic = []) {
 		const tail = fixed.slice(definition.prefix.length + 1).split('.');
 		if (tail.some((part) => part === '')) return false;
 		if (wildcard) return tail.length < definition.depth;
-		return tail.length === definition.depth && (!definition.suffix || tail.at(-1) === definition.suffix);
+		return (
+			tail.length === definition.depth && (!definition.suffix || tail.at(-1) === definition.suffix)
+		);
 	});
 }
 
 // Regression oracles: concatenation is a namespace, but a literal trailing dot,
 // unknown child, similarly named section or wrong platform is never exempted.
-assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. name)'), ['shortcuts.keys.*']);
-assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys.")'), ['shortcuts.keys.']);
+assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. name)'), [
+	'shortcuts.keys.*'
+]);
+assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys.")'), [
+	'shortcuts.keys.'
+]);
 const declaredProbe = new Set(['shortcuts.keys.layer_scroll']);
 assert.equal(isDeclaredSurface('shortcuts.keys.*', declaredProbe), true);
 assert.equal(isDeclaredSurface('shortcuts.keys.', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.keys.unknown', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.key.*', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.keys.*', new Set()), false);
-const dynamicProbe = [{ prefix: 'hotstrings.modules', depth: 2 },
-	{ prefix: 'llm.profiles.shortcuts', depth: 2, suffix: 'key' }];
+const dynamicProbe = [
+	{ prefix: 'hotstrings.modules', depth: 2 },
+	{ prefix: 'llm.profiles.shortcuts', depth: 2, suffix: 'key' }
+];
 assert.equal(isDeclaredSurface('hotstrings.modules.*', new Set(), dynamicProbe), true);
 assert.equal(isDeclaredSurface('hotstrings.modules.rolls.hc', new Set(), dynamicProbe), true);
 assert.equal(isDeclaredSurface('hotstrings.modules.rolls.*', new Set(), dynamicProbe), true);
-for (const unknown of ['hotstrings.module.*', 'hotstrings.modules.rolls',
-	'hotstrings.modules.rolls.hc.extra', 'hotstrings.modules..hc',
-	'llm.profiles.shortcuts.profile.unknown', 'llm.profiles.shortcuts.profile.key.*']) {
+for (const unknown of [
+	'hotstrings.module.*',
+	'hotstrings.modules.rolls',
+	'hotstrings.modules.rolls.hc.extra',
+	'hotstrings.modules..hc',
+	'llm.profiles.shortcuts.profile.unknown',
+	'llm.profiles.shortcuts.profile.key.*'
+]) {
 	assert.equal(isDeclaredSurface(unknown, new Set(), dynamicProbe), false, unknown);
 }
-assert.equal(isDeclaredSurface('llm.profiles.shortcuts.profile.key', new Set(), dynamicProbe), true);
+assert.equal(
+	isDeclaredSurface('llm.profiles.shortcuts.profile.key', new Set(), dynamicProbe),
+	true
+);
 
 /**
  * Recognizes one exact secondary-file writer, not a globally exempt config key.
@@ -199,44 +223,124 @@ assert.equal(isDeclaredSurface('llm.profiles.shortcuts.profile.key', new Set(), 
  * @returns {boolean} Whether the secondary override owner handles this row.
  */
 function isSecondaryWrite(driver, relative, source, surface, offset) {
-	if (driver !== 'macos' || relative !== 'modules/hotstrings/hotstrings_config.lua'
-		|| surface !== '__global__.word_delimiters') return false;
-	const prepare = /^local function prepare_override_content\(overrides, word_delimiters\)\r?\n[\s\S]*?^end\b/gm.exec(source);
-	const save = /^local function save_to_disk\(overrides, word_delimiters\)\r?\n[\s\S]*?^end\b/gm.exec(source);
+	if (
+		driver !== 'macos' ||
+		relative !== 'modules/hotstrings/hotstrings_config.lua' ||
+		surface !== '__global__.word_delimiters'
+	)
+		return false;
+	const prepare =
+		/^local function prepare_override_content\(overrides, word_delimiters\)\r?\n[\s\S]*?^end\b/gm.exec(
+			source
+		);
+	const save =
+		/^local function save_to_disk\(overrides, word_delimiters\)\r?\n[\s\S]*?^end\b/gm.exec(source);
 	const init = /^function M\.init\(opts\)\r?\n[\s\S]*?^end\b/gm.exec(source);
-	if (!prepare || !save || !init || offset < prepare.index
-		|| offset >= prepare.index + prepare[0].length) return false;
-	return /local snapshot = _state\.source_snapshot/.test(prepare[0])
-		&& /TomlRecordEditor\.patch_table_field\(content,/.test(prepare[0])
-		&& /local prepared, prepare_error = prepare_override_content\(overrides, word_delimiters\)/.test(save[0])
-		&& /content = prepared/.test(save[0])
-		&& /FileSystem\.write_if_unchanged\(_state\.path, content, _state\.source_snapshot\)/.test(save[0])
-		&& /parse_overrides\(opts\.override_path\)/.test(init[0])
-		&& /path\s*= opts\.override_path/.test(init[0]);
+	if (
+		!prepare ||
+		!save ||
+		!init ||
+		offset < prepare.index ||
+		offset >= prepare.index + prepare[0].length
+	)
+		return false;
+	return (
+		/local snapshot = _state\.source_snapshot/.test(prepare[0]) &&
+		/TomlRecordEditor\.patch_table_field\(content,/.test(prepare[0]) &&
+		/local prepared, prepare_error = prepare_override_content\(overrides, word_delimiters\)/.test(
+			save[0]
+		) &&
+		/content = prepared/.test(save[0]) &&
+		/FileSystem\.write_if_unchanged\(_state\.path, content, _state\.source_snapshot\)/.test(
+			save[0]
+		) &&
+		/parse_overrides\(opts\.override_path\)/.test(init[0]) &&
+		/path\s*= opts\.override_path/.test(init[0])
+	);
 }
 
 // The production bootstrap binds this owner to its secondary TOML file.
 // Redirecting that owner to config.toml must fail the gate too.
 const secondaryBootstrap = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', 'init.lua'), 'utf8');
-const secondaryDestination = /override_path = override_path \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
-assert.equal(secondaryDestination.test(secondaryBootstrap), true, 'override owner must target its secondary file');
-assert.equal(secondaryDestination.test(secondaryBootstrap.replace('"hotstrings_config.toml"', '"config.toml"')), false);
+const secondaryDestination =
+	/override_path = override_path \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
+assert.equal(
+	secondaryDestination.test(secondaryBootstrap),
+	true,
+	'override owner must target its secondary file'
+);
+assert.equal(
+	secondaryDestination.test(
+		secondaryBootstrap.replace('"hotstrings_config.toml"', '"config.toml"')
+	),
+	false
+);
 
 // The secondary-file exclusion is tied to the actual preparation/publication
 // chain. Neither another writer nor an undeclared neighbouring leaf inherits it.
 const secondaryOwner = 'modules/hotstrings/hotstrings_config.lua';
 const secondarySource = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', secondaryOwner), 'utf8');
-const secondaryRow = /section\s*=\s*"__global__"\s*,\s*key\s*=\s*"word_delimiters"/.exec(secondarySource);
+const secondaryRow = /section\s*=\s*"__global__"\s*,\s*key\s*=\s*"word_delimiters"/.exec(
+	secondarySource
+);
 assert.ok(secondaryRow, 'secondary owner must still expose the literal row under test');
-assert.equal(isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.word_delimiters', secondaryRow.index), true);
-assert.equal(isSecondaryWrite('macos', 'infra/config.lua', secondarySource, '__global__.word_delimiters', secondaryRow.index), false);
-assert.equal(isSecondaryWrite('linux', secondaryOwner, secondarySource, '__global__.word_delimiters', secondaryRow.index), false);
-assert.equal(isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.unknown', secondaryRow.index), false);
-assert.equal(isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.word_delimiters', 0), false);
-assert.equal(isSecondaryWrite('macos', secondaryOwner,
-	secondarySource.replace('FileSystem.write_if_unchanged(_state.path, content, _state.source_snapshot)',
-		'FileSystem.write_if_unchanged(config_path, content, _state.source_snapshot)'),
-	'__global__.word_delimiters', secondaryRow.index), false);
+assert.equal(
+	isSecondaryWrite(
+		'macos',
+		secondaryOwner,
+		secondarySource,
+		'__global__.word_delimiters',
+		secondaryRow.index
+	),
+	true
+);
+assert.equal(
+	isSecondaryWrite(
+		'macos',
+		'infra/config.lua',
+		secondarySource,
+		'__global__.word_delimiters',
+		secondaryRow.index
+	),
+	false
+);
+assert.equal(
+	isSecondaryWrite(
+		'linux',
+		secondaryOwner,
+		secondarySource,
+		'__global__.word_delimiters',
+		secondaryRow.index
+	),
+	false
+);
+assert.equal(
+	isSecondaryWrite(
+		'macos',
+		secondaryOwner,
+		secondarySource,
+		'__global__.unknown',
+		secondaryRow.index
+	),
+	false
+);
+assert.equal(
+	isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.word_delimiters', 0),
+	false
+);
+assert.equal(
+	isSecondaryWrite(
+		'macos',
+		secondaryOwner,
+		secondarySource.replace(
+			'FileSystem.write_if_unchanged(_state.path, content, _state.source_snapshot)',
+			'FileSystem.write_if_unchanged(config_path, content, _state.source_snapshot)'
+		),
+		'__global__.word_delimiters',
+		secondaryRow.index
+	),
+	false
+);
 
 /**
  * Every "section.key" (or bare section) a driver's own source reads or writes.
@@ -258,7 +362,9 @@ function surfaceOf(driver) {
 			if (!/\.(lua|ahk)$/.test(e.name)) continue;
 			const src = fs.readFileSync(p, 'utf8');
 			// batch_write rows: { section = "x", key = "y" }
-			for (const m of src.matchAll(/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*"([A-Za-z0-9_.]+)"/g)) {
+			for (const m of src.matchAll(
+				/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*"([A-Za-z0-9_.]+)"/g
+			)) {
 				const surface = `${m[1]}.${m[2]}`;
 				const relative = path.relative(root, p).split(path.sep).join('/');
 				if (!isSecondaryWrite(driver, relative, src, surface, m.index)) out.add(surface);
@@ -272,7 +378,9 @@ function surfaceOf(driver) {
 			// Windows boot-owned scalar reads. These bypass the manifest-backed
 			// Features tree, so omitting them made a real config surface invisible
 			// to this ratchet.
-			for (const m of src.matchAll(/_FeatureStateIniGet\(\s*[^,]+,\s*"([A-Za-z0-9_.]+)"\s*,\s*"([A-Za-z0-9_.]+)"/g)) {
+			for (const m of src.matchAll(
+				/_FeatureStateIniGet\(\s*[^,]+,\s*"([A-Za-z0-9_.]+)"\s*,\s*"([A-Za-z0-9_.]+)"/g
+			)) {
 				out.add(`${m[1]}.${m[2]}`);
 			}
 			// The [linux.*] silo is read as a TABLE, not key by key, so no pattern
@@ -325,7 +433,9 @@ if (undeclared.length > BASELINE) {
 			'  point the driver at the canonical key that already means the same thing.\n' +
 			'  Do NOT raise the baseline.'
 	);
-	console.error('  Run `node tools/test/test-driver-config-surface-is-declared.cjs --measure` to list them.');
+	console.error(
+		'  Run `node tools/test/test-driver-config-surface-is-declared.cjs --measure` to list them.'
+	);
 	process.exit(1);
 }
 

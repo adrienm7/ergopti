@@ -68,7 +68,9 @@ const ruleIds = [...lifecycleSrc.matchAll(/\bid:\s*'([^']+)'/g)].map((m) => ({
 	at: m.index
 }));
 if (ruleIds.length === 0) {
-	errors.push('parsed no ordering rule from lifecycleContract() — the contract is empty or the parser drifted');
+	errors.push(
+		'parsed no ordering rule from lifecycleContract() — the contract is empty or the parser drifted'
+	);
 }
 for (const { id, at } of ruleIds) {
 	const rest = lifecycleSrc.slice(at, at + 400);
@@ -82,7 +84,9 @@ for (const { id, at } of ruleIds) {
 
 const src = fs.readFileSync(AHK_RENDERER, 'utf8');
 if (src.length < 1000) {
-	errors.push(`${path.basename(AHK_RENDERER)} read as ${src.length} bytes — the renderer moved, and this gate measures nothing`);
+	errors.push(
+		`${path.basename(AHK_RENDERER)} read as ${src.length} bytes — the renderer moved, and this gate measures nothing`
+	);
 }
 
 // A phase is "named" when the renderer mentions it as a word, in any case: the
@@ -103,11 +107,21 @@ for (const phase of phases) {
 // The reverse: a phase word the renderer uses that the contract does not know.
 // Restricted to the four the contract could plausibly gain, so ordinary English
 // in comments does not trip it.
-const CANDIDATE_PHASES = ['teardown', 'suspend', 'prepare', 'reveal', 'restore', 'compose', 'commit'];
+const CANDIDATE_PHASES = [
+	'teardown',
+	'suspend',
+	'prepare',
+	'reveal',
+	'restore',
+	'compose',
+	'commit'
+];
 for (const candidate of CANDIDATE_PHASES) {
 	if (phases.includes(candidate)) continue;
 	// Only a SECTION-COMMENT or function-name use counts as claiming a phase.
-	const asPhase = new RegExp(`(;\\s*${candidate}\\s*[—-]|_Tooltip${candidate}[A-Z])`, 'i').test(src);
+	const asPhase = new RegExp(`(;\\s*${candidate}\\s*[—-]|_Tooltip${candidate}[A-Z])`, 'i').test(
+		src
+	);
 	if (asPhase) {
 		errors.push(
 			`the AutoHotkey renderer marks a "${candidate}" phase that the shared contract does not ` +

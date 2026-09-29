@@ -149,9 +149,6 @@ const MAC_ONLY = [
 const errors = [];
 const notes = [];
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ Parse Both Namespaces =================
@@ -209,9 +206,6 @@ if (Object.keys(mac).length < 14) {
 	errors.push(`parsed ${Object.keys(mac).length} [hs_tap_hold] entr(ies) — expected at least 14`);
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ The Correspondence Holds ==============
@@ -228,7 +222,9 @@ const usedDivergences = new Set();
 
 for (const { pc: pcKey, mac: macKey } of CORRESPONDENCE) {
 	if (!pc[pcKey]) {
-		errors.push(`[tap_hold.keys.${pcKey}] is gone — the correspondence names it, so a rename here un-pairs a key silently`);
+		errors.push(
+			`[tap_hold.keys.${pcKey}] is gone — the correspondence names it, so a rename here un-pairs a key silently`
+		);
 		continue;
 	}
 	if (!mac[macKey]) {
@@ -243,7 +239,10 @@ for (const { pc: pcKey, mac: macKey } of CORRESPONDENCE) {
 		const known = KNOWN_DIVERGENCES[key];
 
 		if (a === null || b === null) {
-			if (!known) errors.push(`${key}: one side declares no ${slot} action (${a} vs ${b}) and nothing records why`);
+			if (!known)
+				errors.push(
+					`${key}: one side declares no ${slot} action (${a} vs ${b}) and nothing records why`
+				);
 			continue;
 		}
 
@@ -278,12 +277,11 @@ for (const { pc: pcKey, mac: macKey } of CORRESPONDENCE) {
 
 for (const key of Object.keys(KNOWN_DIVERGENCES)) {
 	if (!usedDivergences.has(key)) {
-		errors.push(`the divergence recorded for ${key} was never reached — the key or its pairing is gone, and the note is stale`);
+		errors.push(
+			`the divergence recorded for ${key} was never reached — the key or its pairing is gone, and the note is stale`
+		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -303,16 +301,17 @@ for (const key of Object.keys(mac)) {
 }
 for (const key of Object.keys(pc)) {
 	if (pairedPc.has(key)) continue;
-	errors.push(`[tap_hold.keys.${key}] is paired with nothing — add it to the correspondence or to a declared exception`);
+	errors.push(
+		`[tap_hold.keys.${key}] is paired with nothing — add it to the correspondence or to a declared exception`
+	);
 }
 for (const key of MAC_ONLY) {
 	if (!mac[key]) {
-		errors.push(`"${key}" is listed as macOS-only but [hs_tap_hold] no longer declares it — the list is stale`);
+		errors.push(
+			`"${key}" is listed as macOS-only but [hs_tap_hold] no longer declares it — the list is stale`
+		);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================

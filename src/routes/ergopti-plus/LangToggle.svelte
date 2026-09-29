@@ -13,7 +13,12 @@ language never requires touching this component.
 <script>
 	import { i18n, setLang, AVAILABLE_LANGS } from './i18n.svelte.js';
 
-	let index = $derived(Math.max(0, AVAILABLE_LANGS.findIndex((l) => l.code === i18n.lang)));
+	let index = $derived(
+		Math.max(
+			0,
+			AVAILABLE_LANGS.findIndex((l) => l.code === i18n.lang)
+		)
+	);
 </script>
 
 <div

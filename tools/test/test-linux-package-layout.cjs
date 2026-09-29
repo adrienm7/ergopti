@@ -56,24 +56,36 @@ const LEGACY_PREFIXES = ['static/drivers'];
 // unit must fail here, while an AppImage has nowhere to install one.
 const PACKAGERS = [
 	{
-		label: '.deb', rel: 'tools/build/build-linux-deb.sh',
-		root: '/usr/lib/ergopti', wrapperBin: 'usr/bin/ergopti', systemdUnit: true
+		label: '.deb',
+		rel: 'tools/build/build-linux-deb.sh',
+		root: '/usr/lib/ergopti',
+		wrapperBin: 'usr/bin/ergopti',
+		systemdUnit: true
 	},
 	{
-		label: '.rpm', rel: 'tools/build/build-linux-rpm.sh',
-		root: '/usr/lib/ergopti', wrapperBin: 'usr/bin/ergopti', systemdUnit: true
+		label: '.rpm',
+		rel: 'tools/build/build-linux-rpm.sh',
+		root: '/usr/lib/ergopti',
+		wrapperBin: 'usr/bin/ergopti',
+		systemdUnit: true
 	},
 	{
 		// Relocatable: AppRun resolves $HERE at run time, so the root is an
 		// expression rather than an absolute path.
-		label: 'AppImage', rel: 'tools/build/build-linux-appimage.sh',
-		root: '$HERE/usr/lib/ergopti', wrapperBin: 'usr/bin/ergopti', systemdUnit: false
+		label: 'AppImage',
+		rel: 'tools/build/build-linux-appimage.sh',
+		root: '$HERE/usr/lib/ergopti',
+		wrapperBin: 'usr/bin/ergopti',
+		systemdUnit: false
 	},
 	{
 		// Flatpak owns /app inside its sandbox; a user unit cannot be installed
 		// from inside one, so autostart is the portal's business, not ours.
-		label: 'Flatpak', rel: 'tools/build/build-linux-flatpak.sh',
-		root: '/app/lib/ergopti', wrapperBin: '/app/bin/ergopti', systemdUnit: false
+		label: 'Flatpak',
+		rel: 'tools/build/build-linux-flatpak.sh',
+		root: '/app/lib/ergopti',
+		wrapperBin: '/app/bin/ergopti',
+		systemdUnit: false
 	}
 ];
 
@@ -96,17 +108,24 @@ for (const pkg of PACKAGERS) {
 	// Either spelling counts: the absolute path, or $DRIVER_ROOT — which is the
 	// only form available to a relocatable image that learns its root at run time.
 	const entryLiteral = `${pkg.root}/ergopti_hotstrings.lua`;
-	const entryViaVar  = '$DRIVER_ROOT/ergopti_hotstrings.lua';
-	const graphicalLauncher = src.includes('exec bash "$DRIVER_ROOT/install/launch.sh" "$@"')
-		&& read('static/ergopti_plus/linux/install/launch.sh').includes('exec luajit "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"');
+	const entryViaVar = '$DRIVER_ROOT/ergopti_hotstrings.lua';
+	const graphicalLauncher =
+		src.includes('exec bash "$DRIVER_ROOT/install/launch.sh" "$@"') &&
+		read('static/ergopti_plus/linux/install/launch.sh').includes(
+			'exec luajit "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"'
+		);
 	if (!src.includes(entryLiteral) && !src.includes(entryViaVar) && !graphicalLauncher) {
-		errors.push(`${tag}: wrapper must exec ${entryLiteral} (or the same path via $DRIVER_ROOT) — install dir must be boot dir.`);
+		errors.push(
+			`${tag}: wrapper must exec ${entryLiteral} (or the same path via $DRIVER_ROOT) — install dir must be boot dir.`
+		);
 	}
 	// ...and it roots the shared Lua tree on LUA_PATH relative to that root.
 	// This one IS universal: it is written relative to DRIVER_ROOT, so every
 	// format spells it identically no matter where its prefix lands.
 	if (!src.includes(`SHARED_LUA="${SHARED_LUA_EXPR}"`)) {
-		errors.push(`${tag}: wrapper must set SHARED_LUA="${SHARED_LUA_EXPR}" for LUA_PATH resolution.`);
+		errors.push(
+			`${tag}: wrapper must set SHARED_LUA="${SHARED_LUA_EXPR}" for LUA_PATH resolution.`
+		);
 	}
 
 	// 3. The launcher lands at this format's canonical path, and — for formats
@@ -124,7 +143,9 @@ for (const pkg of PACKAGERS) {
 	} else if (src.includes(SERVICE_UNIT)) {
 		// Declared unit-less but shipping one anyway: the declaration is stale,
 		// and section 5's --tray enumeration would not be covering it.
-		errors.push(`${tag}: declared as shipping no systemd unit, but installs ${SERVICE_UNIT} — update PACKAGERS and UNIT_SOURCES.`);
+		errors.push(
+			`${tag}: declared as shipping no systemd unit, but installs ${SERVICE_UNIT} — update PACKAGERS and UNIT_SOURCES.`
+		);
 	}
 
 	// 4. No legacy pre-reorg prefix may reappear.
@@ -153,12 +174,15 @@ const DRIVER_SRC = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 // vendor/ is excluded from the bundle before a packager ever sees it.
 const NON_RUNTIME_DIRS = new Set(['tests', '__pycache__', 'bin', 'vendor']);
 
-const runtimeDirs = fs.readdirSync(DRIVER_SRC, { withFileTypes: true })
+const runtimeDirs = fs
+	.readdirSync(DRIVER_SRC, { withFileTypes: true })
 	.filter((d) => d.isDirectory() && !NON_RUNTIME_DIRS.has(d.name))
 	.map((d) => d.name);
 
 if (runtimeDirs.length === 0) {
-	errors.push('the driver source tree yielded no runtime directory — this scan is broken, not the tree.');
+	errors.push(
+		'the driver source tree yielded no runtime directory — this scan is broken, not the tree.'
+	);
 }
 
 for (const pkg of PACKAGERS) {
@@ -177,7 +201,7 @@ for (const pkg of PACKAGERS) {
 		if (!copiesDir) {
 			errors.push(
 				`${pkg.rel} (${pkg.label}): stages the driver by name but never copies '${dir}/' — ` +
-				`either copy the tree wholesale, or add it. The daemon reads every runtime directory.`
+					`either copy the tree wholesale, or add it. The daemon reads every runtime directory.`
 			);
 		}
 	}
@@ -202,19 +226,19 @@ for (const invariant of [
 	'copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus',
 	'node "${SCRIPT_DIR}/copy-tracked-tree.cjs" "${REPO_ROOT}" "$src" "$dst" "$@"',
 	'git -C "${REPO_ROOT}" ls-files -z -- "${SHARED_RELATIVE}/ui"',
-	'cmp -s "${SHARED_SRC}/ui/${relative}" "${BUILD_DIR}/_shared/ui/${relative}"',
+	'cmp -s "${SHARED_SRC}/ui/${relative}" "${BUILD_DIR}/_shared/ui/${relative}"'
 ]) {
 	if (!bundleBuilderSrc.includes(invariant)) {
 		errors.push(
 			`${BUNDLE_BUILDER}: must derive and byte-check the complete shared UI closure; ` +
-			`missing invariant ${JSON.stringify(invariant)}.`
+				`missing invariant ${JSON.stringify(invariant)}.`
 		);
 	}
 }
 if (/cp\s+-r\s+"\$src"/.test(bundleBuilderSrc) || /rsync\s+.*"\$src"/.test(bundleBuilderSrc)) {
 	errors.push(
 		`${BUNDLE_BUILDER}: must inventory tracked files instead of recursively copying ignored ` +
-		'WebView caches that can contain personal metrics.'
+			'WebView caches that can contain personal metrics.'
 	);
 }
 
@@ -223,13 +247,13 @@ const packageUiCopies = new Map([
 	['tools/build/build-linux-rpm.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/build-linux-appimage.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/build-linux-flatpak.sh', '$BUILD_DIR/_shared/.'],
-	['tools/build/PKGBUILD', 'build/linux/_shared/.'],
+	['tools/build/PKGBUILD', 'build/linux/_shared/.']
 ]);
 for (const [rel, copySource] of packageUiCopies) {
 	if (!read(rel).includes(copySource)) {
 		errors.push(
 			`${rel}: must copy ${copySource}; otherwise a complete release bundle is ` +
-			'truncated again while staging this package format.'
+				'truncated again while staging this package format.'
 		);
 	}
 }
@@ -281,7 +305,9 @@ let daemonExecStartsFound = 0;
 for (const rel of UNIT_SOURCES) {
 	const full = path.join(ROOT, rel);
 	if (!fs.existsSync(full)) {
-		errors.push(`${rel}: expected packaging file is missing — update UNIT_SOURCES or restore the file.`);
+		errors.push(
+			`${rel}: expected packaging file is missing — update UNIT_SOURCES or restore the file.`
+		);
 		continue;
 	}
 	const src = fs.readFileSync(full, 'utf8');
@@ -291,7 +317,7 @@ for (const rel of UNIT_SOURCES) {
 		if (!/\s--tray(\s|$)/.test(m.groups.args)) {
 			errors.push(
 				`${rel}: "${m[0].trim()}" launches the daemon without --tray, so the ` +
-				`installed service has no tray icon and no menu.`
+					`installed service has no tray icon and no menu.`
 			);
 		}
 	}
@@ -300,7 +326,7 @@ for (const rel of UNIT_SOURCES) {
 if (daemonExecStartsFound === 0) {
 	errors.push(
 		'no daemon ExecStart line matched in any packaging file — the selector is stale, ' +
-		'not the tree. A scan that silently finds nothing is the failure mode this check exists to avoid.'
+			'not the tree. A scan that silently finds nothing is the failure mode this check exists to avoid.'
 	);
 }
 
@@ -313,7 +339,7 @@ const EXPLICIT_TRAY_DESKTOP_SOURCES = [
 	'tools/build/build-linux-deb.sh',
 	'tools/build/build-linux-rpm.sh',
 	'tools/build/build-linux-flatpak.sh',
-	'tools/build/PKGBUILD',
+	'tools/build/PKGBUILD'
 ];
 let desktopEntriesFound = 0;
 for (const rel of EXPLICIT_TRAY_DESKTOP_SOURCES) {
@@ -323,7 +349,7 @@ for (const rel of EXPLICIT_TRAY_DESKTOP_SOURCES) {
 		if (!/\s--tray(?:\s|$)/.test(match.groups.command)) {
 			errors.push(
 				`${rel}: "${match[0]}" launches the daemon without --tray, so clicking ` +
-				'the desktop entry starts an invisible background process.'
+					'the desktop entry starts an invisible background process.'
 			);
 		}
 	}
@@ -331,7 +357,7 @@ for (const rel of EXPLICIT_TRAY_DESKTOP_SOURCES) {
 if (desktopEntriesFound !== EXPLICIT_TRAY_DESKTOP_SOURCES.length) {
 	errors.push(
 		`expected ${EXPLICIT_TRAY_DESKTOP_SOURCES.length} explicit-tray desktop entries, ` +
-		`found ${desktopEntriesFound}; the desktop-entry inventory is stale.`
+			`found ${desktopEntriesFound}; the desktop-entry inventory is stale.`
 	);
 }
 
@@ -353,7 +379,7 @@ for (const line of installSrc.split('\n')) {
 	if (/^\s*ln\s+-[A-Za-z]*s/.test(line) && /\.config|CONFIG/.test(line)) {
 		errors.push(
 			`${INSTALL_SH}: "${line.trim()}" links a user config file into the install tree; the ` +
-			'daemon writes that path, so the link makes it overwrite its own source.'
+				'daemon writes that path, so the link makes it overwrite its own source.'
 		);
 	}
 }
@@ -370,7 +396,7 @@ const autostartRetire = 'rm -f -- "${AUTOSTART_FILE}"';
 if (installSrc.split(startupOwner).length - 1 !== 2) {
 	errors.push(
 		`${INSTALL_SH}: reachable systemd and an already-enabled no-bus unit must elect ` +
-		'systemd as the sole startup owner.'
+			'systemd as the sole startup owner.'
 	);
 }
 if (installSrc.split(autostartRetire).length - 1 !== 2) {
@@ -384,10 +410,11 @@ if (installSrc.split(autostartWrite).length - 1 !== 1) {
 	);
 }
 const xdgGuard = 'if [ "${STARTUP_OWNER}" = "xdg" ]; then';
-if (!installSrc.includes(xdgGuard) || installSrc.indexOf(xdgGuard) > installSrc.indexOf(autostartWrite)) {
-	errors.push(
-		`${INSTALL_SH}: the XDG writer must be inside the explicit xdg-owner branch.`
-	);
+if (
+	!installSrc.includes(xdgGuard) ||
+	installSrc.indexOf(xdgGuard) > installSrc.indexOf(autostartWrite)
+) {
+	errors.push(`${INSTALL_SH}: the XDG writer must be inside the explicit xdg-owner branch.`);
 }
 
 // ─── 7. There is ONE unit, and every copy of it agrees ──────────────────────
@@ -423,7 +450,7 @@ for (const rel of UNIT_SOURCES) {
 		if (name !== CANONICAL_UNIT_NAME) {
 			errors.push(
 				`${rel}: names "${name}" — there is one unit, ${CANONICAL_UNIT_NAME}. ` +
-				`A second name means two installers can each enable a daemon, and both grab the keyboard.`
+					`A second name means two installers can each enable a daemon, and both grab the keyboard.`
 			);
 		}
 	}
@@ -434,7 +461,7 @@ for (const rel of UNIT_SOURCES) {
 		if (m[1].trim() !== 'graphical-session.target') {
 			errors.push(
 				`${rel}: "WantedBy=${m[1].trim()}" — the daemon needs a session to read input from ` +
-				`and a tray to draw into; default.target starts it on a TTY login too.`
+					`and a tray to draw into; default.target starts it on a TTY login too.`
 			);
 		}
 	}
@@ -444,8 +471,8 @@ for (const rel of UNIT_SOURCES) {
 		if (/^Environment=DISPLAY/.test(line.trim())) {
 			errors.push(
 				`${rel}: "${line.trim()}" — the daemon probes the display server at runtime ` +
-				`(infra/display_server.lua). A pinned value is wrong on a second seat, wrong ` +
-				`under Wayland, and breaks the X11-to-Wayland switch this unit exists to survive.`
+					`(infra/display_server.lua). A pinned value is wrong on a second seat, wrong ` +
+					`under Wayland, and breaks the X11-to-Wayland switch this unit exists to survive.`
 			);
 		}
 	}
@@ -454,7 +481,7 @@ for (const rel of UNIT_SOURCES) {
 if (unitBlocksSeen === 0) {
 	errors.push(
 		'no [Install] section found in any packaging file — the selector is stale, not the tree. ' +
-		'A scan that silently finds nothing is the failure mode this check exists to avoid.'
+			'A scan that silently finds nothing is the failure mode this check exists to avoid.'
 	);
 }
 
@@ -467,12 +494,13 @@ for (const rel of UNIT_SOURCES) {
 	// the ExecStart of the canonical ergopti-hotstrings.service (itself scanned
 	// here) with sed. Counting that sed expression as a unit let the kanata
 	// unit's own PartOf line satisfy the check in its place.
-	const daemonUnits = (src.match(/^ExecStart=\S*(?:ergopti-hotstrings|\/ergopti)\b/gm) || []).length;
+	const daemonUnits = (src.match(/^ExecStart=\S*(?:ergopti-hotstrings|\/ergopti)\b/gm) || [])
+		.length;
 	const partOf = (src.match(/^PartOf=graphical-session\.target$/gm) || []).length;
 	if (daemonUnits > 0 && partOf < daemonUnits) {
 		errors.push(
 			`${rel}: ${daemonUnits} daemon unit(s) but ${partOf} PartOf=graphical-session.target — ` +
-			`without it the daemon outlives the session it probed at startup.`
+				`without it the daemon outlives the session it probed at startup.`
 		);
 	}
 }
@@ -501,7 +529,7 @@ for (const line of pkgbuildSrc.split('\n')) {
 	if (isCopy && /2>\/dev\/null\s*\|\|\s*true/.test(line)) {
 		errors.push(
 			`${PKGBUILD}: "${line.trim()}" — a staging copy that swallows its own failure ` +
-			`makes makepkg succeed with an empty package. Let it fail.`
+				`makes makepkg succeed with an empty package. Let it fail.`
 		);
 	}
 }
@@ -510,7 +538,7 @@ for (const line of pkgbuildSrc.split('\n')) {
 if (!/cp -r build\/linux\/linux\/\.\s/.test(pkgbuildSrc)) {
 	errors.push(
 		`${PKGBUILD}: must copy the driver from build/linux/linux/ — the builder nests it ` +
-		`one level deeper than build/linux/, and copying the wrong path ships no driver.`
+			`one level deeper than build/linux/, and copying the wrong path ships no driver.`
 	);
 }
 
@@ -520,8 +548,8 @@ if (!/cp -r build\/linux\/linux\/\.\s/.test(pkgbuildSrc)) {
 if (!/cp -r build\/linux\/_shared\/\.\s/.test(pkgbuildSrc)) {
 	errors.push(
 		`${PKGBUILD}: must copy the whole _shared tree — _shared/lua alone omits the ` +
-		`keycode tables, the hotstring packs, the locales and defaults.toml, and the ` +
-		`daemon fails fast on the last of those.`
+			`keycode tables, the hotstring packs, the locales and defaults.toml, and the ` +
+			`daemon fails fast on the last of those.`
 	);
 }
 
@@ -529,7 +557,7 @@ if (!/cp -r build\/linux\/_shared\/\.\s/.test(pkgbuildSrc)) {
 if (!/export LUA_PATH=/.test(pkgbuildSrc)) {
 	errors.push(
 		`${PKGBUILD}: the wrapper must export LUA_PATH — without it the daemon cannot ` +
-		`resolve a single require and exits before it logs anything useful.`
+			`resolve a single require and exits before it logs anything useful.`
 	);
 }
 
@@ -558,7 +586,7 @@ const tarLine = workflowSrc.match(/tar -czf[\s\S]{0,200}?-C build\/linux ([^\n]*
 if (!tarLine) {
 	errors.push(
 		`${WORKFLOW}: the Linux release must archive the driver bundle. Publishing ` +
-		`individual files shipped an installer with no driver behind it.`
+			`individual files shipped an installer with no driver behind it.`
 	);
 } else {
 	const members = tarLine[1].trim().split(/\s+/);
@@ -566,7 +594,7 @@ if (!tarLine) {
 		if (!members.includes(required)) {
 			errors.push(
 				`${WORKFLOW}: the release archive omits "${required}" — ` +
-				`without it the downloaded release cannot install or cannot start.`
+					`without it the downloaded release cannot install or cannot start.`
 			);
 		}
 	}
@@ -578,14 +606,10 @@ if (!/sha256sum "\$LINUX_BUNDLE_ASSET" > "\$LINUX_BUNDLE_ASSET\.sha256"/.test(wo
 	);
 }
 if (!/sha256sum --check "\$LINUX_BUNDLE_ASSET\.sha256"/.test(workflowSrc)) {
-	errors.push(
-		`${WORKFLOW}: CI must verify the generated Linux bundle checksum before upload.`
-	);
+	errors.push(`${WORKFLOW}: CI must verify the generated Linux bundle checksum before upload.`);
 }
 if (!/build\/linux\/\$\{\{ env\.LINUX_BUNDLE_ASSET \}\}\.sha256/.test(workflowSrc)) {
-	errors.push(
-		`${WORKFLOW}: the Linux checksum must be included in the release artifact upload.`
-	);
+	errors.push(`${WORKFLOW}: the Linux checksum must be included in the release artifact upload.`);
 }
 
 // The documentation page must expose the one self-contained entrypoint. The
@@ -636,19 +660,21 @@ for (const staleSurface of [
 	if (layoutInstallPageSrc.includes(staleSurface)) {
 		errors.push(
 			`${LAYOUT_INSTALL_PAGE}: must not advertise stale surface "${staleSurface}"; ` +
-			`only install.sh is a supported standalone entrypoint.`
+				`only install.sh is a supported standalone entrypoint.`
 		);
 	}
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m'
+	);
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }
 console.log(
 	`\x1b[32m[OK] All ${PACKAGERS.length} Linux packager(s) (` +
-	PACKAGERS.map((p) => p.label).join(', ') +
-	') boot the daemon from the same root they install it into, ' +
-	`and all ${daemonExecStartsFound} daemon ExecStart line(s) pass --tray.\x1b[0m`
+		PACKAGERS.map((p) => p.label).join(', ') +
+		') boot the daemon from the same root they install it into, ' +
+		`and all ${daemonExecStartsFound} daemon ExecStart line(s) pass --tray.\x1b[0m`
 );

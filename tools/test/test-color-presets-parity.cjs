@@ -45,7 +45,9 @@ function readPresets(file) {
 	const source = fs.readFileSync(file, 'utf8');
 	const block = source.match(/local COLOR_PRESETS = \{([\s\S]*?)\n\}/);
 	if (!block) {
-		errors.push(`${path.relative(process.cwd(), file)}: no "local COLOR_PRESETS = {" table found — this check cannot compare what it cannot read.`);
+		errors.push(
+			`${path.relative(process.cwd(), file)}: no "local COLOR_PRESETS = {" table found — this check cannot compare what it cannot read.`
+		);
 		return [];
 	}
 	// macOS spells the label as i18n.get("key"); Linux stores the key itself, so
@@ -63,7 +65,10 @@ function readPresets(file) {
 const macos = readPresets(MACOS);
 const linux = readPresets(LINUX);
 
-for (const [name, list] of [['macOS', macos], ['Linux', linux]]) {
+for (const [name, list] of [
+	['macOS', macos],
+	['Linux', linux]
+]) {
 	if (list.length !== EXPECTED_COUNT) {
 		errors.push(
 			`${name} declares ${list.length} colour preset(s), expected ${EXPECTED_COUNT}. Either the ` +

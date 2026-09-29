@@ -54,7 +54,15 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MANIFEST = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml');
+const MANIFEST = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'features',
+	'manifest.toml'
+);
 
 // Frozen on 2026-08-02 at 142: 87 features + 45 menu rows + 10 sections
 // restricted to one platform with no reason_key. 127 restrictions that a parent
@@ -197,8 +205,10 @@ if (REPORT) {
 		const root = r.name.split('.')[0];
 		(byRoot[root] = byRoot[root] || []).push(r);
 	}
-	console.log(`Platform-coverage report — ${real.length} real restriction(s), ` +
-		`${real.length - unexplained.length} explained, ${unexplained.length} not.\n`);
+	console.log(
+		`Platform-coverage report — ${real.length} real restriction(s), ` +
+			`${real.length - unexplained.length} explained, ${unexplained.length} not.\n`
+	);
 	for (const [root, rows] of Object.entries(byRoot).sort()) {
 		console.log(`  ${root} (${rows.length})`);
 		for (const r of rows) {

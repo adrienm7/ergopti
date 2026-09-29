@@ -35,7 +35,7 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
   exists once the first stable release is published.
 - **Updates.** Two paths update the same app. `brew upgrade` updates it with
   the other casks: brew quits the app, replaces it and relaunches it if it was
-  running. The app also keeps updating itself (Sparkle): *Check for updates*
+  running. The app also keeps updating itself (Sparkle): _Check for updates_
   in its About menu, and automatic checks at the frequency chosen there. After
   an in-app update, the next `brew upgrade` reinstalls that same version once,
   since brew only knows the version it installed itself.
@@ -49,7 +49,7 @@ The release job (`Publish Homebrew cask` in
 [`ci.yml`](../../../.github/workflows/ci.yml)) renders the released channel's
 cask with [`tools/build/homebrew-cask.cjs`](../../../tools/build/homebrew-cask.cjs)
 and pushes it to the tap. It needs the `HOMEBREW_TAP_TOKEN` repository secret:
-a fine-grained token with *Contents: read and write* on
+a fine-grained token with _Contents: read and write_ on
 `adrienm7/homebrew-ergopti` only. Without it the release still publishes and
 warns that the tap kept its previous cask.
 
@@ -61,15 +61,15 @@ feature logic lives in the modules it loads.
 
 ## Layout
 
-| Path | Role |
-|---|---|
-| `init.lua` | Thin entry: module wiring + boot sequence. |
-| `adapters/` | OS-isolation layer — every `hs.*`, `io.open`, `os.execute` call lives here (one file per port). The purity guard `tests/meta/test_port_adapter_coverage.lua` enforces it. |
-| `lib/` | Infrastructure & domain helpers (no UI windows). |
-| `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `llm/`, `keymap/`, `karabiner/`, …). |
-| `ui/<window>/` | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `changelog/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`, `hotstring_editor/`, the webview editors, …), each with an `init.lua`. |
-| `data/` | Pure data + `generate_models.py` (MLX model-list codegen) and its `pyproject.toml` / `uv.lock` venv pins. |
-| `tests/` | `meta/` (source-introspection + port-coverage guards), `unit/`, `helpers/`, `stubs/`. |
+| Path                 | Role                                                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init.lua`           | Thin entry: module wiring + boot sequence.                                                                                                                                                                |
+| `adapters/`          | OS-isolation layer — every `hs.*`, `io.open`, `os.execute` call lives here (one file per port). The purity guard `tests/meta/test_port_adapter_coverage.lua` enforces it.                                 |
+| `lib/`               | Infrastructure & domain helpers (no UI windows).                                                                                                                                                          |
+| `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `llm/`, `keymap/`, `karabiner/`, …).                                                                                                                   |
+| `ui/<window>/`       | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `changelog/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`, `hotstring_editor/`, the webview editors, …), each with an `init.lua`. |
+| `data/`              | Pure data + `generate_models.py` (MLX model-list codegen) and its `pyproject.toml` / `uv.lock` venv pins.                                                                                                 |
+| `tests/`             | `meta/` (source-introspection + port-coverage guards), `unit/`, `helpers/`, `stubs/`.                                                                                                                     |
 
 > MLX provisioning: `modules/llm/ensure-mlx-deps.sh` builds a `.venv` from the
 > pinned `pyproject.toml` on startup (hash-gated). `modules/llm/mlx_deps_checker.lua`

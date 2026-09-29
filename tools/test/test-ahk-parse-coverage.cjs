@@ -48,12 +48,12 @@ const SILENT = '/silent';
 
 const AHK2EXE_CANDIDATES = [
 	'C:\\Program Files\\AutoHotkey\\Compiler\\Ahk2Exe.exe',
-	'C:\\Program Files (x86)\\AutoHotkey\\Compiler\\Ahk2Exe.exe',
+	'C:\\Program Files (x86)\\AutoHotkey\\Compiler\\Ahk2Exe.exe'
 ];
 
 const BASE_CANDIDATES = [
 	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe',
-	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey32.exe',
+	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey32.exe'
 ];
 
 // ==================================================
@@ -81,12 +81,12 @@ function firstExisting(candidates) {
 function compile(ahk2exe, base, input, output) {
 	if (fs.existsSync(output)) fs.rmSync(output, { force: true });
 	const res = spawnSync(ahk2exe, ['/in', input, '/out', output, '/base', base, SILENT], {
-		encoding: 'utf8',
+		encoding: 'utf8'
 	});
 	return {
 		status: res.status,
 		produced: fs.existsSync(output),
-		text: `${res.stdout || ''}${res.stderr || ''}`.trim(),
+		text: `${res.stdout || ''}${res.stderr || ''}`.trim()
 	};
 }
 
@@ -100,12 +100,12 @@ function ensureStaticBundle() {
 	if (fs.existsSync(BUNDLE)) return null;
 	const candidates = [
 		{ command: 'py', prefix: ['-3'] },
-		{ command: 'python', prefix: [] },
+		{ command: 'python', prefix: [] }
 	];
 	for (const candidate of candidates) {
 		const run = spawnSync(candidate.command, [...candidate.prefix, BUNDLE_BUILDER], {
 			cwd: ROOT,
-			encoding: 'utf8',
+			encoding: 'utf8'
 		});
 		if (run.error?.code === 'ENOENT') continue;
 		if (run.status === 0 && fs.existsSync(BUNDLE)) return null;
@@ -149,7 +149,10 @@ function probeCompiler(ahk2exe, base, dir) {
 
 	const okRun = compile(ahk2exe, base, good, path.join(dir, 'probe_good.exe'));
 	if (!okRun.produced) {
-		return { usable: false, why: `a VALID script failed to compile (exit ${okRun.status}) — ${okRun.text || 'no output'}` };
+		return {
+			usable: false,
+			why: `a VALID script failed to compile (exit ${okRun.status}) — ${okRun.text || 'no output'}`
+		};
 	}
 	const badRun = compile(ahk2exe, base, bad, path.join(dir, 'probe_bad.exe'));
 	if (badRun.produced) {
@@ -166,7 +169,9 @@ function probeCompiler(ahk2exe, base, dir) {
 
 function skip(reason) {
 	console.log(`\x1b[33m[SKIP] AHK parse coverage — ${reason}\x1b[0m`);
-	console.log('  CI still covers this: the "Compile ErgoptiPlus.ahk" job compiles the same entry point.');
+	console.log(
+		'  CI still covers this: the "Compile ErgoptiPlus.ahk" job compiles the same entry point.'
+	);
 	return 0;
 }
 
@@ -187,7 +192,9 @@ function main() {
 	try {
 		const bundleError = ensureStaticBundle();
 		if (bundleError) {
-			console.error(`\x1b[31m[ERROR] AHK parse coverage cannot prepare FileInstall input: ${bundleError}.\x1b[0m`);
+			console.error(
+				`\x1b[31m[ERROR] AHK parse coverage cannot prepare FileInstall input: ${bundleError}.\x1b[0m`
+			);
 			return 1;
 		}
 		const probe = probeCompiler(ahk2exe, base, dir);
@@ -198,9 +205,15 @@ function main() {
 		// Both conditions matter: Ahk2Exe can exit 0 on a warning without writing
 		// the output, which is the shape CI already guards against.
 		if (run.status !== 0 || !run.produced) {
-			console.error(`\x1b[31m[ERROR] ErgoptiPlus.ahk failed to compile (exit ${run.status}).\x1b[0m`);
-			console.error('  A compile parses the WHOLE #Include graph, so the error is in the entry point or');
-			console.error('  in any file it pulls in — including the ones run_all.ahk deliberately skips.');
+			console.error(
+				`\x1b[31m[ERROR] ErgoptiPlus.ahk failed to compile (exit ${run.status}).\x1b[0m`
+			);
+			console.error(
+				'  A compile parses the WHOLE #Include graph, so the error is in the entry point or'
+			);
+			console.error(
+				'  in any file it pulls in — including the ones run_all.ahk deliberately skips.'
+			);
 			if (run.text) console.error(`\n${run.text}`);
 			return 1;
 		}

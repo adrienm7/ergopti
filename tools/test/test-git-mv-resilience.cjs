@@ -44,7 +44,8 @@ const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 const LUA_HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 // macOS shape: driver_root() .. "modules|lib|ui/….lua".
-const MACOS_PIN_RE = /driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui)[\\/][^"'\n]*\.lua)["']/g;
+const MACOS_PIN_RE =
+	/driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui)[\\/][^"'\n]*\.lua)["']/g;
 
 // Linux shape: helpers.driver_root() .. "/…" — any depth, files and directories,
 // including the "/../_shared/…" escapes into the shared tree.
@@ -66,8 +67,8 @@ const INTENTIONALLY_ABSENT = new Map([
 		'infra/testing.ahk',
 		'test_run_all_include_integrity.ahk asserts no test #Includes it — a historical typo that aborted ' +
 			'the whole suite. Named infra/ since the lib/ -> infra/ rename: the directory a mistaken ' +
-			'#Include would now point into is infra/, and a stale lib/ one cannot resolve at all.',
-	],
+			'#Include would now point into is infra/, and a stale lib/ one cannot resolve at all.'
+	]
 ]);
 
 // ==================================================
@@ -144,7 +145,7 @@ const TARGETS = [
 		root: path.join(DRIVERS, 'macos'),
 		testRe: /^test_.*\.lua$/,
 		skipRe: LUA_HELPER_RE,
-		pins: (src) => extract(src, MACOS_PIN_RE).map((p) => ({ pin: p, kind: 'file' })),
+		pins: (src) => extract(src, MACOS_PIN_RE).map((p) => ({ pin: p, kind: 'file' }))
 	},
 	{
 		name: 'Linux',
@@ -153,7 +154,10 @@ const TARGETS = [
 		skipRe: LUA_HELPER_RE,
 		// A pin with no extension is a directory (the "/../_shared" escapes).
 		pins: (src) =>
-			extract(src, LINUX_PIN_RE).map((p) => ({ pin: p, kind: /\.[A-Za-z0-9]+$/.test(p) ? 'file' : 'dir' })),
+			extract(src, LINUX_PIN_RE).map((p) => ({
+				pin: p,
+				kind: /\.[A-Za-z0-9]+$/.test(p) ? 'file' : 'dir'
+			}))
 	},
 	{
 		name: 'Windows',
@@ -162,9 +166,9 @@ const TARGETS = [
 		skipRe: null,
 		pins: (src) => [
 			...extract(src, AHK_DIR_PIN_RE).map((p) => ({ pin: p, kind: 'ahk-dir' })),
-			...extract(src, AHK_FILE_PIN_RE).map((p) => ({ pin: p, kind: 'file' })),
-		],
-	},
+			...extract(src, AHK_FILE_PIN_RE).map((p) => ({ pin: p, kind: 'file' }))
+		]
+	}
 ];
 
 const stale = [];
@@ -223,7 +227,9 @@ if (stale.length > 0) {
 			'  every assertion built on it.'
 	);
 	for (const s of stale) console.error(`    [${s.driver}] ${s.pin}  ←  ${s.test}`);
-	console.error('\n  Run `node tools/test/test-git-mv-resilience.cjs --measure` for the full inventory.');
+	console.error(
+		'\n  Run `node tools/test/test-git-mv-resilience.cjs --measure` for the full inventory.'
+	);
 	process.exit(1);
 }
 

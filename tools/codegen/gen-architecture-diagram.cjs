@@ -199,7 +199,9 @@ function buildDiagram(ports, domain, driverData) {
 	// --- One adapters subgraph per driver ---
 	for (const { driver, adapters, ext } of driverData) {
 		lines.push('');
-		lines.push(`    subgraph ${driver.prefix}Adapters["${driver.title} Adapters — ${driver.name}/adapters/"]`);
+		lines.push(
+			`    subgraph ${driver.prefix}Adapters["${driver.title} Adapters — ${driver.name}/adapters/"]`
+		);
 		for (const a of adapters) {
 			lines.push(`        ${nodeId(driver.prefix, a)}["${label(a)}${ext}"]`);
 		}

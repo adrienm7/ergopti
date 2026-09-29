@@ -52,7 +52,9 @@ Placed early so a visitor recognises themselves before diving into details.
 			<p class="kicker">{t('Pour qui ?')}</p>
 			<h2>{t('Chacun y gagne, à sa façon.')}</h2>
 			<p class="lead">
-				{t('Ergopti+ n’impose pas une manière de travailler — il accélère la vôtre. Quelques exemples.')}
+				{t(
+					'Ergopti+ n’impose pas une manière de travailler — il accélère la vôtre. Quelques exemples.'
+				)}
 			</p>
 		</header>
 

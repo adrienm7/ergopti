@@ -50,7 +50,9 @@ const SKIP_DIRS = new Set(['tests', 'vendor', 'node_modules', '.venv', '_generat
 const errors = [];
 
 if (!fs.existsSync(OWNER)) {
-	console.error(`\x1b[31m[FAIL] ${path.relative(ROOT, OWNER)} does not exist — nothing owns these paths.\x1b[0m`);
+	console.error(
+		`\x1b[31m[FAIL] ${path.relative(ROOT, OWNER)} does not exist — nothing owns these paths.\x1b[0m`
+	);
 	process.exit(1);
 }
 

@@ -1,1411 +1,1340 @@
 {
-  "created_utc": "2026-09-28T20:49:31.993Z",
-  "repository": "D:/Documents/GitHub/ergopti",
-  "dev": "2d065e7c808fb3006fa23dfa3e2584e1747d3b9e",
-  "main": "3b8811be72745d158bc24dfb41580bb695005081",
-  "branches": [
-    {
-      "branch": "feat/ovh2-console",
-      "head": "a96a9e84e18fb3d81637435365686bd9878b3568",
-      "merge_base": "ab7412933a69c79669142b48614c35c83c1224da",
-      "plus": 1,
-      "minus": 2,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "5415cd345221d4d1cc9cfc339b5771e087eda47b",
-          "subject": "test(linux): route Bash fixtures through the Git userland",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "fa38b2fcff23667a267a030830af8bcc80d0b021",
-          "subject": "test(logging): exercise the configured acknowledgement stall budget",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "+",
-          "sha": "a96a9e84e18fb3d81637435365686bd9878b3568",
-          "subject": "feat(console): center native debug windows at a shared minimum size",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "503f6cb5e1d2c11067a711aa53d3cfb74c8b767b",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout a96a9e84e18fb3d81637435365686bd9878b3568",
-          "changed_paths": [
-            "docs/memory/shared-architecture.md",
-            "static/ergopti_plus/_shared/ui/apps.manifest.json",
-            "static/ergopti_plus/docs/architecture.md",
-            "static/ergopti_plus/macos/modules/gestures/actions.lua",
-            "static/ergopti_plus/macos/tests/helpers/init.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua",
-            "static/ergopti_plus/macos/ui/console_window.lua",
-            "static/ergopti_plus/macos/ui/menu/init.lua",
-            "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-            "static/ergopti_plus/windows/adapters/console_window.ahk",
-            "static/ergopti_plus/windows/infra/lifecycle.ahk",
-            "static/ergopti_plus/windows/modules/gestures/actions.ahk",
-            "static/ergopti_plus/windows/tests/run_all.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_console_window.ahk",
-            "static/ergopti_plus/windows/ui/console_window.ahk",
-            "tools/test/test-webview-geometry-single-source.cjs"
-          ]
-        }
-      ]
-    },
-    {
-      "branch": "feat/ovh2-diag-integration",
-      "head": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
-      "merge_base": "51563a9ad3d8e615fbfbf51bc6d6c44101b0755b",
-      "plus": 6,
-      "minus": 37,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "10e337f1c7f39a9c5ed903cae1990139331a3171",
-          "subject": "feat(layouts): add the keyboard-layout registry folder and its index",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "31d284aebf80a9f4f9a4cc851873807e99734f61",
-          "subject": "feat(linux): convert any registry .keylayout to XKB with one converter",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "0cd338dd996e757a46d44d357fe8f50f8262849c",
-          "subject": "feat(windows): emulate a registry layout by reading its .keylayout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "7872ee8cf466ab3046c6c1468d90725cece6d19b",
-          "subject": "feat(macos): install a registry layout's .keylayout as it is",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "ce472c562587b6c2c19885da2c319ae66dafa7e7",
-          "subject": "feat(linux): convert a registry layout to XKB on the device",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "26fb89a8a56514d0d7f565cb5eb4ab4b7dfff010",
-          "subject": "fix(layouts): name the defaults file a Lua driver cannot decode",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "287851bbe895e41f3ff3618fd04a416807bed198",
-          "subject": "fix(linux): report registry Compose outputs that no key can reach",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "d2d0dd58172f20329417f24b05a7dc41eb099200",
-          "subject": "fix(layouts): pin every registry id rule to the index builder's",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "db8a7745d1abafb29df7039bc44d36b66b61018f",
-          "subject": "feat(windows): read the Ergopti emulation tables from its .keylayout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "61dfc0a37f83867d4de81bbc3e87fac05e3eb762",
-          "subject": "feat(layouts): declare what an emulated layout supersedes, and why",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "c256a697db787ee14368b78762dc0cd26582bc45",
-          "subject": "fix(layouts): declare superseded_reason_key in the manifest schema",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "269853d2340c0813dca52e4d49c62da5e7f76fe3",
-          "subject": "test(windows): pin why the Ergopti table loaders refuse bad input",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "7d9b798f68ba1c6a074c0db707e8b6992e548895",
-          "subject": "docs(windows): point the typography note at the Ergopti .keylayout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "8b028807f8526a7a5afc474ecd389bd24771328d",
-          "subject": "test(windows): replay the Ergopti golden through the registry emulation",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "c6e59c0c25733bf58b0594090821b33861a2abe1",
-          "subject": "feat(layouts): declare each registry layout's family",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "aa2fd65dd72c288dec12754f0bcbfea5e6918525",
-          "subject": "feat(layouts): publish each layout's keyboard name in the index",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "a487caf2beb4956fb2bb0b57bc3b2a65dbc9ea1d",
-          "subject": "feat(layouts): add the shared layout catalogue decisions",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "b68e4341b6ce7b725bbe1509b438a292d92f1088",
-          "subject": "refactor(macos): read a bundle's layouts from its Info.plist",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "893df3cb98c5a8078eada01aff1829750d72ff19",
-          "subject": "feat(macos): install, update and uninstall registry layouts",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "174f86a786c46ca83f5afcbb208704bd3c43bda0",
-          "subject": "feat(linux): install registry layouts in the user XKB tree",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "2fda635fd7c30f13c2a68250f5a98100e4195c9a",
-          "subject": "feat(windows): install, update and uninstall registry layouts",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "+",
-          "sha": "ecacf79938b74817e48ddf9915902b32de8ca1fe",
-          "subject": "feat(layouts): add the shared layout manager window on three drivers",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "dcfbe6051f3b0e33a2ff36030e7575b3cb5367f1",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout ecacf79938b74817e48ddf9915902b32de8ca1fe",
-          "changed_paths": [
-            "package.json",
-            "static/ergopti_plus/_shared/data/locales/ar.json",
-            "static/ergopti_plus/_shared/data/locales/cs.json",
-            "static/ergopti_plus/_shared/data/locales/da.json",
-            "static/ergopti_plus/_shared/data/locales/de.json",
-            "static/ergopti_plus/_shared/data/locales/en.json",
-            "static/ergopti_plus/_shared/data/locales/es.json",
-            "static/ergopti_plus/_shared/data/locales/fr.json",
-            "static/ergopti_plus/_shared/data/locales/he.json",
-            "static/ergopti_plus/_shared/data/locales/hi.json",
-            "static/ergopti_plus/_shared/data/locales/it.json",
-            "static/ergopti_plus/_shared/data/locales/ja.json",
-            "static/ergopti_plus/_shared/data/locales/ko.json",
-            "static/ergopti_plus/_shared/data/locales/nl.json",
-            "static/ergopti_plus/_shared/data/locales/no.json",
-            "static/ergopti_plus/_shared/data/locales/pl.json",
-            "static/ergopti_plus/_shared/data/locales/pt.json",
-            "static/ergopti_plus/_shared/data/locales/ru.json",
-            "static/ergopti_plus/_shared/data/locales/sv.json",
-            "static/ergopti_plus/_shared/data/locales/tr.json",
-            "static/ergopti_plus/_shared/data/locales/uk.json",
-            "static/ergopti_plus/_shared/data/locales/zh.json",
-            "static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua",
-            "static/ergopti_plus/_shared/ui/apps.manifest.json",
-            "static/ergopti_plus/_shared/ui/host_bridge.js",
-            "static/ergopti_plus/_shared/ui/layout_manager/index.html",
-            "static/ergopti_plus/_shared/ui/layout_manager/script.js",
-            "static/ergopti_plus/_shared/ui/layout_manager/strings.json",
-            "static/ergopti_plus/_shared/ui/layout_manager/style.css",
-            "static/ergopti_plus/linux/tests/test_manifest.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua",
-            "static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua",
-            "static/ergopti_plus/linux/ui/layout_manager/bridge.lua",
-            "static/ergopti_plus/linux/ui/webkit_host.lua",
-            "static/ergopti_plus/linux/ui/webview_manager.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
-            "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-            "static/ergopti_plus/windows/tests/run_all.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk",
-            "static/ergopti_plus/windows/ui/layout_manager/init.ahk",
-            "tools/test/run-js-suite.cjs",
-            "tools/test/test-layout-manager-page.cjs",
-            "tools/test/test-webview-geometry-single-source.cjs"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
-          "subject": "refactor(macos): host the layout manager window in ui/layout_manager",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "9da35250472e7a12d34cf86eb1515502f307e071",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout 5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
-          "changed_paths": [
-            "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_window.lua",
-            "static/ergopti_plus/macos/ui/layout_manager/init.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
-            "tools/test/test-driver-tree-parity.cjs",
-            "tools/test/test-webview-geometry-single-source.cjs"
-          ]
-        },
-        {
-          "sign": "-",
-          "sha": "fa9798907c19cc89923d86e8baf80d0de299cb7a",
-          "subject": "feat(menu): make the Ergopti section the custom layout section",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "cf5828429689cedbfe0b61129195c2daad5e8612",
-          "subject": "feat(windows): turn Ergopti-only hotstrings off under another layout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "9f314bf8ed7293f21c45b185f2f24be2c9655f25",
-          "subject": "fix(layouts): read the installed record before writing a layout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "b6b3b1836778818415525ef067591a8cdd1908ea",
-          "subject": "fix(layouts): name the shipped catalogue before the first refresh",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "e94fe6674fbd5842628038e21c63535fa6125500",
-          "subject": "fix(layouts): report a cached index the catalogue sets aside",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "73b2b56e4727e8ea152e59128527fe03e87ed029",
-          "subject": "refactor(layouts): drop the registry download the catalogue replaced",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "0f81fcc182fbd2249b2d1b9e80dc800b21b6b812",
-          "subject": "refactor(layouts): declare the registry user agent once",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "a3f67d96a9701d66bdef83d23c51db62ef7fc58d",
-          "subject": "fix(linux): leave the user XKB tree unchanged after a failed install",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "be0b73524eac608e81eaa1b5f454dc91842884f0",
-          "subject": "test(windows): pin that a refused update keeps the installed layout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "2a2516176a8d3da59044ac5288adfce2c40629ea",
-          "subject": "test(layouts): resolve Git Bash for the packaging fixture",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "54a31ea4cab61cd716c536aa462a9663f3e23380",
-          "subject": "fix(layouts): preserve opt-in geometry hotstrings on every layout",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "c25a00ffed43e6cb7a50effdae2fc738f1f19c36",
-          "subject": "feat(layouts): inventory existing extension content in the registry",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "+",
-          "sha": "f77494627af86efc87bf8df5191a20a1dfb43b85",
-          "subject": "feat(layouts): publish verified extension generations atomically",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "129e02f61498a6545c8cca12ea8fcfbd95396f18",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout f77494627af86efc87bf8df5191a20a1dfb43b85",
-          "changed_paths": [
-            "static/ergopti_plus/_shared/lua/layouts/catalogue.lua",
-            "static/ergopti_plus/_shared/lua/layouts/extension.lua",
-            "static/ergopti_plus/linux/modules/keymap/layout_registry.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua",
-            "static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua",
-            "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-            "static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk",
-            "static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk",
-            "static/ergopti_plus/windows/tests/run_all.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk"
-          ]
-        },
-        {
-          "sign": "-",
-          "sha": "4c56825375440364326484945dee9b50773ce949",
-          "subject": "feat(layouts): show optional extension content in the manager",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "+",
-          "sha": "703d10c88ae4f98be283357afc2116be636efb29",
-          "subject": "feat(layouts): discover committed extension packs on Linux",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "50dff8281d6daf8256d3363922bd7c3323bccaf5",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout 703d10c88ae4f98be283357afc2116be636efb29",
-          "changed_paths": [
-            "static/ergopti_plus/linux/infra/paths.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua"
-          ]
-        },
-        {
-          "sign": "-",
-          "sha": "fa92fdc66aaa719c2ff23d37991505e9debb875b",
-          "subject": "fix(config): preserve quoted extension paths on Windows reload",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "+",
-          "sha": "f35930ec2fedd889c4ffc4fff7dfbd1101626783",
-          "subject": "feat(layouts): discover committed extension packs on macOS",
-          "classification": "no_integration_proven_preserve_patch",
-          "in_main": false,
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout f35930ec2fedd889c4ffc4fff7dfbd1101626783",
-          "changed_paths": [
-            "static/ergopti_plus/macos/infra/extension_packs.lua",
-            "static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "e58cadf956fac2bf18adf652cd3031f4198278b6",
-          "subject": "feat(layouts): declare historical hotstring source bindings",
-          "classification": "no_integration_proven_preserve_patch",
-          "in_main": false,
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout e58cadf956fac2bf18adf652cd3031f4198278b6",
-          "changed_paths": [
-            "static/ergopti_plus/_shared/lua/hotstrings/extensions.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua"
-          ]
-        },
-        {
-          "sign": "-",
-          "sha": "e4076604dbd06ea350bafda535dad52e8fc2eaa3",
-          "subject": "fix(hotstrings): recognize canonical extension source categories",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "-",
-          "sha": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
-          "subject": "feat(layouts): discover Windows packs and plan effective sections",
-          "classification": "patch_equivalent_in_dev"
-        }
-      ]
-    },
-    {
-      "branch": "feat/ovh2-linux-harness",
-      "head": "4929aa3b9b97790038d4ef9581da43ceeec3e2f9",
-      "merge_base": "ab7412933a69c79669142b48614c35c83c1224da",
-      "plus": 0,
-      "minus": 1,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "4929aa3b9b97790038d4ef9581da43ceeec3e2f9",
-          "subject": "test(linux): route Bash fixtures through the Git userland",
-          "classification": "patch_equivalent_in_dev"
-        }
-      ]
-    },
-    {
-      "branch": "feat/ovh2-neutral-config",
-      "head": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-      "merge_base": "437f490243c7a63d32e25a6920ce60c0e958ad82",
-      "plus": 2,
-      "minus": 1,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "aed8fba358ec12168aed35d9a03f398f7e6747ae",
-          "subject": "feat(config): preserve unknown fields in sparse TOML transactions",
-          "classification": "patch_equivalent_in_dev"
-        },
-        {
-          "sign": "+",
-          "sha": "8ad07a053c904c69869172f343ebe8fd4877dcf5",
-          "subject": "feat(config): start neutral and persist only explicit overrides",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "ae047500fe4a6cef4f0497cde3840cfa17b06444",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout 8ad07a053c904c69869172f343ebe8fd4877dcf5",
-          "changed_paths": [
-            "package.json",
-            "static/ergopti_plus/_shared/core/config_schema/config.schema.json",
-            "static/ergopti_plus/_shared/lua/config_defaults.lua",
-            "static/ergopti_plus/_shared/modules/features/linux_evidence.json",
-            "static/ergopti_plus/_shared/modules/features/manifest.schema.json",
-            "static/ergopti_plus/_shared/modules/features/manifest.toml",
-            "static/ergopti_plus/linux/_generated/config_template.toml",
-            "static/ergopti_plus/linux/_generated/features_manifest.lua",
-            "static/ergopti_plus/linux/ergopti_hotstrings.lua",
-            "static/ergopti_plus/linux/infra/manifest_reader.lua",
-            "static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
-            "static/ergopti_plus/linux/modules/gestures/manager.lua",
-            "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
-            "static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
-            "static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
-            "static/ergopti_plus/linux/tests/e2e/daemon_keys_child.lua",
-            "static/ergopti_plus/linux/tests/support/dynamic_hotstrings_fixture.lua",
-            "static/ergopti_plus/linux/tests/support/metrics_consent_fixture.lua",
-            "static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua",
-            "static/ergopti_plus/linux/tests/test_manifest.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_dynamic_hotstrings_manager.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_empty_config_neutral.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_keylogger.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_shortcuts_manager.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_integration.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_loader.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_manager.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua",
-            "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_writer.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_expansion_log_privacy.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_multibyte_trigger.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_unicode_suffix.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_personal_info_combo_resolver.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_priority_override_collision.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_private_mapping_sinks.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_aggregate_walker.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_app_switch_aggregate.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_hold_durations.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_keylogger_privacy_filters.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_metrics_toggles_persist.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_suggestion_counters.lua",
-            "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_window_titles.lua",
-            "static/ergopti_plus/linux/tests/unit/ui/test_global_disable_all_features.lua",
-            "static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
-            "static/ergopti_plus/macos/_generated/config_template.toml",
-            "static/ergopti_plus/macos/_generated/features_manifest.lua",
-            "static/ergopti_plus/macos/infra/manifest_reader.lua",
-            "static/ergopti_plus/macos/infra/preferences.lua",
-            "static/ergopti_plus/macos/init.lua",
-            "static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua",
-            "static/ergopti_plus/macos/modules/gestures/init.lua",
-            "static/ergopti_plus/macos/modules/keylogger/init.lua",
-            "static/ergopti_plus/macos/modules/keymap/init.lua",
-            "static/ergopti_plus/macos/modules/keymap/registry_index.lua",
-            "static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
-            "static/ergopti_plus/macos/modules/shortcuts/init.lua",
-            "static/ergopti_plus/macos/platform/remap/config.lua",
-            "static/ergopti_plus/macos/platform/remap/init.lua",
-            "static/ergopti_plus/macos/tests/support/llm_activation_fixture.lua",
-            "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
-            "static/ergopti_plus/macos/tests/support/shortcut_bindings_fixture.lua",
-            "static/ergopti_plus/macos/tests/unit/infra/test_config_defaults.lua",
-            "static/ergopti_plus/macos/tests/unit/infra/test_empty_config_defaults.lua",
-            "static/ergopti_plus/macos/tests/unit/infra/test_preferences_keeps_unowned_sections.lua",
-            "static/ergopti_plus/macos/tests/unit/infra/test_preferences_sparse.lua",
-            "static/ergopti_plus/macos/tests/unit/lib/test_manifest_reader.lua",
-            "static/ergopti_plus/macos/tests/unit/lib/test_root_controlled_reload_shutdown_inert.lua",
-            "static/ergopti_plus/macos/tests/unit/menu/test_llm_menu_persistence.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/keymap/test_preview_mutation_commit_gate.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/keymap/test_repeat_neutral_config.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_child_composition.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_neutral_boot.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_preference_vs_binding.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_start_transaction.lua",
-            "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_rebind_preserves_keep_awake.lua",
-            "static/ergopti_plus/macos/tests/unit/platform/remap/enable_transaction/test_bulk_owner.lua",
-            "static/ergopti_plus/macos/tests/unit/platform/remap/test_config.lua",
-            "static/ergopti_plus/macos/tests/unit/platform/remap/test_generator_typed_output.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_settings_transaction.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_metrics_filter_transaction.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_shortcuts_checkmarks_show_preference.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/menu/test_preferences_shortcut_keys_survive_pause.lua",
-            "static/ergopti_plus/macos/tests/unit/ui/test_preferences_save_transaction.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
-            "static/ergopti_plus/macos/ui/menu/menu_state.lua",
-            "static/ergopti_plus/windows/_generated/config_template.toml",
-            "static/ergopti_plus/windows/_generated/features_manifest.ahk",
-            "static/ergopti_plus/windows/infra/feature_state.ahk",
-            "static/ergopti_plus/windows/infra/first_boot.ahk",
-            "static/ergopti_plus/windows/infra/hotstrings/hotstrings_cache.ahk",
-            "static/ergopti_plus/windows/infra/manifest_reader.ahk",
-            "static/ergopti_plus/windows/infra/toml/toml_config_loader.ahk",
-            "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_master_gate_drifted_subgate_skip.ahk",
-            "static/ergopti_plus/windows/tests/run_all.ahk",
-            "static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk",
-            "static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_gestures.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_hotstring_language_packs.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_tap_hold_loader.ahk",
-            "tools/build/build-features-manifest.js",
-            "tools/test/run-js-suite.cjs",
-            "tools/test/test-defaults-single-source.cjs",
-            "tools/test/test-feature-state-boot-smoke.cjs",
-            "tools/test/test-gesture-slots-single-source.cjs",
-            "tools/test/test-linux-feature-parity.cjs"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-          "subject": "feat(config): retain rollback debt for scoped transactions",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "dc4f2618159deb0574da7b896a6ab5e1c645f022",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout 7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-          "changed_paths": [
-            "static/ergopti_plus/_shared/lua/config_scope_transaction.lua",
-            "static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua"
-          ]
-        }
-      ]
-    },
-    {
-      "branch": "feat/ovh2-shortcut-refusals",
-      "head": "1835a2ba8f69d6dd5ba8450304acb07b4902427e",
-      "merge_base": "d409787a526c46298ab5370b89988c40b3a5e618",
-      "plus": 0,
-      "minus": 1,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "1835a2ba8f69d6dd5ba8450304acb07b4902427e",
-          "subject": "fix(macos): preserve shortcut preferences after replay refusals",
-          "classification": "patch_equivalent_in_dev"
-        }
-      ]
-    },
-    {
-      "branch": "feat/ovh2-state-refusals",
-      "head": "6c68ec1c8b7f4e7797b07b0766d2aa743ab71c1d",
-      "merge_base": "d409787a526c46298ab5370b89988c40b3a5e618",
-      "plus": 0,
-      "minus": 1,
-      "commits": [
-        {
-          "sign": "-",
-          "sha": "6c68ec1c8b7f4e7797b07b0766d2aa743ab71c1d",
-          "subject": "fix(macos): preserve disabled custom terminators at boot",
-          "classification": "patch_equivalent_in_dev"
-        }
-      ]
-    },
-    {
-      "branch": "feat/ovh2-windows-master-state",
-      "head": "335e06aa1f2b868e225da798269b03edcdf7dcae",
-      "merge_base": "e77324b6785ca29627d1b8c1e0ef689fa69fdabe",
-      "plus": 1,
-      "minus": 0,
-      "commits": [
-        {
-          "sign": "+",
-          "sha": "335e06aa1f2b868e225da798269b03edcdf7dcae",
-          "subject": "fix(windows): preserve desired features behind category masters",
-          "classification": "adapted_integration_identified_not_patch_equivalent",
-          "in_main": false,
-          "integration_commit": "8549080ada96a5df1958e1a09eddb388c51a2445",
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout 335e06aa1f2b868e225da798269b03edcdf7dcae",
-          "changed_paths": [
-            "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-            "static/ergopti_plus/windows/infra/config_io.ahk",
-            "static/ergopti_plus/windows/infra/feature_io.ahk",
-            "static/ergopti_plus/windows/infra/master_gates.ahk",
-            "static/ergopti_plus/windows/infra/personal_features.ahk",
-            "static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk",
-            "static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk",
-            "static/ergopti_plus/windows/tests/test_stubs.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_master_gates.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk",
-            "static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk",
-            "static/ergopti_plus/windows/ui/editors.ahk",
-            "static/ergopti_plus/windows/ui/menu/menu_engine.ahk",
-            "static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk",
-            "static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk",
-            "static/ergopti_plus/windows/ui/menu/menu_init.ahk",
-            "static/ergopti_plus/windows/ui/menu/menu_submenus.ahk",
-            "static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
-          ]
-        }
-      ]
-    },
-    {
-      "branch": "worktree-wf_f8423464-54e-1",
-      "head": "c4f59734352ab442daad6309f5ec57854f4511a3",
-      "merge_base": "f31e85e1154b912ddea286280331d82f7fe2fa0a",
-      "plus": 14,
-      "minus": 0,
-      "commits": [
-        {
-          "sign": "+",
-          "sha": "7a3b86196e52067d02d219fae23e1e92502f2bd3",
-          "subject": "Bump devalue in the npm_and_yarn group across 1 directory (#38)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "7ea5f77607238568f9389eda492cdb40edc223fa",
-          "subject": "Create CNAME",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "CNAME"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "d97701f1ed4545028fab2314eb8b79f621b6814f",
-          "subject": "Bump picomatch in the npm_and_yarn group across 1 directory (#51)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "8a51c7cc5cdd8e7b9c6f338b798bfff5fe7f1758",
-          "subject": "Bump vite in the npm_and_yarn group across 1 directory (#52)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "5f4d709232812ecc42095d852e9685e8d394760c",
-          "subject": "Bump lodash in the npm_and_yarn group across 1 directory (#53)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "fdbad76028652a21cb12eb11b4ac67bc31ee09a9",
-          "subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#54)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "2f7149d636dafcb09b224a979952308dd4e06b6e",
-          "subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#56)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "3f5218a1e2f3889486cb3189114cfbf2230570a5",
-          "subject": "chore(ci): add release build workflow with workflow_dispatch",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            ".github/workflows/release.yml"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "cbd7328b52299ba987eb7f0c06cb298597ebe151",
-          "subject": "Bump lxml from 6.0.2 to 6.1.0 in the uv group across 1 directory (#77)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "pyproject.toml",
-            "uv.lock"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "967519de6071bccad732f88a0dee968c4ef09310",
-          "subject": "Bump svelte in the npm_and_yarn group across 1 directory (#76)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "c23e22f823fc0769630979fbb53b310553b13f4e",
-          "subject": "Bump the npm_and_yarn group across 1 directory with 2 updates (#78)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "d2213d10c9ad21ffb75a0d7a62ef851e40f16fd1",
-          "subject": "chore(ci): remove obsolete deployTocPanel workflow",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            ".github/workflows/deployTocPanel.yml"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "3b8811be72745d158bc24dfb41580bb695005081",
-          "subject": "Bump esbuild in the npm_and_yarn group across 1 directory (#81)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "c4f59734352ab442daad6309f5ec57854f4511a3",
-          "subject": "Bump @sveltejs/kit in the npm_and_yarn group across 1 directory (#83)",
-          "classification": "no_integration_proven_preserve_patch",
-          "in_main": false,
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout c4f59734352ab442daad6309f5ec57854f4511a3",
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        }
-      ]
-    },
-    {
-      "branch": "worktree-wf_f8423464-54e-2",
-      "head": "c4f59734352ab442daad6309f5ec57854f4511a3",
-      "merge_base": "f31e85e1154b912ddea286280331d82f7fe2fa0a",
-      "plus": 14,
-      "minus": 0,
-      "commits": [
-        {
-          "sign": "+",
-          "sha": "7a3b86196e52067d02d219fae23e1e92502f2bd3",
-          "subject": "Bump devalue in the npm_and_yarn group across 1 directory (#38)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "7ea5f77607238568f9389eda492cdb40edc223fa",
-          "subject": "Create CNAME",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "CNAME"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "d97701f1ed4545028fab2314eb8b79f621b6814f",
-          "subject": "Bump picomatch in the npm_and_yarn group across 1 directory (#51)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "8a51c7cc5cdd8e7b9c6f338b798bfff5fe7f1758",
-          "subject": "Bump vite in the npm_and_yarn group across 1 directory (#52)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "5f4d709232812ecc42095d852e9685e8d394760c",
-          "subject": "Bump lodash in the npm_and_yarn group across 1 directory (#53)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "fdbad76028652a21cb12eb11b4ac67bc31ee09a9",
-          "subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#54)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "2f7149d636dafcb09b224a979952308dd4e06b6e",
-          "subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#56)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "3f5218a1e2f3889486cb3189114cfbf2230570a5",
-          "subject": "chore(ci): add release build workflow with workflow_dispatch",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            ".github/workflows/release.yml"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "cbd7328b52299ba987eb7f0c06cb298597ebe151",
-          "subject": "Bump lxml from 6.0.2 to 6.1.0 in the uv group across 1 directory (#77)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "pyproject.toml",
-            "uv.lock"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "967519de6071bccad732f88a0dee968c4ef09310",
-          "subject": "Bump svelte in the npm_and_yarn group across 1 directory (#76)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "c23e22f823fc0769630979fbb53b310553b13f4e",
-          "subject": "Bump the npm_and_yarn group across 1 directory with 2 updates (#78)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "d2213d10c9ad21ffb75a0d7a62ef851e40f16fd1",
-          "subject": "chore(ci): remove obsolete deployTocPanel workflow",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            ".github/workflows/deployTocPanel.yml"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "3b8811be72745d158bc24dfb41580bb695005081",
-          "subject": "Bump esbuild in the npm_and_yarn group across 1 directory (#81)",
-          "classification": "reachable_from_main_not_dev",
-          "in_main": true,
-          "preserve_original_patch": false,
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        },
-        {
-          "sign": "+",
-          "sha": "c4f59734352ab442daad6309f5ec57854f4511a3",
-          "subject": "Bump @sveltejs/kit in the npm_and_yarn group across 1 directory (#83)",
-          "classification": "no_integration_proven_preserve_patch",
-          "in_main": false,
-          "preserve_original_patch": true,
-          "patch_command": "git format-patch -1 --stdout c4f59734352ab442daad6309f5ec57854f4511a3",
-          "changed_paths": [
-            "package-lock.json",
-            "package.json"
-          ]
-        }
-      ]
-    }
-  ],
-  "notes": [
-    "Read-only committed-history audit against pinned dev. Dirty root integration is excluded.",
-    "Minus proves patch equivalence. Plus alone does not prove missing functionality. Adapted integrations use an exact cherry-pick footer or matching unique subject/body and prior integration evidence; retain originals because patch IDs differ.",
-    "The two worktree-wf branches have the same HEAD. Thirteen of their fourteen plus commits are already reachable from main. Only c4f5973 is outside both dev and main.",
-    "f35930ec2 adds macOS infra/extension_packs.lua and its tests/unit/lib/test_extension_packs.lua; both files are absent in dev. This L4 owner remains unintegrated.",
-    "e58cadf95 adds historical hotstring binding metadata to the shared scanner; that implementation is absent in dev. Preserve scanner/test original for coordinated L4 integration.",
-    "c4f5973 is SvelteKit dependency update #83. Preserve once and review against current package versions; do not blindly reapply.",
-    "No patches exported, branches deleted, source/index changed, commits or pushes performed by this audit."
-  ],
-  "preserve_originals": [
-    {
-      "sign": "+",
-      "sha": "a96a9e84e18fb3d81637435365686bd9878b3568",
-      "subject": "feat(console): center native debug windows at a shared minimum size",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "503f6cb5e1d2c11067a711aa53d3cfb74c8b767b",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout a96a9e84e18fb3d81637435365686bd9878b3568",
-      "changed_paths": [
-        "docs/memory/shared-architecture.md",
-        "static/ergopti_plus/_shared/ui/apps.manifest.json",
-        "static/ergopti_plus/docs/architecture.md",
-        "static/ergopti_plus/macos/modules/gestures/actions.lua",
-        "static/ergopti_plus/macos/tests/helpers/init.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua",
-        "static/ergopti_plus/macos/ui/console_window.lua",
-        "static/ergopti_plus/macos/ui/menu/init.lua",
-        "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-        "static/ergopti_plus/windows/adapters/console_window.ahk",
-        "static/ergopti_plus/windows/infra/lifecycle.ahk",
-        "static/ergopti_plus/windows/modules/gestures/actions.ahk",
-        "static/ergopti_plus/windows/tests/run_all.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_console_window.ahk",
-        "static/ergopti_plus/windows/ui/console_window.ahk",
-        "tools/test/test-webview-geometry-single-source.cjs"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "ecacf79938b74817e48ddf9915902b32de8ca1fe",
-      "subject": "feat(layouts): add the shared layout manager window on three drivers",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "dcfbe6051f3b0e33a2ff36030e7575b3cb5367f1",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout ecacf79938b74817e48ddf9915902b32de8ca1fe",
-      "changed_paths": [
-        "package.json",
-        "static/ergopti_plus/_shared/data/locales/ar.json",
-        "static/ergopti_plus/_shared/data/locales/cs.json",
-        "static/ergopti_plus/_shared/data/locales/da.json",
-        "static/ergopti_plus/_shared/data/locales/de.json",
-        "static/ergopti_plus/_shared/data/locales/en.json",
-        "static/ergopti_plus/_shared/data/locales/es.json",
-        "static/ergopti_plus/_shared/data/locales/fr.json",
-        "static/ergopti_plus/_shared/data/locales/he.json",
-        "static/ergopti_plus/_shared/data/locales/hi.json",
-        "static/ergopti_plus/_shared/data/locales/it.json",
-        "static/ergopti_plus/_shared/data/locales/ja.json",
-        "static/ergopti_plus/_shared/data/locales/ko.json",
-        "static/ergopti_plus/_shared/data/locales/nl.json",
-        "static/ergopti_plus/_shared/data/locales/no.json",
-        "static/ergopti_plus/_shared/data/locales/pl.json",
-        "static/ergopti_plus/_shared/data/locales/pt.json",
-        "static/ergopti_plus/_shared/data/locales/ru.json",
-        "static/ergopti_plus/_shared/data/locales/sv.json",
-        "static/ergopti_plus/_shared/data/locales/tr.json",
-        "static/ergopti_plus/_shared/data/locales/uk.json",
-        "static/ergopti_plus/_shared/data/locales/zh.json",
-        "static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua",
-        "static/ergopti_plus/_shared/ui/apps.manifest.json",
-        "static/ergopti_plus/_shared/ui/host_bridge.js",
-        "static/ergopti_plus/_shared/ui/layout_manager/index.html",
-        "static/ergopti_plus/_shared/ui/layout_manager/script.js",
-        "static/ergopti_plus/_shared/ui/layout_manager/strings.json",
-        "static/ergopti_plus/_shared/ui/layout_manager/style.css",
-        "static/ergopti_plus/linux/tests/test_manifest.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua",
-        "static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua",
-        "static/ergopti_plus/linux/ui/layout_manager/bridge.lua",
-        "static/ergopti_plus/linux/ui/webkit_host.lua",
-        "static/ergopti_plus/linux/ui/webview_manager.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
-        "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-        "static/ergopti_plus/windows/tests/run_all.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk",
-        "static/ergopti_plus/windows/ui/layout_manager/init.ahk",
-        "tools/test/run-js-suite.cjs",
-        "tools/test/test-layout-manager-page.cjs",
-        "tools/test/test-webview-geometry-single-source.cjs"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
-      "subject": "refactor(macos): host the layout manager window in ui/layout_manager",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "9da35250472e7a12d34cf86eb1515502f307e071",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout 5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
-      "changed_paths": [
-        "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_window.lua",
-        "static/ergopti_plus/macos/ui/layout_manager/init.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
-        "tools/test/test-driver-tree-parity.cjs",
-        "tools/test/test-webview-geometry-single-source.cjs"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "f77494627af86efc87bf8df5191a20a1dfb43b85",
-      "subject": "feat(layouts): publish verified extension generations atomically",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "129e02f61498a6545c8cca12ea8fcfbd95396f18",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout f77494627af86efc87bf8df5191a20a1dfb43b85",
-      "changed_paths": [
-        "static/ergopti_plus/_shared/lua/layouts/catalogue.lua",
-        "static/ergopti_plus/_shared/lua/layouts/extension.lua",
-        "static/ergopti_plus/linux/modules/keymap/layout_registry.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua",
-        "static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua",
-        "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-        "static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk",
-        "static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk",
-        "static/ergopti_plus/windows/tests/run_all.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "703d10c88ae4f98be283357afc2116be636efb29",
-      "subject": "feat(layouts): discover committed extension packs on Linux",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "50dff8281d6daf8256d3363922bd7c3323bccaf5",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout 703d10c88ae4f98be283357afc2116be636efb29",
-      "changed_paths": [
-        "static/ergopti_plus/linux/infra/paths.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "f35930ec2fedd889c4ffc4fff7dfbd1101626783",
-      "subject": "feat(layouts): discover committed extension packs on macOS",
-      "classification": "no_integration_proven_preserve_patch",
-      "in_main": false,
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout f35930ec2fedd889c4ffc4fff7dfbd1101626783",
-      "changed_paths": [
-        "static/ergopti_plus/macos/infra/extension_packs.lua",
-        "static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "e58cadf956fac2bf18adf652cd3031f4198278b6",
-      "subject": "feat(layouts): declare historical hotstring source bindings",
-      "classification": "no_integration_proven_preserve_patch",
-      "in_main": false,
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout e58cadf956fac2bf18adf652cd3031f4198278b6",
-      "changed_paths": [
-        "static/ergopti_plus/_shared/lua/hotstrings/extensions.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "8ad07a053c904c69869172f343ebe8fd4877dcf5",
-      "subject": "feat(config): start neutral and persist only explicit overrides",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "ae047500fe4a6cef4f0497cde3840cfa17b06444",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout 8ad07a053c904c69869172f343ebe8fd4877dcf5",
-      "changed_paths": [
-        "package.json",
-        "static/ergopti_plus/_shared/core/config_schema/config.schema.json",
-        "static/ergopti_plus/_shared/lua/config_defaults.lua",
-        "static/ergopti_plus/_shared/modules/features/linux_evidence.json",
-        "static/ergopti_plus/_shared/modules/features/manifest.schema.json",
-        "static/ergopti_plus/_shared/modules/features/manifest.toml",
-        "static/ergopti_plus/linux/_generated/config_template.toml",
-        "static/ergopti_plus/linux/_generated/features_manifest.lua",
-        "static/ergopti_plus/linux/ergopti_hotstrings.lua",
-        "static/ergopti_plus/linux/infra/manifest_reader.lua",
-        "static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
-        "static/ergopti_plus/linux/modules/gestures/manager.lua",
-        "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
-        "static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
-        "static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
-        "static/ergopti_plus/linux/tests/e2e/daemon_keys_child.lua",
-        "static/ergopti_plus/linux/tests/support/dynamic_hotstrings_fixture.lua",
-        "static/ergopti_plus/linux/tests/support/metrics_consent_fixture.lua",
-        "static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua",
-        "static/ergopti_plus/linux/tests/test_manifest.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_dynamic_hotstrings_manager.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_empty_config_neutral.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_keylogger.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_shortcuts_manager.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_integration.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_loader.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_manager.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua",
-        "static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_writer.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_expansion_log_privacy.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_multibyte_trigger.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_unicode_suffix.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_personal_info_combo_resolver.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_priority_override_collision.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_private_mapping_sinks.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_aggregate_walker.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_app_switch_aggregate.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_hold_durations.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_keylogger_privacy_filters.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_metrics_toggles_persist.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_suggestion_counters.lua",
-        "static/ergopti_plus/linux/tests/unit/modules/keylogger/test_window_titles.lua",
-        "static/ergopti_plus/linux/tests/unit/ui/test_global_disable_all_features.lua",
-        "static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
-        "static/ergopti_plus/macos/_generated/config_template.toml",
-        "static/ergopti_plus/macos/_generated/features_manifest.lua",
-        "static/ergopti_plus/macos/infra/manifest_reader.lua",
-        "static/ergopti_plus/macos/infra/preferences.lua",
-        "static/ergopti_plus/macos/init.lua",
-        "static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua",
-        "static/ergopti_plus/macos/modules/gestures/init.lua",
-        "static/ergopti_plus/macos/modules/keylogger/init.lua",
-        "static/ergopti_plus/macos/modules/keymap/init.lua",
-        "static/ergopti_plus/macos/modules/keymap/registry_index.lua",
-        "static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
-        "static/ergopti_plus/macos/modules/shortcuts/init.lua",
-        "static/ergopti_plus/macos/platform/remap/config.lua",
-        "static/ergopti_plus/macos/platform/remap/init.lua",
-        "static/ergopti_plus/macos/tests/support/llm_activation_fixture.lua",
-        "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
-        "static/ergopti_plus/macos/tests/support/shortcut_bindings_fixture.lua",
-        "static/ergopti_plus/macos/tests/unit/infra/test_config_defaults.lua",
-        "static/ergopti_plus/macos/tests/unit/infra/test_empty_config_defaults.lua",
-        "static/ergopti_plus/macos/tests/unit/infra/test_preferences_keeps_unowned_sections.lua",
-        "static/ergopti_plus/macos/tests/unit/infra/test_preferences_sparse.lua",
-        "static/ergopti_plus/macos/tests/unit/lib/test_manifest_reader.lua",
-        "static/ergopti_plus/macos/tests/unit/lib/test_root_controlled_reload_shutdown_inert.lua",
-        "static/ergopti_plus/macos/tests/unit/menu/test_llm_menu_persistence.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/keymap/test_preview_mutation_commit_gate.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/keymap/test_repeat_neutral_config.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_child_composition.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_neutral_boot.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_preference_vs_binding.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_start_transaction.lua",
-        "static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_rebind_preserves_keep_awake.lua",
-        "static/ergopti_plus/macos/tests/unit/platform/remap/enable_transaction/test_bulk_owner.lua",
-        "static/ergopti_plus/macos/tests/unit/platform/remap/test_config.lua",
-        "static/ergopti_plus/macos/tests/unit/platform/remap/test_generator_typed_output.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_settings_transaction.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_metrics_filter_transaction.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_shortcuts_checkmarks_show_preference.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/menu/test_preferences_shortcut_keys_survive_pause.lua",
-        "static/ergopti_plus/macos/tests/unit/ui/test_preferences_save_transaction.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
-        "static/ergopti_plus/macos/ui/menu/menu_state.lua",
-        "static/ergopti_plus/windows/_generated/config_template.toml",
-        "static/ergopti_plus/windows/_generated/features_manifest.ahk",
-        "static/ergopti_plus/windows/infra/feature_state.ahk",
-        "static/ergopti_plus/windows/infra/first_boot.ahk",
-        "static/ergopti_plus/windows/infra/hotstrings/hotstrings_cache.ahk",
-        "static/ergopti_plus/windows/infra/manifest_reader.ahk",
-        "static/ergopti_plus/windows/infra/toml/toml_config_loader.ahk",
-        "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_master_gate_drifted_subgate_skip.ahk",
-        "static/ergopti_plus/windows/tests/run_all.ahk",
-        "static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk",
-        "static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_gestures.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_hotstring_language_packs.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_tap_hold_loader.ahk",
-        "tools/build/build-features-manifest.js",
-        "tools/test/run-js-suite.cjs",
-        "tools/test/test-defaults-single-source.cjs",
-        "tools/test/test-feature-state-boot-smoke.cjs",
-        "tools/test/test-gesture-slots-single-source.cjs",
-        "tools/test/test-linux-feature-parity.cjs"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-      "subject": "feat(config): retain rollback debt for scoped transactions",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "dc4f2618159deb0574da7b896a6ab5e1c645f022",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout 7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
-      "changed_paths": [
-        "static/ergopti_plus/_shared/lua/config_scope_transaction.lua",
-        "static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "335e06aa1f2b868e225da798269b03edcdf7dcae",
-      "subject": "fix(windows): preserve desired features behind category masters",
-      "classification": "adapted_integration_identified_not_patch_equivalent",
-      "in_main": false,
-      "integration_commit": "8549080ada96a5df1958e1a09eddb388c51a2445",
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout 335e06aa1f2b868e225da798269b03edcdf7dcae",
-      "changed_paths": [
-        "static/ergopti_plus/windows/ErgoptiPlus.ahk",
-        "static/ergopti_plus/windows/infra/config_io.ahk",
-        "static/ergopti_plus/windows/infra/feature_io.ahk",
-        "static/ergopti_plus/windows/infra/master_gates.ahk",
-        "static/ergopti_plus/windows/infra/personal_features.ahk",
-        "static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk",
-        "static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk",
-        "static/ergopti_plus/windows/tests/test_stubs.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_master_gates.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk",
-        "static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk",
-        "static/ergopti_plus/windows/ui/editors.ahk",
-        "static/ergopti_plus/windows/ui/menu/menu_engine.ahk",
-        "static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk",
-        "static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk",
-        "static/ergopti_plus/windows/ui/menu/menu_init.ahk",
-        "static/ergopti_plus/windows/ui/menu/menu_submenus.ahk",
-        "static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
-      ]
-    },
-    {
-      "sign": "+",
-      "sha": "c4f59734352ab442daad6309f5ec57854f4511a3",
-      "subject": "Bump @sveltejs/kit in the npm_and_yarn group across 1 directory (#83)",
-      "classification": "no_integration_proven_preserve_patch",
-      "in_main": false,
-      "preserve_original_patch": true,
-      "patch_command": "git format-patch -1 --stdout c4f59734352ab442daad6309f5ec57854f4511a3",
-      "changed_paths": [
-        "package-lock.json",
-        "package.json"
-      ]
-    }
-  ]
+	"created_utc": "2026-09-28T20:49:31.993Z",
+	"repository": "D:/Documents/GitHub/ergopti",
+	"dev": "2d065e7c808fb3006fa23dfa3e2584e1747d3b9e",
+	"main": "3b8811be72745d158bc24dfb41580bb695005081",
+	"branches": [
+		{
+			"branch": "feat/ovh2-console",
+			"head": "a96a9e84e18fb3d81637435365686bd9878b3568",
+			"merge_base": "ab7412933a69c79669142b48614c35c83c1224da",
+			"plus": 1,
+			"minus": 2,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "5415cd345221d4d1cc9cfc339b5771e087eda47b",
+					"subject": "test(linux): route Bash fixtures through the Git userland",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "fa38b2fcff23667a267a030830af8bcc80d0b021",
+					"subject": "test(logging): exercise the configured acknowledgement stall budget",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "+",
+					"sha": "a96a9e84e18fb3d81637435365686bd9878b3568",
+					"subject": "feat(console): center native debug windows at a shared minimum size",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "503f6cb5e1d2c11067a711aa53d3cfb74c8b767b",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout a96a9e84e18fb3d81637435365686bd9878b3568",
+					"changed_paths": [
+						"docs/memory/shared-architecture.md",
+						"static/ergopti_plus/_shared/ui/apps.manifest.json",
+						"static/ergopti_plus/docs/architecture.md",
+						"static/ergopti_plus/macos/modules/gestures/actions.lua",
+						"static/ergopti_plus/macos/tests/helpers/init.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua",
+						"static/ergopti_plus/macos/ui/console_window.lua",
+						"static/ergopti_plus/macos/ui/menu/init.lua",
+						"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+						"static/ergopti_plus/windows/adapters/console_window.ahk",
+						"static/ergopti_plus/windows/infra/lifecycle.ahk",
+						"static/ergopti_plus/windows/modules/gestures/actions.ahk",
+						"static/ergopti_plus/windows/tests/run_all.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_console_window.ahk",
+						"static/ergopti_plus/windows/ui/console_window.ahk",
+						"tools/test/test-webview-geometry-single-source.cjs"
+					]
+				}
+			]
+		},
+		{
+			"branch": "feat/ovh2-diag-integration",
+			"head": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
+			"merge_base": "51563a9ad3d8e615fbfbf51bc6d6c44101b0755b",
+			"plus": 6,
+			"minus": 37,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "10e337f1c7f39a9c5ed903cae1990139331a3171",
+					"subject": "feat(layouts): add the keyboard-layout registry folder and its index",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "31d284aebf80a9f4f9a4cc851873807e99734f61",
+					"subject": "feat(linux): convert any registry .keylayout to XKB with one converter",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "0cd338dd996e757a46d44d357fe8f50f8262849c",
+					"subject": "feat(windows): emulate a registry layout by reading its .keylayout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "7872ee8cf466ab3046c6c1468d90725cece6d19b",
+					"subject": "feat(macos): install a registry layout's .keylayout as it is",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "ce472c562587b6c2c19885da2c319ae66dafa7e7",
+					"subject": "feat(linux): convert a registry layout to XKB on the device",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "26fb89a8a56514d0d7f565cb5eb4ab4b7dfff010",
+					"subject": "fix(layouts): name the defaults file a Lua driver cannot decode",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "287851bbe895e41f3ff3618fd04a416807bed198",
+					"subject": "fix(linux): report registry Compose outputs that no key can reach",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "d2d0dd58172f20329417f24b05a7dc41eb099200",
+					"subject": "fix(layouts): pin every registry id rule to the index builder's",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "db8a7745d1abafb29df7039bc44d36b66b61018f",
+					"subject": "feat(windows): read the Ergopti emulation tables from its .keylayout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "61dfc0a37f83867d4de81bbc3e87fac05e3eb762",
+					"subject": "feat(layouts): declare what an emulated layout supersedes, and why",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "c256a697db787ee14368b78762dc0cd26582bc45",
+					"subject": "fix(layouts): declare superseded_reason_key in the manifest schema",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "269853d2340c0813dca52e4d49c62da5e7f76fe3",
+					"subject": "test(windows): pin why the Ergopti table loaders refuse bad input",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "7d9b798f68ba1c6a074c0db707e8b6992e548895",
+					"subject": "docs(windows): point the typography note at the Ergopti .keylayout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "8b028807f8526a7a5afc474ecd389bd24771328d",
+					"subject": "test(windows): replay the Ergopti golden through the registry emulation",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "c6e59c0c25733bf58b0594090821b33861a2abe1",
+					"subject": "feat(layouts): declare each registry layout's family",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "aa2fd65dd72c288dec12754f0bcbfea5e6918525",
+					"subject": "feat(layouts): publish each layout's keyboard name in the index",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "a487caf2beb4956fb2bb0b57bc3b2a65dbc9ea1d",
+					"subject": "feat(layouts): add the shared layout catalogue decisions",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "b68e4341b6ce7b725bbe1509b438a292d92f1088",
+					"subject": "refactor(macos): read a bundle's layouts from its Info.plist",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "893df3cb98c5a8078eada01aff1829750d72ff19",
+					"subject": "feat(macos): install, update and uninstall registry layouts",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "174f86a786c46ca83f5afcbb208704bd3c43bda0",
+					"subject": "feat(linux): install registry layouts in the user XKB tree",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "2fda635fd7c30f13c2a68250f5a98100e4195c9a",
+					"subject": "feat(windows): install, update and uninstall registry layouts",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "+",
+					"sha": "ecacf79938b74817e48ddf9915902b32de8ca1fe",
+					"subject": "feat(layouts): add the shared layout manager window on three drivers",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "dcfbe6051f3b0e33a2ff36030e7575b3cb5367f1",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout ecacf79938b74817e48ddf9915902b32de8ca1fe",
+					"changed_paths": [
+						"package.json",
+						"static/ergopti_plus/_shared/data/locales/ar.json",
+						"static/ergopti_plus/_shared/data/locales/cs.json",
+						"static/ergopti_plus/_shared/data/locales/da.json",
+						"static/ergopti_plus/_shared/data/locales/de.json",
+						"static/ergopti_plus/_shared/data/locales/en.json",
+						"static/ergopti_plus/_shared/data/locales/es.json",
+						"static/ergopti_plus/_shared/data/locales/fr.json",
+						"static/ergopti_plus/_shared/data/locales/he.json",
+						"static/ergopti_plus/_shared/data/locales/hi.json",
+						"static/ergopti_plus/_shared/data/locales/it.json",
+						"static/ergopti_plus/_shared/data/locales/ja.json",
+						"static/ergopti_plus/_shared/data/locales/ko.json",
+						"static/ergopti_plus/_shared/data/locales/nl.json",
+						"static/ergopti_plus/_shared/data/locales/no.json",
+						"static/ergopti_plus/_shared/data/locales/pl.json",
+						"static/ergopti_plus/_shared/data/locales/pt.json",
+						"static/ergopti_plus/_shared/data/locales/ru.json",
+						"static/ergopti_plus/_shared/data/locales/sv.json",
+						"static/ergopti_plus/_shared/data/locales/tr.json",
+						"static/ergopti_plus/_shared/data/locales/uk.json",
+						"static/ergopti_plus/_shared/data/locales/zh.json",
+						"static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua",
+						"static/ergopti_plus/_shared/ui/apps.manifest.json",
+						"static/ergopti_plus/_shared/ui/host_bridge.js",
+						"static/ergopti_plus/_shared/ui/layout_manager/index.html",
+						"static/ergopti_plus/_shared/ui/layout_manager/script.js",
+						"static/ergopti_plus/_shared/ui/layout_manager/strings.json",
+						"static/ergopti_plus/_shared/ui/layout_manager/style.css",
+						"static/ergopti_plus/linux/tests/test_manifest.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua",
+						"static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua",
+						"static/ergopti_plus/linux/ui/layout_manager/bridge.lua",
+						"static/ergopti_plus/linux/ui/webkit_host.lua",
+						"static/ergopti_plus/linux/ui/webview_manager.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
+						"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+						"static/ergopti_plus/windows/tests/run_all.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk",
+						"static/ergopti_plus/windows/ui/layout_manager/init.ahk",
+						"tools/test/run-js-suite.cjs",
+						"tools/test/test-layout-manager-page.cjs",
+						"tools/test/test-webview-geometry-single-source.cjs"
+					]
+				},
+				{
+					"sign": "+",
+					"sha": "5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
+					"subject": "refactor(macos): host the layout manager window in ui/layout_manager",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "9da35250472e7a12d34cf86eb1515502f307e071",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout 5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
+					"changed_paths": [
+						"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_window.lua",
+						"static/ergopti_plus/macos/ui/layout_manager/init.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
+						"tools/test/test-driver-tree-parity.cjs",
+						"tools/test/test-webview-geometry-single-source.cjs"
+					]
+				},
+				{
+					"sign": "-",
+					"sha": "fa9798907c19cc89923d86e8baf80d0de299cb7a",
+					"subject": "feat(menu): make the Ergopti section the custom layout section",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "cf5828429689cedbfe0b61129195c2daad5e8612",
+					"subject": "feat(windows): turn Ergopti-only hotstrings off under another layout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "9f314bf8ed7293f21c45b185f2f24be2c9655f25",
+					"subject": "fix(layouts): read the installed record before writing a layout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "b6b3b1836778818415525ef067591a8cdd1908ea",
+					"subject": "fix(layouts): name the shipped catalogue before the first refresh",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "e94fe6674fbd5842628038e21c63535fa6125500",
+					"subject": "fix(layouts): report a cached index the catalogue sets aside",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "73b2b56e4727e8ea152e59128527fe03e87ed029",
+					"subject": "refactor(layouts): drop the registry download the catalogue replaced",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "0f81fcc182fbd2249b2d1b9e80dc800b21b6b812",
+					"subject": "refactor(layouts): declare the registry user agent once",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "a3f67d96a9701d66bdef83d23c51db62ef7fc58d",
+					"subject": "fix(linux): leave the user XKB tree unchanged after a failed install",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "be0b73524eac608e81eaa1b5f454dc91842884f0",
+					"subject": "test(windows): pin that a refused update keeps the installed layout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "2a2516176a8d3da59044ac5288adfce2c40629ea",
+					"subject": "test(layouts): resolve Git Bash for the packaging fixture",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "54a31ea4cab61cd716c536aa462a9663f3e23380",
+					"subject": "fix(layouts): preserve opt-in geometry hotstrings on every layout",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "c25a00ffed43e6cb7a50effdae2fc738f1f19c36",
+					"subject": "feat(layouts): inventory existing extension content in the registry",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "+",
+					"sha": "f77494627af86efc87bf8df5191a20a1dfb43b85",
+					"subject": "feat(layouts): publish verified extension generations atomically",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "129e02f61498a6545c8cca12ea8fcfbd95396f18",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout f77494627af86efc87bf8df5191a20a1dfb43b85",
+					"changed_paths": [
+						"static/ergopti_plus/_shared/lua/layouts/catalogue.lua",
+						"static/ergopti_plus/_shared/lua/layouts/extension.lua",
+						"static/ergopti_plus/linux/modules/keymap/layout_registry.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua",
+						"static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua",
+						"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+						"static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk",
+						"static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk",
+						"static/ergopti_plus/windows/tests/run_all.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk"
+					]
+				},
+				{
+					"sign": "-",
+					"sha": "4c56825375440364326484945dee9b50773ce949",
+					"subject": "feat(layouts): show optional extension content in the manager",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "+",
+					"sha": "703d10c88ae4f98be283357afc2116be636efb29",
+					"subject": "feat(layouts): discover committed extension packs on Linux",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "50dff8281d6daf8256d3363922bd7c3323bccaf5",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout 703d10c88ae4f98be283357afc2116be636efb29",
+					"changed_paths": [
+						"static/ergopti_plus/linux/infra/paths.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua"
+					]
+				},
+				{
+					"sign": "-",
+					"sha": "fa92fdc66aaa719c2ff23d37991505e9debb875b",
+					"subject": "fix(config): preserve quoted extension paths on Windows reload",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "+",
+					"sha": "f35930ec2fedd889c4ffc4fff7dfbd1101626783",
+					"subject": "feat(layouts): discover committed extension packs on macOS",
+					"classification": "no_integration_proven_preserve_patch",
+					"in_main": false,
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout f35930ec2fedd889c4ffc4fff7dfbd1101626783",
+					"changed_paths": [
+						"static/ergopti_plus/macos/infra/extension_packs.lua",
+						"static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua"
+					]
+				},
+				{
+					"sign": "+",
+					"sha": "e58cadf956fac2bf18adf652cd3031f4198278b6",
+					"subject": "feat(layouts): declare historical hotstring source bindings",
+					"classification": "no_integration_proven_preserve_patch",
+					"in_main": false,
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout e58cadf956fac2bf18adf652cd3031f4198278b6",
+					"changed_paths": [
+						"static/ergopti_plus/_shared/lua/hotstrings/extensions.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua"
+					]
+				},
+				{
+					"sign": "-",
+					"sha": "e4076604dbd06ea350bafda535dad52e8fc2eaa3",
+					"subject": "fix(hotstrings): recognize canonical extension source categories",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "-",
+					"sha": "2dfd67be8bf09ecf7e3b0a8aa822fc7842e41b73",
+					"subject": "feat(layouts): discover Windows packs and plan effective sections",
+					"classification": "patch_equivalent_in_dev"
+				}
+			]
+		},
+		{
+			"branch": "feat/ovh2-linux-harness",
+			"head": "4929aa3b9b97790038d4ef9581da43ceeec3e2f9",
+			"merge_base": "ab7412933a69c79669142b48614c35c83c1224da",
+			"plus": 0,
+			"minus": 1,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "4929aa3b9b97790038d4ef9581da43ceeec3e2f9",
+					"subject": "test(linux): route Bash fixtures through the Git userland",
+					"classification": "patch_equivalent_in_dev"
+				}
+			]
+		},
+		{
+			"branch": "feat/ovh2-neutral-config",
+			"head": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+			"merge_base": "437f490243c7a63d32e25a6920ce60c0e958ad82",
+			"plus": 2,
+			"minus": 1,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "aed8fba358ec12168aed35d9a03f398f7e6747ae",
+					"subject": "feat(config): preserve unknown fields in sparse TOML transactions",
+					"classification": "patch_equivalent_in_dev"
+				},
+				{
+					"sign": "+",
+					"sha": "8ad07a053c904c69869172f343ebe8fd4877dcf5",
+					"subject": "feat(config): start neutral and persist only explicit overrides",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "ae047500fe4a6cef4f0497cde3840cfa17b06444",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout 8ad07a053c904c69869172f343ebe8fd4877dcf5",
+					"changed_paths": [
+						"package.json",
+						"static/ergopti_plus/_shared/core/config_schema/config.schema.json",
+						"static/ergopti_plus/_shared/lua/config_defaults.lua",
+						"static/ergopti_plus/_shared/modules/features/linux_evidence.json",
+						"static/ergopti_plus/_shared/modules/features/manifest.schema.json",
+						"static/ergopti_plus/_shared/modules/features/manifest.toml",
+						"static/ergopti_plus/linux/_generated/config_template.toml",
+						"static/ergopti_plus/linux/_generated/features_manifest.lua",
+						"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+						"static/ergopti_plus/linux/infra/manifest_reader.lua",
+						"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
+						"static/ergopti_plus/linux/modules/gestures/manager.lua",
+						"static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+						"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
+						"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
+						"static/ergopti_plus/linux/tests/e2e/daemon_keys_child.lua",
+						"static/ergopti_plus/linux/tests/support/dynamic_hotstrings_fixture.lua",
+						"static/ergopti_plus/linux/tests/support/metrics_consent_fixture.lua",
+						"static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua",
+						"static/ergopti_plus/linux/tests/test_manifest.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_dynamic_hotstrings_manager.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_empty_config_neutral.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_keylogger.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_shortcuts_manager.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_integration.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_loader.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_manager.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua",
+						"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_writer.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_expansion_log_privacy.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_multibyte_trigger.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_unicode_suffix.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_personal_info_combo_resolver.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_priority_override_collision.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_private_mapping_sinks.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_aggregate_walker.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_app_switch_aggregate.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_hold_durations.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_keylogger_privacy_filters.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_metrics_toggles_persist.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_suggestion_counters.lua",
+						"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_window_titles.lua",
+						"static/ergopti_plus/linux/tests/unit/ui/test_global_disable_all_features.lua",
+						"static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
+						"static/ergopti_plus/macos/_generated/config_template.toml",
+						"static/ergopti_plus/macos/_generated/features_manifest.lua",
+						"static/ergopti_plus/macos/infra/manifest_reader.lua",
+						"static/ergopti_plus/macos/infra/preferences.lua",
+						"static/ergopti_plus/macos/init.lua",
+						"static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua",
+						"static/ergopti_plus/macos/modules/gestures/init.lua",
+						"static/ergopti_plus/macos/modules/keylogger/init.lua",
+						"static/ergopti_plus/macos/modules/keymap/init.lua",
+						"static/ergopti_plus/macos/modules/keymap/registry_index.lua",
+						"static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
+						"static/ergopti_plus/macos/modules/shortcuts/init.lua",
+						"static/ergopti_plus/macos/platform/remap/config.lua",
+						"static/ergopti_plus/macos/platform/remap/init.lua",
+						"static/ergopti_plus/macos/tests/support/llm_activation_fixture.lua",
+						"static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+						"static/ergopti_plus/macos/tests/support/shortcut_bindings_fixture.lua",
+						"static/ergopti_plus/macos/tests/unit/infra/test_config_defaults.lua",
+						"static/ergopti_plus/macos/tests/unit/infra/test_empty_config_defaults.lua",
+						"static/ergopti_plus/macos/tests/unit/infra/test_preferences_keeps_unowned_sections.lua",
+						"static/ergopti_plus/macos/tests/unit/infra/test_preferences_sparse.lua",
+						"static/ergopti_plus/macos/tests/unit/lib/test_manifest_reader.lua",
+						"static/ergopti_plus/macos/tests/unit/lib/test_root_controlled_reload_shutdown_inert.lua",
+						"static/ergopti_plus/macos/tests/unit/menu/test_llm_menu_persistence.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/keymap/test_preview_mutation_commit_gate.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/keymap/test_repeat_neutral_config.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_child_composition.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_neutral_boot.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_preference_vs_binding.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_start_transaction.lua",
+						"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_rebind_preserves_keep_awake.lua",
+						"static/ergopti_plus/macos/tests/unit/platform/remap/enable_transaction/test_bulk_owner.lua",
+						"static/ergopti_plus/macos/tests/unit/platform/remap/test_config.lua",
+						"static/ergopti_plus/macos/tests/unit/platform/remap/test_generator_typed_output.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_settings_transaction.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_metrics_filter_transaction.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_shortcuts_checkmarks_show_preference.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/menu/test_preferences_shortcut_keys_survive_pause.lua",
+						"static/ergopti_plus/macos/tests/unit/ui/test_preferences_save_transaction.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+						"static/ergopti_plus/macos/ui/menu/menu_state.lua",
+						"static/ergopti_plus/windows/_generated/config_template.toml",
+						"static/ergopti_plus/windows/_generated/features_manifest.ahk",
+						"static/ergopti_plus/windows/infra/feature_state.ahk",
+						"static/ergopti_plus/windows/infra/first_boot.ahk",
+						"static/ergopti_plus/windows/infra/hotstrings/hotstrings_cache.ahk",
+						"static/ergopti_plus/windows/infra/manifest_reader.ahk",
+						"static/ergopti_plus/windows/infra/toml/toml_config_loader.ahk",
+						"static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_master_gate_drifted_subgate_skip.ahk",
+						"static/ergopti_plus/windows/tests/run_all.ahk",
+						"static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk",
+						"static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_gestures.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_hotstring_language_packs.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_tap_hold_loader.ahk",
+						"tools/build/build-features-manifest.js",
+						"tools/test/run-js-suite.cjs",
+						"tools/test/test-defaults-single-source.cjs",
+						"tools/test/test-feature-state-boot-smoke.cjs",
+						"tools/test/test-gesture-slots-single-source.cjs",
+						"tools/test/test-linux-feature-parity.cjs"
+					]
+				},
+				{
+					"sign": "+",
+					"sha": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+					"subject": "feat(config): retain rollback debt for scoped transactions",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "dc4f2618159deb0574da7b896a6ab5e1c645f022",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout 7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+					"changed_paths": [
+						"static/ergopti_plus/_shared/lua/config_scope_transaction.lua",
+						"static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua"
+					]
+				}
+			]
+		},
+		{
+			"branch": "feat/ovh2-shortcut-refusals",
+			"head": "1835a2ba8f69d6dd5ba8450304acb07b4902427e",
+			"merge_base": "d409787a526c46298ab5370b89988c40b3a5e618",
+			"plus": 0,
+			"minus": 1,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "1835a2ba8f69d6dd5ba8450304acb07b4902427e",
+					"subject": "fix(macos): preserve shortcut preferences after replay refusals",
+					"classification": "patch_equivalent_in_dev"
+				}
+			]
+		},
+		{
+			"branch": "feat/ovh2-state-refusals",
+			"head": "6c68ec1c8b7f4e7797b07b0766d2aa743ab71c1d",
+			"merge_base": "d409787a526c46298ab5370b89988c40b3a5e618",
+			"plus": 0,
+			"minus": 1,
+			"commits": [
+				{
+					"sign": "-",
+					"sha": "6c68ec1c8b7f4e7797b07b0766d2aa743ab71c1d",
+					"subject": "fix(macos): preserve disabled custom terminators at boot",
+					"classification": "patch_equivalent_in_dev"
+				}
+			]
+		},
+		{
+			"branch": "feat/ovh2-windows-master-state",
+			"head": "335e06aa1f2b868e225da798269b03edcdf7dcae",
+			"merge_base": "e77324b6785ca29627d1b8c1e0ef689fa69fdabe",
+			"plus": 1,
+			"minus": 0,
+			"commits": [
+				{
+					"sign": "+",
+					"sha": "335e06aa1f2b868e225da798269b03edcdf7dcae",
+					"subject": "fix(windows): preserve desired features behind category masters",
+					"classification": "adapted_integration_identified_not_patch_equivalent",
+					"in_main": false,
+					"integration_commit": "8549080ada96a5df1958e1a09eddb388c51a2445",
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout 335e06aa1f2b868e225da798269b03edcdf7dcae",
+					"changed_paths": [
+						"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+						"static/ergopti_plus/windows/infra/config_io.ahk",
+						"static/ergopti_plus/windows/infra/feature_io.ahk",
+						"static/ergopti_plus/windows/infra/master_gates.ahk",
+						"static/ergopti_plus/windows/infra/personal_features.ahk",
+						"static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk",
+						"static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk",
+						"static/ergopti_plus/windows/tests/test_stubs.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_master_gates.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk",
+						"static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk",
+						"static/ergopti_plus/windows/ui/editors.ahk",
+						"static/ergopti_plus/windows/ui/menu/menu_engine.ahk",
+						"static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk",
+						"static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk",
+						"static/ergopti_plus/windows/ui/menu/menu_init.ahk",
+						"static/ergopti_plus/windows/ui/menu/menu_submenus.ahk",
+						"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
+					]
+				}
+			]
+		},
+		{
+			"branch": "worktree-wf_f8423464-54e-1",
+			"head": "c4f59734352ab442daad6309f5ec57854f4511a3",
+			"merge_base": "f31e85e1154b912ddea286280331d82f7fe2fa0a",
+			"plus": 14,
+			"minus": 0,
+			"commits": [
+				{
+					"sign": "+",
+					"sha": "7a3b86196e52067d02d219fae23e1e92502f2bd3",
+					"subject": "Bump devalue in the npm_and_yarn group across 1 directory (#38)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "7ea5f77607238568f9389eda492cdb40edc223fa",
+					"subject": "Create CNAME",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["CNAME"]
+				},
+				{
+					"sign": "+",
+					"sha": "d97701f1ed4545028fab2314eb8b79f621b6814f",
+					"subject": "Bump picomatch in the npm_and_yarn group across 1 directory (#51)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "8a51c7cc5cdd8e7b9c6f338b798bfff5fe7f1758",
+					"subject": "Bump vite in the npm_and_yarn group across 1 directory (#52)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "5f4d709232812ecc42095d852e9685e8d394760c",
+					"subject": "Bump lodash in the npm_and_yarn group across 1 directory (#53)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "fdbad76028652a21cb12eb11b4ac67bc31ee09a9",
+					"subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#54)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "2f7149d636dafcb09b224a979952308dd4e06b6e",
+					"subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#56)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "3f5218a1e2f3889486cb3189114cfbf2230570a5",
+					"subject": "chore(ci): add release build workflow with workflow_dispatch",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": [".github/workflows/release.yml"]
+				},
+				{
+					"sign": "+",
+					"sha": "cbd7328b52299ba987eb7f0c06cb298597ebe151",
+					"subject": "Bump lxml from 6.0.2 to 6.1.0 in the uv group across 1 directory (#77)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["pyproject.toml", "uv.lock"]
+				},
+				{
+					"sign": "+",
+					"sha": "967519de6071bccad732f88a0dee968c4ef09310",
+					"subject": "Bump svelte in the npm_and_yarn group across 1 directory (#76)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "c23e22f823fc0769630979fbb53b310553b13f4e",
+					"subject": "Bump the npm_and_yarn group across 1 directory with 2 updates (#78)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "d2213d10c9ad21ffb75a0d7a62ef851e40f16fd1",
+					"subject": "chore(ci): remove obsolete deployTocPanel workflow",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": [".github/workflows/deployTocPanel.yml"]
+				},
+				{
+					"sign": "+",
+					"sha": "3b8811be72745d158bc24dfb41580bb695005081",
+					"subject": "Bump esbuild in the npm_and_yarn group across 1 directory (#81)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "c4f59734352ab442daad6309f5ec57854f4511a3",
+					"subject": "Bump @sveltejs/kit in the npm_and_yarn group across 1 directory (#83)",
+					"classification": "no_integration_proven_preserve_patch",
+					"in_main": false,
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout c4f59734352ab442daad6309f5ec57854f4511a3",
+					"changed_paths": ["package-lock.json", "package.json"]
+				}
+			]
+		},
+		{
+			"branch": "worktree-wf_f8423464-54e-2",
+			"head": "c4f59734352ab442daad6309f5ec57854f4511a3",
+			"merge_base": "f31e85e1154b912ddea286280331d82f7fe2fa0a",
+			"plus": 14,
+			"minus": 0,
+			"commits": [
+				{
+					"sign": "+",
+					"sha": "7a3b86196e52067d02d219fae23e1e92502f2bd3",
+					"subject": "Bump devalue in the npm_and_yarn group across 1 directory (#38)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "7ea5f77607238568f9389eda492cdb40edc223fa",
+					"subject": "Create CNAME",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["CNAME"]
+				},
+				{
+					"sign": "+",
+					"sha": "d97701f1ed4545028fab2314eb8b79f621b6814f",
+					"subject": "Bump picomatch in the npm_and_yarn group across 1 directory (#51)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "8a51c7cc5cdd8e7b9c6f338b798bfff5fe7f1758",
+					"subject": "Bump vite in the npm_and_yarn group across 1 directory (#52)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "5f4d709232812ecc42095d852e9685e8d394760c",
+					"subject": "Bump lodash in the npm_and_yarn group across 1 directory (#53)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "fdbad76028652a21cb12eb11b4ac67bc31ee09a9",
+					"subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#54)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "2f7149d636dafcb09b224a979952308dd4e06b6e",
+					"subject": "Bump basic-ftp in the npm_and_yarn group across 1 directory (#56)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "3f5218a1e2f3889486cb3189114cfbf2230570a5",
+					"subject": "chore(ci): add release build workflow with workflow_dispatch",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": [".github/workflows/release.yml"]
+				},
+				{
+					"sign": "+",
+					"sha": "cbd7328b52299ba987eb7f0c06cb298597ebe151",
+					"subject": "Bump lxml from 6.0.2 to 6.1.0 in the uv group across 1 directory (#77)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["pyproject.toml", "uv.lock"]
+				},
+				{
+					"sign": "+",
+					"sha": "967519de6071bccad732f88a0dee968c4ef09310",
+					"subject": "Bump svelte in the npm_and_yarn group across 1 directory (#76)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "c23e22f823fc0769630979fbb53b310553b13f4e",
+					"subject": "Bump the npm_and_yarn group across 1 directory with 2 updates (#78)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "d2213d10c9ad21ffb75a0d7a62ef851e40f16fd1",
+					"subject": "chore(ci): remove obsolete deployTocPanel workflow",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": [".github/workflows/deployTocPanel.yml"]
+				},
+				{
+					"sign": "+",
+					"sha": "3b8811be72745d158bc24dfb41580bb695005081",
+					"subject": "Bump esbuild in the npm_and_yarn group across 1 directory (#81)",
+					"classification": "reachable_from_main_not_dev",
+					"in_main": true,
+					"preserve_original_patch": false,
+					"changed_paths": ["package-lock.json", "package.json"]
+				},
+				{
+					"sign": "+",
+					"sha": "c4f59734352ab442daad6309f5ec57854f4511a3",
+					"subject": "Bump @sveltejs/kit in the npm_and_yarn group across 1 directory (#83)",
+					"classification": "no_integration_proven_preserve_patch",
+					"in_main": false,
+					"preserve_original_patch": true,
+					"patch_command": "git format-patch -1 --stdout c4f59734352ab442daad6309f5ec57854f4511a3",
+					"changed_paths": ["package-lock.json", "package.json"]
+				}
+			]
+		}
+	],
+	"notes": [
+		"Read-only committed-history audit against pinned dev. Dirty root integration is excluded.",
+		"Minus proves patch equivalence. Plus alone does not prove missing functionality. Adapted integrations use an exact cherry-pick footer or matching unique subject/body and prior integration evidence; retain originals because patch IDs differ.",
+		"The two worktree-wf branches have the same HEAD. Thirteen of their fourteen plus commits are already reachable from main. Only c4f5973 is outside both dev and main.",
+		"f35930ec2 adds macOS infra/extension_packs.lua and its tests/unit/lib/test_extension_packs.lua; both files are absent in dev. This L4 owner remains unintegrated.",
+		"e58cadf95 adds historical hotstring binding metadata to the shared scanner; that implementation is absent in dev. Preserve scanner/test original for coordinated L4 integration.",
+		"c4f5973 is SvelteKit dependency update #83. Preserve once and review against current package versions; do not blindly reapply.",
+		"No patches exported, branches deleted, source/index changed, commits or pushes performed by this audit."
+	],
+	"preserve_originals": [
+		{
+			"sign": "+",
+			"sha": "a96a9e84e18fb3d81637435365686bd9878b3568",
+			"subject": "feat(console): center native debug windows at a shared minimum size",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "503f6cb5e1d2c11067a711aa53d3cfb74c8b767b",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout a96a9e84e18fb3d81637435365686bd9878b3568",
+			"changed_paths": [
+				"docs/memory/shared-architecture.md",
+				"static/ergopti_plus/_shared/ui/apps.manifest.json",
+				"static/ergopti_plus/docs/architecture.md",
+				"static/ergopti_plus/macos/modules/gestures/actions.lua",
+				"static/ergopti_plus/macos/tests/helpers/init.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/test_console_window.lua",
+				"static/ergopti_plus/macos/ui/console_window.lua",
+				"static/ergopti_plus/macos/ui/menu/init.lua",
+				"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+				"static/ergopti_plus/windows/adapters/console_window.ahk",
+				"static/ergopti_plus/windows/infra/lifecycle.ahk",
+				"static/ergopti_plus/windows/modules/gestures/actions.ahk",
+				"static/ergopti_plus/windows/tests/run_all.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_console_window.ahk",
+				"static/ergopti_plus/windows/ui/console_window.ahk",
+				"tools/test/test-webview-geometry-single-source.cjs"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "ecacf79938b74817e48ddf9915902b32de8ca1fe",
+			"subject": "feat(layouts): add the shared layout manager window on three drivers",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "dcfbe6051f3b0e33a2ff36030e7575b3cb5367f1",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout ecacf79938b74817e48ddf9915902b32de8ca1fe",
+			"changed_paths": [
+				"package.json",
+				"static/ergopti_plus/_shared/data/locales/ar.json",
+				"static/ergopti_plus/_shared/data/locales/cs.json",
+				"static/ergopti_plus/_shared/data/locales/da.json",
+				"static/ergopti_plus/_shared/data/locales/de.json",
+				"static/ergopti_plus/_shared/data/locales/en.json",
+				"static/ergopti_plus/_shared/data/locales/es.json",
+				"static/ergopti_plus/_shared/data/locales/fr.json",
+				"static/ergopti_plus/_shared/data/locales/he.json",
+				"static/ergopti_plus/_shared/data/locales/hi.json",
+				"static/ergopti_plus/_shared/data/locales/it.json",
+				"static/ergopti_plus/_shared/data/locales/ja.json",
+				"static/ergopti_plus/_shared/data/locales/ko.json",
+				"static/ergopti_plus/_shared/data/locales/nl.json",
+				"static/ergopti_plus/_shared/data/locales/no.json",
+				"static/ergopti_plus/_shared/data/locales/pl.json",
+				"static/ergopti_plus/_shared/data/locales/pt.json",
+				"static/ergopti_plus/_shared/data/locales/ru.json",
+				"static/ergopti_plus/_shared/data/locales/sv.json",
+				"static/ergopti_plus/_shared/data/locales/tr.json",
+				"static/ergopti_plus/_shared/data/locales/uk.json",
+				"static/ergopti_plus/_shared/data/locales/zh.json",
+				"static/ergopti_plus/_shared/lua/layouts/manager_bridge.lua",
+				"static/ergopti_plus/_shared/ui/apps.manifest.json",
+				"static/ergopti_plus/_shared/ui/host_bridge.js",
+				"static/ergopti_plus/_shared/ui/layout_manager/index.html",
+				"static/ergopti_plus/_shared/ui/layout_manager/script.js",
+				"static/ergopti_plus/_shared/ui/layout_manager/strings.json",
+				"static/ergopti_plus/_shared/ui/layout_manager/style.css",
+				"static/ergopti_plus/linux/tests/test_manifest.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_webkit_host.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/test_layout_manager_bridge.lua",
+				"static/ergopti_plus/linux/ui/layout_manager/bridge.lua",
+				"static/ergopti_plus/linux/ui/webkit_host.lua",
+				"static/ergopti_plus/linux/ui/webview_manager.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_bridge.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
+				"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+				"static/ergopti_plus/windows/tests/run_all.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk",
+				"static/ergopti_plus/windows/ui/layout_manager/init.ahk",
+				"tools/test/run-js-suite.cjs",
+				"tools/test/test-layout-manager-page.cjs",
+				"tools/test/test-webview-geometry-single-source.cjs"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
+			"subject": "refactor(macos): host the layout manager window in ui/layout_manager",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "9da35250472e7a12d34cf86eb1515502f307e071",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout 5bfa29e5f4e6fcc4f91bf792f85bb46f782f2130",
+			"changed_paths": [
+				"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_layout_manager.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/test_layout_manager_window.lua",
+				"static/ergopti_plus/macos/ui/layout_manager/init.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_layout_manager.lua",
+				"tools/test/test-driver-tree-parity.cjs",
+				"tools/test/test-webview-geometry-single-source.cjs"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "f77494627af86efc87bf8df5191a20a1dfb43b85",
+			"subject": "feat(layouts): publish verified extension generations atomically",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "129e02f61498a6545c8cca12ea8fcfbd95396f18",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout f77494627af86efc87bf8df5191a20a1dfb43b85",
+			"changed_paths": [
+				"static/ergopti_plus/_shared/lua/layouts/catalogue.lua",
+				"static/ergopti_plus/_shared/lua/layouts/extension.lua",
+				"static/ergopti_plus/linux/modules/keymap/layout_registry.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua",
+				"static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_extension.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua",
+				"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+				"static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk",
+				"static/ergopti_plus/windows/modules/keymap/keylayout/layout_extension.ahk",
+				"static/ergopti_plus/windows/tests/run_all.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_layout_catalogue.ahk"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "703d10c88ae4f98be283357afc2116be636efb29",
+			"subject": "feat(layouts): discover committed extension packs on Linux",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "50dff8281d6daf8256d3363922bd7c3323bccaf5",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout 703d10c88ae4f98be283357afc2116be636efb29",
+			"changed_paths": [
+				"static/ergopti_plus/linux/infra/paths.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "f35930ec2fedd889c4ffc4fff7dfbd1101626783",
+			"subject": "feat(layouts): discover committed extension packs on macOS",
+			"classification": "no_integration_proven_preserve_patch",
+			"in_main": false,
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout f35930ec2fedd889c4ffc4fff7dfbd1101626783",
+			"changed_paths": [
+				"static/ergopti_plus/macos/infra/extension_packs.lua",
+				"static/ergopti_plus/macos/tests/unit/lib/test_extension_packs.lua"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "e58cadf956fac2bf18adf652cd3031f4198278b6",
+			"subject": "feat(layouts): declare historical hotstring source bindings",
+			"classification": "no_integration_proven_preserve_patch",
+			"in_main": false,
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout e58cadf956fac2bf18adf652cd3031f4198278b6",
+			"changed_paths": [
+				"static/ergopti_plus/_shared/lua/hotstrings/extensions.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_shared_extensions_scanner.lua"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "8ad07a053c904c69869172f343ebe8fd4877dcf5",
+			"subject": "feat(config): start neutral and persist only explicit overrides",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "ae047500fe4a6cef4f0497cde3840cfa17b06444",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout 8ad07a053c904c69869172f343ebe8fd4877dcf5",
+			"changed_paths": [
+				"package.json",
+				"static/ergopti_plus/_shared/core/config_schema/config.schema.json",
+				"static/ergopti_plus/_shared/lua/config_defaults.lua",
+				"static/ergopti_plus/_shared/modules/features/linux_evidence.json",
+				"static/ergopti_plus/_shared/modules/features/manifest.schema.json",
+				"static/ergopti_plus/_shared/modules/features/manifest.toml",
+				"static/ergopti_plus/linux/_generated/config_template.toml",
+				"static/ergopti_plus/linux/_generated/features_manifest.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/infra/manifest_reader.lua",
+				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
+				"static/ergopti_plus/linux/modules/gestures/manager.lua",
+				"static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+				"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
+				"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
+				"static/ergopti_plus/linux/tests/e2e/daemon_keys_child.lua",
+				"static/ergopti_plus/linux/tests/support/dynamic_hotstrings_fixture.lua",
+				"static/ergopti_plus/linux/tests/support/metrics_consent_fixture.lua",
+				"static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua",
+				"static/ergopti_plus/linux/tests/test_manifest.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_dynamic_hotstrings_manager.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_empty_config_neutral.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_keylogger.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_shortcuts_manager.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_integration.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_loader.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_manager.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_writer.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_expansion_log_privacy.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_multibyte_trigger.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_unicode_suffix.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_catalogue.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_personal_info_combo_resolver.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_priority_override_collision.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_private_mapping_sinks.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_section_opt_in_defaults.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_aggregate_walker.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_app_switch_aggregate.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_hold_durations.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_keylogger_privacy_filters.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_metrics_toggles_persist.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_suggestion_counters.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_window_titles.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/test_global_disable_all_features.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
+				"static/ergopti_plus/macos/_generated/config_template.toml",
+				"static/ergopti_plus/macos/_generated/features_manifest.lua",
+				"static/ergopti_plus/macos/infra/manifest_reader.lua",
+				"static/ergopti_plus/macos/infra/preferences.lua",
+				"static/ergopti_plus/macos/init.lua",
+				"static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua",
+				"static/ergopti_plus/macos/modules/gestures/init.lua",
+				"static/ergopti_plus/macos/modules/keylogger/init.lua",
+				"static/ergopti_plus/macos/modules/keymap/init.lua",
+				"static/ergopti_plus/macos/modules/keymap/registry_index.lua",
+				"static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
+				"static/ergopti_plus/macos/modules/shortcuts/init.lua",
+				"static/ergopti_plus/macos/platform/remap/config.lua",
+				"static/ergopti_plus/macos/platform/remap/init.lua",
+				"static/ergopti_plus/macos/tests/support/llm_activation_fixture.lua",
+				"static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+				"static/ergopti_plus/macos/tests/support/shortcut_bindings_fixture.lua",
+				"static/ergopti_plus/macos/tests/unit/infra/test_config_defaults.lua",
+				"static/ergopti_plus/macos/tests/unit/infra/test_empty_config_defaults.lua",
+				"static/ergopti_plus/macos/tests/unit/infra/test_preferences_keeps_unowned_sections.lua",
+				"static/ergopti_plus/macos/tests/unit/infra/test_preferences_sparse.lua",
+				"static/ergopti_plus/macos/tests/unit/lib/test_manifest_reader.lua",
+				"static/ergopti_plus/macos/tests/unit/lib/test_root_controlled_reload_shutdown_inert.lua",
+				"static/ergopti_plus/macos/tests/unit/menu/test_llm_menu_persistence.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/test_preview_mutation_commit_gate.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/keymap/test_repeat_neutral_config.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_child_composition.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_neutral_boot.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_preference_vs_binding.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_bindings_start_transaction.lua",
+				"static/ergopti_plus/macos/tests/unit/modules/shortcuts/test_rebind_preserves_keep_awake.lua",
+				"static/ergopti_plus/macos/tests/unit/platform/remap/enable_transaction/test_bulk_owner.lua",
+				"static/ergopti_plus/macos/tests/unit/platform/remap/test_config.lua",
+				"static/ergopti_plus/macos/tests/unit/platform/remap/test_generator_typed_output.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_settings_transaction.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_metrics_filter_transaction.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_shortcuts_checkmarks_show_preference.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/test_preferences_shortcut_keys_survive_pause.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/test_preferences_save_transaction.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_llm/init.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_state.lua",
+				"static/ergopti_plus/windows/_generated/config_template.toml",
+				"static/ergopti_plus/windows/_generated/features_manifest.ahk",
+				"static/ergopti_plus/windows/infra/feature_state.ahk",
+				"static/ergopti_plus/windows/infra/first_boot.ahk",
+				"static/ergopti_plus/windows/infra/hotstrings/hotstrings_cache.ahk",
+				"static/ergopti_plus/windows/infra/manifest_reader.ahk",
+				"static/ergopti_plus/windows/infra/toml/toml_config_loader.ahk",
+				"static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_master_gate_drifted_subgate_skip.ahk",
+				"static/ergopti_plus/windows/tests/run_all.ahk",
+				"static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk",
+				"static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_gestures.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_hotstring_language_packs.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_neutral_config_manifest.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_tap_hold_loader.ahk",
+				"tools/build/build-features-manifest.js",
+				"tools/test/run-js-suite.cjs",
+				"tools/test/test-defaults-single-source.cjs",
+				"tools/test/test-feature-state-boot-smoke.cjs",
+				"tools/test/test-gesture-slots-single-source.cjs",
+				"tools/test/test-linux-feature-parity.cjs"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+			"subject": "feat(config): retain rollback debt for scoped transactions",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "dc4f2618159deb0574da7b896a6ab5e1c645f022",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout 7bbae9394ea55b247d2f2d6e16d8c5ce24e7cf27",
+			"changed_paths": [
+				"static/ergopti_plus/_shared/lua/config_scope_transaction.lua",
+				"static/ergopti_plus/macos/tests/unit/infra/test_config_scope_transaction.lua"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "335e06aa1f2b868e225da798269b03edcdf7dcae",
+			"subject": "fix(windows): preserve desired features behind category masters",
+			"classification": "adapted_integration_identified_not_patch_equivalent",
+			"in_main": false,
+			"integration_commit": "8549080ada96a5df1958e1a09eddb388c51a2445",
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout 335e06aa1f2b868e225da798269b03edcdf7dcae",
+			"changed_paths": [
+				"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+				"static/ergopti_plus/windows/infra/config_io.ahk",
+				"static/ergopti_plus/windows/infra/feature_io.ahk",
+				"static/ergopti_plus/windows/infra/master_gates.ahk",
+				"static/ergopti_plus/windows/infra/personal_features.ahk",
+				"static/ergopti_plus/windows/platform/remap/tap_hold_writer.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_batch4.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_config_failures_are_surfaced.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_config_persistence_callers.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_config_typed_foreign_producers.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_feature_io_impl_no_global.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_llm_menu_loaded_gate.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_menu_reload_preserves_suspend.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_personal_hotstring_seed.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_reload_pending_contract.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_tap_hold_global_transaction_20260813.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_tap_hold_persist_before_publish.ahk",
+				"static/ergopti_plus/windows/tests/meta/test_toggle_category_all_features_atomic.ahk",
+				"static/ergopti_plus/windows/tests/test_stubs.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_config_persistence_transactions.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_config_typed_transactions.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_hotstring_bulk_checkboxes.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_llm_menu_persistence.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_master_gates.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_master_gates_not_persisted.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_toml_numeric_strings.ahk",
+				"static/ergopti_plus/windows/ui/editors.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_engine.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_hotstring_switches.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_init.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_submenus.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
+			]
+		},
+		{
+			"sign": "+",
+			"sha": "c4f59734352ab442daad6309f5ec57854f4511a3",
+			"subject": "Bump @sveltejs/kit in the npm_and_yarn group across 1 directory (#83)",
+			"classification": "no_integration_proven_preserve_patch",
+			"in_main": false,
+			"preserve_original_patch": true,
+			"patch_command": "git format-patch -1 --stdout c4f59734352ab442daad6309f5ec57854f4511a3",
+			"changed_paths": ["package-lock.json", "package.json"]
+		}
+	]
 }

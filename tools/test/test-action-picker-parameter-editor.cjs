@@ -31,8 +31,22 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SCRIPT = path.join(SP, '_shared', 'ui', 'action_picker', 'script.js');
 const HTML = path.join(SP, '_shared', 'ui', 'action_picker', 'index.html');
-const CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'send_input_vectors.json');
-const LLM_PROMPT_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'llm_prompt_vectors.json');
+const CORPUS = path.join(
+	SP,
+	'_shared',
+	'tests',
+	'corpus',
+	'action_parameters',
+	'send_input_vectors.json'
+);
+const LLM_PROMPT_CORPUS = path.join(
+	SP,
+	'_shared',
+	'tests',
+	'corpus',
+	'action_parameters',
+	'llm_prompt_vectors.json'
+);
 const VISION_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'llm', 'vision_vectors.json');
 const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
 
@@ -103,11 +117,40 @@ const check = (cond, message) => {
 // Every element the page reaches by id must exist in index.html, or the editor
 // works here and throws in a real webview.
 const html = fs.readFileSync(HTML, 'utf8');
-const IDS = ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 'empty', 'count', 'toc', 'toc-inner',
-	'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back', 'param-save',
-	'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label', 'btn-edit-current',
-	'param-vision', 'param-vision-provider', 'param-vision-provider-label', 'param-vision-model',
-	'param-vision-model-label', 'param-language', 'param-language-label', 'param-language-select'];
+const IDS = [
+	'title',
+	'subtitle',
+	'search',
+	'search-bar',
+	'btn-cancel',
+	'list',
+	'empty',
+	'count',
+	'toc',
+	'toc-inner',
+	'param',
+	'param-title',
+	'param-prompt',
+	'param-hint',
+	'param-input',
+	'param-error',
+	'param-back',
+	'param-save',
+	'param-choice',
+	'param-profile',
+	'param-profile-label',
+	'param-count',
+	'param-count-label',
+	'btn-edit-current',
+	'param-vision',
+	'param-vision-provider',
+	'param-vision-provider-label',
+	'param-vision-model',
+	'param-vision-model-label',
+	'param-language',
+	'param-language-label',
+	'param-language-select'
+];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
 function loadPage(platform, current) {
@@ -172,7 +215,15 @@ function loadPage(platform, current) {
 		context
 	);
 	const keydown = (event) => {
-		const e = Object.assign({ preventDefault() { e.prevented = true; }, prevented: false }, event);
+		const e = Object.assign(
+			{
+				preventDefault() {
+					e.prevented = true;
+				},
+				prevented: false
+			},
+			event
+		);
 		for (const fn of docListeners.keydown || []) fn(e);
 		return e;
 	};
@@ -192,7 +243,10 @@ function loadPage(platform, current) {
 			check(parsed === null, `${vector.id}: the page accepts it as ${JSON.stringify(parsed)}`);
 		} else {
 			const canonical = vector.canonical.repeat(vector.canonical_repeat || 1);
-			check(parsed === canonical, `${vector.id}: the page reads ${JSON.stringify(parsed)}, not ${canonical}`);
+			check(
+				parsed === canonical,
+				`${vector.id}: the page reads ${JSON.stringify(parsed)}, not ${canonical}`
+			);
 		}
 		replayed += 1;
 	}
@@ -206,8 +260,13 @@ function loadPage(platform, current) {
 	}
 	page.context.__luaVocabulary = luaEncoded;
 	const parsed = vm.runInContext(
-		"sendVocabulary = __luaVocabulary; parseParameter('shortcut', 'primary+a')", page.context);
-	check(parsed === 'primary+a', `an empty alias list encoded as {} breaks the lookup: ${JSON.stringify(parsed)}`);
+		"sendVocabulary = __luaVocabulary; parseParameter('shortcut', 'primary+a')",
+		page.context
+	);
+	check(
+		parsed === 'primary+a',
+		`an empty alias list encoded as {} breaks the lookup: ${JSON.stringify(parsed)}`
+	);
 }
 
 // 2. Picking a parameterized action opens the editor instead of confirming.
@@ -215,15 +274,29 @@ function loadPage(platform, current) {
 	const page = loadPage('ahk');
 	vm.runInContext("doConfirm('send_text')", page.context);
 	check(page.posted.length === 0, 'send_text must not confirm before its text is entered');
-	check(page.byId.param.hidden === false && page.byId.list.hidden === true, 'the editor replaces the list');
-	check(page.byId['param-input'].value === 'salut', 'the editor starts from the binding\'s current value');
+	check(
+		page.byId.param.hidden === false && page.byId.list.hidden === true,
+		'the editor replaces the list'
+	);
+	check(
+		page.byId['param-input'].value === 'salut',
+		"the editor starts from the binding's current value"
+	);
 	page.byId['param-input'].value = 'a\nb';
 	page.byId['param-save'].dispatch('click');
-	check(page.posted.length === 0 && page.byId['param-error'].hidden === false, 'an invalid text is refused in place');
+	check(
+		page.posted.length === 0 && page.byId['param-error'].hidden === false,
+		'an invalid text is refused in place'
+	);
 	page.byId['param-input'].value = 'bonjour cela va bien?';
 	page.byId['param-save'].dispatch('click');
-	check(page.posted.length === 1 && page.posted[0].action === 'confirm' && page.posted[0].id === 'send_text'
-		&& page.posted[0].parameter === 'bonjour cela va bien?', 'a valid text confirms the action with it');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].action === 'confirm' &&
+			page.posted[0].id === 'send_text' &&
+			page.posted[0].parameter === 'bonjour cela va bien?',
+		'a valid text confirms the action with it'
+	);
 }
 
 // 3. The key capture turns a keystroke into its name; the shortcut capture into
@@ -232,12 +305,20 @@ function loadPage(platform, current) {
 	const page = loadPage('ahk');
 	vm.runInContext("doConfirm('send_key')", page.context);
 	const e = page.keydown({ key: 'PageDown', code: 'PageDown' });
-	check(e.prevented && page.byId['param-input'].value === 'page_down', 'PageDown is captured as page_down');
+	check(
+		e.prevented && page.byId['param-input'].value === 'page_down',
+		'PageDown is captured as page_down'
+	);
 	page.keydown({ key: 'Escape', code: 'Escape' });
-	check(page.byId['param-input'].value === 'escape' && page.posted.length === 0,
-		'Escape is a key to capture here, not a cancel');
+	check(
+		page.byId['param-input'].value === 'escape' && page.posted.length === 0,
+		'Escape is a key to capture here, not a cancel'
+	);
 	page.byId['param-back'].dispatch('click');
-	check(page.byId.param.hidden === true && page.byId.list.hidden === false, 'Back returns to the list');
+	check(
+		page.byId.param.hidden === true && page.byId.list.hidden === false,
+		'Back returns to the list'
+	);
 
 	vm.runInContext("doConfirm('send_shortcut')", page.context);
 	page.keydown({ key: 'Control', code: 'ControlLeft', ctrlKey: true });
@@ -245,9 +326,15 @@ function loadPage(platform, current) {
 	page.keydown({ key: 'a', code: 'KeyA', ctrlKey: true });
 	check(page.byId['param-input'].value === 'primary+a', 'Ctrl+A is primary+a on Windows and Linux');
 	page.keydown({ key: 'T', code: 'KeyT', ctrlKey: true, shiftKey: true });
-	check(page.byId['param-input'].value === 'primary+shift+t', 'Ctrl+Shift+T captures the letter, not the capital');
+	check(
+		page.byId['param-input'].value === 'primary+shift+t',
+		'Ctrl+Shift+T captures the letter, not the capital'
+	);
 	page.byId['param-save'].dispatch('click');
-	check(page.posted.length === 1 && page.posted[0].parameter === 'primary+shift+t', 'the capture is what is saved');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'primary+shift+t',
+		'the capture is what is saved'
+	);
 
 	const mac = loadPage('hs');
 	vm.runInContext("doConfirm('send_shortcut')", mac.context);
@@ -264,38 +351,68 @@ function loadPage(platform, current) {
 	const page = loadPage('ahk');
 	const input = page.byId['param-input'];
 	vm.runInContext("doConfirm('send_key')", page.context);
-	check(!page.keydown({ key: 'f', code: 'KeyF' }).prevented, 'a character types into the key field');
+	check(
+		!page.keydown({ key: 'f', code: 'KeyF' }).prevented,
+		'a character types into the key field'
+	);
 	input.type('f13');
-	check(!page.keydown({ key: 'Backspace', code: 'Backspace' }).prevented, 'Backspace edits a typed name');
+	check(
+		!page.keydown({ key: 'Backspace', code: 'Backspace' }).prevented,
+		'Backspace edits a typed name'
+	);
 	page.keydown({ key: 'Enter', code: 'Enter' });
-	check(page.posted.length === 1 && page.posted[0].parameter === 'f13', 'Enter saves a typed key name');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'f13',
+		'Enter saves a typed key name'
+	);
 
 	const empty = loadPage('ahk');
 	vm.runInContext("doConfirm('send_key')", empty.context);
 	empty.keydown({ key: 'Backspace', code: 'Backspace' });
 	check(empty.byId['param-input'].value === 'backspace', 'an empty key field captures Backspace');
-	check(!empty.keydown({ key: 'a', code: 'KeyA', ctrlKey: true }).prevented,
-		'Ctrl+A selects the key field instead of being captured');
+	check(
+		!empty.keydown({ key: 'a', code: 'KeyA', ctrlKey: true }).prevented,
+		'Ctrl+A selects the key field instead of being captured'
+	);
 
 	const shortcut = loadPage('ahk');
 	const field = shortcut.byId['param-input'];
 	vm.runInContext("doConfirm('send_shortcut')", shortcut.context);
-	check(!shortcut.keydown({ key: 'c', code: 'KeyC' }).prevented, 'a plain letter types into the shortcut field');
+	check(
+		!shortcut.keydown({ key: 'c', code: 'KeyC' }).prevented,
+		'a plain letter types into the shortcut field'
+	);
 	field.type('ctrl');
-	check(!shortcut.keydown({ key: '+', code: 'Equal', shiftKey: true }).prevented,
-		'Shift+= types "+" after a modifier name');
-	check(!shortcut.keydown({ key: '€', code: 'KeyE', ctrlKey: true, altKey: true,
-		getModifierState: (name) => name === 'AltGraph' }).prevented, 'AltGr types its character');
+	check(
+		!shortcut.keydown({ key: '+', code: 'Equal', shiftKey: true }).prevented,
+		'Shift+= types "+" after a modifier name'
+	);
+	check(
+		!shortcut.keydown({
+			key: '€',
+			code: 'KeyE',
+			ctrlKey: true,
+			altKey: true,
+			getModifierState: (name) => name === 'AltGraph'
+		}).prevented,
+		'AltGr types its character'
+	);
 	field.type('ctrl++');
 	shortcut.keydown({ key: 'Enter', code: 'Enter' });
-	check(shortcut.posted.length === 1 && shortcut.posted[0].parameter === 'ctrl++', 'Enter saves a typed shortcut');
+	check(
+		shortcut.posted.length === 1 && shortcut.posted[0].parameter === 'ctrl++',
+		'Enter saves a typed shortcut'
+	);
 
 	const fresh = loadPage('ahk');
 	vm.runInContext("doConfirm('send_shortcut')", fresh.context);
 	fresh.keydown({ key: 'A', code: 'KeyA', shiftKey: true });
 	check(fresh.byId['param-input'].value === 'shift+a', 'an empty shortcut field captures Shift+A');
 	fresh.keydown({ key: 'Escape', code: 'Escape' });
-	check(fresh.byId.param.hidden === true && fresh.posted.length === 0, 'Escape returns from a shortcut to the list');
+	check(
+		fresh.byId.param.hidden === true && fresh.posted.length === 0,
+		'Escape returns from a shortcut to the list'
+	);
 }
 
 // 5. A kind the page does not edit, and an action without one, confirm directly:
@@ -303,10 +420,17 @@ function loadPage(platform, current) {
 {
 	const page = loadPage('ahk');
 	vm.runInContext("doConfirm('open_url')", page.context);
-	check(page.posted.length === 1 && page.posted[0].id === 'open_url' && page.posted[0].parameter === undefined,
-		'a URL is still asked by the host');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].id === 'open_url' &&
+			page.posted[0].parameter === undefined,
+		'a URL is still asked by the host'
+	);
 	vm.runInContext("doConfirm('enter')", page.context);
-	check(page.posted.length === 2 && page.posted[1].id === 'enter', 'an ordinary action confirms at once');
+	check(
+		page.posted.length === 2 && page.posted[1].id === 'enter',
+		'an ordinary action confirms at once'
+	);
 }
 
 // 6. The llm_prompt rules are the drivers' rules: the shared corpus replayed.
@@ -321,8 +445,12 @@ function loadPage(platform, current) {
 			check(parsed === null, `${vector.id}: the page accepts ${JSON.stringify(vector.value)}`);
 		} else {
 			const expected = vector.num_predictions === undefined ? null : vector.num_predictions;
-			check(parsed !== null && parsed.profileId === vector.profile_id && parsed.numPredictions === expected,
-				`${vector.id}: the page reads ${JSON.stringify(parsed)}`);
+			check(
+				parsed !== null &&
+					parsed.profileId === vector.profile_id &&
+					parsed.numPredictions === expected,
+				`${vector.id}: the page reads ${JSON.stringify(parsed)}`
+			);
 		}
 		replayed += 1;
 	}
@@ -335,32 +463,52 @@ function loadPage(platform, current) {
 	const page = loadPage('ahk');
 	vm.runInContext("doConfirm('llm_prompt_prediction')", page.context);
 	check(page.posted.length === 0, 'the prompt action must not confirm before a prompt is chosen');
-	check(page.byId['param-choice'].hidden === false && page.byId['param-input'].hidden === true,
-		'the prompt editor shows the choices instead of the text field');
+	check(
+		page.byId['param-choice'].hidden === false && page.byId['param-input'].hidden === true,
+		'the prompt editor shows the choices instead of the text field'
+	);
 	const profiles = page.byId['param-profile'].children.map((o) => o.value);
-	check(JSON.stringify(profiles) === JSON.stringify(['basic', 'rewrite', 'custom_1_2']),
-		`every host prompt is offered, in order: ${JSON.stringify(profiles)}`);
+	check(
+		JSON.stringify(profiles) === JSON.stringify(['basic', 'rewrite', 'custom_1_2']),
+		`every host prompt is offered, in order: ${JSON.stringify(profiles)}`
+	);
 	const counts = page.byId['param-count'].children;
-	check(counts.length === 11 && counts[0].value === '' && counts[0].textContent === 'Menu (3)'
-		&& counts[10].value === '10', 'the counts are the menu default then 1 to 10');
-	check(page.byId['param-profile'].value === 'rewrite' && page.byId['param-count'].value === '2',
-		'the editor starts from the binding\'s current prompt and count');
+	check(
+		counts.length === 11 &&
+			counts[0].value === '' &&
+			counts[0].textContent === 'Menu (3)' &&
+			counts[10].value === '10',
+		'the counts are the menu default then 1 to 10'
+	);
+	check(
+		page.byId['param-profile'].value === 'rewrite' && page.byId['param-count'].value === '2',
+		"the editor starts from the binding's current prompt and count"
+	);
 	page.byId['param-count'].value = '';
 	page.byId['param-save'].dispatch('click');
-	check(page.posted.length === 1 && page.posted[0].id === 'llm_prompt_prediction'
-		&& page.posted[0].parameter === 'rewrite', 'the menu count saves the bare prompt id');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].id === 'llm_prompt_prediction' &&
+			page.posted[0].parameter === 'rewrite',
+		'the menu count saves the bare prompt id'
+	);
 
 	const second = loadPage('ahk');
 	vm.runInContext("doConfirm('llm_prompt_prediction')", second.context);
 	second.byId['param-profile'].value = 'custom_1_2';
 	second.byId['param-count'].value = '5';
 	second.keydown({ key: 'Enter', code: 'Enter' });
-	check(second.posted.length === 1 && second.posted[0].parameter === 'custom_1_2|5', 'Enter saves the prompt and its count');
+	check(
+		second.posted.length === 1 && second.posted[0].parameter === 'custom_1_2|5',
+		'Enter saves the prompt and its count'
+	);
 
 	const noChoices = loadPage('ahk');
 	vm.runInContext("promptChoices = []; doConfirm('llm_prompt_prediction')", noChoices.context);
-	check(noChoices.posted.length === 1 && noChoices.posted[0].parameter === undefined,
-		'without prompts to offer, the host asks for the value itself');
+	check(
+		noChoices.posted.length === 1 && noChoices.posted[0].parameter === undefined,
+		'without prompts to offer, the host asks for the value itself'
+	);
 }
 
 // 8. "Edit the current action" appears only when the current action takes a
@@ -369,23 +517,40 @@ function loadPage(platform, current) {
 	const none = loadPage('ahk');
 	check(none.byId['btn-edit-current'].hidden === true, 'no edit button when no action is bound');
 	const plain = loadPage('ahk', 'enter');
-	check(plain.byId['btn-edit-current'].hidden === true, 'no edit button for an action without a parameter');
+	check(
+		plain.byId['btn-edit-current'].hidden === true,
+		'no edit button for an action without a parameter'
+	);
 
 	const prompt = loadPage('ahk', 'llm_prompt_prediction');
 	const button = prompt.byId['btn-edit-current'];
-	check(button.hidden === false && button.textContent === 'Edit current', 'the edit button shows for a prompt action');
+	check(
+		button.hidden === false && button.textContent === 'Edit current',
+		'the edit button shows for a prompt action'
+	);
 	button.dispatch('click');
-	check(prompt.byId.param.hidden === false && prompt.byId['param-profile'].value === 'rewrite'
-		&& prompt.posted.length === 0, 'the edit button opens the prompt editor on the current value');
+	check(
+		prompt.byId.param.hidden === false &&
+			prompt.byId['param-profile'].value === 'rewrite' &&
+			prompt.posted.length === 0,
+		'the edit button opens the prompt editor on the current value'
+	);
 
 	const text = loadPage('ahk', 'send_text');
 	text.byId['btn-edit-current'].dispatch('click');
-	check(text.byId['param-input'].value === 'salut', 'the edit button opens the text editor on the current text');
+	check(
+		text.byId['param-input'].value === 'salut',
+		'the edit button opens the text editor on the current text'
+	);
 
 	const url = loadPage('ahk', 'open_url');
 	url.byId['btn-edit-current'].dispatch('click');
-	check(url.posted.length === 1 && url.posted[0].id === 'open_url' && url.posted[0].parameter === undefined,
-		'the edit button hands a URL back to the host prompt');
+	check(
+		url.posted.length === 1 &&
+			url.posted[0].id === 'open_url' &&
+			url.posted[0].parameter === undefined,
+		'the edit button hands a URL back to the host prompt'
+	);
 }
 
 // 9. The llm_vision rules are the drivers' rules, and its editor offers the
@@ -397,37 +562,63 @@ function loadPage(platform, current) {
 		page.context.__value = vector.value;
 		const parsed = vm.runInContext('parseLlmVision(__value)', page.context);
 		if (vector.valid === false) {
-			check(parsed === null, `vision ${vector.id}: the page accepts ${JSON.stringify(vector.value)}`);
+			check(
+				parsed === null,
+				`vision ${vector.id}: the page accepts ${JSON.stringify(vector.value)}`
+			);
 		} else {
 			const model = vector.model === undefined ? null : vector.model;
-			check(parsed !== null && parsed.backend === vector.backend && parsed.model === model,
-				`vision ${vector.id}: the page reads ${JSON.stringify(parsed)}`);
+			check(
+				parsed !== null && parsed.backend === vector.backend && parsed.model === model,
+				`vision ${vector.id}: the page reads ${JSON.stringify(parsed)}`
+			);
 		}
 	}
 
 	vm.runInContext("doConfirm('llm_screen_region')", page.context);
-	check(page.byId['param-vision'].hidden === false && page.byId['param-input'].hidden === true
-		&& page.byId['param-choice'].hidden === true, 'the vision editor replaces the text field');
-	check(page.byId['param-vision-provider'].value === 'cerebras'
-		&& page.byId['param-vision-model'].value === 'llama-4-scout', 'the editor starts from the binding');
-	check(page.byId['param-vision-model'].placeholder === 'Required', 'a backend without a default asks for a model');
+	check(
+		page.byId['param-vision'].hidden === false &&
+			page.byId['param-input'].hidden === true &&
+			page.byId['param-choice'].hidden === true,
+		'the vision editor replaces the text field'
+	);
+	check(
+		page.byId['param-vision-provider'].value === 'cerebras' &&
+			page.byId['param-vision-model'].value === 'llama-4-scout',
+		'the editor starts from the binding'
+	);
+	check(
+		page.byId['param-vision-model'].placeholder === 'Required',
+		'a backend without a default asks for a model'
+	);
 	page.byId['param-vision-model'].value = '';
 	page.byId['param-save'].dispatch('click');
-	check(page.posted.length === 0 && page.byId['param-error'].hidden === false,
-		'a backend without a default is refused without a model');
+	check(
+		page.posted.length === 0 && page.byId['param-error'].hidden === false,
+		'a backend without a default is refused without a model'
+	);
 	page.byId['param-vision-provider'].value = 'local';
 	page.byId['param-vision-provider'].dispatch('change');
-	check(page.byId['param-vision-model'].placeholder === 'Default: qwen2.5vl:3b', 'the default model is shown');
+	check(
+		page.byId['param-vision-model'].placeholder === 'Default: qwen2.5vl:3b',
+		'the default model is shown'
+	);
 	page.byId['param-save'].dispatch('click');
-	check(page.posted.length === 1 && page.posted[0].id === 'llm_screen_region' && page.posted[0].parameter === 'local',
-		'an empty model keeps the backend default');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].id === 'llm_screen_region' &&
+			page.posted[0].parameter === 'local',
+		'an empty model keeps the backend default'
+	);
 
 	const second = loadPage('ahk');
 	vm.runInContext("doConfirm('llm_screen_region')", second.context);
 	second.byId['param-vision-model'].value = '  llama-4-scout  ';
 	second.keydown({ key: 'Enter', code: 'Enter' });
-	check(second.posted.length === 1 && second.posted[0].parameter === 'cerebras|llama-4-scout',
-		'Enter saves the backend and the trimmed model');
+	check(
+		second.posted.length === 1 && second.posted[0].parameter === 'cerebras|llama-4-scout',
+		'Enter saves the backend and the trimmed model'
+	);
 }
 
 // 10. The llm_language editor offers the host's languages, the interface
@@ -435,17 +626,33 @@ function loadPage(platform, current) {
 {
 	const page = loadPage('ahk');
 	vm.runInContext("doConfirm('llm_translate_selection')", page.context);
-	check(page.byId['param-language'].hidden === false && page.byId['param-input'].hidden === true
-		&& page.byId['param-vision'].hidden === true, 'the language editor replaces the text field');
-	check(page.byId['param-language-label'].textContent === 'Translate into', 'the language label is shown');
+	check(
+		page.byId['param-language'].hidden === false &&
+			page.byId['param-input'].hidden === true &&
+			page.byId['param-vision'].hidden === true,
+		'the language editor replaces the text field'
+	);
+	check(
+		page.byId['param-language-label'].textContent === 'Translate into',
+		'the language label is shown'
+	);
 	check(page.byId['param-language-select'].value === 'ja', 'the editor starts from the binding');
-	check(page.byId['param-language-select'].children[0].value === 'ui', 'the interface language comes first');
+	check(
+		page.byId['param-language-select'].children[0].value === 'ui',
+		'the interface language comes first'
+	);
 	page.byId['param-language-select'].value = 'ui';
 	page.keydown({ key: 'Enter', code: 'Enter' });
-	check(page.posted.length === 1 && page.posted[0].id === 'llm_translate_selection' && page.posted[0].parameter === 'ui',
-		'Enter saves the chosen language');
-	check(vm.runInContext("parseParameter('llm_language', 'xx')", page.context) === null,
-		'a language the host does not offer is refused');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].id === 'llm_translate_selection' &&
+			page.posted[0].parameter === 'ui',
+		'Enter saves the chosen language'
+	);
+	check(
+		vm.runInContext("parseParameter('llm_language', 'xx')", page.context) === null,
+		'a language the host does not offer is refused'
+	);
 }
 
 if (errors.length > 0) {
@@ -453,4 +660,6 @@ if (errors.length > 0) {
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
-console.log('\x1b[32m[OK] the picker edits a text, a key, a shortcut and a prompt choice, validates them as the drivers do, and reopens the current action.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] the picker edits a text, a key, a shortcut and a prompt choice, validates them as the drivers do, and reopens the current action.\x1b[0m'
+);

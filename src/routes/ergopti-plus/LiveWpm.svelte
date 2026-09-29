@@ -44,11 +44,29 @@ FEATURES & RATIONALE:
 	// hotstring expansion or an AI acceptance) appear at once and spike the MPM.
 	const SEGMENTS = [
 		{ kind: 'manual', text: 'Bonjour Madame, je vous écris pour ' },
-		{ kind: 'burst', source: 'hotstring', color: '#e53935', tag: '★ Touche magique', text: 'par exemple ' },
+		{
+			kind: 'burst',
+			source: 'hotstring',
+			color: '#e53935',
+			tag: '★ Touche magique',
+			text: 'par exemple '
+		},
 		{ kind: 'manual', text: 'convenir d’un ' },
-		{ kind: 'burst', source: 'hotstring', color: '#1e88e5', tag: '★ Roulement', text: 'rendez-vous ' },
+		{
+			kind: 'burst',
+			source: 'hotstring',
+			color: '#1e88e5',
+			tag: '★ Roulement',
+			text: 'rendez-vous '
+		},
 		{ kind: 'manual', text: 'la semaine ' },
-		{ kind: 'burst', source: 'ai', color: COLOR_AI, tag: '✨ IA — suite acceptée', text: 'prochaine, si vos disponibilités le permettent.' }
+		{
+			kind: 'burst',
+			source: 'ai',
+			color: COLOR_AI,
+			tag: '✨ IA — suite acceptée',
+			text: 'prochaine, si vos disponibilités le permettent.'
+		}
 	];
 
 	let typed = $state('');

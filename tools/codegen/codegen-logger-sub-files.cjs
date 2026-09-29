@@ -52,7 +52,12 @@ const entries = parsed.sub_files || [];
 const logFiles = (toml.parse(fs.readFileSync(APP_DIRS, 'utf8')).logs || {}).files || {};
 const TOPICAL_PREFIX = logFiles.topical_prefix;
 const LOG_EXTENSION = logFiles.extension;
-if (typeof TOPICAL_PREFIX !== 'string' || TOPICAL_PREFIX === '' || typeof LOG_EXTENSION !== 'string' || LOG_EXTENSION === '') {
+if (
+	typeof TOPICAL_PREFIX !== 'string' ||
+	TOPICAL_PREFIX === '' ||
+	typeof LOG_EXTENSION !== 'string' ||
+	LOG_EXTENSION === ''
+) {
 	console.error('[ERROR] app_dirs.toml [logs.files] must declare topical_prefix and extension.');
 	process.exit(1);
 }
@@ -67,11 +72,15 @@ if (entries.length === 0) {
 
 for (const e of entries) {
 	if (typeof e.name !== 'string' || !Array.isArray(e.patterns) || !Array.isArray(e.platforms)) {
-		console.error(`[ERROR] malformed entry ${JSON.stringify(e.name)}: name, patterns and platforms are required.`);
+		console.error(
+			`[ERROR] malformed entry ${JSON.stringify(e.name)}: name, patterns and platforms are required.`
+		);
 		process.exit(1);
 	}
 	if (e.patterns.length === 0) {
-		console.error(`[ERROR] entry "${e.name}" has no patterns — it would create a log file nothing routes to.`);
+		console.error(
+			`[ERROR] entry "${e.name}" has no patterns — it would create a log file nothing routes to.`
+		);
 		process.exit(1);
 	}
 }
@@ -182,9 +191,7 @@ function emitAhk() {
 // -- Native macOS launcher -----------------------------------------------------
 
 function emitSwift() {
-	const rows = forPlatform('hs').map((e) =>
-		`\t${swiftStr(topicalFileName(e.name))},`
-	);
+	const rows = forPlatform('hs').map((e) => `\t${swiftStr(topicalFileName(e.name))},`);
 
 	return (
 		'// Sources/ErgoptiPlus/LoggerTopics.generated.swift\n' +
@@ -210,10 +217,7 @@ function emitSwift() {
 const targets = [
 	[path.join(SP, 'macos/_generated/logger_sub_files.lua'), emitLua()],
 	[path.join(SP, 'windows/_generated/logger_sub_files.ahk'), emitAhk()],
-	[
-		path.join(SP, 'macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift'),
-		emitSwift()
-	]
+	[path.join(SP, 'macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift'), emitSwift()]
 ];
 
 for (const [abs, content] of targets) {

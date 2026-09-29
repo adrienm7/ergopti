@@ -31,12 +31,15 @@ const MIN_LOCALES = 21;
 const HINTS = [
 	{
 		hint: 'keylogger_ui.metrics_disabled_body',
-		labels: ['menu.metrics.title', 'menu.metrics.enable'],
-	},
+		labels: ['menu.metrics.title', 'menu.metrics.enable']
+	}
 ];
 
 const errors = [];
-const files = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json')).sort();
+const files = fs
+	.readdirSync(LOCALES)
+	.filter((f) => f.endsWith('.json'))
+	.sort();
 if (files.length < MIN_LOCALES) {
 	errors.push(`found ${files.length} locale catalogue(s), expected at least ${MIN_LOCALES}`);
 }

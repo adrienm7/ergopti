@@ -38,7 +38,9 @@ const ax = [...src.matchAll(/\bax\(\s*"([\w.]+)"/g)].map((m) => m[1]);
 const errors = [];
 
 if (sg.length < 50) {
-	errors.push(`found only ${sg.length} sg() registration(s) — the registry shape changed, and this guard is checking nothing`);
+	errors.push(
+		`found only ${sg.length} sg() registration(s) — the registry shape changed, and this guard is checking nothing`
+	);
 }
 
 const localeFiles = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'));
@@ -59,13 +61,17 @@ for (const f of localeFiles) {
  * @returns {string|null} The key that resolves, or null.
  */
 function resolves(strings, name, kind) {
-	if (kind === 'sg' && typeof strings[`sg_actions.${name}`] === 'string') return `sg_actions.${name}`;
+	if (kind === 'sg' && typeof strings[`sg_actions.${name}`] === 'string')
+		return `sg_actions.${name}`;
 	if (typeof strings[`ax_actions.${name}`] === 'string') return `ax_actions.${name}`;
 	if (typeof strings[`sg_actions.${name}`] === 'string') return `sg_actions.${name}`;
 	return null;
 }
 
-for (const [kind, names] of [['sg', sg], ['ax', ax]]) {
+for (const [kind, names] of [
+	['sg', sg],
+	['ax', ax]
+]) {
 	for (const name of names) {
 		const missingIn = [];
 		for (const [code, strings] of Object.entries(locales)) {

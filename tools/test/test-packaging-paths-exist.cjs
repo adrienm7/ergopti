@@ -43,11 +43,13 @@ const MIN_SCRIPTS = 4;
 const MIN_PATHS = 40;
 
 // A repo-relative source path: one of the four top-level trees, then a path.
-const SOURCE_PATH = /(?:^|[\s"'/$}])((?:windows|macos|linux|_shared)\/[A-Za-z0-9_.@-]+(?:\/[A-Za-z0-9_.@-]+)*)/g;
+const SOURCE_PATH =
+	/(?:^|[\s"'/$}])((?:windows|macos|linux|_shared)\/[A-Za-z0-9_.@-]+(?:\/[A-Za-z0-9_.@-]+)*)/g;
 
 // Install destinations on the target machine. These must NOT be looked up here,
 // and must not accidentally become source paths.
-const DESTINATION = /(?:\/usr\/lib|\$\{?HOME\}?\/\.local\/lib|\/usr\/share|\/etc\/|\$DEB_ROOT|\$INSTALL_ROOT)/;
+const DESTINATION =
+	/(?:\/usr\/lib|\$\{?HOME\}?\/\.local\/lib|\/usr\/share|\/etc\/|\$DEB_ROOT|\$INSTALL_ROOT)/;
 
 // Paths built at runtime from a variable, or globs — not statically checkable.
 const NOT_STATIC = /[*?$]|\{|\}/;
@@ -73,7 +75,9 @@ if (!fs.existsSync(BUILD_DIR)) {
 
 const scripts = fs.readdirSync(BUILD_DIR).filter((f) => f.endsWith('.sh'));
 if (scripts.length < MIN_SCRIPTS) {
-	errors.push(`found only ${scripts.length} build script(s) (floor ${MIN_SCRIPTS}) — the scan is broken`);
+	errors.push(
+		`found only ${scripts.length} build script(s) (floor ${MIN_SCRIPTS}) — the scan is broken`
+	);
 }
 
 let checked = 0;
@@ -94,7 +98,8 @@ for (const name of scripts) {
 			// A source path that is really part of an install destination — e.g.
 			// the "linux" in "$DEB_ROOT/usr/lib/ergopti/linux" — is not ours to
 			// resolve. Recognised by the destination markers on the same line.
-			if (DESTINATION.test(line) && !/\bcp\b|\brsync\b|\binstall\b|"\$\{?BUILD_DIR\}?"/.test(line)) continue;
+			if (DESTINATION.test(line) && !/\bcp\b|\brsync\b|\binstall\b|"\$\{?BUILD_DIR\}?"/.test(line))
+				continue;
 
 			const key = `${name}:${rel}`;
 			if (seen.has(key)) continue;
@@ -104,8 +109,9 @@ for (const name of scripts) {
 			// The keyboard layout tree (static/ergopti/) sits beside the driver tree
 			// and shares its top-level names, so a path under it resolves there.
 			const start = m.index + m[0].length - rel.length;
-			const layoutTree = /(?:^|[^A-Za-z0-9_])ergopti\/$/.test(line.slice(0, start))
-				|| FROM_LAYOUT_TREE.some((folder) => rel === folder || rel.startsWith(folder + '/'));
+			const layoutTree =
+				/(?:^|[^A-Za-z0-9_])ergopti\/$/.test(line.slice(0, start)) ||
+				FROM_LAYOUT_TREE.some((folder) => rel === folder || rel.startsWith(folder + '/'));
 			const repositoryStatic = rel.startsWith(FROM_REPOSITORY_STATIC);
 			const base = repositoryStatic ? ROOT : layoutTree ? LAYOUT_ROOT : SP;
 			const source = repositoryStatic ? rel.slice('linux/'.length) : rel;

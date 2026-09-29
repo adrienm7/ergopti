@@ -45,7 +45,7 @@ const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 const TREES = [
 	{ name: 'macos', dir: path.join(DRIVERS, 'macos') },
 	{ name: 'linux', dir: path.join(DRIVERS, 'linux') },
-	{ name: '_shared', dir: path.join(DRIVERS, '_shared', 'lua') },
+	{ name: '_shared', dir: path.join(DRIVERS, '_shared', 'lua') }
 ];
 
 // Third-party source is not ours to fix, and tests may construct the shape on
@@ -150,7 +150,7 @@ function findSelfCapturingLocals(file, src) {
 			file: path.relative(ROOT, file).replace(/\\/g, '/'),
 			line: i + 1,
 			name,
-			text: lines[i].trim().slice(0, 120),
+			text: lines[i].trim().slice(0, 120)
 		});
 	}
 	return out;
@@ -173,7 +173,9 @@ for (const tree of TREES) {
 
 // A walk that finds no files reports no findings and reads exactly like success.
 if (scanned < 100) {
-	console.error(`\x1b[31m[ERROR] scanned only ${scanned} Lua file(s) — the walk is broken, not the code.\x1b[0m`);
+	console.error(
+		`\x1b[31m[ERROR] scanned only ${scanned} Lua file(s) — the walk is broken, not the code.\x1b[0m`
+	);
 	process.exit(1);
 }
 
@@ -189,8 +191,11 @@ if (findings.length > 0) {
 			'      local task\n' +
 			'      task = hs.task.new(cmd, function() if task then pool[task] = nil end end)\n'
 	);
-	for (const f of findings) console.error(`    ${f.file}:${f.line}  captures "${f.name}"  —  ${f.text}`);
+	for (const f of findings)
+		console.error(`    ${f.file}:${f.line}  captures "${f.name}"  —  ${f.text}`);
 	process.exit(1);
 }
 
-console.log(`\x1b[32m[OK] No closure binds a not-yet-declared local (${scanned} Lua file(s)).\x1b[0m`);
+console.log(
+	`\x1b[32m[OK] No closure binds a not-yet-declared local (${scanned} Lua file(s)).\x1b[0m`
+);

@@ -40,7 +40,10 @@ const LOCALES = path.join(SP, '_shared', 'data', 'locales');
 const GENERATED_AHK = path.join(SP, 'windows', '_generated', 'features_manifest.ahk');
 const CONSUMERS = [
 	{ file: path.join(SP, 'windows', 'infra', 'master_gates.ahk'), token: 'superseded_reason_key' },
-	{ file: path.join(SP, 'windows', 'ui', 'menu', 'menu_engine.ahk'), token: 'LayoutSupersededReason(' }
+	{
+		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_engine.ahk'),
+		token: 'LayoutSupersededReason('
+	}
 ];
 const EXPECTED = ['ergopti_base', 'ergopti_alt_gr', 'ergopti_plus', 'direct_access_digits'];
 
@@ -93,11 +96,22 @@ console.log('Layout features an emulated layout supersedes');
 check('the Ergopti emulation features are declared, on Windows-only booleans', () => {
 	assert.ok(declared.length >= EXPECTED.length, `only ${declared.length} declaration(s) found`);
 	for (const id of EXPECTED) {
-		assert.ok(declared.some((d) => d.section === 'layout' && d.id === id), `layout.${id} is not declared`);
+		assert.ok(
+			declared.some((d) => d.section === 'layout' && d.id === id),
+			`layout.${id} is not declared`
+		);
 	}
 	for (const d of declared) {
-		assert.strictEqual(d.platforms, '["ahk"]', `${d.section}.${d.id}: only the Windows driver emulates layouts`);
-		assert.strictEqual(d.type, '"boolean"', `${d.section}.${d.id}: the gate can only turn a boolean off`);
+		assert.strictEqual(
+			d.platforms,
+			'["ahk"]',
+			`${d.section}.${d.id}: only the Windows driver emulates layouts`
+		);
+		assert.strictEqual(
+			d.type,
+			'"boolean"',
+			`${d.section}.${d.id}: the gate can only turn a boolean off`
+		);
 	}
 });
 
@@ -108,7 +122,10 @@ check('every reason resolves in all 21 locales', () => {
 		const catalogue = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
 		for (const d of declared) {
 			const value = catalogue[d.reason];
-			assert.ok(typeof value === 'string' && value.trim() !== '', `${file}: ${d.reason} is missing`);
+			assert.ok(
+				typeof value === 'string' && value.trim() !== '',
+				`${file}: ${d.reason} is missing`
+			);
 		}
 	}
 });
@@ -116,8 +133,13 @@ check('every reason resolves in all 21 locales', () => {
 check('the generated Windows manifest ships every declaration', () => {
 	const generated = fs.readFileSync(GENERATED_AHK, 'utf8');
 	for (const d of declared) {
-		const entry = new RegExp(`Map\\("path", "${d.section}\\.${d.id}",[^\\n]*"superseded_reason_key", "${d.reason.replace(/\./g, '\\.')}"`);
-		assert.ok(entry.test(generated), `${d.section}.${d.id} reaches features_manifest.ahk without its reason`);
+		const entry = new RegExp(
+			`Map\\("path", "${d.section}\\.${d.id}",[^\\n]*"superseded_reason_key", "${d.reason.replace(/\./g, '\\.')}"`
+		);
+		assert.ok(
+			entry.test(generated),
+			`${d.section}.${d.id} reaches features_manifest.ahk without its reason`
+		);
 	}
 });
 
@@ -128,17 +150,30 @@ check('the master gate and the menu read the declaration', () => {
 			.split('\n')
 			.filter((l) => !/^\s*;/.test(l))
 			.join('\n');
-		assert.ok(code.includes(c.token), `${path.relative(ROOT, c.file)} does not use ${c.token} outside comments`);
+		assert.ok(
+			code.includes(c.token),
+			`${path.relative(ROOT, c.file)} does not use ${c.token} outside comments`
+		);
 	}
 });
 
 check('the manifest schema declares every field a feature uses', () => {
 	const entry = JSON.parse(fs.readFileSync(SCHEMA, 'utf8')).$defs.feature_entry;
-	assert.strictEqual(entry.additionalProperties, false, 'feature_entry no longer refuses undeclared fields');
+	assert.strictEqual(
+		entry.additionalProperties,
+		false,
+		'feature_entry no longer refuses undeclared fields'
+	);
 	const used = new Set(blocks.flatMap((b) => Object.keys(b.fields)));
-	assert.ok(used.size >= 5 && used.has('superseded_reason_key'), `only ${used.size} feature field(s) found`);
+	assert.ok(
+		used.size >= 5 && used.has('superseded_reason_key'),
+		`only ${used.size} feature field(s) found`
+	);
 	for (const field of used) {
-		assert.ok(Object.hasOwn(entry.properties, field), `manifest.schema.json does not declare the feature field ${field}`);
+		assert.ok(
+			Object.hasOwn(entry.properties, field),
+			`manifest.schema.json does not declare the feature field ${field}`
+		);
 	}
 });
 

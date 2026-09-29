@@ -35,7 +35,15 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SCRIPT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'metrics_apps', 'script.js');
+const SCRIPT = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'ui',
+	'metrics_apps',
+	'script.js'
+);
 
 const src = fs.readFileSync(SCRIPT, 'utf8');
 
@@ -49,10 +57,22 @@ const prelude = src.slice(0, cut);
 // enough — this guard is about the category tables, and giving it a real DOM
 // would couple it to whatever the dashboard renders next.
 const ALIASES_FILE = path.join(
-	ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'metrics_general_category_aliases.json'
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'data',
+	'metrics_general_category_aliases.json'
 );
 const CORPUS_FILE = path.join(
-	ROOT, 'static', 'ergopti_plus', '_shared', 'tests', 'corpus', 'metrics', 'app_categories_vectors.json'
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'tests',
+	'corpus',
+	'metrics',
+	'app_categories_vectors.json'
 );
 
 const aliasDoc = JSON.parse(fs.readFileSync(ALIASES_FILE, 'utf8'));

@@ -1,355 +1,321 @@
 {
-  "created": "2026-09-28T21:20:42.404Z",
-  "macos": {
-    "wholeSuite": {
-      "passed": 11412,
-      "failed": 1,
-      "modules": 1322,
-      "receipt": {
-        "status": "finished",
-        "started": "2026-09-28T20:24:30.467Z",
-        "finished": "2026-09-28T21:20:07.350Z",
-        "exitCode": 1,
-        "signal": null,
-        "cwd": "D:/Documents/GitHub/ergopti",
-        "executable": "wsl.exe",
-        "args": [
-          "-d",
-          "Ubuntu",
-          "--cd",
-          "/mnt/d/Documents/GitHub/ergopti/static/ergopti_plus/macos",
-          "--",
-          "env",
-          "TMPDIR=/mnt/d/ewt/_scratch/root-macos-v8-private",
-          "/usr/bin/lua5.4",
-          "tests/run.lua"
-        ]
-      },
-      "logSha256": "cc10e74d47fdf19c063b0b3863182ad5ea170ed621a77ac4bdd10c67e61c7f09"
-    },
-    "correction": {
-      "oldModulePassed": 1,
-      "oldModuleFailed": 1,
-      "replacementPassed": 15,
-      "replacementFailed": 0
-    },
-    "compositeUniquePassed": 11426,
-    "note": "The complete run retained the old boot-boundary oracle already loaded by its process. The final replacement was independently replayed; no production source changed."
-  },
-  "javascript": {
-    "wholeSuitePassed": 298,
-    "wholeSuiteTotal": 303,
-    "resolvedFailures": 5,
-    "sourceChangesSinceWholeSuite": [
-      "static/ergopti_plus/_shared/modules/features/linux_evidence.json",
-      "static/ergopti_plus/macos/tests/unit/meta/test_post_onboarding_boot_failure_boundary.lua",
-      "static/ergopti_plus/macos/tests/unit/modules/keymap/test_registry_section_delay_scoping.lua",
-      "tools/test/test-driver-config-surface-is-declared.cjs"
-    ],
-    "note": "One mapped-file generator failure replayed on the byte-identical export; four corrected checks replayed in root."
-  },
-  "replays": [
-    {
-      "name": "handoff-ahk-parse",
-      "status": "finished",
-      "started": "2026-09-28T20:54:59.017Z",
-      "finished": "2026-09-28T20:55:07.083Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/test/test-ahk-parse-coverage.cjs"
-      ]
-    },
-    {
-      "name": "handoff-source-ratchets",
-      "status": "finished",
-      "started": "2026-09-28T20:53:56.024Z",
-      "finished": "2026-09-28T20:53:56.894Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/test/test-no-pinned-source-reads-lua.cjs"
-      ]
-    },
-    {
-      "name": "handoff-final-false-greens",
-      "status": "finished",
-      "started": "2026-09-28T21:05:42.405Z",
-      "finished": "2026-09-28T21:05:47.353Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/test/find-false-greens.cjs"
-      ]
-    },
-    {
-      "name": "handoff-config-surfaces",
-      "status": "finished",
-      "started": "2026-09-28T20:54:03.875Z",
-      "finished": "2026-09-28T20:54:04.883Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/test/test-driver-config-surface-is-declared.cjs"
-      ]
-    },
-    {
-      "name": "handoff-linux-evidence",
-      "status": "finished",
-      "started": "2026-09-28T20:54:05.021Z",
-      "finished": "2026-09-28T20:54:05.385Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/test/test-linux-feature-parity.cjs"
-      ]
-    },
-    {
-      "name": "handoff-generated-drift",
-      "status": "finished",
-      "started": "2026-09-28T20:50:45.085Z",
-      "finished": "2026-09-28T20:50:49.493Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/ewt/_scratch/l4-windows-menu-dev-export",
-      "executable": "node",
-      "args": [
-        "tools/test/test-features-manifest-no-drift.cjs"
-      ]
-    },
-    {
-      "name": "handoff-conventions",
-      "status": "finished",
-      "started": "2026-09-28T20:57:20.665Z",
-      "finished": "2026-09-28T20:57:30.466Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/lint/lint-conventions.js",
-        "--strict"
-      ]
-    },
-    {
-      "name": "handoff-mac-boot-replay",
-      "status": "finished",
-      "started": "2026-09-28T20:57:18.007Z",
-      "finished": "2026-09-28T20:57:20.500Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti/static/ergopti_plus/macos",
-      "executable": "C:/Users/admin/AppData/Local/Programs/Lua/bin/lua.exe",
-      "args": [
-        "tests/run.lua",
-        "--only",
-        "tests.unit.meta.test_post_onboarding_boot_failure_boundary"
-      ]
-    },
-    {
-      "name": "handoff-linux-native-full",
-      "status": "finished",
-      "started": "2026-09-28T20:55:32.166Z",
-      "finished": "2026-09-28T20:59:41.362Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti",
-      "executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
-      "args": [
-        "tools/test/run-linux-lua.cjs",
-        "tests/run.lua"
-      ]
-    },
-    {
-      "name": "handoff-mac-e2e",
-      "status": "finished",
-      "started": "2026-09-28T20:50:00.272Z",
-      "finished": "2026-09-28T20:50:02.116Z",
-      "exitCode": 0,
-      "signal": null,
-      "cwd": "D:/Documents/GitHub/ergopti/static/ergopti_plus/macos",
-      "executable": "C:/Users/admin/AppData/Local/Programs/Lua/bin/lua.exe",
-      "args": [
-        "tests/e2e/run_e2e.lua"
-      ]
-    }
-  ],
-  "publishedCI": {
-    "commit": "2c73147e12ecdd07dea368461954bb8a5f884687",
-    "url": "https://github.com/adrienm7/ergopti/actions/runs/36485979779",
-    "conclusion": "failure",
-    "windows": {
-      "passed": 7238,
-      "failed": 1
-    },
-    "linux": {
-      "passed": 3575,
-      "failed": 1
-    },
-    "macosLua": "unit and E2E jobs passed",
-    "macosSwift": {
-      "tests": 250,
-      "failedAssertions": 4
-    },
-    "site": "success",
-    "layout": "encoding hygiene failed on historical .ahk.txt BOM; other jobs passed",
-    "releaseVerified": false
-  },
-  "correctiveLocal": {
-    "linuxFull": {
-      "passed": 3567,
-      "failed": 9,
-      "cause": "WSL has luv; CI has no luv. Unchanged event-loop and watcher modules."
-    },
-    "linuxDependencyMatchedReplay": {
-      "passed": 65,
-      "failed": 0,
-      "modules": [
-        "event_loop_adapter",
-        "file_watchers",
-        "hotstrings_config"
-      ],
-      "note": "Whole-run failures and changed fixture covered; native CI verdict pending."
-    },
-    "encodingShellExitCode": 0,
-    "artifactHashesVerified": 47,
-    "swift": "Native macOS execution deferred by repository gate on Windows",
-    "windows": {
-      "unit": 7239,
-      "failed": 0,
-      "e2e": 5,
-      "compile": "complete include graph passed",
-      "encoding": "1698 AHK files passed",
-      "regression": "Equivalent primary path spelling fails original code and passes correction; neighbor excluded"
-    },
-    "javascript": {
-      "passed": 302,
-      "total": 303,
-      "failed": [
-        "domain pipeline: build:linux exceeded local orchestration time limit"
-      ],
-      "rootChanged": [],
-      "exportChanged": [],
-      "replay": "Exact domain pipeline replay: 14/14 steps passed, unchanged timeout and assertions",
-      "compositePassed": 303
-    }
-  },
-  "correctiveCommits": [
-    {
-      "commit": "dd5cd6f2d6eb59969708d47e5857733bdf126f3d",
-      "subject": "test(linux): activate bundled hotstrings explicitly in discovery test"
-    },
-    {
-      "commit": "395e8307cf1c98a2cfb2bfc7f9ede871e56c6d2c",
-      "subject": "fix(windows): normalize personal hotstring discovery identity"
-    },
-    {
-      "commit": "c307259693dfe768f5a8ec0972be30f4c4385d92",
-      "subject": "fix(macos): preserve exact updater command paths"
-    },
-    {
-      "commit": "f5a9b4cd7f5a2fa7a0e8afa0e27d11c84939c40e",
-      "subject": "test(macos): isolate append integrity from log retention"
-    }
-  ],
-  "secondPublishedCI": {
-    "commit": "ffb8a80d19c02501fea7939c13e5e93fca5ad77b",
-    "url": "https://github.com/adrienm7/ergopti/actions/runs/36491375070",
-    "conclusion": "failure",
-    "passed": [
-      "shared JavaScript",
-      "Linux unit",
-      "macOS Lua unit",
-      "macOS E2E",
-      "250 Swift tests"
-    ],
-    "layoutInstaller": {
-      "url": "https://github.com/adrienm7/ergopti/actions/runs/36491455142",
-      "jobsPassed": 16,
-      "conclusion": "success"
-    },
-    "failures": [
-      "Windows mixed path spelling in injected scope catalogue",
-      "macOS launch-gate Python fixtures: three stale/shared-state assertions",
-      "Linux live daemon/Ollama/WPM opt-in setup",
-      "Linux updater response size and release WebView"
-    ],
-    "releaseVerified": false
-  },
-  "secondRepairLocal": {
-    "recorded": "2026-09-28T23:29:28.873Z",
-    "windows": {
-      "unit": 7239,
-      "failed": 0,
-      "scopeRegression": 4,
-      "e2e": 5,
-      "compile": true,
-      "encodingFiles": 1698,
-      "priorAttempt": "900-second deadline expired; incomplete, superseded by the complete successful run"
-    },
-    "linux": {
-      "wholeSuitePassed": 3564,
-      "wholeSuiteFailed": 14,
-      "total": 3578,
-      "launchFailure": "The scratch luajit -e launcher supplied the wrong arg[-1] to CLI subprocess tests.",
-      "cliReplayPassed": 22,
-      "cliReplayFailed": 0,
-      "compositeUniquePassed": 3578,
-      "e2e": 115,
-      "livePreferenceOwnerAssertions": 28,
-      "nativeLive": "GitHub CI still required for GTK, uinput, actual Ollama and updater installation"
-    },
-    "macosPython": {
-      "passed": 23,
-      "failed": 0,
-      "baselineFailed": 3
-    },
-    "javascript": {
-      "wholeSuitePassed": 302,
-      "total": 303,
-      "failed": [
-        "Karabiner Python child launch exceeded its unchanged local deadline"
-      ],
-      "replay": "Exact unchanged Karabiner wrapper passed: 27 cases, one platform skip, 3.047 seconds",
-      "compositePassed": 303,
-      "rootChanged": [],
-      "exportChanged": []
-    },
-    "fixes": [
-      "Canonicalize both Windows hotstring identity operands without altering admitted write paths",
-      "Isolate macOS launch scenarios and pin the current explicit profile lists",
-      "Explicit Linux live fixture consent, canonical directories and shipped remap presets",
-      "Bound Linux release fetching to 20 items per page without reducing the 100-candidate horizon; preserve conditional caches and cancellation",
-      "Probe the real shared release-page channel selectors and reject empty probe receipts"
-    ],
-    "releaseVerified": false,
-    "commits": [
-      {
-        "commit": "78e9d0dfe31f61cca9f23cb37c45b38153c969bb",
-        "subject": "fix(windows): compare both hotstring source identities canonically"
-      },
-      {
-        "commit": "76d063017328f2395f504dc1582a999c9468983c",
-        "subject": "test(macos): isolate launch states and pin current scenarios"
-      },
-      {
-        "commit": "d2f3b4a19f9f7817e2a1656cd61e7f6a8e576bdf",
-        "subject": "test(linux): activate live scenarios through canonical preferences"
-      },
-      {
-        "commit": "1362725c775fabb04246212af8ce90723ab6dd9f",
-        "subject": "fix(linux): paginate release discovery within the transport limit"
-      }
-    ]
-  }
+	"created": "2026-09-28T21:20:42.404Z",
+	"macos": {
+		"wholeSuite": {
+			"passed": 11412,
+			"failed": 1,
+			"modules": 1322,
+			"receipt": {
+				"status": "finished",
+				"started": "2026-09-28T20:24:30.467Z",
+				"finished": "2026-09-28T21:20:07.350Z",
+				"exitCode": 1,
+				"signal": null,
+				"cwd": "D:/Documents/GitHub/ergopti",
+				"executable": "wsl.exe",
+				"args": [
+					"-d",
+					"Ubuntu",
+					"--cd",
+					"/mnt/d/Documents/GitHub/ergopti/static/ergopti_plus/macos",
+					"--",
+					"env",
+					"TMPDIR=/mnt/d/ewt/_scratch/root-macos-v8-private",
+					"/usr/bin/lua5.4",
+					"tests/run.lua"
+				]
+			},
+			"logSha256": "cc10e74d47fdf19c063b0b3863182ad5ea170ed621a77ac4bdd10c67e61c7f09"
+		},
+		"correction": {
+			"oldModulePassed": 1,
+			"oldModuleFailed": 1,
+			"replacementPassed": 15,
+			"replacementFailed": 0
+		},
+		"compositeUniquePassed": 11426,
+		"note": "The complete run retained the old boot-boundary oracle already loaded by its process. The final replacement was independently replayed; no production source changed."
+	},
+	"javascript": {
+		"wholeSuitePassed": 298,
+		"wholeSuiteTotal": 303,
+		"resolvedFailures": 5,
+		"sourceChangesSinceWholeSuite": [
+			"static/ergopti_plus/_shared/modules/features/linux_evidence.json",
+			"static/ergopti_plus/macos/tests/unit/meta/test_post_onboarding_boot_failure_boundary.lua",
+			"static/ergopti_plus/macos/tests/unit/modules/keymap/test_registry_section_delay_scoping.lua",
+			"tools/test/test-driver-config-surface-is-declared.cjs"
+		],
+		"note": "One mapped-file generator failure replayed on the byte-identical export; four corrected checks replayed in root."
+	},
+	"replays": [
+		{
+			"name": "handoff-ahk-parse",
+			"status": "finished",
+			"started": "2026-09-28T20:54:59.017Z",
+			"finished": "2026-09-28T20:55:07.083Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/test/test-ahk-parse-coverage.cjs"]
+		},
+		{
+			"name": "handoff-source-ratchets",
+			"status": "finished",
+			"started": "2026-09-28T20:53:56.024Z",
+			"finished": "2026-09-28T20:53:56.894Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/test/test-no-pinned-source-reads-lua.cjs"]
+		},
+		{
+			"name": "handoff-final-false-greens",
+			"status": "finished",
+			"started": "2026-09-28T21:05:42.405Z",
+			"finished": "2026-09-28T21:05:47.353Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/test/find-false-greens.cjs"]
+		},
+		{
+			"name": "handoff-config-surfaces",
+			"status": "finished",
+			"started": "2026-09-28T20:54:03.875Z",
+			"finished": "2026-09-28T20:54:04.883Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/test/test-driver-config-surface-is-declared.cjs"]
+		},
+		{
+			"name": "handoff-linux-evidence",
+			"status": "finished",
+			"started": "2026-09-28T20:54:05.021Z",
+			"finished": "2026-09-28T20:54:05.385Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/test/test-linux-feature-parity.cjs"]
+		},
+		{
+			"name": "handoff-generated-drift",
+			"status": "finished",
+			"started": "2026-09-28T20:50:45.085Z",
+			"finished": "2026-09-28T20:50:49.493Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/ewt/_scratch/l4-windows-menu-dev-export",
+			"executable": "node",
+			"args": ["tools/test/test-features-manifest-no-drift.cjs"]
+		},
+		{
+			"name": "handoff-conventions",
+			"status": "finished",
+			"started": "2026-09-28T20:57:20.665Z",
+			"finished": "2026-09-28T20:57:30.466Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/lint/lint-conventions.js", "--strict"]
+		},
+		{
+			"name": "handoff-mac-boot-replay",
+			"status": "finished",
+			"started": "2026-09-28T20:57:18.007Z",
+			"finished": "2026-09-28T20:57:20.500Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti/static/ergopti_plus/macos",
+			"executable": "C:/Users/admin/AppData/Local/Programs/Lua/bin/lua.exe",
+			"args": [
+				"tests/run.lua",
+				"--only",
+				"tests.unit.meta.test_post_onboarding_boot_failure_boundary"
+			]
+		},
+		{
+			"name": "handoff-linux-native-full",
+			"status": "finished",
+			"started": "2026-09-28T20:55:32.166Z",
+			"finished": "2026-09-28T20:59:41.362Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti",
+			"executable": "D:/ewt/_scratch/d4-node/node-v22.22.2-win-x64/node.exe",
+			"args": ["tools/test/run-linux-lua.cjs", "tests/run.lua"]
+		},
+		{
+			"name": "handoff-mac-e2e",
+			"status": "finished",
+			"started": "2026-09-28T20:50:00.272Z",
+			"finished": "2026-09-28T20:50:02.116Z",
+			"exitCode": 0,
+			"signal": null,
+			"cwd": "D:/Documents/GitHub/ergopti/static/ergopti_plus/macos",
+			"executable": "C:/Users/admin/AppData/Local/Programs/Lua/bin/lua.exe",
+			"args": ["tests/e2e/run_e2e.lua"]
+		}
+	],
+	"publishedCI": {
+		"commit": "2c73147e12ecdd07dea368461954bb8a5f884687",
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/36485979779",
+		"conclusion": "failure",
+		"windows": {
+			"passed": 7238,
+			"failed": 1
+		},
+		"linux": {
+			"passed": 3575,
+			"failed": 1
+		},
+		"macosLua": "unit and E2E jobs passed",
+		"macosSwift": {
+			"tests": 250,
+			"failedAssertions": 4
+		},
+		"site": "success",
+		"layout": "encoding hygiene failed on historical .ahk.txt BOM; other jobs passed",
+		"releaseVerified": false
+	},
+	"correctiveLocal": {
+		"linuxFull": {
+			"passed": 3567,
+			"failed": 9,
+			"cause": "WSL has luv; CI has no luv. Unchanged event-loop and watcher modules."
+		},
+		"linuxDependencyMatchedReplay": {
+			"passed": 65,
+			"failed": 0,
+			"modules": ["event_loop_adapter", "file_watchers", "hotstrings_config"],
+			"note": "Whole-run failures and changed fixture covered; native CI verdict pending."
+		},
+		"encodingShellExitCode": 0,
+		"artifactHashesVerified": 47,
+		"swift": "Native macOS execution deferred by repository gate on Windows",
+		"windows": {
+			"unit": 7239,
+			"failed": 0,
+			"e2e": 5,
+			"compile": "complete include graph passed",
+			"encoding": "1698 AHK files passed",
+			"regression": "Equivalent primary path spelling fails original code and passes correction; neighbor excluded"
+		},
+		"javascript": {
+			"passed": 302,
+			"total": 303,
+			"failed": ["domain pipeline: build:linux exceeded local orchestration time limit"],
+			"rootChanged": [],
+			"exportChanged": [],
+			"replay": "Exact domain pipeline replay: 14/14 steps passed, unchanged timeout and assertions",
+			"compositePassed": 303
+		}
+	},
+	"correctiveCommits": [
+		{
+			"commit": "dd5cd6f2d6eb59969708d47e5857733bdf126f3d",
+			"subject": "test(linux): activate bundled hotstrings explicitly in discovery test"
+		},
+		{
+			"commit": "395e8307cf1c98a2cfb2bfc7f9ede871e56c6d2c",
+			"subject": "fix(windows): normalize personal hotstring discovery identity"
+		},
+		{
+			"commit": "c307259693dfe768f5a8ec0972be30f4c4385d92",
+			"subject": "fix(macos): preserve exact updater command paths"
+		},
+		{
+			"commit": "f5a9b4cd7f5a2fa7a0e8afa0e27d11c84939c40e",
+			"subject": "test(macos): isolate append integrity from log retention"
+		}
+	],
+	"secondPublishedCI": {
+		"commit": "ffb8a80d19c02501fea7939c13e5e93fca5ad77b",
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/36491375070",
+		"conclusion": "failure",
+		"passed": ["shared JavaScript", "Linux unit", "macOS Lua unit", "macOS E2E", "250 Swift tests"],
+		"layoutInstaller": {
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/36491455142",
+			"jobsPassed": 16,
+			"conclusion": "success"
+		},
+		"failures": [
+			"Windows mixed path spelling in injected scope catalogue",
+			"macOS launch-gate Python fixtures: three stale/shared-state assertions",
+			"Linux live daemon/Ollama/WPM opt-in setup",
+			"Linux updater response size and release WebView"
+		],
+		"releaseVerified": false
+	},
+	"secondRepairLocal": {
+		"recorded": "2026-09-28T23:29:28.873Z",
+		"windows": {
+			"unit": 7239,
+			"failed": 0,
+			"scopeRegression": 4,
+			"e2e": 5,
+			"compile": true,
+			"encodingFiles": 1698,
+			"priorAttempt": "900-second deadline expired; incomplete, superseded by the complete successful run"
+		},
+		"linux": {
+			"wholeSuitePassed": 3564,
+			"wholeSuiteFailed": 14,
+			"total": 3578,
+			"launchFailure": "The scratch luajit -e launcher supplied the wrong arg[-1] to CLI subprocess tests.",
+			"cliReplayPassed": 22,
+			"cliReplayFailed": 0,
+			"compositeUniquePassed": 3578,
+			"e2e": 115,
+			"livePreferenceOwnerAssertions": 28,
+			"nativeLive": "GitHub CI still required for GTK, uinput, actual Ollama and updater installation"
+		},
+		"macosPython": {
+			"passed": 23,
+			"failed": 0,
+			"baselineFailed": 3
+		},
+		"javascript": {
+			"wholeSuitePassed": 302,
+			"total": 303,
+			"failed": ["Karabiner Python child launch exceeded its unchanged local deadline"],
+			"replay": "Exact unchanged Karabiner wrapper passed: 27 cases, one platform skip, 3.047 seconds",
+			"compositePassed": 303,
+			"rootChanged": [],
+			"exportChanged": []
+		},
+		"fixes": [
+			"Canonicalize both Windows hotstring identity operands without altering admitted write paths",
+			"Isolate macOS launch scenarios and pin the current explicit profile lists",
+			"Explicit Linux live fixture consent, canonical directories and shipped remap presets",
+			"Bound Linux release fetching to 20 items per page without reducing the 100-candidate horizon; preserve conditional caches and cancellation",
+			"Probe the real shared release-page channel selectors and reject empty probe receipts"
+		],
+		"releaseVerified": false,
+		"commits": [
+			{
+				"commit": "78e9d0dfe31f61cca9f23cb37c45b38153c969bb",
+				"subject": "fix(windows): compare both hotstring source identities canonically"
+			},
+			{
+				"commit": "76d063017328f2395f504dc1582a999c9468983c",
+				"subject": "test(macos): isolate launch states and pin current scenarios"
+			},
+			{
+				"commit": "d2f3b4a19f9f7817e2a1656cd61e7f6a8e576bdf",
+				"subject": "test(linux): activate live scenarios through canonical preferences"
+			},
+			{
+				"commit": "1362725c775fabb04246212af8ce90723ab6dd9f",
+				"subject": "fix(linux): paginate release discovery within the transport limit"
+			}
+		]
+	}
 }

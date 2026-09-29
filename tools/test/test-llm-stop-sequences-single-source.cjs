@@ -19,11 +19,11 @@
 
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const EP   = path.join(ROOT, 'static', 'ergopti_plus');
+const EP = path.join(ROOT, 'static', 'ergopti_plus');
 
 const failures = [];
 
@@ -33,24 +33,21 @@ function check(label, filePath, pattern, mustMatch) {
 		failures.push(`[MISSING] ${rel} — file not found`);
 		return;
 	}
-	const src  = fs.readFileSync(filePath, 'utf8');
-	const hit  = pattern.test(src);
+	const src = fs.readFileSync(filePath, 'utf8');
+	const hit = pattern.test(src);
 	if (mustMatch && !hit) {
 		failures.push(`[MISSING] ${rel} — expected pattern not found: ${pattern}`);
 	} else if (!mustMatch && hit) {
-		failures.push(`[VIOLATION] ${rel} — literal stop array found (should read from inference.json): ${pattern}`);
+		failures.push(
+			`[VIOLATION] ${rel} — literal stop array found (should read from inference.json): ${pattern}`
+		);
 	}
 }
 
 const INFERENCE_JSON = path.join(EP, '_shared', 'modules', 'llm', 'inference.json');
 
 // inference.json must contain the stop_sequences section with unified keys
-check(
-	'inference.json has stop_sequences',
-	INFERENCE_JSON,
-	/"stop_sequences"\s*:/,
-	true
-);
+check('inference.json has stop_sequences', INFERENCE_JSON, /"stop_sequences"\s*:/, true);
 
 // Guard against regression to per-backend keys (ollama_batch etc.)
 check(
@@ -67,18 +64,8 @@ check(
 );
 
 // Verify the unified keys are present
-check(
-	'inference.json has unified "batch" key',
-	INFERENCE_JSON,
-	/"batch"\s*:/,
-	true
-);
-check(
-	'inference.json has unified "line" key',
-	INFERENCE_JSON,
-	/"line"\s*:/,
-	true
-);
+check('inference.json has unified "batch" key', INFERENCE_JSON, /"batch"\s*:/, true);
+check('inference.json has unified "line" key', INFERENCE_JSON, /"line"\s*:/, true);
 
 // AHK api_ollama.ahk must NOT define inline stop globals (detect re-inlining by
 // the distinctive first token "<|eot_id|>" appearing as a literal in this file)
@@ -113,4 +100,6 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] LLM stop sequences: single source in inference.json, no inline literals in backends.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] LLM stop sequences: single source in inference.json, no inline literals in backends.\x1b[0m'
+);

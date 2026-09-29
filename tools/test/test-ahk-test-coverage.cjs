@@ -145,7 +145,9 @@ function main() {
 			const rel = path.relative(TESTS_DIR, o).replace(/\\/g, '/');
 			console.error(`    ${rel}   — add:  #Include ${rel}`);
 		}
-		console.error('  Wire each into static/ergopti_plus/windows/tests/run_all.ahk (or delete it if obsolete).');
+		console.error(
+			'  Wire each into static/ergopti_plus/windows/tests/run_all.ahk (or delete it if obsolete).'
+		);
 		return 1;
 	}
 	console.log(

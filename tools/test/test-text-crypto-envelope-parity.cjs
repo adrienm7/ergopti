@@ -60,7 +60,7 @@ const canonical = lua
 			saltHex: luaConst(lua, 'KDF_SALT_HEX'),
 			keyHex: luaConst(lua, 'KEY_HEX_LENGTH'),
 			ivHex: luaConst(lua, 'IV_HEX_LENGTH')
-	  }
+		}
 	: {};
 
 if (lua) {
@@ -70,7 +70,9 @@ if (lua) {
 	// The credential gate is meaningless if the iteration count is weak. Pin the
 	// floor so a well-meaning "make it faster" cannot quietly gut the KDF.
 	if (canonical.iterations && Number(canonical.iterations) < 600000) {
-		errors.push(`text_crypto.lua: KDF_ITERATIONS is ${canonical.iterations}; must be at least 600000.`);
+		errors.push(
+			`text_crypto.lua: KDF_ITERATIONS is ${canonical.iterations}; must be at least 600000.`
+		);
 	}
 }
 
@@ -136,14 +138,18 @@ for (const rel of [
 ]) {
 	const src = read(rel);
 	if (src && !src.includes('keylogger.text_crypto')) {
-		errors.push(`${rel}: must build on the shared codec require("keylogger.text_crypto"), not re-type the format.`);
+		errors.push(
+			`${rel}: must build on the shared codec require("keylogger.text_crypto"), not re-type the format.`
+		);
 	}
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] At-rest encryption envelope is not single-sourced across drivers:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] At-rest encryption envelope is not single-sourced across drivers:\x1b[0m'
+	);
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }

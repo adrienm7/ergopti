@@ -56,9 +56,7 @@ class EmojiColorFormatter(logging.Formatter):
 
     def format(self, record):
         color = self.LEVEL_COLORS.get(record.levelno, "")
-        record.levelcustom = self.LEVEL_STRINGS.get(
-            record.levelno, f"{record.levelname}: "
-        )
+        record.levelcustom = self.LEVEL_STRINGS.get(record.levelno, f"{record.levelname}: ")
         record.msg = color + str(record.msg) + Style.RESET_ALL
         return super().format(record)
 
@@ -72,9 +70,7 @@ logging.basicConfig(
 
 for handler in logging.getLogger().handlers:
     handler.setFormatter(
-        EmojiColorFormatter(
-            "%(asctime)s %(levelcustom)s%(message)s", datefmt="%H:%M:%S"
-        )
+        EmojiColorFormatter("%(asctime)s %(levelcustom)s%(message)s", datefmt="%H:%M:%S")
     )
 
 

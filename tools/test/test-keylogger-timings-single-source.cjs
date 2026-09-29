@@ -28,7 +28,9 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
-function read(rel) { return fs.readFileSync(path.join(SP, rel), 'utf8'); }
+function read(rel) {
+	return fs.readFileSync(path.join(SP, rel), 'utf8');
+}
 
 /** Extracts an integer registry value: `key = 123`. */
 function registryInt(src, key) {
@@ -52,20 +54,20 @@ try {
 			label: 'context TTL',
 			regKey: 'hook_context_ttl_ms',
 			file: 'windows/modules/keylogger/keylogger_hook.ahk',
-			constName: 'CONTEXT_TTL_MS',
+			constName: 'CONTEXT_TTL_MS'
 		},
 		{
 			label: 'mouse park check',
 			regKey: 'mouse_park_check_ms',
 			file: 'windows/modules/keylogger/keylogger_mouse.ahk',
-			constName: 'PARK_CHECK_MS',
+			constName: 'PARK_CHECK_MS'
 		},
 		{
 			label: 'window topology tick',
 			regKey: 'topo_tick_ms',
 			file: 'windows/modules/keylogger/keylogger_window_topology.ahk',
-			constName: 'TOPO_TICK_MS',
-		},
+			constName: 'TOPO_TICK_MS'
+		}
 	];
 
 	for (const p of pairs) {
@@ -74,9 +76,9 @@ try {
 		if (regVal !== constVal) {
 			errors.push(
 				`${p.label}: registry [timings].${p.regKey} = ${regVal} but ` +
-				`${p.file} ${p.constName} = ${constVal}. ` +
-				`Fix: set ${p.regKey} = ${constVal} in _shared/modules/timings/constants.toml ` +
-				`(the AHK constant is the shipped, canonical value).`
+					`${p.file} ${p.constName} = ${constVal}. ` +
+					`Fix: set ${p.regKey} = ${constVal} in _shared/modules/timings/constants.toml ` +
+					`(the AHK constant is the shipped, canonical value).`
 			);
 		}
 	}
@@ -90,4 +92,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] Keylogger timing constants — CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry.\x1b[0m');
+console.log(
+	'\x1b[32m[OK] Keylogger timing constants — CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry.\x1b[0m'
+);

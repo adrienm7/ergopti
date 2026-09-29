@@ -8,7 +8,13 @@
 			"description": "Only the category-level TOML _meta sets values; no section requested, no user override anywhere.",
 			"category": "dl5cat1",
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14 },
-			"expected": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14, "has_override": false }
+			"expected": {
+				"delay": 0.4,
+				"color": "#444444",
+				"show_tooltip": false,
+				"priority": 14,
+				"has_override": false
+			}
 		},
 		{
 			"id": "toml_section_overrides_toml_category",
@@ -17,7 +23,13 @@
 			"section": "sec",
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true, "priority": 14 },
 			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": false, "priority": 24 },
-			"expected": { "delay": 0.3, "color": "#333333", "show_tooltip": false, "priority": 24, "has_override": false }
+			"expected": {
+				"delay": 0.3,
+				"color": "#333333",
+				"show_tooltip": false,
+				"priority": 24,
+				"has_override": false
+			}
 		},
 		{
 			"id": "user_category_overrides_toml",
@@ -25,7 +37,13 @@
 			"category": "dl5cat3",
 			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "priority": 64 },
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14 },
-			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "priority": 64, "has_override": true }
+			"expected": {
+				"delay": 0.2,
+				"color": "#222222",
+				"show_tooltip": true,
+				"priority": 64,
+				"has_override": true
+			}
 		},
 		{
 			"id": "user_section_overrides_everything",
@@ -36,7 +54,13 @@
 			"user_section": { "delay": 0.1, "color": "#111111", "show_tooltip": false, "priority": 74 },
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true, "priority": 14 },
 			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": true, "priority": 24 },
-			"expected": { "delay": 0.1, "color": "#111111", "show_tooltip": false, "priority": 74, "has_override": true }
+			"expected": {
+				"delay": 0.1,
+				"color": "#111111",
+				"show_tooltip": false,
+				"priority": 74,
+				"has_override": true
+			}
 		},
 		{
 			"id": "mixed_fields_cascade_independently",
@@ -46,7 +70,13 @@
 			"user_category": { "delay": 0.2 },
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14 },
 			"toml_section": { "color": "#333333" },
-			"expected": { "delay": 0.2, "color": "#333333", "show_tooltip": false, "priority": 14, "has_override": true }
+			"expected": {
+				"delay": 0.2,
+				"color": "#333333",
+				"show_tooltip": false,
+				"priority": 14,
+				"has_override": true
+			}
 		},
 		{
 			"id": "extension_override_identifier_casefold",
@@ -56,7 +86,13 @@
 			"resolve_category": "EXT.DEMO",
 			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": false, "priority": 70 },
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true, "priority": 40 },
-			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": false, "priority": 70, "has_override": true }
+			"expected": {
+				"delay": 0.2,
+				"color": "#222222",
+				"show_tooltip": false,
+				"priority": 70,
+				"has_override": true
+			}
 		},
 		{
 			"id": "toml_priority_only_is_not_a_user_override",
@@ -65,7 +101,13 @@
 			"section": "sec",
 			"toml_category": { "priority": 12 },
 			"toml_section": { "priority": 22 },
-			"expected": { "delay": 0.75, "color": "#1e88e5", "show_tooltip": true, "priority": 22, "has_override": false }
+			"expected": {
+				"delay": 0.75,
+				"color": "#1e88e5",
+				"show_tooltip": true,
+				"priority": 22,
+				"has_override": false
+			}
 		},
 		{
 			"id": "user_priority_only_marks_an_override",
@@ -76,7 +118,13 @@
 			"user_section": { "priority": 72 },
 			"toml_category": { "priority": 12 },
 			"toml_section": { "priority": 22 },
-			"expected": { "delay": 0.75, "color": "#1e88e5", "show_tooltip": true, "priority": 72, "has_override": true }
+			"expected": {
+				"delay": 0.75,
+				"color": "#1e88e5",
+				"show_tooltip": true,
+				"priority": 72,
+				"has_override": true
+			}
 		}
 	]
 }

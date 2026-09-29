@@ -8,16 +8,26 @@ import sys
 from urllib.parse import urlsplit
 
 
-MANIFEST = Path(__file__).resolve().parents[2] / "static/ergopti_plus/macos/vendor/karabiner-elements/manifest.json"
+MANIFEST = (
+    Path(__file__).resolve().parents[2]
+    / "static/ergopti_plus/macos/vendor/karabiner-elements/manifest.json"
+)
 FIELDS = ("version", "file_name", "sha256", "source_url")
 
 
 def read_manifest(path=MANIFEST):
     """Reject incomplete or unsafe package identity before a build downloads it."""
     manifest = json.loads(Path(path).read_text(encoding="utf-8"))
-    if (not isinstance(manifest, dict) or set(manifest) != set(FIELDS)
-            or any(not isinstance(manifest[key], str) or not manifest[key]
-                   or any(character.isspace() for character in manifest[key]) for key in FIELDS)):
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest) != set(FIELDS)
+        or any(
+            not isinstance(manifest[key], str)
+            or not manifest[key]
+            or any(character.isspace() for character in manifest[key])
+            for key in FIELDS
+        )
+    ):
         raise ValueError("Invalid Karabiner package manifest fields")
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?", manifest["version"]):
         raise ValueError("Invalid Karabiner package version")
@@ -26,8 +36,14 @@ def read_manifest(path=MANIFEST):
     if not re.fullmatch(r"[0-9a-f]{64}", manifest["sha256"]):
         raise ValueError("Invalid Karabiner package checksum")
     url = urlsplit(manifest["source_url"])
-    if (url.scheme != "https" or not url.hostname or url.username or url.password or url.fragment
-            or url.path.rsplit("/", 1)[-1] != manifest["file_name"]):
+    if (
+        url.scheme != "https"
+        or not url.hostname
+        or url.username
+        or url.password
+        or url.fragment
+        or url.path.rsplit("/", 1)[-1] != manifest["file_name"]
+    ):
         raise ValueError("Invalid Karabiner package URL")
     return manifest
 

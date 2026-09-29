@@ -13,7 +13,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { actualLuaPublications, actualLuaFallback } = require('./support/typing-publication-fixture.cjs');
+const {
+	actualLuaPublications,
+	actualLuaFallback
+} = require('./support/typing-publication-fixture.cjs');
 const root = path.resolve(__dirname, '../../static/ergopti_plus');
 const source = fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/data.js'), 'utf8');
 const stateSource = fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/state.js'), 'utf8');
@@ -27,34 +30,68 @@ function fixture() {
 	const timers = new Map();
 	let nextTimer = 0;
 	const elements = new Map();
-	const state = { did_apply_initial_reset: true, selected_apps: new Set(), app_selection_mode: 'all',
-		available_apps: [], loading_data: false, range_request_sequence: 0,
-		active_range_request_id: 0, range_request_watchdog: null, range_request_selection: null,
-		range_request_show_loader: false, range_request_previous_table_html: null };
-	const context = vm.createContext({ app_state: state,
+	const state = {
+		did_apply_initial_reset: true,
+		selected_apps: new Set(),
+		app_selection_mode: 'all',
+		available_apps: [],
+		loading_data: false,
+		range_request_sequence: 0,
+		active_range_request_id: 0,
+		range_request_watchdog: null,
+		range_request_selection: null,
+		range_request_show_loader: false,
+		range_request_previous_table_html: null
+	};
+	const context = vm.createContext({
+		app_state: state,
 		RANGE_REQUEST_WATCHDOG_MS: watchdogMs,
-		setTimeout(callback, delay) { const id = ++nextTimer; timers.set(id, { callback, delay }); return id; },
-		clearTimeout(id) { timers.delete(id); },
+		setTimeout(callback, delay) {
+			const id = ++nextTimer;
+			timers.set(id, { callback, delay });
+			return id;
+		},
+		clearTimeout(id) {
+			timers.delete(id);
+		},
 		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized', NONE: 'none' },
-		document: { getElementById(id) {
-			if (!elements.has(id)) elements.set(id, { value: '2026-09-01', innerHTML: '' });
-			return elements.get(id);
-		} } });
+		document: {
+			getElementById(id) {
+				if (!elements.has(id)) elements.set(id, { value: '2026-09-01', innerHTML: '' });
+				return elements.get(id);
+			}
+		}
+	});
 	context.window = context;
 	vm.runInContext(source, context);
-	vm.runInContext('compute_manifest_metrics=function(){};update_app_btn_text=function(){};ensure_live_refresh=function(){};render_current_tab=function(){};', context);
+	vm.runInContext(
+		'compute_manifest_metrics=function(){};update_app_btn_text=function(){};ensure_live_refresh=function(){};render_current_tab=function(){};',
+		context
+	);
 	return { context, state, timers, publish: context.publishTypingMetricsData };
 }
 
 const manifest = (app) => ({ '2026-09-01': { [app]: { chars: 1 } } });
-const snapshot = (app) => ({ manifest: manifest(app), initial_data: { marker: app },
-	app_icons: { [app]: 'icon' }, kc_layout: { 0: app } });
-const revisions = (manifestRevision, assetsRevision) => ({ manifest_revision: manifestRevision,
-	...(assetsRevision === undefined ? {} : { assets_revision: assetsRevision }) });
+const snapshot = (app) => ({
+	manifest: manifest(app),
+	initial_data: { marker: app },
+	app_icons: { [app]: 'icon' },
+	kc_layout: { 0: app }
+});
+const revisions = (manifestRevision, assetsRevision) => ({
+	manifest_revision: manifestRevision,
+	...(assetsRevision === undefined ? {} : { assets_revision: assetsRevision })
+});
 
 function test(name, callback) {
-	try { callback(); passed++; console.log(`ok ${name}`); }
-	catch (error) { failed++; console.error(`FAIL ${name}: ${error.message}`); }
+	try {
+		callback();
+		passed++;
+		console.log(`ok ${name}`);
+	} catch (error) {
+		failed++;
+		console.error(`FAIL ${name}: ${error.message}`);
+	}
 }
 
 test('cache paints while fresh submission has not executed', () => {
@@ -74,9 +111,15 @@ test('late startup fills assets without rolling back live manifest or prefetch',
 	let renders = 0;
 	f.state.loading_data = false;
 	f.state.active_range_request_id = 77;
-	f.context.request_range_data = () => { queries++; };
-	f.context.compute_manifest_metrics = () => { throw new Error('assets must not recompute manifest'); };
-	f.context.render_current_tab = () => { renders++; };
+	f.context.request_range_data = () => {
+		queries++;
+	};
+	f.context.compute_manifest_metrics = () => {
+		throw new Error('assets must not recompute manifest');
+	};
+	f.context.render_current_tab = () => {
+		renders++;
+	};
 	assert.equal(f.publish(snapshot('Startup'), revisions(1, 1)), true);
 	assert.equal(queries, 0);
 	assert.equal(renders, 1);
@@ -95,7 +138,9 @@ test('duplicate publication cannot reset current range ownership or render again
 	const f = fixture();
 	f.publish(snapshot('Fresh'), revisions(1, 1));
 	f.state.active_range_request_id = 77;
-	f.context.compute_manifest_metrics = () => { throw new Error('stale render must not run'); };
+	f.context.compute_manifest_metrics = () => {
+		throw new Error('stale render must not run');
+	};
 	assert.equal(f.publish(snapshot('Duplicate'), revisions(1, 1)), false);
 	assert.equal(f.state.active_range_request_id, 77);
 });
@@ -133,7 +178,9 @@ test('missing revision metadata fails before changing visible data', () => {
 
 test('render failure retains already-applied watermarks', () => {
 	const f = fixture();
-	f.context.compute_manifest_metrics = () => { throw new Error('render refused'); };
+	f.context.compute_manifest_metrics = () => {
+		throw new Error('render refused');
+	};
 	assert.throws(() => f.publish(snapshot('Newest'), revisions(3, 3)), /render refused/);
 	assert.deepEqual(f.context.metrics_manifest, manifest('Newest'));
 	f.context.compute_manifest_metrics = () => {};
@@ -162,13 +209,16 @@ test('legacy Windows and Linux process_manifest calls retain replacement semanti
 	assert.deepEqual(Array.from(f.state.available_apps), ['Legacy2']);
 });
 
-
 test('actual FIFO Lua startup retry cannot roll back an applied live snapshot', () => {
 	const scripts = actualLuaPublications();
 	const f = fixture();
 	assert.equal(vm.runInContext(scripts[0], f.context), true);
 	assert.deepEqual(Array.from(f.state.available_apps), ['Live']);
-	assert.equal(vm.runInContext(scripts[1], f.context), true, 'older startup must still supply previously absent assets');
+	assert.equal(
+		vm.runInContext(scripts[1], f.context),
+		true,
+		'older startup must still supply previously absent assets'
+	);
 	assert.deepEqual(Array.from(f.state.available_apps), ['Live']);
 	assert.equal(f.context._prefetch_data, null);
 });
@@ -186,12 +236,19 @@ test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 		if (!elements.has(id)) elements.set(id, { value: '', innerHTML: '', classList: { add() {} } });
 		return elements.get(id);
 	};
-	vm.runInContext(fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/filters.js'), 'utf8'), f.context);
+	vm.runInContext(
+		fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/filters.js'), 'utf8'),
+		f.context
+	);
 	f.context.apply_default_date_range = () => {};
 	f.context.ensure_live_refresh = () => {};
 	f.context.update_app_btn_text = () => {};
 	assert.equal(vm.runInContext(scripts[0], f.context), true);
-	assert.equal(f.state.did_apply_initial_reset, true, 'cold publication must complete the actual initial reset');
+	assert.equal(
+		f.state.did_apply_initial_reset,
+		true,
+		'cold publication must complete the actual initial reset'
+	);
 	assert.equal(vm.runInContext(scripts[1], f.context), true);
 	assert.deepEqual(Array.from(f.state.available_apps), []);
 	assert.equal(f.context.metrics_manifest.length, 0);
@@ -202,7 +259,10 @@ test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 test('nonempty array maps cannot corrupt a valid publication', () => {
 	const f = fixture();
 	assert.throws(() => f.publish({ manifest: ['invalid'] }, revisions(1)), /maps/);
-	assert.throws(() => f.publish({ ...snapshot('Invalid'), app_icons: ['invalid'] }, revisions(1, 1)), /maps/);
+	assert.throws(
+		() => f.publish({ ...snapshot('Invalid'), app_icons: ['invalid'] }, revisions(1, 1)),
+		/maps/
+	);
 	assert.equal(f.context.metrics_manifest, undefined);
 	assert.equal(f.publish(snapshot('Cache'), revisions(0, 0)), true);
 });

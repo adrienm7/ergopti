@@ -50,18 +50,14 @@ class GSettingsMergeTests(unittest.TestCase):
 
     def test_make_primary_moves_the_layout_first_without_dropping_any(self):
         current = [("xkb", "fr"), ("xkb", "us"), ("xkb", "ergopti")]
-        merged, changed = merge_gsettings_source(
-            current, [("xkb", "ergopti")], make_primary=True
-        )
+        merged, changed = merge_gsettings_source(current, [("xkb", "ergopti")], make_primary=True)
         self.assertTrue(changed)
         self.assertEqual(merged[0], ("xkb", "ergopti"))
         self.assertEqual(set(merged), set(current))
 
     def test_make_primary_is_a_noop_when_already_first(self):
         current = [("xkb", "ergopti"), ("xkb", "fr")]
-        merged, changed = merge_gsettings_source(
-            current, [("xkb", "ergopti")], make_primary=True
-        )
+        merged, changed = merge_gsettings_source(current, [("xkb", "ergopti")], make_primary=True)
         self.assertFalse(changed)
         self.assertEqual(merged, current)
 

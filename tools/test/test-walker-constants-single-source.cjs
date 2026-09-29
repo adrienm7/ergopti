@@ -66,13 +66,15 @@ function read(rel) {
 function normalise(raw) {
 	const t = raw.trim();
 	if (t.startsWith('{') || t.startsWith('[')) {
-		return t.slice(1, -1).split(',').map((x) => x.trim()).filter(Boolean).join(',');
+		return t
+			.slice(1, -1)
+			.split(',')
+			.map((x) => x.trim())
+			.filter(Boolean)
+			.join(',');
 	}
 	return String(Number(t));
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -86,11 +88,10 @@ for (const m of sharedSrc.matchAll(/^M\.([A-Z][A-Z0-9_]+)\s*=\s*(\{[^}]*\}|-?[\d
 	shared.set(m[1], normalise(m[2]));
 }
 if (shared.size < 5) {
-	errors.push(`parsed ${shared.size} shared constant(s) from ${SHARED} — expected at least 5; the parser drifted`);
+	errors.push(
+		`parsed ${shared.size} shared constant(s) from ${SHARED} — expected at least 5; the parser drifted`
+	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -103,12 +104,19 @@ const ahkSrc = read(AHK_WALKER);
 // "<- keylogger.<key>" comment and are gated by the timings single-source test.
 const ahk = new Map();
 let ahkPlaceholders = 0;
-for (const m of ahkSrc.matchAll(/^\s*static\s+([A-Z][A-Z0-9_]+)\s*:=\s*(\[[^\]]*\]|-?[\d.]+)\s*(;.*)?$/gm)) {
-	if (m[3] && m[3].includes('<- keylogger.')) { ahkPlaceholders++; continue; }
+for (const m of ahkSrc.matchAll(
+	/^\s*static\s+([A-Z][A-Z0-9_]+)\s*:=\s*(\[[^\]]*\]|-?[\d.]+)\s*(;.*)?$/gm
+)) {
+	if (m[3] && m[3].includes('<- keylogger.')) {
+		ahkPlaceholders++;
+		continue;
+	}
 	ahk.set(m[1], normalise(m[2]));
 }
 if (ahk.size < 5) {
-	errors.push(`parsed ${ahk.size} literal constant(s) from ${AHK_WALKER} — expected at least 5; the parser drifted`);
+	errors.push(
+		`parsed ${ahk.size} literal constant(s) from ${AHK_WALKER} — expected at least 5; the parser drifted`
+	);
 }
 if (ahkPlaceholders === 0) {
 	errors.push(
@@ -129,11 +137,10 @@ for (const [name, value] of shared) {
 	}
 }
 if (comparedAhk === 0) {
-	errors.push('no constant name is shared between the shared helpers and the AHK walker — the gate compares nothing');
+	errors.push(
+		'no constant name is shared between the shared helpers and the AHK walker — the gate compares nothing'
+	);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -143,7 +150,9 @@ if (comparedAhk === 0) {
 
 const hs = new Map();
 for (const rel of HS_AGGREGATOR) {
-	for (const m of read(rel).matchAll(/^\s*(?:local\s+|M\.)([A-Z][A-Z0-9_]+)\s*=\s*(\{[^}]*\}|-?[\d.]+)\s*$/gm)) {
+	for (const m of read(rel).matchAll(
+		/^\s*(?:local\s+|M\.)([A-Z][A-Z0-9_]+)\s*=\s*(\{[^}]*\}|-?[\d.]+)\s*$/gm
+	)) {
 		if (!hs.has(m[1])) hs.set(m[1], { value: normalise(m[2]), file: rel });
 	}
 }
@@ -161,9 +170,6 @@ for (const [name, value] of shared) {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 4/ Report ================================
@@ -171,7 +177,9 @@ for (const [name, value] of shared) {
 // ==================================================
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the keylogger walkers disagree with the shared aggregation constants:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the keylogger walkers disagree with the shared aggregation constants:\x1b[0m'
+	);
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);
 }

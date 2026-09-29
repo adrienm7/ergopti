@@ -21,11 +21,11 @@ No domain spec directly — the keylogger implements the on-disk schema describe
 
 ## Public API
 
-| Function               | Description                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------- |
+| Function               | Description                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------- |
 | `M.start(control)`     | Arm the eventtap and daemons with the runtime pause-state provider               |
 | `M.stop()`             | Disarm the eventtap, stop maintenance, and flush pending buffers                 |
-| `M.resync_context()`   | Drop transient modifier/application context after an observation gap            |
+| `M.resync_context()`   | Drop transient modifier/application context after an observation gap             |
 | `M.notify_synthetic()` | Record a replacement's logical result; the optional privacy flag redacts content |
 
 ## Init pattern

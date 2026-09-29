@@ -37,11 +37,11 @@ before a tracking job exists. Production driver code is unchanged.
 
 ## Candidate measurements
 
-| Test | Baseline | Candidate 01 | Candidate 02 |
-| --- | ---: | ---: | ---: |
-| Refused swap cleanup | 4822.742 | 3643.271 | 3676.039 |
-| Primary swap failure cleanup | 4854.394 | 3605.677 | 3558.072 |
-| Parent cleanup control | Not extracted | 2160.274 | 2161.059 |
+| Test                         |      Baseline | Candidate 01 | Candidate 02 |
+| ---------------------------- | ------------: | -----------: | -----------: |
+| Refused swap cleanup         |      4822.742 |     3643.271 |     3676.039 |
+| Primary swap failure cleanup |      4854.394 |     3605.677 |     3558.072 |
+| Parent cleanup control       | Not extracted |     2160.274 |     2161.059 |
 
 All values are milliseconds. Candidate receipts are
 `updater-job-candidate-01.out` and `updater-job-candidate-02.out`; each passed

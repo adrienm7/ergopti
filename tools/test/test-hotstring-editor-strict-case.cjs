@@ -27,7 +27,7 @@ function element(value = '') {
 		value,
 		checked: false,
 		classList: { add() {}, remove() {} },
-		focus() {},
+		focus() {}
 	};
 }
 
@@ -40,7 +40,7 @@ function runModel(seed, editIndex) {
 		'cb-case': element(),
 		'cb-final': element(),
 		'e-prio': element(''),
-		'save-toast': element(),
+		'save-toast': element()
 	};
 	fields['cb-case'].checked = true;
 
@@ -55,7 +55,7 @@ function runModel(seed, editIndex) {
 		clearTimeout() {},
 		__seed: seed,
 		__editIndex: editIndex,
-		__payloads: [],
+		__payloads: []
 	});
 	context.window = context;
 
@@ -96,42 +96,59 @@ function test(name, callback) {
 console.log('\n=== Hotstring Editor Strict-Case Preservation ===');
 
 test('persist carries strict-case state to every host bridge', () => {
-	const result = runModel({
-		sections: [{
-			name: 'strict',
-			description: 'Strict',
-			entries: [{
-				trigger: 'Case',
-				output: 'exact',
-				is_case_sensitive: true,
-				is_case_sensitive_strict: true,
-			}],
-		}],
-	}, undefined);
+	const result = runModel(
+		{
+			sections: [
+				{
+					name: 'strict',
+					description: 'Strict',
+					entries: [
+						{
+							trigger: 'Case',
+							output: 'exact',
+							is_case_sensitive: true,
+							is_case_sensitive_strict: true
+						}
+					]
+				}
+			]
+		},
+		undefined
+	);
 	assert.strictEqual(result.payload.sections.strict.entries[0].is_case_sensitive_strict, true);
 });
 
 test('editing preserves a hidden strict-case value', () => {
-	const result = runModel({
-		sections: [{
-			name: 'strict',
-			description: 'Strict',
-			entries: [{
-				trigger: 'Case',
-				output: 'exact',
-				is_case_sensitive: true,
-				is_case_sensitive_strict: true,
-			}],
-		}],
-	}, 0);
+	const result = runModel(
+		{
+			sections: [
+				{
+					name: 'strict',
+					description: 'Strict',
+					entries: [
+						{
+							trigger: 'Case',
+							output: 'exact',
+							is_case_sensitive: true,
+							is_case_sensitive_strict: true
+						}
+					]
+				}
+			]
+		},
+		0
+	);
 	assert.strictEqual(result.entry.is_case_sensitive_strict, true);
 	assert.strictEqual(result.payload.sections.strict.entries[0].is_case_sensitive_strict, true);
 });
 
 test('a newly created entry starts with strict case disabled', () => {
-	const result = runModel({
-		sections: [{ name: 'strict', description: 'Strict', entries: [] }],
-	}, null);
+	const result = runModel(
+		{
+			sections: [{ name: 'strict', description: 'Strict', entries: [] }]
+		},
+		null
+	);
 	assert.strictEqual(result.entry.is_case_sensitive_strict, false);
 	assert.strictEqual(result.payload.sections.strict.entries[0].is_case_sensitive_strict, false);
 });

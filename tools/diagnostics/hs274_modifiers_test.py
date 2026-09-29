@@ -10,7 +10,12 @@ import unittest
 from unittest.mock import patch
 
 from hs274_capture import MARKER
-from hs274_modifiers import KEYCODES, modifier_drain, validate_modifier_capture, validate_modifier_output
+from hs274_modifiers import (
+    KEYCODES,
+    modifier_drain,
+    validate_modifier_capture,
+    validate_modifier_output,
+)
 from hs274_stream_test import fixture
 from hs274_stream import validate_stream
 
@@ -19,11 +24,16 @@ def modifier_fixture(*, overlap=False):
     """Use synthetic modifier edges and the retained native trailing pair."""
     capture, _ = fixture()
     template = capture["records"][2]
-    prefix = [dict(template, usage=usage, has_cookie=True, cookie=usage, value=value)
-              for usage in range(224, 232) for value in (1, 0)]
+    prefix = [
+        dict(template, usage=usage, has_cookie=True, cookie=usage, value=value)
+        for usage in range(224, 232)
+        for value in (1, 0)
+    ]
     if overlap:
-        prefix += [dict(template, usage=usage, has_cookie=True, cookie=usage, value=value)
-                   for usage, value in ((225, 1), (229, 1), (225, 0), (229, 0))]
+        prefix += [
+            dict(template, usage=usage, has_cookie=True, cookie=usage, value=value)
+            for usage, value in ((225, 1), (229, 1), (225, 0), (229, 0))
+        ]
     capture["records"] = prefix + capture["records"]
     for sequence, row in enumerate(capture["records"], 1):
         row["sequence"] = sequence
@@ -36,10 +46,10 @@ class ModifierTests(unittest.TestCase):
     def test_shifted_collision_requires_each_physical_edge_and_output_flag(self):
         capture = modifier_fixture()
         template = capture["records"][0]
-        combinations = [(225, 1), (41, 1), (41, 0), (225, 0),
-                        (225, 1), (44, 1), (44, 0), (225, 0)]
-        capture["records"][16:16] = [dict(template, usage=usage, cookie=usage, value=value)
-                                    for usage, value in combinations]
+        combinations = [(225, 1), (41, 1), (41, 0), (225, 0), (225, 1), (44, 1), (44, 0), (225, 0)]
+        capture["records"][16:16] = [
+            dict(template, usage=usage, cookie=usage, value=value) for usage, value in combinations
+        ]
         for sequence, row in enumerate(capture["records"], 1):
             row.update(sequence=sequence, timestamp=sequence)
         capture["seen"] = len(capture["records"])
@@ -49,12 +59,22 @@ class ModifierTests(unittest.TestCase):
         for count in range(len(capture["records"])):
             self.assertFalse(drain({"records": capture["records"][:count]}))
         self.assertTrue(drain(capture))
-        evidence = json.loads((Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json").read_text(encoding="utf-8"))
+        evidence = json.loads(
+            (Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json").read_text(
+                encoding="utf-8"
+            )
+        )
         native = evidence["native"]
         native.update(reports_queued=28, combinations_observed=True)
-        events = [{"type": kind, "keycode": code, "flags": flags}
-                  for kind, code, flags in ((12, 56, 131072), (10, 49, 131072),
-                                            (11, 49, 131072), (12, 56, 0))] * 2
+        events = [
+            {"type": kind, "keycode": code, "flags": flags}
+            for kind, code, flags in (
+                (12, 56, 131072),
+                (10, 49, 131072),
+                (11, 49, 131072),
+                (12, 56, 0),
+            )
+        ] * 2
         native["events"][16:16] = events
         validate_modifier_output(native, combinations=True)
         for index in range(16, 24):
@@ -70,16 +90,25 @@ class ModifierTests(unittest.TestCase):
     def test_overlapping_shift_keeps_partial_release_and_rejects_repeat_credit(self):
         capture = modifier_fixture(overlap=True)
         device = capture["records"][0]["device"]
-        self.assertEqual(validate_modifier_capture(MARKER + json.dumps(capture) + "\n", device, overlap=True), capture)
+        self.assertEqual(
+            validate_modifier_capture(MARKER + json.dumps(capture) + "\n", device, overlap=True),
+            capture,
+        )
         drain = modifier_drain(device, overlap=True)
         for count in range(len(capture["records"])):
             self.assertFalse(drain({"records": capture["records"][:count]}))
         self.assertTrue(drain(capture))
-        evidence = json.loads((Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json").read_text(encoding="utf-8"))
+        evidence = json.loads(
+            (Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json").read_text(
+                encoding="utf-8"
+            )
+        )
         native = evidence["native"]
         native.update(reports_queued=26, overlap_observed=True)
-        overlapping = [{"type": 12, "keycode": code, "flags": shifted * 131072}
-                       for code, shifted in ((56, 1), (60, 1), (56, 1), (60, 0))]
+        overlapping = [
+            {"type": 12, "keycode": code, "flags": shifted * 131072}
+            for code, shifted in ((56, 1), (60, 1), (56, 1), (60, 0))
+        ]
         native["events"][16:16] = overlapping
         validate_modifier_output(native, overlap=True)
         native["events"][18]["flags"] = 0
@@ -97,24 +126,53 @@ class ModifierTests(unittest.TestCase):
 
     def replay_native_modifiers(self, overlap, combinations):
         from hs274_hammerspoon import validate_consumer
-        name = ("hs274-native-combination-consumer.json" if combinations else
-                "hs274-native-overlap-consumer.json" if overlap else "hs274-native-modifier-consumer.json")
+
+        name = (
+            "hs274-native-combination-consumer.json"
+            if combinations
+            else "hs274-native-overlap-consumer.json"
+            if overlap
+            else "hs274-native-modifier-consumer.json"
+        )
         path = Path(__file__).parent / "fixtures" / name
         evidence = json.loads(path.read_text(encoding="utf-8"))
         device = evidence["native"]["registry_entry_id"]
         validate_modifier_output(evidence["native"], overlap=overlap, combinations=combinations)
-        capture = validate_modifier_capture(MARKER + json.dumps(evidence["capture"]) + "\n", device, overlap=overlap, combinations=combinations)
+        capture = validate_modifier_capture(
+            MARKER + json.dumps(evidence["capture"]) + "\n",
+            device,
+            overlap=overlap,
+            combinations=combinations,
+        )
         stream = validate_stream(evidence["stream_output"], capture)
         self.assertEqual(len(stream["records"]), 80 if combinations else 62 if overlap else 52)
         drain = modifier_drain(device, overlap=overlap, combinations=combinations)
         self.assertTrue(drain(stream))
-        modifiers = [row for row in stream["records"] if row["page"] == 7 and 224 <= row["usage"] <= 231]
-        self.assertEqual([(row["cookie"], row["value"]) for row in modifiers],
-                         [(cookie, value) for cookie in range(24, 32) for value in (1, 0)]
-                         + ([(25, 1), (29, 1), (25, 0), (29, 0)] if overlap else [(25, 1), (25, 0)] * 2 if combinations else []))
-        utc_clock = SimpleNamespace(fromtimestamp=lambda epoch: datetime.fromtimestamp(epoch, timezone.utc))
+        modifiers = [
+            row for row in stream["records"] if row["page"] == 7 and 224 <= row["usage"] <= 231
+        ]
+        self.assertEqual(
+            [(row["cookie"], row["value"]) for row in modifiers],
+            [(cookie, value) for cookie in range(24, 32) for value in (1, 0)]
+            + (
+                [(25, 1), (29, 1), (25, 0), (29, 0)]
+                if overlap
+                else [(25, 1), (25, 0)] * 2
+                if combinations
+                else []
+            ),
+        )
+        utc_clock = SimpleNamespace(
+            fromtimestamp=lambda epoch: datetime.fromtimestamp(epoch, timezone.utc)
+        )
         with patch("hs274_hammerspoon.datetime", utc_clock):
-            validate_consumer(evidence["hammerspoon"], capture, modifiers=True, overlap=overlap, combinations=combinations)
+            validate_consumer(
+                evidence["hammerspoon"],
+                capture,
+                modifiers=True,
+                overlap=overlap,
+                combinations=combinations,
+            )
         if overlap or combinations:
             isolation = evidence["isolation"]
             self.assertIsNone(isolation["observation_error"])
@@ -125,10 +183,21 @@ class ModifierTests(unittest.TestCase):
             self.assertFalse(drain({"records": stream["records"][:count]}))
 
     def test_native_modifier_flags_require_both_edges_and_exact_sides(self):
-        pairs = ((59, 262144), (56, 131072), (58, 524288), (55, 1048576),
-                 (62, 262144), (60, 131072), (61, 524288), (54, 1048576))
-        events = [{"type": 12, "keycode": code, "flags": flags}
-                  for code, mask in pairs for flags in (mask, 0)]
+        pairs = (
+            (59, 262144),
+            (56, 131072),
+            (58, 524288),
+            (55, 1048576),
+            (62, 262144),
+            (60, 131072),
+            (61, 524288),
+            (54, 1048576),
+        )
+        events = [
+            {"type": 12, "keycode": code, "flags": flags}
+            for code, mask in pairs
+            for flags in (mask, 0)
+        ]
         events += [{"type": kind, "keycode": 49} for kind in (10, 11, 10, 11)]
         native = {"events": events, "reports_queued": 20, "modifier_pairs_observed": True}
         validate_modifier_output(native)

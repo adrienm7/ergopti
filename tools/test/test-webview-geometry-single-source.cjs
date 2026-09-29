@@ -64,35 +64,58 @@ function readManifest() {
 
 /** Recognizes direct and protected calls without treating comments or strings as code. */
 function resolvesMacosGeometry(source, id) {
-	const lexemes = source.match(/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g) || [];
-	const tokens = lexemes.filter(token => !token.startsWith('--'));
+	const lexemes =
+		source.match(
+			/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g
+		) || [];
+	const tokens = lexemes.filter((token) => !token.startsWith('--'));
 	const shapes = [
 		['ui_builder', '.', 'get_app_geometry', '('],
 		['pcall', '(', 'ui_builder', '.', 'get_app_geometry', ',']
 	];
-	return tokens.some((_, index) => shapes.some(shape => {
-		if (!shape.every((token, offset) => tokens[index + offset] === token)) return false;
-		const argument = tokens[index + shape.length];
-		return (argument === `"${id}"` || argument === `'${id}'`)
-			&& tokens[index + shape.length + 1] === ')';
-	}));
+	return tokens.some((_, index) =>
+		shapes.some((shape) => {
+			if (!shape.every((token, offset) => tokens[index + offset] === token)) return false;
+			const argument = tokens[index + shape.length];
+			return (
+				(argument === `"${id}"` || argument === `'${id}'`) &&
+				tokens[index + shape.length + 1] === ')'
+			);
+		})
+	);
 }
 
 const geometryFixtures = [
 	['direct', 'local geo = ui_builder.get_app_geometry("prompt_editor")', true],
 	['protected', 'local ok, geo = pcall(ui_builder.get_app_geometry, "prompt_editor")', true],
-	['spaced and single-quoted', "local geo = ui_builder . get_app_geometry ( 'prompt_editor' )", true],
+	[
+		'spaced and single-quoted',
+		"local geo = ui_builder . get_app_geometry ( 'prompt_editor' )",
+		true
+	],
 	['wrong direct id', 'local geo = ui_builder.get_app_geometry("another_editor")', false],
-	['wrong protected id', 'local ok, geo = pcall(ui_builder.get_app_geometry, "another_editor")', false],
+	[
+		'wrong protected id',
+		'local ok, geo = pcall(ui_builder.get_app_geometry, "another_editor")',
+		false
+	],
 	['line comment', '-- ui_builder.get_app_geometry("prompt_editor")', false],
 	['long comment', '--[=[ pcall(ui_builder.get_app_geometry, "prompt_editor") ]=]', false],
 	['quoted text', 'local documentation = \'ui_builder.get_app_geometry("prompt_editor")\'', false],
-	['long string', 'local documentation = [=[ui_builder.get_app_geometry("prompt_editor")]=]', false],
+	[
+		'long string',
+		'local documentation = [=[ui_builder.get_app_geometry("prompt_editor")]=]',
+		false
+	],
 	['wrong receiver', 'other_builder.get_app_geometry("prompt_editor")', false],
 	['missing call', 'local geo = { width = 640, height = 480 }', false]
 ];
 for (const [name, source, expected] of geometryFixtures) {
-	assert.equal(resolvesMacosGeometry(source, 'prompt_editor'), expected, `geometry source fixture: ${name}`);
+	assert.equal(
+		resolvesMacosGeometry(source, 'prompt_editor'),
+		expected,
+		`geometry source fixture: ${name}`
+	);
 }
 
 // ── macOS: each module must DEFER to the manifest, never hardcode a size ──────
@@ -119,8 +142,10 @@ const MACOS_MODULES = {
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
 // entry (app gone from the manifest) fails, so this cannot quietly rot.
 const MACOS_EXCLUSIONS = {
-	metrics_apps: 'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
-	metrics_typing: 'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
+	metrics_apps:
+		'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
+	metrics_typing:
+		'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
 	numeric_prompt:
 		'no macOS host — hs.dialog asks for a number natively, so there is no window ' +
 		'to size. Linux has no native numeric dialog and needs a webview to ask at all'
@@ -133,7 +158,11 @@ const MACOS_EXCLUSIONS = {
 const WINDOWS_APPS = {
 	config_cleanup: {
 		file: 'ui/config_cleanup/init.ahk',
-		checks: () => [/class ConfigCleanupWindow extends WebViewHost/, /Host\.AppId\s*:=\s*"config_cleanup"/, /Geo\s*:=\s*super\._Geometry\(\)/]
+		checks: () => [
+			/class ConfigCleanupWindow extends WebViewHost/,
+			/Host\.AppId\s*:=\s*"config_cleanup"/,
+			/Geo\s*:=\s*super\._Geometry\(\)/
+		]
 	},
 	hotstring_editor: {
 		file: 'ui/personal_toml_editor_webview.ahk',
@@ -141,11 +170,17 @@ const WINDOWS_APPS = {
 	},
 	healthcheck: {
 		file: 'ui/healthcheck/core.ahk',
-		checks: (m) => [new RegExp(`HC_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`HC_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [
+			new RegExp(`HC_WIDTH\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`HC_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
 	},
 	error_dialog: {
 		file: 'ui/error_dialog/init.ahk',
-		checks: (m) => [new RegExp(`ED_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`ED_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [
+			new RegExp(`ED_WIDTH\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`ED_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
 	},
 	changelog: {
 		file: 'ui/changelog/init.ahk',
@@ -157,11 +192,17 @@ const WINDOWS_APPS = {
 	},
 	hotstrings_config_window: {
 		file: 'ui/hotstrings_config_window/webview.ahk',
-		checks: (m) => [new RegExp(`HCWWEB_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`HCWWEB_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [
+			new RegExp(`HCWWEB_WIDTH\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`HCWWEB_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
 	},
 	prompt_editor: {
 		file: 'ui/prompt_editor/init.ahk',
-		checks: (m) => [new RegExp(`PROMPTED_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`PROMPTED_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [
+			new RegExp(`PROMPTED_WIDTH\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`PROMPTED_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
 	},
 	onboarding: {
 		file: 'ui/onboarding/webview.ahk',
@@ -181,25 +222,37 @@ const WINDOWS_APPS = {
 	},
 	action_picker: {
 		file: 'ui/action_picker_webview.ahk',
-		checks: (m) => [new RegExp(`ACTPICK_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`ACTPICK_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [
+			new RegExp(`ACTPICK_WIDTH\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`ACTPICK_HEIGHT\\s*:=\\s*${m.height}\\b`)
+		]
 	},
 	layer_editor: {
 		file: 'ui/layer_editor/init.ahk',
 		// Opened through WebViewHost.TryOpen, which reads the size from the manifest
 		// itself: the check is that the host goes through it under its manifest id.
-		checks: () => [/WebViewHost\.TryOpen\(\s*LAYER_EDITOR_APP_ID\b/, /LAYER_EDITOR_APP_ID := "layer_editor"/]
+		checks: () => [
+			/WebViewHost\.TryOpen\(\s*LAYER_EDITOR_APP_ID\b/,
+			/LAYER_EDITOR_APP_ID := "layer_editor"/
+		]
 	},
 	download_window: {
 		file: 'modules/llm/ollama_webview.ahk',
-		checks: (m) => [new RegExp(`_OllamaWV_W\\s*:=\\s*${m.width}\\b`), new RegExp(`_OllamaWV_H\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [
+			new RegExp(`_OllamaWV_W\\s*:=\\s*${m.width}\\b`),
+			new RegExp(`_OllamaWV_H\\s*:=\\s*${m.height}\\b`)
+		]
 	}
 };
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
-	metrics_apps: 'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
-	metrics_typing: 'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
-	token_prompt: 'no Windows host — the token dialog is a native InputBox, which has no manifest geometry',
+	metrics_apps:
+		'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
+	metrics_typing:
+		'KLWV_Open sizes the dashboard to 70 % of the work area, capped 1300x800 — deliberately adaptive, ignores the manifest',
+	token_prompt:
+		'no Windows host — the token dialog is a native InputBox, which has no manifest geometry',
 	numeric_prompt:
 		'no Windows host — InputBox asks for a number natively, same reason as ' +
 		'token_prompt above. Linux has no equivalent and needs a webview to ask at all'
@@ -218,23 +271,35 @@ const apps = readManifest();
 const consoleGeometry = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).native_windows?.console;
 assert.ok(consoleGeometry, 'the native console geometry must exist');
 for (const dimension of ['width_ratio', 'height_ratio']) {
-	assert.ok(typeof consoleGeometry[dimension] === 'number'
-		&& consoleGeometry[dimension] > 0 && consoleGeometry[dimension] <= 1,
-		`native console ${dimension} must be a finite screen ratio`);
+	assert.ok(
+		typeof consoleGeometry[dimension] === 'number' &&
+			consoleGeometry[dimension] > 0 &&
+			consoleGeometry[dimension] <= 1,
+		`native console ${dimension} must be a finite screen ratio`
+	);
 }
 
 /** Removes quoted examples and comments before finding native console references. */
 function consoleCode(source, language) {
 	if (language === 'lua') {
-		return (source.match(/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g) || [])
-			.filter(token => !token.startsWith('--') && !/^["'\[]/.test(token)).join(' ');
+		return (
+			source.match(
+				/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g
+			) || []
+		)
+			.filter((token) => !token.startsWith('--') && !/^["'\[]/.test(token))
+			.join(' ');
 	}
-	return source.replace(/\/\*[\s\S]*?\*\/|;[^\r\n]*|"(?:`[\s\S]|[^"`])*"|'(?:`[\s\S]|[^'`])*'/g, ' ');
+	return source.replace(
+		/\/\*[\s\S]*?\*\/|;[^\r\n]*|"(?:`[\s\S]|[^"`])*"|'(?:`[\s\S]|[^'`])*'/g,
+		' '
+	);
 }
 
 /** Counts live native API references, including protected calls and aliases. */
 function consoleReferences(source, language) {
-	const pattern = language === 'lua' ? /\bhs\s*\.\s*openConsole\b/g : /\b(?:ListVars|KeyHistory)\b/g;
+	const pattern =
+		language === 'lua' ? /\bhs\s*\.\s*openConsole\b/g : /\b(?:ListVars|KeyHistory)\b/g;
 	return [...consoleCode(source, language).matchAll(pattern)].length;
 }
 
@@ -246,14 +311,18 @@ for (const [language, source, count] of [
 	['lua', '--[=[hs.openConsole(true)]=]\nlocal text = [=[hs.openConsole(true)]=]', 0],
 	['ahk', 'ListVars()\nKeyHistory()', 2],
 	['ahk', 'Open := ListVars', 1],
-	['ahk', '; ListVars()\nText := "KeyHistory()"\n/* ListVars() */', 0],
+	['ahk', '; ListVars()\nText := "KeyHistory()"\n/* ListVars() */', 0]
 ]) {
-	assert.equal(consoleReferences(source, language), count, `native console scanner fixture: ${source}`);
+	assert.equal(
+		consoleReferences(source, language),
+		count,
+		`native console scanner fixture: ${source}`
+	);
 }
 
 /** Visits production source files, excluding tests and external/generated code. */
 function productionSources(directory, extension) {
-	return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
 		if (['tests', 'vendor', '_generated'].includes(entry.name)) return [];
 		const absolute = path.join(directory, entry.name);
 		if (entry.isDirectory()) return productionSources(absolute, extension);
@@ -263,7 +332,7 @@ function productionSources(directory, extension) {
 
 for (const [driver, language, owner, expected] of [
 	['macos', 'lua', 'ui/console_window.lua', 1],
-	['windows', 'ahk', 'adapters/console_window.ahk', 2],
+	['windows', 'ahk', 'adapters/console_window.ahk', 2]
 ]) {
 	const directory = path.join(ROOT, SP, driver);
 	const files = productionSources(directory, `.${language}`);
@@ -273,12 +342,15 @@ for (const [driver, language, owner, expected] of [
 		const count = consoleReferences(fs.readFileSync(absolute, 'utf8'), language);
 		const relative = path.relative(directory, absolute).replace(/\\/g, '/');
 		if (relative === owner) owned += count;
-		else if (count) errors.push(`${driver}/${relative}: native console access must use the console window owner`);
+		else if (count)
+			errors.push(`${driver}/${relative}: native console access must use the console window owner`);
 	}
 	assert.equal(owned, expected, `${driver} console owner must exercise the native APIs`);
 	const source = fs.readFileSync(path.join(directory, 'ui/console_window.' + language), 'utf8');
-	assert.ok(source.includes('apps.manifest.json') && source.includes('native_windows'),
-		`${driver} console owner must read the shared geometry`);
+	assert.ok(
+		source.includes('apps.manifest.json') && source.includes('native_windows'),
+		`${driver} console owner must read the shared geometry`
+	);
 }
 
 // ---- macOS defer checks --------------------------------------------------
@@ -293,10 +365,14 @@ for (const [id, rel] of Object.entries(MACOS_MODULES)) {
 		errors.push(`macos/${rel}: must resolve geometry via ui_builder.get_app_geometry("${id}")`);
 	}
 	if (/get_centered_frame\(\s*\d/.test(src)) {
-		errors.push(`macos/${rel}: hardcoded numeric size passed to get_centered_frame — must use geo.width/geo.height`);
+		errors.push(
+			`macos/${rel}: hardcoded numeric size passed to get_centered_frame — must use geo.width/geo.height`
+		);
 	}
 	if (/math\.min\(\s*\d+\s*,\s*math\.floor/.test(src)) {
-		errors.push(`macos/${rel}: hardcoded clamp max in math.min(<number>, math.floor(...)) — must use geo.width/geo.height`);
+		errors.push(
+			`macos/${rel}: hardcoded clamp max in math.min(<number>, math.floor(...)) — must use geo.width/geo.height`
+		);
 	}
 }
 
@@ -311,7 +387,9 @@ for (const [id, spec] of Object.entries(WINDOWS_APPS)) {
 	const src = fs.readFileSync(abs, 'utf8');
 	for (const re of spec.checks(m)) {
 		if (!re.test(src)) {
-			errors.push(`windows/${spec.file}: geometry for "${id}" does not match manifest (${m.width}x${m.height}); expected /${re.source}/`);
+			errors.push(
+				`windows/${spec.file}: geometry for "${id}" does not match manifest (${m.width}x${m.height}); expected /${re.source}/`
+			);
 		}
 	}
 }
@@ -320,7 +398,9 @@ for (const [id, spec] of Object.entries(WINDOWS_APPS)) {
 const linuxAbs = path.join(ROOT, SP, 'linux', LINUX_MANAGER);
 const linuxSrc = fs.readFileSync(linuxAbs, 'utf8');
 if (!/apps\.manifest\.json/.test(linuxSrc)) {
-	errors.push(`linux/${LINUX_MANAGER}: must resolve window geometry from _shared/ui/apps.manifest.json`);
+	errors.push(
+		`linux/${LINUX_MANAGER}: must resolve window geometry from _shared/ui/apps.manifest.json`
+	);
 }
 if (!/manifest\.apps\[\s*app_name\s*\]/.test(linuxSrc)) {
 	errors.push(
@@ -339,7 +419,9 @@ for (const [id, m] of Object.entries(apps)) {
 		// fallback's min_height happens to equal paths_editor's height.
 		const re = new RegExp(`(?<![\\w_])${dim}\\s*=\\s*${m[dim]}\\b`);
 		if (re.test(linuxSrc)) {
-			errors.push(`linux/${LINUX_MANAGER}: hardcodes ${dim} ${m[dim]} — that is "${id}"'s manifest value, read it from the manifest`);
+			errors.push(
+				`linux/${LINUX_MANAGER}: hardcodes ${dim} ${m[dim]} — that is "${id}"'s manifest value, read it from the manifest`
+			);
 		}
 	}
 }
@@ -369,13 +451,17 @@ for (const d of DRIVERS) {
 	}
 	for (const id of Object.keys(d.excluded)) {
 		if (!apps[id]) {
-			errors.push(`${d.name}: EXCLUSIONS names "${id}", which is not in apps.manifest.json — stale entry, delete it.`);
+			errors.push(
+				`${d.name}: EXCLUSIONS names "${id}", which is not in apps.manifest.json — stale entry, delete it.`
+			);
 		}
 	}
 }
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] Webview geometry is not single-sourced from apps.manifest.json:\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] Webview geometry is not single-sourced from apps.manifest.json:\x1b[0m'
+	);
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }

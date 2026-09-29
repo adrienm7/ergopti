@@ -43,11 +43,19 @@ const CLEAR_KEY = 'common.clear_to_system';
 // The approved wording, from the product decision that introduced the keys.
 const APPROVED = {
 	[RESTORE_KEY]: { fr: '↺ Restaurer les valeurs conseillées', en: '↺ Restore recommended values' },
-	[CLEAR_KEY]: { fr: '✕ Tout effacer (comportement du système)', en: '✕ Clear all (system behaviour)' }
+	[CLEAR_KEY]: {
+		fr: '✕ Tout effacer (comportement du système)',
+		en: '✕ Clear all (system behaviour)'
+	}
 };
 
 // Row ids that mean "restore the preset" and "clear to system behaviour".
-const RESTORE_IDS = new Set(['restore_recommended', 'restore_defaults', 'reset_defaults', 'scope_restore']);
+const RESTORE_IDS = new Set([
+	'restore_recommended',
+	'restore_defaults',
+	'reset_defaults',
+	'scope_restore'
+]);
 const CLEAR_IDS = new Set(['disable_all', 'clear_to_system', 'scope_clear']);
 
 // Menus that must keep declaring the rows: menu -> [restore rows, clear rows].
@@ -79,9 +87,6 @@ const DRIVER_BUILT_RESETS = [
 
 const errors = [];
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 1/ The manifest ==========================
@@ -101,13 +106,17 @@ for (const [menu, value] of Object.entries(manifest)) {
 			restores += 1;
 			checkedRows += 1;
 			if (row.i18n !== RESTORE_KEY) {
-				errors.push(`${menu}.${row.id} restores a preset but reads "${row.i18n}", not ${RESTORE_KEY}.`);
+				errors.push(
+					`${menu}.${row.id} restores a preset but reads "${row.i18n}", not ${RESTORE_KEY}.`
+				);
 			}
 		} else if (CLEAR_IDS.has(row.id)) {
 			clears += 1;
 			checkedRows += 1;
 			if (row.i18n !== CLEAR_KEY) {
-				errors.push(`${menu}.${row.id} clears to system behaviour but reads "${row.i18n}", not ${CLEAR_KEY}.`);
+				errors.push(
+					`${menu}.${row.id} clears to system behaviour but reads "${row.i18n}", not ${CLEAR_KEY}.`
+				);
 			}
 		}
 	}
@@ -119,11 +128,9 @@ for (const [menu, value] of Object.entries(manifest)) {
 	}
 }
 for (const menu of Object.keys(EXPECTED_ROWS)) {
-	if (!Array.isArray(manifest[menu])) errors.push(`the manifest has no ${menu} — the row scan read nothing there.`);
+	if (!Array.isArray(manifest[menu]))
+		errors.push(`the manifest has no ${menu} — the row scan read nothing there.`);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -132,7 +139,8 @@ for (const menu of Object.keys(EXPECTED_ROWS)) {
 // ==================================================
 
 const localeFiles = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'));
-if (localeFiles.length !== 21) errors.push(`read ${localeFiles.length} locale file(s), expected 21.`);
+if (localeFiles.length !== 21)
+	errors.push(`read ${localeFiles.length} locale file(s), expected 21.`);
 for (const file of localeFiles) {
 	const table = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
 	const loc = file.replace(/\.json$/, '');
@@ -147,9 +155,6 @@ for (const file of localeFiles) {
 		if (table[key] !== undefined) errors.push(`${file} still carries the retired key "${key}".`);
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -184,10 +189,8 @@ let scanned = 0;
 		}
 	}
 })(SP);
-if (scanned < 500) errors.push(`scanned only ${scanned} source file(s) — the source scan is broken.`);
-
-
-
+if (scanned < 500)
+	errors.push(`scanned only ${scanned} source file(s) — the source scan is broken.`);
 
 // ==================================================
 // ==================================================
@@ -195,7 +198,8 @@ if (scanned < 500) errors.push(`scanned only ${scanned} source file(s) — the s
 // ==================================================
 // ==================================================
 
-if (checkedRows < 5) errors.push(`checked ${checkedRows} restore/clear row(s), expected at least 5.`);
+if (checkedRows < 5)
+	errors.push(`checked ${checkedRows} restore/clear row(s), expected at least 5.`);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] Restore / clear rows do not share their two labels:\x1b[0m');

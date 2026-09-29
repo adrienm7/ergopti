@@ -37,9 +37,15 @@ def failure_evidence(report, logs):
 
 def processes(executable):
     """Resolve only the exact executable command belonging to this fixture."""
-    result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=True)
-    return [int(line.strip().split(None, 1)[0]) for line in result.stdout.splitlines()
-            if len(line.strip().split(None, 1)) == 2 and line.strip().split(None, 1)[1] == str(executable)]
+    result = subprocess.run(
+        ["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=True
+    )
+    return [
+        int(line.strip().split(None, 1)[0])
+        for line in result.stdout.splitlines()
+        if len(line.strip().split(None, 1)) == 2
+        and line.strip().split(None, 1)[1] == str(executable)
+    ]
 
 
 def main():
@@ -66,27 +72,44 @@ def main():
     started = time.monotonic()
     try:
         # Finder does not retain an `open -W` helper throughout app startup.
-        result = subprocess.run(["open", "-n", str(app)], capture_output=True, text=True, timeout=10)
-        report["open"] = {"code": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+        result = subprocess.run(
+            ["open", "-n", str(app)], capture_output=True, text=True, timeout=10
+        )
+        report["open"] = {
+            "code": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
         result.check_returncode()
         while time.monotonic() - started < 45:
-            sample = {"seconds": round(time.monotonic() - started, 3),
-                      "launcher": processes(launcher), "hammerspoon": processes(child)}
+            sample = {
+                "seconds": round(time.monotonic() - started, 3),
+                "launcher": processes(launcher),
+                "hammerspoon": processes(child),
+            }
             report["samples"].append(sample)
             log = launcher_log.read_text(encoding="utf-8") if launcher_log.exists() else ""
             if "FATAL:" in log:
                 raise RuntimeError("Published application reported a fatal startup failure")
-            if sample["seconds"] >= 10 and (len(sample["launcher"]) != 1 or len(sample["hammerspoon"]) != 1):
+            if sample["seconds"] >= 10 and (
+                len(sample["launcher"]) != 1 or len(sample["hammerspoon"]) != 1
+            ):
                 raise RuntimeError("Published application did not retain both exact processes")
             time.sleep(1)
-        text = "\n".join(path.read_text(encoding="utf-8") for path in logs.glob("ErgoptiPlus_*.log"))
+        text = "\n".join(
+            path.read_text(encoding="utf-8") for path in logs.glob("ErgoptiPlus_*.log")
+        )
         report["startup_ready"] = require_startup_ready(text)
         report["survived_observation"] = True
     except Exception as error:
         report["error"] = f"{type(error).__name__}: {error}"
     finally:
         try:
-            screenshot = subprocess.run(["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=10)
+            screenshot = subprocess.run(
+                ["screencapture", "-x", str(output / "desktop.png")],
+                capture_output=True,
+                timeout=10,
+            )
             report["screenshot_exit"] = screenshot.returncode
         except subprocess.TimeoutExpired:
             report["screenshot_error"] = "Screenshot timed out"

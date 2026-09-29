@@ -102,7 +102,9 @@ allFiles.forEach(auditFile);
 
 // The frequency rows build their key from the shared presets, so the keys come
 // from the same list the drivers read instead of a copy of it.
-const updaterDefaults = JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'));
+const updaterDefaults = JSON.parse(
+	fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8')
+);
 const frequencyKeys = updaterDefaults.timing.check_interval_presets.map(
 	(preset) => `menu.about.frequency.${preset.code}`
 );
@@ -113,7 +115,7 @@ if (frequencyKeys.length === 0) {
 
 const REQUIRED_DYNAMIC_KEYS = [...frequencyKeys, 'menu.layout.no_bundle'];
 
-REQUIRED_DYNAMIC_KEYS.forEach(key => {
+REQUIRED_DYNAMIC_KEYS.forEach((key) => {
 	if (!availableKeys.has(key)) {
 		if (!missingKeys.has(key)) missingKeys.set(key, []);
 		missingKeys.get(key).push('Dynamic key check');

@@ -70,11 +70,31 @@ let bridge = '';
 let index = '';
 let host = '';
 let menu = '';
-try { script = read(SCRIPT); } catch (err) { check('script.js readable at shared path', false, err.message); }
-try { bridge = read(HOST_BRIDGE); } catch (err) { check('host_bridge.js readable', false, err.message); }
-try { index = read(INDEX); } catch (err) { check('index.html readable at shared path', false, err.message); }
-try { host = read(WIN_HOST); } catch (err) { check('Windows host readable', false, err.message); }
-try { menu = read(WIN_MENU); } catch (err) { check('Windows menu_profiles readable', false, err.message); }
+try {
+	script = read(SCRIPT);
+} catch (err) {
+	check('script.js readable at shared path', false, err.message);
+}
+try {
+	bridge = read(HOST_BRIDGE);
+} catch (err) {
+	check('host_bridge.js readable', false, err.message);
+}
+try {
+	index = read(INDEX);
+} catch (err) {
+	check('index.html readable at shared path', false, err.message);
+}
+try {
+	host = read(WIN_HOST);
+} catch (err) {
+	check('Windows host readable', false, err.message);
+}
+try {
+	menu = read(WIN_MENU);
+} catch (err) {
+	check('Windows menu_profiles readable', false, err.message);
+}
 
 // 0. Escape closes the placeholder suggestions without cancelling the editor.
 // The page-wide keydown listener cancels on Escape; the editor's own listener
@@ -82,8 +102,10 @@ try { menu = read(WIN_MENU); } catch (err) { check('Windows menu_profiles readab
 // every edit.
 {
 	const editorHandler = script.slice(script.indexOf("editorElement.addEventListener('keydown'"));
-	const escapeBranch = editorHandler.slice(editorHandler.indexOf("if (e.key === 'Escape') {"),
-		editorHandler.indexOf("if (e.key === 'Escape') {") + 400);
+	const escapeBranch = editorHandler.slice(
+		editorHandler.indexOf("if (e.key === 'Escape') {"),
+		editorHandler.indexOf("if (e.key === 'Escape') {") + 400
+	);
 	check(
 		'dismissing the suggestions with Escape does not reach the page-wide cancel',
 		escapeBranch.includes('hideAc()') && escapeBranch.includes('e.stopPropagation()'),

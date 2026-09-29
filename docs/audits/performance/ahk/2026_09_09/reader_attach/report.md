@@ -40,13 +40,13 @@ resident copy implementation, equivalent to the previous worker admission
 mechanism. QPC surrounds the actual `KLR_CacheAttach` call, including validation.
 Peak working set is the native process lifetime peak, not total system memory.
 
-| Sample | Copy admission (ms) | Read-only admission (ms) |
-| --- | ---: | ---: |
-| 1 | 1188.8583 | 3.9900 |
-| 2 | 1251.7872 | 3.5490 |
-| 3 | 1258.1895 | 3.8162 |
-| Median | 1251.7872 | 3.8162 |
-| Maximum | 1258.1895 | 3.9900 |
+| Sample  | Copy admission (ms) | Read-only admission (ms) |
+| ------- | ------------------: | -----------------------: |
+| 1       |           1188.8583 |                   3.9900 |
+| 2       |           1251.7872 |                   3.5490 |
+| 3       |           1258.1895 |                   3.8162 |
+| Median  |           1251.7872 |                   3.8162 |
+| Maximum |           1258.1895 |                   3.9900 |
 
 Copy peak working sets were 803,667,968; 803,667,968; and 803,639,296 bytes.
 Read-only peaks were 16,838,656; 16,830,464; and 16,842,752 bytes.

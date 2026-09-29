@@ -40,7 +40,12 @@
 const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
-const { loadContext, loadLayers, formatResolution, RECOMMENDED_PATH } = require('../lib/keymap-layers.cjs');
+const {
+	loadContext,
+	loadLayers,
+	formatResolution,
+	RECOMMENDED_PATH
+} = require('../lib/keymap-layers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -57,7 +62,9 @@ const fail = (msg) => errors.push(msg);
 
 function report() {
 	if (errors.length > 0) {
-		console.error('\x1b[31m[FAIL] the recommended navigation layer does not reproduce the Windows layer:\x1b[0m');
+		console.error(
+			'\x1b[31m[FAIL] the recommended navigation layer does not reproduce the Windows layer:\x1b[0m'
+		);
 		for (const e of errors) console.error('    - ' + e);
 		process.exit(1);
 	}
@@ -75,10 +82,6 @@ report();
 const ctx = loadContext();
 const keys = ctx.registry.keys;
 
-
-
-
-
 // ==========================================
 // ==========================================
 // ======= 1/ Read the frozen layer =========
@@ -88,7 +91,11 @@ const keys = ctx.registry.keys;
 /** Maps an AHK hotkey label to the physical key it fires on. */
 function labelToCode(label) {
 	// `A & ~B` fires on B; `*`, `~` and `$` are prefix options, not key names.
-	const name = label.split('&').pop().trim().replace(/^[*~$]+/, '');
+	const name = label
+		.split('&')
+		.pop()
+		.trim()
+		.replace(/^[*~$]+/, '');
 	const hits = Object.keys(keys).filter((code) => {
 		const k = keys[code];
 		return k.ahk === name || (k.ahk_send && k.ahk_send.toLowerCase() === name.toLowerCase());
@@ -98,7 +105,9 @@ function labelToCode(label) {
 
 /** Maps an AHK Send key name to a registry code. */
 function sendNameToCode(name) {
-	const hits = Object.keys(keys).filter((code) => keys[code].ahk_send && keys[code].ahk_send.toLowerCase() === name.toLowerCase());
+	const hits = Object.keys(keys).filter(
+		(code) => keys[code].ahk_send && keys[code].ahk_send.toLowerCase() === name.toLowerCase()
+	);
 	return hits.length === 1 ? hits[0] : null;
 }
 
@@ -140,7 +149,8 @@ function sendToCanonical(send, where) {
 /** Turns one golden action into the canonical behaviour string. */
 function actionToCanonical(action, where) {
 	if (action.startsWith('send:')) return sendToCanonical(action.slice(5), where);
-	if (/^repeat_count:\d+$/.test(action) || /^call:[a-z_]+$/.test(action) || action === 'none') return action;
+	if (/^repeat_count:\d+$/.test(action) || /^call:[a-z_]+$/.test(action) || action === 'none')
+		return action;
 	fail(`${where}: unrecognised golden action "${action}"`);
 	return null;
 }
@@ -150,7 +160,8 @@ const golden = JSON.parse(fs.readFileSync(GOLDEN_PATH, 'utf8'));
 const windowsLayer = new Map();
 for (const [index, row] of (Array.isArray(golden.rows) ? golden.rows : []).entries()) {
 	const where = `nav_layer_golden.json row ${index + 1} (${row.hotkey})`;
-	if (!CRITERIA.has(row.criterion)) fail(`${where}: criterion "${row.criterion}" is not ${[...CRITERIA].join(' or ')}`);
+	if (!CRITERIA.has(row.criterion))
+		fail(`${where}: criterion "${row.criterion}" is not ${[...CRITERIA].join(' or ')}`);
 	const behaviour = actionToCanonical(String(row.action), where);
 	if (behaviour === null) continue;
 	const code = labelToCode(String(row.hotkey));
@@ -159,14 +170,15 @@ for (const [index, row] of (Array.isArray(golden.rows) ? golden.rows : []).entri
 		continue;
 	}
 	if (windowsLayer.has(code) && windowsLayer.get(code) !== behaviour)
-		fail(`${where}: ${code} is bound twice with different behaviours (${windowsLayer.get(code)} vs ${behaviour})`);
+		fail(
+			`${where}: ${code} is bound twice with different behaviours (${windowsLayer.get(code)} vs ${behaviour})`
+		);
 	windowsLayer.set(code, behaviour);
 }
-if (windowsLayer.size < MIN_GOLDEN_KEYS) fail(`only ${windowsLayer.size} keys read from the frozen Windows layer (floor ${MIN_GOLDEN_KEYS})`);
-
-
-
-
+if (windowsLayer.size < MIN_GOLDEN_KEYS)
+	fail(
+		`only ${windowsLayer.size} keys read from the frozen Windows layer (floor ${MIN_GOLDEN_KEYS})`
+	);
 
 // ===============================================
 // ===============================================
@@ -200,7 +212,9 @@ const SPECIAL_CASES = [
 // AutoHotkey sources carry a UTF-8 BOM; drop it before the first label is read.
 const BOM = String.fromCharCode(0xfeff);
 const ahkSource = fs.readFileSync(NAV_LAYER_AHK, 'utf8');
-const lines = (ahkSource.startsWith(BOM) ? ahkSource.slice(1) : ahkSource).split(/\r?\n/).map(stripComment);
+const lines = (ahkSource.startsWith(BOM) ? ahkSource.slice(1) : ahkSource)
+	.split(/\r?\n/)
+	.map(stripComment);
 const specialSeen = new Set();
 let condition = null;
 let hotkeys = 0;
@@ -222,23 +236,31 @@ for (let i = 0; i < lines.length; i++) {
 	hotkeys += 1;
 	const label = hot[1].trim();
 	const special = SPECIAL_CASES.find((s) => condition && condition.includes(s.token));
-	if (!special) fail(`nav_layer.ahk:${i + 1}: hotkey ${label} under "${condition || 'no condition'}" — the layer's bindings live in layers.toml now`);
-	else if (label !== special.label) fail(`nav_layer.ahk:${i + 1}: the ${special.token} special case now covers ${label}`);
+	if (!special)
+		fail(
+			`nav_layer.ahk:${i + 1}: hotkey ${label} under "${condition || 'no condition'}" — the layer's bindings live in layers.toml now`
+		);
+	else if (label !== special.label)
+		fail(`nav_layer.ahk:${i + 1}: the ${special.token} special case now covers ${label}`);
 	else specialSeen.add(special.token);
 }
-for (const s of SPECIAL_CASES) if (!specialSeen.has(s.token)) fail(`the ${s.token} special case was not found in nav_layer.ahk — the parser or the file changed`);
-if (hotkeys !== SPECIAL_CASES.length) fail(`nav_layer.ahk declares ${hotkeys} hotkey(s); only the ${SPECIAL_CASES.length} activation fixes belong there`);
+for (const s of SPECIAL_CASES)
+	if (!specialSeen.has(s.token))
+		fail(
+			`the ${s.token} special case was not found in nav_layer.ahk — the parser or the file changed`
+		);
+if (hotkeys !== SPECIAL_CASES.length)
+	fail(
+		`nav_layer.ahk declares ${hotkeys} hotkey(s); only the ${SPECIAL_CASES.length} activation fixes belong there`
+	);
 
 // The table is registered at boot from the root of the configuration folder,
 // where layers.toml lives on every OS. Without this one top-level call the
 // Windows layer binds nothing while every table test stays green.
 const INIT_CALL = 'NavLayer_Init(_SharedDir, _ConfigDir)';
 const initCalls = lines.filter((line) => line.trimEnd() === INIT_CALL).length;
-if (initCalls !== 1) fail(`nav_layer.ahk must call ${INIT_CALL} once at the top level, found ${initCalls}`);
-
-
-
-
+if (initCalls !== 1)
+	fail(`nav_layer.ahk must call ${INIT_CALL} once at the top level, found ${initCalls}`);
 
 // ==========================================
 // ==========================================
@@ -251,17 +273,25 @@ const perOs = {};
 for (const os of ctx.platforms) {
 	const r = loadLayers(recommendedText, os, ctx);
 	perOs[os] = r;
-	for (const e of r.errors) fail(`layers.recommended.toml on ${os}: ${e.code} ${e.layer || ''}.${e.section || ''}.${e.key || ''} — ${e.detail}`);
+	for (const e of r.errors)
+		fail(
+			`layers.recommended.toml on ${os}: ${e.code} ${e.layer || ''}.${e.section || ''}.${e.key || ''} — ${e.detail}`
+		);
 }
 
 const nav = (perOs.windows.layers || {}).nav || {};
 const recommended = new Map(Object.entries(nav).map(([code, r]) => [code, formatResolution(r)]));
 for (const [code, behaviour] of windowsLayer) {
-	if (!recommended.has(code)) fail(`${code}: Windows did ${behaviour}, the recommended layer leaves it unbound`);
-	else if (recommended.get(code) !== behaviour) fail(`${code}: Windows did ${behaviour}, the recommended layer does ${recommended.get(code)}`);
+	if (!recommended.has(code))
+		fail(`${code}: Windows did ${behaviour}, the recommended layer leaves it unbound`);
+	else if (recommended.get(code) !== behaviour)
+		fail(`${code}: Windows did ${behaviour}, the recommended layer does ${recommended.get(code)}`);
 }
 for (const [code, behaviour] of recommended) {
-	if (!windowsLayer.has(code)) fail(`${code}: the recommended layer does ${behaviour} on Windows, the hand-written layer did not bind it`);
+	if (!windowsLayer.has(code))
+		fail(
+			`${code}: the recommended layer does ${behaviour} on Windows, the hand-written layer did not bind it`
+		);
 }
 
 // The hold picker offers exactly the layers the preset defines, and the
@@ -270,11 +300,16 @@ for (const [code, behaviour] of recommended) {
 const tapHold = TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS, 'utf8')).tap_hold || {};
 const pickerLayers = [...((tapHold.hold_picker || {}).layers || [])].sort();
 if (tapHold.layers !== undefined)
-	fail('_shared/tap_hold/defaults.toml declares [tap_hold.layers.*]: layer bindings live in _shared/keymap/layers.recommended.toml, and a second copy matches no driver');
+	fail(
+		'_shared/tap_hold/defaults.toml declares [tap_hold.layers.*]: layer bindings live in _shared/keymap/layers.recommended.toml, and a second copy matches no driver'
+	);
 const presetLayers = Object.keys(perOs.windows.layers || {}).sort();
-if (pickerLayers.length === 0) fail('[tap_hold.hold_picker].layers could not be read from _shared/tap_hold/defaults.toml');
+if (pickerLayers.length === 0)
+	fail('[tap_hold.hold_picker].layers could not be read from _shared/tap_hold/defaults.toml');
 if (JSON.stringify(pickerLayers) !== JSON.stringify(presetLayers))
-	fail(`the hold picker offers layers ${JSON.stringify(pickerLayers)} but the recommended file defines ${JSON.stringify(presetLayers)}`);
+	fail(
+		`the hold picker offers layers ${JSON.stringify(pickerLayers)} but the recommended file defines ${JSON.stringify(presetLayers)}`
+	);
 
 report();
 console.log(

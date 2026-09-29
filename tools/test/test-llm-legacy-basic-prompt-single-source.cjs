@@ -28,7 +28,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 const LEGACY_IDS_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/legacy_ids.json');
 const PROFILES_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/profiles.json');
-const GENERATED_AHK = path.join(ROOT, 'static/ergopti_plus/windows/_generated/llm_profiles_data.ahk');
+const GENERATED_AHK = path.join(
+	ROOT,
+	'static/ergopti_plus/windows/_generated/llm_profiles_data.ahk'
+);
 const PROFILES_AHK = path.join(ROOT, 'static/ergopti_plus/windows/modules/llm/profiles.ahk');
 const PROFILES_LUA = path.join(ROOT, 'static/ergopti_plus/macos/modules/llm/profiles.lua');
 
@@ -79,7 +82,10 @@ test(
 	`legacy_ids.json = ${JSON.stringify(legacyIds)}`
 );
 
-test('profiles.json has a "basic" profile with a non-empty system_single', !!(basicProfile && basicProfile.system_single));
+test(
+	'profiles.json has a "basic" profile with a non-empty system_single',
+	!!(basicProfile && basicProfile.system_single)
+);
 
 // --- Generated AHK legacy map matches legacy_ids.json exactly ---
 for (const [oldId, newId] of Object.entries(legacyIds)) {

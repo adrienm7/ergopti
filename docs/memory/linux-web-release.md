@@ -240,6 +240,7 @@ text (headers, body and URL now go through `--config -`). Remote API keys
 live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
 possibly-synced config folder. Action: keep both live steps green for any
 change to the injector, the engine, the parser or the HTTP client.
+
 ### project-ergopti-xcompose-chained-dead-keys-are-unreachable
 
 The committed Ergopti XCompose files name a dead key pressed inside a dead-key

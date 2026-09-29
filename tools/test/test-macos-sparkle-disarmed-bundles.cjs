@@ -32,7 +32,10 @@ const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
-const buildScript = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+const buildScript = fs.readFileSync(
+	path.join(root, 'tools', 'build', 'build_macos_app.sh'),
+	'utf8'
+);
 const errors = [];
 
 /**
@@ -50,19 +53,23 @@ function shellFunction(name) {
 // Every bundle that must never update itself, with the variable naming its plist.
 const DISARMED_BUNDLES = [
 	{ owner: 'assemble_app', plist: '$hs_plist', label: 'embedded Hammerspoon.app' },
-	{ owner: 'build_native_helper', plist: '$plist', label: 'Git-checkout native helper' },
+	{ owner: 'build_native_helper', plist: '$plist', label: 'Git-checkout native helper' }
 ];
 
 const disarm = shellFunction('disarm_bundle_sparkle');
 if (!disarm) {
-	errors.push('build_macos_app.sh must define disarm_bundle_sparkle for bundles that must not update themselves');
+	errors.push(
+		'build_macos_app.sh must define disarm_bundle_sparkle for bundles that must not update themselves'
+	);
 }
 for (const bundle of DISARMED_BUNDLES) {
 	const body = shellFunction(bundle.owner);
 	if (!body) {
 		errors.push(`build_macos_app.sh no longer defines ${bundle.owner}`);
 	} else if (!body.includes(`disarm_bundle_sparkle "${bundle.plist}"`)) {
-		errors.push(`${bundle.owner} must disarm the Sparkle of the ${bundle.label} through disarm_bundle_sparkle`);
+		errors.push(
+			`${bundle.owner} must disarm the Sparkle of the ${bundle.label} through disarm_bundle_sparkle`
+		);
 	}
 }
 
@@ -71,7 +78,11 @@ for (const bundle of DISARMED_BUNDLES) {
 // failed edit shipped.
 const outside = buildScript.replace(disarm, '');
 for (const line of outside.split('\n')) {
-	if (/^\s*plutil\b.*\bSU(?:FeedURL|ScheduledCheckInterval|EnableAutomaticChecks|AllowsAutomaticUpdates)\b/.test(line)) {
+	if (
+		/^\s*plutil\b.*\bSU(?:FeedURL|ScheduledCheckInterval|EnableAutomaticChecks|AllowsAutomaticUpdates)\b/.test(
+			line
+		)
+	) {
 		errors.push(`Sparkle keys must be edited only by disarm_bundle_sparkle, found: ${line.trim()}`);
 	}
 	if (/^\s*plutil\b.*\|\|\s*true\b/.test(line)) {
@@ -106,7 +117,7 @@ const PLUTIL_DOUBLE = [
 	'			printf \'%s\\n\' "${line#*=}" ;;',
 	'		*) return 2 ;;',
 	'	esac',
-	'}',
+	'}'
 ].join('\n');
 
 // Hammerspoon 1.1.1's Hammerspoon-Info.plist declares exactly these Sparkle keys.
@@ -114,7 +125,7 @@ const HAMMERSPOON_1_1_1_SPARKLE = [
 	'CFBundleIdentifier=com.ergoptiplus.app.hammerspoon',
 	'SUEnableAutomaticChecks=true',
 	'SUFeedURL=https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/appcast.xml',
-	'SUScheduledCheckInterval=21600',
+	'SUScheduledCheckInterval=21600'
 ];
 
 const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
@@ -133,21 +144,33 @@ function runDisarm(entries, env = {}) {
 		const plistPath = path.join(dir, 'Info.plist');
 		const scriptPath = path.join(dir, 'disarm.sh');
 		fs.writeFileSync(plistPath, entries.map((entry) => `${entry}\n`).join(''));
-		fs.writeFileSync(scriptPath, [
-			'set -euo pipefail',
-			'fail() { printf \'%s\\n\' "$*" >&2; exit 1; }',
-			PLUTIL_DOUBLE,
-			disarm,
-			'disarm_bundle_sparkle "$1${MISSING_PLIST:+.missing}"',
-			'',
-		].join('\n'));
+		fs.writeFileSync(
+			scriptPath,
+			[
+				'set -euo pipefail',
+				'fail() { printf \'%s\\n\' "$*" >&2; exit 1; }',
+				PLUTIL_DOUBLE,
+				disarm,
+				'disarm_bundle_sparkle "$1${MISSING_PLIST:+.missing}"',
+				''
+			].join('\n')
+		);
 		const run = spawnSync(bash, [toPosix(scriptPath), toPosix(plistPath)], {
 			encoding: 'utf8',
-			env: { ...process.env, ...env },
+			env: { ...process.env, ...env }
 		});
-		const plist = new Map(fs.readFileSync(plistPath, 'utf8').split('\n').filter(Boolean)
-			.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-		return { status: run.status, stderr: `${run.stderr ?? ''}${run.error ? run.error.message : ''}`, plist };
+		const plist = new Map(
+			fs
+				.readFileSync(plistPath, 'utf8')
+				.split('\n')
+				.filter(Boolean)
+				.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+		);
+		return {
+			status: run.status,
+			stderr: `${run.stderr ?? ''}${run.error ? run.error.message : ''}`,
+			plist
+		};
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
@@ -156,27 +179,35 @@ function runDisarm(entries, env = {}) {
 if (disarm) {
 	const disarmed = runDisarm(HAMMERSPOON_1_1_1_SPARKLE);
 	if (disarmed.status !== 0) {
-		errors.push(`disarm_bundle_sparkle refused Hammerspoon 1.1.1's Sparkle keys: ${disarmed.stderr.trim()}`);
+		errors.push(
+			`disarm_bundle_sparkle refused Hammerspoon 1.1.1's Sparkle keys: ${disarmed.stderr.trim()}`
+		);
 	} else {
 		for (const key of ['SUEnableAutomaticChecks', 'SUAllowsAutomaticUpdates']) {
 			if (disarmed.plist.get(key) !== 'false') {
-				errors.push(`a disarmed bundle must declare ${key} false, found ${disarmed.plist.get(key)}`);
+				errors.push(
+					`a disarmed bundle must declare ${key} false, found ${disarmed.plist.get(key)}`
+				);
 			}
 		}
 		for (const key of ['SUFeedURL', 'SUScheduledCheckInterval']) {
 			if (disarmed.plist.has(key)) errors.push(`a disarmed bundle must not declare ${key}`);
 		}
 		if (disarmed.plist.get('CFBundleIdentifier') !== 'com.ergoptiplus.app.hammerspoon') {
-			errors.push('disarm_bundle_sparkle must leave keys other than Sparkle\'s untouched');
+			errors.push("disarm_bundle_sparkle must leave keys other than Sparkle's untouched");
 		}
 	}
 
 	// Absence is the goal: a bundle that never declared the feed or the check
 	// interval is disarmed for that key, and must still get both switches off.
 	for (const absent of ['SUFeedURL', 'SUScheduledCheckInterval']) {
-		const without = runDisarm(HAMMERSPOON_1_1_1_SPARKLE.filter((entry) => !entry.startsWith(`${absent}=`)));
+		const without = runDisarm(
+			HAMMERSPOON_1_1_1_SPARKLE.filter((entry) => !entry.startsWith(`${absent}=`))
+		);
 		if (without.status !== 0) {
-			errors.push(`disarm_bundle_sparkle must accept a bundle that declares no ${absent}: ${without.stderr.trim()}`);
+			errors.push(
+				`disarm_bundle_sparkle must accept a bundle that declares no ${absent}: ${without.stderr.trim()}`
+			);
 			continue;
 		}
 		for (const key of ['SUEnableAutomaticChecks', 'SUAllowsAutomaticUpdates']) {
@@ -185,23 +216,30 @@ if (disarm) {
 			}
 		}
 		for (const key of ['SUFeedURL', 'SUScheduledCheckInterval']) {
-			if (without.plist.has(key)) errors.push(`without ${absent}, a disarmed bundle must not declare ${key}`);
+			if (without.plist.has(key))
+				errors.push(`without ${absent}, a disarmed bundle must not declare ${key}`);
 		}
 	}
 
 	const unchanged = runDisarm(HAMMERSPOON_1_1_1_SPARKLE, { IGNORE_REPLACE: '1' });
 	if (unchanged.status === 0) {
-		errors.push('disarm_bundle_sparkle must read each switch back and fail when an edit did not apply');
+		errors.push(
+			'disarm_bundle_sparkle must read each switch back and fail when an edit did not apply'
+		);
 	}
 
 	const kept = runDisarm(HAMMERSPOON_1_1_1_SPARKLE, { IGNORE_REMOVE: '1' });
 	if (kept.status === 0) {
-		errors.push('disarm_bundle_sparkle must read the feed back and fail when its removal did not apply');
+		errors.push(
+			'disarm_bundle_sparkle must read the feed back and fail when its removal did not apply'
+		);
 	}
 
 	const unreadable = runDisarm(HAMMERSPOON_1_1_1_SPARKLE, { MISSING_PLIST: '1' });
 	if (unreadable.status === 0) {
-		errors.push('disarm_bundle_sparkle must fail on a plist it cannot read, not treat every key as absent');
+		errors.push(
+			'disarm_bundle_sparkle must fail on a plist it cannot read, not treat every key as absent'
+		);
 	}
 }
 
@@ -210,4 +248,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('[OK] the embedded Hammerspoon and the native helper cannot update themselves through Sparkle.');
+console.log(
+	'[OK] the embedded Hammerspoon and the native helper cannot update themselves through Sparkle.'
+);

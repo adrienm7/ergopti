@@ -38,13 +38,28 @@ const FIX = process.argv.includes('--fix');
 
 // Source trees to validate, and the file extensions that carry a path header.
 const TREES = [
-	'windows/infra', 'windows/modules', 'windows/platform', 'windows/ui', 'windows/adapters',
-	'macos/infra', 'macos/modules', 'macos/platform', 'macos/ui', 'macos/adapters',
-	'linux/modules', 'linux/adapters', 'linux/infra', 'linux/bin', 'linux/ui',
+	'windows/infra',
+	'windows/modules',
+	'windows/platform',
+	'windows/ui',
+	'windows/adapters',
+	'macos/infra',
+	'macos/modules',
+	'macos/platform',
+	'macos/ui',
+	'macos/adapters',
+	'linux/modules',
+	'linux/adapters',
+	'linux/infra',
+	'linux/bin',
+	'linux/ui',
 	// _shared/core (the port specs) and _shared/modules were outside the audit,
 	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)
 	// where every other tree under _shared/ uses the BASE-relative form.
-	'_shared/lua', '_shared/ui', '_shared/core', '_shared/modules'
+	'_shared/lua',
+	'_shared/ui',
+	'_shared/core',
+	'_shared/modules'
 ];
 const EXTS = new Set(['.ahk', '.lua', '.js', '.cjs', '.mjs', '.py', '.sh', '.swift', '.toml']);
 const SKIP_DIR = new Set(['tests', 'vendor', '_generated', 'node_modules']);
@@ -81,7 +96,11 @@ function expectedRel(absPosix) {
 
 function walk(dir, out = []) {
 	let entries;
-	try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+	try {
+		entries = fs.readdirSync(dir, { withFileTypes: true });
+	} catch {
+		return out;
+	}
 	for (const e of entries) {
 		if (e.isDirectory()) {
 			if (!SKIP_DIR.has(e.name) && !e.name.endsWith('.app')) walk(path.join(dir, e.name), out);
@@ -154,7 +173,8 @@ for (const tree of TREES) {
 
 		mismatches.push({
 			abs: path.relative(ROOT, abs).replace(/\\/g, '/'),
-			actual: body, expected: rel
+			actual: body,
+			expected: rel
 		});
 
 		if (FIX) {
@@ -169,16 +189,22 @@ for (const tree of TREES) {
 }
 
 for (const m of mismatches) {
-	console.log(`${FIX ? 'FIXED' : 'STALE'}  ${m.abs}\n   header: ${m.actual}\n   expect: ${m.expected}`);
+	console.log(
+		`${FIX ? 'FIXED' : 'STALE'}  ${m.abs}\n   header: ${m.actual}\n   expect: ${m.expected}`
+	);
 }
 for (const m of missing) {
 	console.log(`MISSING ${m.abs}\n   first comment is not a path header: ${m.line}`);
 }
 
-console.log(`\nChecked ${checked} file(s): ${mismatches.length} ${FIX ? 'fixed' : 'stale'}, ${missing.length} missing/unrecognized.`);
+console.log(
+	`\nChecked ${checked} file(s): ${mismatches.length} ${FIX ? 'fixed' : 'stale'}, ${missing.length} missing/unrecognized.`
+);
 
 if (!FIX && (mismatches.length > 0 || missing.length > 0)) {
-	console.error('\x1b[31m[ERROR] File-path headers diverge from convention 3. Run: node tools/lint/audit-file-headers.cjs --fix\x1b[0m');
+	console.error(
+		'\x1b[31m[ERROR] File-path headers diverge from convention 3. Run: node tools/lint/audit-file-headers.cjs --fix\x1b[0m'
+	);
 	process.exit(1);
 }
 if (mismatches.length === 0 && missing.length === 0) {

@@ -42,7 +42,8 @@ var LayerModel = (function () {
 
 	// The layer-file format, as tools/lib/keymap-layers.cjs states it.
 	const CONTROL_CHARACTER = /[\u0000-\u0008\u000A-\u001F\u007F]/;
-	const TABLE_HEADER = /^\[[ \t]*([A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*)[ \t]*\][ \t]*(?:#.*)?$/;
+	const TABLE_HEADER =
+		/^\[[ \t]*([A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*)[ \t]*\][ \t]*(?:#.*)?$/;
 	const KEY_VALUE = /^(?:([A-Za-z0-9_-]+)|"((?:[^"\\]|\\.)*)"|'([^']*)')[ \t]*=[ \t]*(.*)$/;
 	const BASIC_STRING_VALUE = /^"((?:[^"\\]|\\.)*)"[ \t]*(?:#.*)?$/;
 	const LITERAL_STRING_VALUE = /^'([^']*)'[ \t]*(?:#.*)?$/;
@@ -114,9 +115,30 @@ var LayerModel = (function () {
 
 	// Legends that follow the OS's own keycaps.
 	const OS_LEGENDS = {
-		windows: { ControlLeft: 'Ctrl', ControlRight: 'Ctrl', AltLeft: 'Alt', AltRight: 'AltGr', MetaLeft: 'Win', MetaRight: 'Win' },
-		macos: { ControlLeft: '⌃', ControlRight: '⌃', AltLeft: '⌥', AltRight: '⌥', MetaLeft: '⌘', MetaRight: '⌘' },
-		linux: { ControlLeft: 'Ctrl', ControlRight: 'Ctrl', AltLeft: 'Alt', AltRight: 'AltGr', MetaLeft: 'Super', MetaRight: 'Super' }
+		windows: {
+			ControlLeft: 'Ctrl',
+			ControlRight: 'Ctrl',
+			AltLeft: 'Alt',
+			AltRight: 'AltGr',
+			MetaLeft: 'Win',
+			MetaRight: 'Win'
+		},
+		macos: {
+			ControlLeft: '⌃',
+			ControlRight: '⌃',
+			AltLeft: '⌥',
+			AltRight: '⌥',
+			MetaLeft: '⌘',
+			MetaRight: '⌘'
+		},
+		linux: {
+			ControlLeft: 'Ctrl',
+			ControlRight: 'Ctrl',
+			AltLeft: 'Alt',
+			AltRight: 'AltGr',
+			MetaLeft: 'Super',
+			MetaRight: 'Super'
+		}
 	};
 
 	// Modifier names in a chord, and what joins them, as each OS writes them.
@@ -129,10 +151,6 @@ var LayerModel = (function () {
 
 	const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 	const isTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-
-
-
-
 
 	// ==============================
 	// ======= 2/ File reader =======
@@ -160,9 +178,14 @@ var LayerModel = (function () {
 			}
 			const width = next === 'u' ? 4 : next === 'U' ? 8 : 0;
 			const hex = contents.slice(i + 2, i + 2 + width);
-			if (width === 0 || hex.length !== width || /[^0-9A-Fa-f]/.test(hex)) throw new Error(`"\\${next}" is not a TOML escape`);
+			if (width === 0 || hex.length !== width || /[^0-9A-Fa-f]/.test(hex))
+				throw new Error(`"\\${next}" is not a TOML escape`);
 			const code = parseInt(hex, 16);
-			if (code === 0 || code > MAX_UNICODE_SCALAR || (code >= SURROGATE_FIRST && code <= SURROGATE_LAST))
+			if (
+				code === 0 ||
+				code > MAX_UNICODE_SCALAR ||
+				(code >= SURROGATE_FIRST && code <= SURROGATE_LAST)
+			)
 				throw new Error(`"\\${next}${hex}" is not a character a layer file can hold`);
 			out += String.fromCodePoint(code);
 			i += 1 + width;
@@ -186,12 +209,15 @@ var LayerModel = (function () {
 		m = INTEGER_VALUE.exec(text);
 		if (m) {
 			const digits = m[1].replace(/[+_-]/g, '');
-			if (digits.length > MAX_INTEGER_DIGITS) throw new Error(`an integer has at most ${MAX_INTEGER_DIGITS} digits`);
+			if (digits.length > MAX_INTEGER_DIGITS)
+				throw new Error(`an integer has at most ${MAX_INTEGER_DIGITS} digits`);
 			return Number(m[1].replace(/_/g, ''));
 		}
 		m = FLOAT_VALUE.exec(text);
 		if (m) return Number(m[1]);
-		throw new Error('a value is a one-line string, true, false, a decimal integer or a decimal float');
+		throw new Error(
+			'a value is a one-line string, true, false, a decimal integer or a decimal float'
+		);
 	}
 
 	/**
@@ -212,20 +238,33 @@ var LayerModel = (function () {
 			const where = `line ${index + 1}`;
 			let line = lines[index];
 			if (line.endsWith('\r')) line = line.slice(0, -1);
-			if (CONTROL_CHARACTER.test(line)) return { root: null, problem: `${where}: control characters other than tab are not allowed` };
+			if (CONTROL_CHARACTER.test(line))
+				return {
+					root: null,
+					problem: `${where}: control characters other than tab are not allowed`
+				};
 			line = line.replace(/^[ \t]+|[ \t]+$/g, '');
 			if (line === '' || line.startsWith('#')) continue;
 			if (line.startsWith('[')) {
 				const header = TABLE_HEADER.exec(line);
-				if (!header) return { root: null, problem: `${where}: a table header names bare keys only, like [layers.nav.all]` };
+				if (!header)
+					return {
+						root: null,
+						problem: `${where}: a table header names bare keys only, like [layers.nav.all]`
+					};
 				const segments = header[1].split('.').map((s) => s.trim());
 				let node = rootTable;
 				for (let depth = 0; depth < segments.length; depth++) {
 					const path = JSON.stringify(segments.slice(0, depth + 1));
 					const kind = kinds.get(path);
-					if (kind === 'value') return { root: null, problem: `${where}: "${segments[depth]}" is already a value, not a table` };
+					if (kind === 'value')
+						return {
+							root: null,
+							problem: `${where}: "${segments[depth]}" is already a value, not a table`
+						};
 					if (depth === segments.length - 1) {
-						if (kind === 'table') return { root: null, problem: `${where}: this table is defined twice` };
+						if (kind === 'table')
+							return { root: null, problem: `${where}: this table is defined twice` };
 						kinds.set(path, 'table');
 					} else if (kind === undefined) {
 						kinds.set(path, 'implicit');
@@ -238,11 +277,20 @@ var LayerModel = (function () {
 				continue;
 			}
 			const pair = KEY_VALUE.exec(line);
-			if (!pair) return { root: null, problem: `${where}: expected a table header or one key = value pair (dotted keys are not part of the format)` };
+			if (!pair)
+				return {
+					root: null,
+					problem: `${where}: expected a table header or one key = value pair (dotted keys are not part of the format)`
+				};
 			let key;
 			let value;
 			try {
-				key = pair[1] !== undefined ? pair[1] : pair[2] !== undefined ? unescapeBasic(pair[2]) : pair[3];
+				key =
+					pair[1] !== undefined
+						? pair[1]
+						: pair[2] !== undefined
+							? unescapeBasic(pair[2])
+							: pair[3];
 				value = parseValue(pair[4]);
 			} catch (e) {
 				return { root: null, problem: `${where}: ${e.message}` };
@@ -281,16 +329,13 @@ var LayerModel = (function () {
 			if (!isTable(layer)) return { doc: empty(), problem: `layers.${layerId} must be a table` };
 			doc.layers[layerId] = {};
 			for (const section of Object.keys(layer)) {
-				if (!isTable(layer[section])) return { doc: empty(), problem: `layers.${layerId}.${section} must be a table` };
+				if (!isTable(layer[section]))
+					return { doc: empty(), problem: `layers.${layerId}.${section} must be a table` };
 				doc.layers[layerId][section] = Object.assign({}, layer[section]);
 			}
 		}
 		return { doc, problem: null };
 	}
-
-
-
-
 
 	// ==============================
 	// ======= 3/ File writer =======
@@ -302,7 +347,8 @@ var LayerModel = (function () {
 		for (const c of String(text)) {
 			const code = c.codePointAt(0);
 			if (c === '"' || c === '\\') out += '\\' + c;
-			else if (code < 0x20 || code === 0x7f) out += '\\u' + code.toString(16).toUpperCase().padStart(4, '0');
+			else if (code < 0x20 || code === 0x7f)
+				out += '\\u' + code.toString(16).toUpperCase().padStart(4, '0');
 			else out += c;
 		}
 		return out + '"';
@@ -311,7 +357,8 @@ var LayerModel = (function () {
 	/** One value as the format writes it. */
 	function formatValue(value) {
 		if (typeof value === 'string') return quote(value);
-		if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) return String(value);
+		if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value)))
+			return String(value);
 		throw new Error(`a layer file cannot hold ${JSON.stringify(value)}`);
 	}
 
@@ -332,28 +379,29 @@ var LayerModel = (function () {
 	 */
 	function serialize(doc, data) {
 		const lines = FILE_HEADER.concat(['', '[_meta]', `schema_version = ${data.schema_version}`]);
-		const layerIds = Object.keys(doc.layers).sort((a, b) => (a === data.layer ? -1 : b === data.layer ? 1 : a < b ? -1 : a > b ? 1 : 0));
+		const layerIds = Object.keys(doc.layers).sort((a, b) =>
+			a === data.layer ? -1 : b === data.layer ? 1 : a < b ? -1 : a > b ? 1 : 0
+		);
 		for (const layerId of layerIds) {
 			const layer = doc.layers[layerId];
 			const standard = [SECTION_ALL].concat(data.platforms);
-			const sections = standard.filter((s) => hasOwn(layer, s)).concat(
-				Object.keys(layer)
-					.filter((s) => !standard.includes(s))
-					.sort()
-			);
+			const sections = standard
+				.filter((s) => hasOwn(layer, s))
+				.concat(
+					Object.keys(layer)
+						.filter((s) => !standard.includes(s))
+						.sort()
+				);
 			for (const section of sections) {
 				const codes = orderedCodes(layer[section], data);
 				if (codes.length === 0) continue;
 				lines.push('', `[layers.${layerId}.${section}]`);
-				for (const code of codes) lines.push(`${quote(code)} = ${formatValue(layer[section][code])}`);
+				for (const code of codes)
+					lines.push(`${quote(code)} = ${formatValue(layer[section][code])}`);
 			}
 		}
 		return lines.join('\n') + '\n';
 	}
-
-
-
-
 
 	// ========================
 	// ======= 4/ Edits =======
@@ -366,7 +414,8 @@ var LayerModel = (function () {
 	function prune(doc, layerId) {
 		const layer = doc.layers[layerId];
 		if (!layer) return;
-		for (const section of Object.keys(layer)) if (Object.keys(layer[section]).length === 0) delete layer[section];
+		for (const section of Object.keys(layer))
+			if (Object.keys(layer[section]).length === 0) delete layer[section];
 		if (Object.keys(layer).length === 0) delete doc.layers[layerId];
 	}
 
@@ -443,10 +492,6 @@ var LayerModel = (function () {
 		delete doc.layers[layerId];
 	}
 
-
-
-
-
 	// ===================================
 	// ======= 5/ Meaning of a value =====
 	// ===================================
@@ -466,7 +511,8 @@ var LayerModel = (function () {
 	 *   {type: 'keystroke', chords: {mods: string[], key: string}[]}|{type: 'invalid', problem: string}}
 	 */
 	function parseBinding(value, data) {
-		if (typeof value !== 'string') return { type: 'invalid', problem: 'a binding must be a string' };
+		if (typeof value !== 'string')
+			return { type: 'invalid', problem: 'a binding must be a string' };
 		const colon = value.indexOf(':');
 		if (colon < 0) {
 			if (hasOwn(data.actions, value)) return { type: 'action', id: value };
@@ -477,7 +523,10 @@ var LayerModel = (function () {
 		if (head === 'repeat_count') {
 			const count = Number(rest);
 			if (!/^[0-9]+$/.test(rest) || count < data.repeat_count.min || count > data.repeat_count.max)
-				return { type: 'invalid', problem: `repeat_count takes an integer from ${data.repeat_count.min} to ${data.repeat_count.max}` };
+				return {
+					type: 'invalid',
+					problem: `repeat_count takes an integer from ${data.repeat_count.min} to ${data.repeat_count.max}`
+				};
 			return { type: 'repeat_count', count };
 		}
 		if (head === 'keystroke') {
@@ -486,10 +535,12 @@ var LayerModel = (function () {
 				const tokens = part.split('+');
 				const key = tokens.pop();
 				const entry = keyEntry(key, data);
-				if (!entry || entry.kind !== 'key') return { type: 'invalid', problem: `"${key}" is not a keyboard key` };
+				if (!entry || entry.kind !== 'key')
+					return { type: 'invalid', problem: `"${key}" is not a keyboard key` };
 				const seen = new Set();
 				for (const mod of tokens) {
-					if (mod !== 'primary' && !data.modifier_order.includes(mod)) return { type: 'invalid', problem: `unknown modifier "${mod}"` };
+					if (mod !== 'primary' && !data.modifier_order.includes(mod))
+						return { type: 'invalid', problem: `unknown modifier "${mod}"` };
 					if (seen.has(mod)) return { type: 'invalid', problem: `modifier "${mod}" named twice` };
 					seen.add(mod);
 				}
@@ -509,10 +560,14 @@ var LayerModel = (function () {
 		if (binding.type === 'invalid') return { ok: false, reason_key: null };
 		if (binding.type === 'action') {
 			const action = data.actions[binding.id];
-			return action.platforms.includes(os) ? { ok: true, reason_key: null } : { ok: false, reason_key: action.reason_key };
+			return action.platforms.includes(os)
+				? { ok: true, reason_key: null }
+				: { ok: false, reason_key: action.reason_key };
 		}
 		if (binding.type === 'repeat_count')
-			return data.repeat_count.platforms.includes(os) ? { ok: true, reason_key: null } : { ok: false, reason_key: data.repeat_count.reason_key };
+			return data.repeat_count.platforms.includes(os)
+				? { ok: true, reason_key: null }
+				: { ok: false, reason_key: data.repeat_count.reason_key };
 		for (const chord of binding.chords) {
 			for (const raw of chord.mods) {
 				const mod = raw === 'primary' ? data.primary_modifier[os] : raw;
@@ -531,7 +586,9 @@ var LayerModel = (function () {
 		const entry = keyEntry(code, data);
 		if (!entry) return { ok: false, reason_key: null };
 		const rule = data.source_kinds[entry.kind];
-		return rule.platforms.includes(os) ? { ok: true, reason_key: null } : { ok: false, reason_key: rule.reason_key };
+		return rule.platforms.includes(os)
+			? { ok: true, reason_key: null }
+			: { ok: false, reason_key: rule.reason_key };
 	}
 
 	/** The keycap legend of a code on one OS. */
@@ -557,8 +614,11 @@ var LayerModel = (function () {
 		const names = MODIFIER_NAMES[os];
 		return chords
 			.map((chord) => {
-				const mods = new Set(chord.mods.map((m) => (m === 'primary' ? data.primary_modifier[os] : m)));
-				const ordered = os === 'macos' ? ['ctrl', 'alt', 'shift', 'meta', 'fn'] : data.modifier_order;
+				const mods = new Set(
+					chord.mods.map((m) => (m === 'primary' ? data.primary_modifier[os] : m))
+				);
+				const ordered =
+					os === 'macos' ? ['ctrl', 'alt', 'shift', 'meta', 'fn'] : data.modifier_order;
 				const parts = ordered.filter((m) => mods.has(m)).map((m) => names[m]);
 				parts.push(keyLegend(chord.key, os));
 				return parts.join(CHORD_JOINERS[os]);
@@ -595,7 +655,13 @@ var LayerModel = (function () {
 			for (const id of group.actions) {
 				const action = data.actions[id];
 				const available = action.platforms.includes(os);
-				items.push({ type: 'action', id, label: t(action.label_key), available, reason: available ? null : t(action.reason_key) });
+				items.push({
+					type: 'action',
+					id,
+					label: t(action.label_key),
+					available,
+					reason: available ? null : t(action.reason_key)
+				});
 			}
 		}
 		return items;

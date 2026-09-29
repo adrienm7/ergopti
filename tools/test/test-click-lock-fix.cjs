@@ -24,22 +24,22 @@ let total_pass = 0;
 let total_fail = 0;
 
 function check(label, file, pattern) {
-    const filePath = path.join(REPO_ROOT, file);
-    try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        if (pattern.test(content)) {
-            total_pass++;
-            console.log(`  ${PASS_SYMBOL}  ${label}`);
-        } else {
-            total_fail++;
-            console.log(`  ${FAIL_SYMBOL}  ${label}`);
-            console.log(`       Violation: Pattern not found in ${file}`);
-        }
-    } catch (err) {
-        total_fail++;
-        console.log(`  ${FAIL_SYMBOL}  ${label}`);
-        console.log(`       Error: ${err.message}`);
-    }
+	const filePath = path.join(REPO_ROOT, file);
+	try {
+		const content = fs.readFileSync(filePath, 'utf8');
+		if (pattern.test(content)) {
+			total_pass++;
+			console.log(`  ${PASS_SYMBOL}  ${label}`);
+		} else {
+			total_fail++;
+			console.log(`  ${FAIL_SYMBOL}  ${label}`);
+			console.log(`       Violation: Pattern not found in ${file}`);
+		}
+	} catch (err) {
+		total_fail++;
+		console.log(`  ${FAIL_SYMBOL}  ${label}`);
+		console.log(`       Error: ${err.message}`);
+	}
 }
 
 function read(file) {
@@ -95,8 +95,8 @@ const onKeyDownBody = ahkFunctionBody(clickSource, 'GestureOnKeyDown');
 checkSource(
 	'AHK: keyboard watcher is a non-consuming Level-3 InputHook ("V L3")',
 	startWatcherBody,
-	(body) => /Hook\s*:=\s*InputHook\("V L3"\)/.test(body)
-		&& /Hook\.KeyOpt\("\{All\}", "N"\)/.test(body),
+	(body) =>
+		/Hook\s*:=\s*InputHook\("V L3"\)/.test(body) && /Hook\.KeyOpt\("\{All\}", "N"\)/.test(body),
 	'GestureStartKeyboardWatcher must construct InputHook("V L3") and subscribe to every key'
 );
 
@@ -115,10 +115,11 @@ checkSource(
 checkSource(
 	'AHK: GestureOnKeyDown keeps release ownership on normal and suspended paths',
 	onKeyDownBody,
-	(body) => body.includes('A_IsSuspended')
-		&& (body.match(/GestureReleaseLeftClick\(\)/g) || []).length === 2
-		&& (body.match(/GestureReleaseRightClick\(\)/g) || []).length === 2
-		&& !/\bih\.Stop\(\)/.test(body),
+	(body) =>
+		body.includes('A_IsSuspended') &&
+		(body.match(/GestureReleaseLeftClick\(\)/g) || []).length === 2 &&
+		(body.match(/GestureReleaseRightClick\(\)/g) || []).length === 2 &&
+		!/\bih\.Stop\(\)/.test(body),
 	'keypress handling must delegate both release transactions on both paths without stopping their retry owner first'
 );
 
@@ -132,5 +133,5 @@ check(
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);
 
 if (total_fail > 0) {
-    process.exit(1);
+	process.exit(1);
 }

@@ -18,16 +18,30 @@ def read_inventories(output, fixture_device):
             continue
         if not line.endswith("\n"):
             raise ValueError("Incomplete native key inventory")
-        row = json.loads(line[len(MARKER):], object_pairs_hook=unique_object)
+        row = json.loads(line[len(MARKER) :], object_pairs_hook=unique_object)
         if not isinstance(row, dict) or set(row) != {
-                "version", "device", "coverage", "capacity", "enumerated", "exhausted", "elements", "readable"}:
+            "version",
+            "device",
+            "coverage",
+            "capacity",
+            "enumerated",
+            "exhausted",
+            "elements",
+            "readable",
+        }:
             raise ValueError("Invalid native key inventory envelope")
-        if type(row["version"]) is not int or row["version"] != 2 or row["coverage"] != "fixture_only":
+        if (
+            type(row["version"]) is not int
+            or row["version"] != 2
+            or row["coverage"] != "fixture_only"
+        ):
             raise ValueError("Unsupported native key inventory")
         device = decimal(row["device"], minimum=1)
         if any(type(row[field]) is not bool for field in ("enumerated", "exhausted", "readable")):
             raise ValueError("Invalid native key inventory flags")
-        capacity = integer(row["capacity"], "native inventory capacity", minimum=1, maximum=(1 << 32) - 1)
+        capacity = integer(
+            row["capacity"], "native inventory capacity", minimum=1, maximum=(1 << 32) - 1
+        )
         if not isinstance(row["elements"], list) or len(row["elements"]) > capacity:
             raise ValueError("Invalid native key inventory bound")
         if row["readable"] and (not row["enumerated"] or row["exhausted"] or not row["elements"]):

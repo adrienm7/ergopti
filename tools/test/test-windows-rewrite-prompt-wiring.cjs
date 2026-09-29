@@ -150,7 +150,10 @@ for (const [label, list, prefix] of [
 	const agentConnectors = position(list, `${prefix}modules/llm/agent_connectors.ahk`);
 	const agentAction = position(list, `${prefix}modules/llm/agent_action.ahk`);
 	check(
-		agent > translateAction && agentConnectors > agent && agentAction > agentConnectors && gestures > agentAction,
+		agent > translateAction &&
+			agentConnectors > agent &&
+			agentAction > agentConnectors &&
+			gestures > agentAction,
 		`${label} must include agent.ahk, agent_connectors.ahk, then agent_action.ahk after the translation and before the gesture actions`
 	);
 }
@@ -309,7 +312,7 @@ for (const id of ['llm_screen_region', 'llm_screen_full']) {
 const gestureConfig = read('modules/gestures/config.ahk');
 for (const [needle, why] of [
 	['if (Spec = "llm_vision") {', 'validates the llm_vision kind'],
-	['t("dialog.gestures.param_err_llm_vision")', 'refuses with the kind\'s error text'],
+	['t("dialog.gestures.param_err_llm_vision")', "refuses with the kind's error text"],
 	['case "llm_vision":', 'prompts for the llm_vision kind'],
 	['LLM_Vision_BackendChoicesText()', 'lists the vision backends in the prompt']
 ]) {
@@ -331,7 +334,9 @@ check(
 );
 const remote = read('modules/llm/api_remote.ahk');
 check(
-	bodyOf(remote, 'LLM_RemotePostBody_Async').includes('_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload'),
+	bodyOf(remote, 'LLM_RemotePostBody_Async').includes(
+		'_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload'
+	),
 	'a caller-written remote body must go through the curl transport'
 );
 const streaming = read('modules/llm/api_ollama/ollama_streaming.ahk');
@@ -345,14 +350,18 @@ check(
 );
 const screenshots = read('modules/gestures/screenshots.ahk');
 check(
-	bodyOf(screenshots, '_GestureScreenshotDirectScript').includes('_GestureScreenshotDownscaleScript("$bmp", MaxEdge)') &&
+	bodyOf(screenshots, '_GestureScreenshotDirectScript').includes(
+		'_GestureScreenshotDownscaleScript("$bmp", MaxEdge)'
+	) &&
 		bodyOf(screenshots, '_GestureScreenshotRegionSaveScript').includes(
 			'_GestureScreenshotDownscaleScript("$img", MaxEdge)'
 		),
 	'both capture scripts must shrink the image to the requested longest edge'
 );
 check(
-	bodyOf(screenshots, 'GestureRegionCaptureFinish').includes('_GestureRegionNotify(State.Get("callback", 0)'),
+	bodyOf(screenshots, 'GestureRegionCaptureFinish').includes(
+		'_GestureRegionNotify(State.Get("callback", 0)'
+	),
 	'a region capture must report its end to the owner that asked for it'
 );
 
@@ -391,9 +400,10 @@ check(
 	'the AI menu must draw the llm_live_mode row'
 );
 check(
-	bodyOf(read('infra/hotstrings/hotstring_dispatch.ahk'), '_HSE_MirrorCanonicalEffectToLlm').includes(
-		'LLM_Bridge_ReissueLiveAfterExpansion()'
-	),
+	bodyOf(
+		read('infra/hotstrings/hotstring_dispatch.ahk'),
+		'_HSE_MirrorCanonicalEffectToLlm'
+	).includes('LLM_Bridge_ReissueLiveAfterExpansion()'),
 	'a hotstring expansion must re-issue the live request on the expanded text'
 );
 
@@ -429,15 +439,16 @@ check(
 );
 check(
 	bodyOf(translateAction, '_LLM_Translate_OnSelection').includes('LLM_Vision_SendText('),
-	'the translation must ask through the screen answers\' sender'
+	"the translation must ask through the screen answers' sender"
 );
 check(
 	bodyOf(translateAction, '_LLM_Translate_Show').includes('SelectAfterAccept: true'),
 	'the translation candidate must ask to stay selected once accepted'
 );
 check(
-	bodyOf(bridge, '_LLM_Bridge_OnInjectComplete').includes('_LLM_Bridge_SelectAcceptedText(Transaction)') &&
-		bodyOf(bridge, '_LLM_Bridge_SelectAcceptedText').includes('TextSelectBack('),
+	bodyOf(bridge, '_LLM_Bridge_OnInjectComplete').includes(
+		'_LLM_Bridge_SelectAcceptedText(Transaction)'
+	) && bodyOf(bridge, '_LLM_Bridge_SelectAcceptedText').includes('TextSelectBack('),
 	'a successful acceptance must select again a slot that asks for it'
 );
 for (const [needle, why] of [
@@ -466,16 +477,25 @@ const agentAction = read('modules/llm/agent_action.ahk');
 const agentConnectors = read('modules/llm/agent_connectors.ahk');
 const agentMenu = read('ui/menu/menu_llm/menu_agent.ahk');
 for (const name of [
-	'LLM_Agent_System1Prompt', 'LLM_Agent_System2Prompt', 'LLM_Agent_ResolveModel', 'LLM_Agent_ParseSystem1',
-	'LLM_Agent_ParseJev', 'LLM_Agent_JevQuestions', 'LLM_Agent_ParseActions', 'LLM_Agent_Label',
-	'LLM_Agent_Ics', 'LLM_Agent_Mailto', 'LLM_Agent_Learn'
+	'LLM_Agent_System1Prompt',
+	'LLM_Agent_System2Prompt',
+	'LLM_Agent_ResolveModel',
+	'LLM_Agent_ParseSystem1',
+	'LLM_Agent_ParseJev',
+	'LLM_Agent_JevQuestions',
+	'LLM_Agent_ParseActions',
+	'LLM_Agent_Label',
+	'LLM_Agent_Ics',
+	'LLM_Agent_Mailto',
+	'LLM_Agent_Learn'
 ]) {
 	check(bodyOf(agentPort, name) !== '', `agent.ahk must port ${name}`);
 }
 check(
 	['LLM_Bridge_OnChar', 'LLM_Bridge_OnBackspace'].every((name) =>
-		bodyOf(bridge, name).includes('LLM_Agent_OnTyping(_LLM_Bridge_Buffer)')),
-	'every typed character and Backspace must reach the agent\'s automatic mode'
+		bodyOf(bridge, name).includes('LLM_Agent_OnTyping(_LLM_Bridge_Buffer)')
+	),
+	"every typed character and Backspace must reach the agent's automatic mode"
 );
 check(
 	bridge.includes('Handler := _LLM_Bridge_AcceptedSlotHandler(Transaction)') &&
@@ -495,7 +515,7 @@ check(
 	(agentAction.match(/_LLM_Agent_Chat\(/g) || []).length === 3 &&
 		bodyOf(agentAction, 'LLM_Agent_System1Request').includes('_LLM_Agent_Chat(') &&
 		bodyOf(agentAction, 'LLM_Agent_System2Request').includes('_LLM_Agent_Chat('),
-	'System 1 and System 2 must each have one transport function, the only callers of the agent\'s chat sender'
+	"System 1 and System 2 must each have one transport function, the only callers of the agent's chat sender"
 );
 check(
 	bodyOf(agentAction, '_LLM_Agent_OnPause').includes('_LLM_Agent_Auto["triaged"].Has(Sentence)') &&
@@ -514,15 +534,21 @@ check(
 		bodyOf(agentAction, '_LLM_Agent_SaveLearning').includes('ST_Set'),
 	'the learned thresholds must live in the local state store, not config.toml'
 );
-for (const [source, label] of [[agentAction, 'agent_action.ahk'], [agentConnectors, 'agent_connectors.ahk'],
-	[agentMenu, 'menu_agent.ahk']]) {
+for (const [source, label] of [
+	[agentAction, 'agent_action.ahk'],
+	[agentConnectors, 'agent_connectors.ahk'],
+	[agentMenu, 'menu_agent.ahk']
+]) {
 	check(
-		!/\bComObject\(|\bRun\(|\bRunWait\(|\bFileOpen\(|\bFileAppend\(|\bFileDelete\(|\bDllCall\(/.test(source),
+		!/\bComObject\(|\bRun\(|\bRunWait\(|\bFileOpen\(|\bFileAppend\(|\bFileDelete\(|\bDllCall\(/.test(
+			source
+		),
 		`${label} must reach COM, processes and files through windows/adapters`
 	);
 }
 check(
-	!/\.Send\(/.test(agentConnectors) && bodyOf(agentConnectors, '_LLM_AgentConnector_Mail').includes('Item.Display()'),
+	!/\.Send\(/.test(agentConnectors) &&
+		bodyOf(agentConnectors, '_LLM_AgentConnector_Mail').includes('Item.Display()'),
 	'a mail must only ever be displayed as a draft, never sent'
 );
 check(
@@ -531,8 +557,12 @@ check(
 	'the tray must build the top-level agent row from the manifest agent_menu'
 );
 check(
-	bodyOf(read('ui/menu/menu_llm/persist.ahk'), '_LLM_Menu_SyncToFeatures').includes('LLM_AGENT_SETTING_KEYS') &&
-		bodyOf(read('ui/menu/menu_llm/persist.ahk'), 'LLM_Menu_BuildSavedOpts').includes('LLM_AGENT_SETTING_KEYS'),
+	bodyOf(read('ui/menu/menu_llm/persist.ahk'), '_LLM_Menu_SyncToFeatures').includes(
+		'LLM_AGENT_SETTING_KEYS'
+	) &&
+		bodyOf(read('ui/menu/menu_llm/persist.ahk'), 'LLM_Menu_BuildSavedOpts').includes(
+			'LLM_AGENT_SETTING_KEYS'
+		),
 	'the agent settings must ride the AI menu persistence both ways'
 );
 

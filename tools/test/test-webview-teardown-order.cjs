@@ -169,7 +169,9 @@ if (hostsSeen < MIN_HOSTS) {
 	);
 }
 
-console.log(`\nResults: ${total_pass} passed, ${total_fail} failed (${hostsSeen} hosts discovered).`);
+console.log(
+	`\nResults: ${total_pass} passed, ${total_fail} failed (${hostsSeen} hosts discovered).`
+);
 
 if (total_fail > 0) {
 	process.exit(1);

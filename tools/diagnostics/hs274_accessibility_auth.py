@@ -1,5 +1,6 @@
 # tools/diagnostics/hs274_accessibility_auth.py
 """Authenticate only the observed Accessibility settings sheet on disposable CI."""
+
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -8,7 +9,7 @@ import subprocess
 from hs274_accounts import approval_account
 
 
-SCRIPT = '''
+SCRIPT = """
 set approvalName to system attribute "HS274_APPROVAL_USER"
 set approvalPassword to system attribute "HS274_APPROVAL_PASSWORD"
 if approvalName is "" or approvalPassword is "" then error "Missing temporary approval credentials"
@@ -48,7 +49,7 @@ tell application "System Events"
         error "Authentication sheet did not retire"
     end tell
 end tell
-'''
+"""
 
 
 @contextmanager
@@ -59,13 +60,21 @@ def authenticate_accessibility(report):
     with approval_account(output, state) as (name, password):
         environment = dict(os.environ, HS274_APPROVAL_USER=name, HS274_APPROVAL_PASSWORD=password)
         try:
-            result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True,
-                                    text=True, timeout=10, env=environment)
+            result = subprocess.run(
+                ["/usr/bin/osascript", "-e", SCRIPT],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=environment,
+            )
         except subprocess.TimeoutExpired:
             state["timed_out"] = True
             raise RuntimeError("Accessibility authentication timed out") from None
-        state.update(exit=result.returncode, stdout=result.stdout.replace(password, "<redacted>"),
-                     stderr=result.stderr.replace(password, "<redacted>"))
+        state.update(
+            exit=result.returncode,
+            stdout=result.stdout.replace(password, "<redacted>"),
+            stderr=result.stderr.replace(password, "<redacted>"),
+        )
         if result.returncode != 0 or result.stdout.strip() != "authentication_submitted":
             raise RuntimeError("Accessibility authentication was not confirmed")
         yield
