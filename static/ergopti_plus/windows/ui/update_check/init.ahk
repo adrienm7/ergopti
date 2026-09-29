@@ -20,8 +20,8 @@
 ;    window's GitHub report.
 ; 3. One window, bound to the manual check it shows and to an epoch: a late
 ;    answer of another check, or a message of a closed window, is inert.
-; 4. Without WebView2 the same answer is a native, centered window with the
-;    same texts and buttons.
+; 4. Without WebView2, or when its WebView cannot be created, the same answer
+;    is a native, centered window with the same texts and buttons.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -387,8 +387,7 @@ _UpdateCheck_Open() {
 		G.WVC := WVC
 	} catch as Err {
 		LoggerError("UpdateCheck", "WebView2 could not be created for the update-check window: {1}", Err.Message)
-		_UpdateCheck_CloseWindow()
-		return false
+		return _UpdateCheck_FallBackToNative(Epoch, G)
 	}
 	_UC_Controller := WVC
 	_UC_WebView := WVC.CoreWebView2
@@ -407,6 +406,31 @@ _UpdateCheck_Open() {
 	try _UC_WebView.Navigate("https://" . UC_VHOST . "/ui/update_check/index.html?cb=" . A_TickCount)
 	try _UC_Controller.Fill()
 	LoggerSuccess("UpdateCheck", "Update-check window opened.")
+	return true
+}
+
+; Replaces a WebView2 host whose WebView could not be created (no Evergreen
+; runtime, a boot timeout, another window still booting the shared environment)
+; with the native window. The check and its state stay: the check's answer
+; arrives later, and only a window still showing that check receives it.
+; @param Epoch {Integer} The epoch of the window being opened.
+; @param HostGui {Gui} The WebView2 host, which holds no WebView.
+; @param BuildFn {Func|Integer} Replacement of _UpdateCheck_BuildNative (tests only).
+; @returns {Boolean} opened
+_UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
+	global _UC_Gui, _UC_ResetDone, _UC_WindowEpoch, _UC_Native
+	try HostGui.Destroy()
+	; The environment's boot pumps messages: a window the user closed meanwhile
+	; stays closed, and a window opened since then is not replaced
+	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) {
+		LoggerDone("UpdateCheck", "The update-check window was closed while WebView2 was starting.")
+		return false
+	}
+	_UC_Gui := unset
+	_UC_Native := true
+	Build := HasMethod(BuildFn, "Call") ? BuildFn : _UpdateCheck_BuildNative
+	Build.Call()
+	LoggerSuccess("UpdateCheck", "Update-check window opened (native, WebView2 could not be created).")
 	return true
 }
 

@@ -12,7 +12,8 @@
 ; 3. a newer release is offered in the window, whose Update button is the only
 ;    new consent point, through the existing install;
 ; 4. the list's other channels are kept for the window before the checked
-;    channel's release is selected out of it.
+;    channel's release is selected out of it;
+; 5. a WebView2 that cannot be created leaves the check in the native window.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -76,3 +77,18 @@ _TUCM_OtherChannelsKeptBeforeSelection() {
 }
 Test("update check window: the other channels come from the whole release list (update-check-window)",
 	_TUCM_OtherChannelsKeptBeforeSelection)
+
+; Closing the window on a WebView2 failure dropped the check, so its answer was
+; discarded and the click showed nothing: the failure opens the native window.
+_TUCM_WebViewFailureFallsBackToNative() {
+	Body := _DriverFuncBody("_UpdateCheck_Open")
+	CatchAt := InStr(Body, "catch as Err")
+	Assert(CatchAt > 0, "_UpdateCheck_Open must catch a WebView2 creation failure")
+	Tail := SubStr(Body, CatchAt)
+	Assert(InStr(Tail, "_UpdateCheck_FallBackToNative(Epoch, G)") > 0,
+		"a WebView2 creation failure must fall back to the native window")
+	AssertEqual(0, InStr(Tail, "_UpdateCheck_CloseWindow("),
+		"a WebView2 creation failure must not close the window and drop the check")
+}
+Test("update check window: a WebView2 failure keeps the check in a native window (update-check-window)",
+	_TUCM_WebViewFailureFallsBackToNative)

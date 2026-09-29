@@ -12,7 +12,8 @@
 ;    offered release and closes, a switch goes only to a listed channel, Report
 ;    names the updater and the cause, the log opens only for a failure; a
 ;    click while the driver is paused drives no updater action;
-; 4. the native window composes the page's sentences, placeholders filled;
+; 4. the native window composes the page's sentences, placeholders filled, and
+;    replaces a WebView2 that could not be created without losing the check;
 ; 5. a manual check keeps the other channels with a newer release on its
 ;    request; a background check does not.
 ; ==============================================================================
@@ -215,6 +216,48 @@ _TUCD_PausedClicksCase() {
 }
 Test("update check: a click while paused drives no updater action (update-check-window)",
 	_TUCD_PausedClicks)
+
+; WebView2 can fail to start (no Evergreen runtime, a boot timeout, another
+; window booting the shared environment): the window falls back to its native
+; form, and the check's answer still reaches it.
+_TUCD_WebViewFailure() {
+	_TUCD_Run(_TUCD_WebViewFailureCase)
+}
+_TUCD_WebViewFailureCase() {
+	global _UC_ResetDone, _UC_WindowEpoch, _UC_Native, _UC_Gui
+	Request := _TUCD_Request()
+	Built := []
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	_UC_WindowEpoch += 1
+	Epoch := _UC_WindowEpoch
+	_UC_ResetDone := false
+	Host := _UpdateCheck_NewWindow()
+	_UC_Gui := Host
+	try {
+		AssertTrue(_UpdateCheck_FallBackToNative(Epoch, Host, () => Built.Push(true)),
+			"a WebView2 failure opens the native window")
+		AssertEqual(1, Built.Length, "the native window is built once")
+		AssertTrue(_UC_Native, "the window is native from then on")
+		AssertFalse(IsSet(_UC_Gui), "the WebView2 host is gone")
+		AssertTrue(UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", "v0.0.0-dev.144",
+			"latest", "v0.0.0-dev.144", "others", [])), "the check's answer still reaches the window")
+		AssertEqual("up_to_date", _TUCD_Last()["state"])
+
+		_UC_WindowEpoch += 1
+		Stale := _UC_WindowEpoch
+		_UC_ResetDone := true
+		Closed := _UpdateCheck_NewWindow()
+		AssertFalse(_UpdateCheck_FallBackToNative(Stale, Closed, () => Built.Push(true)),
+			"a window closed while WebView2 was starting stays closed")
+		AssertEqual(1, Built.Length, "no native window replaces a closed one")
+	} finally {
+		_UC_Native := false
+		_UC_ResetDone := true
+		_UC_Gui := unset
+	}
+}
+Test("update check: a WebView2 failure falls back to the native window (update-check-window)",
+	_TUCD_WebViewFailure)
 
 _TUCD_NativeTexts() {
 	Label := _Updater_ChannelLabel("dev")
