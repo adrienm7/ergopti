@@ -512,6 +512,28 @@ local function _all_hotstring_groups_on(config)
 	return true
 end
 
+--- Restores or clears the Hotstrings scope after the user confirms it.
+---
+--- Shared by the Hotstrings rows and the Configuration « restore recommended »
+--- row, so both reach the one transaction that writes the manifest's recommended
+--- values after verified backups. Deleting the explicit choices instead yields the
+--- neutral state, where every catalogue is off: the opposite of the label.
+--- @param ctx table Menu context: paused, is_paused, dyn_hotstrings, tooltip_preview, on_menu_changed.
+--- @param mode string "recommended" or "clear".
+--- @param title string Confirmation dialog title.
+--- @return boolean committed
+local function _apply_hotstrings_scope(ctx, mode, title)
+	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+	local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+	if ask_yes_no(title, label, i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then
+		return false
+	end
+	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
+		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
+	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	return committed
+end
+
 --- Renders the rows of the hotstrings submenu that the manifest describes.
 ---
 --- Defined BEFORE its caller: a `local function` is not hoisted
@@ -1552,14 +1574,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean committed
 	local function apply_hotstrings_scope(mode)
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.hotstrings.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
-		local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
-			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
-		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		return committed
+		return _apply_hotstrings_scope(ctx, mode, i18n_safe("menu.hotstrings.title"))
 	end
 
 	hs_ctx.commands = {
@@ -3387,6 +3402,8 @@ local function _build_configuration(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		-- Every category through its own scope owner, hotstrings included: the
+		-- recommended hotstrings, never the neutral state where every catalogue is off.
 		["restore_recommended"] = function() return apply_global_scope("recommended") end,
 		["start_at_login"] = function()
 			if not require("ui.menu.start_at_login").toggle() then

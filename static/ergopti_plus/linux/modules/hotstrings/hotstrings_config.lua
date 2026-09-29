@@ -1300,31 +1300,6 @@ function M.disable_all()
 	return #changes
 end
 
---- Removes every explicit category and section choice of the known catalogue,
---- which is the manifest's neutral state: every catalogue off.
---- @return integer|boolean Number of explicit choices removed, or false when refused.
-function M.reset_defaults()
-	local changes = {}
-	for _, id in ipairs(known_categories()) do
-		if addressable(id) then
-			if _choices and _choices.groups[id] ~= nil then
-				changes[#changes + 1] = { group = id, enabled = ManifestReader.default_for("hotstrings.groups." .. id) }
-			end
-			local sections = _choices and _choices.modules[id] or {}
-			for _, name in ipairs(known_sections(id)) do
-				if addressable(name) and sections[name] ~= nil then
-					changes[#changes + 1] = { group = id, section = name,
-						enabled = ManifestReader.default_for("hotstrings.modules." .. id .. "." .. name) }
-				end
-			end
-		end
-	end
-	if #changes == 0 then return 0 end
-	if not commit_choices(changes, "Reset hotstring choices") then return false end
-	notify_change()
-	return #changes
-end
-
 --- Whether a category's gate is open.
 --- @param group_name string
 --- @return boolean
