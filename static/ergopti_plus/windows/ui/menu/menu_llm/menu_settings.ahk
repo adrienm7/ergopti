@@ -36,6 +36,12 @@
 ; ================================
 ; ================================
 
+; Available prediction count choices (mirrors HS: for i = 1, 10 do). Declared
+; beside _LLM_Menu_NRows, its only reader, so any include graph that loads the
+; count rows also runs this assignment: the unit harness loads this file but
+; not the menu's _index.ahk.
+global LLM_MENU_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
 /**
  * Row data for the suggestion count choices (1 to 10), the submenu of the
  * first generation row (``_LLM_Menu_GenerationRows``).
