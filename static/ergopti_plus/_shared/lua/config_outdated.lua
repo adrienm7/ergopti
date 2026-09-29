@@ -24,12 +24,20 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+-- Resolved at each report, not at load: an entry is reported once per process,
+-- and the logger in place when it is reported is the one that must see it.
+local function logger() return require("logger.shim") end
 local LOG    = "config_outdated"
 local unpack = table.unpack or unpack
 
--- Paths already reported in this process, so each is named exactly once.
+-- Entries (path and reason) already reported in this process, so each is
+-- named exactly once.
 local _reported = {}
+
+-- Open cleanup scans: each records every path reported while it runs, logged
+-- or not, so the cleanup offers what an owner rejects even when another
+-- reader (the setup wizard showing the value) also reads it.
+local _scans = {}
 
 
 
@@ -60,13 +68,18 @@ end
 --- Reports one outdated configuration entry, once per process.
 --- @param segments table|string Path of the entry, e.g. { "shortcuts", "keys", "at_hash" }.
 --- @param detail string Why this build does not use it.
+--- @param sink table|nil The reporting owner's logger; the shared one by default.
 --- @return boolean first True when this call logged the WARNING.
-function M.report(segments, detail)
+function M.report(segments, detail, sink)
 	local path = dotted(segments)
-	if _reported[path] then return false end
-	_reported[path] = true
-	Logger.warn(LOG, "Outdated configuration entry '%s' ignored (%s); it is offered for cleanup.",
-		path, tostring(detail or "this build does not use it"))
+	for _, scan in ipairs(_scans) do scan[path] = true end
+	detail = tostring(detail or "this build does not use it")
+	-- The same key holding another stale value is another entry to name.
+	local identity = path .. "\0" .. detail
+	if _reported[identity] then return false end
+	_reported[identity] = true
+	(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); it is offered for cleanup.",
+		path, detail)
 	return true
 end
 
@@ -102,6 +115,22 @@ function M.partition(prefix, map, is_known, mark)
 	end
 	table.sort(outdated)
 	return kept, outdated
+end
+
+--- Runs a cleanup collection and returns every path an owner reported as
+--- outdated during it.
+--- @param collect function The driver's readers, run once.
+--- @return table outdated Set of dotted paths.
+function M.collect_reports(collect)
+	if type(collect) ~= "function" then error("config_outdated.collect_reports needs a function", 2) end
+	local scan = {}
+	_scans[#_scans + 1] = scan
+	local ok, err = xpcall(collect, debug.traceback)
+	for index = #_scans, 1, -1 do
+		if _scans[index] == scan then table.remove(_scans, index) end
+	end
+	if not ok then error(err, 0) end
+	return scan
 end
 
 --- Checks a persisted value against its manifest entry: the entry must exist

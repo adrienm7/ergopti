@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
@@ -146,11 +147,32 @@ local function walk_assignments(decoded, consume)
 	end
 end
 
---- Marks exactly the preferences read by the assignment loader.
+--- Whether a stored tap-key action still names something this build runs.
+--- A retired action is outdated configuration: warned about once, run as
+--- "none" and offered by the config cleanup, never an error or a refusal.
+--- @param id string Tap key id.
+--- @param value any Stored value.
+--- @param catalogue table Action catalogue owner.
+--- @return boolean known
+local function stored_action_known(id, value, catalogue)
+	if value == "none" or (type(value) == "string" and catalogue.is_assignable(value)) then return true end
+	ConfigOutdated.report({ "shortcuts", "tap_keys", id },
+		"action '" .. tostring(value) .. "' no longer exists", Logger)
+	return false
+end
+
+--- Marks exactly the preferences read by the assignment loader. A key whose
+--- action no longer exists is left unmarked, so the cleanup offers it.
 --- @param decoded table Decoded config.toml.
 --- @param mark function Segment-based ownership collector.
 function M.mark_config_reads(decoded, mark)
-	walk_assignments(decoded, function(id) mark("shortcuts", "tap_keys", id) end)
+	local catalogue = action_catalogue()
+	walk_assignments(decoded, function(id, value)
+		-- Without a catalogue nothing can be proved outdated: keep every key.
+		if not catalogue or stored_action_known(id, value, catalogue) then
+			mark("shortcuts", "tap_keys", id)
+		end
+	end)
 end
 
 --- Reads every assignment from config.toml, or the manifest default.
@@ -169,9 +191,12 @@ local function load_assignments()
 		end
 		decoded = parsed
 	end
-	local configured = {}
-	walk_assignments(decoded, function(id, value) configured[id] = value end)
 	local Gestures = action_catalogue()
+	local configured = {}
+	walk_assignments(decoded, function(id, value)
+		if Gestures and not stored_action_known(id, value, Gestures) then value = "none" end
+		configured[id] = value
+	end)
 	local loaded = {}
 	for _, key in ipairs(M.keys()) do
 		local value = configured[key.id]
@@ -337,8 +362,11 @@ function M.configuration_candidate(document)
 	local section = document.shortcuts or {}
 	assert(section.tap_keys == nil or type(section.tap_keys) == "table", "tap-key assignments are malformed")
 	local values, assignments = {}, {}
-	walk_assignments(document, function(id, value) values[id] = value end)
 	local catalogue = assert(action_catalogue(), "tap-key action catalogue is unavailable")
+	walk_assignments(document, function(id, value)
+		-- The loader's rule: an outdated action runs as "none".
+		values[id] = stored_action_known(id, value, catalogue) and value or "none"
+	end)
 	for _, key in ipairs(M.keys()) do
 		local action = values[key.id]
 		if action == nil then action = Manifest.default_for(PREF_PREFIX .. key.id) end

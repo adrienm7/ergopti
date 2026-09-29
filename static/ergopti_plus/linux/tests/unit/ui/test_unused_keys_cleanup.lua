@@ -230,6 +230,40 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 		helpers.assert_eq(unknown.keys[1].key, "channel")
 	end)
 
+	helpers.it("unused keys: live bindings are kept, retired actions are offered (config-outdated-shortcuts)",
+		function()
+			local source = table.concat({
+				"[gestures]",
+				"swipe_3_up = \"open_url\"",
+				"tap_3 = \"retired_action_xyz\"",
+				"",
+				"[shortcuts.keyboard]",
+				"ctrl_k = \"select_line\"",
+				"ctrl_j = \"retired_action_xyz\"",
+				"",
+				"[shortcuts.tap_keys]",
+				"number_row_left = \"retired_action_xyz\"",
+				"",
+			}, "\n")
+			local offered = {}
+			for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+				offered[#offered + 1] = key.section .. "." .. key.key
+			end
+			table.sort(offered)
+			-- ctrl_k is a live binding: offering it would delete the user's shortcut.
+			helpers.assert_eq(offered, {
+				"gestures.tap_3", "shortcuts.keyboard.ctrl_j", "shortcuts.tap_keys.number_row_left",
+			})
+
+			-- The Shortcuts scope resolves the same document instead of refusing it.
+			local decoded = TomlCodec.decode(source)
+			local keyboard = require("modules.shortcuts.keyboard_shortcuts").configuration_candidate(decoded)
+			helpers.assert_eq(keyboard.assignments.ctrl_k, "select_line")
+			helpers.assert_nil(keyboard.assignments.ctrl_j)
+			local tap = require("modules.shortcuts.tap_keys").configuration_candidate(decoded)
+			helpers.assert_eq(tap.assignments.number_row_left, "none")
+		end)
+
 	helpers.it("unused keys: an invalid gesture parameter is ignored by the loader and offered", function()
 		local scan = Engine.find_in_source(
 			"[gesture_parameters]\ntap_3__open_url = \"not a url\"\n", Cleanup.collect)
