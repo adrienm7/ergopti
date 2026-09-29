@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Personal information",
 	"notify.quit_refused": "Cannot quit right now: another operation is still in progress. Try again in a moment.",
 	"notify.karabiner.removed": "Ergopti's rules were removed from Karabiner. Your own rules are unchanged.",
+	"notify.touchpad.restored": "Your Windows touchpad gestures were restored.",
+	"notify.touchpad.no_backup": "Nothing to restore: Ergopti never changed your Windows touchpad gestures.",
 	"notify.report_bug_body": "The GitHub form is open and prefilled with the diagnostics (also copied to the clipboard, in case they were shortened).",
 	"notify.screenshot_copied": "Screenshot copied",
 	"notify.screenshot_saved": "Screenshot saved",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Start at login",
 	"menu.global.karabiner_integration": "Ergopti uses Karabiner",
 	"menu.global.remove_from_karabiner": "Remove Ergopti from Karabiner",
+	"menu.global.restore_touchpad_gestures": "Restore Windows touchpad gestures",
 	"dialog.start_at_login.failed": "Could not change automatic startup. Check the system startup settings.",
 	"onboarding.error.open_failed": "The setup wizard could not open. Check the logs, then try Setup wizard in the menu."
 }

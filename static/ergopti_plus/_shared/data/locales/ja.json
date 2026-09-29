@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "個人情報",
 	"notify.quit_refused": "現在は終了できません。別の処理がまだ実行中です。しばらくしてからもう一度お試しください。",
 	"notify.karabiner.removed": "Ergopti のルールを Karabiner から削除しました。ご自身のルールは変更されていません。",
+	"notify.touchpad.restored": "Windows のタッチパッド ジェスチャを復元しました。",
+	"notify.touchpad.no_backup": "復元するものはありません。Ergopti は Windows のタッチパッド ジェスチャを変更していません。",
 	"notify.report_bug_body": "GitHub のフォームを開き、診断情報を入力済みです（短縮された場合に備えて、クリップボードにもコピーしました）。",
 	"notify.screenshot_copied": "スクリーンショットをコピーしました",
 	"notify.screenshot_saved": "スクリーンショットを保存しました",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "ログイン時に起動",
 	"menu.global.karabiner_integration": "Ergopti で Karabiner を使用",
 	"menu.global.remove_from_karabiner": "Karabiner から Ergopti を削除",
+	"menu.global.restore_touchpad_gestures": "Windows のタッチパッド ジェスチャを復元",
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。"
 }

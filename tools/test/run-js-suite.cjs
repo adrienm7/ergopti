@@ -1752,6 +1752,12 @@ const CHECKS = [
 		repro: 'npm run test:update-schedule-contract'
 	},
 	{
+		name: 'Windows touchpad registry: one data file, both writers through one backing-up owner, restore row',
+		cmd: 'node',
+		args: ['tools/test/test-touchpad-registry-single-source.cjs'],
+		repro: 'npm run test:touchpad-registry'
+	},
+	{
 		name: 'Versions page: tabs change the view, the banner subscribes through the host',
 		cmd: 'node',
 		args: ['tools/test/test-changelog-channel-sync.cjs'],

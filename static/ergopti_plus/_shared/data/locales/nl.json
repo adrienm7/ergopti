@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Persoonlijke gegevens",
 	"notify.quit_refused": "Afsluiten is nu niet mogelijk, er loopt nog een andere bewerking. Probeer het zo opnieuw.",
 	"notify.karabiner.removed": "De regels van Ergopti zijn uit Karabiner verwijderd. Je eigen regels zijn ongewijzigd.",
+	"notify.touchpad.restored": "Je Windows-touchpadgebaren zijn hersteld.",
+	"notify.touchpad.no_backup": "Niets te herstellen: Ergopti heeft je Windows-touchpadgebaren nooit gewijzigd.",
 	"notify.report_bug_body": "Het GitHub-formulier is geopend en vooraf ingevuld met de diagnose (ook naar het klembord gekopieerd, voor het geval ze is ingekort).",
 	"notify.screenshot_copied": "Schermafbeelding gekopieerd",
 	"notify.screenshot_saved": "Schermafbeelding opgeslagen",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Starten bij aanmelden",
 	"menu.global.karabiner_integration": "Ergopti gebruikt Karabiner",
 	"menu.global.remove_from_karabiner": "Ergopti uit Karabiner verwijderen",
+	"menu.global.restore_touchpad_gestures": "Windows-touchpadgebaren herstellen",
 	"dialog.start_at_login.failed": "Automatisch starten kon niet worden gewijzigd. Controleer de opstartinstellingen van het systeem.",
 	"onboarding.error.open_failed": "De configuratiewizard kon niet worden geopend. Controleer de logboeken en probeer het opnieuw via het menu."
 }

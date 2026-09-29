@@ -495,56 +495,17 @@ GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0
 		return true
 }
 
-; Writes a single REG_DWORD value via RegistryLib, counting failures.
-GestureRegWriteDword(ValueName, Value, &ErrorsRef) {
-		global GESTURE_REG_PATH
-
-		if (!Reg_WriteDword(GESTURE_REG_PATH, ValueName, Value))
-				ErrorsRef += 1
-}
-
 ; Configures Windows touchpad gestures via the registry so that all 10 gesture
 ; slots send Ctrl+Win+Shift+F1..F10 without any manual Settings configuration.
-; Writes the master enables, per-direction enables, Custom*Tap sentinels,
-; KeyParams (encoded as (VK<<16)|7), and resets the new-system *Action values
-; to 65535 so the old KeyParams system takes precedence.
-; Returns true on success, false if any registry write failed.
+; The values come from the generated touchpad table and are written by its one
+; owner (modules/gestures/touchpad_registry.ahk), which backs up the prior
+; values before the first write so « Restaurer les gestes du pavé tactile
+; Windows » can put them back.
+; Returns true on success, false if the backup or any registry write failed.
 GestureAutoConfigureRegistry(OnDone := 0) {
-		global GESTURE_REG_PATH, GESTURE_REG_CUSTOM_VALUE
-		global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS, GESTURE_REG_KEY_PARAMS_NAMES
-		global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
-		global GESTURE_REG_CUSTOM_TAP_VALUE, GESTURE_REG_MASTER_ENABLES, GESTURE_SLOTS
-
 		LoggerStart("gestures", "Auto-configuring touchpad gestures via registry…")
-		Errors := 0
-
-		; Master enables — turn the gesture families on
-		for _, Name in GESTURE_REG_MASTER_ENABLES {
-				GestureRegWriteDword(Name, GESTURE_REG_CUSTOM_VALUE, &Errors)
-		}
-
-		; Per-slot configuration
-		for _, Slot in GESTURE_SLOTS {
-				; Direction enables (swipes only)
-				if GESTURE_REG_ENABLE_NAMES.Has(Slot) {
-						GestureRegWriteDword(GESTURE_REG_ENABLE_NAMES[Slot],
-								GESTURE_REG_CUSTOM_VALUE, &Errors)
-				}
-				; Custom*Tap=7 sentinel for tap slots
-				if GESTURE_REG_CUSTOM_TAP_NAMES.Has(Slot) {
-						GestureRegWriteDword(GESTURE_REG_CUSTOM_TAP_NAMES[Slot],
-								GESTURE_REG_CUSTOM_TAP_VALUE, &Errors)
-				}
-				; KeyParams — actual shortcut encoding (Ctrl+Win+Shift+Fn)
-				GestureRegWriteDword(GESTURE_REG_KEY_PARAMS_NAMES[Slot],
-						GESTURE_REG_KEY_PARAMS[Slot], &Errors)
-				; New-system *Action — 65535 disables it so KeyParams takes precedence
-				GestureRegWriteDword(GESTURE_REG_ACTIONS[Slot],
-						GESTURE_REG_CUSTOM_VALUE, &Errors)
-		}
-
-		if (Errors > 0) {
-				LoggerError("gestures", "Auto-configuration failed with {1} error(s).", Errors)
+		if !TouchpadRegistryApply() {
+				LoggerError("gestures", "Auto-configuration failed: the touchpad values were not all written.")
 				return False
 		}
 

@@ -671,6 +671,8 @@ _LogBootProgress("menu_llm persist + tests included")
 ; RunTests() calls ExitApp immediately after completion.
 _LogBootProgress("loading gestures modules")
 #Include ../modules/take_note.ahk
+#Include ../_generated/touchpad_registry.ahk
+#Include ../modules/gestures/touchpad_registry.ahk
 #Include ../modules/gestures/init.ahk
 #Include ../modules/gestures/click.ahk
 #Include ../modules/gestures/screenshots.ahk
@@ -753,6 +755,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_runtime_decision_generation.ahk
 #Include meta/test_wpm_global_barrier_behavior_20260813.ahk
 #Include unit/test_gesture_restart_result_zero_is_success.ahk
+#Include unit/test_touchpad_registry.ahk
 _LogBootProgress("gestures + test included")
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category

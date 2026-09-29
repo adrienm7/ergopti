@@ -1083,6 +1083,10 @@ BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled
 	_GateCountsBefore["enabled"] - _GateCountsAfter["enabled"]))
 
 #Include modules/take_note.ahk
+; The touchpad registry table and its one owner (backup, write, restore).
+; Functions only: the first-run wizard above already calls them.
+#Include _generated/touchpad_registry.ahk
+#Include modules/gestures/touchpad_registry.ahk
 #Include modules/gestures/init.ahk
 #Include modules/gestures/click.ahk
 #Include modules/gestures/screenshots.ahk

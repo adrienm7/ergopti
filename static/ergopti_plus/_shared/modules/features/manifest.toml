@@ -4210,6 +4210,15 @@ i18n = "menu.global.remove_from_karabiner"
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
+# Puts back the Precision Touchpad registry values backed up before Ergopti's
+# first gesture configuration (windows/modules/gestures/touchpad_registry.ahk).
+[[menu.configuration_menu]]
+type = "command"
+id = "restore_touchpad_gestures"
+i18n = "menu.global.restore_touchpad_gestures"
+platforms = ["ahk"]
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
+
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
 # They are `command` now, like the four rows below them, and the label is the

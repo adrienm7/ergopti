@@ -1702,6 +1702,8 @@
 	"notify.personal_info": "Informations personnelles",
 	"notify.quit_refused": "Impossible de quitter pour l’instant, une autre opération est en cours. Réessayez dans un instant.",
 	"notify.karabiner.removed": "Les règles d’Ergopti ont été retirées de Karabiner. Vos propres règles sont inchangées.",
+	"notify.touchpad.restored": "Vos gestes du pavé tactile Windows ont été restaurés.",
+	"notify.touchpad.no_backup": "Rien à restaurer : Ergopti n’a jamais modifié vos gestes du pavé tactile Windows.",
 	"notify.report_bug_body": "Le formulaire GitHub est ouvert et prérempli avec le diagnostic (également copié dans le presse-papiers, au cas où il aurait été raccourci).",
 	"notify.screenshot_copied": "Capture copiée",
 	"notify.screenshot_saved": "Capture sauvegardée",
@@ -2972,6 +2974,7 @@
 	"menu.global.start_at_login": "Démarrer à l’ouverture de session",
 	"menu.global.karabiner_integration": "Ergopti utilise Karabiner",
 	"menu.global.remove_from_karabiner": "Retirer Ergopti de Karabiner",
+	"menu.global.restore_touchpad_gestures": "Restaurer les gestes du pavé tactile Windows",
 	"dialog.start_at_login.failed": "Impossible de modifier le démarrage automatique. Vérifiez les réglages de démarrage du système.",
 	"onboarding.error.open_failed": "L’assistant de configuration n’a pas pu s’ouvrir. Consultez les journaux, puis réessayez depuis le menu."
 }
