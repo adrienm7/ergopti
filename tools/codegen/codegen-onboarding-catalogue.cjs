@@ -607,14 +607,23 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 }
 
 /**
- * The hotstring trigger character choice.
- * @returns {object} Choice descriptor.
+ * The hotstring trigger character choice, or undefined on a platform its
+ * `platforms` list leaves out.
+ * @returns {object|undefined} Choice descriptor.
  */
 function magicKeyFor(id, page, platform, projection, labels) {
 	const choice = page.magic_key;
 	if (!isPlainObject(choice) || typeof choice.path !== 'string' || !Array.isArray(choice.options)) {
 		throw new Error(`[onboarding.pages.${id}.magic_key] needs a path and options`);
 	}
+	if (
+		!Array.isArray(choice.platforms) ||
+		choice.platforms.length === 0 ||
+		choice.platforms.some((name) => !MANIFEST_PLATFORMS.includes(name))
+	) {
+		throw new Error(`[onboarding.pages.${id}.magic_key] platforms must list known platforms`);
+	}
+	if (!choice.platforms.includes(platform)) return undefined;
 	const values = projection.project(choice.path, platform);
 	if (typeof values.default !== 'string' || values.default === '') {
 		throw new Error(`${choice.path} must default to a character`);
@@ -683,8 +692,10 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 	if (master) built.master = master;
 	if (hint) built.hint_key = hint;
 	if (note) built.note_key = note;
-	if (page.checklist === 'hotstrings')
-		built.magic_key = magicKeyFor(id, page, platform, projection, labels);
+	if (page.checklist === 'hotstrings') {
+		const magicKey = magicKeyFor(id, page, platform, projection, labels);
+		if (magicKey) built.magic_key = magicKey;
+	}
 	return built;
 }
 

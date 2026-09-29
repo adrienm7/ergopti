@@ -4520,30 +4520,7 @@
 								}
 							]
 						}
-					],
-					"magic_key": {
-						"path": "hotstrings.trigger_char",
-						"default": "★",
-						"recommended": "★",
-						"label_key": "onboarding.magic_key.desc",
-						"hint_key": "onboarding.magic_key.choose_freely",
-						"custom_label_key": "onboarding.magic_key.option_custom",
-						"max_characters": 1,
-						"options": [
-							{
-								"value": "★",
-								"label_key": "onboarding.magic_key.option_blackstar"
-							},
-							{
-								"value": "ù",
-								"label_key": "onboarding.magic_key.option_ugrave"
-							},
-							{
-								"value": ";",
-								"label_key": "onboarding.magic_key.option_semicolon"
-							}
-						]
-					}
+					]
 				},
 				{
 					"id": "llm",

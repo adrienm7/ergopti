@@ -940,7 +940,7 @@ helpers.describe("ui.bridge_handlers", function()
 		helpers.it("(onboarding-rerun) initData shows the values config.toml holds", function()
 			local state = onboarding_state()
 			local path = os.tmpname()
-			write_file(path, '[gestures]\nenabled = false\n[hotstrings]\ntrigger_char = ";"\n'
+			write_file(path, '[gestures]\nenabled = false\n[hotstrings.modules.distancesreduction]\nqu = true\n'
 				.. '[unrelated]\nenabled = true\n')
 			state.config_paths.config = function(rel)
 				helpers.assert_eq(rel, "config.toml")
@@ -950,7 +950,7 @@ helpers.describe("ui.bridge_handlers", function()
 			os.remove(path)
 			helpers.assert_true(result.pushed)
 			helpers.assert_eq(result.data.current, {
-				["gestures.enabled"] = false, ["hotstrings.trigger_char"] = ";",
+				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
 			}, "a re-run shows the answers in force, an explicit false included")
 		end)
 
@@ -1055,14 +1055,15 @@ helpers.describe("ui.bridge_handlers", function()
 			local marked = {}
 			local values = handler.config_values({
 				gestures = { enabled = false },
-				hotstrings = { trigger_char = ";", unknown = 1 },
+				hotstrings = { modules = { distancesreduction = { qu = true } }, trigger_char = ";" },
 				unrelated = { enabled = true },
 			}, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
-			helpers.assert_eq(values, { ["gestures.enabled"] = false, ["hotstrings.trigger_char"] = ";" },
-				"an explicit false is a configured value, not an absent one")
+			helpers.assert_eq(values, {
+				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
+			}, "an explicit false is a configured value, not an absent one")
 			table.sort(marked)
-			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.trigger_char" },
-				"the unused-key cleanup must never offer a key the wizard reads")
+			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.modules.distancesreduction.qu" },
+				"the unused-key cleanup must never offer a key the wizard reads, and only those")
 		end)
 
 		helpers.it("(onboarding-rerun) a chosen folder reloads its own values under the request number", function()
@@ -1109,7 +1110,6 @@ helpers.describe("ui.bridge_handlers", function()
 				operations = {
 					{ path = "gestures.enabled", value = true },
 					{ path = "metrics.enabled", value = false },
-					{ path = "hotstrings.trigger_char", value = ";" },
 				},
 			})
 			helpers.assert_eq(result, { done = true, restarted = true })
@@ -1122,7 +1122,6 @@ helpers.describe("ui.bridge_handlers", function()
 				updates = {
 					{ section = "gestures", key = "enabled", value = true },
 					{ section = "metrics", key = "enabled", delete = true },
-					{ section = "hotstrings", key = "trigger_char", value = ";" },
 				},
 			} }, "every answer lands in one atomic batch and a neutral answer stays sparse")
 			helpers.assert_eq(captured.hidden, 1)
