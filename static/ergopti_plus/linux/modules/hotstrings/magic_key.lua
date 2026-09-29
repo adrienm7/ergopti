@@ -23,25 +23,22 @@
 ---    must not be one the user types in ordinary text — accepting "e" would make
 ---    every word containing an e a potential trigger, and the only way back would
 ---    be to edit the config file the menu exists to avoid.
---- 3. Persisted. A key that resets on restart is worse than no setting: the user
----    reconfigures once, sees it work, and loses it silently.
+--- 3. Persisted as the canonical `hotstrings.trigger_char` leaf of config.toml,
+---    sparse against the manifest default. A key that resets on restart is worse
+---    than no setting: the user reconfigures once, sees it work, and loses it.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
-local Storage = require("adapters.storage")
+local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
 local Terminators = require("keymap.terminators")
 
 local LOG = "magic_key"
 
--- Where the user's choice lives. Namespaced under hotstrings because that is the
--- feature it belongs to, not because the storage layer needs it.
-local STORAGE_KEY = "hotstrings.trigger_char"
-
--- The manifest path the default comes from. Named once so the two readers below
--- cannot drift onto different keys.
+-- The canonical leaf the user's choice lives in and the manifest path its
+-- default comes from: one name, so the reader and the writer cannot drift apart.
 local MANIFEST_PATH = "hotstrings.trigger_char"
 
 -- Set by M.init, so a change can rebuild the menu and re-register the dynamic
@@ -72,8 +69,8 @@ end
 --- The character in effect: the user's choice, or the manifest default.
 --- @return string
 function M.get()
-	local stored = Storage.get(STORAGE_KEY, nil)
-	if stored ~= nil then
+	if Preferences.is_explicit(MANIFEST_PATH) then
+		local stored = Preferences.get(MANIFEST_PATH)
 		if M.validate(stored) then return stored end
 		Logger.error(LOG, "Stored magic key is unsafe or malformed — using the shipped default.")
 	end
@@ -83,7 +80,8 @@ end
 --- Whether the user has chosen a key different from the shipped one.
 --- @return boolean
 function M.is_customised()
-	local stored = Storage.get(STORAGE_KEY, nil)
+	if not Preferences.is_explicit(MANIFEST_PATH) then return false end
+	local stored = Preferences.get(MANIFEST_PATH)
 	return M.validate(stored) == true and stored ~= M.default()
 end
 
@@ -130,7 +128,7 @@ function M.set(candidate)
 		return false, reason
 	end
 
-	if not Storage.set(STORAGE_KEY, candidate) then
+	if not Preferences.set(MANIFEST_PATH, candidate) then
 		Logger.error(LOG, "Could not persist the magic key — the change would be lost at restart.")
 		return false, "dialog.magic_key.error_persist"
 	end
@@ -143,7 +141,7 @@ end
 --- Restores the shipped default by removing the stored override.
 --- @return boolean
 function M.reset()
-	if not Storage.delete(STORAGE_KEY) then
+	if not Preferences.set(MANIFEST_PATH, M.default()) then
 		Logger.error(LOG, "Could not remove the stored magic key — the active key was not changed.")
 		return false
 	end

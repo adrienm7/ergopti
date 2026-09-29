@@ -32,33 +32,37 @@
 local helpers = require("tests.helpers")
 
 
---- Installs a storage stub and returns it with a restore function.
+--- Installs an in-memory canonical preference owner and returns it with a
+--- restore function. The real owner writes config.toml; its own contract test
+--- covers the file, so these cases pin what the magic key does with the answers.
 --- @param opts table|nil { stored?: string, writable?: boolean }
 --- @return table stub, function restore
 local function stub_storage(opts)
 	opts = opts or {}
-	local previous = package.loaded["adapters.storage"]
+	local previous = package.loaded["infra.hotstring_preferences"]
 	local stub = { values = {}, writes = 0, deletes = 0, writable = opts.writable ~= false }
 	if opts.stored ~= nil then stub.values["hotstrings.trigger_char"] = opts.stored end
-	stub.get = function(key, default_value)
-		local value = stub.values[key]
-		if value == nil then return default_value end
+	local function neutral(path) return require("infra.manifest_reader").default_for(path) end
+	stub.get = function(path)
+		local value = stub.values[path]
+		if value == nil then return neutral(path) end
 		return value
 	end
-	stub.set = function(key, value)
-		stub.writes = stub.writes + 1
+	stub.is_explicit = function(path) return stub.values[path] ~= nil end
+	stub.set = function(path, value)
 		if not stub.writable then return false end
-		stub.values[key] = value
+		-- Sparse, as the real owner: the neutral value removes the leaf.
+		if value == neutral(path) then
+			stub.deletes = stub.deletes + 1
+			stub.values[path] = nil
+		else
+			stub.writes = stub.writes + 1
+			stub.values[path] = value
+		end
 		return true
 	end
-	stub.delete = function(key)
-		stub.deletes = stub.deletes + 1
-		if not stub.writable then return false end
-		stub.values[key] = nil
-		return true
-	end
-	package.loaded["adapters.storage"] = stub
-	return stub, function() package.loaded["adapters.storage"] = previous end
+	package.loaded["infra.hotstring_preferences"] = stub
+	return stub, function() package.loaded["infra.hotstring_preferences"] = previous end
 end
 
 
