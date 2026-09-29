@@ -521,3 +521,13 @@ selects a visible mode (`IsWindowVisible` returns 1). Use `Hide` alone when
 sizing a prepared surface; keep the reveal explicit. A source assertion that
 only finds `Show("Hide` cannot prove invisibility. Check the native window after
 construction and after repositioning, as in the tooltip hidden-surface test.
+
+### project-tooltip-two-hwnd-zorder
+
+`ShowWindow` with `SW_SHOWNOACTIVATE` reveals a window in the z-order slot it
+already holds; it never raises it. The tooltip border is a second layered HWND
+that must stack above the opaque content Gui, and pooled borders are older than
+the content they are reused for. Place every tooltip surface explicitly at
+reveal (`SetWindowPos` with `HWND_TOPMOST`, `SWP_SHOWWINDOW | SWP_NOACTIVATE`),
+content first and border last. Check stacking with `GetWindow(GW_HWNDNEXT)` on
+real windows, as in the tooltip border z-order test.

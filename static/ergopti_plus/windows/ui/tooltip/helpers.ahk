@@ -32,22 +32,50 @@ class TooltipLlmStaleRenderError extends Error {
 ; AHK uses two HWNDs (content + border); PREPARE keeps both hidden until the
 ; border DIB and content controls are ready, then REVEAL shows them together.
 
+; Native reveal seam. ShowWindow(SW_SHOWNOACTIVATE) shows a window in the z-order
+; slot it already holds, so the border landed above the content only while it was
+; created after it. A pooled border is always older than the fresh content Gui,
+; which then covered the whole ring except the corner pixels its rounded region
+; clips away. Every reveal therefore places the surface explicitly.
+class _TooltipRevealNative {
+	; HWND_TOPMOST: the top of the always-on-top band both tooltip surfaces use.
+	static InsertAfter := -1
+	; SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW. SWP_NOZORDER is
+	; deliberately absent: the z-order placement is the purpose of the call.
+	static Flags := 0x0001 | 0x0002 | 0x0010 | 0x0040
+
+	static ShowOnTop(Hwnd) {
+		return DllCall("User32\SetWindowPos", "Ptr", Hwnd,
+			"Ptr", this.InsertAfter, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
+			"UInt", this.Flags, "Int") != 0
+	}
+
+	; A failed synchronous flush only defers the paint to the queued WM_PAINT.
+	static PaintNow(Hwnd) {
+		return DllCall("User32\UpdateWindow", "Ptr", Hwnd, "Int") != 0
+	}
+}
+
 ; Show content + border together after PREPARE completed while hidden.
 ; The content is a normal Gui (background + text controls); the border is a
-; separate pre-painted layered window. ShowWindow only QUEUES a WM_PAINT for the
+; separate pre-painted layered window. Showing only QUEUES a WM_PAINT for the
 ; content, so if the message queue is busy the border (already painted via
 ; UpdateLayeredWindow) can appear for up to a few hundred ms over a still-blank
 ; content window — the "border alone without background" flash. UpdateWindow
 ; flushes the content's paint SYNCHRONOUSLY (it bypasses the queue), so the
 ; background+text are on screen BEFORE the border is revealed and the two surfaces
-; appear as one. This keeps the two-window design but removes the visible seam.
-_TooltipRevealPreparedSurfaces(Surface) {
+; appear as one. The border is raised last so it always stacks directly above
+; its content, whichever of the two HWNDs was created first.
+_TooltipRevealPreparedSurfaces(Surface, Native := _TooltipRevealNative) {
 		if (Surface.Rows.Length > 0) {
-				try DllCall("User32\ShowWindow", "Ptr", Surface.Rows[1].Gui.Hwnd, "Int", 4)
-				try DllCall("User32\UpdateWindow", "Ptr", Surface.Rows[1].Gui.Hwnd)
+				ContentHwnd := Surface.Rows[1].Gui.Hwnd
+				if !Native.ShowOnTop(ContentHwnd)
+						throw OSError(A_LastError, "SetWindowPos (tooltip content reveal)")
+				Native.PaintNow(ContentHwnd)
 		}
 		if Surface.Border {
-				GR_Show(Surface.Border.Hwnd)
+				if !Native.ShowOnTop(Surface.Border.Hwnd)
+						throw OSError(A_LastError, "SetWindowPos (tooltip border reveal)")
 		}
 }
 
