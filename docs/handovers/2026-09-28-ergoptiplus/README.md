@@ -44,9 +44,9 @@ to force an old proposal onto a changed source.
 
 | Proposal                     | Status and prerequisite                                                    | Recorded targeted verification                              |
 | ---------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `hotstrings-repeat.patch`    | Linux sparse repeat preference; independent                                | 41/41; old code fails 11 cases                              |
-| `hotstrings-engine.patch`    | Shared engine detached catalogue publication                               | 59/59 on LuaJIT and Lua 5.4; five new cases fail before fix |
-| `hotstrings-catalogue.patch` | Linux catalogue publication; apply after engine                            | 53/53 on both runtimes; five causal failures                |
+| `hotstrings-repeat.patch`    | Integrated on `wip/w1-hotstrings` as `ba0f59d7`; do not reapply            | 41/41; old code fails 11 cases                              |
+| `hotstrings-engine.patch`    | Integrated on `wip/w1-hotstrings` as `7cdf412f`; do not reapply            | 59/59 on LuaJIT and Lua 5.4; five new cases fail before fix |
+| `hotstrings-catalogue.patch` | Integrated on `wip/w1-hotstrings` as `9c6527fe`; do not reapply            | 53/53 on both runtimes; five causal failures                |
 | `mac-remap-sparse.patch`     | macOS neutral remap persistence; after integrated owned-field preservation | 8/8 targeted, 47/47 broader; four causal failures           |
 
 The standalone CI repair changes `test_hotstrings_config.lua` after the
@@ -54,6 +54,14 @@ The standalone CI repair changes `test_hotstrings_config.lua` after the
 the current isolated discovery/activation fixture; preserve its explicit
 activation and real-trigger execution assertions. Original proposal hashes
 remain historical and must not be rewritten to conceal this prerequisite.
+
+The lane handoffs below are hashed evidence and stay as written. Of the open
+items in `linux-hotstrings-final-handoff.md`, `wip/w1-hotstrings` resolves 1, 3
+and 4: categories, sections, the magic key, previews and dynamic families are
+canonical config.toml leaves (`3f6eac6e`, `7801da84`), and a one-shot import
+carries an updated install's storage.json choices into them. Items 2 and 6 are
+covered by `config_scope_file.lua` and `infra/hotstrings_scope.lua`. Items 5
+(terminators in storage) and 7 (no Hotstrings scope rows) remain open.
 
 These proofs are recorded from private overlays, not whole-repository release
 gates. Integrate each coherently and rerun the gates selected by `verify-change`.
