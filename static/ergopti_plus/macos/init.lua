@@ -1388,6 +1388,15 @@ local function language_pack_path(language, stem)
 	return nil
 end
 
+-- Discover the extension packs once for this boot — the bundled ones, the
+-- committed generations of installed layouts, then the user's folder — before
+-- the override resolver, the loader and the menu read them, so all three
+-- describe the same packs. A refused discovery stops the boot as it does on
+-- Windows: a partial catalogue would hide installed hotstrings without a word.
+local ExtensionPacks = require("infra.extension_packs")
+local HotstringExtensions = require("hotstrings.extensions")
+ExtensionPacks.discover()
+
 -- Initialise the hotstrings_config module so per-group delays and tooltip
 -- colors can be resolved from the TOML metadata + the shared user override
 -- file. The resolver routes the personal category through the (possibly
@@ -1401,6 +1410,10 @@ do
 		override_path = override_path,
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
+			-- A namespaced extension pack names its own discovered file.
+			if HotstringExtensions.parse_category_key(category) then
+				return ExtensionPacks.source(category)
+			end
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
 			end
@@ -1587,6 +1600,14 @@ for _, g in ipairs(require("infra.personal_hotstrings").load({ bundled_hotstring
 	hotfile_paths[g.name] = g.path
 end
 
+-- Extension packs next: the package tier sits between the personal groups and
+-- the bundled ones. Each pack registers under its namespaced ext: key and stays
+-- off until the canonical preferences applied before keymap.start say otherwise.
+for _, group in ipairs(ExtensionPacks.load(ExtensionPacks.catalogue(), keymap)) do
+	table.insert(hotfiles, group.name)
+	hotfile_paths[group.name] = group.path
+end
+
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
@@ -1694,7 +1715,7 @@ Logger.debug(LOG, "Starting user interface components…")
 local menubar = menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections,
-	karabiner, hotfile_paths
+	karabiner, hotfile_paths, ExtensionPacks.catalogue()
 )
 -- nil means no tray: the menubar, its native menu or the preference rollback
 -- could not settle. Ignoring it still logged "boot SUCCESSFUL" with no menu.

@@ -15,6 +15,7 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Labels        = require("menu.labels")
+local Extensions    = require("hotstrings.extensions")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
@@ -122,7 +123,10 @@ end
 --- @return string
 local function groupLabel(ctx, name)
 	local meta = ctx.keymap and type(ctx.keymap.get_meta_description) == "function" and ctx.keymap.get_meta_description(name)
-	local lbl = (type(meta) == "string" and meta ~= "") and meta or tostring(name):gsub("_", " ")
+	-- An extension pack without a description is named by its file, not by the
+	-- namespaced key the registry files it under.
+	local _, stem = Extensions.parse_category_key(name)
+	local lbl = (type(meta) == "string" and meta ~= "") and meta or tostring(stem or name):gsub("_", " ")
 	return ctx.applyTriggerChar(lbl)
 end
 

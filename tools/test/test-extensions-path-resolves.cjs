@@ -278,9 +278,10 @@ if (catalogueRouteErrors(catalogue).length === 0)
 
 // ─── 3. macOS: base_dir is the driver root, so exactly one ".." ──────────────
 
+// hotstring_counter.lua left this list when it stopped walking the tree: it
+// counts the packs the boot catalogue registered (section 3b).
 const MAC_SITES = [
 	'static/ergopti_plus/macos/init.lua',
-	'static/ergopti_plus/macos/ui/menu/hotstring_counter.lua',
 	'static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua'
 ];
 
@@ -310,6 +311,36 @@ for (const rel of MAC_SITES) {
 
 if (macSitesSeen === 0) {
 	errors.push('no macOS extensions expression was checked — the selector is stale, not the tree.');
+}
+
+// ─── 3b. Lua discovery owners: the bundled root beside _shared ───────────────
+
+// Both Lua drivers discover packs from the shared root's sibling, the one anchor
+// their path owners already probe. Resolved from the real _shared directory.
+const LUA_DISCOVERY_OWNERS = [
+	'static/ergopti_plus/macos/infra/extension_packs.lua',
+	'static/ergopti_plus/linux/infra/paths.lua'
+];
+for (const rel of LUA_DISCOVERY_OWNERS) {
+	const src = read(rel);
+	if (src === null) {
+		errors.push(
+			`${rel}: expected discovery owner is missing — update the list or restore the file.`
+		);
+		continue;
+	}
+	const code = stripComments(src, '.lua');
+	const matches = [...code.matchAll(/shared\s*\.\.\s*"([^"]*extensions[^"]*)"/g)];
+	if (matches.length !== 1) {
+		errors.push(
+			`${rel}: expected exactly one shared-relative extensions root, found ${matches.length}.`
+		);
+		continue;
+	}
+	assertIsExtensionsTree(
+		`${rel} ("${matches[0][1]}")`,
+		path.join(DRIVERS, '_shared', matches[0][1])
+	);
 }
 
 // ─── 4. The Windows bundler ships the tree ───────────────────────────────────

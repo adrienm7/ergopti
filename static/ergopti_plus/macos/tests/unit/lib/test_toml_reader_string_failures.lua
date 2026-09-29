@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_counter = require("tests.support.hotstring_counter_fixture")
+local with_virtual_file = require("tests.support.virtual_toml_file_fixture")
 
 local recipes = {
 	function(q) return '[[s]]\n' .. q .. ' = { output = "A" }' end,
@@ -42,7 +42,7 @@ helpers.describe("TOML reader quoted failure propagation", function()
 	end
 
 	helpers.it("(reader-string-cache) closes rejected files and retries previews without cached partial results", function()
-		with_counter(function(counter, state, context)
+		with_virtual_file(function(state)
 			helpers.with_fresh_modules({ "toml_codec.reader" }, function()
 				local reader = require("toml_codec.reader")
 				local stores = 0
@@ -56,14 +56,12 @@ helpers.describe("TOML reader quoted failure propagation", function()
 				helpers.assert_eq(stores, 0)
 				helpers.assert_eq(state.opens, 1)
 				helpers.assert_eq(state.closes, 1)
-				local ok, failure = pcall(counter.count_all, context, {})
-				helpers.assert_eq(ok, false)
-				helpers.assert_true(not tostring(failure):find("PRIVATE_DETAIL", 1, true))
 				state.content = '[[s]]\n"a" = { output = "A" }'
-				helpers.assert_eq(counter.count_all(context, {}).ext, 1)
-				helpers.assert_eq(counter.count_all(context, {}).ext, 1)
-				helpers.assert_eq(state.opens, 3)
-				helpers.assert_eq(state.closes, 3)
+				local repaired, repaired_ok = reader.parse('/virtual/extensions/demo/hotstrings/demo.toml')
+				helpers.assert_eq(repaired_ok, true, "a rejected parse must leave nothing that blocks the retry")
+				helpers.assert_eq(#repaired.sections.s.entries, 1)
+				helpers.assert_eq(state.opens, 2)
+				helpers.assert_eq(state.closes, 2)
 			end)
 		end)
 	end)

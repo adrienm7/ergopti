@@ -14,8 +14,6 @@
 local M = {}
 local hs         = hs
 local Logger     = require("infra.logger")
-local DeferredWork = require("infra.deferred_work")
-local text_utils = require("infra.text_utils")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
 local i18n       = require("infra.i18n")
@@ -23,12 +21,12 @@ local i18n       = require("infra.i18n")
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
 local HotCounter  = require("ui.menu.hotstring_counter")
-local MenuUtils   = require("ui.menu.menu_utils")
 local CanvasBadge = require("ui.menu.canvas_badge")
 local Labels      = require("menu.labels")
 
 
 local Languages   = require("hotstrings.languages")
+local Extensions  = require("hotstrings.extensions")
 local TomlCodec   = require("toml_codec.codec")
 local LocaleTable = require("_generated.locale_table")
 
@@ -267,8 +265,8 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		return result
 	end
 
-	-- Language-pack groups render under their language's own submenu, never
-	-- among the neutral categories.
+	-- Language-pack groups render under their language's own submenu, and
+	-- extension packs under their extension's, never among the neutral categories.
 	local LANGUAGE_PACKS = load_language_packs()
 	local LANGUAGE_GROUPS = Languages.groups(LANGUAGE_PACKS)
 
@@ -278,7 +276,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			local flattened_name = name:gsub("_", "")
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
-			and not LANGUAGE_GROUPS[name]
+			and not LANGUAGE_GROUPS[name] and not Extensions.parse_category_key(name)
 			and not (ERGOPTI_GROUPS[name] or ERGOPTI_GROUPS[flattened_name]) then
 				non_ergopti_filter[name] = true
 			end
@@ -325,38 +323,26 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- grounds that "neither Lua driver ships an extensions directory" while
 	-- hotstring_counter.lua was walking exactly that directory and this block
 	-- was rendering the result. A row nothing names is a row nothing can check.
+	-- Each installed extension is one submenu holding its loaded packs, built
+	-- like a language: one « all sections » checkbox for the whole extension,
+	-- then the packs' own rows with their switch and sections. These rows used
+	-- to be read-only counts because no pack reached the typing engine.
 	local manifest_row = "hotstring_extensions"
 	Logger.debug(LOG, "Building manifest row '%s' (%d extension(s)).", manifest_row, #counts.ext_details)
-	local extension_items = {}
-	do
-		for _, ext in ipairs(counts.ext_details) do
-			local toml_submenus = {}
-			for _, f in ipairs(ext.files) do
-				local sec_menu = {
-					{
-						title = i18n.get("menu.hotstrings.open_file"),
-						fn    = (function(path)
-							return function()
-								DeferredWork.after(0, function()
-									pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-								end, "menu_builder.open_extension")
-							end
-						end)(f.path),
-					},
-				}
-				if #f.sections > 0 then table.insert(sec_menu, { title = "-" }) end
-				for _, sec in ipairs(f.sections) do
-					table.insert(sec_menu, {
-						title    = sec.name .. " (" .. fmt_grand(sec.count) .. ")",
-						disabled = true,
-					})
-				end
-				local toml_label = f.stem .. (f.total > 0 and (" (" .. fmt_grand(f.total) .. ")") or "")
-				table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
-			end
-			local ext_label = ext.name .. (ext.total > 0 and (" (" .. fmt_grand(ext.total) .. ")") or "")
-			table.insert(extension_items, { title = ext_label, menu = toml_submenus })
-		end
+	local extension_rows = {}
+	for _, ext in ipairs(counts.ext_details) do
+		local only = {}
+		for _, name in ipairs(ext.groups) do only[name] = true end
+		local items = {}
+		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
+			and menu_mods.hotstrings.build_language_bulk_actions(ctx, ext.groups) or {}
+		for _, row in ipairs(bulk) do items[#items + 1] = row end
+		items[#items + 1] = { separator = true }
+		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
+		extension_rows[#extension_rows + 1] = {
+			label = ext.name .. " (" .. fmt_grand(ext.total) .. ")",
+			items = items,
+		}
 	end
 
 
@@ -377,25 +363,6 @@ local function build_hotstrings_rows(ctx, menu_mods)
 			and i18n.decorate_section(i18n.get("menu.extensions.header") .. " (" .. fmt_grand(ext_total) .. ")")
 			or  i18n.decorate_section(i18n.get("menu.extensions.header")),
 	}
-
-	--- Converts already-built hs rows into the provider data a `list` row
-	--- takes. These builders return menu trees, and rewriting all four of them
-	--- to emit provider rows is a larger job than this one; adapting here is
-	--- what lets the renderer own the placement today.
-	--- @param built table Menu rows in this driver's shape.
-	--- @return table Provider rows.
-	--- The extension rows are still built in this driver's dialect below, so
-	--- they alone are adapted. The category and personal builders emit provider
-	--- rows themselves since 2026-08-07.
-	--- @param built table Rows in this driver's shape.
-	--- @return table Provider rows.
-	local function as_rows(built)
-		local out = {}
-		for _, entry in ipairs(built or {}) do
-			out[#out + 1] = MenuUtils.as_provider_row(entry)
-		end
-		return out
-	end
 
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
@@ -449,7 +416,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		["hotstring_personal"]            = function()
 			return custom_item and { custom_item } or {}
 		end,
-		["hotstring_extensions"]          = function() return as_rows(extension_items) end,
+		["hotstring_extensions"]          = function() return extension_rows end,
 		-- The dynamic-rule categories are Windows' and Linux's; this driver has
 		-- no separate block for them, and an empty provider is what says so
 		-- without the renderer warning about an unanswered row.
