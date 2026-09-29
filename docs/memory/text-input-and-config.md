@@ -120,6 +120,23 @@ The Windows full save is the one exception: it always writes the current
 version, which is safe only because it runs after the boot migration and never
 in a read-only session.
 
+### project-outdated-config-entries-warn-never-refuse
+
+An unknown, retired or outdated config.toml entry (a removed key, a value
+naming a gone hotkey, action, slot, section or mode, an old-shape value) is
+never an ERROR, a refusal, a crash or a rolled-back sync on any driver (the
+maintainer rule behind dev.146's `at_hash`). Lua readers route it through
+`_shared/lua/config_outdated.lua` (`report`, `partition`, `settings_table`,
+`manifest_value_fits` with the owner's own rule): one WARNING per entry and
+reason, read as absent, left unmarked. The cleanup offers every reported path
+even when another reader marks it, and cuts an outdated inline-table member
+alone. Windows shares `TomlConfigOutdatedReason` between the loader and
+`ConfigUnusedKeysFind`, never counts such a value as a rejected override, and
+full saves keep boot-outdated entries on disk for the cleanup. Judge
+"retired" only against a published catalogue; before one exists, keep every
+choice. Real failures stay fail-closed: an unreadable or malformed file, a
+native refusal, and a scope's own post-write candidate still refuse.
+
 ### project-toml-cache-returns-real-booleans
 
 TOML caches return native booleans. Do not compare their values to string
