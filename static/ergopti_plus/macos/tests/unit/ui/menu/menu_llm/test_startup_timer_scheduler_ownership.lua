@@ -136,7 +136,6 @@ local function with_fixture(callback)
 				fixture.menu_updates = (fixture.menu_updates or 0) + 1
 				return true
 			end,
-			apply_llm_shortcut = function() return true end,
 			apply_llm_profile_shortcut = function(profile_id)
 				fixture.profile_applies = fixture.profile_applies or {}
 				fixture.profile_applies[#fixture.profile_applies + 1] = profile_id
@@ -160,7 +159,6 @@ local function with_fixture(callback)
 				end
 				return true
 			end,
-			get_trigger_hk = function() return nil end,
 			get_profile_hks = function() return {} end,
 			prediction_locks = {
 				apply_preference = function() return true end,

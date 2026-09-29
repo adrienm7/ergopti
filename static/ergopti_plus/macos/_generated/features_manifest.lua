@@ -383,9 +383,6 @@ M.features = {
 		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "llm.trigger.shortcut", id = "shortcut", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.shortcut", platforms = { "hs" }, recommended = false, input_altering = false,
-	},
-	{
 		path = "llm.navigation.nav_modifiers", id = "nav_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.nav_modifiers_prompt", platforms = { "hs" }, recommended = {  }, input_altering = false,
 	},
 	{

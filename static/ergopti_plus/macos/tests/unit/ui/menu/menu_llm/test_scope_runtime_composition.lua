@@ -20,7 +20,7 @@ helpers.describe("LLM scope runtime composition", function()
 		helpers.assert_eq(keymap.set_llm_debounce(0.725), true)
 		local runtime = require("ui.menu.menu_llm.scope_runtime").new({
 			state = state, core = core, keymap = keymap, idle = function() return true end,
-			shortcuts = { configuration_snapshot = function() return { llm_trigger_shortcut = false, llm_profile_shortcuts = {} } end,
+			shortcuts = { configuration_snapshot = function() return { llm_profile_shortcuts = {} } end,
 				apply_configuration = function() return true end },
 			reset_health = function() return true end, model_power = function() return 1 end,
 			display_model = function(model) return model end, backend_label = function(backend) return backend end,

@@ -47,14 +47,12 @@ local LOG = "startup_ctrl"
 ---   guarded_check_requirements function Wrapped check_requirements.
 ---   save_prefs                function Persists state to disk.
 ---   update_menu               function Redraws the tray menu.
----   apply_llm_shortcut        function Restores the on-demand trigger shortcut.
 ---   apply_llm_profile_shortcut function Binds a per-profile shortcut.
 ---   activate_hotkey           function Enables a hs.hotkey object.
 ---   mlx_deps_checker          table    MLX deps checker module.
 ---   deps                      table    Full deps table (for update_menu access after reload).
 ---   get_startup_silence       function Returns the current _startup_silence flag.
 ---   set_startup_silence       function Sets the _startup_silence flag.
----   get_trigger_hk            function Returns the current _llm_trigger_hk handle.
 ---   get_profile_hks           function Returns the current _llm_profile_hks map.
 --- @return function check_startup The startup function to call once.
 function M.new(ctx)
@@ -64,14 +62,12 @@ function M.new(ctx)
 	local guarded_check_requirements = ctx.guarded_check_requirements
 	local save_prefs                 = ctx.save_prefs
 	local update_menu                = ctx.update_menu
-	local apply_llm_shortcut         = ctx.apply_llm_shortcut
 	local apply_llm_profile_shortcut = ctx.apply_llm_profile_shortcut
 	local activate_hotkey            = ctx.activate_hotkey
 	local mlx_deps_checker           = ctx.mlx_deps_checker
 	local deps                       = ctx.deps
 	local get_startup_silence        = ctx.get_startup_silence
 	local set_startup_silence        = ctx.set_startup_silence
-	local get_trigger_hk             = ctx.get_trigger_hk
 	local get_profile_hks            = ctx.get_profile_hks
 	local prediction_locks = type(ctx.prediction_locks) == "table"
 		and ctx.prediction_locks or PredictionLockRegistry.new({
@@ -619,16 +615,6 @@ function M.new(ctx)
 			return false
 		end
 		local ok_restore, restore_err = pcall(function()
-			if type(state.llm_trigger_shortcut) == "table" then
-				Logger.debug(LOG, string.format("Restoring trigger shortcut: %s+%s.",
-					table.concat(state.llm_trigger_shortcut.mods or {}, "+"),
-					state.llm_trigger_shortcut.key or "nil"))
-				apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
-				if _startup_paused == true then return false end
-			else
-				Logger.debug(LOG, "No global trigger shortcut configured.")
-			end
-
 			-- Rebuild the set of valid profile ids from built-ins + user profiles
 			local valid_profile_ids = {}
 			local builtin_count = 0
@@ -669,12 +655,7 @@ function M.new(ctx)
 			end
 
 			Logger.debug(LOG, "Activating bound hotkeys…")
-			local trigger_hk  = get_trigger_hk()
 			local profile_hks = get_profile_hks()
-			if trigger_hk then
-				activate_hotkey(trigger_hk)
-				if _startup_paused == true then return false end
-			end
 			for _, hk in pairs(profile_hks) do
 				if hk then
 					activate_hotkey(hk)

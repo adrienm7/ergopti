@@ -70,7 +70,6 @@ local function with_fixture(callback)
 			llm_reset_on_nav = true,
 			llm_active_profile = "basic",
 			llm_profile_shortcuts = {},
-			llm_trigger_shortcut = false,
 		}
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -212,7 +211,6 @@ local function with_fixture(callback)
 				return {
 					bind_hotkey = noop,
 					activate_hotkey = noop,
-					apply_llm_shortcut = noop,
 					apply_llm_profile_shortcut = noop,
 					restore_shortcuts = function() return true end,
 				}

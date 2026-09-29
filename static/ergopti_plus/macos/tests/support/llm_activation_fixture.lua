@@ -87,7 +87,6 @@ local function build_fixture(backend, save_results, options)
 		llm_reset_on_nav = true,
 		llm_active_profile = "basic",
 		llm_profile_shortcuts = {},
-		llm_trigger_shortcut = false,
 	}
 	local last_attempted_enabled = false
 	local runtime_enabled = false
@@ -277,7 +276,6 @@ local function build_fixture(backend, save_results, options)
 			return {
 				bind_hotkey = noop,
 				activate_hotkey = noop,
-				apply_llm_shortcut = noop,
 				apply_llm_profile_shortcut = noop,
 				restore_shortcuts = function() return true end,
 			}

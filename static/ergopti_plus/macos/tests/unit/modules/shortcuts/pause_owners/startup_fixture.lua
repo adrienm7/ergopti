@@ -154,7 +154,6 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		guarded_check_requirements = function(_, on_ok) on_ok(); return true end,
 		save_prefs = function() saves = saves + 1; return true end,
 		update_menu = function() menu_updates = menu_updates + 1; return true end,
-		apply_llm_shortcut = function() return true end,
 		apply_llm_profile_shortcut = function() return true end,
 		activate_hotkey = function() return true end,
 		mlx_deps_checker = {},
@@ -165,7 +164,6 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		prediction_locks = options.prediction_locks,
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() return true end,
-		get_trigger_hk = function() return nil end,
 		get_profile_hks = function() return {} end,
 	})
 	local startup_result = check_startup()

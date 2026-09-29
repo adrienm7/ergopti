@@ -63,7 +63,7 @@ return function(callback)
 		end }
 		package.loaded["ui.menu.menu_llm.startup_controller"] = { new = function() return noop end }
 		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = { new = function()
-			return { bind_hotkey = noop, activate_hotkey = noop, apply_llm_shortcut = noop,
+			return { bind_hotkey = noop, activate_hotkey = noop,
 				apply_llm_profile_shortcut = noop, restore_shortcuts = accept }
 		end }
 		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = accept }

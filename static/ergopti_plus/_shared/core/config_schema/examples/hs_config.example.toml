@@ -159,7 +159,6 @@ instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
 url_bar_filter_enabled = true
-shortcut = false
 
 [llm.trigger.disabled_apps]
 # user-disabled apps for LLM trigger

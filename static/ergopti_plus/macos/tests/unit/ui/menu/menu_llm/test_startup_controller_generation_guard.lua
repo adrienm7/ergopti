@@ -76,14 +76,12 @@ local function make_ctx(keymap, models_mgr, captured_timers)
 		end,
 		save_prefs = function() return true end,
 		update_menu = function() return true end,
-		apply_llm_shortcut = function() return true end,
 		apply_llm_profile_shortcut = function() return true end,
 		activate_hotkey = function() return true end,
 		mlx_deps_checker = {},
 		deps = { update_menu = function() return true end },
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() end,
-		get_trigger_hk = function() return nil end,
 		get_profile_hks = function() return {} end,
 	}
 end

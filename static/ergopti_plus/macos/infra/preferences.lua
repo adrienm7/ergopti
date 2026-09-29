@@ -97,7 +97,6 @@ local KEY_MAP = {
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
-	llm_trigger_shortcut                 = { sec = "llm", path = "trigger", key = "shortcut"       },
 	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
@@ -418,7 +417,7 @@ local function flatten_from_disk(grouped, mark)
 										take(sec_name, disk_key, inner_key)
 									end
 								else
-									-- Structured scalar (e.g. llm.trigger.shortcut = {mods,key})
+									-- Structured scalar (a table value mapped to one flat key)
 									-- or depth-3 nested maps (hotstrings.editor.*).
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup]

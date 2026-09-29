@@ -1,8 +1,8 @@
 # _shared/tests/corpus/config_migrations/shipped_stamp_only_on_windows_and_linux/case.toml
 
 [case]
-description = "The shipped v2 to v3 step is macOS-only: other drivers keep every key and only move the stamp."
+description = "The shipped steps are macOS-only: other drivers keep every key and only move the stamp."
 drivers = ["ahk", "linux"]
 outcome = "migrated"
 from_version = 2
-to_version = 3
+to_version = 4
