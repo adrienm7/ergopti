@@ -3804,6 +3804,14 @@ local function request_bulk_inverse_regeneration(transaction)
 				)
 				return
 			end
+			-- A paused script refuses every regeneration until Resume, which
+			-- rebuilds from the settings this inverse persisted: retrying it
+			-- during the pause only kept every edit, disable and reload refused.
+			if reason == "script-paused" then
+				settle_bulk_settings_saved_for_later(transaction, "persisted-script-paused",
+					"when the script resumes")
+				return
+			end
 			transaction.phase = "rollback-regeneration"
 			Logger.error(LOG, "%s inverse regeneration remains pending: %s.",
 				transaction.label, tostring(reason))
