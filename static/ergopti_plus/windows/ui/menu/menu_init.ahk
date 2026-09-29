@@ -228,7 +228,6 @@ _MI_StageHotstrings() {
 		; handed over as a native Menu until that tree becomes data too.
 		"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),
 		"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),
-		"hotstring_categories_ergopti",  (*) => _HS_CategoryRowsErgopti(),
 		"hotstring_languages",           (*) => _HS_LanguageRows(),
 		"hotstring_personal",           (*) => _HS_PersonalRows(),
 		"hotstring_extensions",          (*) => _HS_ExtensionRows(),

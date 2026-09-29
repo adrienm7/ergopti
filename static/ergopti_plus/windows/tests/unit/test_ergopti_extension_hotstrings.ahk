@@ -105,3 +105,31 @@ _EHX_CacheCompilesOnlyTheBundledFolder() {
 }
 Test("ergopti extension: the bundled cache no longer compiles the moved groups (ergopti-hotstrings-ext)",
 	_EHX_CacheCompilesOnlyTheBundledFolder)
+
+_EHX_MenuListsBoundCategoriesUnderTheExtension() {
+	Rows := _DriverFuncBody("_HS_ExtensionRows")
+	Assert(Rows != "", "the extension rows provider must resolve")
+	Assert(InStr(Rows, "_HS_BoundCategoryRows(Ext.id)") > 0,
+		"each extension submenu lists the categories it binds (SFB reduction and rolls for Ergopti)")
+	Assert(InStr(Rows, 't("menu.extensions.hotstrings_of")') > 0,
+		"each extension submenu is labelled « Hotstrings <extension> »")
+	Bound := _DriverFuncBody("_HS_BoundCategoryRows")
+	Assert(Bound != "", "the bound category rows builder must resolve")
+	Assert(InStr(Bound, '_HotstringBoundSources[Key]["extension"] != ExtensionId') > 0,
+		"a category is listed under the extension that binds it, and only there")
+	Assert(InStr(_DriverSourceNoComments(), '"hotstring_categories_ergopti"') == 0,
+		"the « Disposition Ergopti » section is gone from the hotstrings menu")
+}
+Test("ergopti extension: the Hotstrings menu lists the groups under « Hotstrings Ergopti » (ergopti-hotstrings-ext)",
+	_EHX_MenuListsBoundCategoriesUnderTheExtension)
+
+_EHX_NoExtensionCategoryRowsWithoutRoutes() {
+	_EHX_WithRoutes(A_Temp . "\ergopti-missing-registry-" . A_TickCount . "\", Check)
+	Check(Packs) {
+		Bound := _HS_BoundCategoryRows("ergopti")
+		AssertEqual(0, Bound.rows.Length, "an extension that is not installed lists no category")
+		AssertEqual(0, Bound.total)
+	}
+}
+Test("ergopti extension: without the extension its submenu lists no category (ergopti-hotstrings-ext)",
+	_EHX_NoExtensionCategoryRowsWithoutRoutes)

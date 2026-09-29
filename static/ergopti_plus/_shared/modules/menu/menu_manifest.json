@@ -1196,17 +1196,6 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.hotstrings.header_ergopti"
-		},
-		{
-			"type": "list",
-			"id": "hotstring_categories_ergopti"
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "section_header",
 			"i18n": "menu.hotstrings.personal_header"
 		},
 		{

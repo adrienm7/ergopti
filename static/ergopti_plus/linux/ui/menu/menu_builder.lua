@@ -1343,11 +1343,6 @@ local function _manifest_hotstring_rows(ctx, config)
 			}
 			return rows
 		end,
-		["hotstring_categories_ergopti"]  = function()
-			local rows = {}
-			append_class(rows, "ergopti")
-			return rows
-		end,
 		["hotstring_languages"] = language_rows,
 		["hotstring_personal"] = function()
 			local rows = {}
@@ -1435,13 +1430,24 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 		["hotstring_extensions"] = function()
 			local rows = {}
-			-- One submenu per installed extension, holding its packs. Grouped by
+			-- One « Hotstrings <extension> » submenu per installed extension, holding
+			-- its packs and the bundled categories it binds whole (Ergopti's SFB
+			-- reduction and rolls, which keep their historical ids). Grouped by
 			-- extension rather than listed flat because an extension is the unit the
 			-- user installed and the unit they will want to turn off; its individual
 			-- packs are an implementation detail of how its author organised them.
-			local by_extension, order = {}, {}
+			local by_extension, order, names = {}, {}, {}
 			for _, name in ipairs(groups) do
 				local extension_id = Extensions.parse_category_key(name)
+				local label = nil
+				if not extension_id then
+					local category = type(config.get_category) == "function" and config.get_category(name) or nil
+					local extension = category and category.extension or nil
+					if type(extension) == "table" and type(extension.id) == "string" then
+						extension_id = extension.id
+						label = extension.name
+					end
+				end
 				if extension_id then
 					if not by_extension[extension_id] then
 						by_extension[extension_id] = {}
@@ -1449,6 +1455,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					end
 					local list = by_extension[extension_id]
 					list[#list + 1] = name
+					names[extension_id] = names[extension_id] or label
 				end
 			end
 
@@ -1494,7 +1501,11 @@ local function _manifest_hotstring_rows(ctx, config)
 					sub[#sub + 1] = group_row(name)
 				end
 
-				rows[#rows + 1] = { label = extension_label(extension_id), items = sub }
+				local name = names[extension_id] or extension_label(extension_id)
+				rows[#rows + 1] = {
+					label = string.format(i18n_safe("menu.extensions.hotstrings_of"), name),
+					items = sub,
+				}
 			end
 			return rows
 		end,

@@ -5031,17 +5031,6 @@ type = "---"
 
 [[menu.hotstrings_menu]]
 type = "section_header"
-i18n = "menu.hotstrings.header_ergopti"
-
-[[menu.hotstrings_menu]]
-type = "list"
-id = "hotstring_categories_ergopti"
-
-[[menu.hotstrings_menu]]
-type = "---"
-
-[[menu.hotstrings_menu]]
-type = "section_header"
 i18n = "menu.hotstrings.personal_header"
 
 [[menu.hotstrings_menu]]
@@ -5051,6 +5040,10 @@ id = "hotstring_personal"
 [[menu.hotstrings_menu]]
 type = "---"
 
+# The hotstrings an extension brings: one « Hotstrings <extension> » submenu
+# each, holding its packs and the bundled categories it binds. The Ergopti
+# layout extension binds SFB reduction and rolls there; they had a section of
+# their own, « Disposition Ergopti », until they moved into that extension.
 [[menu.hotstrings_menu]]
 type = "section_header"
 i18n = "menu.extensions.header"

@@ -31,7 +31,6 @@ local TomlCodec   = require("toml_codec.codec")
 local LocaleTable = require("_generated.locale_table")
 
 local _language_packs_cache    = nil
-local _ergopti_groups_cache    = nil
 local _top_level_cache         = nil
 
 --- Returns the parsed menu_manifest.json root.
@@ -52,26 +51,60 @@ local function load_manifest()
 	return ManifestMenu.get_root()
 end
 
---- Loads hotstring group classification from the shared menu_manifest.json.
---- Returns an empty set on failure and logs ERROR (fail-loud — no stale copy).
---- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
-local function load_ergopti_groups()
-	if _ergopti_groups_cache then return _ergopti_groups_cache end
-	local data = load_manifest()
-	if not data or type(data.hotstring_groups) ~= "table" then
-		Logger.error(LOG, "Cannot load Ergopti groups from manifest — groups will be empty.")
-		return {}
+--- The bundled categories each installed extension binds whole, in catalogue order.
+---
+--- A layout extension may carry a whole category written for its geometry
+--- (Ergopti's SFB reduction and rolls). The category keeps its historical id, so
+--- the registry, the preferences and the counters address it as before, and the
+--- menu lists it under the extension that supplies it rather than among the
+--- common categories.
+--- @param ctx table Menu context carrying `extension_packs` and `hotfiles`.
+--- @return table by_extension Map of extension id to { name, groups }.
+--- @return table groups Set of every bound category loaded this boot.
+function M.bound_groups(ctx)
+	local loaded = {}
+	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
+		loaded[ctx.get_group_name and ctx.get_group_name(f) or f] = true
 	end
-	local groups = {}
-	for _, id in ipairs(data.hotstring_groups.ergopti or {}) do
-		groups[id] = true
-		-- Support both underscored (manifest) and flattened (file stems) IDs
-		local flattened = id:gsub("_", "")
-		if flattened ~= id then groups[flattened] = true end
+	local by_extension, groups = {}, {}
+	for _, pack in ipairs(type(ctx.extension_packs) == "table" and ctx.extension_packs or {}) do
+		for _, file in ipairs(pack.bound_files or {}) do
+			local category = file.binding.category
+			if file.binding.sections == nil and loaded[category] then
+				local entry = by_extension[pack.id] or { name = pack.name, groups = {} }
+				by_extension[pack.id] = entry
+				entry.groups[#entry.groups + 1] = category
+				groups[category] = true
+			end
+		end
 	end
-	Logger.debug(LOG, "Ergopti groups loaded from manifest (%d group(s)).", #(data.hotstring_groups.ergopti or {}))
-	_ergopti_groups_cache = groups
-	return groups
+	return by_extension, groups
+end
+
+--- The « Hotstrings <extension> » submenus to draw, in catalogue order: each
+--- installed extension with the categories it binds whole, then its packs.
+--- An extension that supplies no loaded category draws no submenu.
+--- @param ctx table Menu context carrying `extension_packs`.
+--- @param counts table Result of HotCounter.count_all().
+--- @param by_extension table First result of M.bound_groups().
+--- @return table Array of { id, name, groups, total }.
+function M.extension_menus(ctx, counts, by_extension)
+	local ext_by_id = {}
+	for _, ext in ipairs(counts.ext_details) do ext_by_id[ext.id] = ext end
+	local menus = {}
+	for _, pack in ipairs(type(ctx.extension_packs) == "table" and ctx.extension_packs or {}) do
+		local bound, ext = by_extension[pack.id], ext_by_id[pack.id]
+		local names, total = {}, ext and ext.total or 0
+		for _, name in ipairs(bound and bound.groups or {}) do
+			names[#names + 1] = name
+			total = total + ((counts.group_counts and counts.group_counts[name]) or 0)
+		end
+		for _, name in ipairs(ext and ext.groups or {}) do names[#names + 1] = name end
+		if #names > 0 then
+			menus[#menus + 1] = { id = pack.id, name = pack.name, groups = names, total = total }
+		end
+	end
+	return menus
 end
 
 
@@ -168,20 +201,19 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	end
 	Logger.debug(LOG, "Building hotstrings submenu…")
 
-	-- Groups that are specific to the Ergopti keyboard layout — sourced from menu_manifest.json
-	local ERGOPTI_GROUPS = load_ergopti_groups()
+	-- The categories an installed extension binds whole: counted apart from the
+	-- common ones and listed under that extension's submenu.
+	local BOUND_BY_EXTENSION, BOUND_GROUPS = M.bound_groups(ctx)
 
-	local counts = HotCounter.count_all(ctx, ERGOPTI_GROUPS)
+	local counts = HotCounter.count_all(ctx, BOUND_GROUPS)
 	local fmt_grand = HotCounter.fmt_grand
 
 	local common_total      = counts.common
-	local ergopti_total     = counts.ergopti
 	local personal_total    = counts.personal
-	local ext_total         = counts.ext
-	local common_has_count  = counts.has_common
-	local ergopti_has_count = counts.has_ergopti
+	-- The extensions header counts the packs and the categories they bind.
+	local ext_total         = counts.ext + counts.ergopti
 	local personal_has_count= counts.has_personal
-	local ext_has_count     = counts.has_ext
+	local ext_has_count     = counts.has_ext or counts.has_ergopti
 	local grand_total       = counts.grand
 	local grand_has_count   = counts.has_grand
 
@@ -270,21 +302,19 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local LANGUAGE_PACKS = load_language_packs()
 	local LANGUAGE_GROUPS = Languages.groups(LANGUAGE_PACKS)
 
-	local non_ergopti_filter = {}
+	local common_filter = {}
 	if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
 		for _, f in ipairs(ctx.hotfiles) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			local flattened_name = name:gsub("_", "")
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
 			and not LANGUAGE_GROUPS[name] and not Extensions.parse_category_key(name)
-			and not (ERGOPTI_GROUPS[name] or ERGOPTI_GROUPS[flattened_name]) then
-				non_ergopti_filter[name] = true
+			and not BOUND_GROUPS[name] then
+				common_filter[name] = true
 			end
 		end
 	end
 
-	local std_groups = collect_groups(non_ergopti_filter, counts)
-	local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
+	local std_groups = collect_groups(common_filter, counts)
 
 	-- One row per language: its native name, then one « all sections »
 	-- checkbox for every category of that language, then the language's
@@ -323,27 +353,28 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- grounds that "neither Lua driver ships an extensions directory" while
 	-- hotstring_counter.lua was walking exactly that directory and this block
 	-- was rendering the result. A row nothing names is a row nothing can check.
-	-- Each installed extension is one submenu holding its loaded packs, built
-	-- like a language: one « all sections » checkbox for the whole extension,
-	-- then the packs' own rows with their switch and sections. These rows used
-	-- to be read-only counts because no pack reached the typing engine.
+	-- Each installed extension is one « Hotstrings <extension> » submenu holding
+	-- the categories it binds (Ergopti's SFB reduction and rolls) and its loaded
+	-- packs, built like a language: one « all sections » checkbox for the whole
+	-- extension, then each category's own rows with its switch and sections.
 	local manifest_row = "hotstring_extensions"
-	Logger.debug(LOG, "Building manifest row '%s' (%d extension(s)).", manifest_row, #counts.ext_details)
 	local extension_rows = {}
-	for _, ext in ipairs(counts.ext_details) do
+	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION)) do
 		local only = {}
-		for _, name in ipairs(ext.groups) do only[name] = true end
+		for _, name in ipairs(menu.groups) do only[name] = true end
 		local items = {}
 		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
-			and menu_mods.hotstrings.build_language_bulk_actions(ctx, ext.groups) or {}
+			and menu_mods.hotstrings.build_language_bulk_actions(ctx, menu.groups) or {}
 		for _, row in ipairs(bulk) do items[#items + 1] = row end
 		items[#items + 1] = { separator = true }
 		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
 		extension_rows[#extension_rows + 1] = {
-			label = ext.name .. " (" .. fmt_grand(ext.total) .. ")",
+			label = string.format(i18n.get("menu.extensions.hotstrings_of"), menu.name)
+				.. " (" .. fmt_grand(menu.total) .. ")",
 			items = items,
 		}
 	end
+	Logger.debug(LOG, "Built manifest row '%s' (%d extension(s)).", manifest_row, #extension_rows)
 
 
 	-- ===== The manifest's own rows, placed by the shared renderer =====
@@ -355,8 +386,6 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local section_labels = {
 		["menu.hotstrings.header_common"] = i18n.decorate_section(
 			string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))),
-		["menu.hotstrings.header_ergopti"] = i18n.decorate_section(
-			string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))),
 		["menu.hotstrings.personal_header"] = i18n.decorate_section(
 			string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))),
 		["menu.extensions.header"] = ext_has_count
@@ -408,7 +437,6 @@ local function build_hotstrings_rows(ctx, menu_mods)
 
 	local providers = {
 		["hotstring_categories_standard"] = function() return std_groups end,
-		["hotstring_categories_ergopti"]  = function() return ergopti_groups_built end,
 		["hotstring_languages"]           = function() return language_rows end,
 		-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
 		-- that builder emits `label`/`action`/`items` itself, so there is no
