@@ -1401,6 +1401,37 @@ function M.is_missing() return _bootstrap_state == "missing" end
 --- @return boolean True while the selection's bootstrap script is running.
 function M.is_task_running() return _task_running == true end
 
+--- Marks an installed runtime whose import probe failed as not installed, so
+--- the next MLX selection rebuilds it. Updates never re-sync the venv, so a
+--- lock bump or a partial environment otherwise stays broken for good. Only
+--- the sync fingerprint is removed: runtime_installed() then reads false, and
+--- ensure-mlx-deps.sh takes its full staged rebuild path. Nothing is fetched
+--- here; the selection that follows owns the download.
+--- @return boolean invalidated True when the fingerprint was removed.
+function M.invalidate_runtime()
+	if _task_running then
+		Logger.debug(LOG, "MLX runtime invalidation skipped: its bootstrap is running.")
+		return false
+	end
+	local venv = M.venv_dir()
+	if not venv then
+		Logger.error(LOG, "Cannot invalidate the MLX runtime: its folder cannot be named.")
+		return false
+	end
+	local marker = venv .. "/.last_sync_hash"
+	local ok, removed, remove_err = pcall(os.remove, marker)
+	if not ok or not removed then
+		Logger.error(LOG, "Cannot invalidate the MLX runtime fingerprint %s: %s",
+			marker, tostring(ok and remove_err or removed))
+		return false
+	end
+	_bootstrap_state = "missing"
+	_last_failure_message = i18n.get("mlx.runtime_broken_body")
+	_terminal_outcome = nil
+	Logger.warn(LOG, "MLX runtime invalidated; the next MLX selection rebuilds %s.", venv)
+	return true
+end
+
 --- The only bootstrap entry: the user selected the MLX backend (menu row or
 --- AI enable while MLX is the backend). An installed runtime is reused and the
 --- grant is consumed without running the script; a missing one is provisioned.

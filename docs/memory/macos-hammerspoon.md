@@ -92,6 +92,10 @@ another backend, or after an update: only `install_for_selection()` of
 `missing` without a task. An installed runtime is reused by stat alone
 (Ollama: `ollama_binary.resolve()`; MLX: venv `bin/python` plus
 `.last_sync_hash`), so a new `uv.lock` in an update never re-syncs the venv.
+When the MLX import probe then fails on an installed venv,
+`mlx_deps_checker.invalidate_runtime()` removes only `.last_sync_hash`: the
+runtime reads as not installed and the next MLX selection runs the script's
+full staged rebuild. Never re-sync from the probe itself.
 The Ollama installer publishes the whole release archive (CLI plus the
 ggml/MLX libraries it loads from its own folder, as in
 `Ollama.app/Contents/Resources`) into the folder

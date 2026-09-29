@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "无法启动 hs.task 任务。",
 	"mlx.runtime_missing_title": "未安装 MLX 运行环境",
 	"mlx.runtime_missing_body": "安装完成前 AI 保持关闭。请在 AI 菜单中选择 MLX 后端进行安装。",
+	"mlx.runtime_broken_title": "需要重新安装 MLX 运行环境",
+	"mlx.runtime_broken_body": "其 Python 软件包不完整或已过时。请在 AI 菜单中选择 MLX 后端重新安装。",
 	"mlx.download_cancelled": "已取消",
 	"mlx.download_cancelled_body": "%s 的下载已中断。",
 	"mlx.download_failed": "MLX 失败",

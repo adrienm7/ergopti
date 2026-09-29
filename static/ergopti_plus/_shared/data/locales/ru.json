@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "Невозможно запустить задачу hs.task.",
 	"mlx.runtime_missing_title": "Среда MLX не установлена",
 	"mlx.runtime_missing_body": "ИИ остаётся выключенным до установки. Выберите бэкенд MLX в меню ИИ, чтобы установить её.",
+	"mlx.runtime_broken_title": "Среду MLX нужно переустановить",
+	"mlx.runtime_broken_body": "Её пакеты Python неполны или устарели. Выберите бэкенд MLX в меню ИИ, чтобы переустановить её.",
 	"mlx.download_cancelled": "Отменено",
 	"mlx.download_cancelled_body": "Загрузка %s прервана.",
 	"mlx.download_failed": "Ошибка MLX",

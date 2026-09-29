@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "Неможливо запустити завдання hs.task.",
 	"mlx.runtime_missing_title": "Середовище MLX не встановлено",
 	"mlx.runtime_missing_body": "ШІ залишається вимкненим до встановлення. Виберіть бекенд MLX в меню ШІ, щоб встановити його.",
+	"mlx.runtime_broken_title": "Середовище MLX потрібно перевстановити",
+	"mlx.runtime_broken_body": "Його пакети Python неповні або застарілі. Виберіть бекенд MLX в меню ШІ, щоб перевстановити його.",
 	"mlx.download_cancelled": "Скасовано",
 	"mlx.download_cancelled_body": "Завантаження %s перервано.",
 	"mlx.download_failed": "Помилка MLX",

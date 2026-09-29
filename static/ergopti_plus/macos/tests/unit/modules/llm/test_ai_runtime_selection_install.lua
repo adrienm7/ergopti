@@ -409,6 +409,43 @@ helpers.describe("MLX bootstraps only on its selection (ai-runtime-mlx)", functi
 		helpers.assert_true(checker.install_for_selection())
 		helpers.assert_eq(#state.tasks, 1, "selecting MLX again must reinstall the removed runtime")
 	end))
+
+	helpers.it("rebuilds a broken runtime on the next selection, never before", scoped(function()
+		local state = new_state()
+		state.absent = {}
+		state.files[MLX_VENV .. "/bin/python"] = true
+		state.files[MLX_VENV .. "/.last_sync_hash"] = true
+		local checker = load_mlx_checker(state)
+		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_eq(checker.get_state(), "ready")
+
+		local removed = {}
+		local original_remove = os.remove
+		os.remove = function(path)
+			removed[#removed + 1] = path
+			state.files[path] = nil
+			state.absent[path] = true
+			return true
+		end
+		local ok, invalidated = pcall(checker.invalidate_runtime)
+		os.remove = original_remove
+		helpers.assert_true(ok, tostring(invalidated))
+		helpers.assert_true(invalidated)
+		helpers.assert_eq(removed, { MLX_VENV .. "/.last_sync_hash" },
+			"only the sync fingerprint is dropped, so the script rebuilds the whole venv")
+		helpers.assert_eq(checker.runtime_installed(), false)
+		helpers.assert_eq(checker.get_failure_message(),
+			require("infra.i18n").get("mlx.runtime_broken_body"))
+		helpers.assert_eq(#state.tasks, 0, "invalidation itself never downloads")
+
+		local plain
+		helpers.assert_true(checker.check_and_install_deps(function(result) plain = result end))
+		helpers.assert_eq(plain, false)
+		helpers.assert_eq(#state.tasks, 0, "a plain check never rebuilds it")
+
+		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_eq(#state.tasks, 1, "the next MLX selection rebuilds the runtime")
+	end))
 end)
 
 

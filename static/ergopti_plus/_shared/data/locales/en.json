@@ -1655,6 +1655,8 @@
 	"mlx.deps_task_start_failed": "Unable to start hs.task.",
 	"mlx.runtime_missing_title": "The MLX runtime is not installed",
 	"mlx.runtime_missing_body": "The AI stays off until it is installed. Select the MLX backend in the AI menu to install it.",
+	"mlx.runtime_broken_title": "The MLX runtime must be reinstalled",
+	"mlx.runtime_broken_body": "Its Python packages are incomplete or out of date. Select the MLX backend in the AI menu to reinstall it.",
 	"mlx.download_cancelled": "Cancelled",
 	"mlx.download_cancelled_body": "Download of %s interrupted.",
 	"mlx.download_failed": "MLX failed",

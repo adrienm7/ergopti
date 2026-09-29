@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "hs.task başlatılamıyor.",
 	"mlx.runtime_missing_title": "MLX çalışma ortamı yüklü değil",
 	"mlx.runtime_missing_body": "Yüklenene kadar yapay zekâ kapalı kalır. Yüklemek için yapay zekâ menüsünde MLX arka ucunu seçin.",
+	"mlx.runtime_broken_title": "MLX çalışma ortamının yeniden yüklenmesi gerekiyor",
+	"mlx.runtime_broken_body": "Python paketleri eksik veya güncel değil. Yeniden yüklemek için yapay zekâ menüsünde MLX arka ucunu seçin.",
 	"mlx.download_cancelled": "İptal edildi",
 	"mlx.download_cancelled_body": "%s indirmesi kesintiye uğradı.",
 	"mlx.download_failed": "MLX hatası",

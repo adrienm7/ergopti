@@ -455,10 +455,12 @@ function M.new(deps, presets)
 		end
 
 		-- Verify the pinned project venv has every required MLX dependency
-		-- importable. If it does not, the venv is broken / out of sync and the
-		-- user must run modules/llm/ensure-mlx-deps.sh manually — silently
-		-- pip-installing a fallback would bypass pyproject.toml.
-		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"
+		-- importable: the packages ensure-mlx-deps.sh's fast path checks,
+		-- truststore included since the model download gate imports it. If it
+		-- does not, the venv is broken / out of sync and the next MLX selection
+		-- must rebuild it — silently pip-installing a fallback would bypass
+		-- pyproject.toml.
+		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors; import truststore'"
 		-- Publish the exact owner before start(). TaskLifecycle.start() can mutate
 		-- native state and still return false/nil/throw, so refusal begins cleanup;
 		-- it never authorizes the queued completion or drops the GC pin
@@ -511,9 +513,16 @@ function M.new(deps, presets)
 						pcall(mlx_deps_checker.reset_bootstrap_state)
 					end
 				else
-					Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
-					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
-						i18n.get("mlx.deps_missing_body"), "error")
+					-- Installed yet not importable: a partial venv or one an update's
+					-- new lock outdated. Nothing re-syncs it on its own, so mark it
+					-- not installed and name the selection that rebuilds it.
+					Logger.error(LOG, "MLX packages are not importable from the installed runtime %s.",
+						project_venv_python_escaped)
+					if mlx_deps_checker and mlx_deps_checker.invalidate_runtime then
+						pcall(mlx_deps_checker.invalidate_runtime)
+					end
+					pcall(notifications.notify, i18n.get("mlx.runtime_broken_title"),
+						i18n.get("mlx.runtime_broken_body"), "error")
 				end
 				return settle_cancel("dependency_probe_failed")
 			end

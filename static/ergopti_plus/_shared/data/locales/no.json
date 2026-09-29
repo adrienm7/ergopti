@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "Kunne ikke starte hs.task.",
 	"mlx.runtime_missing_title": "MLX-kjøremiljøet er ikke installert",
 	"mlx.runtime_missing_body": "AI forblir av til det er installert. Velg MLX-backend i AI-menyen for å installere det.",
+	"mlx.runtime_broken_title": "MLX-kjøremiljøet må installeres på nytt",
+	"mlx.runtime_broken_body": "Python-pakkene er ufullstendige eller utdaterte. Velg MLX-backend i AI-menyen for å installere det på nytt.",
 	"mlx.download_cancelled": "Avbrutt",
 	"mlx.download_cancelled_body": "Nedlasting av %s avbrutt.",
 	"mlx.download_failed": "MLX mislyktes",

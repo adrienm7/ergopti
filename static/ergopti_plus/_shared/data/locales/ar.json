@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "تعذر بدء مهمة hs.task.",
 	"mlx.runtime_missing_title": "بيئة تشغيل MLX غير مثبّتة",
 	"mlx.runtime_missing_body": "يبقى الذكاء الاصطناعي متوقفًا حتى يتم تثبيتها. اختر واجهة MLX الخلفية في قائمة الذكاء الاصطناعي لتثبيتها.",
+	"mlx.runtime_broken_title": "يجب إعادة تثبيت بيئة تشغيل MLX",
+	"mlx.runtime_broken_body": "حزم Python الخاصة بها ناقصة أو قديمة. اختر واجهة MLX الخلفية في قائمة الذكاء الاصطناعي لإعادة تثبيتها.",
 	"mlx.download_cancelled": "تم الإلغاء",
 	"mlx.download_cancelled_body": "تم مقاطعة تنزيل %s.",
 	"mlx.download_failed": "فشل MLX",

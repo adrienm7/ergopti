@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "לא ניתן להפעיל hs.task.",
 	"mlx.runtime_missing_title": "סביבת הריצה של MLX אינה מותקנת",
 	"mlx.runtime_missing_body": "הבינה המלאכותית נשארת כבויה עד להתקנה. בחרו במנוע MLX בתפריט הבינה המלאכותית כדי להתקין אותו.",
+	"mlx.runtime_broken_title": "יש להתקין מחדש את סביבת הריצה של MLX",
+	"mlx.runtime_broken_body": "חבילות ה-Python שלה חסרות או מיושנות. בחרו במנוע MLX בתפריט הבינה המלאכותית כדי להתקין אותה מחדש.",
 	"mlx.download_cancelled": "בוטל",
 	"mlx.download_cancelled_body": "הורדת %s הופסקה.",
 	"mlx.download_failed": "MLX נכשל",

@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "Nie można uruchomić zadania hs.task.",
 	"mlx.runtime_missing_title": "Środowisko MLX nie jest zainstalowane",
 	"mlx.runtime_missing_body": "AI pozostaje wyłączona do czasu instalacji. Wybierz backend MLX w menu AI, aby go zainstalować.",
+	"mlx.runtime_broken_title": "Środowisko MLX wymaga ponownej instalacji",
+	"mlx.runtime_broken_body": "Jego pakiety Pythona są niekompletne lub nieaktualne. Wybierz backend MLX w menu AI, aby zainstalować je ponownie.",
 	"mlx.download_cancelled": "Anulowano",
 	"mlx.download_cancelled_body": "Pobieranie %s przerwane.",
 	"mlx.download_failed": "Błąd MLX",

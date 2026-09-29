@@ -1638,6 +1638,8 @@
 	"mlx.deps_task_start_failed": "hs.task konnte nicht gestartet werden.",
 	"mlx.runtime_missing_title": "Die MLX-Laufzeit ist nicht installiert",
 	"mlx.runtime_missing_body": "Die KI bleibt aus, bis sie installiert ist. Wählen Sie im KI-Menü das MLX-Backend, um sie zu installieren.",
+	"mlx.runtime_broken_title": "Die MLX-Laufzeit muss neu installiert werden",
+	"mlx.runtime_broken_body": "Ihre Python-Pakete sind unvollständig oder veraltet. Wählen Sie im KI-Menü das MLX-Backend, um sie neu zu installieren.",
 	"mlx.download_cancelled": "Abgebrochen",
 	"mlx.download_cancelled_body": "Download von %s unterbrochen.",
 	"mlx.download_failed": "MLX fehlgeschlagen",
