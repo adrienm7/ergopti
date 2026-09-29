@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Ollama-Website öffnen",
 	"ollama.runtime_missing_title": "Ollama ist nicht installiert",
 	"ollama.runtime_missing_body": "Die KI bleibt aus, bis Ollama installiert ist. Wählen Sie im KI-Menü das Ollama-Backend, um es herunterzuladen, oder installieren Sie es von ollama.com.",
+	"ollama.switch_declined_body": "Ollama wurde nicht installiert, daher bleibt das aktuelle KI-Backend aktiv. Wählen Sie das Ollama-Backend erneut, um es herunterzuladen, oder installieren Sie es von ollama.com.",
 	"ollama.downloading": "Ollama-Modell wird heruntergeladen…",
 	"ollama.fail_title": "Ollama-Fehler",
 	"ollama.install_subtitle": "Lokaler Ollama-Server wird vorbereitet…",

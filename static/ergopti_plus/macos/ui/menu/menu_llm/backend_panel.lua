@@ -669,8 +669,10 @@ function M.build(ctx)
 			-- decline leaves the current backend untouched, and an accepted
 			-- download switches only once the executable exists.
 			if not runtime_install_offer.is_installed("ollama") then
-				return switch_after_install("ollama", runtime_install_offer.select_ollama,
-					activate_ollama)
+				return switch_after_install("ollama", function(on_installed)
+					return runtime_install_offer.select_ollama(on_installed,
+						{ keeps_current_backend = true })
+				end, activate_ollama)
 			end
 			claim_runtime_selection()
 			return activate_ollama()

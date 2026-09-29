@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Ollama の Web サイトを開く",
 	"ollama.runtime_missing_title": "Ollama がインストールされていません",
 	"ollama.runtime_missing_body": "Ollama がインストールされるまで AI はオフのままです。AI メニューで Ollama バックエンドを選択してダウンロードするか、ollama.com からインストールしてください。",
+	"ollama.switch_declined_body": "Ollama はインストールされなかったため、現在の AI バックエンドがそのまま有効です。ダウンロードするには Ollama バックエンドをもう一度選択するか、ollama.com からインストールしてください。",
 	"ollama.downloading": "Ollama モデルをダウンロード中…",
 	"ollama.fail_title": "Ollama エラー",
 	"ollama.install_subtitle": "ローカルOllamaサーバーを準備中…",

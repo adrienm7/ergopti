@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Відкрити сайт Ollama",
 	"ollama.runtime_missing_title": "Ollama не встановлено",
 	"ollama.runtime_missing_body": "ШІ залишається вимкненим, доки Ollama не встановлено. Виберіть бекенд Ollama в меню ШІ, щоб завантажити її, або встановіть її з ollama.com.",
+	"ollama.switch_declined_body": "Ollama не встановлено, тому поточний бекенд ШІ залишається активним. Виберіть бекенд Ollama знову, щоб завантажити її, або встановіть її з ollama.com.",
 	"ollama.downloading": "Завантаження моделі Ollama…",
 	"ollama.fail_title": "Помилка Ollama",
 	"ollama.install_subtitle": "Підготовка локального сервера Ollama…",

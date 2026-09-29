@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "فتح موقع Ollama",
 	"ollama.runtime_missing_title": "Ollama غير مثبّت",
 	"ollama.runtime_missing_body": "يبقى الذكاء الاصطناعي متوقفًا حتى يتم تثبيت Ollama. اختر واجهة Ollama الخلفية في قائمة الذكاء الاصطناعي لتنزيله، أو ثبّته من ollama.com.",
+	"ollama.switch_declined_body": "لم يتم تثبيت Ollama، لذا تبقى الواجهة الخلفية الحالية للذكاء الاصطناعي نشطة. اختر واجهة Ollama الخلفية مرة أخرى لتنزيله، أو ثبّته من ollama.com.",
 	"ollama.downloading": "جارٍ تنزيل نموذج Ollama…",
 	"ollama.fail_title": "خطأ في Ollama",
 	"ollama.install_subtitle": "جارٍ تحضير خادم Ollama المحلي…",

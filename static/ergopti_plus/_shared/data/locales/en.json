@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Open the Ollama website",
 	"ollama.runtime_missing_title": "Ollama is not installed",
 	"ollama.runtime_missing_body": "The AI stays off until Ollama is installed. Select the Ollama backend in the AI menu to download it, or install it from ollama.com.",
+	"ollama.switch_declined_body": "Ollama was not installed, so the current AI backend stays active. Select the Ollama backend again to download it, or install it from ollama.com.",
 	"ollama.downloading": "Downloading Ollama model…",
 	"ollama.fail_title": "Ollama failure",
 	"ollama.install_subtitle": "Preparing local Ollama server…",

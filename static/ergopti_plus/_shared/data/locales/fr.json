@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Ouvrir le site d’Ollama",
 	"ollama.runtime_missing_title": "Ollama n’est pas installé",
 	"ollama.runtime_missing_body": "L’IA reste désactivée tant qu’Ollama n’est pas installé. Sélectionnez le backend Ollama dans le menu IA pour le télécharger, ou installez-le depuis ollama.com.",
+	"ollama.switch_declined_body": "Ollama n’a pas été installé : le backend IA actuel reste actif. Sélectionnez à nouveau le backend Ollama pour le télécharger, ou installez-le depuis ollama.com.",
 	"ollama.downloading": "Téléchargement Ollama en cours…",
 	"ollama.fail_title": "Échec Ollama",
 	"ollama.install_subtitle": "Préparation du serveur Ollama local…",

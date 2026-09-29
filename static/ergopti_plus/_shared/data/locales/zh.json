@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "打开 Ollama 官网",
 	"ollama.runtime_missing_title": "未安装 Ollama",
 	"ollama.runtime_missing_body": "在安装 Ollama 之前，AI 保持关闭。请在 AI 菜单中选择 Ollama 后端进行下载，或从 ollama.com 安装。",
+	"ollama.switch_declined_body": "未安装 Ollama，当前的 AI 后端保持启用。请再次选择 Ollama 后端进行下载，或从 ollama.com 安装。",
 	"ollama.downloading": "正在下载 Ollama 模型…",
 	"ollama.fail_title": "Ollama 错误",
 	"ollama.install_subtitle": "正在准备本地 Ollama 服务器…",

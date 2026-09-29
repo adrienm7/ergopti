@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "פתיחת אתר Ollama",
 	"ollama.runtime_missing_title": "Ollama אינו מותקן",
 	"ollama.runtime_missing_body": "הבינה המלאכותית נשארת כבויה עד להתקנת Ollama. בחרו במנוע Ollama בתפריט הבינה המלאכותית כדי להוריד אותו, או התקינו אותו מ-ollama.com.",
+	"ollama.switch_declined_body": "Ollama לא הותקן, ולכן מנוע הבינה המלאכותית הנוכחי נשאר פעיל. בחרו שוב במנוע Ollama כדי להוריד אותו, או התקינו אותו מ-ollama.com.",
 	"ollama.downloading": "מוריד מודל Ollama…",
 	"ollama.fail_title": "כשל Ollama",
 	"ollama.install_subtitle": "מכין שרת Ollama מקומי…",

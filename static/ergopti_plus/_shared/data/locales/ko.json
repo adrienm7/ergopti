@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Ollama 웹사이트 열기",
 	"ollama.runtime_missing_title": "Ollama가 설치되어 있지 않습니다",
 	"ollama.runtime_missing_body": "Ollama가 설치될 때까지 AI는 꺼진 상태로 유지됩니다. AI 메뉴에서 Ollama 백엔드를 선택해 다운로드하거나 ollama.com에서 설치하세요.",
+	"ollama.switch_declined_body": "Ollama가 설치되지 않아 현재 AI 백엔드가 계속 활성 상태입니다. 다운로드하려면 Ollama 백엔드를 다시 선택하거나 ollama.com에서 설치하세요.",
 	"ollama.downloading": "Ollama 모델 다운로드 중…",
 	"ollama.fail_title": "Ollama 오류",
 	"ollama.install_subtitle": "로컬 Ollama 서버 준비 중…",

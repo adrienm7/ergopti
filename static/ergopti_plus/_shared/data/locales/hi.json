@@ -1740,6 +1740,7 @@
 	"ollama.offer_website": "Ollama वेबसाइट खोलें",
 	"ollama.runtime_missing_title": "Ollama इंस्टॉल नहीं है",
 	"ollama.runtime_missing_body": "Ollama इंस्टॉल होने तक AI बंद रहता है। इसे डाउनलोड करने के लिए AI मेनू में Ollama बैकएंड चुनें, या ollama.com से इंस्टॉल करें।",
+	"ollama.switch_declined_body": "Ollama इंस्टॉल नहीं हुआ, इसलिए मौजूदा AI बैकएंड सक्रिय रहता है। इसे डाउनलोड करने के लिए Ollama बैकएंड फिर से चुनें, या ollama.com से इंस्टॉल करें।",
 	"ollama.downloading": "Ollama मॉडल डाउनलोड हो रहा है…",
 	"ollama.fail_title": "Ollama विफलता",
 	"ollama.install_subtitle": "स्थानीय Ollama सर्वर तैयार किया जा रहा है…",

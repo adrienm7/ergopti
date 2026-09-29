@@ -13,7 +13,8 @@
 ---    callers of the checkers' install_for_selection(), so no boot, update or
 ---    other-backend path can reach a download.
 --- 2. Clear decline: refusing the download opens the website and posts a
----    notification that says the AI stays off and how to install later.
+---    notification that says what stays in place (the AI off, or the current
+---    backend during a switch) and how to install later.
 --- 3. Stat-only detection: availability comes from filesystem probes, so the
 ---    menu can ask while it is being built without spawning a process.
 --- ==============================================================================
@@ -88,10 +89,12 @@ local function ask_ollama_download()
 end
 
 --- Selects the Ollama backend's runtime: reuses an installed Ollama, or offers
---- the download once. A decline leaves everything off and says so.
+--- the download once. A decline changes nothing and says what stays in place.
 --- @param on_complete function|nil Receives the terminal result when accepted.
+--- @param opts table|nil { keeps_current_backend = true } when the user is
+---   switching from another backend, which a decline leaves running.
 --- @return boolean accepted False when the user declined or the check refused.
-function M.select_ollama(on_complete)
+function M.select_ollama(on_complete, opts)
 	if ollama_deps().runtime_available() then
 		Logger.info(LOG, "Ollama already installed; reusing it without a download.")
 		return ollama_deps().check_and_install_deps(on_complete) == true
@@ -104,9 +107,15 @@ function M.select_ollama(on_complete)
 	end
 	Logger.start(LOG, "Offering the Ollama download…")
 	if ask_ollama_download() ~= "download" then
-		Logger.warn(LOG, "Ollama download declined; the AI stays off with this backend.")
+		-- Declining a switch leaves the previous backend running, so "the AI
+		-- stays off" would be false there; it is true when enabling the AI.
+		local keeps_backend = type(opts) == "table" and opts.keeps_current_backend == true
+		Logger.warn(LOG, keeps_backend
+			and "Ollama download declined; the current backend stays active."
+			or "Ollama download declined; the AI stays off with this backend.")
 		pcall(notifications().notify, i18n.get("ollama.runtime_missing_title"),
-			i18n.get("ollama.runtime_missing_body"), "warning")
+			i18n.get(keeps_backend and "ollama.switch_declined_body" or "ollama.runtime_missing_body"),
+			"warning")
 		Logger.success(LOG, "Ollama download offer settled (declined).")
 		return false
 	end
