@@ -1378,8 +1378,23 @@
 			]
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.tapholds.left_hand_tap_hold"
+		},
+		{
 			"type": "list",
-			"id": "tap_hold_keys"
+			"id": "tap_hold_keys_left"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.tapholds.right_hand_tap_hold"
+		},
+		{
+			"type": "list",
+			"id": "tap_hold_keys_right"
 		},
 		{
 			"type": "---",

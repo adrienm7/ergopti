@@ -43,7 +43,17 @@ const APPROVED = {
 	// The header over the input sources macOS has enabled.
 	'menu.layout.active_layouts': { fr: 'Sources de saisie', en: 'Input sources' },
 	// ONE row for the macOS menubar icon, its variants beneath it.
-	'menu.layout.menubar_icon': { fr: 'Icône de la barre des menus', en: 'Menu bar icon' }
+	'menu.layout.menubar_icon': { fr: 'Icône de la barre des menus', en: 'Menu bar icon' },
+	// The Tap-Hold keys are listed under one header per hand (A4), replacing a
+	// « Tap / Hold » header above « Main gauche » and « Main droite ».
+	'menu.tapholds.left_hand_tap_hold': {
+		fr: 'Main gauche — Tap / Hold',
+		en: 'Left hand — Tap / Hold'
+	},
+	'menu.tapholds.right_hand_tap_hold': {
+		fr: 'Main droite — Tap / Hold',
+		en: 'Right hand — Tap / Hold'
+	}
 };
 
 const errors = [];

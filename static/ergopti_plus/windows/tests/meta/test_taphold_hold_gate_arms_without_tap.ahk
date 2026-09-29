@@ -30,18 +30,16 @@
 ; =====================================================================
 ; =====================================================================
 
-; The picker's key ids come from _TH_KeyDefs. Reading them from source rather
-; than hardcoding today's fourteen means a key added to the picker tomorrow is
-; checked the day it is added — the failure mode this repo hits most often is
-; an invariant fixed at one site with one sibling forgotten.
+; The picker's key ids come from TapHoldKeyDefs(), the Windows column of the
+; shared key catalogue ([tap_hold.catalog] in _shared/tap_hold/defaults.toml).
+; Reading them from there rather than hardcoding today's fourteen means a key
+; added to the picker tomorrow is checked the day it is added — the failure mode
+; this repo hits most often is an invariant fixed at one site with one sibling
+; forgotten.
 _THG_PickerKeyIds() {
-	Src := _DriverSourceNoComments()
 	Ids := []
-	Pos := 1
-	while (Pos := RegExMatch(Src, 'Map\("id",\s*"([a-z_]+)",\s*"i18n",\s*"tap_hold\.group\.', &M, Pos)) {
-		Ids.Push(M[1])
-		Pos += M.Len
-	}
+	for _, KeyDef in TapHoldKeyDefs()
+		Ids.Push(KeyDef["id"])
 	return Ids
 }
 

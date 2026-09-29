@@ -32,13 +32,13 @@ local COMMAND_CASES = {
 local PICKER_ROUTE_CASES = {
 	{
 		setter = "set_tap_action",
-		parent_prefix = "Left Shift  :",
+		parent_prefix = "tap_hold.group.left_shift  :",
 		picker_label = "menu.tapholds.tap_arrow",
 		expected_id = "left_shift",
 	},
 	{
 		setter = "set_hold_action",
-		parent_prefix = "Left Shift  :",
+		parent_prefix = "tap_hold.group.left_shift  :",
 		picker_label = "menu.tapholds.hold_arrow",
 		expected_id = "left_shift",
 	},

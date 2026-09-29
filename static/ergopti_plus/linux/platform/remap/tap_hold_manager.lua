@@ -146,7 +146,8 @@ end
 --- with the only trace a DEBUG line at each press.
 local function _warn_unsupported_taps(loaded)
 	local supported = _tap_action_set()
-	for _, key_id in ipairs(Engine.KEY_ORDER) do
+	for _, entry in ipairs(loaded.catalog) do
+		local key_id = entry.id
 		local key = loaded.keys[key_id]
 		local tap = key and key.enabled ~= false and key.tap_action
 		if type(tap) == "string" and tap ~= "" and tap ~= "none" and not supported[tap] then
@@ -156,9 +157,29 @@ local function _warn_unsupported_taps(loaded)
 	end
 end
 
+--- Raises unless the catalogue's Linux column is exactly the keys the engine
+--- has an evdev code for: a listed key the engine cannot remap would be a tray
+--- row that does nothing, an unlisted one a key the tray cannot reach.
+--- @param catalog table The loader's `catalog`, this driver's column.
+local function _check_catalog(catalog)
+	local listed = {}
+	for _, entry in ipairs(catalog) do
+		if not Engine.KEY_CODES[entry.id] then
+			error(string.format("[tap_hold.catalog] lists '%s', which the Linux engine cannot remap", entry.id), 0)
+		end
+		listed[entry.id] = true
+	end
+	for key_id in pairs(Engine.KEY_CODES) do
+		if not listed[key_id] then
+			error(string.format("[tap_hold.catalog] has no Linux entry for the engine's key '%s'", key_id), 0)
+		end
+	end
+end
+
 --- Reads the files and builds a fresh engine; the old one stays until _apply().
 local function _load()
 	local loaded = Config.load(_defaults_path, _user_path)
+	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
 	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
 	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir })
@@ -284,6 +305,14 @@ end
 function M.keys()
 	_require_init()
 	return _loaded.keys
+end
+
+--- The keys the tray lists, in order, each with its hand and label key: the
+--- Linux column of the shared key catalogue ([tap_hold.catalog]).
+--- @return table Array of { id, key, hand, label_key }.
+function M.key_catalog()
+	_require_init()
+	return _loaded.catalog
 end
 
 --- Whether the user's file sets the feature on (its [tap_hold] enabled).

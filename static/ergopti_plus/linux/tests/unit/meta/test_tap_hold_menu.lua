@@ -102,8 +102,9 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
 			helpers.assert_true(section ~= nil, "a Tap-Holds section in the tray")
-			helpers.assert_eq(#key_rows(section), #require("platform.remap.tap_hold_engine").KEY_ORDER,
-				"every key the engine can remap has its row")
+			local engine_keys = 0
+			for _ in pairs(require("platform.remap.tap_hold_engine").KEY_CODES) do engine_keys = engine_keys + 1 end
+			helpers.assert_eq(#key_rows(section), engine_keys, "every key the engine can remap has its row")
 			local i18n = require("infra.i18n")
 			local reset = find(section.menu, i18n.get("common.restore_recommended"))
 			local disable = find(section.menu, i18n.get("common.clear_to_system"))
@@ -255,6 +256,43 @@ helpers.describe("Linux Tap-Holds menu", function()
 			helpers.assert_eq(calls[1][2], "left_ctrl")
 			local escape = find(key_rows(section), i18n.get("tap_hold.group.escape"))
 			helpers.assert_true(not escape.checked, "an unconfigured key is not ticked")
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	-- The keys sat in one undivided list in the Windows order (Engine.KEY_ORDER),
+	-- with no hand; the shared key catalogue now decides the hand of each.
+	helpers.it("lists the keys by hand, with a separator after Space and AltGr opening the right hand", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked)
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local rows = section.menu
+			local function index_of(title)
+				for index, row in ipairs(rows) do
+					if row.title == title then return index end
+				end
+				return nil
+			end
+			local function key_index(label_key)
+				local prefix = i18n.get(label_key) .. "  :"
+				for index, row in ipairs(rows) do
+					if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return index end
+				end
+				return nil
+			end
+			local left = index_of(i18n.section("menu.tapholds.left_hand_tap_hold"))
+			local right = index_of(i18n.section("menu.tapholds.right_hand_tap_hold"))
+			helpers.assert_not_nil(left, "the « Main gauche — Tap / Hold » header")
+			helpers.assert_not_nil(right, "the « Main droite — Tap / Hold » header")
+			local space = key_index("tap_hold.group.space")
+			helpers.assert_true(space ~= nil and space > left and space < right, "Space is a left-hand key")
+			helpers.assert_eq(space, right - 2, "Space is the last left-hand key")
+			helpers.assert_true(rows[space + 1].title == "-" or rows[space + 1].separator == true,
+				"a separator follows the last left-hand key")
+			helpers.assert_eq(key_index("tap_hold.group.alt_gr"), right + 1, "AltGr is the first right-hand key")
+			helpers.assert_true(key_index("tap_hold.group.enter") > right, "Enter is a right-hand key")
 		end)
 		restore(Manager)
 		if not ok then error(err, 0) end
