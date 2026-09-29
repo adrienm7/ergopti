@@ -36,6 +36,7 @@ local KeLifecycle = require("platform.remap.ke_lifecycle")
 local KeVariables = require("platform.remap.ke_variables")
 local LeaseController = require("platform.remap.lease_controller")
 local GuardianNotice = require("platform.remap.guardian_notice")
+local ManagedRuleRemoval = require("platform.remap.managed_rule_removal")
 local Notifications = require("infra.notifications")
 local i18n        = require("infra.i18n")
 local Watchers    = require("platform.remap.watchers")
@@ -82,13 +83,6 @@ local REMAP_GUARDIAN_READY = "ready"
 -- Opened directly for an `unavailable` guardian, which the approval-gated
 -- opener refuses by design.
 local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
-
-local DISABLED_LEGACY_PROBE_STRINGS = {
-	"[ErgoptiPlus managed:",
-	"Script control: physical rcmd + ",
-	"Paused script control: option + ",
-	"ke_held_",
-}
 
 -- Resolve the directory that contains this init.lua at load time.
 -- Works whether the file is symlinked, run from the project, or deployed.
@@ -323,6 +317,28 @@ local function clear_managed_output_set()
 		return false
 	end
 	return true
+end
+
+--- Removes every ErgoptiPlus-marked rule from karabiner.json while the switch
+--- is off. Needs no lease, token or Karabiner process; personal rules keep their
+--- exact bytes and an unprovable file is left untouched.
+--- @param context string Stable diagnostic label.
+--- @return boolean removed True when no marked rule remains.
+--- @return string detail `absent`, `unchanged`, `removed`, or the refusal.
+--- @return integer removed_count Number of rules removed.
+local function remove_managed_rules(context)
+	local call_ok, removed, detail, removed_count = xpcall(function()
+		return ManagedRuleRemoval.remove_managed_rules(KARABINER_OUT)
+	end, debug.traceback)
+	if not call_ok then
+		Logger.error(LOG, "%s: managed-rule removal raised: %s.", context, tostring(removed))
+		return false, "rule-removal-raised", 0
+	end
+	if removed ~= true then
+		Logger.error(LOG, "%s: ErgoptiPlus rules remain in karabiner.json: %s.", context, tostring(detail))
+		return false, tostring(detail), 0
+	end
+	return true, tostring(detail), removed_count or 0
 end
 
 --- Releases one registrar handle without mistaking a contained false for success.
@@ -3315,6 +3331,13 @@ function M.set_enabled(value, on_done, onboarding_gate)
 		_enabled_transition = nil
 		replay_pending_layout_refresh()
 		Logger.info(LOG, "Karabiner integration disabled after exact lease fencing.")
+		-- The fenced rules are inert; « off » also means none is left behind.
+		-- A refusal keeps the switch off and names the retained rules.
+		local removed, removal_detail = remove_managed_rules("Karabiner integration disable")
+		if not removed then
+			settle_enabled_callbacks(transaction, false, "rules-not-removed: " .. removal_detail)
+			return
+		end
 		settle_enabled_callbacks(transaction, true, reason or "stopped")
 	end)
 	if not ok_stop then
@@ -3327,6 +3350,26 @@ function M.set_enabled(value, on_done, onboarding_gate)
 	return stop_requested == true
 end
 
+
+--- « Remove Ergopti from Karabiner »: turns the integration off through the
+--- exact lease when it is on, then removes every ErgoptiPlus rule from
+--- karabiner.json. With the switch already off it only cleans the file.
+--- Karabiner itself is never quit, launched or reconfigured.
+--- @param on_done function|nil Callback fn(ok, reason, removed_count).
+--- @return boolean accepted True when accepted or settled successfully.
+function M.remove_from_karabiner(on_done)
+	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
+	if not require_state("remove_from_karabiner") then
+		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
+		return false
+	end
+	if _state.enabled == true or _enabled_transition ~= nil or _enabled_preflight ~= nil then
+		return M.set_enabled(false, on_done)
+	end
+	local removed, detail, removed_count = remove_managed_rules("Remove Ergopti from Karabiner")
+	invoke_public_callback("remove from Karabiner", on_done, removed, detail, removed_count)
+	return removed
+end
 
 --- Clones the persisted settings without sharing either nested binding table.
 --- @param source table Source state.
@@ -4957,83 +5000,6 @@ function M.resume(on_done)
 	return requested_or_err == true
 end
 
---- Removes only a fully proven historical ErgoptiPlus rule block while the
---- integration is disabled. No lease task is started and the generated B rules
---- are deliberately replaced with an empty incoming block before the merge.
---- @param file_system table Injected filesystem adapter.
---- @return boolean success Whether cleanup was unnecessary or safely deployed.
-local function cleanup_disabled_legacy_rules(file_system)
-	if _state.enabled then return true end
-	if type(file_system.read) ~= "function" then
-		Logger.error(LOG, "Disabled legacy cleanup unavailable — filesystem adapter has no read method.")
-		return false
-	end
-
-	local read_ok, raw = pcall(file_system.read, KARABINER_OUT)
-	if not read_ok then
-		Logger.error(LOG, "Disabled legacy cleanup could not read karabiner.json: %s.", tostring(raw))
-		return false
-	end
-	if raw == nil then return true end
-	if type(raw) ~= "string" then
-		Logger.error(LOG, "Disabled legacy cleanup received non-string karabiner.json content.")
-		return false
-	end
-	local may_need_cleanup = false
-	for _, signature in ipairs(DISABLED_LEGACY_PROBE_STRINGS) do
-		if raw:find(signature, 1, true) then
-			may_need_cleanup = true
-			break
-		end
-	end
-	if not may_need_cleanup then return true end
-
-	local lease_token = LeaseController.token()
-	if type(lease_token) ~= "string" then
-		Logger.error(LOG, "Disabled legacy cleanup refused — no validation token is available.")
-		return false
-	end
-	local ok_build, generated, build_err, legacy_rules, legacy_context = pcall(
-		Generator.build_karabiner_json,
-		_state,
-		M.AVAILABLE_ACTIONS,
-		M.TAP_HOLD_KEYS,
-		M.MOD_COMBOS,
-		M.NON_CANONICAL_COMBOS,
-		_DATA_DIR,
-		lease_token
-	)
-	if not ok_build or type(generated) ~= "table" then
-		Logger.error(
-			LOG,
-			"Disabled legacy cleanup could not build its ownership proof: %s.",
-			tostring(ok_build and build_err or generated)
-		)
-		return false
-	end
-
-	-- The build above exists only to reconstruct old ownership across state/layout
-	-- changes. Installing any newly built manipulator while disabled would violate
-	-- the user's explicit off state
-	generated.profiles[1].complex_modifications.rules = {}
-	local deployed, deploy_detail = Generator.merge_and_deploy_config(
-		generated,
-		KARABINER_OUT,
-		legacy_rules,
-		legacy_context
-	)
-	if not deployed then
-		Logger.error(
-			LOG,
-			"Disabled legacy cleanup deploy failed: %s.",
-			tostring(deploy_detail)
-		)
-		return false
-	end
-	Logger.info(LOG, "Disabled legacy ErgoptiPlus rules removed; personal rules and stock Karabiner were untouched.")
-	return true
-end
-
 
 
 
@@ -5203,7 +5169,12 @@ function M.init(file_system)
 	-- Persisted mappings do not prove that this Hammerspoon generation owns the
 	-- corresponding output keycodes. READY will populate the set after deployment.
 	clear_managed_output_set()
-	if not _state.enabled then cleanup_disabled_legacy_rules(file_system) end
+	-- The switch is read before any lease or guardian work: off means no token,
+	-- no worker and no ErgoptiPlus rule left in the user's karabiner.json.
+	if not _state.enabled then
+		Logger.info(LOG, "Ergopti does not use Karabiner — no lease or guardian will be acquired.")
+		remove_managed_rules("Karabiner integration off at startup")
+	end
 
 	if _state.enabled then
 		Logger.info(LOG, "Integration enabled — deploy will be triggered from init.lua boot completion.")

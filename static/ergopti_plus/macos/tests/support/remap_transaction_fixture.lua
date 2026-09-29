@@ -53,6 +53,7 @@ local OWNED_MODULES = {
 	"infra.fs_dir",
 	"adapters.event_provenance",
 	"adapters.storage",
+	"platform.remap.managed_rule_removal",
 }
 
 --- Runs native construction and every retained callback before restoring state.
@@ -118,6 +119,7 @@ return function(run)
 				timer_after_attempts = 0,
 				timer_cancel_attempts = 0,
 				wizard_runs = 0,
+				rule_removals = {},
 			}
 			local paused_now = options.paused == true
 			local lease_token = "ffeeddccbbaa99887766554433221100"
@@ -211,6 +213,15 @@ return function(run)
 				end,
 				KE_PHYSICAL_KC_LOG = nil,
 			}
+			package.loaded["platform.remap.managed_rule_removal"] = {
+				remove_managed_rules = function(path)
+					calls.rule_removals[#calls.rule_removals + 1] = path
+					if options.rule_removal_succeeds == false then
+						return false, "synthetic karabiner.json refusal", 0
+					end
+					return true, "removed", 1
+				end,
+			}
 			package.loaded["platform.remap.ke_lifecycle"] = {
 				open_gui = function() return true end,
 				stop = function()
@@ -229,7 +240,10 @@ return function(run)
 					calls.phase_listener = phase_listener
 					return true
 				end,
-				token = function() return lease_token end,
+				token = function()
+					calls.token_requests = (calls.token_requests or 0) + 1
+					return lease_token
+				end,
 				start = function(on_done)
 					calls.start = calls.start + 1
 					calls.start_callback = on_done
@@ -442,6 +456,8 @@ return function(run)
 			if not options.skip_init then
 				calls.init_result = remap.init({ expand_path = function(path) return path end })
 			end
+			calls.init_rule_removals = #calls.rule_removals
+			calls.rule_removals = {}
 			calls.stop, calls.start, calls.start_paused = 0, 0, 0
 			calls.build, calls.deploy, calls.execute, calls.save = 0, 0, 0, 0
 			calls.saved_enabled = {}

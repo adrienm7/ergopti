@@ -29,6 +29,7 @@ local STUB_MODULES = {
 	"platform.remap.config",
 	"platform.remap.generator",
 	"platform.remap.ke_lifecycle",
+	"platform.remap.managed_rule_removal",
 	"platform.remap.ke_variables",
 	"platform.remap.lease_controller",
 	"platform.remap.onboarding",
@@ -260,6 +261,11 @@ local function with_remap(options, body)
 			return true, "ok"
 		end,
 		KE_PHYSICAL_KC_LOG = nil,
+	}
+	-- karabiner.json is not part of this scenario: the switch-off cleanup is
+	-- covered by the rule-removal tests.
+	package.loaded["platform.remap.managed_rule_removal"] = {
+		remove_managed_rules = function() return true, "unchanged", 0 end,
 	}
 	package.loaded["platform.remap.ke_lifecycle"] = {
 		open_gui = function() return true end,
