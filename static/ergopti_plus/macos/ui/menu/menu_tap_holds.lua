@@ -9,8 +9,10 @@
 --- never sees, so no label here names it.
 ---
 --- FEATURES & RATIONALE:
---- 1. Tap/Hold section: each key shows "Label : tap / hold" inline. Items are
----    grayed out while the remap engine is not initialised.
+--- 1. Tap/Hold section: each key shows "Label : tap / hold" inline, under the
+---    header of its hand. Which keys, in which order and under which hand is
+---    the shared key catalogue's ([tap_hold.catalog]). Items are grayed out
+---    while the remap engine is not initialised.
 --- 2. Chords section: modifier combos grouped by key, also grayed then.
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
@@ -21,6 +23,8 @@ local M = {}
 local Logger      = require("infra.logger")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
+local Paths       = require("infra.paths")
+local KeyCatalog  = require("tap_hold.key_catalog")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
@@ -305,68 +309,26 @@ end
 -- =========================================
 -- =========================================
 
---- Reads tap_hold_keys_catalog from the shared menu manifest and returns a
---- lookup table of key_id -> true for keys with hand="left" and platforms
---- including "hs". Falls back to the hardcoded set on any load failure.
----
---- Defined BEFORE the LEFT_HAND_IDS call site below: a `local function` is not
---- hoisted, so calling it above its definition would bind the nil global and
---- crash the module at load time (project-lua-closure-before-local-nil-global).
---- @return table
-local function _load_left_hand_from_catalog()
-	local fallback = {
-		escape        = true,
-		tab           = true,
-		caps_lock     = true,
-		left_shift    = true,
-		action            = true,
-		left_control  = true,
-		left_option   = true,
-		left_command  = true,
-		spacebar      = true,
-	}
-	-- The one reader of menu_manifest.json (infra/manifest_menu, cached).
-	--
-	-- This used to fall back to opening and decoding the file right here, "in case
-	-- manifest_menu is not loaded yet". require is synchronous in Lua: if the module
-	-- resolves, its accessor works, and if it does not resolve then a second copy of
-	-- the same io.open would not help either. What the guard actually did was keep a
-	-- third reader of this file alive on a path nothing could reach — which is how
-	-- the driver came to have three of them.
-	local ok_mm, mm = pcall(require, "infra.manifest_menu")
-	if not ok_mm or type(mm) ~= "table" or type(mm.get_root) ~= "function" then
-		Logger.error(LOG, "infra.manifest_menu unavailable — left-hand catalogue uses the built-in set.")
-		return fallback
-	end
-	local data = mm.get_root()
-	if type(data) ~= "table" then return fallback end
-	local catalog = data.tap_hold_keys_catalog
-	if type(catalog) ~= "table" then return fallback end
-	local result = {}
-	for _, key_def in ipairs(catalog) do
-		if type(key_def) ~= "table" then goto continue end
-		if key_def.hand ~= "left" then goto continue end
-		local plats = key_def.platforms
-		if type(plats) ~= "table" then goto continue end
-		for _, p in ipairs(plats) do
-			if p == "hs" then
-				result[key_def.id] = true
-				break
-			end
-		end
-		::continue::
-	end
-	if next(result) == nil then return fallback end
-	return result
-end
-
--- Keys belonging to the left hand (including spacebar, typically thumb-left).
--- Right-hand keys are everything else.
+-- The macOS column of the shared key catalogue ([tap_hold.catalog] in
+-- _shared/tap_hold/defaults.toml): which keys this submenu lists, in which
+-- order, under which hand and with which label. Read once, on first use.
 --
--- **Derived from _shared/modules/menu/menu_manifest.json tap_hold_keys_catalog
--- (MENU-4).** Keys with hand="left" and platforms including "hs" are left-hand;
--- everything else is right-hand. The catalog is the single source of truth.
-local LEFT_HAND_IDS = _load_left_hand_from_catalog()
+-- It replaces a reader of a `tap_hold_keys_catalog` menu-manifest key that
+-- never existed, so its built-in fallback always won — and that fallback said
+-- `action = true` where `fn = true` was meant, which listed Fn under the right
+-- hand.
+local _key_catalog = nil
+
+--- Returns this driver's keys from the shared tap-hold key catalogue.
+--- Raises when the catalogue is unreadable or malformed: the list providers
+--- calling it are isolated by the renderer, which logs the failure.
+--- @return table Array of { id, key, hand, label_key } in tray order.
+local function key_catalog()
+	if _key_catalog == nil then
+		_key_catalog = KeyCatalog.load(Paths.shared("tap_hold/defaults.toml"), "hs")
+	end
+	return _key_catalog
+end
 
 --- Builds a single tap / hold menu item for one key definition.
 --- @param karabiner   table    The karabiner module.
@@ -374,8 +336,9 @@ local LEFT_HAND_IDS = _load_left_hand_from_catalog()
 --- @param update_menu function Callback to refresh the menu bar.
 --- @param enabled     boolean  Whether the integration is active.
 --- @param key_def     table    Entry from TAP_HOLD_KEYS.
+--- @param key_label   string   Translated key name, from the shared catalogue.
 --- @return table hs.menubar menu item.
-local function build_one_tap_hold_item(karabiner, action_index, update_menu, enabled, key_def)
+local function build_one_tap_hold_item(karabiner, action_index, update_menu, enabled, key_def, key_label)
 	local kid = key_def.id
 
 	local ok_tap,  current_tap  = pcall(karabiner.get_tap_action,  kid)
@@ -480,45 +443,53 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	}
 
 	return {
-		label    = string.format("%s  :  %s", key_def.label, combo_label),
+		label    = string.format("%s  :  %s", key_label, combo_label),
 		checked  = is_active or nil,
 		disabled = not enabled or nil,
 		items     = enabled and key_submenu or nil,
 	}
 end
 
---- Builds all tap / hold entries split into "Main gauche" / "Main droite" sections.
+--- Builds the tap / hold rows of one hand, in catalogue order.
+---
+--- The manifest owns the two hand headers and the separator between the hands;
+--- this returns only the key rows beneath one header. A key the remap engine
+--- knows and the shared catalogue does not list gets no row, and
+--- build_picker_trees reports it.
 --- Items are grayed out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
 --- @param enabled     boolean  Whether the integration is active.
+--- @param hand        string   "left" or "right".
 --- @return table List of hs.menubar menu item tables.
-local function build_tap_hold_items(karabiner, action_index, update_menu, enabled)
+local function build_hand_items(karabiner, action_index, update_menu, enabled, hand)
+	local engine_keys = {}
+	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do engine_keys[key_def.id] = key_def end
 	local items = {}
-
-	-- `label`, not `title`: these three go into the `tap_hold_keys` provider
-	-- array, and a row the renderer finds no label on is dropped — so all three
-	-- headers were missing and the two hands ran together in one undivided list.
-	items[#items + 1] = { label = i18n.section("menu.tapholds.header_taps_holds"), disabled = true }
-	items[#items + 1] = { label = i18n.section("menu.tapholds.left_hand"),         disabled = true }
-	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
-		if LEFT_HAND_IDS[key_def.id] then
+	for _, entry in ipairs(KeyCatalog.of_hand(key_catalog(), hand)) do
+		local key_def = engine_keys[entry.id]
+		if key_def then
 			items[#items + 1] = build_one_tap_hold_item(
-				karabiner, action_index, update_menu, enabled, key_def)
+				karabiner, action_index, update_menu, enabled, key_def, i18n.get(entry.label_key))
 		end
 	end
-
-	items[#items + 1] = { label = i18n.section("menu.tapholds.right_hand"), disabled = true }
-	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
-		if not LEFT_HAND_IDS[key_def.id] then
-			items[#items + 1] = build_one_tap_hold_item(
-				karabiner, action_index, update_menu, enabled, key_def)
-		end
-	end
-
 	return items
+end
+
+--- Reports every key the remap engine can bind that the shared catalogue does
+--- not list: such a key would silently have no row in the submenu.
+--- @param karabiner table The karabiner module.
+local function report_uncatalogued_keys(karabiner)
+	local listed = {}
+	for _, entry in ipairs(key_catalog()) do listed[entry.id] = true end
+	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
+		if not listed[key_def.id] then
+			Logger.error(LOG, "Tap-hold key '%s' is missing from [tap_hold.catalog] — it has no menu row.",
+				tostring(key_def.id))
+		end
+	end
 end
 
 
@@ -838,7 +809,7 @@ end
 
 --- Returns the (memoised) tap/hold and raccourcis picker trees, rebuilding only
 --- when the binding fingerprint changes. See _picker_cache rationale above.
---- @return table tap_hold, table raccourcis
+--- @return table tap_hold { left, right } key rows per hand, table raccourcis
 local function build_picker_trees(karabiner, update_menu, enabled)
 	local fp = picker_fingerprint(karabiner, enabled)
 	if _picker_cache and _picker_cache.fp == fp then
@@ -846,8 +817,12 @@ local function build_picker_trees(karabiner, update_menu, enabled)
 		return _picker_cache.tap_hold, _picker_cache.raccourcis
 	end
 	Logger.debug(LOG, "Picker trees rebuilt (binding fingerprint changed).")
+	report_uncatalogued_keys(karabiner)
 	local action_index = build_action_index(karabiner)
-	local tap_hold   = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
+	local tap_hold = {
+		left  = build_hand_items(karabiner, action_index, update_menu, enabled, "left"),
+		right = build_hand_items(karabiner, action_index, update_menu, enabled, "right"),
+	}
 	local raccourcis = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
 	_picker_cache = { fp = fp, tap_hold = tap_hold, raccourcis = raccourcis }
 	return tap_hold, raccourcis
@@ -875,8 +850,10 @@ function M.build(ctx)
 	end
 
 	local enabled = karabiner.get_enabled()
-	local tap_hold, chords = build_picker_trees(karabiner, update_menu, enabled)
 
+	-- The key lists build their trees on demand, inside the renderer's isolated
+	-- provider call: an unreadable key catalogue then costs the key rows and is
+	-- logged, not the whole Tap-Holds submenu.
 	local providers = {
 		["tap_hold_timings"] = function()
 			return {
@@ -886,8 +863,16 @@ function M.build(ctx)
 				build_sticky_delay_item(karabiner, update_menu),
 			}
 		end,
-		["tap_hold_keys"]   = function() return tap_hold end,
-		["tap_hold_chords"] = function() return chords end,
+		["tap_hold_keys_left"] = function()
+			return (build_picker_trees(karabiner, update_menu, enabled)).left
+		end,
+		["tap_hold_keys_right"] = function()
+			return (build_picker_trees(karabiner, update_menu, enabled)).right
+		end,
+		["tap_hold_chords"] = function()
+			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
+			return chords
+		end,
 	}
 
 	-- The two bulk commands are the ids Windows declares for its own tap-holds:

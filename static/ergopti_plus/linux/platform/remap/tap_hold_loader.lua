@@ -28,6 +28,7 @@ local M = {}
 local Logger = require("logger.shim")
 local TomlCodec = require("toml_codec")
 local HoldOptions = require("tap_hold.hold_options")
+local KeyCatalog = require("tap_hold.key_catalog")
 local Manifest = require("infra.manifest_reader")
 
 local LOG = "platform.remap.tap_hold_loader"
@@ -105,7 +106,8 @@ end
 --- @param defaults_path string The shared defaults.toml.
 --- @param user_path string|nil The user's tap_hold.toml.
 --- @return table { enabled = boolean, keys = { [id] = fields }, user_error = string|nil,
----   hold_picker = table|nil }
+---   hold_picker = table|nil, catalog = table } `catalog` is this driver's column
+---   of the shared key catalogue: the keys the tray lists, in order, with hands.
 function M.load(defaults_path, user_path)
 	local defaults, defaults_err = read_toml(defaults_path)
 	if not defaults then
@@ -153,6 +155,8 @@ function M.load(defaults_path, user_path)
 		keys = keys,
 		user_error = user_err,
 		hold_picker = hold_picker,
+		-- Shipped data like the hold picker: a user file cannot move a key.
+		catalog = KeyCatalog.for_platform(defaults, "linux"),
 	}
 end
 

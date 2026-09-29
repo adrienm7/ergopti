@@ -295,6 +295,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-tap-hold-hold-options-parity.cjs'
 	},
 	{
+		name: 'one tap-hold key catalogue: order, hands and labels shared, each column its engine, read by every tray',
+		cmd: 'node',
+		args: ['tools/test/test-tap-hold-key-catalog-single-source.cjs'],
+		repro: 'node tools/test/test-tap-hold-key-catalog-single-source.cjs'
+	},
+	{
 		name: 'one table for what the one-shot Shift types, read by Windows and Linux',
 		cmd: 'node',
 		args: ['tools/test/test-tap-hold-one-shot-results-single-source.cjs'],

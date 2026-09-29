@@ -19,6 +19,9 @@
 #              and [hs_combos] in its module body at require time. There is no
 #              user file for those sections, so an edit here always applies.
 #
+# All three read [tap_hold.catalog] (section 2): which keys each tray lists in
+# its Tap-Hold submenu, in which order, under which hand and with which label.
+#
 # The two namespaces below describe the SAME seven physical keys under different
 # ids (left_ctrl/left_control, left_alt/left_option), with different thresholds
 # (0.2–0.35 s per key vs a flat 1000 ms global) and in places different actions
@@ -163,9 +166,56 @@ hold_modifier = "alt"
 
 
 
+# ====================================
+# ====================================
+# ======= 2. The key catalogue =======
+# ====================================
+# ====================================
+
+# Every key a tap-hold can be set on, in the order each tray lists them, with
+# the hand each belongs to and the key that names it. One entry is one physical
+# key. A driver that has it names it by the id its own engine uses — `ahk` for
+# Windows (the keys platform/remap/*.ahk arm), `hs` for macOS
+# (platform/remap/data/tap_hold_keys.json), `linux` for Linux (KEY_CODES of
+# platform/remap/tap_hold_engine.lua) — and a driver without it has no id. The
+# Tap-Hold submenu lists a driver's keys in this order under two headers,
+# « Main gauche — Tap / Hold » and « Main droite — Tap / Hold », picked by `hand`.
+#
+# It replaces three lists that each claimed to mirror a menu-manifest key,
+# `tap_hold_keys_catalog`, that never existed: Windows' _TH_KeyDefs, Linux's
+# KEY_ORDER and a macOS fallback whose `action = true`, meant as `fn = true`,
+# put Fn under the right hand. tools/test/test-tap-hold-key-catalog-single-source.cjs
+# holds each column to its engine and each tray to this table.
+[tap_hold.catalog]
+keys = [
+	{ id = "escape", hand = "left", label_key = "tap_hold.group.escape", ahk = "escape", hs = "escape", linux = "escape" },
+	{ id = "tab", hand = "left", label_key = "tap_hold.group.tab", ahk = "tab", hs = "tab", linux = "tab" },
+	{ id = "caps_lock", hand = "left", label_key = "tap_hold.group.caps_lock", ahk = "caps_lock", hs = "caps_lock", linux = "caps_lock" },
+	{ id = "left_shift", hand = "left", label_key = "tap_hold.group.left_shift", ahk = "left_shift", hs = "left_shift", linux = "left_shift" },
+	{ id = "fn", hand = "left", label_key = "tap_hold.group.fn", hs = "fn" },
+	{ id = "left_ctrl", hand = "left", label_key = "tap_hold.group.left_ctrl", ahk = "left_ctrl", hs = "left_control", linux = "left_ctrl" },
+	{ id = "win", hand = "left", label_key = "tap_hold.group.win", ahk = "win", linux = "win" },
+	{ id = "left_option", hand = "left", label_key = "tap_hold.group.left_option", hs = "left_option" },
+	{ id = "left_alt", hand = "left", label_key = "tap_hold.group.left_alt", ahk = "left_alt", linux = "left_alt" },
+	{ id = "left_command", hand = "left", label_key = "tap_hold.group.left_command", hs = "left_command" },
+	{ id = "space", hand = "left", label_key = "tap_hold.group.space", ahk = "space", hs = "spacebar", linux = "space" },
+	{ id = "alt_gr", hand = "right", label_key = "tap_hold.group.alt_gr", ahk = "alt_gr", linux = "alt_gr" },
+	{ id = "right_command", hand = "right", label_key = "tap_hold.group.right_command", hs = "right_command" },
+	{ id = "right_option", hand = "right", label_key = "tap_hold.group.right_option", hs = "right_option" },
+	{ id = "right_ctrl", hand = "right", label_key = "tap_hold.group.right_ctrl", ahk = "right_ctrl", linux = "right_ctrl" },
+	{ id = "right_shift", hand = "right", label_key = "tap_hold.group.right_shift", ahk = "right_shift", hs = "right_shift", linux = "right_shift" },
+	{ id = "enter", hand = "right", label_key = "tap_hold.group.enter", ahk = "enter", hs = "return_or_enter", linux = "enter" },
+	{ id = "backspace", hand = "right", label_key = "tap_hold.group.backspace", ahk = "backspace", hs = "delete_or_backspace", linux = "backspace" },
+	{ id = "delete", hand = "right", label_key = "tap_hold.group.delete", ahk = "delete", linux = "delete" },
+]
+
+
+
+
+
 # ==================================================
 # ==================================================
-# ======= 2. macOS Karabiner defaults (hs_*) =======
+# ======= 3. macOS Karabiner defaults (hs_*) =======
 # ==================================================
 # ==================================================
 

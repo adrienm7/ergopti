@@ -259,6 +259,7 @@
 		"test:menu-reset-terminology": "node ./tools/test/test-menu-reset-terminology.cjs",
 		"test:approved-menu-labels": "node ./tools/test/test-approved-menu-labels.cjs",
 		"test:tap-hold-hold-options-parity": "node ./tools/test/test-tap-hold-hold-options-parity.cjs",
+		"test:tap-hold-key-catalog-single-source": "node ./tools/test/test-tap-hold-key-catalog-single-source.cjs",
 		"test:tap-hold-one-shot-results-single-source": "node ./tools/test/test-tap-hold-one-shot-results-single-source.cjs",
 		"test:hotstring-category-submenu-order": "node ./tools/test/test-hotstring-category-submenu-order.cjs",
 		"test:hotstring-language-packs": "node ./tools/test/test-hotstring-language-packs.cjs",

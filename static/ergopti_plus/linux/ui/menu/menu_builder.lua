@@ -2934,13 +2934,13 @@ local function _build_shortcuts(ctx)
 	return { label = i18n_safe("menu.shortcuts.title"), checked = enabled, submenu = items }
 end
 
---- Display name of a tap-hold key, from the shared `tap_hold.group.*` labels
---- the Windows menu uses.
---- @param key_id string e.g. "caps_lock".
+--- Display name of a tap-hold key: the label key the shared key catalogue
+--- gives it, the one the Windows and macOS menus show.
+--- @param entry table One entry of the manager's key_catalog().
 --- @return string
-local function _tap_hold_key_label(key_id)
-	local label = i18n_safe("tap_hold.group." .. key_id)
-	if label == "tap_hold.group." .. key_id then return key_id end
+local function _tap_hold_key_label(entry)
+	local label = i18n_safe(entry.label_key)
+	if label == entry.label_key then return entry.id end
 	return label
 end
 
@@ -2989,7 +2989,7 @@ local function _build_tap_holds(ctx)
 	end
 	local Writer = require("platform.remap.tap_hold_writer")
 	local HoldOptions = require("tap_hold.hold_options")
-	local Engine = require("platform.remap.tap_hold_engine")
+	local KeyCatalog = require("tap_hold.key_catalog")
 
 	local function changed(ok)
 		if not ok then show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title")) end
@@ -3001,7 +3001,10 @@ local function _build_tap_holds(ctx)
 	local feature_on = th.file_enabled() and th.is_enabled()
 
 	--- Opens the searchable action picker for a key's tap.
-	local function pick_tap(key_id, current)
+	--- @param catalog_entry table The key's entry of the manager's key_catalog().
+	--- @param current string The key's tap now.
+	local function pick_tap(catalog_entry, current)
+		local key_id = catalog_entry.id
 		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 		if not ok_picker or type(Picker.open) ~= "function" then
 			Logger.error(LOG, "Action picker is unavailable for the tap of '%s'.", key_id)
@@ -3013,7 +3016,7 @@ local function _build_tap_holds(ctx)
 		end
 		table.sort(items, function(left, right) return left.label < right.label end)
 		Picker.open({
-			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(key_id),
+			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(catalog_entry),
 			label = i18n_safe("dialog.action_picker.label"),
 			current = current == "" and "__native__" or current,
 			allow_native = true,
@@ -3041,61 +3044,70 @@ local function _build_tap_holds(ctx)
 		changed(Writer.set_threshold(key_id, math.floor(ms + 0.5) / 1000))
 	end
 
-	local providers = {
-		["tap_hold_keys"] = function()
-			local rows = {}
-			for _, key_id in ipairs(Engine.KEY_ORDER) do
-				local entry = keys[key_id] or {}
-				local active = keys[key_id] ~= nil and entry.enabled ~= false
-				local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
-				local hold = active and _tap_hold_current_hold(options, entry) or options[1]
-				local tap_label = _tap_hold_action_label(tap, ctx.gestures)
-				local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
-				local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
-				local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
+	--- The rows of one hand: its keys in the shared catalogue's order, each
+	--- with its disable, tap, hold and delay rows. The manifest draws the two
+	--- hand headers and the separator between the hands around them.
+	--- @param hand string "left" or "right".
+	--- @return table
+	local function hand_rows(hand)
+		local rows = {}
+		for _, catalog_entry in ipairs(KeyCatalog.of_hand(th.key_catalog(), hand)) do
+			local key_id = catalog_entry.id
+			local entry = keys[key_id] or {}
+			local active = keys[key_id] ~= nil and entry.enabled ~= false
+			local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
+			local hold = active and _tap_hold_current_hold(options, entry) or options[1]
+			local tap_label = _tap_hold_action_label(tap, ctx.gestures)
+			local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
+			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
+			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
 
-				local hold_rows = {}
-				for _, option in ipairs(options) do
-					hold_rows[#hold_rows + 1] = {
-						label = HoldOptions.label(option, i18n_safe),
-						checked = (hold == option) or nil,
-						action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
-					}
-				end
+			local hold_rows = {}
+			for _, option in ipairs(options) do
+				hold_rows[#hold_rows + 1] = {
+					label = HoldOptions.label(option, i18n_safe),
+					checked = (hold == option) or nil,
+					action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
+				}
+			end
 
-				rows[#rows + 1] = {
-					label = _tap_hold_key_label(key_id) .. "  :  "
-						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
-					checked = configured or nil,
-					items = {
-						{
-							label = i18n_safe("tap_hold.action.disable"),
-							disabled = not configured or nil,
-							action = function() changed(Writer.set_native(key_id)) end,
-						},
-						{ separator = true },
-						{
-							label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
-							action = function() pick_tap(key_id, tap) end,
-						},
-						{
-							label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
-							items = hold_rows,
-						},
-						{
-							label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-							items = {
-								{
-									label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-									action = function() ask_delay(key_id, ms) end,
-								},
+			rows[#rows + 1] = {
+				label = _tap_hold_key_label(catalog_entry) .. "  :  "
+					.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
+				checked = configured or nil,
+				items = {
+					{
+						label = i18n_safe("tap_hold.action.disable"),
+						disabled = not configured or nil,
+						action = function() changed(Writer.set_native(key_id)) end,
+					},
+					{ separator = true },
+					{
+						label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
+						action = function() pick_tap(catalog_entry, tap) end,
+					},
+					{
+						label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
+						items = hold_rows,
+					},
+					{
+						label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
+						items = {
+							{
+								label = i18n_safe("menu.tapholds.key_tap_delay_set"),
+								action = function() ask_delay(key_id, ms) end,
 							},
 						},
 					},
-				}
-			end
-			return rows
-		end,
+				},
+			}
+		end
+		return rows
+	end
+
+	local providers = {
+		["tap_hold_keys_left"] = function() return hand_rows("left") end,
+		["tap_hold_keys_right"] = function() return hand_rows("right") end,
 	}
 
 	local render_ctx = {}

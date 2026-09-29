@@ -5226,12 +5226,31 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "---"
 platforms = ["hs"]
 
-# `list` since 2026-08-07: one row per configurable key, each holding its
-# disable / tap-picker / hold-picker rows, and the hold picker holding its
-# options. The renderer builds all three levels from the provider's data.
+# The keys, one row each holding its disable / tap-picker / hold-picker rows,
+# under one header per hand and with a separator between the hands, so where
+# the left hand ends is visible at a glance. Which keys a driver lists, in which
+# order and under which hand comes from [tap_hold.catalog] in
+# _shared/tap_hold/defaults.toml; each provider returns its hand's rows only.
+# The hand headers replace a « — Tap / Hold — » header followed by « — Main
+# gauche — » and « — Main droite — », drawn by the macOS provider alone.
+[[menu.tap_holds_menu]]
+type = "section_header"
+i18n = "menu.tapholds.left_hand_tap_hold"
+
 [[menu.tap_holds_menu]]
 type = "list"
-id = "tap_hold_keys"
+id = "tap_hold_keys_left"
+
+[[menu.tap_holds_menu]]
+type = "---"
+
+[[menu.tap_holds_menu]]
+type = "section_header"
+i18n = "menu.tapholds.right_hand_tap_hold"
+
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_keys_right"
 
 [[menu.tap_holds_menu]]
 type = "---"

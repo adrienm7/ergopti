@@ -31,29 +31,50 @@
 ; ===========================
 
 ; Ordered list of physical keys exposed in the tap-hold tray submenu.
-; Each entry: Map("id" => v2_key_id, "i18n" => group_i18n_key).
+; Each entry: Map("id" => v2_key_id, "i18n" => label_i18n_key,
+;                 "hand" => "left"|"right").
 ;
-; **Canonical order mirrors _shared/modules/menu/menu_manifest.json
-; tap_hold_keys_catalog (MENU-4).** Entries restricted to platforms=["ahk"]
-; here; macOS-only keys (fn, spacebar, left_control, left_option, left_command,
-; right_command, right_option, return_or_enter, delete_or_backspace) live
-; only in the shared catalog and are filtered out by the AHK manifest reader.
-global _TH_KeyDefs := [
-	Map("id", "escape",       "i18n", "tap_hold.group.escape"),
-	Map("id", "tab",          "i18n", "tap_hold.group.tab"),
-	Map("id", "caps_lock",    "i18n", "tap_hold.group.caps_lock"),
-	Map("id", "left_shift",   "i18n", "tap_hold.group.left_shift"),
-	Map("id", "left_ctrl",    "i18n", "tap_hold.group.left_ctrl"),
-	Map("id", "win",          "i18n", "tap_hold.group.win"),
-	Map("id", "left_alt",     "i18n", "tap_hold.group.left_alt"),
-	Map("id", "space",        "i18n", "tap_hold.group.space"),
-	Map("id", "alt_gr",       "i18n", "tap_hold.group.alt_gr"),
-	Map("id", "right_ctrl",   "i18n", "tap_hold.group.right_ctrl"),
-	Map("id", "right_shift",  "i18n", "tap_hold.group.right_shift"),
-	Map("id", "enter",        "i18n", "tap_hold.group.enter"),
-	Map("id", "backspace",    "i18n", "tap_hold.group.backspace"),
-	Map("id", "delete",       "i18n", "tap_hold.group.delete"),
-]
+; Built from the shared key catalogue, the ``ahk`` column of [tap_hold.catalog]
+; in _shared/tap_hold/defaults.toml, in catalogue order. It was a hardcoded
+; array here whose comment said it mirrored a menu-manifest
+; ``tap_hold_keys_catalog`` that never existed, while the macOS and Linux trays
+; kept lists of their own. Those read the same table through
+; _shared/lua/tap_hold/key_catalog.lua, and
+; tools/test/test-tap-hold-key-catalog-single-source.cjs holds each column to
+; the keys its engine arms.
+global _TH_KeyDefs := _TH_BuildKeyDefs()
+
+; Reads this driver's column of the shared key catalogue. An entry that names
+; no hand or no label is a broken catalogue: it is logged as an ERROR and left
+; out, so the tray never shows a guessed hand.
+; @returns {Array} One Map per Windows key, in catalogue order.
+_TH_BuildKeyDefs() {
+	global _SharedDir
+	Out := []
+	Path := _SharedDir . "\tap_hold\defaults.toml"
+	Sections := ParseTomlFile(Path)
+	Catalog := Sections.Has("tap_hold.catalog") ? Sections["tap_hold.catalog"] : Map()
+	Keys := Catalog.Has("keys") ? Catalog["keys"] : ""
+	if !(Keys is Array) || Keys.Length == 0 {
+		try LoggerError("TapHoldWriter", "'{1}' declares no [tap_hold.catalog] keys — the Tap-Hold submenu has no key rows.", Path)
+		return Out
+	}
+	for Index, Entry in Keys {
+		if !(Entry is Map) || !Entry.Has("id") || !Entry.Has("hand") || !Entry.Has("label_key") {
+			try LoggerError("TapHoldWriter", "[tap_hold.catalog] keys[{1}] needs an id, a hand and a label_key — left out.", Index)
+			continue
+		}
+		Hand := Entry["hand"]
+		if (Hand != "left" && Hand != "right") {
+			try LoggerError("TapHoldWriter", "[tap_hold.catalog] key '{1}' has hand '{2}', not left or right — left out.", Entry["id"], Hand)
+			continue
+		}
+		if !Entry.Has("ahk")
+			continue
+		Out.Push(Map("id", Entry["ahk"], "i18n", Entry["label_key"], "hand", Hand))
+	}
+	return Out
+}
 
 ; Ordered hold options — value stored as hold_modifier or hold_layer in TOML.
 ; Each entry: Map("id" => storage_value, "kind" => "modifier"|"layer"|"none",
@@ -162,6 +183,17 @@ global _TH_TapNoneI18n := "tap_hold.tap.none"
 TapHoldKeyDefs() {
 	global _TH_KeyDefs
 	return _TH_KeyDefs
+}
+
+; Return the key definitions of one hand ("left" or "right"), in order.
+TapHoldKeyDefsOfHand(Hand) {
+	global _TH_KeyDefs
+	Out := []
+	for _, KeyDef in _TH_KeyDefs {
+		if (KeyDef["hand"] == Hand)
+			Out.Push(KeyDef)
+	}
+	return Out
 }
 
 ; Return the ordered hold-option array.
