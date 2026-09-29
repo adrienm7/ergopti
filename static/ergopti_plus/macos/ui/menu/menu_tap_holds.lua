@@ -115,15 +115,26 @@ local function commit_menu_setting(karabiner, source, mutate, update_menu)
 	return accepted
 end
 
+-- The saved-edit notice for each guardian status. The guardian registers once
+-- per launch, so allowing an unregistered helper in Login Items changes
+-- nothing until ErgoptiPlus is reopened; only an approval applies at once.
+local SAVED_UNTIL_GUARDIAN_KEYS = {
+	requires_approval = "menu.tapholds.saved_until_guardian",
+	unavailable       = "menu.tapholds.saved_until_guardian_restart",
+}
+
 --- Tells the user a bulk edit is saved but waits for the remap guardian: the
---- menu shows the new settings, yet nothing applies them until ErgoptiPlus is
---- allowed in Login Items. The click opens that pane.
+--- menu shows the new settings, yet nothing applies them until the guardian
+--- is ready, and the notice says what makes it ready. The click opens Login
+--- Items.
 --- @param karabiner table Remap facade.
 --- @param method_name string Facade method name, for the log.
 --- @param reason string `persisted-guardian-<status>` terminal detail.
 local function announce_saved_until_guardian(karabiner, method_name, reason)
 	Logger.info(LOG, "Karabiner bulk command '%s' saved; its rules deploy once the guardian is ready (%s).",
 		method_name, tostring(reason))
+	local status = reason:match("^persisted%-guardian%-(.+)$")
+	local key = SAVED_UNTIL_GUARDIAN_KEYS[status] or SAVED_UNTIL_GUARDIAN_KEYS.requires_approval
 	local on_click = nil
 	if type(karabiner.open_login_items) == "function" then
 		on_click = function()
@@ -135,7 +146,7 @@ local function announce_saved_until_guardian(karabiner, method_name, reason)
 		end
 	end
 	local ok, sent_or_err = pcall(require("infra.notifications").notify,
-		i18n.get("menu.tapholds.saved_until_guardian"), nil, "info", on_click)
+		i18n.get(key), nil, "info", on_click)
 	if not ok or sent_or_err ~= true then
 		Logger.error(LOG, "Saved-until-guardian notice was not delivered: %s.", tostring(sent_or_err))
 	end

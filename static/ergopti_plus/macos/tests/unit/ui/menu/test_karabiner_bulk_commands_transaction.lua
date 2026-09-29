@@ -176,6 +176,19 @@ local function recording_logger(observations)
 	return logger
 end
 
+--- Returns the shipped English text of one i18n key: the unit i18n echoes
+--- keys, and a notice's wording is what these cases are about.
+--- @param key string i18n key.
+--- @return string text
+local function english_text(key)
+	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
+	local english = hs.json.decode(file:read("*a"))
+	file:close()
+	local text = english[key]
+	helpers.assert_type(text, "string", "the key must exist in en.json: " .. tostring(key))
+	return text
+end
+
 --- Counts logger records at one exact level.
 --- @param observations table Mutable test observations.
 --- @param level string Logger level.
@@ -476,6 +489,38 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("tells to reopen ErgoptiPlus when the saved edit waits on an unregistered helper"
+		.. " (saved-notice-unavailable)", function()
+		local saved_notifications = package.loaded["infra.notifications"]
+		local notices = {}
+		package.loaded["infra.notifications"] = {
+			notify = function(message, _, _, on_click)
+				notices[#notices + 1] = { message = message, on_click = on_click }
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			local opened = 0
+			local built, observations = build_menu("pending", function(remap)
+				remap.open_login_items = function(on_done)
+					opened = opened + 1
+					on_done(true, "opened")
+					return true
+				end
+			end)
+			helpers.assert_true(row_action(find_item(built, COMMAND_CASES[2].label))())
+			observations.terminals.apply_scope(true, "persisted-guardian-unavailable", 3)
+			helpers.assert_eq(#notices, 1)
+			-- The helper registers once per launch: Login Items alone fixes nothing.
+			helpers.assert_true(english_text(notices[1].message):find("quit and reopen", 1, true) ~= nil,
+				"the notice must say to reopen ErgoptiPlus: " .. english_text(notices[1].message))
+			helpers.assert_true(notices[1].on_click())
+			helpers.assert_eq(opened, 1, "the notice still opens Login Items")
+		end)
+		package.loaded["infra.notifications"] = saved_notifications
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("names no single submenu in the saved notice a combo command shows (saved-notice-wording)",
 		function()
 			local saved_notifications = package.loaded["infra.notifications"]
@@ -494,11 +539,7 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 				observations.terminals.copy_tap_actions_to_combos(true,
 					"persisted-guardian-requires_approval", 1)
 				helpers.assert_eq(#notices, 1)
-				local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-				local english = hs.json.decode(file:read("*a"))
-				file:close()
-				local text = english[notices[1]]
-				helpers.assert_type(text, "string", "the notice key must exist: " .. tostring(notices[1]))
+				local text = english_text(notices[1])
 				helpers.assert_nil(text:lower():find("tap%-hold"),
 					"key-combination commands announce it too: " .. text)
 			end)
@@ -690,6 +731,16 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 			helpers.assert_eq(opened[case.opener], 1)
 		end)
 	end
+
+	helpers.it("says to reopen ErgoptiPlus while its helper is unregistered (saved-notice-unavailable)",
+		function()
+			local built = build_guardian_menu("unavailable")
+			local status = find_descendant(built, "menu.tapholds.guardian_unavailable")
+			helpers.assert_not_nil(status)
+			-- It registers once per launch: Login Items alone changes nothing.
+			helpers.assert_true(english_text(status.title or status.label):find("quit and reopen", 1, true) ~= nil,
+				"the row must name the step that registers the helper again")
+		end)
 
 	helpers.it("shows no guardian row when nothing waits on it (guardian-status-row)", function()
 		for _, variant in ipairs({
