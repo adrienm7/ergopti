@@ -10,7 +10,7 @@
 --- 2. the shared policy holds: the same signature never opens twice, an error
 ---    logged while the window is pending or open is folded into it, nothing
 ---    opens while the Debug menu setting is unticked;
---- 3. the window never asks for the keyboard;
+--- 3. the window is presented once through the shared focus helper;
 --- 4. "ready" answers with the error and its report, redacted;
 --- 5. copy, report and open go through the diagnostics actions with the
 ---    report the page showed; an unknown action is refused;
@@ -212,7 +212,8 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		fire_timers(context)
 		helpers.assert_eq(context.windows, 1, "the timer must open the window")
 		helpers.assert_eq(context.handler_name, "error_dialog", "the page posts to the error_dialog handler")
-		helpers.assert_eq(context.focused, 0, "the error window must never ask for the keyboard")
+		helpers.assert_eq(context.focused, 1,
+			"the error window is raised and focused once through the shared helper (ui-focus-not-topmost)")
 		helpers.assert_eq(context.title, "ErgoptiPlus — common.error_title", "the window is titled Error")
 	end)
 
@@ -281,6 +282,7 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		dialog.init()
 		dialog.on_error("keylogger", "Flush failed: %s", "Flush failed: disk full")
 		fire_timers(context)
+		local focused_at_open = context.focused
 		context.page({ body = "ready" })
 		context.page({ body = { action = "copy" } })
 		context.page({ body = { action = "report" } })
@@ -296,7 +298,7 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(report.name, nil, "a report names no file to save")
 		helpers.assert_eq(report.fields.diagnostics, nil, "the report field is filled from the text, not a summary")
 		helpers.assert_eq(report.fields.driver, "macos")
-		helpers.assert_eq(context.focused, 0, "reporting never brings the error window back to the front")
+		helpers.assert_eq(context.focused, focused_at_open, "reporting never brings the error window back to the front")
 		helpers.assert_eq(open.action, "open_path")
 		helpers.assert_eq(open.id, "errors_today", "open_log opens today's errors file, by id")
 		helpers.assert_eq(context.performed[3].paths.errors_today, ERRORS_FILE)

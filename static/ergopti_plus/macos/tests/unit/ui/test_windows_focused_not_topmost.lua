@@ -236,3 +236,115 @@ helpers.describe("ui-focus-not-topmost: diagnostics window (macOS)", function()
 		end)
 
 end)
+
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 3/ The error window is presented =======
+-- ================================================
+-- ================================================
+
+--- Loads the real error window over the real focus helper and chrome.
+--- @param view table Native double.
+--- @param app table Records Hammerspoon activations.
+--- @return table dialog, table timers
+local function load_error_dialog(view, app)
+	for _, name in ipairs({
+		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
+		"infra.locale", "ui.ui_builder", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+	}) do package.loaded[name] = nil end
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+	hs_stub.drawing.windowLevels = LEVELS
+	hs_stub.focus = function() app.activations = app.activations + 1 end
+	hs_stub.webview.new = function() return view end
+	hs_stub.webview.windowMasks = { titled = 1, closable = 2, miniaturizable = 4, resizable = 8 }
+	hs_stub.webview.usercontent.new = function()
+		return { setCallback = function(self) return self end }
+	end
+	hs_stub.screen.mainScreen = function()
+		return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
+	end
+
+	local timers = {}
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["infra.locale"] = { all = function() return {} end }
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(_, fn) timers[#timers + 1] = fn; return { timer = {} }, true end,
+		now_ns = function() return 0 end,
+		cancel = function() return true end,
+	}
+	package.loaded["adapters.storage"] = {
+		get = function(_, default) return default end,
+		set = function() return true end,
+	}
+	package.loaded["infra.manifest_reader"] = {
+		default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
+	}
+	package.loaded["ui.healthcheck.core"] = {
+		DRIVER = "macos",
+		config = function()
+			return {
+				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>",
+					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
+					secret_value_min_length = 6 },
+				templates = {}, repository = {},
+			}
+		end,
+		run = function()
+			return {
+				generated_at = "2026-09-29T08:00:00Z",
+				sections = { paths = { errors_today = "/Users/jdoe/Library/Logs/ergopti_plus/errors.log" } },
+			}
+		end,
+	}
+	package.loaded["ui.healthcheck.report"] = {
+		redaction_context = function() return { home = "/Users/jdoe", user = "jdoe" } end,
+		perform = function() return { ok = true } end,
+	}
+	local real = require("ui.ui_builder")
+	package.loaded["ui.ui_builder"] = setmetatable({
+		build_injected_html = function() return "<html></html>" end,
+		get_app_geometry = function() return { width = 560, height = 460 } end,
+	}, { __index = real })
+	return require("ui.error_dialog"), timers
+end
+
+helpers.describe("ui-focus-not-topmost: error window (macOS)", function()
+
+	helpers.it("is raised and focused when it opens, at the normal level (ui-focus-not-topmost)", function()
+		local saved = {}
+		for key, value in pairs(package.loaded) do saved[key] = value end
+		local prior_hs = _G.hs
+		local ok, err = xpcall(function()
+			local view, calls = recording_view(true)
+			local app = { activations = 0 }
+			local dialog, timers = load_error_dialog(view, app)
+			helpers.assert_true(dialog.init(), "the shipped policy must load")
+			dialog.on_error("keylogger", "Flush failed", "Flush failed")
+			helpers.assert_eq(#timers, 1, "the window opens on its timer")
+			timers[1]()
+			helpers.assert_eq(calls.shows, 1, "the error window is shown")
+			helpers.assert_eq(#calls.levels, 1, "the chrome applies exactly one level")
+			assert_never_on_top(calls, "error window")
+			-- show() alone leaves a window of the inactive Hammerspoon app behind
+			-- the user's key window: it must be raised and the app activated.
+			helpers.assert_eq(calls.raises, 1, "the error window is raised once")
+			helpers.assert_eq(calls.focuses, 1, "the error window is focused once")
+			helpers.assert_eq(app.activations, 1, "Hammerspoon is activated once so the window comes forward")
+		end, debug.traceback)
+		for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
+		for key, value in pairs(saved) do package.loaded[key] = value end
+		_G.hs = prior_hs
+		if not ok then error(err, 0) end
+	end)
+
+end)
