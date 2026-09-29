@@ -3359,6 +3359,7 @@ end
 --- @param candidate table Persisted settings candidate.
 local function publish_settings_state(candidate)
 	_state.tap_holds_enabled = candidate.tap_holds_enabled ~= false
+	_state.mod_combos_enabled = candidate.mod_combos_enabled
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
@@ -3968,8 +3969,10 @@ function M.get_tap_holds_enabled()
 end
 
 --- Switches the Tap-Holds feature and persists it. Off stops generating every
---- tap-hold and modifier-combo rule except the right-Command one that carries
---- AltGr and the script-control trigger; every per-key assignment is kept.
+--- per-key tap-hold rule except the right-Command one that carries AltGr and
+--- the script-control trigger; every per-key assignment is kept. The
+--- modifier-combo rules follow it only while their own switch was never set
+--- (M.set_mod_combos_enabled).
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
 --- @return boolean committed
@@ -3986,6 +3989,33 @@ function M.set_tap_holds_enabled(value)
 	return committed
 end
 
+--- Returns whether the key combinations are switched on: the persisted
+--- [mod_combos] enabled, or the Tap-Holds switch while it was never set.
+--- @return boolean enabled
+function M.get_mod_combos_enabled()
+	if not require_state("get_mod_combos_enabled") then return false end
+	return Generator.key_combinations_enabled(_state)
+end
+
+--- Switches the key combinations and persists the choice, which from then on
+--- no longer follows the Tap-Holds switch. Off stops generating every
+--- modifier-combo rule; every pair's assignment is kept. Does NOT regenerate —
+--- call M.regenerate() explicitly when ready.
+--- @param value boolean Desired switch state.
+--- @return boolean committed
+function M.set_mod_combos_enabled(value)
+	if not require_state("set_mod_combos_enabled") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_mod_combos_enabled(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.mod_combos_enabled = value
+	end)
+	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
+	return committed
+end
+
 --- Copies exactly the settings persisted in config_karabiner.toml.
 --- Runtime handles and watcher capabilities from `_state` are deliberately
 --- excluded, so the snapshot can be retained by a parent transaction.
@@ -3999,13 +4029,15 @@ local function clone_persisted_settings(source)
 		or type(source.tap_hold_timeout_ms) ~= "number"
 		or type(source.sticky_timeout_ms) ~= "number"
 		or type(source.simultaneous_threshold_ms) ~= "number"
-		or type(source.combo_symmetric) ~= "boolean" then
+		or type(source.combo_symmetric) ~= "boolean"
+		or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean") then
 		return nil
 	end
 	local detached = clone_settings_state(source)
 	return {
 		enabled = detached.enabled == true,
 		tap_holds_enabled = detached.tap_holds_enabled ~= false,
+		mod_combos_enabled = detached.mod_combos_enabled,
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
 		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
@@ -4059,6 +4091,7 @@ function M.restore_settings(snapshot, on_done)
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
 		candidate.tap_holds_enabled = restored.tap_holds_enabled
+		candidate.mod_combos_enabled = restored.mod_combos_enabled
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
 		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
@@ -4153,6 +4186,7 @@ function M.reset_to_defaults(on_done)
 	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
 		local defaults = Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
+		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
@@ -5049,6 +5083,7 @@ function M.init(file_system)
 	_state = {
 		enabled                   = user_cfg.enabled,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
+		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,
 		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,

@@ -190,6 +190,12 @@ return function(run)
 				resolve_layout_actions = function() return 0 end,
 			}
 			package.loaded["platform.remap.generator"] = {
+				-- The facade only delegates to this rule; the real one is pinned
+				-- by test_generator_combo_gate_split.lua.
+				key_combinations_enabled = function(state)
+					if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
+					return state.tap_holds_enabled ~= false
+				end,
 				build_karabiner_json = function(...)
 					calls.build = calls.build + 1
 					calls.build_token = select(7, ...)
