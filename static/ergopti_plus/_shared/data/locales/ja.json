@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "ログイン項目の設定を開く…",
 	"menu.tapholds.saved_until_guardian": "💾 キーボード設定を保存しました：ログイン項目で ErgoptiPlus が許可されると適用されます（クリックして設定を開く）。",
 	"menu.tapholds.saved_until_guardian_restart": "💾 キーボード設定を保存しました：ErgoptiPlus がバックグラウンドヘルパーを登録すると適用されます。ログイン項目で ErgoptiPlus が許可されていることを確認してから、ErgoptiPlus を終了してもう一度開いてください（クリックして設定を開く）。",
+	"menu.tapholds.saved_until_helper": "💾 キーボード設定を保存しました：ErgoptiPlus のバックグラウンドヘルパーが応答しだい適用されます。",
 	"menu.tapholds.title": "⌨️ タップホールド",
 	"menu.tapholds.copy_tap_to_combo": "🔁 修飾キーにタップ→コンボをコピー",
 	"menu.tapholds.edit_nav_layer": "ナビゲーションレイヤーを編集…",

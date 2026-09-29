@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Giriş Öğeleri ayarlarını aç…",
 	"menu.tapholds.saved_until_guardian": "💾 Klavye ayarları kaydedildi: ErgoptiPlus'a Giriş Öğeleri'nde izin verildiğinde uygulanacak (ayarları açmak için tıklayın).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Klavye ayarları kaydedildi: ErgoptiPlus arka plan yardımcısını kaydettiğinde uygulanacak. ErgoptiPlus'a Giriş Öğeleri'nde izin verildiğini kontrol edin, ardından ErgoptiPlus'tan çıkıp yeniden açın (ayarları açmak için tıklayın).",
+	"menu.tapholds.saved_until_helper": "💾 Klavye ayarları kaydedildi: ErgoptiPlus arka plan yardımcısı yanıt verir vermez uygulanacak.",
 	"menu.tapholds.title": "⌨️ Dokunma-Basılı Tutma",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Değiştirici tuşlar için tap → combo kopyala",
 	"menu.tapholds.edit_nav_layer": "Gezinme katmanını düzenle…",

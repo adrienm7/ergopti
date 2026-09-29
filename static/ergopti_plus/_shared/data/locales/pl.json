@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Otwórz ustawienia Rzeczy otwieranych podczas logowania…",
 	"menu.tapholds.saved_until_guardian": "💾 Ustawienia klawiatury zapisane: zaczną działać, gdy ErgoptiPlus zostanie dozwolony w Rzeczach otwieranych podczas logowania (kliknij, aby otworzyć ustawienia).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Ustawienia klawiatury zapisane: zaczną działać, gdy ErgoptiPlus zarejestruje swojego pomocnika działającego w tle. Sprawdź, czy ErgoptiPlus jest dozwolony w Rzeczach otwieranych podczas logowania, a następnie zamknij i ponownie otwórz ErgoptiPlus (kliknij, aby otworzyć ustawienia).",
+	"menu.tapholds.saved_until_helper": "💾 Ustawienia klawiatury zapisane: zaczną działać, gdy tylko pomocnik ErgoptiPlus działający w tle odpowie.",
 	"menu.tapholds.title": "⌨️ Dotknięcie-Przytrzymanie",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Skopiuj tap → combo dla klawiszy modyfikujących",
 	"menu.tapholds.edit_nav_layer": "Edytuj warstwę nawigacji…",

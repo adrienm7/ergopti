@@ -1580,6 +1580,7 @@
 	"menu.tapholds.open_login_items": "Otevřít nastavení Položek přihlášení…",
 	"menu.tapholds.saved_until_guardian": "💾 Nastavení klávesnice uloženo: projeví se, jakmile bude ErgoptiPlus povolen v Položkách přihlášení (kliknutím otevřete nastavení).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Nastavení klávesnice uloženo: projeví se, jakmile ErgoptiPlus zaregistruje svého pomocníka na pozadí. Ověřte, že je ErgoptiPlus povolen v Položkách přihlášení, a poté ErgoptiPlus ukončete a znovu otevřete (kliknutím otevřete nastavení).",
+	"menu.tapholds.saved_until_helper": "💾 Nastavení klávesnice uloženo: projeví se, jakmile pomocník ErgoptiPlus na pozadí odpoví.",
 	"menu.tapholds.title": "⌨️ Klepnutí-Přidržení",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Zkopírovat tap → combo pro modifikátory",
 	"menu.tapholds.edit_nav_layer": "Upravit navigační vrstvu…",
