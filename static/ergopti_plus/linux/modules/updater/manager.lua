@@ -741,8 +741,12 @@ function M.check_for_updates(channel, callback)
 				_state = known and "available" or "idle"
 				Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
 					tostring(fetch_error or "empty body"))
+				-- A failure the fetch did not classify is not claimed as a network one
+				if reason == nil then
+					Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
+				end
 				publish_check(callback, known ~= nil, known, fetch_error or "empty body",
-					CheckResult.failure(base, reason or "no_connection", fetch_error or "empty body"))
+					CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
 				return
 			end
 			_cached_release = nil
