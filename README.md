@@ -125,8 +125,8 @@ brew install --cask ergoptiplus        # stable releases
 brew install --cask ergoptiplus@dev   # every dev prerelease
 ```
 
-The app keeps updating itself in place (Sparkle), exactly as a manual install
-does; see [Homebrew](static/ergopti_plus/macos/README.md#install-with-homebrew)
+`brew upgrade` updates it with your other casks, and the app still updates
+itself from its About menu and its automatic checks; see [Homebrew](static/ergopti_plus/macos/README.md#install-with-homebrew)
 for switching channels and uninstalling.
 
 Or by hand:

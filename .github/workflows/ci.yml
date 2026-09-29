@@ -803,7 +803,7 @@ jobs:
           brew tap ${GITHUB_REPOSITORY_OWNER}/ergopti
           brew install --cask ${cask}
           \`\`\`
-          \`ergoptiplus\` installs the stable releases and \`ergoptiplus@dev\` the dev prereleases; this release is in \`${cask}\`. The app then keeps updating itself, and \`brew upgrade\` leaves it to its own updater.
+          \`ergoptiplus\` installs the stable releases and \`ergoptiplus@dev\` the dev prereleases; this release is in \`${cask}\`. \`brew upgrade\` then updates it with your other casks, and the app still updates itself from its About menu.
 
           **Installation — app, by hand:**
           1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
