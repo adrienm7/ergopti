@@ -191,6 +191,8 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_contains(html, "Autoriser ErgoptiPlus dans Accessibilité")
 			helpers.assert_contains(html, "<ol>")
 			helpers.assert_contains(html, "vient de s’ouvrir")
+			helpers.assert_contains(html, "rouvrez ErgoptiPlus pour revoir ces étapes",
+				"Later must say how to get the steps back")
 			helpers.assert_contains(html, "Activez « Hammerspoon » dans la liste")
 			helpers.assert_contains(html, "<code>" .. BUNDLE_PATH .. "</code>")
 			helpers.assert_contains(html, ">Ouvrir les Réglages</button>")
@@ -237,10 +239,10 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 		end)
 	end)
 
-	helpers.it("closes itself when the grant poll succeeds and resumes the boot", function()
+	helpers.it("comes back on reopen and closes itself when the grant poll succeeds", function()
 		with_dialog(function(h)
 			local Wait = require("infra.accessibility_wait")
-			local tick
+			local tick, reopen
 			local trusted = false
 			local events = {}
 			local permission = setmetatable({
@@ -257,6 +259,7 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 				cancel = function() return true end,
 				show_guidance = function() close_dialog = h.dialog.guide_accessibility(permission) end,
 				close_guidance = function() close_dialog() end,
+				watch_reopen = function(on_reopen) reopen = on_reopen; return function() end end,
 				on_trusted = function() events[#events + 1] = "trusted" end,
 				on_timeout = function() events[#events + 1] = "timeout" end,
 				poll_seconds = 1,
@@ -266,6 +269,12 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_eq(h.open_count(), 1)
 			tick()
 			helpers.assert_eq(h.open_count(), 1, "still open while untrusted")
+			h.click("later")
+			helpers.assert_eq(h.open_count(), 0)
+			reopen()
+			helpers.assert_eq(h.open_count(), 1, "reopening ErgoptiPlus brings the steps back after Later")
+			reopen()
+			helpers.assert_eq(#h.windows, 2, "a reopen with the dialog open raises it, never a copy")
 			trusted = true
 			tick()
 			helpers.assert_eq(h.open_count(), 0, "the grant closes the dialog")

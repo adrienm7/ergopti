@@ -702,7 +702,58 @@ end)
 
 -- =======================================
 -- =======================================
--- ======= 4/ Callback Containment =======
+-- ======= 4/ Reopen Activation ==========
+-- =======================================
+-- =======================================
+
+helpers.describe("launcher guard — reopen activation", function()
+	helpers.it("reports only the exact launcher's activation to its one listener", function()
+		with_guard(managed_environment(), function(guard, hs_stub, log_lines)
+			local launcher = make_app(LAUNCHER_PID, LAUNCHER_BUNDLE_ID)
+			hs_stub.application.__set_for_pid(LAUNCHER_PID, launcher)
+			local quit_count = 0
+			helpers.assert_true(guard.init(function() quit_count = quit_count + 1 end))
+			local activations = 0
+			local stop = guard.watch_activation(function() activations = activations + 1 end)
+			helpers.assert_eq(type(stop), "function")
+			local second, refusal = guard.watch_activation(function() end)
+			helpers.assert_nil(second, "one listener at a time")
+			helpers.assert_contains(refusal, "already registered")
+
+			local activated = hs_stub.application.watcher.activated
+			hs_stub.application.__emit("ErgoptiPlus", activated, launcher)
+			hs_stub.application.__emit("Finder", activated, make_app(LAUNCHER_PID + 1, "com.apple.finder"))
+			hs_stub.application.__emit(nil, activated, nil)
+			helpers.assert_eq(activations, 1, "reopening ErgoptiPlus activates the exact launcher PID")
+
+			stop()
+			hs_stub.application.__emit("ErgoptiPlus", activated, launcher)
+			helpers.assert_eq(activations, 1, "a stopped listener hears nothing")
+			helpers.assert_eq(type(guard.watch_activation(function() error("listener exploded") end)), "function")
+			hs_stub.application.__emit("ErgoptiPlus", activated, launcher)
+			helpers.assert_true(table.concat(log_lines, "\n"):find("listener exploded", 1, true) ~= nil,
+				"a raising listener is logged, never lost in the watcher callback")
+			helpers.assert_eq(quit_count, 0, "an activation is never a launcher loss")
+		end)
+	end)
+
+	helpers.it("refuses a listener when no launcher is watched", function()
+		with_guard({}, function(guard)
+			helpers.assert_true(guard.init(function() end))
+			local stop, refusal = guard.watch_activation(function() end)
+			helpers.assert_nil(stop)
+			helpers.assert_contains(refusal, "no launcher")
+		end)
+	end)
+end)
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 5/ Callback Containment =======
 -- =======================================
 -- =======================================
 

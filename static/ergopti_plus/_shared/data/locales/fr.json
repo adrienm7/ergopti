@@ -2223,7 +2223,7 @@
 	"permission_dialog.open_settings": "Ouvrir les Réglages",
 	"permission_dialog.step_add": "Si « Hammerspoon » n’est pas dans la liste, cliquez sur +, appuyez sur ⌘⇧G, collez {1} puis cliquez sur Ouvrir.",
 	"permission_dialog.accessibility.title": "Autoriser ErgoptiPlus dans Accessibilité",
-	"permission_dialog.accessibility.body": "ErgoptiPlus a besoin de cette autorisation pour lire le clavier. Il démarre tout seul dès qu’elle est activée, sans redémarrage.",
+	"permission_dialog.accessibility.body": "ErgoptiPlus a besoin de cette autorisation pour lire le clavier. Il démarre tout seul dès qu’elle est activée, sans redémarrage. Si vous fermez cette fenêtre, rouvrez ErgoptiPlus pour revoir ces étapes.",
 	"permission_dialog.accessibility.step_opened": "Réglages Système > Confidentialité et sécurité > Accessibilité vient de s’ouvrir.",
 	"permission_dialog.accessibility.step_toggle": "Activez « Hammerspoon » dans la liste : c’est le moteur d’ErgoptiPlus. S’il semble déjà activé, désactivez-le puis réactivez-le.",
 	"startup.linux_input_access_body": "Ergopti+ ne peut pas encore lire le clavier ni écrire dans /dev/uinput. Déconnectez-vous puis reconnectez-vous (ou redémarrez) pour que les groupes « input » et « uinput » ajoutés par l’installateur prennent effet. Si le problème persiste, lancez : {1}",
