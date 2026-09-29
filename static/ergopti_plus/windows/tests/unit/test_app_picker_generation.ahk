@@ -154,7 +154,7 @@ _APG_LlmClaimOccursInsideTerminalAdmission() {
 		AssertFalse(LLM_Menu_CommitMutation(
 			"the LLM disabled-applications setting", Mutate, _APG_Apply,
 			_APG_Writer, _APG_Notify, _APG_AcquireSupersedingLlm,
-			_LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+			_LMT_Settle, _LMT_Collect))
 		AssertEqual(0, _APG_WriterCalls,
 			"a picker superseded during terminal admission must refuse before I/O")
 		AssertEqual(0, _APG_ApplyCalls)
@@ -185,13 +185,13 @@ _APG_LlmNewerCommitWinsInRamAndToml() {
 			Candidate, ["x.exe"], ReceiptB)
 		AssertTrue(LLM_Menu_CommitMutation(
 			"the LLM disabled-applications setting", MutateB, _APG_Apply,
-			0, _APG_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Quiesce,
+			0, _APG_Notify, _LMT_Acquire, _LMT_Settle,
 			_APG_CollectDisabledApps))
 		MutateA := (Candidate) => _LLM_Menu_ApplyAppPickerSelection(
 			Candidate, [], ReceiptA)
 		AssertFalse(LLM_Menu_CommitMutation(
 			"the LLM disabled-applications setting", MutateA, _APG_Apply,
-			0, _APG_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Quiesce,
+			0, _APG_Notify, _LMT_Acquire, _LMT_Settle,
 			_APG_CollectDisabledApps))
 		AssertEqual(1, _APG_ApplyCalls)
 		AssertEqual(1, _APG_NotifyCalls)

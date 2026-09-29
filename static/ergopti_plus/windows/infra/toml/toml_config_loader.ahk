@@ -133,8 +133,7 @@ TomlConfigForeignOwnershipRegistry() {
 			"auto_configure_on_next_start", "Gestures"),
 		"llm", Map(
 			"api_entry_id", "LLMMenu",
-			"ollama_port", "LLMMenu",
-			"trigger_shortcut", "LLMMenu"),
+			"ollama_port", "LLMMenu"),
 		"llm.navigation", Map(
 			"nav_modifiers", "LLMMenu"),
 		"llm.trigger", Map(

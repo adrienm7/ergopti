@@ -415,17 +415,6 @@
 				"sample": ["notepad.exe"],
 				"toml_array": true
 			}
-		},
-		{
-			"id": "trigger_shortcut",
-			"ahk": {
-				"tray_key": "trigger_shortcut",
-				"persist": "extra",
-				"section": "llm",
-				"key": "trigger_shortcut",
-				"sample": "Ctrl+Alt+P"
-			},
-			"hs": null
 		}
 	]
 }

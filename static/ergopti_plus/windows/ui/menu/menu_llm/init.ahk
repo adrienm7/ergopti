@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Bootstraps the LLM tray module at script load. Reads persisted user
 ; preferences (passed in as a Map from ErgoptiPlus's main config loader),
-; restores trigger shortcut + per-app overrides + API entries, registers the
+; restores per-app overrides + API entries, registers the
 ; Ctrl+<n> profile hotkeys, builds the menu, and schedules the background
 ; health probe.
 ;
@@ -60,7 +60,7 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	if !(saved_opts is Map)
 		throw TypeError("LLM saved options must be a Map.")
 	static _str_keys := ["model", "profile_id", "temperature",
-		"nav_modifiers", "val_modifiers", "trigger_shortcut", "backend",
+		"nav_modifiers", "val_modifiers", "backend",
 		"api_entry_id", "agent_system1", "agent_system2", "agent_mode"]
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",
 		"ctx_chars", "pred_indent", "ollama_port"]
@@ -130,12 +130,6 @@ _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
 	if !FirstRestore
 		return true
-	; A rejected persisted trigger can still own its old native chord until the
-	; cleanup recovery proves Off. Do not publish any contextual variant while
-	; that global owner is still live, otherwise AHK precedence recreates the
-	; exact cross-owner ambiguity the collision policy rejected.
-	if _LLM_Menu_TriggerRecoveryPending()
-		return false
 	if !HasMethod(ProfileFn, "Call")
 		ProfileFn := LLM_Menu_BindProfileHotkeys
 	if !HasMethod(NavFn, "Call")
@@ -153,9 +147,6 @@ _LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 		NavFn := 0) {
 	if _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn, NavFn)
 		return true
-	if _LLM_Menu_TriggerRecoveryPending()
-		throw TrayRootRetryPendingError(
-			"initial LLM trigger cleanup is pending before contextual hotkeys")
 	if _LLM_Menu_ProfileHotkeyRetryPending()
 		throw TrayRootRetryPendingError(
 			"initial LLM profile hotkeys are pending a bounded retry")
@@ -230,17 +221,6 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; bootstrap / bridge start so predictions do not silently fail.
 	if (_LLM_Menu["backend"] == "ollama")
 		LLM_Menu_EnsureModelReady()
-
-	; Reconcile the native owner even for an empty string. This is essential on
-	; explicit reload and also prevents a stale live handle from surviving while
-	; the row says that the shortcut is disabled.
-	if FirstRestore {
-		TriggerReady := LLM_Menu_ApplyTriggerShortcut(
-			_LLM_Menu["trigger_shortcut"])
-		if !((TriggerReady is Integer) && TriggerReady == 1)
-			try LoggerError("LLM",
-				"Initial trigger shortcut activation remained incomplete.")
-	}
 
 	; Restore persisted remote API entries (lives in api_entries.json next to
 	; the main config.toml — kept separate because the array-of-maps shape

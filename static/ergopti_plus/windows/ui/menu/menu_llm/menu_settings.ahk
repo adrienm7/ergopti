@@ -19,9 +19,9 @@
 ;    ``LLM_Defaults`` (populated from defaults.json — the single source). The
 ;    loader fails fast if the file is missing, so there is no hardcoded mirror
 ;    map; a per-call default only covers keys the loader does not parse.
-; 3. Trigger shortcut: optional global hotkey that fires a prediction on
-;    demand. Default Ctrl+Space mirrors Copilot's "trigger inline suggestion"
-;    so muscle memory carries over.
+; 3. A prediction on demand is the llm_generate_prediction action
+;    (LLM_Menu_TriggerPrediction), bound in a keyboard slot (Win+Space
+;    recommended): the trigger submenu offers no hotkey of its own.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -68,9 +68,8 @@ _LLM_Menu_NRows() {
 
 /**
  * Builds the trigger settings submenu.
- * Mirrors HS: trigger shortcut, debounce (dialog), instant-on-word-end,
- * after-hotstring, reset-on-nav, URL bar filter, password field filter,
- * and the app-exclusion picker.
+ * Mirrors HS: debounce (dialog), instant-on-word-end, after-hotstring,
+ * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
 LLM_Menu_BuildTriggerMenu() {
@@ -79,17 +78,11 @@ LLM_Menu_BuildTriggerMenu() {
 
 /**
  * Row data for the trigger submenu.
- * @returns {Array} Trigger shortcut, debounce, the four toggles, the app picker.
+ * @returns {Array} Debounce, the four toggles, the app picker.
  */
 _LLM_Menu_TriggerRows() {
 	global _LLM_Menu
 	Rows := []
-
-	; Trigger shortcut (fires prediction on demand)
-	sc_display := LLM_Menu_TriggerDisplayValue()
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.trigger_shortcut_label"), "%s", sc_display),
-		"action", (*) => LLM_Menu_PromptTriggerShortcut()))
 
 	; Debounce — dialog like HS (free numeric input)
 	Rows.Push(Map(
@@ -594,7 +587,7 @@ LLM_Menu_PromptOllamaPort() {
 	return LLM_Menu_CommitMutation("the Ollama port setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
 			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted,
-		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
 		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
@@ -603,7 +596,7 @@ LLM_Menu_ResetOllamaPort(default_port) {
 	return LLM_Menu_CommitMutation("the Ollama port reset",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
 			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted,
-		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
 		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
@@ -699,36 +692,11 @@ _LLM_Menu_ApplyNavCommitted(*) {
 
 
 
-; ===============================================
-; ===============================================
-; ======= 7/ Trigger Shortcut + Add Model =======
-; ===============================================
-; ===============================================
-
-/**
- * Opens an InputBox to set/clear the manual trigger shortcut.
- * Format expected: modifier(s) + key, e.g. "ctrl+alt+p" or "ctrl+space".
- * An empty input clears the shortcut.
- */
-LLM_Menu_PromptTriggerShortcut() {
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return LLM_Menu_PromptTriggerShortcut()
-		finally Critical(InheritedCritical)
-	}
-	global _LLM_Menu
-	ib := InputBox(t("menu.llm.shortcut_prompt"), t("menu.llm.trigger_shortcut_title"), "w450 h140", _LLM_Menu["trigger_shortcut"])
-	if (ib.Result != "OK")
-		return
-	raw := Trim(ib.Value)
-	Committed := LLM_Menu_CommitTriggerShortcut(raw)
-	; A partial native cleanup failure returns false but publishes an explicit
-	; recovery projection. Rebuild that warning instead of leaving a stale label
-	if Committed || LLM_Menu_TriggerNeedsAttention()
-		LLM_Menu_RequestBuild("setting_committed")
-	return Committed
-}
+; ================================================
+; ================================================
+; ======= 7/ Manual Prediction + Add Model =======
+; ================================================
+; ================================================
 
 ; The reasons a manual prediction request is refused, each with the locale key
 ; of the notice that tells the user. LLM_Menu_ManualPredictionRefusal decides

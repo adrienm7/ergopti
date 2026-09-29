@@ -88,10 +88,10 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 			updates.Push({ Section: "gestures", Key: "auto_configure_on_next_start", Value: TOML_Bool(true) })
 
 		; The wizard is reachable from the live tray as well as first boot. Hold
-		; current config ownership from native/WAL quiescence through candidate
-		; write, paths.toml replacement, live publication and Reload. A release
-		; before Reload lets an already-open trigger dialog commit to whichever
-		; path the partial transition exposed.
+		; current config ownership from candidate write through paths.toml
+		; replacement, live publication and Reload. A release before Reload lets
+		; an already-open menu dialog commit to whichever path the partial
+		; transition exposed.
 		TransitionPaths := [CandidateConfig]
 		if PathRedirectRequired
 			TransitionPaths.Push(_PathsFile)
@@ -106,11 +106,6 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 		OwnerBundle := AcquireResult["bundle"]
 		ReleaseBundle := true
 		try {
-			if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
-				_Onboarding_CommitError(
-					"onboarding.error.commit_trigger_recovery")
-				return false
-			}
 			; A config.toml the wizard creates carries this build's schema version.
 			updates := ConfigMigrateStampNewFile(updates, CandidateConfig)
 			updates := _ConfigPrepareTypedUpdates(updates)

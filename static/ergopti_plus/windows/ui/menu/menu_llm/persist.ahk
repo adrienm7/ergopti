@@ -150,10 +150,6 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 		return false
 	if !(MenuState is Map)
 		MenuState := _LLM_Menu
-	if !MenuState.Has("trigger_shortcut")
-			|| !LLM_Option_TryNormalize("trigger_shortcut",
-				MenuState["trigger_shortcut"], &TriggerShortcut)
-		return false
 	if MenuState.Has("api_entry_id")
 			&& !LLM_Option_TryNormalize("api_entry_id",
 				MenuState["api_entry_id"], &ApiEntryId)
@@ -182,10 +178,9 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 				MenuState["ollama_port"], &OllamaPort)
 		return false
 
-	Updates.Push({ Section: "llm", Key: "trigger_shortcut", Value: TriggerShortcut })
-	; Ollama port lives under [llm] as a flat key (like trigger_shortcut) — it is
-	; NOT in the Features schema, so it round-trips via the TOML write here + the
-	; cache read in the saved-opts loader, not via _LLM_Menu_SyncToFeatures.
+	; Ollama port lives under [llm] as a flat key — it is NOT in the Features
+	; schema, so it round-trips via the TOML write here + the cache read in the
+	; saved-opts loader, not via _LLM_Menu_SyncToFeatures.
 	if MenuState.Has("ollama_port")
 		Updates.Push({ Section: "llm", Key: "ollama_port", Value: OllamaPort })
 	if MenuState.Has("api_entry_id")
@@ -294,11 +289,6 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 	else
 		_LLM_Menu_LogInvalidPersistedOption("llm.navigation.val_modifiers")
 	if IsSet(Cache) {
-		raw := IniCacheGet(Cache, "llm", "trigger_shortcut")
-		if !((raw is String) && raw == "_") {
-			_LLM_Menu_PutValidatedPersistedOption(
-				opts, "trigger_shortcut", raw, "llm.trigger_shortcut")
-		}
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
 		if !((raw is String) && raw == "_")
 			_LLM_Menu_PutValidatedPersistedOption(

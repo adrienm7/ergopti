@@ -162,13 +162,6 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 		return ConfigTransitionResultIs(Transition, "committed_new")
 	}
 	try {
-		Prepare := Options.Get("prepare", ConfigScopePrepareLifecycle)
-		Prepared := Prepare.Call(Path, Bundle)
-		if !(Prepared is Integer) || Prepared != 1 {
-			ConfigReportPersistenceFailure("the scoped configuration", NotifyFn,
-				"native trigger recovery refused lifecycle preparation")
-			return Receipt
-		}
 		if !ConfigCommitBuilt(Path, "the scoped configuration", Build, Publish, NotifyFn, Bundle) {
 			; A throwing writer may have prepared a WAL before its error reached
 			; the gateway. Resolve that debt before reopening admission.
@@ -193,16 +186,6 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 		if !Transferred
 			_ConfigWriteTerminalRelease(Bundle)
 	}
-}
-
-; Stabilize the existing native/journal owner before rendering the new image.
-; Otherwise a later reload reconciliation could republish old trigger settings.
-ConfigScopePrepareLifecycle(Path, Bundle) {
-	Quiesced := LLM_Menu_QuiesceTriggerForLifecycle(Bundle)
-	if !(Quiesced is Integer) || Quiesced != 1
-		return false
-	Prepared := LLM_TriggerJournalPrepareDestructive(Path, Bundle)
-	return (Prepared is Integer) && Prepared == 1
 }
 
 ; The existing action owner validates grammar and catalogue parameter capability.

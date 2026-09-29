@@ -615,14 +615,12 @@ global _LLM_Menu := Map(
 	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
-	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false,
+	"inline_autotype", false,
 	"ollama_port", 11434
 )
 global _LLM_Menu_Loaded := false
-; Definitions-only trigger transaction. The fake registrar in its unit suite
-; owns every native transition; this include registers no real hotkey.
-#Include ../ui/menu/menu_llm/trigger_journal.ahk
-#Include ../ui/menu/menu_llm/trigger_shortcut.ahk
+; Definitions-only chord translation and hotkey identities; registers no hotkey.
+#Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
@@ -1233,15 +1231,13 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_hotkey_registrar_modifier_keys.ahk
 #Include unit/test_keyboard_slot_win_space.ahk
-#Include unit/test_llm_trigger_shortcut_transactions.ahk
+#Include unit/test_llm_trigger_shortcut_retired.ahk
+#Include unit/test_llm_hotkey_identity.ahk
 #Include unit/test_llm_nav_event_owner.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
 #Include unit/test_llm_profile_hotkey_transaction.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk
 #Include meta/test_llm_hotkey_cross_owner_policy.ahk
-#Include unit/test_llm_trigger_journal.ahk
-#Include meta/test_llm_trigger_shortcut_transaction.ahk
-#Include meta/test_llm_trigger_journal_lifecycle.ahk
 #Include meta/test_config_transition_integration.ahk
 ; Logger behaviour corpus -- severity filtering and the ring buffer, from the
 ; same shared file the macOS and Linux suites replay.

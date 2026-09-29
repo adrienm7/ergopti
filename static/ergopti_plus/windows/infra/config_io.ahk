@@ -1087,7 +1087,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; boot-armed SaveFullConfig timer fires ~0-100 ms after _DriverReady, while
 		; LLM_Menu_Init runs seconds later at the end of the deferred menu build — so
 		; without this dedicated gate the first flush writes module defaults
-		; (onboarding_seen=0, empty overrides, default trigger_shortcut/ollama_port/…)
+		; (onboarding_seen=0, empty overrides, default ollama_port/…)
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
@@ -1395,19 +1395,6 @@ ReloadWithDefaultConfig(*) {
 		OwnerBundle := AcquireResult["bundle"]
 		ReleaseBundle := true
 		try {
-				if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
-						try LoggerError("Config", "Reset to defaults refused because LLM trigger native recovery is incomplete.")
-						_ConfigResetShowFailure(
-							"dialog.reset_defaults.reason.trigger_recovery")
-						return false
-				}
-				if !LLM_TriggerJournalPrepareDestructive(ConfigurationFile,
-						OwnerBundle) {
-						try LoggerError("Config", "Reset to defaults refused because LLM trigger journal recovery is incomplete.")
-						_ConfigResetShowFailure(
-							"dialog.reset_defaults.reason.trigger_journal")
-						return false
-				}
 		; Write a minimal config so Onboarding_Run() skips the wizard on reload.
 		; The user chose "reset defaults" — there is a separate "Setup wizard"
 		; menu item for re-running the first-run flow. Without this placeholder
@@ -1430,7 +1417,7 @@ ReloadWithDefaultConfig(*) {
 			return false
 		}
 		; Keep the destructive owner through Reload. Releasing here lets an
-		; interrupting trigger edit repopulate the reset file or leave a fresh WAL
+		; interrupting menu edit repopulate the reset file or leave a fresh WAL
 		; that makes Reload refuse after the user's files were already removed. A
 		; launched reload owns the bundle until OnExit; a later refusal hands it
 		; back to the same rollback a refused launch runs here.

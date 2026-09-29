@@ -93,11 +93,12 @@ _HotstringsScopeRefusals() {
 		Fixture.options["backup"] := Backup.Bind(Scenario, Fixture)
 		Fixture.options["reload"] := Launch
 		if Scenario == "inventory" {
-			Prepare(*) {
+			; The catalogue changes once admission holds the terminal barrier.
+			Settle(*) {
 				Fixture.catalogue.Push({ Key: "personal:new", Path: Fixture.directory . "\new.toml", IsPersonal: true, IsExtension: false })
 				return true
 			}
-			Fixture.options["prepare"] := Prepare
+			Fixture.options["settle"] := Settle
 		}
 		try {
 			Apply := "HotstringsScopeApply"

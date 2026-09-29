@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_stamp_only_on_windows_and_linux/case.toml
 
 [case]
-description = "The shipped steps are macOS-only: other drivers keep every key and only move the stamp."
+description = "A step that does not name a driver only moves its stamp: Windows and Linux keep space_wrap, which only macOS retired."
 drivers = ["ahk", "linux"]
 outcome = "migrated"
 from_version = 2

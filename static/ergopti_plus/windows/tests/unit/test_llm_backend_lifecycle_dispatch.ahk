@@ -402,10 +402,9 @@ _LBLD_ModelAbaKeepsOnlyFinalIntentCurrent() {
 }
 
 ; Every case replaces the shared _LLM_Menu and the lifecycle epoch. Left in
-; place, the fixture Map, which has no "trigger_shortcut", reached the next test
-; of the same run: the LLM trigger transaction tests failed with "Item has no
-; value" whenever a filter such as --only lifecycle ran them after these
-; (llm-backend-fixture-isolation).
+; place, the partial fixture Map reached the next test of the same run: later
+; LLM menu tests failed with "Item has no value" whenever a filter such as
+; --only lifecycle ran them after these (llm-backend-fixture-isolation).
 _LBLD_Isolated(TestFn) {
 	global _LLM_Menu, _LLM_BackendLifecycleEpoch
 	SavedMenu := _LLM_Menu

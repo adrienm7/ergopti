@@ -601,13 +601,6 @@ BootProfile_Stamp("Module includes initialised")
 
 #Include infra/suspend_handoff.ahk
 #Include infra/boot.ahk
-
-; A pending trigger transaction belongs to the stable paths.toml locator, not
-; necessarily to the config directory selected for this boot. Resolve it before
-; onboarding or the first cached parse can observe and re-save split authority.
-if !LLM_TriggerJournalRecoverAtBoot()
-	throw Error("LLM trigger journal recovery failed before configuration boot")
-
 #Include infra/feature_state.ahk
 #Include infra/tray_bootstrap.ahk
 

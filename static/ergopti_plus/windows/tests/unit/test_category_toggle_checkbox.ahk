@@ -236,7 +236,7 @@ _CTC_LlmFixture(Enabled) {
 		"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 		"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 		"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
-		"trigger_shortcut", "Ctrl+Space", "inline_autotype", false,
+		"inline_autotype", false,
 		"ollama_port", 11434, "user_profiles", [], "api_entry_id", "e1",
 		"api_entries", [Map("Id", "e1", "Name", "Cerebras",
 			"Provider", "cerebras", "BaseUrl", "https://b.invalid/v1",

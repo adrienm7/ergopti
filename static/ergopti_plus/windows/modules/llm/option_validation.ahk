@@ -331,7 +331,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	global LLM_AGENT_MODES
 	static StringKeys := Map(
 		"model", true, "profile_id", true, "language", true,
-		"trigger_shortcut", true, "backend", true, "api_entry_id", true,
+		"backend", true, "api_entry_id", true,
 		"agent_system1", true, "agent_system2", true)
 	; These are semantic consumer bounds, not merely storage types. Keep every
 	; public integer in this one table so boot restore, menu persistence, runtime

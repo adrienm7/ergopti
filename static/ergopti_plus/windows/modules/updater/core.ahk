@@ -522,7 +522,7 @@ _Updater_InvokeLegacyConfigWriter(WriteFn, Path, Updates) {
 _Updater_AcquireChannelConfigBundle() {
 	global ConfigurationFile
 	Bundle := 0
-	try Bundle := LLM_Menu_AcquireLifecycleBundle()
+	try Bundle := ConfigWriteAcquireLifecycleBundle()
 	catch as Err {
 		try LoggerError("Updater", "Could not acquire the channel-transition configuration bundle: {1}.", Err.Message)
 		return false
