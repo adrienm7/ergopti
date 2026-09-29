@@ -532,6 +532,12 @@ end
 --- @return boolean
 function M.set_override(category, section, field, value)
 	if type(category) ~= "string" or category == "" then return false end
+	-- A pending scope restores the override file only while it still holds the
+	-- scope's candidate bytes; a rewrite here would strand that inverse for good.
+	if _scope_owner ~= nil then
+		Logger.error(LOG, "set_override() refused: a hotstring configuration scope is still pending.")
+		return false
+	end
 	-- "priority" was missing until 2026-08-05. The settings window has a priority
 	-- field per category and per section, the bridge forwards it, and this guard
 	-- rejected it — so the control wrote an ERROR to the log and nothing else. The
@@ -624,6 +630,10 @@ end
 --- @param field string|nil nil clears every field of that scope.
 --- @return boolean
 function M.clear_override(category, section, field)
+	if _scope_owner ~= nil then
+		Logger.error(LOG, "clear_override() refused: a hotstring configuration scope is still pending.")
+		return false
+	end
 	local candidate = copy_overrides(_overrides)
 	local entry = candidate[category]
 	if not entry then return true end

@@ -32,6 +32,7 @@ local Manifest = require("infra.manifest_reader")
 local Paths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local Preferences = require("infra.hotstring_preferences")
 
 local LOG = "hotstrings.repeat_key"
 
@@ -140,6 +141,11 @@ end
 --- @return boolean committed
 function M.set_enabled(enabled)
 	if type(enabled) ~= "boolean" then return false end
+	-- The hotstrings scope owns this leaf while it holds the preferences.
+	if Preferences.is_acquired() then
+		Logger.error(LOG, "Repeat configuration refused: a hotstring configuration scope is still pending.")
+		return false
+	end
 	local called, committed, detail = pcall(function()
 		local _, source = read_setting()
 		return Writer.batch_write(Paths.config("config.toml"),

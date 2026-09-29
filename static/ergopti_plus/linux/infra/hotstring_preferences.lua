@@ -263,6 +263,13 @@ function M.acquire(owner)
 	return true
 end
 
+--- Whether a scope transaction owns the hotstring configuration, so another
+--- config.toml writer of the same scope waits instead of breaking its inverse.
+--- @return boolean
+function M.is_acquired()
+	return _scope_owner ~= nil
+end
+
 --- Releases ownership once the transaction retains no compensation.
 --- @param owner table Transaction identity.
 --- @return boolean released
