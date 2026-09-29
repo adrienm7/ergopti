@@ -935,10 +935,33 @@ end
 -- row it shows and the facade opener its Login Items row calls: the approval
 -- opener rechecks that approval is still what is missing, while an
 -- unregistered helper is fixed from the same pane without that precondition.
+-- An approval also offers its numbered steps again: the dialog shows them by
+-- itself once per launch, and this row is where they stay afterwards.
 local GUARDIAN_STATUS_ROWS = {
-	requires_approval = { key = "menu.tapholds.guardian_requires_approval", opener = "open_guardian_settings" },
+	requires_approval = { key = "menu.tapholds.guardian_requires_approval", opener = "open_guardian_settings",
+		steps = true },
 	unavailable       = { key = "menu.tapholds.guardian_unavailable",       opener = "open_login_items" },
 }
+
+--- The row that shows the Login Items steps again, on the user's request.
+--- @param karabiner table Remap facade.
+--- @return table row
+local function login_items_steps_row(karabiner)
+	return {
+		label = i18n.get("menu.tapholds.show_login_items_steps"),
+		action = function()
+			Logger.info(LOG, "Showing the Login Items steps again from the Tap-Holds menu.")
+			local ok, shown = xpcall(function()
+				return require("ui.permission_dialog.login_items_guide").reopen(karabiner)
+			end, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "The Login Items steps could not be shown: %s.", tostring(shown))
+				return false
+			end
+			return shown == true
+		end,
+	}
+end
 
 --- The rows that say why switched-on tap-holds do nothing: the remap guardian
 --- is not ready, so no rule deploys, and before these rows only the log said so.
@@ -953,8 +976,9 @@ local function guardian_status_rows(karabiner, tap_holds_on)
 	if not spec then return {} end
 	local opener = karabiner[spec.opener]
 	local rows = { { label = i18n.get(spec.key), disabled = true } }
+	if spec.steps then rows[#rows + 1] = login_items_steps_row(karabiner) end
 	if type(opener) == "function" then
-		rows[2] = {
+		rows[#rows + 1] = {
 			label = i18n.get("menu.tapholds.open_login_items"),
 			action = function()
 				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)

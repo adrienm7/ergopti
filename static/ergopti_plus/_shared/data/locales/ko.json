@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 비활성: 로그인 항목에서 ErgoptiPlus를 허용하세요",
 	"menu.tapholds.guardian_unavailable": "🔴 비활성: ErgoptiPlus 백그라운드 도우미가 등록되지 않았습니다(로그인 항목을 확인한 다음 ErgoptiPlus를 종료했다가 다시 여세요)",
 	"menu.tapholds.open_login_items": "로그인 항목 설정 열기…",
+	"menu.tapholds.show_login_items_steps": "ErgoptiPlus 허용 단계 보기…",
 	"menu.tapholds.saved_until_guardian": "💾 키보드 설정을 저장했습니다: 로그인 항목에서 ErgoptiPlus가 허용되면 적용됩니다(클릭하여 설정 열기).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 키보드 설정을 저장했습니다: ErgoptiPlus가 백그라운드 도우미를 등록하면 적용됩니다. 로그인 항목에서 ErgoptiPlus가 허용되어 있는지 확인한 다음 ErgoptiPlus를 종료했다가 다시 여세요(클릭하여 설정 열기).",
 	"menu.tapholds.saved_until_helper": "💾 키보드 설정을 저장했습니다: ErgoptiPlus 백그라운드 도우미가 응답하는 즉시 적용됩니다.",

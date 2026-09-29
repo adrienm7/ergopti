@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 無効：ログイン項目で ErgoptiPlus を許可してください",
 	"menu.tapholds.guardian_unavailable": "🔴 無効：ErgoptiPlus のバックグラウンドヘルパーが登録されていません（ログイン項目を確認してから、ErgoptiPlus を終了してもう一度開いてください）",
 	"menu.tapholds.open_login_items": "ログイン項目の設定を開く…",
+	"menu.tapholds.show_login_items_steps": "ErgoptiPlus を許可する手順を表示…",
 	"menu.tapholds.saved_until_guardian": "💾 キーボード設定を保存しました：ログイン項目で ErgoptiPlus が許可されると適用されます（クリックして設定を開く）。",
 	"menu.tapholds.saved_until_guardian_restart": "💾 キーボード設定を保存しました：ErgoptiPlus がバックグラウンドヘルパーを登録すると適用されます。ログイン項目で ErgoptiPlus が許可されていることを確認してから、ErgoptiPlus を終了してもう一度開いてください（クリックして設定を開く）。",
 	"menu.tapholds.saved_until_helper": "💾 キーボード設定を保存しました：ErgoptiPlus のバックグラウンドヘルパーが応答しだい適用されます。",

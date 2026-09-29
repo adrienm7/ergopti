@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 غير نشط: اسمح لـ ErgoptiPlus في عناصر تسجيل الدخول",
 	"menu.tapholds.guardian_unavailable": "🔴 غير نشط: المساعد الخلفي لـ ErgoptiPlus غير مسجَّل (تحقق من عناصر تسجيل الدخول، ثم أنهِ ErgoptiPlus وافتحه مرة أخرى)",
 	"menu.tapholds.open_login_items": "فتح إعدادات عناصر تسجيل الدخول…",
+	"menu.tapholds.show_login_items_steps": "عرض خطوات السماح لـ ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 تم حفظ إعدادات لوحة المفاتيح: ستُطبَّق بمجرد السماح لـ ErgoptiPlus في عناصر تسجيل الدخول (انقر لفتح الإعدادات).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 تم حفظ إعدادات لوحة المفاتيح: ستُطبَّق بمجرد أن يسجّل ErgoptiPlus مساعده في الخلفية. تحقق من السماح لـ ErgoptiPlus في عناصر تسجيل الدخول، ثم أنهِ ErgoptiPlus وافتحه مرة أخرى (انقر لفتح الإعدادات).",
 	"menu.tapholds.saved_until_helper": "💾 تم حفظ إعدادات لوحة المفاتيح: ستُطبَّق بمجرد أن يستجيب المساعد الخلفي لـ ErgoptiPlus.",

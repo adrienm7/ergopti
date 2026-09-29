@@ -831,6 +831,36 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 		if not ok then error(err, 0) end
 	end)
 
+	-- The steps open by themselves once per launch; the row is where they
+	-- stay afterwards (guardian-approval-steps).
+	helpers.it("reopens the Login Items steps while approval is missing (guardian-approval-steps)", function()
+		local saved_guide = package.loaded["ui.permission_dialog.login_items_guide"]
+		local reopened = {}
+		package.loaded["ui.permission_dialog.login_items_guide"] = {
+			reopen = function(remap)
+				reopened[#reopened + 1] = remap
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			local built = build_guardian_menu("requires_approval")
+			local action = row_action(find_descendant(built, "menu.tapholds.show_login_items_steps"))
+			helpers.assert_type(action, "function")
+			helpers.assert_true(action())
+			helpers.assert_eq(#reopened, 1, "the row reopens the steps dialog")
+			helpers.assert_eq(type(reopened[1].guardian_state), "function",
+				"the guide reads the same remap facade as the row")
+			helpers.assert_not_nil(find_descendant(built, "menu.tapholds.open_login_items"),
+				"the direct Login Items row stays")
+
+			local unavailable = build_guardian_menu("unavailable")
+			helpers.assert_nil(find_descendant(unavailable, "menu.tapholds.show_login_items_steps"),
+				"the approval steps cannot register a missing helper")
+		end)
+		package.loaded["ui.permission_dialog.login_items_guide"] = saved_guide
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("shows no guardian row when nothing waits on it (guardian-status-row)", function()
 		for _, variant in ipairs({
 			{ state = "ready" },
@@ -842,6 +872,8 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 			local built = build_guardian_menu(variant.state, variant.options)
 			helpers.assert_nil(find_descendant(built, "menu.tapholds.open_login_items"),
 				"no Login Items row for " .. variant.state)
+			helpers.assert_nil(find_descendant(built, "menu.tapholds.show_login_items_steps"),
+				"no steps row for " .. variant.state)
 			for _, case in ipairs(CASES) do
 				helpers.assert_nil(find_descendant(built, case.key))
 			end

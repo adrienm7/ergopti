@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inaktive: tillad ErgoptiPlus under Login-emner",
 	"menu.tapholds.guardian_unavailable": "🔴 Inaktive: ErgoptiPlus’ baggrundshjælper er ikke registreret (kontrollér Login-emner, og afslut og åbn derefter ErgoptiPlus igen)",
 	"menu.tapholds.open_login_items": "Åbn indstillinger for Login-emner…",
+	"menu.tapholds.show_login_items_steps": "Vis trinene til at tillade ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Tastaturindstillinger gemt: de træder i kraft, når ErgoptiPlus er tilladt under Login-emner (klik for at åbne indstillingerne).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Tastaturindstillinger gemt: de træder i kraft, når ErgoptiPlus har registreret sin baggrundshjælper. Kontrollér, at ErgoptiPlus er tilladt under Login-emner, og afslut og åbn derefter ErgoptiPlus igen (klik for at åbne indstillingerne).",
 	"menu.tapholds.saved_until_helper": "💾 Tastaturindstillinger gemt: de træder i kraft, så snart ErgoptiPlus’ baggrundshjælper svarer.",

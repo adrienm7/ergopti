@@ -1577,6 +1577,7 @@
 	"menu.tapholds.guardian_requires_approval": "🟡 Inactivos: permite ErgoptiPlus en Ítems de inicio",
 	"menu.tapholds.guardian_unavailable": "🔴 Inactivos: el asistente en segundo plano de ErgoptiPlus no está registrado (comprueba Ítems de inicio y luego cierra y vuelve a abrir ErgoptiPlus)",
 	"menu.tapholds.open_login_items": "Abrir los ajustes de Ítems de inicio…",
+	"menu.tapholds.show_login_items_steps": "Mostrar los pasos para permitir ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Ajustes del teclado guardados: se aplicarán en cuanto ErgoptiPlus esté permitido en Ítems de inicio (haz clic para abrir los ajustes).",
 	"menu.tapholds.saved_until_guardian_restart": "💾 Ajustes del teclado guardados: se aplicarán en cuanto ErgoptiPlus registre su asistente en segundo plano. Comprueba que ErgoptiPlus está permitido en Ítems de inicio y luego cierra y vuelve a abrir ErgoptiPlus (haz clic para abrir los ajustes).",
 	"menu.tapholds.saved_until_helper": "💾 Ajustes del teclado guardados: se aplicarán en cuanto responda el asistente en segundo plano de ErgoptiPlus.",
