@@ -388,6 +388,20 @@ body {
 	border-color: var(--accent);
 }
 
+#btn-edit-current {
+	background: var(--surface);
+	border: 1px solid var(--accent);
+	border-radius: 7px;
+	color: var(--accent);
+	cursor: pointer;
+	font: inherit;
+	margin-left: auto;
+	padding: 6px 16px;
+}
+#btn-edit-current[hidden] {
+	display: none;
+}
+
 /* ======================================== */
 /* ======================================== */
 /* ======= 6/ Parameter editor ============ */
@@ -427,6 +441,30 @@ body {
 	padding: 7px 10px;
 }
 #param-input:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+#param-choice {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+#param-choice[hidden] {
+	display: none;
+}
+#param-choice label {
+	color: var(--sub);
+}
+#param-choice select {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 7px;
+	color: var(--text);
+	font: inherit;
+	padding: 7px 10px;
+}
+#param-choice select:focus {
 	border-color: var(--accent);
 	outline: none;
 }

@@ -8,13 +8,16 @@
  * minimal DOM and checks its editor for the send_text, send_key and
  * send_shortcut parameters: a text field, a key capture and a shortcut capture,
  * each validated with the rules the drivers apply, before the page confirms
- * the action together with its value.
+ * the action together with its value. It also checks the llm_prompt editor (a
+ * choice of prompt profile and prediction count) and the button that reopens
+ * the current action's parameter.
  *
  * ROOT CAUSE ENCODED:
  * The picker only chose an action; every parameter was asked afterwards in a
  * native text prompt, so a key or a shortcut had to be spelled by hand ("ctrl+a",
  * "page_down") instead of pressed, and a typo was refused only after the picker
- * had closed.
+ * had closed. Changing the value of a bound action meant finding it again in the
+ * whole catalogue, with nothing pointing at the current one.
  * ==============================================================================
  */
 
@@ -29,6 +32,7 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SCRIPT = path.join(SP, '_shared', 'ui', 'action_picker', 'script.js');
 const HTML = path.join(SP, '_shared', 'ui', 'action_picker', 'index.html');
 const CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'send_input_vectors.json');
+const LLM_PROMPT_CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'llm_prompt_vectors.json');
 const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
 
 /** A DOM element with just what the page script touches. */
@@ -99,10 +103,11 @@ const check = (cond, message) => {
 // works here and throws in a real webview.
 const html = fs.readFileSync(HTML, 'utf8');
 const IDS = ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 'empty', 'count', 'toc', 'toc-inner',
-	'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back', 'param-save'];
+	'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back', 'param-save',
+	'param-choice', 'param-profile', 'param-profile-label', 'param-count', 'param-count-label', 'btn-edit-current'];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
-function loadPage(platform) {
+function loadPage(platform, current) {
 	const byId = {};
 	for (const id of IDS) byId[id] = new FakeElement('div', id);
 	const docListeners = {};
@@ -125,20 +130,28 @@ function loadPage(platform) {
 	posted.length = 0;
 	context.__vocabulary = JSON.parse(fs.readFileSync(VOCABULARY, 'utf8'));
 	context.__platform = platform;
+	context.__current = current || 'none';
 	vm.runInContext(
 		`init({
-			title: 'T', current: 'none', noneLabel: 'Nothing', platform: __platform,
+			title: 'T', current: __current, noneLabel: 'Nothing', platform: __platform,
 			sendVocabulary: __vocabulary,
+			editCurrentLabel: 'Edit current',
+			promptChoices: [{ value: 'basic', label: 'Basic' }, { value: 'rewrite', label: 'Rewrite' },
+				{ value: 'custom_1_2', label: 'Mine' }],
+			defaultCount: 3,
 			parameterStrings: {
 				save: 'Save', back: 'Back', captureKey: 'Press a key', captureShortcut: 'Press a shortcut',
+				promptLabel: 'Prompt', countLabel: 'Count', countDefault: 'Menu ({1})',
 				prompts: { text: 'Text?', key: 'Key?', shortcut: 'Shortcut?' },
-				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut' }
+				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut', llm_prompt: 'Bad prompt' }
 			},
 			items: [
 				{ type: 'action', id: 'send_text', label: 'Type a text', parameter: 'text', parameterValue: 'salut' },
 				{ type: 'action', id: 'send_key', label: 'Press a key', parameter: 'key' },
 				{ type: 'action', id: 'send_shortcut', label: 'Press a shortcut', parameter: 'shortcut' },
-				{ type: 'action', id: 'open_url', label: 'Open a link', parameter: 'url' },
+				{ type: 'action', id: 'open_url', label: 'Open a link', parameter: 'url', parameterValue: 'https://x.y' },
+				{ type: 'action', id: 'llm_prompt_prediction', label: 'Prompt', parameter: 'llm_prompt',
+					parameterValue: 'rewrite|2' },
 				{ type: 'action', id: 'enter', label: 'Enter' }
 			]
 		})`,
@@ -282,9 +295,88 @@ function loadPage(platform) {
 	check(page.posted.length === 2 && page.posted[1].id === 'enter', 'an ordinary action confirms at once');
 }
 
+// 6. The llm_prompt rules are the drivers' rules: the shared corpus replayed.
+{
+	const page = loadPage('ahk');
+	const corpus = JSON.parse(fs.readFileSync(LLM_PROMPT_CORPUS, 'utf8'));
+	let replayed = 0;
+	for (const vector of corpus.vectors) {
+		page.context.__value = vector.value;
+		const parsed = vm.runInContext('parseLlmPrompt(__value)', page.context);
+		if (vector.valid === false) {
+			check(parsed === null, `${vector.id}: the page accepts ${JSON.stringify(vector.value)}`);
+		} else {
+			const expected = vector.num_predictions === undefined ? null : vector.num_predictions;
+			check(parsed !== null && parsed.profileId === vector.profile_id && parsed.numPredictions === expected,
+				`${vector.id}: the page reads ${JSON.stringify(parsed)}`);
+		}
+		replayed += 1;
+	}
+	check(replayed >= 15, `only ${replayed} llm_prompt vector(s) replayed`);
+}
+
+// 7. Picking llm_prompt_prediction offers the host's prompts and the counts,
+//    starts from the binding's value and saves "<id>" or "<id>|<count>".
+{
+	const page = loadPage('ahk');
+	vm.runInContext("doConfirm('llm_prompt_prediction')", page.context);
+	check(page.posted.length === 0, 'the prompt action must not confirm before a prompt is chosen');
+	check(page.byId['param-choice'].hidden === false && page.byId['param-input'].hidden === true,
+		'the prompt editor shows the choices instead of the text field');
+	const profiles = page.byId['param-profile'].children.map((o) => o.value);
+	check(JSON.stringify(profiles) === JSON.stringify(['basic', 'rewrite', 'custom_1_2']),
+		`every host prompt is offered, in order: ${JSON.stringify(profiles)}`);
+	const counts = page.byId['param-count'].children;
+	check(counts.length === 11 && counts[0].value === '' && counts[0].textContent === 'Menu (3)'
+		&& counts[10].value === '10', 'the counts are the menu default then 1 to 10');
+	check(page.byId['param-profile'].value === 'rewrite' && page.byId['param-count'].value === '2',
+		'the editor starts from the binding\'s current prompt and count');
+	page.byId['param-count'].value = '';
+	page.byId['param-save'].dispatch('click');
+	check(page.posted.length === 1 && page.posted[0].id === 'llm_prompt_prediction'
+		&& page.posted[0].parameter === 'rewrite', 'the menu count saves the bare prompt id');
+
+	const second = loadPage('ahk');
+	vm.runInContext("doConfirm('llm_prompt_prediction')", second.context);
+	second.byId['param-profile'].value = 'custom_1_2';
+	second.byId['param-count'].value = '5';
+	second.keydown({ key: 'Enter', code: 'Enter' });
+	check(second.posted.length === 1 && second.posted[0].parameter === 'custom_1_2|5', 'Enter saves the prompt and its count');
+
+	const noChoices = loadPage('ahk');
+	vm.runInContext("promptChoices = []; doConfirm('llm_prompt_prediction')", noChoices.context);
+	check(noChoices.posted.length === 1 && noChoices.posted[0].parameter === undefined,
+		'without prompts to offer, the host asks for the value itself');
+}
+
+// 8. "Edit the current action" appears only when the current action takes a
+//    parameter, and reopens it: the page's editor, or the host's prompt.
+{
+	const none = loadPage('ahk');
+	check(none.byId['btn-edit-current'].hidden === true, 'no edit button when no action is bound');
+	const plain = loadPage('ahk', 'enter');
+	check(plain.byId['btn-edit-current'].hidden === true, 'no edit button for an action without a parameter');
+
+	const prompt = loadPage('ahk', 'llm_prompt_prediction');
+	const button = prompt.byId['btn-edit-current'];
+	check(button.hidden === false && button.textContent === 'Edit current', 'the edit button shows for a prompt action');
+	button.dispatch('click');
+	check(prompt.byId.param.hidden === false && prompt.byId['param-profile'].value === 'rewrite'
+		&& prompt.posted.length === 0, 'the edit button opens the prompt editor on the current value');
+
+	const text = loadPage('ahk', 'send_text');
+	text.byId['btn-edit-current'].dispatch('click');
+	check(text.byId['param-input'].value === 'salut', 'the edit button opens the text editor on the current text');
+
+	const url = loadPage('ahk', 'open_url');
+	url.byId['btn-edit-current'].dispatch('click');
+	check(url.posted.length === 1 && url.posted[0].id === 'open_url' && url.posted[0].parameter === undefined,
+		'the edit button hands a URL back to the host prompt');
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] action picker parameter editor:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
-console.log('\x1b[32m[OK] the picker edits a text, captures a key and a shortcut, and validates them as the drivers do.\x1b[0m');
+console.log('\x1b[32m[OK] the picker edits a text, a key, a shortcut and a prompt choice, validates them as the drivers do, and reopens the current action.\x1b[0m');
