@@ -54,9 +54,11 @@ function M.new(options)
 	function participant.candidate() return candidate end
 
 	--- The exact classified source the candidate was prepared from.
-	--- @return table|nil `{ status = "ok"|"absent", content }`
+	--- @return table|nil `{ status = "ok", content }` or `{ status = "absent" }`
 	function participant.source()
-		return source and { status = source.status, content = source.content } or nil
+		if source == nil then return nil end
+		if source.status ~= "ok" then return { status = source.status } end
+		return { status = "ok", content = source.content }
 	end
 
 	--- The classified source the file holds once the candidate is published.

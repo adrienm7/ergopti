@@ -678,6 +678,16 @@ function M.mark_config_reads(decoded, mark)
 	flatten_from_disk(decoded, mark)
 end
 
+--- Flattens a decoded config.toml into menu-state keys through the walk load()
+--- uses, so a scope applies exactly what the next boot would read. Table values
+--- alias the decoded document, which the caller must not reuse.
+--- @param decoded table Decoded config.toml.
+--- @return table flat Flat preferences.
+function M.flatten_document(decoded)
+	if type(decoded) ~= "table" then error("Preferences.flatten_document needs a decoded document", 2) end
+	return flatten_from_disk(decoded)
+end
+
 --- Moves the save baseline past an unused-key cleanup. The cleanup removes
 --- only paths load() never reads, so the in-memory state still describes the
 --- new bytes; without this the next save would find the file "changed

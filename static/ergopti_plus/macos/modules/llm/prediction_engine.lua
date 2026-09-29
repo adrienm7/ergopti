@@ -631,6 +631,7 @@ end
 -- ==============================
 
 --- @param v boolean
+--- @return boolean committed True once the flag and, when disabling, the teardown settled.
 function M.set_preview_ai_enabled(v)
 	is_ai_preview_enabled = (v == true)
 	Logger.debug(LOG, "AI preview: %s.", is_ai_preview_enabled and "on" or "off")
@@ -640,8 +641,11 @@ function M.set_preview_ai_enabled(v)
 	-- stream still passed its own generation check and repainted the bubble the
 	-- user had just switched off. M.reset() is the contract that actually holds:
 	-- it clears the state, bumps both counters so late callbacks discard
-	-- themselves, stops the chain timer and hides forcibly.
-	if not v then M.reset() end
+	-- themselves, stops the chain timer and hides forcibly. Its refusal is
+	-- returned: a caller acknowledging the switch must not claim a teardown
+	-- that did not settle.
+	if not v then return M.reset() == true end
+	return true
 end
 
 --- @param color table|nil RGBA table, or nil to restore the module default.

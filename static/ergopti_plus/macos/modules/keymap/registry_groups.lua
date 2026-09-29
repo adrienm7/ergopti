@@ -216,6 +216,36 @@ function M.with_hotstring_delays(resolve, publish)
 end
 
 
+--- Deep-copies corpus metadata so a caller cannot reach the registered record.
+--- @param value any Plain Lua data.
+--- @return any copy
+local function copy_plain(value)
+	if type(value) ~= "table" then return value end
+	local out = {}
+	for key, child in pairs(value) do out[key] = copy_plain(child) end
+	return out
+end
+
+--- Returns the delay inputs of every registered TOML group, detached: its
+--- section names (separators and placeholders excluded) and the corpus
+--- metadata the delay projection resolves against. A disabled group keeps the
+--- metadata of its last registration, which is what re-enabling it reads.
+--- @return table|nil inventory { [name] = { sections = { string }, metadata = table } }
+function M.hotstring_delay_inventory()
+	if not require_state("hotstring_delay_inventory") then return nil end
+	local inventory = {}
+	for name, group in pairs(_state.groups) do
+		if group.kind == "toml" then
+			local sections = {}
+			for _, section in ipairs(group.sections or {}) do
+				if section.name ~= "-" and not section.is_module_placeholder then sections[#sections + 1] = section.name end
+			end
+			inventory[name] = { sections = sections, metadata = copy_plain(group.delay_metadata or {}) }
+		end
+	end
+	return inventory
+end
+
 --- Replaces one group's complete section-delay ownership and resizes the word timeout.
 --- Passing nil removes the owner; outer multi-step mutations provide rollback.
 --- @param name string
