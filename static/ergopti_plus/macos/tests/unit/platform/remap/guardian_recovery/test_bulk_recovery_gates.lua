@@ -108,6 +108,36 @@ helpers.describe("Karabiner bulk settings recovery gates", function()
 		end)
 	end)
 
+	helpers.it("redeploys the prior settings once a later build deployed the refused candidate"
+		.. " (bulk-retry-after-deploy)", function()
+		with_remap({ initial_phase = "idle", paused = true }, function(remap, calls)
+			local generator = package.loaded["platform.remap.generator"]
+			local build = generator.build_karabiner_json
+			local built_taps = {}
+			generator.build_karabiner_json = function(state, ...)
+				built_taps[#built_taps + 1] = state.tap_hold_config.left_shift
+					and state.tap_hold_config.left_shift.tap or "none"
+				return build(state, ...)
+			end
+			local restore = refuse_inverse_save()
+			reset(remap)
+			restore()
+			helpers.assert_true(remap.settings_pending() == true)
+			helpers.assert_eq(remap.get_tap_action("left_shift"), "escape",
+				"the refused candidate stays published while its inverse is unsaved")
+
+			calls.script_paused = false
+			helpers.assert_true(remap.resume(function() end) == true)
+			helpers.assert_true(helpers.deep_equal(built_taps, { "escape" }),
+				"Resume deploys the refused candidate: " .. helpers.inspect(built_taps))
+
+			remap.retry_settings_recovery()
+			helpers.assert_eq(remap.get_tap_action("left_shift"), "none")
+			helpers.assert_true(helpers.deep_equal(built_taps, { "escape", "none" }),
+				"the retry must redeploy the prior settings: " .. helpers.inspect(built_taps))
+		end)
+	end)
+
 	helpers.it("still refuses while the retry leaves the recovery owned, naming its current phase",
 		function()
 			with_remap({ initial_phase = "idle", paused = true }, function(remap, calls)

@@ -193,6 +193,7 @@ local _state = nil
 local _enabled_transition = nil
 local _enabled_preflight = nil -- Owns async onboarding settlement before disable can enter STOPPED
 local _bulk_settings_transaction = nil -- Owns candidate publication and exact inverse recovery
+local _deploy_serial = 0 -- Counts karabiner.json deploy attempts, for bulk inverse redeploys
 local retry_bulk_settings_recovery = nil -- Forward declaration used by sibling mutation gates
 -- Unforgeable module-private capabilities allow only fail-closed lifecycle
 -- transactions to rebuild while the public script state remains paused
@@ -3852,7 +3853,10 @@ retry_bulk_settings_recovery = function()
 		) then
 			return false
 		end
-		if transaction.inverse_redeploy_required == false then
+		-- The refused candidate stayed published until this save, so any
+		-- build since (Resume, a layout change, lease recovery) deployed it.
+		if transaction.inverse_redeploy_required == false
+			and transaction.refused_deploy_serial == _deploy_serial then
 			settle_bulk_inverse_without_redeploy(transaction)
 			return _bulk_settings_transaction == nil
 		end
@@ -3900,6 +3904,7 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 	if _bulk_settings_transaction ~= transaction then return end
 	transaction.failure_reason = reason or "candidate-regeneration-failed"
 	transaction.inverse_redeploy_required = refused_before_deploy ~= true
+	transaction.refused_deploy_serial = _deploy_serial
 	transaction.phase = "rollback-persistence"
 	Logger.error(LOG, "%s failed after settings commit; restoring the exact prior configuration.",
 		transaction.label)
@@ -5032,6 +5037,8 @@ function M.regenerate(
 		return fail("generation-failed")
 	end
 
+	-- Counted before the call: a failed deploy may still have written.
+	_deploy_serial = _deploy_serial + 1
 	local deploy_ok, deployed, deploy_detail = xpcall(function()
 		return Generator.merge_and_deploy_config(
 			result,
