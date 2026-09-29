@@ -392,6 +392,13 @@ GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
 		return _GestureRunAction(ActionName, BindingId)
 }
 
+; The actions that read the active window only once they run: its process
+; (quit, force quit) or its Explorer selection. Confirmed, each runs only when
+; the window the question was asked from got its focus back; an action outside
+; this set runs whichever window is active.
+global GESTURE_ACTIONS_ON_ACTIVE_WINDOW := Map("quit_frontmost_app", true, "force_quit_frontmost", true,
+		"unblock_file_selection", true)
+
 ; Whether the generated catalogue asks to confirm an action before it runs.
 GestureActionNeedsConfirm(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
@@ -402,9 +409,11 @@ GestureActionNeedsConfirm(ActionName) {
 ; Asks whether a destructive action may run (Cancel is the default button),
 ; then gives the window the user acted on its focus back and runs it. The
 ; question can outlive a Suspend, which disarms hotkeys and not this thread.
-; When that window cannot get its focus back, the action does not run: the
-; active window is then another one, which force_quit_frontmost would kill.
+; When that window cannot get its focus back, an action that reads the active
+; window does not run: the active window is then another one, which
+; force_quit_frontmost would kill. Any other action (empty_trash) still runs.
 _GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
+		global GESTURE_ACTIONS_ON_ACTIVE_WINDOW
 		Label := _GestureActionLabel(ActionName)
 		Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
 		if (Answer != "OK") {
@@ -417,8 +426,11 @@ _GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
 		}
 		LoggerInfo("gestures", "'{1}' was confirmed.", ActionName)
 		if (PriorHwnd && !Sys.Activate(PriorHwnd)) {
-				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
-				return
+				if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) {
+						LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
+						return
+				}
+				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
 		}
 		_GestureRunAction(ActionName, BindingId)
 }

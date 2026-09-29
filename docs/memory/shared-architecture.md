@@ -117,8 +117,10 @@ the handler. The question's own window takes the focus, so an action that
 acts on the active window must not read it after the answer: macOS reads the
 frontmost application before its alert (from NSWorkspace: the accessibility API
 cannot read a hung or windowless application) and hands it to the action,
-Windows gives the window it was asked from its focus back and refuses to run
-when it cannot, Linux reads it (`TARGETS`) before the question. Windows
+Windows gives the window it was asked from its focus back and, when it cannot,
+refuses only an action that reads the active window
+(`GESTURE_ACTIONS_ON_ACTIVE_WINDOW`), Linux reads it (`TARGETS`) before the
+question. Windows
 native calls of system actions go through
 `adapters/system_control.ahk`: the modules/infra/platform OS-call ratchet has
 almost no headroom left.
