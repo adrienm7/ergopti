@@ -286,6 +286,26 @@ helpers.with_fresh_modules({
 			end
 		end)
 
+		-- The chord slot was built from key 1's tap-hold even with the Tap-Holds
+		-- off: Cmd gauche + Cmd droit entered the navigation layer (F20, here
+		-- key_90) that only left Command's hold may enter. Key 1 is native in
+		-- that graph: the chord types ⌥⌫, then left Command stays a held Cmd.
+		helpers.it("the recommended LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)", function()
+			local state = Config.build_recommended_state(keys, combos)
+			state.tap_holds_enabled = false
+			state.mod_combos_enabled = true
+			local engine = engine_for(rules_of(state))
+			helpers.assert_true(engine:chord({ "left_command", "right_command" }) ~= nil, "a chord rule takes both keys")
+			local keys_typed = typed(engine)
+			local context = describe(keys_typed)
+			helpers.assert_eq(#keys_typed, 2, context)
+			helpers.assert_eq(keys_typed[1].key_code, "delete_or_backspace", context)
+			helpers.assert_eq(keys_typed[1].flags, { left_option = true }, context .. " — ⌥ only, no Cmd")
+			helpers.assert_eq(keys_typed[2].key_code, "left_command", context .. " — then the native Cmd, no layer")
+			engine:up("right_command")
+			engine:up("left_command")
+		end)
+
 		helpers.it("key 1 only tracks its variable and passes through (combos-without-tap-holds)", function()
 			local rules = rules_of(state_with(false, true, "lcmd_tab",
 				{ combo = "none", tap = "none", hold = "delete_fwd" }))
