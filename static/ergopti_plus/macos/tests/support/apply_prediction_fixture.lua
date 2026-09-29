@@ -29,11 +29,14 @@ end
 
 
 --- Loads and drives one prediction acceptance inside a real callback collector.
---- @param options table { text, buffer?, expander_failure?, real_overlap? }
+--- @param options table { text, buffer?, expander_failure?, real_overlap?, prediction? };
+---   prediction is a complete parser record the engine hands over instead of
+---   one built from text and deletes.
 --- @return table result Captured call, event, state, and side-effect data.
 function M.run(options)
 	options = options or {}
-	local prediction_text = assert(options.text, "fixture requires prediction text")
+	local prediction_text = options.prediction and options.prediction.to_type or options.text
+	assert(prediction_text, "fixture requires prediction text")
 
 	purge_driver_modules()
 	package.loaded["tests.stubs.hs"] = nil
@@ -127,7 +130,8 @@ function M.run(options)
 		consume = function(index)
 			if index ~= 1 then return nil, nil end
 			if options.no_prediction then return nil, nil end
-			local prediction = { deletes = options.deletes or 0, to_type = prediction_text }
+			local prediction = options.prediction
+				or { deletes = options.deletes or 0, to_type = prediction_text }
 			return prediction, { prediction }
 		end,
 		reset = function()

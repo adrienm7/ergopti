@@ -342,13 +342,14 @@ function M.build_callbacks(ctx)
 		local stream_preds = {}
 		for _, block_text in ipairs(raw_blocks) do
 			local ok_b, pred_b = pcall(Parser.process_prediction, buffer, ctx.tail, block_text)
-			if ok_b and pred_b and not is_noise_pred(pred_b.to_type) then
+			if ok_b and pred_b and not is_noise_pred(pred_b.to_type, pred_b) then
 				local display = (type(pred_b.nw) == "string" and pred_b.nw ~= "" and pred_b.nw)
 					or pred_b.to_type
 				if display and display:gsub("%s", "") ~= "" then
 					table.insert(stream_preds, {
 						to_type              = pred_b.to_type,
 						deletes              = pred_b.deletes,
+						rewrite              = pred_b.rewrite,
 						chunks               = {},
 						nw                   = display,
 						has_corrections      = false,
@@ -436,7 +437,7 @@ function M.build_callbacks(ctx)
 
 			if pred.to_type then
 				local text = pred.to_type
-				if not is_noise_pred(text)
+				if not is_noise_pred(text, pred)
 					and _tooltip.make_diff_styled(pred.chunks, pred.nw)
 				then
 					local key = build_dedup_key(pred)

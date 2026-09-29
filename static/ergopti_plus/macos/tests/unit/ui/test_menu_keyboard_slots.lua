@@ -350,11 +350,19 @@ end)
 local function parameter_ctx()
 	local ctx = make_ctx()
 	local stored = {}
-	ctx.gestures.get_sg_names = function() return { "#header", "lookup", "select_line", "send_key" } end
-	ctx.gestures.get_action_parameter_spec = function(id)
-		return ({ wrap_selection = "wrap_pair", send_key = "key" })[id]
+	ctx.gestures.get_sg_names = function()
+		return { "#header", "lookup", "select_line", "send_key", "wrap_selection", "llm_prompt_prediction" }
 	end
-	ctx.gestures.get_action_parameter = function() return "" end
+	ctx.gestures.get_action_parameter_spec = function(id)
+		return ({ wrap_selection = "wrap_pair", send_key = "key", llm_prompt_prediction = "llm_prompt" })[id]
+	end
+	ctx.gestures.get_action_parameter = function(_, action)
+		return ({ wrap_selection = "(", llm_prompt_prediction = "rewrite|2" })[action] or ""
+	end
+	ctx.gestures.llm_prompt_choices = function()
+		return { { value = "basic", label = "Basic" }, { value = "rewrite", label = "Rewrite" } }
+	end
+	ctx.gestures.llm_prompt_default_count = function() return 3 end
 	ctx.gestures.validate_action_parameter = function(_, value) return value == "(" or value == "enter" end
 	local vocabulary = { keys = {}, modifiers = {}, text_max_code_points = 500 }
 	ctx.gestures.send_vocabulary = function() return vocabulary end
@@ -426,6 +434,25 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 			helpers.assert_eq(marked and marked.parameter, "key", "the send_key row names its kind")
 			helpers.assert_eq(opts.parameter_strings.prompts.key, "prompt",
 				"the editor shows the native prompt's text")
+			-- Every parameterized row carries its kind and stored value, so the
+			-- page's "edit the current action" can reopen any of them
+			local by_id = {}
+			for _, item in ipairs(opts.items) do
+				if item.id then by_id[item.id] = item end
+			end
+			helpers.assert_eq(by_id.wrap_selection and by_id.wrap_selection.parameter, "wrap_pair")
+			helpers.assert_eq(by_id.wrap_selection and by_id.wrap_selection.parameterValue, "(")
+			helpers.assert_eq(by_id.llm_prompt_prediction and by_id.llm_prompt_prediction.parameter, "llm_prompt")
+			helpers.assert_eq(by_id.llm_prompt_prediction and by_id.llm_prompt_prediction.parameterValue,
+				"rewrite|2")
+			helpers.assert_eq(opts.prompt_choices, ctx.gestures.llm_prompt_choices(),
+				"the llm_prompt editor offers the AI menu's prompts")
+			helpers.assert_eq(opts.default_count, 3, "and names the AI menu's prediction count")
+			helpers.assert_eq(opts.edit_current_label,
+				package.loaded["infra.i18n"].get("dialog.action_picker.edit_current"))
+			helpers.assert_eq(opts.parameter_strings.prompts.llm_prompt, "prompt")
+			helpers.assert_eq(opts.parameter_strings.errors.llm_prompt, "refused")
+			helpers.assert_type(opts.parameter_strings.countDefault, "string")
 			picker.opened[2].confirm("send_key", "enter")
 			helpers.assert_eq(#stored, 1, "the collected value is stored")
 			helpers.assert_eq(stored[1].binding, shortcuts.keyboard_binding_id(slot))
