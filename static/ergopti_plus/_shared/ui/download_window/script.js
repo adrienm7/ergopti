@@ -48,21 +48,23 @@ const KIND_TITLE_KEYS = {
 	mlx_install: 'download_window.kind_mlx_install',
 	ollama_install: 'download_window.kind_ollama_install',
 	mlx_model: 'download_window.kind_mlx_model',
-	ollama_model: 'download_window.kind_ollama_model'
+	ollama_model: 'download_window.kind_ollama_model',
+	app_update: 'download_window.kind_app_update'
 };
 
 const KIND_MODES = {
 	mlx_install: 'bootstrap',
 	ollama_install: 'bootstrap',
 	mlx_model: 'download',
-	ollama_model: 'download'
+	ollama_model: 'download',
+	app_update: 'download'
 };
 
 /**
  * Switches the body class set so the right "kind" accent and "mode" layout
  * are applied. Called by the Lua side at show() time and again whenever the
  * caller re-issues show() with a different kind.
- * @param {string} kind - One of mlx_install, ollama_install, mlx_model, ollama_model.
+ * @param {string} kind - One of mlx_install, ollama_install, mlx_model, ollama_model, app_update.
  * @param {string|null} title - Override for the H2 title (null = use default for kind).
  * @param {string|null} subtitle - Override for the subtitle line (bootstrap mode only).
  * @param {number} [session] - Positive safe integer identifying the host operation.
@@ -82,6 +84,7 @@ function setKind(kind, title, subtitle, session) {
 		'kind-ollama_install',
 		'kind-mlx_model',
 		'kind-ollama_model',
+		'kind-app_update',
 		'is-error'
 	);
 	document.body.classList.add('mode-' + mode, 'kind-' + kind);

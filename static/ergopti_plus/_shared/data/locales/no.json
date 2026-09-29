@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 MLX-modellnedlastning",
 	"download_window.kind_ollama_install": "⚙️ AI-motorinstallasjon (Ollama)",
 	"download_window.kind_ollama_model": "📥 Ollama-modellnedlastning",
+	"download_window.kind_app_update": "📥 Nedlasting av ErgoptiPlus-oppdatering",
 	"download_window.preparing": "Forbereder…",
 	"download_window.size_label": "📦 Størrelse: ",
 	"download_window.speed_label": "⚡ Hastighet: ",

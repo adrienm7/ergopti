@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 MLX modeli indiriliyor",
 	"download_window.kind_ollama_install": "⚙️ Yapay zeka motoru kurulumu (Ollama)",
 	"download_window.kind_ollama_model": "📥 Ollama modeli indiriliyor",
+	"download_window.kind_app_update": "📥 ErgoptiPlus güncellemesi indiriliyor",
 	"download_window.preparing": "Hazırlanıyor…",
 	"download_window.size_label": "📦 Boyut: ",
 	"download_window.speed_label": "⚡ Hız: ",

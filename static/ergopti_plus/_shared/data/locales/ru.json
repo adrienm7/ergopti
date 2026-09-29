@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 Загрузка модели MLX",
 	"download_window.kind_ollama_install": "⚙️ Установка движка ИИ (Ollama)",
 	"download_window.kind_ollama_model": "📥 Загрузка модели Ollama",
+	"download_window.kind_app_update": "📥 Загрузка обновления ErgoptiPlus",
 	"download_window.preparing": "Подготовка…",
 	"download_window.size_label": "📦 Размер: ",
 	"download_window.speed_label": "⚡ Скорость: ",

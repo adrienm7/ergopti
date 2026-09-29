@@ -136,6 +136,7 @@ function M.start(base_url, tag, label, on_done)
 	}
 	_retry_request = nil
 	request.session_id = DownloadWindow.show({
+		kind = "ollama_model",
 		label = label,
 		on_cancel = M.cancel,
 		on_retry = M.retry,

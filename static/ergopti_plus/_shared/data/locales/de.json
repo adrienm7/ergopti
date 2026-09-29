@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 MLX-Modell herunterladen",
 	"download_window.kind_ollama_install": "⚙️ KI-Engine-Installation (Ollama)",
 	"download_window.kind_ollama_model": "📥 Ollama-Modell herunterladen",
+	"download_window.kind_app_update": "📥 ErgoptiPlus-Aktualisierung herunterladen",
 	"download_window.preparing": "Vorbereiten…",
 	"download_window.size_label": "📦 Größe: ",
 	"download_window.speed_label": "⚡ Geschwindigkeit: ",

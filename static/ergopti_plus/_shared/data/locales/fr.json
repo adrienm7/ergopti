@@ -335,6 +335,7 @@
 	"download_window.kind_mlx_model": "📥 Téléchargement du modèle MLX",
 	"download_window.kind_ollama_install": "⚙️ Installation du moteur IA (Ollama)",
 	"download_window.kind_ollama_model": "📥 Téléchargement du modèle Ollama",
+	"download_window.kind_app_update": "📥 Téléchargement de la mise à jour d’ErgoptiPlus",
 	"download_window.preparing": "Préparation…",
 	"download_window.size_label": "📦 Taille : ",
 	"download_window.speed_label": "⚡ Vitesse : ",

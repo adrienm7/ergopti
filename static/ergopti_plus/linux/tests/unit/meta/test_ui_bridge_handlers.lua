@@ -1422,6 +1422,7 @@ helpers.describe("ui.bridge_handlers", function()
       }
       handler._reset()
       local session_id = handler.show({
+		kind = "ollama_model",
 		label = "Qwen fixture",
 		on_cancel = function() cancelled = cancelled + 1; return true end,
 		on_retry = function() retried = retried + 1; return true end,
@@ -1453,13 +1454,33 @@ helpers.describe("ui.bridge_handlers", function()
         eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
       }
       handler._reset()
-      local session_id = handler.show({ label = "Fast fixture" })
+      local session_id = handler.show({ kind = "ollama_model", label = "Fast fixture" })
       helpers.assert_true(handler.complete(session_id, true, "Installed"))
       helpers.assert_eq(#evaluated, 0)
       helpers.assert_true(handler.on_message("ready").pushed)
       helpers.assert_true(evaluated[1]:find("done(true", 1, true) ~= nil)
       helpers.assert_true(evaluated[1]:find("Installed", 1, true) ~= nil)
       package.loaded["ui.webview_manager"] = previous_manager
+    end)
+
+    helpers.it("titles the window by its kind and refuses a kind the page does not know", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local evaluated = {}
+      package.loaded["ui.webview_manager"] = {
+        show = function() return true end,
+        hide = function() return true end,
+        eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
+      }
+      handler._reset()
+      helpers.assert_nil(handler.show({ label = "No kind" }), "a producer must name its kind")
+      helpers.assert_nil(handler.show({ kind = "firmware", label = "Unknown kind" }))
+      local session_id = handler.show({ kind = "app_update", label = "ErgoptiPlus v0.0.0-dev.150" })
+      helpers.assert_true(type(session_id) == "number")
+      helpers.assert_true(handler.on_message("ready").pushed)
+      helpers.assert_true(evaluated[1]:find('setKind("app_update"', 1, true) ~= nil,
+        "the page shows the app-update heading: " .. tostring(evaluated[1]))
+      package.loaded["ui.webview_manager"] = previous_manager
+      handler._reset()
     end)
   end)
 

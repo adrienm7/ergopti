@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 הורדת מודל MLX",
 	"download_window.kind_ollama_install": "⚙️ התקנת מנוע AI (Ollama)",
 	"download_window.kind_ollama_model": "📥 הורדת מודל Ollama",
+	"download_window.kind_app_update": "📥 הורדת עדכון ErgoptiPlus",
 	"download_window.preparing": "מכין…",
 	"download_window.size_label": "📦 גודל: ",
 	"download_window.speed_label": "⚡ מהירות: ",

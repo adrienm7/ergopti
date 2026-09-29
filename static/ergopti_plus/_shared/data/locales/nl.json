@@ -340,6 +340,7 @@
 	"download_window.kind_mlx_model": "📥 MLX-model downloaden",
 	"download_window.kind_ollama_install": "⚙️ AI-engine installatie (Ollama)",
 	"download_window.kind_ollama_model": "📥 Ollama-model downloaden",
+	"download_window.kind_app_update": "📥 Download van de ErgoptiPlus-update",
 	"download_window.preparing": "Voorbereiden…",
 	"download_window.size_label": "📦 Grootte: ",
 	"download_window.speed_label": "⚡ Snelheid: ",
