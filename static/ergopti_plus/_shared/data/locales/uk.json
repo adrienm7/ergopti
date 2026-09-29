@@ -2223,7 +2223,7 @@
 	"permission_dialog.open_settings": "Відкрити налаштування",
 	"permission_dialog.step_add": "Якщо «Hammerspoon» немає у списку, натисніть +, потім ⌘⇧G, вставте {1} і натисніть «Відкрити».",
 	"permission_dialog.accessibility.title": "Дозвольте ErgoptiPlus у розділі «Доступність»",
-	"permission_dialog.accessibility.body": "Цей дозвіл потрібен ErgoptiPlus, щоб зчитувати клавіатуру. Він запуститься сам, щойно дозвіл буде увімкнено, без перезапуску.",
+	"permission_dialog.accessibility.body": "Цей дозвіл потрібен ErgoptiPlus, щоб зчитувати клавіатуру. Він запуститься сам, щойно дозвіл буде увімкнено, без перезапуску. Якщо ви закриєте це вікно, відкрийте ErgoptiPlus знову, щоб ще раз побачити ці кроки.",
 	"permission_dialog.accessibility.step_opened": "Щойно відкрилися Системні параметри > Приватність і безпека > Доступність.",
 	"permission_dialog.accessibility.step_toggle": "Увімкніть «Hammerspoon» у списку: це рушій ErgoptiPlus. Якщо він уже здається увімкненим, вимкніть і знову увімкніть його.",
 	"startup.linux_input_access_body": "Ergopti+ поки що не може читати клавіатуру або писати в /dev/uinput. Вийдіть із сеансу та увійдіть знову (або перезавантажтеся), щоб набули чинності групи «input» і «uinput», додані інсталятором. Якщо проблема не зникає, виконайте: {1}",

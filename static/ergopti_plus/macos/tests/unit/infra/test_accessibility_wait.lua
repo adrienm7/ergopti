@@ -38,6 +38,10 @@ local function harness(overrides)
 		cancel = function(handle) h.cancelled = handle; return true end,
 		show_guidance = function() event("show") end,
 		close_guidance = function() event("close") end,
+		watch_reopen = function(on_reopen)
+			h.reopen = on_reopen
+			return function() event("unwatch") end
+		end,
 		on_trusted = function() event("trusted") end,
 		on_timeout = function(elapsed) event("timeout:" .. tostring(elapsed)) end,
 		poll_seconds = 1,
@@ -106,6 +110,37 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_contains(detail, "already running")
 		local _, refusal = pcall(h.wait.start, { permission = h.permission })
 		helpers.assert_contains(tostring(refusal), "every must be a function")
+	end)
+
+	helpers.it("shows the steps again each time ErgoptiPlus is reopened while waiting", function()
+		local h = harness()
+		h.wait.start(h.opts)
+		local function shown()
+			local count = 0
+			for _, e in ipairs(h.events) do if e == "show" then count = count + 1 end end
+			return count
+		end
+		helpers.assert_eq(shown(), 1)
+		h.reopen()
+		h.reopen()
+		helpers.assert_eq(shown(), 3, "a dialog closed with Later is not a dead end")
+		h.trusted = true
+		h.ticks()
+		helpers.assert_true(h.index("unwatch") ~= nil and h.index("unwatch") < h.index("trusted"),
+			"the boot resumes without the reopen watch")
+		h.reopen()
+		helpers.assert_eq(shown(), 3, "a reopen after the grant shows nothing")
+	end)
+
+	helpers.it("keeps waiting when reopening cannot be watched", function()
+		local h = harness()
+		h.opts.watch_reopen = function() return nil, "no launcher is being watched" end
+		helpers.assert_eq(h.wait.start(h.opts), true)
+		h.reset_done(true)
+		helpers.assert_true(h.index("prompt") ~= nil and h.index("settings") ~= nil)
+		h.trusted = true
+		h.ticks()
+		helpers.assert_true(h.index("trusted") ~= nil)
 	end)
 
 	helpers.it("reports a timer that did not arm without side effects", function()

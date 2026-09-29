@@ -65,4 +65,18 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_true(body:find("show_guidance = function() close_guidance = show_accessibility_guidance() end",
 			1, true) ~= nil, "the wait must own the dialog it closes on the grant")
 	end)
+
+	helpers.it("reopening ErgoptiPlus during the wait shows the steps again", function()
+		local unit, err = helpers.read_driver_unit("local function watch_launcher_reopen(on_reopen)")
+		helpers.assert_true(unit ~= nil, tostring(err))
+		local body = table.concat(code_lines(unit), "\n")
+		local at = body:find("local function watch_launcher_reopen(on_reopen)", 1, true)
+		local fn = body:sub(at, body:find("\nend\n", at, true))
+		helpers.assert_true(fn:find("LauncherGuard.watch_activation(on_reopen)", 1, true) ~= nil,
+			"a reopen only activates the launcher; its guard is the one that sees it")
+		helpers.assert_true(fn:find("xpcall(", 1, true) ~= nil, "a watch failure must never stop the boot")
+		local wait_at = body:find("AccessibilityWait.start({", 1, true)
+		helpers.assert_true(wait_at ~= nil and body:find("watch_reopen = watch_launcher_reopen,", wait_at, true) ~= nil,
+			"the wait must be given the reopen watch, or a closed dialog cannot come back")
+	end)
 end)

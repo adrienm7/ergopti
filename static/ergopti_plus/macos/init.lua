@@ -1073,6 +1073,21 @@ local function show_accessibility_guidance()
 	return close
 end
 
+--- Calls on_reopen each time the user opens ErgoptiPlus again during the wait.
+--- There is no menu yet and the launcher has no window, so without this a
+--- closed dialog could not come back. A refusal only costs that shortcut.
+--- @param on_reopen function Called on each reopen.
+--- @return function|nil stop Stops watching; nil when refused.
+--- @return string|nil detail Exact refusal when stop is nil.
+local function watch_launcher_reopen(on_reopen)
+	local ok, stop, detail = xpcall(function()
+		if LauncherGuard == nil then return nil, "the launcher guard is not loaded" end
+		return LauncherGuard.watch_activation(on_reopen)
+	end, debug.traceback)
+	if not ok then return nil, tostring(stop) end
+	return stop, detail
+end
+
 -- Pre-start the keyboard input owners so they are active before menu.lua reads
 -- saved prefs. Menu.lua will honor saved state and pause/resume them as needed.
 -- Both share one transaction because continuing after a refused start leaves a
@@ -1115,6 +1130,7 @@ if accessibility_trusted ~= true then
 		cancel = TimerScheduler.cancel,
 		show_guidance = function() close_guidance = show_accessibility_guidance() end,
 		close_guidance = function() close_guidance() end,
+		watch_reopen = watch_launcher_reopen,
 		-- Same guard as the first run below: a raise ends in the named exit.
 		on_trusted = function()
 			local resumed_ok, resumed_error = xpcall(finish_boot_after_onboarding, debug.traceback)

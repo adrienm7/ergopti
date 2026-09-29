@@ -2223,7 +2223,7 @@
 	"permission_dialog.open_settings": "Åbn indstillinger",
 	"permission_dialog.step_add": "Hvis „Hammerspoon“ ikke er på listen, skal du klikke på +, trykke på ⌘⇧G, indsætte {1} og klikke på Åbn.",
 	"permission_dialog.accessibility.title": "Tillad ErgoptiPlus under Tilgængelighed",
-	"permission_dialog.accessibility.body": "ErgoptiPlus skal bruge denne tilladelse for at læse tastaturet. Det starter af sig selv, så snart tilladelsen er slået til, uden genstart.",
+	"permission_dialog.accessibility.body": "ErgoptiPlus skal bruge denne tilladelse for at læse tastaturet. Det starter af sig selv, så snart tilladelsen er slået til, uden genstart. Hvis du lukker dette vindue, så åbn ErgoptiPlus igen for at se disse trin.",
 	"permission_dialog.accessibility.step_opened": "Systemindstillinger > Anonymitet og sikkerhed > Tilgængelighed er lige blevet åbnet.",
 	"permission_dialog.accessibility.step_toggle": "Slå „Hammerspoon“ til på listen: det er ErgoptiPlus-motoren. Hvis den allerede ser ud til at være slået til, så slå den fra og til igen.",
 	"startup.linux_input_access_body": "Ergopti+ kan endnu ikke læse tastaturet eller skrive til /dev/uinput. Log ud og ind igen (eller genstart), så grupperne “input” og “uinput”, som installationsprogrammet tilføjede, træder i kraft. Hvis problemet fortsætter, kør: {1}",
