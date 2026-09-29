@@ -2224,7 +2224,7 @@
 	"permission_dialog.step_add": "إذا لم يكن «Hammerspoon» في القائمة، فانقر على +، واضغط ⌘⇧G، والصق {1}، ثم انقر على فتح.",
 	"permission_dialog.accessibility.title": "اسمح لـ ErgoptiPlus في تسهيلات الاستخدام",
 	"permission_dialog.accessibility.body": "يحتاج ErgoptiPlus إلى هذا الإذن لقراءة لوحة المفاتيح. سيبدأ تلقائيًا فور تفعيل الإذن، دون إعادة تشغيل. إذا أغلقت هذه النافذة، فافتح ErgoptiPlus مجددًا لرؤية هذه الخطوات.",
-	"permission_dialog.accessibility.step_opened": "فُتحت للتو إعدادات النظام > الخصوصية والأمن > تسهيلات الاستخدام.",
+	"permission_dialog.accessibility.step_opened": "تُفتح إعدادات النظام على الخصوصية والأمن > تسهيلات الاستخدام (وإلا فانقر على «{1}»). إذا طلب macOS ذلك أيضًا، فاختر فتح إعدادات النظام.",
 	"permission_dialog.accessibility.step_toggle": "فعّل «Hammerspoon» في القائمة: إنه محرك ErgoptiPlus. إذا ظهر مرتين، ففعّل الإدخال غير المفعّل. وإذا كان الإدخال الوحيد يبدو مفعّلًا بالفعل، فأوقفه ثم فعّله من جديد.",
 	"startup.linux_input_access_body": "لا يستطيع Ergopti+ بعدُ قراءة لوحة المفاتيح أو الكتابة في ‎/dev/uinput. سجّل الخروج ثم الدخول من جديد (أو أعد التشغيل) حتى تسري المجموعتان «input» و«uinput» اللتان أضافهما المثبّت. إذا استمرت المشكلة، نفّذ: {1}",
 	"startup.linux_input_access_title": "لا يستطيع Ergopti+ استخدام لوحة المفاتيح بعد",

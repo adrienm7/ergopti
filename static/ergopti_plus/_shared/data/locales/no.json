@@ -2224,7 +2224,7 @@
 	"permission_dialog.step_add": "Hvis «Hammerspoon» ikke står i listen, klikker du på +, trykker ⌘⇧G, limer inn {1} og klikker på Åpne.",
 	"permission_dialog.accessibility.title": "Tillat ErgoptiPlus under Tilgjengelighet",
 	"permission_dialog.accessibility.body": "ErgoptiPlus trenger denne tillatelsen for å lese tastaturet. Det starter av seg selv så snart tillatelsen er slått på, uten omstart. Hvis du lukker dette vinduet, åpner du ErgoptiPlus igjen for å se disse trinnene på nytt.",
-	"permission_dialog.accessibility.step_opened": "Systeminnstillinger > Personvern og sikkerhet > Tilgjengelighet ble nettopp åpnet.",
+	"permission_dialog.accessibility.step_opened": "Systeminnstillinger åpnes på Personvern og sikkerhet > Tilgjengelighet (hvis ikke, klikker du på «{1}»). Hvis macOS også spør, velger du å åpne Systeminnstillinger.",
 	"permission_dialog.accessibility.step_toggle": "Slå på «Hammerspoon» i listen: det er ErgoptiPlus-motoren. Hvis det står to, slår du på den som er av. Hvis den eneste allerede ser påslått ut, slår du den av og på igjen.",
 	"startup.linux_input_access_body": "Ergopti+ kan ennå ikke lese tastaturet eller skrive til /dev/uinput. Logg ut og inn igjen (eller start på nytt) slik at gruppene «input» og «uinput» som installasjonsprogrammet la til, trer i kraft. Hvis problemet vedvarer, kjør: {1}",
 	"startup.linux_input_access_title": "Ergopti+ kan ikke bruke tastaturet ennå",

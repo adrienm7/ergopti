@@ -203,7 +203,13 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			local html = opts.html_string
 			helpers.assert_contains(html, "Autoriser ErgoptiPlus dans Accessibilité")
 			helpers.assert_contains(html, "<ol>")
-			helpers.assert_contains(html, "vient de s’ouvrir")
+			-- The dialog opens before the pane, which may not open at all, while
+			-- macOS shows its own prompt for the same permission.
+			helpers.assert_true(html:find("vient de s’ouvrir", 1, true) == nil,
+				"step 1 must not say the pane has opened before it has")
+			helpers.assert_contains(html, "(sinon, cliquez sur « Ouvrir les Réglages »)",
+				"step 1 names the button that opens the pane when it did not open")
+			helpers.assert_contains(html, "Si macOS le demande aussi, choisissez d’ouvrir Réglages Système.")
 			helpers.assert_contains(html, "rouvrez ErgoptiPlus pour revoir ces étapes",
 				"Later must say how to get the steps back")
 			helpers.assert_contains(html, "Activez « Hammerspoon » dans la liste")

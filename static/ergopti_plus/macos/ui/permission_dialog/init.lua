@@ -109,17 +109,20 @@ end
 --- @return table content { locale, window_title, title, body, steps, open_label, later_label }
 function M.content(kind, bundle_path)
 	local prefix = M.KINDS[kind].prefix
+	local open_label = i18n.get("permission_dialog.open_settings")
 	return {
 		locale       = i18n.get_locale(),
 		window_title = i18n.get("permission_dialog.window_title"),
 		title        = i18n.get(prefix .. ".title"),
 		body         = i18n.get(prefix .. ".body"),
 		steps        = {
-			i18n.get(prefix .. ".step_opened"),
+			-- The dialog opens before the pane does, and the pane may not open
+			-- at all, so this step names the button that opens it again.
+			i18n.format(prefix .. ".step_opened", open_label),
 			i18n.get(prefix .. ".step_toggle"),
 			i18n.format("permission_dialog.step_add", bundle_path),
 		},
-		open_label   = i18n.get("permission_dialog.open_settings"),
+		open_label   = open_label,
 		later_label  = i18n.get("common.later"),
 	}
 end

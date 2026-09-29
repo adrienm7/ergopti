@@ -2224,7 +2224,7 @@
 	"permission_dialog.step_add": "Fehlt „Hammerspoon“ in der Liste, klicken Sie auf +, drücken Sie ⌘⇧G, fügen Sie {1} ein und klicken Sie auf „Öffnen“.",
 	"permission_dialog.accessibility.title": "ErgoptiPlus in den Bedienungshilfen erlauben",
 	"permission_dialog.accessibility.body": "ErgoptiPlus benötigt diese Berechtigung, um die Tastatur zu lesen. Es startet von selbst, sobald sie aktiviert ist, ohne Neustart. Wenn Sie dieses Fenster schließen, öffnen Sie ErgoptiPlus erneut, um diese Schritte wieder zu sehen.",
-	"permission_dialog.accessibility.step_opened": "Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen wurde soeben geöffnet.",
+	"permission_dialog.accessibility.step_opened": "Die Systemeinstellungen öffnen sich bei Datenschutz & Sicherheit > Bedienungshilfen (sonst klicken Sie auf „{1}“). Fragt macOS ebenfalls nach, wählen Sie das Öffnen der Systemeinstellungen.",
 	"permission_dialog.accessibility.step_toggle": "Aktivieren Sie „Hammerspoon“ in der Liste: Das ist die ErgoptiPlus-Engine. Stehen dort zwei, aktivieren Sie den ausgeschalteten Eintrag. Wirkt der einzige Eintrag schon aktiviert, schalten Sie ihn aus und wieder ein.",
 	"startup.linux_input_access_body": "Ergopti+ kann die Tastatur noch nicht lesen oder nicht in /dev/uinput schreiben. Melden Sie sich ab und wieder an (oder starten Sie neu), damit die vom Installationsprogramm hinzugefügten Gruppen „input“ und „uinput“ wirksam werden. Falls das Problem bleibt, führen Sie aus: {1}",
 	"startup.linux_input_access_title": "Ergopti+ kann die Tastatur noch nicht verwenden",

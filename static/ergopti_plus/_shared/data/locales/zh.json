@@ -2224,7 +2224,7 @@
 	"permission_dialog.step_add": "如果列表中没有“Hammerspoon”，请点按 +，按下 ⌘⇧G，粘贴 {1}，然后点按“打开”。",
 	"permission_dialog.accessibility.title": "在“辅助功能”中允许 ErgoptiPlus",
 	"permission_dialog.accessibility.body": "ErgoptiPlus 需要此权限来读取键盘。权限一旦打开，它会自动启动，无需重启。如果关闭此窗口，请再次打开 ErgoptiPlus 以重新查看这些步骤。",
-	"permission_dialog.accessibility.step_opened": "“系统设置 > 隐私与安全性 > 辅助功能”刚刚已打开。",
+	"permission_dialog.accessibility.step_opened": "“系统设置”会打开“隐私与安全性 > 辅助功能”（如果没有打开，请点按“{1}”）。如果 macOS 也提出请求，请选择打开“系统设置”。",
 	"permission_dialog.accessibility.step_toggle": "在列表中打开“Hammerspoon”：它是 ErgoptiPlus 的引擎。如果有两个，请打开处于关闭状态的那个。如果只有一个且看起来已经打开，请先关闭再重新打开。",
 	"startup.linux_input_access_body": "Ergopti+ 暂时无法读取键盘或写入 /dev/uinput。请注销并重新登录（或重启），使安装程序添加的“input”和“uinput”用户组生效。如果问题仍然存在，请运行：{1}",
 	"startup.linux_input_access_title": "Ergopti+ 暂时无法使用键盘",

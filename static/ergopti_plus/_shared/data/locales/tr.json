@@ -2224,7 +2224,7 @@
 	"permission_dialog.step_add": "“Hammerspoon” listede yoksa + düğmesine tıklayın, ⌘⇧G tuşlarına basın, {1} yolunu yapıştırın ve Aç’a tıklayın.",
 	"permission_dialog.accessibility.title": "Erişilebilirlik’te ErgoptiPlus’a izin verin",
 	"permission_dialog.accessibility.body": "ErgoptiPlus’ın klavyeyi okuyabilmesi için bu izne ihtiyacı var. İzin açılır açılmaz yeniden başlatma olmadan kendiliğinden başlar. Bu pencereyi kapatırsanız, bu adımları yeniden görmek için ErgoptiPlus’ı tekrar açın.",
-	"permission_dialog.accessibility.step_opened": "Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik az önce açıldı.",
+	"permission_dialog.accessibility.step_opened": "Sistem Ayarları, Gizlilik ve Güvenlik > Erişilebilirlik bölümünde açılır (açılmazsa “{1}” düğmesine tıklayın). macOS de sorarsa Sistem Ayarları’nı açmayı seçin.",
 	"permission_dialog.accessibility.step_toggle": "Listede “Hammerspoon”u açın: bu, ErgoptiPlus motorudur. İki tane varsa kapalı olanı açın. Tek giriş zaten açık görünüyorsa kapatıp yeniden açın.",
 	"startup.linux_input_access_body": "Ergopti+ klavyeyi henüz okuyamıyor veya /dev/uinput’a yazamıyor. Yükleyicinin eklediği “input” ve “uinput” gruplarının geçerli olması için oturumu kapatıp yeniden açın (veya yeniden başlatın). Sorun sürerse şunu çalıştırın: {1}",
 	"startup.linux_input_access_title": "Ergopti+ klavyeyi henüz kullanamıyor",
