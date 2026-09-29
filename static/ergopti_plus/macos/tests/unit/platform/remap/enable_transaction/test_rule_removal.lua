@@ -122,3 +122,38 @@ helpers.describe("Remove Ergopti from Karabiner", function()
 		end)
 	end)
 end)
+
+helpers.describe("Tap-Hold settings edited while the switch is off", function()
+	-- Every bulk command the Tap-Holds submenu and the global restore reach.
+	local BULK_EDITS = {
+		{ name = "reset_to_defaults", run = function(remap, done) return remap.reset_to_defaults(done) end },
+		{ name = "clear_all_bindings", run = function(remap, done) return remap.clear_all_bindings(done) end },
+		{ name = "copy_tap_actions_to_combos",
+			run = function(remap, done) return remap.copy_tap_actions_to_combos(done) end },
+		{ name = "restore_settings", run = function(remap, done)
+			return remap.restore_settings(remap.snapshot_settings(), done)
+		end },
+	}
+
+	for _, edit in ipairs(BULK_EDITS) do
+		helpers.it(edit.name .. " persists without a deploy and leaves the switch usable", function()
+			with_fixture(function(fixture)
+				local remap, calls = fixture.load_enabled_remap({ initially_enabled = false })
+				local result, reason = nil, nil
+				helpers.assert_true(edit.run(remap, function(ok, detail) result, reason = ok, detail end),
+					"an edit with the switch off is a settings change, not a refused deploy")
+				helpers.assert_eq(result, true, "reason: " .. tostring(reason))
+				helpers.assert_eq(reason, "persisted-integration-off")
+				helpers.assert_true(calls.save >= 1, "the edit must reach config_karabiner.toml")
+				helpers.assert_eq(calls.saved_enabled[#calls.saved_enabled], false,
+					"a settings edit must not decide the switch")
+				helpers.assert_eq(calls.build, 0,
+					"nothing may be deployed while Ergopti does not use Karabiner")
+				helpers.assert_eq(calls.start + calls.start_paused, 0)
+
+				helpers.assert_true(remap.set_enabled(true),
+					"no retained bulk owner may lock the switch after an edit made while it was off")
+			end)
+		end)
+	end
+end)
