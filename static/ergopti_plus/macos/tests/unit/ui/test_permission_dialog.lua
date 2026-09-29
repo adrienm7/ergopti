@@ -352,6 +352,9 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 					"a left margin would keep the steps on the left of a right-to-left page")
 				helpers.assert_contains(html, '<code dir="ltr">' .. BUNDLE_PATH .. "</code>",
 					"the path reads left to right inside a right-to-left step")
+				local code_rule = html:match("code{[^}]*}") or ""
+				helpers.assert_contains(code_rule, "display:inline-block",
+					"an inline path wrapped in a right-to-left line starts at the wrong end")
 			end)
 		end
 	end)

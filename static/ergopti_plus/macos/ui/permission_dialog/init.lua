@@ -127,6 +127,8 @@ end
 -- Page style: system font and colours, light and dark, buttons laid out as in
 -- a native alert (default action at the end of the row). Offsets are logical
 -- (inline-start), so a right-to-left page mirrors like a native alert does.
+-- The path is one box: inline, a wrapped left-to-right run inside a
+-- right-to-left line puts its first fragment at the far end of the line.
 local STYLE = table.concat({
 	":root{color-scheme:light dark}",
 	"html,body{margin:0;height:100%}",
@@ -138,7 +140,7 @@ local STYLE = table.concat({
 	"p{margin:0;line-height:1.45;opacity:.85}",
 	"ol{margin:14px 0 0;margin-inline-start:80px;padding:0;padding-inline-start:18px;line-height:1.45}",
 	"li{margin:0 0 8px}",
-	"code{font:12px ui-monospace,Menlo,monospace;-webkit-user-select:text;word-break:break-all}",
+	"code{font:12px ui-monospace,Menlo,monospace;-webkit-user-select:text;word-break:break-all;display:inline-block;max-width:100%}",
 	".buttons{margin-top:auto;display:flex;justify-content:flex-end;gap:10px;padding-top:14px}",
 	"button{font:13px -apple-system,sans-serif;min-width:96px;padding:4px 14px;border-radius:6px;",
 	"border:1px solid rgba(128,128,128,.35);background:ButtonFace;color:ButtonText}",
