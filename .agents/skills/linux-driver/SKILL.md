@@ -121,14 +121,18 @@ runner cannot answer.
   not yet decided: do not copy either side to the other without the
   maintainer.
 - **`tap_hold_loader.lua`** lays the user's `tap_hold.toml` over
-  `_shared/tap_hold/defaults.toml` key by key and field by field (it used to
-  replace them wholesale, which disabled every key the file did not name).
+  `_shared/tap_hold/defaults.toml` key by key and field by field, but only
+  when the file says `inherit_defaults = true`; otherwise it starts from no
+  keys, so an empty file is the keyboard's own behaviour.
   A hold modifier drops the default layer and the reverse; `tap_action = ""`
-  is the native key and `"none"` swallows it; `inherit_defaults = false`
-  starts from no keys; a malformed user file is reported, never half-applied.
+  is the native key and `"none"` swallows it; a malformed user file is
+  reported, never half-applied.
 - **`tap_hold_writer.lua`** writes only the keys the user changed, through the
   shared TOML codec, via temp file then rename, and refuses to overwrite a file
-  that does not parse. Then it reloads the manager.
+  that does not parse. Then it reloads the manager. The section-wide restore
+  and clear are not writer commands: `infra/tap_hold_scope.lua` renders them
+  through `render_scope()` (the preset written explicitly, never inherited)
+  and publishes both files in the shared scope transaction.
 - **`tap_hold_manager.lua`** is the single owner of "is a tap-hold active":
   the feature switch, the file's `enabled` flag and the daemon's pause meet
   in one place. It installs the engine only through

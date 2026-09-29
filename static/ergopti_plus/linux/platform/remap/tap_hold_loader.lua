@@ -16,8 +16,10 @@
 ---     accepts the same spellings), and a modifier or layer no driver knows
 ---     is an error logged and a hold dropped: the key keeps its tap, as the
 ---     Windows loader refuses an unknown hold where it reads it;
----   - [tap_hold] inherit_defaults = false starts from no keys at all (what
----     "Disable all" writes) and enabled = false switches the feature off;
+---   - only [tap_hold] inherit_defaults = true lays the user file over the
+---     shipped keys; otherwise it starts from no keys at all (an empty file is
+---     the keyboard's own behaviour), and enabled = false switches the feature
+---     off. The scope restore writes the preset explicitly instead;
 ---   - a threshold outside 0..10 s falls back to 0.2 s, a field of the wrong
 ---     type disables its key, and a malformed user file is reported and never
 ---     half-applied.
@@ -102,6 +104,36 @@ local function validated(key_id, fields, hold_picker)
 	return key
 end
 
+--- Reads the shared defaults, failing fast when the shipped file is unusable.
+--- @param defaults_path string The shared defaults.toml.
+--- @return table defaults Decoded defaults document.
+local function read_defaults(defaults_path)
+	local defaults, defaults_err = read_toml(defaults_path)
+	if not defaults then
+		error(string.format("tap-hold defaults unreadable (%s): %s", tostring(defaults_err), tostring(defaults_path)), 0)
+	end
+	return defaults
+end
+
+--- The shipped preset keys ([tap_hold.keys.*]), as detached raw fields. They
+--- are Ergopti's recommendation, written explicitly by a scope restore; the
+--- loader applies them only to a file that asks to inherit them.
+--- @param defaults_path string The shared defaults.toml.
+--- @return table keys key id -> { field = value }
+function M.preset_keys(defaults_path)
+	local defaults = read_defaults(defaults_path)
+	local base = type(defaults.tap_hold) == "table" and type(defaults.tap_hold.keys) == "table"
+		and defaults.tap_hold.keys or {}
+	local keys = {}
+	for key_id, fields in pairs(base) do
+		if type(fields) == "table" then
+			keys[key_id] = {}
+			for field, value in pairs(fields) do keys[key_id][field] = value end
+		end
+	end
+	return keys
+end
+
 --- Loads the effective configuration.
 --- @param defaults_path string The shared defaults.toml.
 --- @param user_path string|nil The user's tap_hold.toml.
@@ -109,19 +141,25 @@ end
 ---   hold_picker = table|nil, catalog = table } `catalog` is this driver's column
 ---   of the shared key catalogue: the keys the tray lists, in order, with hands.
 function M.load(defaults_path, user_path)
-	local defaults, defaults_err = read_toml(defaults_path)
-	if not defaults then
-		error(string.format("tap-hold defaults unreadable (%s): %s", tostring(defaults_err), tostring(defaults_path)), 0)
-	end
-	local base = type(defaults.tap_hold) == "table" and type(defaults.tap_hold.keys) == "table"
-		and defaults.tap_hold.keys or {}
-
 	local user, user_err = nil, nil
 	if user_path then
 		user, user_err = read_toml(user_path)
 		if user_err == "absent" then user_err = nil end
 		if user_err then Logger.error(LOG, "User tap_hold.toml '%s' is %s — tap-holds remain neutral.", user_path, user_err) end
 	end
+	return M.load_document(defaults_path, user, user_err)
+end
+
+--- Builds the effective configuration from an already decoded user document,
+--- so a scope transaction can acknowledge its candidate before publishing it.
+--- @param defaults_path string The shared defaults.toml.
+--- @param user table|nil Decoded user document; nil means no user file.
+--- @param user_err string|nil Why the user file could not be read.
+--- @return table Same shape as M.load().
+function M.load_document(defaults_path, user, user_err)
+	local defaults = read_defaults(defaults_path)
+	local base = type(defaults.tap_hold) == "table" and type(defaults.tap_hold.keys) == "table"
+		and defaults.tap_hold.keys or {}
 	local section = user and type(user.tap_hold) == "table" and user.tap_hold or {}
 	local overrides = type(section.keys) == "table" and section.keys or {}
 

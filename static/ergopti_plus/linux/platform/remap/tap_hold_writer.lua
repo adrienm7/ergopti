@@ -10,8 +10,8 @@
 --- 1. The Windows writer's rules, on the file all three drivers read: a tap is
 ---    an action id, "" (the key itself) or "none" (nothing); a hold is a
 ---    modifier, a layer or none, and choosing one removes the other; "native"
----    clears both; « Disable all » removes owned preferences and leaves the
----    feature neutral without erasing fields owned by other versions.
+---    clears both. The scope restore and clear render through render_scope()
+---    and publish through infra/tap_hold_scope.lua, never through commit().
 --- 2. Only the keys the user changed are written: every other key keeps
 ---    inheriting the shared default.
 --- 3. The file is decoded by the shared TOML codec, not by a line scanner, and
@@ -33,6 +33,9 @@ local LOG = "platform.remap.tap_hold_writer"
 
 -- The Windows loader's bound for time_activation_seconds.
 local MAX_THRESHOLD_SECONDS = 10
+
+-- The per-key fields whose runtime meaning belongs to this writer.
+local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }
 
 local HEADER = {
 	"# tap_hold.toml — written by the Ergopti+ tray menu.",
@@ -126,20 +129,28 @@ local function encode_table(out, tbl, path)
 	end
 end
 
+--- The file's complete text for `document`, as every tray change writes it.
+--- @param document table
+--- @return string
+local function render_document(document)
+	local out = {}
+	for _, line in ipairs(HEADER) do out[#out + 1] = line end
+	encode_table(out, document, "")
+	return table.concat(out, "\n") .. "\n"
+end
+
 --- Replaces the file with `document`.
 --- @param document table
 --- @return boolean
 local function write_document(document)
-	local out = {}
-	for _, line in ipairs(HEADER) do out[#out + 1] = line end
-	encode_table(out, document, "")
+	local text = render_document(document)
 	local tmp = _path .. ".tmp"
 	local fh, err = io.open(tmp, "w")
 	if not fh then
 		Logger.error(LOG, "Cannot write '%s' (%s) — the change was not saved.", tmp, tostring(err))
 		return false
 	end
-	fh:write(table.concat(out, "\n") .. "\n")
+	fh:write(text)
 	fh:close()
 	local ok, rename_err = os.rename(tmp, _path)
 	if not ok then
@@ -188,16 +199,20 @@ local function key_entry(document, key_id)
 	return tap_hold.keys[key_id]
 end
 
---- Removes only fields whose runtime meaning belongs to this writer.
+--- Removes only fields whose runtime meaning belongs to this writer, on every
+--- key this engine knows and every key of the shipped preset.
 --- @param tap_hold table
-local function clear_owned_keys(tap_hold)
-	if type(tap_hold.keys) ~= "table" then return end
-	for key_id in pairs(Engine.KEY_CODES) do
+--- @param preset table key id -> fields of the shipped preset.
+local function clear_owned_keys(tap_hold, preset)
+	if tap_hold.keys == nil then return end
+	if type(tap_hold.keys) ~= "table" then error("[tap_hold] keys is not a table", 0) end
+	local owned = {}
+	for key_id in pairs(Engine.KEY_CODES) do owned[key_id] = true end
+	for key_id in pairs(preset) do owned[key_id] = true end
+	for key_id in pairs(owned) do
 		local entry = tap_hold.keys[key_id]
 		if type(entry) == "table" then
-			for _, field in ipairs({ "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }) do
-				entry[field] = nil
-			end
+			for _, field in ipairs(OWNED_KEY_FIELDS) do entry[field] = nil end
 			if next(entry) == nil then tap_hold.keys[key_id] = nil end
 		end
 	end
@@ -320,26 +335,38 @@ function M.set_enabled(enabled)
 	end)
 end
 
---- Clears owned preferences to the neutral default while preserving unknown data.
---- @return boolean
-function M.disable_all()
-	return commit("disable all", function(document)
-		local tap_hold = section(document)
-		tap_hold.enabled = nil
-		tap_hold.inherit_defaults = nil
-		clear_owned_keys(tap_hold)
-	end)
-end
-
---- Restores the shared preset while retaining fields outside the writer's ownership.
---- @return boolean
-function M.reset_all()
-	return commit("restore shared preset", function(document)
-		local tap_hold = section(document)
-		tap_hold.enabled = Manifest.recommended_for("tap_holds.enabled")
-		tap_hold.inherit_defaults = true
-		clear_owned_keys(tap_hold)
-	end)
+--- Renders the tap-hold scope candidate without writing it: every owned field
+--- is cleared, the manifest's master rows are applied, and a restore writes the
+--- shipped preset explicitly instead of asking the loader to inherit it, so the
+--- file says exactly what runs. Unknown sections and fields are preserved.
+--- @param mode string "recommended" or "clear".
+--- @param document table Decoded user document, consumed by this call.
+--- @param rows table Manifest rows under tap_holds, routed by the transaction.
+--- @param preset table key id -> fields of the shipped preset.
+--- @return string candidate Complete file text.
+function M.render_scope(mode, document, rows, preset)
+	if mode ~= "recommended" and mode ~= "clear" then error("unknown tap-hold scope mode: " .. tostring(mode), 0) end
+	if type(document) ~= "table" or type(rows) ~= "table" or type(preset) ~= "table" then
+		error("tap-hold scope rendering requires a document, rows and the preset", 0)
+	end
+	if document.tap_hold ~= nil and type(document.tap_hold) ~= "table" then error("[tap_hold] is not a table", 0) end
+	local tap_hold = section(document)
+	tap_hold.inherit_defaults = nil
+	clear_owned_keys(tap_hold, preset)
+	for _, row in ipairs(rows) do
+		if row.section ~= "tap_holds" or row.key ~= "enabled" then
+			error("tap-hold scope row has no tap_hold.toml owner: " .. tostring(row.section) .. "." .. tostring(row.key), 0)
+		end
+		if row.delete then tap_hold.enabled = nil else tap_hold.enabled = row.value end
+	end
+	if mode == "recommended" then
+		for key_id, fields in pairs(preset) do
+			local entry = key_entry(document, key_id)
+			for field, value in pairs(fields) do entry[field] = value end
+		end
+	end
+	if next(tap_hold) == nil then document.tap_hold = nil end
+	return render_document(document)
 end
 
 --- Whether the user's file names this key.

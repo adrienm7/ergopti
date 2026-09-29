@@ -15,12 +15,12 @@ local helpers = require("tests.helpers")
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 local WRITER = "platform.remap.tap_hold_writer"
 local PICKER = "ui.action_picker.bridge"
+local SCOPE = "infra.tap_hold_scope"
 
 --- A fake writer recording its calls.
 local function fake_writer(calls)
 	local writer = {}
-	for _, name in ipairs({ "set_tap", "set_hold", "set_native", "set_threshold", "set_enabled",
-		"disable_all", "reset_all" }) do
+	for _, name in ipairs({ "set_tap", "set_hold", "set_native", "set_threshold", "set_enabled" }) do
 		writer[name] = function(...)
 			calls[#calls + 1] = { name, ... }
 			return true
@@ -53,6 +53,12 @@ local function build(calls, picked, user_text)
 		user_path = user_path,
 	})
 	package.loaded[WRITER] = fake_writer(calls)
+	package.loaded[SCOPE] = {
+		apply = function(mode, is_paused)
+			calls[#calls + 1] = { "scope", mode, is_paused() }
+			return true
+		end,
+	}
 	package.loaded[PICKER] = {
 		open = function(opts, on_confirm)
 			picked.opts = opts
@@ -75,6 +81,7 @@ end
 local function restore(Manager)
 	Manager._reset_for_test()
 	package.loaded[WRITER] = nil
+	package.loaded[SCOPE] = nil
 	package.loaded[PICKER] = nil
 end
 
@@ -112,12 +119,30 @@ helpers.describe("Linux Tap-Holds menu", function()
 			helpers.assert_not_nil(reset, "the recommended restore row")
 			helpers.assert_not_nil(disable, "the clear-to-system row")
 			helpers.assert_not_nil(toggle, "the feature switch")
-			reset.fn()
-			disable.fn()
+			local asked = {}
+			local execute = os.execute
+			os.execute = function(command)
+				if command:find("command -v zenity", 1, true) then return 0 end
+				if command:find("zenity --question", 1, true) then
+					asked[#asked + 1] = command
+					return #asked == 3 and 1 or 0
+				end
+				return execute(command)
+			end
+			local ran, raised = pcall(function()
+				reset.fn()
+				disable.fn()
+				reset.fn()
+			end)
+			os.execute = execute
+			if not ran then error(raised, 0) end
 			toggle.fn()
-			helpers.assert_eq(calls[1][1], "reset_all")
-			helpers.assert_eq(calls[2][1], "disable_all")
-			helpers.assert_eq(calls[3][1], "set_enabled")
+			helpers.assert_eq(#asked, 3, "every whole-section row asks first")
+			helpers.assert_contains(asked[1], i18n.get("common.restore_recommended"))
+			helpers.assert_contains(asked[1], "--default-cancel")
+			helpers.assert_eq(calls[1], { "scope", "recommended", false })
+			helpers.assert_eq(calls[2], { "scope", "clear", false })
+			helpers.assert_eq(calls[3][1], "set_enabled", "a declined confirmation runs nothing")
 			helpers.assert_eq(calls[3][2], false, "the switch was on, a click turns it off")
 		end)
 		restore(Manager)
