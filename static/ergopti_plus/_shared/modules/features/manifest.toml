@@ -4974,6 +4974,21 @@ i18n = "menu.hotstrings.enable"
 checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
 
+# The Hotstrings scope, beside its switch like the IA and Metrics ones. Each
+# driver registers both commands on its scope owner, which changes config.toml
+# and the override file as one transaction: recommended delays are written
+# where the corpus inheritance differs, and the Ergopti extension's bound
+# groups (SFB reduction, rolls, repeat corrections) are covered like any other.
+[[menu.hotstrings_menu]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+
+[[menu.hotstrings_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+
 [[menu.hotstrings_menu]]
 type = "---"
 

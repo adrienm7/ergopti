@@ -312,13 +312,12 @@ helpers.describe("hotstrings scope: refusals", function()
 			with_scope(function(c)
 				local renderer = require("infra.manifest_menu")
 				local root = renderer.get_root()
-				local rows, top, execute = root.hotstrings_menu, root.top_level, os.execute
+				local top, execute = root.top_level, os.execute
 				local selected = mode == "recommended" and "recommended" or "clear"
 				local key = selected == "clear" and "common.clear_to_system" or "common.restore_recommended"
 				local changed = 0
 				local passed, err = pcall(function()
-					root.hotstrings_menu = { { type = "command", id = selected == "clear" and "scope_clear" or "scope_restore",
-						i18n = key } }
+					-- The real hotstrings_menu declaration: the rows are the manifest's.
 					root.top_level = { { id = "hotstrings" } }
 					os.execute = function(command)
 						if command:find("command -v zenity", 1, true) then return 0 end
@@ -328,14 +327,14 @@ helpers.describe("hotstrings scope: refusals", function()
 					local menu = require("ui.menu.menu_builder").build({ config = c.Config, paused = false,
 						is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 						tooltip_preview = c.preview_port, on_menu_changed = function() changed = changed + 1 end })
+					-- A direct row of the Hotstrings submenu: the word-delimiter
+					-- submenu nested under the parameters has a restore row of its own.
 					local action
-					local function find(items)
-						for _, row in ipairs(items) do
-							if row.title == require("infra.i18n").get(key) then action = row.fn end
-							if row.menu then find(row.menu) end
+					for _, item in ipairs(menu) do
+						for _, row in ipairs(item.menu or {}) do
+							if action == nil and row.title == require("infra.i18n").get(key) then action = row.fn end
 						end
 					end
-					find(menu)
 					helpers.assert_eq(type(action), "function", "the hotstrings row is registered")
 					action()
 					local expected = mode ~= "cancel"
@@ -348,7 +347,7 @@ helpers.describe("hotstrings scope: refusals", function()
 						helpers.assert_eq(read(c.override_path), OVERRIDES)
 					end
 				end)
-				root.hotstrings_menu, root.top_level, os.execute = rows, top, execute
+				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end
 			end)
 		end)

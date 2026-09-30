@@ -74,6 +74,50 @@ _HotstringsScopeRoundTrip() {
 }
 Test("hotstrings-scope: all stores publish together and restore exact bytes after native refusal", _HotstringsScopeRoundTrip)
 
+; The Hotstrings menu declares both rows and registers them from the same
+; provider, so a click reaches the scope owner the round trip above proves.
+_HotstringsScopeManifestRows() {
+	global _MenuDispatchCallbacks
+	Body := _DriverFuncBody("_MI_StageHotstrings")
+	Assert(Body != "", "_MI_StageHotstrings must be present in the driver source")
+	Assert(InStr(Body, "_HS_ScopeCommands()") > 0,
+		"the Hotstrings menu must register its scope rows from the tested provider")
+	Fixture := _HotstringsScopeFixture()
+	Refusal := 0, Bundle := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Commands := _HS_ScopeCommands(Fixture.options)
+		for Mode in ["clear", "recommended"] {
+			Fixture.options["stamp"] := Mode
+			Id := Mode == "clear" ? "scope_clear" : "scope_restore"
+			Rendered := Menu()
+			try {
+				AssertEqual(1, MenuRenderer_AppendCommand(Rendered, "hotstrings_menu", Id, Commands),
+					"hotstrings_menu must declare " . Id)
+				ItemId := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", 0, "uint")
+				Assert(_MenuDispatchCallbacks.Has(ItemId))
+				Receipt := (_MenuDispatchCallbacks[ItemId])()
+				AssertEqual(Receipt["status"], "pending")
+				Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay"))
+				Refusal.Call("native refusal")
+				AssertEqual(Receipt["status"], "refused")
+				AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
+				AssertEqual(FSReadUtf8Exact(Fixture.overrides), Fixture.overrideSource)
+			} finally Rendered.Delete()
+		}
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("hotstrings-scope: the Hotstrings menu draws both scope rows and runs the owner", _HotstringsScopeManifestRows)
+
 _HotstringsScopeRefusals() {
 	for Scenario in ["backup", "inventory", "external"] {
 		Fixture := _HotstringsScopeFixture()
