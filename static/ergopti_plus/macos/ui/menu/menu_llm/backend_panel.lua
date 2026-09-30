@@ -3,7 +3,8 @@
 --- ==============================================================================
 --- MODULE: LLM Backend Panel
 --- DESCRIPTION:
---- Builds the backend-switcher submenu (MLX, Ollama, API) for the LLM tray menu.
+--- Builds the backend-switcher submenu (MLX, Ollama, API, then the local
+--- servers that answer the OpenAI API) for the LLM tray menu.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Isolated panel: all backend-switching logic lives here so init.lua stays
@@ -576,7 +577,12 @@ function M.build(ctx)
 	local backend_title_str = i18n.get("menu.llm.backend_title")
 	if state.llm_backend == "mlx" then     backend_title_str = backend_title_str .. "MLX 🚀"
 	elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
-	elseif state.llm_backend == "api" then   backend_title_str = backend_title_str .. "API 🌐"
+	elseif state.llm_backend == "api" then
+		-- A local server's entry names the server rather than the remote API
+		local active = llm_mod.api_remote and llm_mod.api_remote.get_active_entry() or nil
+		local server = active and llm_mod.api_remote.is_local_server(active.provider)
+			and llm_mod.api_remote.PROVIDERS[active.provider] or nil
+		backend_title_str = backend_title_str .. (server and (server.label .. " 🖥️") or "API 🌐")
 	else                                     backend_title_str = backend_title_str .. i18n.get("menu.llm.backend_unknown") end
 
 	local rows = {}
@@ -695,38 +701,55 @@ function M.build(ctx)
 	-- The actual entry CRUD (provider, URL, token, model) lives in api_panel.lua.
 	-- This entry only flips the backend so the prediction engine routes through
 	-- ApiRemote on the next request.
+	--- Selects the API backend; a local server's model row selects it too.
+	--- @return boolean|nil committed
+	local function activate_api()
+		claim_runtime_selection()
+		if state.llm_backend ~= "api" then
+			Logger.info(LOG, "Activating remote API backend…")
+			local function finish_api_switch(debt)
+				if not publish_backend_label(debt, "api") then return false end
+				if not invoke_backend_boundary(
+					"API entries reload", llm_mod.load_api_entries) then
+					return false
+				end
+				if not publish_backend_menu(debt) then return false end
+				if not invoke_backend_boundary(
+					"API backend warmup", WarmupCtrl and WarmupCtrl.warmup,
+					"api_backend_switch") then
+					return false
+				end
+				-- The old local server is expendable only after every exact target
+				-- successor has committed.
+				pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+				return true
+			end
+			if state.llm_backend == "mlx" then
+				return leave_mlx("api", finish_api_switch)
+			end
+			return publish_backend("api", finish_api_switch)
+		end
+	end
 	table.insert(rows, {
 		label    = "API 🌐 — " .. i18n.get("menu.llm.backend_api_suffix"),
 		checked  = (state.llm_backend == "api"),
 		disabled = paused or nil,
-		action       = not paused and function()
-			claim_runtime_selection()
-			if state.llm_backend ~= "api" then
-				Logger.info(LOG, "Activating remote API backend…")
-				local function finish_api_switch(debt)
-					if not publish_backend_label(debt, "api") then return false end
-					if not invoke_backend_boundary(
-						"API entries reload", llm_mod.load_api_entries) then
-						return false
-					end
-					if not publish_backend_menu(debt) then return false end
-					if not invoke_backend_boundary(
-						"API backend warmup", WarmupCtrl and WarmupCtrl.warmup,
-						"api_backend_switch") then
-						return false
-					end
-					-- The old local server is expendable only after every exact target
-					-- successor has committed.
-					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
-					return true
-				end
-				if state.llm_backend == "mlx" then
-					return leave_mlx("api", finish_api_switch)
-				end
-				return publish_backend("api", finish_api_switch)
-			end
-		end or nil
+		action   = not paused and activate_api or nil
 	})
+
+
+	-- =====================================================
+	-- ===== 1.4) Local OpenAI-compatible servers =====
+	-- =====================================================
+
+	-- oMLX, LM Studio, llama.cpp, Jan… when they answer (local_server_panel.lua,
+	-- which the AI menu hands over): choosing one of their models stores the
+	-- server's API entry, then selects the API backend through activate_api.
+	if ctx.local_server_rows ~= nil then
+		for _, row in ipairs(ctx.local_server_rows(activate_api)) do
+			table.insert(rows, row)
+		end
+	end
 
 	return backend_title_str, ManifestMenu.render_rows(rows, "llm_backend")
 end

@@ -117,6 +117,19 @@ names it with a Download button that the AI menu's installer
 opening a modal. Route any new local-model consumer through that transport and
 offer (`ai-agent-local-model`).
 
+### project-macos-local-openai-servers-are-keyless-api-entries
+
+Servers the user runs (oMLX, LM Studio, llama-server/LocalAI, Jan) come from
+`_shared/modules/llm/local_servers.json`; `api_remote` registers them as
+`openai`-format providers with `local_server = true`, outside `PROVIDER_ORDER`,
+so a menu lists one only while `local_servers.lua`'s last sweep saw it answer.
+A chosen model is the server's one API entry (`local-<id>`), the only entry
+kind whose token may be `""`: `key_missing()` in `api_remote` and
+`validate_api_entries` in `modules/llm/init.lua` must agree on that exception.
+The engine menu gets its rows through `ctx.local_server_rows`, not a
+`backend_panel` require, because the backend fixtures stub `modules.llm`
+without `api_remote`. Extend `test_local_openai_backends.lua`.
+
 ## Native HID element qualification
 
 ### project-hs-hid-and-host-clock-units

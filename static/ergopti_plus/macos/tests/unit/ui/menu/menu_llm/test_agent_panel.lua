@@ -27,6 +27,7 @@ local OWNED = {
 	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
 	"infra.dialog_util", "ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
 	"infra.logger", "infra.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
+	"modules.llm.local_servers", "ui.menu.menu_llm.local_server_panel",
 }
 
 --- Builds the panel over a state and faked owners.
@@ -221,6 +222,35 @@ helpers.describe("AI agent menu (macOS)", function()
 			helpers.assert_eq(off_model.disabled, true, "no model to choose while off")
 		end)
 	end)
+
+	helpers.it("lists an answering local server with its models, stored as server|model (local-openai-backends)",
+		function()
+			local state = base_state()
+			state.llm_agent_system2 = "lmstudio|gone-model"
+			with_panel(state, function(build, world)
+				local LocalServers = require("modules.llm.local_servers")
+				local system2 = row_starting(build().submenu, "🧠")
+				helpers.assert_eq(system2.title, "🧠 System 2 (thorough): LM Studio 🖥️",
+					"a chosen server that does not answer keeps its name")
+				local row = row_starting(system2.menu, "LM Studio")
+				helpers.assert_eq(row.checked, true, "and stays checked")
+				helpers.assert_eq(row.menu[1].title, "gone-model")
+
+				LocalServers.sweep({ { id = "lmstudio", base_url = "http://localhost:1234/v1" } }, function(_, settle)
+					settle({ ok = true, status = 200, body = '{"data":[{"id":"qwen2.5-7b-instruct"}]}' })
+					return true
+				end)
+				system2 = row_starting(build().submenu, "🧠")
+				row = row_starting(system2.menu, "LM Studio")
+				helpers.assert_eq(titles(system2.menu)[3], "LM Studio 🖥️", "after the local server, before the providers")
+				helpers.assert_eq(table.concat(titles(row.menu), " | "), "qwen2.5-7b-instruct | gone-model")
+				row.menu[1].fn()
+				helpers.assert_eq(world.applied[1].key, "llm_agent_system2")
+				helpers.assert_eq(world.applied[1].value, "lmstudio|qwen2.5-7b-instruct")
+				local system1 = row_starting(build().submenu, "⚡")
+				helpers.assert_true(row_starting(system1.menu, "LM Studio") ~= nil, "System 1 offers it too")
+			end)
+		end)
 
 	helpers.it("switches the mode, refusing the automatic mode without System 1", function()
 		with_panel(base_state(), function(build, world)

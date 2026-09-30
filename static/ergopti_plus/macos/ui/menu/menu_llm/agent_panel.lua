@@ -12,7 +12,9 @@
 ---    shows and does.
 --- 2. Every change goes through the AI menu's setting transaction: runtime
 ---    setter, config.toml, menu refresh, rolled back as a whole on a refusal.
---- 3. The backend lists are the local server, then the providers of
+--- 3. The backend lists are the local server, the local OpenAI-compatible
+---    servers that answer (local_servers.json, each with a submenu of the
+---    models it serves), then the providers of
 ---    api_providers.json that serve the System, in the catalogue's order
 ---    (modules/llm/provider_uses.lua): a decisions provider (Jev) triages only,
 ---    so it is offered to System 1 alone. The model row shows the
@@ -65,15 +67,31 @@ local SYSTEMS = {
 -- =====================================
 -- =====================================
 
---- The backends a System may name: the local server, then the providers that
---- serve it.
+--- The label of a local OpenAI-compatible server (local_servers.json).
+--- @param id string Server id.
+--- @return string label
+local function server_label(id)
+	return require("modules.llm.api_remote").PROVIDERS[id].label .. " 🖥️"
+end
+
+--- The backends a System may name: the local server, the local
+--- OpenAI-compatible servers that answered the last sweep with their models
+--- (modules/llm/local_servers.lua), then the providers that serve it.
 --- @param use string|nil provider_uses.SYSTEM1 (the default, every provider) or SYSTEM2.
 --- @return table Array of { id, label }.
 function M.backends(use)
 	local Remote = require("modules.llm.api_remote")
+	local LocalServers = require("modules.llm.local_servers")
+	use = use or ProviderUses.SYSTEM1
 	local choices = { { id = Vision.LOCAL_BACKEND, label = i18n.get("llm.vision.local_backend") } }
-	for _, provider_id in ipairs(ProviderUses.provider_ids(Remote.PROVIDER_ORDER, Remote.PROVIDERS,
-		use or ProviderUses.SYSTEM1)) do
+	local up = {}
+	for _, server_id in ipairs(LocalServers.detected()) do
+		if LocalServers.result(server_id).status == LocalServers.STATUS_UP then up[#up + 1] = server_id end
+	end
+	for _, server_id in ipairs(ProviderUses.provider_ids(up, Remote.PROVIDERS, use)) do
+		choices[#choices + 1] = { id = server_id, label = server_label(server_id) }
+	end
+	for _, provider_id in ipairs(ProviderUses.provider_ids(Remote.PROVIDER_ORDER, Remote.PROVIDERS, use)) do
 		choices[#choices + 1] = { id = provider_id, label = Remote.PROVIDERS[provider_id].label }
 	end
 	return choices
@@ -86,6 +104,8 @@ local function backend_label(id)
 	for _, choice in ipairs(M.backends()) do
 		if choice.id == id then return choice.label end
 	end
+	-- A chosen local server that does not answer now
+	if require("modules.llm.api_remote").is_local_server(id) then return server_label(id) end
 	return id
 end
 
@@ -213,6 +233,34 @@ local function prompt_model(ctx, system, parsed)
 	return true
 end
 
+--- The model rows of a local server: the models it served at the last sweep,
+--- and the chosen one even when it is gone. Each stores "<server>|<model>".
+--- @param ctx table Panel context.
+--- @param system table SYSTEMS entry.
+--- @param id string Server id.
+--- @param parsed table|nil The current { backend, model }.
+--- @return table rows
+local function server_model_rows(ctx, system, id, parsed)
+	local LocalServers = require("modules.llm.local_servers")
+	local verdict = LocalServers.result(id)
+	local models = {}
+	for _, model in ipairs(verdict and verdict.models or {}) do models[#models + 1] = model end
+	local chosen = parsed and parsed.backend == id and parsed.model or nil
+	local listed = false
+	for _, model in ipairs(models) do listed = listed or model == chosen end
+	if chosen and not listed then models[#models + 1] = chosen end
+	local rows = {}
+	for _, model in ipairs(models) do
+		rows[#rows + 1] = {
+			label = model,
+			checked = model == chosen,
+			action = function() return apply(ctx, system.key, id .. "|" .. model, system.setter) end,
+		}
+	end
+	if #rows == 0 then rows[1] = { label = i18n.get("menu.llm.local_servers.no_models"), disabled = true } end
+	return rows
+end
+
 --- Rows of one System's submenu.
 --- @param ctx table Panel context.
 --- @param system table SYSTEMS entry.
@@ -227,17 +275,28 @@ local function system_rows(ctx, system)
 			action = function() return apply(ctx, system.key, "", system.setter) end,
 		},
 	}
-	for _, choice in ipairs(M.backends(system.use)) do
+	local Remote = require("modules.llm.api_remote")
+	local choices = M.backends(system.use)
+	local chosen_listed = parsed == nil
+	for _, choice in ipairs(choices) do chosen_listed = chosen_listed or choice.id == parsed.backend end
+	if not chosen_listed and Remote.is_local_server(parsed.backend) then
+		-- A chosen local server that does not answer now stays ticked
+		table.insert(choices, 2, { id = parsed.backend, label = server_label(parsed.backend) })
+	end
+	for _, choice in ipairs(choices) do
 		local id = choice.id
-		items[#items + 1] = {
-			label = choice.label,
-			checked = parsed ~= nil and parsed.backend == id,
-			action = function()
+		local row = { label = choice.label, checked = parsed ~= nil and parsed.backend == id }
+		if Remote.is_local_server(id) then
+			-- A local server has no default model: its row lists the models it serves
+			row.items = server_model_rows(ctx, system, id, parsed)
+		else
+			row.action = function()
 				if not apply(ctx, system.key, id, system.setter) then return false end
 				offer_missing_local_model(ctx, id)
 				return true
-			end,
-		}
+			end
+		end
+		items[#items + 1] = row
 	end
 	items[#items + 1] = { separator = true }
 	local model = parsed and resolved_model(parsed) or nil
@@ -296,6 +355,8 @@ function M.build(ctx)
 		or type(ctx.settings_mgr.apply_setting_transaction) ~= "function" then
 		error("agent_panel.build: a state and a settings manager are required")
 	end
+	-- A local server's missing-model notice fixes the Systems through this context
+	require("ui.menu.menu_llm.local_server_panel").set_agent_context(ctx)
 	-- The Shortcuts the agent may run are read again when the menu opens, if stale
 	local Runner = require("modules.llm.agent_runner")
 	local ok_tools, tools_error = pcall(Runner.refresh_tools, false, nil)
