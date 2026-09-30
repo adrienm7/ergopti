@@ -174,6 +174,7 @@ _MI_StageLayout() {
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
+		"magic_key_source",       (*) => MagicKeySourceMenuRows(),
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).

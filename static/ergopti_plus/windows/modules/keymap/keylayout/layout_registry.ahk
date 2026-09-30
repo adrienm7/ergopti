@@ -510,3 +510,18 @@ LayoutRegistry_MagicKeySource(Inputs) {
 	return Map("scan", LayoutRegistry_KeyScan(Inputs["shipped"].Call(), Inputs["keycodes"]),
 		"origin", "default", "follows_os_layout", true, "overrides_emulation", false)
 }
+
+/**
+ * The KeyboardEvent.code of a scan code, among the keys registry layouts define:
+ * the reverse of LayoutRegistry_KeyScan, for a key the user just pressed.
+ * @param {String} Scan - "SCnnn", any case.
+ * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @returns {String} The code, or "" when no layout key has that scan code.
+ */
+LayoutRegistry_KeyCode(Scan, KeycodeTable) {
+	for Key in KeycodeTable["keys"] {
+		if (Key["ahk"] = Scan)
+			return Key["code"]
+	}
+	return ""
+}

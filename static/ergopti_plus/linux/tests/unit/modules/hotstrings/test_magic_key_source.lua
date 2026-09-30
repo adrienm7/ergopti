@@ -63,10 +63,10 @@ end
 
 --- Wires the owner to recording collaborators.
 --- @param Source table
---- @param state table { active, replace, typed_ok } switches the test flips.
---- @return table calls { typed = {}, dispatched = {} }
+--- @param state table { active, replace, typed_ok, grab } switches the test flips.
+--- @return table calls { typed = {}, dispatched = {}, deferred = {} }
 local function wire(Source, state)
-	local calls = { typed = {}, dispatched = {} }
+	local calls = { typed = {}, dispatched = {}, deferred = {} }
 	Source.init({
 		is_active = function() return state.active end,
 		replace_on = function() return state.replace end,
@@ -78,8 +78,24 @@ local function wire(Source, state)
 		dispatch_char = function(char, code)
 			calls.dispatched[#calls.dispatched + 1] = { char = char, code = code }
 		end,
+		can_capture = function() return state.grab ~= false end,
+		key_text = function(code) return code == KEY_J and "j" or nil end,
+		defer = function(fn, delay_ms)
+			calls.deferred[#calls.deferred + 1] = { fn = fn, delay_ms = delay_ms }
+			return true
+		end,
 	})
 	return calls
+end
+
+--- Runs the deferred work queued with no delay, as the next loop tick would.
+local function run_due(calls)
+	for _, entry in ipairs(calls.deferred) do
+		if entry.delay_ms == 0 and not entry.ran then
+			entry.ran = true
+			entry.fn()
+		end
+	end
 end
 
 helpers.describe("magic key source: the config.toml leaf", function()
@@ -148,6 +164,97 @@ helpers.describe("magic key source: the keyboard hook decision", function()
 			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false)
 			helpers.assert_eq(#calls.typed, 0)
 			Source._reset_for_test()
+		end)
+	end)
+end)
+
+helpers.describe("magic key source: choosing a key", function()
+	helpers.it("(magic-key-source) stores a candidate sparsely and refuses any other value", function()
+		with_source(nil, function(Source, Preferences)
+			helpers.assert_true(Source.set("Semicolon"))
+			helpers.assert_eq(Source.get(), "Semicolon")
+			helpers.assert_eq(Source.evdev_code(), 39)
+			local ok, reason = Source.set("Space")
+			helpers.assert_eq(ok, false, "the space bar is never the magic key")
+			helpers.assert_eq(reason, "dialog.magic_key_source.not_a_candidate")
+			helpers.assert_eq(Source.get(), "Semicolon", "a refusal changes nothing")
+			helpers.assert_true(Source.set("auto"))
+			helpers.assert_eq(Preferences.is_explicit(PATH), false, "the automatic key is written as absence")
+		end)
+	end)
+
+	helpers.it("(magic-key-source) a capture takes the next grabbed key, whatever it types", function()
+		with_source(nil, function(Source)
+			local calls = wire(Source, { active = true, replace = true, typed_ok = true })
+			local chosen, refused = {}, {}
+			local handlers = {
+				on_chosen = function(value) chosen[#chosen + 1] = value end,
+				on_refused = function(reason) refused[#refused + 1] = reason end,
+			}
+			helpers.assert_true(Source.capture(handlers))
+			helpers.assert_eq(Source.capture(handlers), false, "one capture at a time")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = { shift = true } }),
+				"the answering key reaches no application, modifiers or not")
+			helpers.assert_eq(#chosen, 0, "nothing is written on the keystroke path")
+			run_due(calls)
+			helpers.assert_eq(chosen, { "KeyJ" })
+			helpers.assert_eq(Source.get(), "KeyJ")
+			helpers.assert_eq(Source.on_key({ code = KEY_C, mods = { shift = true } }), false,
+				"the capture ended with its answer")
+
+			helpers.assert_true(Source.capture(handlers))
+			helpers.assert_true(Source.on_key({ code = 57, mods = {} }), "the space bar is captured too")
+			run_due(calls)
+			helpers.assert_eq(refused, { "dialog.magic_key_source.not_a_candidate" }, "and refused aloud")
+			helpers.assert_eq(Source.get(), "KeyJ")
+
+			helpers.assert_true(Source.capture(handlers))
+			helpers.assert_true(Source.on_key({ code = 1, mods = {} }))
+			run_due(calls)
+			helpers.assert_eq(#chosen + #refused, 2, "Escape ends the capture with nothing changed")
+
+			helpers.assert_true(Source.capture(handlers))
+			local timeout = calls.deferred[#calls.deferred]
+			helpers.assert_true(timeout.delay_ms > 0, "the capture carries the shared timeout")
+			timeout.fn()
+			helpers.assert_eq(Source.on_key({ code = KEY_C, mods = {} }), false, "a timed-out capture takes nothing")
+			Source._reset_for_test()
+		end)
+	end)
+
+	helpers.it("(magic-key-source) no capture without the grab", function()
+		with_source(nil, function(Source)
+			wire(Source, { active = true, replace = true, typed_ok = true, grab = false })
+			helpers.assert_eq(Source.can_capture(), false)
+			helpers.assert_eq(Source.capture({ on_chosen = function() end, on_refused = function() end }), false)
+			Source._reset_for_test()
+		end)
+	end)
+end)
+
+helpers.describe("magic key source: the keyboard-layout menu", function()
+	helpers.it("(magic-key-source) the tray lists the key in effect under the keyboard layout", function()
+		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			local I18n = require("infra.i18n")
+			local builder = helpers.load_module("ui.menu.menu_builder")
+			local ok, items = pcall(builder.build, { on_quit = function() end, magic_key_source = Source })
+			Source._reset_for_test()
+			if not ok then error(items, 0) end
+			local layout
+			for _, item in ipairs(items) do
+				if item.title == I18n.get("menu.layout.title") then layout = item.menu end
+			end
+			helpers.assert_type(layout, "table", "the tray has a keyboard-layout submenu")
+			local prefix = I18n.get("menu.layout.magic_key_source") .. " : "
+			local row
+			for _, item in ipairs(layout) do
+				if type(item.title) == "string" and item.title:sub(1, #prefix) == prefix then row = item end
+			end
+			helpers.assert_type(row, "table", "the keyboard-layout menu names the physical magic key")
+			helpers.assert_eq(row.title, prefix .. "j   (KeyJ)")
+			helpers.assert_eq(row.menu[1].title, I18n.get("menu.layout.magic_key_source.capture"))
+			helpers.assert_type(row.menu[1].fn, "function", "a grabbing daemon captures a key")
 		end)
 	end)
 end)

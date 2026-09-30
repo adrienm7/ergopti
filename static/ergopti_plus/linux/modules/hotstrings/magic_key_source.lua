@@ -23,6 +23,10 @@
 --- 3. Fail safe. A paused driver, the replace section off, a modifier held or
 ---    an injection that did not happen lets the key through untouched, so it is
 ---    typed exactly once, as its own character.
+--- 4. Chosen by pressing it. A capture takes the next grabbed key-down, which
+---    reaches no application, and identifies it by evdev code, so the character
+---    the layout gives it does not matter. It needs the grab: without it the
+---    key would already have been typed.
 --- ==============================================================================
 
 local M = {}
@@ -33,6 +37,8 @@ local Manifest    = require("infra.manifest_reader")
 local Paths       = require("infra.paths")
 local FileSystem  = require("adapters.file_system")
 local Json        = require("json")
+local EvdevCodes  = require("infra.evdev_codes")
+local Timings     = require("infra.timings")
 local Shared      = require("keymap.magic_key_source")
 
 local LOG = "magic_key_source"
@@ -41,12 +47,18 @@ local LOG = "magic_key_source"
 M.PATH = "hotstrings.magic_key_source"
 local AUTOMATIC = Manifest.default_for(M.PATH)
 
+-- How long a capture waits for a key (shared with macOS and Windows).
+local CAPTURE_TIMEOUT_MS = Timings.ms("ui", "magic_key_capture_timeout_ms")
+
 -- Built on first use: the registry is 37 KB of JSON nobody needs while the
 -- automatic value is in effect and no menu asks for the candidates.
 local _resolver = nil
 
 -- The daemon's collaborators, set once by M.init.
 local _deps = nil
+
+-- The capture waiting for a key, nil when none: { handlers }.
+local _capture = nil
 
 
 
@@ -92,6 +104,32 @@ function M.evdev_code()
 	return M.resolver().native(value)
 end
 
+--- Stores a new value; the next press follows it, nothing is re-registered.
+--- @param value string A candidate code or the automatic value.
+--- @return boolean ok
+--- @return string|nil reason_key The i18n key of a refusal.
+function M.set(value)
+	local resolver = M.resolver()
+	if value ~= resolver.automatic and not resolver.is_candidate(value) then
+		Logger.warn(LOG, "Refused physical magic key '%s': no candidate key has that code.", tostring(value))
+		return false, "dialog.magic_key_source.not_a_candidate"
+	end
+	if not Preferences.set(M.PATH, value) then
+		Logger.error(LOG, "Could not persist the physical magic key — the change would be lost at restart.")
+		return false, "dialog.magic_key.error_persist"
+	end
+	Logger.info(LOG, "Physical magic key set to %s.", value)
+	return true, nil
+end
+
+--- What the XKB layout types on a candidate key, nil when it cannot tell.
+--- @param code string Candidate code.
+--- @return string|nil
+function M.key_text(code)
+	if _deps == nil then return nil end
+	return _deps.key_text(M.resolver().native(code))
+end
+
 
 
 
@@ -108,11 +146,16 @@ end
 ---   replace_on    fn() -> boolean  The magic key's replace section is on.
 ---   magic_key     fn() -> string   The magic key character.
 ---   type_text     fn(text) -> boolean  Injects text at the caret.
----   dispatch_char fn(char, code)   The character path a typed key takes. }
+---   dispatch_char fn(char, code)   The character path a typed key takes.
+---   can_capture   fn() -> boolean  The hook owns the keyboard (grab), so a
+---                                  captured key never reaches an application.
+---   key_text      fn(evdev) -> string|nil  What the XKB layout types there.
+---   defer         fn(fn, delay_ms) -> boolean  Runs work after the hook returns. }
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
-	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "type_text", "dispatch_char" }) do
+	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "type_text", "dispatch_char",
+		"can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
 	end
 	Logger.start(LOG, "Initializing…")
@@ -120,11 +163,77 @@ function M.init(deps)
 	Logger.success(LOG, "Initialized (physical magic key %s).", M.get())
 end
 
+--- Whether a key can be captured now: the daemon owns the keyboard.
+--- @return boolean
+function M.can_capture()
+	return _deps ~= nil and _deps.can_capture() == true
+end
+
+--- Captures the next grabbed key-down as the physical magic key. Escape or the
+--- shared timeout (timings [ui] magic_key_capture_timeout_ms) ends it with
+--- nothing changed. The decision runs after the hook returns: persisting it is
+--- file work the keystroke path must not wait for.
+--- @param handlers table { on_chosen = fn(value), on_refused = fn(reason_key) }.
+--- @return boolean started
+function M.capture(handlers)
+	if type(handlers) ~= "table" or type(handlers.on_chosen) ~= "function"
+		or type(handlers.on_refused) ~= "function" then
+		error("magic_key_source.capture needs on_chosen and on_refused", 2)
+	end
+	if _capture ~= nil or not M.can_capture() then return false end
+	local live = { handlers = handlers }
+	_capture = live
+	local armed = _deps.defer(function()
+		if _capture ~= live then return end
+		_capture = nil
+		Logger.info(LOG, "Physical magic key capture timed out: nothing changed.")
+	end, CAPTURE_TIMEOUT_MS)
+	if armed ~= true then
+		_capture = nil
+		Logger.error(LOG, "The capture timeout could not be armed — no key is captured.")
+		return false
+	end
+	Logger.info(LOG, "Waiting for the physical magic key…")
+	return true
+end
+
+--- Settles a capture with the key pressed, after the hook returned.
+--- @param live table The capture.
+--- @param evdev number The pressed key.
+local function settle(live, evdev)
+	if evdev == EvdevCodes.KEY_ESC then
+		Logger.info(LOG, "Physical magic key capture cancelled: nothing changed.")
+		return
+	end
+	local value = M.resolver().code_for(evdev)
+	if value == nil then
+		Logger.warn(LOG, "evdev key %s cannot type the magic key.", tostring(evdev))
+		live.handlers.on_refused("dialog.magic_key_source.not_a_candidate")
+		return
+	end
+	local ok, reason = M.set(value)
+	if not ok then
+		live.handlers.on_refused(reason)
+		return
+	end
+	live.handlers.on_chosen(value)
+end
+
 --- Decides one grabbed key press from the keyboard hook's consumption callback.
 --- @param detail table { code, mods, char } as the hook reports a key-down.
---- @return boolean consumed True when the magic key was typed in its place.
+--- @return boolean consumed True when the key was captured or the magic key
+---   was typed in its place.
 function M.on_key(detail)
 	if _deps == nil or type(detail) ~= "table" then return false end
+	if _capture ~= nil then
+		-- The answer of a capture reaches no application, whatever it is.
+		local live, evdev = _capture, detail.code
+		_capture = nil
+		if _deps.defer(function() settle(live, evdev) end, 0) ~= true then
+			Logger.error(LOG, "The captured key could not be settled — nothing changed.")
+		end
+		return true
+	end
 	local code = M.evdev_code()
 	if code == nil or detail.code ~= code then return false end
 	if not Shared.unmodified(detail.mods) then return false end
@@ -141,10 +250,11 @@ function M.on_key(detail)
 	return true
 end
 
---- Forgets the collaborators and the resolver (test seam).
+--- Forgets the collaborators, the resolver and any capture (test seam).
 function M._reset_for_test()
 	_deps = nil
 	_resolver = nil
+	_capture = nil
 end
 
 return M

@@ -1329,6 +1329,11 @@ local function main()
 			return type(result) == "table" and result.ok == true
 		end,
 		dispatch_char = function(char, code) on_char(char, code) end,
+		-- A captured key must never reach an application, which only the grab
+		-- guarantees; the menu greys the capture row otherwise.
+		can_capture = function() return keyboard_hook.get_mode() == "intercept" end,
+		key_text = keyboard_hook.key_text,
+		defer = function(fn, delay_ms) return event_loop.defer(fn, delay_ms) end,
 	})
 
 	local function on_click()
@@ -1548,6 +1553,9 @@ local function main()
 				-- The preview renderer's own copy of the four toggles, which a
 				-- hotstrings scope refreshes alongside their canonical leaves.
 				tooltip_preview = tooltip_preview,
+				-- The physical magic key: the keyboard-layout menu reads and
+				-- chooses it, and captures one by pressing it.
+				magic_key_source = MagicKeySource,
 				layout        = opts.layout,
 				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes

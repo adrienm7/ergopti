@@ -221,6 +221,182 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 	return true
 }
 
+; The physical magic key captured by pressing it: the next key pressed while this
+; dialog shows becomes [hotstrings] magic_key_source. Escape, closing the dialog
+; or the shared capture timeout changes nothing. It shares the magic-key editor's
+; owner (one suppressive capture at a time, stopped by Suspend and by Close), and
+; the key is identified by scan code, so the layout it types on does not matter.
+MagicKeySourceCapture(*) {
+		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
+		if A_IsSuspended
+				return
+		if IsObject(_MagicKeyEditorInputHook) {
+				; A live capture keeps its owner and comes back to the front: its
+				; hook swallows the next key typed anywhere.
+				if !_MagicKeyEditorStopDebt {
+						if IsObject(_MagicKeyEditorGui)
+								WMPresentWindow(_MagicKeyEditorGui)
+						return
+				}
+				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
+						return
+		}
+		GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
+		GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
+		GuiToShow.Show("Center")
+		Captured := { Scan: 0 }
+		; L0: no text is collected, every key is reported to OnKeyDown (N) and
+		; kept from the application (S); T ends the wait on the shared timeout.
+		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
+		IH.KeyOpt("{All}", "NS")
+		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(Captured)
+		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
+		_InheritedCritical := A_IsCritical
+		try {
+				; Publish + Start is one lifecycle transaction, as in MagicKeyEditor.
+				Critical("On")
+				try {
+						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
+								return
+						_MagicKeyEditorInputHook := IH
+						_MagicKeyEditorGui := GuiToShow
+						_MagicKeyEditorStopDebt := false
+						IH.Start()
+				} finally {
+						Critical("Off")
+				}
+				IH.Wait()
+		} finally {
+				_MagicKeyEditorStopOwned(IH)
+				if (_MagicKeyEditorGui == GuiToShow)
+						_MagicKeyEditorGui := ""
+				try GuiToShow.Destroy()
+				Critical(_InheritedCritical)
+		}
+		; A capture whose wait crossed the pause boundary is discarded.
+		if A_IsSuspended
+				return
+		; Escape, Close and the timeout all end without a scan code.
+		if (IH.EndReason != "Stopped" || Captured.Scan == 0)
+				return
+		Code := LayoutRegistry_KeyCode(Format("SC{:03X}", Captured.Scan), LayoutRegistry_Keycodes())
+		if !MagicKeySourceIsCandidate(Code) {
+				MsgBox(t("dialog.magic_key_source.not_a_candidate"), t("dialog.magic_key_source.title"), "Icon!")
+				return
+		}
+		ModifyMagicKeySource(Code)
+}
+
+; List provider of the Layout menu's `magic_key_source` row (ui/menu/menu_init.ahk).
+; One row naming the key in effect; its submenu captures the next key pressed,
+; restores the automatic key or lists every candidate with the key in effect
+; ticked — the rows the Lua drivers build (_shared/lua/keymap/magic_key_source.lua).
+MagicKeySourceMenuRows() {
+	global ScriptInformation
+	Current := ScriptInformation["MagicKeySource"]
+	Automatic := ManifestDefaultFor("hotstrings.magic_key_source")
+	Keycodes := LayoutRegistry_Keycodes()
+	Hkl := KS_ResolveKeyboardLayout()
+	Items := [
+		Map("label", t("menu.layout.magic_key_source.capture"), "action", MagicKeySourceCapture),
+		Map("separator", true),
+		Map("label", t("menu.layout.magic_key_source.auto"), "checked", Current == Automatic,
+			"action", (*) => ModifyMagicKeySource(Automatic)),
+		Map("separator", true)]
+	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		if (Code == Automatic)
+			continue
+		Items.Push(Map("label", _MagicKeySourceLabel(Code, Keycodes, Hkl),
+			"checked", Current == Code,
+			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
+	}
+	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
+		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
+	return [Map("label", t("menu.layout.magic_key_source") . " : " . Shown, "items", Items)]
+}
+
+; What the OS layout types on a candidate key, then its KeyboardEvent.code, which
+; names the same key on every keyboard; the code alone when the layout cannot say.
+_MagicKeySourceLabel(Code, Keycodes, Hkl) {
+	Scan := Integer("0x" . SubStr(LayoutRegistry_KeyScan(Code, Keycodes), 3))
+	Text := (Hkl == 0) ? "" : KS_KeyTextNoStateChange(KS_ScancodeToVk(Scan, Hkl), Scan, Hkl).Text
+	return (Trim(Text) == "") ? Code : Text . "   (" . Code . ")"
+}
+
+; OnKeyDown of the capture: a modifier alone chooses nothing, Escape cancels, any
+; other key is the answer.
+_MagicKeySourceCaptureKeyDown(Captured, IH, VK, SC) {
+		global HOTKEY_MODIFIER_VKS
+		if HOTKEY_MODIFIER_VKS.Has(VK)
+				return
+		if (VK != GetKeyVK("Escape"))
+				Captured.Scan := SC
+		IH.Stop()
+}
+
+; Whether a value names a candidate key of [hotstrings] magic_key_source: one of
+; the manifest's enum values, spelled as it spells them, other than the
+; automatic default.
+MagicKeySourceIsCandidate(Code) {
+		if !(Code is String) || Code == ""
+				return false
+		if (Code == ManifestDefaultFor("hotstrings.magic_key_source"))
+				return false
+		for Allowed in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+				if (Allowed == Code)
+						return true
+		}
+		return false
+}
+
+_EditorBuildMagicKeySourcePlan(Value) {
+	global Features
+	if _FeatureUsesDesiredState(Features) {
+		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.magic_key_source", Value, "")
+		Plan.publish := _EditorPublishDesiredMagicKeySource.Bind(Plan.publish, Value)
+		return Plan
+	}
+	return {
+		updates: [{ Section: "hotstrings", Key: "magic_key_source", Value: Value }],
+		publish: _EditorPublishMagicKeySource.Bind(Value),
+	}
+}
+
+_EditorPublishDesiredMagicKeySource(PublishFn, Value) {
+	PublishFn.Call()
+	_EditorPublishMagicKeySource(Value)
+}
+
+_EditorPublishMagicKeySource(Value) {
+	global ScriptInformation, Features
+	ScriptInformation["MagicKeySource"] := Value
+	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor("hotstrings.magic_key_source")
+	if IsSet(Features) && Features.Has("hotstrings")
+		Features["hotstrings"]["magic_key_source"] := Value
+}
+
+; Persists the physical magic key ([hotstrings] magic_key_source) and reloads:
+; the remap hotkeys register on its scan code at load.
+; @param Value {String} A candidate code or the automatic value.
+; @returns {Boolean} Whether the choice was written and the reload accepted.
+ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
+	global ConfigurationFile
+	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor("hotstrings.magic_key_source") {
+		LoggerWarn("Editors", "Refused physical magic key '{1}': no candidate key has that code.", String(Value))
+		return false
+	}
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ModifyMagicKeySource(Value, WriterFn, NotifyFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_EditorWriteToml(ConfigurationFile, "the physical magic key",
+			_EditorBuildMagicKeySourcePlan.Bind(Value), WriterFn, NotifyFn)
+		return false
+	return _EditorReloadAfterCommit(ReloadFn)
+}
+
 _EditorBuildRepeatKeyPlan() {
 	global HSE_RepeatEnabled, Features
 	if _FeatureUsesDesiredState(Features) {

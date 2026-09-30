@@ -6,8 +6,8 @@
 --- The decisions the two Lua drivers share about `hotstrings.magic_key_source`,
 --- the physical key that types the magic key while the magic key's `replace`
 --- section is on: which values name a key, which native key a value names,
---- which value a pressed key names, and whether a press is plain enough to be
---- remapped.
+--- which value a pressed key names, whether a press is plain enough to be
+--- remapped, and the menu rows that choose the key.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One value on every driver. The setting is a W3C KeyboardEvent.code, the
@@ -29,6 +29,11 @@ local M = {}
 -- The modifier names the two drivers report: macOS event flags (shift, ctrl,
 -- alt, cmd) and the Linux hook's held modifiers (shift, ctrl, alt, altgr, meta).
 local MODIFIERS = { "shift", "ctrl", "alt", "altgr", "meta", "cmd" }
+
+-- The i18n keys of the menu rows, shared by both Lua drivers.
+local LABEL_KEY = "menu.layout.magic_key_source"
+local AUTOMATIC_KEY = "menu.layout.magic_key_source.auto"
+local CAPTURE_KEY = "menu.layout.magic_key_source.capture"
 
 
 
@@ -161,6 +166,72 @@ function M.unmodified(mods)
 		if mods[name] then return false end
 	end
 	return true
+end
+
+
+
+
+
+-- ============================
+-- ============================
+-- ======= 3/ Menu rows =======
+-- ============================
+-- ============================
+
+--- The label of one key: what the user's own layout types there, then its
+--- KeyboardEvent.code, which names the same key on every keyboard.
+--- @param code string Candidate code.
+--- @param text string|nil Character the OS layout types on that key.
+--- @return string
+function M.label(code, text)
+	if type(text) == "string" and text ~= "" and not text:match("^%s+$") then
+		return text .. "   (" .. code .. ")"
+	end
+	return code
+end
+
+--- Builds the rows of the `magic_key_source` list: one row naming the key in
+--- effect, whose submenu captures a key, restores the automatic key or lists
+--- every candidate with the one in effect ticked. Windows draws the same rows
+--- (windows/ui/menu/menu_layout.ahk _LAY_MagicKeySourceRows).
+--- @param resolver table From M.new.
+--- @param opts table {
+---   t        fn(key) -> string        Translator.
+---   current  string                   The value in effect.
+---   key_text fn(code) -> string|nil   What the OS layout types on that key.
+---   choose   fn(value)                Persists and applies a value.
+---   capture  fn()|nil                 Captures the next key; nil greys the row. }
+--- @return table rows
+function M.menu_rows(resolver, opts)
+	if type(resolver) ~= "table" or type(opts) ~= "table" then
+		error("magic_key_source.menu_rows needs a resolver and options", 2)
+	end
+	for _, name in ipairs({ "t", "key_text", "choose" }) do
+		if type(opts[name]) ~= "function" then error("magic_key_source.menu_rows needs " .. name, 2) end
+	end
+	local t, current = opts.t, opts.current
+	-- A layout that cannot answer leaves the code alone: the row still names
+	-- the key, and a menu build never fails on a keymap query.
+	local function label_of(code)
+		local ok, text = pcall(opts.key_text, code)
+		return M.label(code, ok and text or nil)
+	end
+	local function chooser(value)
+		return function() opts.choose(value) end
+	end
+
+	local capture = type(opts.capture) == "function" and opts.capture or nil
+	local items = {
+		{ label = t(CAPTURE_KEY), disabled = capture == nil or nil, action = capture },
+		{ separator = true },
+		{ label = t(AUTOMATIC_KEY), checked = current == resolver.automatic, action = chooser(resolver.automatic) },
+		{ separator = true },
+	}
+	for _, code in ipairs(resolver.candidates()) do
+		items[#items + 1] = { label = label_of(code), checked = current == code, action = chooser(code) }
+	end
+	local shown = current == resolver.automatic and t(AUTOMATIC_KEY) or label_of(current)
+	return { { label = t(LABEL_KEY) .. " : " .. shown, items = items } }
 end
 
 return M

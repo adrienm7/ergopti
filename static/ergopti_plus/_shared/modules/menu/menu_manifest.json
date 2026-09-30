@@ -1101,6 +1101,10 @@
 			"i18n": "menu.layout.replace"
 		},
 		{
+			"type": "list",
+			"id": "magic_key_source"
+		},
+		{
 			"type": "feature",
 			"path": "layout.ctrl_magic_save",
 			"platforms": [
