@@ -401,6 +401,38 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		helpers.assert_eq(state.runs[2].args[2], "activate")
 		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
 	end)
+
+	helpers.it("keeps the other layouts when one installed entry is outdated (config-outdated-installed)", function()
+		local stale = { id = "ergopti_v1", version = "1.0" }
+		local LayoutRegistry, deps, state = manager({
+			files = {
+				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1,
+					layouts = { ergol = entry_of("ergol"), ergopti_v1 = stale } }),
+				[LOCAL_DIR .. "ergol.keylayout"] = registry_file("ergol/ergol.keylayout"),
+			},
+			runs = { OK_RUN, INSTALLED_RUN },
+		})
+		local warnings = {}
+		local recorder = helpers.make_logger_stub()
+		recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local previous_logger = package.loaded["logger.shim"]
+		package.loaded["logger.shim"] = recorder
+		require("config_outdated").reset_for_tests()
+		local ok, err = pcall(function()
+			local roots = LayoutRegistry.extension_roots(deps)
+			helpers.assert_eq(#roots, 1, "the valid layout's extension still loads at startup")
+			helpers.assert_true(LayoutRegistry.snapshot(deps).installed.ergol ~= nil, "the valid layout stays installed")
+			helpers.assert_eq(#warnings, 1, table.concat(warnings, "\n"))
+			helpers.assert_true(warnings[1]:find("'layouts.ergopti_v1' in '" .. LOCAL_DIR .. "installed.json'", 1, true)
+				~= nil, warnings[1])
+			local result = run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end)
+			helpers.assert_true(result.ok, tostring(result.extra))
+			helpers.assert_eq(Json.decode(state.files[LOCAL_DIR .. "installed.json"]).layouts.ergopti_v1, stale,
+				"a write keeps the entry the user was told to fix")
+		end)
+		package.loaded["logger.shim"] = previous_logger
+		if not ok then error(err, 0) end
+	end)
 end)
 
 helpers.describe("layout manager (Linux): what the package ships", function()
