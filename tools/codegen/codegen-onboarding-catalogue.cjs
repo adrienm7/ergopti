@@ -496,10 +496,10 @@ function masterFor(id, page, platform, projection) {
 
 /**
  * The page's sub-switch on one platform, or null: the switch of part of the
- * checklist that the category switch does not reach. The page writes it with
- * the answer, off for a No and on for a Yes that imports one of its items, so
- * those items follow the answer as they did when the category switch reached
- * them.
+ * checklist that the category switch does not reach. The page writes it where
+ * the answer changes what is in force, off when it turns the category switch
+ * from Yes to No and on when it imports one of its items that was off, so those
+ * items follow the answer as they did when the category switch reached them.
  * @param {string} id Page id.
  * @param {object} page Declaration.
  * @param {string} platform Manifest platform token.
