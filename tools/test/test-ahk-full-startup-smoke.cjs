@@ -40,25 +40,21 @@ const CORPUS = path.join(
 	'config_migrations'
 );
 // config.toml files seeded before the boot: the wizard's neutral defaults, and
-// files older Windows releases wrote.
+// every file an older Windows release wrote (the shipped cases of the shared
+// migration corpus, found by name so a new case boots without an edit here).
 const SEEDED_CONFIGS = {
-	'neutral-defaults': path.join(WINDOWS, '_generated', 'config_template.toml'),
-	'older-release-stamp-only': path.join(
-		CORPUS,
-		'shipped_stamp_only_on_windows_and_linux',
-		'input.toml'
-	),
-	'older-release-trigger-shortcut': path.join(
-		CORPUS,
-		'shipped_trigger_shortcut_removed_on_windows',
-		'input.toml'
-	),
-	'older-release-magic-key-scan-code': path.join(
-		CORPUS,
-		'shipped_magic_key_source_scan_becomes_a_key_code_on_windows',
-		'input.toml'
-	)
+	'neutral-defaults': path.join(WINDOWS, '_generated', 'config_template.toml')
 };
+for (const name of fs.readdirSync(CORPUS).sort()) {
+	if (/^shipped_.+_on_windows(_and_linux)?$/.test(name)) {
+		SEEDED_CONFIGS[`older-release-${name}`] = path.join(CORPUS, name, 'input.toml');
+	}
+}
+if (Object.keys(SEEDED_CONFIGS).length < 4) {
+	throw new Error(
+		'full AHK startup smoke: the migration corpus holds fewer than three Windows releases'
+	);
+}
 const AHK_CANDIDATES = [
 	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe',
 	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey.exe',
