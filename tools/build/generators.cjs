@@ -156,6 +156,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/lua/unicode_case/data.lua']
 	},
 	{
+		script: 'codegen/codegen-hid-key-identity-hs.cjs',
+		outputs: ['static/ergopti_plus/macos/_generated/hid_key_identity.lua']
+	},
+	{
 		script: 'codegen/gen-architecture-diagram.cjs',
 		note: 'runs last: it describes the tree the others have just finished writing',
 		outputs: ['static/ergopti_plus/docs/architecture.md']

@@ -184,6 +184,7 @@
 		"codegen:locale-tables": "node ./tools/codegen/codegen-locale-tables.cjs",
 		"codegen:gesture-emit-actions": "node ./tools/codegen/codegen-gesture-emit-actions.cjs",
 		"codegen:gesture-emit-actions:hs": "node ./tools/codegen/codegen-gesture-emit-actions-hs.cjs",
+		"codegen:hid-key-identity:hs": "node ./tools/codegen/codegen-hid-key-identity-hs.cjs",
 		"codegen:gesture-emit-actions:linux": "node ./tools/codegen/codegen-gesture-emit-actions-linux.cjs",
 		"codegen:action-catalogue": "node ./tools/codegen/codegen-action-catalogue.cjs",
 		"codegen:unicode-case": "node ./tools/codegen/codegen-unicode-case.cjs",
