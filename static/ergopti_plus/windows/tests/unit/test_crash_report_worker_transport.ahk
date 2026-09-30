@@ -23,7 +23,11 @@
 ; ================================================
 ; ================================================
 
-global _CRWT_TIMEOUT_MS := 10000
+; Ceiling of every wait for a spawned PowerShell crash worker. The waits
+; return as soon as the worker reports, so the ceiling only costs time on a
+; genuine failure; a loaded CI runner once took over 10 s to finish the
+; large-snapshot worker whose run is otherwise well under a second.
+global _CRWT_TIMEOUT_MS := 30000
 global _CRWT_FallbackSpawnState := 0
 global _CRWT_PrimaryExitSpawnState := 0
 global _CRWT_ShutdownSpawnState := 0
@@ -278,7 +282,7 @@ Test("error-net: large snapshot survives the native primary deadline (crash-larg
 ; ==========================================================
 
 _CRWT_DelayedWorkerDoesNotBlockParent() {
-	global _ConfigDir, _VendorDir
+	global _ConfigDir, _VendorDir, _CRWT_TIMEOUT_MS
 	OldConfigDir := _ConfigDir
 	Scope := _CRWF_Fixture("delay")
 	TestDir := Scope.Directory
@@ -293,7 +297,7 @@ _CRWT_DelayedWorkerDoesNotBlockParent() {
 		Assert(IsObject(Owner), "the delayed crash worker must start")
 		SecondCallbackTick := A_TickCount
 		Assert(!State["called"], "a second parent callback must run before the delayed worker completes")
-		Assert(_CRWT_WaitUntil(() => State["called"], 10000), "the delayed worker must eventually complete")
+		Assert(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS), "the delayed worker must eventually complete")
 		Assert(SecondCallbackTick <= State["tick"], "the parent callback must precede the worker terminal callback")
 		AssertEqual(0, State["exit_code"], "the delayed worker must still exit successfully")
 	} catch as Err {
