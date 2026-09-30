@@ -74,19 +74,26 @@ local HOLD_FIELDS = {
 	hold_layer = HoldOptions.canonical_layer,
 }
 
---- Validates one key's fields; a bad field disables the key. A value this
---- build no longer accepts is an outdated entry: warned once, naming the file
---- it came from, never an ERROR.
+--- Validates one key's fields; a bad field disables the key. A value the
+--- user's file holds that this build no longer accepts is an outdated entry:
+--- warned once, naming the file, never an ERROR. The same value in the shipped
+--- defaults is a shipped-data bug, and stays an ERROR.
 --- @param key_id string
 --- @param fields table
 --- @param hold_picker table|nil The shared `[tap_hold.hold_picker]` catalogue.
---- @param origin function origin(field) -> the file the field's value came from.
+--- @param origin function origin(field) -> the file the field's value came
+---   from, and whether that file is the user's.
 --- @return table
 local function validated(key_id, fields, hold_picker, origin)
 	local key = {}
 	for field, value in pairs(fields) do key[field] = value end
 	local function outdated(field, detail)
-		Outdated.report_in_file(origin(field), { "tap_hold", "keys", key_id, field }, detail)
+		local file, from_user = origin(field)
+		if from_user then
+			Outdated.report_in_file(file, { "tap_hold", "keys", key_id, field }, detail)
+		else
+			Logger.error(LOG, "Shipped tap-hold defaults '%s': [tap_hold.keys.%s] %s — %s.", file, key_id, field, detail)
+		end
 	end
 	for _, field in ipairs(STRING_FIELDS) do
 		if key[field] ~= nil and type(key[field]) ~= "string" then
@@ -230,7 +237,8 @@ function M.load_document(defaults_path, user, user_err, user_path)
 	for key_id, fields in pairs(keys) do
 		local set_by_user = user_fields[key_id] or {}
 		keys[key_id] = validated(key_id, fields, hold_picker, function(field)
-			return set_by_user[field] and user_file or defaults_path
+			if set_by_user[field] then return user_file, true end
+			return defaults_path, false
 		end)
 	end
 

@@ -102,6 +102,40 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("keeps a bad value of the shipped defaults an ERROR (config-outdated-tap-hold-shipped)", function()
+		-- A shipped-data bug is not the user's outdated entry: it must stay loud.
+		local shipped = assert(io.open(DEFAULTS, "rb"))
+		local text = shipped:read("*a")
+		shipped:close()
+		local broken, replaced = text:gsub('(%[tap_hold%.keys%.caps_lock%][^%[]-hold_modifier%s*=%s*)"ctrl"', '%1"hyper"', 1)
+		helpers.assert_eq(replaced, 1, "the fixture edits the shipped caps_lock hold")
+		local defaults_path, user_path = os.tmpname(), os.tmpname()
+		local Logger = require("logger.shim")
+		local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(function()
+			local fh = assert(io.open(defaults_path, "wb"))
+			fh:write(broken)
+			fh:close()
+			fh = assert(io.open(user_path, "wb"))
+			fh:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n")
+			fh:close()
+			local loaded = Config.load(defaults_path, user_path)
+			helpers.assert_nil(loaded.keys.caps_lock.hold_modifier, "the bad hold is still dropped")
+			helpers.assert_eq(#errors, 1, table.concat(errors, " | "))
+			helpers.assert_contains(errors[1], "hyper")
+			helpers.assert_contains(errors[1], defaults_path)
+			for _, line in ipairs(warnings) do
+				helpers.assert_true(line:find("hyper", 1, true) == nil, "not reported as the user's entry: " .. line)
+			end
+		end)
+		Logger.error, Logger.warn = real_error, real_warn
+		os.remove(defaults_path)
+		os.remove(user_path)
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("reports a malformed user file and keeps every key neutral", function()
 		local loaded = load('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.user_error, "malformed")
