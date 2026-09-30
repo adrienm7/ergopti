@@ -38,7 +38,6 @@ _BuildShortcutsSubmenu() {
 	; ended the Menu.Insert splice that used to duplicate the groups on every
 	; updater-driven tray refresh
 	ListProviders := Map(
-		"script_control_shortcuts",   () => _SC_ScriptControlRows(),
 		"keyboard_slots",             () => KeyboardSlotRows(),
 		; The number-row tap keys: labels read live from the layout in use.
 		"tap_keys",                   () => TapKeyRows(),
@@ -52,13 +51,22 @@ _BuildShortcutsSubmenu() {
 	; `command` rows: a static label, a click, and the renderer builds the row.
 	; The category switch is one of them: the Shortcuts master gate.
 	Commands := _SC_ScopeCommands()
-	Getters := Map(
-		"shortcuts_enabled", () => IsCategoryGated("Shortcuts"),
-		"key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
+	Getters := _SC_Getters()
 
-	GroupBuilders := Map("key_combinations", () => _SC_KeyCombinationsSubmenu())
+	GroupBuilders := Map(
+		"key_combinations", () => _SC_KeyCombinationsSubmenu(),
+		"script_control",   () => _SC_ScriptControlSubmenu())
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters)
+}
+
+; The checked_when getters of the Shortcuts submenu: its switch, and the ticks
+; of the key-combinations and script-control group titles.
+_SC_Getters() {
+	return Map(
+		"shortcuts_enabled", () => IsCategoryGated("Shortcuts"),
+		"key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
+		"script_control_enabled", () => ScriptShortcutChordsAreOn())
 }
 
 ; The « Combinaisons de touches » group: its own first-row switch (the
@@ -76,15 +84,29 @@ _SC_Personal(SubMenu, _Cat) {
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
-; List provider: the script-control shortcuts submenu, as one row.
-;
-; A `list` of one rather than a `dynamic` handler: the label is static and the
-; tree below it is built by another subsystem, which is precisely what `submenu`
-; is for. The renderer draws the row.
-_SC_ScriptControlRows() {
-	return [Map(
-		"label",   t("menu.shortcuts.script_shortcuts"),
-		"submenu", BuildScriptShortcutsMenu())]
+; « Raccourcis de gestion du script », declared by script_control_group: its
+; switch, the restore of its preset, the clear to the system's behaviour, then
+; one row per slot. Its title in the Shortcuts submenu is ticked while the
+; switch is on (checked_when), which only the switch row can change.
+; @param Options {Map} Scope ports for tests; the real config otherwise.
+_SC_ScriptControlSubmenu(Options := unset) {
+	Getters := Map("script_control_enabled", () => ScriptShortcutChordsAreOn())
+	ListProviders := Map("script_control_shortcuts", () => ScriptShortcutRows())
+	return MenuRenderer_Build("script_control_group", "Shortcuts", "", "", ListProviders,
+		_SC_ScriptControlCommands(IsSet(Options) ? Options : Map()), Getters)
+}
+
+; The commands of script_control_group's first rows. The restore and the clear
+; apply at once, like every scope row: their owner backs up first. Options are
+; the scope ports ("path", "reload"...) plus "toggle_reload", the switch's own
+; reload, for tests.
+_SC_ScriptControlCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"script_control_toggle", (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
+			OwnedOptions.Get("path", ""), OwnedOptions.Get("toggle_reload", 0)),
+		"restore_recommended", (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
+		"clear_to_system", (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
 }
 
 ; Dynamic handler: extensions shortcuts submenus.

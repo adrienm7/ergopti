@@ -40,6 +40,13 @@
 #       description_key         Required. i18n key for the menu label.
 #       platforms               Optional. Defaults to the parent section's
 #                               ``platforms`` value if absent.
+#       active_by_default       Optional, true only on an input_altering entry
+#                               the maintainer decided to switch on in an empty
+#                               configuration: its default must equal its
+#                               recommended value. Every other input-altering
+#                               entry defaults to off (false / "none" / "");
+#                               tools/test/test-defaults-single-source.cjs
+#                               pins the approved list.
 #       superseded_reason_key   Optional, Windows-only booleans. i18n key of
 #                               why the feature is off while a registry layout
 #                               is emulated (layout.emulated_layout): the master
@@ -2229,39 +2236,63 @@ description_key = "menu.shortcuts.personal.programmable_keyboard"
 # ===== 3.5.9 shortcuts.script_control =====
 # ==========================================
 
+# The script-management chords (AltGr + Enter, BackSpace, Delete, Escape) start
+# with their preset in an empty configuration: the maintainer's decision of
+# 2026-09-30, because they pause, reload, quit and edit the driver and are no
+# typing feature. They are the declared exception to "every input-altering
+# feature is off by default" (active_by_default); a config.toml that names
+# "none" for a slot keeps it off.
+#
+# chords_enabled is the switch at the head of their submenu: off leaves every
+# chord to the system while the slots keep their actions. Like the
+# key-combinations switch it only narrows what the slots enable, so it is a
+# parameter and starts on.
+[[features.shortcuts.script_control]]
+id = "chords_enabled"
+platforms = ["ahk"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.shortcuts.script_shortcuts_enable"
+
 [[features.shortcuts.script_control]]
 id = "script_altgr_backspace"
 platforms = ["ahk"]
-default = "none"
+default = "script_reload"
 recommended = "script_reload"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_backspace"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_delete"
 platforms = ["ahk"]
-default = "none"
+default = "open_personal_shortcuts"
 recommended = "open_personal_shortcuts"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_delete"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_enter"
 platforms = ["ahk"]
-default = "none"
+default = "script_pause_toggle"
 recommended = "script_pause_toggle"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_enter"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_escape"
 platforms = ["ahk"]
-default = "none"
+default = "script_quit"
 recommended = "script_quit"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
@@ -4454,16 +4485,16 @@ i18n = "menu.shortcuts.key_combinations"
 checked_when = ["key_combinations_enabled"]
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
-# `list` since 2026-08-08: the handler's whole body was one row with a static
-# label whose submenu another subsystem builds, which is what a provider
-# returning a single `submenu` row says.
+# « Raccourcis de gestion du script »: the AltGr script chords, a group whose
+# title is ticked while its first-row switch is on. Its rows are
+# script_control_group. AHK-only, on the same evidence as personal_shortcuts
+# below: the features.shortcuts.script_control entries it lists are each
+# Windows-only, so on macOS and Linux it had nothing to enumerate.
 [[menu.shortcuts_menu]]
-type = "list"
-id = "script_control_shortcuts"
-
-# AHK-only, on the same evidence as personal_shortcuts below: the four
-# features.shortcuts.script_control entries this row lists are each Windows-only,
-# so on macOS and Linux it had nothing to enumerate.
+type = "group"
+id = "script_control"
+i18n = "menu.shortcuts.script_shortcuts"
+checked_when = ["script_control_enabled"]
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
@@ -4588,6 +4619,48 @@ path = "shortcuts.lalt_caps_lock"
 group_label = "LAltCapsLock"
 platforms = ["ahk"]
 reason_key = "platform_reason.chord_families_are_each_platforms"
+
+# « Raccourcis de gestion du script », the maintainer's first group of every
+# submenu (2026-09-30): the switch of the chords, the restore of their preset,
+# the clear to the system's behaviour, then the four slots. Off keeps every
+# slot's action and leaves every chord to the system; the clear sets every slot
+# to "none" explicitly, since an absent slot starts with its preset.
+# `category` names the switch, as a toggle row must; it is the Windows
+# shortcuts.script_control.chords_enabled feature, not a [category_enabled] gate.
+[[menu.script_control_group]]
+type = "toggle"
+id = "script_control_toggle"
+i18n = "menu.shortcuts.script_shortcuts_enable"
+checked_when = ["script_control_enabled"]
+category = "ScriptControl"
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
+[[menu.script_control_group]]
+type = "command"
+id = "restore_recommended"
+i18n = "common.restore_recommended"
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
+[[menu.script_control_group]]
+type = "command"
+id = "clear_to_system"
+i18n = "common.clear_to_system"
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
+
+[[menu.script_control_group]]
+type = "---"
+platforms = ["ahk"]
+
+# One row per slot, labelled « AltGr + Entrée : <action> », each opening the
+# shared action picker.
+[[menu.script_control_group]]
+type = "list"
+id = "script_control_shortcuts"
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
 
 # Unrestricted: every driver draws this row from the declaration and registers
 # only what the click does. Windows used to insert its own master row by hand in
@@ -5940,10 +6013,6 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"
-"shortcuts.script_control.script_altgr_backspace" = "sg_labels.script_altgr_backspace"
-"shortcuts.script_control.script_altgr_delete" = "sg_labels.script_altgr_delete"
-"shortcuts.script_control.script_altgr_enter" = "sg_labels.script_altgr_enter"
-"shortcuts.script_control.script_altgr_escape" = "sg_labels.script_altgr_escape"
 "shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
 "shortcuts.script_control.return_key" = "sg_labels.script_ropt_return"
 "shortcuts.script_control.backspace" = "sg_labels.script_ropt_backspace"

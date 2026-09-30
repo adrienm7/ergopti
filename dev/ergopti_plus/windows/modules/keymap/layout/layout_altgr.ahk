@@ -184,6 +184,66 @@ ScriptAltGrKanaChordIsLive(AltGrDown) {
     return AltGrDown and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and AltGrKeyIsAltGr()
 }
 
+; The #HotIf of each script chord hotkey, bound to its slot by
+; ScriptAltGrChordPlan: the chord's AltGr check, then whether the slot runs an
+; action now (ScriptShortcutSlotRunsAction). Without the second half an
+; unassigned slot still took AltGr+Enter and retyped a bare Enter
+; (script-chord-slot-2026-09-30). The trailing parameter swallows the hotkey
+; name AutoHotkey passes to a criterion.
+; @param Slot {String} The SCRIPT_SHORTCUT_SLOTS id the hotkey runs.
+; @return {Boolean}
+ScriptAltGrChordRunsSlot(Slot, *) {
+    return ScriptAltGrChordIsLive(IsRealAltGrPress()) and ScriptShortcutSlotRunsAction(Slot)
+}
+
+; The Kana-style twin: the suffix alone while SC138 is physically down.
+ScriptAltGrKanaChordRunsSlot(Slot, *) {
+    return ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P")) and ScriptShortcutSlotRunsAction(Slot)
+}
+
+; The paused twin: while paused the combinations cannot arm (the prefix anchor
+; is suspended with every hotkey), so the chord runs from the suffix alone.
+ScriptAltGrPausedChordRunsSlot(Slot, *) {
+    return ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P")) and ScriptShortcutSlotRunsAction(Slot)
+}
+
+; The script chord hotkeys, three per slot, each with the criterion bound to
+; its slot (infra/script_altgr_hotkeys.ahk registers them in this order).
+; - "SC138 & <key>": the AltGr key by its scan code only. "RAlt & Enter" and
+;   "^!Enter" twins were dead: the SC138 hotkeys route every right Alt event to
+;   the scan code's record, and the suffix scan-code hotkeys route those keys'
+;   events to theirs, so a twin named by a virtual key was never looked up
+;   (hook.cpp: sc_takes_precedence). ScriptAltGrChordIsLive keeps them, running
+;   and paused, off a layout whose AltGr key is a plain Alt: on QWERTY RAlt+Esc
+;   must stay Alt+Esc, not quit the driver.
+; - "$<key>": the Kana-style twin, registered on every layout: the AltGr family
+;   follows the foreground window's layout (infra/altgr_family.ahk), so the
+;   criterion decides per press whether this layout is a Kana one.
+; - "$*<key>": the paused twin. With * it also matches under the LCtrl+RAlt an
+;   AltGr layout holds: without it, AltGr+Enter could not unpause there.
+; @param Slots {Array} The slot ids, in registration order.
+; @param ScanCodes {Map} Slot id -> scan code of the key AltGr modifies.
+; @return {Array} Maps of "slot", "scan_code", "hotkey" and "criterion".
+ScriptAltGrChordPlan(Slots, ScanCodes) {
+    if (ScanCodes.Count != Slots.Length)
+        throw ValueError("Every script chord slot needs exactly one scan code.", -1)
+    Plan := []
+    for Slot in Slots {
+        if !ScanCodes.Has(Slot)
+            throw ValueError("A script chord slot has no scan code.", -1, Slot)
+        Sc := ScanCodes[Slot]
+        if !RegExMatch(Sc, "^SC[0-9A-F]{3}$")
+            throw ValueError("A script chord scan code is malformed.", -1, Sc)
+        Plan.Push(Map("slot", Slot, "scan_code", Sc,
+            "hotkey", "SC138 & " . Sc, "criterion", ScriptAltGrChordRunsSlot.Bind(Slot)))
+        Plan.Push(Map("slot", Slot, "scan_code", Sc,
+            "hotkey", "$" . Sc, "criterion", ScriptAltGrKanaChordRunsSlot.Bind(Slot)))
+        Plan.Push(Map("slot", Slot, "scan_code", Sc,
+            "hotkey", "$*" . Sc, "criterion", ScriptAltGrPausedChordRunsSlot.Bind(Slot)))
+    }
+    return Plan
+}
+
 ; Run the Plain or Shifted callable from ``Table[SC]`` depending on the
 ; current Shift state. The ``*`` parameter swallows the hotkey name that
 ; AHK passes when invoking a hotkey callback.

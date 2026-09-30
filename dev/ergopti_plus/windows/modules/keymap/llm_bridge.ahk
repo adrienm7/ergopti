@@ -807,8 +807,16 @@ _LLM_SlotAccept_Insert(State) {
 ; Emit Tab normally whenever canonical acceptance rejects it. A tap-hold's Tab
 ; tap passes TapHoldTapProvenance(), the user's own key, and accepts like the
 ; physical Tab; a gesture keeps the default false provenance, so it navigates as
-; configured and can never accept an LLM prediction (llm-accept-inserts).
-LLM_Tooltip_FireTabOrAccept(Modifiers := [], TabProvenance := false) {
+; configured and can never accept an LLM prediction (llm-accept-inserts). The
+; same tap under one Shift is the user's Shift+Tab and moves the marker of a
+; multi-slot prediction instead (LLM_Menu_NavShiftTabTap).
+; @param {Func} ModifierIsHeldFn - Test seam of the Shift+Tab chord; the logical
+;     key state when omitted.
+LLM_Tooltip_FireTabOrAccept(Modifiers := [], TabProvenance := false,
+		ModifierIsHeldFn := 0) {
+	if _LLM_Accept_TapHoldTapKey(TabProvenance) != ""
+			&& LLM_Menu_NavShiftTabTap(ModifierIsHeldFn)
+		return true
 	if LLM_Tooltip_TryAcceptTab(TabProvenance, Modifiers)
 		return true
 	TextPressKey("Tab", Modifiers)

@@ -110,6 +110,19 @@ local function load_core_with_timer_spy(options)
 	return fresh_core, timer_spy_calls, loaded_hs, controller, load_time_calls
 end
 
+--- Admits an Ollama daemon start for one fixture: the AI gate on and an
+--- installed Ollama are the only state in which a backend identity starts it
+--- (llm-backend-ollama-start-gate).
+--- @param core table A fresh core from load_core_with_timer_spy.
+--- @return function restore Restores the executable resolver.
+local function admit_ollama_start(core)
+	helpers.assert_true(core.set_runtime_llm_enabled(true))
+	local binary = package.loaded["modules.llm.ollama_binary"]
+	local original_resolve = binary.resolve
+	binary.resolve = function() return "/Applications/Ollama.app/Contents/Resources/ollama", nil, binary.SOURCE_APP end
+	return function() binary.resolve = original_resolve end
+end
+
 
 
 
@@ -389,6 +402,7 @@ helpers.describe("Core.set_backend / get_backend", function()
 		helpers.it("lets a nested backend successor win during " .. boundary, function()
 			local fresh_core = load_core_with_timer_spy()
 			helpers.assert_true(fresh_core.set_backend("mlx"))
+			local restore_resolver = admit_ollama_start(fresh_core)
 			local api = package.loaded["modules.llm.api_ollama"]
 			local original_reset = api.reset_ready
 			local original_ensure = api.ensure_running
@@ -423,6 +437,7 @@ helpers.describe("Core.set_backend / get_backend", function()
 			end, debug.traceback)
 			api.reset_ready = original_reset
 			api.ensure_running = original_ensure
+			restore_resolver()
 			if not test_ok then error(test_error, 0) end
 		end)
 	end
@@ -432,6 +447,7 @@ helpers.describe("Core.set_backend / get_backend", function()
 			function()
 				local fresh_core = load_core_with_timer_spy()
 				helpers.assert_true(fresh_core.set_backend("mlx"))
+				local restore_resolver = admit_ollama_start(fresh_core)
 				local api = package.loaded["modules.llm.api_ollama"]
 				local original_ensure = api.ensure_running
 				local ensure_calls = 0
@@ -458,6 +474,7 @@ helpers.describe("Core.set_backend / get_backend", function()
 					helpers.assert_eq(ensure_calls, 2)
 				end, debug.traceback)
 				api.ensure_running = original_ensure
+				restore_resolver()
 				if not test_ok then error(test_error, 0) end
 			end)
 	end
@@ -595,29 +612,33 @@ helpers.describe("Core profile accessors", function()
 				end
 				helpers.assert_true(fresh_core.set_backend("mlx"))
 				fresh_core.set_llm_model_mlx("fixture-model")
-				fresh_core.set_runtime_llm_enabled(true)
-				fresh_core.set_active_profile("advanced")
-				helpers.assert_eq(#captured, 1)
-				package.loaded["modules.llm.api_ollama"].ensure_running = function()
-					ensure_calls = ensure_calls + 1
-					return true
-				end
+				local restore_resolver = admit_ollama_start(fresh_core)
+				local test_ok, test_error = xpcall(function()
+					fresh_core.set_active_profile("advanced")
+					helpers.assert_eq(#captured, 1)
+					package.loaded["modules.llm.api_ollama"].ensure_running = function()
+						ensure_calls = ensure_calls + 1
+						return true
+					end
 
-				controller.cancel_mode = mode
-				helpers.assert_eq(fresh_core.set_backend("ollama"), false)
-				helpers.assert_eq(fresh_core.get_backend(), "mlx",
-					"backend publication must wait for exact cleanup")
-				helpers.assert_eq(ensure_calls, 0,
-					"daemon startup is a forbidden sibling while cleanup is pending")
-				helpers.assert_not_nil(captured[1].handle.timer)
+					controller.cancel_mode = mode
+					helpers.assert_eq(fresh_core.set_backend("ollama"), false)
+					helpers.assert_eq(fresh_core.get_backend(), "mlx",
+						"backend publication must wait for exact cleanup")
+					helpers.assert_eq(ensure_calls, 0,
+						"daemon startup is a forbidden sibling while cleanup is pending")
+					helpers.assert_not_nil(captured[1].handle.timer)
 
-				controller.cancel_mode = "true"
-				helpers.assert_true(fresh_core.set_backend("ollama"))
-				helpers.assert_eq(fresh_core.get_backend(), "ollama")
-				helpers.assert_eq(ensure_calls, 1)
-				helpers.assert_nil(captured[1].handle.timer)
-				captured[1].fn()
-				helpers.assert_eq(warmup_calls, 0)
+					controller.cancel_mode = "true"
+					helpers.assert_true(fresh_core.set_backend("ollama"))
+					helpers.assert_eq(fresh_core.get_backend(), "ollama")
+					helpers.assert_eq(ensure_calls, 1)
+					helpers.assert_nil(captured[1].handle.timer)
+					captured[1].fn()
+					helpers.assert_eq(warmup_calls, 0)
+				end, debug.traceback)
+				restore_resolver()
+				if not test_ok then error(test_error, 0) end
 			end)
 	end
 

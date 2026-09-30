@@ -355,9 +355,16 @@ _AFFL_NoRegistrationReadsTheFamily() {
 	AssertTrue(Registering >= 5, "the scan must find the driver's hotkey registrations; found " . Registering)
 	AssertEqual(0, Offenders.Length, "a registration must not read the AltGr family outside its live criterion: "
 		. (Offenders.Length ? Offenders[1] : ""))
+	; The registrar takes every chord and criterion from the plan, which binds the
+	; Kana twin to a criterion reading the family per press (script-chord-slot-2026-09-30).
 	Body := _StripFullLineComments(_DriverFuncBody("_RegisterScriptAltGrHotkeys"))
-	AssertTrue(InStr(Body, 'HotIf((*) => ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P")))') > 0,
+	AssertTrue(InStr(Body, "ScriptAltGrChordPlan(") > 0 and InStr(Body, 'HotIf(Row["criterion"])') > 0,
+		"the script chords must be registered from the plan, each under its own criterion")
+	Plan := _StripFullLineComments(_DriverFuncBody("ScriptAltGrChordPlan"))
+	AssertTrue(InStr(Plan, '"$" . Sc') > 0 and InStr(Plan, "ScriptAltGrKanaChordRunsSlot.Bind(Slot)") > 0,
 		"the Kana script chords must be registered on every layout, gated per press")
+	AssertTrue(InStr(_DriverFuncBody("ScriptAltGrKanaChordRunsSlot"), 'ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P"))') > 0,
+		"the Kana twins' criterion must read the family per press")
 }
 Test("altgr family: no hotkey registration reads the family outside its live criterion (altgr-family-live-2026-09-27)",
 	_AFFL_NoRegistrationReadsTheFamily)

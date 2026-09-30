@@ -3,24 +3,27 @@
 --- ==============================================================================
 --- MODULE: MLX Repair Offer
 --- DESCRIPTION:
---- Tells the user why the MLX runtime failed, in plain words, and carries the
---- button that fixes it: « Réparer l'installation MLX » removes Ergopti's own
---- MLX environment and installs it again. On a Mac that cannot run MLX it
---- offers Ollama instead; a repair refused twice on the same path shows that
---- path in the Finder.
+--- Tells the user why the MLX runtime failed, or that it is not installed, in
+--- plain words, and carries the button that fixes it: « Réparer l'installation
+--- MLX » removes Ergopti's own MLX environment and installs it again, and
+--- « Installer le moteur MLX » installs a runtime that is absent. On a Mac that
+--- cannot run MLX it offers Ollama instead; a repair refused twice on the same
+--- path shows that path in the Finder.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A button, never a command: a failed install used to end on "cause
----    inconnue" and a broken runtime on a notification asking to select MLX
----    again, which did nothing while MLX was already selected.
+---    inconnue", and a broken or absent runtime on a notification asking to
+---    select MLX in the menu, which did nothing while MLX was already selected.
 --- 2. Outside the caller's stack: failures arrive from task callbacks and the
 ---    import probe, where no modal dialog may run, so the dialog is deferred to
 ---    the timer scheduler; one dialog at a time, the newest cause shown.
---- 3. The router owns the install: the repair goes through
----    runtime_install_offer.select_mlx({ repair = true }), the one caller of
----    the checker's install_for_selection().
+--- 3. The router owns the install: the repair and the install both go through
+---    runtime_install_offer.select_mlx(), the one caller of the checker's
+---    install_for_selection(), the repair with { repair = true }. A failed
+---    install or repair opens this offer again with its cause and the repair
+---    button, the retry of any failed installation.
 --- 4. The AI menu registers what it owns: the Ollama row's selection for an
----    unsupported Mac, and the model restart once a repair succeeded.
+---    unsupported Mac, and the model restart once an installation succeeded.
 --- ==============================================================================
 
 local M = {}
@@ -43,16 +46,17 @@ local function deferred() return require("infra.deferred_work") end
 
 -- fn() -> boolean: selects the Ollama backend, as its menu row does
 local _alternative = nil
--- fn() -> boolean: restarts the MLX model once a repair succeeded
+-- fn() -> boolean: restarts the MLX model once an installation succeeded
 local _resume = nil
 -- Cause waiting for its deferred dialog; a newer failure replaces it
 local _pending_cause = nil
 local _scheduled = false
 -- The dialog is modal: a second failure while it is open asks nothing more
 local _asking = false
-local _repair_running = false
--- Kind of the failure the last repair ended on; a permission refused again on
--- the same path is shown in the Finder rather than repaired a third time
+-- An install or a repair is running: its end opens the offer again on failure
+local _installation_running = false
+-- Kind of the failure the last install or repair ended on; a permission refused
+-- again on the same path is shown in the Finder rather than repaired once more
 local _last_repair_failure = nil
 
 
@@ -96,6 +100,19 @@ end
 --- @return table dialog { title, body, primary, secondary, action }
 local function dialog_for(cause)
 	local ok_venv, venv = pcall(function() return checker().venv_dir() end)
+	if cause.kind == "missing" then
+		-- Nothing failed: the runtime was never installed, or its folder is gone.
+		local install = i18n().get("mlx.install_button")
+		local paragraphs = { i18n().get("mlx.runtime_missing_body") }
+		if ok_venv and type(venv) == "string" then
+			paragraphs[#paragraphs + 1] = i18n().format("mlx.install_action", venv, install)
+		end
+		return {
+			title = i18n().get("mlx.runtime_missing_title"), body = table.concat(paragraphs, "\n\n"),
+			primary = install, secondary = i18n().get("common.later"),
+			action = "install",
+		}
+	end
 	local body = Diagnosis.describe(cause, {
 		venv = ok_venv and venv or nil,
 		log_path = Logger.today_log_path(),
@@ -163,6 +180,8 @@ local function present(cause)
 	end
 	if dialog.action == "repair" then
 		M.repair()
+	elseif dialog.action == "install" then
+		M.install()
 	elseif dialog.action == "reveal" then
 		reveal(cause.path)
 	elseif dialog.action == "alternative" then
@@ -224,28 +243,32 @@ function M.offer(cause)
 	return true
 end
 
---- Removes Ergopti's MLX environment and installs it again, then restarts
---- the MLX model; a failure opens the offer again with its own cause.
+--- Runs the MLX runtime installation the user asked for through the router,
+--- then restarts the MLX model. A failure is presented by the router, which
+--- opens this offer again with its cause and the repair button.
+--- @param mode string "install" for an absent runtime, "repair" to rebuild it.
 --- @return boolean accepted
-function M.repair()
-	if _repair_running then
-		Logger.info(LOG, "An MLX repair is already running.")
+local function run_installation(mode)
+	local label = mode == "repair" and "repair" or "installation"
+	if _installation_running then
+		Logger.info(LOG, "An MLX installation or repair is already running.")
 		return false
 	end
-	_repair_running = true
-	Logger.start(LOG, "Repairing the MLX installation on the user's request…")
+	_installation_running = true
+	Logger.start(LOG, "Running the MLX %s on the user's request…", label)
 	local ok, accepted = pcall(function()
 		return router().select_mlx(function(done)
-			_repair_running = false
+			_installation_running = false
 			if done ~= true then
 				local cause = resolve_cause(nil)
 				_last_repair_failure = cause.kind
-				Logger.error(LOG, "The MLX repair failed (%s).", tostring(cause.kind))
+				Logger.error(LOG, "The MLX %s failed (%s).", label, tostring(cause.kind))
 				return false
 			end
 			_last_repair_failure = nil
-			Logger.success(LOG, "MLX installation repaired.")
-			pcall(notifications().notify, i18n().get("mlx.repair_done"),
+			Logger.success(LOG, "MLX %s done.", label)
+			pcall(notifications().notify,
+				i18n().get(mode == "repair" and "mlx.repair_done" or "mlx.install_done"),
 				i18n().get("mlx.deps_step_ready"), "success")
 			-- The model restarts outside the installer's completion, which still
 			-- holds its bootstrap intent while it delivers this result.
@@ -254,28 +277,43 @@ function M.repair()
 				local committed = deferred().after(0, function()
 					local resumed, result = pcall(resume)
 					if not resumed or result == false then
-						Logger.error(LOG, "The MLX model did not restart after the repair: %s.", tostring(result))
+						Logger.error(LOG, "The MLX model did not restart after the %s: %s.", label, tostring(result))
 					end
 				end, "mlx_repair_offer.resume")
 				if committed ~= true then
-					Logger.error(LOG, "The MLX model restart could not be scheduled after the repair.")
+					Logger.error(LOG, "The MLX model restart could not be scheduled after the %s.", label)
 				end
 			end
 			return true
-		end, { repair = true })
+		end, mode == "repair" and { repair = true } or nil)
 	end)
 	if not ok or accepted ~= true then
-		_repair_running = false
-		Logger.error(LOG, "The MLX repair was not accepted: %s.", tostring(accepted))
+		_installation_running = false
+		Logger.error(LOG, "The MLX %s was not accepted: %s.", label, tostring(accepted))
 		return false
 	end
 	return true
 end
 
---- Forgets the pending dialog, the repair state and the registrations.
+--- Removes Ergopti's MLX environment and installs it again, then restarts
+--- the MLX model; a failure opens the offer again with its own cause.
+--- @return boolean accepted
+function M.repair()
+	return run_installation("repair")
+end
+
+--- Installs the absent MLX runtime, as selecting the MLX backend does, then
+--- restarts the MLX model; a failure opens the offer again with its own cause
+--- and the repair button.
+--- @return boolean accepted
+function M.install()
+	return run_installation("install")
+end
+
+--- Forgets the pending dialog, the installation state and the registrations.
 function M.reset()
 	_alternative, _resume, _pending_cause = nil, nil, nil
-	_scheduled, _asking, _repair_running, _last_repair_failure = false, false, false, nil
+	_scheduled, _asking, _installation_running, _last_repair_failure = false, false, false, nil
 end
 
 return M

@@ -534,8 +534,8 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 			end,
 		}
 		package.loaded["infra.notifications"] = {
-			notify = function(title, body, kind)
-				record.notices[#record.notices + 1] = { title = title, body = body, kind = kind }
+			notify = function(title, body, kind, on_click)
+				record.notices[#record.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 				return true
 			end,
 		}
@@ -605,6 +605,33 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		helpers.assert_eq(Offer.notify_if_missing("ollama"), true)
 		helpers.assert_eq(record.dialogs, 0, "boot never shows the download offer")
 		helpers.assert_eq(#record.state.tasks, 0, "boot never downloads")
+	end))
+
+	helpers.it("the boot notice of a missing Ollama opens its download offer when clicked", scoped(function()
+		local record = new_record()
+		local checker = load_ollama_checker(record.state)
+		local Offer = load_offer("ollama.offer_download", record)
+		package.loaded["modules.llm.ollama_deps_checker"] = checker
+		helpers.assert_true(Offer.notify_if_missing("ollama"))
+		helpers.assert_eq(#record.notices, 1)
+		helpers.assert_eq(record.notices[1].body,
+			require("infra.i18n").get("ollama.runtime_missing_click"),
+			"the notice used to name the menu row to select, with no action of its own")
+		-- Called below: a notice without its click fails there.
+		helpers.assert_not_nil(record.notices[1].on_click,
+			"the notice carries the click that opens its fix")
+		helpers.assert_eq(record.dialogs, 0)
+		helpers.assert_eq(#record.state.tasks, 0)
+		record.notices[1].on_click()
+		helpers.assert_eq(record.dialogs, 1, "the click opens the download offer, which asks first")
+		helpers.assert_eq(#record.state.tasks, 1, "accepting the offer downloads Ollama")
+		helpers.assert_eq(record.state.tasks[1].args[6], MANAGED_DIR)
+		record.state.executables[MANAGED_BIN] = true
+		record.state.tasks[1].done(0, "", "")
+
+		record.notices[1].on_click()
+		helpers.assert_eq(record.dialogs, 1, "a runtime installed since the notice offers nothing")
+		helpers.assert_eq(#record.state.tasks, 1)
 	end))
 end)
 

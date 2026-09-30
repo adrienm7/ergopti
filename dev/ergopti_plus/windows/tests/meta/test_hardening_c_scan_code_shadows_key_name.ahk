@@ -16,7 +16,15 @@
 ; names (_shared/data/keycodes/physical_keys.json: ahk_send -> ahk), static
 ; labels and literal Hotkey() registrations alike, and proves its scanner on a
 ; fixture (hardening-c-scan-code-precedence). Character keys are named through
-; the active layout, which no source scan knows, so they stay out of scope.
+; the active layout, but the AltGr layer declares every one of them by scan code
+; ("SC138 & SCnnn", whatever the emulation state), so a hotkey the hook owns
+; that names a character ("~^v", "$^x", "^y" under #HotIf or #InputLevel 2)
+; never fires either: the keylogger's "~^v" paste hotkey never did. A plain,
+; global "^!+i::" at #InputLevel 0 is a RegisterHotKey hotkey instead, matched
+; by the OS on its virtual key once the hook lets the key through, so it stays
+; legal. #InputLevel, #HotIf and #UseHook carry across #Include, so each static
+; label's context comes from walking the include graph of the driver's root
+; scripts in parse order; a literal Hotkey() call counts as a hook hotkey.
 ; tools/test/test-hardening-c-ahk-scan-code-precedence.cjs runs the same scan
 ; on every OS, before the Windows lane.
 ; ==============================================================================
@@ -116,6 +124,164 @@ _HCSC_Offenders(Declarations, Names) {
 	return Offenders
 }
 
+; One static label, anchored on its own line: a key, an optional combination
+; partner and " Up", then "::".
+global _HCSC_LABEL_LINE := "i)^[ \t]*([~*$#!^+<>]*[A-Za-z][A-Za-z0-9_]*(?:[ \t]*&[ \t]*~?[A-Za-z][A-Za-z0-9_]*)?(?:[ \t]+up)?)[ \t]*::"
+
+; Windows virtual-key ranges (WinUser.h) that name characters: digits, letters
+; and the OEM punctuation keys the active layout assigns.
+global _HCSC_CHARACTER_VK_RANGES := [[0x30, 0x39], [0x41, 0x5A], [0xBA, 0xC0], [0xDB, 0xDF], [0xE2, 0xE2]]
+
+; "SCnnn" -> registry code of every character key: a key with no fixed name.
+_HCSC_CharacterScanCodes() {
+	Registry := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\data\keycodes\physical_keys.json", "UTF-8"))
+	Keys := Map()
+	for Code, Rec in Registry["keys"] {
+		if (Rec["kind"] != "key") || ((Rec["ahk_send"] is String) && (Rec["ahk_send"] != ""))
+			continue
+		if !(Rec["ahk"] is String) || !RegExMatch(Rec["ahk"], "^SC[0-9A-F]{3}$")
+			continue
+		Keys[Rec["ahk"]] := Code
+	}
+	return Keys
+}
+
+; Whether a lowercased key names a character: one character, or its VK.
+_HCSC_IsCharacterKey(Key) {
+	global _HCSC_CHARACTER_VK_RANGES
+	if (StrLen(Key) = 1)
+		return true
+	if !RegExMatch(Key, "^vk([0-9a-f]{2})$", &Vk)
+		return false
+	Code := Integer("0x" . Vk[1])
+	for Range in _HCSC_CHARACTER_VK_RANGES {
+		if (Code >= Range[1] && Code <= Range[2])
+			return true
+	}
+	return false
+}
+
+_HCSC_NamesCharacter(Declaration) {
+	for Key in _HCSC_KeysOf(Declaration) {
+		if _HCSC_IsCharacterKey(Key)
+			return true
+	}
+	return false
+}
+
+; Collapses "." and ".." segments so one file reached by two relative paths is
+; visited once, as AutoHotkey includes it once.
+_HCSC_NormalizePath(RawPath) {
+	Segments := []
+	for Segment in StrSplit(StrReplace(RawPath, "/", "\"), "\") {
+		if (Segment = "..") {
+			if (Segments.Length > 1)
+				Segments.Pop()
+		} else if (Segment != "." && Segment != "") {
+			Segments.Push(Segment)
+		}
+	}
+	Joined := ""
+	for Index, Segment in Segments
+		Joined .= (Index = 1 ? "" : "\") . Segment
+	return Joined
+}
+
+; One #Include argument (after its *i) resolved as AutoHotkey v2 does: relative
+; to the including file's directory, or to the last directory an #Include
+; named; %A_ScriptDir% is the driver root. Library and other variable paths
+; resolve to "".
+_HCSC_ResolveInclude(Argument, Dir, File) {
+	if (SubStr(Argument, 1, 1) = "<")
+		return ""
+	SplitPath(A_ScriptDir, , &DriverRoot)
+	Expanded := StrReplace(StrReplace(Argument, "%A_ScriptDir%", DriverRoot), "%A_LineFile%", File)
+	if InStr(Expanded, "%")
+		return ""
+	if !RegExMatch(Expanded, "^[A-Za-z]:[\\/]")
+		Expanded := Dir . "\" . Expanded
+	return _HCSC_NormalizePath(Expanded)
+}
+
+; Applies one masked line to the positional directive state. Returns the file
+; an #Include names, for the caller to visit in place, or "".
+_HCSC_ApplyDirective(Line, State, Cursor) {
+	if RegExMatch(Line, "i)^\s*#InputLevel\b\s*(\d*)", &Directive) {
+		State["level"] := (Directive[1] = "") ? 0 : Integer(Directive[1])
+	} else if RegExMatch(Line, "i)^\s*#UseHook\b\s*(\S*)", &Directive) {
+		State["usehook"] := !RegExMatch(Directive[1], "i)^(false|off|0)$")
+	} else if RegExMatch(Line, "i)^\s*#HotIf\b(.*)$", &Directive) {
+		State["hotif"] := (Trim(Directive[1]) != "")
+	} else if RegExMatch(Line, "i)^\s*#Include(?:Again)?\s+(?:\*i\s+)?(.+?)\s*$", &Directive) {
+		Target := _HCSC_ResolveInclude(Directive[1], Cursor["dir"], Cursor["file"])
+		Attributes := (Target = "") ? "" : FileExist(Target)
+		if InStr(Attributes, "D")
+			Cursor["dir"] := Target
+		else if (Attributes != "")
+			return Target
+	}
+	return ""
+}
+
+; Visits one file in parse order, following its #Include directives in place,
+; and records every static label with its file and the directive context at
+; its line.
+_HCSC_WalkIncludes(File, State, Seen, Labels) {
+	global _HCSC_LABEL_LINE
+	if Seen.Has(StrLower(File))
+		return
+	Seen[StrLower(File)] := true
+	Src := FileRead(File, "UTF-8")
+	Masked := _DriverMaskNonCode(&Src)
+	SplitPath(File, , &Dir)
+	Cursor := Map("dir", Dir, "file", File)
+	for Line in StrSplit(Masked, "`n", "`r") {
+		Target := _HCSC_ApplyDirective(Line, State, Cursor)
+		if (Target != "")
+			_HCSC_WalkIncludes(Target, State, Seen, Labels)
+		else if RegExMatch(Line, _HCSC_LABEL_LINE, &Label)
+			Labels.Push(Map("text", Label[1], "file", File, "context", State.Clone()))
+	}
+}
+
+; Why AutoHotkey's hook, not RegisterHotKey, owns a static label ("" for a
+; registered hotkey), from its syntax and its directive context.
+_HCSC_HookReasons(Text, Context) {
+	Reasons := ""
+	RegExMatch(Text, "^[~*$#!^+<>]*", &Prefix)
+	for Symbol in ["~", "$", "*", "<", ">"] {
+		if InStr(Prefix[0], Symbol)
+			Reasons .= ", the " . Symbol . " prefix"
+	}
+	if RegExMatch(Text, "i)\s+up\s*$")
+		Reasons .= ", a key-up hotkey"
+	if InStr(Text, "&")
+		Reasons .= ", a custom combination"
+	if Context["hotif"]
+		Reasons .= ", a #HotIf criterion"
+	if (Context["level"] != 0)
+		Reasons .= ", #InputLevel " . Context["level"]
+	if Context["usehook"]
+		Reasons .= ", #UseHook"
+	return LTrim(Reasons, ", ")
+}
+
+; Character-key declarations the hook owns, comma-separated in order: static
+; labels with a hook reason, then every literal Hotkey() registration, whose
+; HotIf context no scan knows.
+_HCSC_CharacterOffenders(Labels, Calls) {
+	Offenders := ""
+	for Entry in Labels {
+		if _HCSC_NamesCharacter(Entry["text"]) && (_HCSC_HookReasons(Entry["text"], Entry["context"]) != "")
+			Offenders .= (Offenders = "" ? "" : ", ") . Entry["text"]
+	}
+	for Text in Calls {
+		if _HCSC_NamesCharacter(Text)
+			Offenders .= (Offenders = "" ? "" : ", ") . Text
+	}
+	return Offenders
+}
+
 _HCSC_ScannerFindsTheShadowedShape() {
 	Fixture := "#HotIf LLM_Tooltip_GetText() != 0`nTab:: {`n}`n#HotIf`nSC00F:: {`n}`n*$SC01C:: return`n"
 		. 'Hotkey("~*vk0D", Fn)' . "`n"
@@ -155,3 +321,102 @@ _HCSC_NoNameHotkeyOnAScanCodeKey() {
 }
 Test("hotkeys: no name or VK hotkey targets a key declared by scan code (hardening-c-scan-code-precedence)",
 	_HCSC_NoNameHotkeyOnAScanCodeKey)
+
+_HCSC_CharacterScannerFlagsHookOwnedCharacters() {
+	global _HCSC_LABEL_LINE
+	Fixture := "^!+i:: {`n}`n#InputLevel 2`n^!+j:: return`n#InputLevel 0`n#HotIf Foo()`n^k:: return`n#HotIf`n"
+		. "$^m:: return`nTab:: return`nSC02F:: return`n"
+		. 'Hotkey("~^v", Fn)' . "`n"
+		. 'Hotkey("~^vk56", Fn)' . "`n"
+		. 'Hotkey("^vk0D", Fn)' . "`n"
+	Masked := _DriverMaskNonCode(&Fixture)
+	State := Map("level", 0, "hotif", false, "usehook", false)
+	Cursor := Map("dir", A_ScriptDir, "file", A_ScriptFullPath)
+	Labels := []
+	for Line in StrSplit(Masked, "`n", "`r") {
+		_HCSC_ApplyDirective(Line, State, Cursor)
+		if RegExMatch(Line, _HCSC_LABEL_LINE, &Label)
+			Labels.Push(Map("text", Label[1], "context", State.Clone()))
+	}
+	Found := _HCSC_Declarations(Fixture, Masked, &LabelCount, &CallCount)
+	AssertEqual(LabelCount, Labels.Length, "the line walk must see every static label of the fixture")
+	Calls := []
+	Loop CallCount
+		Calls.Push(Found[LabelCount + A_Index])
+	AssertEqual("^!+j, ^k, $^m, ~^v, ~^vk56", _HCSC_CharacterOffenders(Labels, Calls),
+		"the scanner must flag every character hotkey the hook owns, and spare a plain global one at #InputLevel 0")
+}
+Test("hotkeys: the character-key scanner flags exactly the hook-owned shapes (hardening-c-scan-code-precedence)",
+	_HCSC_CharacterScannerFlagsHookOwnedCharacters)
+
+_HCSC_NoHookHotkeyNamesACharacter() {
+	Src := _DriverSourceConcat()
+	Assert(Src != "", "the driver source must be readable for the character-key meta-test")
+	Masked := _DriverMaskNonCode(&Src)
+	Code := _StripFullLineComments(Src)
+	Found := _HCSC_Declarations(Code, Masked, &LabelCount, &CallCount)
+	ScanCodes := Map()
+	for Declaration in Found {
+		for Key in _HCSC_KeysOf(Declaration) {
+			if RegExMatch(Key, "^sc([0-9a-f]{3})$", &Sc)
+				ScanCodes["SC" . StrUpper(Sc[1])] := true
+		}
+	}
+	; The premise: the AltGr layer registers every key of the emulation's AltGr
+	; levels as "SC138 & SCnnn", unconditionally; the golden fixture freezes them.
+	Assert(RegExMatch(Code, "m)^RegisterAltGrLayer\(\)\s*$") > 0,
+		"the layout must still register the AltGr layer unconditionally")
+	StrReplace(Code, 'Hotkey("SC138 & " . SC,', , , &AltGrRegistrations)
+	Assert(AltGrRegistrations >= 3, "the AltGr layer must still register its keys as SC138 & SCnnn hotkeys")
+	Golden := JsonParse(FileRead(A_ScriptDir . "\fixtures\ergopti_emulation_golden.json", "UTF-8"))
+	AltGr := Map()
+	for Level in ["altgr_rows", "altgr_number_row", "altgr_plus"] {
+		for Sc in Golden["levels"][Level]
+			AltGr[StrUpper(Sc)] := true
+	}
+	Characters := _HCSC_CharacterScanCodes()
+	Assert(Characters.Count > 40, "the registry must name the character keys, found " . Characters.Count)
+	Undeclared := ""
+	for Sc, KeyCode in Characters {
+		if !AltGr.Has(Sc) && !ScanCodes.Has(Sc)
+			Undeclared .= (Undeclared = "" ? "" : ", ") . KeyCode
+	}
+	AssertEqual("", Undeclared,
+		"every character key must stay declared by scan code, or the character rule below must be revisited")
+
+	; Driver labels only, as _DriverSourceConcat reads them: tests, vendor code
+	; and generated files are not the driver's own hotkeys.
+	SplitPath(A_ScriptDir, , &DriverRoot)
+	Seen := Map()
+	Walked := []
+	Loop Files, DriverRoot . "\*.ahk" {
+		State := Map("level", 0, "hotif", false, "usehook", false)
+		_HCSC_WalkIncludes(A_LoopFileFullPath, State, Seen, Walked)
+	}
+	Labels := []
+	for Entry in Walked {
+		if !RegExMatch(Entry["file"], "i)\\(tests|vendor|_generated)\\")
+			Labels.Push(Entry)
+	}
+	Assert(Seen.Count > 100, "the #Include walk from the driver root scripts must reach the driver, reached " . Seen.Count)
+	Leveled := 0
+	Criteria := 0
+	for Entry in Labels {
+		if (Entry["context"]["level"] != 0)
+			Leveled++
+		if Entry["context"]["hotif"]
+			Criteria++
+	}
+	Assert(Leveled > 20, "the #Include walk must place the layout hotkeys under #InputLevel 2, found " . Leveled)
+	Assert(Criteria > 20, "the #Include walk must see the #HotIf criteria of static hotkeys, found " . Criteria)
+	AssertEqual(LabelCount, Labels.Length,
+		"every driver hotkey must be reachable from a driver root script through #Include")
+	Calls := []
+	Loop CallCount
+		Calls.Push(Found[LabelCount + A_Index])
+	AssertEqual("", _HCSC_CharacterOffenders(Labels, Calls),
+		"a hotkey the hook owns never fires on a character key, all of which are declared by scan code: "
+		. "observe the key on the HookDispatcher, declare it by scan code, or keep it a plain global hotkey at #InputLevel 0")
+}
+Test("hotkeys: no hook-owned hotkey names a character key (hardening-c-scan-code-precedence)",
+	_HCSC_NoHookHotkeyNamesACharacter)

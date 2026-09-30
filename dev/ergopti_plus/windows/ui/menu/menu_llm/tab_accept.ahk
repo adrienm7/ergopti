@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Tray — Tab Accept + Nav hotkeys
 ; DESCRIPTION:
-; Owns the slot-navigation hotkeys (nav_modifiers + Up / Down, val_modifiers +
+; Owns the slot-navigation hotkeys (nav_modifiers + an arrow, val_modifiers +
 ; 1..9, 0) that move the active slot when the tooltip shows multiple
 ; predictions. The physical Tab that accepts the visible prediction is an SC00F
 ; variant in platform/remap/tab.ahk: AutoHotkey looks the physical Tab up by
@@ -18,11 +18,15 @@
 ;    past the last loops back to the first — feels snappier than a hard stop
 ;    at the boundary.
 ; 3. Navigation is consumed: while the native owner routes a multi-slot
-;    prediction, its Up / Down chord moves the marker and never reaches the
-;    application, like the macOS tooltip (handle_llm_keys). The hotkeys below
-;    perform the cycle themselves; the native owner never cycles, so the
-;    order in which Windows calls the two keyboard hooks cannot drop or
-;    double a press (llm-tooltip-nav-consumed, llm-nav-cycle-windows).
+;    prediction, its chord moves the marker and never reaches the application,
+;    like the macOS tooltip (handle_llm_keys). Up and Left step back, Down and
+;    Right forward, as the shared label (↑/← and ↓/→) says, and so do the left
+;    and right Shift+Tab the tooltip footer advertises (⇧G + Tab, ⇧D + Tab);
+;    Windows had none of these but Up and Down, and they moved the caret
+;    instead (llm-nav-left-right-windows). The hotkeys below perform the cycle
+;    themselves; the native owner never cycles, so the order in which Windows
+;    calls the two keyboard hooks cannot drop or double a press
+;    (llm-tooltip-nav-consumed, llm-nav-cycle-windows).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -91,12 +95,28 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 ; once in either order (llm-nav-cycle-windows). The wildcard lets one hotkey
 ; serve every configured modifier; the criterion demands the exact chord of the
 ; committed plan. #InputLevel 1 is the native routes' own level: both take
-; physical input and AutoHotkey output above it.
+; physical input and AutoHotkey output above it. AutoHotkey resolves each arrow
+; name by its scan code (SC148, SC150, SC14B, SC14D).
+;
+; Shift+Tab is the footer's other chord, whatever nav_modifiers holds: the left
+; Shift steps back and the right one forward, as on macOS, with no other
+; modifier. The physical Tab is its scan code, SC00F (platform/remap/tab.ahk).
+; A side-specific Shift is the most specific SC00F hotkey under that Shift, so
+; the hook resolves the chord here first and falls back to the Tab key's other
+; owners, which keep every other Shift+Tab, when the criterion refuses it.
 #InputLevel 1
 #HotIf LLM_Menu_NavCycleChordIsOwned("Up")
 *Up:: LLM_Menu_NavCycleChord("Up")
 #HotIf LLM_Menu_NavCycleChordIsOwned("Down")
 *Down:: LLM_Menu_NavCycleChord("Down")
+#HotIf LLM_Menu_NavCycleChordIsOwned("Left")
+*Left:: LLM_Menu_NavCycleChord("Left")
+#HotIf LLM_Menu_NavCycleChordIsOwned("Right")
+*Right:: LLM_Menu_NavCycleChord("Right")
+#HotIf LLM_Menu_NavShiftTabIsOwned("LShift")
+<+SC00F:: LLM_Menu_NavShiftTabCycle("LShift")
+#HotIf LLM_Menu_NavShiftTabIsOwned("RShift")
+>+SC00F:: LLM_Menu_NavShiftTabCycle("RShift")
 #HotIf
 #InputLevel 0
 
@@ -106,33 +126,60 @@ global LLM_NAV_CYCLE_ROUTES := Map(
 	"Up", Map("index", 1, "code", "sc0148", "delta", -1),
 	"Down", Map("index", 2, "code", "sc0150", "delta", 1))
 
+; Each arrow the hotkeys above consume, and the cycle route whose chord and step
+; it shares: Left steps back like Up and Right forward like Down. The plan keeps
+; only the two native cycle routes the DLL contract requires, so Left and Right
+; never become native routes.
+global LLM_NAV_CYCLE_KEYS := Map("Up", "Up", "Down", "Down",
+	"Left", "Up", "Right", "Down")
+
+; The Shift of each Shift+Tab navigation chord and the slot step it moves: the
+; left one back (⇧G + Tab), the right one forward (⇧D + Tab).
+global LLM_NAV_SHIFT_TAB_STEPS := Map("LShift", -1, "RShift", 1)
+
 /**
- * The #HotIf of the hotkeys that consume the navigation chord: whether the Up
- * or Down press being resolved is the committed cycle chord, with exactly its
+ * The committed cycle route whose chord and step an arrow shares.
+ * @param {String} Key - "Up", "Down", "Left" or "Right".
+ * @returns {Map|Integer} The route, or 0 for another key or before this file's
+ *     globals are assigned, since a #HotIf criterion is live before them.
+ */
+_LLM_Menu_NavCycleRoute(Key) {
+	global LLM_NAV_CYCLE_ROUTES, LLM_NAV_CYCLE_KEYS
+	if !IsSet(LLM_NAV_CYCLE_ROUTES) || !IsSet(LLM_NAV_CYCLE_KEYS)
+			|| !LLM_NAV_CYCLE_KEYS.Has(Key)
+		return 0
+	return LLM_NAV_CYCLE_ROUTES[LLM_NAV_CYCLE_KEYS[Key]]
+}
+
+/**
+ * The #HotIf of the hotkeys that consume the navigation chord: whether the
+ * arrow press being resolved is the committed cycle chord, with exactly its
  * modifiers held, while the native owner routes a multi-slot prediction. Any
  * other modifier set, one slot, or an owner that is not routing leaves the key
  * to the application.
- * @param {String} Key - "Up" or "Down".
+ * @param {String} Key - "Up", "Down", "Left" or "Right".
  * @param {Func} ModifierIsHeldFn - Test seam taking "Ctrl", "Alt", "Shift",
  *     "LWin" or "RWin"; the logical key state when omitted, which is what a
  *     hotkey without the wildcard would compare.
  * @returns {Boolean}
  */
 LLM_Menu_NavCycleChordIsOwned(Key, ModifierIsHeldFn := 0) {
-	global _LLM_Menu_NavHotkeysBound, LLM_NAV_CYCLE_ROUTES
+	global _LLM_Menu_NavHotkeysBound
 	; A #HotIf criterion is live before this file's globals are assigned.
-	if !IsSet(_LLM_Menu_NavHotkeysBound) || !IsSet(LLM_NAV_CYCLE_ROUTES)
+	if !IsSet(_LLM_Menu_NavHotkeysBound)
+			|| !(_LLM_Menu_NavHotkeysBound is Array)
 		return false
-	if !(_LLM_Menu_NavHotkeysBound is Array) || !LLM_NAV_CYCLE_ROUTES.Has(Key)
+	Route := _LLM_Menu_NavCycleRoute(Key)
+	if !(Route is Map)
 		return false
-	Route := LLM_NAV_CYCLE_ROUTES[Key]
 	if _LLM_Menu_NavHotkeysBound.Length < Route["index"]
 		return false
 	Entry := _LLM_Menu_NavHotkeysBound[Route["index"]]
 	if !(Entry is Map)
 		return false
-	; The physical identity is what the native route matches: its modifiers
-	; are the exact chord, its key must be the one this hotkey resolves to.
+	; The route's physical identity is what the native plan committed: its
+	; modifiers are the exact chord, and its key must be the route's own (Up or
+	; Down), whose chord Left and Right share.
 	if !RegExMatch(Entry.Get("physical_id", ""),
 			"i)^([\^!+#]*)" . Route["code"] . "$", &Match)
 		return false
@@ -151,25 +198,110 @@ LLM_Menu_NavCycleChordIsOwned(Key, ModifierIsHeldFn := 0) {
 
 /**
  * The action of the hotkeys that consume the navigation chord: moves the ▶
- * marker one slot, to the previous one for Up and the next one for Down,
- * wrapping around at both ends, and repaints the prediction in place. The
- * native owner never cycles, so this is the only cycle of the press
+ * marker one slot, to the previous one for Up and Left and the next one for
+ * Down and Right, wrapping around at both ends, and repaints the prediction in
+ * place. The native owner never cycles, so this is the only cycle of the press
  * (llm-nav-cycle-windows).
- * @param {String} Key - "Up" or "Down".
+ * @param {String} Key - "Up", "Down", "Left" or "Right".
  * @param {Func} SetActiveIdxFn - Test seam taking the target slot; the in-place
  *     repaint when omitted.
  * @returns {Integer} The slot the marker moved to, or 0 when none moved.
+ * @throws {ValueError} For a key that does not cycle.
  */
 LLM_Menu_NavCycleChord(Key, SetActiveIdxFn := 0) {
-	global LLM_NAV_CYCLE_ROUTES
-	return LLM_TooltipCycleActiveIdx(LLM_NAV_CYCLE_ROUTES[Key]["delta"],
-		SetActiveIdxFn)
+	Route := _LLM_Menu_NavCycleRoute(Key)
+	if !(Route is Map)
+		throw ValueError("A prediction cycle needs an arrow key.", -1, Key)
+	return LLM_TooltipCycleActiveIdx(Route["delta"], SetActiveIdxFn)
+}
+
+/**
+ * The Shift of the Shift+Tab navigation chord held right now: exactly one Shift
+ * and no other modifier. Both Shifts together name no side, so that chord stays
+ * the application's.
+ * @param {Func} ModifierIsHeldFn - Test seam taking "LShift", "RShift", "Ctrl",
+ *     "Alt", "LWin" or "RWin"; the logical key state when omitted.
+ * @returns {String} "LShift", "RShift", or "" when no single Shift is the chord.
+ */
+LLM_Menu_NavShiftTabSide(ModifierIsHeldFn := 0) {
+	if !HasMethod(ModifierIsHeldFn, "Call")
+		ModifierIsHeldFn := GetKeyState
+	for Name in ["Ctrl", "Alt", "LWin", "RWin"] {
+		if ModifierIsHeldFn.Call(Name)
+			return ""
+	}
+	Left := ModifierIsHeldFn.Call("LShift") ? true : false
+	Right := ModifierIsHeldFn.Call("RShift") ? true : false
+	if (Left == Right)
+		return ""
+	return Left ? "LShift" : "RShift"
+}
+
+/**
+ * The #HotIf of the hotkeys that consume Shift+Tab: whether Side's Shift alone
+ * is held with the Tab being resolved while the native owner routes a
+ * multi-slot prediction. The Tab key's own owners keep the press
+ * (platform/remap/tab.ahk): the navigation layer while it is held, the Kana
+ * AltGr, which AutoHotkey does not count as a modifier, and the auto-repeat of
+ * a press a Tab tap-hold owns.
+ * @param {String} Side - "LShift" or "RShift".
+ * @param {Func} ModifierIsHeldFn - Test seam of LLM_Menu_NavShiftTabSide.
+ * @returns {Boolean}
+ */
+LLM_Menu_NavShiftTabIsOwned(Side, ModifierIsHeldFn := 0) {
+	global LLM_NAV_SHIFT_TAB_STEPS, LayerEnabled
+	; A #HotIf criterion is live before this file's globals are assigned.
+	if !IsSet(LLM_NAV_SHIFT_TAB_STEPS) || !LLM_NAV_SHIFT_TAB_STEPS.Has(Side)
+		return false
+	if LLM_Menu_NavShiftTabSide(ModifierIsHeldFn) != Side
+		return false
+	if IsSet(LayerEnabled) && LayerEnabled
+		return false
+	if IsSet(TapHoldKanaAltGrHeld) && TapHoldKanaAltGrHeld()
+		return false
+	if IsSet(TapHoldPressIsOwned) && TapHoldPressIsOwned("tab")
+		return false
+	return LLM_TooltipNavCycleIsOwned()
+}
+
+/**
+ * The action of the hotkeys that consume Shift+Tab: moves the ▶ marker one slot
+ * back for the left Shift and forward for the right one, wrapping around, like
+ * the arrows (LLM_TooltipCycleActiveIdx).
+ * @param {String} Side - "LShift" or "RShift".
+ * @param {Func} SetActiveIdxFn - Test seam taking the target slot; the in-place
+ *     repaint when omitted.
+ * @returns {Integer} The slot the marker moved to, or 0 when none moved.
+ * @throws {ValueError} For another side.
+ */
+LLM_Menu_NavShiftTabCycle(Side, SetActiveIdxFn := 0) {
+	global LLM_NAV_SHIFT_TAB_STEPS
+	if !LLM_NAV_SHIFT_TAB_STEPS.Has(Side)
+		throw ValueError("A Shift+Tab cycle needs the left or right Shift.", -1, Side)
+	return LLM_TooltipCycleActiveIdx(LLM_NAV_SHIFT_TAB_STEPS[Side], SetActiveIdxFn)
+}
+
+/**
+ * A tap-hold's Tab tapped under one Shift is the user's Shift+Tab: the
+ * recommended AltGr taps Tab, and a Tab tap-hold emits its own. While the native
+ * owner routes a multi-slot prediction it moves the marker like the physical
+ * chord, and nothing is typed (llm-nav-left-right-windows).
+ * @param {Func} ModifierIsHeldFn - Test seam of LLM_Menu_NavShiftTabSide.
+ * @param {Func} SetActiveIdxFn - Test seam of LLM_Menu_NavShiftTabCycle.
+ * @returns {Boolean} True when the tap was the navigation chord and is consumed.
+ */
+LLM_Menu_NavShiftTabTap(ModifierIsHeldFn := 0, SetActiveIdxFn := 0) {
+	Side := LLM_Menu_NavShiftTabSide(ModifierIsHeldFn)
+	if Side == "" || !LLM_Menu_NavShiftTabIsOwned(Side, ModifierIsHeldFn)
+		return false
+	LLM_Menu_NavShiftTabCycle(Side, SetActiveIdxFn)
+	return true
 }
 
 ; ── Slot navigation ──
 ; When the tooltip shows multiple predictions, the user can cycle the
-; active slot with the configured modifier + Up / Down. The empty
-; nav_modifiers case (default) binds bare Up / Down — matches the HS
+; active slot with the configured modifier + an arrow. The empty
+; nav_modifiers case (default) binds bare arrows — matches the HS
 ; default where llm_nav_modifiers = {}. val_modifiers + digit N (bare digits
 ; when val_modifiers is empty) is a consumed native jump that inserts slot N;
 ; a digit beyond the shown slots passes through, like HS. Both bindings
@@ -347,9 +479,9 @@ _LLM_Menu_BuildNavBindingPlan(MenuState) {
 	val_prefix := Prefixes["val_prefix"]
 	Plan := [
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Up",
-			(*) => LLM_Menu_NavCycleChord("Up")),
+			(*) => _LLM_Nav_Cycle(-1)),
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Down",
-			(*) => LLM_Menu_NavCycleChord("Down"))
+			(*) => _LLM_Nav_Cycle(1))
 	]
 	Loop 10 {
 		Digit := (A_Index == 10) ? "0" : String(A_Index)
@@ -608,6 +740,19 @@ _LLM_Menu_MakeNavJump(idx) {
 ; ======= 2/ Slot Navigation Helpers =======
 ; ==========================================
 ; ==========================================
+
+; The cycle callback of a plan bound as AutoHotkey hotkeys: moves the ▶ marker
+; one slot through the public tooltip API, like the digit jumps below. The
+; native owner never fires it, since its cycle routes are parked
+; (LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES): the consuming *Up / *Down hotkeys
+; cycle the prediction it routes through LLM_Menu_NavCycleChord instead.
+_LLM_Nav_Cycle(delta) {
+	slots := LLM_Tooltip_GetSlots()
+	if (slots.Length <= 1)
+		return
+	LLM_Tooltip_SetActiveIdx(LLM_TooltipWrapSlot(LLM_Tooltip_GetActiveIdx(),
+		delta, slots.Length))
+}
 
 _LLM_Nav_Jump(idx) {
 	slots := LLM_Tooltip_GetSlots()

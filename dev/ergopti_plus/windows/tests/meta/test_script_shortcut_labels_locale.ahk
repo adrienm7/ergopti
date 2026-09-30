@@ -14,7 +14,7 @@
 ;
 ; The fix stores plain key strings (e.g. "sg_labels.script_altgr_enter") in
 ; SCRIPT_SHORTCUT_LABELS and wraps the lookup through t() at the point of use
-; inside BuildScriptShortcutsMenu, where I18nInit() has already run.
+; inside ScriptShortcutRows, where I18nInit() has already run.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -77,7 +77,7 @@ Test("F29: SCRIPT_SHORTCUT_LABELS stores raw i18n keys, not t() calls", _SSSL_As
 
 ; ======================================================================
 ; ======================================================================
-; ======= 3/ BuildScriptShortcutsMenu resolves via t() ================
+; ======= 3/ ScriptShortcutRows resolves via t() =======================
 ; ======================================================================
 ; ======================================================================
 
@@ -85,13 +85,13 @@ _SSSL_AssertMenuResolvesViaT() {
 	Src := _SSSL_StripLineComments(_DriverSourceConcat())
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
-	; Locate BuildScriptShortcutsMenu body (column-0 definition, not a call site)
-	Body := _DriverFuncBody("BuildScriptShortcutsMenu")
-	Assert(Body != "", "BuildScriptShortcutsMenu must exist in the driver source")
+	; Locate ScriptShortcutRows body (column-0 definition, not a call site)
+	Body := _DriverFuncBody("ScriptShortcutRows")
+	Assert(Body != "", "ScriptShortcutRows must exist in the driver source")
 
 	; The label lookup must go through t(SCRIPT_SHORTCUT_LABELS[...]) so the
 	; translation is resolved at call time, after I18nInit() has run.
 	Assert(RegExMatch(Body, "t\s*\(\s*SCRIPT_SHORTCUT_LABELS\[") > 0,
-		"BuildScriptShortcutsMenu must use t(SCRIPT_SHORTCUT_LABELS[Slot]) to resolve labels at call time (F29)")
+		"ScriptShortcutRows must use t(SCRIPT_SHORTCUT_LABELS[Slot]) to resolve labels at call time (F29)")
 }
-Test("F29: BuildScriptShortcutsMenu resolves label via t(SCRIPT_SHORTCUT_LABELS[Slot])", _SSSL_AssertMenuResolvesViaT)
+Test("F29: ScriptShortcutRows resolves label via t(SCRIPT_SHORTCUT_LABELS[Slot])", _SSSL_AssertMenuResolvesViaT)

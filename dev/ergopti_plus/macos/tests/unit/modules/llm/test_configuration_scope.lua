@@ -63,8 +63,19 @@ helpers.describe("llm-configuration-scope", function()
 
 	helpers.it("keeps explicit ordinary backend selection authorized to start Ollama", function()
 		local core, starts = fixture()
+		-- Only with the AI on and Ollama installed (llm-backend-ollama-start-gate)
 		helpers.assert_true(core.set_backend("ollama"))
-		helpers.assert_eq(starts(), 1)
+		helpers.assert_eq(starts(), 0)
+		helpers.assert_true(core.set_runtime_llm_enabled(true))
+		local binary = package.loaded["modules.llm.ollama_binary"]
+		local original_resolve = binary.resolve
+		binary.resolve = function() return "/Applications/Ollama.app/Contents/Resources/ollama", nil, binary.SOURCE_APP end
+		local ok, err = xpcall(function()
+			helpers.assert_true(core.set_backend("ollama"))
+			helpers.assert_eq(starts(), 1)
+		end, debug.traceback)
+		binary.resolve = original_resolve
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("refuses a failed readiness reset instead of claiming configuration completion", function()
