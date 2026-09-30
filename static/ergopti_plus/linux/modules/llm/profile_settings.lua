@@ -44,6 +44,8 @@ local _registry_source = nil
 -- every save: one bad entry used to empty the registry in memory, and the next
 -- save then erased every other prompt the user had written.
 local _unreadable_profiles = {}
+-- The unreadable entries already named, so each is warned once per process.
+local _reported_profiles = {}
 local _profile_serial = 0
 
 local function forget_registry(refresh_values)
@@ -141,20 +143,51 @@ local function copy_profile(profile)
 	return copy
 end
 
+--- Whether a stored registry is not an older build's shape. A damaged or newer
+--- one is not outdated: its reader refuses it loudly and it is kept.
+--- @param value any The stored llm.user_profiles value.
+--- @return boolean
+local function registry_current(value)
+	return not RegistryCodec.is_outdated(value)
+end
+
+--- Names a stored profile this build cannot offer, once per process: it is
+--- read at every registry load, and kept in the registry on every write.
+--- @param index number Position in the stored registry.
+--- @param candidate any The stored entry.
+--- @param detail string Why it is not offered.
+local function report_unreadable_profile(index, candidate, detail)
+	local identity = tostring(index) .. "\0" .. tostring(type(candidate) == "table" and candidate.id) .. "\0" .. detail
+	if _reported_profiles[identity] then return end
+	_reported_profiles[identity] = true
+	Logger.warn(LOG, "Stored user profile at index %d is outdated (%s); it is kept but not offered.", index, detail)
+end
+
 local function load_user_profiles()
 	if _user_profiles then return _user_profiles end
 	local Storage = require("infra.llm_preferences")
 	local values, source = Storage.get_many({ USER_PROFILES_KEY })
 	assert(type(source) == "table", "user profiles require an exact source snapshot")
-	local stored = RegistryCodec.decode(values[USER_PROFILES_KEY])
+	local stored = {}
+	if RegistryCodec.is_outdated(values[USER_PROFILES_KEY]) then
+		-- An older build's registry, without the versioned envelope: outdated as
+		-- a whole, offered by the cleanup, replaced by the next profile saved.
+		ConfigOutdated.report(USER_PROFILES_KEY, ConfigOutdated.REFUSED, Logger)
+	else
+		stored = RegistryCodec.decode(values[USER_PROFILES_KEY])
+	end
 	_user_profiles = {}
 	_registry_source = source
 	_unreadable_profiles = {}
 	local seen = {}
 	for index, candidate in ipairs(stored) do
 		local profile = normalize_user_profile(candidate, true)
-		if not profile or seen[profile.id] or built_in_exists(profile.id) then
-			Logger.error(LOG, "Stored user profile at index %d is invalid; it is kept but not offered.", index)
+		local problem = (not profile and "a field this build does not read, or one it needs is missing")
+			or (seen[profile.id] and "its id is already taken")
+			or (built_in_exists(profile.id) and "its id is now a built-in profile's")
+			or nil
+		if problem then
+			report_unreadable_profile(index, candidate, problem)
 			_unreadable_profiles[#_unreadable_profiles + 1] = candidate
 		else
 			seen[profile.id] = true
@@ -493,6 +526,7 @@ function M._reset()
 	_user_profiles = nil
 	_registry_source = nil
 	_unreadable_profiles = {}
+	_reported_profiles = {}
 	_profile_serial = 0
 	ModelProfile._reset()
 end
@@ -502,7 +536,7 @@ end
 --- @param mark function Consumed-key collector.
 function M.mark_config_reads(document, mark)
 	local preferences = require("infra.llm_preferences")
-	preferences.mark_config_read(document, USER_PROFILES_KEY, mark)
+	preferences.mark_config_read(document, USER_PROFILES_KEY, mark, registry_current)
 	for name, definition in pairs(DEFINITIONS) do
 		preferences.mark_config_read(document, definition.path, mark, function(value) return valid(name, value) end)
 	end
