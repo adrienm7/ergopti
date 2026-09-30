@@ -1740,6 +1740,12 @@ const CHECKS = [
 		repro: 'npm run test:windows-script-chords-follow-their-slot'
 	},
 	{
+		name: 'the three drivers share the script chords, their presets, their defaults and their submenu',
+		cmd: 'node',
+		args: ['tools/test/test-script-chords-three-os.cjs'],
+		repro: 'npm run test:script-chords-three-os'
+	},
+	{
 		name: 'Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation',
 		cmd: 'node',
 		args: ['tools/test/test-windows-hotstring-preview-shows.cjs'],
