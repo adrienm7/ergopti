@@ -672,6 +672,18 @@ only cleared a flag, so the taps and "Health-check tick" lines kept running with
 Gestures off; such a line now proves Gestures was ON. Test doubles:
 `tests/support/gesture_runtime_fixture.lua`.
 
+### project-hs-click-drag-is-not-a-gesture
+
+A click-drag text selection (one finger pressing the trackpad, another
+sliding, or a drag after tap to click) reaches the touch frames as two or more
+moving contacts. Until 2026-09 the engine fired the two-finger swipe action
+(`arrow_up` in the recommended preset) or a three-finger tap mid-drag, and the
+selection was lost. `modules/gestures/engine.lua` `process_frame` now hands
+every frame from the first one with a button held
+(`adapters/mouse_control.lua` `any_button_down`) to the last lift to the
+pointer. Action: keep that guard ahead of any gesture state change, and never
+subscribe a gesture tap to button or drag events.
+
 ## Clipboard, files, and privacy
 
 ### project-hs-clipboard-transaction-ownership
