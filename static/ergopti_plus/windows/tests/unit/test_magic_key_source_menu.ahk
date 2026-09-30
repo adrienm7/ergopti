@@ -8,7 +8,9 @@
 ; key in effect, whose submenu captures the next key pressed, restores the
 ; automatic key or lists every candidate. Windows could only take the key from
 ; a hand-edited scan code. These cases pin the rows, the capture's key decision
-; and reverse scan-code lookup, and the editor that persists a choice.
+; (read from the physical key state: the InputHook only sees what a remap hotkey
+; sends, so the scan code it reported named the wrong key under the emulation),
+; reverse scan-code lookup, and the editor that persists a choice.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -79,28 +81,114 @@ _MKS_MenuPlacementCase() {
 
 class _MKS_FakeHook {
 	Stops := 0
+	InProgress := true
 
 	Stop() {
 		this.Stops += 1
+		this.InProgress := false
 	}
 }
 
-Test("magic key source: the capture takes a key, ignores a lone modifier and stops on Escape (magic-key-source)",
-	_MKS_CaptureKeyDownCase)
+Test("magic key source: the capture ignores a lone modifier and stops on Escape (magic-key-source)",
+	_MKS_CaptureModifierEscapeCase)
 
-_MKS_CaptureKeyDownCase() {
-	Captured := { Scan: 0 }
+_MKS_CaptureModifierEscapeCase() {
+	Down := Map()
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
 	Hook := _MKS_FakeHook()
-	_MagicKeySourceCaptureKeyDown(Captured, Hook, GetKeyVK("LShift"), GetKeySC("LShift"))
-	AssertEqual(0, Captured.Scan, "a modifier alone chooses nothing")
+	Down["SC02A"] := true
+	_MagicKeySourceCaptureKeyDown(State, Hook, GetKeyVK("LShift"), GetKeySC("LShift"))
+	AssertEqual("", State.Scan, "a modifier alone chooses nothing")
 	AssertEqual(0, Hook.Stops, "and keeps the capture waiting")
-	_MagicKeySourceCaptureKeyDown(Captured, Hook, GetKeyVK("Escape"), GetKeySC("Escape"))
-	AssertEqual(0, Captured.Scan, "Escape chooses nothing")
-	AssertEqual(1, Hook.Stops, "and ends the capture")
-	Captured := { Scan: 0 }
-	_MagicKeySourceCaptureKeyDown(Captured, Hook, 0x4A, 0x24)
-	AssertEqual(0x24, Captured.Scan, "any other key is the answer, by scan code")
-	AssertEqual(2, Hook.Stops)
+	_MagicKeySourceCaptureKeyDown(State, Hook, GetKeyVK("Escape"), GetKeySC("Escape"))
+	AssertEqual("", State.Scan, "Escape chooses nothing")
+	AssertFalse(State.Refused, "and refuses nothing")
+	AssertEqual(1, Hook.Stops, "it ends the capture")
+}
+
+; With the Ergopti emulation on, every candidate key is a remap hotkey: the
+; InputHook never sees the key pressed, only what its hotkey sends.
+Test("magic key source: the capture answers with the key physically down, not what the hook saw (magic-key-source)",
+	_MKS_CapturePhysicalKeyCase)
+
+_MKS_CapturePhysicalKeyCase() {
+	Down := Map()
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
+	Hook := _MKS_FakeHook()
+	Down["SC027"] := true
+	; The Semicolon key of the emulation sends "j", reported with the scan code
+	; of j on the OS layout.
+	_MagicKeySourceCaptureKeyDown(State, Hook, 0x4A, 0x24)
+	AssertEqual("SC027", State.Scan, "the key pressed, never the scan code of its output")
+	AssertEqual(1, Hook.Stops)
+
+	Down := Map()
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
+	Hook := _MKS_FakeHook()
+	Down["SC02E"] := true
+	; The current magic key sends {Text}★: a VK_PACKET with no scan code.
+	_MagicKeySourceCaptureKeyDown(State, Hook, 0xE7, 0)
+	AssertEqual("SC02E", State.Scan, "the magic key's own key is answered too")
+	AssertEqual("KeyC", LayoutRegistry_KeyCode(State.Scan, LayoutRegistry_Keycodes()))
+}
+
+Test("magic key source: the capture refuses a key that is no candidate (magic-key-source)",
+	_MKS_CaptureRefusalCase)
+
+_MKS_CaptureRefusalCase() {
+	State := _MagicKeySourceCaptureState((Key) => false)
+	Hook := _MKS_FakeHook()
+	_MagicKeySourceCaptureKeyDown(State, Hook, GetKeyVK("Space"), GetKeySC("Space"))
+	AssertTrue(State.Refused, "the space bar, down with no candidate, is refused aloud")
+	AssertEqual("", State.Scan)
+	AssertEqual(1, Hook.Stops)
+}
+
+Test("magic key source: a key held when the capture opened answers only once released (magic-key-source)",
+	_MKS_CaptureHeldKeyCase)
+
+_MKS_CaptureHeldKeyCase() {
+	Down := Map("SC024", true)
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
+	Hook := _MKS_FakeHook()
+	_MagicKeySourceCaptureKeyDown(State, Hook, 0x4A, 0x24)
+	AssertEqual(0, Hook.Stops, "its auto-repeat is no answer, nor a refusal")
+	AssertFalse(State.Refused)
+	Down.Delete("SC024")
+	Down["SC010"] := true
+	_MagicKeySourceCaptureKeyDown(State, Hook, 0x51, 0x10)
+	AssertEqual("SC010", State.Scan, "another key answers")
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
+	Down.Delete("SC010")
+	_MagicKeySourcePressedScan(State)
+	Down["SC010"] := true
+	AssertEqual("SC010", _MagicKeySourcePressedScan(State), "the held key, pressed again, answers")
+}
+
+Test("magic key source: the capture's poll answers a key whose hotkey sends nothing (magic-key-source)",
+	_MKS_CapturePollCase)
+
+_MKS_CapturePollCase() {
+	Down := Map()
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
+	Hook := _MKS_FakeHook()
+	_MagicKeySourceCapturePoll(State, Hook)
+	AssertEqual(0, Hook.Stops, "nothing down, nothing answered")
+	Down["SC01A"] := true
+	_MagicKeySourceCapturePoll(State, Hook)
+	AssertEqual("SC01A", State.Scan, "a dead key of the emulation answers from its physical state")
+	AssertEqual(1, Hook.Stops)
+	Down["SC010"] := true
+	_MagicKeySourceCapturePoll(State, Hook)
+	AssertEqual("SC01A", State.Scan, "a stopped capture takes no second answer")
+
+	Down := Map("Escape", true)
+	State := _MagicKeySourceCaptureState((Key) => Down.Has(Key))
+	Hook := _MKS_FakeHook()
+	_MagicKeySourceCapturePoll(State, Hook)
+	AssertEqual(1, Hook.Stops, "Escape held ends the capture")
+	AssertEqual("", State.Scan)
+
 	Body := _DriverFuncBody("MagicKeySourceCapture")
 	Assert(Body != "", "MagicKeySourceCapture must exist in ui/editors.ahk")
 	Assert(InStr(Body, "_MagicKeyEditorInputHook := IH") > 0,
@@ -108,7 +196,11 @@ _MKS_CaptureKeyDownCase() {
 	Assert(InStr(Body, 'GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))') > 0,
 		"closing the dialog stops the suppressive hook")
 	Assert(InStr(Body, '"magic_key_capture_timeout_ms"') > 0, "the capture ends on the shared timeout")
-	Assert(InStr(Body, "ModifyMagicKeySource(Code)") > 0, "a captured candidate is persisted")
+	Assert(InStr(Body, 'SetTimer(Poll, TimingsGet("ui", "magic_key_capture_poll_ms"))') > 0,
+		"the poll runs on the shared interval while the capture waits")
+	Assert(InStr(Body, "SetTimer(Poll, 0)") > 0, "and stops with it")
+	Assert(InStr(Body, "ModifyMagicKeySource(LayoutRegistry_KeyCode(State.Scan,") > 0,
+		"a captured candidate is persisted")
 }
 
 Test("magic key source: a pressed scan code names its key back (magic-key-source)", _MKS_KeyCodeCase)
