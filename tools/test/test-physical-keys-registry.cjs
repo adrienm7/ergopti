@@ -694,6 +694,20 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 		fail(`hid: the form-dependent usages are ${JSON.stringify(formDependent)}, expected [53, 100]`);
 }
 
+// --- 5.4 fn/globe has no registry position, so the macOS keycode it resolves to
+// is the shared keycodes constant, which must be the heatmap's fn keycode.
+{
+	const src = read('_shared/lua/keycodes/init.lua');
+	const fnConst = /^M\.FUNCTION\s*=\s*(\d+)/m.exec(src);
+	const azerty = JSON.parse(read('_shared/data/keycodes/azerty.json'));
+	const fnHeatmap = azerty.keys.find((entry) => entry.qwerty === 'fn');
+	if (!fnConst) fail('keycodes/init.lua: M.FUNCTION (the fn/globe keycode) is missing');
+	else if (!fnHeatmap || fnHeatmap.kc !== Number(fnConst[1]))
+		fail(
+			`keycodes/init.lua: FUNCTION = ${fnConst[1]} but the heatmap's fn keycode is ${fnHeatmap && fnHeatmap.kc}`
+		);
+}
+
 report();
 console.log(
 	`\x1b[32m[OK] ${codes.length} physical keys (${byKind.key.length} keys, ${byKind.mouse_button.length} mouse buttons, ` +

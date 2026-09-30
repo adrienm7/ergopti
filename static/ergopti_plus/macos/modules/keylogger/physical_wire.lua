@@ -4,6 +4,13 @@
 local M = {}
 local UINT64_MAX = "18446744073709551615"
 
+--- HID usage pages that carry physical keys: Keyboard/Keypad, Consumer, and the
+--- two Apple vendor pages that report fn/globe.
+M.PAGE_KEYBOARD = 0x07
+M.PAGE_CONSUMER = 0x0C
+M.PAGE_APPLE_VENDOR_TOP_CASE = 0x00FF
+M.PAGE_APPLE_VENDOR_KEYBOARD = 0xFF01
+
 --- Validates a canonical unsigned decimal string.
 ---@param value string Wire value.
 ---@param positive boolean Require a nonzero value.
