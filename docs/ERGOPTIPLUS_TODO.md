@@ -304,13 +304,25 @@ These are software implementations; final hardware verification remains below.
         guardian's Login Items steps, the Homebrew install writing settings
         (provenance fix), Windows tooltip rendering on 10/11, every new menu row
         and the wizard re-run on the three OSes.
-39. [ ] Repository hygiene the session could not do: the temporary `backup/*`
-        branches (except `backup/wip/delta-updates`) and the `backup/next/*`
-        branches must be deleted by the maintainer (branch deletion was refused
-        with HTTP 403 from the session); the finished agent worktrees under
-        `.claude/worktrees/` can be removed; the uncommitted test edit left in
-        the `wip/win-tooltip-border-fix` worktree (tooltip DPI radius) is the
-        only unsaved change among them.
+39. [~] Repository hygiene: the maintainer deleted every temporary backup
+    branch on 2026-09-30; agents must not create `backup/*` branches again.
+    The finished agent worktrees under `.claude/worktrees/` can be removed;
+    the uncommitted test edit left in the `wip/win-tooltip-border-fix`
+    worktree (tooltip DPI radius) is the only unsaved change among them.
+40. [ ] The packaged-launch gate never builds a Karabiner configuration: the CI
+        runners have no Karabiner-Elements, so dev.148 passed every launch
+        scenario while every real Mac refused the deploy (« generated rule 1
+        manipulator 3 has inconsistent managed conditions », fixed with
+        `json-shared-tables`). Add a launch scenario that makes the app build
+        and merge its Karabiner configuration in the real Hammerspoon runtime
+        (into the runner's own `~/.config/karabiner/karabiner.json`) and fails
+        on any ERROR, without needing the Karabiner driver.
+41. [ ] Remaining direct `hs.json.decode` calls (ratchet
+        `tests/meta/test_json_decode_through_codec.lua`, 21 calls in 19 files):
+        they only read what they decode today; move them to
+        `adapters/json_codec.lua`, which returns a tree, and lower the
+        baseline. Audit the other hs stubs for the same kind of divergence from
+        the native behaviour.
 
 ## Time estimate
 
