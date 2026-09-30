@@ -5,8 +5,9 @@
 --- ==============================================================================
 --- MODULE: HID Key Identity (macOS)
 --- DESCRIPTION:
---- Every registry key by HID usage page and usage, with the macOS virtual
---- keycode the metrics store for it. `kc` is the same on every registry form;
+--- Every key by HID usage page and usage (registry keys, their aliases, and
+--- the keys no layer can bind), with the macOS virtual keycode the metrics
+--- store for it. `kc` is the same on every registry form;
 --- a key whose keycode depends on the keyboard type carries one keycode per
 --- form instead. modules/keylogger/physical_key_identity.lua owns the policy
 --- that reads it.
@@ -62,6 +63,7 @@ return {
 			[47] = { code = "BracketLeft", kc = 33 },
 			[48] = { code = "BracketRight", kc = 30 },
 			[49] = { code = "Backslash", kc = 42 },
+			[50] = { code = "Backslash", kc = 42 },
 			[51] = { code = "Semicolon", kc = 41 },
 			[52] = { code = "Quote", kc = 39 },
 			[53] = { code = "Backquote", ansi = 50, iso = 10 },
@@ -81,6 +83,9 @@ return {
 			[67] = { code = "F10", kc = 109 },
 			[68] = { code = "F11", kc = 103 },
 			[69] = { code = "F12", kc = 111 },
+			[70] = { code = "PrintScreen", kc = 105 },
+			[71] = { code = "ScrollLock", kc = 107 },
+			[72] = { code = "Pause", kc = 113 },
 			[73] = { code = "Insert", kc = 114 },
 			[74] = { code = "Home", kc = 115 },
 			[75] = { code = "PageUp", kc = 116 },
@@ -110,6 +115,23 @@ return {
 			[99] = { code = "NumpadDecimal", kc = 65 },
 			[100] = { code = "IntlBackslash", ansi = 10, iso = 50 },
 			[101] = { code = "ContextMenu", kc = 110 },
+			[103] = { code = "NumpadEqual", kc = 81 },
+			[104] = { code = "F13", kc = 105 },
+			[105] = { code = "F14", kc = 107 },
+			[106] = { code = "F15", kc = 113 },
+			[107] = { code = "F16", kc = 106 },
+			[108] = { code = "F17", kc = 64 },
+			[109] = { code = "F18", kc = 79 },
+			[110] = { code = "F19", kc = 80 },
+			[111] = { code = "F20", kc = 90 },
+			[127] = { code = "AudioVolumeMute", kc = 74 },
+			[128] = { code = "AudioVolumeUp", kc = 72 },
+			[129] = { code = "AudioVolumeDown", kc = 73 },
+			[133] = { code = "NumpadComma", kc = 95 },
+			[135] = { code = "IntlRo", kc = 94 },
+			[137] = { code = "IntlYen", kc = 93 },
+			[144] = { code = "Lang1", kc = 104 },
+			[145] = { code = "Lang2", kc = 102 },
 			[224] = { code = "ControlLeft", kc = 59 },
 			[225] = { code = "ShiftLeft", kc = 56 },
 			[226] = { code = "AltLeft", kc = 58 },

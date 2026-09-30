@@ -14,14 +14,16 @@
 ---    across the switch.
 --- 2. Registry-owned: every keyboard and consumer key resolves through
 ---    _generated/hid_key_identity.lua, generated from the shared physical-key
----    registry and its HID companion hid_usages.json; this module holds no
----    usage table of its own.
+---    registry and its HID companion hid_usages.json, which also lists the
+---    further usages keyboards send for a known key (Non-US # is Backslash) and
+---    the keys no layer can bind (F13 to F20, keypad =, the JIS keys); this
+---    module holds no usage table of its own.
 --- 3. ISO swap: the registry places a usage by the USB HID usage tables, and
 ---    macOS reports the key left of 1 (usage 0x35) and the key left of Z (0x64)
 ---    with swapped keycodes on an ISO keyboard (macos_iso in the registry). Only
 ---    a key whose keycode differs by form needs the device's keyboard type; every
 ---    other key resolves without it. A keyboard type the registry has no form for
----    (JIS) leaves only those keys unattributed.
+---    (JIS) leaves only those two positions unattributed; the JIS keys resolve.
 --- 4. fn/globe is counted: Apple keyboards report it as usage 0x0003 on a vendor
 ---    page, the top case page (0x00FF) or the Apple keyboard page (0xFF01). It
 ---    resolves to the fn keycode Quartz reports in flagsChanged (keycodes.FUNCTION).

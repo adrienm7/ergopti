@@ -21,10 +21,14 @@
  *    registry form is emitted as `kc`; only a record whose keycode differs by
  *    form (the ISO swap of the keys left of 1 and left of Z) is emitted with one
  *    keycode per form, so the consumer needs a keyboard type for those keys only.
- * 3. Refuses instead of guessing: a key without a HID usage, a usage for an
- *    unknown key, a duplicate usage or a usage outside its page's range fails
- *    the generation.
- * 4. Pure data, no runtime JSON: the Hammerspoon keylogger requires a Lua table
+ * 3. Every usage a keyboard sends for a known key: a registry key's aliases
+ *    (the PC ISO Non-US # usage is Backslash) resolve like its main usage, and
+ *    the keys no layer can bind (F13 to F20, keypad =, the JIS keys) come from
+ *    hid_usages.json's unregistered table with their macOS keycode.
+ * 4. Refuses instead of guessing: a key without a HID usage, a usage for an
+ *    unknown key, an unregistered key the registry does know, a duplicate usage
+ *    or a usage outside its page's range fails the generation.
+ * 5. Pure data, no runtime JSON: the Hammerspoon keylogger requires a Lua table
  *    and never parses the registry on the capture path.
  *
  * USAGE:  node tools/codegen/codegen-hid-key-identity-hs.cjs
@@ -53,11 +57,16 @@ function fail(message) {
 }
 
 const registry = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
-const hidUsages = JSON.parse(fs.readFileSync(HID_USAGES, 'utf8')).keys || {};
+const hidData = JSON.parse(fs.readFileSync(HID_USAGES, 'utf8'));
+const hidUsages = hidData.keys || {};
+const unregistered = hidData.unregistered || {};
 for (const code of Object.keys(hidUsages)) {
 	const entry = (registry.keys || {})[code];
 	if (!entry || entry.kind !== 'key') fail(`hid_usages.json names ${code}, not a registry key.`);
 }
+for (const code of Object.keys(unregistered))
+	if ((registry.keys || {})[code] !== undefined)
+		fail(`${code} is a registry key; give it a usage under keys, not unregistered.`);
 const forms = registry.forms;
 if (!Array.isArray(forms) || forms.length === 0) fail('the registry declares no forms.');
 
@@ -69,15 +78,14 @@ function keycodeOn(entry, form) {
 }
 
 const pages = new Map();
-for (const [code, entry] of Object.entries(registry.keys || {})) {
-	if (entry.kind !== 'key') continue;
-	const hid = hidUsages[code];
+
+/** Records one usage of one key, refusing a malformed or duplicate usage. */
+function record(code, hid, byForm) {
 	if (!hid || typeof hid !== 'object') fail(`${code} has no HID usage in hid_usages.json.`);
 	const max = USAGE_MAX[hid.page];
 	if (max === undefined) fail(`${code}: usage page ${hid.page} is not a key page.`);
 	if (!Number.isInteger(hid.usage) || hid.usage < 1 || hid.usage > max)
 		fail(`${code}: usage ${hid.usage} is outside page ${hid.page}.`);
-	const byForm = forms.map((form) => keycodeOn(entry, form));
 	for (const kc of byForm)
 		if (!Number.isInteger(kc) || kc < 0) fail(`${code}: keycode ${kc} is not a macOS keycode.`);
 	if (!pages.has(hid.page)) pages.set(hid.page, new Map());
@@ -86,6 +94,20 @@ for (const [code, entry] of Object.entries(registry.keys || {})) {
 		fail(`${code} and ${usages.get(hid.usage).code} share usage ${hid.page}:${hid.usage}.`);
 	usages.set(hid.usage, { code, byForm });
 }
+
+for (const [code, entry] of Object.entries(registry.keys || {})) {
+	if (entry.kind !== 'key') continue;
+	const hid = hidUsages[code];
+	const byForm = forms.map((form) => keycodeOn(entry, form));
+	record(code, hid, byForm);
+	for (const alias of (hid && hid.aliases) || []) record(code, alias, byForm);
+}
+for (const [code, entry] of Object.entries(unregistered))
+	record(
+		code,
+		entry,
+		forms.map(() => entry.hs)
+	);
 if (pages.size === 0) fail('the registry yields no HID usage — refusing an empty table.');
 
 /** A Lua double-quoted literal. */
@@ -99,8 +121,9 @@ lines.push('');
 lines.push('--- ==============================================================================');
 lines.push('--- MODULE: HID Key Identity (macOS)');
 lines.push('--- DESCRIPTION:');
-lines.push('--- Every registry key by HID usage page and usage, with the macOS virtual');
-lines.push('--- keycode the metrics store for it. `kc` is the same on every registry form;');
+lines.push('--- Every key by HID usage page and usage (registry keys, their aliases, and');
+lines.push('--- the keys no layer can bind), with the macOS virtual keycode the metrics');
+lines.push('--- store for it. `kc` is the same on every registry form;');
 lines.push('--- a key whose keycode depends on the keyboard type carries one keycode per');
 lines.push('--- form instead. modules/keylogger/physical_key_identity.lua owns the policy');
 lines.push('--- that reads it.');

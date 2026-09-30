@@ -6,7 +6,9 @@
 --- Checks that a raw HID usage resolves to the macOS keycode the metrics store
 --- for that physical key: through the shared registry on either keyboard form,
 --- with the ISO swap of the keys left of 1 and left of Z, fn/globe on both Apple
---- vendor pages, and an explicit reason for every usage without an identity.
+--- vendor pages, the further usages real keyboards send for known keys (Non-US #,
+--- F13 to F20, keypad =, the JIS keys), and an explicit reason for every usage
+--- without an identity.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,7 +25,8 @@ local PAGE_APPLE_KEYBOARD = 0xFF01
 -- Keyboard-page usages of the ISO swap pair and of keys outside the registry.
 local USAGE_GRAVE = 0x35
 local USAGE_NON_US_BACKSLASH = 0x64
-local USAGE_F13 = 0x68
+local USAGE_NON_US_HASH = 0x32
+local USAGE_F21 = 0x70
 
 --- Loads one shipped keycode data file.
 --- @param name string File name under _shared/data/keycodes.
@@ -97,9 +100,33 @@ helpers.describe("physical key identity (hs274)", function()
 		helpers.assert_eq(Identity.resolve(PAGE_CONSUMER, 0xEA, "none"), 73, "Volume down")
 	end)
 
+	helpers.it("resolves the PC ISO key left of Return as Backslash on every keyboard type", function()
+		for _, keyboard_type in ipairs({ "ansi", "iso", "jis" }) do
+			helpers.assert_eq(Identity.resolve(PAGE_KEYBOARD, USAGE_NON_US_HASH, keyboard_type), 42,
+				"Non-US # on " .. keyboard_type)
+		end
+	end)
+
+	helpers.it("resolves the keys real keyboards send that no layer can bind", function()
+		for _, case in ipairs({
+			{ 0x46, 105, "PrintScreen is F13 on macOS" },
+			{ 0x47, 107, "ScrollLock is F14 on macOS" },
+			{ 0x48, 113, "Pause is F15 on macOS" },
+			{ 0x67, 81, "keypad =" },
+			{ 0x68, 105, "F13" }, { 0x69, 107, "F14" }, { 0x6A, 113, "F15" }, { 0x6B, 106, "F16" },
+			{ 0x6C, 64, "F17" }, { 0x6D, 79, "F18" }, { 0x6E, 80, "F19" }, { 0x6F, 90, "F20" },
+			{ 0x85, 95, "JIS keypad comma" }, { 0x87, 94, "JIS Ro" }, { 0x89, 93, "JIS Yen" },
+			{ 0x90, 104, "JIS Kana" }, { 0x91, 102, "JIS Eisu" },
+			{ 0x7F, 74, "keyboard-page Mute" }, { 0x80, 72, "keyboard-page Volume Up" },
+			{ 0x81, 73, "keyboard-page Volume Down" },
+		}) do
+			helpers.assert_eq(Identity.resolve(PAGE_KEYBOARD, case[1], "jis"), case[2], case[3])
+		end
+	end)
+
 	helpers.it("gives every usage without an identity a reason instead of a guess", function()
 		for _, case in ipairs({
-			{ PAGE_KEYBOARD, USAGE_F13, "ansi" },   -- F13: not in the registry
+			{ PAGE_KEYBOARD, USAGE_F21, "ansi" },   -- F21: no macOS keycode
 			{ PAGE_CONSUMER, 0xCD, "none" },        -- Play/Pause: no macOS keycode
 			{ PAGE_TOP_CASE, 0x04, "ansi" },        -- a top case usage other than fn
 			{ 0x08, 0x01, "ansi" },                 -- not a key page at all
