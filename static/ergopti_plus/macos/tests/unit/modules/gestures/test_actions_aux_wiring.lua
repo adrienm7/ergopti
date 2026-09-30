@@ -27,7 +27,9 @@ helpers.describe("gesture Actions exact-owner wiring", function()
 		helpers.assert_eq(actions.execute_single("open_config"), true)
 		helpers.assert_eq(#calls.applescript, 1)
 		helpers.assert_eq(#calls.open, 1)
-		helpers.assert_eq(calls.open[1].target, "/tmp/ergopti/config.toml")
+		-- The configuration folder, not hs.configdir ("/tmp/ergopti" here), which is
+		-- the application bundle once installed (hardening-b-installed-layout).
+		helpers.assert_eq(calls.open[1].target, "/fixture/config/config.toml")
 
 		helpers.assert_eq(actions.execute_single("screenshot_region_clipboard"), true)
 		helpers.assert_eq(actions.execute_single("screenshot_window_save"), true)

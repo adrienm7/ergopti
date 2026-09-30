@@ -2010,6 +2010,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-hardening-c-ahk-scan-code-precedence.cjs'
 	},
 	{
+		name: 'no macOS or Linux module builds a user-data path inside the installed driver folder (hardening-b)',
+		cmd: 'node',
+		args: ['tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs'],
+		repro: 'node tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs'
+	},
+	{
 		name: 'tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)',
 		cmd: 'node',
 		args: ['tools/test/find-false-greens.cjs'],

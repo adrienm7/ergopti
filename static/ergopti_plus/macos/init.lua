@@ -397,12 +397,20 @@ Boot.stage("TOML hotstring cache wired")
 -- it, and the same-boot delay-reading pass also hits the snapshot. Kept in an
 -- adapter so _shared/ stays filesystem-free (the reader sees only a load/store hook).
 --
--- Declared here rather than inline because the file watchers must EXCLUDE this
--- directory: it sits inside the watched driver tree and the snapshots are .lua
--- files, so every cache write looked like a source edit and reloaded the driver.
--- Two spellings of the path is exactly how the writer and the watcher would
--- drift apart again.
-local TOML_CACHE_DIR = (hs.configdir or ".") .. "/cache/toml_hotstrings"
+-- The snapshots live in the user's Caches folder. They lived under hs.configdir,
+-- which is the signed application bundle once installed: every boot created
+-- cache/toml_hotstrings inside it (hardening-b-installed-layout), altering a
+-- sealed bundle where it was writable and losing the cache where it was not.
+-- Declared here rather than inline because the file watchers must still EXCLUDE
+-- this directory whenever a source checkout's watched tree contains it; two
+-- spellings of the path is how the writer and the watcher would drift apart.
+local TOML_CACHE_DIR = nil
+do
+	local home = os.getenv("HOME")
+	if type(home) == "string" and home ~= "" then
+		TOML_CACHE_DIR = home .. "/Library/Caches/" .. require("app_dirs").folder_name .. "/toml_hotstrings"
+	end
+end
 do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
@@ -1904,9 +1912,9 @@ local file_watchers_committed = require("infra.file_watchers").start({
 		config_paths.get("ConfigTomlPath"),
 		config_paths.get("KarabinerConfigPath"),
 	},
-	-- Runtime store, not source: the TOML snapshot cache lives inside the
-	-- watched driver tree and writes .lua files, so without this every cache
-	-- refresh triggered a full reload — and the reload re-warms the cache.
+	-- Runtime store, not source: the TOML snapshot cache writes .lua files, so
+	-- wherever a watched tree contains it every cache refresh would trigger a
+	-- full reload — and the reload re-warms the cache.
 	ignored_dirs            = { TOML_CACHE_DIR },
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
