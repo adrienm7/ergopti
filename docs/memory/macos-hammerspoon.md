@@ -241,6 +241,17 @@ way (`tests/unit/adapters/test_json_codec_tree.lua`), and
 `tests/meta/test_json_decode_through_codec.lua` ratchets the remaining direct
 calls, which only read what they decode.
 
+### project-hs-modal-dialog-parks-the-logger-pump
+
+`hs.dialog.blockAlert`, `textPrompt`, `chooseFileOrFolder` and a synchronous
+`hs.osascript` `display dialog` park the main run loop: timers stop, so the
+native logger transport can neither resend nor read its ACK. Its stall
+budget used wall time, so a user reading a dialog for thirty seconds made the
+driver exit ("did not ACK retained sequence 128 within the 30000 ms stall
+budget (3 sends)"). The budget now counts running pump time, a parked gap
+counting at most `ack_retry_cap_ms` (`transport-parked-run-loop`). Any other
+wall-clock watchdog that runs on hs.timer has the same exposure.
+
 ### project-hs-native-task-lifecycle-contract
 
 Task construction, start, callback, timeout, and teardown are distinct failure

@@ -658,13 +658,15 @@ flush_interval_ms = 500
 # HS: adapters/log_transport.lua ACK_RETRY_SEC (seconds).
 ack_retry_ms = 500
 
-# Longest wait between two resends of the same batch.
+# Longest wait between two resends of the same batch, and the most a parked
+# run loop (a modal dialog, a busy main thread) counts against stall_fatal_ms.
 # HS: adapters/log_transport.lua ACK_RETRY_CAP_SEC (seconds).
 ack_retry_cap_ms = 4000
 
-# How long the native worker may leave one batch unacknowledged before the
-# transport is declared failed and the driver exits. A slow disk, a sync tool
-# or App Nap can stall it for seconds; that is not a failure.
+# How long the native worker may leave one batch unacknowledged, in running
+# pump time, before the transport is declared failed and the driver exits. A
+# slow disk, a sync tool or App Nap can stall it for seconds; that is not a
+# failure, and neither is a dialog the user reads while the run loop is parked.
 # HS: adapters/log_transport.lua STALL_FATAL_SEC (seconds).
 stall_fatal_ms = 30000
 
