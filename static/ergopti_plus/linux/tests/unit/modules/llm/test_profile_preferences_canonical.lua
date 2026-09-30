@@ -147,6 +147,30 @@ helpers.describe("canonical Linux prompt profiles", function()
 		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm", "user_profiles" })
 	end)
 
+	for _, stored in ipairs({ "user_profiles = '[{\"id\":\"user_old\"}]'", "user_profiles = [\"user_old\"]" }) do
+		helpers.it("never overwrites an older build's registry: " .. stored .. " (config-outdated-llm-profiles-write)",
+			function()
+				-- Read as no user profile, it was replaced by the next save or delete,
+				-- erasing every prompt the user had written.
+				local source = "[llm]\n" .. stored .. "\n"
+				with_config(source, function(settings, path)
+					local Logger = require("logger.shim")
+					local real_error, errors = Logger.error, {}
+					Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+					local ok, err = pcall(function()
+						helpers.assert_eq(settings.list_user(), {})
+						helpers.assert_eq(settings.save_user_profile(profile(), true, false), false)
+						helpers.assert_eq(settings.delete_user_profile("user_old"), false)
+						helpers.assert_eq(Sandbox.read_bytes(path), source, "the old registry is left byte for byte")
+						helpers.assert_eq(#errors, 2, "each refused write is one named ERROR: " .. table.concat(errors, " | "))
+						for _, line in ipairs(errors) do helpers.assert_contains(line, "llm.user_profiles") end
+					end)
+					Logger.error = real_error
+					if not ok then error(err, 0) end
+				end)
+			end)
+	end
+
 	helpers.it("warns once, never an ERROR, about a stored profile it cannot offer (config-outdated-llm-profiles)", function()
 		local stale = profile(); stale.id = "user_stale"; stale.retired_field = 1
 		local registry = "v1:" .. Base64.encode(Json.encode({ profile(), stale }))
