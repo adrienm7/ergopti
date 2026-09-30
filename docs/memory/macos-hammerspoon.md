@@ -252,6 +252,15 @@ budget (3 sends)"). The budget now counts running pump time, a parked gap
 counting at most `ack_retry_cap_ms` (`transport-parked-run-loop`). Any other
 wall-clock watchdog that runs on hs.timer has the same exposure.
 
+### project-karabiner-cli-reads-no-user-variables
+
+`karabiner_cli` can set variables (`--set-variables`) but has no option to
+read one: the CapsWord pointer probe called `--get-variable`, and cxxopts
+answers any unknown option with exit status 2 ("error parsing options"). Its
+real option list is in Karabiner-Elements `src/bin/cli/src/main.cpp`; check
+it before passing a new flag. User variables are only visible in
+EventViewer, not to the CLI.
+
 ### project-hs-native-task-lifecycle-contract
 
 Task construction, start, callback, timeout, and teardown are distinct failure

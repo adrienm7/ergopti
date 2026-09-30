@@ -50,12 +50,16 @@ local function fresh_harness(options)
 		eventtap_stop_attempts = 0,
 		timer_cancel_attempts = {},
 		logged_errors = {},
+		logged_warnings = {},
 		revision = options.revision or 0,
 		pending_activation = options.pending_activation == true,
 	}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_module, format_string, ...)
 		h.logged_errors[#h.logged_errors + 1] = string.format(format_string, ...)
+	end
+	logger.warn = function(_module, format_string, ...)
+		h.logged_warnings[#h.logged_warnings + 1] = string.format(format_string, ...)
 	end
 	logger.pcall = function(module, fn, ...)
 		local results = table.pack(pcall(fn, ...))
@@ -300,6 +304,28 @@ helpers.describe("watchers CapsWord uses one exact serialized writer", function(
 		pointer(h)
 		helpers.assert_eq(#h.tasks, 2,
 			"the failed probe must release the guard for a later pointer event")
+	end)
+
+	helpers.it("(capsword-probe-unsupported) karabiner_cli rejecting --get-variable is reported once, never retried", function()
+		-- A user saw "CapsWord variable probe exited with status 2" on every
+		-- mouse movement: karabiner_cli has no --get-variable option, and exit 2
+		-- is its unknown-option status.
+		local h = fresh_harness()
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 1)
+		h.tasks[1].callback(2, "error parsing options: Option 'get-variable' does not exist", "")
+		helpers.assert_eq(#h.logged_errors, 0, "an unsupported probe is not an error on every pointer event")
+		helpers.assert_eq(#h.logged_warnings, 1, "the limitation is reported once")
+		helpers.assert_contains(h.logged_warnings[1], "--get-variable")
+		for _ = 1, 5 do pointer(h) end
+		helpers.assert_eq(#h.tasks, 1, "no later pointer event spawns the refused probe again")
+		helpers.assert_eq(#h.logged_warnings, 1)
+		helpers.assert_eq(#h.capslock, 0, "an unknown CapsWord state leaves CapsLock alone")
+
+		h.pending_activation = true
+		pointer(h)
+		helpers.assert_eq(#h.writers, 1, "a CapsWord this driver activated is still cancelled")
+		helpers.assert_eq(h.writers[1].kind, "supersede")
 	end)
 
 	helpers.it("CapsWord watcher: supersedes an in-flight local activation before launching a probe", function()
