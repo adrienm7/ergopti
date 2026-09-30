@@ -37,6 +37,7 @@ local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
+local Agent     = require("llm.agent")
 local LOG       = "preferences"
 
 
@@ -357,6 +358,33 @@ local function persisted_units_fit(spec, value)
 	return true
 end
 
+--- Owners' rules for scalars whose value set is closed beyond the manifest's
+--- Lua type. The agent's modes are shared with every driver (llm.agent).
+local SCALAR_VALUE_RULES = {
+	llm_agent_mode = function(value)
+		if Agent.MODES[value] then return true end
+		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
+	end,
+}
+
+--- Whether a persisted scalar still holds a value its owner accepts: its own
+--- rule, or membership of its manifest enum (ui.menubar_icon). A retired value
+--- reaching the state was replayed into a refusal (an agent mode's boot ERROR)
+--- or drawn with an ERROR; it is outdated configuration instead.
+--- @param flat_key string Flat state key.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function scalar_value_fits(flat_key, value)
+	if SCALAR_VALUE_RULES[flat_key] then return SCALAR_VALUE_RULES[flat_key](value) end
+	local spec = KEY_MAP[flat_key]
+	if not spec then return true end
+	local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or flat_key)
+	local entry = Manifest.find_entry_by_path(path)
+	if type(entry) ~= "table" or entry.type ~= "enum" then return true end
+	return ConfigOutdated.manifest_value_fits(entry, value, "hs")
+end
+
 --- Resolves canonical defaults/operations into the units used by their native owner.
 --- @param path string Canonical configuration path.
 --- @param value any Value expressed in persisted units.
@@ -512,6 +540,7 @@ local function flatten_from_disk(grouped, mark)
 			fits, detail = ConfigOutdated.manifest_value_fits(
 				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
 		end
+		if fits then fits, detail = scalar_value_fits(flat_key, value) end
 		if not fits then
 			ConfigOutdated.report({ ... }, detail)
 			return
