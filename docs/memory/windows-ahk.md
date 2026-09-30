@@ -245,6 +245,28 @@ the native route (same committed plan entry, #InputLevel 1, exact modifiers,
 owner routing a multi-slot record); when the DLL is next rebuilt, suppress cycle
 routes natively and retire the AHK swallowers.
 
+### project-llm-tap-hold-tab-is-the-users-tab
+
+The recommended AltGr taps Tab (`_shared/tap_hold/defaults.toml`), and a
+tap-hold's tap runs on its key's release, so Tab is never physically down and
+the old "physical Tab" policy refused it as synthetic: the Tab was typed over
+every prediction. `TapHoldDispatchTap` names the key whose tap it runs
+(`TapHoldTapProvenance`), and `_LLM_Accept_BareTabRefusal` accepts that Tab only
+while the same tap is still dispatched, bare and in the rendered control.
+Action: give a new user-key Tab producer that provenance; never pass one from a
+gesture, macro, timer or text send (`test_llm_menu_tab_source_hwnd.ahk`).
+
+### project-llm-validation-digit-is-the-digit-row-key
+
+The validation chord's native route was resolved by `VkKeyScanExW` of the digit
+character, Shift+VK_1 on an AZERTY host, while the recommended digit-row
+emulation (`direct_access_digits`) types 1 with the bare key: the chord never
+matched and the digit was typed. `_LLM_Menu_NavDigitRowKey` binds digits to
+VK_0..VK_9 with exactly the configured modifiers, like the macOS keycodes and
+the Linux digit-row codes. The Ctrl+1..9 profile hotkeys still follow the
+character. Action: keep the navigation plan layout-independent; a French
+fixture must yield the same digit identities as a US one.
+
 ### project-ahk-probing-synthetic-input
 
 Tests of injected input must prove provenance and destination, not merely that a

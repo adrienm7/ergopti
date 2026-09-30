@@ -328,11 +328,13 @@ per-render keyDown watcher and the keymap fallback `handle_llm_keys`, and tap
 restarts decide which runs first; the fallback must match the watcher (Up is
 the previous slot) and run before the keymap's idle word wipe, which resets the
 predictions. Windows swallows in AHK what the native owner cycles
-(`project-llm-nav-cycle-routes-pass-through`). Linux reads the digit by its
-physical digit-row key (`EvdevCodes.DIGIT_ROW_SLOT`): the typed character made
-Shift+2 an `@` that never matched. Only macOS also navigates with ←/→ and
-Shift+Tab. Action: change the rule on all three drivers with the
-`llm-tooltip-chords-consumed` matrix tests.
+(`project-llm-nav-cycle-routes-pass-through`). The validation digit is the
+digit-row key on every driver: macOS keycodes, Linux `EvdevCodes.DIGIT_ROW_SLOT`
+(the typed character made Shift+2 an `@` that never matched) and Windows
+`_LLM_Menu_NavDigitRowKey`. A tap-hold whose tap is Tab is the user's Tab
+(`project-llm-tap-hold-tab-is-the-users-tab`). Only macOS also navigates with
+←/→ and Shift+Tab. Action: change the rule on all three drivers with the
+`llm-tooltip-chords-consumed` and `llm-accept-inserts` tests.
 
 ## Logging and observability
 
