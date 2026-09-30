@@ -1,5 +1,5 @@
 --- _generated/hid_key_identity.lua
---- AUTO-GENERATED from _shared/data/keycodes/physical_keys.json.
+--- AUTO-GENERATED from _shared/data/keycodes/{physical_keys,hid_usages}.json.
 --- DO NOT EDIT BY HAND — run `npm run codegen:hid-key-identity:hs` to refresh.
 
 --- ==============================================================================
