@@ -250,7 +250,10 @@ budget used wall time, so a user reading a dialog for thirty seconds made the
 driver exit ("did not ACK retained sequence 128 within the 30000 ms stall
 budget (3 sends)"). The budget now counts running pump time, a parked gap
 counting at most `ack_retry_cap_ms` (`transport-parked-run-loop`). Any other
-wall-clock watchdog that runs on hs.timer has the same exposure.
+wall-clock watchdog that runs on hs.timer has the same exposure: the Karabiner
+lease ACK timeout fenced the live lease ("timeout waiting for PONG 159") until
+a timeout that fires late got one grace of running time to read the pipe
+(`lease-parked-run-loop`).
 
 ### project-karabiner-cli-reads-no-user-variables
 

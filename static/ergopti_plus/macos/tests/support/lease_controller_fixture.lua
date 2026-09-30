@@ -34,6 +34,7 @@ local function load_controller(options)
 	package.loaded["infra.logger"] = logger
 
 	local ctx = {
+		clock = 0,
 		spawns = {},
 		timers = {},
 		uuid_index = 0,
@@ -116,6 +117,9 @@ local function load_controller(options)
 	}
 
 	package.loaded["adapters.timer_scheduler"] = {
+		-- Seconds on the fixture's clock; tests advance ctx.clock to model a
+		-- run loop parked past a deadline.
+		awake_time = function() return ctx.clock end,
 		after = function(_delay, fn)
 			if ctx.next_after_error then
 				local err = ctx.next_after_error

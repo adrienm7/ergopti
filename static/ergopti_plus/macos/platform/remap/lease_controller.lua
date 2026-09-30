@@ -38,6 +38,13 @@ local LOG = "karabiner.lease"
 local READY_ACK_TIMEOUT_SEC = 4.0
 local COMMAND_ACK_TIMEOUT_SEC = 2.0
 local STOP_ACK_TIMEOUT_SEC = 7.0
+-- An ACK timeout that fires this much later than due was held by a parked run
+-- loop (a modal dialog, a busy main thread). The worker's answer may be waiting
+-- in the pipe behind it, so the deadline is extended once by ACK_GRACE_SEC of
+-- running time before the generation fails. A user who kept a dialog open
+-- while a heartbeat was in flight saw "timeout waiting for PONG 159".
+local PARKED_RUN_LOOP_LATENESS_SEC = 0.5
+local ACK_GRACE_SEC = 1.0
 local HEARTBEAT_INTERVAL_SEC = 5 -- Bounds Core Service reset recovery without a 1 Hz CLI loop.
 local HEARTBEAT_RETRY_SEC = 1.0
 local MAX_CONSECUTIVE_HEARTBEAT_FAILURES = 2
@@ -777,12 +784,15 @@ end
 --- Arms a bounded timeout for one expected protocol acknowledgement.
 --- @param generation table Generation awaiting the ACK.
 --- @param expected string Expected protocol line.
-local function arm_ack_timer(generation, expected)
+--- @param grace boolean|nil Whether this is the one extension after a parked run loop.
+local function arm_ack_timer(generation, expected, grace)
 	cancel_ack_timer(generation)
 	generation.awaiting = expected
 	local timeout = COMMAND_ACK_TIMEOUT_SEC
 	if expected == "READY" then timeout = READY_ACK_TIMEOUT_SEC end
 	if expected == "STOPPED" then timeout = STOP_ACK_TIMEOUT_SEC end
+	if grace then timeout = ACK_GRACE_SEC end
+	local armed_at = TimerScheduler.awake_time()
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
@@ -797,6 +807,13 @@ local function arm_ack_timer(generation, expected)
 		if generation.ack_timer ~= timer
 			or generation.awaiting ~= expected or generation.failed then return end
 		generation.ack_timer = nil
+		if not grace and TimerScheduler.awake_time() - armed_at - timeout > PARKED_RUN_LOOP_LATENESS_SEC then
+			Logger.debug(LOG,
+				"Karabiner lease %s: %s timeout fired late after a parked run loop; reading the pipe first.",
+				generation.token, expected)
+			arm_ack_timer(generation, expected, true)
+			return
+		end
 		fail_generation(generation, "timeout waiting for " .. expected)
 	end)
 	if schedule_ok then timer = timer_or_err end
