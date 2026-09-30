@@ -135,7 +135,7 @@ end
 --- @return boolean shown
 local function present(cause)
 	if _asking then
-		Logger.info(LOG, "An MLX repair dialog is already open; this failure waits for it.")
+		Logger.info(LOG, "An MLX repair dialog is already open; this failure is only logged.")
 		return false
 	end
 	cause = resolve_cause(cause)
@@ -143,8 +143,15 @@ local function present(cause)
 	Logger.warn(LOG, "Offering the MLX %s action for a %s failure.",
 		tostring(dialog.action or "acknowledge"), tostring(cause.kind))
 	_asking = true
-	local ok, choice = pcall(dialogs().block_alert, dialog.title, dialog.body,
-		dialog.primary, dialog.secondary, "warning")
+	local ok, choice
+	if dialog.secondary == nil then
+		-- The native alert types its optional arguments: a nil second button
+		-- followed by a style is not "no button", so a notice passes neither.
+		ok, choice = pcall(dialogs().block_alert, dialog.title, dialog.body, dialog.primary)
+	else
+		ok, choice = pcall(dialogs().block_alert, dialog.title, dialog.body,
+			dialog.primary, dialog.secondary, "warning")
+	end
 	_asking = false
 	if not ok then
 		Logger.error(LOG, "The MLX repair dialog could not be shown: %s", tostring(choice))

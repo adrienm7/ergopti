@@ -203,9 +203,11 @@ local function load_world(world)
 		end,
 	})
 	package.loaded["infra.dialog_util"] = {
-		block_alert = function(title, body, primary, secondary)
+		block_alert = function(...)
+			local title, body, primary, secondary = ...
 			world.dialogs[#world.dialogs + 1] = {
 				title = title, body = body, primary = primary, secondary = secondary,
+				argument_count = select("#", ...),
 			}
 			local answer = table.remove(world.answers, 1)
 			if answer == "primary" then return primary end
@@ -645,6 +647,19 @@ helpers.describe("A Mac that cannot run MLX is told so and offered Ollama (mlx-b
 			world.dialogs[1].body)
 		helpers.assert_eq(world.dialogs[1].primary, "Utiliser Ollama")
 		helpers.assert_eq(world.alternatives, 1, "the button selects Ollama")
+	end))
+
+	helpers.it("shows one OK button, never a nil second one, when Ollama is not offered", scoped(function()
+		local world = new_world({ uname = "x86_64" })
+		local _, router = load_world(world)
+		speak("fr")
+		helpers.assert_eq(router.select_mlx(), false)
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 1)
+		helpers.assert_eq(world.dialogs[1].primary, "OK")
+		helpers.assert_eq(world.dialogs[1].secondary, nil)
+		helpers.assert_eq(world.dialogs[1].argument_count, 3,
+			"a nil second button followed by a style is refused by the native alert")
 	end))
 
 	helpers.it("refuses macOS 13 on Apple Silicon, and lets an unreadable probe try", scoped(function()
