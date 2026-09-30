@@ -72,8 +72,12 @@ local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
 -- The launcher's registration role runs at most five bounded launchctl steps
--- (3 s each plus a 0.25 s termination grace) and one 3 s guardian health wait.
-local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 20.0
+-- (3 s each plus a 0.25 s termination grace) and two 3 s guardian health waits
+-- (a loaded job whose health check fails is booted out and bootstrapped again):
+-- 22.25 s. The deadline keeps 2 s over that for the pipe and the main thread;
+-- at 20 s it killed a slow registration that was still inside its own budget
+-- (hardening-d-native-timeout-contract).
+local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 25.0
 local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
 local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
