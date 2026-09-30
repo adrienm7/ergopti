@@ -722,6 +722,9 @@ platform = "all"
 [sg_actions.screenshot_fullscreen_clipboard]
 platform = "all"
 
+# Every screen, saved at once with no selection: the recommended action of the
+# number-row key left of 1. Windows captures the virtual screen, Linux the
+# whole desktop, macOS one file per display.
 [sg_actions.screenshot_fullscreen_save]
 platform = "all"
 
@@ -928,8 +931,7 @@ emit_ahk = "^{Right}^+{Left}"
 # Opens the operating system's own capture tool through the shortcut the OS
 # reserves for it: the Snipping Tool overlay (Win+Shift+S), the macOS
 # Screenshot toolbar (Cmd+Shift+5), and whatever the Linux desktop binds to
-# Print (GNOME's screenshot UI, KDE Spectacle, Xfce Screenshooter). The
-# number-row tap key left of 1 runs it by default.
+# Print (GNOME's screenshot UI, KDE Spectacle, Xfce Screenshooter).
 platform = "all"
 emit_ahk = "#+s"
 emit_hs_key = "5"

@@ -434,6 +434,16 @@ function M.save(flags, prefix, parent)
 		report_failure("target allocation", "target directory is invalid")
 		return false
 	end
+	-- screencapture writes one file per display it is given and captures the
+	-- main display alone when given one file: a whole-screen capture (no area
+	-- flag) names a file for every display, as Cmd+Shift+3 saves one per screen.
+	local targets = { target }
+	if #flags == 0 then
+		local displays = require("adapters.mouse_control").getMonitorCount()
+		for index = 2, displays do
+			targets[index] = (target:gsub("%.png$", "_" .. index .. ".png"))
+		end
+	end
 
 	local operation = create_operation("saved screenshot", scope_id)
 	if not operation then return false end
@@ -446,18 +456,24 @@ function M.save(flags, prefix, parent)
 
 		local args = {}
 		for _, flag in ipairs(flags) do args[#args + 1] = tostring(flag) end
-		args[#args + 1] = target
+		for _, path in ipairs(targets) do args[#args + 1] = path end
 		local mark = CaptureFlow.clipboard_mark()
 		return start_task(operation, SCREENCAPTURE_BIN, args,
 			function(capture_exit_code, _, capture_stderr)
-				local outcome, detail = CaptureFlow.settle({
-					path = target,
-					mark = mark,
-					exit_code = capture_exit_code,
-					stderr = capture_stderr,
-					interactive = CaptureFlow.is_interactive(flags),
-					destination = "file",
-				})
+				-- Every display's file is verified: one missing image is a failed
+				-- capture, not a saved one.
+				local outcome, detail
+				for _, path in ipairs(targets) do
+					outcome, detail = CaptureFlow.settle({
+						path = path,
+						mark = mark,
+						exit_code = capture_exit_code,
+						stderr = capture_stderr,
+						interactive = CaptureFlow.is_interactive(flags),
+						destination = "file",
+					})
+					if outcome ~= CaptureFlow.OUTCOME_SAVED then break end
+				end
 				return report_capture_outcome(operation, outcome, detail, target,
 					"shortcuts.screenshot_failed")
 			end, "capture")

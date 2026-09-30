@@ -1708,7 +1708,7 @@
 									},
 									{
 										"path": "shortcuts.tap_keys.number_row_left",
-										"value": "screen_capture",
+										"value": "screenshot_fullscreen_save",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1718,7 +1718,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.screen_capture"
+												"key": "sg_actions.screenshot_fullscreen_save"
 											}
 										]
 									}
@@ -3072,7 +3072,7 @@
 									},
 									{
 										"path": "shortcuts.tap_keys.number_row_left",
-										"value": "screen_capture",
+										"value": "screenshot_fullscreen_save",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3082,7 +3082,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.screen_capture"
+												"key": "sg_actions.screenshot_fullscreen_save"
 											}
 										]
 									},
@@ -4797,7 +4797,7 @@
 									},
 									{
 										"path": "shortcuts.tap_keys.number_row_left",
-										"value": "screen_capture",
+										"value": "screenshot_fullscreen_save",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -4807,7 +4807,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.screen_capture"
+												"key": "sg_actions.screenshot_fullscreen_save"
 											}
 										]
 									}
