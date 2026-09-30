@@ -8,6 +8,15 @@
  * with a unique wrapper identity and isolated configuration directory. The
  * driver exits itself only after publishing ready, so any load-order/runtime
  * startup exception becomes this test's non-zero child exit.
+ *
+ * FEATURES & RATIONALE:
+ * 1. hardening-a-startup-zero-error: a boot that reaches ready may still have
+ *    logged an ERROR, which opens the error window for the user. Every boot's
+ *    logs must hold no ERROR or FATAL line and no suppressed error window.
+ * 2. User states: a fresh folder, the neutral defaults the wizard writes, and
+ *    config.toml files older releases wrote (the shared migration corpus).
+ * 3. CI runs it in the Windows unit job with ERGOPTI_AHK_EXE set, which turns
+ *    a missing interpreter into a failure instead of a skip.
  * ==============================================================================
  */
 
@@ -21,6 +30,35 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const ENTRY = path.join(WINDOWS, 'ErgoptiPlus.ahk');
+const CORPUS = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'tests',
+	'corpus',
+	'config_migrations'
+);
+// config.toml files seeded before the boot: the wizard's neutral defaults, and
+// files older Windows releases wrote.
+const SEEDED_CONFIGS = {
+	'neutral-defaults': path.join(WINDOWS, '_generated', 'config_template.toml'),
+	'older-release-stamp-only': path.join(
+		CORPUS,
+		'shipped_stamp_only_on_windows_and_linux',
+		'input.toml'
+	),
+	'older-release-trigger-shortcut': path.join(
+		CORPUS,
+		'shipped_trigger_shortcut_removed_on_windows',
+		'input.toml'
+	),
+	'older-release-magic-key-scan-code': path.join(
+		CORPUS,
+		'shipped_magic_key_source_scan_becomes_a_key_code_on_windows',
+		'input.toml'
+	)
+};
 const AHK_CANDIDATES = [
 	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe',
 	'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey.exe',
@@ -30,6 +68,42 @@ const AHK_CANDIDATES = [
 function fail(message) {
 	console.error(`\x1b[31m[ERROR] full AHK startup smoke: ${message}\x1b[0m`);
 	return 1;
+}
+
+/**
+ * Every line of a boot's logs a user would have been shown as an error.
+ * @param {string} configRoot
+ * @returns {string[]}
+ */
+function loggedErrors(configRoot) {
+	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	if (!fs.existsSync(logs)) return [];
+	const found = [];
+	for (const name of fs.readdirSync(logs)) {
+		const file = path.join(logs, name);
+		// ErgoptiPlus_errors_*.log repeats every WARNING and ERROR of the main log.
+		if (!name.endsWith('.log') || name.includes('errors_') || !fs.statSync(file).isFile()) continue;
+		for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+			if (/\[(ERROR|FATAL)\]/.test(line) || line.includes('the error window for')) {
+				found.push(`${name}: ${line.trim()}`);
+			}
+		}
+	}
+	return found;
+}
+
+/**
+ * Fails a boot that reached ready with an error logged (hardening-a).
+ * @param {string} label
+ * @param {string} configRoot
+ * @returns {number|null} exit code, or null when the logs are clean
+ */
+function failOnLoggedErrors(label, configRoot) {
+	const errors = loggedErrors(configRoot);
+	if (errors.length === 0) return null;
+	return fail(
+		`${label} reached ready with ${errors.length} error line(s):\n${errors.slice(0, 12).join('\n')}`
+	);
 }
 
 function logTail(configRoot) {
@@ -54,7 +128,11 @@ function main() {
 		console.log('\x1b[33m[SKIP] full AHK startup smoke — AutoHotkey is Windows-only.\x1b[0m');
 		return 0;
 	}
-	const ahk = AHK_CANDIDATES.find((candidate) => fs.existsSync(candidate));
+	// CI names its interpreter: a missing one there is a failure, not a skip.
+	const named = process.env.ERGOPTI_AHK_EXE || '';
+	if (named && !fs.existsSync(named))
+		return fail(`ERGOPTI_AHK_EXE names a missing interpreter: ${named}`);
+	const ahk = named || AHK_CANDIDATES.find((candidate) => fs.existsSync(candidate));
 	if (!ahk) {
 		console.log('\x1b[33m[SKIP] full AHK startup smoke — AutoHotkey v2 is not installed.\x1b[0m');
 		return 0;
@@ -87,10 +165,16 @@ function main() {
 			'suspend-marker',
 			'extension-neutral',
 			'extension-enabled',
-			'extension-master-off'
+			'extension-master-off',
+			...Object.keys(SEEDED_CONFIGS)
 		]) {
 			const configRoot = path.join(scratch, fixture);
 			fs.mkdirSync(configRoot, { recursive: true });
+			if (SEEDED_CONFIGS[fixture]) {
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				fs.mkdirSync(config, { recursive: true });
+				fs.copyFileSync(SEEDED_CONFIGS[fixture], path.join(config, 'config.toml'));
+			}
 			const extensionFixture = fixture.startsWith('extension-');
 			const selected = fixture !== 'extension-neutral';
 			const effective = fixture === 'extension-enabled';
@@ -153,6 +237,8 @@ function main() {
 			if (markerBearing && fs.existsSync(marker)) {
 				return fail(`${fixture}: startup reached ready without consuming the suspend marker.`);
 			}
+			const logged = failOnLoggedErrors(fixture, configRoot);
+			if (logged !== null) return logged;
 			// Reuse the first fixture once so the no-bootstrap path is exercised too.
 			if (fixture === 'fresh-config') {
 				const second = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
@@ -168,10 +254,13 @@ function main() {
 						`reloaded-config exited ${second.status}.${output ? `\n${output}` : ''}${logs ? `\n${logs}` : ''}`
 					);
 				}
+				const reloaded = failOnLoggedErrors('reloaded-config', configRoot);
+				if (reloaded !== null) return reloaded;
 			}
 		}
 		console.log(
-			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker and extension opt-in boots reached ready.\x1b[0m'
+			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
+				'neutral-defaults and older-release boots reached ready with no error logged.\x1b[0m'
 		);
 		return 0;
 	} finally {
