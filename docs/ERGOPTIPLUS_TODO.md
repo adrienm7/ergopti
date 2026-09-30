@@ -332,14 +332,14 @@ These are software implementations; final hardware verification remains below.
         shared decoder as one key named "a.b", so the app ignores them. Linux
         still refuses to save over a `[[hotstrings.terminators]]` list
         (`terminator_settings.lua`) although the writer now can.
-43. [ ] A Mac upgraded from a pre-lease release could not deploy (dev.149:
-        « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
-        historical CapsWord anchor »): its karabiner.json keeps an untagged
-        historical block the merge cannot prove, and nothing in the app
-        removes it. The maintainer was given a one-off cleanup script. Find
-        why the proof fails from the backed-up file, then offer the removal of
-        such rules in the app (listed, confirmed, backed up) instead of an
-        abort.
+43. [~] A Mac upgraded from a pre-lease release could not deploy (dev.149:
+    « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
+    historical CapsWord anchor »): its karabiner.json keeps an untagged
+    historical block the merge cannot prove. The refused deploy now offers
+    « Retirer les anciennes règles » (listed, confirmed, backed up next to
+    karabiner.json), also from a Tap-Hold menu row while the rules are
+    pending (`karabiner-legacy-cleanup`); untested on a real Mac. Still to
+    do: find why the proof fails from the backed-up file.
 44. [ ] CapsWord is no longer cancelled by the pointer when Karabiner activated
         it (AltGr + CapsLock): the watcher probed the variable with
         `karabiner_cli --get-variable`, an option karabiner_cli has never had
