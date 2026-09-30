@@ -64,7 +64,9 @@ local ENOENT = 2
 -- ============================
 
 -- The registry form the key codes are read for (physical_keys.json "forms").
+-- The layer editor host reads the keys' legends in the same form.
 local KEYBOARD_FORM = "iso"
+M.KEYBOARD_FORM = KEYBOARD_FORM
 
 -- The Karabiner variable the hold actions set while the layer is held.
 local LAYER_ACTIVE_VAR_NAME = "layer_active"
