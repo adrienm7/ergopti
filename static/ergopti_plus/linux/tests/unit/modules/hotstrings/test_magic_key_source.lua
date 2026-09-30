@@ -64,10 +64,12 @@ end
 --- Wires the owner to recording collaborators.
 --- @param Source table
 --- @param state table { active, replace, typed_ok, grab, typable } switches the test flips.
---- @return table calls { typed = {}, dispatched = {}, deferred = {} }
-local function wire(Source, state)
-	local calls = { typed = {}, dispatched = {}, deferred = {} }
+--- @param end_selection function|nil The selection window's end; counted when nil.
+--- @return table calls { typed = {}, dispatched = {}, deferred = {}, ended = 0 }
+local function wire(Source, state, end_selection)
+	local calls = { typed = {}, dispatched = {}, deferred = {}, ended = 0 }
 	Source.init({
+		end_selection = end_selection or function() calls.ended = calls.ended + 1 end,
 		is_active = function() return state.active end,
 		replace_on = function() return state.replace end,
 		magic_key = function() return "★" end,
@@ -152,6 +154,7 @@ helpers.describe("magic key source: the keyboard hook decision", function()
 			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false,
 				"an injection that did not happen lets the key through, typed once")
 			helpers.assert_eq(#calls.dispatched, 1, "nothing reaches the buffer that the application lacks")
+			helpers.assert_eq(calls.ended, 1, "only the typed magic key ended the selection window")
 			local ok = pcall(wire, Source, state)
 			helpers.assert_eq(ok, false, "a second initialization is refused")
 			Source._reset_for_test()
@@ -183,6 +186,30 @@ helpers.describe("magic key source: the keyboard hook decision", function()
 			Preferences.get = real_get
 			Source._reset_for_test()
 			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("(magic-key-source) the magic key typed over a selection ends wrap-on-type's window", function()
+		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
+			local primary, wrapped = "", {}
+			local wrap = helpers.load_module("modules.shortcuts.wrap_on_type").new({
+				is_active = function() return true end,
+				get_pair = function(char) return char == "(" and { left = "(", right = ")" } or nil end,
+				read_primary = function() return true, primary end,
+				type_text = function(text)
+					wrapped[#wrapped + 1] = text
+					return true
+				end,
+			})
+			wire(Source, { active = true, replace = true, typed_ok = true }, wrap.end_selection_window)
+			-- A drag selects "foo", then the magic key replaces it.
+			wrap.on_pointer_down()
+			primary = "foo"
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			helpers.assert_eq(wrap.selection_window_open(), false, "the typed ★ ended the selection")
+			helpers.assert_eq(wrap.on_key({ code = 10, char = "(", mods = {} }), false, "the symbol types")
+			helpers.assert_eq(wrapped, {}, "the text ★ replaced is not typed back from PRIMARY")
+			Source._reset_for_test()
 		end)
 	end)
 
