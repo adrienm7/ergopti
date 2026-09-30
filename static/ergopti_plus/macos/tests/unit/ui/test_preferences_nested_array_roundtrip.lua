@@ -52,7 +52,9 @@ helpers.describe("nested preference array restoration", function()
 	end
 	for key, value in pairs({
 		llm_val_modifiers = { "ctrl", "alt" },
-		llm_profile_shortcuts = { user_first = { mods = { "ctrl" }, key = "1" } },
+		-- A shortcut binds a profile the build ships: one for a profile that no
+		-- longer exists is outdated (config-outdated-profiles).
+		llm_profile_shortcuts = { basic = { mods = { "ctrl" }, key = "1" } },
 		custom_editor_shortcut = { mods = { "alt" }, key = "e" },
 	}) do
 		helpers.it("(nested-preference-array) preserves neighboring value " .. key, function()

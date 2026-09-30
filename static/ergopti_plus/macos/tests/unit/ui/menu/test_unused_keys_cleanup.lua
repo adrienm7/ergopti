@@ -414,6 +414,34 @@ helpers.with_stub_scope(MODULES, function()
 				if not ok then error(err, 0) end
 			end)
 
+		helpers.it("unused keys: a deleted prompt profile is never selected nor bound and is offered (config-outdated-profiles)",
+			function()
+				-- The active id silently ran "basic"; the shortcut was unbound with a
+				-- WARNING at every boot. Both were marked as read.
+				local source = table.concat({
+					"[llm.profiles]",
+					"active = \"deleted_profile\"",
+					"shortcuts = { deleted_profile = { mods = [\"cmd\"], key = \"p\" }, "
+						.. "user_mine = { mods = [\"cmd\"], key = \"m\" }, basic = { mods = [\"cmd\"], key = \"b\" } }",
+					"user_profiles = [{ id = \"user_mine\", label = \"Mine\" }]",
+					"",
+				}, "\n")
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_nil(flat.llm_active_profile, "the state keeps the default profile")
+				local bound = {}
+				for id in pairs(flat.llm_profile_shortcuts or {}) do bound[#bound + 1] = id end
+				table.sort(bound)
+				helpers.assert_eq(bound, { "basic", "user_mine" }, "built-in and user profiles keep their shortcut")
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "llm.profiles.active", "llm.profiles.shortcuts.deleted_profile" })
+				local legacy = Preferences.flatten_document(TomlCodec.decode("[llm.profiles]\nactive = \"parallel\"\n"))
+				helpers.assert_eq(legacy.llm_active_profile, "parallel", "a legacy id is migrated by its owner, not outdated")
+			end)
+
 		helpers.it("unused keys: a retired hotstring delay is never saved back and is offered (config-outdated-delays)", function()
 			-- set_delay ignored it, the state kept it and every save wrote it back.
 			local source = "[hotstrings.delays]\nrolls = 0.4\nretired_delay = 0.1\nautocorrection = \"slow\"\n"
