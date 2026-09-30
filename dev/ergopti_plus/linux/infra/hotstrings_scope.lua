@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Restores the recommended hotstring settings, or clears them to the neutral
 --- state, across both files that hold them: config.toml (category and section
---- choices, the scalar leaves) and the override file (delays, colours, previews
---- and priorities). One user command is one transaction with one inverse.
+--- choices, the scalar leaves, the word delimiters) and the override file
+--- (delays, colours, previews and priorities). One user command is one
+--- transaction with one inverse.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Runtime first, then files. The engine, the scalar owners and the preview
@@ -21,6 +22,10 @@
 ---    explicit delay wherever the corpus inheritance differs from the manifest.
 --- 4. Only this driver's readers are written. A manifest row no Linux reader
 ---    consumes (a Windows feature row) is removed by both modes, never set.
+--- 5. Shipped word delimiters return to their catalogue defaults in both modes,
+---    as the delimiter submenu's own « restore recommended » does. The user's
+---    own delimiters and their states are user data and are kept; a state for
+---    an unknown key is left for the config cleanup.
 --- ==============================================================================
 
 local M = {}
@@ -48,7 +53,7 @@ end
 
 --- Builds one transaction over the real owners.
 --- @param options table path, backup_suffix, is_paused, and the runtime owners:
----   config, preferences, repeat_key, magic_key, dynamic (optional),
+---   config, preferences, repeat_key, magic_key, terminators, dynamic (optional),
 ---   preview_settings with preview (optional), files, remove.
 --- @return table owner apply(mode), revert(), release(), pending(), retry_restore()
 function M.new(options)
@@ -57,8 +62,10 @@ function M.new(options)
 	local Config, Preferences = options.config, options.preferences
 	local RepeatKey, MagicKey = options.repeat_key, options.magic_key
 	local Dynamic, PreviewSettings, preview = options.dynamic, options.preview_settings, options.preview
+	local Terminators = options.terminators
 	assert(type(Config) == "table" and type(Preferences) == "table" and type(RepeatKey) == "table"
-		and type(MagicKey) == "table" and type(PreviewSettings) == "table", "hotstrings scope owners are incomplete")
+		and type(MagicKey) == "table" and type(PreviewSettings) == "table" and type(Terminators) == "table",
+		"hotstrings scope owners are incomplete")
 	local files = options.files or require("adapters.file_system")
 	local remove = options.remove or function(target) return os.remove(target) == true end
 	local owner, held, current_mode = {}, false, nil
@@ -114,7 +121,7 @@ function M.new(options)
 		local preferences = Preferences.snapshot()
 		if type(config) ~= "table" or type(preferences) ~= "table" then return nil end
 		return { config = config, preferences = preferences, repeat_enabled = RepeatKey.is_enabled(),
-			trigger = MagicKey.get() }
+			trigger = MagicKey.get(), terminators = Terminators.snapshot() }
 	end
 
 	--- Applies the dynamic owner and the preview renderer to the adopted leaves.
@@ -134,6 +141,7 @@ function M.new(options)
 		if secondary and secondary.restore() ~= true then return false end
 		if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
 		if RepeatKey.restore_configuration(snapshot.repeat_enabled) ~= true then return false end
+		if Terminators.restore_configuration(snapshot.terminators) ~= true then return false end
 		local current = MagicKey.get()
 		if Config.restore_configuration(owner, snapshot.config) ~= true then return false end
 		return apply_dependents(snapshot.trigger, current)
@@ -155,6 +163,9 @@ function M.new(options)
 					operations[#operations + 1] = { path = segments, value = row.value }
 				end
 			end
+			for _, segments in ipairs(Terminators.builtin_state_leaves(Codec.decode(source.content or ""))) do
+				operations[#operations + 1] = { path = segments, delete = true }
+			end
 			local prepared, detail = prepare_overrides(current_mode)
 			if prepared ~= true then return false, "override file: " .. tostring(detail) end
 			return Writer.prepare_batch(path, LeafRows.prepare(source.content or "", operations), adapter, source)
@@ -169,6 +180,7 @@ function M.new(options)
 			local previous = MagicKey.get()
 			if Preferences.adopt(owner, decoded) ~= true then return false end
 			if RepeatKey.adopt_configuration(decoded) ~= true then return false end
+			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
 			if Config.apply_configuration(owner, decoded, secondary.candidate()) ~= true then return false end
@@ -264,6 +276,7 @@ function M.apply(mode, is_paused, ports)
 		preferences = require("infra.hotstring_preferences"),
 		repeat_key = require("modules.hotstrings.repeat_key"),
 		magic_key = require("modules.hotstrings.magic_key"),
+		terminators = require("modules.hotstrings.terminator_settings"),
 		preview_settings = require("modules.hotstrings.preview_settings"),
 		dynamic = ports.dynamic, preview = ports.preview,
 	})

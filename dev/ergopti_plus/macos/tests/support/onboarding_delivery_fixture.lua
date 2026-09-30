@@ -11,11 +11,20 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system", "infra.config_paths" }, function()
+		"adapters.file_system", "infra.config_paths", "platform.remap" }, function()
 		-- Distinctive rule: a wizard that derived the path itself cannot match it.
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/virtual/current/" end,
 			metrics_dir = function(dir) return "<metrics of " .. dir .. ">" end,
+			get = function(key)
+				assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+				return "/virtual/current/hammerspoon/config_karabiner.toml"
+			end,
+		}
+		-- The remap owner reports the tap-hold keys beside each config.toml read:
+		-- none here, so the pages start from config.toml's values alone.
+		package.loaded["platform.remap"] = {
+			recommended_key_report = function() return { enabled = false, keys = {} } end,
 		}
 		local picker = {}
 		package.loaded["ui.menu.menu_paths"] = {

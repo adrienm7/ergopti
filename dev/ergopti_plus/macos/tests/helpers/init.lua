@@ -238,6 +238,11 @@ function M.load_with_stubs(module_name, hs_overrides)
 	if module_name == "modules.keymap.expander" then
 		loaded["modules.keymap.terminator_replay"] = nil
 	end
+	-- The keymap applies the physical magic key its child owns: a fresh keymap
+	-- must not inherit a key the previous fixture chose.
+	if module_name == "modules.keymap" or module_name == "modules.keymap.init" then
+		loaded["modules.keymap.magic_key_source"] = nil
+	end
 	-- The system-action facade now exposes three stateful child owners. Reloading
 	-- only the facade would retain their pause claims, exact native debt, and the
 	-- previous test's native contracts as an impossible fresh-parent/stale-child

@@ -174,6 +174,7 @@ _MI_StageLayout() {
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
+		"magic_key_source",       (*) => MagicKeySourceMenuRows(),
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
@@ -238,10 +239,11 @@ _MI_StageHotstrings() {
 	; row now: ticked when every section is on, and a click switches the whole
 	; tree to the other side. Read once per build, like every tick here.
 	HotstringsAllSectionsOn := _HS_AllHotstringsOn()
-	_HotCommands := Map(
-		"hotstrings_toggle",       MenuRenderer_CategoryGateCommand("Hotstrings"),
-		"hotstrings_all_sections", (*) => ToggleAllHotstrings(!HotstringsAllSectionsOn),
-	)
+	; « Restore recommended » and « Clear » come from the tested terminal
+	; provider, so the rows reach the same scope owner as its unit tests.
+	_HotCommands := _HS_ScopeCommands()
+	_HotCommands["hotstrings_toggle"] := MenuRenderer_CategoryGateCommand("Hotstrings")
+	_HotCommands["hotstrings_all_sections"] := (*) => ToggleAllHotstrings(!HotstringsAllSectionsOn)
 	_HotGetters := Map(
 		"hotstrings_enabled",              () => IsCategoryGated("Hotstrings"),
 		"hotstrings_all_sections_enabled", () => HotstringsAllSectionsOn,

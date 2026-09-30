@@ -572,6 +572,18 @@ wpm_color_hold_ms = 1000
 # HS: ui/wpm/wpm_menubar.lua. Linux: ui/wpm/tray_readout.lua.
 wpm_menubar_update_ms = 500
 
+# How long capturing the physical magic key by pressing it waits for a key
+# before it ends with nothing changed.
+# AHK: ui/editors.ahk MagicKeySourceCapture. HS: ui/menu/magic_key_source_menu.lua.
+# Linux: modules/hotstrings/magic_key_source.lua capture.
+magic_key_capture_timeout_ms = 10000
+
+# How often that capture reads the physical key state on Windows, for a key
+# whose remap hotkey sends nothing its InputHook sees (a dead key, a tap-hold).
+# Well under a key press, so a quick tap is still caught.
+# AHK: ui/editors.ahk MagicKeySourceCapture.
+magic_key_capture_poll_ms = 10
+
 # Hammerspoon reload debounce after a config file change.
 # HS: init.lua / menu/init.lua 0.5 s reload_timer.
 hs_reload_debounce_ms = 500

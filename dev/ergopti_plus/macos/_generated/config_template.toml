@@ -12,6 +12,7 @@ show_error_dialog = true
 [hotstrings]
 enabled = false
 trigger_char = "★"
+magic_key_source = "auto"
 repeat_key_enabled = false
 expansion_delay = 0.75
 preview_ai_enabled = false

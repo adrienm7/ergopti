@@ -36,6 +36,7 @@ pattern_max_length = 1
 
 [hotstrings]
 trigger_char = "★"
+magic_key_source = "auto"
 repeat_key_enabled = false
 preview_ai_enabled = false
 preview_autocorrect_enabled = false

@@ -49,6 +49,7 @@ local OWNERS = {
 	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
 	{ key = "expansion_delay", setter = "set_base_delay", getter = "get_base_delay" },
 	{ key = "trigger_char", setter = "set_trigger_char", getter = "get_trigger_char" },
+	{ key = "magic_key_source", setter = "set_magic_key_source", getter = "get_magic_key_source" },
 	{ key = "preview_star_enabled", setter = "set_preview_star_enabled" },
 	{ key = "preview_autocorrect_enabled", setter = "set_preview_autocorrect_enabled" },
 	{ key = "preview_colored_tooltips", setter = "set_preview_colored_tooltips" },
@@ -113,7 +114,8 @@ end
 ---   start_engine / stop_engine (exact true), is_personal(name),
 ---   override_backup_path(), remove(path) for a created override file, and an
 ---   optional editor with set_trigger_char.
---- @return table owner apply(mode), pending(), retry_restore()
+--- @return table owner apply(mode), revert(), release(), pending(), retry_restore(),
+---   unavailable()
 function M.new(options)
 	assert(type(options) == "table", "hotstrings scope options are required")
 	local keymap, Config, state = options.keymap, options.config, options.state
@@ -169,10 +171,14 @@ function M.new(options)
 		return selected
 	end
 
-	--- Prepares the override half of the plan and proves the reader agrees.
+	--- Prepares the override half of the plan and proves the reader agrees. It
+	--- stores nothing: a transaction keeps what it returns, and a check that
+	--- only asks never replaces the file a retained inverse still needs.
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean prepared
 	--- @return string|nil reason
+	--- @return table|nil file The prepared override participant.
+	--- @return table|nil parsed The candidate as the engine's reader parses it.
 	local function prepare_overrides(mode)
 		local committed = Config.scope_snapshot()
 		if type(committed) ~= "table" then return false, "the override file was not read cleanly" end
@@ -194,16 +200,16 @@ function M.new(options)
 			inherited = function(name, section) return inherit(name, section, registered[name].metadata) end,
 			extra = { { override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
 		local path = Config.get_override_path()
-		secondary = ScopeFile.new({ path = path, backup_path = options.override_backup_path(), files = options.files,
+		local file = ScopeFile.new({ path = path, backup_path = options.override_backup_path(), files = options.files,
 			remove = options.remove })
-		local prepared, detail = secondary.prepare(Planner.writer_rows(changes))
+		local prepared, detail = file.prepare(Planner.writer_rows(changes))
 		if prepared ~= true then return false, detail end
-		local source = secondary.source()
+		local source = file.source()
 		if source.status ~= committed.source.status
 			or (source.status == "ok" and source.content ~= committed.source.content) then
 			return false, "the override file changed since it was loaded"
 		end
-		local parsed = Config.parse_override_content(secondary.candidate() or "")
+		local parsed = Config.parse_override_content(file.candidate() or "")
 		for _, change in ipairs(changes) do
 			local key = change.override[1] == "ext" and ("ext." .. change.override[2]) or change.override[1]
 			local entry = parsed[key]
@@ -214,8 +220,7 @@ function M.new(options)
 				return false, "the override file keeps a spelling the scope cannot address: " .. key
 			end
 		end
-		active = { overrides = parsed }
-		return true
+		return true, nil, file, parsed
 	end
 
 	--- Re-registers enabled groups so their collision priorities are read again.
@@ -305,8 +310,9 @@ function M.new(options)
 			for key in pairs(keymap.DELAY_KEY_TO_CATEGORY) do
 				operations[#operations + 1] = { path = { "hotstrings", "delays", key }, delete = true }
 			end
-			local prepared, why = prepare_overrides(current_mode)
+			local prepared, why, file, parsed = prepare_overrides(current_mode)
 			if prepared ~= true then return false, "override file: " .. tostring(why) end
+			secondary, active = file, { overrides = parsed }
 			return Writer.prepare_batch(path, LeafRows.prepare(content or "", operations), files, source)
 		end
 		local transaction = Transaction.new(config)
@@ -329,6 +335,18 @@ function M.new(options)
 				if not transaction.pending() then release() end
 				return committed, detail
 			end,
+			-- A composed global scope reverts this commit when a later category
+			-- refuses. Restoring the override file adopts its source again, which
+			-- only the fence holder may do, so the revert holds it like an apply.
+			revert = function()
+				if held then return false, "the hotstrings scope is still held" end
+				if Config.acquire(fence) ~= true then return false, "hotstring overrides are held" end
+				held = true
+				local reverted, detail = transaction.revert()
+				if not transaction.pending() then release() end
+				return reverted, detail
+			end,
+			release = transaction.release,
 		}
 	end
 	ports.runtime = {
@@ -404,7 +422,25 @@ function M.new(options)
 			return true
 		end,
 	}
-	return require("ui.menu.scoped_preferences").new(ports)
+	local owner = require("ui.menu.scoped_preferences").new(ports)
+	--- Why this owner cannot serve a composed restore now, or nil. The global
+	--- restore skips and names such a category instead of refusing every other
+	--- one with it: an override file whose source did not read cleanly, one
+	--- changed since it was loaded, or one keeping a spelling the plan cannot
+	--- address. The check prepares both modes' candidates and writes nothing.
+	--- @return string|nil reason
+	function owner.unavailable()
+		-- A retained inverse is the composition's to report: it refuses to start.
+		if owner.pending() then return nil end
+		if type(Config.scope_snapshot()) ~= "table" then return "the hotstring override file was not read cleanly" end
+		for _, mode in ipairs({ "clear", "recommended" }) do
+			local called, prepared, why = pcall(prepare_overrides, mode)
+			if not called then return tostring(prepared) end
+			if prepared ~= true then return tostring(why) end
+		end
+		return nil
+	end
+	return owner
 end
 
 return M

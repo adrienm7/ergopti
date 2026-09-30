@@ -16,7 +16,7 @@
 
 global _HS_GrandTotalCache := -1
 
-; Shared declarations may expose these only after every host has a terminal owner.
+; The hotstrings_menu scope rows, bound to the compensated scope owner.
 _HS_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(

@@ -237,10 +237,21 @@ _TapHold_ParseFileInto(FilePath, Result) {
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
 			KeyId := KeyMatch[1]
 			ExpectedKind := TapHoldFieldKinds().Get(Key, "")
-			if (ExpectedKind == "" || LiteralKind != ExpectedKind) {
+			; A field no tap-hold key has (an older build's, a hand edit's) is an
+			; outdated entry, not a schema violation of the key: warned, ignored,
+			; and the rest of the key still applies (the maintainer's
+			; outdated-entry rule, as on Linux). A known field of the wrong type
+			; still disables its key below (AHK-134).
+			if (ExpectedKind == "") {
+				try LoggerWarn("TapHoldLoader",
+					"Outdated entry '[{1}].{2}' in '{3}' ignored (no tap-hold key has this field); the config cleanup only covers config.toml, so fix or delete it in that file.",
+					CurrentPath, Key, FilePath)
+				continue
+			}
+			if (LiteralKind != ExpectedKind) {
 				try LoggerError("TapHoldLoader",
 					"Field '[{1}].{2}' violates tap-hold schema type '{3}'; key disabled.",
-					CurrentPath, Key, ExpectedKind == "" ? "known field" : ExpectedKind)
+					CurrentPath, Key, ExpectedKind)
 				InvalidKeys[KeyId] := true
 				continue
 			}

@@ -170,6 +170,39 @@ helpers.describe("layout manager (Linux): installing", function()
 			"the user root follows the effective configuration folder, as on macOS and Windows")
 	end)
 
+	helpers.it("still starts with the other packs when the installed record is damaged (config-outdated-installed)", function()
+		local Paths = require("infra.paths")
+		local saved_registry = package.loaded["modules.keymap.layout_registry"]
+		local saved_config = package.loaded["infra.config_paths"]
+		local saved_logger = package.loaded["logger.shim"]
+		local errors = {}
+		local recorder = helpers.make_logger_stub()
+		recorder.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		package.loaded["modules.keymap.layout_registry"] = {
+			extension_roots = function() error("the installed-layouts record is not valid JSON", 0) end,
+			shipped_extension_root = function() return { pack = "/driver/layouts/registry/ergopti" } end,
+		}
+		package.loaded["infra.config_paths"] = {
+			home = function() return "/private/user" end,
+			get_config_dir = function() return "/private/xdg/ergopti" end,
+		}
+		package.loaded["logger.shim"] = recorder
+		local Fresh = helpers.load_module("infra.paths")
+		local ok, roots = pcall(function()
+			Fresh.extension_roots()
+			return Fresh.extension_roots()
+		end)
+		package.loaded["modules.keymap.layout_registry"] = saved_registry
+		package.loaded["infra.config_paths"] = saved_config
+		package.loaded["logger.shim"] = saved_logger
+		package.loaded["infra.paths"] = Paths
+		helpers.assert_true(ok, "a damaged record never stops the daemon: " .. tostring(roots))
+		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" })
+		helpers.assert_eq(roots[#roots], "/private/xdg/ergopti/extensions")
+		helpers.assert_eq(#errors, 1, "the skipped record is reported once, never a silent success")
+		helpers.assert_true(errors[1]:find("not valid JSON", 1, true) ~= nil, errors[1])
+	end)
+
 	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true
@@ -400,6 +433,38 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		helpers.assert_true(result.ok, tostring(result.extra))
 		helpers.assert_eq(state.runs[2].args[2], "activate")
 		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+	end)
+
+	helpers.it("keeps the other layouts when one installed entry is outdated (config-outdated-installed)", function()
+		local stale = { id = "ergopti_v1", version = "1.0" }
+		local LayoutRegistry, deps, state = manager({
+			files = {
+				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1,
+					layouts = { ergol = entry_of("ergol"), ergopti_v1 = stale } }),
+				[LOCAL_DIR .. "ergol.keylayout"] = registry_file("ergol/ergol.keylayout"),
+			},
+			runs = { OK_RUN, INSTALLED_RUN },
+		})
+		local warnings = {}
+		local recorder = helpers.make_logger_stub()
+		recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local previous_logger = package.loaded["logger.shim"]
+		package.loaded["logger.shim"] = recorder
+		require("config_outdated").reset_for_tests()
+		local ok, err = pcall(function()
+			local roots = LayoutRegistry.extension_roots(deps)
+			helpers.assert_eq(#roots, 1, "the valid layout's extension still loads at startup")
+			helpers.assert_true(LayoutRegistry.snapshot(deps).installed.ergol ~= nil, "the valid layout stays installed")
+			helpers.assert_eq(#warnings, 1, table.concat(warnings, "\n"))
+			helpers.assert_true(warnings[1]:find("'layouts.ergopti_v1' in '" .. LOCAL_DIR .. "installed.json'", 1, true)
+				~= nil, warnings[1])
+			local result = run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end)
+			helpers.assert_true(result.ok, tostring(result.extra))
+			helpers.assert_eq(Json.decode(state.files[LOCAL_DIR .. "installed.json"]).layouts.ergopti_v1, stale,
+				"a write keeps the entry the user was told to fix")
+		end)
+		package.loaded["logger.shim"] = previous_logger
+		if not ok then error(err, 0) end
 	end)
 end)
 

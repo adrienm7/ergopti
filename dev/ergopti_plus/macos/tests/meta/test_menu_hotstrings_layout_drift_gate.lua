@@ -61,6 +61,10 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- to build `toggle` rows: the signature keys on the id when there is one, and
 	-- an id is what lets a driver register the command that asks for the row.
 	"toggle:hotstrings_toggle",
+	-- The Hotstrings scope beside its switch since 2026-09-30, as under IA and
+	-- Metrics: every driver registers both on its scope owner.
+	"command:scope_restore",
+	"command:scope_clear",
 	-- The switch is set apart from what it governs, on every driver: the
 	-- Windows renderer used to insert this separator itself, beside the switch it
 	-- also inserted by hand, and the Lua drivers drew none.
@@ -154,6 +158,10 @@ local CANONICAL_LAYOUT_MENU = {
 	-- above and for the same reason: their choices are macOS input sources.
 	"list:layout_switching",
 	"feature:hotstrings.magic_key.replace",
+	-- UPDATED 2026-09-30: the physical key the replace switch turns into the
+	-- magic key, chosen on every driver by pressing it or from the candidates
+	-- (ui/menu/magic_key_source_menu.lua).
+	"list:magic_key_source",
 }
 
 --- Reads and decodes the shared menu_manifest.json.

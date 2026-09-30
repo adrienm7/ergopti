@@ -132,6 +132,70 @@ helpers.describe("canonical Linux prompt profiles", function()
 		end
 	end)
 
+	helpers.it("reads an older build's registry as no user profile, warns and offers it (config-outdated-llm-profiles)", function()
+		local source = "[llm]\nuser_profiles = '[{\"id\":\"user_old\"}]'\n[llm.profiles]\nactive = \"basic\"\n"
+		with_config(source, function(settings)
+			require("config_outdated").reset_for_tests()
+			local reported = require("config_outdated").collect_reports(function()
+				helpers.assert_eq(settings.get("active"), "basic", "the menu and typing paths never raise")
+				helpers.assert_eq(settings.list_user(), {})
+			end)
+			helpers.assert_eq(reported, { ["llm.user_profiles"] = true })
+		end)
+		local scan = require("config_unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		helpers.assert_eq(#scan.keys, 1, "the cleanup offers the registry the reader ignores")
+		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm", "user_profiles" })
+	end)
+
+	for _, stored in ipairs({ "user_profiles = '[{\"id\":\"user_old\"}]'", "user_profiles = [\"user_old\"]" }) do
+		helpers.it("never overwrites an older build's registry: " .. stored .. " (config-outdated-llm-profiles-write)",
+			function()
+				-- Read as no user profile, it was replaced by the next save or delete,
+				-- erasing every prompt the user had written.
+				local source = "[llm]\n" .. stored .. "\n"
+				with_config(source, function(settings, path)
+					local Logger = require("logger.shim")
+					local real_error, errors = Logger.error, {}
+					Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+					local ok, err = pcall(function()
+						helpers.assert_eq(settings.list_user(), {})
+						helpers.assert_eq(settings.save_user_profile(profile(), true, false), false)
+						helpers.assert_eq(settings.delete_user_profile("user_old"), false)
+						helpers.assert_eq(Sandbox.read_bytes(path), source, "the old registry is left byte for byte")
+						helpers.assert_eq(#errors, 2, "each refused write is one named ERROR: " .. table.concat(errors, " | "))
+						for _, line in ipairs(errors) do helpers.assert_contains(line, "llm.user_profiles") end
+					end)
+					Logger.error = real_error
+					if not ok then error(err, 0) end
+				end)
+			end)
+	end
+
+	helpers.it("warns once, never an ERROR, about a stored profile it cannot offer (config-outdated-llm-profiles)", function()
+		local stale = profile(); stale.id = "user_stale"; stale.retired_field = 1
+		local registry = "v1:" .. Base64.encode(Json.encode({ profile(), stale }))
+		with_config('[llm]\nuser_profiles = "' .. registry .. '"\n', function(settings, path)
+			local Logger = require("logger.shim")
+			local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
+			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			local ok, err = pcall(function()
+				helpers.assert_eq(#settings.list_user(), 1, "the readable profile is still offered")
+				settings.reload_configuration()
+				helpers.assert_eq(#settings.list_user(), 1)
+				helpers.assert_eq(errors, {}, "an outdated stored profile is never an ERROR")
+				helpers.assert_eq(#warnings, 1, "named once however often the registry is read")
+				helpers.assert_contains(warnings[1], "index 2")
+				local added = profile(); added.id = "user_added"
+				helpers.assert_true(settings.save_user_profile(added, false, false))
+				local stored = require("modules.llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+				helpers.assert_eq(stored[#stored].retired_field, 1, "the outdated profile is kept on write")
+			end)
+			Logger.error, Logger.warn = real_error, real_warn
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("reads declared canonical choices without importing legacy storage", function()
 		with_config('[llm.profiles]\nactive = "basic"\nnum_predictions = 5\nauto_profile_for_model = false\n', function(settings)
 			helpers.assert_eq(settings.get("active"), "basic")

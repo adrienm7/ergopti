@@ -58,7 +58,8 @@ end
 ---   get_pair     fn(char) -> { left, right }|nil  the shared wrap-pair lookup.
 ---   read_primary fn() -> ok, text  the PRIMARY selection.
 ---   type_text    fn(text) -> boolean  types over the live selection. }
---- @return table controller { on_key, on_pointer_down, selection_window_open }
+--- @return table controller { on_key, on_pointer_down, end_selection_window,
+---   selection_window_open }
 function M.new(opts)
 	check_opts(opts)
 
@@ -78,6 +79,13 @@ function M.new(opts)
 	--- @return boolean
 	function controller.selection_window_open()
 		return baseline ~= nil
+	end
+
+	--- A key typed by an earlier consumer of the hook (the physical magic key)
+	--- replaced any selection, as a key reaching on_key would: the window ends,
+	--- or a later wrap symbol would type the deleted text back from PRIMARY.
+	function controller.end_selection_window()
+		baseline = nil
 	end
 
 	--- A pointer button went down: it may start a drag or a multi-click

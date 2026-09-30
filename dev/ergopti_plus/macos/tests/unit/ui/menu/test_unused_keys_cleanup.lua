@@ -281,6 +281,52 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
 		end)
 
+		helpers.it("unused keys: each entry the cleanup offers is named once after boot (config-outdated-unknown-leaves)", function()
+			-- An unknown leaf or section was dropped at load without a word: only
+			-- the cleanup's list ever showed it, unlike the Windows loader.
+			local source = "[hotstrings]\nstale_toggle = false\n[shortcuts.keys]\nat_hash = true\n[stale.section]\nlabel = \"old\"\n"
+			local saved_logger = package.loaded["logger.shim"]
+			local warnings = {}
+			local recorder = helpers.make_logger_stub()
+			recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			package.loaded["logger.shim"] = recorder
+			require("config_outdated").reset_for_tests()
+			local ok, err = pcall(function()
+				Sandbox.with_config(source, function(path)
+					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2)
+					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2, "the same entries are listed again…")
+				end)
+			end)
+			package.loaded["logger.shim"] = saved_logger
+			if not ok then error(err, 0) end
+			local text = table.concat(warnings, "\n")
+			helpers.assert_eq(#warnings, 3, "…but each is named once, the owner's own report included: " .. text)
+			helpers.assert_true(text:find("'hotstrings.stale_toggle' ignored (no reader of this build uses it)", 1, true) ~= nil, text)
+			helpers.assert_true(text:find("'stale.section.label' ignored (no reader of this build uses it)", 1, true) ~= nil, text)
+			helpers.assert_true(text:find("'shortcuts.keys.at_hash'", 1, true) ~= nil, text)
+		end)
+
+		helpers.it("unused keys: a retired agent mode or icon variant is never loaded and is offered (config-outdated-closed-values)",
+			function()
+				-- The mode reached the boot replay, whose refusal logged an ERROR at
+				-- every start; the icon variant was drawn with an ERROR. Both were
+				-- marked as read, so the cleanup never offered them.
+				local source = "[llm]\nagent_mode = \"suggest\"\nenabled = true\n[ui]\nmenubar_icon = \"v9\"\n"
+				local scan = Engine.find_in_source(source, Cleanup.collect)
+				helpers.assert_eq(scan.status, "ok")
+				local offered = {}
+				for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "llm.agent_mode", "ui.menubar_icon" })
+				Sandbox.with_config(source, function(path)
+					local flat, status = Preferences.load(path)
+					helpers.assert_eq(status, "ok")
+					helpers.assert_nil(flat.llm_agent_mode, "the state keeps the agent's default mode")
+					helpers.assert_nil(flat.menubar_icon, "the state keeps the default icon")
+					helpers.assert_eq(flat.llm_enabled, true, "the rest of the file loads")
+				end)
+			end)
+
 		helpers.it("unused keys: plain keyboard and tap_keys values are offered (config-outdated-shortcut-shape)", function()
 			local source = "[shortcuts]\nkeyboard = \"x\"\ntap_keys = \"y\"\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
@@ -349,6 +395,94 @@ helpers.with_stub_scope(MODULES, function()
 					"shortcuts.script_control.backspace", "shortcuts.tap_keys.number_row_left" })
 			end)
 			package.loaded["modules.gestures.actions"] = saved
+			if not ok then error(err, 0) end
+		end)
+
+		helpers.it("unused keys: an outdated action parameter is never replayed and is offered (config-outdated-parameters)",
+			function()
+				-- The whole [gestures.action_parameters] table was marked as read,
+				-- and the boot replay dropped such an entry without a word.
+				local source = table.concat({
+					"[gestures.action_parameters]",
+					"tap_3__retired_action = \"x\"",
+					"tap_4__wrap_selection = \"retired pair\"",
+					"tap_5__open_url = \"https://example.com\"",
+					"",
+				}, "\n")
+				local saved = package.loaded["modules.gestures.actions"]
+				package.loaded["modules.gestures.actions"] = {
+					is_assignable = function() return true end,
+					split_action_parameter_key = function(key)
+						for _, action in ipairs({ "wrap_selection", "open_url" }) do
+							local suffix = "__" .. action
+							if key:sub(-#suffix) == suffix then return key:sub(1, #key - #suffix), action end
+						end
+						return nil, nil
+					end,
+					validate_action_parameter = function(action, value)
+						if action == "wrap_selection" then return value == "()" end
+						return value:match("^https?://") ~= nil
+					end,
+				}
+				local ok, err = pcall(function()
+					local flat = Preferences.flatten_document(TomlCodec.decode(source))
+					helpers.assert_eq(flat.gesture_action_parameters, { tap_5__open_url = "https://example.com" })
+					local offered = {}
+					for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+						offered[#offered + 1] = key.section .. "." .. key.key
+					end
+					table.sort(offered)
+					helpers.assert_eq(offered, { "gestures.action_parameters.tap_3__retired_action",
+						"gestures.action_parameters.tap_4__wrap_selection" })
+				end)
+				package.loaded["modules.gestures.actions"] = saved
+				if not ok then error(err, 0) end
+			end)
+
+		helpers.it("unused keys: a deleted prompt profile is never selected nor bound and is offered (config-outdated-profiles)",
+			function()
+				-- The active id silently ran "basic"; the shortcut was unbound with a
+				-- WARNING at every boot. Both were marked as read.
+				local source = table.concat({
+					"[llm.profiles]",
+					"active = \"deleted_profile\"",
+					"shortcuts = { deleted_profile = { mods = [\"cmd\"], key = \"p\" }, "
+						.. "user_mine = { mods = [\"cmd\"], key = \"m\" }, basic = { mods = [\"cmd\"], key = \"b\" } }",
+					"user_profiles = [{ id = \"user_mine\", label = \"Mine\" }]",
+					"",
+				}, "\n")
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_nil(flat.llm_active_profile, "the state keeps the default profile")
+				local bound = {}
+				for id in pairs(flat.llm_profile_shortcuts or {}) do bound[#bound + 1] = id end
+				table.sort(bound)
+				helpers.assert_eq(bound, { "basic", "user_mine" }, "built-in and user profiles keep their shortcut")
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "llm.profiles.active", "llm.profiles.shortcuts.deleted_profile" })
+				local legacy = Preferences.flatten_document(TomlCodec.decode("[llm.profiles]\nactive = \"parallel\"\n"))
+				helpers.assert_eq(legacy.llm_active_profile, "parallel", "a legacy id is migrated by its owner, not outdated")
+			end)
+
+		helpers.it("unused keys: a retired hotstring delay is never saved back and is offered (config-outdated-delays)", function()
+			-- set_delay ignored it, the state kept it and every save wrote it back.
+			local source = "[hotstrings.delays]\nrolls = 0.4\nretired_delay = 0.1\nautocorrection = \"slow\"\n"
+			local saved = package.loaded["modules.keymap"]
+			package.loaded["modules.keymap"] = { DELAYS_DEFAULT = { rolls = 0.5, autocorrection = 1.0 } }
+			local ok, err = pcall(function()
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_eq(flat.delays, { rolls = 0.4 })
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "hotstrings.delays.autocorrection", "hotstrings.delays.retired_delay" })
+			end)
+			package.loaded["modules.keymap"] = saved
 			if not ok then error(err, 0) end
 		end)
 
@@ -505,6 +639,54 @@ helpers.with_stub_scope(MODULES, function()
 				helpers.assert_nil(Sandbox.read_bytes(Engine.backup_path(path, Sandbox.STAMP)))
 			end)
 		end)
+
+		helpers.it("unused keys: an ordinary save keeps plain keyboard and tap_keys values for the cleanup (config-outdated-save-keeps)",
+			function()
+				-- Every Preferences.save deleted them in silence, since the Shortcuts
+				-- reset's container rows ran on every shortcut preparation.
+				local source = "[shortcuts]\nkeyboard = \"legacy\"\ntap_keys = [\"legacy\"]\n"
+				local changed = not require("infra.manifest_reader").default_for("shortcuts.enabled")
+				Sandbox.with_config(source, function(path)
+					helpers.assert_eq(select(2, Preferences.load(path)), "ok")
+					helpers.assert_eq(Preferences.save(path, { shortcuts = changed }, {}, {}), true)
+					local saved = TomlCodec.decode(Sandbox.read_bytes(path))
+					helpers.assert_eq(saved.shortcuts.enabled, changed, "the ordinary change is saved")
+					helpers.assert_eq(saved.shortcuts.keyboard, "legacy", "the outdated keyboard value is kept")
+					helpers.assert_eq(saved.shortcuts.tap_keys, { "legacy" }, "the outdated tap_keys value is kept")
+					local rows = Preferences.prepare_shortcut_updates({ status = "ok", content = source },
+						{ { section = "shortcuts.keyboard", key = "cmd_k", value = "copy" } }, { "keyboard" })
+					local deleted = {}
+					for _, row in ipairs(rows) do
+						if row.delete and row.section == "shortcuts" then deleted[#deleted + 1] = row.key end
+					end
+					helpers.assert_eq(deleted, { "keyboard" }, "a single-slot write replaces only its own container")
+				end)
+			end)
+
+		helpers.it("unused keys: an ordinary save keeps values judged outdated at load (config-outdated-save-keeps-scalars)",
+			function()
+				-- The state held their default, and the first save turned it into a
+				-- delete: the values were gone before the cleanup could offer them.
+				local source = "[llm]\nagent_mode = \"suggest\"\n[llm.profiles]\nactive = \"deleted_profile\"\n"
+					.. "[ui]\nmenubar_icon = \"v9\"\n"
+				local state = { llm_agent_mode = "off", llm_active_profile = "basic", menubar_icon = "v1" }
+				Sandbox.with_config(source, function(path)
+					helpers.assert_eq(select(2, Preferences.load(path)), "ok")
+					helpers.assert_eq(Preferences.save(path, state, {}, {}), true)
+					local saved = TomlCodec.decode(Sandbox.read_bytes(path))
+					helpers.assert_eq(saved.llm.agent_mode, "suggest")
+					helpers.assert_eq(saved.llm.profiles.active, "deleted_profile")
+					helpers.assert_eq(saved.ui.menubar_icon, "v9")
+					-- A value the user sets replaces the outdated one; its later
+					-- default is saved sparsely again.
+					state.llm_agent_mode = "auto"
+					helpers.assert_eq(Preferences.save(path, state, {}, {}), true)
+					helpers.assert_eq(TomlCodec.decode(Sandbox.read_bytes(path)).llm.agent_mode, "auto")
+					state.llm_agent_mode = "off"
+					helpers.assert_eq(Preferences.save(path, state, {}, {}), true)
+					helpers.assert_nil(TomlCodec.decode(Sandbox.read_bytes(path)).llm.agent_mode)
+				end)
+			end)
 
 		helpers.it("unused keys: the next preference save succeeds after a cleanup", function()
 			Sandbox.with_config(FIXTURE, function(path)

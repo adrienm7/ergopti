@@ -29,6 +29,7 @@ local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
@@ -732,6 +733,13 @@ function M.build(ctx)
 		["active_layouts"]   = active_layout_rows,
 		["layout_bundle"]    = function() return bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
+		-- The physical magic key, chosen by pressing it or from the candidates.
+		["magic_key_source"] = function()
+			return MagicKeySourceMenu.rows({
+				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
+				update_menu = update_menu, paused = ctx and ctx.paused,
+			})
+		end,
 	})
 
 	-- `submenu`, not `items`: these rows are already materialised. The tray

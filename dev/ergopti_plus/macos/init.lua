@@ -1927,6 +1927,19 @@ hs.timer.doAfter(2, function()
 	pcall(function() require("ui.ui_builder").warmup_webkit() end)
 end)
 
+-- Name once each config.toml entry no reader of this build uses, as the
+-- Windows loader does at startup: the warning behind what « Nettoyer
+-- config.toml » offers. Off the boot critical path; a failure is logged with
+-- its traceback, never lost in the timer's dispatch.
+hs.timer.doAfter(3, function()
+	local listed, list_err = xpcall(function()
+		require("ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
+	end, debug.traceback)
+	if not listed then
+		Logger.error(LOG, "Unused configuration entries could not be listed: %s", tostring(list_err))
+	end
+end)
+
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
 Logger.info(LOG, "════════════════════════════════════════════════════════════")

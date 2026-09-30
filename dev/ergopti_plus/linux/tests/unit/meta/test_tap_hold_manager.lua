@@ -318,17 +318,20 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("warns at configuration load about a tap it cannot run", function()
+	helpers.it("warns once at configuration load about a tap it cannot run (config-outdated-tap-hold)", function()
 		local Manager, warnings, _, close, user_path = catalogue_manager(
 			'[tap_hold.keys.caps_lock]\ntap_action = "microsoft_bold"\n'
 				.. '[tap_hold.keys.left_ctrl]\ntap_action = "select_all"\n')
 		local ok, err = pcall(function()
 			helpers.assert_eq(#warnings, 1, "one warning, for the one tap Linux cannot run")
-			helpers.assert_contains(warnings[1], "caps_lock")
+			helpers.assert_contains(warnings[1], "tap_hold.keys.caps_lock.tap_action")
 			helpers.assert_contains(warnings[1], "microsoft_bold")
+			helpers.assert_contains(warnings[1], user_path)
+			helpers.assert_true(Manager.reload())
+			helpers.assert_eq(#warnings, 1, "the same stale tap is not named again at every reload")
 			write(user_path, '[tap_hold.keys.caps_lock]\ntap_action = "lookup"\n')
 			helpers.assert_true(Manager.reload())
-			helpers.assert_eq(#warnings, 2, "a reload is a configuration load too")
+			helpers.assert_eq(#warnings, 2, "another stale tap is another entry to name")
 			helpers.assert_contains(warnings[2], "lookup")
 		end)
 		close()

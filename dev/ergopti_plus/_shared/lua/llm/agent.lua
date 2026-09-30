@@ -25,6 +25,10 @@
 
 local M = {}
 
+--- The agent's modes, the same on every driver: off, action (on request) and
+--- auto (after a typing pause). A stored mode outside this set is outdated.
+M.MODES = { off = true, action = true, auto = true }
+
 
 
 

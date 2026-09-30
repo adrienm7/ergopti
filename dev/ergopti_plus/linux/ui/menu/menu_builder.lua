@@ -31,6 +31,7 @@ local Extensions = require("hotstrings.extensions")
 local Languages = require("hotstrings.languages")
 local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
+local MagicKeySourceRows = require("keymap.magic_key_source")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
@@ -488,6 +489,48 @@ local function _build_layouts(ctx)
 			return rows
 		end,
 	}
+
+	-- The physical magic key: the key typing the magic key, chosen by pressing it
+	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
+	-- are the shared ones macOS draws too.
+	providers["magic_key_source"] = function()
+		local Source = ctx.magic_key_source
+		if type(Source) ~= "table" then
+			Logger.error(LOG, "No physical magic-key owner in the menu context — its row cannot be built.")
+			return {}
+		end
+		local function notify(key, level)
+			local ok_notifier, Notifier = pcall(require, "adapters.notifier")
+			if ok_notifier then
+				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
+			else
+				Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
+			end
+		end
+		local function changed()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		return MagicKeySourceRows.menu_rows(Source.resolver(), {
+			t = i18n_safe,
+			current = Source.get(),
+			key_text = Source.key_text,
+			choose = function(value)
+				local ok, reason = Source.set(value)
+				if not ok then
+					show_error(i18n_safe(reason))
+					return
+				end
+				changed()
+			end,
+			capture = Source.can_capture() and function()
+				local started = Source.capture({
+					on_chosen = changed,
+					on_refused = function(reason) notify(reason, "warning") end,
+				})
+				if started then notify("dialog.magic_key_source.prompt", "info") end
+			end or nil,
+		})
+	end
 
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)

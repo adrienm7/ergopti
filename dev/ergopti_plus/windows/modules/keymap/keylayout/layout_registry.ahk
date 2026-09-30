@@ -459,16 +459,33 @@ LayoutRegistry_DetectMagicKeyScan(Hkl, Char, ScanFn := KS_ScanScancodeForChar) {
 }
 
 /**
+ * The physical magic key the built-in Ergopti layout declares, read from the
+ * registry the driver ships rather than from a discovered pack, so a user's own
+ * copy of the extension cannot take the last-resort key away.
+ * @returns {String} KeyboardEvent.code.
+ * @throws {Error} When the shipped manifest declares no magic key.
+ */
+LayoutRegistry_ShippedMagicKey() {
+	global ERGOPTI_LAYOUT_ID
+	Code := LayoutRegistry_DeclaredMagicKey(ERGOPTI_LAYOUT_ID, [], LayoutRegistry_BundledDir())
+	if Code == ""
+		throw Error("The shipped '" . ERGOPTI_LAYOUT_ID . "' layout extension declares no magic key.")
+	return Code
+}
+
+/**
  * Chooses the physical key that types the magic key. The key the user
  * configured always wins; then the key the active layout declares; then, with
  * no layout emulated, the key that types the source character on the OS
- * layout; then the shipped default. A detection never replaces a choice, and
- * an emulated layout is never probed through the OS layout it replaces.
+ * layout; then the key the shipped Ergopti layout declares. A detection never
+ * replaces a choice, and an emulated layout is never probed through the OS
+ * layout it replaces.
  * @param {Map} Inputs - "chosen" (whether the user configured a key),
- *   "configured" (that scan code, or the shipped default), "declared"
- *   (KeyboardEvent.code or ""), "emulated" (whether a layout is emulated),
- *   "keycodes" (parsed mac_keycodes.json) and "detect" (callable returning the
- *   scan code probed on the OS layout, or "").
+ *   "configured" (that KeyboardEvent.code, from [hotstrings] magic_key_source),
+ *   "declared" (KeyboardEvent.code or ""), "emulated" (whether a layout is
+ *   emulated), "keycodes" (parsed mac_keycodes.json), "detect" (callable
+ *   returning the scan code probed on the OS layout, or "") and "shipped"
+ *   (callable returning the KeyboardEvent.code of the last resort).
  * @returns {Map} "scan", "origin" (user, layout, detected or default),
  *   "follows_os_layout", whether an OS layout switch can move the key, and
  *   "overrides_emulation", whether an emulated layout yields that key's
@@ -478,18 +495,59 @@ LayoutRegistry_DetectMagicKeyScan(Hkl, Char, ScanFn := KS_ScanScancodeForChar) {
  */
 LayoutRegistry_MagicKeySource(Inputs) {
 	if Inputs["chosen"]
-		return Map("scan", Inputs["configured"], "origin", "user", "follows_os_layout", false,
-			"overrides_emulation", true)
+		return Map("scan", LayoutRegistry_KeyScan(Inputs["configured"], Inputs["keycodes"]),
+			"origin", "user", "follows_os_layout", false, "overrides_emulation", true)
 	if Inputs["declared"] != ""
 		return Map("scan", LayoutRegistry_KeyScan(Inputs["declared"], Inputs["keycodes"]),
 			"origin", "layout", "follows_os_layout", false, "overrides_emulation", true)
 	if Inputs["emulated"]
-		return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", false,
-			"overrides_emulation", false)
+		return Map("scan", LayoutRegistry_KeyScan(Inputs["shipped"].Call(), Inputs["keycodes"]),
+			"origin", "default", "follows_os_layout", false, "overrides_emulation", false)
 	Detected := Inputs["detect"].Call()
 	if Detected != ""
 		return Map("scan", Detected, "origin", "detected", "follows_os_layout", true,
 			"overrides_emulation", false)
-	return Map("scan", Inputs["configured"], "origin", "default", "follows_os_layout", true,
-		"overrides_emulation", false)
+	return Map("scan", LayoutRegistry_KeyScan(Inputs["shipped"].Call(), Inputs["keycodes"]),
+		"origin", "default", "follows_os_layout", true, "overrides_emulation", false)
+}
+
+/**
+ * The hotkeys that make the physical magic key type the magic key
+ * (modules/keymap/layout.ahk registers them). The key a layout declares,
+ * detected or shipped, is the layout's own magic-key position: its other levels
+ * follow the source character (Shift types its capital, Ctrl and Alt its
+ * shortcuts), Ctrl+★ may save and Win+★ opens the personal editor. A key the
+ * user chose is a key of the layout they type on: only its plain press becomes
+ * the magic key, and every level and chord stays the layout's, as on macOS and
+ * Linux (_shared/lua/keymap/magic_key_source.lua).
+ * @param {String} Scan - "SCnnn" of the physical magic key.
+ * @param {Boolean} Chosen - Whether the user chose it ([hotstrings] magic_key_source).
+ * @param {Boolean} CtrlSave - Whether [layout] ctrl_magic_save is on.
+ * @returns {Array} Maps of "kind" ("remap": every level through RemapKey,
+ *   "magic": the plain press alone, "ctrl_save": Ctrl+S, "editor": the personal
+ *   editor, registered under the replace section's criterion) and "hotkey".
+ */
+LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
+	if Chosen
+		return [Map("kind", "magic", "hotkey", Scan)]
+	Hotkeys := [Map("kind", "remap", "hotkey", Scan)]
+	if CtrlSave
+		Hotkeys.Push(Map("kind", "ctrl_save", "hotkey", "^" . Scan))
+	Hotkeys.Push(Map("kind", "editor", "hotkey", "#" . Scan))
+	return Hotkeys
+}
+
+/**
+ * The KeyboardEvent.code of a scan code, among the keys registry layouts define:
+ * the reverse of LayoutRegistry_KeyScan, for a key the user just pressed.
+ * @param {String} Scan - "SCnnn", any case.
+ * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @returns {String} The code, or "" when no layout key has that scan code.
+ */
+LayoutRegistry_KeyCode(Scan, KeycodeTable) {
+	for Key in KeycodeTable["keys"] {
+		if (Key["ahk"] = Scan)
+			return Key["code"]
+	}
+	return ""
 }

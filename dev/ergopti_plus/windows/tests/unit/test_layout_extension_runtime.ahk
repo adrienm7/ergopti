@@ -137,3 +137,17 @@ _L4R_InstalledDiscovery() {
 	} finally DirDelete(Directory, true)
 }
 Test("layout-extension-runtime: installed record owns discovery and uninstall removes visibility", _L4R_InstalledDiscovery)
+
+_L4R_DamagedRecordNeverStopsStartup() {
+	Directory := _LCT_TempDir()
+	try {
+		LocalDir := LayoutRegistry_LocalDir(Directory)
+		DirCreate(LocalDir)
+		_LCT_WriteRaw(LocalDir . LayoutRegistry_Settings()["installed_file"], "{ damaged")
+		Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", Directory . "missing-registry\")
+		AssertEqual(Roots.Length, 2, "the bundled and user roots still load when the installed record is damaged")
+		Assert(Roots[2] == RTrim(Directory, "\/") . "\extensions", "the user root follows the installed generations")
+	} finally DirDelete(Directory, true)
+}
+Test("layout-extension-runtime: a damaged installed record never stops startup (config-outdated-installed)",
+	_L4R_DamagedRecordNeverStopsStartup)

@@ -116,6 +116,12 @@ M.TAB = 48
 --- keyboards send 76 instead of 36 for the numeric-keypad Enter key.
 M.ENTER = 76
 
+--- fn / globe (keycode 63, kVK_Function) — the key macOS reports in flagsChanged
+--- for fn. The physical-key stream resolves the Apple vendor fn/globe usage to
+--- this keycode (modules/keylogger/physical_key_identity.lua), so both sources
+--- give the key one identity, the one the heatmap draws at the fn position.
+M.FUNCTION = 63
+
 --- Arrow keys (keycodes 123/124/125/126 — left/right/down/up) — consumed by
 --- the LLM tooltip eventtap for prediction navigation. Each press also resets
 --- the auto-dismiss timer so a user actively navigating never loses the

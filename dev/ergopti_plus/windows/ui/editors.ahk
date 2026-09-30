@@ -221,6 +221,265 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 	return true
 }
 
+; The physical magic key captured by pressing it: the next key pressed while this
+; dialog shows becomes [hotstrings] magic_key_source. Escape, closing the dialog
+; or the shared capture timeout changes nothing. It shares the magic-key editor's
+; owner (one suppressive capture at a time, stopped by Suspend and by Close).
+;
+; The key is read from the keyboard hook's PHYSICAL key state, never from the
+; scan code the InputHook reports: a remap hotkey suppresses the key it fires on,
+; and the hook only sees what that hotkey sends (HookDispatcherConst), at level 2
+; — with the Ergopti emulation on, the key typing "j" reported the scan code of
+; "j" on the OS layout, and the magic key its own {Text}★, scan code 0. A key
+; press, whatever reaches the hook, and a short poll, for a hotkey that sends
+; nothing the hook sees (a dead key, a tap-hold), both ask which candidate key is
+; physically down. GetKeyState "P" is exact only while the keyboard hook is
+; installed, which it always is in this driver.
+MagicKeySourceCapture(*) {
+		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
+		if A_IsSuspended
+				return
+		if IsObject(_MagicKeyEditorInputHook) {
+				; A live capture keeps its owner and comes back to the front: its
+				; hook swallows the next key typed anywhere.
+				if !_MagicKeyEditorStopDebt {
+						if IsObject(_MagicKeyEditorGui)
+								WMPresentWindow(_MagicKeyEditorGui)
+						return
+				}
+				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
+						return
+		}
+		GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
+		GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
+		GuiToShow.Show("Center")
+		State := _MagicKeySourceCaptureState()
+		; L0: no text is collected, every key is reported to OnKeyDown (N) and
+		; kept from the application (S); T ends the wait on the shared timeout.
+		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
+		IH.KeyOpt("{All}", "NS")
+		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
+		MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
+		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
+		_InheritedCritical := A_IsCritical
+		try {
+				; Publish + Start is one lifecycle transaction, as in MagicKeyEditor.
+				Critical("On")
+				try {
+						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
+								return
+						_MagicKeyEditorInputHook := IH
+						_MagicKeyEditorGui := GuiToShow
+						_MagicKeyEditorStopDebt := false
+						IH.Start()
+				} finally {
+						Critical("Off")
+				}
+				SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))
+				IH.Wait()
+		} finally {
+				SetTimer(MagicKeyCapturePoll, 0)
+				_MagicKeyEditorStopOwned(IH)
+				if (_MagicKeyEditorGui == GuiToShow)
+						_MagicKeyEditorGui := ""
+				try GuiToShow.Destroy()
+				Critical(_InheritedCritical)
+		}
+		; A capture whose wait crossed the pause boundary is discarded.
+		if A_IsSuspended
+				return
+		; Escape, Close and the timeout all end without an answer.
+		if (IH.EndReason != "Stopped")
+				return
+		if State.Refused {
+				MsgBox(t("dialog.magic_key_source.not_a_candidate"), t("dialog.magic_key_source.title"), "Icon!")
+				return
+		}
+		if (State.Scan == "")
+				return
+		ModifyMagicKeySource(LayoutRegistry_KeyCode(State.Scan, LayoutRegistry_Keycodes()))
+}
+
+; The state of one capture: the scan codes of the candidate keys, how a key's
+; physical state is read, the candidates already down when it opened (an answer
+; only once released), and the answer: a scan code, or Refused for a key that is
+; no candidate.
+; @param IsDown {Func} (KeyName) → whether the key is physically down.
+; @returns {Object} Scans, IsDown, Held, Scan and Refused.
+_MagicKeySourceCaptureState(IsDown := _MagicKeySourceIsDown) {
+		Scans := []
+		Keycodes := LayoutRegistry_Keycodes()
+		for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+				if MagicKeySourceIsCandidate(Code)
+						Scans.Push(LayoutRegistry_KeyScan(Code, Keycodes))
+		}
+		Held := Map()
+		for Scan in Scans {
+				if IsDown.Call(Scan)
+						Held[Scan] := true
+		}
+		return { Scans: Scans, IsDown: IsDown, Held: Held, Scan: "", Refused: false }
+}
+
+_MagicKeySourceIsDown(KeyName) {
+		return GetKeyState(KeyName, "P")
+}
+
+; The candidate key physically down, "" when none. A key held since the capture
+; opened stops being ignored once it was released.
+_MagicKeySourcePressedScan(State) {
+		; Collected first: a Map must not lose keys while it is enumerated.
+		Released := []
+		for Scan in State.Held {
+				if !State.IsDown.Call(Scan)
+						Released.Push(Scan)
+		}
+		for Scan in Released
+				State.Held.Delete(Scan)
+		for Scan in State.Scans {
+				if !State.Held.Has(Scan) && State.IsDown.Call(Scan)
+						return Scan
+		}
+		return ""
+}
+
+; Poll of the capture, for a key whose hotkey sends nothing the InputHook sees.
+_MagicKeySourceCapturePoll(State, IH) {
+		if !IH.InProgress
+				return
+		if State.IsDown.Call("Escape") {
+				IH.Stop()
+				return
+		}
+		Scan := _MagicKeySourcePressedScan(State)
+		if (Scan == "")
+				return
+		State.Scan := Scan
+		IH.Stop()
+}
+
+; List provider of the Layout menu's `magic_key_source` row (ui/menu/menu_init.ahk).
+; One row naming the key in effect; its submenu captures the next key pressed,
+; restores the automatic key or lists every candidate with the key in effect
+; ticked — the rows the Lua drivers build (_shared/lua/keymap/magic_key_source.lua).
+MagicKeySourceMenuRows() {
+	global ScriptInformation
+	Current := ScriptInformation["MagicKeySource"]
+	Automatic := ManifestDefaultFor("hotstrings.magic_key_source")
+	Keycodes := LayoutRegistry_Keycodes()
+	Hkl := KS_ResolveKeyboardLayout()
+	Items := [
+		Map("label", t("menu.layout.magic_key_source.capture"), "action", MagicKeySourceCapture),
+		Map("separator", true),
+		Map("label", t("menu.layout.magic_key_source.auto"), "checked", Current == Automatic,
+			"action", (*) => ModifyMagicKeySource(Automatic)),
+		Map("separator", true)]
+	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		if (Code == Automatic)
+			continue
+		Items.Push(Map("label", _MagicKeySourceLabel(Code, Keycodes, Hkl),
+			"checked", Current == Code,
+			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
+	}
+	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
+		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
+	return [Map("label", t("menu.layout.magic_key_source") . " : " . Shown, "items", Items)]
+}
+
+; What the OS layout types on a candidate key, then its KeyboardEvent.code, which
+; names the same key on every keyboard; the code alone when the layout cannot say.
+_MagicKeySourceLabel(Code, Keycodes, Hkl) {
+	Scan := Integer("0x" . SubStr(LayoutRegistry_KeyScan(Code, Keycodes), 3))
+	Text := (Hkl == 0) ? "" : KS_KeyTextNoStateChange(KS_ScancodeToVk(Scan, Hkl), Scan, Hkl).Text
+	return (Trim(Text) == "") ? Code : Text . "   (" . Code . ")"
+}
+
+; OnKeyDown of the capture: a modifier alone chooses nothing, Escape cancels, and
+; any other key answers with the candidate physically down — VK and SC describe
+; what reached the hook, a remap's output rather than the key pressed. With no
+; candidate down, the key pressed is none (Space, Enter, F5…) and is refused; a
+; candidate held since the capture opened only repeats and is no answer yet.
+_MagicKeySourceCaptureKeyDown(State, IH, VK, SC) {
+		global HOTKEY_MODIFIER_VKS
+		if HOTKEY_MODIFIER_VKS.Has(VK)
+				return
+		if (VK == GetKeyVK("Escape")) {
+				IH.Stop()
+				return
+		}
+		Scan := _MagicKeySourcePressedScan(State)
+		if (Scan == "") {
+				if (State.Held.Count > 0)
+						return
+				State.Refused := true
+		}
+		State.Scan := Scan
+		IH.Stop()
+}
+
+; Whether a value names a candidate key of [hotstrings] magic_key_source: one of
+; the manifest's enum values, spelled as it spells them, other than the
+; automatic default.
+MagicKeySourceIsCandidate(Code) {
+		if !(Code is String) || Code == ""
+				return false
+		if (Code == ManifestDefaultFor("hotstrings.magic_key_source"))
+				return false
+		for Allowed in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+				if (Allowed == Code)
+						return true
+		}
+		return false
+}
+
+_EditorBuildMagicKeySourcePlan(Value) {
+	global Features
+	if _FeatureUsesDesiredState(Features) {
+		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.magic_key_source", Value, "")
+		Plan.publish := _EditorPublishDesiredMagicKeySource.Bind(Plan.publish, Value)
+		return Plan
+	}
+	return {
+		updates: [{ Section: "hotstrings", Key: "magic_key_source", Value: Value }],
+		publish: _EditorPublishMagicKeySource.Bind(Value),
+	}
+}
+
+_EditorPublishDesiredMagicKeySource(PublishFn, Value) {
+	PublishFn.Call()
+	_EditorPublishMagicKeySource(Value)
+}
+
+_EditorPublishMagicKeySource(Value) {
+	global ScriptInformation, Features
+	ScriptInformation["MagicKeySource"] := Value
+	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor("hotstrings.magic_key_source")
+	if IsSet(Features) && Features.Has("hotstrings")
+		Features["hotstrings"]["magic_key_source"] := Value
+}
+
+; Persists the physical magic key ([hotstrings] magic_key_source) and reloads:
+; the remap hotkeys register on its scan code at load.
+; @param Value {String} A candidate code or the automatic value.
+; @returns {Boolean} Whether the choice was written and the reload accepted.
+ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
+	global ConfigurationFile
+	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor("hotstrings.magic_key_source") {
+		LoggerWarn("Editors", "Refused physical magic key '{1}': no candidate key has that code.", String(Value))
+		return false
+	}
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ModifyMagicKeySource(Value, WriterFn, NotifyFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_EditorWriteToml(ConfigurationFile, "the physical magic key",
+			_EditorBuildMagicKeySourcePlan.Bind(Value), WriterFn, NotifyFn)
+		return false
+	return _EditorReloadAfterCommit(ReloadFn)
+}
+
 _EditorBuildRepeatKeyPlan() {
 	global HSE_RepeatEnabled, Features
 	if _FeatureUsesDesiredState(Features) {

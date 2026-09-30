@@ -242,12 +242,30 @@ function M.empty_installed()
 	return { schema_version = M.INSTALLED_SCHEMA_VERSION, layouts = {} }
 end
 
+--- Why one entry of the installed-layouts record cannot be used, if it cannot.
+--- @param id any The entry's key.
+--- @param entry any The entry.
+--- @return string|nil problem
+local function installed_entry_problem(id, entry)
+	if not Registry.is_valid_id(id) then return "'" .. tostring(id) .. "' is not a layout id" end
+	if type(entry) ~= "table" then return "the entry is not an object" end
+	if entry.id ~= id then return "its id field does not name this entry" end
+	if type(entry.sha256) ~= "string" or type(entry.version) ~= "string" then
+		return "it has no verified sha256 and version"
+	end
+	return nil
+end
+
 --- Decodes the installed-layouts record. A missing file (nil text) is an
 --- empty record; an unreadable one is an error, never an empty record, so a
---- damaged file cannot make installed layouts look absent.
+--- damaged file cannot make installed layouts look absent. One entry this
+--- build cannot use (an older build's shape, an id it no longer accepts) is
+--- left out of `layouts` and kept, with the reason, in `outdated`: the caller
+--- warns about it, and the other layouts stay installed.
 --- @param text string|nil
 --- @param decode_json function
---- @return table|nil record { schema_version, layouts = { [id] = entry } }
+--- @return table|nil record { schema_version, layouts = { [id] = entry },
+---   outdated = { [id] = { entry = raw entry, detail = reason } } }
 --- @return string|nil error
 function M.decode_installed(text, decode_json)
 	if text == nil then return M.empty_installed(), nil end
@@ -257,32 +275,43 @@ function M.decode_installed(text, decode_json)
 		return nil, "the installed-layouts record has schema version " .. tostring(record.schema_version)
 	end
 	if type(record.layouts) ~= "table" then return nil, "the installed-layouts record has no layouts table" end
+	local layouts, outdated = {}, {}
 	for id, entry in pairs(record.layouts) do
-		if not Registry.is_valid_id(id) or type(entry) ~= "table" or entry.id ~= id
-			or type(entry.sha256) ~= "string" or type(entry.version) ~= "string" then
-			return nil, "the installed-layouts record has an invalid entry '" .. tostring(id) .. "'"
-		end
+		local problem = installed_entry_problem(id, entry)
+		if problem then outdated[tostring(id)] = { entry = entry, detail = problem }
+		else layouts[id] = entry end
 	end
+	record.layouts, record.outdated = layouts, outdated
 	return record, nil
 end
 
---- A copy of the record with one entry added or replaced.
+--- A new record to write, holding the entries a decode left out unchanged: a
+--- write never deletes an entry the user was told to fix.
+--- @param record table A decoded record.
+--- @return table copy
+local function writable_copy(record)
+	local copy = M.empty_installed()
+	for id, item in pairs(record.outdated or {}) do copy.layouts[id] = item.entry end
+	return copy
+end
+
+--- A copy of the record with one entry added or replaced, to write.
 --- @param record table
 --- @param entry table Registry index entry the installed copy was verified against.
 --- @return table
 function M.with_installed(record, entry)
-	local copy = M.empty_installed()
+	local copy = writable_copy(record)
 	for id, installed in pairs(record.layouts) do copy.layouts[id] = installed end
 	copy.layouts[entry.id] = entry
 	return copy
 end
 
---- A copy of the record without one entry.
+--- A copy of the record without one entry, to write.
 --- @param record table
 --- @param id string
 --- @return table
 function M.without_installed(record, id)
-	local copy = M.empty_installed()
+	local copy = writable_copy(record)
 	for installed_id, installed in pairs(record.layouts) do
 		if installed_id ~= id then copy.layouts[installed_id] = installed end
 	end

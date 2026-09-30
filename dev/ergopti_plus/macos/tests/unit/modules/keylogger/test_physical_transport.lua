@@ -16,7 +16,7 @@ local function fixture(overrides)
 	local receiver = Delivery.new({ batch_limit = 8,
 		admit = function() return "fixture-capture" end,
 		context = function() return { allowed = true, app = "Fixture", timestamp = "2026-09-12 12:00:00.000" } end,
-		keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,
+		keycode = Frames.keycode,
 		emit = function(press) observed.presses[#observed.presses + 1] = press end,
 	})
 	local frames = Frames.new("fixture", "1")

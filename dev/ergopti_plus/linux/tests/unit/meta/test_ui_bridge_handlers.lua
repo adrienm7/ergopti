@@ -939,7 +939,9 @@ helpers.describe("ui.bridge_handlers", function()
 
 		helpers.it("(onboarding-rerun) initData shows the values config.toml holds", function()
 			local state = onboarding_state()
-			local path = os.tmpname()
+			local folder = scratch_dir()
+			helpers.assert_true(os.execute("mkdir -p '" .. folder .. "'"))
+			local path = folder .. "/config.toml"
 			write_file(path, '[gestures]\nenabled = false\n[hotstrings.modules.distancesreduction]\nqu = true\n'
 				.. '[unrelated]\nenabled = true\n')
 			state.config_paths.config = function(rel)
@@ -948,10 +950,39 @@ helpers.describe("ui.bridge_handlers", function()
 			end
 			local result = handler.on_message({ action = "ready" }, state)
 			os.remove(path)
+			os.remove(folder)
 			helpers.assert_true(result.pushed)
 			helpers.assert_eq(result.data.current, {
 				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
 			}, "a re-run shows the answers in force, an explicit false included")
+		end)
+
+		-- A re-run started the Tap-Holds page at No with Tap-Holds on, pre-checked
+		-- every key and imported over the user's own ones.
+		helpers.it("(onboarding-rerun) initData shows the tap-hold keys and switch of the folder", function()
+			local state, values = onboarding_state()
+			local folder = scratch_dir()
+			helpers.assert_true(os.execute("mkdir -p '" .. folder .. "'"))
+			values.config_dir = folder
+			write_file(folder .. "/tap_hold.toml", '[tap_hold]\nenabled = true\n'
+				.. '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\ntap_action = "enter"\n'
+				.. 'hold_modifier = "ctrl"\n'
+				.. '[tap_hold.keys.left_alt]\ntap_action = "escape"\n')
+			local ready = handler.on_message({ action = "ready" }, state)
+			local chosen = handler.on_message({ action = "loadExistingConfig", config_dir = folder, request = 5 }, state)
+			write_file(folder .. "/tap_hold.toml", '[tap_hold.keys.left_alt\n')
+			local broken = handler.on_message({ action = "ready" }, state)
+			os.remove(folder .. "/tap_hold.toml")
+			os.remove(folder)
+			local expected = {
+				["tap_holds.enabled"] = true,
+				["tap_holds.keys.caps_lock"] = true,
+				["tap_holds.keys.left_alt"] = "customised",
+			}
+			helpers.assert_eq(ready.data.current, expected,
+				"an imported key reads as on, the user's own one as kept, and the switch as in force")
+			helpers.assert_eq(chosen.values, expected, "a chosen folder reads its own tap-hold file")
+			helpers.assert_eq(broken.pushed, false, "an unreadable tap-hold file never opens a neutral page")
 		end)
 
 		helpers.it("(onboarding-rerun) an unreadable config.toml never opens neutral pages", function()
@@ -1140,6 +1171,73 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(result, { done = true, restarted = false })
 			helpers.assert_eq(#captured.writes, 1, "the answers are already saved")
 			helpers.assert_eq(captured.notices, 1)
+		end)
+
+		-- The Tap-Holds page asked, then imported nothing: its keys live in
+		-- tap_hold.toml, which only the tap-hold writer owns.
+		helpers.it("(onboarding-tap-holds) imports the checked keys into the chosen folder after the answers", function()
+			local state, _, captured = onboarding_state()
+			local target = scratch_dir()
+			helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+			local Writer = helpers.load_module("platform.remap.tap_hold_writer")
+			local imports = {}
+			state.tap_hold_writer = setmetatable({
+				import_recommended = function(path, keys, preset)
+					imports[#imports + 1] = { path = path, keys = keys, config_writes = #captured.writes }
+					return Writer.import_recommended(path, keys, preset)
+				end,
+			}, { __index = Writer })
+			local result = finish(state, { locale = "en", config_dir = target, operations = {
+				{ path = "tap_holds.keys.caps_lock", value = true },
+				{ path = "gestures.enabled", value = true },
+				{ path = "tap_holds.keys.left_alt", value = false },
+				{ path = "tap_holds.keys.tab", value = true },
+			} })
+			local loaded = require("platform.remap.tap_hold_loader").load(
+				require("infra.paths").shared("tap_hold/defaults.toml"), target .. "/tap_hold.toml")
+			os.remove(target .. "/tap_hold.toml")
+			os.remove(target)
+			helpers.assert_eq(result, { done = true, restarted = true })
+			helpers.assert_eq(imports, { { path = target .. "/tap_hold.toml", keys = { "caps_lock", "tab" },
+				config_writes = 1 } }, "one import of the checked keys, into the chosen folder, after the answers")
+			helpers.assert_eq(captured.writes[1].updates, { { section = "gestures", key = "enabled", value = true } },
+				"no tap-hold key reaches config.toml")
+			helpers.assert_eq(loaded.enabled, true, "the import switches the Tap-Holds on in their own file")
+			helpers.assert_eq(loaded.keys.caps_lock.tap_action, "enter")
+			helpers.assert_true(loaded.keys.tab ~= nil)
+			helpers.assert_nil(loaded.keys.left_alt, "an unchecked key is not written")
+			helpers.assert_eq(captured.errors, {})
+		end)
+
+		helpers.it("(onboarding-tap-holds) a No or an unchecked list never reaches the tap-hold writer", function()
+			local state, _, captured = onboarding_state()
+			local calls = 0
+			state.tap_hold_writer = {
+				FILE_NAME = "tap_hold.toml",
+				import_recommended = function() calls = calls + 1; return true end,
+			}
+			local result = finish(state, { locale = "en", config_dir = "", operations = {
+				{ path = "tap_holds.keys.caps_lock", value = false },
+				{ path = "gestures.enabled", value = false },
+			} })
+			helpers.assert_true(result.done)
+			helpers.assert_eq(calls, 0, "nothing is written for a key the user did not keep")
+			helpers.assert_eq(#captured.writes, 1)
+		end)
+
+		helpers.it("(onboarding-tap-holds) a refused import is reported and the saved answers still apply", function()
+			local state, _, captured = onboarding_state()
+			state.tap_hold_writer = {
+				FILE_NAME = "tap_hold.toml",
+				import_recommended = function() return false, "tap_hold.toml does not parse" end,
+			}
+			local result = finish(state, { locale = "en", config_dir = "", operations = {
+				{ path = "tap_holds.keys.caps_lock", value = true },
+			} })
+			helpers.assert_eq(result, { done = true, restarted = true })
+			helpers.assert_eq(#captured.writes, 1, "the other answers are saved")
+			helpers.assert_eq(captured.errors, { "onboarding.error.tap_holds_import" },
+				"the user is told the keys were not imported")
 		end)
 
 		-- Category, section and magic-key choices are config.toml leaves of the

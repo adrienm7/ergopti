@@ -75,6 +75,22 @@ end)
 -- ===================================================
 
 helpers.describe("linux: word-delimiter menu changes are durable", function()
+	-- storage.json sits outside every configuration scope, so the hotstrings
+	-- « restore recommended » and « clear » could never reach the delimiters.
+	helpers.it("keeps them in config.toml through their owner, after the legacy import", function()
+		local src = read_file(DAEMON_PATH)
+		local owner_at = src:find('require("modules.hotstrings.terminator_settings")', 1, true)
+		local import_at = src:find('require("infra.legacy_hotstring_storage").import', 1, true)
+		helpers.assert_true(owner_at ~= nil, "the daemon must load the delimiters from their config owner")
+		helpers.assert_true(import_at ~= nil and import_at < owner_at,
+			"the storage.json value is imported before the owner reads config.toml")
+		helpers.assert_true(src:find("terminator_settings.load()", 1, true) ~= nil)
+		helpers.assert_true(src:find("on_persist_terminators = terminator_settings.persist", 1, true) ~= nil,
+			"the menu persists through the same owner")
+		helpers.assert_nil(src:find('"hotstrings.terminator_state"', 1, true), "the daemon no longer reads storage")
+		helpers.assert_nil(src:find('"hotstrings.custom_terminators"', 1, true))
+	end)
+
 	helpers.it("rolls a live toggle back when the atomic preference write fails", function()
 		local Terminators = require("keymap.terminators")
 		local menu_builder = helpers.load_module("ui.menu.menu_builder")

@@ -20,6 +20,11 @@
 --- 3. Known entries are untouched. Only an entry the caller's owner rejects is
 ---    reported; a real I/O or native refusal of a known entry stays the
 ---    caller's ERROR.
+--- 4. Other files follow the same rule. An outdated entry of a file the cleanup
+---    never scans (layers.toml, tap_hold.toml, storage.json…) is warned once,
+---    ignored and the rest of the file kept; the WARNING names the file and the
+---    entry to fix by hand. A file unreadable or malformed as a whole stays
+---    its owner's failure.
 --- ==============================================================================
 
 local M = {}
@@ -92,10 +97,34 @@ function M.report(segments, detail, sink)
 		(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); it is offered for cleanup.",
 			path, detail)
 	else
-		-- A quoted key has no line the cleanup can cut; promising it would be false.
+		-- A quoted key or a list member has no line the cleanup can cut;
+		-- promising it would be false.
 		(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); the config cleanup "
-			.. "cannot remove a quoted key, delete it from config.toml by hand.", path, detail)
+			.. "cannot remove a quoted key or a list member, delete it from config.toml by hand.", path, detail)
 	end
+	return true
+end
+
+--- Reports one outdated entry of a file the config cleanup never scans
+--- (layers.toml, tap_hold.toml, storage.json…), once per process. Only
+--- config.toml has a cleanup, so the WARNING names the file and the entry to
+--- fix by hand instead of promising a cleanup, and no cleanup scan records it.
+--- @param file string Path of the file holding the entry.
+--- @param segments table|string Path of the entry inside that file.
+--- @param detail string Why this build does not use it.
+--- @param sink table|nil The reporting owner's logger; the shared one by default.
+--- @return boolean first True when this call logged the WARNING.
+function M.report_in_file(file, segments, detail, sink)
+	if type(file) ~= "string" or file == "" then
+		error("config_outdated: an entry outside config.toml needs its file", 2)
+	end
+	local path = dotted(segments)
+	detail = tostring(detail or "this build does not use it")
+	local identity = file .. "\0" .. path .. "\0" .. detail
+	if _reported[identity] then return false end
+	_reported[identity] = true
+	(sink or logger()).warn(LOG, "Outdated entry '%s' in '%s' ignored (%s); the config cleanup only covers "
+		.. "config.toml, so fix or delete it in that file.", path, file, detail)
 	return true
 end
 

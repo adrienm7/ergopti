@@ -259,6 +259,96 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 		end)
 	end)
 
+	helpers.it("write() publishes when macOS re-stamps its own provenance attribute", function()
+		for _, case in ipairs({
+			{ label = "a destination stamped by another app", destination = "01-previous-writer" },
+			{ label = "a destination with no provenance yet", destination = nil },
+		}) do
+			with_fixture(function(fixture)
+				local path = os.tmpname():gsub("\\", "/")
+				local original = assert(io.open(path, "w"))
+				assert(original:write("old settings")); assert(original:close())
+				local metadata = {
+					records = {
+						[path] = {
+							permissions = "rw-------",
+							uid = 501,
+							gid = 20,
+							dev = 7,
+							ino = 31,
+							acl = "",
+							xattrs = {
+								["com.apple.provenance"] = case.destination,
+								["user.ergopti"] = "must-survive",
+							},
+						},
+					},
+					default = { permissions = "rw-r--r--", uid = 501, gid = 20, acl = "", xattrs = {} },
+					-- The kernel stamps the writing app's provenance on the staged
+					-- inode; no copy can carry the destination's value over.
+					after_copy = function(staged)
+						staged.xattrs["com.apple.provenance"] = "02-ergoptiplus"
+						staged.xattrs["com.apple.macl"] = "tcc-label"
+					end,
+				}
+				local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+				local call_ok, write_ok = xpcall(function()
+					return adapter.write(path, "new settings")
+				end, debug.traceback)
+				if not call_ok then
+					os.remove(path)
+					error(write_ok, 0)
+				end
+
+				helpers.assert_true(write_ok, case.label .. ": an OS-owned attribute must not block publication")
+				local published = assert(io.open(path, "r"))
+				helpers.assert_eq(published:read("*a"), "new settings", case.label)
+				published:close()
+				os.remove(path)
+			end)
+		end
+	end)
+
+	helpers.it("write() still refuses a changed attribute the OS does not own", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local original = assert(io.open(path, "w"))
+			assert(original:write("authoritative bytes")); assert(original:close())
+			local metadata = {
+				records = {
+					[path] = {
+						permissions = "rw-------",
+						uid = 501,
+						gid = 20,
+						dev = 7,
+						ino = 41,
+						acl = "",
+						xattrs = { ["com.apple.provenance"] = "01-previous-writer", ["user.ergopti"] = "must-survive" },
+					},
+				},
+				default = { permissions = "rw-r--r--", uid = 501, gid = 20, acl = "", xattrs = {} },
+				after_copy = function(staged)
+					staged.xattrs["com.apple.provenance"] = "02-ergoptiplus"
+					staged.xattrs["user.ergopti"] = "lost"
+				end,
+			}
+			local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+			local call_ok, write_ok = xpcall(function()
+				return adapter.write(path, "must not publish")
+			end, debug.traceback)
+			if not call_ok then
+				os.remove(path)
+				error(write_ok, 0)
+			end
+
+			helpers.assert_eq(write_ok, false, "a user attribute that changed must still fail closed")
+			local live = assert(io.open(path, "r"))
+			helpers.assert_eq(live:read("*a"), "authoritative bytes")
+			live:close()
+			os.remove(path)
+		end)
+	end)
+
 	helpers.it("write() refuses publication when the staged metadata copy is incomplete", function()
 		with_fixture(function(fixture)
 			local path = os.tmpname():gsub("\\", "/")

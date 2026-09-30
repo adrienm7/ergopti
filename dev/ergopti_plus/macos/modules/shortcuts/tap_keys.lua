@@ -233,7 +233,8 @@ function M.set_action(id, action_id, is_assignable)
 	end
 	local called, committed = pcall(function()
 		local _, source = read_config()
-		local rows = Preferences.prepare_shortcut_updates(source, { Manifest.sparse_operation(CONFIG_SECTION .. "." .. id, action_id) })
+		local rows = Preferences.prepare_shortcut_updates(source,
+			{ Manifest.sparse_operation(CONFIG_SECTION .. "." .. id, action_id) }, { "tap_keys" })
 		return Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source)
 	end)
 	if not called or committed ~= true then

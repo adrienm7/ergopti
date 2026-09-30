@@ -34,6 +34,7 @@ local InputSourceBroker = require("adapters.input_source_broker")
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
+local AccountingMode = require("modules.keylogger.physical_accounting_mode")
 local Timestamp      = require("modules.keylogger.timestamp")
 local PrivacyContext = require("modules.keylogger.privacy_context")
 -- The WPM formula lives once, in the shared metrics module. This file used to
@@ -304,9 +305,12 @@ local _is_paused
 -- A filesystem callback delivered during module construction must fail closed;
 -- after construction, the bridge reaches the same enable/pause/privacy gate as
 -- every other persistence sink instead of reconstructing only part of it.
+-- The ledger is a legacy physical source: once a producer stream is selected it
+-- credits nothing, exactly like the event tap, so no press is counted twice.
 local kc_bridge_initialized = KcBridge.init(
 	CoreState, nil, nil, nil, function()
 		if type(M.may_persist) ~= "function" then return false end
+		if not AccountingMode.legacy_credits() then return false end
 		return M.may_persist()
 	end)
 if kc_bridge_initialized ~= true then
@@ -676,20 +680,28 @@ local function handle_key(event_obj)
 		-- absent → press (record now); present → release (compute hold, clear).
 		-- During a hotstring expansion the script is paused; skip modifier logging
 		-- so synthetic Shift/Ctrl/Alt held by the expander don't pollute the log.
+		-- The press/release bookkeeping always runs, but a modifier is credited
+		-- only while the legacy sources own physical accounting: an admitted
+		-- stream credits it from the physical key instead.
 		if evt_type == hs.eventtap.event.types.flagsChanged then
 			local keycode = event_obj:getKeyCode()
 			local flags   = event_obj:getFlags() or {}
 			if MODIFIER_KEYCODES[keycode] then
 				local down_at = CoreState.modifier_down_at[keycode]
+				local credits = AccountingMode.legacy_credits()
 				if not down_at then
 					-- Press — record timestamp and credit the kc dict
 					CoreState.modifier_down_at[keycode] = now
-					LogManager.log_modifier_press(keycode, current_cached_app_name())
+					if credits then
+						LogManager.log_modifier_press(keycode, current_cached_app_name())
+					end
 				else
 					-- Release — compute hold duration and feed the manifest
 					local hold_ms = math.floor(now - down_at)
 					CoreState.modifier_down_at[keycode] = nil
-					LogManager.log_modifier_hold(keycode, current_cached_app_name(), hold_ms)
+					if credits then
+						LogManager.log_modifier_hold(keycode, current_cached_app_name(), hold_ms)
+					end
 				end
 			end
 			-- Keep the flag snapshot up to date for any code path that reads it
@@ -811,10 +823,12 @@ local function handle_key(event_obj)
 			d  = delay,
 			dk = false,
 			cp = false,
-			-- Suppress the output kc when Karabiner is logging the physical key for
-			-- this keycode — the bridge will credit the physical key instead, so we
-			-- must not also count the remapped output or the heatmap is double-counted.
-			kc = KcBridge.is_ke_managed_output_kc(keycode) and nil or keycode,
+			-- The keycode is a physical credit only while the legacy sources own
+			-- accounting. A managed output keycode is not proof of a remapped key (a
+			-- passthrough Space shares 49 with a remapped Escape), so the output is
+			-- never suppressed by keycode; an admitted producer stream owns every
+			-- physical credit instead (HS-274, physical_accounting_mode.lua).
+			kc = AccountingMode.legacy_credits() and keycode or nil,
 		}
 
 		local ev_entry = nil

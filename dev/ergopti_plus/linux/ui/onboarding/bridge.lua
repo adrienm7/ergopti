@@ -7,7 +7,9 @@
 --- The page answers with manifest paths and values; the shared
 --- onboarding_answers contract validates them against the generated catalogue
 --- and they reach config.toml in one versioned batch, after which the daemon
---- restarts so every module starts from the file.
+--- restarts so every module starts from the file. The Tap-Holds page's checked
+--- keys are imported into the chosen folder's tap_hold.toml by the tap-hold
+--- writer, which also switches the feature on there.
 --- ==============================================================================
 
 local M = {}
@@ -139,24 +141,53 @@ function M.config_values(decoded, mark)
 	return Answers.current_values(catalogue(), decoded, mark)
 end
 
---- The configured value of every wizard path in a config file.
+--- The wizard values of the tap_hold.toml beside a config.toml: the Tap-Holds
+--- switch and each key configured there, which the page keeps as they are.
+--- @param state table Daemon state and optional test-injected authorities.
 --- @param path string Absolute config.toml path.
---- @return table|nil values Empty for an absent file, nil when unreadable.
-local function values_of(path)
+--- @return table|nil values nil when the tap-hold file cannot be read.
+local function tap_hold_values_of(state, path)
+	local writer = dependency(state, "tap_hold_writer", "platform.remap.tap_hold_writer")
+	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	if not writer or not loader then
+		Logger.error(LOG, "The tap-hold keys in force cannot be read: the tap-hold owner is unavailable.")
+		return nil
+	end
+	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
+	local ok, report, err = pcall(loader.key_report, Paths.shared("tap_hold/defaults.toml"),
+		folder .. "/" .. writer.FILE_NAME)
+	if not ok or not report then
+		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
+		return nil
+	end
+	return Answers.tap_hold_values(catalogue(), report)
+end
+
+--- The configured value of every wizard path in a config file and in the
+--- tap-hold file beside it.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param path string Absolute config.toml path.
+--- @return table|nil values Empty for absent files, nil when one is unreadable.
+local function values_of(state, path)
+	local values = {}
 	local fh, err, code = io.open(path, "r")
-	if not fh then
-		if code == 2 then return {} end
+	if fh then
+		local raw = fh:read("*a")
+		fh:close()
+		local ok, parsed = pcall(TomlCodec.decode, raw)
+		if not ok or type(parsed) ~= "table" then
+			Logger.error(LOG, "The configuration in force could not be decoded.")
+			return nil
+		end
+		values = M.config_values(parsed)
+	elseif code ~= 2 then
 		Logger.error(LOG, "The configuration in force could not be read: %s.", tostring(err))
 		return nil
 	end
-	local raw = fh:read("*a")
-	fh:close()
-	local ok, parsed = pcall(TomlCodec.decode, raw)
-	if not ok or type(parsed) ~= "table" then
-		Logger.error(LOG, "The configuration in force could not be decoded.")
-		return nil
-	end
-	return M.config_values(parsed)
+	local tap_holds = tap_hold_values_of(state, path)
+	if not tap_holds then return nil end
+	for key, value in pairs(tap_holds) do values[key] = value end
+	return values
 end
 
 local function build_init_data(state)
@@ -173,7 +204,7 @@ local function build_init_data(state)
 	local strings = locale_strings(current_locale)
 	local current_dir = config_paths.get_config_dir()
 	local default_dir = config_paths.default_config_dir()
-	local values = values_of(config_paths.config(CONFIG_FILE))
+	local values = values_of(state, config_paths.config(CONFIG_FILE))
 	if not strings or not values then return nil end
 	return {
 		platform = CATALOGUE_DRIVER,
@@ -191,8 +222,8 @@ end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
---- Tells the user why the wizard saved nothing, as the other hosts' dialogs do;
---- the window stays open for a retry.
+--- Tells the user what the wizard could not save, as the other hosts' dialogs
+--- do; a refused commit leaves the window open for a retry.
 --- @param state table Daemon state.
 --- @param key string Locale key of the message.
 local function report_failure(state, key)
@@ -245,6 +276,32 @@ local function prepare_destination(path)
 	return true
 end
 
+--- Imports the checked tap-hold keys into the chosen folder's tap_hold.toml.
+--- The answers are already committed: a refused import is reported and leaves
+--- that file as it was, and the daemon still restarts on the saved answers.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param target_dir string The configuration folder the wizard set up.
+--- @param keys table The engine's key ids to import, at least one.
+--- @return boolean imported
+local function import_tap_holds(state, target_dir, keys)
+	local writer = dependency(state, "tap_hold_writer", "platform.remap.tap_hold_writer")
+	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	if not writer or not loader then
+		Logger.error(LOG, "The tap-hold keys were not imported: the tap-hold writer is unavailable.")
+		report_failure(state, "onboarding.error.tap_holds_import")
+		return false
+	end
+	local ok, imported, detail = pcall(function()
+		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		return writer.import_recommended(target_dir .. "/" .. writer.FILE_NAME, keys, preset)
+	end)
+	if ok and imported == true then return true end
+	Logger.error(LOG, "The tap-hold keys were not imported: %s.",
+		tostring(ok and detail or imported))
+	report_failure(state, "onboarding.error.tap_holds_import")
+	return false
+end
+
 local function finish(state, answers)
 	local authorities = {
 		i18n = dependency(state, "i18n", "infra.i18n"),
@@ -273,6 +330,7 @@ local function finish(state, answers)
 		return { done = false }
 	end
 	local rows, refusal = Answers.rows(index, answers.operations, authorities.manifest)
+	local tap_hold_keys = rows and Answers.tap_hold_keys(index, answers.operations, authorities.manifest)
 	local target_dir = normalize_config_dir(authorities.config_paths, answers.config_dir)
 	if not rows or not locale_available(authorities.i18n, answers.locale) or not target_dir then
 		Logger.error(LOG, "Onboarding finish refused — %s.",
@@ -313,6 +371,7 @@ local function finish(state, answers)
 		return { done = false }
 	end
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
+	if #tap_hold_keys > 0 then import_tap_holds(state, target_dir, tap_hold_keys) end
 
 	local manager = webview(state)
 	if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end
@@ -394,7 +453,7 @@ function M.on_message(payload, state)
 			Logger.error(LOG, "loadExistingConfig refused — folder or request number invalid.")
 			return { loaded = false }
 		end
-		local ok_values, values = pcall(values_of, chosen .. "/" .. CONFIG_FILE)
+		local ok_values, values = pcall(values_of, state, chosen .. "/" .. CONFIG_FILE)
 		if not ok_values or not values then return { loaded = false } end
 		return { loaded = push(state, "applyCurrentValues", { request = payload.request, values = values }),
 			values = values }

@@ -36,6 +36,7 @@ local FileSystem = require("adapters.file_system")
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
+local Outdated = require("config_outdated")
 
 local LOG = "karabiner"
 
@@ -510,6 +511,32 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	for _, entry in pairs(combos_config) do
 		if type(entry) == "table" then complete_slots(entry, { "tap", "hold", "combo" }) end
 	end
+
+	-- An entry this build cannot use is outdated: a key or combination the
+	-- catalogue no longer has, or a binding that is not a table. It is warned
+	-- once naming this file. A retired entry is left out of the state: a save
+	-- merges only the state's own ids, so it stays on disk for the user instead
+	-- of making every save fail to encode it. A known key's unusable value runs
+	-- as its neutral binding; a save over it is still refused, never discarding
+	-- it (the owned-fields contract), until the user fixes the file.
+	local function drop_outdated(config, catalogue, section, slots)
+		local known = {}
+		for _, def in ipairs(catalogue) do known[def.id] = true end
+		for id, entry in pairs(config) do
+			if not known[id] then
+				Outdated.report_in_file(user_config_path, { section, "config", tostring(id) },
+					"no entry of this build's catalogue has this id")
+				config[id] = nil
+			elseif type(entry) ~= "table" then
+				Outdated.report_in_file(user_config_path, { section, "config", id },
+					"a binding is a table of actions; the neutral one is used")
+				config[id] = {}
+				complete_slots(config[id], slots)
+			end
+		end
+	end
+	drop_outdated(tap_hold_config, tap_hold_keys, "tap_holds", { "tap", "hold" })
+	drop_outdated(combos_config, mod_combos, "mod_combos", { "tap", "hold", "combo" })
 
 	-- Reads one optional number; absence is the canonical default.
 	local function timing(section, key, default, label)

@@ -199,6 +199,18 @@ _ScopeOwnerBackupAndExternalRefusals() {
 }
 Test("config-scope: backup collisions and external edits refuse before publication", _ScopeOwnerBackupAndExternalRefusals)
 
+; One scope and mode per call, so the refused call reads parameters. A closure
+; never sees a for-loop variable: built in the loops, it threw an UnsetError
+; before ConfigScopeApply ran, which satisfied both AssertThrows and the
+; zero-admission count below.
+; @param Scope {String} A scope declaring a separate-file preset.
+; @param Mode {String} "recommended" or "clear".
+; @param Acquire {Func} The counting admission port.
+_ScopeOwnerRejectsPresetCase(Scope, Mode, Acquire) {
+	AssertThrows(() => ConfigScopeApply(Scope, Mode, Map(), Map("acquire", Acquire)),
+		Scope . " " . Mode . " must refuse without its separate-file preset owner")
+}
+
 _ScopeOwnerRejectsPreset() {
 	Calls := 0
 	Acquire(*) {
@@ -207,7 +219,7 @@ _ScopeOwnerRejectsPreset() {
 	}
 	for Scope in ["global", "tap_holds"] {
 		for Mode in ["recommended", "clear"]
-			AssertThrows(() => ConfigScopeApply(Scope, Mode, Map(), Map("acquire", Acquire)))
+			_ScopeOwnerRejectsPresetCase(Scope, Mode, Acquire)
 	}
 	AssertEqual(Calls, 0, "preset scopes must refuse before any admission or disk effect")
 }
