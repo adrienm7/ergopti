@@ -17,7 +17,8 @@
 --- before the caret. The hook forwards every physical key to the application
 --- BEFORE calling back, and the model does the same. {PUMP} runs one idle tick
 --- of the daemon's loop and {TAP} runs the tap action "select_all" through the
---- tap-hold manager's action runner.
+--- tap-hold manager's action runner. {TICK} turns the scripted whole-second
+--- clock (ERGOPTI_E2E_CLOCK=seconds) over to the next second, no time passing.
 --- Prints one line: SCREEN <quoted text>.
 --- ==============================================================================
 
@@ -29,6 +30,25 @@ package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.
 -- and coreutils) are emulated for this test process as tests/run.lua does for
 -- the unit suite; install() does nothing anywhere else.
 require("tests.win_compat").install()
+
+-- ERGOPTI_E2E_CLOCK=seconds: the daemon's clock is the whole-second os.time()
+-- it falls back to without luv, held still and turned over only by {TICK}, so
+-- a scenario can put a second boundary between two keys typed together.
+-- Installed before the first module loads, since infra.monotonic chooses its
+-- source once. "system" leaves the clock as the machine has it.
+local CLOCK = os.getenv("ERGOPTI_E2E_CLOCK") or "system"
+local clock_seconds = nil
+if CLOCK == "seconds" then
+	package.preload["luv"] = function() error("the scripted clock runs the daemon without luv") end
+	local system_time = os.time
+	clock_seconds = system_time()
+	os.time = function(date)
+		if date ~= nil then return system_time(date) end
+		return clock_seconds
+	end
+elseif CLOCK ~= "system" then
+	error("ERGOPTI_E2E_CLOCK must be system or seconds, not " .. CLOCK)
+end
 
 local Codes = require("infra.evdev_codes")
 
@@ -214,6 +234,10 @@ package.preload["adapters.event_loop"] = function()
 				i = i + #token + 2
 				local ran = pcall(tap_executor, "select_all", "tap_hold")
 				if not ran then screen[#screen + 1] = "[tap failed]" end
+			elseif token == "TICK" then
+				i = i + #token + 2
+				if not clock_seconds then error("{TICK} needs ERGOPTI_E2E_CLOCK=seconds") end
+				clock_seconds = clock_seconds + 1
 			elseif token then
 				i = i + #token + 2
 				if token == "BS" then table.remove(screen) end

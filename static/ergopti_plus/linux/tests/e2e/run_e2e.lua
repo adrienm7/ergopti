@@ -416,6 +416,17 @@ local DAEMON_SCENARIOS = {
 	{ name = "with AI loaded, a word-only trigger does not fire mid-word after a Backspace",
 		keys = "xy{BS}adn ", screen = "xadn ", llm = true },
 	{ name = "with AI loaded, an end-char trigger expands", keys = "adn ", screen = "ADN ", llm = true },
+	-- Without luv the daemon's clock counts whole seconds, and two keys typed
+	-- together read a second apart whenever that second turns over between
+	-- them: the 0.75 s expansion delay then dropped the trigger. This is the
+	-- stubbed CI step's clock, where the AI twin above once failed that way.
+	{ name = "a trigger typed across a clock second still expands", keys = "ad{TICK}n ", screen = "ADN ",
+		clock = "seconds" },
+	{ name = "with AI loaded, a corrected typo typed across a clock second still expands",
+		keys = "adx{BS}{TICK}n ", screen = "ADN ", llm = true, clock = "seconds" },
+	-- Two seconds on that clock is more than one of real pause: the delay holds.
+	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = "ad{TICK}{TICK}n ",
+		screen = "adn ", clock = "seconds" },
 	-- A touchpad reader that fails stops the reader alone: the same module
 	-- still runs the tap actions (gesture-pump-keeps-actions).
 	{ name = "a failing touchpad pump leaves the tap actions running", keys = "{PUMP}{TAP}",
@@ -502,6 +513,7 @@ do
 		for _, pair in ipairs(home_env) do env[#env + 1] = pair end
 		env[#env + 1] = { "ERGOPTI_E2E_LLM", scenario.llm and "1" or "0" }
 		env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
+		env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 		local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 		local pipe = io.popen(command, "r")
 		local output = pipe and pipe:read("*a") or ""
