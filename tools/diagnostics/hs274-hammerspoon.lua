@@ -62,7 +62,11 @@ local function run()
 			}
 			return owner.context.history.resolve(original_ns)
 		end,
-		keycode = function(usage) return config.keycodes[tostring(usage)] end,
+		keycode = function(page, usage)
+			local keycode = page == 7 and config.keycodes[tostring(usage)] or nil
+			if keycode then return keycode end
+			return nil, "unmapped_usage"
+		end,
 		emit = function(press)
 			result.presses[#result.presses + 1] = press
 			press.action = "physical_press"
