@@ -392,17 +392,48 @@ first physical input.
 
 Opening ordinary Hammerspoon with a Git checkout is a supported launch path;
 users must not need to build or start ErgoptiPlus.app to obtain its native
-remapping dependencies. App and repository onboarding must select the same
-pinned fork, even when official Karabiner is installed. Official application,
-CLI or running-service presence is not proof of fork readiness. Verify the
-cooperating peers and live stream capability, retain user configuration, and
-include a preinstalled-official case in native acceptance. The current
-bundle-bound lease helper does not yet satisfy this bootstrap requirement.
+remapping dependencies. App and repository onboarding must install and select
+the same pinned owned runtime (`project-hs-owned-remap-runtime`), from the same
+root-owned location, whichever way Ergopti was started. An installed or running
+official Karabiner-Elements is a coexistence case, not proof of runtime
+readiness: verify the owned peers by designated requirement and the live stream
+capability, leave the user's `~/.config/karabiner` untouched, and include a
+preinstalled-official case in native acceptance. The current bundle-bound lease
+helper does not yet satisfy this bootstrap requirement.
 
 ### project-hs-karabiner-exact-lease-isolation
 
-Ergopti owns only token-scoped Karabiner rules and variables. It never owns
-Karabiner's shared UI, daemon, grabber, or VirtualHID processes.
+In shared mode, the production path until the owned runtime ships, Ergopti owns
+only token-scoped Karabiner rules and variables and never owns, quits, unloads
+or restarts Karabiner-Elements' UI, daemon, grabber, console user server or
+VirtualHID processes. `tests/meta/test_karabiner_stock_process_isolation.lua`
+enforces this; keep it strict until WP6 of the
+[HS-274 plan](../handovers/2026-09-29-overnight/hs274-delivery-plan.md) lands
+the owned runtime together with the exact code it must allow. ADR 011 then
+permits two things only: controlling the Ergopti-labelled runtime peers, and
+quitting stock Karabiner through the default-on « close other Karabiner
+instances » option while the owned runtime runs. Any other control of stock
+`/Library/Application Support/org.pqrs/Karabiner-Elements` processes remains a
+bug.
+
+### project-hs-owned-remap-runtime
+
+[ADR 011](../../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)
+(maintainer, 2026-09-29) replaces the Karabiner-Elements application with an
+Ergopti-owned background runtime: the unmodified pqrs VirtualHIDDevice plus a
+self-signed headless 3-product fork of Karabiner-Elements 16.3.0 carrying the
+HS-274 stream. It runs only while Tap-Hold is on; metrics-only users keep the
+Quartz event tap, exact when nothing is remapped. Mechanisms future work must
+keep: the console user server takes its configuration from `$XDG_CONFIG_HOME`,
+so Ergopti owns a complete `karabiner.json` without a source patch; the daemon
+ungrabs when its console-user peer closes, so the owner must start that peer
+with the owner-PID watch WP4 adds; root binaries run only from a root-owned
+`/Library/Application Support/ErgoptiPlus/…` copy, never from the
+user-writable app bundle; upstream `same_team_id` trusts every peer of an
+unsigned daemon, so the fork must pin the Ergopti certificate leaf before it is
+distributed. A selected stream never falls back to Quartz or the ledger when it
+is lost: it records a gap. Never ship the 10-product « complete candidate » or
+keep the Updater, which can replace the fork with official binaries.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 

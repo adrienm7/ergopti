@@ -35,6 +35,14 @@ Service (called `karabiner_grabber` before v15.7), console server,
 version-dependent session agents, `Karabiner-VirtualHIDDevice-Daemon`, or the
 DriverKit VirtualHID process.
 
+These rules describe the shared Karabiner mode shipped today. The owned mode
+decided in [ADR 011](../../docs/adr/011-owned-karabiner-runtime.md) will add
+Ergopti's own headless runtime, whose console user server is started with the
+owner's PID so that the daemon stops grabbing, and the keyboard returns to
+native input, when that owner disappears. Stock Karabiner processes stay out of
+reach in both modes, except for the explicit, default-on « close other
+Karabiner instances » option of the owned mode.
+
 The Lua suite simulates the missing-parent and native-termination paths. A
 physical Activity Monitor Force Quit and observable keyboard-release check still
 requires a built application on macOS.
@@ -61,13 +69,15 @@ user who never turns the integration on never gets a Background Item from
 ErgoptiPlus. Turning it off later does not unregister a guardian registered
 earlier: it stays in Login Items until uninstall (tracked as TODO item 13).
 
-This is deliberately not a Karabiner process watchdog. Karabiner's UI, menubar,
-root Core Service, console user server, user/session agents, observers,
-extensions, watchers, `Karabiner-VirtualHIDDevice-Daemon` and its DriverKit
-process are shared with the user's own configuration and remain entirely
-user-managed. Disabling ErgoptiPlus revokes
+This is deliberately not a Karabiner process watchdog. In the shared mode,
+Karabiner's UI, menubar, root Core Service, console user server, user/session
+agents, observers, extensions, watchers, `Karabiner-VirtualHIDDevice-Daemon` and
+its DriverKit process are shared with the user's own configuration and remain
+entirely user-managed. Disabling ErgoptiPlus revokes
 only `ergopti_mode_<token>` / `ergopti_revoked_<token>`; it neither quits nor
-restarts stock Karabiner.
+restarts stock Karabiner. The owned mode of ADR 011 does not turn this guardian
+into a watchdog either: its fail-safe is the daemon's own ungrab when the
+owner-started console user server exits.
 
 Non-authority engine state is isolated independently. Generated rules and
 Hammerspoon writers use `ergopti_<logical-name>_<token>` for `layer_active`,
