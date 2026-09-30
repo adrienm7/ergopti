@@ -29,6 +29,7 @@ local EmitActions = require("_generated.gesture_emit_actions")
 local Json = require("json")
 local Paths = require("infra.paths")
 local NavLayer = require("platform.remap.nav_layer")
+local Outdated = require("config_outdated")
 
 local LOG = "platform.remap.tap_hold_manager"
 local MS_PER_SECOND = 1000
@@ -143,7 +144,9 @@ end
 
 --- Warns about every tap the configuration asks for that this driver cannot
 --- run: the key would otherwise hold as configured and do nothing on a tap,
---- with the only trace a DEBUG line at each press.
+--- with the only trace a DEBUG line at each press. A tap the user's file
+--- names is an outdated entry (a retired action, or one only another driver
+--- runs): warned once, naming the file, not at every reload.
 local function _warn_unsupported_taps(loaded)
 	local supported = _tap_action_set()
 	for _, entry in ipairs(loaded.catalog) do
@@ -151,8 +154,13 @@ local function _warn_unsupported_taps(loaded)
 		local key = loaded.keys[key_id]
 		local tap = key and key.enabled ~= false and key.tap_action
 		if type(tap) == "string" and tap ~= "" and tap ~= "none" and not supported[tap] then
-			Logger.warn(LOG, "Tap-hold key '%s': tap action '%s' has no Linux implementation — its tap does nothing.",
-				key_id, tap)
+			if (loaded.user_fields[key_id] or {}).tap_action then
+				Outdated.report_in_file(loaded.user_path, { "tap_hold", "keys", key_id, "tap_action" },
+					"this driver runs no tap action '" .. tap .. "'; the tap does nothing")
+			else
+				Logger.warn(LOG, "Tap-hold key '%s': tap action '%s' has no Linux implementation — its tap does nothing.",
+					key_id, tap)
+			end
 		end
 	end
 end
@@ -290,7 +298,7 @@ function M.apply_configuration(document)
 		return false
 	end
 	local ok, loaded, one_shot, engine = pcall(function()
-		return _build(Config.load_document(_defaults_path, document))
+		return _build(Config.load_document(_defaults_path, document, nil, _user_path))
 	end)
 	if not ok then
 		Logger.error(LOG, "Tap-hold scope candidate refused, the previous configuration stays: %s.", tostring(loaded))
