@@ -486,6 +486,23 @@ Turning it off removes only marked rules by byte-span surgery proven by decoded
 equality; never re-serialize `karabiner.json`, which would rewrite personal
 rules.
 
+### project-hs-karabiner-legacy-conflicts-are-offered-for-removal
+
+Untagged rules carrying a historical ErgoptiPlus signature
+(`legacy_ergopti_signature_reasons`) that no released block proves make the
+merge refuse every deploy; it must keep refusing, since such a rule may be
+personal. The refusal is data (`merge_and_deploy_config`'s fourth return, kind
+`legacy_conflicts`). The remap bridge keeps that set with the build's legacy
+context and offers `ui.legacy_rules_cleanup` once per launch per set from a
+zero-delay timer, since the refusal happens inside the lease transaction. The
+Tap-Hold menu row reopens it while pending. `ManagedRuleRemoval.remove_legacy_rules`
+removes exactly what `Generator.find_legacy_signature_conflicts` (the merge's
+own classifier) reports: never give it a criterion of its own. It writes a
+verified `karabiner.json.ergoptiplus-legacy-<time>-<n>.bak` first, then
+publishes by byte surgery over the exact bytes it read. A merge refusal writes
+nothing yet still goes through `contain_ambiguous_deploy_failure`, which fences
+an ACTIVE generation; tests of a refused deploy start from a PREPARED lease.
+
 ### project-hs-guardian-approval-has-one-native-poller
 
 A guardian held for Background Items approval keeps every rule inert. Its first

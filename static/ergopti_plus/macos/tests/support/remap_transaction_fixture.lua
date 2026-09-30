@@ -120,6 +120,13 @@ return function(run)
 				timer_cancel_attempts = 0,
 				wizard_runs = 0,
 				rule_removals = {},
+				legacy_removals = {},
+				-- The fourth build return, as the merge receives it.
+				legacy_context = { fixture = "legacy-context" },
+				-- fn(...) -> merge_and_deploy_config results, when set.
+				deploy_override = nil,
+				-- { ok, detail, removed_count, backup_path } of remove_legacy_rules.
+				legacy_removal_result = nil,
 			}
 			local paused_now = options.paused == true
 			local lease_token = "ffeeddccbbaa99887766554433221100"
@@ -202,15 +209,17 @@ return function(run)
 					calls.build = calls.build + 1
 					calls.build_token = select(7, ...)
 					if options.build_succeeds == false then return nil, "build failed" end
-					return {}
+					return {}, nil, {}, calls.legacy_context
 				end,
-				merge_and_deploy_config = function()
+				merge_and_deploy_config = function(...)
 					calls.deploy = calls.deploy + 1
+					if calls.deploy_override then return calls.deploy_override(...) end
 					if options.deploy_succeeds == false or calls.fail_deploy then
 						return false, "deploy failed"
 					end
 					return true, "ok"
 				end,
+				REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts",
 				KE_PHYSICAL_KC_LOG = nil,
 			}
 			package.loaded["platform.remap.managed_rule_removal"] = {
@@ -220,6 +229,15 @@ return function(run)
 						return false, "synthetic karabiner.json refusal", 0
 					end
 					return true, "removed", 1
+				end,
+				remove_legacy_rules = function(path, legacy_context)
+					calls.legacy_removals[#calls.legacy_removals + 1] = {
+						path = path,
+						legacy_context = legacy_context,
+					}
+					local result = calls.legacy_removal_result
+					if result then return result[1], result[2], result[3], result[4] end
+					return true, "removed", 2, "/backup/karabiner.json.bak"
 				end,
 			}
 			package.loaded["platform.remap.ke_lifecycle"] = {

@@ -989,6 +989,35 @@ local function guardian_status_rows(karabiner, tap_holds_on)
 	return rows
 end
 
+--- The row that removes the rules an older ErgoptiPlus left in Karabiner,
+--- shown only while they keep every setting from being applied. Its dialog is
+--- the one the remap bridge offers by itself once per launch.
+--- @param karabiner table Remap facade.
+--- @return table rows Empty unless legacy rules are pending.
+local function legacy_rules_rows(karabiner)
+	if type(karabiner.legacy_rule_conflicts) ~= "function" then return {} end
+	local ok, conflicts = pcall(karabiner.legacy_rule_conflicts)
+	if not ok then
+		Logger.error(LOG, "The pending legacy Karabiner rules could not be read: %s.", tostring(conflicts))
+		return {}
+	end
+	if type(conflicts) ~= "table" then return {} end
+	return { {
+		label = i18n.get("menu.tapholds.legacy_rules_pending"),
+		action = function()
+			Logger.info(LOG, "Showing the legacy Karabiner rules cleanup from the Tap-Holds menu.")
+			local shown_ok, shown = xpcall(function()
+				return require("ui.legacy_rules_cleanup").open(karabiner)
+			end, debug.traceback)
+			if not shown_ok then
+				Logger.error(LOG, "The legacy Karabiner rules cleanup could not be shown: %s.", tostring(shown))
+				return false
+			end
+			return shown == true
+		end,
+	} }
+end
+
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -1019,10 +1048,12 @@ function M.build(ctx)
 	-- provider call: an unreadable key catalogue then costs the key rows and is
 	-- logged, not the whole Tap-Holds submenu.
 	local providers = {
-		-- The first engine-specific rows: while the guardian is not ready,
-		-- they open with why nothing applies and the way to fix it.
+		-- The first engine-specific rows: while rules an older release left in
+		-- Karabiner block the deploy, or the guardian is not ready, they open
+		-- with why nothing applies and the way to fix it.
 		["tap_hold_timings"] = function()
-			local rows = guardian_status_rows(karabiner, tap_holds_on)
+			local rows = legacy_rules_rows(karabiner)
+			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
 			return rows

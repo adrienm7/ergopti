@@ -1800,6 +1800,20 @@ do
 		Logger.error(LOG, "Login Items steps unavailable; the approval banner remains: %s.", tostring(registered))
 	end
 end
+-- Rules an older ErgoptiPlus left in karabiner.json can refuse every deploy:
+-- the first refusal offers their removal in a dialog. A failure here only
+-- costs that dialog (the Tap-Holds menu row keeps the removal), never the boot.
+do
+	local presenter_ok, registered = xpcall(function()
+		return karabiner.set_legacy_cleanup_presenter(function()
+			return require("ui.legacy_rules_cleanup").offer(karabiner)
+		end)
+	end, debug.traceback)
+	if presenter_ok ~= true or registered ~= true then
+		Logger.error(LOG, "Legacy-rule cleanup dialog unavailable; the Tap-Holds menu keeps it: %s.",
+			tostring(registered))
+	end
+end
 Boot.mark("UI: karabiner.init")
 Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")
 

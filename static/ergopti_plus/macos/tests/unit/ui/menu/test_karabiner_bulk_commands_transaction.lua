@@ -881,5 +881,56 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 	end)
 end)
 
+-- The legacy rules row
+
+helpers.describe("the Tap-Hold submenu offers the legacy rules cleanup (karabiner-legacy-cleanup)", function()
+	local PENDING = { count = 25, descriptions = { "CapsWord — toggle and deactivation" } }
+	local ROW = "menu.tapholds.legacy_rules_pending"
+
+	helpers.it("shows the row only while legacy rules block the deploy (karabiner-legacy-cleanup)", function()
+		for _, variant in ipairs({
+			{ pending = PENDING, shown = true },
+			{ pending = PENDING, shown = true, tap_holds_on = false },
+			{ pending = nil, shown = false },
+		}) do
+			local built = build_menu("pending", function(remap)
+				remap.legacy_rule_conflicts = function() return variant.pending end
+				remap.get_tap_holds_enabled = function() return variant.tap_holds_on ~= false end
+			end)
+			local row = find_descendant(built, ROW)
+			helpers.assert_eq(row ~= nil, variant.shown,
+				"the row follows the pending rules, Tap-Holds " .. tostring(variant.tap_holds_on ~= false))
+		end
+		helpers.assert_nil(find_descendant(build_menu("pending"), ROW),
+			"a facade without legacy rules shows no row")
+	end)
+
+	helpers.it("the row reopens the cleanup dialog (karabiner-legacy-cleanup)", function()
+		local saved_cleanup = package.loaded["ui.legacy_rules_cleanup"]
+		local opened = {}
+		package.loaded["ui.legacy_rules_cleanup"] = {
+			open = function(remap)
+				opened[#opened + 1] = remap
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			local built, observations = build_menu("pending", function(remap)
+				remap.legacy_rule_conflicts = function() return PENDING end
+				remap.remove_legacy_rules = function() return true end
+			end)
+			local action = row_action(find_descendant(built, ROW))
+			helpers.assert_type(action, "function")
+			helpers.assert_true(action())
+			helpers.assert_eq(#opened, 1, "the row shows the same dialog the bridge offers")
+			helpers.assert_eq(type(opened[1].remove_legacy_rules), "function",
+				"the dialog reads the same remap facade as the row")
+			helpers.assert_eq(count_logs(observations, "error"), 0)
+		end)
+		package.loaded["ui.legacy_rules_cleanup"] = saved_cleanup
+		if not ok then error(err, 0) end
+	end)
+end)
+
 package.loaded["infra.dialog_util"] = SAVED_DIALOGS
 package.loaded["infra.config_paths"] = SAVED_PATHS
