@@ -53,8 +53,49 @@ const HEADER = {
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
 		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
 		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
-		"'choices' are projected from the feature's enum_values by this generator."
+		"'choices' are projected from the feature's enum_values by this generator.",
+	_comment4:
+		"unavailable (rows restricted by platforms only): 'hide' = not applicable where the row " +
+		"is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported " +
+		'there, drawn disabled with its label and its translated reason_key. A restricted row ' +
+		'without the field is hidden, as before the field existed.'
 };
+
+const PLATFORMS = ['ahk', 'hs', 'linux'];
+
+/**
+ * Refuses an `unavailable` declaration the renderers cannot honour.
+ *
+ * The maintainer's two cases for a row a platform lacks: NOT APPLICABLE there
+ * (`hide`: it makes no sense on that OS, so nothing is drawn and no reason is
+ * owed) and NOT YET PORTED there (`grey`: the feature exists elsewhere, so the
+ * row is drawn disabled with its translated reason, which needs a label and a
+ * reason to draw).
+ * @param {object} menu The parsed [menu] tables.
+ */
+function validateUnavailable(menu) {
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			if (!row || typeof row !== 'object' || row.unavailable === undefined) continue;
+			const where = `menu.${key} row "${row.id || row.path || row.i18n || row.type}"`;
+			if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
+				throw new Error(`${where}: unavailable must be "hide" or "grey"`);
+			const restricted =
+				Array.isArray(row.platforms) && PLATFORMS.some((p) => !row.platforms.includes(p));
+			if (!restricted)
+				throw new Error(`${where}: unavailable needs platforms that leave some platform out`);
+			if (row.unavailable === 'hide' && row.reason_key !== undefined)
+				throw new Error(`${where}: a hidden row carries no reason_key`);
+			if (row.unavailable === 'grey') {
+				if (typeof row.reason_key !== 'string' || row.reason_key === '')
+					throw new Error(`${where}: a greyed row needs its reason_key`);
+				if (typeof row.i18n !== 'string' || row.i18n === '')
+					throw new Error(`${where}: a greyed row needs an i18n label`);
+			}
+		}
+	}
+}
 
 /**
  * Projects each `choice` row's values from the enum feature its `path` names.
@@ -111,6 +152,7 @@ function build() {
 	}
 
 	projectChoices(parsed.menu, raw);
+	validateUnavailable(parsed.menu);
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');

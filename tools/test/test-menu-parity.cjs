@@ -40,7 +40,9 @@
  *    diverging row itself — never to a structural accident.
  * 4. Every i18n key the manifest names resolves in all 21 locales, so a label
  *    tree is a tree of labels and not of raw keys.
- * 5. A row narrower than the menu containing it should say why (`reason_key`).
+ * 5. A row narrower than the menu containing it should say why (`reason_key`),
+ *    or be declared not applicable there (`unavailable = "hide"`, the
+ *    maintainer's classification of 2026-09-30, which owes no reason).
  *    Ratcheted, because 41 predate this gate.
  * 6. The Lua drivers render an ever-growing share of the manifest through the
  *    shared renderer rather than by hand. Ratcheted upward.
@@ -401,7 +403,7 @@ for (const menuKey of MENU_KEYS) {
 		if (isSeparator(row)) continue;
 		const own = Array.isArray(row.platforms) ? row.platforms : PLATFORMS;
 		const narrower = parentVisibility.filter((p) => !own.includes(p));
-		if (narrower.length === 0 || row.reason_key) continue;
+		if (narrower.length === 0 || row.reason_key || row.unavailable === 'hide') continue;
 		unreasoned.push(
 			`${menuKey}/${row.id || row.i18n || row.category || row.type} hidden on ` +
 				`${narrower.map((p) => DRIVER_OF[p]).join(', ')}`
