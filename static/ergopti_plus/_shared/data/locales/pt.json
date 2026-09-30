@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Atualizar lista ativa para v%s (instalar v%s primeiro)",
 	"menu.layout.update_list_ok": "Lista de fontes de entrada atualizada.",
 	"menu.layout.update_version": "Atualizar Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "Sobre o Ergopti IA",
-	"menu.llm.about_body": "Ergopti IA — Sugestões inteligentes de teclado\nBackend: Ollama (local)\nVersão: 1.0",
 	"menu.llm.add_custom_model": "Adicionar um modelo personalizado",
 	"menu.llm.add_model_entry": "➕ Adicionar um modelo personalizado…",
 	"menu.llm.after_hotstring": "Sugestão após o vencimento de uma bolha de hotstring",

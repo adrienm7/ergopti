@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "有効リストをv%sに更新（先にv%sをインストール）",
 	"menu.layout.update_list_ok": "入力ソースリストを更新しました。",
 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s に更新",
-	"menu.llm.about": "Ergopti AIについて",
-	"menu.llm.about_body": "Ergopti AI — スマートキーボード提案\nバックエンド: Ollama (ローカル)\nバージョン: 1.0",
 	"menu.llm.add_custom_model": "カスタムモデルを追加",
 	"menu.llm.add_model_entry": "➕ カスタムモデルを追加…",
 	"menu.llm.after_hotstring": "ホットストリングバブルが消えた後に提案",

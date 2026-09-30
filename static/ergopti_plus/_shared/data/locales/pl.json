@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Uaktualnij aktywną listę do v%s (najpierw zainstaluj v%s)",
 	"menu.layout.update_list_ok": "Lista źródeł wejścia zaktualizowana.",
 	"menu.layout.update_version": "Zaktualizuj Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "O Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — Inteligentne podpowiedzi klawiatury\nBackend: Ollama (lokalne)\nWersja: 1.0",
 	"menu.llm.add_custom_model": "Dodaj niestandardowy model",
 	"menu.llm.add_model_entry": "➕ Dodaj niestandardowy model…",
 	"menu.llm.after_hotstring": "Sugestia po wygaśnięciu bąbelka hotstring'a",

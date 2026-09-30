@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "שדרג רשימה פעילה ל-v%s (התקן v%s תחילה)",
 	"menu.layout.update_list_ok": "רשימת מקורות הקלט עודכנה.",
 	"menu.layout.update_version": "עדכן Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "אודות Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — הצעות מקלדת חכמות\nצד שרת: Ollama (מקומי)\nגרסה: 1.0",
 	"menu.llm.add_custom_model": "הוסף מודל מותאם",
 	"menu.llm.add_model_entry": "➕ הוסף מודל מותאם…",
 	"menu.llm.after_hotstring": "הצעה לאחר פקיעת בועת hotstring",

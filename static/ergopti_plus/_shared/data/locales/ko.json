@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "활성 목록을 v%s로 업그레이드 (먼저 v%s 설치)",
 	"menu.layout.update_list_ok": "입력 소스 목록이 업데이트되었습니다.",
 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s 업데이트",
-	"menu.llm.about": "Ergopti AI 정보",
-	"menu.llm.about_body": "Ergopti AI — 스마트 키보드 제안\n백엔드: Ollama (로컬)\n버전: 1.0",
 	"menu.llm.add_custom_model": "사용자 지정 모델 추가",
 	"menu.llm.add_model_entry": "➕ 사용자 지정 모델 추가…",
 	"menu.llm.after_hotstring": "핫스트링 버블 만료 후 제안",

@@ -1295,8 +1295,6 @@
 	"menu.layout.layout_on_resume": "Layout when script is active",
 	"menu.layout.pause_layout_enabled": "Auto-switch layout on pause / resume",
 	"menu.layout.pause_layout_section": "Layout on pause / resume",
-	"menu.llm.about": "About Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — Smart keyboard suggestions\nBackend: Ollama (local)\nVersion: 1.0",
 	"menu.llm.add_custom_model": "Add a custom model",
 	"menu.llm.add_model_entry": "➕ Add a custom model…",
 	"menu.llm.after_hotstring": "Suggestion after a hotstring bubble expires",

@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Aktif listeyi v%s'e yükselt (önce v%s yükleyin)",
 	"menu.layout.update_list_ok": "Giriş kaynağı listesi güncellendi.",
 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s güncelle",
-	"menu.llm.about": "Ergopti AI Hakkında",
-	"menu.llm.about_body": "Ergopti AI — Akıllı klavye önerileri\nBackend: Ollama (yerel)\nSürüm: 1.0",
 	"menu.llm.add_custom_model": "Özel model ekle",
 	"menu.llm.add_model_entry": "➕ Özel model ekle…",
 	"menu.llm.after_hotstring": "Kısaltma baloncuğu sona erdiğinde öneri",
