@@ -15,6 +15,15 @@
 --- one channel owner, persists it, and the answer (channel_changed) carries
 --- the subscription that holds afterwards. A change made from the menu is
 --- pushed to an open page the same way.
+---
+--- A release's « Install this version » button posts install_release: the
+--- shared sequence (_shared/lua/updater/release_install.lua) backs the
+--- configuration up (modules/updater/config_backup.lua), finds the release in
+--- the list this bridge last fetched from the GitHub API, then downloads,
+--- verifies and installs it through the updater manager's update path and
+--- restarts the daemon on it. Each phase is pushed as install_progress. The
+--- restore banner posts restore_backup; the daemon restarts on the restored
+--- configuration.
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +38,9 @@ local Shell = require("adapters.shell_runner")
 local Json = require("json")
 local Base64 = require("compat.base64")
 local ReleaseSources = require("updater.release_sources")
+local Parser = require("updater.release_parser")
+local ReleaseInstall = require("updater.release_install")
+local VersionOrder = require("updater.version")
 
 -- The owner and the repository come from the shared updater defaults, their
 -- single source (tools/test/test-repo-url-single-source.cjs). The loader is
@@ -41,6 +53,12 @@ local MAX_SOURCE_BYTES = 4 * 1024 * 1024
 
 local _fetch_generation = 0
 local _sources = nil
+-- The release list the last fetch published: { kind = "json"|"feed", body }.
+-- An install finds its release here, so the page and the host act on one list.
+local _last_list = nil
+-- The one install session of this window (created on the first request).
+local _install_session = nil
+local _daemon_state = nil
 
 --- The repository's web root, from the shared updater defaults.
 --- @return string|nil url
@@ -143,6 +161,8 @@ local function _build_initial_payload(state, channel)
 		cache_miss = #releases == 0,
 		repo_url = sources and sources.page_url or nil,
 		version = state._version or Version.VERSION,
+		-- What this build can install and restore, for the install buttons.
+		install = M._install_context(),
 	}
 end
 
@@ -242,10 +262,12 @@ function M.start_fetch(channel)
 		end
 		if result.error then
 			Logger.done(LOG, "Release fetch ended with an error (channel=%s).", channel)
+			_last_list = nil
 			M._push({ action = "releases_error", channel = channel, error_key = result.error_key })
 			return
 		end
 		Logger.success(LOG, "Releases fetched from %s (channel=%s).", result.source, channel)
+		_last_list = { kind = result.kind, body = result.body }
 		local payload = { action = "releases", channel = channel }
 		if result.kind == "feed" then payload.feed = result.body else payload.json = result.body end
 		M._push(payload)
@@ -295,10 +317,154 @@ function M.push_subscribed_channel(channel)
 	return M._push({ action = "channel_changed", channel = channel, ok = true }) == true
 end
 
+-- =========================================
+-- =========================================
+-- ======= 2/ Release Install ==============
+-- =========================================
+-- =========================================
+
+-- Test seam: the configuration backup module (modules/updater/config_backup.lua).
+M._config_backup = nil
+
+--- The configuration backup owner, built for the folder in force now.
+--- @return table|nil owner
+local function backup_owner()
+	local module = M._config_backup or require("modules.updater.config_backup")
+	return module.owner()
+end
+
+--- Why this build cannot install a release, or nil when it can.
+--- @param manager table|nil
+--- @return string|nil key Locale key the page shows.
+local function install_blocked(manager)
+	if Version.VERSION == Version.LOCAL then return "changelog_window.install_blocked_source" end
+	if manager and type(manager.installation_kind) == "function" and manager.installation_kind() == "package" then
+		return "changelog_window.install_blocked_package"
+	end
+	return nil
+end
+
+--- The newest restorable pre-install backup as the page describes it, or nil.
+--- @return table|nil
+local function restorable_backup()
+	local owner = backup_owner()
+	local latest = owner and owner.latest("pre_install") or nil
+	if not latest then return nil end
+	return { id = latest.id, created_at = latest.created_at, tag = latest.tag }
+end
+
+--- What this build can install, for the page's buttons and restore banner.
+--- @return table context { installed, blocked_key, backup }
+function M._install_context()
+	local manager = updater()
+	local blocked = install_blocked(manager)
+	return {
+		installed = Version.VERSION,
+		blocked_key = blocked or "",
+		backup = restorable_backup(),
+	}
+end
+
+--- Finds a release in the list the page shows.
+--- @param tag string
+--- @return string|nil chunk Raw release object JSON.
+--- @return string|nil reason Locale key when it is not there.
+local function find_release(tag)
+	local manager = updater()
+	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
+	if _last_list.kind ~= "json" then
+		-- The Atom feed carries no asset list and no checksum.
+		return nil, ReleaseInstall.REASON.no_details
+	end
+	if not manager or not manager.CHANNELS.channel_for_tag(tag) then
+		return nil, ReleaseInstall.REASON.unknown_release
+	end
+	local wanted = VersionOrder.normalize_tag(tag)
+	for _, chunk in ipairs(Parser.split_releases_array(_last_list.body)) do
+		if VersionOrder.normalize_tag(Parser.parse_tag(chunk)) == wanted then return chunk, nil end
+	end
+	return nil, ReleaseInstall.REASON.unknown_release
+end
+
+--- The install session of this window, over the updater manager's update path.
+--- @return table session
+local function install_session()
+	if _install_session then return _install_session end
+	_install_session = ReleaseInstall.new({
+		logger = Logger,
+		log = LOG,
+		blocked = function() return install_blocked(updater()) end,
+		find_release = function(tag) return find_release(tag) end,
+		backup = function(chunk)
+			local owner, err = backup_owner()
+			if not owner then return nil, err end
+			return owner.create("pre_install", { tag = Parser.parse_tag(chunk), from_version = Version.VERSION })
+		end,
+		resolve_asset = function(chunk)
+			local manager = updater()
+			return manager and manager.release_record(chunk) or nil
+		end,
+		download = function(record, _, done)
+			local manager = updater()
+			if not manager then return false end
+			return manager.download_release(record, function(path, err, stage)
+				done(path, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download, err)
+			end) == true
+		end,
+		install = function(path, _, record)
+			local manager = updater()
+			if manager and manager.install_release_archive(path, record.tag) == true then return true end
+			return false, ReleaseInstall.REASON.install, "the installer refused the archive"
+		end,
+		restart = function(chunk)
+			local restart = type(_daemon_state) == "table" and _daemon_state.restart_after_update or nil
+			if type(restart) ~= "function" then
+				Logger.error(LOG, "No daemon restart hook: the installed release starts at the next launch.")
+				return false
+			end
+			return restart(Parser.parse_tag(chunk)) == true
+		end,
+		report = function(message)
+			local payload = { action = "install_progress" }
+			for key, value in pairs(message) do payload[key] = value end
+			M._push(payload)
+		end,
+	})
+	return _install_session
+end
+
+--- Restores a pre-install backup and restarts the daemon on it.
+--- @param id any Backup id posted by the page.
+--- @return table answer restore_progress
+local function restore(id)
+	local owner = backup_owner()
+	if not owner then
+		return { action = "restore_progress", phase = "failed", reason_key = "changelog_window.restore_error_backup" }
+	end
+	M._push({ action = "restore_progress", phase = "restoring" })
+	local restored, reason, pre = owner.restore(id)
+	if not restored then
+		local key = reason == "missing" and "changelog_window.restore_error_missing"
+			or reason == "backup" and "changelog_window.restore_error_backup"
+			or "changelog_window.restore_error_unexpected"
+		return { action = "restore_progress", phase = "failed", reason_key = key,
+			backup_path = pre and pre.path or nil }
+	end
+	local restart = type(_daemon_state) == "table" and _daemon_state.restart or nil
+	if type(restart) ~= "function" or restart("configuration restored") ~= true then
+		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it.")
+	end
+	return { action = "restore_progress", phase = "restored", backup_path = pre and pre.path or nil }
+end
+
 --- Clears cached state; used by tests.
 function M._reset()
 	_fetch_generation = 0
 	_sources = nil
+	_last_list = nil
+	_install_session = nil
+	_daemon_state = nil
+	M._config_backup = nil
 	M._http_get = default_http_get
 	M._push = default_push
 end
@@ -309,7 +475,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 2/ Message Handler ==============
+-- ======= 3/ Message Handler ==============
 -- =========================================
 -- =========================================
 
@@ -318,6 +484,7 @@ end
 --- @param state  table Daemon state.
 --- @return any|nil  Response to send back to JS.
 function M.on_message(payload, state)
+	if type(state) == "table" then _daemon_state = state end
 	if type(payload) == "string" then
 		if payload == "ready" or payload == "refresh" then
 			-- The window opens on the subscribed channel, as on the other drivers:
@@ -354,6 +521,20 @@ function M.on_message(payload, state)
 
 	if action == "set_channel" then
 		return M.subscribe(payload.channel, state)
+	end
+
+	-- Only this click installs a chosen release: nothing else calls the session.
+	if action == "install_release" then
+		install_session().install(payload.tag, payload.channel)
+		return nil
+	end
+
+	if action == "restore_backup" then
+		if install_session().busy() then
+			return { action = "restore_progress", phase = "failed",
+				reason_key = "changelog_window.restore_error_unexpected" }
+		end
+		return restore(payload.id)
 	end
 
 	if action == "open_url" then

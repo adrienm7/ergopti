@@ -17,6 +17,7 @@
 		<script src="release_body.js"></script>
 		<script src="../_generated/update_channel_registry.js"></script>
 		<script src="../update_channels.js"></script>
+		<script src="../version_order.js"></script>
 	</head>
 	<body>
 		<div id="sidebar">
@@ -27,6 +28,10 @@
 		</div>
 
 		<div id="content">
+			<div id="restore-banner" style="display: none">
+				<span id="restore-text"></span>
+				<button id="btn-restore" type="button"></button>
+			</div>
 			<div id="subscribe-banner" style="display: none">
 				<span id="subscribe-text"></span>
 				<button id="btn-subscribe"></button>
@@ -39,7 +44,13 @@
 			<div id="content-header">
 				<div id="release-tag"></div>
 				<div id="release-meta"></div>
+				<button id="btn-install" type="button"></button>
 				<button id="btn-github"></button>
+			</div>
+			<div id="install-note" style="display: none"></div>
+			<div id="install-panel" style="display: none">
+				<span id="install-text"></span>
+				<button id="btn-install-retry" type="button"></button>
 			</div>
 			<div id="release-body"></div>
 		</div>

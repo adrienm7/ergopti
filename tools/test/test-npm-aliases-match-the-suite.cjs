@@ -54,7 +54,11 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/test-properties.cjs', // property + mutation pass, run under --full
 	// Python suites: verify-change's xkb-python gate and linux-layout.yml run
 	// them; the JS suite stays free of a Python dependency.
-	'tools/test/run-xkb-python-tests.cjs'
+	'tools/test/run-xkb-python-tests.cjs',
+	// Real-browser render: needs Playwright and its Chromium, which the CI
+	// image does not install; test-changelog-release-install.cjs runs the
+	// same page scripts against a recording DOM inside the suite.
+	'tools/test/browser/changelog-release-install.playwright.cjs'
 ]);
 
 // Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last

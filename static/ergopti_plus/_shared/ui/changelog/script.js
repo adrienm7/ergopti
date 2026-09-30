@@ -31,6 +31,17 @@
  *    A tab only changes what is shown; the window opens on the channel the user
  *    subscribed to, and a banner offers to subscribe to the one on screen. The
  *    host owns the subscription and answers with setSubscribedChannel().
+ * 7. One-click install: every release but the installed one carries « Install
+ *    this version » (« Go back to this version » when it is older, by the
+ *    shared semver order in ../version_order.js) beside « View on GitHub ». The
+ *    click posts install_release with the tag and the channel on screen, and
+ *    nothing else: the host backs the configuration up, downloads and verifies
+ *    the release through its updater, installs it and restarts, reporting each
+ *    phase through setInstallProgress(). A failure stays in the window with a
+ *    Retry button. A host that cannot install (a source run, a system package)
+ *    names why, and the button stays greyed with that reason.
+ * 8. Restoring the backup: the host names the latest pre-install backup it can
+ *    restore; the banner's button posts restore_backup with its id.
  * ==============================================================================
  */
 
@@ -64,11 +75,41 @@ var CHANGELOG_WATCHDOG_MS = 45000;
 // Per-request budget of the browser-preview fetch. Mirrors
 // release_sources.source_timeout_sec in the same defaults file.
 var CLIENT_FETCH_TIMEOUT_MS = 15000;
+// The install phases a host reports, in order; 'failed' ends any of them.
+var INSTALL_PHASES = {
+	backing_up: true,
+	downloading: true,
+	installing: true,
+	restarting: true,
+	failed: true
+};
+// The restore phases a host reports.
+var RESTORE_PHASES = { restoring: true, restored: true, failed: true };
+// The only locale keys a host may name for an install or a restore: a host
+// message is data, so any other key shows the generic failure instead.
+var INSTALL_REASON_KEY = /^changelog_window\.install_error_[a-z_]+$/;
+var INSTALL_BLOCKED_KEY = /^changelog_window\.install_blocked_[a-z_]+$/;
+var RESTORE_REASON_KEY = /^changelog_window\.restore_error_[a-z_]+$/;
 // Identifies the active load; a late timer or fetch of a superseded load is
 // ignored instead of overwriting the current state.
 var _loadToken = 0;
 var _watchdogTimer = null;
 var _hasNativeHost = _detectNativeHost();
+// The running build as the host names it ("local" for a source run); null when
+// no host announced one, which leaves every release without an install button.
+var _installedVersion = _hostString(window.__installed_version);
+// Locale key saying why this build cannot install a release (a source run, a
+// system package), or '' when it can.
+var _installBlockedKey = _hostKey(window.__install_blocked_key, INSTALL_BLOCKED_KEY);
+// The install the page asked for or the host reports:
+// { tag, channel, phase, reasonKey, backupPath }, or null.
+var _install = null;
+// The pre-install backup the host can restore ({ id, createdAt, tag }), or null.
+var _restorable = _hostBackup(window.__restorable_backup);
+// Restore state: 'idle', 'pending' (request posted), 'restoring', 'restored' or 'failed'.
+var _restoreState = 'idle';
+var _restoreReasonKey = '';
+var _restorePath = '';
 
 /**
  * Reports whether a native host owns this page's network access.
@@ -88,6 +129,41 @@ function _detectNativeHost() {
 		window.webkit.messageHandlers &&
 		window.webkit.messageHandlers.changelog_bridge
 	);
+}
+
+/**
+ * A non-empty string a host sent, or null.
+ * @param {*} value
+ * @return {?string}
+ */
+function _hostString(value) {
+	return typeof value === 'string' && value !== '' ? value : null;
+}
+
+/**
+ * A locale key a host sent when it matches the family allowed there, or ''.
+ * @param {*} value
+ * @param {RegExp} family
+ * @return {string}
+ */
+function _hostKey(value, family) {
+	return typeof value === 'string' && family.test(value) ? value : '';
+}
+
+/**
+ * The restorable backup a host described, or null for anything else.
+ * @param {*} value - { id, created_at, tag } as the host sends it.
+ * @return {?{id: string, createdAt: string, tag: string}}
+ */
+function _hostBackup(value) {
+	if (!value || typeof value !== 'object') return null;
+	var id = _hostString(value.id);
+	if (!id) return null;
+	return {
+		id: id,
+		createdAt: _hostString(value.created_at) || '',
+		tag: _hostString(value.tag) || ''
+	};
 }
 
 // =========================================
@@ -120,6 +196,18 @@ if (window.__ergopti_host === 'linux') {
 		if (response.action === 'channel_changed') {
 			setSubscribedChannel(response.channel, response.ok !== false);
 			return;
+		}
+		if (response.action === 'install_progress') {
+			setInstallProgress(response);
+			return;
+		}
+		if (response.action === 'restore_progress') {
+			setRestoreProgress(response);
+			return;
+		}
+		// Release answers also say what this build can install and restore.
+		if (response.install && typeof response.install === 'object') {
+			setInstallContext(response.install);
 		}
 		// Release answers also say which channel the user receives updates from;
 		// they leave a pending subscription request to its own answer.
@@ -267,6 +355,12 @@ function _initializePage() {
 	var subscribe = document.getElementById('btn-subscribe');
 	var confirm = document.getElementById('btn-subscribe-confirm');
 	var cancel = document.getElementById('btn-subscribe-cancel');
+	var install = document.getElementById('btn-install');
+	var installRetry = document.getElementById('btn-install-retry');
+	var restore = document.getElementById('btn-restore');
+	if (install) install.addEventListener('click', requestInstall);
+	if (installRetry) installRetry.addEventListener('click', retryInstall);
+	if (restore) restore.addEventListener('click', requestRestore);
 	if (subscribe) subscribe.addEventListener('click', requestSubscription);
 	if (confirm) confirm.addEventListener('click', confirmSubscription);
 	if (cancel) cancel.addEventListener('click', cancelSubscription);
@@ -309,6 +403,9 @@ function applyLabels() {
 	var btnPage = document.getElementById('btn-releases-page');
 	var pageLabel = _t('changelog_window.open_releases_page');
 	if (btnPage && pageLabel) btnPage.textContent = pageLabel;
+
+	_renderInstallControls();
+	_renderRestoreBanner();
 }
 
 // Apply labels once i18n strings arrive (either from fetch or direct injection).
@@ -611,6 +708,14 @@ function renderReleaseList() {
 			badge2.textContent = _t('changelog_window.badge_latest') || 'latest';
 			item.appendChild(badge2);
 		}
+		if (_isInstalled(release)) {
+			item.classList.add('installed');
+			var installedBadge = document.createElement('div');
+			installedBadge.className = 'release-item-badge badge-installed';
+			installedBadge.setAttribute('data-i18n', 'changelog_window.badge_installed');
+			installedBadge.textContent = _t('changelog_window.badge_installed') || '';
+			item.appendChild(installedBadge);
+		}
 
 		list.appendChild(item);
 	});
@@ -633,6 +738,7 @@ function clearContent() {
 	if (bodyEl) bodyEl.replaceChildren();
 	if (btnGh) btnGh.style.display = 'none';
 	_currentReleaseUrl = null;
+	_renderInstallControls();
 }
 
 /**
@@ -664,6 +770,7 @@ function selectRelease(idx) {
 	if (btnGh) {
 		btnGh.style.display = _currentReleaseUrl ? 'block' : 'none';
 	}
+	_renderInstallControls();
 
 	// Render markdown body.
 	var bodyEl = document.getElementById('release-body');
@@ -787,7 +894,264 @@ function openReleasesPage() {
 
 // ======================================
 // ======================================
-// ======= 6/ Loading & Error State =====
+// ======= 6/ Release Install ===========
+// ======================================
+// ======================================
+
+/**
+ * Whether a release is the build that runs. A source run ("local") matches no
+ * release, so every release offers an install (greyed with its reason).
+ * @param {Object} release
+ * @return {boolean}
+ */
+function _isInstalled(release) {
+	if (_installedVersion === null || !release) return false;
+	var tag = ReleaseVersionOrder.normalize(release.tag_name);
+	return tag !== '' && tag === ReleaseVersionOrder.normalize(_installedVersion);
+}
+
+/**
+ * The label of a release's install button: going back for an older release
+ * than the installed build, installing otherwise (a newer release, or a build
+ * the semver order cannot place, such as a source run).
+ * @param {Object} release
+ * @return {string} Locale key.
+ */
+function _installLabelKey(release) {
+	var older = ReleaseVersionOrder.compare(release.tag_name, _installedVersion) < 0;
+	return older ? 'changelog_window.rollback_release' : 'changelog_window.install_release';
+}
+
+/** Whether an install the page asked for is still running on the host. */
+function _installRunning() {
+	return _install !== null && _install.phase !== 'failed';
+}
+
+/** Fills a template's {tag} and {path} placeholders. */
+function _fillInstall(key, tag, path) {
+	return (_t(key) || '')
+		.split('{tag}')
+		.join(tag || '')
+		.split('{path}')
+		.join(path || '');
+}
+
+/** The status line of the install the host reports. */
+function _installStatusText() {
+	var tag = _install.tag;
+	var path = _install.backupPath;
+	if (_install.phase === 'requested' || _install.phase === 'backing_up')
+		return _fillInstall('changelog_window.install_backing_up', tag, path);
+	if (_install.phase === 'downloading')
+		return _fillInstall('changelog_window.install_downloading', tag, path);
+	if (_install.phase === 'installing')
+		return _fillInstall('changelog_window.install_installing', tag, path);
+	if (_install.phase === 'restarting')
+		return _fillInstall('changelog_window.install_restarting', tag, path);
+	var reason = _fillInstall(
+		_install.reasonKey || 'changelog_window.install_error_unexpected',
+		tag,
+		path
+	);
+	if (!path) return reason;
+	return reason + ' ' + _fillInstall('changelog_window.install_backup_kept', tag, path);
+}
+
+/**
+ * Draws the selected release's install button, the note beside it and the
+ * status of the install in progress.
+ */
+function _renderInstallControls() {
+	var button = document.getElementById('btn-install');
+	var note = document.getElementById('install-note');
+	var release = _selectedIndex >= 0 ? _releases[_selectedIndex] : null;
+	// No host announced its build: nothing on this page can install.
+	var offered = release !== null && release !== undefined && _installedVersion !== null;
+	var installed = offered && _isInstalled(release);
+	if (button) {
+		var shown = offered && !installed;
+		button.style.display = shown ? 'block' : 'none';
+		if (shown) {
+			button.textContent = _t(_installLabelKey(release)) || '';
+			button.disabled = _installBlockedKey !== '' || _installRunning();
+			button.title = _installBlockedKey !== '' ? _t(_installBlockedKey) || '' : '';
+		}
+	}
+	if (note) {
+		var noteKey = installed
+			? 'changelog_window.installed_note'
+			: offered && _installBlockedKey !== ''
+				? _installBlockedKey
+				: '';
+		note.style.display = noteKey ? 'block' : 'none';
+		note.textContent = noteKey ? _t(noteKey) || '' : '';
+	}
+	var panel = document.getElementById('install-panel');
+	var text = document.getElementById('install-text');
+	var retryButton = document.getElementById('btn-install-retry');
+	if (panel) panel.style.display = _install ? 'flex' : 'none';
+	if (panel) panel.className = _install && _install.phase === 'failed' ? 'failed' : '';
+	if (text) text.textContent = _install ? _installStatusText() : '';
+	if (retryButton) {
+		retryButton.textContent = _t('changelog_window.retry') || '';
+		retryButton.style.display = _install && _install.phase === 'failed' ? '' : 'none';
+	}
+}
+
+/**
+ * Posts the one install request of the selected release. Nothing else is
+ * asked: no confirmation, since the host backs the configuration up first.
+ */
+function requestInstall() {
+	var release = _selectedIndex >= 0 ? _releases[_selectedIndex] : null;
+	if (!release || _installedVersion === null || _isInstalled(release)) return;
+	if (_installBlockedKey !== '' || _installRunning()) return;
+	_postInstall(release.tag_name, _currentChannel);
+}
+
+/** Asks the host again for the install that failed. */
+function retryInstall() {
+	if (!_install || _install.phase !== 'failed') return;
+	if (_installBlockedKey !== '') return;
+	_postInstall(_install.tag, _install.channel);
+}
+
+/**
+ * Records the request and posts it.
+ * @param {string} tag - Release tag.
+ * @param {string} channel - Registry channel the release was listed on.
+ */
+function _postInstall(tag, channel) {
+	if (typeof tag !== 'string' || tag === '') return;
+	_install = { tag: tag, channel: channel, phase: 'requested', reasonKey: '', backupPath: '' };
+	_renderInstallControls();
+	_postChangelogMessage({ action: 'install_release', tag: tag, channel: channel });
+}
+
+/**
+ * Called by a native host with the phase of the install it runs:
+ * { tag, phase, reason_key?, backup_path? }. An install the page did not ask
+ * for is shown too, so a second window follows the first.
+ * @param {Object} message
+ */
+function setInstallProgress(message) {
+	if (!message || typeof message !== 'object') return;
+	var tag = _hostString(message.tag);
+	if (!tag || !INSTALL_PHASES[message.phase]) return;
+	_install = {
+		tag: tag,
+		channel: _install && _install.tag === tag ? _install.channel : _currentChannel,
+		phase: message.phase,
+		reasonKey: _hostKey(message.reason_key, INSTALL_REASON_KEY),
+		backupPath: _hostString(message.backup_path) || ''
+	};
+	_renderInstallControls();
+}
+
+/**
+ * Called by a native host with what this build can install: { installed,
+ * blocked_key, backup }. Windows and macOS seed the same values before the page
+ * runs; Linux sends them in the `install` field of its release answers.
+ * @param {Object} context
+ */
+function setInstallContext(context) {
+	if (!context || typeof context !== 'object') return;
+	var installed = _hostString(context.installed);
+	if (installed) _installedVersion = installed;
+	_installBlockedKey = _hostKey(context.blocked_key, INSTALL_BLOCKED_KEY);
+	if (Object.prototype.hasOwnProperty.call(context, 'backup')) {
+		_restorable = _hostBackup(context.backup);
+	}
+	renderReleaseList();
+	if (_selectedIndex >= 0) {
+		document.querySelectorAll('.release-item').forEach(function (el) {
+			el.classList.toggle('selected', parseInt(el.getAttribute('data-idx'), 10) === _selectedIndex);
+		});
+	}
+	_renderInstallControls();
+	_renderRestoreBanner();
+}
+
+// ======================================
+// ======================================
+// ======= 7/ Configuration Restore =====
+// ======================================
+// ======================================
+
+/** Formats a backup's ISO time for the banner. */
+function _formatBackupTime(iso) {
+	if (!iso) return '';
+	var date = new Date(iso);
+	if (isNaN(date.getTime())) return iso;
+	return date.toLocaleString(undefined, {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit'
+	});
+}
+
+/** Draws the banner that offers to restore the latest pre-install backup. */
+function _renderRestoreBanner() {
+	var banner = document.getElementById('restore-banner');
+	if (!banner) return;
+	var visible = _restorable !== null || _restoreState === 'failed';
+	banner.style.display = visible ? 'flex' : 'none';
+	banner.className = _restoreState === 'failed' ? 'failed' : '';
+	var text = document.getElementById('restore-text');
+	if (text) {
+		var key = 'changelog_window.restore_available';
+		if (_restoreState === 'pending' || _restoreState === 'restoring')
+			key = 'changelog_window.restore_running';
+		else if (_restoreState === 'restored') key = 'changelog_window.restore_done';
+		else if (_restoreState === 'failed')
+			key = _restoreReasonKey || 'changelog_window.restore_error_unexpected';
+		text.textContent = (_t(key) || '')
+			.split('{date}')
+			.join(_restorable ? _formatBackupTime(_restorable.createdAt) : '')
+			.split('{tag}')
+			.join(_restorable ? _restorable.tag : '')
+			.split('{path}')
+			.join(_restorePath);
+	}
+	var button = document.getElementById('btn-restore');
+	if (button) {
+		button.textContent = _t('changelog_window.restore_button') || '';
+		var idle = _restoreState === 'idle' || _restoreState === 'failed';
+		button.style.display = _restorable !== null && _restoreState !== 'restored' ? '' : 'none';
+		button.disabled = !idle || _installRunning();
+	}
+}
+
+/** Posts the restore of the backup the banner names. */
+function requestRestore() {
+	if (_restorable === null) return;
+	if (_restoreState !== 'idle' && _restoreState !== 'failed') return;
+	if (_installRunning()) return;
+	_restoreState = 'pending';
+	_restoreReasonKey = '';
+	_restorePath = '';
+	_renderRestoreBanner();
+	_postChangelogMessage({ action: 'restore_backup', id: _restorable.id });
+}
+
+/**
+ * Called by a native host with the phase of a restore:
+ * { id, phase, reason_key?, backup_path? }.
+ * @param {Object} message
+ */
+function setRestoreProgress(message) {
+	if (!message || typeof message !== 'object' || !RESTORE_PHASES[message.phase]) return;
+	_restoreState = message.phase;
+	_restoreReasonKey = _hostKey(message.reason_key, RESTORE_REASON_KEY);
+	_restorePath = _hostString(message.backup_path) || '';
+	_renderRestoreBanner();
+}
+
+// ======================================
+// ======================================
+// ======= 8/ Loading & Error State =====
 // ======================================
 // ======================================
 
@@ -818,7 +1182,7 @@ function hideError() {
 
 // ======================================
 // ======================================
-// ======= 7/ Initialisation ===========
+// ======= 9/ Initialisation ===========
 // ======================================
 // ======================================
 

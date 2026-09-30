@@ -151,6 +151,17 @@ local function with_changelog(callback)
 			}
 
 			local changelog = require("ui.changelog")
+			-- The install owners are not what these cases exercise: a packaged
+			-- build with no backup, which installs nothing unless a case says so.
+			changelog._deps = {
+				updater = {
+					is_local_source = function() return false end,
+					current_version = function() return "0.0.0-dev.140" end,
+				},
+				backup = { owner = function() return { latest = function() return nil end } end },
+				installer = {},
+				coordinator = {},
+			}
 			callback(changelog, state, function(message)
 				helpers.assert_type(bridge_callback, "function",
 					"the real changelog bridge must be registered")

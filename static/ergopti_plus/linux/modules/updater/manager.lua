@@ -37,6 +37,10 @@
 ---    delay. Paused: nothing is dispatched and the record is left as it is.
 --- 6. Self-replace: downloads the latest archive, extracts it, and replaces
 ---    the running binary. A .old backup is kept so the user can revert.
+--- 7. A chosen release: the Versions window installs any release of the list it
+---    shows through the same download, checksum and install path
+---    (release_record, download_release, install_release_archive); only a
+---    click there reaches them, never the schedule.
 --- ==============================================================================
 
 local M = {}
@@ -271,6 +275,7 @@ local _installed_launcher = nil  -- wrapper of the installation an update replac
 local _download_part   = nil
 local _download_dest   = nil
 local _verified_archive = nil
+local _verified_release = nil      -- the release record the verified archive belongs to
 
 -- =========================================
 -- =========================================
@@ -596,6 +601,27 @@ local function _select_checksum_asset(body)
 end
 
 M._select_checksum_asset = _select_checksum_asset
+
+--- The installable record of one release object of the release list: its tag
+--- and the canonical Linux bundle with its checksum, or nil when the release
+--- lacks either (it cannot be installed on this system).
+--- @param body string Raw release object JSON.
+--- @return table|nil record { tag, notes, download_url, checksum_url, published_at, prerelease }
+function M.release_record(body)
+	if type(body) ~= "string" or body == "" then return nil end
+	local tag = Parser.parse_tag(body)
+	local asset_url = _select_update_asset(body)
+	local checksum_url = _select_checksum_asset(body)
+	if tag == "" or asset_url == "" or checksum_url == "" then return nil end
+	return {
+		tag          = tag,
+		notes        = Parser.parse_notes(body),
+		download_url = asset_url,
+		checksum_url = checksum_url,
+		published_at = Parser.parse_published_at(body),
+		prerelease   = Parser.parse_prerelease_flag(body),
+	}
+end
 
 -- =========================================
 -- =========================================
@@ -987,14 +1013,18 @@ end
 --- @param callback function|nil
 --- @param path string|nil
 --- @param err string|nil
-local function publish_download(callback, path, err)
-	_state = path and "available" or "idle"
+--- @param stage string|nil "download" or "verify": where a failure happened.
+--- @param release table|nil The release the archive belongs to.
+--- @param failure_state string The updater state a failure returns to.
+local function publish_download(callback, path, err, stage, release, failure_state)
+	_state = path and "available" or failure_state
 	_verified_archive = path
+	_verified_release = path and release or nil
 	_download_part = nil
 	_download_dest = nil
-	if err then Logger.error(LOG, "Update download failed: %s.", tostring(err)) end
+	if err then Logger.error(LOG, "Update download failed (%s): %s.", tostring(stage), tostring(err)) end
 	if type(callback) ~= "function" then return end
-	local ok, callback_error = pcall(callback, path, err)
+	local ok, callback_error = pcall(callback, path, err, path and nil or stage)
 	if not ok then Logger.error(LOG, "Update download callback raised: %s.", tostring(callback_error)) end
 end
 
@@ -1004,40 +1034,30 @@ local function remove_partial_download()
 	if _download_dest then Fs.delete(_download_dest) end
 end
 
---- Downloads and verifies the canonical update archive asynchronously.
---- @param url string|nil Must match the cached release URL when provided.
---- @param callback function|nil Receives verified path, error.
+--- Downloads one release's archive and its published checksum, and keeps the
+--- archive only when its SHA-256 matches.
+--- @param release table { tag, download_url, checksum_url }
+--- @param download_url string
+--- @param callback function|nil Receives verified path, error, failing stage.
+--- @param failure_state string The updater state a failure returns to.
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_update(url, callback)
-	local release = _cached_release
-	local download_url = url or (release and release.download_url)
-	if not release or type(download_url) ~= "string" or download_url == ""
-		or download_url ~= release.download_url
-		or type(release.checksum_url) ~= "string" or release.checksum_url == "" then
-		Logger.error(LOG, "No authenticated canonical Linux download is available.")
-		if type(callback) == "function" then callback(nil, "authenticated release unavailable") end
-		return false
-	end
-	if _state ~= "available" then
-		if type(callback) == "function" then callback(nil, "updater is not ready to download") end
-		return false
-	end
-
+local function start_download(release, download_url, callback, failure_state)
 	local temp_path = os.tmpname()
 	if type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
-		if type(callback) == "function" then callback(nil, "temporary path unavailable") end
+		if type(callback) == "function" then callback(nil, "temporary path unavailable", "download") end
 		return false
 	end
 	Fs.delete(temp_path)
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+	_verified_release = nil
 	_download_dest = temp_path .. ".tar.gz"
 	_download_part = _download_dest .. ".part"
 	remove_partial_download()
 	_state = "downloading"
 
-	local function fail(message)
+	local function fail(message, stage)
 		remove_partial_download()
-		publish_download(callback, nil, message)
+		publish_download(callback, nil, message, stage or "download", release, failure_state)
 	end
 	local checksum_dispatched = M._http_client.get(release.checksum_url, {
 		["User-Agent"] = USER_AGENT,
@@ -1053,7 +1073,7 @@ function M.download_update(url, callback)
 			return
 		end
 		local expected, checksum_error = parse_checksum(checksum_result.body)
-		if not expected then fail(checksum_error); return end
+		if not expected then fail(checksum_error, "verify"); return end
 
 		Logger.info(LOG, "Downloading authenticated update to %s.", _download_part)
 		M._http_client.download(download_url, { ["User-Agent"] = USER_AGENT }, _download_part, {
@@ -1068,13 +1088,13 @@ function M.download_update(url, callback)
 			end
 			local size = file_size(_download_part)
 			if not size or size <= 0 or size > MAX_DOWNLOAD_BYTES then
-				fail("downloaded archive has an invalid size")
+				fail("downloaded archive has an invalid size", "verify")
 				return
 			end
 			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS },
 				function(actual, digest_error)
-					if not actual then fail(digest_error or "archive digest failed"); return end
-					if actual ~= expected then fail("SHA-256 checksum mismatch"); return end
+					if not actual then fail(digest_error or "archive digest failed", "verify"); return end
+					if actual ~= expected then fail("SHA-256 checksum mismatch", "verify"); return end
 					local renamed, rename_error = os.rename(_download_part, _download_dest)
 					if not renamed then
 						fail("verified archive publication failed: " .. tostring(rename_error))
@@ -1082,7 +1102,7 @@ function M.download_update(url, callback)
 					end
 					local verified_path = _download_dest
 					Logger.success(LOG, "Downloaded and verified %d bytes to %s.", size, verified_path)
-					publish_download(callback, verified_path, nil)
+					publish_download(callback, verified_path, nil, nil, release, failure_state)
 				end)
 		end)
 	end)
@@ -1090,6 +1110,50 @@ function M.download_update(url, callback)
 		fail("checksum request was not dispatched")
 	end
 	return checksum_dispatched
+end
+
+--- Downloads and verifies the canonical update archive asynchronously.
+--- @param url string|nil Must match the cached release URL when provided.
+--- @param callback function|nil Receives verified path, error, failing stage.
+--- @return boolean Whether the checksum request was dispatched.
+function M.download_update(url, callback)
+	local release = _cached_release
+	local download_url = url or (release and release.download_url)
+	if not release or type(download_url) ~= "string" or download_url == ""
+		or download_url ~= release.download_url
+		or type(release.checksum_url) ~= "string" or release.checksum_url == "" then
+		Logger.error(LOG, "No authenticated canonical Linux download is available.")
+		if type(callback) == "function" then callback(nil, "authenticated release unavailable", "download") end
+		return false
+	end
+	if _state ~= "available" then
+		if type(callback) == "function" then callback(nil, "updater is not ready to download", "download") end
+		return false
+	end
+	return start_download(release, download_url, callback, "idle")
+end
+
+--- Downloads and verifies the archive of a release the user chose in the
+--- Versions window, through the same checksum path as an update. The cached
+--- update offer is left as it was, so a failure keeps the menu's update row.
+--- @param release table M.release_record() result.
+--- @param callback function|nil Receives verified path, error, failing stage.
+--- @return boolean Whether the checksum request was dispatched.
+function M.download_release(release, callback)
+	if type(release) ~= "table" or type(release.tag) ~= "string" or release.tag == ""
+		or type(release.download_url) ~= "string" or release.download_url == ""
+		or type(release.checksum_url) ~= "string" or release.checksum_url == "" then
+		Logger.error(LOG, "Refused to download a release without its canonical Linux bundle and checksum.")
+		if type(callback) == "function" then callback(nil, "authenticated release unavailable", "download") end
+		return false
+	end
+	if _state == "checking" or _state == "downloading" or _state == "installing" then
+		Logger.warn(LOG, "Refused to download %s while the updater is %s.", release.tag, _state)
+		if type(callback) == "function" then callback(nil, "updater is busy", "download") end
+		return false
+	end
+	Logger.info(LOG, "Downloading the chosen release %s.", release.tag)
+	return start_download(release, release.download_url, callback, _state)
 end
 
 --- Cancels any in-flight updater transport or digest and removes partial files.
@@ -1111,6 +1175,7 @@ function M.cancel_update()
 	_download_part = nil
 	_download_dest = nil
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+	_verified_release = nil
 	_state = "idle"
 	return true
 end
@@ -1124,11 +1189,12 @@ M._resolve_installation = function()
 	return Installer.resolve(module_source_path())
 end
 
---- Installs the downloaded update into a standalone user installation. System
+--- Installs a verified archive into a standalone user installation. System
 --- packages and immutable bundles retain ownership of their own update path.
 --- @param archive_path string Path to the downloaded archive.
+--- @param expected_version string|nil The version the archive must carry.
 --- @return boolean true on success.
-function M.install_update(archive_path)
+local function install_archive(archive_path, expected_version)
 	if not archive_path or archive_path ~= _verified_archive or not Fs.exists(archive_path) then
 		Logger.error(LOG, "Refusing an archive not authenticated by this updater: %s.",
 			tostring(archive_path))
@@ -1145,7 +1211,6 @@ function M.install_update(archive_path)
 		return false
 	end
 
-	local expected_version = _cached_release and _cached_release.tag or nil
 	local installed, detail = Installer.install({
 		archive_path = archive_path,
 		expected_version = expected_version,
@@ -1159,9 +1224,41 @@ function M.install_update(archive_path)
 	if detail then Logger.warn(LOG, "%s.", detail) end
 	Logger.success(LOG, "Update installed with a verified rollback backup.")
 	_verified_archive = nil
+	_verified_release = nil
 	_installed_launcher = context.wrapper
 	_state = "idle"
 	return true
+end
+
+--- Installs the downloaded update into a standalone user installation.
+--- @param archive_path string Path to the downloaded archive.
+--- @return boolean true on success.
+function M.install_update(archive_path)
+	return install_archive(archive_path, _cached_release and _cached_release.tag or nil)
+end
+
+--- Installs the verified archive of a release the user chose in the Versions
+--- window. The archive must be the one download_release verified for that
+--- very tag, and the installer checks the version it carries.
+--- @param archive_path string
+--- @param tag string The chosen release's tag.
+--- @return boolean true on success.
+function M.install_release_archive(archive_path, tag)
+	if type(tag) ~= "string" or not _verified_release or _verified_release.tag ~= tag then
+		Logger.error(LOG, "Refusing to install %s: its archive was not verified for that release.", tostring(tag))
+		return false
+	end
+	return install_archive(archive_path, tag)
+end
+
+--- Whether this installation can replace itself (a standalone install), and
+--- why not otherwise.
+--- @return string kind "standalone", "package" or "unmanaged"
+--- @return string|nil reason
+function M.installation_kind()
+	local ok, context = pcall(M._resolve_installation)
+	if not ok or type(context) ~= "table" then return "unmanaged", tostring(context) end
+	return context.kind, context.reason
 end
 
 --- The launcher of the installation the last update replaced, which starts
@@ -1207,6 +1304,7 @@ function M.set_channel(new_channel)
 	_channel = new_channel
 	_channel_persisted = true
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+	_verified_release = nil
 	_state = "idle"
 	_cached_release = nil
 	Logger.info(LOG, "Update channel set to '%s' (persisted).", _channel)
@@ -1273,6 +1371,7 @@ function M.clear_cached_release()
 		return false
 	end
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+	_verified_release = nil
 	_cached_release = nil
 	_state = "idle"
 	return true

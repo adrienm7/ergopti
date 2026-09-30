@@ -19,6 +19,12 @@
 ;    channel changes and to open URLs in the default browser.
 ; 4. Singleton: a second call while the window is already open brings it to
 ;    the front instead of opening a duplicate.
+; 5. One-click release install: « Install this version » posts install_release.
+;    modules/updater/release_install.ahk backs the configuration up, finds the
+;    release in the list this window last fetched from the GitHub API, then
+;    hands it to the update path (Updater_DownloadAndInstall), whose phases and
+;    failures reach the page through setInstallProgress(). The restore banner
+;    posts restore_backup; the driver reloads on the restored configuration.
 ; ==============================================================================
 
 
@@ -41,6 +47,10 @@ global _CLW_Channel    := ""
 global _CLW_Request    := unset
 global _CLW_BridgeSessionToken := ""
 global _CLW_BridgeRejectionReported := false
+; The release list the last fetch published: Map("kind", "json"|"feed", "json",
+; text), or 0. An install finds its release here, so the page and the host act
+; on one list.
+global _CLW_LastList := 0
 
 ; Every asynchronous fetch owns both the WebView session that started it and a
 ; monotonically increasing request epoch.  A channel switch invalidates the
@@ -157,7 +167,6 @@ Changelog_Close() {
 
 
 
-
 ; =================================
 ; =================================
 ; ======= 3/ Window Builder =======
@@ -259,6 +268,7 @@ _CLW_BuildWindow(Channel, Request) {
 		. "window.__subscribed_channel=" . _CLW_JsStr(UPDATER_CHANNEL) . ";"
 		. "window.__channel_switch_restarts=true;"
 		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
+		. _CLW_InstallSeed()
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
 	; Navigate to the shared HTML file.
@@ -290,7 +300,6 @@ _CLW_BuildWindow(Channel, Request) {
 	; Inject i18n strings once the page is ready (via the flush queue).
 	_CLW_Eval(_CLW_I18nApplyScript())
 }
-
 
 
 
@@ -470,6 +479,8 @@ _CLW_SafetyFlush(ExpectedWindowEpoch) {
  *   {"action":"fetch","channel":"<registry channel id>","session":"…"}
  *   {"action":"set_channel","channel":"<registry channel id>","session":"…"}
  *   {"action":"open_url","url":"…","session":"…"}
+ *   {"action":"install_release","tag":"…","channel":"…","session":"…"}
+ *   {"action":"restore_backup","id":"…","session":"…"}
  */
 _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler, Args) {
 	global _CLW_Channel
@@ -539,6 +550,13 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		}
 		if (Url != "")
 			_Updater_OpenManualUrl(() => Url, Request)
+	} else if (Action == "install_release") {
+		; Only this click installs a chosen release: nothing else calls the sequence.
+		Tag := (Payload.Has("tag") && Payload["tag"] is String) ? Payload["tag"] : ""
+		Channel := (Payload.Has("channel") && Payload["channel"] is String) ? Payload["channel"] : ""
+		ReleaseInstall_Start(Tag, Channel, _CLW_InstallDeps(Request))
+	} else if (Action == "restore_backup") {
+		_CLW_RestoreBackup((Payload.Has("id") && Payload["id"] is String) ? Payload["id"] : "")
 	}
 }
 
@@ -573,7 +591,6 @@ _CLW_SubscribeChannel(Channel, Request, SetChannelFn := 0, EvalFn := 0) {
 		_CLW_Eval(Script)
 	return Accepted
 }
-
 
 
 
@@ -717,6 +734,7 @@ _CLW_SourceFailed(Context, Status, Reason) {
 	}
 	try LoggerWarn("Changelog", "Release sources exhausted: API failed ({1}), Atom feed failed ({2}) (channel={3}).",
 		Context.ApiFailure, Reason, Channel)
+	global _CLW_LastList := 0
 	; A rate-limit is not an outage, and telling the user to check their
 	; connection sends them after the wrong problem.
 	ErrKey := (Context.ApiStatus == 403 or Context.ApiStatus == 429)
@@ -797,6 +815,7 @@ _CLW_PollFetch(Req, Context, Polls) {
 	; The text crosses into the page as a JS string literal and is parsed there
 	; (JSON.parse or the Atom reader); a response is never evaluated as script.
 	; injectReleases* keeps what the channel's view lists (shared registry).
+	global _CLW_LastList := Map("kind", Context.Stage == "feed" ? "feed" : "json", "json", Json)
 	if (Context.Stage == "feed") {
 		try LoggerDone("Changelog", "Injecting releases from the Atom feed (channel={1}; API failed: {2})…",
 			Channel, Context.ApiFailure)
@@ -811,10 +830,149 @@ _CLW_PollFetch(Req, Context, Polls) {
 
 
 
+; ==================================
+; ==================================
+; ======= 6/ Release Install =======
+; ==================================
+; ==================================
+
+/**
+ * The page seeds of what this build can install and restore.
+ * @returns {string} Script assignments.
+ */
+_CLW_InstallSeed() {
+	global _ConfigDir
+	BackupJson := "null"
+	try {
+		Latest := ConfigBackup_Latest(_ConfigDir, "pre_install")
+		if IsObject(Latest)
+			BackupJson := ReleaseInstall_MessageJson(Map("id", Latest["id"],
+				"created_at", Latest["created_at"], "tag", Latest["tag"]))
+	} catch as Err {
+		try LoggerError("Changelog", "The restorable configuration backup could not be read: {1}.", Err.Message)
+	}
+	return "window.__installed_version=" . _CLW_JsStr(Updater_CurrentVersion()) . ";"
+		. "window.__install_blocked_key=" . _CLW_JsStr(_CLW_InstallBlocked()) . ";"
+		. "window.__restorable_backup=" . BackupJson . ";"
+}
+
+/**
+ * Why this build cannot install a release, as a page locale key, or "".
+ * @returns {string}
+ */
+_CLW_InstallBlocked() {
+	return Updater_IsLocalSource() ? "changelog_window.install_blocked_source" : ""
+}
+
+/**
+ * The ports of one install from this window, over the update path.
+ * @param {object} Request - Manual request context of the click.
+ * @returns {Map}
+ */
+_CLW_InstallDeps(Request) {
+	return Map(
+		"busy", () => _UpdaterDownloadInProgress || _UpdaterRecoveryPublishTarget != "",
+		"blocked", _CLW_InstallBlocked,
+		"find", _CLW_FindRelease,
+		"backup", (Release) => ConfigBackup_Create(_ConfigDir, "pre_install", Release.Tag, Updater_CurrentVersion()),
+		"asset", (Release) => _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag),
+		"install", (Release, Observer) => _CLW_StartUpdatePath(Release, Observer, Request),
+		"report", _CLW_ReportInstall)
+}
+
+/**
+ * Finds a release in the list this window last fetched from the GitHub API.
+ * @param {string} Tag
+ * @returns {Map} Map("release", Release) or Map("reason", page locale key).
+ */
+_CLW_FindRelease(Tag) {
+	global _CLW_LastList, RELEASE_INSTALL_REASONS
+	if !IsObject(_CLW_LastList)
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	; The Atom feed carries no asset list and no digest.
+	if (_CLW_LastList["kind"] != "json")
+		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+	if (UpdateChannels_ForTag(Tag) == "")
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Wanted := _Updater_NormalizeTag(Tag)
+	for _, Release in Updater_ParseReleasesList(_CLW_LastList["json"]) {
+		if (_Updater_NormalizeTag(Release.Tag) == Wanted)
+			return Map("release", Release)
+	}
+	return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+}
+
+/**
+ * Hands a chosen release to the update path while this window observes it.
+ * @returns {boolean} Whether the update path started.
+ */
+_CLW_StartUpdatePath(Release, Observer, Request) {
+	global _UpdaterInstallObserver
+	_UpdaterInstallObserver := Observer
+	Started := false
+	try {
+		Started := Updater_DownloadAndInstall(Release, Request) == true
+	} finally {
+		if !Started && IsObject(_UpdaterInstallObserver) && ObjPtr(_UpdaterInstallObserver) == ObjPtr(Observer)
+			_UpdaterInstallObserver := 0
+	}
+	return Started
+}
+
+/**
+ * Shows one install phase in the page. A failure after the window closed is
+ * shown in the updater's modal box instead of nowhere.
+ * @param {Map} Message - tag, phase, reason_key, backup_path.
+ */
+_CLW_ReportInstall(Message) {
+	global _CLW_Gui
+	if !IsSet(_CLW_Gui) {
+		if (Message["phase"] == "failed")
+			MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		return
+	}
+	_CLW_Eval("setInstallProgress(" . ReleaseInstall_MessageJson(Message) . ")")
+}
+
+/**
+ * Restores a pre-install backup and reloads the driver on it.
+ * @param {string} Id - Backup id posted by the page.
+ */
+_CLW_RestoreBackup(Id) {
+	global _ConfigDir
+	if ReleaseInstall_Busy() {
+		_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "failed",
+			"reason_key", "changelog_window.restore_error_unexpected")) . ")")
+		return
+	}
+	_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "restoring")) . ")")
+	try Result := ConfigBackup_Restore(_ConfigDir, Id)
+	catch as Err {
+		try LoggerError("Changelog", "The configuration restore raised: {1}.", Err.Message)
+		Result := Map("ok", false, "reason", "backup", "pre", 0)
+	}
+	PrePath := IsObject(Result["pre"]) ? Result["pre"]["path"] : ""
+	if !Result["ok"] {
+		Key := (Result["reason"] == "missing") ? "changelog_window.restore_error_missing"
+			: (Result["reason"] == "backup") ? "changelog_window.restore_error_backup"
+			: "changelog_window.restore_error_unexpected"
+		_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "failed",
+			"reason_key", Key, "backup_path", PrePath)) . ")")
+		return
+	}
+	_CLW_Eval("setRestoreProgress(" . ReleaseInstall_MessageJson(Map("phase", "restored",
+		"backup_path", PrePath)) . ")")
+	; The page shows the answer first; every module reads the files at start.
+	TimerArmOneShotMs((*) => ReloadPreservingSuspend(), 400)
+}
+
+
+
+
 
 ; ==========================
 ; ==========================
-; ======= 6/ Helpers =======
+; ======= 7/ Helpers =======
 ; ==========================
 ; ==========================
 
@@ -1103,10 +1261,9 @@ _CLW_Reset() {
 
 
 
-
 ; ========================================
 ; ========================================
-; ======= 7/ Window Event Handlers =======
+; ======= 8/ Window Event Handlers =======
 ; ========================================
 ; ========================================
 

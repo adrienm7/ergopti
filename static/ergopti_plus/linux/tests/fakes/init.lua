@@ -235,12 +235,15 @@ function M.notifier(opts)
 end
 
 --- Key/value storage held in a table.
---- @param opts table|nil { initial = table, writes_fail = boolean }
+--- @param opts table|nil { initial = table, writes_fail = boolean, path = string }
 --- @return table
 function M.storage(opts)
 	opts = opts or {}
 	local fake = { values = {} }
 	for k, v in pairs(opts.initial or {}) do fake.values[k] = v end
+
+	-- The store's file, which the configuration backup copies.
+	function fake.path() return opts.path or "/fake/ergopti_plus/storage.json" end
 
 	function fake.set(key, value)
 		if opts.writes_fail then return false end

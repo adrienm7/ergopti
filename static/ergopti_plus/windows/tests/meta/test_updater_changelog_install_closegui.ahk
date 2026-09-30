@@ -39,10 +39,11 @@ _UCIG_CheckInstallSelectedUsesCloseGui() {
 	Assert(IdxNext > IdxAssign, "could not bound the InstallSelected closure for inspection")
 	InstallSelectedBody := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
 
-	HelperCall := InStr(InstallSelectedBody, "_Updater_OpenSelectedReleasePrompt(G,")
+	HelperCall := InStr(InstallSelectedBody, "_Updater_InstallChosenRelease(G,")
 	Assert(HelperCall > 0,
-		"InstallSelected must delegate to the guarded release-prompt helper")
-	Helper := _DriverFuncBody("_Updater_OpenSelectedReleasePrompt")
+		"InstallSelected must delegate to the guarded chosen-release install helper")
+	Helper := _DriverFuncBody("_Updater_InstallChosenRelease")
+	Assert(Helper != "", "_Updater_InstallChosenRelease must exist in modules/updater/changelog.ahk")
 	Assert(InStr(Helper, "_Updater_CloseGui(G)") > 0,
 		"the guarded InstallSelected helper must close via _Updater_CloseGui(G), matching every other close path -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
 	Assert(InStr(InstallSelectedBody, "G.Destroy()") = 0,
