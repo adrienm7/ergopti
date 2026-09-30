@@ -97,14 +97,17 @@ M.MODIFIER_OF = {
 --- Codes named individually because something synthesises them rather than only
 --- recognising them. The injector emits Backspace to erase a trigger, so it
 --- needs the number, and a second literal 14 in that file is the duplication
---- this module exists to prevent. Up and Down are named for the prediction
---- engine, which moves the agent tooltip's selection with them.
+--- this module exists to prevent. The four arrows are named for the prediction
+--- engine, which moves the tooltip's active prediction with them: Up and Left
+--- to the previous one, Down and Right to the next.
 M.KEY_BACKSPACE = 14
 M.KEY_TAB       = 15
 M.KEY_ENTER     = 28
 M.KEY_ESC       = 1
 M.KEY_UP        = 103
 M.KEY_DOWN      = 108
+M.KEY_LEFT      = 105
+M.KEY_RIGHT     = 106
 
 --- The digit-row keys, KEY_1 to KEY_0, by the prediction slot each numbers (0
 --- is slot 10). The validation chord names the physical key, as the macOS
@@ -125,8 +128,8 @@ M.CONTROL_NAME_OF = {
 	[M.KEY_ESC]       = "escape",
 	[M.KEY_UP]        = "up",
 	[M.KEY_DOWN]      = "down",
-	[105] = "left",
-	[106] = "right",
+	[M.KEY_LEFT]      = "left",
+	[M.KEY_RIGHT]     = "right",
 	[102] = "home",
 	[107] = "end",
 	[104] = "pageup",
