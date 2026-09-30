@@ -32,7 +32,9 @@
 ---    localised and HIToolbox names differ, made the first layout poll report a
 ---    change that fenced the boot's RESUME in flight, logged « prepared lease
 ---    RESUME failed: lease-stopping » and opened the error window. The boot of
----    that layout keeps its one lease worker.
+---    that layout keeps its one lease worker. A real layout switch or a reload
+---    while that RESUME is in flight supersedes the activation without an ERROR
+---    (lease-stop-supersedes-activation).
 --- ==============================================================================
 
 local M = {}
@@ -268,6 +270,12 @@ local function scenarios(repo)
 		{ name = "an Ergopti layout boots while the lease worker answers late, on one lease worker",
 			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "ergopti_layout_slow_worker", facts = { lease_workers = "1", lease_phase = "active" } },
+		{ name = "a layout switch while the boot's RESUME is in flight activates a fresh lease",
+			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			machine = "layout_switch_during_resume", facts = { lease_workers = "2", lease_phase = "active" } },
+		{ name = "a reload while the boot's RESUME is in flight fences the lease before reloading",
+			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			machine = "reload_during_resume", facts = { native_reloads = "1", lease_phase = "idle" } },
 	}
 	for _, case in ipairs(older_release_cases(repo)) do
 		list[#list + 1] = {

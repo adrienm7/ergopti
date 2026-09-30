@@ -582,6 +582,21 @@ Compare a layout name only with a name of its own form
 reads the keymap only at start and on the menu's switch, so neither driver
 has this class.
 
+### project-hs-lease-stop-supersedes-activation
+
+An accepted `LeaseController` Stop answers the READY wait and the pause or
+resume command it supersedes with `LeaseContract.STOPPED_BEFORE_READY` and
+`COMMAND_SUPERSEDED_BY_STOP`. The remap coordinator fences its own activation
+in flight on a layout change, a reload or a disable, and the Stop's requester
+logs why. The superseded activation, and the Enable or Resume transaction it
+ends, log at INFO (`LeaseContract.is_superseded_by_stop`); the activation
+requests no second fence. Every other activation failure stays an ERROR. The
+retained layout regeneration waits for STOPPED, then starts a fresh token.
+The boot E2E machines `layout_switch_during_resume` and `reload_during_resume`
+pin both paths. The lease controller state is per Lua VM: a previous
+process's worker fences its own tokens on stdin EOF and cannot answer
+« lease-stopping » to a new boot.
+
 ### project-hs-karabiner-legacy-conflicts-are-offered-for-removal
 
 Untagged rules carrying a historical ErgoptiPlus signature
