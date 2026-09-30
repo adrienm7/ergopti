@@ -541,6 +541,41 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.pending(), false)
 	end)
 
+	-- The global restore composes this owner with every other category; one it
+	-- cannot serve because of its second file must be skipped and named, not
+	-- refuse every other category with it.
+	helpers.it("names why it cannot serve a composed restore, and nothing when it can", function()
+		local f = fixture()
+		helpers.assert_nil(f.owner.unavailable(), "a cleanly read override file is served")
+		helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES, "the check writes nothing")
+		local parse = f.config.parse_override_content
+		f.config.parse_override_content = function(content)
+			local parsed = parse(content)
+			parsed.autocorrection = { sections = { caps = { delay = 2.0 } } }
+			return parsed
+		end
+		local reason = f.owner.unavailable()
+		helpers.assert_true(type(reason) == "string" and reason:find("cannot address", 1, true) ~= nil, tostring(reason))
+		f.config.parse_override_content = parse
+		local snapshot = f.config.scope_snapshot
+		f.config.scope_snapshot = function() return nil end
+		helpers.assert_true(type(f.owner.unavailable()) == "string", "an unread override file is named")
+		f.config.scope_snapshot = snapshot
+		helpers.assert_eq(f.owner.apply("clear"), true, "the check leaves the owner usable")
+	end)
+
+	helpers.it("leaves a retained inverse to the composition and its override file intact", function()
+		local f = fixture()
+		f.controls.refuse, f.controls.then_refuse = "config", "overrides"
+		helpers.assert_eq(f.owner.apply("clear"), false)
+		helpers.assert_eq(f.owner.pending(), true)
+		helpers.assert_nil(f.owner.unavailable(), "the composition reports the debt itself")
+		f.controls.refuse = nil
+		helpers.assert_eq(f.owner.retry_restore(), true)
+		helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES, "the retained inverse still restores its file")
+		helpers.assert_eq(f.owner.pending(), false)
+	end)
+
 	helpers.it("creates an absent override file for a recommendation and removes it on rollback", function()
 		local f = fixture({ overrides = false })
 		f.controls.refuse = "config"

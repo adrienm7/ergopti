@@ -1521,6 +1521,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics" }) do
 				owners[scope] = function() return preference_scope_owner(scope) end
 			end
+			-- The Hotstrings owner also needs its override file: one it cannot
+			-- serve is skipped and named, like an owner this Mac lacks, instead of
+			-- refusing every other category with it.
+			owners.hotstrings = function()
+				local owner = preference_scope_owner("hotstrings")
+				if owner == nil then return nil end
+				local reason = owner.unavailable()
+				if reason ~= nil then
+					Logger.warn(LOG, "Global scope skips hotstrings: %s.", tostring(reason))
+					return nil
+				end
+				return owner
+			end
 			global_scope = require("ui.menu.global_scope").new({
 				owners = owners,
 				remap = karabiner,

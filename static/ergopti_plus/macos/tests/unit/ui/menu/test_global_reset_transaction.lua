@@ -24,6 +24,7 @@ local MODULE_KEYS = {
 	"ui.menu.metrics_scope",
 	"ui.menu.hotstrings_scope",
 	"modules.hotstrings.hotstrings_config",
+	"ui.menu.global_scope",
 	"ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
 	"infra.dialog_util",
@@ -1268,6 +1269,26 @@ helpers.describe("hotstrings scope menu composition", function()
 			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("hotstrings", "recommended"), true)
 			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
 			helpers.assert_eq(constructions, 1, "one owner per session keeps its retained inverse")
+		end)
+	end)
+
+	helpers.it("skips the hotstrings category of the global restore when its owner cannot serve it", function()
+		with_menu_fixture({}, function(observations)
+			package.loaded["modules.hotstrings.hotstrings_config"] = {
+				get_override_path = function() return "/virtual/hotstrings_config.toml" end,
+			}
+			local reason = "the hotstring override file was not read cleanly"
+			local owner = { apply = function() return true end, unavailable = function() return reason end }
+			package.loaded["ui.menu.hotstrings_scope"] = { new = function() return owner end }
+			local composed
+			package.loaded["ui.menu.global_scope"] = { new = function(options)
+				composed = options
+				return { apply = function() return true end }
+			end }
+			helpers.assert_eq(observations.actions.reset_defaults(), true)
+			helpers.assert_nil(composed.owners.hotstrings(), "an owner that cannot serve its files is skipped")
+			reason = nil
+			helpers.assert_eq(composed.owners.hotstrings(), owner, "an available owner takes part")
 		end)
 	end)
 end)
