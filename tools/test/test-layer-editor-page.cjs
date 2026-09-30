@@ -19,6 +19,9 @@
  * 3. Presets: Restore recommended saves Ergopti's layer, Clear all saves no layer.
  * 4. Host replies: a refused save keeps the edits and says why; a first Close
  *    with unsaved edits warns instead of closing.
+ * 5. Key captions (layer-editor-action-wrap): a key's action wraps over
+ *    several lines of a readable size that its key holds at the window's
+ *    default and minimum sizes, and its tooltip carries the whole text.
  * ==============================================================================
  */
 
@@ -507,6 +510,163 @@ const DATA = (() => {
 		page.el('status').textContent === EN['layer_editor.save_refused'].replace('{1}', '?'),
 		'an empty error object from a Lua host is read as no error list'
 	);
+}
+
+// ==================================================================
+// ==================================================================
+// ======= 5/ Key captions (layer-editor-action-wrap) ===============
+// ==================================================================
+// ==================================================================
+
+// A key's action used to be one 9.5 px line cut with an ellipsis at the bottom
+// of the key: unreadable. It now wraps over several lines of a readable size
+// inside a key tall enough to hold them, and the key's tooltip carries the
+// whole text. The CSS is read as data, so a rule that stops wrapping, shrinks
+// the text or cuts the lines fails here, not only on a screen.
+
+const CSS = fs.readFileSync(path.join(APP, 'style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+// The smallest font size a key's action may use, in CSS pixels.
+const MIN_BINDING_FONT_PX = 11;
+// The fewest lines a key's action must be able to show at the default window size.
+const MIN_BINDING_LINES = 3;
+// The fewest lines it must still show at the window's minimum size.
+const MIN_BINDING_LINES_AT_MIN_WIDTH = 2;
+// Horizontal space the board does not get: #main's side padding and a
+// vertical scrollbar (WebView2 draws a classic one).
+const BOARD_SIDE_ALLOWANCE_PX = 36 + 17;
+const APPS = JSON.parse(fs.readFileSync(path.join(UI, 'apps.manifest.json'), 'utf8'));
+
+/** The declarations of the rule whose selector list is exactly `selector`. */
+function cssRule(selector) {
+	for (const match of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		const selectors = match[1].split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+		if (!selectors.includes(selector)) continue;
+		const out = {};
+		for (const declaration of match[2].split(';')) {
+			const at = declaration.indexOf(':');
+			if (at > 0) out[declaration.slice(0, at).trim()] = declaration.slice(at + 1).trim();
+		}
+		return out;
+	}
+	return null;
+}
+
+/** A length in px (`12px`), or NaN. */
+function px(value) {
+	const m = /^(-?\d+(?:\.\d+)?)px$/.exec(String(value || '').trim());
+	return m ? Number(m[1]) : NaN;
+}
+
+/** The four sides of a padding shorthand, in px. */
+function paddingOf(value) {
+	const parts = String(value || '0px')
+		.trim()
+		.split(/\s+/)
+		.map((p) => (p === '0' ? 0 : px(p)));
+	const [top, right = top, bottom = top] = parts;
+	return { top, right, bottom, left: parts.length === 4 ? parts[3] : right };
+}
+
+/** A unitless line-height times the font size, in px. */
+function lineHeightPx(rule) {
+	const factor = Number(rule['line-height']);
+	return factor * px(rule['font-size']);
+}
+
+{
+	const binding = cssRule('.key .binding');
+	const legend = cssRule('.key .legend');
+	const cap = cssRule('.key .cap');
+	const slot = cssRule('.key');
+	check(binding !== null, '(layer-editor-action-wrap) style.css has no `.key .binding` rule');
+	check(
+		legend !== null && cap !== null && slot !== null,
+		'(layer-editor-action-wrap) a key rule is missing'
+	);
+	if (binding && legend && cap && slot) {
+		check(
+			binding['white-space'] === 'normal',
+			`(layer-editor-action-wrap) a key's action must wrap (white-space: normal), not ${binding['white-space']}`
+		);
+		check(
+			binding['overflow-wrap'] === 'anywhere' || binding['word-break'] === 'break-word',
+			"(layer-editor-action-wrap) a key's action must break a word longer than the key"
+		);
+		check(
+			!('text-overflow' in binding),
+			"(layer-editor-action-wrap) a key's action is clamped by lines, never cut on one line"
+		);
+		const fontPx = px(binding['font-size']);
+		check(
+			fontPx >= MIN_BINDING_FONT_PX,
+			`(layer-editor-action-wrap) a key's action is ${binding['font-size']}, below ${MIN_BINDING_FONT_PX}px`
+		);
+		const clamp = Number(binding['-webkit-line-clamp']);
+		check(
+			Number.isInteger(clamp) && clamp >= MIN_BINDING_LINES,
+			`(layer-editor-action-wrap) a key's action must be clamped to at least ${MIN_BINDING_LINES} lines, not ${binding['-webkit-line-clamp']}`
+		);
+		check(
+			binding.display === '-webkit-box' && binding['-webkit-box-orient'] === 'vertical',
+			'(layer-editor-action-wrap) the line clamp needs display: -webkit-box and a vertical box'
+		);
+		check(
+			binding.overflow === 'hidden' && binding['min-height'] === '0',
+			"(layer-editor-action-wrap) the action must shrink inside its key's cap and hide what does not fit"
+		);
+
+		// The lines a 1u key holds at a window width, with the page's own board.
+		const page = loadPage();
+		page.call(
+			`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
+		);
+		const columns = Math.max(
+			...DATA.keys
+				.filter((k) => k.geometry && k.geometry.iso)
+				.map((k) => {
+					const g = k.geometry.iso;
+					return Math.max(
+						g.col + g.width,
+						g.bottom_col !== undefined ? g.bottom_col + g.bottom_width : 0
+					);
+				})
+		);
+		const rows = page.call('BOARD_ROWS + FUNCTION_ROW_GAP');
+		const boardRatio = parseFloat(page.el('board').style.paddingTop) / 100;
+		const keyHeightPerWidth = (boardRatio * columns) / rows;
+		const slotPad = paddingOf(slot.padding);
+		const capPad = paddingOf(cap.padding);
+		const border = px(String(cap.border).split(/\s+/)[0]);
+		const gap = cap.gap === undefined ? 0 : px(cap.gap);
+		const linesAt = (windowWidth) => {
+			const unit = (windowWidth - BOARD_SIDE_ALLOWANCE_PX) / columns;
+			const inner =
+				unit * keyHeightPerWidth -
+				slotPad.top -
+				slotPad.bottom -
+				2 * border -
+				capPad.top -
+				capPad.bottom;
+			return Math.floor((inner - lineHeightPx(legend) - gap) / lineHeightPx(binding) + 1e-9);
+		};
+		const app = APPS.apps ? APPS.apps.layer_editor : APPS.layer_editor;
+		check(
+			app && linesAt(app.width) >= Math.min(clamp, MIN_BINDING_LINES),
+			`(layer-editor-action-wrap) a 1u key holds ${app && linesAt(app.width)} line(s) of its action at the default ${app && app.width}px window, not ${MIN_BINDING_LINES}`
+		);
+		check(
+			app && linesAt(app.min_width) >= MIN_BINDING_LINES_AT_MIN_WIDTH,
+			`(layer-editor-action-wrap) a 1u key holds ${app && linesAt(app.min_width)} line(s) of its action at the minimum ${app && app.min_width}px window`
+		);
+		check(
+			page.key('KeyQ').title === EN['layer_actions.sel_doc_start'],
+			`(layer-editor-action-wrap) a key's tooltip must carry its whole action, not "${page.key('KeyQ').title}"`
+		);
+		check(
+			page.key('Digit1').title === EN['layer_editor.value.repeat_count'].replace('{1}', '1'),
+			"(layer-editor-action-wrap) a repeat count's tooltip must carry its whole text"
+		);
+	}
 }
 
 if (checks < 40) fail(`only ${checks} checks ran (floor 40)`);

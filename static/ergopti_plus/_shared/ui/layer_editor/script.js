@@ -26,6 +26,9 @@
  *    repeat count and a keyboard shortcut.
  * 3. Nothing is written by the page: the host validates the text with its own
  *    loader for every OS and refuses anything they would not all read.
+ * 4. Readable keys: a key's action wraps over several lines of the key, whose
+ *    rows are taller than its columns (KEY_HEIGHT_RATIO), and its tooltip
+ *    carries the whole text when the lines cannot.
  * ==============================================================================
  */
 
@@ -41,6 +44,10 @@ var DEFAULT_FORM = 'iso';
 // The gap between the function row and the rest, in key units.
 var FUNCTION_ROW_GAP = 0.25;
 var BOARD_ROWS = 6;
+// A row's height over a column's width. The keys keep their places and widths;
+// the extra height holds a key's action over several readable lines
+// (style.css .key .binding).
+var KEY_HEIGHT_RATIO = 1.5;
 
 // Mouse buttons and wheel directions, by registry code, and their label keys.
 var INPUT_LABEL_KEYS = {
@@ -324,12 +331,14 @@ function buildInput(code, info, text, extraClass) {
 			.trim()
 	);
 	node.dataset.code = code;
-	node.title = info.reason || '';
+	var binding = bindingShort(info.value);
+	// A long action is clamped on the key: the tooltip carries all of it.
+	node.title = info.reason || binding;
 	// The slot fills the key's place on the board; the cap inside it is drawn a
 	// little smaller, which leaves the gap between two keys.
 	var cap = make('div', 'cap');
 	cap.appendChild(make('span', 'legend', text));
-	cap.appendChild(make('span', 'binding', bindingShort(info.value)));
+	cap.appendChild(make('span', 'binding', binding));
 	node.appendChild(cap);
 	node.addEventListener('click', function () {
 		select(code);
@@ -367,7 +376,8 @@ function renderBoard(current, recommended) {
 	// A zero-height box whose padding carries the board's proportions: the keys'
 	// percentages resolve against that padding box, in every engine the three
 	// hosts embed (older WebKitGTK builds lack aspect-ratio).
-	board.style.paddingTop = ((BOARD_ROWS + FUNCTION_ROW_GAP) / boardColumns()) * 100 + '%';
+	board.style.paddingTop =
+		(((BOARD_ROWS + FUNCTION_ROW_GAP) * KEY_HEIGHT_RATIO) / boardColumns()) * 100 + '%';
 	DATA.keys.forEach(function (k) {
 		var geo = k.geometry && k.geometry[state.form];
 		if (!geo) return;
