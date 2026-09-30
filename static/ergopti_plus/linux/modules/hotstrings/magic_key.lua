@@ -34,6 +34,7 @@ local Logger = require("logger.shim")
 local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
 local Terminators = require("keymap.terminators")
+local ConfigOutdated = require("config_outdated")
 
 local LOG = "magic_key"
 
@@ -66,13 +67,15 @@ function M.default()
 	return ""
 end
 
---- The character in effect: the user's choice, or the manifest default.
+--- The character in effect: the user's choice, or the manifest default. A
+--- stored key today's policy refuses (one an older build accepted) is an
+--- outdated entry: warned once, offered by the cleanup, the default used.
 --- @return string
 function M.get()
 	if Preferences.is_explicit(MANIFEST_PATH) then
 		local stored = Preferences.get(MANIFEST_PATH)
 		if M.validate(stored) then return stored end
-		Logger.error(LOG, "Stored magic key is unsafe or malformed — using the shipped default.")
+		ConfigOutdated.report(MANIFEST_PATH, ConfigOutdated.REFUSED, Logger)
 	end
 	return M.default()
 end

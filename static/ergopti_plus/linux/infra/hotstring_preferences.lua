@@ -29,6 +29,7 @@ local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
+local Terminators = require("keymap.terminators")
 
 local LOG = "infra.hotstring_preferences"
 
@@ -55,6 +56,13 @@ for _, path in ipairs(OWNED) do
 	assert(type(neutral) == "boolean" or type(neutral) == "string", "hotstring preference default is not a scalar: " .. path)
 	_owned[path] = type(neutral)
 end
+
+-- Owners' rules beyond the declared type. A stored value its owner refuses
+-- (a magic key today's shared policy rejects) is outdated for the cleanup
+-- exactly as it is for the owner's reader, which warns with the same words.
+local VALUE_RULES = {
+	["hotstrings.trigger_char"] = function(value) return Terminators.validate_magic_key(value) == true end,
+}
 
 local _document = nil
 -- Bumped on every change of _document, so a reader that caches what it derived
@@ -237,7 +245,12 @@ end
 function M.mark_config_reads(document, mark)
 	validate(document)
 	for _, path in ipairs(OWNED) do
-		if lookup(document, path) ~= nil then mark((table.unpack or unpack)(segments(path))) end
+		local value = lookup(document, path)
+		if value ~= nil and VALUE_RULES[path] and not VALUE_RULES[path](value) then
+			ConfigOutdated.report(path, ConfigOutdated.REFUSED, Logger)
+		elseif value ~= nil then
+			mark((table.unpack or unpack)(segments(path)))
+		end
 	end
 end
 
