@@ -83,6 +83,24 @@ strip `docs.json`/`lua.json` from the embedded Hammerspoon: `_coresetup.lua`
 requires `hs.doc` at startup, which registers both files. Ollama is not
 bundled either (the guard rejects `Tools/Ollama` in the build script).
 
+### project-macos-python-is-chosen-by-its-slices
+
+`/usr/bin/python3` is the xcode-select shim: it runs the python3 of the active
+developer folder (DEVELOPER_DIR, `/var/db/xcode_select_link`, Xcode, then the
+Command Line Tools), whatever processor that copy was built for. dev.155 ran it
+at every boot for the input-source probe, and on an Apple silicon Mac migrated
+from Intel macOS started it under Rosetta and posted "support for Intel-based
+apps is ending … Python". Nothing at boot may run Python (the probe reads
+`defaults read` through `infra/openstep_plist.lua`), and every helper takes
+its interpreter from `adapters/python_interpreter.lua`, which reads Mach-O
+slices without executing anything and refuses one without the native slice;
+a refusal opens `ui/python_runtime_offer.lua`. Never start `python3` by a
+fixed path or PATH, and never run an interpreter to ask its architecture.
+Unit tests get the real resolver over a modelled Mac through
+`helpers.load_with_stubs` (`HEALTHY_PYTHON`); the boot harness declares each
+spawned executable's slices and fails on E2E_ROSETTA (`hardening-h-no-rosetta`).
+The App Cloner's own scripts still run `python3` from PATH/`/usr/bin`.
+
 ### project-macos-ai-runtimes-install-on-selection
 
 Neither AI runtime ships in the app or downloads at boot, on AI enable with

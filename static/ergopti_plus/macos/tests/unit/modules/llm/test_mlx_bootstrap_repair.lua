@@ -40,6 +40,7 @@ local OWNED = {
 	"modules.llm.ollama_deps_checker", "modules.llm.backend_detector",
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
+	"adapters.python_interpreter", "ui.python_runtime_offer",
 }
 
 -- The closing lines ensure-mlx-deps.sh prints after any failed uv sync: they
@@ -820,5 +821,36 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		helpers.assert_true(world.dialogs[1].body:find("Select the MLX backend", 1, true) == nil,
 			world.dialogs[1].body)
 		helpers.assert_eq(#world.tasks, 0, "« Later » starts nothing")
+	end))
+
+	-- hardening-h-no-rosetta: the installer's PTY wrapper is Python.
+	helpers.it("starts no Intel Python for the installer and offers a native one", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		local offers = {}
+		package.loaded["ui.python_runtime_offer"] = {
+			offer = function(state) offers[#offers + 1] = state; return true end,
+		}
+		local intel = "\207\250\237\254" .. "\7\0\0\1" .. string.rep("\0", 24)
+		package.loaded["adapters.python_interpreter"]._set_deps({
+			read_head = function(path)
+				if path == helpers.HEALTHY_PYTHON then return intel end
+				return nil
+			end,
+			realpath = function(path) return path end,
+			getenv = function() return nil end,
+			select_link_target = function() return nil end,
+			process_arch = function() return "arm64" end,
+		})
+		click_boot_notice(world)
+		world.answers = { "primary" }
+		drain(world)
+		helpers.assert_eq(#world.tasks, 0, "no interpreter may start under Rosetta")
+		helpers.assert_eq(checker.get_failure_cause().kind, "no_native_python")
+		drain(world)
+		helpers.assert_eq(#offers, 1, "the MLX offer hands the fix to the Python offer")
+		helpers.assert_eq(offers[1].kind, "python_not_native")
+		helpers.assert_eq(offers[1].found[1].path, helpers.HEALTHY_PYTHON)
+		helpers.assert_eq(#world.dialogs, 1, "no MLX repair dialog for a Python it cannot repair")
 	end))
 end)

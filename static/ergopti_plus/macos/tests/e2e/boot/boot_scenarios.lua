@@ -304,9 +304,10 @@ local function scenarios(repo)
 		{ name = "a reload while the boot's RESUME is in flight fences the lease before reloading",
 			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "reload_during_resume", facts = { native_reloads = "1", lease_phase = "idle" } },
-		-- hardening-h-no-rosetta: the boot of a Mac that kept its Intel Pythons.
-		{ name = "a Mac migrated from Intel boots without Rosetta",
-			setup = migrated_from_intel, steps = { "boot" }, marker = BOOTED_MARKER },
+		-- hardening-h-no-rosetta: the recommended shortcuts, then a Python helper
+		-- (the display-mirror shortcut), which must pick the arm64 Homebrew.
+		{ name = "a Mac migrated from Intel boots and runs a Python helper without Rosetta",
+			setup = migrated_from_intel, steps = { "restore_recommended", "python_helper" }, marker = BOOTED_MARKER },
 		{ name = "a Mac migrated from Intel without an arm64 Python boots without Rosetta",
 			setup = migrated_from_intel_without_native_python, steps = { "boot" }, marker = BOOTED_MARKER },
 	}

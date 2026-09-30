@@ -101,6 +101,9 @@ local CAUSE_KEYS = {
 	import_failed   = "mlx.cause_import",
 	python          = "mlx.cause_python",
 	network         = "mlx.cause_network",
+	-- Named before the installer starts (adapters/python_interpreter.lua): its
+	-- fix is a native Python, which ui/python_runtime_offer.lua installs.
+	no_native_python = "mlx.cause_no_native_python",
 }
 
 

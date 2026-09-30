@@ -55,6 +55,7 @@ local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
+local PythonInterpreter = require("adapters.python_interpreter")
 
 local LOG = "mlx_deps"
 
@@ -1161,6 +1162,14 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_stale_intent()
 	end
 
+	-- The PTY wrapper runs on an interpreter this Mac runs natively; without
+	-- one the failure is named and its offer carries the install
+	-- (hardening-h-no-rosetta).
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		return settle_preflight_failure(nil,
+			{ kind = "no_native_python", state = python_state, repairable = false })
+	end
 	local pty_wrapper_path, wrapper_error = PtyProcessGroup.create("MLX dependency")
 	if not pty_wrapper_path then
 		Logger.error(LOG, "Failed to publish the MLX process-group wrapper: %s.",
@@ -1178,8 +1187,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- stdio. Without a pty, uv (Rust) and any libc-using subprocess switch
 	-- to fully buffered stdio when piped, meaning their output only reaches
 	-- our streaming callback when a 4 KB buffer fills — i.e., not for
-	-- minutes. We use Python (built-in to macOS at /usr/bin/python3 since
-	-- Catalina) rather than BSD `script` because macOS `script -F` does not
+	-- minutes. We use Python (the native one adapters.python_interpreter
+	-- names) rather than BSD `script` because macOS `script -F` does not
 	-- mean "flush" (it means "write to named pipe") — `script` ends up
 	-- buffering its own stdout output and we get nothing in real time.
 	-- python -u + pty.spawn gives us unbuffered, line-by-line forwarding.
@@ -1380,7 +1389,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 
 	-- Construct the full Python invocation: python3 executes the PTY wrapper,
 	-- passing bash_cmd so the child process receives the exact shell command.
-	task = TaskLifecycle.native("MLX dependency bootstrap", "/usr/bin/python3",
+	task = TaskLifecycle.native("MLX dependency bootstrap", python_bin,
 		completion_callback, streaming_callback,
 		{ "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
 

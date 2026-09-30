@@ -156,6 +156,11 @@ local function present(cause)
 		return false
 	end
 	cause = resolve_cause(cause)
+	if cause.kind == "no_native_python" then
+		-- The fix is a Python this Mac runs natively, not an MLX repair: its own
+		-- offer names what was found and carries the install.
+		return require("ui.python_runtime_offer").offer(cause.state)
+	end
 	local dialog = dialog_for(cause)
 	Logger.warn(LOG, "Offering the MLX %s action for a %s failure.",
 		tostring(dialog.action or "acknowledge"), tostring(cause.kind))
