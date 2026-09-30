@@ -21,6 +21,8 @@ local _check_client  = require("adapters.http_client").new()
 local _warmup_client = require("adapters.http_client").new()
 -- Screen reading (modules/llm/screen_answer.lua) never shares the prediction owner
 local _vision_client = require("adapters.http_client").new()
+-- The AI agent menu's model listing never supersedes a request in flight
+local _listing_client = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -1172,6 +1174,134 @@ end
 
 
 
+-- The failure reason of a request whose model the local server does not hold
+M.MODEL_MISSING = "model_missing"
+
+-- Longest server error text a log line carries
+local MAX_LOGGED_SERVER_ERROR = 300
+
+-- What the local server listed last (/api/tags): normalized model name -> true,
+-- nil until a listing succeeded. A request names a model only once a listing
+-- held it; a "model not found" answer clears the listing.
+local _listed_models = nil
+
+--- Normalizes a model name as the local server matches it: case-insensitive,
+--- with its implicit ":latest" tag written out.
+--- @param name any
+--- @return string|nil normalized nil for anything but a non-empty string.
+local function normalize_model_name(name)
+	if type(name) ~= "string" or name == "" then return nil end
+	local lowered = name:lower()
+	-- The tag follows a ":" of the last path segment (a registry host may carry a port)
+	if not lowered:match("[^/]*$"):find(":", 1, true) then lowered = lowered .. ":latest" end
+	return lowered
+end
+M.normalize_model_name = normalize_model_name
+
+--- Reads the error a failed answer of the local server carries: its JSON
+--- "error" (Ollama's errors name the model or the fault, never the request's
+--- text), else the start of its body, else the transport's error.
+--- @param r table The HTTP result.
+--- @return string text
+local function server_error_text(r)
+	local body = type(r.body) == "string" and r.body or ""
+	if body:match("^%s*{") then
+		local decoded = JsonCodec.decode(body)
+		if type(decoded) == "table" and type(decoded.error) == "string" and decoded.error ~= "" then
+			return decoded.error:sub(1, MAX_LOGGED_SERVER_ERROR)
+		end
+	end
+	if body ~= "" then return body:sub(1, MAX_LOGGED_SERVER_ERROR) end
+	local transport = tostring(r.error or "")
+	return transport ~= "" and transport or "no body"
+end
+
+--- Reads the model a "model not found" answer names: Ollama answers
+--- 404 {"error":"model 'X' not found"} (chat handler) or
+--- {"error":"model \"X\" not found, try pulling it first"} (scheduler).
+--- @param status any The HTTP status.
+--- @param error_text string What server_error_text read.
+--- @return string|nil model nil for any other failure.
+local function missing_model_of(status, error_text)
+	if status ~= 404 then return nil end
+	return error_text:match("^model ['\"]([^'\"]+)['\"] not found")
+end
+
+--- Asks the local server which models it holds and records the answer.
+--- @param client table The HTTP client to ask with: the request's own, so a
+---        newer request supersedes the listing as it supersedes the request.
+--- @param on_done function Receives the listed names, or nil and a reason.
+local function list_models(client, on_done)
+	client.get(M.get_base_url() .. "/api/tags", {}, function(r)
+		Logger.pcall(LOG, function()
+			if r.status ~= 200 then
+				Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
+					tostring(r.status), server_error_text(r))
+				on_done(nil, "http_" .. tostring(r.status or "unknown"))
+				return
+			end
+			local tags = type(r.body) == "string" and r.body:match("^%s*{") and JsonCodec.decode(r.body) or nil
+			if type(tags) ~= "table" or type(tags.models) ~= "table" then
+				Logger.error(LOG, "The local server's model list is unreadable (%d byte(s)).", #(r.body or ""))
+				on_done(nil, "unreadable_model_list")
+				return
+			end
+			local names = {}
+			for _, entry in ipairs(tags.models) do
+				if type(entry) == "table" then
+					for _, field in ipairs({ "name", "model" }) do
+						local name = normalize_model_name(entry[field])
+						if name then names[name] = true end
+					end
+				end
+			end
+			_listed_models = names
+			Logger.debug(LOG, "The local server lists %d model(s).", #tags.models)
+			on_done(names)
+		end)
+	end)
+end
+
+--- Tells whether the local server holds a model, as its last listing said.
+--- @param model string The model name.
+--- @return boolean|nil installed nil while no listing succeeded.
+function M.local_model_installed(model)
+	local name = normalize_model_name(model)
+	if name == nil or _listed_models == nil then return nil end
+	return _listed_models[name] == true
+end
+
+--- Lists the local server's models again, for the menus.
+--- @param on_done function|nil Receives true once listed, or false and a reason.
+function M.refresh_local_models(on_done)
+	list_models(_listing_client, function(names, reason)
+		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done", names ~= nil, reason) end
+	end)
+end
+
+--- Asks the local server whether it holds a model.
+--- @param model string The model name.
+--- @param on_result function Receives true or false, or nil and a reason when
+---        the server could not tell.
+function M.verify_local_model(model, on_result)
+	if normalize_model_name(model) == nil or type(on_result) ~= "function" then
+		error("api_ollama.verify_local_model: a model name and on_result are required")
+	end
+	list_models(_listing_client, function(names, reason)
+		if names == nil then return ApiCommon.protected_call(on_result, "on_result", nil, reason) end
+		ApiCommon.protected_call(on_result, "on_result", names[normalize_model_name(model)] == true)
+	end)
+end
+
+--- Forgets the last listing: a download or a removal changed what the server holds.
+function M.forget_local_models()
+	_listed_models = nil
+end
+
+
+
+
+
 -- ======================================
 -- ======================================
 -- ======= 2/ Core Request Engine =======
@@ -1729,15 +1859,23 @@ end
 --- Posts one prebuilt request body (llm/vision.lua build_request, format
 --- "ollama") to the local server's /api/chat, whatever backend the AI menu uses
 --- for text. The body carries private text or a screenshot: neither it nor the
---- answer is logged.
---- @param client table The HTTP client that posts it.
+--- answer is logged, only the server's own error.
+--- A model is requested only once the local server listed it: a missing one
+--- fails with MODEL_MISSING and its name, and so does a "model not found"
+--- answer, so the caller can name it and offer its download.
+--- @param client table The HTTP client that lists the models and posts the body.
 --- @param label string What is requested, for the log ("Vision", "Agent").
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
---- @param on_fail function Receives a short reason when no answer came back.
+--- @param on_fail function Receives a short reason when no answer came back,
+---        and { model } for MODEL_MISSING.
 local function request_prebuilt(client, label, body, on_text, on_fail)
 	if type(body) ~= "table" or type(on_text) ~= "function" or type(on_fail) ~= "function" then
 		error("api_ollama." .. label .. " request: a body, on_text and on_fail are required")
+	end
+	local model = body.model
+	if normalize_model_name(model) == nil then
+		error("api_ollama." .. label .. " request: the body names no model")
 	end
 	local encoded, encode_error = JsonCodec.encode(body)
 	if not encoded then
@@ -1745,31 +1883,55 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 		ApiCommon.protected_call(on_fail, "on_fail", "encode_failed")
 		return
 	end
-	local t0 = TimerScheduler.now()
-	Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, tostring(body.model), #encoded)
-	client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
-		function(r)
-			Logger.pcall(LOG, function()
-				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-				if r.status ~= 200 then
-					Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
-						label, ms, tostring(r.status), tostring(r.error or ""))
-					ApiCommon.protected_call(on_fail, "on_fail", "http_" .. tostring(r.status or "unknown"))
-					return
-				end
-				local resp = JsonCodec.decode(r.body)
-				local content = type(resp) == "table" and type(resp.message) == "table"
-					and resp.message.content or nil
-				local text = type(content) == "string" and Parser.strip_thinking(content) or ""
-				if text == "" then
-					Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
-					ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
-					return
-				end
-				Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
-				ApiCommon.protected_call(on_text, "on_text", text)
+	local function post()
+		local t0 = TimerScheduler.now()
+		Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, model, #encoded)
+		client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+			function(r)
+				Logger.pcall(LOG, function()
+					local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+					if r.status ~= 200 then
+						local server_error = server_error_text(r)
+						Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
+							label, ms, tostring(r.status), server_error)
+						local missing = missing_model_of(r.status, server_error)
+						if missing then
+							-- The listing that held it is stale: the next request lists again
+							M.forget_local_models()
+							ApiCommon.protected_call(on_fail, "on_fail", M.MODEL_MISSING, { model = missing })
+							return
+						end
+						ApiCommon.protected_call(on_fail, "on_fail", "http_" .. tostring(r.status or "unknown"))
+						return
+					end
+					local resp = JsonCodec.decode(r.body)
+					local content = type(resp) == "table" and type(resp.message) == "table"
+						and resp.message.content or nil
+					local text = type(content) == "string" and Parser.strip_thinking(content) or ""
+					if text == "" then
+						Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
+						ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
+						return
+					end
+					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
+					ApiCommon.protected_call(on_text, "on_text", text)
+				end)
 			end)
-		end)
+	end
+	if M.local_model_installed(model) == true then return post() end
+	Logger.info(LOG, "%s request: checking that the local server holds model %s…", label, model)
+	list_models(client, function(names, reason)
+		if names == nil then
+			ApiCommon.protected_call(on_fail, "on_fail", reason)
+			return
+		end
+		if names[normalize_model_name(model)] ~= true then
+			Logger.warn(LOG, "%s request not sent: the local server does not hold model %s.", label, model)
+			ApiCommon.protected_call(on_fail, "on_fail", M.MODEL_MISSING, { model = model })
+			return
+		end
+		post()
+	end)
 end
 
 --- Posts one prebuilt vision request body (a screenshot and its prompt) to the

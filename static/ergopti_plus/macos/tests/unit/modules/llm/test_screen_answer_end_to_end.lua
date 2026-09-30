@@ -95,12 +95,26 @@ local function completion_body(content)
 	})
 end
 
+--- Answers the local server's pending model listing with these models.
+--- @param world table
+--- @param names table Installed model names.
+local function list_local_models(world, names)
+	local pending = world.local_gets[#world.local_gets]
+	assert(pending, "a model listing was asked for")
+	local models = {}
+	for index, name in ipairs(names) do models[index] = { name = name, model = name } end
+	pending.callback({ ok = true, status = 200, body = json.encode({ models = models }), headers = {} })
+end
+
 --- Builds the real pipeline around the faked boundaries.
 --- @return table world
 local function build_world()
 	local world = {
 		captures = {}, vision_posts = {}, local_posts = {}, text_posts = {},
 		notices = {}, loadings = 0, renders = {}, hides = 0,
+		-- The local server's model listings, the missing-model dialogs and the
+		-- downloads their button asked for
+		local_gets = {}, alerts = {}, installs = {},
 	}
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
@@ -174,6 +188,12 @@ local function build_world()
 			return true
 		end,
 	}
+	package.loaded["infra.dialog_util"] = {
+		block_alert = function(title, message, first, second)
+			world.alerts[#world.alerts + 1] = { title = title, message = message, buttons = { first, second } }
+			return first
+		end,
+	}
 	-- The screenshot boundary: the test completes each capture itself
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = {
 		capture_image = function(flags, parent, max_edge, on_image)
@@ -224,6 +244,15 @@ local function build_world()
 	local local_vision = get_upvalue(ollama.request_vision, "_vision_client")
 	assert(type(local_vision) == "table", "the local vision owner must be reachable")
 	local_vision.post = capture_into(world.local_posts)
+	local_vision.get = function(url, headers, callback)
+		world.local_gets[#world.local_gets + 1] = { url = url, headers = headers, callback = callback }
+		return true
+	end
+	local offer = require("modules.llm.local_model_offer")
+	offer.set_installer(function(model)
+		world.installs[#world.installs + 1] = model
+		return true
+	end)
 
 	local engine = require("modules.llm.prediction_engine")
 	world.engine = engine
@@ -400,6 +429,9 @@ helpers.describe("screen answers end to end (llm-vision)", function()
 		helpers.assert_eq(trigger(world, "llm_screen_region", "local"), true)
 		world.captures[1].on_image("image", IMAGE)
 		helpers.assert_eq(#world.vision_posts, 0, "no API provider is involved")
+		-- Only a model the local server lists is requested (ai-agent-local-model)
+		helpers.assert_eq(#world.local_posts, 0)
+		list_local_models(world, { CONFIG.default_models["local"] })
 		helpers.assert_eq(#world.local_posts, 1)
 		local post = world.local_posts[1]
 		helpers.assert_true(post.url:match("^http://127%.0%.0%.1:%d+/api/chat$") ~= nil, post.url)
@@ -408,6 +440,20 @@ helpers.describe("screen answers end to end (llm-vision)", function()
 		post.callback({ ok = true, status = 200, body = json.encode({ message = { content = "SCREEN: " .. SCREEN } }) })
 		helpers.assert_eq(#world.text_posts, 1, "the answers still run on the AI menu's backend")
 		assert_answer_request(world, 1)
+	end)
+
+	helpers.it("(ai-agent-local-model) names a missing local vision model and offers its download", function()
+		local world = build_world()
+		helpers.assert_eq(trigger(world, "llm_screen_region", "local"), true)
+		world.captures[1].on_image("image", IMAGE)
+		list_local_models(world, { "llama3.2:3b" })
+		helpers.assert_eq(#world.local_posts, 0, "the missing model is never requested")
+		helpers.assert_eq(#world.alerts, 1, "the missing model is named, with a button")
+		-- This world's i18n echoes keys; the agent's test reads the real wording
+		helpers.assert_eq(world.alerts[1].title, "llm.local_model.missing_title")
+		helpers.assert_eq(world.alerts[1].buttons[1], "menu.llm.btn_download")
+		helpers.assert_eq(world.installs[1], CONFIG.default_models["local"], "its Download button pulls it")
+		helpers.assert_eq(#world.text_posts, 0, "nothing is drafted")
 	end)
 
 	helpers.it("does nothing when the region selection is cancelled", function()

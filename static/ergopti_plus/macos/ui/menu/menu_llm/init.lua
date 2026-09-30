@@ -1691,8 +1691,17 @@ local function create_menu(deps)
 		-- The AI agent's top-level menu shares this menu's setting transaction: its
 		-- settings live in [llm] and are reset with the AI scope.
 		local function build_agent_item()
-				return AgentPanel.build({ state = state, settings_mgr = settings_mgr })
+				return AgentPanel.build({ state = state, settings_mgr = settings_mgr, update_menu = update_menu })
 		end
+		-- The local models the agent and the screen reading name are
+		-- downloaded by this menu's models manager, in its download window;
+		-- a completed download changes what the AI agent menu shows.
+		require("modules.llm.local_model_offer").set_installer(function(model, on_done)
+				return models_mgr.pull_ollama_model(model, function()
+						on_done(true)
+						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
+				end, function(reason) on_done(false, reason) end)
+		end)
 		-- The llm_agent_auto_toggle action persists the mode it switches to
 		-- through the same transaction as the menu.
 		require("modules.llm.agent_runner").set_mode_persister(function(mode)
