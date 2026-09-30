@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "तापमान",
 	"menu.shortcuts.alt_add": "[+ एक Alt+… शॉर्टकट जोड़ें]",
 	"menu.shortcuts.alt_group": "⎇ Alt शॉर्टकट",
-	"menu.shortcuts.altgr_symbol": "AltGr + प्रतीक",
+	"menu.shortcuts.selection_symbol": "चयन + प्रतीक",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ ChatGPT URL संपादित करें…",
 	"menu.shortcuts.ctrl_add": "[+ एक Ctrl+… शॉर्टकट जोड़ें]",
 	"menu.shortcuts.cmd_add": "[+ एक Cmd+… शॉर्टकट जोड़ें]",

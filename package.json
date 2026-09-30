@@ -282,6 +282,7 @@
 		"test:menu-first-group": "node ./tools/test/test-menu-first-group.cjs",
 		"test:native-menu-rows": "node ./tools/test/test-native-menu-rows.cjs",
 		"test:menu-unavailable-rows": "node ./tools/test/test-menu-unavailable-rows.cjs",
+		"test:shortcuts-wrap-group": "node ./tools/test/test-shortcuts-wrap-group.cjs",
 		"test:restore-recommended-no-confirm": "node ./tools/test/test-restore-recommended-no-confirm.cjs",
 		"test:approved-menu-labels": "node ./tools/test/test-approved-menu-labels.cjs",
 		"test:tap-hold-hold-options-parity": "node ./tools/test/test-tap-hold-hold-options-parity.cjs",

@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "Температура",
 	"menu.shortcuts.alt_add": "[+ Додати скорочення Alt+…]",
 	"menu.shortcuts.alt_group": "⎇ Скорочення Alt",
-	"menu.shortcuts.altgr_symbol": "AltGr + символ",
+	"menu.shortcuts.selection_symbol": "Виділення + символ",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ Змінити URL ChatGPT…",
 	"menu.shortcuts.ctrl_add": "[+ Додати скорочення Ctrl+…]",
 	"menu.shortcuts.cmd_add": "[+ Додати скорочення Cmd+…]",

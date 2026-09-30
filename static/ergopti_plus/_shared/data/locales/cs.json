@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "Teplota",
 	"menu.shortcuts.alt_add": "[+ Přidat zkratku Alt+…]",
 	"menu.shortcuts.alt_group": "⎇ Zkratky Alt",
-	"menu.shortcuts.altgr_symbol": "AltGr + symbol",
+	"menu.shortcuts.selection_symbol": "Výběr + symbol",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ Upravit URL ChatGPT…",
 	"menu.shortcuts.ctrl_add": "[+ Přidat zkratku Ctrl+…]",
 	"menu.shortcuts.cmd_add": "[+ Přidat zkratku Cmd+…]",

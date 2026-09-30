@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "Sıcaklık",
 	"menu.shortcuts.alt_add": "[+ Alt+… kısayolu ekle]",
 	"menu.shortcuts.alt_group": "⎇ Alt kısayolları",
-	"menu.shortcuts.altgr_symbol": "AltGr + sembol",
+	"menu.shortcuts.selection_symbol": "Seçim + sembol",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ ChatGPT URL'sini düzenle…",
 	"menu.shortcuts.ctrl_add": "[+ Ctrl+… kısayolu ekle]",
 	"menu.shortcuts.cmd_add": "[+ Cmd+… kısayolu ekle]",

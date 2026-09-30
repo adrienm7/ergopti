@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "温度",
 	"menu.shortcuts.alt_add": "[+ 添加 Alt+… 快捷键]",
 	"menu.shortcuts.alt_group": "⎇ Alt 快捷键",
-	"menu.shortcuts.altgr_symbol": "AltGr + 符号",
+	"menu.shortcuts.selection_symbol": "选中内容 + 符号",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ 编辑 ChatGPT URL…",
 	"menu.shortcuts.ctrl_add": "[+ 添加 Ctrl+… 快捷键]",
 	"menu.shortcuts.cmd_add": "[+ 添加 Cmd+… 快捷键]",

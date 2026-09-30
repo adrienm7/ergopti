@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "Temperatur",
 	"menu.shortcuts.alt_add": "[+ Alt+… Tastenkürzel hinzufügen]",
 	"menu.shortcuts.alt_group": "⎇ Alt-Tastenkürzel",
-	"menu.shortcuts.altgr_symbol": "AltGr + Symbol",
+	"menu.shortcuts.selection_symbol": "Auswahl + Symbol",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ ChatGPT-URL bearbeiten…",
 	"menu.shortcuts.ctrl_add": "[+ Ctrl+… Tastenkürzel hinzufügen]",
 	"menu.shortcuts.cmd_add": "[+ Cmd+… Tastenkürzel hinzufügen]",

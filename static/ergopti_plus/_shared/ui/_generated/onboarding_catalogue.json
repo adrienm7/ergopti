@@ -3091,7 +3091,7 @@
 									"recommended": true,
 									"label": [
 										{
-											"key": "menu.shortcuts.altgr_symbol"
+											"key": "menu.shortcuts.selection_symbol"
 										}
 									],
 									"value_label": [
