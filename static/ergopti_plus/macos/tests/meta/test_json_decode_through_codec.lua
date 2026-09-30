@@ -20,29 +20,29 @@
 local helpers = require("tests.helpers")
 local DRIVER_ROOT = helpers.driver_root()
 
--- Production files that still call hs.json.decode directly, with their count
--- of calls. Only ever lower these.
+-- Production modules that still call hs.json.decode directly, with their
+-- count of calls. Only ever lower these.
 local DIRECT_DECODE_BASELINE = {
-	["adapters/json_codec.lua"]                         = 1,
-	["infra/locale.lua"]                                = 1,
-	["infra/manifest_menu.lua"]                         = 1,
-	["infra/personal_hotstrings.lua"]                   = 1,
-	["infra/vscode_bridge.lua"]                         = 1,
-	["modules/gestures/actions.lua"]                    = 1,
-	["modules/keylogger/aggregator/core.lua"]           = 1,
-	["modules/keymap/registry.lua"]                     = 1,
-	["modules/llm/api_common.lua"]                      = 1,
-	["modules/llm/api_mlx.lua"]                         = 1,
-	["modules/llm/init.lua"]                            = 2,
-	["modules/shortcuts/actions/text.lua"]              = 1,
-	["modules/shortcuts/keyboard_shortcuts.lua"]        = 1,
-	["ui/changelog/init.lua"]                           = 1,
-	["ui/console_window.lua"]                           = 1,
-	["ui/menu/menu_llm/models_manager.lua"]             = 1,
-	["ui/menu/menu_llm/models_manager_mlx_download.lua"] = 2,
-	["ui/menu/menu_llm/models_manager_mlx_server.lua"]  = 1,
-	["ui/menu/menu_llm/startup_controller.lua"]         = 1,
-	["ui/ui_builder.lua"]                               = 1,
+	["adapters.json_codec"]                          = 1,
+	["infra.locale"]                                 = 1,
+	["infra.manifest_menu"]                          = 1,
+	["infra.personal_hotstrings"]                    = 1,
+	["infra.vscode_bridge"]                          = 1,
+	["modules.gestures.actions"]                     = 1,
+	["modules.keylogger.aggregator.core"]            = 1,
+	["modules.keymap.registry"]                      = 1,
+	["modules.llm.api_common"]                       = 1,
+	["modules.llm.api_mlx"]                          = 1,
+	["modules.llm"]                                  = 2,
+	["modules.shortcuts.actions.text"]               = 1,
+	["modules.shortcuts.keyboard_shortcuts"]         = 1,
+	["ui.changelog"]                                 = 1,
+	["ui.console_window"]                            = 1,
+	["ui.menu.menu_llm.models_manager"]              = 1,
+	["ui.menu.menu_llm.models_manager_mlx_download"] = 2,
+	["ui.menu.menu_llm.models_manager_mlx_server"]   = 1,
+	["ui.menu.menu_llm.startup_controller"]          = 1,
+	["ui.ui_builder"]                                = 1,
 }
 
 --- Lists production Lua files recursively without relying on LuaFileSystem.
@@ -101,17 +101,18 @@ helpers.describe("JSON decoding goes through the codec (json-shared-tables)", fu
 			if not relative:find("^tests/") and not relative:find("^vendor/") then
 				local count = count_direct_decodes(read_file(path) or "")
 				if count > 0 then
-					found[relative] = count
-					if count ~= DIRECT_DECODE_BASELINE[relative] then
+					local module = relative:gsub("%.lua$", ""):gsub("/", "."):gsub("%.init$", "")
+					found[module] = count
+					if count ~= DIRECT_DECODE_BASELINE[module] then
 						drift[#drift + 1] = string.format("%s: %d call(s), baseline %s",
-							relative, count, tostring(DIRECT_DECODE_BASELINE[relative]))
+							module, count, tostring(DIRECT_DECODE_BASELINE[module]))
 					end
 				end
 			end
 		end
-		for relative, count in pairs(DIRECT_DECODE_BASELINE) do
-			if not found[relative] then
-				drift[#drift + 1] = string.format("%s: 0 call(s), baseline %d — lower the baseline", relative, count)
+		for module, count in pairs(DIRECT_DECODE_BASELINE) do
+			if not found[module] then
+				drift[#drift + 1] = string.format("%s: 0 call(s), baseline %d — lower the baseline", module, count)
 			end
 		end
 		table.sort(drift)
