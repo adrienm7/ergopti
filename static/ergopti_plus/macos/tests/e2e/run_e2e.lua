@@ -712,12 +712,31 @@ for _, v in ipairs(corpus_or_err) do
 	run_corpus_vector(v)
 end
 
+-- The REAL init.lua of an installed application copy, booted over each user
+-- state that decides what a boot does (tests/e2e/boot/boot_scenarios.lua):
+-- no ERROR, no dialog, no write or user-data read inside the bundle.
+print("\n--- Installed-application boot scenarios ---")
+dofile(driver_root .. "/tests/e2e/boot/boot_scenarios.lua").run({
+	pass = function(label)
+		pass_count = pass_count + 1
+		print(string.format("  PASS  %s", label))
+	end,
+	fail = function(label, expected, actual)
+		fail_count = fail_count + 1
+		print(string.format("  FAIL  %s  expected=%s\n        %s", label, tostring(expected), tostring(actual)))
+	end,
+	skip = function(label)
+		skip_count = skip_count + 1
+		print(string.format("  SKIP  %s", label))
+	end,
+}, { driver = driver_root, interpreter = arg and arg[-1] or "lua" })
+
 -- Final summary.
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))
 print(string.format("# pass %d / %d", pass_count, total))
 if skip_count > 0 then
-	print(string.format("# skip %d driver-specific vector(s)", skip_count))
+	print(string.format("# skip %d driver-specific vector(s) or host-specific scenario(s)", skip_count))
 end
 if fail_count > 0 then
 	print(string.format("# FAIL %d test(s) failed.", fail_count))
