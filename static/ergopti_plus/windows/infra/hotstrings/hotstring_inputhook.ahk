@@ -1941,9 +1941,11 @@ HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken) {
 }
 
 ; Dispatch callback. Registered Specs match by object identity; transient
-; repeat/personal fallbacks are recreated on every probe, so they match by their
-; engine-owned kind + trigger. Exact completed-buffer and end-char equality
-; prevents an old visible row from donating its frozen dynamic value elsewhere.
+; fallbacks are recreated on every probe, so they match by their engine-owned
+; kind + trigger. Only the personal combo is ever visible: a repeat is never
+; published (_PrefixDecisionIsDoubling), so its dispatch prepares a fresh
+; decision. Exact completed-buffer and end-char equality prevents an old
+; visible row from donating its frozen dynamic value elsewhere.
 HotstringPrefixWatcherClaimVisibleDecision(Spec, EndChar, BufferAfterCompletion) {
 	global _PrefixVisibleFireDecisions
 	if !IsObject(Spec) or !IsObject(_PrefixVisibleFireDecisions)
@@ -2263,9 +2265,21 @@ _PrefixDecisionCategory(Spec) {
 		return Spec.Category
 	if Spec.HasOwnProp("PreviewFields")
 		return "personal"
-	if (Spec.HasOwnProp("IsRepeat") and Spec.IsRepeat)
-		return "magickey"
 	return ""
+}
+
+; Whether an engine decision doubles the character before the magic key. The
+; bubble never offers one (no-repeat-preview): the repeat fallback can double
+; almost every letter that is not the first of its word, so its row sat on
+; nearly every keystroke and buried the expansions worth announcing. IsRepeat is
+; the engine's own marker for the whole class, set by the transient fallback
+; (HSE_TryRepeatKey) and by any Spec registered with the IsRepeat option, so no
+; replacement text is inspected here. The engine still fires the doubling when
+; the magic key is pressed; only the advance notice is withheld.
+_PrefixDecisionIsDoubling(Decision) {
+	return (IsObject(Decision) and Decision.HasOwnProp("Spec")
+		and IsObject(Decision.Spec) and Decision.Spec.HasOwnProp("IsRepeat")
+		and Decision.Spec.IsRepeat) ? true : false
 }
 
 _PrefixCandidateFromDecision(Decision, ContentGeneration,
@@ -2306,6 +2320,8 @@ _PrefixCandidateFromDecision(Decision, ContentGeneration,
 ; old collector walked a second file-derived index, ranked its own candidate
 ; union, then asked the matcher whether the chosen row happened to be valid.
 ; That could never discover a different live winner or a same-trigger reload.
+; A doubling winner is withheld rather than replaced: the engine's answer stays
+; the only candidate for its completion key, so no lower row can take its place.
 _PrefixCollectCandidates(ContentGeneration := unset,
 		InputContextGeneration := unset) {
 	global HSE_Buffer, HSE_WORD_TERMINATORS, ScriptInformation
@@ -2321,20 +2337,24 @@ _PrefixCollectCandidates(ContentGeneration := unset,
 	EndCompletion := SubStr(HSE_WORD_TERMINATORS, 1, 1)
 	if EndCompletion != "" {
 		EndDecision := HSE_PreviewNextDecision(HSE_Buffer, EndCompletion)
-		EndCandidate := _PrefixCandidateFromDecision(EndDecision,
-			ContentGeneration, InputContextGeneration)
-		if IsObject(EndCandidate)
-			Candidates.Push(EndCandidate)
+		if !_PrefixDecisionIsDoubling(EndDecision) {
+			EndCandidate := _PrefixCandidateFromDecision(EndDecision,
+				ContentGeneration, InputContextGeneration)
+			if IsObject(EndCandidate)
+				Candidates.Push(EndCandidate)
+		}
 	}
 
 	MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
 		? ScriptInformation["MagicKey"] : ""
 	if MagicKey != "" and MagicKey !== EndCompletion {
 		MagicDecision := HSE_PreviewNextDecision(HSE_Buffer, MagicKey)
-		MagicCandidate := _PrefixCandidateFromDecision(MagicDecision,
-			ContentGeneration, InputContextGeneration)
-		if IsObject(MagicCandidate)
-			Candidates.Push(MagicCandidate)
+		if !_PrefixDecisionIsDoubling(MagicDecision) {
+			MagicCandidate := _PrefixCandidateFromDecision(MagicDecision,
+				ContentGeneration, InputContextGeneration)
+			if IsObject(MagicCandidate)
+				Candidates.Push(MagicCandidate)
+		}
 	}
 	return Candidates
 }

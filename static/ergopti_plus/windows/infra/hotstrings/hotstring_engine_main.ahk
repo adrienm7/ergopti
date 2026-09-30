@@ -980,6 +980,10 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 ; that replaced the now-removed [[repeat]] TOML entries — it fires only when no
 ; registered hotstring already claimed the <x><MagicKey> sequence.
 ;
+; HSE_PreviewNextDecision still reports it, so the oracle stays the truth about
+; what the magic key fires, but the bubble never offers it: IsRepeat is what
+; _PrefixDecisionIsDoubling reads to withhold the row (no-repeat-preview).
+;
 ; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {

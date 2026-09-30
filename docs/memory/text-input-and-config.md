@@ -123,6 +123,17 @@ already-loaded hotstring cache rows rather than reparsing disk.
 Preview/search indexes are derived only from canonical source files. Runtime
 caches must not become an additional content source.
 
+### project-the-bubble-never-offers-a-doubling
+
+The maintainer ruled that no driver previews the magic key's doubling (the
+repeat fallback, `x★` → `xx`): it is available after almost every mid-word
+letter, so its row was constant noise. It still fires. Windows keeps it in
+`HSE_PreviewNextDecision`, so no lower candidate is promoted in its place, and
+`_PrefixCollectCandidates` withholds any decision whose Spec carries
+`IsRepeat`. macOS and Linux preview only registry mappings, and the doubling
+is an engine fallback outside the registry: never fold it into their preview.
+`repeat_corrections` entries (ê → u after a doubled letter) are not doublings.
+
 ### project-a-driver-that-types-also-types-into-its-own-keylogger
 
 Synthetic text can re-enter metrics and preview hooks. Filter by owned provenance
