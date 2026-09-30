@@ -211,8 +211,12 @@ engine can remap — the Windows `platform/remap/*.ahk` hotkeys, macOS
 refuses at load. Keep it one multi-line inline-table array under a
 single-bracket header: the Windows narrow tap-hold parser recognises only
 `[x]` headers, so the lines after a `[[x]]` header would land in the previous
-`[tap_hold.keys.*]` section. Action: add a key to the catalogue and to its
-engine in the same change.
+`[tap_hold.keys.*]` section. The first-run wizard's Tap-Holds page lists each
+engine's recommended keys from this table; their answers
+(`tap_holds.keys.<id>`, marked `tap_hold_key`) are no configuration paths, and
+each host hands the checked keys to its own tap-hold writer, never to
+config.toml. Action: add a key to the catalogue and to its engine in the same
+change, and keep every manifest path out of `tap_holds.keys`.
 
 ### project-key-combinations-have-their-own-gate
 
