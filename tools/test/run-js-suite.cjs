@@ -2034,7 +2034,7 @@ const CHECKS = [
 		repro: 'node tools/test/test-hardening-f-ahk-meta-counts.cjs'
 	},
 	{
-		name: 'every dialog that reports a fixable state offers its fix as a button (hardening-g)',
+		name: 'every dialog or notice that reports a fixable state offers its fix as an action (hardening-g)',
 		cmd: 'node',
 		args: ['tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs'],
 		repro: 'node tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs'
