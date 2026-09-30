@@ -2016,6 +2016,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs'
 	},
 	{
+		name: 'every Windows meta test census the Linux lane can recompute matches the driver source (hardening-f)',
+		cmd: 'node',
+		args: ['tools/test/test-hardening-f-ahk-meta-counts.cjs'],
+		repro: 'node tools/test/test-hardening-f-ahk-meta-counts.cjs'
+	},
+	{
 		name: 'tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)',
 		cmd: 'node',
 		args: ['tools/test/find-false-greens.cjs'],
