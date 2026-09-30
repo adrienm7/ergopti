@@ -112,6 +112,32 @@ local function judge(output, action, wizard)
 	return problems, facts
 end
 
+--- The keys the shipped recommended layer binds on one OS: its `all` table
+--- and that OS's table (_shared/keymap/layers.recommended.toml).
+--- @param shared string The _shared folder.
+--- @param os_name string "macos" or "linux".
+--- @return integer keys
+local function recommended_layer_keys(shared, os_name)
+	local fh = assert(io.open(shared .. "/keymap/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
+	local keys, count, scope = {}, 0, nil
+	for line in fh:lines() do
+		local header = line:match("^%[layers%.[%w_]+%.([%w_]+)%]")
+		if header then
+			scope = header
+		elseif line:match("^%[") then
+			scope = nil
+		elseif scope == "all" or scope == os_name then
+			local key = line:match('^"([^"]+)"%s*=')
+			if key and not keys[key] then
+				keys[key] = true
+				count = count + 1
+			end
+		end
+	end
+	fh:close()
+	return count
+end
+
 --- Runs every scenario through `check`.
 --- @param check table { pass(label), fail(label, expected, actual), skip(label) }
 --- @param options table { driver, interpreter }
@@ -162,14 +188,18 @@ function M.run(check, options)
 				table.concat(problems, "\n        ", 1, math.min(#problems, 12)))
 		end
 		if scenario.recommended then
+			-- Every key the preset binds on Linux is bound; the layer was empty
+			-- before db71c39bf.
 			local bindings = tonumber(facts.nav_layer_bindings) or 0
 			local keys = tonumber(facts.nav_layer_keys) or 0
-			if bindings > 0 and keys > 0 then
+			local preset_keys = recommended_layer_keys(options.driver .. "/../_shared", "linux")
+			if bindings >= preset_keys and preset_keys > 0 and keys > 0 then
 				check.pass(string.format("hardening-e-presets: the recommended navigation layer binds %d key(s) "
-					.. "and %d tap-hold key(s) enter it", bindings, keys))
+					.. "of %d in the preset and %d tap-hold key(s) enter it", bindings, preset_keys, keys))
 			else
 				check.fail("hardening-e-presets: the recommended navigation layer is bound and entered",
-					"bindings > 0 and an entering key", string.format("%d bindings, %d entering", bindings, keys))
+					string.format("%d bindings and an entering key", preset_keys),
+					string.format("%d bindings, %d entering", bindings, keys))
 			end
 		end
 	end
