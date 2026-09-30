@@ -353,6 +353,12 @@ These are software implementations; final hardware verification remains below.
         of 13 assets, and published releases are immutable. Create the
         release as a draft, verify every expected asset by name (re-upload a
         missing one), then publish; fail the job if one is still missing.
+46. [ ] The AI agent and screen reading on Windows and Linux still send a local
+        model Ollama may not have pulled (default qwen2.5:7b, vision
+        qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags,
+        names the missing model and offers its download
+        (`ai-agent-local-model`). Each driver needs its own model listing and
+        a hook into its models manager; the seven locale keys are shared.
 
 ## Time estimate
 
