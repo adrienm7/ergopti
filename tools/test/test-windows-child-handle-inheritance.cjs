@@ -7,14 +7,17 @@
  * The Windows driver launches its children with inherited standard streams,
  * which only the AHK suite can execute, on Windows CI. This gate checks from
  * the sources, anywhere, what keeps a task's capture file private to its own
- * process tree (shell-capture-lock):
+ * process tree and its cleanup quiet (shell-capture-lock):
  *
  * 1. Every CreateProcessW that inherits handles is inventoried: the shell
  *    runner's launch names its two streams in a PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
  *    and any other inheriting launch is an audited entry of INHERITING_LAUNCHES.
  * 2. The shell runner opens, passes and closes those inheritable streams inside
  *    one Critical window, so no other driver thread can launch in between.
- * 3. The AHK regression test is registered in run_all.ahk.
+ * 3. Every capture removal goes through _SR_CaptureRemove, whose refusals by a
+ *    foreign handle are retried, bounded and handed to the next start's sweep
+ *    instead of being logged as an ERROR and forgotten.
+ * 4. The AHK regression test is registered in run_all.ahk.
  *
  * ROOT CAUSE ENCODED:
  * CreateProcessW with bInheritHandles and no handle list copies every
@@ -22,8 +25,9 @@
  * that started another task while a task's capture handle was open (the launch
  * ran outside Critical) gave that capture to an unrelated, possibly
  * session-long child. Once the task's own tree had exited, that copy, opened
- * without FILE_SHARE_DELETE, made DeleteFileW fail with ERROR_SHARING_VIOLATION
- * (the error window on opening the versions window).
+ * without FILE_SHARE_DELETE, made DeleteFileW fail with ERROR_SHARING_VIOLATION,
+ * and the adapter reported it as an ERROR (the error window on opening the
+ * versions window).
  * ==============================================================================
  */
 
@@ -228,7 +232,83 @@ check(
 	'_SR_DeleteInheritedHandleList must release the attribute list'
 );
 
-// 3. The behavioural regression runs in the AHK suite.
+// 3. One capture-removal owner, whose foreign-handle refusals are not errors.
+check(
+	!/\b(?:FileDelete|DirDelete)\(/.test(runner),
+	'shell_runner.ahk must remove captures through _SR_CaptureRemove, never FileDelete or DirDelete'
+);
+const remove = bodyOf(runner, '_SR_CaptureRemove');
+check(
+	/DeleteFileW[\s\S]*RemoveDirectoryW/.test(remove) &&
+		(runner.match(/"Kernel32\\(?:DeleteFileW|RemoveDirectoryW)"/g) || []).length === 2,
+	'the DeleteFileW and RemoveDirectoryW calls of the adapter must live in _SR_CaptureRemove only'
+);
+check(
+	remove.includes('return delete_error') &&
+		remove.includes('return directory_error') &&
+		/SR_ERROR_SHARING_VIOLATION/.test(remove),
+	'_SR_CaptureRemove must return a sharing refusal to its owner instead of throwing it'
+);
+for (const [name, value] of [
+	['SR_ERROR_SHARING_VIOLATION', '32'],
+	['SR_ERROR_LOCK_VIOLATION', '33'],
+	['SR_ERROR_DIR_NOT_EMPTY', '145']
+])
+	check(constant(name) === value, `${name} is Win32 ${value}`);
+const removeCallers = new Set();
+// Calls only: the definition is the one occurrence at column 0.
+for (const match of runner.matchAll(/(?<!^)_SR_CaptureRemove\(/gm)) {
+	const before = runner.slice(0, match.index);
+	const owner = [...before.matchAll(/^([A-Za-z_][A-Za-z0-9_]*)\(/gm)].pop();
+	if (owner) removeCallers.add(owner[1]);
+}
+check(
+	JSON.stringify([...removeCallers].sort()) ===
+		JSON.stringify(
+			[
+				'ShellRunner_Exec',
+				'_SR_CaptureSweepStale',
+				'_SR_LegacyCleanupCaptureDirectory',
+				'_SR_TreeCleanupCapture'
+			].sort()
+		),
+	`every capture owner must remove through _SR_CaptureRemove, found ${[...removeCallers].join(', ')}`
+);
+const settle = bodyOf(runner, '_SR_CaptureSettle');
+check(
+	settle.includes('SR_CAPTURE_LOCK_BUDGET_MS') &&
+		settle.includes('_SR_LogAt("Warn"') &&
+		!settle.includes('_SR_LogError('),
+	'_SR_CaptureSettle must bound the retry and warn once, never log a held capture as an error'
+);
+check(
+	bodyOf(runner, '_SR_LegacyCleanupCaptureDirectory').includes('_SR_CaptureSettle(') &&
+		bodyOf(runner, '_SR_TreeCleanupCapture').includes('_SR_CaptureSettle('),
+	'the legacy and tree-owned owners must share one settlement policy'
+);
+const finish = bodyOf(runner, '_SR_TreeFinishClaim');
+const read_ = finish.indexOf('FileRead(');
+const cleanup = finish.indexOf('_SR_TreeCleanupCapture(Claim, DeleteFn)');
+check(
+	read_ > 0 && cleanup > read_ && finish.indexOf('_SR_CompletionQueue(') > cleanup,
+	'_SR_TreeFinishClaim must read, then hand removal to _SR_TreeCleanupCapture, then queue the completion'
+);
+const poll = bodyOf(runner, '_SR_TreePoll');
+check(
+	poll.indexOf('_SR_TreeDrainCaptureDebts()') > 0 &&
+		poll.indexOf('_SR_TreeDrainCaptureDebts()') < poll.indexOf('A_IsSuspended') &&
+		/_SR_TreeNativeDebts\.Count = 0\s*&& _SR_TreeCaptureDebts\.Count = 0/.test(poll),
+	'_SR_TreePoll must retry held captures and stay armed while one is owned'
+);
+const acquire = bodyOf(runner, '_SR_AcquireCaptureDirectory');
+check(
+	acquire.includes('_SR_CaptureSweepStale(A_Temp, OwnerPid)') &&
+		acquire.includes('SR_CAPTURE_DIR_PREFIX') &&
+		bodyOf(runner, '_SR_CaptureSweepStale').includes('SR_CAPTURE_DIR_PREFIX'),
+	'capture folders and their sweep must share SR_CAPTURE_DIR_PREFIX, the sweep running once per process'
+);
+
+// 4. The behavioural regression runs in the AHK suite.
 const testFile = 'tests/unit/test_shell_runner_capture_lock.ahk';
 check(
 	/^#Include unit\/test_shell_runner_capture_lock\.ahk\s*$/m.test(read('tests/run_all.ahk')),

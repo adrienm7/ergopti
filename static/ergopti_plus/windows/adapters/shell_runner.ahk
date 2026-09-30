@@ -20,7 +20,9 @@
 ;    terminate() returns true only after ActiveProcesses reaches zero.
 ; 4. All Run/RunWait invocations are wrapped in try/catch so a launch failure
 ;    never propagates to the caller as an unhandled exception.
-; 5. A child inherits its own standard streams and nothing else.
+; 5. A child inherits its own standard streams and nothing else, and a capture
+;    that another process still holds once its task has ended is retried, then
+;    left to the next process's sweep, never reported as an error.
 ;
 ; SYMMETRY NOTE:
 ; This adapter mirrors macos/adapters/shell_runner.lua (Hammerspoon). The surface
@@ -115,6 +117,26 @@ global SR_PROC_THREAD_ATTRIBUTE_HANDLE_LIST := 0x00020002
 global SR_STARTUPINFO_BYTES := (A_PtrSize = 8) ? 104 : 68
 global SR_ERROR_INSUFFICIENT_BUFFER := 122
 
+; Refusals that another process's open handle causes, which clear when that
+; handle closes: a sharing or lock violation on the capture file, and its folder
+; held open or still listing a delete-pending file. A scanner such as Windows
+; Defender opens a file its writer has just closed, so a capture can stay locked
+; for a moment after its whole tree has exited; any other refusal is a failure.
+global SR_ERROR_SHARING_VIOLATION := 32
+global SR_ERROR_LOCK_VIOLATION := 33
+global SR_ERROR_DIR_NOT_EMPTY := 145
+; A capture still locked after this long is left, with one warning, to the sweep
+; of the next process, so a stuck foreign handle cannot keep the pollers armed or
+; refuse legacy launches for the rest of the session.
+global SR_CAPTURE_LOCK_BUDGET_MS := 5000
+; Private capture folders are A_Temp\<prefix><owner PID>_<serial>; the sweep
+; recognises a folder whose owner has exited by this same name.
+global SR_CAPTURE_DIR_PREFIX := "ergopti_sr_capture_"
+; Finished tree-owned claims whose capture a foreign handle still locks
+global _SR_TreeCaptureDebts := Map()
+; The first capture allocation of a process sweeps its dead predecessors' folders
+global _SR_CaptureSweepDone := false
+
 
 ; ShellRunner is deliberately valid as an isolated adapter file.  The normal
 ; driver includes logger.ahk before it, but direct /validate with #Warn must not
@@ -131,6 +153,18 @@ global SR_ERROR_INSUFFICIENT_BUFFER := 122
 _SR_LogError(FormatString, Args*) {
 	try {
 		LoggerFn := %"LoggerError"%
+		LoggerFn.Call("adapters.shell_runner", FormatString, Args*)
+	} catch as Err {
+		try OutputDebug("[adapters.shell_runner] " . Format(FormatString, Args*))
+	}
+}
+
+; The same dynamic logger resolution for the other levels. Level is the logger
+; function suffix ("Debug", "Info", "Warn").
+_SR_LogAt(Level, FormatString, Args*) {
+	try {
+		LoggerName := "Logger" . Level
+		LoggerFn := %LoggerName%
 		LoggerFn.Call("adapters.shell_runner", FormatString, Args*)
 	} catch as Err {
 		try OutputDebug("[adapters.shell_runner] " . Format(FormatString, Args*))
@@ -248,13 +282,16 @@ ShellRunner_Exec(Cmd) {
 			try Result := FileRead(TmpFile)
 			catch as Err
 				_SR_LogError("exec() capture read failed: {1}", Err.Message)
-			try FileDelete(TmpFile)
-			catch as Err
-				_SR_LogError("exec() capture deletion failed: {1}", Err.Message)
 		}
-		try DirDelete(RTrim(CaptureDir, "\\"))
-		catch as Err
-			_SR_LogError("exec() capture directory cleanup failed: {1}", Err.Message)
+		; RunWait returns on cmd.exe's exit alone; a foreign handle that outlives
+		; it leaves the folder to the next process's sweep.
+		try {
+			Refusal := _SR_CaptureRemove(Map("TmpFile", TmpFile, "CaptureDir", CaptureDir))
+			if Refusal
+				_SR_LogAt("Warn", "exec() capture is still locked by another process (Win32 {1}); the next start's sweep removes it.",
+					Refusal)
+		} catch as Err
+			_SR_LogError("exec() capture cleanup failed: {1}", Err.Message)
 	}
 
 	return Trim(Result, "`r`n")
@@ -1005,24 +1042,20 @@ _SR_CompletionDrain() {
 		_SR_CompletionDispatch(claim)
 }
 
-_SR_LegacyCleanupCaptureDirectory(Claim) {
-	try {
-		for operation, capture_path in Map("DeleteFileW", Claim["TmpFile"],
-			"RemoveDirectoryW", Claim.Get("CaptureDir", "")) {
-			if capture_path = ""
-				continue
-			if !DllCall("Kernel32\" . operation, "WStr", capture_path, "Int") {
-				local native_error := A_LastError
-				if native_error != SR_ERROR_FILE_NOT_FOUND && native_error != SR_ERROR_PATH_NOT_FOUND
-					throw Error(operation . " failed (Win32 " . native_error . ").")
-			}
-		}
-		Claim["CapturePending"] := false
-		return true
-	} catch as Err {
+; A foreign handle's refusal keeps CapturePending for the poller to retry until
+; the lock budget hands the folder to the next process's sweep; any other
+; refusal is retained as an error, as before.
+_SR_LegacyCleanupCaptureDirectory(Claim, DeleteFn := 0) {
+	local refusal := 0
+	try refusal := _SR_CaptureRemove(Claim, DeleteFn)
+	catch as Err {
 		_SR_LegacyCleanupError(Claim, "capture", Err.Message)
 		return false
 	}
+	if _SR_CaptureSettle(Claim, refusal, "Legacy task " . Claim["TaskId"]) = "retry"
+		return false
+	Claim["CapturePending"] := false
+	return true
 }
 
 ; Legacy callers own the root PID, not a kill-on-close job. Reuse the native
@@ -1093,11 +1126,15 @@ _SR_BuildDirectCommandLine(Executable, Args) {
 }
 
 _SR_AcquireCaptureDirectory() {
-	global _SR_CaptureSerial
+	global _SR_CaptureSerial, _SR_CaptureSweepDone
 	OwnerPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+	if !_SR_CaptureSweepDone {
+		_SR_CaptureSweepDone := true
+		_SR_CaptureSweepStale(A_Temp, OwnerPid)
+	}
 	loop 128 {
 		_SR_CaptureSerial += 1
-		Candidate := A_Temp . "\ergopti_sr_capture_" . OwnerPid . "_"
+		Candidate := A_Temp . "\" . SR_CAPTURE_DIR_PREFIX . OwnerPid . "_"
 			. _SR_CaptureSerial
 		if DllCall("Kernel32\CreateDirectoryW", "Str", Candidate, "Ptr", 0, "Int")
 			return Candidate . "\"
@@ -2074,8 +2111,10 @@ _SR_TreeRecordQuiesced(State, Claim) {
 }
 
 ; Filesystem capture and callbacks are intentionally separated from the native
-; ownership fence so neither can run while Critical.
-_SR_TreeFinishClaim(Claim, ReadFn := 0) {
+; ownership fence so neither can run while Critical. The capture is read, then
+; removed; a foreign handle that still locks it defers only the removal, never
+; the completion (DeleteFn is a regression seam for DeleteFileW).
+_SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 	if !IsObject(Claim)
 		return false
 	_SR_TreeLogNativeDebt(Claim)
@@ -2103,16 +2142,7 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0) {
 			_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
 				Claim["TaskId"], Err.Message)
 		} finally {
-			try {
-				if tmp_file != "" && FileExist(tmp_file)
-					FileDelete(tmp_file)
-				local capture_dir := Claim.Get("CaptureDir", "")
-				if capture_dir != "" && DirExist(capture_dir)
-					DirDelete(RTrim(capture_dir, "\\"))
-			} catch as Err {
-				_SR_LogError("tree-owned task {1} output deletion failed: {2}",
-					Claim["TaskId"], Err.Message)
-			}
+			_SR_TreeCleanupCapture(Claim, DeleteFn)
 		}
 		_SR_CompletionQueue(Claim, Claim["ExitCode"], stdout, "")
 	} finally {
@@ -2120,6 +2150,58 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0) {
 	}
 	_SR_CompletionDispatch(Claim)
 	return true
+}
+
+; Removes a finished task's capture. A refusal that another process's handle
+; explains keeps the claim as capture debt, retried by the tree poller until
+; the lock budget hands the folder to the next process's sweep; any other
+; refusal is an error. Returns true once this process owns nothing of it.
+_SR_TreeCleanupCapture(Claim, DeleteFn := 0) {
+	local refusal := 0
+	try refusal := _SR_CaptureRemove(Claim, DeleteFn)
+	catch as Err {
+		_SR_TreeSetCaptureDebt(Claim, false)
+		_SR_LogError("tree-owned task {1} output deletion failed: {2}",
+			Claim["TaskId"], Err.Message)
+		return true
+	}
+	local outcome := _SR_CaptureSettle(Claim, refusal, "Tree-owned task " . Claim["TaskId"])
+	_SR_TreeSetCaptureDebt(Claim, outcome = "retry")
+	return outcome != "retry"
+}
+
+; Publishes or retires the exact claim as capture debt; a retained debt keeps
+; the tree poller armed, published first so the next tick can reach it.
+_SR_TreeSetCaptureDebt(Claim, Pending) {
+	local previous_critical := Critical("On")
+	try {
+		local identity := ObjPtr(Claim)
+		if Pending
+			_SR_TreeCaptureDebts[identity] := Claim
+		else if _SR_TreeCaptureDebts.Has(identity)
+			_SR_TreeCaptureDebts.Delete(identity)
+	} finally {
+		Critical(previous_critical)
+	}
+	if !Pending
+		return
+	; Completion never depends on the retry timer; any later poll still drains it
+	try _SR_TreeEnsurePoller()
+	catch as Err
+		_SR_LogError("tree-owned task {1} capture retry timer failed: {2}",
+			Claim["TaskId"], Err.Message)
+}
+
+; Retries every retained capture; each retry runs the same one-shot settlement
+_SR_TreeDrainCaptureDebts(DeleteFn := 0) {
+	local previous_critical := Critical("On")
+	local snapshot := 0
+	try snapshot := _SR_TreeCaptureDebts.Clone()
+	finally Critical(previous_critical)
+	for identity, claim in snapshot {
+		if _SR_TreeCaptureDebts.Has(identity)
+			_SR_TreeCleanupCapture(claim, DeleteFn)
+	}
 }
 
 ; Caller owns Critical. Applying the timer before publishing its logical flag
@@ -2154,11 +2236,13 @@ _SR_TreeEnsurePoller(ApplyTimer := 0) {
 ; keep a completed task alive or make teardown target an unrelated process.
 _SR_TreePoll(ApplyTimer := 0) {
 	_SR_TreeDrainNativeDebts()
+	_SR_TreeDrainCaptureDebts()
 	_SR_CompletionDrain()
 	local snapshot := 0
 	local previous_critical := Critical("On")
 	try {
-		if _SR_TreeOwnedTasks.Count = 0 && _SR_TreeNativeDebts.Count = 0 {
+		if _SR_TreeOwnedTasks.Count = 0 && _SR_TreeNativeDebts.Count = 0
+			&& _SR_TreeCaptureDebts.Count = 0 {
 			_SR_TreeSetPollerRunningLocked(false, ApplyTimer)
 			return
 		} else if A_IsSuspended {
@@ -2490,4 +2574,121 @@ _SR_LegacyDrainReleases() {
 			released := false
 	}
 	return released
+}
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 3.3) Capture cleanup =======
+; ====================================
+; ====================================
+
+; Deletes a capture file, then its private folder. Returns 0 once both are gone
+; (already absent counts), or the Win32 code of a refusal another process's
+; handle explains, for the caller to retry; any other refusal throws. Capture
+; is a Map holding "TmpFile" and "CaptureDir" ("" skips either); it records the
+; file's removal, as a retry would otherwise reopen a delete-pending file and
+; read ERROR_ACCESS_DENIED. DeleteFn replaces DeleteFileW in regression tests.
+_SR_CaptureRemove(Capture, DeleteFn := 0) {
+	local tmp_file := Capture["TmpFile"]
+	if tmp_file != "" && !Capture.Get("CaptureFileRemoved", false) {
+		local deleted := IsObject(DeleteFn) ? DeleteFn.Call(tmp_file)
+			: DllCall("Kernel32\DeleteFileW", "WStr", tmp_file, "Int")
+		if !deleted {
+			local delete_error := A_LastError
+			if delete_error = SR_ERROR_SHARING_VIOLATION || delete_error = SR_ERROR_LOCK_VIOLATION
+				return delete_error
+			if delete_error != SR_ERROR_FILE_NOT_FOUND && delete_error != SR_ERROR_PATH_NOT_FOUND
+				throw Error("DeleteFileW failed (Win32 " . delete_error . ").")
+		}
+		Capture["CaptureFileRemoved"] := true
+	}
+	local capture_dir := Capture.Get("CaptureDir", "")
+	if capture_dir != "" && !DllCall("Kernel32\RemoveDirectoryW", "WStr", capture_dir, "Int") {
+		local directory_error := A_LastError
+		if directory_error = SR_ERROR_SHARING_VIOLATION || directory_error = SR_ERROR_DIR_NOT_EMPTY
+			return directory_error
+		if directory_error != SR_ERROR_FILE_NOT_FOUND && directory_error != SR_ERROR_PATH_NOT_FOUND
+			throw Error("RemoveDirectoryW failed (Win32 " . directory_error . ").")
+	}
+	return 0
+}
+
+; Settles one removal attempt on the claim that owns the capture: "done" once
+; removed, "retry" while another process's handle refuses it within
+; SR_CAPTURE_LOCK_BUDGET_MS, "abandoned" once that budget is spent. A scanner
+; holding a just-closed file is expected, so the first refusal and a later
+; removal are DEBUG. A lock outliving the budget is WARN, once: the next
+; process's sweep recovers the folder, but a handle held that long needs a look.
+; ERROR stays for the refusals no foreign handle explains.
+_SR_CaptureSettle(Claim, Refusal, Owner) {
+	if !Refusal {
+		if Claim.Has("CaptureLockSince")
+			_SR_LogAt("Debug", "{1} capture removed {2} ms after another process first held it (Win32 {3}).",
+				Owner, A_TickCount - Claim["CaptureLockSince"], Claim["CaptureLockCode"])
+		return "done"
+	}
+	if !Claim.Has("CaptureLockSince") {
+		Claim["CaptureLockSince"] := A_TickCount
+		Claim["CaptureLockCode"] := Refusal
+		_SR_LogAt("Debug", "{1} capture is held by another process (Win32 {2}); retrying its removal for up to {3} ms.",
+			Owner, Refusal, SR_CAPTURE_LOCK_BUDGET_MS)
+		return "retry"
+	}
+	local held_ms := A_TickCount - Claim["CaptureLockSince"]
+	if held_ms < SR_CAPTURE_LOCK_BUDGET_MS
+		return "retry"
+	local capture_dir := Claim.Get("CaptureDir", "")
+	_SR_LogAt("Warn", "{1} capture '{2}' is still held by another process after {3} ms (Win32 {4}); the next start's sweep removes it.",
+		Owner, capture_dir != "" ? capture_dir : Claim["TmpFile"], held_ms, Refusal)
+	return "abandoned"
+}
+
+; Removes the capture folders of processes that have exited: a lock that
+; outlived its budget, or an owner that exited with cleanup pending, left them.
+; A folder whose owner PID is live, even a reused one, waits for a later start.
+; Never throws: it runs inside the first capture allocation of a process.
+; @param Directory {String} Folder holding the capture folders.
+; @param CurrentPid {Integer} This process, whose folders are never swept.
+; @returns {Map} "removed" and "kept" folder counts.
+_SR_CaptureSweepStale(Directory, CurrentPid) {
+	local removed := 0, kept := 0, first_refusal := ""
+	local name_pattern := "^" . SR_CAPTURE_DIR_PREFIX . "([1-9]\d{0,9})_[1-9]\d*$"
+	try {
+		Loop Files Directory . "\" . SR_CAPTURE_DIR_PREFIX . "*", "D" {
+			if !RegExMatch(A_LoopFileName, name_pattern, &name_match)
+				continue
+			local owner_pid := Integer(name_match[1])
+			if owner_pid > 0xFFFFFFFF || owner_pid = CurrentPid
+				|| ProcessExist(owner_pid) = owner_pid
+				continue
+			local capture := Map("TmpFile", A_LoopFileFullPath . "\output.tmp",
+				"CaptureDir", A_LoopFileFullPath . "\")
+			local refusal := 0, diagnostic := ""
+			try refusal := _SR_CaptureRemove(capture)
+			catch as Err
+				diagnostic := Err.Message
+			if !refusal && diagnostic = "" {
+				removed += 1
+				continue
+			}
+			kept += 1
+			if first_refusal = ""
+				first_refusal := A_LoopFileName . ": "
+					. (diagnostic != "" ? diagnostic : "Win32 " . refusal)
+		}
+	} catch as Err {
+		kept += 1
+		first_refusal := "enumeration failed: " . Err.Message
+	}
+	if removed
+		_SR_LogAt("Info", "Removed {1} capture folder(s) that exited processes left in '{2}'.",
+			removed, Directory)
+	if kept
+		_SR_LogAt("Warn", "{1} stale capture folder(s) could not be removed ({2}); the next start retries.",
+			kept, first_refusal)
+	return Map("removed", removed, "kept", kept)
 }

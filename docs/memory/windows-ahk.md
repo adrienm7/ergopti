@@ -621,6 +621,10 @@ had exited, because the leaked copy did not share delete access. Action: a
 launch lists its streams in `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` and keeps them
 inside Critical (`_SR_TreeCreateSuspended`). Any other inheriting launch does
 the same or is audited in `tools/test/test-windows-child-handle-inheritance.cjs`.
+A scanner can also hold a file its writer has just closed after job accounting
+reached zero, so capture removal retries a sharing refusal for
+`SR_CAPTURE_LOCK_BUDGET_MS`, then warns once and leaves the folder to the next
+process's sweep; it never logs an ERROR for it.
 
 ### project-webview2-bridge-gotchas
 

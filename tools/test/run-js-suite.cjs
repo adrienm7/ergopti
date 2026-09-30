@@ -1692,7 +1692,7 @@ const CHECKS = [
 		repro: 'npm run test:windows-llm-accept-injection'
 	},
 	{
-		name: 'Windows children inherit only their own launch streams',
+		name: 'Windows children inherit only their own streams and a held capture is retried, not an error',
 		cmd: 'node',
 		args: ['tools/test/test-windows-child-handle-inheritance.cjs'],
 		repro: 'npm run test:windows-child-handle-inheritance'
