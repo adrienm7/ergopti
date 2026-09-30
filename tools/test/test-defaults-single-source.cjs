@@ -32,8 +32,11 @@ async function main() {
 	);
 	let inputCount = 0;
 	// The declared exceptions to "an empty configuration alters no input": the
-	// script-management chords the maintainer switched on (2026-09-30). A new
-	// entry joins this list by a deliberate decision, never by a default edit.
+	// script-management chords the maintainer switched on (2026-09-30, « Je les
+	// veux actifs par défaut »), then on the three drivers alike (« Oui sur
+	// macOS et ils doivent être ajoutés sur Linux aussi. On met tout en commun
+	// sur les 3 OS »). A new entry joins this list by a deliberate decision,
+	// never by a default edit.
 	const APPROVED_ACTIVE_BY_DEFAULT = [
 		'shortcuts.script_control.script_altgr_backspace',
 		'shortcuts.script_control.script_altgr_delete',

@@ -252,6 +252,9 @@ local function open_keyboard_slot_picker(prompt)
 		helpers.assert_not_nil(picker_choice,
 			"the shared searchable picker must be reachable from a keyboard slot")
 		helpers.assert_true(type(picker_choice.fn) == "function")
+		-- Only what the click does: drawing the menu read the parameters of the
+		-- rows' own bindings, the script chords' presets among them.
+		for index = #events, 1, -1 do events[index] = nil end
 		picker_choice.fn()
 		return built
 	end)

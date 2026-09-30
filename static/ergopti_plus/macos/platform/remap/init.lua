@@ -188,6 +188,7 @@ local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop mus
 local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
 local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
 local _approval_presenter       = nil   -- Login Items steps the boot registered, or nil
+local _script_chords_source     = nil   -- The script chords' plan the boot registered, or nil
 local _legacy_cleanup_presenter = nil   -- Legacy-rule cleanup dialog the boot registered, or nil
 local _legacy_conflicts         = nil   -- Untagged legacy rules the last deploy refused, while pending
 local _legacy_cleanup_offered   = {}    -- Conflict sets whose cleanup was offered in this launch
@@ -3087,6 +3088,25 @@ end
 --- guardian first awaits approval (ui/permission_dialog/login_items_guide).
 --- @param present function fn() -> boolean, true when the steps reach the user.
 --- @return boolean registered False when a presenter is already registered.
+--- Registers the owner of the script chords' plan, which each regeneration
+--- reads (modules/shortcuts/script_control.lua karabiner_chords): only a chord
+--- that runs an action gets its sentinel rule. Before the registration a
+--- deploy carries the chords of an empty configuration.
+--- @param source function Returns { normal = slot -> true, paused = slot -> true }.
+--- @return boolean registered
+function M.set_script_chords_source(source)
+	if type(source) ~= "function" then
+		error("platform.remap.set_script_chords_source(): source must be a function", 2)
+	end
+	if _script_chords_source ~= nil then
+		Logger.error(LOG, "The script chords' source is already registered; keeping the first one.")
+		return false
+	end
+	_script_chords_source = source
+	Logger.debug(LOG, "Script chords' source registered.")
+	return true
+end
+
 function M.set_approval_presenter(present)
 	if type(present) ~= "function" then
 		error("platform.remap.set_approval_presenter(): present must be a function", 2)
@@ -5463,6 +5483,16 @@ function M.regenerate(
 		return fail("nav-layer-unavailable")
 	end
 	_state.nav_layer = nav_layer
+
+	-- The script chords that run now, read like the layer for every build.
+	if _script_chords_source ~= nil then
+		local ok_chords, chords = pcall(_script_chords_source)
+		if not ok_chords or type(chords) ~= "table" then
+			Logger.error(LOG, "The script chords could not be read: %s.", tostring(chords))
+			return fail("script-chords-unavailable")
+		end
+		_state.script_chords = chords
+	end
 
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,

@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + Enter",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "Pravý Opt + ⌫",
+	"sg_labels.script_ropt_delete": "Pravý Opt + ⌦",
 	"sg_labels.script_ropt_escape": "Pravý Opt + Esc",
 	"sg_labels.script_ropt_return": "Pravý Opt + Return",
 	"shortcut_utils.format_hint": "Použijte formát mods+klávesa, například cmd+shift+b",

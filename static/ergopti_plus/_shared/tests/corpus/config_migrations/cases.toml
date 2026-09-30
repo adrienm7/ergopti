@@ -32,6 +32,8 @@ cases = [
 	"shipped_magic_key_source_mixed_case_scan_on_windows",
 	"shipped_magic_key_source_scan_becomes_a_key_code_on_windows",
 	"shipped_magic_key_source_unknown_scan_renamed_on_windows",
+	"shipped_script_chords_kept_on_windows_and_linux",
+	"shipped_script_chords_renamed_on_macos",
 	"shipped_space_wrap_removed_on_macos",
 	"shipped_stamp_only_on_windows_and_linux",
 	"shipped_switch_actions_kept_on_windows_and_linux",

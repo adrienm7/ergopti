@@ -207,10 +207,28 @@ never extend the list without a maintainer decision. A clear that must give
 the system's behaviour writes the off value explicitly, because deleting the
 key restores the preset: such an entry declares it as `cleared`, and the scope
 builders (`config_defaults.scope_operations`, `ManifestScopeOperations`) write
-it in every clear, the Shortcuts and global ones included. On Windows the
-submenu's switch
+it in every clear, the Shortcuts and global ones included. The submenu's switch
 (`shortcuts.script_control.chords_enabled`) only narrows what the slots
 enable, so it is a parameter that starts on, like the key-combinations switch.
+
+### project-script-chords-are-one-model-on-three-drivers
+
+Maintainer decision (2026-09-30, « On met tout en commun sur les 3 OS »): the
+script chords are the same four `shortcuts.script_control.script_altgr_*`
+entries on every driver (Enter pause, Backspace reload, Delete personal
+shortcuts, Escape quit), with AltGr on Windows and Linux and the right Option
+key on macOS. `_shared/modules/actions/script_chords.json` names each slot's
+key per driver and the actions a paused driver still runs; Linux and macOS
+apply `_shared/lua/script_chords.lua`, Windows `ScriptShortcutSlotRunsAction`,
+and `test-script-chords-three-os.cjs` pins the three, the submenu
+(`script_control_group`) and the defaults. A chord belongs to the driver only
+while its slot runs an action: an unassigned slot or the switch off leaves it
+native. The submenu's restore and clear are the Shortcuts scope narrowed to
+the chords (`config_scope_transaction` `select`), at once and without a
+question. The macOS keys `enabled`, `return_key`, `backspace` and `escape`
+became `chords_enabled` and the slots in config schema v7. Action: change a
+slot, a preset or the paused actions on the three drivers and in the JSON at
+once, never on one driver.
 
 ### project-restore-and-clear-read-two-shared-keys
 

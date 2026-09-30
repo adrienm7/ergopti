@@ -48,9 +48,12 @@ function M.with_sentinel(callback)
 			F13_KARABINER_RETURN = 0x6A,
 			F14_KARABINER_BACKSPACE = 0x6B,
 			F15_KARABINER_ESCAPE = 0x6C,
+			F18_KARABINER_DELETE = 0x4F,
+			SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
 			BACKSPACE = 0x33,
 			RETURN = 0x24,
 			ESCAPE = 0x35,
+			FORWARD_DELETE = 0x75,
 		}
 		package.loaded["modules.gestures.engine"] = {init = function() end}
 		package.loaded["modules.gestures.actions"] = {
@@ -106,7 +109,7 @@ function M.with_sentinel(callback)
 				},
 			},
 		})
-		subject.set_shortcut_action("return_key", "open_config")
+		subject.set_shortcut_action("script_altgr_enter", "open_config")
 		subject.set_extras({open_config = function() error("extra exploded") end})
 		return callback({
 			subject = subject, failures = failures,

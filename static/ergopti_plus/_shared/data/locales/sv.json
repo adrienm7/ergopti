@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + Retur",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "Höger Opt + ⌫",
+	"sg_labels.script_ropt_delete": "Höger Opt + ⌦",
 	"sg_labels.script_ropt_escape": "Höger Opt + Esc",
 	"sg_labels.script_ropt_return": "Höger Opt + Retur",
 	"shortcut_utils.format_hint": "Använd formatet mods+tangent, t.ex. cmd+shift+b",

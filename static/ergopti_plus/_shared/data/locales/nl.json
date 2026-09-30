@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + Enter",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "Rechter Opt + ⌫",
+	"sg_labels.script_ropt_delete": "Rechter Opt + ⌦",
 	"sg_labels.script_ropt_escape": "Rechter Opt + Esc",
 	"sg_labels.script_ropt_return": "Rechter Opt + Return",
 	"shortcut_utils.format_hint": "Gebruik het formaat mods+toets, bijvoorbeeld cmd+shift+b",

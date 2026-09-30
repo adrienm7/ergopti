@@ -90,7 +90,7 @@ const OPENS_SUBMENU = {
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	key_combinations: 'key_combinations_group',
-	// « Raccourcis de gestion du script », the Windows AltGr script chords.
+	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
 	hotstrings_params: 'hotstrings_params_group',
@@ -533,7 +533,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // without any row leaving the renderer.
 // hs 14 → 15: the « Combinaisons de touches » group under Shortcuts
 // (key_combinations_group) renders the Karabiner chords through the renderer.
-const RENDERED_THROUGH_SHARED = { hs: 15, linux: 13 };
+// hs 15 → 16, linux 13 → 14: « Raccourcis de gestion du script »
+// (script_control_group), the script chords the three drivers share.
+const RENDERED_THROUGH_SHARED = { hs: 16, linux: 14 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

@@ -33,6 +33,7 @@ local ProfileSelector = require("llm.profile_selector")
 local Tone          = require("llm.tone")
 local Vision        = require("llm.vision")
 local JsonCodec     = require("adapters.json_codec")
+local ChordCatalogue = require("infra.script_chord_catalogue")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -91,15 +92,17 @@ local function action_resume_is_current(lifecycle, attempt)
 		and lifecycle.admission_open == false
 end
 
---- The dedicated script-control tap survives global PAUSE, but only its two
---- root lifecycle actions may bypass feature admission. Arbitrary catalogue
---- actions assigned to the same physical slots remain fenced normally.
+--- The dedicated script-control tap survives global PAUSE, but only the
+--- script-management actions of the shared chord catalogue (paused_actions of
+--- _shared/modules/actions/script_chords.json) may bypass feature admission.
+--- Arbitrary catalogue actions assigned to the same chords remain fenced
+--- normally.
 --- @param name string Action identifier.
 --- @param binding string|nil Binding provenance.
 --- @return boolean control_plane
 local function is_script_control_plane_action(name, binding)
 	return type(binding) == "string" and binding:match("^script__") ~= nil
-		and (name == "script_reload" or name == "script_quit")
+		and ChordCatalogue.get().paused_actions[name] == true
 end
 
 --- Maps a configurable keyboard binding (a keyboard slot or a number-row tap

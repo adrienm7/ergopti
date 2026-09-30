@@ -1,0 +1,9 @@
+# _shared/tests/corpus/config_migrations/shipped_script_chords_kept_on_windows_and_linux/input.toml
+
+[_meta]
+schema_version = 6
+
+[shortcuts.script_control]
+chords_enabled = false
+return_key = "script_reload"
+script_altgr_delete = "none"

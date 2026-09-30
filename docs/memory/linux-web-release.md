@@ -86,6 +86,18 @@ one free-text action. No Linux release had been installed, so nothing
 migrates an old kanata unit. Action: do not reintroduce an external remapper or a `kanata.kbd` release asset; change
 tap-hold behaviour in the engine and its loader/writer, with Lua tests.
 
+### project-linux-script-chords-decide-in-the-consumption-callback
+
+The Linux script chords (`modules/shortcuts/script_chords.lua`) decide in the
+keyboard hook's consumption callback, before the tap keys: AltGr is the XKB
+level-3 role the hook reports, so a layout whose right Alt is a plain Alt has
+no chord. They follow no feature switch but their own, run on the next loop
+tick and judge the slot again there, so a pause in between runs only a
+script-management action. The Shortcuts scope owns them; its `only =
+"script_chords"` narrowing leaves the other owners' rows and parameters alone.
+Action: keep any new chord in that callback, never in `on_key`, where the
+application already has the key.
+
 ### project-linux-uinput-drops-a-press-of-a-held-key
 
 The kernel keeps one bit per key: a press of a key already down is dropped, and

@@ -474,6 +474,22 @@ The keycode-based script-control event tap survives layout changes and pause.
 Do not restart it through shortcut lifecycle or regenerate Karabiner state on a
 pause-driven layout switch.
 
+### project-macos-script-chords-are-karabiner-rules-per-slot
+
+A sentinel cannot be given back: once Karabiner turned right Option + Return
+into F13, the application never sees the chord. The generator therefore emits
+a script chord's sentinel rule only for a slot that runs an action
+(`platform/remap/script_chord_rules.lua`, the paused rules only for the
+paused actions), reading the plan from `script_control.karabiner_chords` at
+every build (`set_script_chords_source`); `script_control` asks for one
+coalesced regeneration when the plan changes. The three historical rules stay
+in the graph until the legacy capture, which must keep describing what older
+releases deployed, then the current rules replace them. The Delete slot's
+sentinel is F18, shared with keep-awake's own keystroke, which carries
+Ergopti's provenance and never passes a sentinel check; its rule also reads
+fn + Backspace and comes first. Action: never emit a sentinel rule for a slot
+that runs nothing, and re-pin the generator graph tests for an intended change.
+
 ### project-hs-shortcut-preference-is-not-the-binding
 
 Named shortcuts in `modules/shortcuts/bindings.lua` have two axes:

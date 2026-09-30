@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + Enter",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "Opt ימני + ⌫",
+	"sg_labels.script_ropt_delete": "Opt ימני + ⌦",
 	"sg_labels.script_ropt_escape": "Opt ימני + Esc",
 	"sg_labels.script_ropt_return": "Opt ימני + Return",
 	"shortcut_utils.format_hint": "השתמש בפורמט mods+מקש, לדוגמה cmd+shift+b",

@@ -190,11 +190,11 @@ helpers.describe("the script-control picker configures before it binds", functio
 		-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than
 		-- by path. Driving the picker behaviourally needs a full menu context plus a
 		-- menubar; what is decidable is that the assignment is gated on the prompt.
-		local src = helpers.read_driver_source("local function dyn_script_control")
+		local src = helpers.read_driver_source("local function script_control_group")
 		helpers.assert_true(src ~= nil, "menu_shortcuts source must be locatable")
 		if not src then return end
 
-		local at = src:find("script_control_shortcuts%[keyname%] = a")
+		local at = src:find("script_control_shortcuts%[slot_id%] = a")
 		helpers.assert_true(at ~= nil, "the script-control assignment must be locatable")
 		if not at then return end
 
@@ -225,19 +225,21 @@ helpers.describe("the script-control picker configures before it binds", functio
 				.. "precisely the drift that made the configured link unreadable")
 
 		local sc_src = helpers.read_driver_source("BINDING_PREFIX")
+		-- One sentinel branch and one fallback branch serve every shared slot
+		-- (script-chords-three-os-2026-09-30).
 		local routed = 0
 		for _ in sc_src:gmatch("return finish%(defer_dispatch%(") do routed = routed + 1 end
-		helpers.assert_true(routed >= 6,
-			"every sentinel/fallback branch must route through the shared deferred dispatcher (found "
+		helpers.assert_eq(routed, 2,
+			"the sentinel and the fallback branches must route through the shared deferred dispatcher (found "
 				.. routed .. ")")
 		local prefixed = 0
-		for _ in sc_src:gmatch("dispatch_action%(action, M%.BINDING_PREFIX %.%. binding%)") do
+		for _ in sc_src:gmatch("dispatch_action%(action, M%.BINDING_PREFIX %.%. slot_id%)") do
 			prefixed = prefixed + 1
 		end
 		helpers.assert_eq(prefixed, 1,
 			"the one shared dispatcher must derive its storage key from exported BINDING_PREFIX")
 
-		local menu_src = helpers.read_driver_source("local function dyn_script_control")
+		local menu_src = helpers.read_driver_source("local function script_control_group")
 		helpers.assert_true(menu_src ~= nil, "menu_shortcuts source must be locatable")
 		local at = menu_src:find("prompt_action_parameter", 1, true)
 		helpers.assert_true(at ~= nil, "the prompt call must be locatable")
@@ -251,18 +253,18 @@ helpers.describe("the script-control picker configures before it binds", functio
 			"the picker must prompt under the prefixed binding key. Passing the bare keyname "
 				.. "stores the URL where nothing reads it, and AltGr+Backspace bound to "
 				.. "\"Ouvrir un lien\" simply does nothing when pressed")
-		helpers.assert_true(call:find("keyname", 1, true) ~= nil,
-			"and it must still identify WHICH key is being configured, so the three slots do "
+		helpers.assert_true(call:find("slot_id", 1, true) ~= nil,
+			"and it must still identify WHICH key is being configured, so the four slots do "
 				.. "not share one parameter")
 
-		local decl = menu_src:find("local prefix = script_control.BINDING_PREFIX", 1, true)
+		local decl = menu_src:find("local prefix = script_control.SCRIPT_BINDING_PREFIX", 1, true)
 		helpers.assert_true(decl ~= nil and decl < at,
 			"and that prefix must come from script_control itself — the module that dispatches "
 				.. "under it — not from a literal repeated in the menu")
 	end)
 
 	helpers.it("does not assign when the prompt is declined", function()
-		local src = helpers.read_driver_source("local function dyn_script_control")
+		local src = helpers.read_driver_source("local function script_control_group")
 		if not src then return end
 
 		local at = src:find("prompt_action_parameter")

@@ -190,8 +190,8 @@ helpers.describe("Generator.build_karabiner_json: structural skeleton", function
 			make_state(), {NONE_ACTION}, {}, {}, nil, "/fake/data_dir/"
 		)
 		local rules = result.profiles[1].complex_modifications.rules
-		-- Script-control sentinel rules are always emitted (3 slots), but
-		-- tap/hold and combo lists are empty.
+		-- The script chords' sentinel rules of an empty configuration (the
+		-- four presets), but tap/hold and combo lists are empty.
 		helpers.assert_true(type(rules) == "table", "rules must be a table")
 	end)
 
@@ -1127,13 +1127,14 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 	-- the paused config so the script-management shortcuts stay exempt from pause.
 		local rules = Generator.build_paused_script_control_rules(TEST_LEASE_TOKEN)
 
-	helpers.it("emits 3 rules — one per script-control slot", function()
+	helpers.it("emits 4 rules — one per shared script chord of an empty configuration", function()
 		-- While paused the remap is off, so the user reaches these with the REAL option
-		-- key (option+Enter/Backspace/Escape). One rule per slot, option-only — NOT one
-		-- per modifier, and NOT a right_command variant (the user does not press rcmd
-		-- while paused, and rcmd+Backspace/Escape would shadow native macOS chords). F-H6.
+		-- key (option+Enter/Backspace/Delete/Escape). One rule per slot, option-only —
+		-- NOT one per modifier, and NOT a right_command variant (the user does not press
+		-- rcmd while paused, and rcmd+Backspace/Escape would shadow native macOS chords).
+		-- F-H6. Every preset is a script-management action, so all four stay live.
 		helpers.assert_true(type(rules) == "table", "must return a table")
-		helpers.assert_eq(#rules, 3)
+		helpers.assert_eq(#rules, 4)
 	end)
 
 	helpers.it("each rule is option-gated with the exact generation fence variables", function()
@@ -1158,7 +1159,7 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 		end
 	end)
 
-	helpers.it("gates on the real option key (NOT right_command) for all three keys", function()
+	helpers.it("gates on the real option key (NOT right_command) for all four keys", function()
 		-- While paused we do not touch the real rcmd; the shortcuts are option+key.
 		local keys = {}
 		for _, rule in ipairs(rules) do
@@ -1170,8 +1171,8 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 				"paused rules must NOT gate on right_command — rcmd is not used while paused")
 			keys[m.from.key_code] = true
 		end
-		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.escape,
-			"all three script-control keys must be present")
+		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.delete_forward
+			and keys.escape, "all four script-control keys must be present")
 	end)
 
 	helpers.it("stamps every paused sentinel with the left_control tag (consume-proof guard)", function()

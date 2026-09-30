@@ -860,6 +860,7 @@ local function start_watchers()
 			Keycodes.F13_KARABINER_RETURN,
 			Keycodes.F14_KARABINER_BACKSPACE,
 			Keycodes.F15_KARABINER_ESCAPE,
+			Keycodes.F18_KARABINER_DELETE,
 			Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,
 			Keycodes.F20_LAYER_NAV_ENTERED,

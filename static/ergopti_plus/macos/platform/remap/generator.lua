@@ -44,6 +44,7 @@ local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local ControlSignals = require("platform.remap.control_signals")
 local NavLayer = require("platform.remap.nav_layer")
+local ScriptChordRules = require("platform.remap.script_chord_rules")
 
 local LOG = "karabiner"
 
@@ -111,10 +112,11 @@ local HAND_MODIFIER_FLAGS = {
 local NEVER_POSTED_KEY_CODE   = "vk_none"
 local NEVER_POSTED_EXPRESSION = "0"
 
--- Physical key and sentinel outputs for the script-control rules.
--- These values must match the F13/F14/F15 sentinel constants consumed by
--- modules/shortcuts/script_control.lua.
-local SCRIPT_CONTROL_HOLDER_KEY     = "right_command"
+-- Physical key and sentinel outputs of the three historical script-control
+-- rules (Return, Backspace, Escape), which the legacy graph proof below
+-- reconstructs. The rules deployed now are the shared script chords of
+-- platform/remap/script_chord_rules.lua, the Delete slot included.
+local SCRIPT_CONTROL_HOLDER_KEY     = ScriptChordRules.HOLDER_KEY
 -- Synthetic modifier KE stamps onto every emitted F13/F14/F15 sentinel. HS reads
 -- it off the EVENT itself (modules/shortcuts/script_control.lua) to confirm a
 -- genuine sentinel without depending on the live keyboard modifier state — which
@@ -1500,9 +1502,10 @@ end
 --- The normal sentinel rules condition on ke_held_right_command, but every normal
 --- rule requires the generation-scoped mode to be ACTIVE. These
 --- pause-only rules gate DIRECTLY on the physical modifier, so
---- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
---- modules/shortcuts/script_control.lua) while every other remap is off, so
---- the script-control shortcuts stay identical and working while paused.
+--- AltGr+Enter / Backspace / Delete / Escape keep emitting their sentinels
+--- (consumed by modules/shortcuts/script_control.lua) while every other remap
+--- is off, for the slots whose action is a script-management one: any other
+--- slot, like an unassigned one, leaves the chord to the system while paused.
 --- While paused the remap layer is OFF, so the user reaches these shortcuts with the
 --- REAL option key — option+Enter / option+Backspace / option+Escape. The rules gate
 --- ONLY on the side-agnostic real "option" key and deliberately do NOT include a
@@ -1510,15 +1513,22 @@ end
 --- right_command+Backspace/Escape rule would shadow native macOS chords (e.g.
 --- Cmd+Delete = delete-to-line-start). One rule per slot (F-H6).
 --- @param lease_token string Canonical generation token shared with the watchdog.
---- @return table|nil rules List of managed Karabiner rules (one per slot).
+--- @param script_chords table|nil The script chords' plan (script_chord_rules.lua);
+---   nil deploys those of an empty configuration.
+--- @return table|nil rules List of managed Karabiner rules (one per paused slot).
 --- @return string|nil error_message Validation failure.
-function M.build_paused_script_control_rules(lease_token)
+function M.build_paused_script_control_rules(lease_token, script_chords)
 	if not LeaseContract.is_valid_token(lease_token) then
 		local err = LeaseContract.invalid_token_error(lease_token)
 		Logger.error(LOG, "Cannot build paused script-control rules: %s.", err)
 		return nil, err
 	end
-	local rules = build_raw_paused_script_control_rules()
+	local built, rules = pcall(ScriptChordRules.paused, script_chords)
+	if not built then
+		local err = "script chords: " .. tostring(rules)
+		Logger.error(LOG, "Cannot build paused script-control rules: %s.", err)
+		return nil, err
+	end
 	local managed, err = gate_managed_rules(rules, lease_token, MANAGED_MODE_PAUSE)
 	if not managed then Logger.error(LOG, "Cannot gate paused script-control rules: %s.", err) end
 	return managed, err
@@ -1778,8 +1788,12 @@ function M.build_karabiner_json(
 	-- Script-control sentinel rules (placed after combos so a user-configured
 	-- rcmd+bsp/ret/esc combo takes precedence over the sentinel when both exist).
 	-- These rely on ke_held_right_command being set by the rcmd tap/hold rule.
+	-- The three historical rules stand here while the legacy graph below is
+	-- captured; the script chords that run now then take their place.
+	local historical_script_rules = {}
 	for _, rule in ipairs(build_script_control_sentinel_rules()) do
 		all_rules[#all_rules + 1] = rule
+		historical_script_rules[rule] = true
 	end
 
 
@@ -1886,6 +1900,27 @@ function M.build_karabiner_json(
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
 	end
 
+	-- Only a script chord that runs an action keeps its sentinel rule: an
+	-- unassigned slot, or every slot while the chords' switch is off, leaves
+	-- the key combination to the system (script-chords-three-os-2026-09-30).
+	local chords_ok, chord_rules = pcall(ScriptChordRules.running, state.script_chords,
+		held_var_name(SCRIPT_CONTROL_HOLDER_KEY))
+	if not chords_ok then
+		local err = "script chords: " .. tostring(chord_rules)
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+		return nil, err
+	end
+	local with_chords = {}
+	for _, rule in ipairs(all_rules) do
+		if not historical_script_rules[rule] then
+			with_chords[#with_chords + 1] = rule
+		elseif chord_rules then
+			for _, chord_rule in ipairs(chord_rules) do with_chords[#with_chords + 1] = chord_rule end
+			chord_rules = nil
+		end
+	end
+	all_rules = with_chords
+
 	-- Tap-Holds or key combinations switched off: drop that feature's rules
 	-- after the legacy capture above, which must keep describing the complete
 	-- historical graph. Keys then behave natively while every stored assignment
@@ -1951,7 +1986,7 @@ function M.build_karabiner_json(
 	end
 	all_rules = managed_normal
 
-	local paused_rules, pause_err = M.build_paused_script_control_rules(lease_token)
+	local paused_rules, pause_err = M.build_paused_script_control_rules(lease_token, state.script_chords)
 	if not paused_rules then return nil, pause_err end
 	for _, rule in ipairs(paused_rules) do all_rules[#all_rules + 1] = rule end
 

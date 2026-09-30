@@ -2983,6 +2983,65 @@ local function _build_shortcuts(ctx)
 		return rows
 	end
 
+	-- « Raccourcis de gestion du script », declared by script_control_group as
+	-- on every driver: the chords' switch, the restore of their preset, the
+	-- clear to the system's behaviour, then one row per slot. The restore and
+	-- the clear apply at once, without a question, through the Shortcuts scope
+	-- narrowed to the chords; the clear writes "none" in every slot, since an
+	-- absent slot starts with its preset. The title is ticked from the switch.
+	local group_builders = {}
+	group_builders["script_control"] = function()
+		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
+		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		if not ok_chords or not ok_gestures then
+			Logger.error(LOG, "Script chords unavailable — the shortcuts submenu loses them.")
+			return nil
+		end
+		local chords_on = Chords.chords_enabled()
+		local chord_providers = {}
+		chord_providers["script_control_shortcuts"] = function()
+			local rows = {}
+			for _, slot in ipairs(Chords.slots()) do
+				local bound = Chords.get_action(slot.id)
+				local name = i18n_safe("sg_labels." .. slot.id)
+				local function assign(option, picked)
+					local assigned = assign_parameterized_action(ctx, Gestures, Chords.binding_id(slot.id),
+						option, function() return Chords.set_action(slot.id, option) end, picked)
+					if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return assigned
+				end
+				rows[#rows + 1] = {
+					label = name .. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+						Gestures, Chords.binding_id(slot.id), bound),
+					items = slot_binding_rows(name, bound, Chords.binding_id(slot.id), assign),
+				}
+			end
+			return rows
+		end
+		local function apply_chords_scope(mode)
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+			local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "script_chords")
+			if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return committed
+		end
+		local chords_ctx = {}
+		for key, value in pairs(ctx) do chords_ctx[key] = value end
+		chords_ctx.commands = {}
+		for key, value in pairs(ctx.commands or {}) do chords_ctx.commands[key] = value end
+		chords_ctx.commands["script_control_toggle"] = function()
+			local switched = Chords.set_chords_enabled(not chords_on)
+			if switched and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return switched
+		end
+		chords_ctx.commands["restore_recommended"] = function() return apply_chords_scope("recommended") end
+		chords_ctx.commands["clear_to_system"] = function() return apply_chords_scope("clear") end
+		chords_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do chords_ctx.state_getters[key] = value end
+		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
+		-- Already rendered: the group row takes the rows as its finished submenu.
+		return ManifestMenu.build("script_control_group", "Shortcuts", nil, nil, chords_ctx, chord_providers)
+	end
+
 	-- The wrap-symbol picker. The manifest called it Windows-only until
 	-- 2026-08-06 while this driver had been drawing it all along; it is a shared
 	-- `list` row now, in the same position on all three drivers.
@@ -3048,6 +3107,11 @@ local function _build_shortcuts(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+	-- Ticks « Raccourcis de gestion du script » while its switch is on.
+	sc_ctx.state_getters["script_control_enabled"] = function()
+		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
+		return ok_chords and Chords.chords_enabled() == true
+	end
 	-- The manifest's `feature` row for wrap-on-type, drawn where the manifest
 	-- hangs it (just above the wrap-symbol picker). Its label is the feature's
 	-- own description key, as on Windows.
@@ -3069,7 +3133,7 @@ local function _build_shortcuts(ctx)
 	end
 
 	local manifest_rows = ManifestMenu
-		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, sc_ctx, providers)
+		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, group_builders, sc_ctx, providers)
 		or {}
 	if #manifest_rows > 0 then
 		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end

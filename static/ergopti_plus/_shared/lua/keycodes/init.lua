@@ -63,9 +63,14 @@ M.F16_LLM_CHAIN_SIGNAL = 106
 --- Bound by platform/remap/watchers.lua so the shortcut is layout-independent.
 M.F17_CYCLE_WINDOWS = 64
 
---- F18 (keycode 79) — currently used by modules/shortcuts/actions/system.lua as
---- the OS-wake keystroke for the keep-awake jiggler. Free for reassignment.
+--- F18 (keycode 79) — two roles that never meet. modules/shortcuts/actions/
+--- system.lua posts it itself as the keep-awake jiggler's OS-wake keystroke,
+--- with Ergopti's provenance, which every sentinel reader refuses; Karabiner
+--- emits it, tagged left_control + left_shift, as the sentinel of the right
+--- Option + Delete script-control slot, the fourth slot every driver shares
+--- since 2026-09-30, when F13–F17, F19 and F20 were all taken.
 M.F18_WAKE_OS = 79
+M.F18_KARABINER_DELETE = 79
 
 --- F19 (keycode 80) — Karabiner-emitted "nav layer left" sentinel, the pair of
 --- F20: tapped by every action that turns the navigation layer off (the hold's
@@ -84,6 +89,17 @@ M.F19_LAYER_NAV_EXITED = 80
 --- modules/keymap/control_sentinels.lua so no application ever receives it,
 --- then publish the signal in-process (the LLM tooltip renews its deadline).
 M.F20_LAYER_NAV_ENTERED = 90
+
+--- The constant naming the sentinel Karabiner emits for each script chord slot
+--- (_shared/modules/actions/script_chords.json): written by the rules of
+--- platform/remap/script_chord_rules.lua and read by
+--- modules/shortcuts/script_control.lua, each through its keycode registry.
+M.SCRIPT_CHORD_SENTINELS = {
+	script_altgr_enter     = "F13_KARABINER_RETURN",
+	script_altgr_backspace = "F14_KARABINER_BACKSPACE",
+	script_altgr_delete    = "F18_KARABINER_DELETE",
+	script_altgr_escape    = "F15_KARABINER_ESCAPE",
+}
 
 -- NOTE: M.to_name() is Hammerspoon-specific (requires hs.keycodes.map) and
 -- lives in the HS-local infra/keycodes.lua shim, not here.

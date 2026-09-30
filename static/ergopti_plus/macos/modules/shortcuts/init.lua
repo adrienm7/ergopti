@@ -21,6 +21,7 @@ local HotkeyRegistrar   = require("adapters.hotkey_registrar")
 local StartupTransaction = require("infra.startup_transaction")
 local Logger             = require("infra.logger")
 local Manifest           = require("infra.manifest_reader")
+local ChordCatalogue     = require("infra.script_chord_catalogue")
 
 local M = {}
 
@@ -103,14 +104,14 @@ end)
 -- ================================
 -- ================================
 
+-- The script chords of an empty configuration: every slot on its preset and
+-- the switch on (infra/script_chord_catalogue.lua).
+local _script_chord_defaults, _script_chords_on = ChordCatalogue.defaults()
+
 M.DEFAULT_STATE = {
 	shortcuts                = Manifest.default_for("shortcuts.enabled"),
-	script_control_enabled   = Manifest.default_for("shortcuts.script_control.enabled"),
-	script_control_shortcuts = {
-		return_key = Manifest.default_for("shortcuts.script_control.return_key"),
-		backspace = Manifest.default_for("shortcuts.script_control.backspace"),
-		escape = Manifest.default_for("shortcuts.script_control.escape"),
-	},
+	script_control_enabled   = _script_chords_on,
+	script_control_shortcuts = _script_chord_defaults,
 	chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,
 }
 
@@ -145,6 +146,12 @@ M.get_pause_epoch       = ScriptControl.get_pause_epoch
 M.register_pause_owner  = ScriptControl.register_pause_owner
 M.PAUSE_OWNER_IDS       = ScriptControl.PAUSE_OWNER_IDS
 M.set_shortcut_action   = ScriptControl.set_shortcut_action
+M.set_script_chords_enabled = ScriptControl.set_chords_enabled
+M.script_chords_enabled = ScriptControl.chords_enabled
+M.script_chord_slots    = ScriptControl.slots
+M.script_chord_runs     = ScriptControl.slot_runs
+M.karabiner_script_chords = ScriptControl.karabiner_chords
+M.SCRIPT_BINDING_PREFIX = ScriptControl.BINDING_PREFIX
 M.set_on_pause_change   = ScriptControl.set_on_pause_change
 M.set_extras            = ScriptControl.set_extras
 M.toggle_script_control = ScriptControl.toggle

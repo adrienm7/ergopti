@@ -70,7 +70,7 @@ local MODULE_KEYS = {
 	"ui.menu.init",
 }
 
-local SCRIPT_SLOTS = { "return_key", "backspace", "escape" }
+local SCRIPT_SLOTS = { "script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape" }
 
 --- Clones nested test values without sharing keys or children.
 --- @param value any Source value.
@@ -197,9 +197,10 @@ local function with_menu_fixture(options, callback)
 		hotstrings = { common = true, work = true },
 		terminator_states = { space = true },
 		script_control_shortcuts = {
-			return_key = "script_pause_toggle",
-			backspace = "script_reload",
-			escape = "script_quit",
+			script_altgr_enter = "script_pause_toggle",
+			script_altgr_backspace = "script_reload",
+			script_altgr_delete = "open_personal_shortcuts",
+			script_altgr_escape = "script_quit",
 		},
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,
@@ -545,9 +546,10 @@ local function with_menu_fixture(options, callback)
 	shortcuts = {
 		DEFAULT_STATE = {
 			script_control_shortcuts = {
-				return_key = "script_pause_toggle",
-				backspace = "script_reload",
-				escape = "script_quit",
+				script_altgr_enter = "script_pause_toggle",
+				script_altgr_backspace = "script_reload",
+				script_altgr_delete = "open_personal_shortcuts",
+				script_altgr_escape = "script_quit",
 			},
 		},
 		is_paused = function() return false end,

@@ -48,7 +48,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 7
+current_version = 8
 unstamped_version = 2
 
 
@@ -221,4 +221,20 @@ reason = "Layer + Scroll is retired on macOS: the navigation layer's wheel bindi
 # recommended layer, whose wheel is volume up and down.
 ops = [
 	{ op = "delete", section = "shortcuts.keys", key = "layer_scroll" },
+]
+
+[steps.v7_to_v8]
+from = 7
+to = 8
+drivers = ["hs"]
+reason = "The script-management chords are one set of four slots on every driver: the macOS switch and its three right-Option slots take the names Windows and Linux use."
+# The macOS `enabled` switch turned every chord off, as chords_enabled off
+# does; return_key, backspace and escape held the
+# actions of right Option + Return, Backspace and Escape. The Delete slot is
+# new on macOS and has nothing to carry over.
+ops = [
+	{ op = "rename", section = "shortcuts.script_control", key = "enabled", to_key = "chords_enabled" },
+	{ op = "rename", section = "shortcuts.script_control", key = "return_key", to_key = "script_altgr_enter" },
+	{ op = "rename", section = "shortcuts.script_control", key = "backspace", to_key = "script_altgr_backspace" },
+	{ op = "rename", section = "shortcuts.script_control", key = "escape", to_key = "script_altgr_escape" },
 ]

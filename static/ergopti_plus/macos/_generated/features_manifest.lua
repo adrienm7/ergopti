@@ -47,7 +47,7 @@ M.sections = {
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.lalt_caps_lock"] = { description_key = "menu.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts.tap_keys"] = { description_key = "menu.shortcuts.header_tap_keys", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs" }, subsections = {  } },
@@ -416,6 +416,21 @@ M.features = {
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" }, recommended = "https://chat.openai.com", input_altering = false,
 	},
 	{
+		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_backspace", id = "script_altgr_backspace", section = "shortcuts.script_control", default = "script_reload", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_backspace", platforms = { "ahk", "hs", "linux" }, recommended = "script_reload", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_delete", id = "script_altgr_delete", section = "shortcuts.script_control", default = "open_personal_shortcuts", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_delete", platforms = { "ahk", "hs", "linux" }, recommended = "open_personal_shortcuts", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_enter", id = "script_altgr_enter", section = "shortcuts.script_control", default = "script_pause_toggle", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_enter", platforms = { "ahk", "hs", "linux" }, recommended = "script_pause_toggle", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_escape", id = "script_altgr_escape", section = "shortcuts.script_control", default = "script_quit", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_escape", platforms = { "ahk", "hs", "linux" }, recommended = "script_quit", input_altering = true, cleared = "none",
+	},
+	{
 		path = "shortcuts.keyboard.hs_ctrl_space", id = "hs_ctrl_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", input_altering = true,
 	},
 	{
@@ -776,18 +791,6 @@ M.features = {
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "shortcuts.script_control.enabled", id = "enabled", section = "shortcuts.script_control", default = false, type = "boolean", description_key = "menu.shortcuts", platforms = { "hs" }, recommended = true, input_altering = true,
-	},
-	{
-		path = "shortcuts.script_control.return_key", id = "return_key", section = "shortcuts.script_control", default = "none", type = "action", description_key = "menu.shortcuts", platforms = { "hs" }, recommended = "script_pause_toggle", input_altering = true,
-	},
-	{
-		path = "shortcuts.script_control.backspace", id = "backspace", section = "shortcuts.script_control", default = "none", type = "action", description_key = "menu.shortcuts", platforms = { "hs" }, recommended = "script_reload", input_altering = true,
-	},
-	{
-		path = "shortcuts.script_control.escape", id = "escape", section = "shortcuts.script_control", default = "none", type = "action", description_key = "menu.shortcuts", platforms = { "hs" }, recommended = "script_quit", input_altering = true,
-	},
-	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, input_altering = true,
 	},
 	{
@@ -1122,21 +1125,6 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.personal.programmable_keyboard", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.chords_enabled", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_backspace", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_delete", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_enter", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_escape", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.keyboard.ctrl_b", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },

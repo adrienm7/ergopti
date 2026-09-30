@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + إدخال",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "Right Opt + ⌫",
+	"sg_labels.script_ropt_delete": "Right Opt + ⌦",
 	"sg_labels.script_ropt_escape": "Right Opt + Esc",
 	"sg_labels.script_ropt_return": "Right Opt + Return",
 	"shortcut_utils.format_hint": "استخدم تنسيق mods+مفتاح، مثلاً cmd+shift+b",

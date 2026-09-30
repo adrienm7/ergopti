@@ -25,7 +25,7 @@ helpers.describe("configured shortcut row labels", function()
 				local parameters = {
 					[keyboard_binding("ctrl_a")] = "https://keyboard.example/?q=[x]&p=50%",
 					[tap_binding("number_row_left")] = "https://tap.example",
-					[script_prefix .. "return_key"] = "https://script.example",
+					[script_prefix .. "script_altgr_enter"] = "https://script.example",
 				}
 				local reads = {}
 				local gestures = {
@@ -60,13 +60,23 @@ helpers.describe("configured shortcut row labels", function()
 				package.loaded["infra.deferred_work"] = {}
 				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["ui.menu.menu_utils"] = {}
+				-- The Shortcuts submenu opens the script chords' group, whose rows
+				-- are its provider's.
 				package.loaded["infra.manifest_menu"] = {
-					build = function(_, _, _, _, _, providers) return providers.script_control_shortcuts() end,
+					build = function(key, _, _, groups, _, providers)
+						if key == "shortcuts_menu" then return groups.script_control() end
+						return providers.script_control_shortcuts()
+					end,
 				}
 				local ctx = { gestures = gestures, shortcuts = shortcuts, updateMenu = function() end,
 					state = { shortcuts = true, script_control_enabled = true,
-						script_control_shortcuts = { return_key = "open_url", backspace = "none", escape = "none" } },
-					script_control = { ACTIONS = { "none", "open_url" }, BINDING_PREFIX = script_prefix } }
+						script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
+							script_altgr_delete = "none", script_altgr_escape = "none" } },
+					script_control = { ACTIONS = { "none", "open_url" }, SCRIPT_BINDING_PREFIX = script_prefix,
+						script_chord_slots = function()
+							return { { id = "script_altgr_enter" }, { id = "script_altgr_backspace" },
+								{ id = "script_altgr_delete" }, { id = "script_altgr_escape" } }
+						end } }
 				local label, expected
 				if surface == "keyboard" then
 					label = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)[1].items[1].label
@@ -76,8 +86,8 @@ helpers.describe("configured shortcut row labels", function()
 					expected = parameters[tap_binding("number_row_left")]
 				else
 					local menu = require("ui.menu.menu_shortcuts").build(ctx)
-					label = menu.submenu[1].items[1].label
-					expected = parameters[script_prefix .. "return_key"]
+					label = menu.submenu[1].label
+					expected = parameters[script_prefix .. "script_altgr_enter"]
 				end
 				helpers.assert_true(label:find("Open [" .. expected .. "]", 1, true) ~= nil, label)
 				helpers.assert_true(label:find("[configurable]", 1, true) == nil, label)
