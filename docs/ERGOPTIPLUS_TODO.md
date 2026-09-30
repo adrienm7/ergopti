@@ -222,7 +222,10 @@ These are software implementations; final hardware verification remains below.
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
       the wizard re-run on the three OSes; on a Mac with an Ergopti layout,
       startup logs no « Lease-bound input startup failed » ERROR and no
-      « Layout poll detected change » between the two names of one layout.
+      « Layout poll detected change » between the two names of one layout; every
+      settings menu opens with its switch, « Restaurer les valeurs conseillées »
+      and « Tout effacer » (no question asked), Configuration offers the global
+      clear, and the macOS Gestures menu shows its conflicts row after them.
 - [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
   branch on 2026-09-30; agents must not create `backup/*` branches again. The
   finished agent worktrees under `.claude/worktrees/` can be removed; the
@@ -333,18 +336,15 @@ checked on a real machine moves to item 51 (Windows) or its macOS twin.
 Releases: push to `dev` without a release until every item below is
 integrated, then publish one grouped release.
 
-- [ ] **53.** Every menu and submenu opens with the same group: its master
-      toggle, « Restaurer les valeurs conseillées », « ✕ Tout effacer (comportement
-      du système) », then a separator. AI and Metrics keep only the restore. No
-      confirmation for any clear (the backup is enough; Linux asks today).
-      Configuration gains the global « Tout effacer » next to its restore, in one
-      transaction. The macOS Gestures menu shows its conflicts row after that group.
-      Branch `feat/menu-first-group`. In Shortcuts, « Taper un symbole encadre la sélection » (renamed, no
-      AltGr) and « Symboles encadrants » form one group, with no separator.
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
-      driver code; a row that does not apply to an OS is hidden there, a feature not
-      yet ported is greyed with its reason. A ratchet gate counts the native menu
-      sites left; migrate them to zero once items 52, 53, 55 and 57 are integrated.
+      driver code. The ratchet `npm run test:native-menu-rows` counts the rows
+      drivers still build (baseline: Windows 125, macOS 209, Linux 127, each
+      site listed in tools/test/native-menu-rows-baseline.json); migrate them to
+      zero. Each OS-limited row declares `unavailable = "hide"` (not
+      applicable) or `"grey"` (not yet ported, with its reason); classify the
+      existing rows during the migration (proposal in the menu-first-group
+      report: most hide; greyed: Linux edit_shortcuts, Linux key
+      combinations, Linux metrics shortcut rows, Windows preview_bubbles).
 - [ ] **55.** Script management shortcuts, the same on the three drivers: four
       slots (Enter pause, Delete personal shortcuts, Backspace reload, Escape quit)
       on AltGr (Windows, Linux) or Option (macOS), active by default (documented
