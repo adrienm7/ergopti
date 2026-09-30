@@ -87,9 +87,13 @@ Both Lua drivers keep word delimiters in config.toml:
 key is the shared catalogue default; Linux writes only differences) and
 `hotstrings.terminators` is an inline list of `{ key, char, label, consume }`
 records. Linux reads and writes them through
-`modules/hotstrings/terminator_settings` (storage.json is imported once);
-Windows keeps its delimiter string in the override file. The shared writer
-cannot address an `[[array-of-tables]]` element, so keep the list inline.
+`modules/hotstrings/terminator_settings` (storage.json is imported once): a
+save writes only what differs from the catalogue at the last sync, so hand
+edits and outdated entries survive, and the Hotstrings scope resets only the
+shipped delimiters' states, keeping the user's own. Windows keeps its
+delimiter string in the override file. The shared writer cannot address an
+`[[array-of-tables]]` element: such a list is read, but only an inline list
+can be saved.
 
 ### project-hotstrings-self-healing-cache
 
