@@ -76,8 +76,9 @@ local function install_doubles(h)
 		end,
 	}
 
-	h.remap = { state = "requires_approval", opens = 0, open_ok = true }
+	h.remap = { state = "requires_approval", opens = 0, open_ok = true, tap_holds = true }
 	function h.remap.guardian_state() return h.remap.state end
+	function h.remap.get_tap_holds_enabled() return h.remap.tap_holds end
 	function h.remap.open_login_items(on_done)
 		h.remap.opens = h.remap.opens + 1
 		on_done(h.remap.open_ok, h.remap.open_ok and "opened" or "open-exited-non-zero")
@@ -136,6 +137,18 @@ helpers.describe("Login Items approval guide (guardian-approval-steps)", functio
 			helpers.assert_true(h.guide.reopen(h.remap) == true, "the menu row brings them back on request")
 			helpers.assert_eq(#h.shows, 2)
 			helpers.assert_eq(h.count("error"), 0, "an approval not given yet is not an error")
+		end)
+	end)
+
+	helpers.it("leaves the banner to a user whose Tap-Holds are off", function()
+		with_guide(function(h)
+			h.remap.tap_holds = false
+			helpers.assert_true(h.guide.offer(h.remap) == false,
+				"without Tap-Holds the menu has no guardian row to come back to")
+			helpers.assert_eq(#h.shows, 0)
+			helpers.assert_eq(#h.timers, 0, "no poll is armed for steps not shown")
+			h.remap.tap_holds = true
+			helpers.assert_true(h.guide.offer(h.remap) == true, "the declined offer does not spend the launch's one")
 		end)
 	end)
 
