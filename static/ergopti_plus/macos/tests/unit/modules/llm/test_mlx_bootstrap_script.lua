@@ -89,12 +89,16 @@ end
 -- recorded for the assertions.
 local FAKE_UV = [==[#!/usr/bin/env bash
 set -eu
-printf '%s | cache=%s python_dir=%s no_modify=%s preference=%s\n' "$*" \
+printf '%s | cache=%s python_dir=%s no_modify=%s preference=%s system_certs=%s ca_file=%s https_relay=%s no_relay=%s downloads=%s\n' "$*" \
 	"${UV_CACHE_DIR:-}" "${UV_PYTHON_INSTALL_DIR:-}" "${UV_NO_MODIFY_PATH:-}" \
-	"${UV_PYTHON_PREFERENCE:-}" >> "$FIXTURE_ROOT/uv.log"
+	"${UV_PYTHON_PREFERENCE:-}" "${UV_SYSTEM_CERTS:-}" "${SSL_CERT_FILE:-}${REQUESTS_CA_BUNDLE:-}" \
+	"${HTTPS_PROXY:-}" "${NO_PROXY:-}" "${UV_PYTHON_DOWNLOADS:-}" >> "$FIXTURE_ROOT/uv.log"
 case "${1:-}" in
 	--version)
 		printf '%s\n' 'uv 0.0.0-fixture'
+		;;
+	--help)
+		printf '%s\n' '      --system-certs'
 		;;
 	python)
 		exit 0
@@ -139,6 +143,7 @@ local function new_fixture()
 		.. sh_quote(home .. "/.local/bin") .. " && cp "
 		.. sh_quote(driver .. "modules/llm/ensure-mlx-deps.sh") .. " "
 		.. sh_quote(driver .. "modules/llm/network-retry.sh") .. " "
+		.. sh_quote(driver .. "modules/llm/uv-release.sh") .. " "
 		.. sh_quote(project .. "/modules/llm/") .. " && cp "
 		.. sh_quote(driver .. "pyproject.toml") .. " " .. sh_quote(driver .. "uv.lock") .. " "
 		.. sh_quote(project .. "/"))
@@ -360,6 +365,112 @@ helpers.describe("No uv or venv Python built for another processor is started (h
 			"the Intel interpreter is never started, not even to probe it: " .. output)
 		local header = read(fixture.venv .. "/bin/python") or ""
 		helpers.assert_true(header:sub(1, 2) == "#!", "the venv is rebuilt on uv's own interpreter")
+	end)
+end)
+end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 4c/ Managed Networks =======
+-- ====================================
+-- ====================================
+
+-- What `scutil --proxy` prints on a Mac whose network settings name a relay.
+local SCUTIL_RELAY = table.concat({
+	"<dictionary> {",
+	"  ExceptionsList : <array> {",
+	"    0 : *.local",
+	"    1 : 169.254/16",
+	"  }",
+	"  HTTPEnable : 1",
+	"  HTTPPort : 3128",
+	"  HTTPProxy : relay.corp",
+	"  HTTPSEnable : 1",
+	"  HTTPSPort : 3129",
+	"  HTTPSProxy : relay.corp",
+	"  ProxyAutoConfigEnable : 0",
+	"}",
+}, "\n")
+
+--- The uv.log lines of one subcommand.
+--- @param fixture table
+--- @param subcommand string e.g. "venv", "sync".
+--- @return table lines
+local function uv_calls(fixture, subcommand)
+	local lines = {}
+	for line in (read(fixture.root .. "/uv.log") or ""):gmatch("[^\n]+") do
+		if line:find("^" .. subcommand .. " ") then lines[#lines + 1] = line end
+	end
+	return lines
+end
+
+if POSIX then
+helpers.describe("The installer works on a managed network (mlx-bootstrap-managed-network)", function()
+	it_runs("trusts the system store and hands no CA file to uv", function(fixture)
+		-- A GUI launch carries no CA variable; the host running the suite may.
+		local output, status = bootstrap(fixture, "SSL_CERT_FILE= REQUESTS_CA_BUNDLE=")
+		helpers.assert_eq(status, 0, output)
+		local syncs = uv_calls(fixture, "sync")
+		helpers.assert_true(#syncs > 0, "uv sync ran")
+		for _, line in ipairs(syncs) do
+			helpers.assert_true(line:find("system_certs=1", 1, true) ~= nil,
+				"uv loads the keychain's roots, a company inspection certificate included: " .. line)
+			helpers.assert_true(line:find("ca_file= ", 1, true) ~= nil,
+				"no CA file overrides the system store (the Mozilla bundle refused every "
+					.. "download behind a TLS-inspecting relay): " .. line)
+		end
+	end)
+
+	it_runs("hands the relay to uv with loopback excluded", function(fixture)
+		local output, status = bootstrap(fixture, "HTTPS_PROXY=http://relay.corp:3129 NO_PROXY=intranet.corp")
+		helpers.assert_eq(status, 0, output)
+		local sync = uv_calls(fixture, "sync")[1] or ""
+		helpers.assert_true(sync:find("https_relay=http://relay.corp:3129", 1, true) ~= nil, sync)
+		helpers.assert_true(sync:find("no_relay=intranet.corp,localhost,127.0.0.1,::1", 1, true) ~= nil,
+			"the local servers never go through the relay: " .. sync)
+	end)
+
+	it_runs("builds the venv on a native system Python without downloading one", function(fixture)
+		local python = fixture.root .. "/native-python3"
+		write(python, "#!/usr/bin/env bash\nexit 0\n")
+		run("chmod +x " .. sh_quote(python))
+		local output, status = bootstrap(fixture, "ERGOPTI_NATIVE_PYTHONS=" .. sh_quote("/nonexistent/python3:" .. python))
+		helpers.assert_eq(status, 0, output)
+		local venv = uv_calls(fixture, "venv")[1] or ""
+		helpers.assert_true(venv:find("--python " .. python, 1, true) ~= nil, venv)
+		helpers.assert_true(venv:find("downloads=never", 1, true) ~= nil, venv)
+		helpers.assert_true(venv:find("preference=only%-system") ~= nil, venv)
+		helpers.assert_eq(#uv_calls(fixture, "python"), 0,
+			"no managed interpreter is looked up or downloaded (GitHub)")
+	end)
+
+	helpers.it("reads the relay and its exceptions from scutil, and names a PAC it cannot apply", function()
+		local driver = helpers.driver_root()
+		local function parse(text)
+			local output = run("printf '%s' " .. sh_quote(text) .. " | bash -c "
+				.. sh_quote(". " .. sh_quote(driver .. "modules/llm/network-retry.sh") .. " && system_network_from_scutil"))
+			return (output:gsub("%s+$", ""))
+		end
+		helpers.assert_eq(parse(SCUTIL_RELAY),
+			"HTTPS_PROXY=http://relay.corp:3129\nHTTP_PROXY=http://relay.corp:3128\nNO_PROXY=.local,169.254/16")
+		helpers.assert_eq(parse("<dictionary> {\n  HTTPSEnable : 0\n  ProxyAutoConfigEnable : 1\n"
+			.. "  ProxyAutoConfigURLString : http://wpad.corp/relay.pac\n}"), "PAC_URL=http://wpad.corp/relay.pac")
+		helpers.assert_eq(parse("<dictionary> {\n  HTTPSEnable : 0\n}"), "")
+	end)
+
+	helpers.it("installs uv from its pinned PyPI wheel, never an installer piped into a shell", function()
+		local driver = helpers.driver_root()
+		local script = assert(read(driver .. "modules/llm/ensure-mlx-deps.sh"))
+		local release = assert(read(driver .. "modules/llm/uv-release.sh"))
+		helpers.assert_true(script:find("| sh", 1, true) == nil and script:find("astral.sh", 1, true) == nil,
+			"the Astral installer downloads uv from GitHub, which company networks block")
+		helpers.assert_true(release:find('UV_WHEEL_ARM64_URL="https://files.pythonhosted.org/', 1, true) ~= nil)
+		helpers.assert_true(release:match('UV_WHEEL_ARM64_SHA256="%x+"') ~= nil
+			and #release:match('UV_WHEEL_ARM64_SHA256="(%x+)"') == 64, "the wheel is pinned by its SHA-256")
 	end)
 end)
 end

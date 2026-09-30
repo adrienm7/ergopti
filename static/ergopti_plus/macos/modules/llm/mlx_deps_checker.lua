@@ -1164,8 +1164,10 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- Forward the project root so the script knows where to find .venv even
 	-- when launched outside the project directory (e.g. from launchd).
 	local env_prefix = "PROJECT_ROOT=" .. shell_quote(hs_root) .. " "
-	-- The script refuses every uv and venv interpreter without this slice.
+	-- The script refuses every uv and venv interpreter without this slice, and
+	-- builds the venv on a native system Python rather than download one.
 	env_prefix = env_prefix .. "ERGOPTI_NATIVE_ARCH=" .. shell_quote(PythonInterpreter.native_arch() or "") .. " "
+		.. "ERGOPTI_NATIVE_PYTHONS=" .. shell_quote(table.concat(PythonInterpreter.native_candidates(), ":")) .. " "
 	if repair then env_prefix = env_prefix .. "ERGOPTI_MLX_REPAIR=1 " end
 	local bash_cmd = env_prefix .. "/bin/bash " .. shell_quote(script_path)
 

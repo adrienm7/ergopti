@@ -313,6 +313,19 @@ function M.resolve()
 	return nil, state
 end
 
+--- Every installed interpreter this Mac runs natively, in resolution order,
+--- for a consumer that needs more than the first one (the MLX installer picks
+--- one recent enough to build its venv).
+--- @return table paths
+function M.native_candidates()
+	local native = M.native_arch()
+	local paths = {}
+	for _, candidate in ipairs(M.candidates()) do
+		if M.inspect(candidate.path, native) then paths[#paths + 1] = candidate.path end
+	end
+	return paths
+end
+
 --- Replaces native edges for tests; nil restores the defaults.
 --- @param overrides table|nil { read_head, realpath, getenv, select_link_target, process_arch }
 function M._set_deps(overrides)

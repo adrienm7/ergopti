@@ -207,6 +207,17 @@ local function load_world(world)
 		end,
 	})
 	package.loaded["infra.dialog_util"] = {
+		-- The network failures' offer: its actions, then « Plus tard ».
+		choose = function(title, body, choices, cancel_label)
+			world.dialogs[#world.dialogs + 1] = {
+				title = title, body = body, choices = choices, cancel = cancel_label,
+				primary = choices[1], secondary = choices[2],
+			}
+			local answer = table.remove(world.answers, 1)
+			if answer == "primary" then return 1 end
+			if answer == "secondary" then return 2 end
+			return nil
+		end,
 		block_alert = function(...)
 			local title, body, primary, secondary = ...
 			world.dialogs[#world.dialogs + 1] = {
@@ -551,9 +562,9 @@ helpers.describe("Selecting MLX again after a failure retries it (mlx-bootstrap-
 		stream_lines(world.tasks[1], { "curl: (6) Could not resolve host: astral.sh" })
 		world.tasks[1].finish(1, "", "")
 		helpers.assert_eq(results, { false })
-		helpers.assert_eq(checker.get_failure_cause().kind, "network")
+		helpers.assert_eq(checker.get_failure_cause().kind, "offline")
 		helpers.assert_eq(#world.deferred, 1, "every failed selection offers its repair")
-		world.answers = { "secondary" }
+		world.answers = { "later" }
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 1)
 		helpers.assert_eq(#world.tasks, 1, "« Later » starts nothing")
@@ -779,19 +790,20 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		helpers.assert_eq(#world.tasks, 1)
 		stream_lines(world.tasks[1], { "curl: (6) Could not resolve host: astral.sh" })
 		world.tasks[1].finish(1, "", "")
-		helpers.assert_eq(checker.get_failure_cause().kind, "network")
+		helpers.assert_eq(checker.get_failure_cause().kind, "offline")
 
-		-- The failure reopens the offer with its cause and the button that retries.
+		-- The failure reopens the offer with its cause, in the words the three
+		-- drivers share (network.failure.offline), and the button that retries.
 		world.answers = { "primary" }
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 2)
 		local failed = world.dialogs[2]
 		helpers.assert_eq(failed.title, "L’installation de MLX a échoué")
-		helpers.assert_true(failed.body:find("Le téléchargement a échoué : vérifiez la connexion à Internet.", 1, true) ~= nil,
-			failed.body)
+		helpers.assert_true(failed.body:find("Le serveur est injoignable", 1, true) ~= nil, failed.body)
 		helpers.assert_true(failed.body:find("Could not resolve host: astral.sh", 1, true) ~= nil,
 			"the dialog quotes the line that proves the cause")
-		helpers.assert_eq(failed.primary, "Réparer l’installation MLX")
+		helpers.assert_eq(failed.primary, "Réessayer")
+		helpers.assert_eq(failed.secondary, "Ouvrir les réglages du proxy")
 		helpers.assert_eq(#world.tasks, 2, "the repair button retries at once")
 		helpers.assert_true(world.tasks[2].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil,
 			"the retry removes what the failed install left, then installs again")
@@ -799,11 +811,11 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		-- A repair that fails in turn says why, with the same button.
 		stream_lines(world.tasks[2], { "curl: (6) Could not resolve host: astral.sh" })
 		world.tasks[2].finish(1, "", "")
-		world.answers = { "secondary" }
+		world.answers = { "later" }
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 3)
-		helpers.assert_eq(world.dialogs[3].primary, "Réparer l’installation MLX")
-		helpers.assert_true(world.dialogs[3].body:find("vérifiez la connexion à Internet", 1, true) ~= nil,
+		helpers.assert_eq(world.dialogs[3].primary, "Réessayer")
+		helpers.assert_true(world.dialogs[3].body:find("Le serveur est injoignable", 1, true) ~= nil,
 			world.dialogs[3].body)
 		helpers.assert_eq(#world.tasks, 2, "« Plus tard » starts nothing")
 	end))
@@ -893,5 +905,95 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		local command = world.tasks[1].command()
 		helpers.assert_true(command:find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil, command)
 		helpers.assert_true(command:find("ERGOPTI_NATIVE_ARCH='arm64'", 1, true) ~= nil, command)
+	end))
+end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 8/ Managed Network Failure Classes =======
+-- ==================================================
+-- ==================================================
+
+helpers.describe("A network failure names its class and its fixes (mlx-bootstrap-network-classes)", function()
+	helpers.it("classifies uv's and curl's failures into the classes the drivers share", scoped(function()
+		local world = new_world()
+		load_world(world)
+		local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
+		local cases = {
+			{ "certificate", {
+				"error: Request failed after 3 retries",
+				"  Caused by: Failed to download `https://github.com/astral-sh/python-build-standalone/x.tar.gz`",
+				"  Caused by: error sending request for url (https://github.com/astral-sh/x.tar.gz)",
+				"  Caused by: client error (Connect)",
+				"  Caused by: invalid peer certificate: UnknownIssuer",
+			} },
+			-- A company filter denying uv network access: "Operation not permitted",
+			-- once read as a file permission that offered to show a folder.
+			{ "host_blocked", {
+				"  Caused by: error sending request for url (https://files.pythonhosted.org/packages/mlx.whl)",
+				"  Caused by: client error (Connect)",
+				"  Caused by: tcp connect error: Operation not permitted (os error 1)",
+			} },
+			{ "host_blocked", {
+				"Permission error: operation not permitted",
+				"Request failed after 3 retries",
+				"Caused by: failed to download URL",
+				"Error sending request for URL",
+			} },
+			{ "proxy", { "curl: (56) CONNECT tunnel failed, response 407", "HTTP/1.1 407 Proxy Authentication Required" } },
+			{ "offline", { "curl: (6) Could not resolve host: files.pythonhosted.org" } },
+			{ "permission", { "error: failed to create directory `/Users/u/Library/Application Support/Ergopti/mlx-venv`: Operation not permitted (os error 1)" } },
+		}
+		for _, case in ipairs(cases) do
+			local cause = Diagnosis.classify(case[2], 1)
+			helpers.assert_eq(cause.kind, case[1], table.concat(case[2], " | "))
+			helpers.assert_true(cause.repairable, case[1] .. " is retried")
+		end
+	end))
+
+	helpers.it("offers the network settings for a relay refusal and opens them", scoped(function()
+		local world = new_world()
+		local checker, router = load_world(world)
+		speak("fr")
+		helpers.assert_true(router.select_mlx(function() end))
+		stream_lines(world.tasks[1], { "HTTP/1.1 407 Proxy Authentication Required" })
+		world.tasks[1].finish(1, "", "")
+		helpers.assert_eq(checker.get_failure_cause().kind, "proxy")
+		world.answers = { "primary" }
+		drain(world)
+		local dialog = world.dialogs[#world.dialogs]
+		helpers.assert_eq(dialog.choices[1], "Ouvrir les réglages du proxy")
+		helpers.assert_eq(dialog.choices[2], "Réessayer")
+		helpers.assert_true(dialog.body:find("407 Proxy Authentication Required", 1, true) ~= nil, dialog.body)
+		local spawn = world.spawns[#world.spawns]
+		helpers.assert_eq(spawn.executable, "/usr/bin/open")
+		helpers.assert_eq(spawn.args[1], "x-apple.systempreferences:com.apple.Network-Settings.extension")
+		helpers.assert_eq(#world.tasks, 1, "opening the settings starts no install")
+	end))
+
+	helpers.it("offers Ollama for a blocked host, and never a folder to show", scoped(function()
+		local world = new_world()
+		local checker, router, offer = load_world(world)
+		speak("fr")
+		offer.set_alternative(function() world.alternatives = world.alternatives + 1; return true end)
+		helpers.assert_true(router.select_mlx(function() end))
+		stream_lines(world.tasks[1], {
+			"  Caused by: error sending request for url (https://files.pythonhosted.org/packages/mlx.whl)",
+			"  Caused by: tcp connect error: Operation not permitted (os error 1)",
+		})
+		world.tasks[1].finish(1, "", "")
+		helpers.assert_eq(checker.get_failure_cause().kind, "host_blocked")
+		world.answers = { "secondary" }
+		drain(world)
+		local dialog = world.dialogs[#world.dialogs]
+		helpers.assert_eq(dialog.choices[1], "Réessayer")
+		helpers.assert_eq(dialog.choices[2], "Utiliser Ollama")
+		helpers.assert_true(dialog.body:find("Le réseau bloque l'accès à ce serveur", 1, true) ~= nil, dialog.body)
+		helpers.assert_eq(world.alternatives, 1, "« Utiliser Ollama » selects Ollama")
+		offer.set_alternative(nil)
 	end))
 end)
