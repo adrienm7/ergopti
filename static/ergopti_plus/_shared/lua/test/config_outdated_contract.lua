@@ -51,6 +51,26 @@ function M.register(helpers)
 				"a missing path stays a programmer error")
 		end)
 
+		helpers.it("names the file and entry to fix outside config.toml, once, and never feeds a cleanup scan", function()
+			Outdated.reset_for_tests()
+			local sink, lines = recorder()
+			local reports = Outdated.collect_reports(function()
+				helpers.assert_eq(Outdated.report_in_file("/cfg/layers.toml", { "layers", "nav", "all", "KeyD" },
+					"not a layer action", sink), true)
+				helpers.assert_eq(Outdated.report_in_file("/cfg/layers.toml", "layers.nav.all.KeyD",
+					"not a layer action", sink), false, "a segment path and its dotted spelling are one entry")
+				helpers.assert_eq(Outdated.report_in_file("/cfg/other.toml", "layers.nav.all.KeyD",
+					"not a layer action", sink), true, "the same path in another file is another entry")
+			end)
+			helpers.assert_eq(#lines, 2)
+			helpers.assert_true(lines[1]:find("'layers.nav.all.KeyD' in '/cfg/layers.toml'", 1, true) ~= nil, lines[1])
+			helpers.assert_true(lines[1]:find("offered for cleanup", 1, true) == nil,
+				"only config.toml has a cleanup to offer it: " .. lines[1])
+			helpers.assert_eq(reports, {}, "the config.toml cleanup never lists another file's entry")
+			helpers.assert_throws(function() Outdated.report_in_file(nil, "a", "no file") end,
+				"a missing file stays a programmer error")
+		end)
+
 		helpers.it("partitions known entries, marks exactly them and reports the rest", function()
 			Outdated.reset_for_tests()
 			local marked = {}
