@@ -403,14 +403,15 @@ helpers.describe("keyboard_hook: a consumed dead key leaves no Compose pending",
 		}
 	end
 
-	local function drive(consume)
+	local function drive(consume, held)
 		local Capture = helpers.load_module("adapters.xkb_capture")
 		Capture._set_backend(backend())
 		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
 		local hook = helpers.load_module("adapters.keyboard_hook")
 		local chars = {}
-		local ok, err = pcall(hook._test_drive,
-			{ key(KEY_DEAD, 1), key(KEY_DEAD, 0), key(KEY_E, 1), key(KEY_E, 0) }, {
+		local events = { key(KEY_DEAD, 1), key(KEY_DEAD, 0), key(KEY_E, 1), key(KEY_E, 0) }
+		if held then table.insert(events, 2, key(KEY_DEAD, 2)) end
+		local ok, err = pcall(hook._test_drive, events, {
 			liveXkb = true,
 			onConsume = function(detail) return consume and detail.code == KEY_DEAD end,
 			onChar = function(char) chars[#chars + 1] = char end,
@@ -424,5 +425,9 @@ helpers.describe("keyboard_hook: a consumed dead key leaves no Compose pending",
 	helpers.it("(magic-key-source) reads the next key plain after a consumed dead key", function()
 		helpers.assert_eq(drive(false), { "ê" }, "a dead key the application received still composes")
 		helpers.assert_eq(drive(true), { "e" }, "the application never saw the dead key: E is plain there")
+	end)
+
+	helpers.it("(magic-key-source) reads the next key plain after a consumed dead key was held", function()
+		helpers.assert_eq(drive(true, true), { "e" }, "nor any auto-repeat of it")
 	end)
 end)

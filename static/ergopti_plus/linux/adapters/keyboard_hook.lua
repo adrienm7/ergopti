@@ -715,7 +715,13 @@ local function _dispatch_event(ev, source)
 
 	local consumed_key = source_key(source, ev.code)
 	if _consumed_down[consumed_key] then
-		if ev.value == InputEvent.VALUE_UP then _consumed_down[consumed_key] = nil end
+		if ev.value == InputEvent.VALUE_UP then
+			_consumed_down[consumed_key] = nil
+		else
+			-- XKB read each auto-repeat of the consumed press too, a dead key's
+			-- included, and the application saw none of them.
+			_cancel_capture_compose()
+		end
 		return
 	end
 
