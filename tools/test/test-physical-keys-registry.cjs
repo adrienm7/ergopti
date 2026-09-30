@@ -31,6 +31,9 @@
  *    _shared/lua/keycodes/init.lua, azerty.json, heatmap_win.js SC_TO_KC, the
  *    Karabiner legacy_layer_keys.json and the native tap-hold input keys. Each scan is
  *    floored so a parser that stops matching cannot pass over nothing.
+ * 5. HID usages: every key carries exactly one USB HID usage, no two keys share
+ *    one, each agrees with the USB HID Usage Tables, and a raw usage resolves to
+ *    the macOS keycode of its form with the ISO swap of 0x35 and 0x64 only.
  * ==============================================================================
  */
 
@@ -125,6 +128,11 @@ const GROUPS = {
 const KEYBOARD_GROUPS = new Set(['function', 'alphanumeric', 'navigation', 'numpad']);
 
 const isInt = (v) => Number.isInteger(v);
+
+// USB HID usage pages a registry key may sit on, and the largest usage of each.
+const HID_PAGE_KEYBOARD = 7;
+const HID_PAGE_CONSUMER = 12;
+const HID_USAGE_MAX = { [HID_PAGE_KEYBOARD]: 0xff, [HID_PAGE_CONSUMER]: 0xffff };
 const karabinerEvent = (v, allowed) =>
 	v &&
 	typeof v === 'object' &&
@@ -161,7 +169,23 @@ for (const code of codes) {
 		// under that character — the whole point of a physical registry.
 		if (usLegend(code) !== undefined && code !== 'Space' && k.ahk_send !== null)
 			fail(`${code}: a character key must not carry an ahk_send name (Send it by scan code)`);
+		// A media key is a Consumer-page usage, exactly as its Karabiner event says;
+		// every other key sits on the Keyboard/Keypad page.
+		const page = k.group === 'media' ? HID_PAGE_CONSUMER : HID_PAGE_KEYBOARD;
+		if (
+			!k.hid ||
+			typeof k.hid !== 'object' ||
+			JSON.stringify(Object.keys(k.hid).sort()) !== '["page","usage"]'
+		)
+			fail(`${code}: hid must be one {page, usage} object`);
+		else if (k.hid.page !== page)
+			fail(`${code}: hid page must be ${page} for group ${k.group}, found ${k.hid.page}`);
+		else if (!isInt(k.hid.usage) || k.hid.usage < 1 || k.hid.usage > HID_USAGE_MAX[page])
+			fail(`${code}: hid usage ${k.hid.usage} is outside page ${page}`);
+		if (k.karabiner && 'consumer_key_code' in k.karabiner !== (page === HID_PAGE_CONSUMER))
+			fail(`${code}: the Karabiner event and the hid page disagree on the usage page`);
 	} else if (k.kind === 'mouse_button') {
+		if (k.hid !== undefined) fail(`${code}: only keyboard keys carry a hid usage`);
 		if (!/^(L|R|M|X)Button[12]?$/.test(k.ahk))
 			fail(`${code}: ahk must be an AutoHotkey mouse button name`);
 		if (!isInt(k.evdev) || k.evdev < 272 || k.evdev > 276)
@@ -170,6 +194,7 @@ for (const code of codes) {
 		if (!karabinerEvent(k.karabiner, ['pointing_button']))
 			fail(`${code}: karabiner must be one {pointing_button} event`);
 	} else if (k.kind === 'wheel') {
+		if (k.hid !== undefined) fail(`${code}: only keyboard keys carry a hid usage`);
 		if (!/^Wheel(Up|Down|Left|Right)$/.test(k.ahk))
 			fail(`${code}: ahk must be an AutoHotkey wheel name`);
 		if (k.evdev !== null || k.hs !== null || k.karabiner !== null)
@@ -539,6 +564,134 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	}
 	for (const id of Object.keys(physical))
 		if (!seen.has(id)) fail('native tap-hold key was not compared: ' + id);
+}
+
+// =====================================
+// =====================================
+// ======= 5/ HID usages ===============
+// =====================================
+// =====================================
+
+// --- 5.1 Total and unique: one usage per key, one key per usage.
+{
+	const seen = new Map();
+	for (const code of byKind.key) {
+		const hid = keys[code].hid;
+		if (!hid) continue;
+		const id = hid.page + ':' + hid.usage;
+		if (seen.has(id)) fail(`hid: ${code} and ${seen.get(id)} share usage ${id}`);
+		else seen.set(id, code);
+	}
+	if (seen.size !== byKind.key.length)
+		fail(
+			`hid: ${seen.size} distinct usages for ${byKind.key.length} keys — the mapping is not total`
+		);
+}
+
+// --- 5.2 The USB HID Usage Tables 1.21 (section 10, Keyboard/Keypad page, and
+// section 15, Consumer page) are the oracle: each W3C code names the position
+// its usage is defined at.
+{
+	const HUT = {};
+	'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach((l, i) => (HUT['Key' + l] = [7, 0x04 + i]));
+	'123456789'.split('').forEach((d, i) => (HUT['Digit' + d] = [7, 0x1e + i]));
+	for (let i = 1; i <= 12; i++) HUT['F' + i] = [7, 0x39 + i];
+	'123456789'.split('').forEach((d, i) => (HUT['Numpad' + d] = [7, 0x59 + i]));
+	Object.assign(HUT, {
+		Digit0: [7, 0x27],
+		Enter: [7, 0x28],
+		Escape: [7, 0x29],
+		Backspace: [7, 0x2a],
+		Tab: [7, 0x2b],
+		Space: [7, 0x2c],
+		Minus: [7, 0x2d],
+		Equal: [7, 0x2e],
+		BracketLeft: [7, 0x2f],
+		BracketRight: [7, 0x30],
+		Backslash: [7, 0x31],
+		Semicolon: [7, 0x33],
+		Quote: [7, 0x34],
+		Backquote: [7, 0x35],
+		Comma: [7, 0x36],
+		Period: [7, 0x37],
+		Slash: [7, 0x38],
+		CapsLock: [7, 0x39],
+		Insert: [7, 0x49],
+		Home: [7, 0x4a],
+		PageUp: [7, 0x4b],
+		Delete: [7, 0x4c],
+		End: [7, 0x4d],
+		PageDown: [7, 0x4e],
+		ArrowRight: [7, 0x4f],
+		ArrowLeft: [7, 0x50],
+		ArrowDown: [7, 0x51],
+		ArrowUp: [7, 0x52],
+		NumLock: [7, 0x53],
+		NumpadDivide: [7, 0x54],
+		NumpadMultiply: [7, 0x55],
+		NumpadSubtract: [7, 0x56],
+		NumpadAdd: [7, 0x57],
+		NumpadEnter: [7, 0x58],
+		Numpad0: [7, 0x62],
+		NumpadDecimal: [7, 0x63],
+		IntlBackslash: [7, 0x64],
+		ContextMenu: [7, 0x65],
+		ControlLeft: [7, 0xe0],
+		ShiftLeft: [7, 0xe1],
+		AltLeft: [7, 0xe2],
+		MetaLeft: [7, 0xe3],
+		ControlRight: [7, 0xe4],
+		ShiftRight: [7, 0xe5],
+		AltRight: [7, 0xe6],
+		MetaRight: [7, 0xe7],
+		AudioVolumeMute: [12, 0xe2],
+		AudioVolumeUp: [12, 0xe9],
+		AudioVolumeDown: [12, 0xea]
+	});
+	let n = 0;
+	for (const code of byKind.key) {
+		const hid = keys[code].hid;
+		const expected = HUT[code];
+		if (!expected) {
+			fail(`hid: ${code} has no entry in this test's USB HID usage oracle — extend the table`);
+			continue;
+		}
+		if (!hid || hid.page !== expected[0] || hid.usage !== expected[1])
+			fail(
+				`hid: ${code} is ${JSON.stringify(hid)} but the HID usage tables define ${expected[0]}:0x${expected[1].toString(16)}`
+			);
+		n++;
+	}
+	if (n < 100) fail(`hid: only ${n} usages compared (floor 100)`);
+}
+
+// --- 5.3 A raw usage resolves to the macOS keycode of its position on the
+// device's form. macOS swaps the keycodes of 0x35 (left of 1) and 0x64 (left of
+// Z) on an ISO keyboard, and no other usage depends on the form.
+{
+	const kcOf = (page, usage, form) => {
+		const code = byKind.key.find(
+			(c) => keys[c].hid && keys[c].hid.page === page && keys[c].hid.usage === usage
+		);
+		return code === undefined ? undefined : resolved(code, 'hs', form);
+	};
+	const expected = [
+		['ansi', 0x35, 50],
+		['ansi', 0x64, 10],
+		['iso', 0x35, 10],
+		['iso', 0x64, 50]
+	];
+	for (const [form, usage, kc] of expected) {
+		const got = kcOf(HID_PAGE_KEYBOARD, usage, form);
+		if (got !== kc)
+			fail(`hid: usage 0x${usage.toString(16)} on ${form} resolves to ${got}, expected ${kc}`);
+	}
+	const formDependent = byKind.key
+		.filter((c) => resolved(c, 'hs', 'ansi') !== resolved(c, 'hs', 'iso'))
+		.map((c) => keys[c].hid && keys[c].hid.usage)
+		.sort((a, b) => a - b);
+	if (JSON.stringify(formDependent) !== JSON.stringify([0x35, 0x64]))
+		fail(`hid: the form-dependent usages are ${JSON.stringify(formDependent)}, expected [53, 100]`);
 }
 
 report();

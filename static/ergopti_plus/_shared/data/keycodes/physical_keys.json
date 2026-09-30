@@ -7,6 +7,7 @@
 		"ahk_send": "AutoHotkey Send name for a layout-independent key, or null for a character key (a Send of a character key uses {SCnnn} so the active layout cannot change which key is pressed).",
 		"evdev": "Linux input-event-codes.h KEY_* / BTN_* code; null for a wheel direction (a REL_WHEEL / REL_HWHEEL motion, described by axis and direction).",
 		"hs": "macOS virtual keycode (kVK_*) for keys, the NSEvent button number for mouse buttons; null for a wheel direction.",
+		"hid": "Keys only: the USB HID usage of the key's position ({page, usage}; page 7 is Keyboard/Keypad, page 12 Consumer), from the USB HID Usage Tables, the same on every OS and form. macOS reports the keys at usages 0x35 and 0x64 with swapped keycodes on an ISO keyboard (macos_iso), so a raw usage resolves to a keycode through the device's form.",
 		"karabiner": "Karabiner-Elements event object ({key_code}, {consumer_key_code} or {pointing_button}); null for a wheel direction, which Karabiner cannot take as input.",
 		"kanata": "kanata key name, in the short form every kanata release accepts.",
 		"macos_iso": "Overrides for macOS on an ISO keyboard: macOS reports the key left of 1 and the key left of Z with swapped codes (kVK_ISO_Section / kVK_ANSI_Grave, and non_us_backslash / grave_accent_and_tilde in Karabiner).",
@@ -24,6 +25,7 @@
 			"ahk_send": "Escape",
 			"evdev": 1,
 			"hs": 53,
+			"hid": { "page": 7, "usage": 41 },
 			"karabiner": { "key_code": "escape" },
 			"kanata": "esc",
 			"geometry": {
@@ -38,6 +40,7 @@
 			"ahk_send": "F1",
 			"evdev": 59,
 			"hs": 122,
+			"hid": { "page": 7, "usage": 58 },
 			"karabiner": { "key_code": "f1" },
 			"kanata": "f1",
 			"geometry": {
@@ -52,6 +55,7 @@
 			"ahk_send": "F2",
 			"evdev": 60,
 			"hs": 120,
+			"hid": { "page": 7, "usage": 59 },
 			"karabiner": { "key_code": "f2" },
 			"kanata": "f2",
 			"geometry": {
@@ -66,6 +70,7 @@
 			"ahk_send": "F3",
 			"evdev": 61,
 			"hs": 99,
+			"hid": { "page": 7, "usage": 60 },
 			"karabiner": { "key_code": "f3" },
 			"kanata": "f3",
 			"geometry": {
@@ -80,6 +85,7 @@
 			"ahk_send": "F4",
 			"evdev": 62,
 			"hs": 118,
+			"hid": { "page": 7, "usage": 61 },
 			"karabiner": { "key_code": "f4" },
 			"kanata": "f4",
 			"geometry": {
@@ -94,6 +100,7 @@
 			"ahk_send": "F5",
 			"evdev": 63,
 			"hs": 96,
+			"hid": { "page": 7, "usage": 62 },
 			"karabiner": { "key_code": "f5" },
 			"kanata": "f5",
 			"geometry": {
@@ -108,6 +115,7 @@
 			"ahk_send": "F6",
 			"evdev": 64,
 			"hs": 97,
+			"hid": { "page": 7, "usage": 63 },
 			"karabiner": { "key_code": "f6" },
 			"kanata": "f6",
 			"geometry": {
@@ -122,6 +130,7 @@
 			"ahk_send": "F7",
 			"evdev": 65,
 			"hs": 98,
+			"hid": { "page": 7, "usage": 64 },
 			"karabiner": { "key_code": "f7" },
 			"kanata": "f7",
 			"geometry": {
@@ -136,6 +145,7 @@
 			"ahk_send": "F8",
 			"evdev": 66,
 			"hs": 100,
+			"hid": { "page": 7, "usage": 65 },
 			"karabiner": { "key_code": "f8" },
 			"kanata": "f8",
 			"geometry": {
@@ -150,6 +160,7 @@
 			"ahk_send": "F9",
 			"evdev": 67,
 			"hs": 101,
+			"hid": { "page": 7, "usage": 66 },
 			"karabiner": { "key_code": "f9" },
 			"kanata": "f9",
 			"geometry": {
@@ -164,6 +175,7 @@
 			"ahk_send": "F10",
 			"evdev": 68,
 			"hs": 109,
+			"hid": { "page": 7, "usage": 67 },
 			"karabiner": { "key_code": "f10" },
 			"kanata": "f10",
 			"geometry": {
@@ -178,6 +190,7 @@
 			"ahk_send": "F11",
 			"evdev": 87,
 			"hs": 103,
+			"hid": { "page": 7, "usage": 68 },
 			"karabiner": { "key_code": "f11" },
 			"kanata": "f11",
 			"geometry": {
@@ -192,6 +205,7 @@
 			"ahk_send": "F12",
 			"evdev": 88,
 			"hs": 111,
+			"hid": { "page": 7, "usage": 69 },
 			"karabiner": { "key_code": "f12" },
 			"kanata": "f12",
 			"geometry": {
@@ -206,6 +220,7 @@
 			"ahk_send": null,
 			"evdev": 41,
 			"hs": 50,
+			"hid": { "page": 7, "usage": 53 },
 			"karabiner": { "key_code": "grave_accent_and_tilde" },
 			"kanata": "grv",
 			"macos_iso": { "hs": 10, "karabiner": { "key_code": "non_us_backslash" } },
@@ -221,6 +236,7 @@
 			"ahk_send": null,
 			"evdev": 2,
 			"hs": 18,
+			"hid": { "page": 7, "usage": 30 },
 			"karabiner": { "key_code": "1" },
 			"kanata": "1",
 			"geometry": {
@@ -235,6 +251,7 @@
 			"ahk_send": null,
 			"evdev": 3,
 			"hs": 19,
+			"hid": { "page": 7, "usage": 31 },
 			"karabiner": { "key_code": "2" },
 			"kanata": "2",
 			"geometry": {
@@ -249,6 +266,7 @@
 			"ahk_send": null,
 			"evdev": 4,
 			"hs": 20,
+			"hid": { "page": 7, "usage": 32 },
 			"karabiner": { "key_code": "3" },
 			"kanata": "3",
 			"geometry": {
@@ -263,6 +281,7 @@
 			"ahk_send": null,
 			"evdev": 5,
 			"hs": 21,
+			"hid": { "page": 7, "usage": 33 },
 			"karabiner": { "key_code": "4" },
 			"kanata": "4",
 			"geometry": {
@@ -277,6 +296,7 @@
 			"ahk_send": null,
 			"evdev": 6,
 			"hs": 23,
+			"hid": { "page": 7, "usage": 34 },
 			"karabiner": { "key_code": "5" },
 			"kanata": "5",
 			"geometry": {
@@ -291,6 +311,7 @@
 			"ahk_send": null,
 			"evdev": 7,
 			"hs": 22,
+			"hid": { "page": 7, "usage": 35 },
 			"karabiner": { "key_code": "6" },
 			"kanata": "6",
 			"geometry": {
@@ -305,6 +326,7 @@
 			"ahk_send": null,
 			"evdev": 8,
 			"hs": 26,
+			"hid": { "page": 7, "usage": 36 },
 			"karabiner": { "key_code": "7" },
 			"kanata": "7",
 			"geometry": {
@@ -319,6 +341,7 @@
 			"ahk_send": null,
 			"evdev": 9,
 			"hs": 28,
+			"hid": { "page": 7, "usage": 37 },
 			"karabiner": { "key_code": "8" },
 			"kanata": "8",
 			"geometry": {
@@ -333,6 +356,7 @@
 			"ahk_send": null,
 			"evdev": 10,
 			"hs": 25,
+			"hid": { "page": 7, "usage": 38 },
 			"karabiner": { "key_code": "9" },
 			"kanata": "9",
 			"geometry": {
@@ -347,6 +371,7 @@
 			"ahk_send": null,
 			"evdev": 11,
 			"hs": 29,
+			"hid": { "page": 7, "usage": 39 },
 			"karabiner": { "key_code": "0" },
 			"kanata": "0",
 			"geometry": {
@@ -361,6 +386,7 @@
 			"ahk_send": null,
 			"evdev": 12,
 			"hs": 27,
+			"hid": { "page": 7, "usage": 45 },
 			"karabiner": { "key_code": "hyphen" },
 			"kanata": "min",
 			"geometry": {
@@ -375,6 +401,7 @@
 			"ahk_send": null,
 			"evdev": 13,
 			"hs": 24,
+			"hid": { "page": 7, "usage": 46 },
 			"karabiner": { "key_code": "equal_sign" },
 			"kanata": "eql",
 			"geometry": {
@@ -389,6 +416,7 @@
 			"ahk_send": "BackSpace",
 			"evdev": 14,
 			"hs": 51,
+			"hid": { "page": 7, "usage": 42 },
 			"karabiner": { "key_code": "delete_or_backspace" },
 			"kanata": "bspc",
 			"geometry": {
@@ -403,6 +431,7 @@
 			"ahk_send": "Tab",
 			"evdev": 15,
 			"hs": 48,
+			"hid": { "page": 7, "usage": 43 },
 			"karabiner": { "key_code": "tab" },
 			"kanata": "tab",
 			"geometry": {
@@ -417,6 +446,7 @@
 			"ahk_send": null,
 			"evdev": 16,
 			"hs": 12,
+			"hid": { "page": 7, "usage": 20 },
 			"karabiner": { "key_code": "q" },
 			"kanata": "q",
 			"geometry": {
@@ -431,6 +461,7 @@
 			"ahk_send": null,
 			"evdev": 17,
 			"hs": 13,
+			"hid": { "page": 7, "usage": 26 },
 			"karabiner": { "key_code": "w" },
 			"kanata": "w",
 			"geometry": {
@@ -445,6 +476,7 @@
 			"ahk_send": null,
 			"evdev": 18,
 			"hs": 14,
+			"hid": { "page": 7, "usage": 8 },
 			"karabiner": { "key_code": "e" },
 			"kanata": "e",
 			"geometry": {
@@ -459,6 +491,7 @@
 			"ahk_send": null,
 			"evdev": 19,
 			"hs": 15,
+			"hid": { "page": 7, "usage": 21 },
 			"karabiner": { "key_code": "r" },
 			"kanata": "r",
 			"geometry": {
@@ -473,6 +506,7 @@
 			"ahk_send": null,
 			"evdev": 20,
 			"hs": 17,
+			"hid": { "page": 7, "usage": 23 },
 			"karabiner": { "key_code": "t" },
 			"kanata": "t",
 			"geometry": {
@@ -487,6 +521,7 @@
 			"ahk_send": null,
 			"evdev": 21,
 			"hs": 16,
+			"hid": { "page": 7, "usage": 28 },
 			"karabiner": { "key_code": "y" },
 			"kanata": "y",
 			"geometry": {
@@ -501,6 +536,7 @@
 			"ahk_send": null,
 			"evdev": 22,
 			"hs": 32,
+			"hid": { "page": 7, "usage": 24 },
 			"karabiner": { "key_code": "u" },
 			"kanata": "u",
 			"geometry": {
@@ -515,6 +551,7 @@
 			"ahk_send": null,
 			"evdev": 23,
 			"hs": 34,
+			"hid": { "page": 7, "usage": 12 },
 			"karabiner": { "key_code": "i" },
 			"kanata": "i",
 			"geometry": {
@@ -529,6 +566,7 @@
 			"ahk_send": null,
 			"evdev": 24,
 			"hs": 31,
+			"hid": { "page": 7, "usage": 18 },
 			"karabiner": { "key_code": "o" },
 			"kanata": "o",
 			"geometry": {
@@ -543,6 +581,7 @@
 			"ahk_send": null,
 			"evdev": 25,
 			"hs": 35,
+			"hid": { "page": 7, "usage": 19 },
 			"karabiner": { "key_code": "p" },
 			"kanata": "p",
 			"geometry": {
@@ -557,6 +596,7 @@
 			"ahk_send": null,
 			"evdev": 26,
 			"hs": 33,
+			"hid": { "page": 7, "usage": 47 },
 			"karabiner": { "key_code": "open_bracket" },
 			"kanata": "lbrc",
 			"geometry": {
@@ -571,6 +611,7 @@
 			"ahk_send": null,
 			"evdev": 27,
 			"hs": 30,
+			"hid": { "page": 7, "usage": 48 },
 			"karabiner": { "key_code": "close_bracket" },
 			"kanata": "rbrc",
 			"geometry": {
@@ -585,6 +626,7 @@
 			"ahk_send": null,
 			"evdev": 43,
 			"hs": 42,
+			"hid": { "page": 7, "usage": 49 },
 			"karabiner": { "key_code": "backslash" },
 			"kanata": "bksl",
 			"geometry": {
@@ -599,6 +641,7 @@
 			"ahk_send": "CapsLock",
 			"evdev": 58,
 			"hs": 57,
+			"hid": { "page": 7, "usage": 57 },
 			"karabiner": { "key_code": "caps_lock" },
 			"kanata": "caps",
 			"geometry": {
@@ -613,6 +656,7 @@
 			"ahk_send": null,
 			"evdev": 30,
 			"hs": 0,
+			"hid": { "page": 7, "usage": 4 },
 			"karabiner": { "key_code": "a" },
 			"kanata": "a",
 			"geometry": {
@@ -627,6 +671,7 @@
 			"ahk_send": null,
 			"evdev": 31,
 			"hs": 1,
+			"hid": { "page": 7, "usage": 22 },
 			"karabiner": { "key_code": "s" },
 			"kanata": "s",
 			"geometry": {
@@ -641,6 +686,7 @@
 			"ahk_send": null,
 			"evdev": 32,
 			"hs": 2,
+			"hid": { "page": 7, "usage": 7 },
 			"karabiner": { "key_code": "d" },
 			"kanata": "d",
 			"geometry": {
@@ -655,6 +701,7 @@
 			"ahk_send": null,
 			"evdev": 33,
 			"hs": 3,
+			"hid": { "page": 7, "usage": 9 },
 			"karabiner": { "key_code": "f" },
 			"kanata": "f",
 			"geometry": {
@@ -669,6 +716,7 @@
 			"ahk_send": null,
 			"evdev": 34,
 			"hs": 5,
+			"hid": { "page": 7, "usage": 10 },
 			"karabiner": { "key_code": "g" },
 			"kanata": "g",
 			"geometry": {
@@ -683,6 +731,7 @@
 			"ahk_send": null,
 			"evdev": 35,
 			"hs": 4,
+			"hid": { "page": 7, "usage": 11 },
 			"karabiner": { "key_code": "h" },
 			"kanata": "h",
 			"geometry": {
@@ -697,6 +746,7 @@
 			"ahk_send": null,
 			"evdev": 36,
 			"hs": 38,
+			"hid": { "page": 7, "usage": 13 },
 			"karabiner": { "key_code": "j" },
 			"kanata": "j",
 			"geometry": {
@@ -711,6 +761,7 @@
 			"ahk_send": null,
 			"evdev": 37,
 			"hs": 40,
+			"hid": { "page": 7, "usage": 14 },
 			"karabiner": { "key_code": "k" },
 			"kanata": "k",
 			"geometry": {
@@ -725,6 +776,7 @@
 			"ahk_send": null,
 			"evdev": 38,
 			"hs": 37,
+			"hid": { "page": 7, "usage": 15 },
 			"karabiner": { "key_code": "l" },
 			"kanata": "l",
 			"geometry": {
@@ -739,6 +791,7 @@
 			"ahk_send": null,
 			"evdev": 39,
 			"hs": 41,
+			"hid": { "page": 7, "usage": 51 },
 			"karabiner": { "key_code": "semicolon" },
 			"kanata": "scln",
 			"geometry": {
@@ -753,6 +806,7 @@
 			"ahk_send": null,
 			"evdev": 40,
 			"hs": 39,
+			"hid": { "page": 7, "usage": 52 },
 			"karabiner": { "key_code": "quote" },
 			"kanata": "apos",
 			"geometry": {
@@ -767,6 +821,7 @@
 			"ahk_send": "Enter",
 			"evdev": 28,
 			"hs": 36,
+			"hid": { "page": 7, "usage": 40 },
 			"karabiner": { "key_code": "return_or_enter" },
 			"kanata": "ret",
 			"geometry": {
@@ -788,6 +843,7 @@
 			"ahk_send": "LShift",
 			"evdev": 42,
 			"hs": 56,
+			"hid": { "page": 7, "usage": 225 },
 			"karabiner": { "key_code": "left_shift" },
 			"kanata": "lsft",
 			"geometry": {
@@ -802,6 +858,7 @@
 			"ahk_send": null,
 			"evdev": 86,
 			"hs": 10,
+			"hid": { "page": 7, "usage": 100 },
 			"karabiner": { "key_code": "non_us_backslash" },
 			"kanata": "102d",
 			"macos_iso": { "hs": 50, "karabiner": { "key_code": "grave_accent_and_tilde" } },
@@ -814,6 +871,7 @@
 			"ahk_send": null,
 			"evdev": 44,
 			"hs": 6,
+			"hid": { "page": 7, "usage": 29 },
 			"karabiner": { "key_code": "z" },
 			"kanata": "z",
 			"geometry": {
@@ -828,6 +886,7 @@
 			"ahk_send": null,
 			"evdev": 45,
 			"hs": 7,
+			"hid": { "page": 7, "usage": 27 },
 			"karabiner": { "key_code": "x" },
 			"kanata": "x",
 			"geometry": {
@@ -842,6 +901,7 @@
 			"ahk_send": null,
 			"evdev": 46,
 			"hs": 8,
+			"hid": { "page": 7, "usage": 6 },
 			"karabiner": { "key_code": "c" },
 			"kanata": "c",
 			"geometry": {
@@ -856,6 +916,7 @@
 			"ahk_send": null,
 			"evdev": 47,
 			"hs": 9,
+			"hid": { "page": 7, "usage": 25 },
 			"karabiner": { "key_code": "v" },
 			"kanata": "v",
 			"geometry": {
@@ -870,6 +931,7 @@
 			"ahk_send": null,
 			"evdev": 48,
 			"hs": 11,
+			"hid": { "page": 7, "usage": 5 },
 			"karabiner": { "key_code": "b" },
 			"kanata": "b",
 			"geometry": {
@@ -884,6 +946,7 @@
 			"ahk_send": null,
 			"evdev": 49,
 			"hs": 45,
+			"hid": { "page": 7, "usage": 17 },
 			"karabiner": { "key_code": "n" },
 			"kanata": "n",
 			"geometry": {
@@ -898,6 +961,7 @@
 			"ahk_send": null,
 			"evdev": 50,
 			"hs": 46,
+			"hid": { "page": 7, "usage": 16 },
 			"karabiner": { "key_code": "m" },
 			"kanata": "m",
 			"geometry": {
@@ -912,6 +976,7 @@
 			"ahk_send": null,
 			"evdev": 51,
 			"hs": 43,
+			"hid": { "page": 7, "usage": 54 },
 			"karabiner": { "key_code": "comma" },
 			"kanata": "comm",
 			"geometry": {
@@ -926,6 +991,7 @@
 			"ahk_send": null,
 			"evdev": 52,
 			"hs": 47,
+			"hid": { "page": 7, "usage": 55 },
 			"karabiner": { "key_code": "period" },
 			"kanata": ".",
 			"geometry": {
@@ -940,6 +1006,7 @@
 			"ahk_send": null,
 			"evdev": 53,
 			"hs": 44,
+			"hid": { "page": 7, "usage": 56 },
 			"karabiner": { "key_code": "slash" },
 			"kanata": "/",
 			"geometry": {
@@ -954,6 +1021,7 @@
 			"ahk_send": "RShift",
 			"evdev": 54,
 			"hs": 60,
+			"hid": { "page": 7, "usage": 229 },
 			"karabiner": { "key_code": "right_shift" },
 			"kanata": "rsft",
 			"geometry": {
@@ -968,6 +1036,7 @@
 			"ahk_send": "LCtrl",
 			"evdev": 29,
 			"hs": 59,
+			"hid": { "page": 7, "usage": 224 },
 			"karabiner": { "key_code": "left_control" },
 			"kanata": "lctl",
 			"geometry": {
@@ -982,6 +1051,7 @@
 			"ahk_send": "LWin",
 			"evdev": 125,
 			"hs": 55,
+			"hid": { "page": 7, "usage": 227 },
 			"karabiner": { "key_code": "left_command" },
 			"kanata": "lmet",
 			"geometry": {
@@ -996,6 +1066,7 @@
 			"ahk_send": "LAlt",
 			"evdev": 56,
 			"hs": 58,
+			"hid": { "page": 7, "usage": 226 },
 			"karabiner": { "key_code": "left_option" },
 			"kanata": "lalt",
 			"geometry": {
@@ -1010,6 +1081,7 @@
 			"ahk_send": "Space",
 			"evdev": 57,
 			"hs": 49,
+			"hid": { "page": 7, "usage": 44 },
 			"karabiner": { "key_code": "spacebar" },
 			"kanata": "spc",
 			"geometry": {
@@ -1024,6 +1096,7 @@
 			"ahk_send": "RAlt",
 			"evdev": 100,
 			"hs": 61,
+			"hid": { "page": 7, "usage": 230 },
 			"karabiner": { "key_code": "right_option" },
 			"kanata": "ralt",
 			"geometry": {
@@ -1038,6 +1111,7 @@
 			"ahk_send": "RWin",
 			"evdev": 126,
 			"hs": 54,
+			"hid": { "page": 7, "usage": 231 },
 			"karabiner": { "key_code": "right_command" },
 			"kanata": "rmet",
 			"geometry": {
@@ -1052,6 +1126,7 @@
 			"ahk_send": "AppsKey",
 			"evdev": 127,
 			"hs": 110,
+			"hid": { "page": 7, "usage": 101 },
 			"karabiner": { "key_code": "application" },
 			"kanata": "comp",
 			"geometry": {
@@ -1066,6 +1141,7 @@
 			"ahk_send": "RCtrl",
 			"evdev": 97,
 			"hs": 62,
+			"hid": { "page": 7, "usage": 228 },
 			"karabiner": { "key_code": "right_control" },
 			"kanata": "rctl",
 			"geometry": {
@@ -1080,6 +1156,7 @@
 			"ahk_send": "Insert",
 			"evdev": 110,
 			"hs": 114,
+			"hid": { "page": 7, "usage": 73 },
 			"karabiner": { "key_code": "insert" },
 			"kanata": "ins",
 			"geometry": {
@@ -1094,6 +1171,7 @@
 			"ahk_send": "Delete",
 			"evdev": 111,
 			"hs": 117,
+			"hid": { "page": 7, "usage": 76 },
 			"karabiner": { "key_code": "delete_forward" },
 			"kanata": "del",
 			"geometry": {
@@ -1108,6 +1186,7 @@
 			"ahk_send": "Home",
 			"evdev": 102,
 			"hs": 115,
+			"hid": { "page": 7, "usage": 74 },
 			"karabiner": { "key_code": "home" },
 			"kanata": "home",
 			"geometry": {
@@ -1122,6 +1201,7 @@
 			"ahk_send": "End",
 			"evdev": 107,
 			"hs": 119,
+			"hid": { "page": 7, "usage": 77 },
 			"karabiner": { "key_code": "end" },
 			"kanata": "end",
 			"geometry": {
@@ -1136,6 +1216,7 @@
 			"ahk_send": "PgUp",
 			"evdev": 104,
 			"hs": 116,
+			"hid": { "page": 7, "usage": 75 },
 			"karabiner": { "key_code": "page_up" },
 			"kanata": "pgup",
 			"geometry": {
@@ -1150,6 +1231,7 @@
 			"ahk_send": "PgDn",
 			"evdev": 109,
 			"hs": 121,
+			"hid": { "page": 7, "usage": 78 },
 			"karabiner": { "key_code": "page_down" },
 			"kanata": "pgdn",
 			"geometry": {
@@ -1164,6 +1246,7 @@
 			"ahk_send": "Up",
 			"evdev": 103,
 			"hs": 126,
+			"hid": { "page": 7, "usage": 82 },
 			"karabiner": { "key_code": "up_arrow" },
 			"kanata": "up",
 			"geometry": {
@@ -1178,6 +1261,7 @@
 			"ahk_send": "Left",
 			"evdev": 105,
 			"hs": 123,
+			"hid": { "page": 7, "usage": 80 },
 			"karabiner": { "key_code": "left_arrow" },
 			"kanata": "left",
 			"geometry": {
@@ -1192,6 +1276,7 @@
 			"ahk_send": "Down",
 			"evdev": 108,
 			"hs": 125,
+			"hid": { "page": 7, "usage": 81 },
 			"karabiner": { "key_code": "down_arrow" },
 			"kanata": "down",
 			"geometry": {
@@ -1206,6 +1291,7 @@
 			"ahk_send": "Right",
 			"evdev": 106,
 			"hs": 124,
+			"hid": { "page": 7, "usage": 79 },
 			"karabiner": { "key_code": "right_arrow" },
 			"kanata": "rght",
 			"geometry": {
@@ -1220,6 +1306,7 @@
 			"ahk_send": "NumLock",
 			"evdev": 69,
 			"hs": 71,
+			"hid": { "page": 7, "usage": 83 },
 			"karabiner": { "key_code": "keypad_num_lock" },
 			"kanata": "nlck",
 			"geometry": {
@@ -1234,6 +1321,7 @@
 			"ahk_send": "NumpadDiv",
 			"evdev": 98,
 			"hs": 75,
+			"hid": { "page": 7, "usage": 84 },
 			"karabiner": { "key_code": "keypad_slash" },
 			"kanata": "kp/",
 			"geometry": {
@@ -1248,6 +1336,7 @@
 			"ahk_send": "NumpadMult",
 			"evdev": 55,
 			"hs": 67,
+			"hid": { "page": 7, "usage": 85 },
 			"karabiner": { "key_code": "keypad_asterisk" },
 			"kanata": "kp*",
 			"geometry": {
@@ -1262,6 +1351,7 @@
 			"ahk_send": "NumpadSub",
 			"evdev": 74,
 			"hs": 78,
+			"hid": { "page": 7, "usage": 86 },
 			"karabiner": { "key_code": "keypad_hyphen" },
 			"kanata": "kp-",
 			"geometry": {
@@ -1276,6 +1366,7 @@
 			"ahk_send": "Numpad7",
 			"evdev": 71,
 			"hs": 89,
+			"hid": { "page": 7, "usage": 95 },
 			"karabiner": { "key_code": "keypad_7" },
 			"kanata": "kp7",
 			"geometry": {
@@ -1290,6 +1381,7 @@
 			"ahk_send": "Numpad8",
 			"evdev": 72,
 			"hs": 91,
+			"hid": { "page": 7, "usage": 96 },
 			"karabiner": { "key_code": "keypad_8" },
 			"kanata": "kp8",
 			"geometry": {
@@ -1304,6 +1396,7 @@
 			"ahk_send": "Numpad9",
 			"evdev": 73,
 			"hs": 92,
+			"hid": { "page": 7, "usage": 97 },
 			"karabiner": { "key_code": "keypad_9" },
 			"kanata": "kp9",
 			"geometry": {
@@ -1318,6 +1411,7 @@
 			"ahk_send": "NumpadAdd",
 			"evdev": 78,
 			"hs": 69,
+			"hid": { "page": 7, "usage": 87 },
 			"karabiner": { "key_code": "keypad_plus" },
 			"kanata": "kp+",
 			"geometry": {
@@ -1332,6 +1426,7 @@
 			"ahk_send": "Numpad4",
 			"evdev": 75,
 			"hs": 86,
+			"hid": { "page": 7, "usage": 92 },
 			"karabiner": { "key_code": "keypad_4" },
 			"kanata": "kp4",
 			"geometry": {
@@ -1346,6 +1441,7 @@
 			"ahk_send": "Numpad5",
 			"evdev": 76,
 			"hs": 87,
+			"hid": { "page": 7, "usage": 93 },
 			"karabiner": { "key_code": "keypad_5" },
 			"kanata": "kp5",
 			"geometry": {
@@ -1360,6 +1456,7 @@
 			"ahk_send": "Numpad6",
 			"evdev": 77,
 			"hs": 88,
+			"hid": { "page": 7, "usage": 94 },
 			"karabiner": { "key_code": "keypad_6" },
 			"kanata": "kp6",
 			"geometry": {
@@ -1374,6 +1471,7 @@
 			"ahk_send": "Numpad1",
 			"evdev": 79,
 			"hs": 83,
+			"hid": { "page": 7, "usage": 89 },
 			"karabiner": { "key_code": "keypad_1" },
 			"kanata": "kp1",
 			"geometry": {
@@ -1388,6 +1486,7 @@
 			"ahk_send": "Numpad2",
 			"evdev": 80,
 			"hs": 84,
+			"hid": { "page": 7, "usage": 90 },
 			"karabiner": { "key_code": "keypad_2" },
 			"kanata": "kp2",
 			"geometry": {
@@ -1402,6 +1501,7 @@
 			"ahk_send": "Numpad3",
 			"evdev": 81,
 			"hs": 85,
+			"hid": { "page": 7, "usage": 91 },
 			"karabiner": { "key_code": "keypad_3" },
 			"kanata": "kp3",
 			"geometry": {
@@ -1416,6 +1516,7 @@
 			"ahk_send": "NumpadEnter",
 			"evdev": 96,
 			"hs": 76,
+			"hid": { "page": 7, "usage": 88 },
 			"karabiner": { "key_code": "keypad_enter" },
 			"kanata": "kprt",
 			"geometry": {
@@ -1430,6 +1531,7 @@
 			"ahk_send": "Numpad0",
 			"evdev": 82,
 			"hs": 82,
+			"hid": { "page": 7, "usage": 98 },
 			"karabiner": { "key_code": "keypad_0" },
 			"kanata": "kp0",
 			"geometry": {
@@ -1444,6 +1546,7 @@
 			"ahk_send": "NumpadDot",
 			"evdev": 83,
 			"hs": 65,
+			"hid": { "page": 7, "usage": 99 },
 			"karabiner": { "key_code": "keypad_period" },
 			"kanata": "kp.",
 			"geometry": {
@@ -1458,6 +1561,7 @@
 			"ahk_send": "Volume_Mute",
 			"evdev": 113,
 			"hs": 74,
+			"hid": { "page": 12, "usage": 226 },
 			"karabiner": { "consumer_key_code": "mute" },
 			"kanata": "mute"
 		},
@@ -1468,6 +1572,7 @@
 			"ahk_send": "Volume_Down",
 			"evdev": 114,
 			"hs": 73,
+			"hid": { "page": 12, "usage": 234 },
 			"karabiner": { "consumer_key_code": "volume_decrement" },
 			"kanata": "vold"
 		},
@@ -1478,6 +1583,7 @@
 			"ahk_send": "Volume_Up",
 			"evdev": 115,
 			"hs": 72,
+			"hid": { "page": 12, "usage": 233 },
 			"karabiner": { "consumer_key_code": "volume_increment" },
 			"kanata": "volu"
 		},
