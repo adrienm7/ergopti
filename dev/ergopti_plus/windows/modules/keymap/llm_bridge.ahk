@@ -479,6 +479,61 @@ _LLM_Accept_IsAllowed(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSour
 	return _LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource)
 }
 
+; Names the gate of the canonical policy that refuses a Tab, or "" when the
+; policy admits it. It evaluates the same two predicates as _LLM_Accept_IsAllowed
+; in the same order, so a refusal always has exactly one name.
+_LLM_Accept_RefusalGate(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSource) {
+	if !_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
+		return _LLM_Accept_BareTabRefusal(IsPhysicalTabEvent, Modifiers, InputSnapshot)
+	if !_LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource)
+		return "the focus is not the control the prediction was rendered for"
+	return ""
+}
+
+; The conjunct of _LLM_Accept_IsBarePhysicalTabEvent that fails, checked in its
+; own order. Only called once that predicate answered false.
+_LLM_Accept_BareTabRefusal(IsPhysicalTabEvent, Modifiers, InputSnapshot) {
+	if !(IsPhysicalTabEvent is Integer) or IsPhysicalTabEvent != true
+		return "the Tab is not a physical event"
+	if _LLM_Accept_HasDeclaredModifiers(Modifiers)
+		return "the Tab declares modifiers"
+	if !(InputSnapshot is Map)
+		return "the input snapshot is missing"
+	for Key in ["known", "tab_down", "ctrl_down", "alt_down", "shift_down",
+			"win_down", "current_hwnd", "current_control"] {
+		if !InputSnapshot.Has(Key)
+			return "the input snapshot is incomplete"
+	}
+	for Key in ["known", "tab_down", "ctrl_down", "alt_down", "shift_down", "win_down"] {
+		if !(InputSnapshot[Key] is Integer)
+			return "the input snapshot is incomplete"
+	}
+	if !InputSnapshot["known"]
+		return "the focus could not be verified"
+	if !InputSnapshot["tab_down"]
+		return "Tab is not physically down"
+	if _LLM_Accept_AnyModifierDown(InputSnapshot)
+		return "a modifier is physically held"
+	throw Error("The bare physical Tab policy refused a press none of its conditions refuses.")
+}
+
+/**
+ * Traces at DEBUG the gate that refused a physical Tab while a prediction is on
+ * screen. That refusal is otherwise invisible: the Tab reaches the application
+ * or the key's tap-hold instead. Silent while no prediction is shown, which is
+ * every ordinary Tab press, and while only the loading indicator is.
+ * @param {String} Gate - What refused the press.
+ * @returns {Boolean} True when the refusal was traced.
+ */
+LLM_Tooltip_ReportTabRefusal(Gate) {
+	if !(Gate is String) || Gate == ""
+		throw ValueError("A refused Tab must name the gate that refused it.")
+	if !LLM_Tooltip_IsVisible() || LLM_Tooltip_IsLoading()
+		return false
+	try LoggerDebug("LLM", "Physical Tab not accepted over a shown prediction: {1}.", Gate)
+	return true
+}
+
 /**
  * Canonical LLM acceptance primitive. Only an unmodified PHYSICAL Tab in the
  * exact HWND/control that owns the rendered prediction may inject it. Optional
@@ -498,25 +553,43 @@ LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnap
 	Presented := LLM_Tooltip_GetAcceptSnapshot()
 	if !IsSet(InputSnapshot)
 		InputSnapshot := _LLM_Accept_ReadInputSnapshot()
+	; Only a physical Tab can accept, so only its refusal is worth a trace.
+	TraceRefusal := (IsPhysicalTabEvent is Integer) && IsPhysicalTabEvent == true
+	RefusedGate := ""
+	Joined := false
 	PreviousCritical := Critical("On")
 	try {
 		; The HotIf and InputHook callbacks can observe the SAME physical Tab. The
 		; first callback owns injection; a sibling may join only when it proves the
 		; same bare physical-Tab profile. Chords and remaps keep their normal output.
 		if _LLM_AcceptInProgress {
-			return _LLM_Accept_IsBarePhysicalTabEvent(
+			Joined := _LLM_Accept_IsBarePhysicalTabEvent(
 				IsPhysicalTabEvent, Modifiers, InputSnapshot)
+			if !Joined
+				RefusedGate := "another acceptance owns the claim"
+		} else if !IsObject(Presented) {
+			RefusedGate := "the shown prediction offers no acceptable snapshot"
+		} else if !_LLM_Accept_IsAllowed(
+				IsPhysicalTabEvent, Modifiers, InputSnapshot,
+				Presented.AcceptSource) {
+			RefusedGate := TraceRefusal
+				? _LLM_Accept_RefusalGate(IsPhysicalTabEvent, Modifiers,
+					InputSnapshot, Presented.AcceptSource)
+				: "the Tab is not a physical event"
 		}
-		if !IsObject(Presented)
-			return false
-		if !_LLM_Accept_IsAllowed(
-			IsPhysicalTabEvent, Modifiers, InputSnapshot,
-			Presented.AcceptSource)
-			return false
 	} finally {
 		Critical(PreviousCritical)
 	}
-	return _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?)
+	if Joined
+		return true
+	if (RefusedGate == "") {
+		if _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?)
+			return true
+		RefusedGate := "the shown prediction changed before its claim"
+	}
+	if TraceRefusal
+		LLM_Tooltip_ReportTabRefusal(RefusedGate)
+	return false
 }
 
 /**
