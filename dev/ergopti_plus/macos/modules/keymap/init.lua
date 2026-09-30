@@ -1242,6 +1242,19 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	local dt  = now - CoreState.last_key_time
 	CoreState.last_key_time = now
+	local flags = e:getFlags()
+
+	-- 2. Route LLM prediction keys (Tab / Enter / digits / arrows) before the
+	-- pause wipe and the buffer logic. Tagged synthetic keys already returned
+	-- above, so every event here is a real input/control event and must retain
+	-- the normal LLM semantics. A chord the visible tooltip owns types nothing:
+	-- reading the predictions for longer than the word timeout must not dismiss
+	-- them and hand that chord to the application (llm-tooltip-chords-consumed).
+	-- F16 is an internal control channel only when its exact Quartz tag says so.
+	-- A physical/programmable F16 must never satisfy chain_pending ahead of the
+	-- delayed loopback that owns that edge.
+	if not internal_loopback and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
+		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 
 	-- Wipe the buffer after the user pauses long enough that the next keystroke
 	-- cannot possibly belong to the same word. The pause itself stands in for
@@ -1254,11 +1267,6 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		LLMBridge.reset_predictions()
 	end
 
-	local flags = e:getFlags()
-
-	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.
-	-- Tagged synthetic keys already returned above, so every event here is a real
-	-- input/control event and must retain the normal LLM semantics.
 	if internal_loopback then
 		-- F16 is an internal edge, never application input. A declined chain (for
 		-- example after a reset) is still consumed; only the first live delivery may
@@ -1266,11 +1274,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		LLMBridge.handle_llm_keys(keyCode, flags, false)
 		return true
 	end
-	-- F16 is an internal control channel only when its exact Quartz tag says so.
-	-- A physical/programmable F16 must never satisfy chain_pending ahead of the
-	-- delayed loopback that owns that edge.
 	if keyCode == Keycodes.F16_LLM_CHAIN_SIGNAL then return false end
-	if LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 
 	-- 3. Run custom interceptors registered by external modules.
 	-- The character is read HERE rather than at step 8, because the interceptors

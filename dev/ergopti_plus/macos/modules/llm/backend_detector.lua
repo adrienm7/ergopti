@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Decides which LLM backend ("mlx" or "ollama") should be the default on
 --- the current host. The rule is straightforward and deterministic:
----   - macOS on Apple Silicon (arm64) ≥ 13.0  → "mlx"  (native MLX runtime)
+---   - macOS on Apple Silicon (arm64) ≥ 14.0  → "mlx"  (native MLX runtime)
 ---   - everything else                         → "ollama" (portable fallback)
 ---
 --- A user-saved preference (hs.settings: "llm_backend") always wins over the
@@ -45,11 +45,13 @@ M.BACKEND_MLX    = "mlx"
 M.BACKEND_OLLAMA = "ollama"
 M.BACKEND_API    = "api"  -- remote provider (OpenAI / Anthropic / Gemini / …)
 
--- macOS minimum version required for the MLX backend. MLX itself supports
--- 13.5+ in practice; we accept ≥ 13.0 as a permissive floor and let the
--- pip install fail loudly if the OS is too old (the deps checker surfaces
--- the failure through the unified progress UI).
-local MLX_MIN_MACOS_MAJOR = 13
+-- Oldest macOS the MLX runtime installs on: the mlx and mlx-metal wheels the
+-- committed uv.lock pins start at macosx_14_0_arm64. The former floor of 13
+-- picked MLX on macOS 13, where uv sync then failed with no wheel "for the
+-- current platform", reported as a network error. A test reads uv.lock to
+-- keep this floor equal to the oldest locked wheel.
+local MLX_MIN_MACOS_MAJOR = 14
+M.MLX_MIN_MACOS_MAJOR = MLX_MIN_MACOS_MAJOR
 
 -- Hammerspoon-settings key under which the user's explicit choice is
 -- persisted. Picking the same key as menu_llm.DEFAULT_STATE keeps the two
@@ -70,6 +72,9 @@ local SETTING_KEY = "llm_backend"
 --- @return boolean True when the host CPU is arm64.
 local _is_arm_cached = nil
 local _macos_major_cached = nil
+-- The architecture uname named ("arm64" or "x86_64"), or false when it named
+-- neither, so a fallback guess is never reported as a probed fact.
+local _probed_arch = nil
 
 local function is_apple_silicon()
 	-- Memoised: the CPU architecture cannot change while the process runs, and
@@ -77,9 +82,10 @@ local function is_apple_silicon()
 	-- boot, on the critical path before the keymap starts.
 	if _is_arm_cached ~= nil then return _is_arm_cached end
 	local ok, out = pcall(hs.execute, "/usr/bin/uname -m")
+	_probed_arch = false
 	if ok and type(out) == "string" then
-		if out:match("arm64") then _is_arm_cached = true; return true end
-		if out:match("x86_64") then _is_arm_cached = false; return false end
+		if out:match("arm64") then _probed_arch = "arm64"; _is_arm_cached = true; return true end
+		if out:match("x86_64") then _probed_arch = "x86_64"; _is_arm_cached = false; return false end
 	end
 	-- Heuristic fallback: Homebrew on Apple Silicon installs to /opt/homebrew,
 	-- on Intel to /usr/local. Not 100 % bullet-proof, but catches every
@@ -134,6 +140,23 @@ function M.auto_default()
 	Logger.debug(LOG, "Auto-default = ollama (arm=%s, macOS major=%s).",
 		tostring(arm), tostring(major))
 	return M.BACKEND_OLLAMA
+end
+
+--- Tells whether this Mac can run the MLX runtime: Apple Silicon running
+--- natively (Ergopti under Rosetta reads x86_64 and gets x86_64 wheels) and
+--- macOS MLX_MIN_MACOS_MAJOR or later. Only a probed fact refuses: an
+--- architecture or a version that cannot be read lets the installation try
+--- and name its own failure.
+--- @return boolean supported False only when a probe proved MLX cannot run.
+--- @return table platform { arch = "arm64"|"x86_64"|nil, macos_major = integer|nil }
+function M.mlx_support()
+	is_apple_silicon()
+	local arch = _probed_arch or nil
+	local major = macos_major_version()
+	local platform = { arch = arch, macos_major = major }
+	if arch == "x86_64" then return false, platform end
+	if major ~= nil and major < MLX_MIN_MACOS_MAJOR then return false, platform end
+	return true, platform
 end
 
 --- Returns the effective backend the rest of the stack should use. Honours

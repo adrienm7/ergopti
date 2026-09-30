@@ -385,9 +385,13 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 	}
 	CandidatePlan := Built["plan"]
 	; Resolves each chord's native spelling and physical identity from one
-	; keyboard-layout snapshot; the plan check below refuses any entry left
-	; without them, and a duplicate physical owner leaves the plan untouched.
-	if !_LLM_Menu_AttachPlanPhysicalIdentities(CandidatePlan, KeyResolverFn) {
+	; keyboard-layout snapshot, a digit by its digit-row key; the plan check
+	; below refuses any entry left without them, and a duplicate physical owner
+	; leaves the plan untouched.
+	LayoutResolver := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	if !HasMethod(LayoutResolver, "Call")
+			|| !_LLM_Menu_AttachPlanPhysicalIdentities(CandidatePlan,
+				_LLM_Menu_NavDigitRowKey.Bind(LayoutResolver)) {
 		_LLM_Menu_LogNavBindingFailure(
 			"Navigation hotkeys rejected: physical ownership could not be resolved.",
 			LogFn)

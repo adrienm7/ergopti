@@ -34,6 +34,9 @@ local OWNED_MODULES = {
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer",
+	"ui.menu.menu_llm.mlx_repair_offer",
+	"modules.llm.mlx_bootstrap_diagnosis",
+	"modules.llm.backend_detector",
 	"adapters.timer_scheduler",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"adapters.event_provenance",
@@ -418,6 +421,8 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["modules.llm.mlx_deps_checker"] = {
 		install_for_selection = mlx_selection_bootstrap,
 		runtime_installed = function() return options.mlx_installed == true end,
+		-- A failed selection opens the repair offer with the checker's cause.
+		get_failure_cause = function() return nil end,
 	}
 	calls.ollama_installs = 0
 	package.loaded["modules.llm.ollama_deps_checker"] = {

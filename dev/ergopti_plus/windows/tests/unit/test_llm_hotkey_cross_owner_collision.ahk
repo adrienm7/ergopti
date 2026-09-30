@@ -318,13 +318,12 @@ _LHCC_DescriptorPhysicalKey(Key) {
 	return _LHCC_FrenchPhysicalKey(Key)
 }
 
+; Up and Down resolved to one key: two navigation routes, one physical owner.
+; A digit cannot collide this way any more, since the plan names every digit
+; by its own digit-row key (_LLM_Menu_NavDigitRowKey).
 _LHCC_NavDuplicatePhysicalKey(Key) {
-	if Key == "1"
-		return Map("axis", "vk", "code", 0x31,
-			"implicit_modifiers", "+")
-	if Key == "2"
-		return Map("axis", "vk", "code", 0x31,
-			"implicit_modifiers", "")
+	if StrLower(Key) == "down"
+		return _LHCC_UsPhysicalKey("up")
 	return _LHCC_UsPhysicalKey(Key)
 }
 
@@ -470,8 +469,10 @@ _LHCC_FrozenSpecsKeepBindingLayoutCore() {
 	AssertFalse(_LPHT_Hotkeys.Has("^5"),
 		"profile Hotkey() must never reparse the logical digit after admission")
 
-	; The navigation generation freezes the same way: the French !5 owns
-	; Alt+Shift+VK35, a Shift bit the textual menu does not spell.
+	; The navigation generation freezes too, but its digit is the digit-row
+	; key: the Shift the French layout needs to type 5 is no part of the
+	; validation chord, which is the key labelled 5, as on macOS and Linux
+	; (llm-accept-inserts).
 	_LHCC_InstallReservedMenuState()
 	_LLM_Menu["val_modifiers"] := "alt"
 	_LNHT_Reset()
@@ -488,10 +489,12 @@ _LHCC_FrozenSpecsKeepBindingLayoutCore() {
 		}
 	}
 	AssertTrue(PublishedFive is Map)
-	AssertEqual("!+vk35", PublishedFive["native_spec"])
-	AssertEqual("!+vk35", PublishedFive["native_id"])
-	AssertEqual("!+vk0035", PublishedFive["physical_id"])
-	AssertTrue(_LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|!+vk35"))
+	AssertEqual("!vk35", PublishedFive["native_spec"])
+	AssertEqual("!vk35", PublishedFive["native_id"])
+	AssertEqual("!vk0035", PublishedFive["physical_id"])
+	AssertTrue(_LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|!vk35"))
+	AssertFalse(_LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|!+vk35"),
+		"the layout's Shift for the character 5 must not join the validation chord")
 	AssertFalse(_LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|!5"),
 		"navigation Hotkey() must receive only the frozen explicit VK spec")
 	return true
@@ -800,12 +803,16 @@ _LHCC_NavCleanupKeepsRegistrationLayoutCore() {
 	_LNHT_Reset()
 	_LLM_Menu["nav_modifiers"] := "alt"
 	_LLM_Menu["val_modifiers"] := "ctrl"
+	; The validation chord is the digit-row key on every layout
+	; (llm-accept-inserts): the French binding freezes the same Ctrl+VK35 as the
+	; US one, never the Ctrl+Shift+VK35 that types 5 on AZERTY.
 	FrenchStatus := LLM_Menu_BindNavHotkeys(_LLM_Menu, _LNHT_Hotkey,
 		_LNHT_HotIf, _LNHT_Log, _LNHT_ForceHotIfReset,
 		_LHCC_FrenchPhysicalKey)
 	AssertTrue((FrenchStatus is Integer) && FrenchStatus == 1)
 	AssertEqual(1, _LLM_Menu_NavActiveSlot)
-	AssertTrue(_LNHT_Hotkeys.Has("1|^+vk35"))
+	AssertTrue(_LNHT_Hotkeys.Has("1|^vk35"))
+	AssertFalse(_LNHT_Hotkeys.Has("1|^+vk35"))
 	AssertFalse(_LNHT_Hotkeys.Has("1|^5"))
 	FrenchPlan := _LLM_Menu_NavSlotPlans[1]
 
@@ -816,6 +823,9 @@ _LHCC_NavCleanupKeepsRegistrationLayoutCore() {
 	AssertEqual(2, _LLM_Menu_NavActiveSlot)
 	AssertTrue(_LNHT_Hotkeys.Has("2|^vk35"))
 
+	; A rebind that fails after registering the digit restores the prior
+	; generation: the same exact native variant is registered again, nothing of
+	; it is retired.
 	_LNHT_Events := []
 	_LNHT_FailSpec := "^vk35"
 	_LNHT_FailAfterApply := true
@@ -824,11 +834,11 @@ _LHCC_NavCleanupKeepsRegistrationLayoutCore() {
 		_LHCC_UsPhysicalKey)
 	AssertTrue((RollbackStatus is Integer) && RollbackStatus == 0)
 	AssertTrue(_LLM_Menu_NavSlotPlans[1] == FrenchPlan)
-	AssertTrue(_LNHT_Hotkeys.Has("1|^+vk35"))
-	AssertFalse(_LNHT_Hotkeys.Has("1|^vk35"))
-	AssertEqual(1, _LHCC_EventCount(_LNHT_Events, "1|^vk35 On"))
-	AssertEqual(1, _LHCC_EventCount(_LNHT_Events, "1|^vk35 Off"))
-	AssertEqual(1, _LHCC_EventCount(_LNHT_Events, "1|^+vk35 On"))
+	AssertTrue(_LNHT_Hotkeys.Has("1|^vk35"))
+	AssertFalse(_LNHT_Hotkeys.Has("1|^+vk35"))
+	AssertEqual(2, _LHCC_EventCount(_LNHT_Events, "1|^vk35 On"),
+		"the failed attempt and the restore must each register the exact variant once")
+	AssertEqual(0, _LHCC_EventCount(_LNHT_Events, "1|^vk35 Off"))
 
 	_LNHT_Events := []
 	_LNHT_FailSpec := ""
@@ -840,8 +850,8 @@ _LHCC_NavCleanupKeepsRegistrationLayoutCore() {
 	AssertEqual(1, _LLM_Menu_NavActiveSlot)
 	AssertFalse(_LNHT_Hotkeys.Has("1|^+vk35"))
 	AssertTrue(_LNHT_Hotkeys.Has("1|^vk35"))
-	AssertEqual(1, _LHCC_EventCount(_LNHT_Events, "1|^+vk35 Off"),
-		"slot recycling must retire the exact prior-layout native variant")
+	AssertEqual(0, _LHCC_EventCount(_LNHT_Events, "1|^vk35 Off"),
+		"slot recycling keeps the layout-independent variant it binds again")
 	AssertEqual(1, _LHCC_EventCount(_LNHT_Events, "1|^vk35 On"))
 	return true
 }

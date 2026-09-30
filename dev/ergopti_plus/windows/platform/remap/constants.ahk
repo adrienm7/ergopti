@@ -1101,6 +1101,29 @@ TapHoldPriorKeyIsSelf(KeyId, PriorKey := unset, KeyNameFn := 0) {
 	return PriorKey == Expected
 }
 
+; The tap-hold key whose physical tap TapHoldDispatchTap is running now, or "".
+; Only the hotkeys of the physical tap-hold keys dispatch a tap, on the release
+; of the key they own, so a keystroke sent inside that dispatch is the user's
+; own key: a Tab tapped there accepts a shown prediction as the physical Tab
+; does (TapHoldTapProvenance, llm-accept-inserts).
+global _TapHoldTapInDispatch := ""
+
+; @return {String} The key id whose physical tap is being dispatched, or "".
+TapHoldTapInDispatch() {
+	global _TapHoldTapInDispatch
+	return IsSet(_TapHoldTapInDispatch) ? _TapHoldTapInDispatch : ""
+}
+
+; The provenance of a keystroke tap sent now: the tap-hold key the user just
+; tapped, or false outside a dispatch (a gesture, a macro, a timer, a text
+; send). The acceptance policy trusts it only while that same tap is still
+; being dispatched.
+; @return {Map|Boolean} Map("kind", "tap_hold_tap", "key_id", KeyId), or false.
+TapHoldTapProvenance() {
+	KeyId := TapHoldTapInDispatch()
+	return KeyId == "" ? false : Map("kind", "tap_hold_tap", "key_id", KeyId)
+}
+
 ; Run any tap output through the single activity/suspend gate, then consume the
 ; tracked physical press. Native taps (Space, Enter, Backspace, Escape, Delete)
 ; must use this helper too; otherwise only GESTURE_ACTIONS-based taps are safe.
@@ -1108,7 +1131,7 @@ TapHoldPriorKeyIsSelf(KeyId, PriorKey := unset, KeyNameFn := 0) {
 ; @param TapFn {Func} Zero-argument callback that emits the tap output.
 ; @return {Boolean} True when TapFn ran, false when the tap was suppressed.
 TapHoldDispatchTap(KeyId, TapFn) {
-	global TapHold
+	global TapHold, _TapHoldTapInDispatch
 	try {
 		if A_IsSuspended {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' because script is suspended.", KeyId)
@@ -1135,7 +1158,10 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; keys. DisableCapsWord is a no-op when CapsWord is inactive.
 		if _TapHoldTapEndsCapsWord(KeyId)
 			DisableCapsWord()
-		TapFn.Call()
+		PreviousTap := TapHoldTapInDispatch()
+		_TapHoldTapInDispatch := KeyId
+		try TapFn.Call()
+		finally _TapHoldTapInDispatch := PreviousTap
 		return true
 	}
 	finally {
@@ -1207,10 +1233,12 @@ global _TapHoldModifierIsHeld := (Name) => GetKeyState(Name)
 ; @return {Boolean} The sender's verdict.
 TapHoldEmitKeyTap(Key, Mods := []) {
 	Modifiers := _TapHoldKeyTapModifiers(Mods)
-	; Every Tab producer goes through the guarded LLM wrapper. A tap-hold's
-	; Tab is not a physical Tab, so the wrapper only types it.
+	; Every Tab producer goes through the guarded LLM wrapper. A Tab tapped from
+	; a tap-hold's dispatch is the user's own Tab key (AltGr taps Tab in the
+	; recommended preset): it carries that key as its provenance and accepts a
+	; shown prediction like the physical Tab. Outside a dispatch it only types.
 	if (Key = "Tab" and Mods.Length == 0)
-		return LLM_Tooltip_FireTabOrAccept(Modifiers)
+		return LLM_Tooltip_FireTabOrAccept(Modifiers, TapHoldTapProvenance())
 	return TextPressKey(Key, Modifiers)
 }
 
