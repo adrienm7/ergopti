@@ -186,17 +186,25 @@ _SRPSG_TreePollerTransitionsAreCentralized() {
 		'_SR_TreeOwnedTasks[State["TaskId"]] := State', true)
 	local start_ensure_pos := InStr(start, "_SR_TreeEnsurePoller()", true)
 	local quiesce := _StripFullLineComments(_DriverFuncBody("_SR_TreeQuiesceNative"))
-	Assert(quiesce != "", "native cleanup must remain inspectable")
-	AssertEqual(2, _SRPSG_Count(source, "_SR_TreeEnsurePoller(") - 1,
-		"tree-poller arming must retain exactly the launch and native-debt callers")
+	local capture_debt := _StripFullLineComments(_DriverFuncBody("_SR_TreeSetCaptureDebt"))
+	Assert(quiesce != "" && capture_debt != "",
+		"native cleanup and capture cleanup debt must remain inspectable")
+	AssertEqual(3, _SRPSG_Count(source, "_SR_TreeEnsurePoller(") - 1,
+		"tree-poller arming must retain exactly the launch, native-debt and capture-debt callers")
 	AssertEqual(1, _SRPSG_Count(start, "_SR_TreeEnsurePoller("),
 		"the successful tree-owned start must arm through the central helper")
 	AssertEqual(1, _SRPSG_Count(quiesce, "_SR_TreeEnsurePoller("),
 		"native release debt must arm through the same central helper")
+	AssertEqual(1, _SRPSG_Count(capture_debt, "_SR_TreeEnsurePoller("),
+		"a capture a foreign handle still locks must arm through the same central helper")
 	local debt_publish := InStr(quiesce, '_SR_TreeNativeDebts[ObjPtr(Claim)] := Claim', true)
 	local debt_arm := InStr(quiesce, "_SR_TreeEnsurePoller()", true)
 	Assert(debt_publish > 0 && debt_arm > debt_publish,
 		"the exact cleanup owner must remain reachable before retry scheduling")
+	local capture_publish := InStr(capture_debt, "_SR_TreeCaptureDebts[identity] := Claim", true)
+	local capture_arm := InStr(capture_debt, "_SR_TreeEnsurePoller()", true)
+	Assert(capture_publish > 0 && capture_arm > capture_publish,
+		"the locked capture's exact owner must remain reachable before retry scheduling")
 	Assert(publish_pos > 0 && start_ensure_pos > publish_pos,
 		"the tree-owned task must be published before its sole Ensure call can arm the poller")
 }
