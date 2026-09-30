@@ -70,8 +70,10 @@ function M.new(options)
 	function owner.release()
 		if transaction ~= nil then transaction.release() end
 	end
-	--- Applies one mode. A composed scope asks once for every category, so it
-	--- passes preconfirmed; a menu row asks here.
+	--- Applies one mode. Restoring the recommended values applies at once:
+	--- the backup and the exact inverse already make it recoverable. Only a
+	--- clear, which removes the category's settings, asks first; a composed
+	--- clear asks once for every category, so it passes preconfirmed.
 	--- @param mode string "recommended" or "clear".
 	--- @param preconfirmed boolean|nil True when the caller already asked.
 	--- @return boolean committed
@@ -80,10 +82,12 @@ function M.new(options)
 		return options.admission("Preference scope: " .. options.scope, function()
 			if options.paused() ~= false then return false end
 			if claim.pending() and claim.retry_restore() ~= true then return false end
-			if preconfirmed ~= true and options.confirm(mode) ~= true then return false end
-			-- The modal runs a native event loop; pause may acquire the engine while
-			-- confirmation is open, so its admission must be checked again.
-			if options.paused() ~= false then return false end
+			if mode == "clear" and preconfirmed ~= true then
+				if options.confirm(mode) ~= true then return false end
+				-- The modal runs a native event loop; pause may acquire the engine while
+				-- confirmation is open, so its admission must be checked again.
+				if options.paused() ~= false then return false end
+			end
 			transaction = (options.transaction_factory or Scope.new)({
 				manifest = Manifest,
 				path = options.path, backup_path = options.backup_path(), files = options.files,

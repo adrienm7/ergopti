@@ -218,7 +218,8 @@ helpers.describe("macOS complete gesture scope", function()
 	helpers.it("rechecks pause after the modal confirmation returns", function()
 		local owner, _, files, _, controls, _, _, writes, original = fixture()
 		controls.confirm_hook = function() controls.paused = true end
-		helpers.assert_eq(owner.apply("recommended"), false)
+		-- Only a clear opens the modal; a restore asks nothing.
+		helpers.assert_eq(owner.apply("clear"), false)
 		helpers.assert_eq(files.config, original)
 		helpers.assert_eq(writes(), 0)
 	end)

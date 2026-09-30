@@ -263,13 +263,14 @@ helpers.describe("Linux terminal LLM scope", function()
 				local old_apply = scope.apply
 				local key = mode == "clear" and "common.clear_to_system" or "common.restore_recommended"
 				local id = mode == "clear" and "scope_clear" or "scope_restore"
-				local changed = 0
+				local changed, questions = 0, 0
 				local ok, err = pcall(function()
 					-- Pending common declarations stay private to this renderer test.
 					root.llm_menu = {{ type = "command", id = id, i18n = key }}
 					root.top_level = {{ id = "llm" }}
 					os.execute = function(command)
 						if command:find("zenity --question", 1, true) then
+							questions = questions + 1
 							helpers.assert_contains(command, require("infra.i18n").get("menu.llm.title"))
 							return 0
 						end
@@ -294,6 +295,8 @@ helpers.describe("Linux terminal LLM scope", function()
 					helpers.assert_eq(type(action), "function")
 					action()
 					helpers.assert_eq(changed, 1)
+					-- Only the clear asks (restore-recommended-no-confirm).
+					helpers.assert_eq(questions, mode == "clear" and 1 or 0)
 					helpers.assert_eq(engine.is_enabled(), mode == "recommended")
 					helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.unknown, "keep")
 				end)

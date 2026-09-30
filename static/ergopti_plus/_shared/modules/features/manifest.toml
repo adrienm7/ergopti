@@ -4172,8 +4172,9 @@ id = "locales"
 # folders editor and the setup wizard.
 #
 # Restores Ergopti's recommended values: each driver composes every category's
-# own scope owner in the [scopes.global] order, all or nothing, after one
-# confirmation. AI and metrics consent are never granted by it.
+# own scope owner in the [scopes.global] order, all or nothing, at once — every
+# owner writes its backup first, so no row asks before a restore. AI and metrics
+# consent are never granted by it.
 [[menu.configuration_menu]]
 type = "command"
 id = "restore_recommended"

@@ -125,20 +125,22 @@ helpers.describe("Linux Tap-Holds menu", function()
 				if command:find("command -v zenity", 1, true) then return 0 end
 				if command:find("zenity --question", 1, true) then
 					asked[#asked + 1] = command
-					return #asked == 3 and 1 or 0
+					return #asked == 2 and 1 or 0
 				end
 				return execute(command)
 			end
 			local ran, raised = pcall(function()
 				reset.fn()
 				disable.fn()
-				reset.fn()
+				disable.fn()
 			end)
 			os.execute = execute
 			if not ran then error(raised, 0) end
 			toggle.fn()
-			helpers.assert_eq(#asked, 3, "every whole-section row asks first")
-			helpers.assert_contains(asked[1], i18n.get("common.restore_recommended"))
+			-- The restore applies at once (restore-recommended-no-confirm); the
+			-- clear keeps its default-No question.
+			helpers.assert_eq(#asked, 2, "only the clear row asks first")
+			helpers.assert_contains(asked[1], i18n.get("common.clear_to_system"))
 			helpers.assert_contains(asked[1], "--default-cancel")
 			helpers.assert_eq(calls[1], { "scope", "recommended", false })
 			helpers.assert_eq(calls[2], { "scope", "clear", false })

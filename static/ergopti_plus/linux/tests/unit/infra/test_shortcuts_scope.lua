@@ -340,13 +340,14 @@ helpers.describe("Linux terminal shortcut scope", function()
 				local selected = mode == "recommended" and "recommended" or "clear"
 				local key = selected == "clear" and "common.clear_to_system" or "common.restore_recommended"
 				local id = selected == "clear" and "scope_clear" or "scope_restore"
-				local changed = 0
+				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					root.shortcuts_menu = {{ type = "command", id = id, i18n = key }}
 					root.top_level = {{ id = "shortcuts" }}
 					os.execute = function(command)
 						if command:find("command -v zenity", 1, true) then return 0 end
 						if command:find("zenity --question", 1, true) then
+							questions = questions + 1
 							if mode == "paused confirmation" then controls.paused = true end
 							return mode == "cancel" and 1 or 0
 						end
@@ -367,6 +368,8 @@ helpers.describe("Linux terminal shortcut scope", function()
 					action()
 					local expected = mode == "clear" or mode == "recommended"
 					helpers.assert_eq(changed, expected and 1 or 0)
+					-- Only the clear asks (restore-recommended-no-confirm).
+					helpers.assert_eq(questions, selected == "clear" and 1 or 0)
 					helpers.assert_eq(owners.manager.is_enabled(), mode ~= "clear")
 					if not expected then helpers.assert_eq(Sandbox.read_bytes(path), SOURCE) end
 				end)
