@@ -22,6 +22,12 @@
 --- 3. hardening-e-presets: the recommended preset is imported by clicking the
 ---    real « Restore recommended values » row, then booted: the navigation
 ---    layer must be non-empty and entered by a key (db71c39bf).
+--- 4. Both processors (boot-arch-ollama-default): every scenario boots on an
+---    Apple silicon Mac and on an Intel Mac, at once. The default AI backend
+---    follows the processor, and an Intel Mac booting an older config.toml
+---    started the Ollama it never installed, with the AI off, and logged an
+---    ERROR that arm64 boots could not show. A boot that turns the AI on
+---    without its runtime must tell the user so, naming that runtime.
 --- ==============================================================================
 
 local M = {}
@@ -186,16 +192,54 @@ end
 -- also left their preference keys and a tilde paths.toml.
 local CORPUS_REL = "/static/ergopti_plus/_shared/tests/corpus/config_migrations"
 
---- The shipped corpus cases of macOS, sorted, each with its schema version.
+--- Reads one key of one table of a flat config.toml (headers, then
+--- `key = value` lines), the shape every corpus input has.
+--- @param toml string File content.
+--- @param section string Table header without brackets, e.g. "llm".
+--- @param key string
+--- @return string|nil value Raw value text.
+local function toml_value(toml, section, key)
+	local current = nil
+	for line in toml:gmatch("[^\n]+") do
+		local header = line:match("^%s*%[([^%]]+)%]%s*$")
+		if header then
+			current = header
+		elseif current == section then
+			local value = line:match("^%s*" .. key .. "%s*=%s*(.-)%s*$")
+			if value then return value end
+		end
+	end
+	return nil
+end
+
+--- The runtime a boot that turns the AI on must name when it is missing, as
+--- the product defines it: the selected backend, else the platform default
+--- (MLX on Apple silicon, Ollama on Intel). The E2E Mac installs neither.
+--- @param case table { enables_ai, selected } from older_release_cases.
+--- @param arch string
+--- @return string|nil runtime Product name, or nil when the AI stays off.
+local function missing_ai_runtime(case, arch)
+	if not case.enables_ai then return nil end
+	local selected = case.selected or (arch == "arm64" and "mlx" or "ollama")
+	return ({ mlx = "MLX", ollama = "Ollama" })[selected]
+end
+
+--- The shipped corpus cases of macOS, sorted, each with its schema version
+--- and what its config.toml says about the AI.
 --- @param repo string Repository root.
---- @return table cases { name, stamped }
+--- @return table cases { name, stamped, enables_ai, selected }
 local function older_release_cases(repo)
 	local cases = {}
 	local listing = io.popen("ls " .. q(repo .. CORPUS_REL))
 	for name in listing:lines() do
 		if name:match("^shipped_.+_on_macos$") then
 			local input = assert(read(repo .. CORPUS_REL .. "/" .. name .. "/input.toml"), "missing input of " .. name)
-			cases[#cases + 1] = { name = name, stamped = input:find("schema_version%s*=") ~= nil }
+			cases[#cases + 1] = {
+				name = name,
+				stamped = input:find("schema_version%s*=") ~= nil,
+				enables_ai = toml_value(input, "llm", "enabled") == "true",
+				selected = (toml_value(input, "llm.models", "selected") or ""):match('^"(%w+)"$'),
+			}
 		end
 	end
 	listing:close()
@@ -222,9 +266,18 @@ local function scenarios(repo)
 				.. (case.stamped and ")" or ", unstamped, with legacy settings and a tilde paths.toml)"),
 			setup = older_release(case.name, not case.stamped and legacy_settings_and_tilde_paths or nil),
 			steps = { "boot" }, marker = BOOTED_MARKER,
+			-- The legacy preference keys of an unstamped release turn the AI off
+			ai_runtime = case.stamped and function(arch) return missing_ai_runtime(case, arch) end or nil,
 		}
 	end
 	if #list < 6 then error("boot scenarios: the migration corpus holds fewer than three macOS releases") end
+	local turns_ai_on = false
+	for _, scenario in ipairs(list) do
+		turns_ai_on = turns_ai_on or (scenario.ai_runtime ~= nil and scenario.ai_runtime("x86_64") ~= nil)
+	end
+	if not turns_ai_on then
+		error("boot scenarios: no stamped macOS release of the migration corpus turns the AI on")
+	end
 	return list
 end
 
@@ -238,11 +291,11 @@ end
 -- ===================================
 -- ===================================
 
---- Runs one child and returns its complete output.
---- @param ctx table Scenario context.
+--- The shell command of one child, its settings file written.
+--- @param ctx table Scenario context of one architecture.
 --- @param action string boot_child action.
---- @return string output
-local function run_child(ctx, action)
+--- @return string command
+local function child_command(ctx, action)
 	local settings_file = ctx.root .. "/settings.lua"
 	local fh = assert(io.open(settings_file, "w"))
 	fh:write("return {\n")
@@ -252,17 +305,34 @@ local function run_child(ctx, action)
 	end
 	fh:write("}\n")
 	fh:close()
-	local command = table.concat({
+	return table.concat({
 		"cd " .. q(ctx.root) .. " &&",
 		"HOME=" .. q(ctx.home), "TMPDIR=" .. q(ctx.root .. "/tmp"),
 		"XDG_CONFIG_HOME=", "XDG_STATE_HOME=", "XDG_DATA_HOME=", "XDG_CACHE_HOME=",
 		q(ctx.interpreter), q(ctx.driver .. "/tests/e2e/boot/boot_child.lua"),
-		q(ctx.driver), q(ctx.app_root), q(ctx.root .. "/machine"), q(ctx.home), q(action), q(settings_file), "2>&1",
+		q(ctx.driver), q(ctx.app_root), q(ctx.root .. "/machine"), q(ctx.home), q(action), q(ctx.arch),
+		q(settings_file),
 	}, " ")
-	local pipe = io.popen(command, "r")
-	local output = pipe:read("*a")
-	pipe:close()
-	return output
+end
+
+--- Runs one action on every architecture at once, one child each, so the
+--- second processor costs no second wait.
+--- @param contexts table Scenario contexts, one per architecture.
+--- @param action string boot_child action.
+--- @return table outputs Each child's complete output, by context index.
+local function run_children(contexts, action)
+	local jobs = {}
+	for index, ctx in ipairs(contexts) do
+		jobs[index] = "(" .. child_command(ctx, action) .. ") > " .. q(ctx.root .. "/" .. action .. ".out") .. " 2>&1 &"
+	end
+	jobs[#jobs + 1] = "wait"
+	-- Each child's output is judged, not this shell's status
+	os.execute(table.concat(jobs, " "))
+	local outputs = {}
+	for index, ctx in ipairs(contexts) do
+		outputs[index] = read(ctx.root .. "/" .. action .. ".out") or ""
+	end
+	return outputs
 end
 
 --- What one boot showed the user or did to the bundle, as failure lines.
@@ -343,7 +413,19 @@ local function recommended_layer_keys(shared, os_name)
 	return count
 end
 
---- Runs every scenario through `check`.
+--- Whether a boot told the user that the AI runtime it needs is missing: a
+--- notification naming that runtime (a product name, never translated).
+--- @param output string Child output.
+--- @param runtime string "MLX" or "Ollama".
+--- @return boolean told
+local function notified_missing_runtime(output, runtime)
+	for line in output:gmatch("[^\n]+") do
+		if line:match("^E2E_NOTIFY ") and line:find(runtime, 1, true) then return true end
+	end
+	return false
+end
+
+--- Runs every scenario through `check`, on every architecture.
 --- @param check table { pass(label), fail(label, expected, actual), skip(label) }
 --- @param options table { driver, interpreter }
 function M.run(check, options)
@@ -361,52 +443,69 @@ function M.run(check, options)
 	stage_app(repo, app_root)
 	local before = bundle_files(app_root)
 	for index, scenario in ipairs(scenarios(repo)) do
-		local root = scratch .. "/" .. index
-		local ctx = {
-			root = root, home = root .. "/home", repo = repo, driver = options.driver, app_root = app_root,
-			interpreter = options.interpreter, world = world,
-		}
-		run("mkdir -p " .. q(ctx.home) .. " " .. q(root .. "/tmp"))
-		if scenario.setup then scenario.setup(ctx) end
-		local problems = {}
-		local last_output = ""
+		local contexts = {}
+		for _, arch in ipairs(world.ARCHITECTURES) do
+			local root = scratch .. "/" .. index .. "-" .. arch
+			local ctx = {
+				root = root, home = root .. "/home", repo = repo, driver = options.driver, app_root = app_root,
+				interpreter = options.interpreter, world = world, arch = arch, problems = {},
+			}
+			run("mkdir -p " .. q(ctx.home) .. " " .. q(root .. "/tmp"))
+			if scenario.setup then scenario.setup(ctx) end
+			contexts[#contexts + 1] = ctx
+		end
 		for _, action in ipairs(scenario.steps) do
-			last_output = run_child(ctx, action)
+			local outputs = run_children(contexts, action)
 			local marker = action ~= "restore_recommended" and scenario.marker or nil
-			for _, problem in ipairs(judge(last_output, action, marker)) do
-				problems[#problems + 1] = action .. ": " .. problem
+			for context_index, ctx in ipairs(contexts) do
+				local output = outputs[context_index]
+				for _, problem in ipairs(judge(output, action, marker)) do
+					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+				end
+				local runtime = action == "boot" and scenario.ai_runtime and scenario.ai_runtime(ctx.arch) or nil
+				if runtime and not notified_missing_runtime(output, runtime) then
+					ctx.problems[#ctx.problems + 1] = action .. ": the AI is on without " .. runtime
+						.. ", and no notification names it"
+				end
 			end
 		end
 		-- hardening-b: the bundle a boot leaves is the bundle it found.
 		local after = bundle_files(app_root)
+		local bundle_problems = {}
 		for path in pairs(after) do
-			if not before[path] then problems[#problems + 1] = "created inside the bundle: " .. path end
+			if not before[path] then bundle_problems[#bundle_problems + 1] = "created inside the bundle: " .. path end
 		end
 		for path in pairs(before) do
-			if not after[path] then problems[#problems + 1] = "deleted from the bundle: " .. path end
+			if not after[path] then bundle_problems[#bundle_problems + 1] = "deleted from the bundle: " .. path end
 		end
 		before = after
-		if #problems == 0 then
-			check.pass("hardening-a/b boot: " .. scenario.name)
-		else
-			check.fail("hardening-a/b boot: " .. scenario.name, "no ERROR, dialog or bundle write",
-				table.concat(problems, "\n        ", 1, math.min(#problems, 12)))
-		end
-		if scenario.recommended then
-			-- Every key the preset binds on macOS has at least one manipulator gated
-			-- on the layer; the layer was empty before db71c39bf.
-			local layer_rows, entering = navigation_layer(ctx.home, json)
-			local preset_keys = recommended_layer_keys(repo .. "/static/ergopti_plus/_shared", "macos")
-			if layer_rows >= preset_keys and preset_keys > 0 and entering > 0 then
-				check.pass(string.format("hardening-e-presets: the recommended navigation layer is deployed "
-					.. "(%d rows for %d preset keys) and a key enters it (%d)", layer_rows, preset_keys, entering))
+		for _, ctx in ipairs(contexts) do
+			-- The boots of one scenario run at once: either may have written it
+			for _, problem in ipairs(bundle_problems) do ctx.problems[#ctx.problems + 1] = problem end
+			local label = "hardening-a/b boot (" .. ctx.arch .. "): " .. scenario.name
+			if #ctx.problems == 0 then
+				check.pass(label)
 			else
-				check.fail("hardening-e-presets: the recommended navigation layer is deployed and entered",
-					string.format("at least %d rows and an entering key", preset_keys),
-					string.format("%d rows, %d entering", layer_rows, entering))
+				check.fail(label, "no ERROR, dialog or bundle write, and any missing AI runtime named",
+					table.concat(ctx.problems, "\n        ", 1, math.min(#ctx.problems, 12)))
 			end
+			if scenario.recommended then
+				-- Every key the preset binds on macOS has at least one manipulator gated
+				-- on the layer; the layer was empty before db71c39bf.
+				local layer_rows, entering = navigation_layer(ctx.home, json)
+				local preset_keys = recommended_layer_keys(repo .. "/static/ergopti_plus/_shared", "macos")
+				if layer_rows >= preset_keys and preset_keys > 0 and entering > 0 then
+					check.pass(string.format("hardening-e-presets (%s): the recommended navigation layer is deployed "
+						.. "(%d rows for %d preset keys) and a key enters it (%d)", ctx.arch, layer_rows, preset_keys,
+						entering))
+				else
+					check.fail("hardening-e-presets (" .. ctx.arch .. "): the recommended navigation layer is "
+						.. "deployed and entered", string.format("at least %d rows and an entering key", preset_keys),
+						string.format("%d rows, %d entering", layer_rows, entering))
+				end
+			end
+			run("rm -rf " .. q(ctx.root))
 		end
-		run("rm -rf " .. q(root))
 	end
 	run("rm -rf " .. q(scratch))
 end

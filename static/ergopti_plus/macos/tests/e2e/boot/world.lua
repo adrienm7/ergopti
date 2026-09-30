@@ -23,6 +23,8 @@
 ---    time that only run() advances, so a boot is deterministic and fast.
 --- 4. One machine: system folders (/Applications, /Library) resolve inside the
 ---    scenario's own root, so the Mac the boot sees is the same on every host.
+--- 5. Either processor: the scenario names the architecture `uname -m`
+---    answers, because the platform default AI backend follows it.
 --- ==============================================================================
 
 local M = {}
@@ -314,17 +316,26 @@ local function machine_answer(path, args, helper)
 	return { code = 127, stderr = tostring(path) .. ": this command is not modelled by the E2E Mac" }
 end
 
--- hs.execute answers of the set-up Mac, by substring of the command line.
-local EXECUTE_ANSWERS = {
-	{ "systemextensionsctl list", "1 extension(s)\n--- com.apple.system_extension.driver_extension\n"
-		.. "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]\n"
-		.. "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)\t"
-		.. "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice\t[activated enabled]\n", true },
-	{ "/usr/bin/pgrep", "123\n", true },
-	-- An Apple silicon Mac on macOS 15, where the neutral AI backend is MLX.
-	{ "uname -m", "arm64\n", true },
-	{ "sw_vers -productVersion", "15.5\n", true },
-}
+-- The processors a Mac can have, as `uname -m` names them. The platform
+-- default AI backend follows it (modules/llm/backend_detector.lua): MLX on
+-- Apple silicon, Ollama on Intel, which an older config.toml without a
+-- selected backend restores.
+M.ARCHITECTURES = { "arm64", "x86_64" }
+
+--- hs.execute answers of the set-up Mac, by substring of the command line.
+--- @param arch string One of M.ARCHITECTURES.
+--- @return table answers { substring, output, success }
+local function execute_answers(arch)
+	return {
+		{ "systemextensionsctl list", "1 extension(s)\n--- com.apple.system_extension.driver_extension\n"
+			.. "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]\n"
+			.. "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)\t"
+			.. "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice\t[activated enabled]\n", true },
+		{ "/usr/bin/pgrep", "123\n", true },
+		{ "uname -m", arch .. "\n", true },
+		{ "sw_vers -productVersion", "15.5\n", true },
+	}
+end
 
 
 
@@ -431,7 +442,8 @@ end
 --- Completes the hs stub where the boot needs a native answer it lacks.
 --- @param hs table The hs stub.
 --- @param env table launcher_environment().
-local function install_natives(hs, env)
+--- @param arch string One of M.ARCHITECTURES.
+local function install_natives(hs, env, arch)
 	hs.accessibilityState = function() return true end
 	hs.settings.getKeys = function()
 		local keys = {}
@@ -530,6 +542,17 @@ local function install_natives(hs, env)
 		record("DIALOG", "chooseFileOrFolder: " .. tostring(message))
 		return nil
 	end
+	-- A notification is what a boot tells the user without taking the keyboard:
+	-- recorded when sent, not judged, so a scenario can require one.
+	hs.notify.new = function(first, second)
+		local attributes = type(first) == "table" and first or second or {}
+		local notification = handle({})
+		notification.send = function(self)
+			record("NOTIFY", tostring(attributes.title) .. " — " .. tostring(attributes.informativeText))
+			return self
+		end
+		return notification
+	end
 	local applescript = hs.osascript.applescript
 	hs.osascript.applescript = function(source)
 		if type(source) == "string" and (source:find("display dialog", 1, true)
@@ -608,7 +631,7 @@ local function install_natives(hs, env)
 		end
 		return task
 	end
-	for _, answer in ipairs(EXECUTE_ANSWERS) do hs.__set_exec(answer[1], answer[2], answer[3]) end
+	for _, answer in ipairs(execute_answers(arch)) do hs.__set_exec(answer[1], answer[2], answer[3]) end
 
 	-- The menu bar item keeps the menu it is given, so a scenario can click a
 	-- row the way the user does (M.menu_items, M.click).
@@ -799,14 +822,17 @@ end
 
 --- Builds the world around the hs stub. Call before init.lua runs.
 --- @param hs table The hs stub, already the global `hs`.
---- @param options table { app_root, machine_root, home, shipped_optional }
+--- @param options table { app_root, machine_root, home, arch, shipped_optional }
 --- @return table env The launcher environment in force.
 function M.install(hs, options)
+	local known_arch = false
+	for _, arch in ipairs(M.ARCHITECTURES) do known_arch = known_arch or options.arch == arch end
+	if not known_arch then error("E2E world: unknown processor architecture " .. tostring(options.arch), 2) end
 	local env = M.launcher_environment(options.app_root, options.home)
 	install_log_transport()
 	install_timers(hs)
 	install_launcher(hs, env)
-	install_natives(hs, env)
+	install_natives(hs, env, options.arch)
 	install_extension_searcher(hs)
 	install_file_system(hs, options)
 	hs.configdir = env.ERGOPTI_CONFIG_DIR
