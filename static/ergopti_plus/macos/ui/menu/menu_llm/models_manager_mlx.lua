@@ -483,7 +483,7 @@ function M.new(deps, presets)
 			else
 				-- Differentiate the cases so the user sees the truth:
 				--   1. bootstrap still running → "patientez", do not flip to error
-				--   2. no runtime at all        → name the selection that installs it
+				--   2. no runtime at all        → the install button
 				--   3. bootstrap failed         → its cause, with the repair button
 				--   4. installed, not importable → the probe's own error, with the
 				--      repair button; the runtime is flagged broken
@@ -503,9 +503,10 @@ function M.new(deps, presets)
 						Logger.warn(LOG, "MLX import probe failed again on the runtime flagged broken.")
 						offer_repair(nil)
 					else
+						-- The notice used to name the menu row that installs it;
+						-- the offer carries the button that does.
 						Logger.warn(LOG, "MLX import probe failed: the MLX runtime is not installed.")
-						pcall(notifications.notify, i18n.get("mlx.runtime_missing_title"),
-							i18n.get("mlx.runtime_missing_body"), "warning")
+						offer_repair({ kind = "missing", repairable = true })
 					end
 				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
 					local cause = mlx_deps_checker.get_failure_cause and mlx_deps_checker.get_failure_cause()

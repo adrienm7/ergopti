@@ -1329,10 +1329,15 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 		helpers.assert_eq(record.notices[1].body, "mlx.deps_missing_body")
 	end)
 
-	helpers.it("points a missing runtime at the MLX selection without touching it", function()
+	helpers.it("offers the install button for a missing runtime without touching it", function()
 		local record = run_failed_probe({ installed = false })
 		helpers.assert_eq(record.invalidations, 0)
-		helpers.assert_eq(record.notices[1].title, "mlx.runtime_missing_title")
+		-- The notice used to name the menu row that installs the runtime, with
+		-- no action of its own: the offer carries the install button.
+		helpers.assert_eq(#record.notices, 0, "a missing runtime is not a notice without its fix")
+		helpers.assert_eq(#record.offers, 1, "a missing runtime offers its install button")
+		helpers.assert_eq(record.offers[1].kind, "missing")
+		helpers.assert_eq(record.offers[1].repairable, true)
 	end)
 
 	helpers.it("offers the repair again when the flagged runtime fails once more", function()
