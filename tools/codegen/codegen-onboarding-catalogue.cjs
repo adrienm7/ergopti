@@ -83,7 +83,8 @@ const PAGE_FIELDS = new Set([
 	'file_path',
 	'section_path',
 	'neutral_label_key',
-	'magic_key'
+	'magic_key',
+	'sub_switch'
 ]);
 
 // The separator a hotstring file writes between groups of its sections_order.
@@ -437,7 +438,14 @@ function validatePage(id, page, manifest, labels) {
 		if (typeof page[field] !== 'string') throw new Error(`[onboarding.pages.${id}] needs ${field}`);
 		labels.requireKey(page[field], `onboarding page ${id}`);
 	}
-	for (const field of ['master', 'hint_key', 'note_key', 'file_path', 'section_path']) {
+	for (const field of [
+		'master',
+		'hint_key',
+		'note_key',
+		'file_path',
+		'section_path',
+		'sub_switch'
+	]) {
 		if (page[field] === undefined) continue;
 		if (!isPlainObject(page[field]))
 			throw new Error(`[onboarding.pages.${id}] ${field} must be per platform`);
@@ -484,6 +492,71 @@ function masterFor(id, page, platform, projection) {
 		throw new Error(`onboarding page ${id}: ${masterPath} must carry the manifest recommendation`);
 	}
 	return { path: masterPath, default: false };
+}
+
+/**
+ * The page's sub-switch on one platform, or null: the switch of part of the
+ * checklist that the category switch does not reach. The page writes it with
+ * the answer, off for a No and on for a Yes that imports one of its items, so
+ * those items follow the answer as they did when the category switch reached
+ * them.
+ * @param {string} id Page id.
+ * @param {object} page Declaration.
+ * @param {string} platform Manifest platform token.
+ * @param {object|null} master The page's category switch on the platform.
+ * @param {object[]} groups The page's checklist on the platform.
+ * @param {object} manifest Parsed manifest.
+ * @param {object} projection Manifest projection.
+ * @returns {object|null} Sub-switch descriptor.
+ */
+function subSwitchFor(id, page, platform, master, groups, manifest, projection) {
+	const declared = page.sub_switch && page.sub_switch[platform];
+	if (declared === undefined) return null;
+	if (
+		!isPlainObject(declared) ||
+		typeof declared.path !== 'string' ||
+		typeof declared.menu_group !== 'string'
+	) {
+		throw new Error(`[onboarding.pages.${id}] sub_switch needs a path and a menu_group`);
+	}
+	if (!master) {
+		throw new Error(`onboarding page ${id}: a sub-switch needs the category switch on ${platform}`);
+	}
+	const values = projection.project(declared.path, platform);
+	if (typeof values.default !== 'boolean') {
+		throw new Error(`onboarding page ${id}: ${declared.path} must be a boolean`);
+	}
+	if (projection.scopeOf(declared.path) !== id) {
+		throw new Error(`onboarding page ${id}: ${declared.path} belongs to another scope`);
+	}
+	const rows = (manifest.menu && manifest.menu[declared.menu_group]) || [];
+	const sections = rows
+		.filter(
+			(row) => row.type === 'feature' && (row.platforms || MANIFEST_PLATFORMS).includes(platform)
+		)
+		.map((row) => row.path);
+	if (sections.length === 0) {
+		throw new Error(
+			`onboarding page ${id}: menu group ${declared.menu_group} has no feature row on ${platform}`
+		);
+	}
+	const itemPaths = [];
+	(function walk(list) {
+		for (const group of list) {
+			(group.items || []).forEach((item) => itemPaths.push(item.path));
+			walk(group.groups || []);
+		}
+	})(groups);
+	const items = [];
+	for (const section of sections) {
+		const governed = itemPaths.filter((itemPath) => itemPath.startsWith(section + '.'));
+		// A section the page cannot import could never turn the switch back on.
+		if (governed.length === 0) {
+			throw new Error(`onboarding page ${id}: ${section} has no checklist item on ${platform}`);
+		}
+		items.push(...governed);
+	}
+	return { path: declared.path, default: values.default, items };
 }
 
 /**
@@ -844,6 +917,8 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 		groups
 	};
 	if (master) built.master = master;
+	const subSwitch = subSwitchFor(id, page, platform, master, groups, manifest, projection);
+	if (subSwitch) built.sub_switch = subSwitch;
 	if (hint) built.hint_key = hint;
 	if (note) built.note_key = note;
 	if (page.checklist === 'hotstrings') {
@@ -919,6 +994,7 @@ function buildCatalogue() {
 		};
 		for (const page of data.pages) {
 			if (page.master) claim(page.master);
+			if (page.sub_switch) claim(page.sub_switch);
 			if (page.magic_key) claim(page.magic_key);
 			(function walk(groups) {
 				for (const group of groups) {

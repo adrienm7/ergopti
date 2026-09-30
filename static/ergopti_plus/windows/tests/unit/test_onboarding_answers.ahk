@@ -169,6 +169,31 @@ _TOAN_TriggerLengthCountsCharacters() {
 Test("onboarding answers: the trigger length counts characters (onboarding-answers-windows)",
 	_TOAN_TriggerLengthCountsCharacters)
 
+; The key combinations follow only their own switch, which the Shortcuts master
+; no longer reaches: the Shortcuts answer writes it, or a re-run answered No
+; would leave the AltGr / LAlt / CapsLock families on.
+_TOAN_ShortcutsAnswerWritesTheKeyCombinationsSwitch() {
+	Index := OnboardingCatalogue()
+	AssertTrue(Index["entries"].Has("category_enabled.key_combinations"),
+		"the Shortcuts page writes the key-combinations switch")
+	AssertEqual("switch", Index["entries"]["category_enabled.key_combinations"]["kind"])
+	Off := OnboardingAnswerRows(Index, [_TOAN_Op("category_enabled.shortcuts", false),
+		_TOAN_Op("category_enabled.key_combinations", false)])
+	AssertTrue(Off is Array, "a No is a valid answer: " . (Off is String ? Off : ""))
+	Row := _TOAN_RowFor(Off, "category_enabled", "key_combinations")
+	AssertTrue(Row is Object && Row.HasOwnProp("Value") && Row.Value == 0,
+		"a No writes the switch off, as the Shortcuts master once turned the families off")
+	On := OnboardingAnswerRows(Index, [_TOAN_Op("category_enabled.key_combinations", true)])
+	AssertTrue(On is Array)
+	Row := _TOAN_RowFor(On, "category_enabled", "key_combinations")
+	AssertTrue(Row is Object && Row.HasOwnProp("Delete") && Row.Delete == 1,
+		"on is the neutral value: the key is removed, and absent is on")
+	AssertTrue(OnboardingAnswerRows(Index, [_TOAN_Op("category_enabled.key_combinations", "off")]) is String,
+		"the switch takes true or false")
+}
+Test("onboarding answers: the Shortcuts answer writes the key-combinations switch (onboarding-answers-windows)",
+	_TOAN_ShortcutsAnswerWritesTheKeyCombinationsSwitch)
+
 ; The Tap-Holds page asked, then imported no key: its answers must reach the
 ; tap-hold writer, and only the checked ones.
 _TOAN_TapHoldKeysGoToTheWriterNeverToConfig() {

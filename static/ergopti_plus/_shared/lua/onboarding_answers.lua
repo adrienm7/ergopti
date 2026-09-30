@@ -99,6 +99,10 @@ function M.load(text, driver)
 	end
 	for _, page in ipairs(platform.pages) do
 		if type(page.master) == "table" then claim(page.master.path, { kind = "switch", default = false }) end
+		-- A switch of part of the checklist that the master no longer reaches.
+		if type(page.sub_switch) == "table" then
+			claim(page.sub_switch.path, { kind = "switch", default = page.sub_switch.default })
+		end
 		if type(page.magic_key) == "table" then
 			local limit = page.magic_key.max_characters
 			assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0,

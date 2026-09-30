@@ -75,6 +75,10 @@ OnboardingCatalogueIndex(Text) {
 			throw ValueError("the onboarding catalogue has a malformed page")
 		if Page.Has("master")
 			_OnboardingClaim(Entries, Page["master"], "switch")
+		; The Shortcuts answer also writes the key-combinations switch, which its
+		; master no longer reaches.
+		if Page.Has("sub_switch")
+			_OnboardingClaim(Entries, Page["sub_switch"], "switch")
 		if Page.Has("magic_key")
 			_OnboardingClaim(Entries, Page["magic_key"], "character")
 		_OnboardingClaimGroups(Entries, Page.Get("groups", []))

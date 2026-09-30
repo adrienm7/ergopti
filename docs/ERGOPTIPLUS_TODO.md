@@ -222,8 +222,10 @@ These are software implementations; final hardware verification remains below.
 28. [~] macOS permission instructions in a native dialog, never a one-line
     hs.alert banner. Integrated.
 29. [~] force_quit_frontmost asks for confirmation; key combinations governed only
-    by their own switch on every OS. Integrated. After the demo: the Windows
-    wizard's Shortcuts answer should also write the key-combinations switch.
+    by their own switch on every OS. Integrated. The Windows wizard's Shortcuts
+    answer also writes that switch (No off, Yes on once a family is imported);
+    macOS lists no combination there and Linux has none. Statically checked
+    on Windows until its CI run.
 30. [ ] Physical magic-key setting on all three OSes (after the demo).
         Implemented on the unpublished branch `next/magic-key-3os`: one
         `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by
