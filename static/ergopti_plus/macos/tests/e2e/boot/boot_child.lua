@@ -9,17 +9,19 @@
 --- performs the scenario's action and prints what a user would have seen.
 ---
 --- Usage: lua boot_child.lua <repo macOS driver> <app root> <machine root>
----   <home> <action> [<settings.lua>, a file returning the hs.settings values
----   an older release left in the application's preference domain]
+---   <home> <action> <arch> [<settings.lua>, a file returning the hs.settings
+---   values an older release left in the application's preference domain]
+--- Arch: the processor `uname -m` names (arm64 or x86_64).
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes).
 --- Output: the driver's log lines, E2E_* observation lines from the world,
 --- E2E_FACT key=value lines, and a final E2E_DONE line.
 --- ==============================================================================
 
-local REPO_DRIVER, APP_ROOT, MACHINE_ROOT, HOME, ACTION, SETTINGS_FILE = arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]
-assert(REPO_DRIVER and APP_ROOT and MACHINE_ROOT and HOME and ACTION,
-	"usage: boot_child.lua <repo driver> <app root> <machine root> <home> <action>")
+local REPO_DRIVER, APP_ROOT, MACHINE_ROOT, HOME, ACTION, ARCH, SETTINGS_FILE =
+	arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7]
+assert(REPO_DRIVER and APP_ROOT and MACHINE_ROOT and HOME and ACTION and ARCH,
+	"usage: boot_child.lua <repo driver> <app root> <machine root> <home> <action> <arch>")
 
 local RESOURCES = APP_ROOT .. "/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus"
 local DRIVER = RESOURCES .. "/macos"
@@ -51,6 +53,7 @@ local env = World.install(hs, {
 	app_root = APP_ROOT,
 	machine_root = MACHINE_ROOT,
 	home = HOME,
+	arch = ARCH,
 	-- Package-only files: every release has them, a checkout never does.
 	shipped_optional = { [SHARED .. "/build_stamp.txt"] = true },
 })

@@ -156,9 +156,11 @@ as detail), without the generic notice when each waiter passes
 `reports_unreachable`; the switch and the startup turn the AI off with a WARN
 and call `unreachable_backend_offer.lua`. Its dialog (`dialog_util.choose`: an
 AppleScript alert holds three buttons, more become a list) names Ollama and its
-URL, then offers each answering local server first, start or install. On
-macOS the neutral backend is MLX, so Ollama is always an explicit choice (W1):
-a server is only ever a confirmed button. Action: route a new local-backend
+URL, then offers each answering local server first, start or install. The
+neutral backend is MLX on Apple silicon only (W1); on Intel Ollama is the
+platform default (see `project-macos-llm-runtime-enable-gate`). Either way the
+backend is never replaced silently: a server is only ever a confirmed button.
+Action: route a new local-backend
 failure through that offer and keep unexplained ones ERROR
 (`llm-requirements-error-kept`); extend `test_llm_enable_unreachable_local.lua`.
 
@@ -778,7 +780,19 @@ XCTest. Put them in a normal source file even when bootstrap is their main user.
 ### project-macos-llm-runtime-enable-gate
 
 Restored profile/model state never authorizes model loading. Only the live LLM
-enable gate may trigger warmup side effects.
+enable gate may trigger warmup side effects, the Ollama daemon included:
+`modules/llm/init.lua` starts it from `set_backend` or auto-detection only
+through `ollama_start_admitted()`, the gate on and `ollama_binary.resolve()`
+finding an executable. `manifest_reader` resolves the default of
+`llm.models.selected` through `backend_detector.auto_default()`, Ollama on
+x86_64, so an Intel Mac restores Ollama from any config.toml without a selected
+backend. Since Ollama stopped shipping, `set_backend` starting it with the AI
+off logged "Ollama server executable resolution did not commit" at every Intel
+boot (the error window); arm64 boots restore MLX and never showed it. A missing
+Ollama with the AI on is the boot notice's and the unreachable offer's, never a
+start. `tests/e2e/boot` boots every scenario on arm64 and x86_64 at once
+(`world.ARCHITECTURES`); keep both, and extend
+`test_backend_ollama_start_gate.lua` for a new daemon-start caller.
 
 ### project-hs-canonical-lua-module-identity
 
