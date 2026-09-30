@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "Dil seçimi kaydedilemedi.",
 	"onboarding.error.reload_pending": "Yanıtlarınız kaydedildi, ancak bunları uygulayan yeniden yükleme çalıştırılamadı. Kurulumu tamamlamak için menü çubuğundaki Yeniden Yükle'yi kullanın.",
 	"onboarding.error.tap_holds_import": "Diğer yanıtlarınız kaydedildi, ancak önerilen tap-hold tuşları içe aktarılamadı. Bunları Dokunma-Basılı Tutma menüsünden seçin.",
+	"onboarding.error.nav_layer_import": "Diğer yanıtlarınız ve tap-hold tuşları kaydedildi, ancak önerilen gezinme katmanı içe aktarılamadı. Dokunma-Basılı Tutma menüsündeki “Gezinme katmanını düzenle…” ile geri yükleyin.",
 	"onboarding.error.tap_holds_import_timeout": "Diğer yanıtlarınız kaydedildi, ancak önerilen tap-hold tuşlarının içe aktarımı zamanında tamamlanmadı. Yeniden yüklemeden sonra bunları Dokunma-Basılı Tutma menüsünde kontrol edin.",
 	"onboarding.error.title": "ErgoptiPlus — Hata",
 	"onboarding.error.write_failed": "Yapılandırma dosyası yazılamadı.",

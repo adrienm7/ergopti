@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "לא ניתן לשמור את בחירת השפה.",
 	"onboarding.error.reload_pending": "התשובות שלך נשמרו, אך הטעינה מחדש שמחילה אותן לא התבצעה. השתמש ב„טען מחדש” בשורת התפריטים כדי לסיים את ההגדרה.",
 	"onboarding.error.tap_holds_import": "שאר התשובות שלך נשמרו, אך לא ניתן היה לייבא את מקשי ה-tap-hold המומלצים. בחרו אותם בתפריט Tap-Holds.",
+	"onboarding.error.nav_layer_import": "שאר התשובות שלך ומקשי ה-tap-hold נשמרו, אך לא ניתן היה לייבא את שכבת הניווט המומלצת. שחזרו אותה באמצעות „עריכת שכבת הניווט…” בתפריט Tap-Holds.",
 	"onboarding.error.tap_holds_import_timeout": "שאר התשובות שלך נשמרו, אך ייבוא מקשי ה-tap-hold המומלצים לא הסתיים בזמן. בדוק אותם בתפריט Tap-Holds לאחר הטעינה מחדש.",
 	"onboarding.error.title": "ErgoptiPlus — שגיאה",
 	"onboarding.error.write_failed": "כשל בכתיבת קובץ הגדרות.",

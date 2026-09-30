@@ -27,8 +27,11 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 	if !_HCW_FlushNumericWrite(false)
 		return Map("status", "refused", "scope", "global", "mode", Mode, "detail", "pending_numeric_write")
 	Hotstrings := HotstringsScopeFiles(Selected)
+	; The restore brings the recommended layer into a folder without layers.toml
+	; (TapHoldScopeOwner), for the folder the caller names.
 	Tap := TapHoldScopeOwner(Selected.Get("tap_hold_path", _TH_TapHoldConfigPath()),
-		Selected.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml"), Mode)
+		Selected.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml"), Mode,
+		Selected.Get("layers_config_dir", ""))
 	Files := GlobalScopeFiles(Selected.Get("path", ConfigurationFile), [Hotstrings, Tap])
 	Operations() {
 		Providers := Map("hotstrings", Hotstrings.Inventory.Bind(Hotstrings),

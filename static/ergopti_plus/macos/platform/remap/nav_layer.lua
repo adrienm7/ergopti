@@ -28,6 +28,11 @@
 --- 6. The wheel stays out: Karabiner takes no wheel input, the loader reports a
 ---    wheel binding unavailable on macOS, and the Layer + Scroll shortcut keeps
 ---    the volume on the wheel.
+--- 7. The layer comes with its key: importing the recommended key whose hold
+---    enters the layer (the first-run wizard, the Tap-Holds « Restore
+---    recommended values ») also creates layers.toml from Ergopti's recommended
+---    layer when the folder has none (keymap.layer_preset); an existing file is
+---    the user's and is never replaced.
 --- ==============================================================================
 
 local M = {}
@@ -39,6 +44,10 @@ local LOG = "karabiner.nav_layer"
 -- The layer a tap-hold key's hold_layer "nav" enters
 -- (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
 M.NAV_LAYER_ID = "nav"
+
+-- The tap-hold hold action (data/actions.json) that sets layer_active, the
+-- one way a macOS key enters the layer.
+M.HOLD_ACTION_ID = "layer"
 
 local OS = "macos"
 -- errno for a path that does not exist, as io.open reports it.
@@ -342,6 +351,75 @@ function M.load(opts)
 	for _ in pairs(bindings) do count = count + 1 end
 	Logger.success(LOG, "Navigation layer loaded: %d key(s) bound.", count)
 	return { bindings = bindings, registry = ctx.registry }
+end
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 6/ Recommended layer import =======
+-- ===========================================
+-- ===========================================
+
+--- Whether the shipped recommendation of one of the keys holds the layer.
+--- @param key_ids table Key ids of tap_hold_keys.json.
+--- @param presets table Key id -> { tap, hold } (platform.remap.defaults tap_hold).
+--- @return boolean enters
+function M.recommendation_enters_layer(key_ids, presets)
+	if type(key_ids) ~= "table" or type(presets) ~= "table" then
+		error("nav_layer.recommendation_enters_layer needs the key ids and the presets", 2)
+	end
+	for _, key_id in ipairs(key_ids) do
+		local preset = presets[key_id]
+		if type(preset) == "table" and preset[2] == M.HOLD_ACTION_ID then return true end
+	end
+	return false
+end
+
+--- Creates the user's layers.toml from Ergopti's recommended layer when the
+--- configuration folder has none; an existing file is kept as it is.
+--- @param opts table|nil { shared_root, config_dir, file_adapter }; each defaults to the driver's own.
+--- @return table|nil import What keymap.layer_preset.import_if_absent() returned.
+--- @return string|nil err Why the absent file could not be created.
+function M.import_recommended(opts)
+	opts = opts or {}
+	local shared_root = opts.shared_root or require("infra.paths").shared_root()
+	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
+	local LayerPreset = require("keymap.layer_preset")
+	Logger.start(LOG, "Importing the recommended navigation layer into '%s' when it has none…", tostring(config_dir))
+	local ok, import, err = pcall(LayerPreset.import_if_absent, {
+		shared_root  = shared_root,
+		config_dir   = config_dir,
+		toml_decode  = require("toml_codec").decode,
+		file_adapter = opts.file_adapter or require("adapters.file_system"),
+	})
+	if not ok then import, err = nil, tostring(import) end
+	if not import then
+		Logger.error(LOG, "The recommended navigation layer was not imported: %s.", tostring(err))
+		return nil, err
+	end
+	if import.status == LayerPreset.IMPORTED then
+		Logger.success(LOG, "Recommended navigation layer imported into '%s'.", import.path)
+	else
+		Logger.success(LOG, "'%s' is kept as the user's own layer%s.", import.path,
+			import.detail and (" (" .. import.detail .. ")") or "")
+	end
+	return import
+end
+
+--- Removes a layers.toml import_recommended() created, while it holds the preset's bytes.
+--- @param import table|nil What import_recommended() returned.
+--- @param file_adapter table|nil The adapter it wrote through; the driver's own by default.
+--- @return boolean undone
+function M.undo_import(import, file_adapter)
+	local undone, err = require("keymap.layer_preset").undo(import, file_adapter or require("adapters.file_system"))
+	if undone ~= true then
+		Logger.error(LOG, "The navigation layer '%s' could not be removed again: %s.",
+			tostring(import and import.path), tostring(err))
+	end
+	return undone == true
 end
 
 return M

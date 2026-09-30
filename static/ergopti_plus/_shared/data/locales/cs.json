@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "Výběr jazyka se nepodařilo uložit.",
 	"onboarding.error.reload_pending": "Vaše odpovědi byly uloženy, ale opětovné načtení, které je použije, neproběhlo. Dokončete nastavení volbou Znovu načíst v řádku nabídek.",
 	"onboarding.error.tap_holds_import": "Vaše ostatní odpovědi byly uloženy, ale doporučené klávesy tap-hold se nepodařilo importovat. Vyberte je v nabídce Klepnutí-Přidržení.",
+	"onboarding.error.nav_layer_import": "Vaše ostatní odpovědi a klávesy tap-hold byly uloženy, ale doporučenou navigační vrstvu se nepodařilo importovat. Obnovte ji pomocí „Upravit navigační vrstvu…“ v nabídce Klepnutí-Přidržení.",
 	"onboarding.error.tap_holds_import_timeout": "Vaše ostatní odpovědi byly uloženy, ale import doporučených kláves tap-hold se nedokončil včas. Po opětovném načtení je zkontrolujte v nabídce Klepnutí-Přidržení.",
 	"onboarding.error.title": "ErgoptiPlus — Chyba",
 	"onboarding.error.write_failed": "Nepodařilo se zapsat konfigurační soubor.",

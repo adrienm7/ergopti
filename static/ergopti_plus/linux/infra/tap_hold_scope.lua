@@ -17,6 +17,12 @@
 ---    tap_hold parameter domain change; unknown sections and fields survive.
 --- 3. Revertible: a committed owner keeps its exact inverse, so a composed
 ---    scope can undo it when a later category refuses.
+--- 4. The layer comes with its key: a restore also creates the folder's
+---    layers.toml from Ergopti's recommended navigation layer when there is
+---    none (keymap.layer_preset), before the engine is rebuilt, so the key the
+---    preset holds on the layer never enters an empty one. An existing
+---    layers.toml is the user's and stays; a refused or reverted restore
+---    removes only the file it created.
 --- ==============================================================================
 
 local M = {}
@@ -25,6 +31,7 @@ local Transaction = require("config_scope_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
+local LayerPreset = require("keymap.layer_preset")
 local LOG = "infra.tap_hold_scope"
 local _owner, _sequence = nil, 0
 
@@ -36,9 +43,46 @@ local function is_tap_hold_binding(binding)
 	return binding == "tap_hold" or (type(binding) == "string" and binding:match("^tap_hold__[a-z0-9_]+$") ~= nil)
 end
 
+--- Creates the recommended layers.toml beside tap_hold.toml when there is none.
+--- @param options table The owner's options (tap_hold_path, shared_root).
+--- @param files table The owner's file port, the one undo_layer() removes through.
+--- @return table|nil import What LayerPreset.import_if_absent() returned.
+--- @return string|nil err Why the absent file could not be created.
+local function import_layer(options, files)
+	local config_dir = assert(options.tap_hold_path:match("^(.*)[/\\][^/\\]+$"),
+		"tap-hold scope needs tap_hold.toml inside a configuration folder")
+	local ok, import, err = pcall(LayerPreset.import_if_absent, {
+		shared_root = options.shared_root or require("infra.paths").shared_root(),
+		config_dir = config_dir, toml_decode = Codec.decode, file_adapter = files,
+	})
+	if not ok then return nil, tostring(import) end
+	if not import then return nil, err end
+	if import.status == LayerPreset.IMPORTED then
+		Logger.info(LOG, "Recommended navigation layer imported into '%s'.", import.path)
+	elseif import.detail then
+		Logger.warn(LOG, "'%s' is kept as it is (%s): the restore never replaces a layer file.",
+			import.path, import.detail)
+	end
+	return import
+end
+
+--- Removes the layers.toml a restore created, while it holds the preset's bytes.
+--- @param import table|nil What import_layer() returned.
+--- @param files table The owner's file port.
+--- @return boolean undone
+local function undo_layer(import, files)
+	local undone, err = LayerPreset.undo(import, files)
+	if undone ~= true then
+		Logger.error(LOG, "The navigation layer '%s' a refused restore created could not be removed: %s.",
+			tostring(import and import.path), tostring(err))
+	end
+	return undone == true
+end
+
 --- Builds one transaction owner over tap_hold.toml and config.toml.
 --- @param options table path, backup_path, tap_hold_path, tap_hold_backup_path,
----   is_paused and optional manager, loader, writer, parameters and files ports.
+---   is_paused and optional manager, loader, writer, parameters, files and
+---   shared_root ports.
 --- @return table owner apply(mode), revert(), release(), pending(), retry_restore().
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "tap-hold scope requires live pause ownership")
@@ -50,7 +94,7 @@ function M.new(options)
 	local writer = options.writer or require("platform.remap.tap_hold_writer")
 	local parameters = options.parameters or require("modules.gestures.manager")
 	local files = options.files or require("adapters.file_system")
-	local owner, held, legacy, source = {}, false, {}, nil
+	local owner, held, legacy, source, layer = {}, false, {}, nil, nil
 	local preset = loader.preset_keys(manager.defaults_path())
 	local function parameter_domain(path)
 		local key = path:match("^gesture_parameters%.(.+)$")
@@ -123,13 +167,24 @@ function M.new(options)
 	function owner.apply(mode)
 		if held or (mode ~= "clear" and mode ~= "recommended") or options.is_paused() then return false end
 		if not acquire() then return false, "tap-hold parameters are already owned" end
+		layer = nil
+		if mode == "recommended" then
+			local import, err = import_layer(options, files)
+			if not import then
+				release()
+				return false, "the recommended navigation layer cannot be imported: " .. tostring(err)
+			end
+			layer = import
+		end
 		local committed, detail = transaction.apply("tap_holds", mode)
+		if committed ~= true and undo_layer(layer, files) then layer = nil end
 		if not transaction.pending() then release() end
 		return committed, detail
 	end
 	function owner.revert()
 		if not acquire() then return false, "tap-hold parameters are already owned" end
 		local reverted, detail = transaction.revert()
+		if reverted == true and undo_layer(layer, files) then layer = nil end
 		if not transaction.pending() then release() end
 		return reverted, detail
 	end

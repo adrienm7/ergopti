@@ -9,7 +9,9 @@
 --- and they reach config.toml in one versioned batch, after which the daemon
 --- restarts so every module starts from the file. The Tap-Holds page's checked
 --- keys are imported into the chosen folder's tap_hold.toml by the tap-hold
---- writer, which also switches the feature on there.
+--- writer, which also switches the feature on there. A key whose recommended
+--- hold enters the navigation layer brings Ergopti's recommended layer along
+--- (keymap.layer_preset) when the folder has no layers.toml of its own.
 --- ==============================================================================
 
 local M = {}
@@ -302,6 +304,42 @@ local function import_tap_holds(state, target_dir, keys)
 	return false
 end
 
+--- Imports Ergopti's recommended navigation layer into the chosen folder when
+--- an imported key's recommended hold enters it and the folder has no
+--- layers.toml: an existing one is the user's and stays as it is.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param target_dir string The configuration folder the wizard set up.
+--- @param keys table The imported tap-hold key ids.
+--- @return boolean ok False when the layer was due and could not be written.
+local function import_nav_layer(state, target_dir, keys)
+	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	local LayerPreset = dependency(state, "layer_preset", "keymap.layer_preset")
+	local ok, import, err = pcall(function()
+		local shared_root = Paths.shared_root()
+		local layer_id = LayerPreset.read(shared_root, TomlCodec.decode).layer_id
+		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		local enters = false
+		for _, key_id in ipairs(keys) do
+			enters = enters or (type(preset[key_id]) == "table" and preset[key_id].hold_layer == layer_id)
+		end
+		if not enters then return { status = "not_needed" } end
+		return LayerPreset.import_if_absent({ shared_root = shared_root, config_dir = target_dir,
+			toml_decode = TomlCodec.decode })
+	end)
+	if ok and import then
+		if import.status == LayerPreset.IMPORTED then
+			Logger.success(LOG, "Recommended navigation layer imported into '%s'.", import.path)
+		elseif import.status == LayerPreset.KEPT then
+			Logger.info(LOG, "'%s' is kept: the wizard never replaces a layer file%s.", import.path,
+				import.detail and (" (" .. import.detail .. ")") or "")
+		end
+		return true
+	end
+	Logger.error(LOG, "The recommended navigation layer was not imported: %s.", tostring(ok and err or import))
+	report_failure(state, "onboarding.error.nav_layer_import")
+	return false
+end
+
 local function finish(state, answers)
 	local authorities = {
 		i18n = dependency(state, "i18n", "infra.i18n"),
@@ -371,7 +409,9 @@ local function finish(state, answers)
 		return { done = false }
 	end
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
-	if #tap_hold_keys > 0 then import_tap_holds(state, target_dir, tap_hold_keys) end
+	if #tap_hold_keys > 0 and import_tap_holds(state, target_dir, tap_hold_keys) then
+		import_nav_layer(state, target_dir, tap_hold_keys)
+	end
 
 	local manager = webview(state)
 	if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end

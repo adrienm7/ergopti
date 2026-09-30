@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "言語の選択を保存できませんでした。",
 	"onboarding.error.reload_pending": "回答は保存されましたが、それを適用する再読み込みを実行できませんでした。メニューバーの「再読み込み」で設定を完了してください。",
 	"onboarding.error.tap_holds_import": "他の回答は保存されましたが、推奨のタップホールドキーをインポートできませんでした。タップホールドメニューで選択してください。",
+	"onboarding.error.nav_layer_import": "他の回答とタップホールドキーは保存されましたが、推奨のナビゲーションレイヤーをインポートできませんでした。タップホールドメニューの「ナビゲーションレイヤーを編集…」で復元してください。",
 	"onboarding.error.tap_holds_import_timeout": "他の回答は保存されましたが、推奨のタップホールドキーのインポートが時間内に完了しませんでした。再読み込み後にタップホールドメニューで確認してください。",
 	"onboarding.error.title": "ErgoptiPlus — エラー",
 	"onboarding.error.write_failed": "設定ファイルの書き込みに失敗しました。",

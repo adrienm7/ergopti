@@ -17,7 +17,9 @@
 ---    catalogue and they reach config.toml in one versioned batch_write, then
 ---    hs.reload() starts every module from the file. The Tap-Holds page's
 ---    checked keys go to the remap owner, which imports their recommendation
----    into config_karabiner.toml and switches the Tap-Holds on there.
+---    into config_karabiner.toml and switches the Tap-Holds on there. A key
+---    whose recommended hold enters the navigation layer brings Ergopti's
+---    recommended layer along when the folder has no layers.toml of its own.
 --- 4. Re-run shows the values in force: the page receives the configured value
 ---    of every wizard path, for the folder it opens on and for any folder the
 ---    user picks, the tap-hold keys and switch included, which the remap owner
@@ -520,6 +522,29 @@ local function import_tap_holds(keys, moved, on_done)
 	on_done(saved_ok and saved == true, saved_ok and detail or saved)
 end
 
+--- Creates layers.toml from Ergopti's recommended navigation layer when one of
+--- the imported keys' recommended hold enters that layer and the configuration
+--- folder has none: without it the key would enter an empty layer, since an
+--- absent layers.toml binds no key. An existing file is the user's and stays.
+--- @param keys table Key ids of tap_hold_keys.json the wizard imports.
+--- @return table|nil import What the nav layer owner imported, nil when nothing was due.
+--- @return boolean failed True when the layer was due and could not be written.
+local function import_nav_layer(keys)
+	local ok, import, failed = pcall(function()
+		local NavLayer = require("platform.remap.nav_layer")
+		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
+			return nil, false
+		end
+		local imported = NavLayer.import_recommended({ config_dir = require("infra.config_paths").get_config_dir() })
+		return imported, imported == nil
+	end)
+	if not ok then
+		Logger.error(LOG, "The recommended navigation layer could not be imported: %s.", tostring(import))
+		return nil, true
+	end
+	return import, failed
+end
+
 --- Shows a notice once deferred work runs: never inside the callback of an
 --- owner that is still dispatching, such as a Karabiner terminal.
 --- @param key string Locale key of the notice.
@@ -653,6 +678,9 @@ local function commit(answers)
 		announce_and_reload()
 		return
 	end
+	-- The layer the imported keys enter is written first, so a live bridge's
+	-- regeneration already deploys it; a refused key import takes it back.
+	local layer, layer_failed = import_nav_layer(tap_hold_keys)
 	-- The answers are saved: a refused import leaves config_karabiner.toml as
 	-- it was, says so, and the reload still applies the rest. A bridge that
 	-- never answers cannot hold the reload back past the timeout either.
@@ -661,6 +689,10 @@ local function commit(answers)
 		settled = true
 		if ok then
 			Logger.success(LOG, "Imported %d recommended tap-hold key(s).", #tap_hold_keys)
+			if layer_failed then
+				deferred_notice("onboarding.error.nav_layer_import", announce_and_reload)
+				return
+			end
 			announce_and_reload()
 			return
 		end
@@ -676,6 +708,9 @@ local function commit(answers)
 		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import runs without it.")
 	end
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
+		-- Only a refusal takes the layer back: after a timeout the keys may
+		-- still land, and they must not enter an empty layer then.
+		if not ok then require("platform.remap.nav_layer").undo_import(layer) end
 		if settled then
 			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
 				tostring(detail))
