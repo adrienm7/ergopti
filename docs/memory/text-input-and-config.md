@@ -188,3 +188,15 @@ it with repeated synthetic probes.
 
 Keymap defaults live in the owning keymap module and flow through explicit
 injection. Menus and bridges consume those defaults rather than redeclaring them.
+
+### project-physical-magic-key-is-one-keyboardevent-code
+
+`hotstrings.magic_key_source` names the physical magic key on every driver by
+its KeyboardEvent.code, resolved through the physical-key tables (scan code,
+macOS keycode in nav_layer's ISO form, evdev code). Its default `auto` means
+the layout owns the key: Windows keeps its declared, detected, then shipped
+Ergopti chain, while macOS and Linux remap nothing, because their Ergopti+
+OS layouts already type the magic key on KeyC. Action: add a candidate only
+through the manifest enum and mac_keycodes.json (test-magic-key-source.cjs
+pins both and the v4_to_v5 map); never make a Lua driver remap `auto`, which
+would take KeyC from every QWERTY user who turned the replace section on.
