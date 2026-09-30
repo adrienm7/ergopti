@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Installa all’uscita da ErgoptiPlus",
 	"updater.move_to_applications": "ErgoptiPlus deve essere avviato dalla cartella Applicazioni per installare gli aggiornamenti. Spostalo lì e riprova.",
 	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "non installato",
 	"menu.llm.backend_mlx_unsupported": "richiede Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "在 ErgoptiPlus 退出时安装",
 	"updater.move_to_applications": "要安装更新，ErgoptiPlus 必须从“应用程序”文件夹运行。请将其移到该文件夹后重试。",
 	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "未安装",
 	"menu.llm.backend_mlx_unsupported": "需要 Apple 芯片",
 	"menu.llm.backend_unknown": "Unknown",

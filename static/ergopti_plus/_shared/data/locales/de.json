@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Beim Beenden von ErgoptiPlus installieren",
 	"updater.move_to_applications": "ErgoptiPlus muss aus dem Ordner „Programme“ gestartet werden, um Updates zu installieren. Verschieben Sie es dorthin und versuchen Sie es erneut.",
 	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "nicht installiert",
 	"menu.llm.backend_mlx_unsupported": "erfordert Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

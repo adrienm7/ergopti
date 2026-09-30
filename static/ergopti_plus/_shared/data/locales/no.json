@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Installer når ErgoptiPlus avsluttes",
 	"updater.move_to_applications": "ErgoptiPlus må kjøres fra Programmer-mappen for å installere oppdateringer. Flytt det dit og prøv igjen.",
 	"vscode.reload_required": "Last inn VSCode på nytt (Cmd+Shift+P > Reload Window) for å aktivere skriveutvidelsen",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "ikke installert",
 	"menu.llm.backend_mlx_unsupported": "krever Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

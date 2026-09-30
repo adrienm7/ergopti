@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Installeren wanneer ErgoptiPlus stopt",
 	"updater.move_to_applications": "ErgoptiPlus moet vanuit de map Apps worden gestart om updates te installeren. Verplaats het daarheen en probeer het opnieuw.",
 	"vscode.reload_required": "Herlaad VSCode (Cmd+Shift+P > Reload Window) om de typextensie te activeren",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "niet geïnstalleerd",
 	"menu.llm.backend_mlx_unsupported": "vereist Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

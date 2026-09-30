@@ -4018,10 +4018,12 @@ i18n = "common.restore_recommended"
 [[menu.llm_menu]]
 type = "---"
 
+# No i18n: the row names the backend selected in its submenu, the option's
+# label cut before its em dash (« API 🌐 »), as the maintainer asked on
+# 2026-09-30 in place of « Backend : api ».
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
-i18n = "menu.llm.model_backend"
 disabled_when_off = false
 health_dot = false
 platforms = ["ahk", "hs"]

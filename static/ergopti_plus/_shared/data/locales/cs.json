@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Nainstalovat při ukončení ErgoptiPlus",
 	"updater.move_to_applications": "Aby bylo možné instalovat aktualizace, musí ErgoptiPlus běžet ze složky Aplikace. Přesuňte jej tam a zkuste to znovu.",
 	"vscode.reload_required": "Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "nenainstalováno",
 	"menu.llm.backend_mlx_unsupported": "vyžaduje Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

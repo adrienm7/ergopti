@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "ErgoptiPlus 종료 시 설치",
 	"updater.move_to_applications": "업데이트를 설치하려면 ErgoptiPlus를 응용 프로그램 폴더에서 실행해야 합니다. 그곳으로 옮긴 후 다시 시도하세요.",
 	"vscode.reload_required": "타이핑 확장 프로그램을 활성화하려면 VSCode를 다시 로드하세요 (Cmd+Shift+P > Reload Window)",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "설치되지 않음",
 	"menu.llm.backend_mlx_unsupported": "Apple 실리콘 필요",
 	"menu.llm.backend_unknown": "Unknown",

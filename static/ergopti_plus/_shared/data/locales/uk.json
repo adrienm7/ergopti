@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Встановити під час виходу з ErgoptiPlus",
 	"updater.move_to_applications": "Щоб встановлювати оновлення, ErgoptiPlus має запускатися з папки «Програми». Перемістіть його туди й повторіть спробу.",
 	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "не встановлено",
 	"menu.llm.backend_mlx_unsupported": "потрібен Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

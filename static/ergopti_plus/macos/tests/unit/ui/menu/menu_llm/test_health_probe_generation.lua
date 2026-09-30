@@ -356,7 +356,7 @@ helpers.describe("LLM health probe ownership", function()
 				helpers.assert_eq(#fixture.probes, 1)
 				local target_identity = target == "api" and "API 🌐" or "Ollama 🦙"
 				find_nested_action(
-					item, "menu.llm.backend_title", target_identity)()
+					item, "MLX 🚀", target_identity)()
 				local updates_before_stale = fixture.updates()
 				fixture.probes[1].completion(200)
 				helpers.assert_eq(fixture.updates(), updates_before_stale,
@@ -473,7 +473,7 @@ helpers.describe("LLM health probe ownership", function()
 			local port_action = find_nested_action(
 				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
 			local backend_action = find_nested_action(
-				item, "menu.llm.backend_title", "API 🌐")
+				item, "MLX 🚀", "API 🌐")
 			helpers.assert_eq(type(port_action), "function")
 			helpers.assert_eq(type(backend_action), "function")
 
@@ -500,7 +500,7 @@ helpers.describe("LLM health probe ownership", function()
 			local port_action = find_nested_action(
 				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
 			local backend_action = find_nested_action(
-				item, "menu.llm.backend_title", "API 🌐")
+				item, "MLX 🚀", "API 🌐")
 
 			helpers.assert_eq(backend_action(), true)
 			helpers.assert_eq(fixture.pending_stop_kind(), "backend")

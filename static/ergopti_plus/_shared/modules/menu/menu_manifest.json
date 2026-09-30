@@ -176,7 +176,6 @@
 		{
 			"type": "dynamic",
 			"id": "llm_backend",
-			"i18n": "menu.llm.model_backend",
 			"disabled_when_off": false,
 			"health_dot": false,
 			"platforms": [

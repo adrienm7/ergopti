@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "ErgoptiPlus बंद होने पर इंस्टॉल करें",
 	"updater.move_to_applications": "अपडेट इंस्टॉल करने के लिए ErgoptiPlus को Applications फ़ोल्डर से चलाना होगा। इसे वहाँ ले जाएँ, फिर दोबारा कोशिश करें।",
 	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "इंस्टॉल नहीं",
 	"menu.llm.backend_mlx_unsupported": "Apple Silicon आवश्यक",
 	"menu.llm.backend_unknown": "Unknown",
