@@ -340,13 +340,14 @@ helpers.describe("Linux terminal shortcut scope", function()
 				local selected = mode == "recommended" and "recommended" or "clear"
 				local key = selected == "clear" and "common.clear_to_system" or "common.restore_recommended"
 				local id = selected == "clear" and "scope_clear" or "scope_restore"
-				local changed = 0
+				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					root.shortcuts_menu = {{ type = "command", id = id, i18n = key }}
 					root.top_level = {{ id = "shortcuts" }}
 					os.execute = function(command)
 						if command:find("command -v zenity", 1, true) then return 0 end
 						if command:find("zenity --question", 1, true) then
+							questions = questions + 1
 							if mode == "paused confirmation" then controls.paused = true end
 							return mode == "cancel" and 1 or 0
 						end
@@ -367,6 +368,8 @@ helpers.describe("Linux terminal shortcut scope", function()
 					action()
 					local expected = mode == "clear" or mode == "recommended"
 					helpers.assert_eq(changed, expected and 1 or 0)
+					-- Only the clear asks (restore-recommended-no-confirm).
+					helpers.assert_eq(questions, selected == "clear" and 1 or 0)
 					helpers.assert_eq(owners.manager.is_enabled(), mode ~= "clear")
 					if not expected then helpers.assert_eq(Sandbox.read_bytes(path), SOURCE) end
 				end)
@@ -375,6 +378,48 @@ helpers.describe("Linux terminal shortcut scope", function()
 			end)
 		end)
 	end
+end)
+
+-- shortcuts-restore-row: the row is the manifest's own declaration now, not
+-- one this suite injects. It runs the recommended scope without a question.
+helpers.describe("Linux Shortcuts restore row", function()
+	helpers.it("the declared Shortcuts restore row restores the recommended scope without a question", function()
+		with_scope(function(_, owners, controls, path)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top, execute = root.top_level, os.execute
+			local changed, questions = 0, 0
+			local passed, err = pcall(function()
+				root.top_level = {{ id = "shortcuts" }}
+				os.execute = function(command)
+					if command:find("command -v zenity", 1, true) then return 0 end
+					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
+					return execute(command)
+				end
+				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					is_paused = function() return controls.paused end,
+					on_menu_changed = function() changed = changed + 1 end })
+				local i18n = require("infra.i18n")
+				local action
+				for _, item in ipairs(menu) do
+					if item.title == i18n.get("menu.shortcuts.title") then
+						for _, row in ipairs(item.menu or {}) do
+							if row.title == i18n.get("common.restore_recommended") then action = row.fn end
+						end
+					end
+				end
+				helpers.assert_eq(type(action), "function", "the Shortcuts submenu draws the declared restore row")
+				owners.manager.set_enabled(false)
+				action()
+				helpers.assert_eq(questions, 0, "restoring the recommended values asks nothing")
+				helpers.assert_eq(changed, 1)
+				helpers.assert_eq(owners.manager.is_enabled(), Manifest.recommended_for("shortcuts.enabled"))
+				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).other.value, 42)
+			end)
+			root.top_level, os.execute = top, execute
+			if not passed then error(err, 0) end
+		end)
+	end)
 end)
 
 helpers.describe("Linux terminal shortcut scope revert", function()

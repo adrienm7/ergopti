@@ -36,6 +36,15 @@ local OLLAMA_READINESS_PROBE_TIMEOUT_SEC = 5         -- Bound each worker withou
 local OLLAMA_READINESS_RETRY_DELAY_SEC = 0.5         -- Preserve the established daemon-start polling cadence.
 local OLLAMA_READINESS_MAX_RETRIES = 30              -- Allow thirty bounded probes before terminal failure.
 
+-- Readiness failures after which nothing answers at the Ollama endpoint: no
+-- executable to start, a start that failed, or a start that never answered.
+-- The ownership refusals (pause, overlap, a stale caller) are not the user's to fix.
+local UNREACHABLE_READINESS = {
+	restart_command_unavailable = true,
+	restart_failed = true,
+	readiness_timeout = true,
+}
+
 local ok_dw, download_window = pcall(require, "ui.download_window")
 if not ok_dw then download_window = nil end
 
@@ -366,6 +375,8 @@ function M.new(deps, presets, ram_getter)
 			terminal_sent = false,
 			requirement_lifecycle = requirement_lifecycle,
 			requirement_registered = false,
+			-- The caller turns a failed start into its own error, which names the fix
+			reports_unreachable = type(opts) == "table" and opts.reports_unreachable == true,
 		}
 
 		local function waiter_is_current(candidate)
@@ -645,6 +656,23 @@ function M.new(deps, presets, ram_getter)
 			return false
 		end
 
+		--- Posts the generic "Ollama failed" notice, unless every waiter turns the
+		--- failure into its own error with the fix: two notices would say one thing.
+		--- @param message_key string Locale key of the notice body.
+		--- @return boolean reported True when the callers report the failure.
+		local function notify_start_failure(message_key)
+			local reported = #operation.waiters > 0
+			for _, candidate in ipairs(operation.waiters) do
+				if candidate.reports_unreachable ~= true then reported = false end
+			end
+			if reported then
+				Logger.debug(LOG, "Ollama start failure (%s) is reported by its caller.", message_key)
+				return true
+			end
+			pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get(message_key), "error")
+			return false
+		end
+
 		local start_probe
 		local start_restart
 		local schedule_retry
@@ -792,8 +820,7 @@ function M.new(deps, presets, ram_getter)
 		start_restart = function()
 			local command = build_ollama_restart_command()
 			if not command then
-				pcall(notifications.notify, i18n.get("ollama.fail_title"),
-					i18n.get("ollama.daemon_fail"), "error")
+				notify_start_failure("ollama.daemon_fail")
 				settle_operation(false, "restart_command_unavailable")
 				return false
 			end
@@ -804,8 +831,7 @@ function M.new(deps, presets, ram_getter)
 					if exit_code ~= 0 then
 						Logger.error(LOG, "Ollama daemon restart worker exited with code %s.",
 							tostring(exit_code))
-						pcall(notifications.notify, i18n.get("ollama.fail_title"),
-							i18n.get("ollama.daemon_fail"), "error")
+						notify_start_failure("ollama.daemon_fail")
 						settle_operation(false, "restart_failed")
 						return false
 					end
@@ -829,10 +855,14 @@ function M.new(deps, presets, ram_getter)
 						return start_restart()
 					end
 					if operation.retries < OLLAMA_READINESS_MAX_RETRIES then return schedule_retry() end
-					Logger.error(LOG, "Ollama daemon stayed unavailable after %d readiness probes.",
-						OLLAMA_READINESS_MAX_RETRIES)
-					pcall(notifications.notify, i18n.get("ollama.fail_title"),
-						i18n.get("ollama.start_fail"), "error")
+					if notify_start_failure("ollama.start_fail") then
+						-- The caller's error names the fix; this is its log line
+						Logger.warn(LOG, "Ollama daemon stayed unavailable after %d readiness probes.",
+							OLLAMA_READINESS_MAX_RETRIES)
+					else
+						Logger.error(LOG, "Ollama daemon stayed unavailable after %d readiness probes.",
+							OLLAMA_READINESS_MAX_RETRIES)
+					end
 					settle_operation(false, "readiness_timeout")
 					return false
 				end, "readiness_probe_start_refused")
@@ -1763,6 +1793,15 @@ function M.new(deps, presets, ram_getter)
 			if not current_or_cancel() then return false end
 			return settle(on_success, "Ollama requirement success", ...)
 		end
+		--- A start that never answered is one reason for the caller, whatever
+		--- step gave up: it offers the fixes of an unreachable Ollama.
+		--- @param reason string Readiness failure reason.
+		local function settle_readiness_failure(reason, ...)
+			if UNREACHABLE_READINESS[reason] then
+				return settle_cancel(OllamaEndpoint.UNREACHABLE, reason)
+			end
+			return settle_cancel(reason, ...)
+		end
 		if not current_or_cancel() then return false end
 		if not target_model or target_model == "" then return settle_success() end
 		local silent = type(opts) == "table" and opts.silent_notifications == true
@@ -1912,7 +1951,7 @@ function M.new(deps, presets, ram_getter)
 				return false
 			end
 			return true
-		end, settle_cancel, opts)
+		end, settle_readiness_failure, opts)
 		if readiness_accepted ~= true then
 			settle_cancel("readiness_dispatch_refused")
 			return false

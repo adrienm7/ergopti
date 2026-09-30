@@ -12,7 +12,8 @@
 ---    endpoint answers. A sweep probes every server at once through a probe
 ---    the caller injects (api_remote owns the HTTP transport, the address and
 ---    the key), so the main thread never waits and tests fake the transport.
----    A newer sweep supersedes an older one: a late answer is dropped.
+---    A newer sweep supersedes an older one: a late answer is dropped, and the
+---    older sweep's caller hears when the newer one completes.
 --- 2. A 401 or 403 is an answer: the server runs and wants a key, which the
 ---    menu then asks for.
 --- 3. Requests take the openai format of api_providers.json: api_remote
@@ -184,6 +185,9 @@ local _checked_at = nil
 -- Identity of the sweep in flight; an older sweep's answers are dropped
 local _sweep_generation = 0
 local _sweep_active = false
+-- Callers waiting for fresh verdicts. A newer sweep drops an older one's
+-- answers, not its callers: they hear when the newest sweep completes
+local _waiters = {}
 
 --- Tells whether two verdicts differ.
 --- @param a table|nil
@@ -202,15 +206,20 @@ end
 --- @param targets table Array of { id, base_url, … }, one per server.
 --- @param probe function (target, settle) -> boolean dispatched; settle(response)
 ---        receives the HTTP adapter's answer, once.
---- @param on_done function|nil Receives (changed) once every target settled.
+--- @param on_done function|nil Receives (changed) once every target settled,
+---        or once the newer sweep that superseded this one did.
 --- @return boolean started
 function M.sweep(targets, probe, on_done)
 	if type(targets) ~= "table" or type(probe) ~= "function" then
 		error("local_servers.sweep: targets and a probe are required")
 	end
+	if on_done ~= nil and type(on_done) ~= "function" then
+		error("local_servers.sweep: on_done must be a function")
+	end
 	_sweep_generation = _sweep_generation + 1
 	local generation = _sweep_generation
 	_sweep_active = true
+	if on_done then _waiters[#_waiters + 1] = on_done end
 	local fresh = {}
 	local pending = #targets
 
@@ -227,8 +236,10 @@ function M.sweep(targets, probe, on_done)
 		local found = {}
 		for _, id in ipairs(M.detected()) do found[#found + 1] = id .. "=" .. _results[id].status end
 		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
-		if type(on_done) == "function" then
-			local ok, err = xpcall(on_done, debug.traceback, changed)
+		local waiters = _waiters
+		_waiters = {}
+		for _, waiter in ipairs(waiters) do
+			local ok, err = xpcall(waiter, debug.traceback, changed)
 			if not ok then Logger.error(LOG, "Local server sweep callback raised: %s", tostring(err)) end
 		end
 	end

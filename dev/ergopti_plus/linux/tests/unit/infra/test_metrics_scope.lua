@@ -234,7 +234,10 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						action()
 						local committed = scenario == "clear" or scenario == "recommended"
 						helpers.assert_eq(changed, committed and 1 or 0)
-						helpers.assert_eq(questions, scenario == "pause before confirmation" and 0 or 1)
+						-- Only a clear asks; the restore applies at once
+						-- (restore-recommended-no-confirm).
+						local asks = mode == "clear" and scenario ~= "pause before confirmation"
+						helpers.assert_eq(questions, asks and 1 or 0)
 						if committed then
 							helpers.assert_eq(#backups, 1)
 							helpers.assert_eq(Sandbox.read_bytes(backups[1]), source)

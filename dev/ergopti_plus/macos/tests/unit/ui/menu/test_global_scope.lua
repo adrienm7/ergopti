@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Global Scope (macOS)
 --- DESCRIPTION:
---- Configuration › « Restore recommended values » asks once, then composes
---- the scoped config.toml owners and the remap engine's asynchronous scope in
---- the manifest's global order. A refusal reverts every committed category,
+--- Configuration › « Restore recommended values » composes the scoped
+--- config.toml owners and the remap engine's asynchronous scope in the
+--- manifest's global order, at once; only a clear asks, once for every category. A refusal reverts every committed category,
 --- the remap one through its settings snapshot, and a category without an
 --- available owner is skipped.
 --- ==============================================================================
@@ -82,12 +82,12 @@ local function build(trace, options)
 end
 
 helpers.describe("macOS global scope", function()
-	helpers.it("asks once, then composes the remap and scoped owners in manifest order", function()
+	helpers.it("restores at once, composing the remap and scoped owners in manifest order", function()
 		local trace = {}
 		local remap = remap_double(trace, true)
 		local global, observed = build(trace, { remap = remap })
 		helpers.assert_eq(global.apply("recommended"), true)
-		helpers.assert_eq(observed.confirmations, 1, "one question covers every category")
+		helpers.assert_eq(observed.confirmations, 0, "restoring the recommended values asks nothing")
 		helpers.assert_eq(trace, { "remap:tap_holds:recommended" }, "the next category waits for the terminal")
 		helpers.assert_eq(global.pending(), true)
 		remap.settle(true)
@@ -112,6 +112,7 @@ helpers.describe("macOS global scope", function()
 		local remap = remap_double(trace, true)
 		local global, observed = build(trace, { remap = remap, refuse = "llm", refuse_defer = true })
 		helpers.assert_eq(global.apply("clear"), true)
+		helpers.assert_eq(observed.confirmations, 1, "one question covers every category of a clear")
 		remap.settle(true)
 		remap.settle(true)
 		local tail = {}
@@ -124,10 +125,10 @@ helpers.describe("macOS global scope", function()
 		helpers.assert_eq(observed.refreshes[1][2].reverted, true)
 	end)
 
-	helpers.it("does nothing on No, while paused, or for an unavailable owner", function()
+	helpers.it("does nothing on a declined clear, while paused, or for an unavailable owner", function()
 		local trace = {}
 		local declined = build(trace, { decline = true })
-		helpers.assert_eq(declined.apply("recommended"), false)
+		helpers.assert_eq(declined.apply("clear"), false)
 		local paused, observed = build(trace, { paused = true })
 		helpers.assert_eq(paused.apply("recommended"), false)
 		helpers.assert_eq(observed.confirmations, 0, "a paused session is not even asked")

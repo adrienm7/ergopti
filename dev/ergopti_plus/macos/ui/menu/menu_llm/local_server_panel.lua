@@ -6,7 +6,8 @@
 --- The rows of the AI engine submenu for the local servers that speak the
 --- OpenAI API (modules/llm/local_servers.lua): each server that answers, with
 --- the models it serves, its address and its key; a new search; another
---- address. Also the fixes the failure notices offer.
+--- address. Also the fixes the failure notices offer, and the switch to a
+--- server that the unreachable-backend error offers (use_server).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Listed only when it answers: the menu shows the last sweep's verdicts
@@ -120,14 +121,39 @@ end
 --- @param ctx table Engine menu context, with activate_api.
 --- @param id string Server id.
 --- @param model string Model id.
+--- @param on_selected function|nil Receives true once the API backend serves
+---        the model, false when the entry or the backend switch did not commit.
 --- @return boolean started
-function M.select_model(ctx, id, model)
+function M.select_model(ctx, id, model, on_selected)
 	Logger.info(LOG, "Local server '%s' model '%s' chosen.", id, model)
 	return ApiPanel.apply_local_server(ctx, id, { model = model }, function(committed)
 		if committed and ctx.state.llm_backend ~= "api" and type(ctx.activate_api) == "function" then
 			ctx.activate_api()
 		end
+		if type(on_selected) == "function" then
+			local selected = committed == true and ctx.state.llm_backend == "api"
+			if committed == true and not selected then
+				-- Leaving MLX waits for its server to stop: the switch lands later
+				Logger.warn(LOG, "Local server '%s' is stored; the API backend is not selected yet.", id)
+			end
+			on_selected(selected)
+		end
 	end)
+end
+
+--- Makes a server the prediction backend from outside the engine menu (the
+--- unreachable-backend error), through the last engine menu's context.
+--- @param id string Server id.
+--- @param model string Model id.
+--- @param on_selected function|nil As for select_model.
+--- @return boolean started
+function M.use_server(id, model, on_selected)
+	if _ctx == nil then
+		-- The AI menu builds its engine rows on its first draw, before any error
+		Logger.error(LOG, "Local server '%s' cannot be selected: the AI engine menu was never built.", id)
+		return false
+	end
+	return M.select_model(_ctx, id, model, on_selected)
 end
 
 --- Asks for a server's address, stores it and searches again.

@@ -753,5 +753,18 @@ TrayTip(Text, Title := "", Options := 0) {
     return
 }
 MsgBox(Text := "", Title := "", Options := "") {
-    return
+	TestMsgBoxCount(true)
+	return
+}
+
+; Counts the dialogs the MsgBox stub above absorbed, so a test can prove that an
+; action showed none. The stub answers "" to every question, which reads as No,
+; so a question in front of an action would also have stopped it.
+; @param {Boolean} Record True to count one more dialog.
+; @returns {Integer} Dialogs absorbed so far.
+TestMsgBoxCount(Record := false) {
+	static Count := 0
+	if Record
+		Count += 1
+	return Count
 }

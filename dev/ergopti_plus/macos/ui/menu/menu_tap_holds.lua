@@ -20,7 +20,8 @@
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
 --- 5. Restore recommended / clear run the remap engine's tap_holds scope: a
----    default-No confirmation, a verified backup, then the exact terminal.
+---    verified backup, then the exact terminal. Only the clear asks first,
+---    with a default-No question; the restore applies at once.
 --- ==============================================================================
 
 local M = {}
@@ -262,18 +263,21 @@ end
 -- Makes each scope backup path unique within the session.
 local _scope_generation = 0
 
---- Asks, then applies one tap_holds scope mode through the remap transaction.
+--- Applies one tap_holds scope mode through the remap transaction. A clear
+--- asks first; restoring the recommended values does not.
 --- The chords belong to the shortcuts scope and are not part of this request.
 --- @param karabiner table Remap facade.
 --- @param mode string "recommended" or "clear".
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean accepted
 local function run_scope(karabiner, mode, update_menu)
-	local label = i18n.get(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-	local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
-	if require("infra.dialog_util").block_alert(i18n.get("menu.tapholds.title"), label, no, yes, "warning") ~= yes then
-		Logger.info(LOG, "Tap-hold scope %s declined.", mode)
-		return false
+	if mode == "clear" then
+		local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+		if require("infra.dialog_util").block_alert(i18n.get("menu.tapholds.title"),
+			i18n.get("common.clear_to_system"), no, yes, "warning") ~= yes then
+			Logger.info(LOG, "Tap-hold scope %s declined.", mode)
+			return false
+		end
 	end
 	_scope_generation = _scope_generation + 1
 	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. ".tap_holds-"
