@@ -78,9 +78,16 @@ local KEYCODE_ESCAPE    = Keycodes.ESCAPE   -- Escape key consumed by the dynami
 local KEYCODE_RETURN    = Keycodes.RETURN   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
 local KEYCODE_TAB       = 48   -- Tab: accepts the highlighted prediction and stops all streaming
-local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
-local KEYCODE_ARROW_MAX = 126  -- Highest arrow keycode (up arrow); range covers all four
 local EMPTY_MODIFIERS   = {}   -- Submit keys are owned only as bare physical keys.
+
+-- Step of each arrow keycode through the shown predictions: ↑/← previous,
+-- ↓/→ next, as the tooltip watcher moves and as its footer (↑/← ◀ ▶ ↓/→) says.
+local ARROW_NAVIGATION_DELTA = {
+	[123] = -1,  -- Left arrow
+	[126] = -1,  -- Up arrow
+	[124] = 1,   -- Right arrow
+	[125] = 1,   -- Down arrow
+}
 
 -- ── UI / display parameters ──────────────────────────────────────────────────
 
@@ -1791,16 +1798,16 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 
 	local preds = engine.get_predictions()
 
-	-- Arrow keys navigate through the prediction list.
-	-- We must consume the event so the main eventtap does not call check_nav_reset()
-	-- which would clear the buffer and dismiss the tooltip.
-	if keyCode >= KEYCODE_ARROW_MIN and keyCode <= KEYCODE_ARROW_MAX and #preds > 1 then
-		if core_llm.check_modifiers(flags, engine.get_navigation_mods()) then
-			local delta = (keyCode == KEYCODE_ARROW_MIN or keyCode == KEYCODE_ARROW_MAX - 1) and -1 or 1
-			Logger.debug(LOG, "Prediction navigation: %+d.", delta)
-			engine.navigate(delta)
-			return true
-		end
+	-- The exact navigation chord moves through several predictions and is
+	-- consumed, so the application never sees it and the main eventtap does not
+	-- call check_nav_reset(), which would clear the buffer and dismiss the
+	-- tooltip. Any other chord, and every arrow over a single prediction, is the
+	-- application's (llm-tooltip-chords-consumed).
+	local delta = ARROW_NAVIGATION_DELTA[keyCode]
+	if delta and #preds > 1 and core_llm.check_modifiers(flags, engine.get_navigation_mods()) then
+		Logger.debug(LOG, "Prediction navigation: %+d.", delta)
+		engine.navigate(delta)
+		return true
 	end
 
 	-- Tab accepts the currently highlighted prediction, cancelling any in-flight
