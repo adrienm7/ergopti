@@ -508,24 +508,63 @@ do
 	local device = os.tmpname()
 	local device_fh = assert(io.open(device, "w"))
 	device_fh:close()
-	for _, scenario in ipairs(DAEMON_SCENARIOS) do
-		local env = {}
-		for _, pair in ipairs(home_env) do env[#env + 1] = pair end
-		env[#env + 1] = { "ERGOPTI_E2E_LLM", scenario.llm and "1" or "0" }
-		env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
-		env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
-		local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
-		local pipe = io.popen(command, "r")
+	--- Runs every key scenario in one user state.
+	--- @param base_env table Ordered { name, value } pairs naming the state's folders.
+	--- @param prefix string Label prefix naming the state.
+	local function run_key_scenarios(base_env, prefix)
+		for _, scenario in ipairs(DAEMON_SCENARIOS) do
+			local env = {}
+			for _, pair in ipairs(base_env) do env[#env + 1] = pair end
+			env[#env + 1] = { "ERGOPTI_E2E_LLM", scenario.llm and "1" or "0" }
+			env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
+			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
+			local pipe = io.popen(command, "r")
+			local output = pipe and pipe:read("*a") or ""
+			if pipe then pipe:close() end
+			local quoted = output:match("SCREEN (%b\"\")")
+			local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
+			if screen == scenario.screen then
+				pass(prefix .. scenario.name)
+			else
+				fail(prefix .. scenario.name, string.format("%q", scenario.screen),
+					screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
+			end
+		end
+	end
+	run_key_scenarios(home_env, "")
+
+	-- hardening-e-presets: the same keys over the recommended preset, committed
+	-- by a start-up child through the menu's own composition in a folder tree
+	-- of its own. A default change must not silently break a feature the
+	-- neutral defaults keep working, nor the other way round (45704357d).
+	if not ON_WINDOWS then
+		local preset = os.tmpname()
+		os.remove(preset)
+		local preset_env = {
+			{ "HOME", preset },
+			{ "XDG_CONFIG_HOME", preset .. "/.config" },
+			{ "XDG_STATE_HOME", preset .. "/.local/state" },
+			{ "XDG_DATA_HOME", preset .. "/.local/share" },
+			{ "XDG_CACHE_HOME", preset .. "/.cache" },
+		}
+		local made = os.execute("mkdir -p " .. sh_quoted(preset))
+		if not (made == true or made == 0) then error("run_e2e: cannot create the preset HOME " .. preset) end
+		local parts = {}
+		for _, pair in ipairs(preset_env) do parts[#parts + 1] = pair[1] .. "=" .. sh_quoted(pair[2]) end
+		parts[#parts + 1] = sh_quoted(interpreter) .. " tests/e2e/startup_child.lua"
+		parts[#parts + 1] = sh_quoted(device) .. " restore_recommended " .. sh_quoted(driver_root)
+		parts[#parts + 1] = sh_quoted(driver_root .. "/_generated/config_template.toml") .. " 2>&1"
+		local pipe = io.popen(table.concat(parts, " "), "r")
 		local output = pipe and pipe:read("*a") or ""
 		if pipe then pipe:close() end
-		local quoted = output:match("SCREEN (%b\"\")")
-		local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
-		if screen == scenario.screen then
-			pass(scenario.name)
+		if output:find("E2E_FACT restore_committed=true", 1, true) then
+			run_key_scenarios(preset_env, "recommended preset: ")
 		else
-			fail(scenario.name, string.format("%q", scenario.screen),
-				screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
+			fail("hardening-e-presets: the recommended preset is committed for the key scenarios",
+				"restore_committed=true", output:sub(-300))
 		end
+		os.execute("rm -rf " .. sh_quoted(preset))
 	end
 
 	-- The real tray menu, every module loaded, rows counted without GTK. The
