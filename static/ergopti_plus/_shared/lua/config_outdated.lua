@@ -92,9 +92,10 @@ function M.report(segments, detail, sink)
 		(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); it is offered for cleanup.",
 			path, detail)
 	else
-		-- A quoted key has no line the cleanup can cut; promising it would be false.
+		-- A quoted key or a list member has no line the cleanup can cut;
+		-- promising it would be false.
 		(sink or logger()).warn(LOG, "Outdated configuration entry '%s' ignored (%s); the config cleanup "
-			.. "cannot remove a quoted key, delete it from config.toml by hand.", path, detail)
+			.. "cannot remove a quoted key or a list member, delete it from config.toml by hand.", path, detail)
 	end
 	return true
 end
