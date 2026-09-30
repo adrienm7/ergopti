@@ -134,6 +134,23 @@ helpers.describe("AI agent settings: stored like every llm.* setting", function(
 		end)
 	end)
 
+	helpers.it("warns once about a retired mode or spec and offers it for cleanup (config-outdated-llm-agent)", function()
+		local marked = {}
+		require("config_outdated").reset_for_tests()
+		local reported = require("config_outdated").collect_reports(function()
+			Scenario.run({ stored = { ["llm.agent_system1"] = "Bad Value", ["llm.agent_mode"] = "suggest" } }, function()
+				local Settings = require("modules.llm.agent_settings")
+				helpers.assert_eq(Settings.get_mode(), "off")
+				helpers.assert_eq(Settings.get_spec("system1"), "")
+			end)
+			require("modules.llm.agent_settings").mark_config_reads({ llm = {
+				agent_system1 = "Bad Value", agent_system2 = "cerebras", agent_mode = "suggest",
+			} }, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
+		end)
+		helpers.assert_eq(marked, { "llm.agent_system2" }, "only the value the reader uses is kept")
+		helpers.assert_eq(reported, { ["llm.agent_mode"] = true, ["llm.agent_system1"] = true })
+	end)
+
 	helpers.it("marks its four keys as read for the config cleanup", function()
 		local marked = {}
 		require("modules.llm.agent_settings").mark_config_reads({ llm = {
