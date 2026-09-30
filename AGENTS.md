@@ -36,6 +36,10 @@ skills and durable technical knowledge in routed memory.
 
 ## Delivery
 
+- Every fix and feature covers Windows, macOS and Linux. When one OS cannot
+  have it, state why in the change and in the menu's reason text; a failure
+  seen on one OS (a download behind a company proxy, a layout name mismatch)
+  is checked on the other two before the fix is done.
 - Write code, identifiers, developer documentation, logs, and commit messages
   in English. Route user-facing French text through the `i18n` skill.
 - Treat the strict convention lint as authoritative for indentation, file
