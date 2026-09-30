@@ -35,6 +35,13 @@
 ---    that layout keeps its one lease worker. A real layout switch or a reload
 ---    while that RESUME is in flight supersedes the activation without an ERROR
 ---    (lease-stop-supersedes-activation).
+--- 6. hardening-h-no-rosetta: on Apple silicon no started process may lack an
+---    arm64 slice. dev.155 opened, on a Mac migrated from an Intel one, macOS's
+---    "support for Intel-based apps is ending" notice about Python: the boot's
+---    input-source probe ran /usr/bin/python3, whose xcode-select shim runs the
+---    active developer folder's python3, and that copy was x86_64 only. The
+---    migrated Mac keeps those Intel Pythons (and an Intel Homebrew in
+---    /usr/local); a Python helper started after the boot must pick the arm64 one.
 --- ==============================================================================
 
 local M = {}
@@ -176,6 +183,27 @@ local function older_release(case, extra)
 	end
 end
 
+--- A Mac migrated from an Intel one: the Command Line Tools and the Homebrew
+--- it brought along are x86_64 only, beside an Apple silicon Homebrew.
+--- @param ctx table Scenario context.
+local function migrated_from_intel(ctx)
+	neutral_defaults(ctx)
+	local machine = ctx.root .. "/machine"
+	ctx.world.write_macho(machine .. "/Library/Developer/CommandLineTools/usr/bin/python3", { "x86_64" })
+	ctx.world.write_macho(machine .. "/usr/local/bin/python3", { "x86_64" })
+	ctx.world.write_macho(machine .. "/opt/homebrew/bin/python3", { "arm64" })
+end
+
+--- The same migrated Mac without any arm64 Python: nothing at boot needs one,
+--- so the boot neither starts an Intel Python nor asks for a native one.
+--- @param ctx table Scenario context.
+local function migrated_from_intel_without_native_python(ctx)
+	neutral_defaults(ctx)
+	local machine = ctx.root .. "/machine"
+	ctx.world.write_macho(machine .. "/Library/Developer/CommandLineTools/usr/bin/python3", { "x86_64" })
+	ctx.world.write_macho(machine .. "/usr/local/bin/python3", { "x86_64" })
+end
+
 --- The preference keys and the tilde paths.toml of releases before the
 --- namespaced settings (tools/diagnostics/macos_launch_gate.py: upgraded,
 --- tilde_paths).
@@ -276,6 +304,11 @@ local function scenarios(repo)
 		{ name = "a reload while the boot's RESUME is in flight fences the lease before reloading",
 			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "reload_during_resume", facts = { native_reloads = "1", lease_phase = "idle" } },
+		-- hardening-h-no-rosetta: the boot of a Mac that kept its Intel Pythons.
+		{ name = "a Mac migrated from Intel boots without Rosetta",
+			setup = migrated_from_intel, steps = { "boot" }, marker = BOOTED_MARKER },
+		{ name = "a Mac migrated from Intel without an arm64 Python boots without Rosetta",
+			setup = migrated_from_intel_without_native_python, steps = { "boot" }, marker = BOOTED_MARKER },
 	}
 	for _, case in ipairs(older_release_cases(repo)) do
 		list[#list + 1] = {
@@ -366,7 +399,7 @@ local function judge(output, action, marker)
 		else
 			local kind = line:match("^E2E_([%u_]+) ")
 			if kind == "DIALOG" or kind == "EXIT" or kind == "BUNDLE_WRITE" or kind == "BUNDLE_READ_MISSING"
-				or kind == "OPEN_MISSING"
+				or kind == "OPEN_MISSING" or kind == "ROSETTA"
 				or kind == "TIMER_RAISED" or kind == "TAP_RAISED" or kind == "BOOT_RAISED"
 				or kind == "SCENARIO_FAILED" then
 				problems[#problems + 1] = line
@@ -452,6 +485,21 @@ local function recommended_layer_keys(shared, os_name)
 	return count
 end
 
+--- The Pythons a child started, as the world recorded them, split between its
+--- boot and its action (boot_child records E2E_PHASE between the two).
+--- @param output string Child output.
+--- @return table boot, table action E2E_SPAWN_ARCH lines of Python executables.
+local function started_pythons(output)
+	local boot, action = {}, {}
+	local current = boot
+	for line in output:gmatch("[^\n]+") do
+		if line:match("^E2E_PHASE ") then current = action end
+		local executable = line:match("^E2E_SPAWN_ARCH (%S+)")
+		if executable and executable:match("/python[%d.]*$") then current[#current + 1] = line end
+	end
+	return boot, action
+end
+
 --- Whether a boot told the user that the AI runtime it needs is missing: a
 --- notification naming that runtime (a product name, never translated).
 --- @param output string Child output.
@@ -504,6 +552,15 @@ function M.run(check, options)
 				end
 				for _, problem in ipairs(judge_facts(output, scenario.facts)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+				end
+				-- hardening-h: the boot starts no Python at all; the helper starts one,
+				-- which the ROSETTA judgement above then covers.
+				local boot_pythons, action_pythons = started_pythons(output)
+				if #boot_pythons > 0 then
+					ctx.problems[#ctx.problems + 1] = action .. ": the boot started a Python: " .. boot_pythons[1]
+				end
+				if action == "python_helper" and #action_pythons == 0 then
+					ctx.problems[#ctx.problems + 1] = action .. ": the Python helper started no Python"
 				end
 				local runtime = action == "boot" and scenario.ai_runtime and scenario.ai_runtime(ctx.arch) or nil
 				if runtime and not notified_missing_runtime(output, runtime) then

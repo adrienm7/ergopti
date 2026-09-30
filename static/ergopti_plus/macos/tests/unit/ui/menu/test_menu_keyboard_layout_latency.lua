@@ -10,8 +10,8 @@
 --- start alone is 300 ms–1 s.
 ---
 --- THE FIX: bundle discovery is memoised for the session, and the active-layout
---- list is served from a cache that is refreshed ASYNCHRONOUSLY (hs.task, inline
---- `python3 -c`) off the click path. These tests assert that the warm open path
+--- list is served from a cache that is refreshed ASYNCHRONOUSLY (hs.task,
+--- `defaults read`, no Python since hardening-h-no-rosetta) off the click path. These tests assert that the warm open path
 --- spawns no blocking subprocess and that the async probe output is parsed
 --- correctly, so the latency can never silently return.
 --- ==============================================================================
@@ -44,15 +44,19 @@ end
 
 --- ===================================================
 --- ===================================================
---- ======= 1) Active-layout JSON parser (pure) =======
+--- ===== 1) Active-layout probe parser (pure) ========
 --- ===================================================
 --- ===================================================
 
 helpers.describe("menu_keyboard_layout._parse_active_layouts", function()
 	local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 
-	helpers.it("parses a JSON array of KeyboardLayout Names into records", function()
-		local recs = kbd._parse_active_layouts('["French","Ergopti_v2_2_2_plus"]', nil)
+	local TWO_LAYOUTS = '(\n    {\n    InputSourceKind = "Keyboard Layout";\n    "KeyboardLayout ID" = 1;\n'
+		.. '    "KeyboardLayout Name" = French;\n},\n    {\n    InputSourceKind = "Keyboard Layout";\n'
+		.. '    "KeyboardLayout Name" = "Ergopti_v2_2_2_plus";\n}\n)\n'
+
+	helpers.it("parses the enabled input sources into KeyboardLayout Name records", function()
+		local recs = kbd._parse_active_layouts(TWO_LAYOUTS, nil)
 		helpers.assert_true(type(recs) == "table" and #recs == 2, "two records expected")
 		helpers.assert_eq(recs[1].id, "French")
 		helpers.assert_eq(recs[2].id, "Ergopti_v2_2_2_plus")
@@ -62,7 +66,7 @@ helpers.describe("menu_keyboard_layout._parse_active_layouts", function()
 	end)
 
 	helpers.it("computes `selected` live against the current layout name", function()
-		local recs = kbd._parse_active_layouts('["French","Ergopti_v2_2_2_plus"]', "French")
+		local recs = kbd._parse_active_layouts(TWO_LAYOUTS, "French")
 		helpers.assert_true(recs[1].selected, "French must be selected")
 		helpers.assert_true(not recs[2].selected, "Ergopti must not be selected")
 	end)
@@ -84,7 +88,7 @@ helpers.describe("menu_keyboard_layout active-layout open path", function()
 	helpers.it("serves the cache without ANY synchronous hs.execute call", function()
 		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
 			-- hs.task present → the async refresh uses it, never a blocking hs.execute.
-			task = task_stub_firing('["French"]'),
+			task = task_stub_firing('({ "KeyboardLayout Name" = French; })'),
 		})
 		-- Warm the cache as if a startup prime / earlier probe had populated it.
 		kbd._set_active_layouts_cache({ { id = "French", name = "French", selected = false } })
@@ -111,7 +115,7 @@ helpers.describe("menu_keyboard_layout async refresh", function()
 		package.loaded["adapters.shell_runner"] = nil
 		package.loaded["adapters.timer_scheduler"] = nil
 		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
-			task = task_stub_firing('["French","Ergopti_v2_2_2_plus"]'),
+			task = task_stub_firing('({ "KeyboardLayout Name" = French; }, { "KeyboardLayout Name" = Ergopti_v2_2_2_plus; })'),
 		})
 		local done = false
 		kbd._refresh_active_layouts_async(function() done = true end)
