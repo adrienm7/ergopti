@@ -121,7 +121,7 @@ its rule from the user's `layers.toml` on every regeneration (no file, no rule).
 release before that appended verbatim; it is never deployed, only compared, to
 prove and remove an older unleased ErgoptiPlus block.
 
-The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`.
+The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`. It is diagnostic only: the keylogger never suppresses a credit because a keycode is a managed output, since the same keycode is also a real key (HS-274).
 
 ## Lifecycle API
 

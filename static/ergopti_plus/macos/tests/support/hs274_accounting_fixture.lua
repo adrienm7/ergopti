@@ -23,7 +23,7 @@ local OWNED_MODULES = {
 	"infra.dialog_util", "infra.teardown_transaction", "modules.keylogger.init",
 	"modules.keylogger.log_manager", "modules.keylogger.context_tracker",
 	"modules.keylogger.kc_bridge", "modules.keylogger.watchers", "modules.keylogger.timestamp",
-	"adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
+	"modules.keylogger.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
 	"adapters.keyboard_hook", "adapters.input_source_broker", "adapters.storage",
 	"adapters.timer_scheduler", "modules.keylogger.aggregator.events",
 	"modules.keylogger.aggregator.state", "modules.keylogger.aggregator.core",
@@ -33,6 +33,10 @@ local OWNED_MODULES = {
 -- The calendar day and application every scenario records under.
 local DAY = "2026-09-08"
 local APP = "TestApp"
+
+-- The stream owner and the capture it admits in stream scenarios.
+local STREAM_OWNER = "hs274-owner"
+local STREAM_CAPTURE = "hs274-capture"
 
 --- Returns the named upvalue of a production closure.
 --- @param fn function Closure to inspect.
@@ -73,7 +77,11 @@ end
 ---   system_events                   the modifier events the keylogger appended;
 ---   counts()                        kc_ngram credits after aggregation;
 ---   aggregate()                     the aggregator state after aggregation;
----   kc_bridge                       the keylogger's (stubbed) Karabiner bridge.
+---   ledger_may_persist()            the gate the bridge asks before a ledger credit;
+---   admit_stream()                  selects the stream and admits a complete capture;
+---   kc_bridge                       the keylogger's (stubbed) Karabiner bridge;
+---   mode                            the physical accounting policy the keylogger uses;
+---   state                           the keylogger's CoreState.
 --- @param callback function Scenario body.
 function M.run(callback)
 	helpers.with_stub_scope(OWNED_MODULES, function()
@@ -97,8 +105,21 @@ function M.run(callback)
 		local credits = {}
 		local scenario = {
 			kc_bridge = package.loaded["modules.keylogger.kc_bridge"],
+			mode = require("modules.keylogger.physical_accounting_mode"),
+			state = fixture.state,
 			system_events = system_events,
 		}
+
+		function scenario.ledger_may_persist()
+			return scenario.kc_bridge.may_persist()
+		end
+
+		function scenario.admit_stream()
+			scenario.mode.select_stream(STREAM_OWNER)
+			local admitted, reason = scenario.mode.admit(STREAM_OWNER, STREAM_CAPTURE,
+				scenario.mode.COMPLETE_COVERAGE)
+			helpers.assert_eq(admitted, true, "a complete capture must be admitted: " .. tostring(reason))
+		end
 
 		function scenario.key_down(keycode, chars)
 			handle_key(quartz_event(types.keyDown, keycode, chars))
@@ -115,7 +136,7 @@ function M.run(callback)
 
 		function scenario.stream_press(keycode)
 			credits[#credits + 1] = { timestamp = DAY .. " 10:00:00.000", action = "physical_press",
-				keycode = keycode, app = APP, capture = "hs274-capture", device = "41" }
+				keycode = keycode, app = APP, capture = STREAM_CAPTURE, device = "41" }
 		end
 
 		function scenario.typing_events()
@@ -155,5 +176,7 @@ end
 
 M.DAY = DAY
 M.APP = APP
+M.STREAM_OWNER = STREAM_OWNER
+M.STREAM_CAPTURE = STREAM_CAPTURE
 
 return M

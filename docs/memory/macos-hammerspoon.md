@@ -677,6 +677,14 @@ deduplicating. EventViewer raw capture disables remapping, a first
 provides neither coverage nor provenance. Consult the
 [HS-274 evidence and rejected paths](../audits/hammerspoon/2026_09_09/discoveries.md)
 before repeating acquisition experiments or using historical TODOs.
+`modules/keylogger/physical_accounting_mode.lua` is the one owner of the
+answer: the event tap (keyDown `kc`, flagsChanged modifier events) and the
+ledger credit only under the legacy source; a selected stream makes both
+silent, and a stream without an admitted complete capture is a gap, not a
+fallback. Gate any new physical writer on it, and keep
+`test_hs274_duplicate_count.lua` and `test_hs274_physical_collision.lua` green:
+they pin the legacy double count and fail for either the `and nil or` idiom or
+global suppression.
 
 ### project-hs-webview-nil-error-sentinel
 

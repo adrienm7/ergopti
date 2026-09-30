@@ -77,3 +77,32 @@ helpers.describe("HS-274 physical collision — legacy sources", function()
 		end)
 	end)
 end)
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 2/ Exclusive Stream =======
+-- ===================================
+-- ===================================
+
+helpers.describe("HS-274 physical collision — admitted producer stream", function()
+	helpers.it("credits the remapped Escape and the passthrough Space once each", function()
+		Accounting.run(function(scenario)
+			claim_space_as_managed_output(scenario)
+			scenario.admit_stream()
+			-- Escape pressed: the stream credits Escape, Karabiner outputs Space.
+			scenario.stream_press(KEYCODE_ESCAPE)
+			scenario.key_down(KEYCODE_SPACE, " ")
+			-- Space pressed: the stream credits Space, which passes through.
+			scenario.stream_press(KEYCODE_SPACE)
+			scenario.key_down(KEYCODE_SPACE, " ")
+			helpers.assert_eq(scenario.counts(), { [KEYCODE_ESCAPE] = 1, [KEYCODE_SPACE] = 1 })
+			helpers.assert_eq(scenario.aggregate().agg_batch.chars_class[
+				Accounting.DAY .. "\1" .. Accounting.APP].space, 2,
+				"both logical Spaces must still be recorded as text")
+		end)
+	end)
+end)

@@ -90,8 +90,12 @@ function M.load_keylogger()
 		end,
 	}
 	local kc_running = false
-	package.loaded["modules.keylogger.kc_bridge"] = {
+	local kc_bridge
+	kc_bridge = {
+		-- Retains the keylogger's persistence gate so a fixture can ask the exact
+		-- question the real bridge asks before persisting a ledger line.
 		init = function(core_state, _pathwatcher, _timer, _log_manager, may_persist)
+			kc_bridge.may_persist = may_persist
 			return type(core_state) == "table" and type(may_persist) == "function"
 		end,
 		set_log_manager = function(log_manager) return type(log_manager) == "table" end,
@@ -100,6 +104,7 @@ function M.load_keylogger()
 		is_running = function() return kc_running end,
 		is_ke_managed_output_kc = function() return false end,
 	}
+	package.loaded["modules.keylogger.kc_bridge"] = kc_bridge
 	local hardware_running = false
 	package.loaded["modules.keylogger.watchers"] = {
 		init = function(core_state, is_paused)

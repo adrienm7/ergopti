@@ -109,6 +109,7 @@ Effort is in focused agent-days, including CI iteration.
 - **Goal:** replace the `and nil or` idiom with an explicit policy module, and turn the two audit proofs into suite tests.
 - **Files:**
   - New `modules/keylogger/physical_accounting_mode.lua`, which answers "does Quartz credit `kc` now?". It returns `ledger` in the default mode, and `none` only while a complete-coverage capture is admitted.
+  - As delivered, the policy has three sources rather than two, to honour section 4: `legacy` (the default: Quartz and the ledger), `stream` (an admitted complete capture) and `gap` (the stream is selected but no capture is admitted, before admission or after a loss). Quartz and the ledger credit nothing in both `stream` and `gap`; only the owner's explicit release returns to `legacy`. "None only while admitted" would have fallen back to Quartz on stream loss.
   - `keylogger/init.lua:817` and the `flagsChanged` `modifier_press`/`modifier_hold` sites.
   - New `tests/unit/modules/keylogger/test_hs274_duplicate_count.lua` and `test_hs274_physical_collision.lua`, ported from `docs/audits/hammerspoon/2026_09_08/proofs/`. They drive the real `init.lua` keyDown path, not the stubbed classifier.
 - **Depends on:** WP0.
