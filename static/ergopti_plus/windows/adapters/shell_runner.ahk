@@ -20,6 +20,7 @@
 ;    terminate() returns true only after ActiveProcesses reaches zero.
 ; 4. All Run/RunWait invocations are wrapped in try/catch so a launch failure
 ;    never propagates to the caller as an unhandled exception.
+; 5. A child inherits its own standard streams and nothing else.
 ;
 ; SYMMETRY NOTE:
 ; This adapter mirrors macos/adapters/shell_runner.lua (Hammerspoon). The surface
@@ -105,6 +106,14 @@ global SR_TREE_ACTIVE_PROCESSES_OFFSET := 40
 global SR_TREE_TERMINATION_CONFIRM_BUDGET_MS := 500
 global SR_TREE_TERMINATION_CONFIRM_POLL_MS := 10
 global SR_TREE_ACCOUNTING_FAILURE_LIMIT := 2
+
+; CreateProcessW with bInheritHandles gives the child EVERY inheritable handle
+; this process holds at that instant unless a handle list names the ones to
+; pass. STARTUPINFOEXW is STARTUPINFOW followed by the attribute-list pointer.
+global SR_EXTENDED_STARTUPINFO_PRESENT := 0x00080000
+global SR_PROC_THREAD_ATTRIBUTE_HANDLE_LIST := 0x00020002
+global SR_STARTUPINFO_BYTES := (A_PtrSize = 8) ? 104 : 68
+global SR_ERROR_INSUFFICIENT_BUFFER := 122
 
 
 ; ShellRunner is deliberately valid as an isolated adapter file.  The normal
@@ -1535,6 +1544,16 @@ _SR_TreeHandleProcessId(State) {
 ; Returns {ProcessHandle, ThreadHandle, JobHandle, Pid, Assigned}. On every
 ; failure the exact handles acquired so far are terminated/closed before the
 ; exception escapes. CreateProcessW requires a mutable UTF-16 command buffer.
+;
+; The child's standard streams are inheritable handles of this process from
+; their CreateFileW to their CloseHandle, and CreateProcessW with inheritance
+; copies every inheritable handle into the child it creates. A driver thread
+; that started another task inside that window therefore gave this task's
+; capture to that child, outside this task's job and possibly alive for the
+; session: its copy, opened without FILE_SHARE_DELETE, made DeleteFileW fail
+; with ERROR_SHARING_VIOLATION once this tree had ended. The window is Critical,
+; so no other driver thread launches inside it, and a handle list passes this
+; child its own two streams and nothing else.
 _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
 		CreateFn := PLC_CreateProcessWithInheritedHandles,
 		CloseStreamFn := _SR_TreeCloseLaunchStream) {
@@ -1568,46 +1587,63 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
 				throw Error("SetInformationJobObject failed (Win32 " . A_LastError . ").")
 		}
 
-		local startup_bytes := (A_PtrSize = 8) ? 104 : 68
-		local startup_info := Buffer(startup_bytes, 0)
+		; STARTUPINFOEXW: STARTUPINFOW, then the attribute-list pointer
+		local startup_info := Buffer(SR_STARTUPINFO_BYTES + A_PtrSize, 0)
 		NumPut("UInt", startup_info.Size, startup_info, 0)
 		local security := Buffer((A_PtrSize = 8) ? 24 : 12, 0)
 		NumPut("UInt", security.Size, security, 0)
 		NumPut("Int", true, security, (A_PtrSize = 8) ? 16 : 8)
 		local invalid_handle := -1
-		input_handle := DllCall("Kernel32\CreateFileW", "Str", "NUL",
-			"UInt", 0x80000000, "UInt", 3, "Ptr", security.Ptr,
-			"UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
-		if (input_handle = invalid_handle)
-			throw Error("CreateFileW(NUL input) failed (Win32 " . A_LastError . ").")
 		local output_target := CapturePath != "" ? CapturePath : "NUL"
 		local output_disposition := CapturePath != "" ? 1 : 3
-		output_handle := DllCall("Kernel32\CreateFileW", "Str", output_target,
-			"UInt", 0x40000000, "UInt", 3, "Ptr", security.Ptr,
-			"UInt", output_disposition, "UInt", 0x80, "Ptr", 0, "Ptr")
-		if (output_handle = invalid_handle)
-			throw Error("CreateFileW(capture output) failed (Win32 " . A_LastError . ").")
-		NumPut("UInt", 0x00000100, startup_info, 60)
-		NumPut("Ptr", input_handle, startup_info, (A_PtrSize = 8) ? 80 : 56)
-		NumPut("Ptr", output_handle, startup_info, (A_PtrSize = 8) ? 88 : 60)
-		NumPut("Ptr", output_handle, startup_info, (A_PtrSize = 8) ? 96 : 64)
 		local process_info := Buffer(2 * A_PtrSize + 8, 0)
 		local command_buffer := Buffer(StrPut(CommandLine, "UTF-16") * 2, 0)
 		StrPut(CommandLine, command_buffer, "UTF-16")
 		local creation_flags := SR_TREE_CREATE_SUSPENDED | SR_TREE_CREATE_NO_WINDOW
+			| SR_EXTENDED_STARTUPINFO_PRESENT
 		local application_path := _SR_ResolveExecutableForCreateProcess(Executable)
-		CreateFn.Call(application_path, command_buffer,
-			creation_flags, startup_info, process_info)
-		; Cleanup must own the successful creation before any stream close can fail.
-		process_handle := NumGet(process_info, 0, "Ptr")
-		thread_handle := NumGet(process_info, A_PtrSize, "Ptr")
-		pid := NumGet(process_info, 2 * A_PtrSize, "UInt")
-		if !CloseStreamFn.Call(input_handle)
-			throw Error("CloseHandle(input) failed (Win32 " . A_LastError . ").")
-		input_handle := 0
-		if !CloseStreamFn.Call(output_handle)
-			throw Error("CloseHandle(output) failed (Win32 " . A_LastError . ").")
-		output_handle := 0
+		local handle_list := 0
+		local previous_critical := Critical("On")
+		try {
+			input_handle := DllCall("Kernel32\CreateFileW", "Str", "NUL",
+				"UInt", 0x80000000, "UInt", 3, "Ptr", security.Ptr,
+				"UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			if (input_handle = invalid_handle)
+				throw Error("CreateFileW(NUL input) failed (Win32 " . A_LastError . ").")
+			output_handle := DllCall("Kernel32\CreateFileW", "Str", output_target,
+				"UInt", 0x40000000, "UInt", 3, "Ptr", security.Ptr,
+				"UInt", output_disposition, "UInt", 0x80, "Ptr", 0, "Ptr")
+			if (output_handle = invalid_handle)
+				throw Error("CreateFileW(capture output) failed (Win32 " . A_LastError . ").")
+			handle_list := _SR_NewInheritedHandleList([input_handle, output_handle])
+			NumPut("UInt", 0x00000100, startup_info, 60)
+			NumPut("Ptr", input_handle, startup_info, (A_PtrSize = 8) ? 80 : 56)
+			NumPut("Ptr", output_handle, startup_info, (A_PtrSize = 8) ? 88 : 60)
+			NumPut("Ptr", output_handle, startup_info, (A_PtrSize = 8) ? 96 : 64)
+			NumPut("Ptr", handle_list["List"].Ptr, startup_info, SR_STARTUPINFO_BYTES)
+			CreateFn.Call(application_path, command_buffer,
+				creation_flags, startup_info, process_info)
+			; Cleanup must own the successful creation before any stream close can fail.
+			process_handle := NumGet(process_info, 0, "Ptr")
+			thread_handle := NumGet(process_info, A_PtrSize, "Ptr")
+			pid := NumGet(process_info, 2 * A_PtrSize, "UInt")
+			if !CloseStreamFn.Call(input_handle)
+				throw Error("CloseHandle(input) failed (Win32 " . A_LastError . ").")
+			input_handle := 0
+			if !CloseStreamFn.Call(output_handle)
+				throw Error("CloseHandle(output) failed (Win32 " . A_LastError . ").")
+			output_handle := 0
+		} finally {
+			; An inheritable stream never outlives the Critical window, even refused
+			for stream_handle in [input_handle, output_handle] {
+				if stream_handle && stream_handle != invalid_handle
+					try DllCall("Kernel32\CloseHandle", "Ptr", stream_handle, "Int")
+			}
+			input_handle := 0
+			output_handle := 0
+			_SR_DeleteInheritedHandleList(handle_list)
+			Critical(previous_critical)
+		}
 
 		if OwnTree {
 			if !DllCall("Kernel32\AssignProcessToJobObject",
@@ -1626,10 +1662,6 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
 		job_handle := 0
 		return owned
 	} catch as Err {
-		if input_handle && input_handle != -1
-			try DllCall("Kernel32\CloseHandle", "Ptr", input_handle, "Int")
-		if output_handle && output_handle != -1
-			try DllCall("Kernel32\CloseHandle", "Ptr", output_handle, "Int")
 		local partial := Map(
 			"ProcessHandle", process_handle,
 			"ThreadHandle", thread_handle,
@@ -1646,6 +1678,41 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
 
 _SR_TreeCloseLaunchStream(Handle) {
 	return DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
+}
+
+; Builds a PROC_THREAD_ATTRIBUTE_HANDLE_LIST naming exactly Handles, the only
+; inheritable handles CreateProcessW then passes to the child. Every handle must
+; be inheritable and listed once. The returned Map owns the attribute list and
+; the handle array it points into until _SR_DeleteInheritedHandleList.
+_SR_NewInheritedHandleList(Handles) {
+	local list_bytes := 0
+	local sized := DllCall("Kernel32\InitializeProcThreadAttributeList", "Ptr", 0,
+		"UInt", 1, "UInt", 0, "UPtr*", &list_bytes, "Int")
+	local size_error := A_LastError
+	if sized || size_error != SR_ERROR_INSUFFICIENT_BUFFER || list_bytes <= 0
+		throw Error("InitializeProcThreadAttributeList could not size the handle list (Win32 "
+			. size_error . ").")
+	local attribute_list := Buffer(list_bytes, 0)
+	if !DllCall("Kernel32\InitializeProcThreadAttributeList", "Ptr", attribute_list.Ptr,
+			"UInt", 1, "UInt", 0, "UPtr*", &list_bytes, "Int")
+		throw Error("InitializeProcThreadAttributeList failed (Win32 " . A_LastError . ").")
+	local handle_values := Buffer(Handles.Length * A_PtrSize, 0)
+	for index, handle_value in Handles
+		NumPut("Ptr", handle_value, handle_values, (index - 1) * A_PtrSize)
+	if !DllCall("Kernel32\UpdateProcThreadAttribute", "Ptr", attribute_list.Ptr,
+			"UInt", 0, "UPtr", SR_PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+			"Ptr", handle_values.Ptr, "UPtr", handle_values.Size,
+			"Ptr", 0, "Ptr", 0, "Int") {
+		local update_error := A_LastError
+		DllCall("Kernel32\DeleteProcThreadAttributeList", "Ptr", attribute_list.Ptr)
+		throw Error("UpdateProcThreadAttribute(handle list) failed (Win32 " . update_error . ").")
+	}
+	return Map("List", attribute_list, "Values", handle_values)
+}
+
+_SR_DeleteInheritedHandleList(Owner) {
+	if Owner is Map
+		DllCall("Kernel32\DeleteProcThreadAttributeList", "Ptr", Owner["List"].Ptr)
 }
 
 _SR_TreeClaimTask(State, FireDone, AccountingConfirmedZero := false) {

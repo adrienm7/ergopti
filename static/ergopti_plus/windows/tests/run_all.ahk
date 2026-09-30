@@ -1923,6 +1923,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_tree_native_refusal.ahk
 #Include unit/test_shell_runner_tree_close_recovery.ahk
 #Include unit/test_shell_runner_capture_debt.ahk
+#Include unit/test_shell_runner_capture_lock.ahk
 #Include unit/test_shell_runner_creator_debt.ahk
 #Include unit/test_shell_runner_completion_pause.ahk
 #Include unit/test_shell_runner_deferred_completion.ahk
