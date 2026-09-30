@@ -52,6 +52,19 @@ Section and category toggles rebuild the custom hotstring registry in-process.
 Native-engine and layout-backed features under `hotstrings.*` remain explicit
 reload-only exceptions.
 
+### project-hotstrings-master-tick-reads-the-engine-gate
+
+The Hotstrings switch's tick must read the state the engine gates expansion
+on, never « every category on »: the wizard's recommendation opens one section
+of one category. Windows reads `category_enabled.hotstrings`; macOS reads
+`hotstrings.enabled` (`state.keymap`), which starts or stops the typing engine
+through `KeymapLifecycle.ensure_started`/`ensure_stopped`, so off silences
+personal and dynamic hotstrings too, and AI predictions ride the same taps;
+Linux stores no flag, so its tick is `hotstrings_config.any_enabled()` or the
+dynamic master, and off closes every gate plus the dynamic master (on is
+`enable_all`). On Windows and macOS the categories keep their choices under
+the master, and « all sections » is the row that switches them.
+
 ### project-hotstring-language-packs-and-opt-in
 
 Language-specific hotstrings live in `_shared/modules/hotstrings/<language>/`
