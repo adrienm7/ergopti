@@ -49,7 +49,21 @@ concurrency:
   group: hs274-native-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  contract:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # The Lua consumer admits one baseline version; until the producer emits
+      # it, a consumer run would spend a macOS runner and fail at admission.
+      - name: Refuse a Hammerspoon consumer the producer baseline cannot serve
+        if: inputs.hammerspoon_consumer
+        run: python3 tools/diagnostics/hs274_baseline_contract.py
   observe:
+    needs: contract
     if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
     runs-on: macos-15
     timeout-minutes: 10
