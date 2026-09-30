@@ -76,9 +76,10 @@
 			"globs": [
 				"static/ergopti_plus/_shared/assets/**",
 				"static/ergopti_plus/_shared/data/keycodes/evdev.json",
+				"static/ergopti_plus/_shared/data/keycodes/hid_usages.json",
 				"static/ergopti_plus/_shared/modules/features/linux_evidence.json"
 			],
-			"why": "The macOS and Linux tray PNGs, the Linux evdev key codes and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json."
+			"why": "The macOS and Linux tray PNGs, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json."
 		},
 		{
 			"name": "website-logos",

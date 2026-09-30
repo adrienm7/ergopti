@@ -129,6 +129,7 @@ Effort is in focused agent-days, including CI iteration.
   - `physical_delivery.lua:101-105`: replace "retire the whole capture on the first unmapped usage" with an explicit uncounted-usage tally reported in coverage.
   - Per-device keyboard type in `physical_baseline.lua` rows.
   - An explicit policy for the fn/globe key (Apple vendor top-case page) and the consumer page.
+  - As delivered, the usages live in `_shared/data/keycodes/hid_usages.json`, keyed by registry id and validated against the registry by the same test, not in `physical_keys.json`: Windows parses the registry at boot (`layers_loader.ahk`) whenever a layers.toml exists, and only the macOS codegen needs them.
   - As delivered: fn/globe (usage 0x0003 on page 0x00FF or 0xFF01) resolves to kVK 63, and the Consumer keys the registry knows (mute, volume up and down) to their keycodes. Other media keys have no macOS virtual keycode and are tallied as uncounted; counting them, as decided in Q5, needs an identity shared with the event-tap path. Baseline version 2 (keyboard type per device, usage page per key) is now the consumer contract, and the producer (C++ pages, native attach, Python reader) must emit it in WP4. The raw ISO usage of the key left of 1 is assumed to follow the USB tables; WP9 checks it on the internal keyboard.
 - **Depends on:** WP0.
 - **Verify:**

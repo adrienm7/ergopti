@@ -6,20 +6,24 @@
  * DESCRIPTION:
  * Generates `macos/_generated/hid_key_identity.lua`, the table the macOS
  * physical-key stream uses to turn a raw HID (usage page, usage) into the macOS
- * virtual keycode the metrics already store, from the one physical-key
- * registry `_shared/data/keycodes/physical_keys.json`.
+ * virtual keycode the metrics already store, from the physical-key registry
+ * `_shared/data/keycodes/physical_keys.json` and its HID companion
+ * `_shared/data/keycodes/hid_usages.json`.
  *
  * FEATURES & RATIONALE:
- * 1. Single source of truth: the registry already owns every key's macOS
- *    keycode (`hs`), its ISO override (`macos_iso.hs`) and now its HID usage
- *    (`hid`). A hand-written usage table in the keylogger would be a sixth copy
- *    of physical-key identity, the drift the registry was created to end.
+ * 1. Single source per concern: the registry owns every key's macOS keycode
+ *    (`hs`) and its ISO override (`macos_iso.hs`); hid_usages.json owns each
+ *    key's HID usage, by registry key id. The HID data stays out of the
+ *    registry because every driver parses the registry and only macOS needs it.
+ *    A hand-written usage table in the keylogger would be a sixth copy of
+ *    physical-key identity, the drift the registry was created to end.
  * 2. Form only where it matters: a record whose keycode is the same on every
  *    registry form is emitted as `kc`; only a record whose keycode differs by
  *    form (the ISO swap of the keys left of 1 and left of Z) is emitted with one
  *    keycode per form, so the consumer needs a keyboard type for those keys only.
- * 3. Refuses instead of guessing: a key without a `hid` usage, a duplicate usage
- *    or a usage outside its page's range fails the generation.
+ * 3. Refuses instead of guessing: a key without a HID usage, a usage for an
+ *    unknown key, a duplicate usage or a usage outside its page's range fails
+ *    the generation.
  * 4. Pure data, no runtime JSON: the Hammerspoon keylogger requires a Lua table
  *    and never parses the registry on the capture path.
  *
@@ -35,6 +39,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const REGISTRY = path.join(SP, '_shared', 'data', 'keycodes', 'physical_keys.json');
+const HID_USAGES = path.join(SP, '_shared', 'data', 'keycodes', 'hid_usages.json');
 const OUT = path.join(SP, 'macos', '_generated', 'hid_key_identity.lua');
 
 // The largest usage of each page a registry key may carry: the Keyboard/Keypad
@@ -48,6 +53,11 @@ function fail(message) {
 }
 
 const registry = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+const hidUsages = JSON.parse(fs.readFileSync(HID_USAGES, 'utf8')).keys || {};
+for (const code of Object.keys(hidUsages)) {
+	const entry = (registry.keys || {})[code];
+	if (!entry || entry.kind !== 'key') fail(`hid_usages.json names ${code}, not a registry key.`);
+}
 const forms = registry.forms;
 if (!Array.isArray(forms) || forms.length === 0) fail('the registry declares no forms.');
 
@@ -61,8 +71,8 @@ function keycodeOn(entry, form) {
 const pages = new Map();
 for (const [code, entry] of Object.entries(registry.keys || {})) {
 	if (entry.kind !== 'key') continue;
-	const hid = entry.hid;
-	if (!hid || typeof hid !== 'object') fail(`${code} has no hid usage.`);
+	const hid = hidUsages[code];
+	if (!hid || typeof hid !== 'object') fail(`${code} has no HID usage in hid_usages.json.`);
 	const max = USAGE_MAX[hid.page];
 	if (max === undefined) fail(`${code}: usage page ${hid.page} is not a key page.`);
 	if (!Number.isInteger(hid.usage) || hid.usage < 1 || hid.usage > max)
@@ -83,7 +93,7 @@ const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '
 
 const lines = [];
 lines.push('--- _generated/hid_key_identity.lua');
-lines.push('--- AUTO-GENERATED from _shared/data/keycodes/physical_keys.json.');
+lines.push('--- AUTO-GENERATED from _shared/data/keycodes/{physical_keys,hid_usages}.json.');
 lines.push('--- DO NOT EDIT BY HAND — run `npm run codegen:hid-key-identity:hs` to refresh.');
 lines.push('');
 lines.push('--- ==============================================================================');

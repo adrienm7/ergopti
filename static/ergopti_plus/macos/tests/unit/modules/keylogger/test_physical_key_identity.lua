@@ -25,25 +25,35 @@ local USAGE_GRAVE = 0x35
 local USAGE_NON_US_BACKSLASH = 0x64
 local USAGE_F13 = 0x68
 
---- Loads the shipped physical-key registry.
---- @return table registry
-local function registry()
-	local handle = assert(io.open(helpers.shared("data/keycodes/physical_keys.json"), "r"))
+--- Loads one shipped keycode data file.
+--- @param name string File name under _shared/data/keycodes.
+--- @return table data
+local function keycode_data(name)
+	local handle = assert(io.open(helpers.shared("data/keycodes/" .. name), "r"))
 	local text = handle:read("a")
 	handle:close()
 	return Json.decode(text)
 end
 
+--- Loads the physical-key registry and its HID usages by registry key id.
+--- @return table registry
+--- @return table hid_usages
+local function registry()
+	return keycode_data("physical_keys.json"), keycode_data("hid_usages.json").keys
+end
+
 helpers.describe("physical key identity (hs274)", function()
 	helpers.it("resolves every registry key to its macOS keycode on each form", function()
-		local data = registry()
+		local data, hid_usages = registry()
 		local checked = 0
 		for code, entry in pairs(data.keys) do
 			if entry.kind == "key" then
+				local hid = hid_usages[code]
+				helpers.assert_true(type(hid) == "table", code .. " must have a HID usage")
 				for _, form in ipairs(data.forms) do
 					local override = type(entry["macos_" .. form]) == "table" and entry["macos_" .. form].hs
 					local expected = type(override) == "number" and override or entry.hs
-					helpers.assert_eq(Identity.resolve(entry.hid.page, entry.hid.usage, form), expected,
+					helpers.assert_eq(Identity.resolve(hid.page, hid.usage, form), expected,
 						code .. " on " .. form)
 				end
 				checked = checked + 1
@@ -57,12 +67,11 @@ helpers.describe("physical key identity (hs274)", function()
 		helpers.assert_eq(Identity.resolve(PAGE_KEYBOARD, USAGE_NON_US_BACKSLASH, "ansi"), 10)
 		helpers.assert_eq(Identity.resolve(PAGE_KEYBOARD, USAGE_GRAVE, "iso"), 10)
 		helpers.assert_eq(Identity.resolve(PAGE_KEYBOARD, USAGE_NON_US_BACKSLASH, "iso"), 50)
-		local data = registry()
-		for code, entry in pairs(data.keys) do
-			local usage = entry.hid and entry.hid.usage
-			if entry.kind == "key" and usage ~= USAGE_GRAVE and usage ~= USAGE_NON_US_BACKSLASH then
-				helpers.assert_eq(Identity.resolve(entry.hid.page, usage, "iso"),
-					Identity.resolve(entry.hid.page, usage, "ansi"), code .. " must not depend on the form")
+		local _, hid_usages = registry()
+		for code, hid in pairs(hid_usages) do
+			if hid.usage ~= USAGE_GRAVE and hid.usage ~= USAGE_NON_US_BACKSLASH then
+				helpers.assert_eq(Identity.resolve(hid.page, hid.usage, "iso"),
+					Identity.resolve(hid.page, hid.usage, "ansi"), code .. " must not depend on the form")
 			end
 		end
 	end)

@@ -835,9 +835,12 @@ press the key-identity policy cannot attribute is tallied in the receiver's
 The stream credits the macOS virtual keycode Quartz would have reported for the
 same physical key, so history and the heatmap keep one identity:
 `modules/keylogger/physical_key_identity.lua` resolves through
-`_generated/hid_key_identity.lua`, generated from the registry's `hid`, `hs` and
-`macos_iso.hs` (`npm run codegen:hid-key-identity:hs`). The registry places a
-usage by the USB HID usage tables, so only 0x35 (left of 1) and 0x64 (left of Z)
+`_generated/hid_key_identity.lua`, generated from the registry's `hs` and
+`macos_iso.hs` and from `_shared/data/keycodes/hid_usages.json`
+(`npm run codegen:hid-key-identity:hs`). Keep HID data out of
+`physical_keys.json`: Windows parses the registry at boot whenever a
+layers.toml exists, and only macOS needs it. A usage names a position by the
+USB HID usage tables, so only 0x35 (left of 1) and 0x64 (left of Z)
 depend on the device's keyboard type (the ISO swap); a JIS device, which the
 registry has no form for, leaves only those two uncounted. That raw usages follow
 the standard positions on Apple ISO hardware, while Karabiner rules name the key

@@ -56,7 +56,8 @@ never suppressed instead, because it is also a real key.
 
 The stream credits the macOS keycode Quartz would report for the same key:
 `physical_key_identity.lua` resolves a raw HID usage through the generated
-`_generated/hid_key_identity.lua` (from the shared registry), using the device's
+`_generated/hid_key_identity.lua` (from the shared registry and
+`_shared/data/keycodes/hid_usages.json`), using the device's
 keyboard type only for the ISO swap pair, and maps fn/globe to the fn keycode.
 `physical_delivery.lua` tallies a press it cannot attribute in `uncounted()`
 instead of retiring the capture, and `physical_baseline.lua` admits only the

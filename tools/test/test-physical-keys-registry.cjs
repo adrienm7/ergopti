@@ -31,9 +31,11 @@
  *    _shared/lua/keycodes/init.lua, azerty.json, heatmap_win.js SC_TO_KC, the
  *    Karabiner legacy_layer_keys.json and the native tap-hold input keys. Each scan is
  *    floored so a parser that stops matching cannot pass over nothing.
- * 5. HID usages: every key carries exactly one USB HID usage, no two keys share
+ * 5. HID usages (hid_usages.json, beside the registry and read only by the macOS
+ *    codegen): every key carries exactly one USB HID usage, no two keys share
  *    one, each agrees with the USB HID Usage Tables, and a raw usage resolves to
- *    the macOS keycode of its form with the ISO swap of 0x35 and 0x64 only.
+ *    the macOS keycode of its form with the ISO swap of 0x35 and 0x64 only. The
+ *    registry itself carries no HID column: Windows parses it at boot.
  * ==============================================================================
  */
 
@@ -45,6 +47,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const REGISTRY = path.join(SP, '_shared', 'data', 'keycodes', 'physical_keys.json');
+const HID_USAGES = path.join(SP, '_shared', 'data', 'keycodes', 'hid_usages.json');
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -145,6 +148,10 @@ for (const code of codes) {
 	const k = keys[code];
 	if (!/^[A-Z][A-Za-z0-9]*$/.test(code))
 		fail(`${code}: not a KeyboardEvent.code-shaped identifier`);
+	// Every driver parses this file (Windows at boot, whenever a layers.toml
+	// exists), so macOS-only HID data lives in hid_usages.json instead.
+	if (k.hid !== undefined)
+		fail(`${code}: the registry carries no hid column — HID usages belong in hid_usages.json`);
 	if (!GROUPS[k.kind] || !GROUPS[k.kind].includes(k.group))
 		fail(`${code}: group ${JSON.stringify(k.group)} is not valid for kind ${k.kind}`);
 	if (typeof k.kanata !== 'string' || k.kanata === '' || /[\s()@]/.test(k.kanata))
@@ -169,23 +176,7 @@ for (const code of codes) {
 		// under that character — the whole point of a physical registry.
 		if (usLegend(code) !== undefined && code !== 'Space' && k.ahk_send !== null)
 			fail(`${code}: a character key must not carry an ahk_send name (Send it by scan code)`);
-		// A media key is a Consumer-page usage, exactly as its Karabiner event says;
-		// every other key sits on the Keyboard/Keypad page.
-		const page = k.group === 'media' ? HID_PAGE_CONSUMER : HID_PAGE_KEYBOARD;
-		if (
-			!k.hid ||
-			typeof k.hid !== 'object' ||
-			JSON.stringify(Object.keys(k.hid).sort()) !== '["page","usage"]'
-		)
-			fail(`${code}: hid must be one {page, usage} object`);
-		else if (k.hid.page !== page)
-			fail(`${code}: hid page must be ${page} for group ${k.group}, found ${k.hid.page}`);
-		else if (!isInt(k.hid.usage) || k.hid.usage < 1 || k.hid.usage > HID_USAGE_MAX[page])
-			fail(`${code}: hid usage ${k.hid.usage} is outside page ${page}`);
-		if (k.karabiner && 'consumer_key_code' in k.karabiner !== (page === HID_PAGE_CONSUMER))
-			fail(`${code}: the Karabiner event and the hid page disagree on the usage page`);
 	} else if (k.kind === 'mouse_button') {
-		if (k.hid !== undefined) fail(`${code}: only keyboard keys carry a hid usage`);
 		if (!/^(L|R|M|X)Button[12]?$/.test(k.ahk))
 			fail(`${code}: ahk must be an AutoHotkey mouse button name`);
 		if (!isInt(k.evdev) || k.evdev < 272 || k.evdev > 276)
@@ -194,7 +185,6 @@ for (const code of codes) {
 		if (!karabinerEvent(k.karabiner, ['pointing_button']))
 			fail(`${code}: karabiner must be one {pointing_button} event`);
 	} else if (k.kind === 'wheel') {
-		if (k.hid !== undefined) fail(`${code}: only keyboard keys carry a hid usage`);
 		if (!/^Wheel(Up|Down|Left|Right)$/.test(k.ahk))
 			fail(`${code}: ahk must be an AutoHotkey wheel name`);
 		if (k.evdev !== null || k.hs !== null || k.karabiner !== null)
@@ -572,11 +562,43 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 // =====================================
 // =====================================
 
-// --- 5.1 Total and unique: one usage per key, one key per usage.
+const hidUsages = fs.existsSync(HID_USAGES) ? JSON.parse(fs.readFileSync(HID_USAGES, 'utf8')) : {};
+if (hidUsages.schema_version !== 1)
+	fail(
+		`hid_usages.json: schema_version must be 1, found ${JSON.stringify(hidUsages.schema_version)}`
+	);
+const hidKeys = hidUsages.keys || {};
+const hidOf = (code) => hidKeys[code];
+
+// --- 5.1 Shape: every entry names a registry key and one usage on the page its
+// group implies; a media key is a Consumer-page usage, exactly as its Karabiner
+// event says, and every other key sits on the Keyboard/Keypad page.
+for (const [code, hid] of Object.entries(hidKeys)) {
+	const k = keys[code];
+	if (!k || k.kind !== 'key') {
+		fail(`hid_usages.json: ${code} is not a keyboard key of the registry`);
+		continue;
+	}
+	const page = k.group === 'media' ? HID_PAGE_CONSUMER : HID_PAGE_KEYBOARD;
+	if (
+		!hid ||
+		typeof hid !== 'object' ||
+		JSON.stringify(Object.keys(hid).sort()) !== '["page","usage"]'
+	)
+		fail(`hid_usages.json: ${code} must be one {page, usage} object`);
+	else if (hid.page !== page)
+		fail(`hid_usages.json: ${code} page must be ${page} for group ${k.group}, found ${hid.page}`);
+	else if (!isInt(hid.usage) || hid.usage < 1 || hid.usage > HID_USAGE_MAX[page])
+		fail(`hid_usages.json: ${code} usage ${hid.usage} is outside page ${page}`);
+	if (k.karabiner && 'consumer_key_code' in k.karabiner !== (page === HID_PAGE_CONSUMER))
+		fail(`hid_usages.json: ${code}: the Karabiner event and the hid page disagree on the page`);
+}
+
+// --- 5.2 Total and unique: one usage per key, one key per usage.
 {
 	const seen = new Map();
 	for (const code of byKind.key) {
-		const hid = keys[code].hid;
+		const hid = hidOf(code);
 		if (!hid) continue;
 		const id = hid.page + ':' + hid.usage;
 		if (seen.has(id)) fail(`hid: ${code} and ${seen.get(id)} share usage ${id}`);
@@ -588,7 +610,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 		);
 }
 
-// --- 5.2 The USB HID Usage Tables 1.21 (section 10, Keyboard/Keypad page, and
+// --- 5.3 The USB HID Usage Tables 1.21 (section 10, Keyboard/Keypad page, and
 // section 15, Consumer page) are the oracle: each W3C code names the position
 // its usage is defined at.
 {
@@ -650,7 +672,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	});
 	let n = 0;
 	for (const code of byKind.key) {
-		const hid = keys[code].hid;
+		const hid = hidOf(code);
 		const expected = HUT[code];
 		if (!expected) {
 			fail(`hid: ${code} has no entry in this test's USB HID usage oracle — extend the table`);
@@ -665,13 +687,13 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	if (n < 100) fail(`hid: only ${n} usages compared (floor 100)`);
 }
 
-// --- 5.3 A raw usage resolves to the macOS keycode of its position on the
+// --- 5.4 A raw usage resolves to the macOS keycode of its position on the
 // device's form. macOS swaps the keycodes of 0x35 (left of 1) and 0x64 (left of
 // Z) on an ISO keyboard, and no other usage depends on the form.
 {
 	const kcOf = (page, usage, form) => {
 		const code = byKind.key.find(
-			(c) => keys[c].hid && keys[c].hid.page === page && keys[c].hid.usage === usage
+			(c) => hidOf(c) && hidOf(c).page === page && hidOf(c).usage === usage
 		);
 		return code === undefined ? undefined : resolved(code, 'hs', form);
 	};
@@ -688,13 +710,13 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	}
 	const formDependent = byKind.key
 		.filter((c) => resolved(c, 'hs', 'ansi') !== resolved(c, 'hs', 'iso'))
-		.map((c) => keys[c].hid && keys[c].hid.usage)
+		.map((c) => hidOf(c) && hidOf(c).usage)
 		.sort((a, b) => a - b);
 	if (JSON.stringify(formDependent) !== JSON.stringify([0x35, 0x64]))
 		fail(`hid: the form-dependent usages are ${JSON.stringify(formDependent)}, expected [53, 100]`);
 }
 
-// --- 5.4 fn/globe has no registry position, so the macOS keycode it resolves to
+// --- 5.5 fn/globe has no registry position, so the macOS keycode it resolves to
 // is the shared keycodes constant, which must be the heatmap's fn keycode.
 {
 	const src = read('_shared/lua/keycodes/init.lua');
