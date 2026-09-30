@@ -18,6 +18,9 @@
 ---    backend during a switch) and how to install later.
 --- 3. Stat-only detection: availability comes from filesystem probes, so the
 ---    menu can ask while it is being built without spawning a process.
+--- 4. A failure offers its repair: an MLX selection that fails, or a Mac that
+---    cannot run MLX, opens the repair offer (mlx_repair_offer), which names
+---    the cause and carries the button that fixes it, or offers Ollama.
 --- ==============================================================================
 
 local M = {}
@@ -35,6 +38,8 @@ local LOG = "menu_llm.runtime_offer"
 -- always talk to the instance that currently owns each runtime.
 local function ollama_deps() return require("modules.llm.ollama_deps_checker") end
 local function mlx_deps() return require("modules.llm.mlx_deps_checker") end
+local function mlx_repair_offer() return require("ui.menu.menu_llm.mlx_repair_offer") end
+local function backend_detector() return require("modules.llm.backend_detector") end
 local function dialogs() return require("infra.dialog_util") end
 local function notifications() return require("infra.notifications") end
 
@@ -139,11 +144,59 @@ function M.install_ollama(on_complete)
 	return M.select_ollama(on_complete, { install_consented = true })
 end
 
---- Selects the MLX backend's runtime: reuses it, or provisions it once.
+--- Opens the repair offer for a failed MLX selection, outside the caller's
+--- stack: the terminal result arrives from a task callback.
+--- @param cause table|nil Cause of the failure, the checker's when nil.
+local function offer_mlx_repair(cause)
+	local ok, offered = pcall(function() return mlx_repair_offer().offer(cause) end)
+	if not ok or offered ~= true then
+		Logger.error(LOG, "The MLX repair offer could not be scheduled: %s.", tostring(offered))
+	end
+end
+
+--- Refuses MLX on a Mac that cannot run it, before anything is downloaded.
+--- @return boolean supported
+local function mlx_supported_here()
+	local ok, supported, platform = pcall(function() return backend_detector().mlx_support() end)
+	if not ok then
+		-- An unreadable probe proves nothing: the installation names its own failure
+		Logger.error(LOG, "The MLX platform probe failed: %s.", tostring(supported))
+		return true
+	end
+	if supported ~= false then return true end
+	platform = type(platform) == "table" and platform or {}
+	Logger.warn(LOG, "MLX cannot run on this Mac (arch=%s, macOS major=%s); offering the other backends.",
+		tostring(platform.arch), tostring(platform.macos_major))
+	local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
+	offer_mlx_repair({
+		kind = "unsupported",
+		machine = Diagnosis.describe_machine(platform.arch, platform.macos_major),
+		repairable = false,
+	})
+	return false
+end
+
+--- Selects the MLX backend's runtime: reuses it, or provisions it once. A
+--- runtime flagged broken, or opts.repair, is removed and rebuilt. A failure,
+--- and a Mac that cannot run MLX, open the repair offer: the next selection,
+--- or its button, always tries again.
 --- @param on_complete function|nil Receives the terminal result.
+--- @param opts table|nil { repair = true } for the repair button.
 --- @return boolean accepted
-function M.select_mlx(on_complete)
-	return mlx_deps().install_for_selection(on_complete) == true
+function M.select_mlx(on_complete, opts)
+	if not mlx_supported_here() then
+		if type(on_complete) == "function" then
+			Logger.callback(LOG, "MLX unsupported selection callback", on_complete, false)
+		end
+		return false
+	end
+	local function settle(ok)
+		if ok ~= true then offer_mlx_repair(mlx_deps().get_failure_cause()) end
+		if type(on_complete) == "function" then return on_complete(ok) end
+		return ok
+	end
+	local install_opts = type(opts) == "table" and opts.repair == true and { repair = true } or nil
+	return mlx_deps().install_for_selection(settle, install_opts) == true
 end
 
 --- Dispatches a backend selection to its runtime owner.
