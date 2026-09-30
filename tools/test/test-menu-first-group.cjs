@@ -24,7 +24,9 @@
  *   2. A menu that shows a scope row opens with [switch] restore clear '---'.
  *      A declared restore-only menu shows no clear row at all.
  *   3. No scope row follows that first separator.
- *   4. A scope row hidden on a platform says why (reason_key).
+ *   4. A scope row left out of a platform is classified: greyed there with its
+ *      reason (`unavailable = "grey"`, drawn and so held to 2 and 3) or hidden
+ *      as not applicable (`unavailable = "hide"`).
  * The drivers' suites click the rows of the rendered menus themselves.
  * ==============================================================================
  */
@@ -78,7 +80,7 @@ const EXPECTED_MENUS = [
 // ==================================================
 
 /**
- * Whether a row is drawn on one platform.
+ * Whether a row is declared for one platform.
  * @param {object} row Manifest row.
  * @param {string} platform 'ahk', 'hs' or 'linux'.
  * @returns {boolean}
@@ -86,6 +88,17 @@ const EXPECTED_MENUS = [
 function shownOn(row, platform) {
 	if (row.platforms === undefined || row.platforms === 'both') return true;
 	return Array.isArray(row.platforms) && row.platforms.includes(platform);
+}
+
+/**
+ * Whether a row is drawn on one platform: declared there, or greyed there as
+ * not yet ported (`unavailable = "grey"`).
+ * @param {object} row Manifest row.
+ * @param {string} platform 'ahk', 'hs' or 'linux'.
+ * @returns {boolean}
+ */
+function drawnOn(row, platform) {
+	return shownOn(row, platform) || row.unavailable === 'grey';
 }
 
 /**
@@ -98,7 +111,7 @@ function shownOn(row, platform) {
 function project(rows, platform) {
 	const kept = [];
 	for (const row of rows) {
-		if (!row || typeof row !== 'object' || !shownOn(row, platform)) continue;
+		if (!row || typeof row !== 'object' || !drawnOn(row, platform)) continue;
 		if (row.type === '---') {
 			if (kept.length > 0 && kept[kept.length - 1].type !== '---') kept.push(row);
 		} else {
@@ -147,8 +160,10 @@ function checkMenu(menu, rows, errors) {
 			);
 		}
 		const hidden = PLATFORMS.some((platform) => !shownOn(row, platform));
-		if (hidden && typeof row.reason_key !== 'string') {
-			errors.push(`${menu}.${row.id} is hidden on some platform without a reason_key.`);
+		if (hidden && row.unavailable !== 'hide' && typeof row.reason_key !== 'string') {
+			errors.push(
+				`${menu}.${row.id} is left out of some platform without a reason_key or unavailable = "hide".`
+			);
 		}
 	}
 	for (const platform of PLATFORMS) {
@@ -229,6 +244,18 @@ function describe(row) {
 	assert.equal(run([toggle, restore, clear, sep, other, clear]).length, 3, 'a second clear row');
 	const hidden = { ...clear, platforms: ['ahk'] };
 	assert.equal(run([toggle, restore, hidden, sep, other]).length, 3, 'hs and linux lose the clear');
+	const greyed = { ...clear, platforms: ['ahk'], unavailable: 'grey', reason_key: 'r' };
+	assert.deepEqual(
+		run([toggle, restore, greyed, sep, other]),
+		[],
+		'a greyed clear is drawn in place'
+	);
+	const reorderedGrey = { ...restore, platforms: ['ahk'], unavailable: 'grey', reason_key: 'r' };
+	assert.equal(
+		run([toggle, clear, reorderedGrey, sep, other]).length,
+		3,
+		'a greyed row keeps its order'
+	);
 	const renamed = { type: 'command', id: 'disable_all', i18n: CLEAR.i18n };
 	assert.equal(
 		run([toggle, restore, renamed, sep, other]).length,

@@ -289,6 +289,12 @@ const CHECKS = [
 		repro: 'npm run test:menu-first-group'
 	},
 	{
+		name: 'a row a platform lacks is declared hidden (not applicable) or greyed with its reason (not yet ported)',
+		cmd: 'node',
+		args: ['tools/test/test-menu-unavailable-rows.cjs'],
+		repro: 'npm run test:menu-unavailable-rows'
+	},
+	{
 		name: 'no driver builds more menu rows outside the shared manifest than its baseline (native-menu-rows ratchet)',
 		cmd: 'node',
 		args: ['tools/test/test-native-menu-rows.cjs'],

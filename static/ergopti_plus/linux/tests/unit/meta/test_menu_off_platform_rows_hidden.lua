@@ -9,8 +9,13 @@
 --- `reason_key` for it: "… — Linux only" rows on macOS, the Windows registry
 --- options under Gestures. Those explanations are long, so the tray became very
 --- wide, and every one of those rows was a row the user could not use. The user
---- asked for them gone: a row this platform does not have is never rendered,
---- with or without a reason. The health check is where those reasons are read.
+--- asked for them gone: a row this platform does not have is not rendered, with
+--- or without a reason. The health check is where those reasons are read.
+---
+--- One kind came back on 2026-09-30: a row declared `unavailable = "grey"` (not
+--- yet ported here) is drawn disabled with its label and the short head of its
+--- reason, the text before its first colon; `unavailable = "hide"` (not
+--- applicable here) is hidden like an undeclared row.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -153,9 +158,81 @@ end)
 
 
 
+-- ===============================================
+-- ===============================================
+-- ======= 2/ A row declared greyed or hidden ====
+-- ===============================================
+-- ===============================================
+
+--- Renders a fixture menu of declared rows for Linux.
+--- @return table rows
+local function render_declared()
+	local Renderer = helpers.load_module("menu.renderer")
+	local tmp_dir = os.tmpname()
+	os.remove(tmp_dir)
+	os.execute('mkdir -p "' .. tmp_dir .. '/modules/menu"')
+	local fh = assert(io.open(tmp_dir .. "/modules/menu/menu_manifest.json", "w"))
+	fh:write([[
+{
+	"declared_menu": [
+		{ "type": "command", "id": "ported", "i18n": "menu.test.ours" },
+		{ "type": "command", "id": "not_yet", "i18n": "menu.test.labelled", "platforms": ["ahk", "hs"],
+		  "unavailable": "grey", "reason_key": "platform_reason.not_yet" },
+		{ "type": "command", "id": "not_here", "i18n": "menu.test.never", "platforms": ["hs"],
+		  "unavailable": "hide" }
+	]
+}
+]])
+	fh:close()
+	local strings = {
+		["menu.test.ours"] = "Ours", ["menu.test.labelled"] = "Réglages avancés",
+		["menu.test.never"] = "Jamais ici",
+		["platform_reason.not_yet"] = "Pas encore sous Linux : le moteur de cette ligne manque.",
+	}
+	local R = Renderer.new({
+		platform      = PLATFORM,
+		manifest_path = function() return tmp_dir .. "/modules/menu/menu_manifest.json" end,
+		json_decode   = require("json").decode,
+		i18n          = {
+			get     = function(key) return strings[key] or key end,
+			section = function(key) return strings[key] or key end,
+		},
+		logger        = helpers.make_logger_stub(),
+	})
+	local rows = R.build("declared_menu", "Test", {}, nil, { commands = {
+		ported = function() end, not_yet = function() error("a greyed row runs nothing") end,
+		not_here = function() end,
+	} })
+	os.execute('rm -rf "' .. tmp_dir .. '"')
+	return rows or {}
+end
+
+helpers.describe("renderer: a row declared greyed or hidden", function()
+
+	helpers.it("draws a not-yet-ported row disabled with its label and the head of its reason", function()
+		local rows = render_declared()
+		local stand_in = row_containing(rows, "Réglages avancés")
+		helpers.assert_true(stand_in ~= nil, "the greyed row must be drawn")
+		helpers.assert_eq(stand_in.title, "Réglages avancés — Pas encore sous Linux")
+		helpers.assert_eq(stand_in.disabled, true)
+		helpers.assert_nil(stand_in.fn, "a greyed row runs nothing")
+		helpers.assert_eq(rows[1].title, "Ours", "the stand-in keeps its declared place")
+		helpers.assert_eq(rows[2], stand_in)
+	end)
+
+	helpers.it("hides a row declared not applicable here", function()
+		helpers.assert_nil(row_containing(render_declared(), "Jamais ici"))
+	end)
+
+end)
+
+
+
+
+
 -- ==============================================
 -- ==============================================
--- ======= 2/ Every menu of the real tray =======
+-- ======= 3/ Every menu of the real tray =======
 -- ==============================================
 -- ==============================================
 

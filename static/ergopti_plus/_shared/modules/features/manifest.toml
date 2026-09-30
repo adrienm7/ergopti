@@ -4375,12 +4375,14 @@ category = "Shortcuts"
 # Linux register both on their scope owners, which back up config.toml and
 # publish the whole scope in one transaction. macOS keeps the key combinations
 # in the Karabiner settings, which only the Configuration rows compose with the
-# shortcut preferences so far.
+# shortcut preferences so far: not yet ported there, so macOS draws both rows
+# greyed with that reason.
 [[menu.shortcuts_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 platforms = ["ahk", "linux"]
+unavailable = "grey"
 reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
@@ -4388,6 +4390,7 @@ type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
 platforms = ["ahk", "linux"]
+unavailable = "grey"
 reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
@@ -4922,20 +4925,21 @@ reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # The keyboard-layout scope's restore and clear, right after the switch Windows
 # shows (the first group). Windows and macOS register both on their scope
-# owners; the layout settings do not exist on Linux.
+# owners. Not applicable on Linux, which has none of these settings (it types
+# through the XKB layout the system selects), so the rows are hidden there.
 [[menu.layout_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 platforms = ["ahk", "hs"]
-reason_key = "platform_reason.no_layout_settings_on_linux"
+unavailable = "hide"
 
 [[menu.layout_menu]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
 platforms = ["ahk", "hs"]
-reason_key = "platform_reason.no_layout_settings_on_linux"
+unavailable = "hide"
 
 # Two sections, so a user reads at a glance which rows are about the custom
 # layout (the registry layouts the layout manager installs, the one typing

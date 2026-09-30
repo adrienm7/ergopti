@@ -222,6 +222,18 @@ maintainer's rule): `test-native-menu-rows.cjs` ratchets the rows drivers still
 build themselves against `native-menu-rows-baseline.json`, which lists each
 site as file:line; lower it with `--update-baseline` as rows move.
 
+### project-a-row-a-platform-lacks-is-hidden-or-greyed
+
+A manifest row restricted by `platforms` declares how the other platforms lack
+it (the maintainer's two cases, 2026-09-30): `unavailable = "hide"` when it is
+not applicable there (never drawn, no `reason_key`), `unavailable = "grey"`
+when it is not yet ported there (drawn disabled as its label plus the head of
+its translated reason, the text before the first colon, so the tray stays
+narrow). An undeclared restriction stays hidden, its reason read by the health
+check only. The generator, both renderers and `test-menu-unavailable-rows.cjs`
+hold the pair; a greyed reason's head must stay short in all 21 locales.
+Action: classify a restriction you add or touch, never with a long reason head.
+
 ### project-a-composite-scope-composes-revertible-owners
 
 The global restore/clear never writes category keys itself. On the Lua
