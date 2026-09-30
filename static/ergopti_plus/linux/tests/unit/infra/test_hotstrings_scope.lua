@@ -58,16 +58,20 @@ end
 
 --- Runs body with every owner loaded fresh against a private configuration folder.
 --- @param body function body(context)
-local function with_scope(body)
+--- @param source string|nil Initial config.toml bytes; CONFIG by default.
+local function with_scope(body, source)
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
+	-- The shared delimiter catalogue outlives every module cache reset.
+	local Terminators = require("modules.hotstrings.terminator_settings")
+	local catalogue = Terminators.snapshot()
 	local directory = string.format("%s/ergopti_hotstrings_scope_%d_%d",
 		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999))
 	assert(os.execute("mkdir -p '" .. directory .. "'"))
 	local ok, err = pcall(function()
 		for _, name in ipairs({ "modules.hotstrings.hotstrings_config", "infra.hotstring_preferences",
 			"modules.hotstrings.repeat_key", "modules.hotstrings.magic_key", "modules.hotstrings.preview_settings",
-			"infra.hotstrings_scope" }) do
+			"modules.hotstrings.terminator_settings", "infra.hotstrings_scope" }) do
 			package.loaded[name] = nil
 		end
 		-- The real path owner, with only the configuration folder moved.
@@ -91,7 +95,7 @@ local function with_scope(body)
 			end,
 		}
 		local config_path, override_path = directory .. "/config.toml", directory .. "/hotstrings_overrides.toml"
-		write(config_path, CONFIG)
+		write(config_path, source or CONFIG)
 		write(override_path, OVERRIDES)
 		local context = { config_path = config_path, override_path = override_path, directory = directory,
 			published = {}, dynamic_calls = {}, preview = {}, paused = false }
@@ -131,16 +135,19 @@ local function with_scope(body)
 		context.Preferences = require("infra.hotstring_preferences")
 		context.RepeatKey = require("modules.hotstrings.repeat_key")
 		context.MagicKey = require("modules.hotstrings.magic_key")
+		context.Terminators = require("modules.hotstrings.terminator_settings")
+		assert(context.Terminators.load(), "the fixture delimiters must load")
 		context.suffix = ".hotstrings-test.bak"
 		context.scope = require("infra.hotstrings_scope").new({
 			path = config_path, backup_suffix = context.suffix, files = context.files,
 			is_paused = function() return context.paused end,
 			config = Config, preferences = context.Preferences, repeat_key = context.RepeatKey,
 			magic_key = context.MagicKey, preview_settings = require("modules.hotstrings.preview_settings"),
-			dynamic = context.dynamic, preview = context.preview_port,
+			terminators = context.Terminators, dynamic = context.dynamic, preview = context.preview_port,
 		})
 		body(context)
 	end)
+	assert(Terminators.restore_configuration(catalogue), "the delimiter catalogue must be put back")
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	os.execute("rm -rf '" .. directory .. "'")
@@ -295,6 +302,7 @@ helpers.describe("hotstrings scope: refusals", function()
 			helpers.assert_eq(read(c.override_path), "[foreign]\ndelay = 7\n", "override setters wait for the inverse")
 			helpers.assert_eq(c.RepeatKey.set_enabled(not c.RepeatKey.is_enabled()), false)
 			helpers.assert_eq(read(c.config_path), config_bytes, "the repeat key waits for the inverse")
+			helpers.assert_eq(c.Terminators.persist(), false, "the word delimiters wait for the inverse")
 			helpers.assert_eq(c.scope.retry_restore(), false, "the foreign bytes still block the inverse")
 			helpers.assert_eq(c.scope.pending(), true)
 			c.before_publish = nil
@@ -398,6 +406,67 @@ helpers.describe("hotstrings scope: refusals", function()
 			helpers.assert_eq(read(c.config_path), CONFIG)
 			helpers.assert_eq(#c.published, 0)
 		end)
+	end)
+end)
+
+-- Delimiters the user switched, one of their own, and a state no delimiter owns.
+local DELIMITER_CONFIG = '[hotstrings]\nunknown = "kept"\n'
+	.. 'terminators = [{ key = "custom_¤", char = "¤", label = "¤", consume = true }]\n'
+	.. '\n[hotstrings.terminator_states]\nspace = false\nslash = true\n"custom_¤" = false\nretired = true\n'
+	.. '\n[other]\nvalue = 1\n'
+
+--- Whether the shared catalogue holds a custom delimiter.
+--- @param key string Delimiter identity.
+--- @return boolean
+local function has_custom(key)
+	for _, def in ipairs(require("keymap.terminators").get_terminator_defs()) do
+		if def.key == key and def.custom then return true end
+	end
+	return false
+end
+
+helpers.describe("hotstrings scope: word delimiters", function()
+	-- They lived in storage.json, which no scope reaches; both modes now return
+	-- them to the catalogue, as Windows removes its delimiter string.
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("returns the word delimiters to the catalogue on " .. mode, function()
+			with_scope(function(c)
+				local Terminators = require("keymap.terminators")
+				helpers.assert_eq(Terminators.is_terminator_enabled("space"), false, "the fixture delimiters are loaded")
+				helpers.assert_true(has_custom("custom_¤"))
+				local committed, detail = c.scope.apply(mode)
+				helpers.assert_true(committed, tostring(detail))
+				local config = Codec.decode(read(c.config_path))
+				local states = config.hotstrings.terminator_states or {}
+				helpers.assert_nil(states.space)
+				helpers.assert_nil(states.slash)
+				helpers.assert_nil(states["custom_¤"])
+				helpers.assert_nil(config.hotstrings.terminators)
+				helpers.assert_eq(states.retired, true, "a state no delimiter owns is left for the cleanup")
+				helpers.assert_eq(config.hotstrings.unknown, "kept")
+				helpers.assert_eq(config.other.value, 1)
+				helpers.assert_eq(Terminators.is_terminator_enabled("space"), true, "the runtime follows the file")
+				helpers.assert_eq(Terminators.is_terminator_enabled("slash"), false)
+				helpers.assert_eq(has_custom("custom_¤"), false)
+				helpers.assert_eq(read(c.config_path .. c.suffix), DELIMITER_CONFIG, "config.toml backup is exact")
+				helpers.assert_true(c.Terminators.persist(), "ordinary delimiter writes resume")
+				helpers.assert_nil(Codec.decode(read(c.config_path)).hotstrings.terminators)
+			end, DELIMITER_CONFIG)
+		end)
+	end
+
+	helpers.it("puts the word delimiters back when config.toml publication is refused", function()
+		with_scope(function(c)
+			local Terminators = require("keymap.terminators")
+			c.refuse = c.config_path
+			helpers.assert_eq(c.scope.apply("clear"), false)
+			helpers.assert_eq(read(c.config_path), DELIMITER_CONFIG)
+			helpers.assert_eq(Terminators.is_terminator_enabled("space"), false)
+			helpers.assert_eq(Terminators.is_terminator_enabled("slash"), true)
+			helpers.assert_true(has_custom("custom_¤"))
+			helpers.assert_eq(Terminators.is_terminator_enabled("custom_¤"), false)
+			helpers.assert_eq(c.scope.pending(), false)
+		end, DELIMITER_CONFIG)
 	end)
 end)
 
