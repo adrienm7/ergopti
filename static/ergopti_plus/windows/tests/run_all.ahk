@@ -1636,6 +1636,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_altgr_lctrl_not_typed.ahk
 #Include meta/test_prior_key_guards_use_helper.ahk
 #Include meta/test_modifier_hotkeys_single_identity.ahk
+#Include meta/test_hardening_c_scan_code_shadows_key_name.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk
 #Include meta/test_case_transform_synthetic_mark.ahk
 #Include meta/test_color_dropdown_recompute_index.ahk
