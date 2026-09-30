@@ -2,10 +2,11 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-09-30. Published to `dev` from `integration-3` (v0.0.0-dev.147), then
-from `integration-4` (the morning's work, same day). This ordered checklist is the
-current handoff; older workflow task-status files are historical evidence.
-Update the completed item and its verification before moving to the next item.
+Updated: 2026-09-30, evening. Latest release: v0.0.0-dev.155 (c9e4c64ab).
+This checklist is the current handoff; older workflow task-status files are
+historical evidence.
+Item numbers are stable identifiers: a finished item is removed (its durable
+facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
@@ -67,345 +68,322 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
-1. [x] Finish the current verification and repair its failures. Windows:
-       7,239/7,239 unit checks and 5/5 E2E passed. Linux native: 3,576/3,576 passed
-       in the fresh complete run after the Lua 5.4 test-loader correction.
-       Linux E2E: 115/115. macOS full: 11412 passed and one old test-oracle failure; the corrected
-       module passes 15/15 (11426 distinct cases in the composite).
-       macOS E2E: 67/67 plus one platform-specific skip. JavaScript's five
-       failures are resolved: four corrected guards/evidence checks pass in the
-       real checkout; generation passes on the byte-identical export. Windows
-       production compilation and strict conventions also pass. The Mac full run
-       found a stale boot-boundary test; its strengthened replacement passes 15/15
-       and rejects removal of each of 12 mandatory startup failure gates.
-2. [x] Commit the eight reviewed integration units atomically: macOS canonical
-       hotstring caches, personal-info boot gate, delay publication, remap field
-       preservation; Linux shortcut scopes; shared AI/metrics scope commands;
-       canonical Ctrl+G; configuration-surface verification.
-3. [x] Account for every local branch and unfinished proposal. Preserve useful
-       unapplied patches, full product specifications, proof summaries and precise
-       continuation instructions inside this repository. Distinguish executable
-       code from untested design fragments. Remove branches only after proof that
-       their work is integrated or preserved. The cloneable package now exists at
-       [the handoff directory](handovers/2026-09-28-ergoptiplus/README.md), including
-       four pending patches and eleven exact original commits. Branch audit found
-       two missing L4 contributions (`f35930ec2`, `e58cadf95`) and one dependency
-       update (`c4f5973`) to review. These are preserved, not silently merged.
-       The retired-worktree audit also recovered unapplied D4 model labels/21
-       locales and L4 boot/test changes; their exact deltas are in the same package.
-4. [x] Finish publication: every Windows, Linux, shared and macOS job passed
-       and CI published `v0.0.0-dev.144`. Verify the CI verdict of the two
-       later local macOS corrections before starting item 5.
-5. [~] Complete W1 neutral configuration and recommended/clear scopes. Finish
-   macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
-   composition. Keep unknown fields, verified backups, exact runtime
-   acknowledgement, external-write conflict detection and retryable rollback.
-   Recommended delay values must match effective runtime inheritance: deleting
-   `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
-   0.5 s. Do not assume deletion implements the recommendation.
-   Hotstrings: Linux categories, sections and scalar settings are canonical
-   config.toml leaves, with a one-shot import of legacy storage.json choices;
-   both Lua drivers have a two-file recommended/clear owner whose planner
-   writes explicit delays where inheritance differs, bound Ergopti groups
-   included. Published in the second 2026-09-30 release:
-   `hotstrings_menu` declares `scope_restore`/`scope_clear` beside the switch
-   and all three drivers register them (Windows from `_HS_ScopeCommands`);
-   macOS constructs its owner once per session and composes it into the
-   global restore (skipped and named when its override file cannot be
-   served), its transaction now reverting and releasing, and a scope's
-   retained inverse is settled through the writer fence so the other
-   categories' reverts and every later writer are admitted again; the macOS
-   Hotstrings switch starts the typing engine « Clear » stopped. Linux word
-   delimiters are config.toml leaves (`[hotstrings.terminator_states]`,
-   `hotstrings.terminators`, the macOS paths) imported once from
-   storage.json; a save writes only what the menu changed; both Linux modes
-   return the shipped delimiters to their defaults and keep the user's own
-   (user data, as the delimiter submenu does). Still open: the macOS scope
-   leaves its delimiter states as they are (Windows resets its whole
-   delimiter string), and the Windows rows are verified statically only.
-6. [~] Complete L4 extension layout geometry and physical magic-key behavior.
-   Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
-   The physical magic-key setting is item 30.
-7. [~] Complete W2: seven-page first-run opt-in wizard, per-category recommended
-   choices, consistent WebView behavior and genuine translations in 21 locales.
-   The tap-holds page lists each engine's recommended keys from the shared
-   tap-hold catalogue and imports only the checked ones through each driver's
-   tap-hold writer: Windows renders them into the tap_hold.toml beside
-   config.toml in the wizard's own transition, macOS goes through the remap
-   owner's settings transaction (a file save before the bridge starts or for a
-   moved folder), Linux through tap_hold_writer into the chosen folder, where
-   macOS and Linux also switch the Tap-Holds on. A re-run reads the keys each
-   folder already configures: the page opens at the switch in force, shows a
-   key at its recommendation checked and one of the user's as kept, locks both,
-   and every writer refuses to import over the latter and backs up the file it
-   replaces. Published in the second 2026-09-30 release. Remaining: a
-   real-device re-run of the wizard on each OS (Windows was verified by CI
-   only), and Linux still applies its hotstring sections through
-   hotstrings_config (storage.json) and leaves the trigger to its tray.
-8. [x] Complete A4: TapHold menu grouped by hand, shared catalogue, key
-       combinations under Shortcuts, with the actual configuration/runtime owners.
-9. [x] Complete C4: shared centered update-check WebView, checking/current/new
-       release/error states, other-channel notices and explicit install action.
-10. [x] Complete D3: separate previous/next desktop actions with and without
-        wrapping on each OS; retire the global wrapping toggle.
-11. [x] Complete D4: explicit AI prediction action, recommended slots, removal of
-        duplicate trigger paths, Windows feedback and model/suggestion/menu labels.
-12. [x] Complete D5: remaining approved system actions, including required
-        confirmation for quarantine/trash; exclude the rejected quit-all-apps action.
-13. [~] Complete F2: honor the Karabiner integration switch before leases and
-    guardians; preserve personal rules; back up and restore Windows touchpad
-    registry values through one owner. Remaining: turning the switch off or
-    « Retirer Ergopti de Karabiner » does not unregister a guardian
-    LaunchAgent registered while it was on (needs a headless unregister
-    role in the launcher, verified on a Mac).
-    Legend: `[x]` implemented, reviewed and integrated on `integration-2`
-    (published only once `dev` is pushed); `[~]` integrated with the precise
-    remainder recorded in the item or in the overnight handoff.
-14. [x] Run final cross-driver, shared, encoding, convention and 21-locale gates;
-        record real-device checks still unavailable on this Windows host.
-        Local gates on the released tip: JS 319/320, macOS Lua 12231/12231, Linux 4289/4289, macOS E2E and Linux E2E all scenarios, strict conventions, AHK encoding (1738 files) and gen:check (39 outputs of 22 generators, no drift). The only JS red is the
-        container-only "Linux install.sh … sandboxed real run", which refuses
-        root. Full CI without release (run 36649301758 (CI #619)) was green on the same tip,
-        including the Windows AHK suites, packaging and install-and-launch on
-        the three OSes. Real-device checks remain: macOS tap-holds and the
-        guardian's Login Items approval, Windows tooltip rendering.
-15. [x] Finish storage cleanup after all useful work is recoverable from GitHub.
-        `C:/ewt`, `C:/ewtb` and `D:/ewt` are deleted. Their unique commits,
-        pending patches and specifications are in the handoff package; their
-        full-tree exports differed from `dev` only by formatting.
-16. [~] Publish final corrective commits, verify CI and release assets, and write
-    the final report with completed scope, limitations and manual test results.
-    Published twice on 2026-09-30 (v0.0.0-dev.147, then the morning's work with
-    the Homebrew provenance fix). Local gates of the second tip: JS 320/321 (only the root-sandbox install check), macOS Lua 12333/12333, Linux 4367/4367, macOS E2E 67/67, Linux E2E 118/118, strict conventions, AHK encoding (1740 files), gen:check (40 outputs of 23 generators); full
-    CI without release: run 36697666039 (CI #633). The maintainer's manual test results remain.
+- [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
+  Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
+  composition. Keep unknown fields, verified backups, exact runtime
+  acknowledgement, external-write conflict detection and retryable rollback.
+  Recommended delay values must match effective runtime inheritance: deleting
+  `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
+  0.5 s. Do not assume deletion implements the recommendation. Hotstrings: Linux
+  categories, sections and scalar settings are canonical config.toml leaves,
+  with a one-shot import of legacy storage.json choices; both Lua drivers have a
+  two-file recommended/clear owner whose planner writes explicit delays where
+  inheritance differs, bound Ergopti groups included. Published in the second
+  2026-09-30 release: `hotstrings_menu` declares `scope_restore`/`scope_clear`
+  beside the switch and all three drivers register them (Windows from
+  `_HS_ScopeCommands`); macOS constructs its owner once per session and composes
+  it into the global restore (skipped and named when its override file cannot be
+  served), its transaction now reverting and releasing, and a scope's retained
+  inverse is settled through the writer fence so the other categories' reverts
+  and every later writer are admitted again; the macOS Hotstrings switch starts
+  the typing engine « Clear » stopped. Linux word delimiters are config.toml
+  leaves (`[hotstrings.terminator_states]`, `hotstrings.terminators`, the macOS
+  paths) imported once from storage.json; a save writes only what the menu
+  changed; both Linux modes return the shipped delimiters to their defaults and
+  keep the user's own (user data, as the delimiter submenu does). Still open:
+  the macOS scope leaves its delimiter states as they are (Windows resets its
+  whole delimiter string), and the Windows rows are verified statically only.
+- [~] **6.** Complete L4 extension layout geometry and physical magic-key
+  behavior. Keep independent base/Shift, AltGr/ShiftAltGr and number-row
+  emulation. The physical magic-key setting is item 30.
+- [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
+  recommended choices, consistent WebView behavior and genuine translations in
+  21 locales. The tap-holds page lists each engine's recommended keys from the
+  shared tap-hold catalogue and imports only the checked ones through each
+  driver's tap-hold writer: Windows renders them into the tap_hold.toml beside
+  config.toml in the wizard's own transition, macOS goes through the remap
+  owner's settings transaction (a file save before the bridge starts or for a
+  moved folder), Linux through tap_hold_writer into the chosen folder, where
+  macOS and Linux also switch the Tap-Holds on. A re-run reads the keys each
+  folder already configures: the page opens at the switch in force, shows a key
+  at its recommendation checked and one of the user's as kept, locks both, and
+  every writer refuses to import over the latter and backs up the file it
+  replaces. Published in the second 2026-09-30 release. Remaining: a real-device
+  re-run of the wizard on each OS (Windows was verified by CI only), and Linux
+  still applies its hotstring sections through hotstrings_config (storage.json)
+  and leaves the trigger to its tray.
+- [~] **13.** Complete F2: honor the Karabiner integration switch before leases
+  and guardians; preserve personal rules; back up and restore Windows touchpad
+  registry values through one owner. Remaining: turning the switch off or «
+  Retirer Ergopti de Karabiner » does not unregister a guardian LaunchAgent
+  registered while it was on (needs a headless unregister role in the launcher,
+  verified on a Mac). Legend: `[x]` implemented, reviewed and integrated on
+  `integration-2` (published only once `dev` is pushed); `[~]` integrated with
+  the precise remainder recorded in the item or in the overnight handoff.
+- [~] **16.** Publish final corrective commits, verify CI and release assets,
+  and write the final report with completed scope, limitations and manual test
+  results. Published twice on 2026-09-30 (v0.0.0-dev.147, then the morning's
+  work with the Homebrew provenance fix). Local gates of the second tip: JS
+  320/321 (only the root-sandbox install check), macOS Lua 12333/12333, Linux
+  4367/4367, macOS E2E 67/67, Linux E2E 118/118, strict conventions, AHK
+  encoding (1740 files), gen:check (40 outputs of 23 generators); full CI
+  without release: run 36697666039 (CI #633). The maintainer's manual test
+  results remain.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
-17. [~] About/Version submenu: one titled release-channel submenu, version row
-    with the short commit hash ("Version locale (hash)" for a source
-    checkout), Uninstall moved to its bottom. Integrated.
-18. [~] Configuration › « Chemins » (was « Dossiers ») in 21 locales. Integrated.
-19. [~] Windows tooltip border hidden under its content and white corner pixels
-    (pooled border z-order + ring drawn from the content region). Integrated;
-    verify visually on Windows 10/11.
-20. [~] Windows launch smoke test: detect a real startup dialog instead of a 20 s
-    extraction deadline. Integrated.
-21. [~] Lighter bundles: Windows bundle 556 → 228 files; macOS zip 99.3 → 46.6 MB
-    (unused Karabiner-Elements.pkg dropped, payload manifest, zip -9).
-    No bundled Ollama; Ollama and MLX runtimes are installed only the first
-    time each is selected as AI backend. Integrated. After the demo: `.tar.xz`
-    archive.
-22. [ ] Delta updates: macOS Sparkle deltas are ready on `wip/delta-updates`
-        (mirrored as `backup/wip/delta-updates`, not integrated: its CI step
-        only runs on real releases, so it needs a dry-run CI mode first), then
-        Windows and Linux per ADR 010 with an automatic full-download fallback.
-23. [~] Ergopti-only hotstring groups (SFB reduction, rolls, repeat corrections)
-    moved into the Ergopti extension, shown under « Hotstrings Ergopti ».
-    Integrated. Open maintainer decisions: "installed" currently means
-    "shipped with the app" (the submenu shows for every user); other
-    Ergopti-looking groups (distancesreduction `qu`, `comma_j`,
-    `comma_far_letters`, `ê` sections, French `suffixes_a`, magickey `replace`)
-    were not moved.
-24. [~] macOS tap-hold outage: a not-ready remap guardian held every Karabiner
-    regeneration forever and pinned the first bulk edit (Restore defaults),
-    refusing later edits and Reload. Fixed, with a Tap-Hold menu row saying
-    why tap-holds wait. Guardian approval UX: registration was already
-    automatic; a requires_approval answer now opens numbered Login Items steps
-    in the native permission dialog (once per launch, after the Accessibility
-    dialog, closed automatically on approval; not while Tap-Holds are off,
-    where the banner stays). Integrated; verify on a Mac.
-25. [~] Config policy: an unknown/retired key or a value naming something that
-    no longer exists is one WARNING, ignored, and offered by the config
-    cleanup — never an ERROR (fixes the dev.146 startup ERROR
-    « M.enable(): unknown hotkey 'at_hash' »). Integrated for config.toml on
-    the three drivers. The other files (layers.toml, installed.json, storage.json,
-    tap_hold.toml, api_keys.json, the AI and hotstrings files) followed in
-    the second 2026-09-30 release; what remains is item 33.
-26. [~] Diagnostics window showed raw translation keys (possibly because boot
-    failed first); it must show real text even in a degraded boot.
-    Integrated.
-27. [~] Every Ergopti window is only focused when opened, never always-on-top
-    (overlays exempt), with a guard test. Integrated.
-28. [~] macOS permission instructions in a native dialog, never a one-line
-    hs.alert banner. Integrated.
-29. [x] force_quit_frontmost asks for confirmation; key combinations governed only
-        by their own switch on every OS; the Windows wizard's Shortcuts answer
-        writes that switch only when the answer changes it.
-30. [~] Physical magic-key setting on all three OSes: one
-    `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
-    config schema v5 migrating every spelling of the Windows
-    `magic_key_source_scan`, and a Layout menu row that captures the next
-    physical key or lists the candidates. Published in the second 2026-09-30
-    release. A chosen key replaces only its plain press (Windows keeps the
-    layout's Shift/AltGr/Ctrl/Win), the Windows capture reads the physical key
-    state, Linux refuses a key it cannot type without the clipboard and cancels
-    a pending Compose. Remaining: real-device checks on each OS (Windows
-    capture under the emulation, macOS on ISO and ANSI boards where Backquote
-    and IntlBackslash both answer, Linux grab and injection); Linux follow-ups:
-    the Layout menu shows the row without the replace switch it depends on,
-    holding the key types one ★ where the others auto-repeat, choosing
-    Backquote, Minus or Equal silently overrides a tap-key action, and tap-key
-    presses leave the wrap-on-type window open.
-31. [~] HS-274 exact physical key accounting with an Ergopti-owned background
-    Karabiner runtime (no Karabiner-Elements app). Plan, decisions and ADR 011
-    in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2 are
-    published (decision record, one accounting policy whose default `legacy`
-    mode is byte-identical to dev.147, HID usages with aliases in
-    `_shared/data/keycodes/hid_usages.json`, a key-identity policy). Remaining,
-    in order: WP3 production consumer owner (plan section WP3 lists the review
-    notes: settle held modifiers when the source changes, map a refused
-    producer version to one unavailable WARNING), WP4 headless fork producer
-    emitting baseline v2 (the native harness refuses early until then), WP5
-    reproducible runtime artifact, WP6 install/launchd ownership and the
-    default-on "close other Karabiner instances" option, WP7 owned
-    configuration, WP8 native acceptance, WP9 real-Mac acceptance (internal
-    keyboard: verify the ISO 0x35/0x64 assumption and fn/globe), WP10 enable
-    and retire. Open: an identity for media keys without a macOS keycode
-    (play/pause, track skips, brightness), and a VirtualHIDDevice version-skew
-    policy. About 30-40 agent-days plus maintainer hardware time.
-32. [x] Test hygiene: every AutoHotkey closure built in a for loop now reads a
-        parameter (11 sites fixed, including 51 TOML fuzz vectors that had never
-        run), `test-ahk-loop-capture.cjs` rejects the pattern tree-wide, the
-        core OS-purity baseline is 252, and the crash-worker wait ceiling
-        is 30 s. Other ratchet baselines can still tighten (ui 130 → 125,
-        entry 8 → 6, family core 773 → 736, family ui 280 → 263).
+- [~] **19.** Windows tooltip border hidden under its content and white corner
+  pixels (pooled border z-order + ring drawn from the content region).
+  Integrated; verify visually on Windows 10/11.
+- [ ] **22.** Delta updates: macOS Sparkle deltas are ready on
+      `wip/delta-updates` (mirrored as `backup/wip/delta-updates`, not integrated:
+      its CI step only runs on real releases, so it needs a dry-run CI mode first),
+      then Windows and Linux per ADR 010 with an automatic full-download fallback.
+- [~] **23.** Ergopti-only hotstring groups (SFB reduction, rolls, repeat
+  corrections) moved into the Ergopti extension, shown under « Hotstrings
+  Ergopti ». Integrated. Open maintainer decisions: "installed" currently means
+  "shipped with the app" (the submenu shows for every user); other
+  Ergopti-looking groups (distancesreduction `qu`, `comma_j`,
+  `comma_far_letters`, `ê` sections, French `suffixes_a`, magickey `replace`)
+  were not moved.
+- [~] **24.** macOS tap-hold outage: a not-ready remap guardian held every
+  Karabiner regeneration forever and pinned the first bulk edit (Restore
+  defaults), refusing later edits and Reload. Fixed, with a Tap-Hold menu row
+  saying why tap-holds wait. Guardian approval UX: registration was already
+  automatic; a requires_approval answer now opens numbered Login Items steps in
+  the native permission dialog (once per launch, after the Accessibility dialog,
+  closed automatically on approval; not while Tap-Holds are off, where the
+  banner stays). Integrated; verify on a Mac.
+- [~] **30.** Physical magic-key setting on all three OSes: one
+  `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
+  config schema v5 migrating every spelling of the Windows
+  `magic_key_source_scan`, and a Layout menu row that captures the next physical
+  key or lists the candidates. Published in the second 2026-09-30 release. A
+  chosen key replaces only its plain press (Windows keeps the layout's
+  Shift/AltGr/Ctrl/Win), the Windows capture reads the physical key state, Linux
+  refuses a key it cannot type without the clipboard and cancels a pending
+  Compose. Remaining: real-device checks on each OS (Windows capture under the
+  emulation, macOS on ISO and ANSI boards where Backquote and IntlBackslash both
+  answer, Linux grab and injection); Linux follow-ups: the Layout menu shows the
+  row without the replace switch it depends on, holding the key types one ★
+  where the others auto-repeat, choosing Backquote, Minus or Equal silently
+  overrides a tap-key action, and tap-key presses leave the wrap-on-type window
+  open.
+- [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
+  background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
+  ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
+  are published (decision record, one accounting policy whose default `legacy`
+  mode is byte-identical to dev.147, HID usages with aliases in
+  `_shared/data/keycodes/hid_usages.json`, a key-identity policy). Remaining, in
+  order: WP3 production consumer owner (plan section WP3 lists the review notes:
+  settle held modifiers when the source changes, map a refused producer version
+  to one unavailable WARNING), WP4 headless fork producer emitting baseline v2
+  (the native harness refuses early until then), WP5 reproducible runtime
+  artifact, WP6 install/launchd ownership and the default-on "close other
+  Karabiner instances" option, WP7 owned configuration, WP8 native acceptance,
+  WP9 real-Mac acceptance (internal keyboard: verify the ISO 0x35/0x64
+  assumption and fn/globe), WP10 enable and retire. Open: an identity for media
+  keys without a macOS keycode (play/pause, track skips, brightness), and a
+  VirtualHIDDevice version-skew policy. About 30-40 agent-days plus maintainer
+  hardware time.
 
 ## Remaining work after the 2026-09-30 releases
 
-33. [ ] Item 25, other files: Published in the second 2026-09-30 release for the files the
-        review listed; see `docs/memory/text-input-and-config.md`.
-        Still open everywhere: sites 76 (no catalogue of parameter bindings),
-        macOS 14/93 and order overrides (no "catalogue published" signal), 16/91
-        (expert `[script]`/`[features]` layer), 18 (dynamic model list), 19,
-        24, 26, 28, a Karabiner key bound to a plain string (saves refused with a
-        generic ERROR), Linux layers.toml refused as a whole still stops the
-        daemon, Windows sites 32, 34, 36, 37-60 and its whole-file installed.json
-        refusal, repeated Windows tap_hold unknown-field warnings, and the macOS
-        boot-time unread-entries scan cost (36-56 ms on the main thread). Two
-        maintainer decisions are pending: config_migrate's fail-closed guard for
-        invalid stamps (site 108) and a migrations.toml exception for key
-        removals handled by the cleanup (site 112).
-34. [ ] Item 5 follow-ups: the macOS Hotstrings scope leaves delimiter states as
-        they are (Windows and Linux reset the shipped ones), check that the
-        Windows « recommended » delays equal the manifest recommendation, and a
-        hand-written `[[hotstrings.terminators]]` list is applied with a warning
-        but cannot be edited from the menu.
-35. [ ] Item 13 remainder: unregister the remap guardian LaunchAgent when the
-        Karabiner switch goes off or « Retirer Ergopti de Karabiner » runs
-        (headless unregister role in the launcher, verified on a Mac).
-36. [ ] Item 21 remainder: macOS release archive as `.tar.xz` (verify Sparkle,
-        the Homebrew cask and CI install first).
-37. [ ] Item 23 decisions: whether « Hotstrings Ergopti » should appear only when
-        the layout is really installed (today: always, shipped copy), and
-        whether to move distancesreduction `qu`, `comma_j`,
-        `comma_far_letters`, the `ê` sections, French `suffixes_a` and the
-        magickey `replace` section into the Ergopti extension.
-38. [ ] Real-device checks the container cannot run: macOS tap-holds and the
-        guardian's Login Items steps, the Homebrew install writing settings
-        (provenance fix), Windows tooltip rendering on 10/11, every new menu row
-        and the wizard re-run on the three OSes.
-39. [~] Repository hygiene: the maintainer deleted every temporary backup
-    branch on 2026-09-30; agents must not create `backup/*` branches again.
-    The finished agent worktrees under `.claude/worktrees/` can be removed;
-    the uncommitted test edit left in the `wip/win-tooltip-border-fix`
-    worktree (tooltip DPI radius) is the only unsaved change among them.
-40. [ ] The packaged-launch gate never builds a Karabiner configuration: the CI
-        runners have no Karabiner-Elements, so dev.148 passed every launch
-        scenario while every real Mac refused the deploy (« generated rule 1
-        manipulator 3 has inconsistent managed conditions », fixed with
-        `json-shared-tables`). Add a launch scenario that makes the app build
-        and merge its Karabiner configuration in the real Hammerspoon runtime
-        (into the runner's own `~/.config/karabiner/karabiner.json`) and fails
-        on any ERROR, without needing the Karabiner driver.
-41. [ ] Remaining direct `hs.json.decode` calls (ratchet
-        `tests/meta/test_json_decode_through_codec.lua`, 21 calls in 19 files):
-        they only read what they decode today; move them to
-        `adapters/json_codec.lua`, which returns a tree, and lower the
-        baseline. Audit the other hs stubs for the same kind of divergence from
-        the native behaviour.
-42. [ ] config.toml batch writer follow-ups (`toml-batch-existing-key`): an old
-        build's scalar where a table is now expected (`magickey = true` under
-        `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with
-        « the batch cannot address the destination without ambiguous TOML
-        keys » — maintainer decision: may an ordinary save overwrite a value
-        flagged outdated? Hand-written dotted keys (`a.b = 1`) are read by the
-        shared decoder as one key named "a.b", so the app ignores them. Linux
-        still refuses to save over a `[[hotstrings.terminators]]` list
-        (`terminator_settings.lua`) although the writer now can.
-43. [~] A Mac upgraded from a pre-lease release could not deploy (dev.149:
-    « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
-    historical CapsWord anchor »): its karabiner.json keeps an untagged
-    historical block the merge cannot prove. The refused deploy now offers
-    « Retirer les anciennes règles » (listed, confirmed, backed up next to
-    karabiner.json), also from a Tap-Hold menu row while the rules are
-    pending (`karabiner-legacy-cleanup`); untested on a real Mac. Still to
-    do: find why the proof fails from the backed-up file.
-44. [ ] CapsWord is no longer cancelled by the pointer when Karabiner activated
-        it (AltGr + CapsLock): the watcher probed the variable with
-        `karabiner_cli --get-variable`, an option karabiner_cli has never had
-        (exit 2), so it only ever worked for a CapsWord this driver activated;
-        since dev.150 it stops probing after that refusal
-        (`capsword-probe-unsupported`). Give the activation a way to tell
-        Hammerspoon (for example a sentinel key the activation rule emits,
-        like the script-control ones) so every CapsWord is cancelled.
-45. [ ] v0.0.0-dev.150 was published without ErgoptiPlus-linux-noarch.rpm:
-        `gh release create` listed the file and exited 0, but GitHub kept 12
-        of 13 assets, and published releases are immutable. Create the
-        release as a draft, verify every expected asset by name (re-upload a
-        missing one), then publish; fail the job if one is still missing.
-46. [ ] The AI agent and screen reading on Windows and Linux still send a local
-        model Ollama may not have pulled (default qwen2.5:7b, vision
-        qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags,
-        names the missing model and offers its download
-        (`ai-agent-local-model`). Each driver needs its own model listing and
-        a hook into its models manager; the seven locale keys are shared.
-47. [ ] Running local OpenAI-compatible servers (oMLX, LM Studio,
-        llama-server/LocalAI, Jan; `_shared/modules/llm/local_servers.json`)
-        are AI backends on macOS only (`local-openai-backends`). Windows and
-        Linux need an asynchronous probe (WinHTTP, curl), keyless API entries
-        (Linux `api_remote.lua` refuses an empty key) and menu rows; the Linux
-        tray has no text input for an address or a key.
-48. [ ] Enabling the AI when Ollama does not answer is explained on macOS
-        only: the AI stays off and one error names Ollama and its address,
-        with a button per running local server, "Start Ollama" or "Install
-        Ollama and the model" (`llm-enable-unreachable-local`,
-        `ui/menu/menu_llm/unreachable_backend_offer.lua`). Linux `llm_toggle`
-        turns the prediction engine on without any reachability check, and the
-        Windows tray only adds an install row while the Ollama dependencies are
-        missing; neither names the address nor offers a start or a running
-        server. Their neutral backend is Ollama (`llm.models.selected`
-        `default_per_platform`), so once item 47 lands a server that answers is
-        the natural first button there; the switch must still be confirmed (W1).
-49. [ ] Windows keyboard-hook order audit: AutoHotkey removes and reinstalls
-        its own low-level keyboard hook around every SendInput (upstream
-        `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first
-        send its hook runs before the native arbiter's. Windows guarantees no
-        order anyway: a program that hooks later runs first, and a hook that
-        exceeds `LowLevelHooksTimeout` is dropped. The prediction navigation
-        no longer depends on it (`llm-nav-cycle-windows`), but the paced
-        expansion terminal capture still assumes the native hook runs first
-        (the comment above `LLM_NavEventOwner_EnsureStarted()` in
-        `ErgoptiPlus.ahk`). Audit every native arbiter route, make each one
-        order-independent, and test both hook orders like
-        `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
-50. [ ] Measure SendEvent against SendInput on Windows. While the native
-        arbiter's low-level hook is installed, SendInput is interruptible
-        anyway, which is the only reason AutoHotkey removes its own hook, so
-        SendInput now only costs the rehook of item 49. `ErgoptiPlus.ahk`
-        sets `SendMode("Event")`, yet `hotstring_send.ahk`,
-        `hotstring_dispatch.ahk`, `text_sender.ahk` and `config_io.ahk` still
-        call SendInput. Measure long expansions, pastes and accepted
-        predictions (latency, dropped or interleaved keys) before switching;
-        not before the demo.
-51. [ ] Windows checks on a real machine for the 2026-09-30 evening fixes
-        (AutoHotkey cannot run in the Linux sessions): the four arrows (↑/←
-        back, ↓/→ forward) and the left and right Shift+Tab over a multi-slot
-        AI prediction move the marker once per press, wrap at both ends and
-        never move the caret, also right after a reload, with `nav_modifiers`
-        set to ctrl and with a tap-hold's Tab tapped under one Shift; the
-        footer shows "⇧G + Tab ou ↑/←"; Tab then inserts the chosen slot; the
-        hotstring bubbles and the delayed expansions work with the layout
-        emulation off and on; an accepted prediction no longer types "eeee".
+- [ ] **33.** Config policy for the files other than config.toml (the former
+      item 25): Published in the second 2026-09-30 release for the files the review
+      listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
+      sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
+      (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
+      layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
+      plain string (saves refused with a generic ERROR), Linux layers.toml refused
+      as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
+      whole-file installed.json refusal, repeated Windows tap_hold unknown-field
+      warnings, and the macOS boot-time unread-entries scan cost (36-56 ms on the
+      main thread). Two maintainer decisions are pending: config_migrate's
+      fail-closed guard for invalid stamps (site 108) and a migrations.toml
+      exception for key removals handled by the cleanup (site 112).
+- [ ] **34.** Item 5 follow-ups: the macOS Hotstrings scope leaves delimiter
+      states as they are (Windows and Linux reset the shipped ones), check that the
+      Windows « recommended » delays equal the manifest recommendation, and a
+      hand-written `[[hotstrings.terminators]]` list is applied with a warning but
+      cannot be edited from the menu.
+- [ ] **35.** Item 13 remainder: unregister the remap guardian LaunchAgent when
+      the Karabiner switch goes off or « Retirer Ergopti de Karabiner » runs
+      (headless unregister role in the launcher, verified on a Mac).
+- [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
+      `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
+- [ ] **37.** Item 23 decisions: whether « Hotstrings Ergopti » should appear
+      only when the layout is really installed (today: always, shipped copy), and
+      whether to move distancesreduction `qu`, `comma_j`, `comma_far_letters`, the
+      `ê` sections, French `suffixes_a` and the magickey `replace` section into the
+      Ergopti extension.
+- [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
+      the guardian's Login Items steps, the Homebrew install writing settings
+      (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
+      the wizard re-run on the three OSes.
+- [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
+  branch on 2026-09-30; agents must not create `backup/*` branches again. The
+  finished agent worktrees under `.claude/worktrees/` can be removed; the
+  uncommitted test edit left in the `wip/win-tooltip-border-fix` worktree
+  (tooltip DPI radius) is the only unsaved change among them.
+- [ ] **40.** The packaged-launch gate never builds a Karabiner configuration:
+      the CI runners have no Karabiner-Elements, so dev.148 passed every launch
+      scenario while every real Mac refused the deploy (« generated rule 1
+      manipulator 3 has inconsistent managed conditions », fixed with
+      `json-shared-tables`). Add a launch scenario that makes the app build and
+      merge its Karabiner configuration in the real Hammerspoon runtime (into the
+      runner's own `~/.config/karabiner/karabiner.json`) and fails on any ERROR,
+      without needing the Karabiner driver.
+- [ ] **41.** Remaining direct `hs.json.decode` calls (ratchet
+      `tests/meta/test_json_decode_through_codec.lua`, 21 calls in 19 files): they
+      only read what they decode today; move them to `adapters/json_codec.lua`,
+      which returns a tree, and lower the baseline. Audit the other hs stubs for the
+      same kind of divergence from the native behaviour.
+- [ ] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+      an old build's scalar where a table is now expected (`magickey = true` under
+      `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
+      the batch cannot address the destination without ambiguous TOML keys » —
+      maintainer decision: may an ordinary save overwrite a value flagged outdated?
+      Hand-written dotted keys (`a.b = 1`) are read by the shared decoder as one key
+      named "a.b", so the app ignores them. Linux still refuses to save over a
+      `[[hotstrings.terminators]]` list (`terminator_settings.lua`) although the
+      writer now can.
+- [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
+  « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
+  historical CapsWord anchor »): its karabiner.json keeps an untagged historical
+  block the merge cannot prove. The refused deploy now offers « Retirer les
+  anciennes règles » (listed, confirmed, backed up next to karabiner.json), also
+  from a Tap-Hold menu row while the rules are pending
+  (`karabiner-legacy-cleanup`); untested on a real Mac. Still to do: find why
+  the proof fails from the backed-up file.
+- [ ] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
+      activated it (AltGr + CapsLock): the watcher probed the variable with
+      `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit
+      2), so it only ever worked for a CapsWord this driver activated; since dev.150
+      it stops probing after that refusal (`capsword-probe-unsupported`). Give the
+      activation a way to tell Hammerspoon (for example a sentinel key the
+      activation rule emits, like the script-control ones) so every CapsWord is
+      cancelled.
+- [ ] **45.** v0.0.0-dev.150 was published without ErgoptiPlus-linux-noarch.rpm:
+      `gh release create` listed the file and exited 0, but GitHub kept 12 of 13
+      assets, and published releases are immutable. Create the release as a draft,
+      verify every expected asset by name (re-upload a missing one), then publish;
+      fail the job if one is still missing.
+- [ ] **46.** The AI agent and screen reading on Windows and Linux still send a
+      local model Ollama may not have pulled (default qwen2.5:7b, vision
+      qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags, names
+      the missing model and offers its download (`ai-agent-local-model`). Each
+      driver needs its own model listing and a hook into its models manager; the
+      seven locale keys are shared.
+- [ ] **47.** Running local OpenAI-compatible servers (oMLX, LM Studio,
+      llama-server/LocalAI, Jan; `_shared/modules/llm/local_servers.json`) are AI
+      backends on macOS only (`local-openai-backends`). Windows and Linux need an
+      asynchronous probe (WinHTTP, curl), keyless API entries (Linux
+      `api_remote.lua` refuses an empty key) and menu rows; the Linux tray has no
+      text input for an address or a key.
+- [ ] **48.** Enabling the AI when Ollama does not answer is explained on macOS
+      only: the AI stays off and one error names Ollama and its address, with a
+      button per running local server, "Start Ollama" or "Install Ollama and the
+      model" (`llm-enable-unreachable-local`,
+      `ui/menu/menu_llm/unreachable_backend_offer.lua`). Linux `llm_toggle` turns
+      the prediction engine on without any reachability check, and the Windows tray
+      only adds an install row while the Ollama dependencies are missing; neither
+      names the address nor offers a start or a running server. Their neutral
+      backend is Ollama (`llm.models.selected` `default_per_platform`), so once item
+      47 lands a server that answers is the natural first button there; the switch
+      must still be confirmed (W1).
+- [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
+      reinstalls its own low-level keyboard hook around every SendInput (upstream
+      `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
+      hook runs before the native arbiter's. Windows guarantees no order anyway: a
+      program that hooks later runs first, and a hook that exceeds
+      `LowLevelHooksTimeout` is dropped. The prediction navigation no longer depends
+      on it (`llm-nav-cycle-windows`), but the paced expansion terminal capture
+      still assumes the native hook runs first (the comment above
+      `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
+      arbiter route, make each one order-independent, and test both hook orders like
+      `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+- [ ] **50.** Measure SendEvent against SendInput on Windows. While the native
+      arbiter's low-level hook is installed, SendInput is interruptible anyway,
+      which is the only reason AutoHotkey removes its own hook, so SendInput now
+      only costs the rehook of item 49. `ErgoptiPlus.ahk` sets `SendMode("Event")`,
+      yet `hotstring_send.ahk`, `hotstring_dispatch.ahk`, `text_sender.ahk` and
+      `config_io.ahk` still call SendInput. Measure long expansions, pastes and
+      accepted predictions (latency, dropped or interleaved keys) before switching;
+      not before the demo.
+- [ ] **51.** Windows checks on a real machine for the 2026-09-30 evening fixes
+      (AutoHotkey cannot run in the Linux sessions): the four arrows (↑/← back, ↓/→
+      forward) and the left and right Shift+Tab over a multi-slot AI prediction move
+      the marker once per press, wrap at both ends and never move the caret, also
+      right after a reload, with `nav_modifiers` set to ctrl and with a tap-hold's
+      Tab tapped under one Shift; the footer shows "⇧G + Tab ou ↑/←"; Tab then
+      inserts the chosen slot; the hotstring bubbles and the delayed expansions work
+      with the layout emulation off and on; an accepted prediction no longer types
+      "eeee"; a Ctrl+V paste adds one row to the clipboard log with the emulation
+      off and on; AltGr+Entrée, AltGr+Suppr, AltGr+Retour arrière and AltGr+Échap
+      run their script action out of the box, and the « Raccourcis de gestion du
+      script » switch makes them native again.
+
+## Maintainer requests on the evening of 2026-09-30
+
+Each item is removed once it is integrated and pushed; what must still be
+checked on a real machine moves to item 51 (Windows) or its macOS twin.
+Releases: push to `dev` without a release until every item below is
+integrated, then publish one grouped release.
+
+- [ ] **52.** AI menu: no « Tout effacer » row; the Backend row shows the
+      selected option's label up to its em dash, emoji included (« 🌐 API »), on
+      every driver; each API entry is named `provider/model` automatically (for
+      example `cerebras/llama-3.3-70b`) and the configuration no longer asks for a
+      name. Branch `feat/llm-menu-cleanup`.
+- [ ] **53.** Every menu and submenu opens with the same group: its master
+      toggle, « Restaurer les valeurs conseillées », « ✕ Tout effacer (comportement
+      du système) », then a separator. AI and Metrics keep only the restore. No
+      confirmation for any clear (the backup is enough; Linux asks today).
+      Configuration gains the global « Tout effacer » next to its restore, in one
+      transaction. The macOS Gestures menu shows its conflicts row after that group.
+      Branch `feat/menu-first-group`.
+- [ ] **54.** Every menu is declared in the shared menu manifest, never in
+      driver code; a row that does not apply to an OS is hidden there, a feature not
+      yet ported is greyed with its reason. A ratchet gate counts the native menu
+      sites left; migrate them to zero once items 52, 53, 55 and 57 are integrated.
+- [ ] **55.** Script management shortcuts, the same on the three drivers: four
+      slots (Enter pause, Delete personal shortcuts, Backspace reload, Escape quit)
+      on AltGr (Windows, Linux) or Option (macOS), active by default (documented
+      exception), one submenu with its switch, restore and clear; every clear writes
+      "none" so the chords go native. Windows is integrated; macOS and Linux on
+      `feat/script-chords-three-os`.
+- [ ] **56.** Navigation layer editor: each keycap shows the current layout's
+      character (the emulated Ergopti layout, else the OS layout) and its action's
+      label; the layer gets Scroll up / Scroll down slots (volume by default,
+      editable, macOS through Hammerspoon while the layer is held) and the « Layer +
+      Scroll » shortcut goes. Branch `feat/layer-editor-legends`.
+- [ ] **57.** Versions window: « Revenir à cette version » on every other
+      release (backup of the whole configuration first, a button to restore it, the
+      update's own download, verification and install path); no driver ever installs
+      an update by itself, it only notifies; on a run from the sources, «
+      Désinstaller » and these buttons are greyed with their reason. Branch
+      `feat/release-rollback`.
+- [ ] **58.** Windows: opening the versions window logs "tree-owned task output
+      deletion failed (32)". Another spawned process inherits the task's capture
+      handle (inherited handles without a handle list); pass only the task's own
+      handles and retry a locked temp file quietly. Branch
+      `fix/windows-shell-runner-sharing`.
+- [ ] **59.** macOS v0.0.0-dev.155: "Lease-bound input startup failed:
+      prepared lease RESUME failed: lease-stopping" at startup. Cause: the layout
+      watcher compares the localised layout name with the HIToolbox name, sees a
+      phantom layout change about 2 s after boot, and stops the activation in
+      flight; that intentional stop is logged at ERROR. Branch
+      `fix/macos-lease-resume-stopping`.
+- [ ] **60.** Windows: the registry-layout emulation registers its dead-key
+      resets by key name ("~" plus Enter, Escape, BackSpace, Tab), which the scan
+      code declarations of the same keys shadow, so the resets never fire; the
+      scan-code precedence gate misses names built by concatenation.
+- [ ] **61.** macOS on Apple silicon: opening the app posts « Fin de la prise
+      en charge des apps basées sur Intel … cette version de Python », so a Python
+      it launches runs under Rosetta (likely an Intel Homebrew `python3` found first
+      in the PATH, or a venv it created). Choose interpreters by architecture and
+      repair an Intel venv with a button. Branch `fix/macos-intel-python`.
 
 ## Time estimate
 
