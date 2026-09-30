@@ -247,6 +247,7 @@ return {
 	"tests.unit.modules.llm.test_display_settings",
 	"tests.unit.modules.llm.test_navigation_settings",
 	"tests.unit.modules.llm.test_prediction_digit_accept",
+	"tests.unit.modules.llm.test_llm_tooltip_chords_consumed",
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.test_prediction_trigger_now",
 	"tests.unit.modules.llm.test_prompt_prediction",
