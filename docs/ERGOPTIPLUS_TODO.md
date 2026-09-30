@@ -359,6 +359,12 @@ These are software implementations; final hardware verification remains below.
         names the missing model and offers its download
         (`ai-agent-local-model`). Each driver needs its own model listing and
         a hook into its models manager; the seven locale keys are shared.
+47. [ ] Running local OpenAI-compatible servers (oMLX, LM Studio,
+        llama-server/LocalAI, Jan; `_shared/modules/llm/local_servers.json`)
+        are AI backends on macOS only (`local-openai-backends`). Windows and
+        Linux need an asynchronous probe (WinHTTP, curl), keyless API entries
+        (Linux `api_remote.lua` refuses an empty key) and menu rows; the Linux
+        tray has no text input for an address or a key.
 
 ## Time estimate
 
