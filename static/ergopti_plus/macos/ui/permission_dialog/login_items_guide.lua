@@ -69,8 +69,9 @@ local _guide = nil
 --- @param remap table Remap facade.
 local function validate(remap)
 	if type(remap) ~= "table" or type(remap.guardian_state) ~= "function"
-		or type(remap.open_login_items) ~= "function" then
-		error("login_items_guide: remap must provide guardian_state and open_login_items", 3)
+		or type(remap.open_login_items) ~= "function"
+		or type(remap.get_tap_holds_enabled) ~= "function" then
+		error("login_items_guide: remap must provide guardian_state, open_login_items and get_tap_holds_enabled", 3)
 	end
 end
 
@@ -229,6 +230,13 @@ end
 --- @return boolean offered True when the steps are open or waiting to open.
 function M.offer(remap)
 	validate(remap)
+	-- The steps promise that the Tap-Holds menu keeps them after « Later »,
+	-- and that menu only lists the guardian while Tap-Holds are on: with them
+	-- off, the notice keeps its banner, which stays reachable.
+	if remap.get_tap_holds_enabled() ~= true then
+		Logger.info(LOG, "No automatic Login Items steps: Tap-Holds are off, the approval banner stays.")
+		return false
+	end
 	if _offered then
 		Logger.debug(LOG, "The Login Items steps were already offered in this launch.")
 		return false
