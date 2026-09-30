@@ -5961,6 +5961,16 @@ checklist = "hotstrings"
 file_path = { ahk = "category_enabled.{group}", hs = "hotstrings.groups.{stem}", linux = "hotstrings.groups.{stem}" }
 section_path = { ahk = "hotstrings.{group}.{section}.enabled", hs = "hotstrings.modules.{stem}.{section}", linux = "hotstrings.modules.{stem}.{section}" }
 neutral_label_key = "onboarding.hotstrings.all_languages"
+# The preview bubbles only show what a hotstring will type. The neutral defaults
+# leave them off and the groups above never import them, so every fresh
+# configuration showed no bubble at all. The AI bubble stays out, as it does
+# from the menu's restore (restore_exclude): its backend is not chosen yet.
+settings_label_key = "menu.hotstrings.preview_bubbles"
+
+[onboarding.pages.hotstrings.settings]
+"hotstrings.preview_star_enabled" = "menu.hotstrings.tooltip_magic"
+"hotstrings.preview_autocorrect_enabled" = "menu.hotstrings.tooltip_autocorrect"
+"hotstrings.preview_colored_tooltips" = "menu.hotstrings.tooltip_colored"
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"
