@@ -362,6 +362,39 @@ TestTapHold_InvalidSchemaTypesFailClosed() {
 Test("TapHoldLoader: schema type violations fail closed (AHK-134)",
 	TestTapHold_InvalidSchemaTypesFailClosed)
 
+; A field no tap-hold key has disabled the whole key with an ERROR at every
+; boot, as if it were a wrong-typed known field. It is an outdated entry: one
+; WARNING, the field ignored, the rest of the key applied (config-outdated-tap-hold).
+TestTapHold_UnknownFieldIsOutdated() {
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		; The same valid key the AHK-134 fixture proves active.
+		Path := _TH_Write("[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n"
+			. "retired_field = 1`r`n")
+		TH := LoadTapHoldToml(Path)
+		AssertTrue(TapHoldIsActive(TH, "tab"), "an unknown field must not disable its key")
+		AssertEqual("alt_tab_monitor", TapHoldTapAction(TH, "tab"))
+		AssertFalse(TH["keys"]["tab"].Has("retired_field"), "the unknown field is ignored")
+		Warned := false, Errors := 0
+		for Line in Captured {
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+			if (InStr(Line, "[WARNING]", true) and InStr(Line, "retired_field") and InStr(Line, "tap_hold.keys.tab"))
+				Warned := true
+		}
+		AssertEqual(0, Errors, "an outdated field is never an ERROR")
+		AssertTrue(Warned, "the outdated field is named in a WARNING with its key")
+	} finally {
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: an unknown field is warned and ignored, its key kept (config-outdated-tap-hold)",
+	TestTapHold_UnknownFieldIsOutdated)
+
 TestTapHold_InheritDefaultsFalse() {
 	Path := _TH_Write(
 		"[tap_hold]`r`n"
