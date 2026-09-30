@@ -194,10 +194,11 @@ function M.init(deps)
 	Logger.success(LOG, "Initialized (physical magic key %s).", M.get())
 end
 
---- Whether a key can be captured now: the daemon owns the keyboard.
+--- Whether a key can be captured now: the daemon owns the keyboard and is not
+--- paused, as macOS greys the row while paused — a paused driver takes no key.
 --- @return boolean
 function M.can_capture()
-	return _deps ~= nil and _deps.can_capture() == true
+	return _deps ~= nil and _deps.can_capture() == true and _deps.is_active() == true
 end
 
 --- Captures the next grabbed key-down as the physical magic key. Escape or the

@@ -310,6 +310,18 @@ helpers.describe("magic key source: choosing a key", function()
 			Source._reset_for_test()
 		end)
 	end)
+
+	helpers.it("(magic-key-source) no capture while the driver is paused, as on macOS", function()
+		with_source(nil, function(Source)
+			local state = { active = false, replace = true, typed_ok = true }
+			wire(Source, state)
+			helpers.assert_eq(Source.can_capture(), false, "the menu greys the row")
+			helpers.assert_eq(Source.capture({ on_chosen = function() end, on_refused = function() end }), false)
+			state.active = true
+			helpers.assert_true(Source.can_capture(), "resumed, it captures again")
+			Source._reset_for_test()
+		end)
+	end)
 end)
 
 helpers.describe("magic key source: the keyboard-layout menu", function()
