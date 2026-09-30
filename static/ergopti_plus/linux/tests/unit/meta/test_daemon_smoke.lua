@@ -71,8 +71,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
       helpers.assert_true(src:find("typed_at_ms         = now_ms", 1, true) ~= nil,
         "each matcher input must carry its monotonic timestamp")
-      helpers.assert_true(src:find("engine_mod.within_interkey_delay(result, delay_sec)", 1, true) ~= nil,
-        "expiry must evaluate every interval retained by the matched suffix")
+      local expiry_call = "engine_mod.within_interkey_delay(result, delay_sec, Monotonic.resolution_ms())"
+      helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
+        "expiry must evaluate every retained interval against the stamping clock's resolution")
       helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
         "a single previous-key timestamp recreates the original final-pair-only bug")
 

@@ -857,10 +857,12 @@ local function main()
 		-- consumed trigger, and 0 means "always". The engine keeps timestamps aligned
 		-- with its rolling buffer, including resets and chained expansions, so an
 		-- earlier pause cannot disappear merely because the final pair was quick.
+		-- The clock's resolution goes with the stamps: without luv it counts whole
+		-- seconds, and a trigger typed across a second boundary read as a pause.
 		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec) then
+			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec, Monotonic.resolution_ms()) then
 				Logger.debug(LOG,
 					"Expired: '%s' had a %.2fs pause, its category allows %.2fs.",
 					tostring(result.trigger),

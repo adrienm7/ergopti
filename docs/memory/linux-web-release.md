@@ -94,6 +94,16 @@ uinput therefore released a Ctrl a tap-hold was still holding. Action:
 `combo_emitter` skips the chord modifiers `keyboard_hook` reports held, and the
 tap-hold engine masks a lone Alt or Super release with KEY_F24.
 
+### project-linux-coarse-clock-overstates-a-gap
+
+Without luv (optional at install, and absent from the stubbed CI E2E step)
+`infra/monotonic` is `os.time() * 1000`: two keys typed together read 1000 ms
+apart when the second turns over between them. The 0.75 s expansion delay
+dropped such a trigger, which surfaced as a rare E2E flake. Action: compare a
+difference of two readings only after taking off `Monotonic.resolution_ms()`,
+as `within_interkey_delay` and `keyboard_hook` do; a daemon scenario that
+depends on time pins it with `ERGOPTI_E2E_CLOCK=seconds` and `{TICK}`.
+
 ## Website and documentation
 
 ### project-site-i18n-gettext-french-key
