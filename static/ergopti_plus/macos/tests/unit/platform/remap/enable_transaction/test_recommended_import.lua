@@ -193,6 +193,30 @@ helpers.describe("the remap owner imports the wizard's checked keys", function()
 			helpers.assert_nil(disk.files["/wizard/b-2"], "nor backed up")
 		end)
 	end)
+
+	-- A bridge whose settings save is still owed makes it to the settings path
+	-- in force then: once a wizard moved the configuration, the new folder's
+	-- file, over the keys the wizard had just saved there.
+	helpers.it("refuses a direct save while the running bridge owes a settings save", function()
+		with_fixture(function(fixture)
+			local remap, calls, deploy, disk = importing_remap(fixture)
+			wizard_settings({})
+			helpers.assert_eq(remap.has_pending_settings_save(), false)
+			helpers.assert_true(remap.import_recommended_keys({ keys = { "left_shift" }, backup_path = "/remap/b-3" }))
+			helpers.assert_eq(remap.has_pending_settings_save(), true, "the transaction owes its terminal")
+			calls.saved_payloads = {}
+			local saved, detail = remap.save_recommended_keys({ keys = { "caps_lock" }, path = WIZARD,
+				backup_path = "/wizard/b-3" })
+			helpers.assert_eq(saved, false, "the owed save would undo this one")
+			helpers.assert_type(detail, "string", "the wizard reports why")
+			helpers.assert_eq(#calls.saved_payloads, 0, "nothing is written")
+			helpers.assert_nil(disk.files["/wizard/b-3"], "nor backed up")
+			deploy.terminal(true, "ready")
+			helpers.assert_eq(remap.has_pending_settings_save(), false, "the terminal settles the debt")
+			helpers.assert_true(remap.save_recommended_keys({ keys = { "caps_lock" }, path = WIZARD,
+				backup_path = "/wizard/b-3" }), "a settled bridge owes nothing")
+		end)
+	end)
 end)
 
 return true
