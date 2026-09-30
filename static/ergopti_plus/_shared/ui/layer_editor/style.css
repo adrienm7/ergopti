@@ -133,7 +133,13 @@ button:disabled {
 	gap: 6px;
 }
 
-.legend {
+.toggle {
+	align-items: center;
+	display: flex;
+	gap: 5px;
+}
+
+.chips {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
@@ -160,6 +166,11 @@ button:disabled {
 .chip.unavailable {
 	border-style: dashed;
 	opacity: 0.5;
+}
+
+.chip.layer-key {
+	border: 2px solid var(--accent);
+	padding: 0 7px;
 }
 
 #banner {
@@ -204,18 +215,17 @@ button:disabled {
 	position: absolute;
 }
 
-/* The legend on top, the action below it filling the rest of the cap. */
+/* The legend small in the cap's top-left corner, the action below it as the
+   key's main text. A plain block, not a flex column: the action's line clamp
+   (a -webkit-box) collapsed as a shrinkable flex item in WebKit. */
 .key .cap {
 	background: var(--surface);
 	border: 1px solid var(--border);
 	border-radius: 5px;
-	display: flex;
-	flex-direction: column;
-	gap: 1px;
 	height: 100%;
-	justify-content: flex-start;
 	overflow: hidden;
-	padding: 1px 3px;
+	padding: 1px 2px 2px 3px;
+	position: relative;
 }
 
 #mouse .key {
@@ -227,46 +237,99 @@ button:disabled {
 	min-height: 44px;
 }
 
+/* What the key types in the user's layout (or its translated name): one short
+   line, never the key's main text. */
 .key .legend {
-	flex: none;
-	font-size: 11px;
-	font-weight: 600;
-	line-height: 1.1;
-}
-
-/* The action wraps over as many lines as the key holds (the board's rows are
-   taller than its columns for them) and is clamped there; the key's tooltip
-   and the panel carry the whole text. break-word is the fallback of the older
-   WebKitGTK builds that lack overflow-wrap: anywhere. */
-.key .binding {
-	-webkit-box-orient: vertical;
 	color: var(--sub);
-	display: -webkit-box;
-	flex: 0 1 auto;
-	font-size: 11px;
-	hyphens: auto;
-	-webkit-line-clamp: 4;
-	line-height: 1.12;
-	min-height: 0;
+	display: block;
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1.2;
 	overflow: hidden;
-	overflow-wrap: anywhere;
-	white-space: normal;
-	word-break: break-word;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.key.recommended .cap {
+#mouse .key .legend {
+	white-space: normal;
+}
+
+/* The action wraps between words over the lines the key holds (the board's
+   rows are taller than its columns for them) and is clamped there with an
+   ellipsis; a word longer than the key is hyphenated in the page's language
+   where the engine can, else broken. The tooltip and the panel carry the whole
+   text. */
+.key .action {
+	-webkit-box-orient: vertical;
+	color: var(--text);
+	display: -webkit-box;
+	font-size: 11px;
+	font-weight: 500;
+	-webkit-hyphens: auto;
+	hyphens: auto;
+	-webkit-line-clamp: 3;
+	line-height: 1.15;
+	margin-top: 1px;
+	overflow: hidden;
+	overflow-wrap: break-word;
+	white-space: normal;
+}
+
+/* The catalogue label's icon, ahead of its words. */
+.key .action .icon {
+	color: var(--accent);
+	font-size: 12px;
+}
+
+/* A caption that is only an icon (a repeat count, a short shortcut) reads
+   bigger. */
+.key .action.iconic {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.key .action.iconic .icon {
+	color: var(--text);
+	font-size: 13px;
+}
+
+/* Bound keys are filled; an unbound key stays quiet, outlined only when the
+   recommended layer binds it. */
+.key.bound.recommended .cap {
 	background: var(--recommended-soft);
 	border-color: var(--recommended);
 }
 
-.key.custom .cap {
+.key.bound.custom .cap {
 	background: var(--custom-soft);
 	border-color: var(--custom);
+}
+
+.key.custom:not(.bound) .cap {
+	border-color: var(--custom);
+	border-style: dashed;
 }
 
 .key.invalid .cap {
 	background: var(--invalid-soft);
 	border-color: var(--invalid);
+}
+
+/* The key whose hold enters the layer. */
+.key.layer-key .cap {
+	border: 2px solid var(--accent);
+}
+
+.key.layer-key .action {
+	color: var(--accent);
+}
+
+/* Below this window width a 1u key holds two lines of its action under its
+   legend, not three (tools/test/test-layer-editor-page.cjs measures both). */
+@media (max-width: 980px) {
+	.key .action {
+		-webkit-line-clamp: 2;
+	}
 }
 
 .key.unavailable {
