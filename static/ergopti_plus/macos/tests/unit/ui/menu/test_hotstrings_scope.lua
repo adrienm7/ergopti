@@ -471,6 +471,76 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.projected["autocorrection/caps"], 1.0)
 	end)
 
+	helpers.it("reverts a committed restore to both files and the runtime, then releases the fence", function()
+		local f = fixture()
+		helpers.assert_eq(f.owner.apply("recommended"), true)
+		helpers.assert_eq(f.km.projected["autocorrection/caps"], 0.5)
+		helpers.assert_eq(f.owner.revert(), true)
+		helpers.assert_eq(f.files.config, ORIGINAL_CONFIG)
+		helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES)
+		helpers.assert_eq(f.km.projected["autocorrection/caps"], 2.0)
+		helpers.assert_eq(f.config.scope_snapshot().source.content, ORIGINAL_OVERRIDES)
+		helpers.assert_eq(f.prefs.source_snapshot("config").content, ORIGINAL_CONFIG)
+		helpers.assert_eq(f.km.is_group_enabled("rolls"), false)
+		helpers.assert_eq(f.km.repeat_enabled, false)
+		helpers.assert_eq(f.km.trigger, "§")
+		helpers.assert_eq(f.editor.trigger, "§")
+		helpers.assert_eq(f.state.delays, { autocorrection = 3.0, dynamichotstrings = 1.5 })
+		helpers.assert_eq(f.owner.pending(), false)
+		helpers.assert_eq(f.owner.revert(), false, "one commit has one inverse")
+		helpers.assert_eq(f.config.set_override("rolls", nil, "delay", 0.4), true, "the file is released")
+	end)
+
+	helpers.it("retains a refused revert, fences ordinary writes, and settles it on retry", function()
+		local f = fixture()
+		helpers.assert_eq(f.owner.apply("clear"), true)
+		f.controls.refuse = "overrides"
+		helpers.assert_eq(f.owner.revert(), false)
+		helpers.assert_eq(f.owner.pending(), true)
+		helpers.assert_eq(f.config.set_override("rolls", nil, "delay", 0.4), false, "ordinary writes wait")
+		f.controls.refuse = nil
+		helpers.assert_eq(f.owner.retry_restore(), true)
+		helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES)
+		helpers.assert_eq(f.files.config, ORIGINAL_CONFIG)
+		helpers.assert_eq(f.state.keymap, true)
+		helpers.assert_eq(f.engine.started, true)
+		helpers.assert_eq(f.owner.pending(), false)
+		helpers.assert_eq(f.config.set_override("rolls", nil, "delay", 0.4), true)
+	end)
+
+	-- Configuration › « Restore recommended values » composes this owner with
+	-- the others; a later category's refusal must undo this one exactly.
+	helpers.it("takes part in the global scope, reverted when a later category refuses", function()
+		local f = fixture()
+		local refused = {
+			apply = function() return false end,
+			revert = function() return false end,
+			release = function() end,
+			pending = function() return false end,
+			retry_restore = function() return true end,
+		}
+		local refreshes = {}
+		package.loaded["ui.menu.global_scope"] = nil
+		local global = require("ui.menu.global_scope").new({
+			owners = { hotstrings = function() return f.owner end, llm = function() return refused end },
+			backup_path = function(scope) return "remap-" .. scope end,
+			defer = function(continuation) continuation(); return true end,
+			paused = function() return false end,
+			confirm = function() return true end,
+			refresh = function(committed, report) refreshes[#refreshes + 1] = { committed, report } end,
+		})
+		helpers.assert_eq(global.apply("recommended"), true)
+		helpers.assert_eq(#refreshes, 1)
+		helpers.assert_eq(refreshes[1][1], false)
+		helpers.assert_eq(refreshes[1][2].failed, "llm")
+		helpers.assert_eq(refreshes[1][2].reverted, true)
+		helpers.assert_eq(f.files.config, ORIGINAL_CONFIG)
+		helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES)
+		helpers.assert_eq(f.km.projected["autocorrection/caps"], 2.0)
+		helpers.assert_eq(f.km.is_group_enabled("rolls"), false)
+		helpers.assert_eq(f.owner.pending(), false)
+	end)
+
 	helpers.it("creates an absent override file for a recommendation and removes it on rollback", function()
 		local f = fixture({ overrides = false })
 		f.controls.refuse = "config"

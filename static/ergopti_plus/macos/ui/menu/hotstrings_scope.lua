@@ -113,7 +113,7 @@ end
 ---   start_engine / stop_engine (exact true), is_personal(name),
 ---   override_backup_path(), remove(path) for a created override file, and an
 ---   optional editor with set_trigger_char.
---- @return table owner apply(mode), pending(), retry_restore()
+--- @return table owner apply(mode), revert(), release(), pending(), retry_restore()
 function M.new(options)
 	assert(type(options) == "table", "hotstrings scope options are required")
 	local keymap, Config, state = options.keymap, options.config, options.state
@@ -329,6 +329,18 @@ function M.new(options)
 				if not transaction.pending() then release() end
 				return committed, detail
 			end,
+			-- A composed global scope reverts this commit when a later category
+			-- refuses. Restoring the override file adopts its source again, which
+			-- only the fence holder may do, so the revert holds it like an apply.
+			revert = function()
+				if held then return false, "the hotstrings scope is still held" end
+				if Config.acquire(fence) ~= true then return false, "hotstring overrides are held" end
+				held = true
+				local reverted, detail = transaction.revert()
+				if not transaction.pending() then release() end
+				return reverted, detail
+			end,
+			release = transaction.release,
 		}
 	end
 	ports.runtime = {
