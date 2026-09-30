@@ -170,6 +170,36 @@ helpers.describe("layout manager (Linux): installing", function()
 			"the user root follows the effective configuration folder, as on macOS and Windows")
 	end)
 
+	helpers.it("still starts with the other packs when the installed record is damaged (config-outdated-installed)", function()
+		local Paths = require("infra.paths")
+		local saved_registry = package.loaded["modules.keymap.layout_registry"]
+		local saved_config = package.loaded["infra.config_paths"]
+		local saved_logger = package.loaded["logger.shim"]
+		local errors = {}
+		local recorder = helpers.make_logger_stub()
+		recorder.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		package.loaded["modules.keymap.layout_registry"] = {
+			extension_roots = function() error("the installed-layouts record is not valid JSON", 0) end,
+			shipped_extension_root = function() return { pack = "/driver/layouts/registry/ergopti" } end,
+		}
+		package.loaded["infra.config_paths"] = {
+			home = function() return "/private/user" end,
+			get_config_dir = function() return "/private/xdg/ergopti" end,
+		}
+		package.loaded["logger.shim"] = recorder
+		local Fresh = helpers.load_module("infra.paths")
+		local ok, roots = pcall(Fresh.extension_roots)
+		package.loaded["modules.keymap.layout_registry"] = saved_registry
+		package.loaded["infra.config_paths"] = saved_config
+		package.loaded["logger.shim"] = saved_logger
+		package.loaded["infra.paths"] = Paths
+		helpers.assert_true(ok, "a damaged record never stops the daemon: " .. tostring(roots))
+		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" })
+		helpers.assert_eq(roots[#roots], "/private/xdg/ergopti/extensions")
+		helpers.assert_eq(#errors, 1, "the skipped record is reported, never a silent success")
+		helpers.assert_true(errors[1]:find("not valid JSON", 1, true) ~= nil, errors[1])
+	end)
+
 	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true
