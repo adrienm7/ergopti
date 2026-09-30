@@ -55,6 +55,11 @@ local WINDOW_TITLE_KEY       = "onboarding.window_title"
 -- Delay between the success notification and the reload that applies it.
 local RELOAD_DELAY_SEC = 1.5
 
+-- How long the running bridge may take to answer the tap-hold import before
+-- the wizard reloads without its answer: its deployment waits on the remap
+-- guardian (20 s at most to register) and the lease, never on the user.
+local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
+
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
 
@@ -485,9 +490,9 @@ end
 
 --- Imports the checked tap-hold keys through the remap owner. The running
 --- bridge takes them in its settings transaction when it runs the folder the
---- wizard set up; before it starts (the first run) or for a folder the wizard
---- moves the configuration to, the owner saves them to that folder's file,
---- which the reload reads.
+--- wizard set up; before it starts (the first run), once it stopped, or for a
+--- folder the wizard moves the configuration to, the owner saves them to that
+--- folder's file, which the reload reads.
 --- Either way the owner backs the file up first.
 --- @param keys table Key ids of tap_hold_keys.json, at least one.
 --- @param moved boolean Whether the wizard moved the configuration folder.
@@ -505,7 +510,7 @@ local function import_tap_holds(keys, moved, on_done)
 	end
 	_backup_sequence = _backup_sequence + 1
 	local backup_path = string.format("%s.tap_holds-%d-%d.bak", path, os.time(), _backup_sequence)
-	if Remap.is_initialized() and not moved then
+	if Remap.is_running() and not moved then
 		Remap.import_recommended_keys({ keys = keys, backup_path = backup_path },
 			function(ok, reason) on_done(ok == true, reason) end)
 		return
@@ -513,6 +518,49 @@ local function import_tap_holds(keys, moved, on_done)
 	local saved_ok, saved, detail = pcall(Remap.save_recommended_keys,
 		{ keys = keys, path = path, backup_path = backup_path })
 	on_done(saved_ok and saved == true, saved_ok and detail or saved)
+end
+
+--- Shows a notice once deferred work runs: never inside the callback of an
+--- owner that is still dispatching, such as a Karabiner terminal.
+--- @param key string Locale key of the notice.
+--- @param after function|nil Work to run once the user dismissed it.
+local function deferred_notice(key, after)
+	local scheduled = DeferredWork.after(0, function()
+		require("infra.dialog_util").block_alert(i18n.get("onboarding.error.title"), i18n.get(key),
+			i18n.get("onboarding.btn.ok"))
+		if after then after() end
+	end, "onboarding.notice")
+	if scheduled ~= true then
+		Logger.error(LOG, "The notice '%s' could not be scheduled.", key)
+		if after then after() end
+	end
+end
+
+--- Reloads Hammerspoon so every module starts from the saved answers. Once the
+--- termination coordinator runs, the reload is an owned request: a refusal or
+--- an abort tells the user the answers still wait for a reload. Without it no
+--- Karabiner lease was taken this session, and the reload wrapper reloads
+--- natively, as it does for every caller.
+local function reload_applying_answers()
+	local TerminationCoordinator = require("infra.termination_coordinator")
+	if TerminationCoordinator.is_initialized() ~= true then
+		hs.reload()
+		return
+	end
+	local told = false
+	local function reload_still_needed(detail)
+		if told then return end
+		told = true
+		Logger.error(LOG, "The reload that applies the onboarding answers did not run: %s.", tostring(detail))
+		deferred_notice("onboarding.error.reload_pending")
+	end
+	local call_ok, accepted = pcall(TerminationCoordinator.request_reload_owned, "onboarding",
+		reload_still_needed)
+	-- An accepted reload may already have finalized this environment: nothing
+	-- runs after it.
+	if not call_ok or accepted ~= true then
+		reload_still_needed(call_ok and "the reload request was refused" or accepted)
+	end
 end
 
 --- Validates the answers, persists the folder and the language, writes every
@@ -596,25 +644,44 @@ local function commit(answers)
 
 	local function announce_and_reload()
 		notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
-		DeferredWork.after(RELOAD_DELAY_SEC, function()
-			hs.reload()
-		end, "onboarding.reload")
+		if DeferredWork.after(RELOAD_DELAY_SEC, reload_applying_answers, "onboarding.reload") ~= true then
+			Logger.error(LOG, "The reload that applies the onboarding answers could not be scheduled.")
+			deferred_notice("onboarding.error.reload_pending")
+		end
 	end
 	if #tap_hold_keys == 0 then
 		announce_and_reload()
 		return
 	end
 	-- The answers are saved: a refused import leaves config_karabiner.toml as
-	-- it was, says so, and the reload still applies the rest.
-	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
+	-- it was, says so, and the reload still applies the rest. A bridge that
+	-- never answers cannot hold the reload back past the timeout either.
+	local settled = false
+	local function settle(ok, detail, notice_key)
+		settled = true
 		if ok then
 			Logger.success(LOG, "Imported %d recommended tap-hold key(s).", #tap_hold_keys)
-		else
-			Logger.error(LOG, "The recommended tap-hold keys were not imported: %s.", tostring(detail))
-			require("infra.dialog_util").block_alert(i18n.get("onboarding.error.title"),
-				i18n.get("onboarding.error.tap_holds_import"), i18n.get("onboarding.btn.ok"))
+			announce_and_reload()
+			return
 		end
-		announce_and_reload()
+		Logger.error(LOG, "The recommended tap-hold keys were not imported: %s.", tostring(detail))
+		deferred_notice(notice_key, announce_and_reload)
+	end
+	local armed = DeferredWork.after(TAP_HOLD_IMPORT_TIMEOUT_SEC, function()
+		if settled then return end
+		settle(false, string.format("no answer within %d s", TAP_HOLD_IMPORT_TIMEOUT_SEC),
+			"onboarding.error.tap_holds_import_timeout")
+	end, "onboarding.tap_holds_import_timeout")
+	if armed ~= true then
+		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import runs without it.")
+	end
+	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
+		if settled then
+			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
+				tostring(detail))
+			return
+		end
+		settle(ok, detail, "onboarding.error.tap_holds_import")
 	end)
 end
 
