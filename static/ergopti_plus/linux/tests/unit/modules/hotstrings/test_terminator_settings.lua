@@ -220,6 +220,42 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 	end)
 end)
 
+helpers.describe("word-delimiter settings: a [[hotstrings.terminators]] list", function()
+	-- Readable, but the shared writer cannot update array-of-tables elements:
+	-- every delimiter save refused over it with a writer error that named
+	-- neither the form nor the fix.
+	helpers.it("is read, names its inline form, and lets the states be saved around it", function()
+		local stored = '[hotstrings]\nunknown = "kept"\n\n[[hotstrings.terminators]]\n'
+			.. 'key = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\n'
+		with_settings(stored, function(Settings, path, sandbox, Terminators)
+			local Logger = require("logger.shim")
+			local warn, fail, warnings, errors = Logger.warn, Logger.error, {}, {}
+			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			local passed, failure = pcall(function()
+				helpers.assert_true(Settings.load())
+				helpers.assert_true(has_custom(Terminators, "custom_¤"), "the list is read")
+				local named = false
+				for _, line in ipairs(warnings) do
+					if line:find(path, 1, true) and line:find("terminators = [{", 1, true) then named = true end
+				end
+				helpers.assert_true(named, "the load names the file and the inline form")
+				helpers.assert_true(Terminators.set_terminator_enabled("slash", true))
+				helpers.assert_true(Settings.persist(), "a state change is saved around the list")
+				helpers.assert_eq(Codec.decode(sandbox.read_bytes(path)).hotstrings.terminator_states.slash, true)
+				local before = sandbox.read_bytes(path)
+				helpers.assert_true(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false))
+				helpers.assert_eq(Settings.persist(), false, "a list change cannot be saved over its tables")
+				helpers.assert_eq(sandbox.read_bytes(path), before)
+				helpers.assert_true(#errors > 0 and errors[#errors]:find("terminators = [{", 1, true) ~= nil,
+					"the refusal names the inline form")
+			end)
+			Logger.warn, Logger.error = warn, fail
+			if not passed then error(failure, 0) end
+		end)
+	end)
+end)
+
 helpers.describe("word-delimiter settings: scope adoption and outdated entries", function()
 	helpers.it("adopts a candidate and restores the exact runtime snapshot", function()
 		with_settings(SOURCE, function(Settings, _, _, Terminators)

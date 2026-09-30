@@ -459,6 +459,23 @@ helpers.describe("hotstrings scope: word delimiters", function()
 		end)
 	end
 
+	-- The scope used to delete the user's list, which the shared writer cannot
+	-- address when it is written as [[hotstrings.terminators]] tables, so the
+	-- whole restore refused.
+	helpers.it("resets the shipped delimiters around a [[hotstrings.terminators]] list", function()
+		local source = '[hotstrings]\nunknown = "kept"\n\n[hotstrings.terminator_states]\nspace = false\n'
+			.. '\n[[hotstrings.terminators]]\nkey = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\n'
+		with_scope(function(c)
+			local committed, detail = c.scope.apply("clear")
+			helpers.assert_true(committed, tostring(detail))
+			local config = Codec.decode(read(c.config_path))
+			helpers.assert_nil((config.hotstrings.terminator_states or {}).space)
+			helpers.assert_eq(config.hotstrings.terminators,
+				{ { key = "custom_¤", char = "¤", label = "¤", consume = true } })
+			helpers.assert_true(has_custom("custom_¤"))
+		end, source)
+	end)
+
 	helpers.it("puts the word delimiters back when config.toml publication is refused", function()
 		with_scope(function(c)
 			local Terminators = require("keymap.terminators")
