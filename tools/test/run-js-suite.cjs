@@ -1998,6 +1998,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-false-green-pcall-rejection.cjs'
 	},
 	{
+		name: 'every Hammerspoon deadline keeps 2 s over the native worker budget it waits for (hardening-d)',
+		cmd: 'node',
+		args: ['tools/test/test-hardening-d-native-timeout-contract.cjs'],
+		repro: 'node tools/test/test-hardening-d-native-timeout-contract.cjs'
+	},
+	{
 		name: 'tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)',
 		cmd: 'node',
 		args: ['tools/test/find-false-greens.cjs'],

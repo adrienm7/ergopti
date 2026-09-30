@@ -4,7 +4,7 @@
 --- MODULE: Bulk Edits Still Waiting On The Guardian's First Answer
 --- DESCRIPTION:
 --- A bulk edit is released as saved on the guardian's first non-ready answer.
---- Before that answer (a boot registration takes up to 20 s), a controlled
+--- Before that answer (a boot registration takes up to 25 s), a controlled
 --- reload was refused behind it, and a pause cancelled its retained context as
 --- a failure: the saved edit was reverted with error notices, and the inverse
 --- queued a fresh guardian wait during the pause that pinned the rollback
