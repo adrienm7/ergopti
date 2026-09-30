@@ -1026,8 +1026,12 @@ _RegisterRollsAltGrHotkeys()
 ; ================================
 ; ================================
 
+; Ctrl on the QWERTY V position pastes, like Ctrl on Ergopti's own V (RemapKey).
+; Both emit through _RemapEmit: a SendEvent at this hotkey's SendLevel 2 that the
+; keylogger's paste observer (level 1 and above) sees. SendInput removes the
+; script's own hook while it sends, so the paste it typed was never observed.
 #HotIf IsSet(Features) and Features["layout"]["ergopti_base"]
-^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste doesn't work
+^SC02F:: _RemapEmit("^v", "v")
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
