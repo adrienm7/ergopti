@@ -572,6 +572,16 @@ Test("LLM API entries: second-target refusal restores both old authorities "
 	. "(llm-api-two-target-failure-rollback)",
 	_LMT_ApiSecondTargetFailureRollsEverythingOld)
 
+; The api_entries.json serializer one encryption fixture commits with. A
+; function of its own so the closure reads a parameter: a closure never sees a
+; for-loop variable, so built in the loop it threw an UnsetError, and every
+; fixture was refused for that error instead of for its encryptor's output.
+; @param EncryptFn {Func} The token encryptor under test.
+; @returns {Func} A serializer taking the detached menu candidate.
+_LMT_SerializerEncryptingWith(EncryptFn) {
+	return (MenuState) => _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn)
+}
+
 _LMT_ApiTokenEncryptionFailurePreservesOldImage() {
 	global _LLM_Menu, ConfigurationFile, _PathsFile, _LMT_ApiPath
 	global _LMT_ApplyCalls
@@ -599,8 +609,7 @@ _LMT_ApiTokenEncryptionFailurePreservesOldImage() {
 			["empty envelope", (*) => "dpapi:"],
 			["malformed envelope", (*) => "dpapi:not-base64!"]
 		] {
-			SerializeFn := (MenuState) => _LLM_Menu_SerializeApiEntries(
-				MenuState, Fixture[2])
+			SerializeFn := _LMT_SerializerEncryptingWith(Fixture[2])
 			AssertFalse(_LMT_ApiCommitWithSerializer(SerializeFn),
 				Fixture[1] . " token encryption must refuse the complete transition")
 			AssertEqual(OldApiImage, FSReadUtf8Exact(_LMT_ApiPath),
