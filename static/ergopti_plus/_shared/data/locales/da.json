@@ -3051,6 +3051,8 @@
 	"platform_reason.tray_top_level_rows_are_each_drivers": "Hver drivers bakke bærer de øverste rækker, dens platform har: applikationsværktøjerne på macOS, den indbyggede opdatering på Linux, pauseknappen på Windows. De andre når det samme et andet sted, eller slet ikke.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ikke på Windows: den driver tegner et flagikon på hver sproglinje, og en delt menurække bærer en etiket, et flueben, en handling og en undermenu — ikke et ikon. At erklære rækken dér ville bytte flagene væk for en fælles beskrivelse.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Kun Linux: denne driver læser rå tastekoder fra kernen og skal vide, hvilket fysisk layout der frembragte dem, så den vælger den tabel, den afkoder med. macOS spørger systemet om dets inputkilder, og Windows installerer et tastaturlayout; ingen af dem har en afkodningstabel at vælge.",
+	"platform_reason.no_layout_settings_on_linux": "Ikke på Linux: ingen af de layoutindstillinger, som rækken gendanner, findes i denne driver. Windows gendanner sin layoutemulering og macOS skiftet af inputkilde ved pause; Linux skriver med det XKB-layout, systemet vælger.",
+	"platform_reason.shortcuts_restore_is_composed_on_macos": "Endnu ikke på macOS: dér gemmes tastekombinationerne i Karabiners indstillinger, og kun gendannelsen i menuen Konfiguration bringer dem tilbage sammen med de øvrige genvejsindstillinger.",
 	"metrics_apps.chart_time_series": "Tid",
 	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",

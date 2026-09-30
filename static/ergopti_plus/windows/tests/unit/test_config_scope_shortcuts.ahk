@@ -1,6 +1,9 @@
 ﻿; tests/unit/test_config_scope_shortcuts.ahk
 
-_ScopeShortcutsCase(Mode) {
+; @param {String} Mode "recommended" or "clear".
+; @param {Boolean} FromManifest True to draw the row the Shortcuts submenu
+;   declares (only the restore has one) instead of the agreed command id.
+_ScopeShortcutsCase(Mode, FromManifest := false) {
 	global _PersonalShortcutsRegistry, Features, KeyboardShortcutAssignments, _IniCache
 	global GestureActionParameters, _MenuDispatchCallbacks, KEYBOARD_SHORTCUT_DEFAULTS
 	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
@@ -30,8 +33,14 @@ _ScopeShortcutsCase(Mode) {
 		Factory := "_SC_ScopeCommands"
 		Commands := %Factory%(Fixture.options)
 		Id := Mode == "clear" ? "scope_clear" : "scope_restore"
-		AssertEqual(_ScopeTestRenderCommand(Rendered, "shortcuts_menu", Id, Commands), 1)
+		if FromManifest
+			Drawn := MenuRenderer_AppendCommand(Rendered, "shortcuts_menu", Id, Commands)
+		else
+			Drawn := _ScopeTestRenderCommand(Rendered, "shortcuts_menu", Id, Commands)
+		AssertEqual(Drawn, 1, "the Shortcuts submenu must draw " . Id)
 		ItemId := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", 0, "uint")
+		Assert(ObjPtr(_MenuDispatchCallbacks[ItemId]) == ObjPtr(Commands[Id]),
+			"the drawn row must dispatch the scope command the submenu registers")
 		Receipt := (_MenuDispatchCallbacks[ItemId])()
 		AssertEqual(Receipt["status"], "pending")
 		Parsed := TOML_ParseFreshFile(Fixture.path)
