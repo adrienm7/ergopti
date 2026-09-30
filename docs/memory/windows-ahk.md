@@ -608,6 +608,20 @@ lock on a second real handle reproduces the false receipt without disk exhaustio
 or a fake File object; pair it with unlocked multibyte controls. See vendor
 `TextIO.cpp` (`TextStream::Write`) and `TextIO.h` (`FlushWriteBuffer`, `Handle`).
 
+### project-ahk-child-inherits-every-inheritable-handle
+
+`CreateProcessW` with `bInheritHandles` copies every inheritable handle the
+driver holds at that instant, not just the STARTUPINFO streams. An AHK thread
+can also be interrupted between lines: the interpreter checks its queue every
+5 ms (`LONG_OPERATION_UPDATE`, v2.0.26 `defines.h`). A timer that started a
+second task while the first task's capture handle was still open handed that
+capture to an unrelated child. Symptom (2026-09-30, opening the versions
+window): `tree-owned task N output deletion failed: (32)` after the whole job
+had exited, because the leaked copy did not share delete access. Action: a
+launch lists its streams in `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` and keeps them
+inside Critical (`_SR_TreeCreateSuspended`). Any other inheriting launch does
+the same or is audited in `tools/test/test-windows-child-handle-inheritance.cjs`.
+
 ### project-webview2-bridge-gotchas
 
 WebView2 hosts must retain message subscriptions, wait for navigation readiness,

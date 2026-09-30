@@ -1692,6 +1692,12 @@ const CHECKS = [
 		repro: 'npm run test:windows-llm-accept-injection'
 	},
 	{
+		name: 'Windows children inherit only their own launch streams',
+		cmd: 'node',
+		args: ['tools/test/test-windows-child-handle-inheritance.cjs'],
+		repro: 'npm run test:windows-child-handle-inheritance'
+	},
+	{
 		name: 'Windows cycles a visible prediction once per navigation chord in either keyboard-hook order',
 		cmd: 'node',
 		args: ['tools/test/test-windows-llm-nav-cycle.cjs'],
