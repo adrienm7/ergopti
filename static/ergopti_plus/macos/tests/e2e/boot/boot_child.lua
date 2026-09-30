@@ -11,15 +11,17 @@
 --- Usage: lua boot_child.lua <repo macOS driver> <app root> <machine root>
 ---   <home> <action> <arch> [<settings.lua>, a file returning the hs.settings
 ---   values an older release left in the application's preference domain]
+---   [<machine>, a world.MACHINES name; standard by default]
 --- Arch: the processor `uname -m` names (arm64 or x86_64).
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes).
 --- Output: the driver's log lines, E2E_* observation lines from the world,
---- E2E_FACT key=value lines, and a final E2E_DONE line.
+--- E2E_FACT key=value lines (the lease workers started and the final lease
+--- phase among them), and a final E2E_DONE line.
 --- ==============================================================================
 
-local REPO_DRIVER, APP_ROOT, MACHINE_ROOT, HOME, ACTION, ARCH, SETTINGS_FILE =
-	arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7]
+local REPO_DRIVER, APP_ROOT, MACHINE_ROOT, HOME, ACTION, ARCH, SETTINGS_FILE, MACHINE =
+	arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8]
 assert(REPO_DRIVER and APP_ROOT and MACHINE_ROOT and HOME and ACTION and ARCH,
 	"usage: boot_child.lua <repo driver> <app root> <machine root> <home> <action> <arch>")
 
@@ -54,6 +56,7 @@ local env = World.install(hs, {
 	machine_root = MACHINE_ROOT,
 	home = HOME,
 	arch = ARCH,
+	machine = MACHINE,
 	-- Package-only files: every release has them, a checkout never does.
 	shipped_optional = { [SHARED .. "/build_stamp.txt"] = true },
 })
@@ -141,5 +144,15 @@ elseif ACTION == "open_windows" then
 elseif ACTION ~= "boot" then
 	World.record("SCENARIO_FAILED", "unknown action " .. tostring(ACTION))
 end
+-- What the boot did with its Karabiner lease: a phantom layout change fenced
+-- the boot's activation and started a second worker (layout-name-forms).
+local lease_ok, lease_phase = pcall(function()
+	-- A fresh install stops at the wizard, before the controller exists.
+	local controller = require("platform.remap.lease_controller")
+	if controller.is_initialized() ~= true then return "uninitialized" end
+	return (controller.status())
+end)
+World.record("FACT", "lease_workers=" .. World.lease_workers_started)
+World.record("FACT", "lease_phase=" .. (lease_ok and tostring(lease_phase) or "unreadable"))
 World.flush_logs()
 World.record("DONE", ACTION)
