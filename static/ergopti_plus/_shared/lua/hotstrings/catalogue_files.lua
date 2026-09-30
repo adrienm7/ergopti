@@ -32,17 +32,29 @@ local METADATA_FILES = {
 	["defaults.toml"] = true,
 }
 
+--- Files of other features that live in the configuration folder, which macOS
+--- reads as its hotstrings folder (HotstringsDirPath): the navigation layer,
+--- which the recommended import writes there, and the wrap symbols an older
+--- release left. Read as a category, either one made that folder look like a
+--- copy of the catalogue, so the boot loaded it instead of the bundled
+--- categories and lost every shipped hotstring (hardening-a-startup-zero-error).
+local CONFIGURATION_FILES = {
+	["layers.toml"] = true,
+	["wrap_symbols.toml"] = true,
+}
+
 --- Whether a file found in a hotstrings directory is a category to load.
 ---
 --- Underscore-prefixed files are metadata by convention; defaults.toml predates
---- that convention and is named explicitly.
+--- that convention and is named explicitly, as are the configuration files
+--- that share the folder.
 --- @param path string A file name or path.
 --- @return boolean
 function M.is_category_file(path)
 	if type(path) ~= "string" or path == "" then return false end
 	local name = path:match("([^/\\]+)$")
 	if not name or not name:match("%.toml$") then return false end
-	return name:sub(1, 1) ~= "_" and not METADATA_FILES[name]
+	return name:sub(1, 1) ~= "_" and not METADATA_FILES[name] and not CONFIGURATION_FILES[name]
 end
 
 return M
