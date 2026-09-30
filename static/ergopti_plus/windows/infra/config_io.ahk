@@ -1585,27 +1585,41 @@ global SCRIPT_SHORTCUT_SUSPEND_ALLOWED := Map(
 		"open_personal_shortcuts", true,
 )
 
-RunScriptShortcutAction(Slot) {
-		global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_FALLBACKS
-		global SCRIPT_SHORTCUT_SUSPEND_ALLOWED
-		Action := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-		if (Action == "none") {
-				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
-				return
-		}
-		if !GESTURE_ACTIONS.Has(Action) {
-				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
-				return
-		}
+; Whether the chords of a script slot belong to the driver right now: the slot
+; runs a catalogue action and, while the driver is paused, only a script-management
+; one. Every chord hotkey asks this in its #HotIf (ScriptAltGrChordPlan), so an
+; unassigned slot leaves AltGr+Enter, BackSpace, Delete or Escape to the system.
+; It used to take the chord anyway and retype the bare key, so AltGr+Entrée typed
+; Entrée in a configuration without an assignment, where the system gets
+; AltGr+Enter (script-chord-slot-2026-09-30).
+; @param Slot {String} A SCRIPT_SHORTCUT_SLOTS id; any other id is a caller bug.
+; @param Suspended {Boolean} The pause state to judge by; A_IsSuspended by default.
+; @return {Boolean}
+ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
+		global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_SUSPEND_ALLOWED
+		if !ScriptShortcutAssignments.Has(Slot)
+				throw ValueError("Unknown script shortcut slot.", -1, Slot)
+		Action := ScriptShortcutAssignments[Slot]
+		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
+				return false
 		; While suspended these chords stay armed ONLY for script management. Without this
 		; scope check the exemption silently widened to whatever the user assigned, so a
-		; paused driver still fired arbitrary gesture actions. Fall back to the slot's
-		; native key instead, exactly like an unassigned slot.
-		if (A_IsSuspended and !SCRIPT_SHORTCUT_SUSPEND_ALLOWED.Has(Action)) {
+		; paused driver still fired arbitrary gesture actions.
+		return !Suspended or SCRIPT_SHORTCUT_SUSPEND_ALLOWED.Has(Action)
+}
+
+RunScriptShortcutAction(Slot) {
+		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_FALLBACKS
+		if !ScriptShortcutSlotRunsAction(Slot) {
+				; The chord's #HotIf admitted this slot at the press, so only a pause
+				; that began before this thread ran gets here: the chord was already
+				; taken, and its key is the one thing left to give back.
+				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused since the press); sending its key instead.",
+						Slot, ScriptShortcutAssignments[Slot])
 				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
 				return
 		}
-		GestureInvokeAction(Action, GestureBindingId("script", Slot))
+		GestureInvokeAction(ScriptShortcutAssignments[Slot], GestureBindingId("script", Slot))
 }
 
 SetScriptShortcutAction(Slot, ActionName) {

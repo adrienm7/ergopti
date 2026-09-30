@@ -1704,6 +1704,12 @@ const CHECKS = [
 		repro: 'npm run test:llm-nav-chord-contract'
 	},
 	{
+		name: 'Windows script chords belong to the driver only while their slot runs an action',
+		cmd: 'node',
+		args: ['tools/test/test-windows-script-chords-follow-their-slot.cjs'],
+		repro: 'npm run test:windows-script-chords-follow-their-slot'
+	},
+	{
 		name: 'Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation',
 		cmd: 'node',
 		args: ['tools/test/test-windows-hotstring-preview-shows.cjs'],

@@ -69,10 +69,16 @@ _ADSG_CheckActionAlwaysRuns() {
 }
 
 _ADSG_CheckSuspendedFallbackHotkeysStillRegistered() {
+	; The registrar registers the rows of ScriptAltGrChordPlan, whose paused twin
+	; of each slot lives under ScriptAltGrPausedChordRunsSlot (script-chord-slot-2026-09-30).
 	Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-	Assert(Body != "", "_RegisterScriptAltGrHotkeys must be present in infra/script_altgr_hotkeys.ahk")
-	Assert(InStr(Body, "A_IsSuspended and GetKeyState(") > 0,
-		"_RegisterScriptAltGrHotkeys must still register the dedicated already-suspended fallback hotkeys (SC01C/SC00E/SC153/SC001 gated on A_IsSuspended) so paused-state control stays reachable")
+	Assert(InStr(Body, "ScriptAltGrChordPlan(") > 0,
+		"_RegisterScriptAltGrHotkeys must register the script chords of ScriptAltGrChordPlan")
+	Plan := _DriverFuncBody("ScriptAltGrChordPlan")
+	Assert(InStr(Plan, '"$*" . Sc') > 0 and InStr(Plan, "ScriptAltGrPausedChordRunsSlot.Bind(Slot)") > 0,
+		"the plan must still register the dedicated already-suspended fallback hotkeys (SC01C/SC00E/SC153/SC001) so paused-state control stays reachable")
+	Assert(InStr(_DriverFuncBody("ScriptAltGrPausedChordRunsSlot"), "A_IsSuspended and GetKeyState(") > 0,
+		"the paused twins must be gated on A_IsSuspended and the physical SC138")
 }
 
 
@@ -87,13 +93,16 @@ Test("meta altgr-dispatch-suspend-guard: suspended-state fallback hotkeys remain
 ; whatever the user assigned — a paused driver still fired arbitrary gesture actions,
 ; breaking "pause = tout éteint".
 _ADSG_SuspendExemptionIsScopedToManagement() {
+	; The pause check moved into ScriptShortcutSlotRunsAction, which every chord's
+	; #HotIf and RunScriptShortcutAction ask (script-chord-slot-2026-09-30).
 	Body := _DriverFuncBody("RunScriptShortcutAction")
 	Assert(Body != "", "RunScriptShortcutAction must exist in infra/config_io.ahk")
-	GatePos := InStr(Body, "A_IsSuspended")
+	GatePos := InStr(Body, "ScriptShortcutSlotRunsAction(Slot)")
 	InvokePos := InStr(Body, "GestureInvokeAction(")
 	Assert(GatePos > 0 && InvokePos > GatePos,
-		"RunScriptShortcutAction must check A_IsSuspended BEFORE invoking the action, so a paused driver cannot run an arbitrary assignment")
-	Assert(InStr(Body, "SCRIPT_SHORTCUT_SUSPEND_ALLOWED") > 0,
+		"RunScriptShortcutAction must ask ScriptShortcutSlotRunsAction BEFORE invoking the action, so a paused driver cannot run an arbitrary assignment")
+	Gate := _DriverFuncBody("ScriptShortcutSlotRunsAction")
+	Assert(InStr(Gate, "Suspended := A_IsSuspended") > 0 and InStr(Gate, "SCRIPT_SHORTCUT_SUSPEND_ALLOWED") > 0,
 		"the suspended path must consult the script-management allowlist")
 
 	Allow := _DriverSourceConcat()
