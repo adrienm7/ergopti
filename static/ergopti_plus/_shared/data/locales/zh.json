@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "MLX 软件包已安装，但无法加载。",
 	"mlx.cause_python": "安装所用的 Python 无法运行 MLX。",
 	"mlx.cause_no_native_python": "未安装为此 Mac 构建的 Python 3，无法运行安装。",
+	"mlx.cause_venv_not_native": "MLX 环境是用适用于其他处理器（{1}）的 Python 构建的：macOS 会通过 Rosetta 运行它，因此不会启动。",
 	"mlx.cause_gatekeeper": "macOS 安全功能（Gatekeeper）阻止了 MLX 安装中的一个文件。",
 	"mlx.cause_exit": "安装已停止，代码为 {1}。",
 	"mlx.unsupported_title": "此 Mac 无法使用 MLX",

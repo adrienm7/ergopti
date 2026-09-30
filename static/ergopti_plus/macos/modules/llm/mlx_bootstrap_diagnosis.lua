@@ -90,7 +90,7 @@ local SIGNATURES = {
 local REPAIRABLE = {
 	developer_tools = true, gatekeeper = true, permission = true,
 	disk_full = true, import_failed = true, python = true, network = true,
-	exit = true,
+	exit = true, venv_not_native = true,
 }
 
 -- Message key per kind.
@@ -308,6 +308,10 @@ function M.cause_sentence(cause)
 	end
 	if kind == "foreign_path" then
 		return i18n().format("mlx.cause_foreign_path", tostring(cause.path))
+	end
+	if kind == "venv_not_native" then
+		-- Named from the interpreter's header (mlx_deps_checker); never started.
+		return i18n().format("mlx.cause_venv_not_native", tostring(cause.archs or "?"))
 	end
 	if kind == "developer_tools" then
 		return i18n().format("mlx.cause_developer_tools", i18n().get("mlx.repair_button"))

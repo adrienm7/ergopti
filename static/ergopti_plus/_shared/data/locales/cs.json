@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "Balíčky MLX jsou nainstalované, ale nenačtou se.",
 	"mlx.cause_python": "Python, který instalace používá, nedokáže spustit MLX.",
 	"mlx.cause_no_native_python": "Pro spuštění instalace není nainstalován žádný Python 3 sestavený pro tento Mac.",
+	"mlx.cause_venv_not_native": "Prostředí MLX bylo sestaveno s Pythonem pro jiný procesor ({1}): macOS by ho spouštěl přes Rosettu, proto se nespouští.",
 	"mlx.cause_gatekeeper": "Zabezpečení macOS (Gatekeeper) zablokovalo soubor instalace MLX.",
 	"mlx.cause_exit": "Instalace skončila s kódem {1}.",
 	"mlx.unsupported_title": "MLX není na tomto Macu k dispozici",
