@@ -331,6 +331,8 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		for index, row in ipairs(rows) do drawn[index] = row.title end
 		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
 			i18n.get("common.restore_recommended"),
+			i18n.get("common.clear_to_system"),
+			"-",
 			i18n.get("menu.global.clean_unused_keys"),
 			"-",
 			CONFIG_FOLDER,

@@ -18,6 +18,9 @@
 --- 2. Layout Awareness: macOS can emit two input-source notifications in rapid
 ---    succession during a layout switch. Debouncing coalesces them into a
 ---    single callback so the caller does not rebuild the KE config twice.
+---    One layout has two names: hs.keycodes gives its localised name
+---    ("Ergopti+"), HIToolbox its KeyboardLayout Name ("Ergopti_v2_2_2_plus").
+---    Each is compared only with a name of its own form (layout-name-forms).
 --- 3. Window Cycling: Cycles focus through standard windows of the active app
 ---    directly via the Hammerspoon API, bypassing the macOS Cmd+` shortcut
 ---    which is layout-dependent and inactive on some keyboard layouts (AZERTY).
@@ -74,9 +77,16 @@ local KARABINER_CLI_UNKNOWN_OPTION_EXIT = 2
 -- window supersede the previous one instead of triggering parallel rebuilds.
 local _input_source_timer = nil
 
--- Last known layout name — used by the HIToolbox poll to detect changes when
--- hs.keycodes.inputSourceChanged is unreliable (Sequoia regression).
+-- Last known layout as HIToolbox names it (KeyboardLayout Name) — used by the
+-- HIToolbox poll to detect changes when hs.keycodes.inputSourceChanged is
+-- unreliable (Sequoia regression). Nil until the watcher's first read adopts it.
 local _last_known_layout = nil
+-- The same layout as hs.keycodes names it (its localised name). Only the read
+-- that adopts the HIToolbox baseline, and a notification whose HIToolbox read
+-- failed, compare against it (layout-name-forms).
+local _last_known_cached_layout = nil
+-- A notification arrived before the HIToolbox baseline existed.
+local _notification_before_baseline = false
 
 -- Poll interval for the HIToolbox fallback watcher.
 -- Shared cross-driver value ([ui] layout_poll_ms).
@@ -709,12 +719,16 @@ end
 -- =======================================
 
 --- Parses the KeyboardLayout Name out of `defaults read … AppleSelectedInputSources`.
+--- `defaults` always quotes that key (it holds a space) and quotes a value
+--- only when it is not purely alphanumeric: `"KeyboardLayout Name" = ABC;`
+--- but `"KeyboardLayout Name" = "Ergopti_v2_2_2_plus";`. The bare form used to
+--- match nothing, so the poll never resolved an ABC or French layout.
 --- @param raw string|nil The raw `defaults` output.
 --- @return string|nil The layout name, or nil when absent.
 local function parse_layout_name(raw)
 	if type(raw) ~= "string" or raw == "" then return nil end
 	return raw:match('"KeyboardLayout Name"%s*=%s*"([^"]+)"')
-		or raw:match("KeyboardLayout Name%s*=%s*([^;%s]+)")
+		or raw:match('"KeyboardLayout Name"%s*=%s*([%w]+)%s*;')
 end
 
 --- Reads Hammerspoon's cached layout exactly once under exception protection.
@@ -789,10 +803,14 @@ local function read_layout_async(callback)
 	return true
 end
 
---- Fires the on_change callback with proper debouncing, updating _last_known_layout.
+--- Fires the on_change callback with proper debouncing, updating both layout
+--- names. A change seen only in the localised form leaves the HIToolbox
+--- baseline to the next read, which adopts it without reporting it again.
 --- @param on_change fun(layout_name: string)
 --- @param layout_name string
-local function fire_layout_change(on_change, layout_name, watcher_gen)
+--- @param watcher_gen integer Watcher generation that observed the change.
+--- @param hitoolbox_name string|nil The new KeyboardLayout Name, when read.
+local function fire_layout_change(on_change, layout_name, watcher_gen, hitoolbox_name)
 	if _input_source_timer then
 		if not stop_native_watcher(_input_source_timer, "Superseded input-source debounce timer") then
 			retain_cleanup_handle(_input_source_timer_cleanup_backlog, _input_source_timer)
@@ -804,7 +822,8 @@ local function fire_layout_change(on_change, layout_name, watcher_gen)
 		if _input_source_timer ~= timer then return end
 		_input_source_timer = nil
 		if watcher_gen ~= _input_source_watcher_gen then return end
-		_last_known_layout  = layout_name
+		_last_known_layout = hitoolbox_name
+		_last_known_cached_layout = read_current_layout_safe()
 		local ok_cb, err = pcall(on_change, layout_name)
 		if not ok_cb then
 			Logger.error(LOG, "Input source change handler failed: %s.", tostring(err))
@@ -904,10 +923,16 @@ function M.start_input_source_watcher(on_change)
 	_input_source_watcher_gen = _input_source_watcher_gen + 1
 	local watcher_gen = _input_source_watcher_gen
 
-	-- Seed without spawning. The unified asynchronous refresh below resolves the
-	-- authoritative HIToolbox value after native watcher ownership commits.
-	_last_known_layout = read_current_layout_safe()
-	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
+	-- Seed only the localised name without spawning: the first asynchronous
+	-- read adopts the HIToolbox name after native watcher ownership commits.
+	-- The two forms differ for an Ergopti layout ("Ergopti+" against
+	-- "Ergopti_v2_2_2_plus"), and comparing them reported a layout change at
+	-- the first poll of every boot, which fenced the boot's lease activation
+	-- in flight (layout-name-forms).
+	_last_known_layout = nil
+	_notification_before_baseline = false
+	_last_known_cached_layout = read_current_layout_safe()
+	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_cached_layout))
 
 	local run_layout_refresh = nil
 	local notification_before_refresh_ready = false
@@ -917,6 +942,7 @@ function M.start_input_source_watcher(on_change)
 		if watcher_gen ~= _input_source_watcher_gen then return end
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
 			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
+		if _last_known_layout == nil then _notification_before_baseline = true end
 		if type(run_layout_refresh) ~= "function" then
 			-- A hostile broker may deliver synchronously from subscribe(). Replay only
 			-- after the poll timer and every cleanup owner have committed.
@@ -1031,17 +1057,37 @@ function M.start_input_source_watcher(on_change)
 				end
 				_layout_poll_watchdog = nil
 			end
-			if not current and refresh_source == "notification" then
-				current = read_current_layout_safe()
-			end
-			if current and current ~= _last_known_layout then
+			if current and _last_known_layout == nil then
+				-- The first HIToolbox name has nothing of its form to be compared with.
+				-- It is adopted unless a notification arrived before it, or the
+				-- localised name moved since the seed: either way the layout may have
+				-- changed after the build read it, so a change is reported.
+				local notified = refresh_source == "notification" or _notification_before_baseline
+				_notification_before_baseline = false
+				local cached = read_current_layout_safe()
+				if notified or cached ~= _last_known_cached_layout then
+					Logger.info(LOG, "Layout %s detected change before its baseline: '%s' → '%s'.",
+						refresh_source, tostring(_last_known_cached_layout), current)
+					fire_layout_change(on_change, current, watcher_gen, current)
+				else
+					_last_known_layout = current
+					Logger.debug(LOG, "Layout baseline adopted from HIToolbox: '%s'.", current)
+				end
+			elseif current and current ~= _last_known_layout then
 				Logger.info(LOG, "Layout %s detected change: '%s' → '%s'.",
 					refresh_source,
 					tostring(_last_known_layout), current)
-				fire_layout_change(on_change, current, watcher_gen)
+				fire_layout_change(on_change, current, watcher_gen, current)
 			elseif not current and refresh_source == "notification" then
-				Logger.warn(LOG,
-					"Input source notification could not resolve a layout; waiting for poll recovery.")
+				local cached = read_current_layout_safe()
+				if cached and cached ~= _last_known_cached_layout then
+					Logger.info(LOG, "Layout notification detected change: '%s' → '%s'.",
+						tostring(_last_known_cached_layout), cached)
+					fire_layout_change(on_change, cached, watcher_gen, nil)
+				elseif not cached then
+					Logger.warn(LOG,
+						"Input source notification could not resolve a layout; waiting for poll recovery.")
+				end
 			end
 		end)
 		if read_started ~= true then

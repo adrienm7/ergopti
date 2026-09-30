@@ -9,7 +9,7 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 	return _MR_RenderCommand(TargetMenu, Item, MenuKey, Commands, Map())
 }
 
-_ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
+_ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"]) {
 	global _MenuDispatchCallbacks
 	Fixture := _ScopeOwnerFixture()
 	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
@@ -23,7 +23,9 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 	Fixture.options["reload"] := Launch
 	try {
 		Commands := %Factory%(Fixture.options)
-		for Mode in ["recommended", "clear"] {
+		if Modes.Length == 1
+			Assert(!Commands.Has("scope_clear"), MenuKey . " offers the restore alone")
+		for Mode in Modes {
 			Fixture.options["stamp"] := Mode
 			Id := Mode == "clear" ? "scope_clear" : "scope_restore"
 			Rendered := Menu()
@@ -76,9 +78,10 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 Test("config-scope-menu: layout commands publish only their scope and recover refusal",
 	_ScopeMenuCommandsCase.Bind("keyboard_layout", "_LAY_ScopeCommands", "layout_menu"))
 Test("config-scope-menu: LLM commands preserve credentials and recover refusal",
-	_ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu"))
-Test("config-scope-menu: metrics commands preserve consent on restore and recover refusal",
-	_ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu"))
+	_ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu", ["recommended"]))
+; The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
+Test("config-scope-menu: metrics restore preserves consent, recovers refusal, and has no clear",
+	_ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu", ["recommended"]))
 
 _ScopeMenuAbsentConsent() {
 	for Factory in ["_LLM_ScopeCommands", "_MET_ScopeCommands"] {
@@ -108,3 +111,26 @@ _ScopeMenuAbsentConsent() {
 	}
 }
 Test("config-scope-menu: recommendations never create LLM or metrics consent", _ScopeMenuAbsentConsent)
+
+; ai-menu-no-clear. The AI menu showed « Tout effacer (comportement du
+; système) » under its switch, which leaves nothing the system would do in
+; the AI's place; the maintainer retired it on 2026-09-30. The declaration and
+; the command factory both lose it, while the restore row stays.
+_ScopeMenuLlmHasNoClear() {
+	Commands := _LLM_ScopeCommands()
+	Assert(Commands.Has("scope_restore"), "the AI menu keeps its restore command")
+	AssertFalse(Commands.Has("scope_clear"), "the AI menu registers no clear command")
+	Declared := _MR_GetMenuDef("llm_menu")
+	Assert(Declared is Array && Declared.Length > 0, "the AI menu declaration must be readable")
+	Restores := 0
+	for Row in Declared {
+		Id := _MR_Get(Row, "id", "")
+		AssertFalse(Id == "scope_clear", "the AI menu declares no clear row")
+		AssertFalse(_MR_Get(Row, "i18n", "") == "common.clear_to_system",
+			"no AI row reads the clear label")
+		if Id == "scope_restore"
+			Restores += 1
+	}
+	AssertEqual(1, Restores, "the AI menu declares its restore row once")
+}
+Test("ai-menu-no-clear: the AI menu declares and registers the restore alone", _ScopeMenuLlmHasNoClear)

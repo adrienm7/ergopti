@@ -1,15 +1,16 @@
 --- tests/unit/ui/test_restore_recommended_no_confirm.lua
 
 --- ==============================================================================
---- MODULE: Restore Recommended Values Asks Nothing (Linux)
+--- MODULE: Restore And Clear Ask Nothing (Linux)
 --- DESCRIPTION:
 --- Regression restore-recommended-no-confirm. Every « Restaurer les valeurs
 --- conseillées » row of the tray used to open a default-No zenity question
 --- before it applied, and the maintainer retired that step: a restore is
---- recoverable through the backup its owner writes first. Each case clicks the
---- real tray row with zenity answering No, so a question that came back would
---- also stop the restore, and checks that the recommended values were applied.
---- The clear row beside it removes the section's settings and keeps its question.
+--- recoverable through the backup its owner writes first. On 2026-09-30 he
+--- retired the « Tout effacer » question too, per menu and global alike, for
+--- parity with Windows, which never asked. Each case clicks the real tray row
+--- with zenity answering No, so a question that came back would also stop the
+--- row, and checks that the values were applied after the backup.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -27,8 +28,7 @@ local function with_zenity_answering_no(body)
 	local previous_modal = package.loaded["ui.modal"]
 	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
-		if command:find("command -v zenity", 1, true) then return 0 end
-		if command:find("zenity --question", 1, true) then
+		if command:find("zenity", 1, true) then
 			asked[#asked + 1] = command
 			return 1
 		end
@@ -109,17 +109,17 @@ helpers.describe("restore-recommended-no-confirm: Gestures (Linux)", function()
 		end)
 	end)
 
-	helpers.it("the clear row still asks, and a No leaves the file and the reader untouched", function()
+	helpers.it("the clear row applies at once after its backup, without a question", function()
 		with_gestures(function(gestures, path, backups)
 			local ctx = { _version = "test", gestures = gestures, on_menu_changed = function() end }
 			local row = tray_row(ctx, "menu.gestures.title", "common.clear_to_system")
 			helpers.assert_true(row ~= nil and type(row.fn) == "function", "the real Gestures clear row")
 			local asked = with_zenity_answering_no(function() row.fn() end)
-			helpers.assert_eq(#asked, 1)
-			helpers.assert_contains(asked[1], "--default-cancel")
-			helpers.assert_eq(#backups, 0)
-			helpers.assert_eq(Sandbox.read_bytes(path), GESTURE_SOURCE)
-			helpers.assert_true(gestures.is_enabled())
+			helpers.assert_eq(#asked, 0, "clearing asks nothing either")
+			helpers.assert_eq(#backups, 1)
+			helpers.assert_eq(Sandbox.read_bytes(backups[1]), GESTURE_SOURCE, "the backup is written before the clear")
+			helpers.assert_eq(gestures.is_enabled(), false)
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).other.value, 42)
 		end)
 	end)
 end)
@@ -167,37 +167,39 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (Linux)", function()
 		end)
 	end)
 
-	helpers.it("the clear row still asks, and a No runs nothing", function()
+	helpers.it("the clear row runs the clear scope without a question", function()
 		with_tap_holds(function(ctx, calls)
 			local row = tray_row(ctx, "menu.tapholds.title", "common.clear_to_system")
 			helpers.assert_true(row ~= nil and type(row.fn) == "function", "the real Tap-Holds clear row")
 			local asked = with_zenity_answering_no(function() row.fn() end)
-			helpers.assert_eq(#asked, 1)
-			helpers.assert_contains(asked[1], require("infra.i18n").get("common.clear_to_system"))
-			helpers.assert_eq(calls, {})
+			helpers.assert_eq(#asked, 0, "clearing asks nothing either")
+			helpers.assert_eq(calls, { "clear" })
 		end)
 	end)
 end)
 
 helpers.describe("restore-recommended-no-confirm: Configuration (Linux)", function()
-	helpers.it("the global restore composes every category without a question", function()
-		local names = { "infra.global_scope", "ui.menu.menu_builder" }
-		local saved = {}
-		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-		local calls = {}
-		local ok, err = pcall(function()
-			package.loaded["infra.global_scope"] = {
-				participants = function() calls[#calls + 1] = "participants"; return {} end,
-				apply = function(mode) calls[#calls + 1] = mode; return true, { reverted = nil } end,
-			}
-			local ctx = { _version = "test", on_quit = function() end, is_paused = function() return false end }
-			local row = tray_row(ctx, "menu.configuration.title", "common.restore_recommended")
-			helpers.assert_true(row ~= nil and type(row.fn) == "function", "the real Configuration restore row")
-			local asked = with_zenity_answering_no(function() row.fn() end)
-			helpers.assert_eq(#asked, 0, "restoring the recommended values asks nothing")
+	for _, case in ipairs({ { key = "common.restore_recommended", mode = "recommended" },
+		{ key = "common.clear_to_system", mode = "clear" } }) do
+		helpers.it("the global " .. case.mode .. " composes every category without a question", function()
+			local names = { "infra.global_scope", "ui.menu.menu_builder" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local calls = {}
+			local ok, err = pcall(function()
+				package.loaded["infra.global_scope"] = {
+					participants = function() calls[#calls + 1] = "participants"; return {} end,
+					apply = function(mode) calls[#calls + 1] = mode; return true, { reverted = nil } end,
+				}
+				local ctx = { _version = "test", on_quit = function() end, is_paused = function() return false end }
+				local row = tray_row(ctx, "menu.configuration.title", case.key)
+				helpers.assert_true(row ~= nil and type(row.fn) == "function", "the real Configuration " .. case.mode .. " row")
+				local asked = with_zenity_answering_no(function() row.fn() end)
+				helpers.assert_eq(#asked, 0, "neither Configuration row asks")
+			end)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+			helpers.assert_eq(calls, { "participants", case.mode })
 		end)
-		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-		if not ok then error(err, 0) end
-		helpers.assert_eq(calls, { "participants", "recommended" })
-	end)
+	end
 end)

@@ -76,4 +76,21 @@ helpers.describe("IA submenu on/off row", function()
 		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.enable")
 		helpers.assert_eq(rows[1] and rows[1].checked, true)
 	end)
+
+	-- ai-menu-no-clear: « Tout effacer (comportement du système) » sat under the
+	-- switch and cleared a section with nothing for the system to do in its
+	-- place; the maintainer retired it, and « Restaurer les valeurs conseillées »
+	-- stays the only row between the switch and the separator.
+	helpers.it("draws the restore row under the switch and no clear row", function()
+		local _, render_ctx = build_item(true)
+		helpers.assert_nil(render_ctx.commands["scope_clear"], "the AI menu registers no clear command")
+		local rows = render(render_ctx)
+		helpers.assert_eq(rows[2] and rows[2].title, "common.restore_recommended",
+			"the restore row follows the switch")
+		helpers.assert_eq(type(rows[2].fn), "function", "the restore row runs its scope command")
+		for index, row in ipairs(rows) do
+			helpers.assert_true(row.title ~= "common.clear_to_system",
+				"row " .. index .. " of the AI submenu is a clear row")
+		end
+	end)
 end)

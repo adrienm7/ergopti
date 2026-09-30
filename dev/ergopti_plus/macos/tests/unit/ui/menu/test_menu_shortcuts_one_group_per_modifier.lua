@@ -86,7 +86,17 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 	helpers.it("draws the wrap-text toggle with a title", function()
 		local rows = render_shortcuts_submenu()
 		helpers.assert_eq(rows[1].title, "menu.shortcuts.enable", "the submenu opens with its category switch")
-		helpers.assert_eq(rows[2].title, "-", "a separator sets the switch apart")
+		-- The first group (2026-09-30): the restore and the clear follow the
+		-- switch, greyed here because the Shortcuts scope is not yet ported to
+		-- macOS, then a separator sets the group apart.
+		for index, key in ipairs({ "common.restore_recommended", "common.clear_to_system" }) do
+			local row = rows[index + 1]
+			helpers.assert_true(type(row.title) == "string" and row.title:find(key, 1, true) == 1,
+				key .. " must follow the switch, got " .. tostring(row.title))
+			helpers.assert_eq(row.disabled, true, key .. " is greyed on macOS")
+			helpers.assert_nil(row.fn, key .. " runs nothing on macOS")
+		end
+		helpers.assert_eq(rows[4].title, "-", "a separator closes the first group")
 		-- The number-row tap keys follow the category switch and replace the fixed
 		-- screenshot key; the wrap-text toggle is the first row after them.
 		local wrap = nil
@@ -99,8 +109,26 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 		helpers.assert_true(wrap ~= nil, "the wrap-text toggle must be drawn with its title")
 		helpers.assert_true(type(wrap.fn) == "function", "the wrap-text toggle must be clickable")
 		-- A section header is drawn with its dash decoration around the label.
-		helpers.assert_true(type(rows[3].title) == "string"
-			and rows[3].title:find("menu.shortcuts.header_tap_keys", 1, true) ~= nil,
-			"the tap keys follow the category switch under their header")
+		helpers.assert_true(type(rows[5].title) == "string"
+			and rows[5].title:find("menu.shortcuts.header_tap_keys", 1, true) ~= nil,
+			"the tap keys follow the first group under their header")
+	end)
+
+	-- The maintainer's request of 2026-09-30: the wrap-text toggle reads as its
+	-- behaviour alone (no « AltGr + symbole » trigger: the symbols need not be on
+	-- AltGr), and « Symboles encadrants » follows it with no line between them.
+	helpers.it("draws the wrap-text toggle as its behaviour, grouped with its symbols", function()
+		local rows = render_shortcuts_submenu()
+		local at = nil
+		for index, entry in ipairs(rows) do
+			if entry.title == "Wrap" then at = index end
+		end
+		helpers.assert_true(at ~= nil, "the wrap-text toggle is labelled by its behaviour alone")
+		helpers.assert_eq(rows[at + 1].title, "menu.shortcuts.wrap_symbols",
+			"the wrapping symbols follow the toggle with no separator between them")
+		for _, entry in ipairs(rows) do
+			helpers.assert_true(type(entry.title) ~= "string" or not entry.title:find("altgr", 1, true),
+				"no row names the retired AltGr trigger: " .. tostring(entry.title))
+		end
 	end)
 end)

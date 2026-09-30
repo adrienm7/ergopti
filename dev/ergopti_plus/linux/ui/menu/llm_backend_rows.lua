@@ -19,11 +19,15 @@
 ---    offered for its key like any other, but its entry never becomes the
 ---    predictions' one: it is listed with its own test and removal, and adding
 ---    it keeps the entry predictions already use.
+--- 5. Every entry reads <provider>/<model>, told apart by host then order when
+---    two share it (_shared/lua/llm/api_entry_names.lua), on every driver. The
+---    label an entry stores is written for older builds and never read.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
+local EntryNames = require("llm.api_entry_names")
 
 local LOG = "ui.menu.llm_backend_rows"
 -- The characters of a test reply shown in the verdict, as on macOS.
@@ -46,21 +50,41 @@ local function fill(template, values)
 	return (template:gsub("{(%d+)}", function(index) return tostring(values[tonumber(index)] or "") end))
 end
 
+--- The automatic name of every entry, by id: <provider>/<model>, with the
+--- model and address its requests use.
+--- @param remote table api_remote
+--- @param list table The entries, in their order.
+--- @return table names Entry id -> name.
+local function entry_names(remote, list)
+	local resolved = {}
+	for index, entry in ipairs(list) do
+		local provider = remote.provider(entry.provider) or {}
+		resolved[index] = {
+			provider = entry.provider,
+			model = entry.model ~= "" and entry.model or (provider.default_model or ""),
+			base_url = entry.base_url ~= "" and entry.base_url or (provider.base_url or ""),
+		}
+	end
+	local names = {}
+	for index, name in ipairs(EntryNames.names(resolved)) do names[list[index].id] = name end
+	return names
+end
+
 --- Reports a test verdict.
 --- @param dialogs table
---- @param entry table
+--- @param name string The entry's automatic name.
 --- @param ok boolean
 --- @param detail string
 --- @param elapsed_ms number
-local function report_test(dialogs, entry, ok, detail, elapsed_ms)
+local function report_test(dialogs, name, ok, detail, elapsed_ms)
 	if ok then
 		local reply = tostring(detail or "")
 		if #reply > TEST_REPLY_PREVIEW then reply = reply:sub(1, TEST_REPLY_PREVIEW) .. "..." end
 		dialogs.info(tr("menu.llm.api_test_ok_title"),
-			fill(tr("menu.llm.api_test_ok_body"), { entry.label, math.floor(elapsed_ms or 0), reply }))
+			fill(tr("menu.llm.api_test_ok_body"), { name, math.floor(elapsed_ms or 0), reply }))
 		return
 	end
-	local body = (tr("menu.llm.api_unreachable_body"):gsub("%%s", function() return entry.label end))
+	local body = (tr("menu.llm.api_unreachable_body"):gsub("%%s", function() return name end))
 	dialogs.error(body .. "\n" .. tostring(detail or ""), tr("menu.llm.api_unreachable_title"))
 end
 
@@ -68,12 +92,13 @@ end
 --- @param remote table api_remote
 --- @param dialogs table
 --- @param entry table
-local function run_test(remote, dialogs, entry)
+--- @param name string The entry's automatic name.
+local function run_test(remote, dialogs, entry, name)
 	local dispatched = remote.test(entry, function(ok, detail, elapsed_ms)
-		Logger.info(LOG, "API test of '%s': %s.", entry.label, ok and "answered" or "failed")
-		report_test(dialogs, entry, ok, detail, elapsed_ms)
+		Logger.info(LOG, "API test of '%s': %s.", name, ok and "answered" or "failed")
+		report_test(dialogs, name, ok, detail, elapsed_ms)
 	end)
-	if not dispatched then Logger.warn(LOG, "API test of '%s' could not be sent.", entry.label) end
+	if not dispatched then Logger.warn(LOG, "API test of '%s' could not be sent.", name) end
 end
 
 --- Asks for a provider's key (and URL and model where needed), stores the
@@ -108,10 +133,12 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 
 	local chat = remote.serves(provider.id, "chat")
 	local previous = entries.active()
+	-- The label is required by the builds before 2026-10 that read this file;
+	-- it holds the automatic name and no tray reads it.
 	local entry, err = entries.add({
 		provider = provider.id,
 		token = token,
-		label = provider.label,
+		label = provider.id .. "/" .. model,
 		model = model ~= provider.default_model and model or "",
 		base_url = base_url,
 	})
@@ -124,27 +151,28 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	else
 		-- Only the agent's System 1 reads this key: predictions keep their entry.
 		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
-			entry.label)
+			entry.id)
 		if previous and entries.set_active(previous.id) ~= true then
-			Logger.error(LOG, "The predictions' API entry '%s' could not be selected again.", previous.label)
+			Logger.error(LOG, "The predictions' API entry '%s' could not be selected again.", previous.id)
 		end
 	end
 	if type(on_changed) == "function" then on_changed() end
-	run_test(remote, dialogs, entry)
+	run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id])
 end
 
 --- The name of the model that answers predictions: the active API entry's
---- under the API backend, as macOS and Windows show it, else Ollama's model.
+--- automatic name under the API backend, as macOS and Windows show it, else
+--- Ollama's model.
 --- @param llm table Prediction engine.
 --- @param backend string The selected backend.
+--- @param remote table|nil The api_remote module, nil when it cannot load.
 --- @param entries table|nil The API entries module, nil when it cannot load.
 --- @return string|nil name Nil when no model is selected.
-local function selected_model_name(llm, backend, entries)
+local function selected_model_name(llm, backend, remote, entries)
 	if backend == "api" then
 		local active = entries and entries.active() or nil
-		if type(active) ~= "table" then return nil end
-		if type(active.label) == "string" and active.label ~= "" then return active.label end
-		return type(active.model) == "string" and active.model ~= "" and active.model or nil
+		if type(active) ~= "table" or not remote then return nil end
+		return entry_names(remote, entries.list())[active.id]
 	end
 	local model = type(llm.get_current_model) == "function" and llm.get_current_model() or nil
 	return type(model) == "string" and model ~= "" and model or nil
@@ -165,7 +193,7 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 
 	-- The selected model heads the list under the key macOS and Windows give
 	-- their model row, so the three trays name it with one wording.
-	local selected = selected_model_name(llm, backend, ok_entries and entries or nil)
+	local selected = selected_model_name(llm, backend, ok_remote and remote or nil, ok_entries and entries or nil)
 	local rows = {
 		{
 			label = string.format(tr("menu.llm.model_label"), selected or tr("menu.llm.no_model_none")),
@@ -195,11 +223,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 
 	local active = entries.active()
 	local list = entries.list()
+	local names = entry_names(remote, list)
 	if #list == 0 then rows[#rows + 1] = { label = tr("menu.llm.api_no_entry"), disabled = true } end
 	for _, entry in ipairs(list) do
-		local provider = remote.provider(entry.provider)
-		local model = entry.model ~= "" and entry.model or (provider and provider.default_model or "")
-		local label = string.format("%s — %s", entry.label, model)
+		local label = names[entry.id]
 		if remote.serves(entry.provider, "chat") then
 			rows[#rows + 1] = {
 				label = label,
@@ -209,9 +236,9 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 		else
 			-- Never the predictions' entry: its own test and removal instead.
 			rows[#rows + 1] = { label = label, items = {
-				{ label = tr("menu.llm.api_test_entry"), action = function() run_test(remote, dialogs, entry) end },
+				{ label = tr("menu.llm.api_test_entry"), action = function() run_test(remote, dialogs, entry, label) end },
 				{ label = "🗑️ " .. tr("menu.llm.api_remove_entry"), action = function()
-					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return entry.label end))
+					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return end
 					entries.remove(entry.id)
 					changed()
@@ -232,17 +259,18 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 		add_items[1] = { label = tr("menu.llm.api_providers_unavailable"), disabled = true }
 	end
 	rows[#rows + 1] = { label = tr("menu.llm.api_add_entry"), items = add_items }
+	local active_name = active and names[active.id] or nil
 	rows[#rows + 1] = {
 		label = tr("menu.llm.api_test_entry"),
 		disabled = active == nil or nil,
-		action = function() if active then run_test(remote, dialogs, active) end end,
+		action = function() if active then run_test(remote, dialogs, active, active_name) end end,
 	}
 	rows[#rows + 1] = {
-		label = "🗑️ " .. tr("menu.llm.api_remove_entry") .. (active and (" (" .. active.label .. ")") or ""),
+		label = "🗑️ " .. tr("menu.llm.api_remove_entry") .. (active and (" (" .. active_name .. ")") or ""),
 		disabled = active == nil or nil,
 		action = function()
 			if not active then return end
-			local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active.label end))
+			local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 			if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return end
 			entries.remove(active.id)
 			changed()

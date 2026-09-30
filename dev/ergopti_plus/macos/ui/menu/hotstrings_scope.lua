@@ -109,8 +109,8 @@ end
 
 --- Creates the Hotstrings scope over the running owners.
 --- @param options table Scoped-preference ports (path, files, state, preferences,
----   checkpoint, demotions, capture_preferences, admission, paused, backup_path,
----   confirm) plus the hotstring owners: keymap, config (hotstrings_config),
+---   checkpoint, demotions, capture_preferences, admission, paused, backup_path)
+---   plus the hotstring owners: keymap, config (hotstrings_config),
 ---   start_engine / stop_engine (exact true), is_personal(name),
 ---   override_backup_path(), remove(path) for a created override file, and an
 ---   optional editor with set_trigger_char.

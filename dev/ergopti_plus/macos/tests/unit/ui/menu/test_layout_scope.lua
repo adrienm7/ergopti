@@ -37,7 +37,7 @@ local function fixture()
 			capture_preferences = function() return prefs.snapshot(state, {}, {}) end,
 			backup_path = function() return backup or "backup" end,
 			admission = function(_, callback) return callback() end,
-			paused = function() return false end, confirm = function() return controls.confirm ~= false end,
+			paused = function() return false end,
 			runtime = {
 				capture = function() return Layout.capture_scope(state) end,
 				apply = function(_, rows) return Layout.apply_scope(state, rows) end,
@@ -142,10 +142,10 @@ helpers.describe("macOS keyboard-layout scope", function()
 			helpers.assert_eq(save(), true)
 		end
 	end)
-	helpers.it("cancel and stale source refuse before backup and state mutation", function()
-		for _, failure in ipairs({ "cancel", "stale" }) do
-			local owner, _, state, files, controls, _, _, writes = fixture()
-			if failure == "cancel" then controls.confirm = false else files.config = '[future]\nexternal = true\n' end
+	helpers.it("a stale source refuses before backup and state mutation", function()
+		for _, failure in ipairs({ "stale" }) do
+			local owner, _, state, files, _, _, _, writes = fixture()
+			if failure == "stale" then files.config = '[future]\nexternal = true\n' end
 			helpers.assert_eq(owner.apply("clear"), false)
 			helpers.assert_eq(writes(), 0)
 			helpers.assert_eq(state.layout_on_resume, "Ergopti+")
@@ -211,9 +211,9 @@ helpers.describe("macOS scoped preferences under a composition", function()
 	helpers.it("reverts two owners of one checkpoint newest first, as a refused composition does", function()
 		local first, _, state, files, _, prefs, save, _, original, new_owner = fixture()
 		local second = new_owner("backup-second")
-		helpers.assert_eq(first.apply("clear", true), true)
+		helpers.assert_eq(first.apply("clear"), true)
 		local between = files.config
-		helpers.assert_eq(second.apply("recommended", true), true)
+		helpers.assert_eq(second.apply("recommended"), true)
 		helpers.assert_eq(second.revert(), true)
 		helpers.assert_eq(files.config, between)
 		helpers.assert_eq(first.revert(), true, "the older owner still holds the reinstated revision")
@@ -227,18 +227,29 @@ helpers.describe("macOS scoped preferences under a composition", function()
 	helpers.it("a reinstated revision is forgotten once an ordinary save changes the checkpoint", function()
 		local first, _, _, _, _, _, save, _, _, new_owner = fixture()
 		local second = new_owner("backup-second")
-		helpers.assert_eq(first.apply("clear", true), true)
-		helpers.assert_eq(second.apply("recommended", true), true)
+		helpers.assert_eq(first.apply("clear"), true)
+		helpers.assert_eq(second.apply("recommended"), true)
 		helpers.assert_eq(second.revert(), true)
 		helpers.assert_eq(save(), true)
 		helpers.assert_eq(first.revert(), false, "an interleaved save is never overwritten by an old inverse")
 	end)
 
-	helpers.it("a composed request skips the per-scope question it already asked", function()
-		local owner, _, _, _, controls = fixture()
-		controls.confirm = false
-		helpers.assert_eq(owner.apply("clear"), false, "a menu row still asks")
-		helpers.assert_eq(owner.apply("clear", true), true)
+	-- The maintainer retired the clear's question on 2026-09-30: a menu row
+	-- and a composed request apply alike, and a caller still wiring a question
+	-- port is refused rather than silently ignored.
+	helpers.it("a clear applies at once and the owner refuses a question port", function()
+		local owner, _, _, _, _, _, _, writes = fixture()
+		helpers.assert_eq(owner.apply("clear"), true)
+		helpers.assert_true(writes() > 0)
+		local ok, err = pcall(function()
+			return require("ui.menu.scoped_preferences").new({ scope = "keyboard_layout",
+				confirm = function() return true end, admission = function() end, paused = function() end,
+				backup_path = function() end, capture_preferences = function() end,
+				checkpoint = { capture = function() end, replace = function() end, restore = function() end },
+				runtime = { capture = function() end, apply = function() end, restore = function() end } })
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("asks no question", 1, true) ~= nil, tostring(err))
 	end)
 end)
 

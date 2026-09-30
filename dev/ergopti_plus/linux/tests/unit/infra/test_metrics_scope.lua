@@ -179,7 +179,43 @@ helpers.describe("Linux metrics scope rendered commands", function()
 		paused = true
 		helpers.assert_eq(getter(), true)
 	end)
-	for _, scenario in ipairs({ "clear", "recommended", "cancel", "publication refusal", "pause before confirmation", "pause during confirmation" }) do
+	-- The Metrics menu offers the restore alone since 2026-09-30 (the maintainer
+	-- retired its clear); the owner's clear stays covered above and composed by
+	-- the Configuration clear. No row asks a question.
+	helpers.it("the real Metrics submenu opens with its switch and restore, and offers no clear", function()
+		local loaded = {}
+		for name, value in pairs(package.loaded) do loaded[name] = value end
+		local ok, err = pcall(function()
+			package.loaded["adapters.storage"] = {
+				get = function(_, default) return default end,
+				set = function() error("metrics scope must not write legacy storage") end,
+			}
+			with_scope(function(_, collector)
+				local i18n = require("infra.i18n")
+				package.loaded["ui.menu.menu_builder"] = nil
+				local passed, detail = pcall(function()
+					local rows = require("ui.menu.menu_builder").build({ keylogger = collector,
+						paused = false, is_paused = function() return false end })
+					local submenu
+					for _, row in ipairs(rows) do
+						if row.menu and row.title:find(i18n.get("menu.metrics.title"), 1, true) then submenu = row.menu end
+					end
+					helpers.assert_true(type(submenu) == "table", "the real Metrics submenu must exist")
+					helpers.assert_eq(table.concat({ submenu[1].title, submenu[2].title, submenu[3].title }, " | "),
+						table.concat({ i18n.get("menu.metrics.enable"), i18n.get("common.restore_recommended"), "-" }, " | "))
+					helpers.assert_eq(type(submenu[2].fn), "function")
+					for _, row in ipairs(submenu) do
+						helpers.assert_true(row.title ~= i18n.get("common.clear_to_system"), "the Metrics clear is retired")
+					end
+				end)
+				if not passed then error(detail, 0) end
+			end)
+		end)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		if not ok then error(err, 0) end
+	end)
+	for _, scenario in ipairs({ "recommended", "publication refusal", "pause before the click" }) do
 		helpers.it("routes " .. scenario .. " through the actual terminal owner", function()
 			local loaded = {}
 			for name, value in pairs(package.loaded) do loaded[name] = value end
@@ -195,9 +231,8 @@ helpers.describe("Linux metrics scope rendered commands", function()
 					local execute = os.execute
 					local old_files = package.loaded["adapters.file_system"]
 					local backups, changed, questions, paused = {}, 0, 0, false
-					local mode = scenario == "recommended" and "recommended" or "clear"
-					local key = mode == "clear" and "common.clear_to_system" or "common.restore_recommended"
-					local id = mode == "clear" and "scope_clear" or "scope_restore"
+					local mode = "recommended"
+					local key, id = "common.restore_recommended", "scope_restore"
 					local source = Sandbox.read_bytes(path)
 					local passed, detail = pcall(function()
 						root.metrics_menu = {{ type = "command", id = id, i18n = key }}
@@ -208,13 +243,10 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						if scenario == "publication refusal" then controls.refuse = path end
 						package.loaded["adapters.file_system"] = controls.files
 						os.execute = function(command)
-							if command:find("zenity --question", 1, true) then
+							if command:find("zenity", 1, true) then
 								questions = questions + 1
-								helpers.assert_contains(command, require("infra.i18n").get("menu.metrics.title"))
-								if scenario == "pause during confirmation" then paused = true end
-								return scenario == "cancel" and 1 or 0
+								return 0
 							end
-							if command:find("command -v zenity", 1, true) then return 0 end
 							return execute(command)
 						end
 						package.loaded["ui.menu.menu_builder"] = nil
@@ -230,22 +262,15 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						end
 						find(rows)
 						helpers.assert_eq(type(action), "function", "the real renderer must bind the scope command")
-						if scenario == "pause before confirmation" then paused = true end
+						if scenario == "pause before the click" then paused = true end
 						action()
-						local committed = scenario == "clear" or scenario == "recommended"
+						local committed = scenario == "recommended"
 						helpers.assert_eq(changed, committed and 1 or 0)
-						-- Only a clear asks; the restore applies at once
-						-- (restore-recommended-no-confirm).
-						local asks = mode == "clear" and scenario ~= "pause before confirmation"
-						helpers.assert_eq(questions, asks and 1 or 0)
+						helpers.assert_eq(questions, 0, "the restore applies at once (restore-recommended-no-confirm)")
 						if committed then
 							helpers.assert_eq(#backups, 1)
 							helpers.assert_eq(Sandbox.read_bytes(backups[1]), source)
 							helpers.assert_eq(collector.is_enabled(), mode == "recommended")
-							if mode == "clear" then
-								helpers.assert_eq(widget.is_running(), false)
-								helpers.assert_eq(readout.is_running(), false)
-							end
 							local result = Codec.decode(Sandbox.read_bytes(path))
 							helpers.assert_eq(result.metrics.unknown, "keep")
 							helpers.assert_eq(result.other.value, 42)

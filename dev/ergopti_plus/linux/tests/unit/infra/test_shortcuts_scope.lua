@@ -331,49 +331,49 @@ helpers.describe("Linux terminal shortcut scope", function()
 		helpers.assert_true(active())
 	end)
 
-	for _, mode in ipairs({ "clear", "recommended", "cancel", "paused confirmation" }) do
+	-- The declared rows of the first group, not injected ones: the switch, the
+	-- restore, the clear, a separator. Neither scope row asks (the maintainer
+	-- retired the clear's question on 2026-09-30); a pause refuses the owner.
+	for _, mode in ipairs({ "clear", "recommended", "paused" }) do
 		helpers.it("routes the actual rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(_, owners, controls, path)
 				local renderer = require("infra.manifest_menu")
 				local root = renderer.get_root()
-				local rows, top, execute = root.shortcuts_menu, root.top_level, os.execute
+				local top, execute = root.top_level, os.execute
 				local selected = mode == "recommended" and "recommended" or "clear"
-				local key = selected == "clear" and "common.clear_to_system" or "common.restore_recommended"
-				local id = selected == "clear" and "scope_clear" or "scope_restore"
+				local i18n = require("infra.i18n")
 				local changed, questions = 0, 0
 				local passed, err = pcall(function()
-					root.shortcuts_menu = {{ type = "command", id = id, i18n = key }}
 					root.top_level = {{ id = "shortcuts" }}
 					os.execute = function(command)
-						if command:find("command -v zenity", 1, true) then return 0 end
-						if command:find("zenity --question", 1, true) then
+						if command:find("zenity", 1, true) then
 							questions = questions + 1
-							if mode == "paused confirmation" then controls.paused = true end
-							return mode == "cancel" and 1 or 0
+							return 0
 						end
 						return execute(command)
 					end
 					local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
-					local action
-					local function find(items)
-						for _, row in ipairs(items) do
-							if row.title == require("infra.i18n").get(key) then action = row.fn end
-							if row.menu then find(row.menu) end
-						end
+					local submenu
+					for _, item in ipairs(menu) do
+						if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
 					end
-					find(menu)
+					helpers.assert_true(type(submenu) == "table", "the real Shortcuts submenu must exist")
+					helpers.assert_eq(table.concat({ submenu[1].title, submenu[2].title, submenu[3].title,
+						submenu[4].title }, " | "), table.concat({ i18n.get("menu.shortcuts.enable"),
+						i18n.get("common.restore_recommended"), i18n.get("common.clear_to_system"), "-" }, " | "))
+					local action = (selected == "clear" and submenu[3] or submenu[2]).fn
 					helpers.assert_eq(type(action), "function")
+					if mode == "paused" then controls.paused = true end
 					action()
-					local expected = mode == "clear" or mode == "recommended"
+					local expected = mode ~= "paused"
 					helpers.assert_eq(changed, expected and 1 or 0)
-					-- Only the clear asks (restore-recommended-no-confirm).
-					helpers.assert_eq(questions, selected == "clear" and 1 or 0)
+					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
 					helpers.assert_eq(owners.manager.is_enabled(), mode ~= "clear")
 					if not expected then helpers.assert_eq(Sandbox.read_bytes(path), SOURCE) end
 				end)
-				root.shortcuts_menu, root.top_level, os.execute = rows, top, execute
+				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end
 			end)
 		end)
@@ -417,6 +417,40 @@ helpers.describe("Linux Shortcuts restore row", function()
 				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).other.value, 42)
 			end)
 			root.top_level, os.execute = top, execute
+			if not passed then error(err, 0) end
+		end)
+	end)
+end)
+
+-- The maintainer's request of 2026-09-30: « Taper un symbole encadre la
+-- sélection » (no AltGr: the symbols need not be there) and « Symboles
+-- encadrants » form one group, with no separator between them.
+helpers.describe("Linux Shortcuts wrap group", function()
+	helpers.it("draws the wrap toggle by its behaviour, followed by its symbols", function()
+		with_scope(function(_, owners, controls)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top = root.top_level
+			local passed, err = pcall(function()
+				root.top_level = {{ id = "shortcuts" }}
+				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					is_paused = function() return controls.paused end })
+				local i18n = require("infra.i18n")
+				local submenu
+				for _, item in ipairs(menu) do
+					if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
+				end
+				helpers.assert_true(type(submenu) == "table", "the real Shortcuts submenu must exist")
+				local at
+				for index, row in ipairs(submenu) do
+					if row.title == i18n.get("shortcuts.label_wrap_text") then at = index end
+				end
+				helpers.assert_true(at ~= nil, "the wrap toggle is drawn with its label")
+				helpers.assert_eq(submenu[at + 1].title, i18n.get("menu.shortcuts.wrap_symbols"),
+					"the wrapping symbols follow the toggle with no separator between them")
+				helpers.assert_true(not i18n.get("shortcuts.label_wrap_text"):find("AltGr", 1, true))
+			end)
+			root.top_level = top
 			if not passed then error(err, 0) end
 		end)
 	end)

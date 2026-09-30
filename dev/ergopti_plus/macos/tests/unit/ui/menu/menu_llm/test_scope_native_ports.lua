@@ -36,20 +36,20 @@ helpers.describe("LLM scope native ports", function()
 		end)
 	end)
 
-	helpers.it("routes both real LLM menu commands through the complete scope port", function()
+	helpers.it("routes the real LLM restore command through the complete scope port", function()
 		with_activation("ollama", { true }, nil, function(_, _, calls)
 			local selected, mode
 			calls.root_deps.apply_preference_scope = function(scope, value) selected, mode = scope, value; return true end
 			calls.handler.build_item()
 			local commands = calls.render_ctx.commands
-			helpers.assert_eq(commands.scope_clear(), true)
-			helpers.assert_eq(selected, "llm")
-			helpers.assert_eq(mode, "clear")
 			helpers.assert_eq(commands.scope_restore(), true)
+			helpers.assert_eq(selected, "llm")
 			helpers.assert_eq(mode, "recommended")
+			-- ai-menu-no-clear: the AI menu's clear row was retired with its command
+			helpers.assert_nil(commands.scope_clear, "the AI menu registers no clear command")
 			calls.set_paused(true)
 			calls.handler.build_item()
-			helpers.assert_eq(calls.render_ctx.commands.scope_clear(), false)
+			helpers.assert_eq(calls.render_ctx.commands.scope_restore(), false)
 		end)
 	end)
 

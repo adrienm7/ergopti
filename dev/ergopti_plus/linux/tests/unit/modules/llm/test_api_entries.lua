@@ -87,11 +87,13 @@ helpers.describe("api_entries: a private, durable store", function()
 		helpers.assert_eq(reloaded.active().model, "m")
 	end)
 
-	helpers.it("names a second entry of the same label apart", function()
+	-- The tray names entries itself (api-entry-auto-name): the stored label is
+	-- kept as written for older builds, never made unique by the store.
+	helpers.it("stores the label it is given", function()
 		local entries = fresh()
-		entries.add({ provider = "cerebras", token = "a", label = "Cerebras" })
-		local second = entries.add({ provider = "cerebras", token = "b", label = "Cerebras" })
-		helpers.assert_eq(second.label, "Cerebras (2)")
+		entries.add({ provider = "cerebras", token = "a", label = "cerebras/qwen" })
+		local second = entries.add({ provider = "cerebras", token = "b", label = "cerebras/qwen" })
+		helpers.assert_eq(second.label, "cerebras/qwen")
 	end)
 
 	helpers.it("removing the selected entry leaves none selected", function()

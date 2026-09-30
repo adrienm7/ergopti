@@ -562,12 +562,16 @@ _LAY_ScopeCommands(Options := unset) {
 }
 
 /**
- * Reuses the existing global Restore row without adding platform-only UI. The
- * tray's restore also creates the configuration folder's layers.toml from the
- * recommended layer when it has none; injected options name their own.
+ * The Configuration menu's first group: the global restore and clear, each one
+ * composed transaction over every category's owner, applied at once after its
+ * backups. The tray's restore also creates the configuration folder's
+ * layers.toml from the recommended layer when it has none; injected options
+ * name their own.
  */
 _MI_GlobalScopeCommands(Options := unset) {
 	global _ConfigDir
 	Selected := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
-	return Map("restore_recommended", (*) => ConfigGlobalScopeApply("recommended", Selected))
+	return Map(
+		"scope_restore", (*) => ConfigGlobalScopeApply("recommended", Selected),
+		"scope_clear", (*) => ConfigGlobalScopeApply("clear", Selected))
 }

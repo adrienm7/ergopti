@@ -40,7 +40,7 @@ end
 helpers.describe("backend_panel.lua: is_apple_silicon is a single exported source of truth (F-MED-4)", function()
 
 	helpers.it("exports M.is_apple_silicon", function()
-		local src = read_src("\"menu.llm.backend_ollama_suffix\"") -- ui/menu/menu_llm/backend_panel.lua
+		local src = read_src("M.is_apple_silicon = is_apple_silicon") -- ui/menu/menu_llm/backend_panel.lua
 		helpers.assert_true(
 			src:find("M.is_apple_silicon = is_apple_silicon", 1, true) ~= nil,
 			"backend_panel.lua must export M.is_apple_silicon (F-MED-4)"
@@ -51,7 +51,7 @@ helpers.describe("backend_panel.lua: is_apple_silicon is a single exported sourc
 		-- Scope to the is_apple_silicon FUNCTION BODY only, not the whole file —
 		-- the doc comment right above it legitimately mentions the OLD
 		-- /opt/homebrew heuristic in prose to explain why this detector exists.
-		local src = read_src("\"menu.llm.backend_ollama_suffix\"") -- ui/menu/menu_llm/backend_panel.lua
+		local src = read_src("M.is_apple_silicon = is_apple_silicon") -- ui/menu/menu_llm/backend_panel.lua
 		local fn_start = src:find("local function is_apple_silicon()", 1, true)
 		helpers.assert_true(fn_start ~= nil, "backend_panel.lua must define is_apple_silicon()")
 		local fn_end  = src:find("\nend", fn_start, true)

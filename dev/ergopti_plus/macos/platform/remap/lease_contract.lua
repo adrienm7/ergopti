@@ -20,6 +20,9 @@
 ---    so callers can validate a generation before any external side effect.
 --- 5. Personal Isolation: Bare names never belong to ErgoptiPlus at runtime;
 ---    every driver-owned state variable carries its exact generation token.
+--- 6. Stop Supersession: an accepted Stop of a generation answers its pending
+---    READY wait or command with a reason of its own, so a caller can tell an
+---    operation its own Stop superseded from one the worker failed.
 --- ==============================================================================
 
 local M = {}
@@ -38,6 +41,10 @@ M.MODE_PAUSED = 2
 M.MANAGED_TAG_LABEL = "ErgoptiPlus managed"
 M.MANAGED_MODE_NORMAL = "normal"
 M.MANAGED_MODE_PAUSE = "pause"
+-- The reasons an accepted Stop gives the READY wait and the pause or resume
+-- command it supersedes on the same generation (lease_controller M.stop).
+M.STOPPED_BEFORE_READY = "stopped-before-ready"
+M.COMMAND_SUPERSEDED_BY_STOP = "lease-stopping"
 
 local UUID_HYPHEN_POSITIONS = { 9, 14, 19, 24 }
 local RUNTIME_LOGICAL_NAMES = {
@@ -262,6 +269,26 @@ function M.parse_managed_description(description)
 	local expected = M.managed_description_prefix(token, mode)
 	if description:sub(1, #expected) ~= expected then return nil end
 	return token, mode
+end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 4/ Stop Supersession =======
+-- ====================================
+-- ====================================
+
+--- Reports whether a lease callback reason means that an accepted Stop of the
+--- same generation superseded the operation. The Stop's requester owns the
+--- diagnosis: it logs why it stopped, at the severity that cause deserves, so
+--- the superseded operation is not a second failure.
+--- @param reason any Reason passed to a lease start or command callback.
+--- @return boolean superseded True only for the two Stop supersession reasons.
+function M.is_superseded_by_stop(reason)
+	return reason == M.STOPPED_BEFORE_READY or reason == M.COMMAND_SUPERSEDED_BY_STOP
 end
 
 return M

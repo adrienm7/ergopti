@@ -550,6 +550,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_keylogger_journal_repair_debt.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
 #Include unit/test_llm_api_test_entry.ahk
+#Include unit/test_llm_api_entry_names.ahk
 #Include unit/test_llm_menu_backend_model_labels.ahk
 #Include unit/test_llm_menu_build_submenu.ahk
 #Include unit/test_llm_menu_prediction_count.ahk

@@ -8,9 +8,10 @@
 ; categories, which users read as one more category and overlooked: they now
 ; sit under their own header, behind a separator, and carry their locale's flag
 ; (an icon here, since Win32 menus cannot render flag emoji). The Configuration
-; submenu draws the two rows that rewrite the configuration, a separator, then
-; the rows that open a window and login startup, and ends there: Uninstall
-; closes the Version / Updates submenu, after a separator, since 2026-09.
+; submenu opens with the global restore and clear (the first group of every
+; settings menu), a separator, the cleanup, a separator, then the rows that
+; open a window and login startup, and ends there: Uninstall closes the
+; Version / Updates submenu, after a separator, since 2026-09.
 ; ============================================================================
 
 ; Index of the first manifest entry of ``Key`` whose ``Field`` equals ``Value``.
@@ -57,13 +58,13 @@ _MLG_Order(MenuName) {
 	return Order
 }
 
-; The Configuration submenu: the two rows that rewrite the configuration, a
-; separator, then configuration windows, login startup, the macOS-only
-; Karabiner rows and the Windows-only touchpad restore, with no separator left
-; dangling at its end.
+; The Configuration submenu: the global restore and clear, a separator, the
+; cleanup, a separator, then configuration windows, login startup, the
+; macOS-only Karabiner rows and the Windows-only touchpad restore, with no
+; separator left dangling at its end.
 _MLG_ConfigurationRowsInOrder() {
-	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard, start_at_login, "
-		. "karabiner_integration, remove_from_karabiner, restore_touchpad_gestures",
+	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, ---, config_folder, setup_wizard, "
+		. "start_at_login, karabiner_integration, remove_from_karabiner, restore_touchpad_gestures",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")
@@ -71,8 +72,9 @@ _MLG_ConfigurationRowsInOrder() {
 	AssertContains(Body, "Commands := _MI_GlobalScopeCommands()",
 		"the real Configuration menu must retain the global command factory")
 	Commands := _MI_GlobalScopeCommands()
-	AssertTrue(Commands.Has("restore_recommended") && Commands["restore_recommended"] is Func,
-		"the global owner must expose the existing Restore command")
+	for _, Id in ["scope_restore", "scope_clear"]
+		AssertTrue(Commands.Has(Id) && Commands[Id] is Func,
+			"the global owner must expose the " . Id . " command")
 	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],

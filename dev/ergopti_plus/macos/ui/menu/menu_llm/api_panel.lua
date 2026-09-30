@@ -12,6 +12,9 @@
 --- 2. Optimistic UI with rollback: a new entry is staged in memory, the menu
 ---    refreshes immediately, and the entry is only persisted to Keychain if the
 ---    availability probe succeeds — on failure the in-memory state is rolled back.
+--- 3. Automatic names: every entry reads <provider>/<model>, told apart by host
+---    then order when two share it (_shared/lua/llm/api_entry_names.lua). Adding
+---    an entry asks no name, and a `label` an earlier build stored is not read.
 --- ==============================================================================
 
 local M = {}
@@ -23,6 +26,7 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
+local EntryNames     = require("llm.api_entry_names")
 
 local LOG = "api_panel"
 
@@ -100,6 +104,30 @@ local function notify_persistence_failure(label)
 		i18n.get("common.error_title"), i18n.get("dialog.bulk_toggle.save_failed"), "error")
 end
 
+--- The automatic name of every entry, by id: <provider>/<model>, with the
+--- model and address its requests use (the provider's defaults for empty
+--- fields), told apart as the shared rule tells them apart.
+--- @param api_remote table The remote backend, for its provider catalogue.
+--- @param entries table The entries to name, in their order.
+--- @return table names Entry id -> name.
+local function entry_names(api_remote, entries)
+	local providers = type(api_remote) == "table" and type(api_remote.PROVIDERS) == "table"
+		and api_remote.PROVIDERS or {}
+	local resolved = {}
+	for index, e in ipairs(entries or {}) do
+		local provider = providers[e.provider] or {}
+		resolved[index] = {
+			provider = tostring(e.provider or ""),
+			model = (type(e.model) == "string" and e.model ~= "") and e.model or (provider.default_model or ""),
+			base_url = (type(e.base_url) == "string" and e.base_url ~= "") and e.base_url
+				or (provider.base_url or ""),
+		}
+	end
+	local names = {}
+	for index, name in ipairs(EntryNames.names(resolved)) do names[entries[index].id] = name end
+	return names
+end
+
 --- Revokes the prediction-engine identity before a remote-entry mutation.
 --- ApiRemote fences callbacks and readiness, while the keymap bridge owns the
 --- already-visible tooltip and request counters; both halves must transition.
@@ -132,10 +160,9 @@ end
 -- =============================
 -- =============================
 
---- Display name for the active API entry: its configured label, else its
---- model, else the provider default (what requests resolve), else nil.
---- Used by the model parent row so backend api never shows the stale
---- local-model slot.
+--- Display name for the active API entry: its automatic name, as the entry
+--- picker shows it, else nil. Used by the model parent row so backend api
+--- never shows the stale local-model slot.
 --- @return string|nil Display name or nil.
 function M.active_entry_display_name()
 	local remote = llm_mod and llm_mod.api_remote
@@ -146,20 +173,7 @@ function M.active_entry_display_name()
 	end
 	local active_id = remote.get_active_entry_id()
 	if type(active_id) ~= "string" or active_id == "" then return nil end
-	for _, e in ipairs(remote.get_entries() or {}) do
-		if type(e) == "table" and e.id == active_id then
-			if type(e.label) == "string" and e.label ~= "" then return e.label end
-			if type(e.model) == "string" and e.model ~= "" then return e.model end
-			local providers = remote.PROVIDERS
-			local prov = type(providers) == "table" and providers[e.provider] or nil
-			if type(prov) == "table" and type(prov.default_model) == "string"
-				and prov.default_model ~= "" then
-				return prov.default_model
-			end
-			return nil
-		end
-	end
-	return nil
+	return entry_names(remote, remote.get_entries() or {})[active_id]
 end
 
 -- Shared probe-verdict rendering for the Test action and the post-add
@@ -226,22 +240,6 @@ local function probe_offer_accepted()
 	return ok_c and choice == i18n.get("button.ok")
 end
 
---- Returns a label unused by entries: the base, then base (2), ... so
---- default provider/model names stay distinct row by row.
---- @param base string Desired label.
---- @param entries table|nil Entry list.
---- @return string Unique label.
-local function unique_entry_label(base, entries)
-	local taken = {}
-	for _, e in ipairs(entries or {}) do
-		if type(e) == "table" and type(e.label) == "string" then taken[e.label] = true end
-	end
-	if not taken[base] then return base end
-	local n = 2
-	while taken[string.format("%s (%d)", base, n)] do n = n + 1 end
-	return string.format("%s (%d)", base, n)
-end
-
 --- Adds an entry whose provider serves System 1 only (a decisions provider).
 --- It never becomes the prediction backend: the active entry is kept, the
 --- entry is proven by the shared decisions probe (api_providers.json
@@ -252,7 +250,7 @@ end
 --- @return boolean started True when the probe was sent.
 local function add_system1_entry(add)
 	local api_remote, new_entry = add.api_remote, add.new_entry
-	local label = tostring(new_entry.label or new_entry.id or "")
+	local label = entry_names(api_remote, add.entries)[new_entry.id]
 	if reset_prediction_identity(add.keymap, "stage System 1 API entry") ~= true then return false end
 	local my_add_gen = begin_mutation()
 	if not my_add_gen then return false end
@@ -309,9 +307,9 @@ end
 --- @param api_remote table The remote backend.
 --- @param entry table The System 1-only entry.
 --- @param busy boolean True while a mutation or a pause forbids actions.
+--- @param label string The entry's automatic name.
 --- @return table rows
-local function system1_entry_rows(ctx, api_remote, entry, busy)
-	local label = tostring(entry.label or entry.id or "?")
+local function system1_entry_rows(ctx, api_remote, entry, busy, label)
 	local test_row = {
 		label = string.format("%s (%s)", i18n.get("menu.llm.api_test_entry"), label),
 		disabled = busy or nil,
@@ -391,20 +389,20 @@ function M.build(ctx)
 	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
 	local rows       = {}
 	local mutation_busy = _mutation_owner ~= nil
+	local names      = entry_names(api_remote, entries)
 
 
 	-- =====================================================
 	-- ===== 1.1) Entry list =====
 	-- =====================================================
 
-	-- One row per configured entry, showing the defined name only (the
-	-- provider/model pair is folded into the default name at creation) —
-	-- clicking sets it as active and triggers a warmup so the next
-	-- prediction uses the new entry immediately.
+	-- One row per configured entry, named <provider>/<model> — clicking
+	-- sets it as active and triggers a warmup so the next prediction uses
+	-- the new entry immediately.
 	for _, e in ipairs(entries) do
 		if not is_system1_only(api_remote, e) then
 			table.insert(rows, {
-				label    = tostring(e.label or e.id or "?"),
+				label    = names[e.id],
 				checked  = (e.id == active_id),
 				disabled = (paused or mutation_busy) or nil,
 				action       = (not paused and not mutation_busy) and function()
@@ -488,15 +486,6 @@ function M.build(ctx)
 						p.default_model,
 						i18n.get("menu.llm.api_prompt_model"))
 					if not model_ok then return false end
-					-- Label comes LAST so its default is provider/model. An
-					-- accepted empty label keeps that default; Cancel aborts.
-					local default_label = string.format("%s/%s", pid,
-						(model ~= "" and model) or p.default_model)
-					local label_ok, label = prompt_field(
-						string.format("API %s — Label", p.label),
-						default_label,
-						i18n.get("menu.llm.api_prompt_name"))
-					if not label_ok then return false end
 
 					-- Unique id: seq suffix prevents collision when two entries are
 					-- created within the same second (os.time() resolution = 1s).
@@ -509,8 +498,6 @@ function M.build(ctx)
 						base_url = (base_url ~= "" and base_url ~= p.base_url) and base_url or "",
 						token    = token,
 						model    = (model ~= "" and model) or p.default_model,
-						label    = unique_entry_label(
-							(label ~= "" and label) or default_label, list),
 					}
 					local previous_active_id = api_remote.get_active_entry_id and api_remote.get_active_entry_id() or ""
 					local previous_model = state.llm_model
@@ -521,6 +508,7 @@ function M.build(ctx)
 						table.insert(clone, x)
 					end
 					table.insert(clone, new_entry)
+					local new_name = entry_names(api_remote, clone)[id]
 					if is_system1_only(api_remote, new_entry) then
 						return add_system1_entry({
 							api_remote = api_remote, keymap = keymap, update_menu = update_menu,
@@ -547,7 +535,7 @@ function M.build(ctx)
 						if kind == "unreachable" then
 							pcall_log("notify(api_unreachable)", notifications.notify,
 								i18n.get("menu.llm.api_unreachable_title"),
-								string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
+								string.format(i18n.get("menu.llm.api_unreachable_body"), new_name),
 								"warning")
 						else
 							Logger.error(LOG, "Remote API validation did not commit (%s): %s",
@@ -571,7 +559,7 @@ function M.build(ctx)
 									if ok == true then
 										pcall_log("notify(api_validated)", notifications.notify,
 											i18n.get("menu.llm.api_validated_title"),
-											string.format(i18n.get("menu.llm.api_validated_body"), new_entry.label),
+											string.format(i18n.get("menu.llm.api_validated_body"), new_name),
 											"success")
 									else
 										Logger.error(LOG, "Remote API entry committed with cleanup debt: %s",
@@ -588,13 +576,13 @@ function M.build(ctx)
 											Logger.error(LOG, "API test refused: shared test-request spec unavailable.")
 										else
 											Logger.info(LOG, "API test dispatched for '%s' (model %s).",
-												tostring(new_entry.label or ""), tostring(new_entry.model or ""))
+												new_name, tostring(new_entry.model or ""))
 											api_remote.test_request(new_entry, spec,
 												function(reply, ms)
-													notify_probe_verdict(true, tostring(new_entry.label or ""), reply, ms, nil)
+													notify_probe_verdict(true, new_name, reply, ms, nil)
 												end,
 												function(_, detail)
-													notify_probe_verdict(false, tostring(new_entry.label or ""), "", 0, detail)
+													notify_probe_verdict(false, new_name, "", 0, detail)
 												end)
 										end
 									end
@@ -640,7 +628,7 @@ function M.build(ctx)
 	-- The active entry is shared by the management rows below (Test,
 	-- Remove): resolve it once so the two cannot disagree mid-build.
 	local active_entry = api_remote and api_remote.get_active_entry() or nil
-	local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
+	local active_label = active_entry and (names[active_entry.id] or "") or ""
 
 
 
@@ -661,7 +649,7 @@ function M.build(ctx)
 		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
 		action       = (not paused and not mutation_busy and active_entry) and function()
 			local probed_id = active_entry.id
-			local probed_label = tostring(active_entry.label or active_entry.id or "?")
+			local probed_label = active_label
 			local probed_entry = {
 				id       = active_entry.id,
 				provider = active_entry.provider,
@@ -778,7 +766,7 @@ function M.build(ctx)
 	local system1_rows = {}
 	for _, e in ipairs(entries) do
 		if is_system1_only(api_remote, e) and e.id ~= (active_entry and active_entry.id) then
-			for _, row in ipairs(system1_entry_rows(ctx, api_remote, e, paused or mutation_busy)) do
+			for _, row in ipairs(system1_entry_rows(ctx, api_remote, e, paused or mutation_busy, names[e.id])) do
 				system1_rows[#system1_rows + 1] = row
 			end
 		end
@@ -793,10 +781,8 @@ function M.build(ctx)
 	-- ===== 1.6) Build parent row title =====
 	-- =====================================================
 
-	local api_title = active_entry
-		and string.format("API — %s (%s)", active_label,
-			(api_remote.PROVIDERS[active_entry.provider] and api_remote.PROVIDERS[active_entry.provider].label) or active_entry.provider)
-		or  "API — " .. i18n.get("menu.llm.api_no_entry")
+	-- The name already starts with the provider: it is not repeated.
+	local api_title = "API — " .. (active_entry and active_label or i18n.get("menu.llm.api_no_entry"))
 
 	return api_title, ManifestMenu.render_rows(rows, "llm_backend")
 end
@@ -818,6 +804,7 @@ function M.build_model_picker(ctx)
 	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
 	local rows       = {}
 	local mutation_busy = _mutation_owner ~= nil
+	local names      = entry_names(api_remote, entries)
 
 	table.insert(rows, {
 		label   = i18n.get("menu.llm.no_model"),
@@ -862,7 +849,7 @@ function M.build_model_picker(ctx)
 	for _, e in ipairs(entries) do
 		if not is_system1_only(api_remote, e) then
 			table.insert(rows, {
-				label    = tostring(e.label or e.id or "?"),
+				label    = names[e.id],
 				checked  = (e.id == active_id),
 				disabled = (paused or mutation_busy) or nil,
 				action       = (not paused and not mutation_busy) and function()
@@ -949,7 +936,6 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 		previous_entries[#previous_entries + 1] = e
 		if e ~= existing then staged[#staged + 1] = e end
 	end
-	entry.label = unique_entry_label(provider.label .. "/" .. entry.model, staged)
 	staged[#staged + 1] = entry
 
 	local state = ctx.state

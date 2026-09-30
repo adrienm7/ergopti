@@ -115,7 +115,20 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 		end
 		helpers.assert_type(add_action, "function")
 		local result = add_action()
+		-- The entry rows after the add, the rows before the Add row
+		local entry_labels = {}
+		local _, rows_after = panel.build({
+			state = state, paused = false,
+			keymap = { reset_predictions = function() return true end },
+			update_menu = function() end,
+			WarmupCtrl = { warmup = function() end },
+		})
+		for _, row in ipairs(rows_after) do
+			if type(row.items) == "table" then break end
+			entry_labels[#entry_labels + 1] = row.label
+		end
 		observations = {
+			entry_labels = entry_labels,
 			result = result,
 			prompt_calls = prompt_calls,
 			validation_calls = validation_calls,
@@ -132,10 +145,11 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 end
 
 helpers.describe("API panel prompt cancellation", function()
-	for cancel_index = 1, 4 do
+	-- Three fields since the name one was retired (api-entry-auto-name)
+	for cancel_index = 1, 3 do
 		helpers.it("aborts when field " .. tostring(cancel_index) .. " is cancelled", function()
 			local values = {
-				"https://api.example.invalid/v1", "secret", "custom-model", "Custom",
+				"https://api.example.invalid/v1", "secret", "custom-model",
 			}
 			local got = run_add_fixture(function(index)
 				if index == cancel_index then
@@ -159,36 +173,38 @@ helpers.describe("API panel prompt cancellation", function()
 	end
 
 	helpers.it("keeps accepted empty optional fields distinct from Cancel", function()
-		local values = { "", "secret", "", "" }
+		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
 			return "OK", values[index]
 		end)
 
-		helpers.assert_eq(got.prompt_calls, 4)
+		helpers.assert_eq(got.prompt_calls, 3, "URL, key and model: no name is asked (api-entry-auto-name)")
 		helpers.assert_eq(got.validation_calls, 1)
 		helpers.assert_eq(got.reset_calls, 1)
 		helpers.assert_type(got.staged_entry, "table")
 		helpers.assert_eq(got.staged_entry.base_url, "")
 		helpers.assert_eq(got.staged_entry.model, "default-model")
-		helpers.assert_eq(got.staged_entry.label, "openai/default-model",
-			"an empty label defaults to provider/model, never the bare provider")
+		helpers.assert_nil(got.staged_entry.label, "no name is stored: the entry is named automatically")
+		helpers.assert_eq(got.entry_labels, { "openai/default-model" })
 	end)
 
-	helpers.it("dedupes a taken default label", function()
-		local values = { "", "secret", "", "" }
+	helpers.it("names a new entry apart from one of the same provider and model (api-entry-auto-name)", function()
+		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
 			return "OK", values[index]
 		end, "button.cancel", {
-			{ id = "old", provider = "openai", model = "default-model", label = "openai/default-model" },
+			{ id = "old", provider = "openai", model = "default-model", label = "Mon nom" },
 		})
 
 		helpers.assert_eq(#got.entries, 2, "the new entry must be staged")
-		helpers.assert_eq(got.entries[#got.entries].label, "openai/default-model (2)",
-			"a taken default label must count up so rows stay distinct")
+		helpers.assert_eq(got.entry_labels, {
+			"openai/default-model (api.example.invalid)",
+			"openai/default-model (api.example.invalid, 2)",
+		}, "another key at the same address is told apart by its order, and the stored label is not shown")
 	end)
 
 	helpers.it("offers a probe after add when confirmed", function()
-		local values = { "", "secret", "", "" }
+		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
 			return "OK", values[index]
 		end, "button.ok")
@@ -200,7 +216,7 @@ helpers.describe("API panel prompt cancellation", function()
 	end)
 
 	helpers.it("skips the probe after add when declined", function()
-		local values = { "", "secret", "", "" }
+		local values = { "", "secret", "" }
 		local got = run_add_fixture(function(index)
 			return "OK", values[index]
 		end, "button.cancel")

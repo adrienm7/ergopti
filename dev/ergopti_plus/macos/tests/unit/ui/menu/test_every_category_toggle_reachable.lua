@@ -338,8 +338,8 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 		helpers.assert_eq(ctx.state.keymap, false)
 	end)
 
-	-- The Hotstrings scope rows sit under the switch, like the IA and Metrics
-	-- ones, and run the scope owner; they were declared nowhere, so no driver
+	-- The Hotstrings scope rows sit under the switch, like the Metrics ones,
+	-- and run the scope owner; they were declared nowhere, so no driver
 	-- offered « restore recommended » or « clear » for the hotstrings.
 	for _, paused in ipairs({ false, true }) do
 		helpers.it("draws the hotstrings restore and clear rows, routed to the scope (paused "

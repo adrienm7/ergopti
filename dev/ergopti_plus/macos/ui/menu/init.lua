@@ -1165,10 +1165,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return require("ui.menu.uninstall").run()
 			end)
 		end,
-		-- Configuration › « Restore recommended values »: every category's own
-		-- scope owner, composed all or nothing (ui.menu.global_scope).
+		-- Configuration › « Restore recommended values » and « Clear all »:
+		-- every category's own scope owner, composed all or nothing
+		-- (ui.menu.global_scope). Neither asks; each owner backs up first.
 		reset_defaults            = function()
 			return type(apply_global_scope) == "function" and apply_global_scope("recommended") == true
+		end,
+		clear_to_system           = function()
+			return type(apply_global_scope) == "function" and apply_global_scope("clear") == true
 		end,
 		factory_reset             = function() return reset_all_defaults() end,
 		clean_unused_keys         = function()
@@ -1261,18 +1265,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ctx is a stable table of upvalue references — fields that are mutable at
 	-- runtime (state, keymap, …) are already live pointers so the menu always
 	-- reads current values without rebuilding the table on every click.
-	--- The question a clear asks before it removes a category's settings, for
-	--- the scope owners' confirm port. They ask it before a clear only: restoring
-	--- the recommended values applies at once, after the owner's backup.
-	--- @param title_key string i18n key of the dialog title.
-	--- @return function confirm True once the user chose Yes.
-	local function clear_confirmation(title_key)
-		return function()
-			local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
-			return require("infra.dialog_util").block_alert(i18n.get(title_key),
-				i18n.get("common.clear_to_system"), no, yes, "warning") == yes
-		end
-	end
 	local gesture_scope = nil
 	local scope_generation = 0
 	local function gesture_scope_owner()
@@ -1294,7 +1286,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					return MenuPaths.get("ConfigTomlPath") .. ".gestures-"
 						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 				end,
-				confirm = clear_confirmation("menu.gestures.title"),
 			})
 		end
 		return gesture_scope
@@ -1347,7 +1338,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						return MenuPaths.get("ConfigTomlPath") .. ".shortcuts-"
 							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 					end,
-					confirm = clear_confirmation("menu.shortcuts.title"),
 				})
 			end
 			return shortcuts_scope
@@ -1369,7 +1359,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".llm-" .. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 					end,
-					confirm = clear_confirmation("menu.llm.title"),
 				})
 			end
 			return llm_scope
@@ -1414,7 +1403,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						return MenuPaths.get("ConfigTomlPath") .. ".metrics-"
 							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 					end,
-					confirm = clear_confirmation("menu.metrics.title"),
 				})
 			end
 			return metrics_scope
@@ -1458,7 +1446,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						return HotstringsConfig.get_override_path() .. ".hotstrings-"
 							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 					end,
-					confirm = clear_confirmation("menu.hotstrings.title"),
 				})
 			end
 			return hotstrings_scope
@@ -1486,7 +1473,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					return MenuPaths.get("ConfigTomlPath") .. ".layout-"
 						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 				end,
-				confirm = clear_confirmation("menu.layout.title"),
 			})
 		end
 		return layout_scope
@@ -1538,7 +1524,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
 					return core_mods.shortcuts_mod.is_paused()
 				end,
-				confirm = clear_confirmation("menu.configuration.title"),
 				refresh = function()
 					Builder.invalidate_cache()
 					updateMenu()

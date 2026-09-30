@@ -4,25 +4,50 @@
 ; MODULE: LLM Menu Backend/Model Label Tests
 ; DESCRIPTION:
 ; The IA submenu parent rows must show display names, not storage ids: the
-; backend row reads "Backend: API", never "Backend: api", and the model row
+; backend row reads what its submenu shows for the selected backend, cut
+; before the em dash (« API 🌐 », never « Backend : api »), and the model row
 ; follows the active backend — with backend api it shows the selected API
-; entry's model (falling back to the provider default, exactly what requests
-; use), never the stale Ollama tag from before the switch. The Ollama slot
+; entry's automatic name, <provider>/<model> with the model requests use,
+; never the stale Ollama tag from before the switch. The Ollama slot
 ; itself is preserved untouched so switching back restores it.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_LBMD_BackendDisplayName() {
-	Assert(_DriverFuncBody("_LLM_Menu_BackendDisplayName") != "",
-		"_LLM_Menu_BackendDisplayName must exist in menu_models.ahk")
-	AssertEqual("API", _LLM_Menu_BackendDisplayName("api"))
-	AssertEqual("Ollama", _LLM_Menu_BackendDisplayName("ollama"))
-	AssertEqual("weird", _LLM_Menu_BackendDisplayName("weird"),
-		"an unknown backend falls back to its id, never blanks")
+; backend-row-selected-option. The Backend row read « Backend : API »; the
+; maintainer asked on 2026-09-30 for the selected option as the submenu lists
+; it, cut before its em dash, emoji included. The expected text is read from
+; the submenu's own checked row, then pinned to the brand it must start with.
+_LBMD_BackendRowLabel() {
+	global _LLM_Menu
+	Assert(_DriverFuncBody("_LLM_Menu_BackendRowLabel") != "",
+		"_LLM_Menu_BackendRowLabel must exist in menu_models.ahk")
+	SavedMenu := _LLM_Menu
+	try {
+		for Backend, Expected in Map("api", "API 🌐", "ollama", "Ollama 🦙") {
+			_LLM_Menu := Map("backend", Backend, "ollama_port", 11434)
+			Checked := ""
+			for Row in _LLM_Menu_BackendRows() {
+				if Row.Get("checked", false)
+					Checked := Row["label"]
+			}
+			AssertContains(Checked, " — ", Backend . ": the option carries its description after an em dash")
+			AssertEqual(Expected, _LLM_Menu_BackendRowLabel(),
+				Backend . ": the row names the selected option, emoji included")
+			AssertEqual(Expected, Trim(SubStr(Checked, 1, InStr(Checked, "—") - 1)),
+				Backend . ": the row is the checked option cut before its em dash")
+		}
+		_LLM_Menu := Map("backend", "mlx", "ollama_port", 11434)
+		AssertEqual(t("menu.llm.backend_unknown"), _LLM_Menu_BackendRowLabel(),
+			"a backend the submenu does not offer is named unknown, never blank")
+	} finally _LLM_Menu := SavedMenu
+	AssertEqual("MLX 🚀", _LLM_Menu_OptionHead("MLX 🚀 — Recommandé — natif"),
+		"the head stops at the first em dash")
+	AssertEqual("Sans tiret", _LLM_Menu_OptionHead(" Sans tiret "),
+		"a label without an em dash is shown whole")
 }
-Test("llm menu: backend row shows display names (llm-menu-backend-label)",
-	_LBMD_BackendDisplayName)
+Test("backend-row-selected-option: the Backend row names the selected option",
+	_LBMD_BackendRowLabel)
 
 _LBMD_ModelDisplayText() {
 	global _LLM_Menu, LLM_API_PROVIDERS
@@ -37,17 +62,14 @@ _LBMD_ModelDisplayText() {
 			"api_entries", [Map("Id", "e1", "Name", "Cerebras",
 				"Provider", "cerebras", "BaseUrl", "https://b.invalid/v1",
 				"Token", "sekret", "Model", "qwen-3.8-27b")])
-		AssertEqual("Cerebras", _LLM_Menu_ModelDisplayText(),
-			"with backend api the row shows the configured entry name")
-		AssertEqual("Cerebras",
+		AssertEqual("cerebras/qwen-3.8-27b", _LLM_Menu_ModelDisplayText(),
+			"with backend api the row shows the entry's automatic name, not its stored one")
+		AssertEqual("cerebras/qwen-3.8-27b",
 			_LLM_Menu_ApiEntryDisplayName(_LLM_Menu["api_entries"][1]))
-		_LLM_Menu["api_entries"][1]["Name"] := ""
-		AssertEqual("qwen-3.8-27b", _LLM_Menu_ModelDisplayText(),
-			"an unnamed entry falls back to its model")
 		_LLM_Menu["api_entries"][1]["Model"] := ""
-		AssertEqual(LLM_API_PROVIDERS["cerebras"]["DefaultModel"],
+		AssertEqual("cerebras/" . LLM_API_PROVIDERS["cerebras"]["DefaultModel"],
 			_LLM_Menu_ModelDisplayText(),
-			"an entry without name or model falls back to the provider default")
+			"an entry without a model is named after the provider default")
 		_LLM_Menu["api_entry_id"] := "ghost"
 		AssertEqual("", _LLM_Menu_ModelDisplayText(),
 			"an unknown entry never resurrects the stale ollama tag")
@@ -66,8 +88,8 @@ Test("llm menu: model row follows the active backend (llm-menu-model-label)",
 _LBMD_RowsUseDisplayHelpers() {
 	Main := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_EmitRow"))
 	Assert(Main != "", "_LLM_Menu_EmitRow must remain source-visible")
-	Assert(InStr(Main, "_LLM_Menu_BackendDisplayName(") > 0,
-		"the backend row must use the display-name helper")
+	Assert(InStr(Main, "_LLM_Menu_BackendRowLabel(") > 0,
+		"the backend row must name the selected option")
 	Assert(InStr(Main, "_LLM_Menu_ModelDisplayText(") > 0,
 		"the model row must use the display-text helper")
 	Assert(InStr(Main, 'StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"])') == 0,

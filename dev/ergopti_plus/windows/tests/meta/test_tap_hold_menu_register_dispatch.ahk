@@ -51,7 +51,7 @@ _THRD_ButtonsAreCommands() {
 	; Both buttons reach the renderer as named commands. A `command` row is drawn
 	; by the renderer's _MR_RenderRows path, which registers it — the
 	; driver never adds it, so it cannot add it raw.
-	for _, Id in ["reset_defaults", "disable_all"] {
+	for _, Id in ["scope_restore", "scope_clear"] {
 		Assert(InStr(Commands, Chr(34) . Id . Chr(34)) > 0,
 			"the terminal provider must pass '" . Id . "' to the renderer as a command (HIGH-07)")
 	}

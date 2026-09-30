@@ -164,8 +164,10 @@ helpers.describe("API panel test request", function()
 			calls[1].on_ok("OK", 42)
 			helpers.assert_eq(#notifications, 1, "one success notification must surface")
 			helpers.assert_eq(notifications[1].title, "menu.llm.api_test_ok_title")
-			helpers.assert_true(notifications[1].body:find("Prod", 1, true) ~= nil,
-				"the success body must name the entry")
+			helpers.assert_true(notifications[1].body:find("openai/probe-model", 1, true) ~= nil,
+				"the success body must name the entry automatically")
+			helpers.assert_true(notifications[1].body:find("Prod", 1, true) == nil,
+				"the label an earlier build stored is never shown")
 			helpers.assert_true(notifications[1].body:find("42", 1, true) ~= nil,
 				"the success body must carry the latency")
 			helpers.assert_true(notifications[1].body:find("OK", 1, true) ~= nil,
@@ -204,7 +206,8 @@ helpers.describe("API panel test request", function()
 			calls[1].on_fail("request_failed")
 			helpers.assert_eq(#notifications, 1, "one failure notification must surface")
 			helpers.assert_eq(notifications[1].title, "menu.llm.api_unreachable_title")
-			helpers.assert_true(notifications[1].body:find("Prod", 1, true) ~= nil)
+			helpers.assert_true(notifications[1].body:find("openai/probe-model", 1, true) ~= nil,
+				"the failure body names the entry automatically")
 			helpers.assert_true(notifications[1].body:find("live-secret", 1, true) == nil,
 				"the token must never reach a notification")
 			helpers.assert_eq(notifications[1].level, "error")
@@ -274,14 +277,14 @@ helpers.describe("API panel test request", function()
 			local panel = require("ui.menu.menu_llm.api_panel")
 			helpers.assert_true(type(panel.active_entry_display_name) == "function",
 				"the panel must expose the entry display name")
-			helpers.assert_eq(panel.active_entry_display_name(), "Prod",
-				"the row shows the configured entry name, never the model id")
-			entry.label = ""
-			helpers.assert_eq(panel.active_entry_display_name(), "probe-model",
-				"an unnamed entry falls back to its model")
+			helpers.assert_eq(panel.active_entry_display_name(), "openai/probe-model",
+				"the row shows the automatic name, never the label an earlier build stored")
+			entry.label = nil
+			helpers.assert_eq(panel.active_entry_display_name(), "openai/probe-model",
+				"an entry without a stored label reads the same")
 			entry.model = ""
-			helpers.assert_eq(panel.active_entry_display_name(), "openai-default",
-				"an entry without name or model falls back to the provider default")
+			helpers.assert_eq(panel.active_entry_display_name(), "openai/openai-default",
+				"an entry without a model is named after the provider default")
 			entry.id = "ghost"
 			helpers.assert_true(panel.active_entry_display_name() == nil,
 				"an unknown entry never resurrects a stale model")
@@ -408,6 +411,44 @@ helpers.describe("API panel test request", function()
 			calls[1].on_ok("OK", 9)
 			helpers.assert_eq(#notifications, 0,
 				"a completion for a deleted entry must stay silent")
+		end)
+	end)
+
+	-- api-entry-auto-name: every row names its entry <provider>/<model>, the
+	-- label a user typed in an earlier build is not read, and two entries of
+	-- one provider and model read apart by their host.
+	helpers.it("names every entry after its provider and model (api-entry-auto-name)", function()
+		helpers.with_fresh_modules({
+			"modules.llm",
+			"infra.i18n",
+			"infra.logger",
+			"infra.dialog_util",
+			"infra.notifications",
+			"infra.manifest_menu",
+			"ui.menu.menu_llm.api_panel",
+		}, function()
+			local entries = {
+				{ id = "a", provider = "openai", token = "t-a", model = "m1", label = "Ma clé",
+					base_url = "https://api.example.invalid/v1" },
+				{ id = "b", provider = "openai", token = "t-b", model = "m1", label = "Autre",
+					base_url = "http://localhost:8080/v1" },
+				{ id = "c", provider = "openai", token = "t-c", model = "m2", label = "Troisième" },
+			}
+			install_doubles({ entries = entries, active_id = "a", spec = nil })
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local expected = { "openai/m1 (api.example.invalid)", "openai/m1 (localhost:8080)", "openai/m2" }
+			local title, rows = panel.build(fixture_context())
+			for index, name in ipairs(expected) do
+				helpers.assert_eq(rows[index].label, name, "entry row " .. index)
+			end
+			helpers.assert_eq(title, "API — openai/m1 (api.example.invalid)",
+				"the parent row names the active entry without repeating its provider")
+			local picker = panel.build_model_picker(fixture_context())
+			for index, name in ipairs(expected) do
+				-- The picker opens with « No model » and a separator
+				helpers.assert_eq(picker[index + 2].label, name, "picker row " .. index)
+			end
+			helpers.assert_eq(panel.active_entry_display_name(), expected[1])
 		end)
 	end)
 

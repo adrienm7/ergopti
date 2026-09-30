@@ -56,8 +56,8 @@ _THHS_Render() {
 	Providers := Map(
 		"tap_hold_keys_left", (*) => _THHS_KeyIdRows("left", Inert),
 		"tap_hold_keys_right", (*) => _THHS_KeyIdRows("right", Inert))
-	Commands := Map("tapholds_toggle", Inert, "reset_defaults", Inert,
-		"disable_all", Inert, "edit_nav_layer", Inert)
+	Commands := Map("tapholds_toggle", Inert, "scope_restore", Inert,
+		"scope_clear", Inert, "edit_nav_layer", Inert)
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", Providers, Commands,
 		Map("tapholds_enabled", () => false))
 }

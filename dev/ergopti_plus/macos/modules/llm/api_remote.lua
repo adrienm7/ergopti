@@ -346,7 +346,9 @@ local RETRY_FAILED_MAX_MULT      = _R_MAX_MULT
 -- Array of user-configured API entries. Each entry is a table:
 --   { id, provider, base_url?, token, model, label? }
 -- ``base_url`` overrides the provider default when present (empty string =
--- inherit). ``label`` is a user-friendly name shown in the entry picker.
+-- inherit). ``label`` is the name a user typed in builds before 2026-10: it is
+-- kept as stored and never read, since every tray names an entry after its
+-- provider and model (_shared/lua/llm/api_entry_names.lua).
 local _entries = {}
 local _active_id = ""
 local _is_ready = false
@@ -378,13 +380,15 @@ local _retired_provider_reported = {}
 --- ignored, so warmup and predictions through it are off; the entries live in
 --- the app's settings, not a file, so the user replaces or deletes it from the
 --- AI menu. Only a DEBUG line said so before.
+--- The entry is named as the AI menu names it, after its provider and model.
 --- @param entry table The stored entry (its token is never logged).
 local function report_retired_provider(entry)
 	local key = tostring(entry.id) .. "\0" .. tostring(entry.provider)
 	if _retired_provider_reported[key] then return end
 	_retired_provider_reported[key] = true
-	Logger.warn(LOG, "API entry '%s' names provider '%s', which this build no longer has; it is ignored — "
-		.. "replace or delete it in the AI menu.", tostring(entry.label or entry.id), tostring(entry.provider))
+	Logger.warn(LOG, "API entry '%s/%s' names provider '%s', which this build no longer has; it is ignored — "
+		.. "replace or delete it in the AI menu.", tostring(entry.provider), tostring(entry.model),
+		tostring(entry.provider))
 end
 
 --- Completes one availability owner exactly once without conflating

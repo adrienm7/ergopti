@@ -1843,13 +1843,16 @@ function M.stop(reason, on_done)
 	Logger.info(LOG, "Stopping Karabiner lease %s (%s).", generation.token, tostring(reason or "unspecified"))
 
 	cancel_ack_timer(generation)
-	settle_callbacks("lease.start", generation.start_callbacks, false, "stopped-before-ready")
+	settle_callbacks("lease.start", generation.start_callbacks, false,
+		LeaseContract.STOPPED_BEFORE_READY)
 	if generation.command then
-		settle_callbacks("lease.command", generation.command.callbacks, false, "lease-stopping")
+		settle_callbacks("lease.command", generation.command.callbacks, false,
+			LeaseContract.COMMAND_SUPERSEDED_BY_STOP)
 		generation.command = nil
 	end
 	if generation.queued_command then
-		settle_callbacks("lease.command", generation.queued_command.callbacks, false, "lease-stopping")
+		settle_callbacks("lease.command", generation.queued_command.callbacks, false,
+			LeaseContract.COMMAND_SUPERSEDED_BY_STOP)
 		generation.queued_command = nil
 	end
 
