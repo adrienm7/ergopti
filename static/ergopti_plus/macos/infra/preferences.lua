@@ -978,7 +978,8 @@ local function prepare_inline_updates(source, updates, root)
 			if path == root or path:sub(1, #root + 1) == root .. "." then
 				local value = decoded
 				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
-				if type(value) == "table" then inline[path] = { record = record, value = value } end
+				-- A list is not a table of settings: no owned leaf lives inside it.
+				if type(value) == "table" and #value == 0 then inline[path] = { record = record, value = value } end
 			end
 		end
 	end
@@ -1031,7 +1032,21 @@ end
 --- @param updates table Owned leaf operations.
 --- @return table Prepared writer operations.
 function M.prepare_shortcut_updates(source, updates)
-	return prepare_inline_updates(source, updates, "shortcuts")
+	-- A plain value an older build left where the shortcut scope keeps a table
+	-- of assignments (`keyboard = "…"`) would make every row below it
+	-- unwritable. The scope owns that container, so the outdated value goes
+	-- with its reset instead of refusing it, as the Linux scope does.
+	local rows = {}
+	local decoded = TomlCodec.decode(source.content or "")
+	local section = type(decoded) == "table" and decoded.shortcuts or nil
+	for _, key in ipairs(type(section) == "table" and { "keyboard", "tap_keys" } or {}) do
+		local value = section[key]
+		if value ~= nil and (type(value) ~= "table" or #value > 0) then
+			rows[#rows + 1] = { section = "shortcuts", key = key, delete = true }
+		end
+	end
+	for _, row in ipairs(prepare_inline_updates(source, updates, "shortcuts")) do rows[#rows + 1] = row end
+	return rows
 end
 
 --- Preserves unowned hotstring neighbors while changing declared inline leaves.
