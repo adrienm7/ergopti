@@ -2004,6 +2004,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-hardening-d-native-timeout-contract.cjs'
 	},
 	{
+		name: 'no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)',
+		cmd: 'node',
+		args: ['tools/test/test-hardening-c-ahk-scan-code-precedence.cjs'],
+		repro: 'node tools/test/test-hardening-c-ahk-scan-code-precedence.cjs'
+	},
+	{
 		name: 'tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)',
 		cmd: 'node',
 		args: ['tools/test/find-false-greens.cjs'],
