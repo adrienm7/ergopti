@@ -35,6 +35,20 @@
 ; =============================================
 ; =============================================
 
+; The i18n key each _Onboarding_CommitError call of Body passes as a literal,
+; in source order.
+; @param Body string Commit source, full-line comments stripped.
+; @returns {Array}
+_ONA_CommitFailureKeys(Body) {
+	Keys := []
+	Position := 1
+	while (Position := RegExMatch(Body, '_Onboarding_CommitError\(\s*"([a-z_.]+)"\s*\)', &Match, Position)) {
+		Keys.Push(Match[1])
+		Position += Match.Len
+	}
+	return Keys
+}
+
 
 
 
@@ -107,23 +121,29 @@ _ONA_CommitErrorsUseSelectedLocale() {
 		"commit failures must be shown by the one renderer that follows the wizard's language")
 	Assert(CommitBody != "" && ErrorBody != "",
 		"onboarding commit and its error renderer must remain source-visible")
+	; A count alone let a new branch in unnoticed, or one showing an untranslated
+	; string; each branch is named here by the key it shows, in source order.
 	RegExReplace(CommitBody, "_Onboarding_CommitError\(", "",
 		&ErrorCallCount)
-	AssertEqual(8, ErrorCallCount,
-		"the complete onboarding commit failure class must remain enumerated")
-	for Key in [
-		"onboarding.error.commit_invalid_config_dir",
-		"onboarding.error.commit_transaction_busy",
-		"onboarding.error.commit_candidate_render",
-		"onboarding.error.commit_source_verification",
-		"onboarding.error.commit_redirect_render",
-		"onboarding.error.commit_transition",
-		"onboarding.error.commit_rollback",
-		"onboarding.error.commit_unexpected"
-	] {
-		Assert(InStr(CommitBody, '"' . Key . '"') > 0,
-			"every onboarding failure branch must pass an i18n key: " . Key)
-	}
+	Keys := _ONA_CommitFailureKeys(CommitBody)
+	AssertEqual(ErrorCallCount, Keys.Length,
+		"every onboarding commit failure must pass a literal i18n key the wizard's language resolves")
+	Listed := ""
+	for Key in Keys
+		Listed .= Key . "`n"
+	; The render and source checks run twice: for config.toml, then for the
+	; tap_hold.toml the Tap-Holds page imports into in the same transition.
+	AssertEqual("onboarding.error.commit_invalid_config_dir`n"
+		. "onboarding.error.commit_transaction_busy`n"
+		. "onboarding.error.commit_candidate_render`n"
+		. "onboarding.error.commit_source_verification`n"
+		. "onboarding.error.commit_candidate_render`n"
+		. "onboarding.error.commit_source_verification`n"
+		. "onboarding.error.commit_redirect_render`n"
+		. "onboarding.error.commit_transition`n"
+		. "onboarding.error.commit_unexpected`n"
+		. "onboarding.error.commit_rollback`n",
+		Listed, "the complete onboarding commit failure class must remain enumerated, branch by branch")
 	Assert(InStr(ErrorBody, "IsSet(_ob_locale)") > 0
 		&& InStr(ErrorBody, '_Onboarding_Translate(Code, Key)') > 0
 		&& InStr(ErrorBody,
