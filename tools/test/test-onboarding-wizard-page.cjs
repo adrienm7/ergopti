@@ -756,6 +756,52 @@ function cataloguePaths(driver) {
 // ======= 4/ Hotstrings, Tap-Holds ===
 // ======================================
 
+(function hotstringsPageImportsThePreviewBubbles() {
+	// (wizard-preview-bubbles) The page listed only hotstring groups, so the
+	// preview bubbles, off in the neutral defaults, stayed off on every fresh
+	// configuration: « tooltip pour hotstrings ne s'affiche plus ».
+	for (const platform of ['macos', 'linux']) {
+		const described = CATALOGUE.platforms[platform].pages.find((p) => p.id === 'hotstrings');
+		const bubbles = described.groups.find(
+			(group) => group.label && group.label[0].key === 'menu.hotstrings.preview_bubbles'
+		);
+		assert.ok(bubbles, platform + ': the hotstrings page offers the preview bubbles');
+		assert.deepEqual(
+			bubbles.items.map((item) => [item.path, item.value]),
+			[
+				['hotstrings.preview_star_enabled', true],
+				['hotstrings.preview_autocorrect_enabled', true],
+				['hotstrings.preview_colored_tooltips', true]
+			],
+			platform + ': the three display bubbles, recommended on'
+		);
+		assert.ok(
+			!bubbles.items.some((item) => item.path === 'hotstrings.preview_ai_enabled'),
+			platform + ': the AI bubble waits for a backend, as the menu restore does'
+		);
+	}
+	const page = openWizard({ platform: 'linux' });
+	page.platform = 'linux';
+	goToPage(page, 'hotstrings');
+	answer(page, true);
+	const operations = finish(page).answers.operations;
+	for (const setting of [
+		'hotstrings.preview_star_enabled',
+		'hotstrings.preview_autocorrect_enabled',
+		'hotstrings.preview_colored_tooltips'
+	]) {
+		assert.ok(
+			operations.some((op) => op.path === setting && op.value === true),
+			setting + ' is imported with the recommended hotstrings'
+		);
+	}
+	const windows = CATALOGUE.platforms.windows.pages.find((p) => p.id === 'hotstrings');
+	assert.ok(
+		!JSON.stringify(windows).includes('preview_star_enabled'),
+		'Windows draws no preview bubble'
+	);
+})();
+
 (function hotstringsGroupLanguageFileSection() {
 	const page = openWizard({ platform: 'linux' });
 	page.platform = 'linux';
@@ -774,7 +820,8 @@ function cataloguePaths(driver) {
 		'a language pack is named by its locale'
 	);
 	assert.ok(described.groups.every((group) => group.select_all === true && !group.path));
-	for (const language of described.groups) {
+	// The last group holds the preview bubbles, settings rather than a language.
+	for (const language of described.groups.filter((group) => group.groups)) {
 		for (const file of language.groups) {
 			assert.ok(
 				file.path.startsWith('hotstrings.groups.'),

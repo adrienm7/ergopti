@@ -4397,6 +4397,49 @@
 										"text": "🇫🇷 Français"
 									}
 								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.hotstrings.preview_bubbles"
+									}
+								],
+								"select_all": true,
+								"items": [
+									{
+										"path": "hotstrings.preview_star_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_magic"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_autocorrect_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_autocorrect"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_colored_tooltips",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_colored"
+											}
+										]
+									}
+								]
 							}
 						],
 						"master": {
@@ -5501,6 +5544,49 @@
 								"label": [
 									{
 										"text": "🇫🇷 Français"
+									}
+								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.hotstrings.preview_bubbles"
+									}
+								],
+								"select_all": true,
+								"items": [
+									{
+										"path": "hotstrings.preview_star_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_magic"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_autocorrect_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_autocorrect"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_colored_tooltips",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_colored"
+											}
+										]
 									}
 								]
 							}

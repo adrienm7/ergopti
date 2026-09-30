@@ -102,7 +102,9 @@ const PAGE_FIELDS = new Set([
 	'magic_key',
 	'sub_switch',
 	'state',
-	'triggers'
+	'triggers',
+	'settings',
+	'settings_label_key'
 ]);
 
 // What the page draws between an item's trigger and the action it imports. No
@@ -606,6 +608,62 @@ function validatePage(id, page, manifest, labels) {
 	if (page.checklist === 'tap_holds' && id !== 'tap_holds') {
 		throw new Error(`[onboarding.pages.${id}] only the tap_holds page lists tap-hold keys`);
 	}
+	if (page.settings !== undefined) {
+		if (!isPlainObject(page.settings) || Object.keys(page.settings).length === 0) {
+			throw new Error(`[onboarding.pages.${id}] settings maps setting paths to label keys`);
+		}
+		if (typeof page.settings_label_key !== 'string')
+			throw new Error(`[onboarding.pages.${id}] settings need a settings_label_key`);
+		labels.requireKey(page.settings_label_key, `onboarding page ${id} settings`);
+		for (const [settingPath, key] of Object.entries(page.settings)) {
+			labels.requireKey(key, `onboarding page ${id} setting ${settingPath}`);
+		}
+	} else if (page.settings_label_key !== undefined) {
+		throw new Error(`[onboarding.pages.${id}] settings_label_key names no settings`);
+	}
+}
+
+/**
+ * The recommended settings a page imports besides its own checklist: one
+ * labelled group of the listed paths declared on the platform whose
+ * recommendation differs from their neutral default. The hotstrings page lists
+ * its hotstring groups, and without this the preview bubbles, which only show
+ * what a hotstring will type, stayed off on every fresh configuration.
+ * @param {string} id Page id.
+ * @param {object} page Declaration.
+ * @param {string} platform Manifest platform token.
+ * @param {object} features Indexed manifest features.
+ * @param {object} projection Value projection.
+ * @returns {object[]} One labelled group, or none.
+ */
+function settingsGroups(id, page, platform, features, projection) {
+	if (page.settings === undefined) return [];
+	const items = [];
+	for (const [settingPath, key] of Object.entries(page.settings)) {
+		const feature = features.get(settingPath);
+		if (!feature)
+			throw new Error(`onboarding page ${id} setting ${settingPath} is not a manifest feature`);
+		if (projection.scopeOf(settingPath) !== id) {
+			throw new Error(`onboarding page ${id} setting ${settingPath} belongs to another scope`);
+		}
+		if (!feature.platforms.includes(platform)) continue;
+		const values = projection.project(settingPath, platform);
+		if (sameValue(values.default, values.recommended)) {
+			throw new Error(
+				`onboarding page ${id} setting ${settingPath} recommends its neutral default`
+			);
+		}
+		items.push({
+			path: settingPath,
+			value: values.recommended,
+			default: values.default,
+			recommended: true,
+			label: [{ key }]
+		});
+	}
+	return items.length > 0
+		? [{ label: [{ key: page.settings_label_key }], select_all: true, items }]
+		: [];
 }
 
 /**
@@ -1172,6 +1230,7 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 	} else if (page.checklist === 'tap_holds') {
 		groups = tapHoldGroups(id, platform, labels);
 	}
+	groups = groups.concat(settingsGroups(id, page, platform, features, projection));
 	const hint = page.hint_key && page.hint_key[platform];
 	const note = page.note_key && page.note_key[platform];
 	if (hint) labels.requireKey(hint, `onboarding page ${id}`);
