@@ -386,6 +386,7 @@ InstallSendNoOps()
 #Include unit/test_preview_index_covers_every_registration.ahk
 #Include unit/test_preview_defers_to_engine.ahk
 #Include unit/test_no_repeat_preview.ahk
+#Include unit/test_hotstring_preview_shows.ahk
 #Include unit/test_prefix_index_cache_equiv.ahk
 #Include unit/test_personal_info_mask_vectors.ahk
 #Include unit/test_personal_info_tags_single_source.ahk
