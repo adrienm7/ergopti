@@ -423,6 +423,17 @@ h1 {
 	line-height: 1.4;
 }
 
+/* The separator between a trigger and its action: the arrows inside gesture
+   and action labels must never read as it. */
+.value-separator {
+	color: #007aff;
+	font-weight: 700;
+}
+
+.check-row input[type='checkbox']:disabled + .check-label .value-separator {
+	opacity: 0.6;
+}
+
 /* ===================================== */
 /* ===================================== */
 /* ======= 9/ Buttons ================= */
