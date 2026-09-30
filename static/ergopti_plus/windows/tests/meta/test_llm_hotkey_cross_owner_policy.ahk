@@ -3,20 +3,18 @@
 ; ==============================================================================
 ; MODULE: LLM Cross-Owner Hotkey Policy Meta Test
 ; DESCRIPTION:
-; Source guard for the raw clipboard owner, whose textual permanent name must
+; Source guard for the raw textual character owners, whose permanent names must
 ; remain visible after the registrar freezes character hotkeys to explicit VK
-; specs.
+; specs. The LLM rescue hotkey (^!+i) is the production one: the clipboard's
+; "~^v" was retired for an InputHook paste observer, since a hotkey named by a
+; character never fires on the keys the driver declares by scan code.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_LHCM_TextualClipboardOwnerRemainsVisibleToFrozenAdmission() {
-	ClipboardBody := _StripFullLineComments(_DriverFuncBody("KL_Clip_Start"))
-	Assert(ClipboardBody != "",
-		"the raw clipboard hotkey producer must remain reachable")
-	Assert(RegExMatch(ClipboardBody,
-		'is)Hotkey\(\s*"~\^v"\s*,\s*KL_Clip_OnPasteHK\s*,\s*"On"\s*\)') > 0,
-		"the production inventory must retain the raw textual Ctrl+V owner")
+_LHCM_TextualCharacterOwnerRemainsVisibleToFrozenAdmission() {
+	Assert(RegExMatch(_DriverSourceNoComments(), "m)^[ \t]*\^!\+i::") > 0,
+		"the production inventory must retain the raw textual Ctrl+Alt+Shift+I owner")
 
 	ReserveBody := _StripFullLineComments(
 		_DriverFuncBody("_HotkeyRegistrarReserveOwned"))
@@ -35,4 +33,4 @@ _LHCM_TextualClipboardOwnerRemainsVisibleToFrozenAdmission() {
 }
 
 Test("[llm-hotkey-collision] frozen specs still see raw textual owners",
-	_LHCM_TextualClipboardOwnerRemainsVisibleToFrozenAdmission)
+	_LHCM_TextualCharacterOwnerRemainsVisibleToFrozenAdmission)
