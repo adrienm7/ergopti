@@ -22,6 +22,8 @@ local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
 	"ui.menu.metrics_scope",
+	"ui.menu.hotstrings_scope",
+	"modules.hotstrings.hotstrings_config",
 	"ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
 	"infra.dialog_util",
@@ -635,6 +637,7 @@ local function with_menu_fixture(options, callback)
 			return perform(observations, "preview-ai", function() end)
 		end,
 	}
+	observations.keymap = keymap
 	local karabiner = {
 		snapshot_settings = function() return clone(observations.karabiner_state) end,
 		clear_all_bindings = function(on_done)
@@ -1214,6 +1217,57 @@ helpers.describe("metrics scope menu composition", function()
 			selected = "onboarding.btn.yes"
 			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("metrics", "recommended"), true)
 			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+		end)
+	end)
+end)
+
+helpers.describe("hotstrings scope menu composition", function()
+	helpers.it("wires the running keymap, both files, the shared fence and a default-No confirmation", function()
+		with_menu_fixture({}, function(observations)
+			local received, selected, dialog_args
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				dialog_args = { ... }
+				return selected
+			end }
+			local overrides = { get_override_path = function() return "/virtual/hotstrings_config.toml" end }
+			package.loaded["modules.hotstrings.hotstrings_config"] = overrides
+			local constructions = 0
+			package.loaded["ui.menu.hotstrings_scope"] = { new = function(options)
+				received, constructions = options, constructions + 1
+				return { apply = function(mode)
+					return options.admission("hotstrings scope fixture", function()
+						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
+							"ordinary save must not enter an owned scope")
+						return options.confirm(mode)
+					end)
+				end }
+			end }
+			selected = "onboarding.btn.no"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("hotstrings", "clear"), false)
+			helpers.assert_eq(dialog_args[1], "menu.hotstrings.title")
+			helpers.assert_eq(dialog_args[2], "common.clear_to_system")
+			helpers.assert_eq(dialog_args[3], "onboarding.btn.no")
+			helpers.assert_eq(dialog_args[4], "onboarding.btn.yes")
+			helpers.assert_eq(received.keymap, observations.keymap, "the scope drives the running typing engine")
+			helpers.assert_eq(received.config, overrides, "the scope owns the loaded override file")
+			helpers.assert_eq(received.path, "/virtual/config.toml")
+			helpers.assert_eq(received.state, observations.state)
+			helpers.assert_type(received.checkpoint.capture, "function")
+			helpers.assert_type(received.checkpoint.replace, "function")
+			helpers.assert_type(received.demotions.release_feature, "function")
+			helpers.assert_eq(received.editor, package.loaded["ui.hotstring_editor"],
+				"the editor follows the magic key, as from its own menu row")
+			for _, name in ipairs({ "start_engine", "stop_engine", "is_personal", "remove", "capture_preferences" }) do
+				helpers.assert_type(received[name], "function", name)
+			end
+			local config_backup, override_backup = received.backup_path(), received.override_backup_path()
+			helpers.assert_eq(config_backup:find("/virtual/config.toml.hotstrings-", 1, true), 1)
+			helpers.assert_eq(override_backup:find("/virtual/hotstrings_config.toml.hotstrings-", 1, true), 1)
+			helpers.assert_true(received.backup_path() ~= config_backup, "every backup path is new")
+			selected = "onboarding.btn.yes"
+			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("hotstrings", "recommended"), true)
+			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+			helpers.assert_eq(constructions, 1, "one owner per session keeps its retained inverse")
 		end)
 	end)
 end)
