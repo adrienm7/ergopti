@@ -2184,6 +2184,30 @@ LLM_NavEventOwner_SyncRecord(Record, AllowLifecycleResume := false) {
 	return true
 }
 
+; Whether the native owner routes navigation for Record right now: started,
+; not quarantined or fenced, holding a committed plan, and naming Record's token
+; as its active owner. Unlike LLM_NavEventOwner_SyncRecord, an owner that is not
+; running answers false: nothing cycles then, so nothing may consume the
+; navigation chord on its behalf (llm-tooltip-nav-consumed).
+; @param {Object} Record - Presented prediction record.
+; @returns {Boolean}
+LLM_NavEventOwner_RoutesRecord(Record) {
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerCommittedPlan
+	; A parse-time #HotIf reaches this before the adapter's initializers run.
+	if !IsSet(_LLM_NavEventOwnerStarted)
+			|| !IsSet(_LLM_NavEventOwnerQuarantined)
+			|| !IsSet(_LLM_NavEventOwnerCommittedPlan)
+		return false
+	if !_LLM_NavEventOwnerStarted || _LLM_NavEventOwnerQuarantined
+			|| !(_LLM_NavEventOwnerCommittedPlan is Array)
+		return false
+	if !IsObject(Record) || !Record.HasOwnProp("NavOwnerToken")
+			|| !(Record.NavOwnerToken is Integer) || Record.NavOwnerToken <= 0
+		return false
+	return LLM_NavEventOwner_SyncRecord(Record)
+}
+
 _LLM_NavEventOwnerPublishCurrentSurface(AllowLifecycleResume := false) {
 	global _TooltipActiveSurface, _LLM_NavEventOwnerRecords
 	Surface := IsSet(_TooltipActiveSurface) ? _TooltipActiveSurface : 0

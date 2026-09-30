@@ -725,6 +725,24 @@ LLM_TooltipOwnsSurface() {
 	return IsObject(Record) and Record.Kind == "prediction"
 }
 
+; True while the native navigation owner cycles the prediction on screen: a real
+; prediction with at least two slots, no acceptance outcome yet, whose record the
+; owner routes. With one slot a cycle is refused and the arrow stays the
+; application's, as on macOS. Read from the #HotIf of the hotkeys that consume the
+; navigation chord (menu_llm/tab_accept.ahk, llm-tooltip-nav-consumed).
+LLM_TooltipNavCycleIsOwned() {
+	Record := _LLM_TooltipGetCurrentRecord()
+	if !IsObject(Record) or Record.Kind != "prediction"
+		return false
+	if !(Record.Slots is Array) or Record.Slots.Length < 2
+		return false
+	if !Record.HasOwnProp("Lifecycle") or !IsObject(Record.Lifecycle)
+			or Record.Lifecycle.Outcome != ""
+		return false
+	return IsSet(LLM_NavEventOwner_RoutesRecord)
+		&& LLM_NavEventOwner_RoutesRecord(Record)
+}
+
 ; True while a real prediction is still inside its minimum-display window. The
 ; bridge's keystroke / pointer dismissal consults this so a prediction is never
 ; dismissed by the user the instant it appears. False during loading and once the
