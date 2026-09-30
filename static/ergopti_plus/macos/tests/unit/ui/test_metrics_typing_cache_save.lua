@@ -3,7 +3,8 @@
 --- ==============================================================================
 --- MODULE: Typing Metrics Cache Save Outcomes
 --- DESCRIPTION:
---- Optional cache persistence must report failures without blocking live delivery.
+--- Optional snapshot persistence must report failures without blocking live
+--- delivery, and must replace the previous snapshot only by an atomic rename.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -11,7 +12,7 @@ local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
 
 local function with_save(mode, callback)
-	local previous_open = io.open
+	local previous_open, previous_rename, previous_remove = io.open, os.rename, os.remove
 	local ok, err = xpcall(function()
 		Scope.run(function()
 			package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
@@ -26,7 +27,7 @@ local function with_save(mode, callback)
 				every = function() return { timer = {} }, true end,
 				cancel = function(handle) handle.timer = nil; return true end,
 			})
-			local state = { mode = mode, opens = 0, writes = 0, closes = 0, codes = {} }
+			local state = { mode = mode, opens = 0, writes = 0, closes = 0, renames = 0, unlinks = 0, codes = {} }
 			window.webview.evaluateJavaScript = function(self, code)
 				window.evaluated = window.evaluated + 1
 				state.codes[#state.codes + 1] = code
@@ -36,24 +37,27 @@ local function with_save(mode, callback)
 			package.loaded["infra.logger"].warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end
-			package.loaded["hs.json"].encode = function(value)
-				if type(value.manifest) == "string" then
-					if state.mode == "encode_throw" then error("PRIVATE_PAYLOAD") end
-					if state.mode == "encode_nil" then return nil end
-					if state.mode == "encode_number" then return 42 end
-				end
-				return "{}"
+			os.remove = function() state.unlinks = state.unlinks + 1; return true end
+			os.rename = function(from, to)
+				state.renames = state.renames + 1
+				helpers.assert_eq(from, to .. ".partial", "the snapshot is replaced from its sibling partial file")
+				if state.mode == "rename_throw" then error("PRIVATE_PATH") end
+				if state.mode == "rename_nil" then return nil, "PRIVATE_PATH", 18 end
+				return true
 			end
-			io.open = function(_, access)
+			io.open = function(path, access)
 				if access == "r" then return nil, "missing", 2 end
 				helpers.assert_eq(access, "w")
+				helpers.assert_true(path:sub(-8) == ".partial", "a save never writes the live snapshot in place")
 				state.opens = state.opens + 1
 				if state.mode == "open_nil" then return nil, "PRIVATE_PATH", 13 end
 				if state.mode == "open_throw" then error("PRIVATE_PATH") end
 				return {
-					write = function(self, content)
+					write = function(self, header, payload)
 						state.writes = state.writes + 1
-						helpers.assert_eq(content, "{}")
+						helpers.assert_true(header:find("^ERGOPTI_TYPING_METRICS_SNAPSHOT 2 %d+ " .. #payload .. "\n$") ~= nil,
+							"the header carries the format version, the time and the payload length")
+						helpers.assert_eq(payload:sub(1, 12), '{"manifest":')
 						if state.mode == "write_throw" then error("PRIVATE_PAYLOAD") end
 						if state.mode == "write_nil" or state.mode == "both_nil" then return nil, "PRIVATE_PAYLOAD", 28 end
 						return self
@@ -74,24 +78,29 @@ local function with_save(mode, callback)
 			callback(dashboard, state, window, warnings, refresh)
 		end)
 	end, debug.traceback)
-	io.open = previous_open
+	io.open, os.rename, os.remove = previous_open, previous_rename, previous_remove
 	if not ok then error(err, 0) end
 end
 
 helpers.describe("typing metrics cache save", function()
-	for _, mode in ipairs({ "success", "encode_throw", "encode_nil", "encode_number", "open_nil", "open_throw",
-		"write_nil", "write_throw", "close_nil", "close_throw", "both_nil" }) do
+	for _, mode in ipairs({ "success", "open_nil", "open_throw", "write_nil", "write_throw", "close_nil",
+		"close_throw", "both_nil", "rename_nil", "rename_throw" }) do
 		helpers.it("(typing-cache-save) keeps live readiness after " .. mode, function()
 			with_save(mode, function(_, state, window, warnings, refresh)
 				refresh()
-				helpers.assert_eq(window.evaluated, 1, "live readiness must still be submitted")
-				helpers.assert_eq(state.codes[1], "typeof window.publishTypingMetricsData")
-				helpers.assert_eq(#warnings, mode == "success" and 0 or 1)
-				local encoded = mode:sub(1, 7) ~= "encode_"
-				local acquired = encoded and mode ~= "open_nil" and mode ~= "open_throw"
-				helpers.assert_eq(state.opens, encoded and 1 or 0)
+				-- The loading notice, then the fresh publication
+				helpers.assert_eq(window.evaluated, 2, "live readiness must still be submitted")
+				helpers.assert_eq(state.codes[2], "typeof window.publishTypingMetricsData")
+				helpers.assert_eq(#warnings, mode == "success" and 0 or 1, table.concat(warnings, " | "))
+				local acquired = mode ~= "open_nil" and mode ~= "open_throw"
+				local written = acquired and mode ~= "write_nil" and mode ~= "write_throw" and mode ~= "close_nil"
+					and mode ~= "close_throw" and mode ~= "both_nil"
+				helpers.assert_eq(state.opens, 1)
 				helpers.assert_eq(state.writes, acquired and 1 or 0)
 				helpers.assert_eq(state.closes, acquired and 1 or 0, "write failure still requires exact cleanup")
+				helpers.assert_eq(state.renames, written and 1 or 0, "only a complete partial file is published")
+				helpers.assert_eq(state.unlinks, (acquired and mode ~= "success") and 1 or 0,
+					"a failed save removes its partial file")
 				if #warnings > 0 then helpers.assert_nil(warnings[1]:find("PRIVATE_", 1, true)) end
 			end)
 		end)
@@ -101,7 +110,7 @@ helpers.describe("typing metrics cache save", function()
 			for index, mode in ipairs({ "open_nil", "open_nil", "success", "open_nil" }) do
 				state.mode = mode
 				refresh()
-				helpers.assert_eq(window.evaluated, index)
+				helpers.assert_eq(window.evaluated, 2 * index)
 				helpers.assert_eq(#warnings, index == 4 and 2 or 1)
 				helpers.assert_true(dashboard.close())
 			end

@@ -146,7 +146,7 @@ for (const success of [true, false]) {
 		f.context.reset_filters();
 		const clear = f.context._lua_request;
 		const native = actualPurge(clear, success);
-		assert.equal(native.removes, 1);
+		assert.equal(native.removes, 2, 'the snapshot and any partial save are unlinked');
 		assert.equal(vm.runInContext(native.ack, f.context), true);
 		f.select('2026-09-04');
 		f.dispatch();

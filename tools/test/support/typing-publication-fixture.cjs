@@ -41,16 +41,23 @@ package.loaded['hs.fs'].attributes=function()return {}end
 package.loaded['adapters.file_system'].read_with_status=function()return nil,'absent'end
 local manager=package.loaded['modules.keylogger.log_manager']
 manager.get_sqlite_path=function()return '/virtual/db'end
-manager.get_db_rev=function()return rev end
-package.loaded['modules.keylogger.sqlite_reader']={
- read_manifest=function()if empty then return {} end;return {['2026-09-01']={[rev==1 and 'Startup' or 'Live']={chars=rev}}}end,
- read_range_split_today=function()return {historical={},today={}}end}
+-- The paced projection is private; the publications around it are under test
+package.loaded['ui.metrics_typing.projection'].session=function()
+ return {
+  manifest=function()
+   local manifest=empty and {} or {['2026-09-01']={[rev==1 and 'Startup' or 'Live']={chars=rev}}}
+   return manifest,package.loaded['hs.json'].encode(manifest)
+  end,
+  range=function()return '{"historical":{},"today":{}}' end,
+ }
+end
 dashboard._app_icon_cache={Startup=false,Live=false}
 if empty then hs.keycodes.map={} end
 io.open=function()local f={};function f:write()return self end;function f:close()return true end;return f end
+os.rename=function()return true end
 context.webview.evaluateJavaScript=function(self,code,done)
  evaluations[#evaluations+1]={code=code,done=done}
- if not code:find('^typeof ') then publications[#publications+1]=code end
+ if code:find('publishTypingMetricsData(',1,true) then publications[#publications+1]=code end
  return self
 end
 local function fire(index)now=timers[index].at;timers[index].run()end
@@ -62,15 +69,24 @@ local function complete_pending_probes()
   end
  end
 end
+local function last_probe()
+ for index=#evaluations,1,-1 do
+  if evaluations[index].code=='typeof window.publishTypingMetricsData' then return evaluations[index] end
+ end
+end
 assert(dashboard.show())
-fire(1);fire(2)
-assert(now==0.1 and evaluations[1].code:find('^typeof '))
-evaluations[1].completed=true;evaluations[1].done('undefined')
-assert(timers[3].at>now)
+-- Bootstrap: loading notice, then the paced full projection's slice
+fire(1);fire(#timers)
+local startup=last_probe()
+assert(startup and not startup.completed)
+startup.completed=true;startup.done('undefined')
+local retry=#timers
+assert(timers[retry].at>now)
 now=0.15;rev=2;assert(dashboard.push_live_update())
-fire(4);complete_pending_probes()
+-- Live continuation queues the paced live projection; its slice publishes
+fire(#timers);fire(#timers);complete_pending_probes()
 assert(#publications==1)
-fire(3);complete_pending_probes()
+fire(retry);complete_pending_probes()
 assert(#publications==2)
 print('PUBLICATIONS='..json.encode(publications))
 `
@@ -94,18 +110,25 @@ local dashboard,context=require('tests.support.metrics_typing_fixture')({
  after=function(delay,fn)local h={timer={}};timers[#timers+1]={at=now+delay,run=function()h.timer=nil;fn()end};return h,true end,
  every=function()return {timer={}},true end,
  cancel=function(h)h.timer=nil;return true end})
-local codec=package.loaded['hs.json'];codec.encode=json.encode
-codec.decode=function()return {manifest='{"2026-09-01":{"Cache":{"chars":1}}}',app_icons='{}',kc_layout='{}'}end
-package.loaded['adapters.file_system'].read_with_status=function()return 'cached','ok'end
+local codec=package.loaded['hs.json'];codec.encode=json.encode;codec.decode=json.decode
+local payload='{"manifest":{"2026-09-01":{"Cache":{"chars":1}}},"app_icons":{},"initial_data":null,"kc_layout":{}}'
+package.loaded['adapters.file_system'].read_with_status=function()
+ return 'ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1790000000 '..#payload..'\\n'..payload,'ok'
+end
 package.loaded['hs.fs'].attributes=function()return {}end
-local manager=package.loaded['modules.keylogger.log_manager'];manager.get_sqlite_path=function()return '/virtual/db'end;manager.get_db_rev=function()return 1 end
-package.loaded['modules.keylogger.sqlite_reader']={read_manifest=function()return {['2026-09-01']={Fresh={chars=2}}}end,
- read_range_split_today=function()return {historical={},today={}}end}
+local manager=package.loaded['modules.keylogger.log_manager'];manager.get_sqlite_path=function()return '/virtual/db'end
+package.loaded['ui.metrics_typing.projection'].session=function()
+ return {
+  manifest=function()local manifest={['2026-09-01']={Fresh={chars=2}}};return manifest,json.encode(manifest)end,
+  range=function()return '{"historical":{},"today":{}}' end,
+ }
+end
 dashboard._app_icon_cache={Fresh=false}
 io.open=function()local f={};function f:write()return self end;function f:close()return true end;return f end
+os.rename=function()return true end
 context.webview.evaluateJavaScript=function(self,code,done)
  evaluations[#evaluations+1]={code=code,done=done}
- if not code:find('^typeof ') then
+ if code:find('publishTypingMetricsData(',1,true) then
   local refused=code:find('Fresh',1,true)~=nil
   publications[#publications+1]={code=code,admitted=not refused}
   if refused then return nil end

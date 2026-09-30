@@ -9,15 +9,18 @@
 --- frontend JS.
 ---
 --- FEATURES & RATIONALE:
---- 1. SQLite-only data path: no openssl decrypt, no manifest.json, no .idx
----    file — every value originates from `db.sqlite`.
---- 2. rev-keyed cache: cached projection is reused across opens until the
----    SQLite `meta.rev` advances (bumped on every ingest batch).
---- 3. Two-stage paint: pre-fill from disk-cached snapshot, then overwrite
----    with fresh SQL projection in the background.
+--- 1. Instant first paint: the last complete publication is persisted by
+---    `ui.metrics_typing.snapshot` and painted as soon as the page is ready,
+---    labelled with its date, before any aggregation has run.
+--- 2. Paced refresh: every projection (open, live update, filter request)
+---    runs as an `infra.paced_job` in bounded main-thread slices, one job at a
+---    time, and updates the page in place when it completes. Nothing reads
+---    SQLite synchronously on the open path or in the request poller.
+--- 3. Incremental projection: `ui.metrics_typing.projection` reuses past days
+---    while their fingerprint is unchanged, so a refresh reads only new days.
 --- 4. Filter requests: the JS frontend pushes `(start_date, end_date, apps)`
----    via `window._lua_request`; the poll timer reads it, runs the query
----    (cached), and pushes back the result.
+---    via `window._lua_request`; the poll timer reads it, queues the paced
+---    projection (latest request wins), and pushes back the result.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +35,10 @@ local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local i18n       = require("infra.i18n")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PacedJob   = require("infra.paced_job")
+local PacedJson  = require("infra.paced_json")
+local Projection = require("ui.metrics_typing.projection")
+local Snapshot   = require("ui.metrics_typing.snapshot")
 
 local LOG = "metrics_typing"
 
@@ -69,9 +76,6 @@ local function ensure_ingest_listener()
 	return true
 end
 
-local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
-local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
-local ENOENT_ERROR_CODE = 2
 local JS_MAX_SAFE_INTEGER = 2 ^ 53 - 1
 
 M._wv             = nil
@@ -90,6 +94,13 @@ local _continuation_timers = {}
 local _closing_webview = nil
 local _delivery_errors = {}
 local _delivery_generation = nil
+--- Running paced projection, if any; one job at a time per window.
+M._job = nil
+--- Work waiting for the running job: a full refresh, a live manifest refresh,
+--- and the latest range request (older ones are superseded by the frontend).
+local _pending_work = { full = false, live = false, range = nil }
+--- Snapshot timestamp painted in this window, shown again if the refresh fails.
+local _painted_snapshot_at = nil
 
 local function delivery_is_current(generation, webview)
 	return generation == _generation and M._wv == webview
@@ -153,14 +164,37 @@ local function encode_delivery(generation, webview, site, value)
 	return encoded
 end
 
+--- Cancels the running projection job and forgets queued work.
+--- @return boolean settled True once no job timer remains owned.
+local function cancel_job()
+	_pending_work = { full = false, live = false, range = nil }
+	local job = M._job
+	if not job then return true end
+	M._job = nil
+	local settled = job.cancel()
+	if not settled then Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.") end
+	return settled
+end
+
 local _cache_reset_failure_generation = nil
 
-local function remove_disk_cache(generation, webview)
+local request_work
+
+--- Forgets every cached projection, on disk and in memory, once the disk
+--- snapshot is gone. The running job is cancelled in the same turn, so it can
+--- neither republish nor re-save what was cleared, and a full projection is
+--- queued again so the page leaves its refreshing state.
+--- @return boolean removed True only when the disk snapshot is gone.
+local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
-	local ok, removed, _, error_code = pcall(os.remove, UI_CACHE_FILE)
+	local removed = Snapshot.remove()
 	if not delivery_is_current(generation, webview) then return false end
-	-- Unlike opening a symlink target, unlink absence proves there is no cache entry to remove
-	if ok and (removed == true or error_code == ENOENT_ERROR_CODE) then return true end
+	if removed then
+		cancel_job()
+		Projection.reset()
+		request_work(generation, webview, "full")
+		return true
+	end
 	if _cache_reset_failure_generation ~= generation then
 		_cache_reset_failure_generation = generation
 		Logger.error(LOG, "Typing metrics cache reset failed (disk deletion; content withheld; repeats suppressed).")
@@ -179,13 +213,8 @@ local function clear_cache(generation, webview, reset_id)
 	if not owner or owner.generation ~= generation or reset_id > owner.id then
 		owner = { generation = generation, id = reset_id, settled = false }
 		_cache_reset_owner = owner
-		local removed = remove_disk_cache(generation, webview)
+		local removed = reset_caches(generation, webview)
 		if not delivery_is_current(generation, webview) or _cache_reset_owner ~= owner then return end
-		if removed then
-			M._range_cache = {}
-			M._manifest_cache = nil
-			M._last_query = nil
-		end
 		owner.result = removed
 		owner.settled = true
 		if removed then Logger.info(LOG, "Caches cleared by user reset.") end
@@ -248,10 +277,12 @@ local function stop_runtime()
 	_generation = _generation + 1
 	_pending_live_publication = nil
 	_cache_reset_owner = nil
+	_painted_snapshot_at = nil
 	M._pending_full_refresh = false
+	local job_stopped = cancel_job()
 	local poller_stopped = cancel_poller()
 	local continuations_stopped = cancel_continuations()
-	return poller_stopped and continuations_stopped
+	return job_stopped and poller_stopped and continuations_stopped
 end
 
 --- Retries deletion of an unpublished WebView retained by startup rollback.
@@ -353,14 +384,6 @@ local function resolve_ui_assets_dir(subdir)
 	return nil
 end
 
---- rev-keyed projection caches.
-M._manifest_cache    = nil
-M._manifest_rev      = -1
-M._range_cache       = {}    -- cache_key → { historical, today }
-M._range_cache_rev   = -1
-
---- Last query parameters seen by the poller.
-M._last_query = nil
 --- Coalesces one full manifest refresh per completed ingest cycle.
 M._pending_full_refresh = false
 
@@ -375,6 +398,9 @@ M._pending_full_refresh = false
 -- ============================
 
 local MAX_ICON_LOOKUPS_PER_OPEN = 24
+
+--- Pseudo-apps the frontend never selects by default (data.js process_manifest).
+local EXCLUDED_APPS = { Unknown = true, _sys = true, _system = true }
 
 local function get_app_icon(app_name)
 	local app = hs.application.find(app_name)
@@ -392,209 +418,38 @@ end
 
 
 
--- ===============================
--- ===============================
--- ======= 2/ Data loaders =======
--- ===============================
--- ===============================
+-- ====================================
+-- ====================================
+-- ======= 2/ Paced projections =======
+-- ====================================
+-- ====================================
 
---- Build a stable cache key for a (start, end, apps) query.
-local function make_cache_key(start_date, end_date, apps)
-	local sorted = {}
-	if type(apps) == "table" then
-		for _, v in ipairs(apps) do table.insert(sorted, v) end
-		table.sort(sorted)
-	end
-	return (start_date or "") .. "|" .. (end_date or "") .. "|" .. table.concat(sorted, ",")
+--- Returns the readable db.sqlite path, or nil when no store exists yet.
+--- @return string|nil sqlite_path
+local function readable_sqlite_path()
+	local sqlite_path = _get_log_manager().get_sqlite_path()
+	if not sqlite_path or not fs.attributes(sqlite_path) then return nil end
+	return sqlite_path
 end
 
---- Reset the range cache when meta.rev advances.
-local function _maybe_invalidate_range_cache(rev)
-	if rev ~= M._range_cache_rev then
-		M._range_cache     = {}
-		M._range_cache_rev = rev
-		Logger.info(LOG, "rev advanced (%d) — flushing n-gram range cache.", rev)
-	end
-end
-
---- Cached fetch_range — historical + today's per-app idx merged from SQLite.
-local function fetch_range_cached(start_date, end_date, selected_apps)
-	local log_manager   = require("modules.keylogger.log_manager")
-	local sqlite_reader = require("modules.keylogger.sqlite_reader")
-	local sqlite_path   = log_manager.get_sqlite_path()
-	if not sqlite_path or not fs.attributes(sqlite_path) then
-		return { historical = {}, today = {} }
+--- Computes the complete first-paint publication: manifest, app icons, the
+--- all-time n-gram prefetch, and the keycode layout.
+--- @param pacer table Pacer from `infra.paced_job`.
+--- @return table result { payload = string, generated_at = epoch seconds }.
+local function compute_full(pacer)
+	local generated_at = os.time()
+	local today = os.date("%Y-%m-%d")
+	local manifest, manifest_json = {}, "{}"
+	local session = nil
+	local sqlite_path = readable_sqlite_path()
+	if sqlite_path then
+		session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path, today, pacer)
+		manifest, manifest_json = session.manifest()
 	end
 
-	local rev = log_manager.get_db_rev()
-	_maybe_invalidate_range_cache(rev)
-
-	local key = make_cache_key(start_date, end_date, selected_apps)
-	if M._range_cache[key] then
-		Logger.done(LOG, "n-gram range cache hit.")
-		return M._range_cache[key]
-	end
-	Logger.trace(LOG, "n-gram range cache miss — projecting…")
-	local result = sqlite_reader.read_range_split_today(sqlite_path, start_date, end_date, selected_apps)
-	M._range_cache[key] = result
-	Logger.done(LOG, "n-gram range cached.")
-	return result
-end
-
---- Cached manifest — invalidated on rev bump.
-local function read_manifest_cached()
-	local log_manager   = require("modules.keylogger.log_manager")
-	local sqlite_reader = require("modules.keylogger.sqlite_reader")
-	local sqlite_path   = log_manager.get_sqlite_path()
-	if not sqlite_path or not fs.attributes(sqlite_path) then return {} end
-
-	local rev = log_manager.get_db_rev()
-	if M._manifest_cache and M._manifest_rev == rev then
-		return M._manifest_cache
-	end
-	M._manifest_cache = sqlite_reader.read_manifest(sqlite_path)
-	M._manifest_rev   = rev
-	return M._manifest_cache
-end
-
-
-
-
-
--- ================================
--- ================================
--- ======= 3/ Disk pre-fill =======
--- ================================
--- ================================
-
-local cache_save_failures = {}
-
-local function report_cache_save_failure(category)
-	if cache_save_failures[category] then return end
-	cache_save_failures[category] = true
-	Logger.warn(LOG, "Typing metrics disk cache save refused at %s; live publication continues.", category)
-end
-
-local function save_disk_cache(payload)
-	local encoded, body = pcall(json.encode, payload)
-	if not encoded or type(body) ~= "string" then
-		report_cache_save_failure("encoding")
-		return false
-	end
-	local opened, file = pcall(io.open, UI_CACHE_FILE, "w")
-	if not opened or not file then report_cache_save_failure("open"); return false end
-	local written, result = pcall(function() return file:write(body) end)
-	-- Cleanup is mandatory even when a write raises or returns an operational error
-	local closed, close_result = pcall(function() return file:close() end)
-	local write_failed = not written or result ~= file
-	local close_failed = not closed or close_result ~= true
-	if write_failed or close_failed then
-		report_cache_save_failure(write_failed and (close_failed and "write and close" or "write") or "close")
-		return false
-	end
-	cache_save_failures = {}
-	return true
-end
-
-local cache_read_failures = {}
-
-local function report_cache_read_failure(category)
-	if cache_read_failures[category] then return end
-	cache_read_failures[category] = true
-	Logger.warn(LOG, "Typing metrics disk cache read refused at %s; fresh data loading continues.", category)
-end
-
-local function load_disk_cache()
-	local reported = false
-	local read_ok, content, status = pcall(FileSystem.read_with_status, UI_CACHE_FILE, function(category)
-		reported = true
-		report_cache_read_failure(category)
-	end)
-	if read_ok and status == "absent" then return nil end
-	if not read_ok or status ~= "ok" or type(content) ~= "string" then
-		if not reported then report_cache_read_failure(read_ok and "read" or "dependency") end
-		return nil
-	end
-	local ok, data = pcall(json.decode, content)
-	if not ok or type(data) ~= "table" then
-		report_cache_read_failure("decode")
-		return nil
-	end
-	cache_read_failures = {}
-	return data
-end
-
-
-
-
-
--- ===============================
--- ===============================
--- ======= 4/ Data refresh =======
--- ===============================
--- ===============================
-
-local function publish_data(generation, webview, site, payload, revision, with_assets)
-	local retry_delay = site == "cache" and 0.10 or 0.15
-	local retry_count = site == "cache" and 50 or 60
-	local metadata = string.format('{"manifest_revision":%d%s}', revision,
-		with_assets and string.format(',"assets_revision":%d', revision) or "")
-	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
-	local publication = { code = code, generation = generation, revision = revision }
-	if site == "live manifest" then
-		if _pending_live_publication and _pending_live_publication.generation == generation then
-			if revision > _pending_live_publication.revision then
-				_pending_live_publication.code = code
-				_pending_live_publication.revision = revision
-			end
-			return true
-		end
-		_pending_live_publication = publication
-	end
-	local function release_pending()
-		if _pending_live_publication == publication then _pending_live_publication = nil end
-	end
-	local function attempt(remaining)
-		local admitted = submit_javascript(generation, webview, site .. " readiness", "typeof window.publishTypingMetricsData", function(kind)
-			if kind == "function" then
-				release_pending()
-				submit_javascript(generation, webview, site, publication.code, function(applied)
-					if applied == true then
-						if site == "live manifest" then
-							Logger.debug(LOG, "Typing metrics live publication applied.")
-						else
-							Logger.success(LOG, "Typing metrics publication applied (%s).", site)
-						end
-					elseif applied == false then
-						Logger.debug(LOG, "Typing metrics stale publication discarded (%s).", site)
-					else
-						delivery_failure(generation, webview, site, "invalid publication acknowledgement")
-					end
-				end)
-			elseif remaining > 0 then
-				if not schedule_continuation(retry_delay, generation, webview,
-					function() attempt(remaining - 1) end, "Typing metrics publication readiness")
-				then release_pending() end
-			else
-				release_pending()
-				delivery_failure(generation, webview, site, "publication capability unavailable")
-			end
-		end, release_pending)
-		if not admitted then release_pending() end
-		return admitted
-	end
-	return attempt(retry_count)
-end
-
-local function load_and_inject(generation, webview)
-	if generation ~= _generation or M._wv ~= webview then return false end
-	_publication_revision = _publication_revision + 1
-	local revision = _publication_revision
-
-	local manifest = read_manifest_cached()
-	if generation ~= _generation or M._wv ~= webview then return false end
-
-	-- App icons + apps list + first_date computed from manifest.
+	-- App icons + apps list + first_date computed from manifest. The apps list
+	-- excludes the same pseudo-apps as the frontend's default selection, so the
+	-- prefetch and the page's first range request share one cached history.
 	local app_icons      = {}
 	local icon_lookups   = 0
 	local first_date     = nil
@@ -603,7 +458,7 @@ local function load_and_inject(generation, webview)
 	for date_str, day_data in pairs(manifest) do
 		if first_date == nil or date_str < first_date then first_date = date_str end
 		for app_name, _ in pairs(day_data) do
-			if app_name ~= "Unknown" and not all_apps_set[app_name] then
+			if not EXCLUDED_APPS[app_name] and not all_apps_set[app_name] then
 				all_apps_set[app_name] = true
 				table.insert(all_apps_list, app_name)
 			end
@@ -612,6 +467,8 @@ local function load_and_inject(generation, webview)
 				if cached ~= nil then
 					if cached then app_icons[app_name] = cached end
 				elseif icon_lookups < MAX_ICON_LOOKUPS_PER_OPEN then
+					-- Each lookup enumerates running applications natively
+					pacer.pause()
 					local icon = get_app_icon(app_name)
 					M._app_icon_cache[app_name] = icon or false
 					if icon then app_icons[app_name] = icon end
@@ -632,57 +489,261 @@ local function load_and_inject(generation, webview)
 	end
 
 	-- Initial range pre-fetch (first_date → today).
-	local today_str         = os.date("%Y-%m-%d")
 	local initial_data_json = "null"
-	if first_date then
-		local initial_data = fetch_range_cached(first_date, today_str, all_apps_list)
-		initial_data_json = encode_delivery(generation, webview, "manifest", initial_data)
-		if not initial_data_json then return false end
+	if session and first_date then
+		initial_data_json = session.range(first_date, today, all_apps_list)
 	end
 
+	return {
+		generated_at = generated_at,
+		payload = string.format('{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+			manifest_json, PacedJson.encode(app_icons, pacer), initial_data_json,
+			PacedJson.encode(kc_layout, pacer)),
+	}
+end
+
+--- Computes the manifest alone after an ingest; the frontend then replays its
+--- active range request.
+--- @param pacer table Pacer from `infra.paced_job`.
+--- @return string payload Publication object text.
+local function compute_live(pacer)
+	local sqlite_path = readable_sqlite_path()
+	if not sqlite_path then return '{"manifest":{}}' end
+	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+		os.date("%Y-%m-%d"), pacer)
+	local _, manifest_json = session.manifest()
+	return '{"manifest":' .. manifest_json .. "}"
+end
+
+--- Computes one range request's { historical, today } payload.
+--- @param query table Decoded frontend request.
+--- @param pacer table Pacer from `infra.paced_job`.
+--- @return string payload Encoded range data.
+local function compute_range(query, pacer)
+	local sqlite_path = readable_sqlite_path()
+	if not sqlite_path then return '{"historical":[],"today":[]}' end
+	local apps = type(query.apps) == "table" and query.apps or nil
+	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+		os.date("%Y-%m-%d"), pacer)
+	return session.range(query.start_date, query.end_date, apps)
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 3/ Page publication =======
+-- ===================================
+-- ===================================
+
+--- Probes a frontend capability until it exists, then runs `on_ready`.
+--- @param generation integer Dashboard generation.
+--- @param webview table Exact webview owner.
+--- @param site string Diagnostic site.
+--- @param capability string Global function name the page must define.
+--- @param on_ready function Continuation once the capability exists.
+--- @param on_abandon function Called when delivery is given up.
+--- @return boolean admitted
+local function when_ready(generation, webview, site, capability, on_ready, on_abandon)
+	local retry_delay = site == "cache" and 0.10 or 0.15
+	local retry_count = site == "cache" and 50 or 60
+	local function attempt(remaining)
+		local admitted = submit_javascript(generation, webview, site .. " readiness", "typeof window." .. capability, function(kind)
+			if kind == "function" then
+				on_ready()
+			elseif remaining > 0 then
+				if not schedule_continuation(retry_delay, generation, webview,
+					function() attempt(remaining - 1) end, "Typing metrics publication readiness")
+				then on_abandon() end
+			else
+				on_abandon()
+				delivery_failure(generation, webview, site, "publication capability unavailable")
+			end
+		end, on_abandon)
+		if not admitted then on_abandon() end
+		return admitted
+	end
+	return attempt(retry_count)
+end
+
+--- Encodes the freshness banner state for the page.
+--- @param state string "stale", "loading", "fresh" or "failed".
+--- @param generated_at number|nil Epoch seconds of the data shown.
+--- @return string json
+local function freshness_json(state, generated_at)
+	if generated_at then
+		return string.format('{"state":"%s","generated_at":%d}', state, math.floor(generated_at * 1000))
+	end
+	return string.format('{"state":"%s"}', state)
+end
+
+local function publish_data(generation, webview, site, payload, revision, with_assets, freshness)
+	local metadata = string.format('{"manifest_revision":%d%s%s}', revision,
+		with_assets and string.format(',"assets_revision":%d', revision) or "",
+		freshness and (',"freshness":' .. freshness) or "")
+	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
+	local publication = { code = code, generation = generation, revision = revision }
+	if site == "live manifest" then
+		if _pending_live_publication and _pending_live_publication.generation == generation then
+			if revision > _pending_live_publication.revision then
+				_pending_live_publication.code = code
+				_pending_live_publication.revision = revision
+			end
+			return true
+		end
+		_pending_live_publication = publication
+	end
+	local function release_pending()
+		if _pending_live_publication == publication then _pending_live_publication = nil end
+	end
+	return when_ready(generation, webview, site, "publishTypingMetricsData", function()
+		release_pending()
+		submit_javascript(generation, webview, site, publication.code, function(applied)
+			if applied == true then
+				if site == "live manifest" then
+					Logger.debug(LOG, "Typing metrics live publication applied.")
+				else
+					Logger.success(LOG, "Typing metrics publication applied (%s).", site)
+				end
+			elseif applied == false then
+				Logger.debug(LOG, "Typing metrics stale publication discarded (%s).", site)
+			else
+				delivery_failure(generation, webview, site, "invalid publication acknowledgement")
+			end
+		end)
+	end, release_pending)
+end
+
+--- Shows a freshness state that carries no data (loading, failed refresh).
+--- @param generation integer Dashboard generation.
+--- @param webview table Exact webview owner.
+--- @param freshness string Encoded freshness state.
+--- @param revision integer Ordering against data publications.
+--- @return boolean admitted
+local function publish_freshness(generation, webview, freshness, revision)
+	local code = string.format("window.setTypingMetricsFreshness(%s,%d);", freshness, revision)
+	return when_ready(generation, webview, "freshness", "setTypingMetricsFreshness", function()
+		submit_javascript(generation, webview, "freshness", code)
+	end, function() end)
+end
+
+--- Paints the persisted snapshot, or the loading state when there is none.
+--- Reads one file and hands its payload to the page verbatim.
+local function prefill_from_disk_cache(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
+	local snapshot = Snapshot.load()
+	if not snapshot then
+		publish_freshness(generation, webview, freshness_json("loading"), 0)
+		return false
+	end
+	_painted_snapshot_at = snapshot.generated_at
+	return publish_data(generation, webview, "cache", snapshot.payload, 0, true,
+		freshness_json("stale", snapshot.generated_at))
+end
 
-	local manifest_json = encode_delivery(generation, webview, "manifest", manifest)
-	if not manifest_json then return false end
-	local app_icons_json = encode_delivery(generation, webview, "manifest", app_icons)
-	if not app_icons_json then return false end
-	local kc_layout_json = encode_delivery(generation, webview, "manifest", kc_layout)
-	if not kc_layout_json then return false end
+--- Publishes one completed job's result.
+local function deliver_work(generation, webview, work, ok, result)
+	if not delivery_is_current(generation, webview) then return end
+	if work.kind == "full" then
+		_publication_revision = _publication_revision + 1
+		if not ok then
+			publish_freshness(generation, webview, freshness_json("failed", _painted_snapshot_at),
+				_publication_revision)
+			return
+		end
+		Snapshot.save(result.payload, result.generated_at)
+		publish_data(generation, webview, "manifest", result.payload, _publication_revision, true,
+			freshness_json("fresh"))
+	elseif work.kind == "live" then
+		if not ok then return end
+		_publication_revision = _publication_revision + 1
+		publish_data(generation, webview, "live manifest", result, _publication_revision, false)
+	else
+		local request_id = work.request_id
+		local encoded = ok and result or "null"
+		local js_cmd
+		if request_id then
+			js_cmd = string.format("window.receive_range_data(%s,%d)", encoded, request_id)
+		else
+			-- Backward compatibility for a cached dashboard loaded before the
+			-- request-id protocol was introduced
+			js_cmd = string.format("window.receive_range_data(%s)", encoded)
+		end
+		submit_javascript(generation, webview, "range", js_cmd)
+	end
+end
 
-	save_disk_cache({
-		manifest     = manifest_json,
-		app_icons    = app_icons_json,
-		initial_data = initial_data_json,
-		kc_layout    = kc_layout_json,
+--- Starts the next queued job when none is running.
+--- @param generation integer Dashboard generation.
+--- @param webview table Exact webview owner.
+--- @return boolean accepted
+local function run_next_work(generation, webview)
+	if not delivery_is_current(generation, webview) then return false end
+	if M._job then return true end
+	local work
+	if _pending_work.full then
+		_pending_work.full = false
+		-- A full refresh publishes the manifest too, so it absorbs a live one
+		_pending_work.live = false
+		work = { kind = "full" }
+	elseif _pending_work.live then
+		_pending_work.live = false
+		work = { kind = "live" }
+	elseif _pending_work.range then
+		work = _pending_work.range
+		_pending_work.range = nil
+	else
+		return true
+	end
+	local job
+	job = PacedJob.start({
+		label = "Typing metrics " .. work.kind .. " projection",
+		body = function(pacer)
+			if work.kind == "full" then return compute_full(pacer) end
+			if work.kind == "live" then return compute_live(pacer) end
+			return compute_range(work.query, pacer)
+		end,
+		on_done = function(ok, result)
+			if M._job ~= job then return end
+			M._job = nil
+			deliver_work(generation, webview, work, ok, result)
+			run_next_work(generation, webview)
+		end,
 	})
+	if not job then
+		deliver_work(generation, webview, work, false, "projection job refused")
+		return false
+	end
+	M._job = job
+	return true
+end
 
-	return publish_data(generation, webview, "manifest", string.format(
-		'{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
-		manifest_json, app_icons_json, initial_data_json, kc_layout_json), revision, true)
+--- Queues projection work for the current window.
+--- @param generation integer Dashboard generation.
+--- @param webview table Exact webview owner.
+--- @param kind string "full", "live" or "range".
+--- @param work table|nil Range work { kind, query, request_id }.
+--- @return boolean accepted
+request_work = function(generation, webview, kind, work)
+	if not delivery_is_current(generation, webview) then return false end
+	if kind == "full" then
+		_pending_work.full = true
+	elseif kind == "live" then
+		_pending_work.live = true
+	else
+		-- The frontend supersedes older requests itself; only the latest is served
+		_pending_work.range = work
+	end
+	return run_next_work(generation, webview)
 end
 
 --- Refresh just the manifest-backed UI state after an ingest. `process_manifest`
---- preserves the current filters and requests their n-gram range again, avoiding
---- load_and_inject()'s expensive all-app prefetch on every live update.
+--- preserves the current filters and requests their n-gram range again, so the
+--- all-app prefetch is not recomputed on every live update.
 local function refresh_live_manifest(generation, webview)
-	if generation ~= _generation or M._wv ~= webview then return false end
-	_publication_revision = _publication_revision + 1
-	local revision = _publication_revision
-	local manifest = read_manifest_cached()
-	if generation ~= _generation or M._wv ~= webview then return false end
-	local manifest_json = encode_delivery(generation, webview, "live manifest", manifest)
-	if not manifest_json then return false end
-	return publish_data(generation, webview, "live manifest",
-		'{"manifest":' .. manifest_json .. '}', revision, false)
-end
-
-local function prefill_from_disk_cache(generation, webview)
-	if generation ~= _generation or M._wv ~= webview then return false end
-	local cached = load_disk_cache()
-	if not cached or type(cached.manifest) ~= "string" then return false end
-	return publish_data(generation, webview, "cache", string.format(
-		'{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
-		cached.manifest, cached.app_icons or "{}", cached.initial_data or "null", cached.kc_layout or "{}"), 0, true)
+	return request_work(generation, webview, "live")
 end
 
 
@@ -777,9 +838,11 @@ function M.show()
 			if _closing_webview == webview then return end
 			_generation = _generation + 1
 			M._wv = nil
+			_painted_snapshot_at = nil
+			local job_stopped = cancel_job()
 			local poller_stopped = cancel_poller()
 			local continuations_stopped = cancel_continuations()
-			if not poller_stopped or not continuations_stopped then
+			if not job_stopped or not poller_stopped or not continuations_stopped then
 				Logger.error(LOG, "Typing metrics close retained timer cleanup debt.")
 			end
 			Logger.info(LOG, "Typing metrics dashboard closed.")
@@ -791,13 +854,11 @@ function M.show()
 		return false
 	end
 
+	-- The snapshot paint reads one file; the aggregation is a paced job whose
+	-- first slice runs on a later timer turn, never on this open path.
 	local bootstrap_committed = schedule_continuation(0.05, generation, webview, function()
-		local had_cache     = prefill_from_disk_cache(generation, webview)
-		local refresh_delay = had_cache and 0.40 or 0.05
-		if not schedule_continuation(refresh_delay, generation, webview,
-			function() load_and_inject(generation, webview) end,
-			"Dashboard fresh-data load")
-		then
+		prefill_from_disk_cache(generation, webview)
+		if not request_work(generation, webview, "full") then
 			Logger.error(LOG, "Dashboard fresh-data load could not be scheduled.")
 		end
 	end, "Dashboard bootstrap")
@@ -831,21 +892,12 @@ function M.show()
 							if query.action == "clear_cache" then
 								clear_cache(generation, webview, query.reset_id)
 							else
-								M._last_query = query
-								local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
-								local encoded = encode_delivery(generation, webview, "range", raw_data)
-								if not encoded then return end
 								local request_id = tonumber(query.request_id)
-								local js_cmd
-								if request_id and request_id > 0 and request_id % 1 == 0 then
-									js_cmd = string.format(
-										"window.receive_range_data(%s,%d)", encoded, request_id)
-								else
-									-- Backward compatibility for a cached dashboard loaded before the
-									-- request-id protocol was introduced
-									js_cmd = string.format("window.receive_range_data(%s)", encoded)
+								if not (request_id and request_id > 0 and request_id % 1 == 0) then
+									request_id = nil
 								end
-								submit_javascript(generation, webview, "range", js_cmd)
+								request_work(generation, webview, "range",
+									{ kind = "range", query = query, request_id = request_id })
 							end
 						end
 					end)

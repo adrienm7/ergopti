@@ -330,6 +330,7 @@
 		"test:driver-config-surface-is-declared": "node ./tools/test/test-driver-config-surface-is-declared.cjs",
 		"test:metrics-heatmap-translation": "node ./tools/test/test-metrics-heatmap-translation.cjs",
 		"test:metrics-rebuild-banner": "node ./tools/test/test-metrics-rebuild-banner.cjs",
+		"test:metrics-freshness-banner": "node ./tools/test/test-metrics-freshness-banner.cjs",
 		"test:mutation-targets": "node ./tools/test/test-mutation-targets.cjs",
 		"test:gate-scripts-are-wired": "node ./tools/test/test-gate-scripts-are-wired.cjs",
 		"test:updater-constants-single-source": "node ./tools/test/test-updater-constants-single-source.cjs",

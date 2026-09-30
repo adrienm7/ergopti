@@ -4,7 +4,11 @@
 --- MODULE: Typing Reset Completion Tests
 --- DESCRIPTION:
 --- Acknowledges exact reset ownership only after the disk transaction settles.
+--- A reset deletes the snapshot and any interrupted partial save: two unlinks.
 --- ==============================================================================
+
+--- Unlinks one committed reset performs (snapshot + partial save).
+local UNLINKS_PER_RESET = 2
 
 local helpers = require("tests.helpers")
 local with_delivery = require("tests.support.typing_delivery_fixture")
@@ -25,7 +29,7 @@ helpers.describe("typing reset completion", function()
 					context.poll(); evaluations[1].done("request", nil); evaluations[2].done(true, nil)
 					if mode == "retired" then context.on_close() end
 					if mode ~= "refused" then evaluations[3].done(nil, {}) end
-					helpers.assert_eq(removals, 1)
+					helpers.assert_eq(removals, UNLINKS_PER_RESET)
 					helpers.assert_eq(#errors, mode == "retired" and 0 or 1)
 				end, debug.traceback)
 				os.remove = original
@@ -48,7 +52,7 @@ helpers.describe("typing reset completion", function()
 			os.remove = function() removals = removals + 1; return true end
 			local ok, err = xpcall(function()
 				dispatch()
-				helpers.assert_eq(removals, 2)
+				helpers.assert_eq(removals, 2 * UNLINKS_PER_RESET)
 				helpers.assert_eq(#evaluations, 5)
 				helpers.assert_eq(evaluations[5].code, "window.complete_cache_reset(2,true);")
 			end, debug.traceback)
@@ -68,12 +72,12 @@ helpers.describe("typing reset completion", function()
 					evaluations[#evaluations].done(true, nil)
 				end
 				dispatch(); dispatch()
-				helpers.assert_eq(removals, 1)
+				helpers.assert_eq(removals, UNLINKS_PER_RESET)
 				helpers.assert_eq(evaluations[#evaluations].code, "window.complete_cache_reset(1,true);")
 				id = 2; dispatch()
-				helpers.assert_eq(removals, 2)
+				helpers.assert_eq(removals, 2 * UNLINKS_PER_RESET)
 				id = 1; dispatch()
-				helpers.assert_eq(removals, 2)
+				helpers.assert_eq(removals, 2 * UNLINKS_PER_RESET)
 				helpers.assert_eq(#evaluations, 11)
 			end, debug.traceback)
 			os.remove = original
@@ -116,7 +120,7 @@ helpers.describe("typing reset completion", function()
 					context.poll(); evaluations[1].done("request", nil)
 					helpers.assert_eq(removals, 0)
 					evaluations[2].done(true, nil)
-					helpers.assert_eq(removals, 1)
+					helpers.assert_eq(removals, UNLINKS_PER_RESET)
 					helpers.assert_eq(#evaluations, 3)
 					helpers.assert_eq(evaluations[3].code, "window.complete_cache_reset(1," .. tostring(success) .. ");")
 				end, debug.traceback)

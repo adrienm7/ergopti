@@ -184,6 +184,10 @@ window.publishTypingMetricsData = function (payload, metadata) {
 	) {
 		throw new TypeError('Typing metrics publication requires manifest and selected asset maps');
 	}
+	// The banner states how current the data is; ordered by the same revision
+	if (metadata.freshness !== undefined && window.metrics_freshness) {
+		window.metrics_freshness.show(metadata.freshness, metadata.manifest_revision);
+	}
 	let manifestChanged = false;
 	let assetsChanged = false;
 	if (metadata.manifest_revision > appliedTypingManifestRevision) {
@@ -205,6 +209,17 @@ window.publishTypingMetricsData = function (payload, metadata) {
 	if (manifestChanged) process_manifest();
 	else if (assetsChanged) render_current_tab();
 	return manifestChanged || assetsChanged;
+};
+
+/**
+ * Shows a host freshness state that carries no data: loading before the first
+ * snapshot exists, or a failed update.
+ * @param {Object} freshness - {state, generated_at} from the host.
+ * @param {number} revision - Host publication revision ordering the state.
+ * @returns {boolean} Whether the state was applied.
+ */
+window.setTypingMetricsFreshness = function (freshness, revision) {
+	return !!(window.metrics_freshness && window.metrics_freshness.show(freshness, revision));
 };
 
 /**

@@ -1458,6 +1458,12 @@ const CHECKS = [
 		args: ['tools/test/test-metrics-rebuild-banner.cjs'],
 		repro: 'npm run test:metrics-rebuild-banner'
 	},
+	{
+		name: 'metrics freshness banner (cached snapshots carry their date)',
+		cmd: 'node',
+		args: ['tools/test/test-metrics-freshness-banner.cjs'],
+		repro: 'npm run test:metrics-freshness-banner'
+	},
 	// CI verifies AHK encoding with an inline PowerShell step rather than this
 	// script, so the script itself never ran anywhere: a divergence between the
 	// two implementations was invisible. Run the real one here too.

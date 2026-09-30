@@ -108,7 +108,8 @@ require('tests.support.typing_delivery_fixture')(function(dashboard,context,_,er
  evaluations[1].done(${JSON.stringify(request)},nil)
  assert(removes==0 and #evaluations==2)
  evaluations[2].done(true,nil)
- assert(removes==1 and #evaluations==3)
+ -- One reset unlinks the snapshot and any partial save
+assert(removes==2 and #evaluations==3)
  print('PURGE='..json.encode({ack=evaluations[2].code,terminal=evaluations[3].code,removes=removes,errors=#errors}))
 end)
 `

@@ -74,8 +74,13 @@ function controller(request, outcomes = [], admission = 'accepted') {
 package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
 local json=require('json')
 local poll
+-- Paced projection slices are queued on 10 ms timers and run after the callbacks
+local slices={}
 local dashboard,context=require('tests.support.metrics_typing_fixture')({
- after=function() return {timer={}},true end,
+ after=function(delay,fn)
+  if delay==require('infra.paced_job').DEFAULT_GAP_SEC then slices[#slices+1]=fn end
+  return {timer={}},true
+ end,
  every=function(_,fn) poll=fn;return {timer={}},true end,
  cancel=function(handle) handle.timer=nil;return true end})
 package.loaded['hs.json'].decode=json.decode
@@ -85,6 +90,13 @@ local reads,errors,removes=0,0,0
 package.loaded['modules.keylogger.log_manager'].get_sqlite_path=function() reads=reads+1;return nil end
 package.loaded['infra.logger'].error=function() errors=errors+1 end
 os.remove=function() removes=removes+1;return true end
+-- A completed projection saves its snapshot; keep that write off the real disk
+local real_open=io.open
+io.open=function(file,mode)
+ if mode=='w' then local handle={};handle.write=function() return handle end;handle.close=function() return true end;return handle end
+ return real_open(file,mode)
+end
+os.rename=function() return true end
 local polls,resets,codes,completions={},{},{},{}
 local admission=${JSON.stringify(admission)}
 context.webview.evaluateJavaScript=function(self,code,callback)
@@ -113,6 +125,7 @@ for index,outcome in ipairs(outcomes) do
   resets[index](true)
  end
 end
+while #slices>0 do table.remove(slices,1)() end
 print('RESULT='..json.encode({codes=codes,completions=completions,before=before,reads=reads,errors=errors,removes=removes}))
 `
 	});
@@ -166,8 +179,9 @@ test('a retained Reset executes once after its own successful acknowledgement', 
 	const outcomes = result.codes.map((code) => vm.runInContext(code, context));
 	assert.deepEqual(outcomes, [true, false]);
 	const completed = controller(request, outcomes);
-	assert.equal(completed.removes, 1);
-	assert.equal(completed.reads, 0);
+	// The snapshot and any partial save are both unlinked by one reset
+	assert.equal(completed.removes, 2);
+	assert.equal(completed.reads, 1, 'a committed reset projects fresh data once');
 	assert.equal(completed.errors, 0);
 	assert.equal(
 		context.app_state.active_cache_reset_id,

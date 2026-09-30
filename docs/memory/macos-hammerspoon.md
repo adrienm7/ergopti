@@ -801,6 +801,19 @@ fallback. Gate any new physical writer on it, and keep
 they pin the legacy double count and fail for either the `and nil or` idiom or
 global suppression.
 
+### project-hs-metrics-paced-projection
+
+The typing dashboard never reads `db.sqlite` from a WebView or poller
+callback. Its projections run as `infra.paced_job` coroutines through the
+optional pacer of `sqlite_reader`, which drains each statement before handing
+out rows: the cache uses `journal_mode = DELETE`, so a reader statement held
+across a pause would make the ingest COMMIT fail with `SQLITE_BUSY`. An
+all-time `GROUP BY` sorts every row in its first step, so paced n-gram reads go
+one day per statement. Past days are reused only while
+`sqlite_reader.fingerprint` of their watermark is unchanged; `ngram_chars`
+witnesses the bigram to heptagram tables, so any new writer of those tables
+must also credit `ngram_chars` on the same day or join the fingerprint.
+
 ### project-hs-webview-nil-error-sentinel
 
 Hammerspoon 1.1.1 calls `NSError_toLua` unconditionally after JavaScript
