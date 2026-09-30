@@ -1968,6 +1968,12 @@ const CHECKS = [
 		repro: 'npm run test:layer-editor-page'
 	},
 	{
+		name: 'layer editor legends: the hosts send the current layout and the layer key by one contract',
+		cmd: 'node',
+		args: ['tools/test/test-layer-editor-legends.cjs'],
+		repro: 'npm run test:layer-editor-legends'
+	},
+	{
 		name: 'recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS',
 		cmd: 'node',
 		args: ['tools/test/test-nav-layer-recommended-golden.cjs'],

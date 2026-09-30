@@ -5,11 +5,12 @@
 ; DESCRIPTION:
 ; Shows the shared navigation layer editor (_shared/ui/layer_editor) in a
 ; WebView2 window through the manifest-driven WebViewHost factory, answers its
-; "ready" with the user's layers.toml, and saves what it sends: the text must
-; load without an error on every OS (platform/remap/layers_loader.ahk), is
-; published atomically, and the driver reloads so NavLayer_Init registers the
-; edited layer. The macOS and Linux hosts implement the same contract through
-; _shared/lua/keymap/layer_editor.lua.
+; "ready" with the user's layers.toml, the legends of the layout the user types
+; with and the key whose hold enters the layer, and saves what it sends: the
+; text must load without an error on every OS
+; (platform/remap/layers_loader.ahk), is published atomically, and the driver
+; reloads so NavLayer_Init registers the edited layer. The macOS and Linux
+; hosts implement the same contract through _shared/lua/keymap/layer_editor.lua.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The page offers only what exists on Windows; the host still refuses any
@@ -19,6 +20,17 @@
 ;    over it in one write-through rename; a refused save leaves it untouched.
 ; 3. The layer is registered once per process (nav_layer_table.ahk), so a saved
 ;    layer applies through the pause-preserving reload every setting uses.
+; 4. Legends: a key that types a character (the registry sends it by scan
+;    code, ahk_send null) shows what the layout emulation types there
+;    unshifted (a registry layout, the digit row, the Ergopti base layer read
+;    from its .keylayout), else what the layout the user types with (the
+;    driver's one resolver, KS_ResolveKeyboardLayout) types on its scan code,
+;    read through ToUnicodeEx without touching the dead-key state. A key left
+;    without a printable character shows its registry code on the page, and
+;    the reason is logged once (_shared/tests/corpus/layer_editor/legends.json).
+;    The page asks again when its window comes back to the front.
+; 5. The layer key is the tap-hold key whose hold enters NAV_LAYER_ID in the
+;    retained tap-hold configuration (MasterGateDesiredTapHold).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -33,6 +45,34 @@ global LAYER_EDITOR_MAX_TEXT_BYTES := 65536
 global LAYER_EDITOR_INVALID_PAYLOAD := "invalid_payload"
 global LAYER_EDITOR_WRITE_FAILED := "write_failed"
 global LAYER_EDITOR_FILE_UNREADABLE := "file_unreadable"
+; Where the legends were read, the Lua hosts' LEGEND_SOURCE_* (pinned by the suite).
+global LAYER_EDITOR_LEGEND_SOURCE_EMULATION := "emulation"
+global LAYER_EDITOR_LEGEND_SOURCE_OS := "os"
+
+; Tap-hold key id (the ahk column of [tap_hold.catalog]) -> the registry code of
+; that physical key. The Windows remap files name their keys by literal scan
+; codes, so this is the one table that ties the two vocabularies;
+; tools/test/test-layer-editor-legends.cjs holds it to the catalogue and, through
+; the Linux engine's evdev codes, to the registry.
+global LAYER_EDITOR_TAP_HOLD_KEY_CODES := Map(
+	"escape", "Escape", "tab", "Tab", "caps_lock", "CapsLock", "left_shift", "ShiftLeft",
+	"left_ctrl", "ControlLeft", "win", "MetaLeft", "left_alt", "AltLeft", "space", "Space",
+	"alt_gr", "AltRight", "right_ctrl", "ControlRight", "right_shift", "ShiftRight",
+	"enter", "Enter", "backspace", "Backspace", "delete", "Delete"
+)
+
+; The OS calls a legend needs, all in adapters/key_state.ahk: the layout the
+; user types with now, a scan code's virtual key on it, and what that key types
+; unshifted there, read without arming a dead key. The unit suite passes a fake.
+global _LayerEditorOsProbe := {
+	Hkl: KS_ResolveKeyboardLayout,
+	ScToVk: KS_ScancodeToVk,
+	ToUnicode: KS_KeyTextNoStateChange,
+}
+
+; The unresolved-legend reports already logged, by signature: the reason is said
+; once, not at every window.
+global _LayerEditorReported := Map()
 
 
 
@@ -112,9 +152,175 @@ LayerEditor_Save(Text, Ctx, ConfigDir) {
 
 
 
+; ==========================
+; ==========================
+; ======= 2/ Legends =======
+; ==========================
+; ==========================
+
+/**
+ * A layout's character as a key legend.
+ * @param {Any} Text - What the layout types on a key.
+ * @returns {string} Text itself; "" when it is not a string, is empty or blank,
+ *   or holds a control character (C0, DEL or C1).
+ */
+LayerEditor_LegendText(Text) {
+	if !(Text is String) || (Text == "")
+		return ""
+	if RegExMatch(Text, "[\x{00}-\x{1F}\x{7F}-\x{9F}]")
+		return ""
+	if (RegExReplace(Text, "[\s\x{A0}\x{202F}]") == "")
+		return ""
+	return Text
+}
+
+/**
+ * The layout emulation in force now, as the legends read it.
+ * @returns {Map} "active" (a base layer is emulated) and "character", a Func
+ *   taking a scan code name ("SC010") and giving what the emulation types
+ *   there unshifted, "" for a key it leaves to the OS layout.
+ */
+LayerEditor_CurrentEmulation() {
+	global Features
+	Layout := (IsSet(Features) && Features is Map && Features.Has("layout")) ? Features["layout"] : Map()
+	Registry := KeylayoutEmulation_LayerIsActive("ergopti_base")
+	Ergopti := !Registry && Layout.Get("ergopti_base", false) == true
+	Digits := Layout.Get("direct_access_digits", false) == true
+	return Map("active", Registry || Ergopti,
+		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Digits))
+}
+
+; What the emulation types unshifted on scan code Sc, in the order its hotkeys
+; win: the digit row (direct_access_digits, over any layout), a registry layout
+; (keylayout_emulation.ahk), then the Ergopti base layer, whose characters and
+; dead keys come from its .keylayout (layout_ergopti.ahk).
+_LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
+	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS
+	Code := Integer("0x" . SubStr(Sc, 3))
+	if Digits {
+		for _, Key in KS_DIGIT_ROW_KEYS {
+			if (Key[2] == Code)
+				return Chr(Key[1])
+		}
+		Edges := ErgoptiNumberRowEdgeMapping()
+		if Edges.Has(Code)
+			return Edges[Code]
+	}
+	if Registry
+		return KLE_KeyCodes.Has(Sc) ? Keylayout_Resolve(KLE_Model, KLE_LevelIndex[""], KLE_KeyCodes[Sc])["Text"] : ""
+	if !Ergopti
+		return ""
+	Spec := ErgoptiLayout_Spec()
+	Base := Spec["levels"]["base"]
+	if !Base.Has(Sc)
+		return ""
+	Descriptor := Base[Sc]
+	if Descriptor.Has("text")
+		return Descriptor["text"]
+	return Descriptor.Has("dead") ? Spec["terminators"][Descriptor["dead"]] : ""
+}
+
+/**
+ * The legends of every key that types a character.
+ * @param {Map} Ctx - The loader context.
+ * @param {Map} Emulation - From LayerEditor_CurrentEmulation.
+ * @param {Object} Probe - The OS calls; _LayerEditorOsProbe by default.
+ * @returns {Map} "source", "keys" (registry code -> legend), "unresolved"
+ *   (the codes left without one, in registry-code order) and "reason".
+ */
+LayerEditor_Legends(Ctx, Emulation, Probe := "") {
+	global _LayerEditorOsProbe, LAYER_EDITOR_LEGEND_SOURCE_EMULATION, LAYER_EDITOR_LEGEND_SOURCE_OS
+	if !IsObject(Probe)
+		Probe := _LayerEditorOsProbe
+	Hkl := Probe.Hkl.Call()
+	Keys := Map()
+	Unresolved := []
+	for Code, Entry in Ctx["keys"] {
+		; A named key's ahk_send is its Send name; a character key's is null.
+		if (Entry["kind"] != "key") || (Entry["ahk_send"] is String)
+			continue
+		Sc := Entry["ahk"]
+		Text := Emulation["character"].Call(Sc)
+		if (Text == "") && (Hkl != 0) {
+			ScCode := Integer("0x" . SubStr(Sc, 3))
+			Vk := Probe.ScToVk.Call(ScCode, Hkl)
+			if Vk
+				Text := Probe.ToUnicode.Call(Vk, ScCode, Hkl).Text
+		}
+		Text := LayerEditor_LegendText(Text)
+		if (Text == "")
+			Unresolved.Push(Code)
+		else
+			Keys[Code] := Text
+	}
+	return Map(
+		"source", Emulation["active"] ? LAYER_EDITOR_LEGEND_SOURCE_EMULATION : LAYER_EDITOR_LEGEND_SOURCE_OS,
+		"keys", Keys,
+		"unresolved", Unresolved,
+		"reason", (Hkl == 0) ? "no keyboard layout could be read"
+			: Format("the keyboard layout 0x{:08X} types nothing printable there", Hkl & 0xFFFFFFFF))
+}
+
+/**
+ * Says once why keys show their registry code instead of a legend.
+ * @param {Map} Legends - From LayerEditor_Legends.
+ * @returns {Boolean} True when this call logged.
+ */
+LayerEditor_ReportUnresolved(Legends) {
+	global _LayerEditorReported
+	if (Legends["unresolved"].Length == 0)
+		return false
+	Codes := ""
+	for Index, Code in Legends["unresolved"]
+		Codes .= (Index == 1 ? "" : ", ") . Code
+	Signature := Codes . "|" . Legends["reason"]
+	if _LayerEditorReported.Has(Signature)
+		return false
+	_LayerEditorReported[Signature] := true
+	LoggerWarn("LayerEditor", "{1} key(s) show their registry code, not a legend ({2}): {3}.",
+		Legends["unresolved"].Length, Codes, Legends["reason"])
+	return true
+}
+
+/**
+ * The legends of the layout in force now, reported when some are missing.
+ * @param {Map} Ctx - The loader context.
+ * @returns {Map} From LayerEditor_Legends.
+ */
+LayerEditor_CurrentLegends(Ctx) {
+	Legends := LayerEditor_Legends(Ctx, LayerEditor_CurrentEmulation())
+	LayerEditor_ReportUnresolved(Legends)
+	return Legends
+}
+
+/**
+ * The registry codes of the keys whose hold enters the navigation layer.
+ * @param {Map} TapHoldSource - A tap-hold configuration (LoadTapHoldToml's shape).
+ * @returns {Array} Codes in tap-hold id order.
+ */
+LayerEditor_LayerKeys(TapHoldSource) {
+	global LAYER_EDITOR_TAP_HOLD_KEY_CODES, NAV_LAYER_ID
+	Codes := []
+	for Id, Code in LAYER_EDITOR_TAP_HOLD_KEY_CODES {
+		if (TapHoldHoldLayer(TapHoldSource, Id) == NAV_LAYER_ID)
+			Codes.Push(Code)
+	}
+	return Codes
+}
+
+; The layer keys of the retained tap-hold configuration.
+_LayerEditor_CurrentLayerKeys() {
+	global TapHold
+	return LayerEditor_LayerKeys(MasterGateDesiredTapHold(IsSet(TapHold) ? TapHold : Map("keys", Map())))
+}
+
+
+
+
+
 ; =======================================
 ; =======================================
-; ======= 2/ Messages to the page =======
+; ======= 3/ Messages to the page =======
 ; =======================================
 ; =======================================
 
@@ -138,15 +344,40 @@ _LayerEditor_ErrorsJson(Errors) {
 	return Out . "]"
 }
 
+; Legends as the page's `legends` object: {source, keys: {code: legend}}.
+_LayerEditor_LegendsJson(Legends) {
+	Out := '{"source":' . JsonStringLiteral(Legends["source"]) . ',"keys":{'
+	First := true
+	for Code, Text in Legends["keys"] {
+		Out .= (First ? "" : ",") . JsonStringLiteral(Code) . ":" . JsonStringLiteral(Text)
+		First := false
+	}
+	return Out . "}}"
+}
+
+; A list of strings as a JSON array.
+_LayerEditor_StringsJson(Values) {
+	Out := "["
+	for Index, Value in Values
+		Out .= (Index == 1 ? "" : ",") . JsonStringLiteral(Value)
+	return Out . "]"
+}
+
 /**
- * The page's init() call: the OS, the file's path and text, and every problem
- * any OS's loader finds in it.
+ * The page's init() call: the OS, the file's path and text, every problem any
+ * OS's loader finds in it, the legends and the layer keys.
  * @param {Map} Ctx - The loader context.
  * @param {string} ConfigDir - The configuration folder.
+ * @param {Map} Legends - From LayerEditor_Legends; the layout in force by default.
+ * @param {Array} LayerKeys - From LayerEditor_LayerKeys; the retained tap-holds' by default.
  * @returns {string} JavaScript to evaluate in the page.
  */
-LayerEditor_InitJs(Ctx, ConfigDir) {
+LayerEditor_InitJs(Ctx, ConfigDir, Legends := "", LayerKeys := "") {
 	global LAYER_EDITOR_OS, LAYER_EDITOR_FILE_UNREADABLE
+	if !IsObject(Legends)
+		Legends := LayerEditor_CurrentLegends(Ctx)
+	if !IsObject(LayerKeys)
+		LayerKeys := _LayerEditor_CurrentLayerKeys()
 	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
 	TextJson := "null"
 	Errors := []
@@ -163,7 +394,18 @@ LayerEditor_InitJs(Ctx, ConfigDir) {
 		. '"os":' . JsonStringLiteral(LAYER_EDITOR_OS)
 		. ',"path":' . JsonStringLiteral(Path)
 		. ',"text":' . TextJson
-		. ',"errors":' . _LayerEditor_ErrorsJson(Errors) . "})"
+		. ',"errors":' . _LayerEditor_ErrorsJson(Errors)
+		. ',"legends":' . _LayerEditor_LegendsJson(Legends)
+		. ',"layer_keys":' . _LayerEditor_StringsJson(LayerKeys) . "})"
+}
+
+/**
+ * The page's setLegends() call, the answer to its "legends" message.
+ * @param {Map} Legends - From LayerEditor_Legends.
+ * @returns {string} JavaScript to evaluate in the page.
+ */
+LayerEditor_SetLegendsJs(Legends) {
+	return "if(window.setLegends)window.setLegends(" . _LayerEditor_LegendsJson(Legends) . ")"
 }
 
 /**
@@ -185,7 +427,7 @@ LayerEditor_SaveResultJs(Result) {
 
 ; =============================
 ; =============================
-; ======= 3/ The window =======
+; ======= 4/ The window =======
 ; =============================
 ; =============================
 
@@ -207,12 +449,25 @@ LayerEditor_Open(*) {
 }
 
 _LayerEditor_OnReady(Host) {
-	global _SharedDir, _ConfigDir
+	global _ConfigDir
 	try {
-		Host.Eval(LayerEditor_InitJs(KeymapLayers_LoadContext(_SharedDir), _ConfigDir))
+		Host.Eval(LayerEditor_InitJs(_LayerEditor_Context(), _ConfigDir))
 	} catch as Err {
 		LoggerError("LayerEditor", "The layer data could not be read: {1}.", Err.Message)
 	}
+}
+
+; The loader context of the shipped registry and vocabulary, decoded once per
+; _shared folder: the registry alone costs about 160 ms, and the page asks for
+; the legends again each time its window comes back to the front.
+_LayerEditor_Context() {
+	global _SharedDir
+	static Ctx := 0, Dir := ""
+	if !IsObject(Ctx) || (Dir != _SharedDir) {
+		Ctx := KeymapLayers_LoadContext(_SharedDir)
+		Dir := _SharedDir
+	}
+	return Ctx
 }
 
 /**
@@ -226,6 +481,14 @@ _LayerEditor_OnMessage(Host, Payload, ApplyFn := ReloadPreservingSuspend) {
 	Action := Payload.Has("action") ? Payload["action"] : ""
 	if (Action == "cancel") {
 		Host.Close()
+		return
+	}
+	if (Action == "legends") {
+		try {
+			Host.Eval(LayerEditor_SetLegendsJs(LayerEditor_CurrentLegends(_LayerEditor_Context())))
+		} catch as Err {
+			LoggerError("LayerEditor", "The legends could not be read again: {1}.", Err.Message)
+		}
 		return
 	}
 	if (Action != "save") {
