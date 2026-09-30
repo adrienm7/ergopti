@@ -281,6 +281,31 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
 		end)
 
+		helpers.it("unused keys: each entry the cleanup offers is named once after boot (config-outdated-unknown-leaves)", function()
+			-- An unknown leaf or section was dropped at load without a word: only
+			-- the cleanup's list ever showed it, unlike the Windows loader.
+			local source = "[hotstrings]\nstale_toggle = false\n[shortcuts.keys]\nat_hash = true\n[stale.section]\nlabel = \"old\"\n"
+			local saved_logger = package.loaded["logger.shim"]
+			local warnings = {}
+			local recorder = helpers.make_logger_stub()
+			recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			package.loaded["logger.shim"] = recorder
+			require("config_outdated").reset_for_tests()
+			local ok, err = pcall(function()
+				Sandbox.with_config(source, function(path)
+					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2)
+					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2, "the same entries are listed again…")
+				end)
+			end)
+			package.loaded["logger.shim"] = saved_logger
+			if not ok then error(err, 0) end
+			local text = table.concat(warnings, "\n")
+			helpers.assert_eq(#warnings, 3, "…but each is named once, the owner's own report included: " .. text)
+			helpers.assert_true(text:find("'hotstrings.stale_toggle' ignored (no reader of this build uses it)", 1, true) ~= nil, text)
+			helpers.assert_true(text:find("'stale.section.label' ignored (no reader of this build uses it)", 1, true) ~= nil, text)
+			helpers.assert_true(text:find("'shortcuts.keys.at_hash'", 1, true) ~= nil, text)
+		end)
+
 		helpers.it("unused keys: a retired agent mode or icon variant is never loaded and is offered (config-outdated-closed-values)",
 			function()
 				-- The mode reached the boot replay, whose refusal logged an ERROR at
